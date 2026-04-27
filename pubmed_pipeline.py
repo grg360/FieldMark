@@ -197,6 +197,8 @@ def pubmed_esearch(
     tool_name: str,
 ) -> List[str]:
     esearch_url = f"{base_url}/esearch.fcgi"
+    api_key = os.getenv("PUBMED_API_KEY")
+    sleep_seconds = 0.11 if api_key else 0.34
     webenv: Optional[str] = None
     query_key: Optional[str] = None
     ids: List[str] = []
@@ -218,6 +220,8 @@ def pubmed_esearch(
         }
         if email:
             params["email"] = email
+        if api_key:
+            params["api_key"] = api_key
         if webenv and query_key:
             params["WebEnv"] = webenv
             params["query_key"] = query_key
@@ -236,7 +240,7 @@ def pubmed_esearch(
             break
         ids.extend(batch_ids)
         retstart += len(batch_ids)
-        time.sleep(0.34)  # Respect NCBI rate limits (~3 requests/sec without API key).
+        time.sleep(sleep_seconds)
 
     # Preserve order while removing any duplicated PMIDs.
     seen: Set[str] = set()
@@ -261,6 +265,8 @@ def pubmed_efetch(
     tool_name: str,
 ) -> List[ET.Element]:
     efetch_url = f"{base_url}/efetch.fcgi"
+    api_key = os.getenv("PUBMED_API_KEY")
+    sleep_seconds = 0.11 if api_key else 0.34
     all_articles: List[ET.Element] = []
     for batch in chunked(list(pmids), 100):
         params = {
@@ -271,11 +277,13 @@ def pubmed_efetch(
         }
         if email:
             params["email"] = email
+        if api_key:
+            params["api_key"] = api_key
 
         response = safe_get(efetch_url, params=params, session=session)
         root = parse_xml(response.content, "efetch")
         all_articles.extend(root.findall("./PubmedArticle"))
-        time.sleep(0.34)
+        time.sleep(sleep_seconds)
     return all_articles
 
 
@@ -297,6 +305,159 @@ def parse_doi(article: ET.Element) -> Optional[str]:
         if aid.attrib.get("IdType", "").lower() == "doi" and aid.text:
             return aid.text.strip()
     return None
+
+
+def build_author_query(first_name: Optional[str], last_name: Optional[str]) -> Optional[str]:
+    if not last_name:
+        return None
+    normalized_last = normalize_space(last_name)
+    normalized_first = normalize_space(first_name) if first_name else None
+    if not normalized_last:
+        return None
+    if normalized_first:
+        first_initial = normalized_first[0]
+        return f"\"{normalized_last} {first_initial}\"[Author]"
+    return f"\"{normalized_last}\"[Author]"
+
+
+def normalize_space(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    cleaned = re.sub(r"\s+", " ", value).strip()
+    return cleaned or None
+
+
+def pubmed_esearch_all(
+    session: requests.Session,
+    base_url: str,
+    query: str,
+    per_call: int,
+    email: Optional[str],
+    tool_name: str,
+) -> List[str]:
+    """
+    Fetch all PMIDs for a query with pagination.
+    """
+    esearch_url = f"{base_url}/esearch.fcgi"
+    api_key = os.getenv("PUBMED_API_KEY")
+    sleep_seconds = 0.11 if api_key else 0.34
+    max_results = 500
+    ids: List[str] = []
+    retstart = 0
+
+    while len(ids) < max_results:
+        batch_size = min(per_call, max_results - len(ids))
+        params = {
+            "db": "pubmed",
+            "term": query,
+            "retmode": "xml",
+            "retmax": str(batch_size),
+            "retstart": str(retstart),
+            "sort": "pub_date",
+            "tool": tool_name,
+        }
+        if email:
+            params["email"] = email
+        if api_key:
+            params["api_key"] = api_key
+
+        response = safe_get(esearch_url, params=params, session=session)
+        root = parse_xml(response.content, "esearch_all")
+        if root.findtext("ERROR"):
+            raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
+
+        batch_ids = [elem.text for elem in root.findall("./IdList/Id") if elem.text]
+        if not batch_ids:
+            break
+
+        ids.extend(batch_ids)
+        retstart += len(batch_ids)
+        if len(ids) >= max_results:
+            break
+        time.sleep(sleep_seconds)
+
+    seen: Set[str] = set()
+    unique_ids: List[str] = []
+    for pmid in ids:
+        if pmid not in seen:
+            seen.add(pmid)
+            unique_ids.append(pmid)
+    return unique_ids[:max_results]
+
+
+def is_author_match(
+    article_author_first: Optional[str],
+    article_author_last: Optional[str],
+    target_first: Optional[str],
+    target_last: Optional[str],
+) -> bool:
+    if not article_author_last or not target_last:
+        return False
+
+    article_last_norm = normalize_token(article_author_last)
+    target_last_norm = normalize_token(target_last)
+    if article_last_norm != target_last_norm:
+        return False
+
+    # If we do not have first name on the HCP record, last-name-only fallback.
+    if not target_first:
+        return True
+
+    article_first_norm = normalize_token(article_author_first)
+    target_first_norm = normalize_token(target_first)
+    if not article_first_norm:
+        return False
+
+    return article_first_norm.startswith(target_first_norm[:1]) or target_first_norm.startswith(article_first_norm[:1])
+
+
+def extract_publication_rows_for_hcp(
+    articles: Sequence[ET.Element],
+    hcp_id: str,
+    first_name: Optional[str],
+    last_name: Optional[str],
+) -> List[Dict[str, object]]:
+    rows: List[Dict[str, object]] = []
+    seen_pubmed_ids: Set[str] = set()
+
+    for article in articles:
+        pmid = text_or_none(article.find("./MedlineCitation/PMID"))
+        if not pmid or pmid in seen_pubmed_ids:
+            continue
+
+        title = text_or_none(article.find("./MedlineCitation/Article/ArticleTitle"))
+        journal = text_or_none(article.find("./MedlineCitation/Article/Journal/Title"))
+        pub_year = parse_pub_year(article)
+        doi = parse_doi(article)
+
+        author_nodes = article.findall("./MedlineCitation/Article/AuthorList/Author")
+        matched = False
+        for author in author_nodes:
+            if author.find("CollectiveName") is not None:
+                continue
+            article_first = clean_person_name(text_or_none(author.find("ForeName")) or text_or_none(author.find("Initials")))
+            article_last = clean_person_name(text_or_none(author.find("LastName")))
+            if is_author_match(article_first, article_last, first_name, last_name):
+                matched = True
+                break
+
+        if not matched:
+            continue
+
+        seen_pubmed_ids.add(pmid)
+        rows.append(
+            {
+                "hcp_id": hcp_id,
+                "pubmed_id": pmid,
+                "title": title,
+                "journal": journal,
+                "pub_year": pub_year,
+                "citation_count": None,
+                "doi": doi,
+            }
+        )
+
+    return rows
 
 
 def extract_records(articles: Sequence[ET.Element]) -> Tuple[Dict[str, HCPRecord], List[PublicationRecord]]:
@@ -472,6 +633,111 @@ def upsert_publications(
     return len(publication_rows)
 
 
+def fetch_hcps_with_low_publication_counts(
+    supabase: Client,
+    max_publications: int = 2,
+) -> List[Dict[str, object]]:
+    try:
+        hcps_response = (
+            supabase.table("hcps")
+            .select("id,first_name,last_name")
+            .execute()
+        )
+        pubs_response = (
+            supabase.table("publications")
+            .select("hcp_id,pubmed_id")
+            .execute()
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to load HCP/publication counts for second pass: {exc}") from exc
+
+    pub_counts: Dict[str, int] = {}
+    for row in pubs_response.data or []:
+        hcp_id = row.get("hcp_id")
+        if hcp_id:
+            pub_counts[hcp_id] = pub_counts.get(hcp_id, 0) + 1
+
+    low_pub_hcps: List[Dict[str, object]] = []
+    for hcp in hcps_response.data or []:
+        hcp_id = hcp.get("id")
+        if not hcp_id:
+            continue
+        if pub_counts.get(hcp_id, 0) <= max_publications:
+            low_pub_hcps.append(hcp)
+    return low_pub_hcps
+
+
+def run_author_enrichment_second_pass(
+    supabase: Client,
+    session: requests.Session,
+    base_url: str,
+    email: Optional[str],
+    tool_name: str,
+    per_call: int,
+) -> int:
+    """
+    For HCPs with sparse publication history, fetch career-spanning author publications.
+    """
+    low_pub_hcps = fetch_hcps_with_low_publication_counts(supabase, max_publications=2)
+    low_pub_hcps = low_pub_hcps[:200]
+    if not low_pub_hcps:
+        print("Second pass: no HCPs with fewer than 3 publications found.")
+        return 0
+
+    print(f"Second pass: found {len(low_pub_hcps)} HCPs with fewer than 3 publications.")
+    total_upserted = 0
+    for hcp in low_pub_hcps:
+        hcp_id = hcp.get("id")
+        first_name = clean_person_name(hcp.get("first_name"))
+        last_name = clean_person_name(hcp.get("last_name"))
+        if not hcp_id:
+            continue
+
+        author_query = build_author_query(first_name, last_name)
+        if not author_query:
+            continue
+
+        try:
+            pmids = pubmed_esearch_all(
+                session=session,
+                base_url=base_url,
+                query=author_query,
+                per_call=per_call,
+                email=email,
+                tool_name=tool_name,
+            )
+        except Exception as exc:
+            print(f"Second pass warning: failed search for HCP {hcp_id}: {exc}")
+            continue
+
+        if not pmids:
+            continue
+
+        pmids = pmids[:50]
+
+        try:
+            articles = pubmed_efetch(
+                session=session,
+                base_url=base_url,
+                pmids=pmids,
+                email=email,
+                tool_name=tool_name,
+            )
+            rows = extract_publication_rows_for_hcp(articles, hcp_id, first_name, last_name)
+            if not rows:
+                continue
+            supabase.table("publications").upsert(
+                rows,
+                on_conflict="hcp_id,pubmed_id",
+            ).execute()
+            total_upserted += len(rows)
+        except Exception as exc:
+            print(f"Second pass warning: failed upsert for HCP {hcp_id}: {exc}")
+            continue
+
+    return total_upserted
+
+
 def run_pipeline() -> None:
     base_url = os.getenv("PUBMED_API_BASE", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils")
     tool_name = os.getenv("PUBMED_TOOL", "fieldmark_pubmed_pipeline")
@@ -522,6 +788,17 @@ def run_pipeline() -> None:
     print("Upserting publications into Supabase...")
     inserted_or_updated = upsert_publications(supabase, publication_records, hcp_id_map)
     print(f"Upserted {inserted_or_updated} publication rows.")
+
+    print("Starting second pass author enrichment...")
+    second_pass_count = run_author_enrichment_second_pass(
+        supabase=supabase,
+        session=session,
+        base_url=base_url,
+        email=email,
+        tool_name=tool_name,
+        per_call=per_call,
+    )
+    print(f"Second pass upserted {second_pass_count} publication rows.")
     print("Pipeline run completed.")
 
 
