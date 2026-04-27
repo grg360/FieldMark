@@ -55,6 +55,21 @@ PUBMED_QUERY = """
 )
 """.strip()
 
+PUBMED_QUERY_HEPATOLOGY = """
+(
+  ("primary biliary cholangitis"[Title/Abstract]
+   OR "primary biliary cirrhosis"[Title/Abstract]
+   OR "biliary cholangitis"[Title/Abstract]
+   OR "cholestatic liver disease"[Title/Abstract]
+   OR "linerixibat"[Title/Abstract]
+   OR "IBAT inhibitor"[Title/Abstract]
+   OR "ileal bile acid transporter"[Title/Abstract]
+   OR "obeticholic acid"[Title/Abstract]
+   OR "NASH"[Title/Abstract]
+   OR "MAFLD"[Title/Abstract]
+   OR "non-alcoholic steatohepatitis"[Title/Abstract])
+)
+""".strip()
 
 @dataclass
 class HCPRecord:
