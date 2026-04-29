@@ -1,0 +1,453 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-size: 16px;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  background-color: #0A0A0B;
+  color: #E8E6DF;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide scrollbars globally but keep scroll functionality */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ─── Tablet layout (≥600px) ─────────────────────────────────────────── */
+@media (min-width: 600px) {
+
+  /* ── Shared: wider content containers ── */
+  .fm-screen {
+    max-width: 880px !important;
+  }
+
+  /* ── Shared: nav bars 56px ── */
+  .fm-nav {
+    height: 56px !important;
+  }
+  .fm-nav span,
+  .fm-nav button span {
+    font-size: 15px !important;
+  }
+
+  /* ── TopBar ── */
+  .fm-topbar {
+    height: 56px !important;
+  }
+  .fm-topbar .fm-logo {
+    font-size: 16px !important;
+  }
+  .fm-topbar svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  /* ── Feed: DH chip ── */
+  .fm-dh-chip {
+    padding: 10px 20px !important;
+  }
+  .fm-dh-chip-label {
+    font-size: 14px !important;
+  }
+  .fm-dh-chip-sub {
+    font-size: 13px !important;
+  }
+  .fm-dh-chip-count {
+    font-size: 13px !important;
+  }
+
+  /* ── Feed: section header ── */
+  .fm-section-header-left {
+    font-size: 15px !important;
+  }
+  .fm-section-header-right {
+    font-size: 13px !important;
+  }
+
+  /* ── HCP card grid ── */
+  .fm-card-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    padding: 0 16px !important;
+  }
+  .fm-card-grid > * {
+    margin: 0 !important;
+  }
+
+  /* ── TA Filter Chips ── */
+  .fm-ta-chip {
+    padding: 8px 16px !important;
+    font-size: 14px !important;
+  }
+  .fm-indication-chip {
+    padding: 6px 14px !important;
+    font-size: 12px !important;
+  }
+
+  /* ── Detail screen two-column ── */
+  .fm-detail-body {
+    display: grid !important;
+    grid-template-columns: 55% 45% !important;
+    gap: 0 !important;
+    align-items: start !important;
+    overflow-y: auto !important;
+  }
+  .fm-detail-left {
+    border-right: 1px solid #1E1E22 !important;
+    overflow-y: auto !important;
+  }
+  .fm-detail-right {
+    padding: 16px !important;
+    position: sticky !important;
+    top: 0 !important;
+  }
+  .fm-detail-section-text {
+    font-size: 14px !important;
+  }
+  .fm-detail-heading {
+    font-size: 19px !important;
+  }
+  .fm-detail-subheading {
+    font-size: 14px !important;
+  }
+  /* Hide mobile metric pills on tablet, show tablet ones */
+  .fm-detail-metric-pills-mobile {
+    display: none !important;
+  }
+  .fm-detail-metric-pills-tablet {
+    display: grid !important;
+  }
+
+  /* ── Bibliography two-column cards ── */
+  .fm-bib-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    flex-direction: unset !important;
+  }
+  .fm-bib-citation {
+    font-size: 20px !important;
+  }
+
+  /* ── Search ── */
+  .fm-search-input {
+    height: 56px !important;
+    font-size: 16px !important;
+  }
+  .fm-search-chip {
+    font-size: 13px !important;
+    padding: 8px 14px !important;
+  }
+  .fm-search-results-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    padding: 0 16px !important;
+  }
+  .fm-search-results-grid > * {
+    margin: 0 !important;
+  }
+
+  /* ── Landscape map ── */
+  .fm-map-container {
+    height: calc(100dvh - 120px) !important;
+  }
+  .fm-map-popup-wide {
+    max-width: 280px !important;
+  }
+
+  /* ── Landscape summary two-column lists ── */
+  .fm-summary-lists {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 24px !important;
+  }
+  .fm-summary-dist-bar {
+    height: 10px !important;
+  }
+
+  /* ── Profile two-column ── */
+  .fm-profile-body {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0 !important;
+    align-items: start !important;
+    border-bottom: 1px solid #1E1E22 !important;
+  }
+  .fm-profile-col-left {
+    border-bottom: none !important;
+  }
+  .fm-profile-col-right {
+    border-left: 1px solid #1E1E22 !important;
+  }
+
+  /* ── Auth screen ── */
+  .fm-auth-screen {
+    max-width: 480px !important;
+  }
+  .fm-auth-logo {
+    font-size: 64px !important;
+  }
+  .fm-auth-headline {
+    font-size: 26px !important;
+  }
+  .fm-auth-btn {
+    max-width: 400px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* ── TA onboarding 2x2 grid ── */
+  .fm-ta-cards-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+  .fm-ta-card {
+    padding: 20px !important;
+  }
+  .fm-ta-continue-btn {
+    max-width: 400px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    display: block !important;
+  }
+
+  /* ── Note entry 3-column interaction grid ── */
+  .fm-note-interaction-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .fm-note-submit-btn {
+    max-width: 400px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    display: block !important;
+  }
+
+  /* ── City feed: same card grid as main feed ── */
+  .fm-city-card-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    padding: 0 16px !important;
+  }
+  .fm-city-card-grid > * {
+    margin: 0 !important;
+  }
+
+  /* ── General: minimum tap target ── */
+  button {
+    min-height: 44px;
+  }
+}
+
+/* ─── Mobile font size overrides (≤768px) ────────────────────────────── */
+@media (max-width: 768px) {
+  * {
+    -webkit-text-size-adjust: none;
+  }
+
+  body {
+    font-size: 16px;
+  }
+
+  /* Tailwind utility overrides */
+  .text-sm { font-size: 15px !important; }
+  .text-xs { font-size: 13px !important; }
+
+  /* Minimum font size floor for text-bearing elements */
+  p, span, div, button, input, label {
+    min-font-size: 13px;
+  }
+
+  /* ── HCP card name: 16px ── */
+  .fm-hcp-name {
+    font-size: 16px !important;
+  }
+
+  /* ── Institution / specialty line: 14px ── */
+  .fm-hcp-institution {
+    font-size: 14px !important;
+  }
+
+  /* ── Rising star explanation: 14px ── */
+  .fm-hcp-explanation {
+    font-size: 14px !important;
+  }
+
+  /* ── Stat pill label (PUB VEL etc): 12px ── */
+  .fm-stat-label {
+    font-size: 12px !important;
+  }
+
+  /* ── Stat pill value (3.2x etc): 14px ── */
+  .fm-stat-value {
+    font-size: 14px !important;
+  }
+
+  /* ── Score badge: 14px ── */
+  .fm-score-badge {
+    font-size: 14px !important;
+  }
+
+  /* ── Section headers: 15px ── */
+  .fm-section-header-left {
+    font-size: 15px !important;
+  }
+
+  /* ── Nav bar text: 15px ── */
+  .fm-nav span,
+  .fm-nav button span {
+    font-size: 15px !important;
+  }
+
+  /* ── TA chip text: 14px ── */
+  .fm-ta-chip {
+    font-size: 14px !important;
+  }
+
+  /* ── Indication chip text: 13px ── */
+  .fm-indication-chip {
+    font-size: 13px !important;
+  }
+
+  /* ── Detail screen body text: 14px ── */
+  .fm-detail-section-text {
+    font-size: 14px !important;
+  }
+
+  /* ── Score breakdown labels: 14px ── */
+  .fm-score-label {
+    font-size: 14px !important;
+  }
+
+  /* ── Bibliography title: 14px ── */
+  .fm-bib-title {
+    font-size: 14px !important;
+  }
+
+  /* ── Bibliography journal: 13px ── */
+  .fm-bib-journal {
+    font-size: 13px !important;
+  }
+
+  /* ── Bibliography metadata: 12px ── */
+  .fm-bib-meta {
+    font-size: 12px !important;
+  }
+
+  /* ── Tooltip text: 13px ── */
+  .fm-tooltip-text {
+    font-size: 13px !important;
+  }
+
+  /* ── Modal text: 14px ── */
+  .fm-modal-text {
+    font-size: 14px !important;
+  }
+
+  /* ── Profile screen labels: 13px ── */
+  .fm-profile-label {
+    font-size: 13px !important;
+  }
+
+  /* ── Summary tab labels: 12px ── */
+  .fm-summary-tab-label {
+    font-size: 12px !important;
+  }
+
+  /* ── Summary tab values: 22px ── */
+  .fm-summary-tab-value {
+    font-size: 22px !important;
+  }
+
+  /* ── Landscape tab labels: 14px ── */
+  .fm-landscape-tab-label {
+    font-size: 14px !important;
+  }
+
+  /* Inline-style fallbacks for components not yet using fm- classes */
+
+  /* HCP card name */
+  [style*="fontSize: 14"][style*="fontWeight: 500"][style*="E8E6DF"] {
+    font-size: 16px !important;
+  }
+
+  /* Institution/specialty and explanation lines */
+  [style*="fontSize: 12"][style*="6B6A65"],
+  [style*="fontSize: 12"][style*="B8B4AC"] {
+    font-size: 14px !important;
+  }
+
+  /* Stat pill label */
+  [style*="fontSize: 10"][style*="6B6A65"][style*="uppercase"],
+  [style*="fontSize: 10"][style*="uppercase"] {
+    font-size: 12px !important;
+  }
+
+  /* Stat pill value */
+  [style*="fontSize: 11"][style*="monospace"][style*="E8E6DF"] {
+    font-size: 14px !important;
+  }
+
+  /* Section headers */
+  [style*="fontSize: 13"][style*="fontWeight: 500"][style*="E8E6DF"] {
+    font-size: 15px !important;
+  }
+
+  /* General 13px body text → 14px */
+  [style*="fontSize: 13"][style*="6B6A65"],
+  [style*="fontSize: 13"][style*="E8E6DF"],
+  [style*="fontSize: 13"][style*="9B9892"] {
+    font-size: 14px !important;
+  }
+
+  /* TA filter chips */
+  [style*="fontSize: 12"][style*="system-ui"] {
+    font-size: 14px !important;
+  }
+
+  /* Indication chips */
+  [style*="fontSize: 11"][style*="system-ui"] {
+    font-size: 13px !important;
+  }
+
+  /* Tooltip / small secondary text */
+  [style*="fontSize: 11"][style*="9B9892"],
+  [style*="fontSize: 12"][style*="9B9892"] {
+    font-size: 13px !important;
+  }
+
+  /* Score badge */
+  [style*="fontSize: 12"][style*="E8E6DF"][style*="fontWeight: 500"] {
+    font-size: 14px !important;
+  }
+}

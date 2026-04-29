@@ -33,8 +33,21 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-SCORE_VERSION = "v1.1"
-TOP_N_PER_TA = 20
+SCORE_VERSION = "v1.2"
+# When OpenAlex has enriched hcps.total_career_pubs, require this minimum for rankings / non-zero composite.
+MIN_TOTAL_CAREER_PUBS_FOR_RANKINGS = 10
+# If total_career_pubs is null, fall back to counting publication rows in our DB.
+MIN_STORED_PUBLICATIONS_FALLBACK = 3
+MAX_STORED_PUBLICATIONS_FOR_RANKINGS = 200
+RECENT_PUBLICATION_YEAR_CUTOFF = 2022
+
+
+def passes_ranking_publication_threshold(total_career_pubs: Optional[int], stored_pub_count: int) -> bool:
+    if stored_pub_count > MAX_STORED_PUBLICATIONS_FOR_RANKINGS:
+        return False
+    if total_career_pubs is not None:
+        return total_career_pubs >= MIN_TOTAL_CAREER_PUBS_FOR_RANKINGS
+    return stored_pub_count >= MIN_STORED_PUBLICATIONS_FALLBACK
 
 
 @dataclass
@@ -51,6 +64,8 @@ class ScoreRow:
     calculated_at: str
     first_pub_year: Optional[int]
     career_multiplier: float
+    publications_count: int
+    total_career_pubs: Optional[int]
 
 
 def get_required_env(name: str) -> str:
@@ -88,6 +103,64 @@ def fetch_all_rows(supabase: Client, table: str, columns: str, page_size: int = 
             break
         offset += page_size
     return rows
+
+
+def fetch_us_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
+    rows: List[Dict] = []
+    offset = 0
+    while True:
+        try:
+            response = (
+                supabase.table("hcps")
+                .select("id,first_name,last_name,country,total_career_pubs,first_pub_year")
+                .eq("country", "USA")
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed reading USA HCP rows: {exc}") from exc
+
+        batch = response.data or []
+        if not batch:
+            break
+        rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return rows
+
+
+def dedupe_hcps_by_name(hcps: Sequence[Dict], publications: Sequence[Dict]) -> List[Dict]:
+    pub_count_by_hcp: Dict[str, int] = {}
+    for pub in publications:
+        hid = pub.get("hcp_id")
+        if hid:
+            pub_count_by_hcp[hid] = pub_count_by_hcp.get(hid, 0) + 1
+
+    best_by_name: Dict[Tuple[str, str], Dict] = {}
+    for hcp in hcps:
+        hid = hcp.get("id")
+        if not hid:
+            continue
+        first = (str(hcp.get("first_name")).lower().strip() if hcp.get("first_name") else "")
+        last = (str(hcp.get("last_name")).lower().strip() if hcp.get("last_name") else "")
+        if not first and not last:
+            # Keep unnamed records keyed by id-equivalent tuple.
+            key = (str(hid), "")
+        else:
+            key = (first, last)
+
+        current_best = best_by_name.get(key)
+        if current_best is None:
+            best_by_name[key] = hcp
+            continue
+
+        current_best_count = pub_count_by_hcp.get(current_best.get("id"), 0)
+        challenger_count = pub_count_by_hcp.get(hid, 0)
+        if challenger_count > current_best_count:
+            best_by_name[key] = hcp
+
+    return list(best_by_name.values())
 
 
 def normalize_0_100(values: Dict[Tuple[str, str], float]) -> Dict[Tuple[str, str], float]:
@@ -218,7 +291,7 @@ def publication_velocity_raw(pub_years: Sequence[int], current_year: int) -> flo
     return (trend_gain * 0.7) + (acceleration * 0.3)
 
 
-def career_age_multiplier(first_pub_year: Optional[int]) -> float:
+def first_pub_year_override_multiplier(first_pub_year: Optional[int]) -> float:
     if first_pub_year is None:
         return 1.0
     if first_pub_year >= 2020:
@@ -227,6 +300,22 @@ def career_age_multiplier(first_pub_year: Optional[int]) -> float:
         return 1.15
     if 2011 <= first_pub_year <= 2016:
         return 1.0
+    return 0.75
+
+
+def recent_publication_ratio_multiplier(pub_years: Sequence[int]) -> float:
+    valid_years = [y for y in pub_years if y > 0]
+    if not valid_years:
+        # Neutral when no publication years are available.
+        return 1.0
+    recent_count = sum(1 for y in valid_years if y >= RECENT_PUBLICATION_YEAR_CUTOFF)
+    ratio = recent_count / len(valid_years)
+    if ratio >= 0.80:
+        return 1.30
+    if ratio >= 0.50:
+        return 1.15
+    if ratio >= 0.25:
+        return 1.00
     return 0.75
 
 
@@ -242,7 +331,8 @@ def citation_trajectory_raw(publications: Sequence[Dict], current_year: int) -> 
         pub_year = safe_int(pub.get("pub_year"), 0)
         if pub_year <= 0:
             continue
-        citations = max(0, safe_int(pub.get("citation_count"), 0))
+        # Cap citation outliers before trajectory normalization.
+        citations = min(150, max(0, safe_int(pub.get("citation_count"), 0)))
         age = max(1, current_year - pub_year + 1)
         citation_density = citations / age
         if pub_year >= current_year - 2:
@@ -326,6 +416,7 @@ def compute_scores(
     publications: Sequence[Dict],
     trial_investigators: Sequence[Dict],
     clinical_trials: Sequence[Dict],
+    hcps: Sequence[Dict],
 ) -> List[ScoreRow]:
     now_dt = datetime.now(timezone.utc).date()
     current_year = now_dt.year
@@ -335,6 +426,31 @@ def compute_scores(
         trial_investigators=trial_investigators,
         clinical_trials=clinical_trials,
     )
+    pub_count_by_hcp: Dict[str, int] = {hid: len(pubs) for hid, pubs in pubs_by_hcp.items()}
+    allowed_hcp_ids = {h.get("id") for h in hcps if h.get("id")}
+
+    total_career_by_hcp: Dict[str, Optional[int]] = {}
+    first_pub_year_enriched_by_hcp: Dict[str, Optional[int]] = {}
+    for h in hcps:
+        hid = h.get("id")
+        if not hid:
+            continue
+        raw_first_pub = h.get("first_pub_year")
+        if raw_first_pub is None:
+            first_pub_year_enriched_by_hcp[hid] = None
+        else:
+            try:
+                first_pub_year_enriched_by_hcp[hid] = int(raw_first_pub)
+            except (TypeError, ValueError):
+                first_pub_year_enriched_by_hcp[hid] = None
+        raw_tcp = h.get("total_career_pubs")
+        if raw_tcp is None:
+            total_career_by_hcp[hid] = None
+        else:
+            try:
+                total_career_by_hcp[hid] = int(raw_tcp)
+            except (TypeError, ValueError):
+                total_career_by_hcp[hid] = None
 
     raw_pub_velocity: Dict[Tuple[str, str], float] = {}
     raw_citation: Dict[Tuple[str, str], float] = {}
@@ -342,12 +458,13 @@ def compute_scores(
     recency_scores: Dict[Tuple[str, str], float] = {}
     has_pub_and_trial: Dict[Tuple[str, str], bool] = {}
     first_pub_year_by_hcp: Dict[str, Optional[int]] = {}
+    recent_pub_multiplier_by_hcp: Dict[str, float] = {}
 
     valid_pairs: List[Tuple[str, str]] = []
     for rel in hcp_tas:
         hcp_id = rel.get("hcp_id")
         ta_id = rel.get("therapeutic_area_id")
-        if not hcp_id or not ta_id:
+        if not hcp_id or not ta_id or hcp_id not in allowed_hcp_ids:
             continue
 
         key = (hcp_id, ta_id)
@@ -357,7 +474,16 @@ def compute_scores(
         hcp_links = links_by_hcp.get(hcp_id, [])
 
         pub_years = [safe_int(pub.get("pub_year"), 0) for pub in hcp_pubs if safe_int(pub.get("pub_year"), 0) > 0]
-        first_pub_year_by_hcp[hcp_id] = min(pub_years) if pub_years else None
+        # Priority order:
+        # 1) OpenAlex-enriched hcps.first_pub_year when present
+        # 2) Derived min publication year from loaded publications
+        # 3) None when no publication years exist
+        first_pub_year_by_hcp[hcp_id] = (
+            first_pub_year_enriched_by_hcp.get(hcp_id)
+            if first_pub_year_enriched_by_hcp.get(hcp_id) is not None
+            else (min(pub_years) if pub_years else None)
+        )
+        recent_pub_multiplier_by_hcp[hcp_id] = recent_publication_ratio_multiplier(pub_years)
         raw_pub_velocity[key] = publication_velocity_raw(pub_years, current_year) if pub_years else -1.0
         raw_citation[key] = citation_trajectory_raw(hcp_pubs, current_year) if hcp_pubs else -1.0
         trial_scores[key] = compute_trial_score(hcp_links, trials_by_id)
@@ -388,19 +514,36 @@ def compute_scores(
         citation = citation_scores.get(key, 0.0)
         trial_score = trial_scores.get(key, 0.0)
         recency = recency_scores.get(key, 0.0)
+        publications_count = pub_count_by_hcp.get(hcp_id, 0)
+        total_career_pubs = total_career_by_hcp.get(hcp_id)
+        # Citation trajectory gating:
+        # - Primary: require >=5 stored pubs and a valid CareerPubs value.
+        # - Fallback: if CareerPubs is missing, require >=10 stored pubs.
+        if total_career_pubs is not None and publications_count >= 5:
+            citation_for_scoring = citation
+        elif total_career_pubs is None and publications_count >= 10:
+            citation_for_scoring = citation
+        else:
+            citation_for_scoring = 0.0
         cross_multiplier = 1.15 if has_pub_and_trial.get(key, False) else 1.0
         first_pub_year = first_pub_year_by_hcp.get(hcp_id)
-        career_multiplier = career_age_multiplier(first_pub_year)
+        career_multiplier = recent_pub_multiplier_by_hcp.get(hcp_id, 1.0)
+        # Secondary override: if enriched first_pub_year exists on hcps, it takes precedence.
+        if first_pub_year_enriched_by_hcp.get(hcp_id) is not None:
+            career_multiplier = first_pub_year_override_multiplier(first_pub_year)
 
         weighted_base = (
-            (0.25 * pub_velocity)
-            + (0.20 * citation)
-            + (0.30 * trial_score)
-            + (0.10 * recency)
+            (0.50 * pub_velocity)
+            + (0.15 * citation_for_scoring)
+            + (0.10 * trial_score)
+            + (0.05 * recency)
         )
-        # Cross-signal bonus is applied as a multiplier.
+        # Cross-signal and career multipliers are applied after base weighting.
         composite_uncapped = weighted_base * cross_multiplier * career_multiplier
         composite = max(0.0, min(100.0, composite_uncapped))
+
+        if not passes_ranking_publication_threshold(total_career_pubs, publications_count):
+            composite = 0.0
 
         rows.append(
             ScoreRow(
@@ -408,7 +551,7 @@ def compute_scores(
                 therapeutic_area_id=ta_id,
                 composite_score=round(composite, 4),
                 pub_velocity_score=round(pub_velocity, 4),
-                citation_trajectory_score=round(citation, 4),
+                citation_trajectory_score=round(citation_for_scoring, 4),
                 trial_investigator_score=round(trial_score, 4),
                 congress_score=0.0,
                 msl_signal_score=0.0,
@@ -416,6 +559,8 @@ def compute_scores(
                 calculated_at=now_iso,
                 first_pub_year=first_pub_year,
                 career_multiplier=round(career_multiplier, 4),
+                publications_count=publications_count,
+                total_career_pubs=total_career_pubs,
             )
         )
 
@@ -442,23 +587,43 @@ def upsert_scores(supabase: Client, score_rows: Sequence[ScoreRow]) -> int:
         for row in score_rows
     ]
 
-    try:
-        # Recommended unique index for deterministic updates:
-        # unique (hcp_id, therapeutic_area_id, score_version)
-        supabase.table("hcp_scores").upsert(
-            payload,
-            on_conflict="hcp_id,therapeutic_area_id,score_version",
-        ).execute()
-    except Exception as exc:
-        raise RuntimeError(f"Failed to upsert hcp_scores: {exc}") from exc
+    batch_size = 500
+    progress_every = 5000
+    processed = 0
+
+    for start in range(0, len(payload), batch_size):
+        batch = payload[start : start + batch_size]
+        try:
+            # Recommended unique index for deterministic updates:
+            # unique (hcp_id, therapeutic_area_id, score_version)
+            supabase.table("hcp_scores").upsert(
+                batch,
+                on_conflict="hcp_id,therapeutic_area_id,score_version",
+            ).execute()
+        except Exception as exc:
+            raise RuntimeError(f"Failed to upsert hcp_scores batch starting at {start}: {exc}") from exc
+
+        processed += len(batch)
+        if processed % progress_every == 0:
+            print(f"Upsert progress: {processed}/{len(payload)} hcp_scores rows")
+
     return len(payload)
+
+
+def get_top_n_for_ta(hcp_count: int) -> int:
+    if hcp_count >= 5000:
+        return 100
+    if 2000 <= hcp_count <= 4999:
+        return 50
+    if 500 <= hcp_count <= 1999:
+        return 20
+    return 10
 
 
 def print_top_rising_stars(
     score_rows: Sequence[ScoreRow],
     hcps: Sequence[Dict],
     therapeutic_areas: Sequence[Dict],
-    top_n: int = TOP_N_PER_TA,
 ) -> None:
     hcp_name_map = {
         row["id"]: f'{row.get("first_name", "")} {row.get("last_name", "")}'.strip()
@@ -467,20 +632,38 @@ def print_top_rising_stars(
     }
     ta_name_map = {row["id"]: row.get("name", row["id"]) for row in therapeutic_areas if row.get("id")}
 
+    eligible_rows = [
+        r
+        for r in score_rows
+        if passes_ranking_publication_threshold(r.total_career_pubs, r.publications_count)
+    ]
     by_ta: Dict[str, List[ScoreRow]] = {}
-    for row in score_rows:
+    for row in eligible_rows:
         by_ta.setdefault(row.therapeutic_area_id, []).append(row)
 
     print("\n=== TOP RISING STARS BY THERAPEUTIC AREA ===")
+    print(
+        f"(Rankings: need total_career_pubs>={MIN_TOTAL_CAREER_PUBS_FOR_RANKINGS} when set; "
+        f"else >= {MIN_STORED_PUBLICATIONS_FALLBACK} stored publication rows; "
+        f"exclude HCPs with >{MAX_STORED_PUBLICATIONS_FOR_RANKINGS} stored publications.)\n"
+    )
     for ta_id, rows in by_ta.items():
         ta_name = ta_name_map.get(ta_id, ta_id)
+        unique_hcp_count = len({row.hcp_id for row in rows})
+        top_n = get_top_n_for_ta(unique_hcp_count)
         sorted_rows = sorted(rows, key=lambda r: r.composite_score, reverse=True)[:top_n]
-        print(f"\n[{ta_name}] Top {len(sorted_rows)}")
+        print(f"\n[{ta_name}] Top {len(sorted_rows)} of {unique_hcp_count} HCPs")
         for idx, row in enumerate(sorted_rows, start=1):
             hcp_name = hcp_name_map.get(row.hcp_id, row.hcp_id)
+            career_part = (
+                f"CareerPubs={row.total_career_pubs}"
+                if row.total_career_pubs is not None
+                else "CareerPubs=None"
+            )
             print(
                 f"{idx:>2}. {hcp_name:<35} "
                 f"Composite={row.composite_score:6.2f} "
+                f"StoredPubs={row.publications_count:<3} {career_part} "
                 f"(PubVel={row.pub_velocity_score:6.2f}, "
                 f"CitTraj={row.citation_trajectory_score:6.2f}, "
                 f"Trial={row.trial_investigator_score:6.2f}, "
@@ -494,7 +677,8 @@ def run_pipeline() -> None:
     supabase = init_supabase()
 
     print("Loading Supabase data...")
-    hcps = fetch_all_rows(supabase, "hcps", "id,first_name,last_name")
+    hcps = fetch_us_hcps(supabase)
+    print(f"Loaded {len(hcps)} US HCPs (country='USA').")
     publications = fetch_all_rows(supabase, "publications", "hcp_id,pub_year,citation_count")
     clinical_trials = fetch_all_rows(
         supabase,
@@ -513,6 +697,10 @@ def run_pipeline() -> None:
     )
     therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
 
+    original_hcp_count = len(hcps)
+    hcps = dedupe_hcps_by_name(hcps, publications)
+    print(f"Deduped HCPs by name: {original_hcp_count} -> {len(hcps)}")
+
     print(
         f"Loaded hcps={len(hcps)}, pubs={len(publications)}, trials={len(clinical_trials)}, "
         f"trial_links={len(trial_investigators)}, hcp_ta={len(hcp_tas)}"
@@ -524,6 +712,7 @@ def run_pipeline() -> None:
         publications=publications,
         trial_investigators=trial_investigators,
         clinical_trials=clinical_trials,
+        hcps=hcps,
     )
     print(f"Computed {len(scores)} score rows.")
 
@@ -531,7 +720,7 @@ def run_pipeline() -> None:
     upserted = upsert_scores(supabase, scores)
     print(f"Upserted {upserted} hcp_scores records.")
 
-    print_top_rising_stars(scores, hcps, therapeutic_areas, top_n=TOP_N_PER_TA)
+    print_top_rising_stars(scores, hcps, therapeutic_areas)
     print("\nScoring pipeline complete.")
 
 

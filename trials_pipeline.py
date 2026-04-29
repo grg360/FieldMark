@@ -120,6 +120,31 @@ def normalize_key(value: Optional[str]) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
 
 
+def normalize_role_key(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    value = re.sub(r"[^A-Za-z0-9]+", "_", value.strip().upper())
+    value = re.sub(r"_+", "_", value).strip("_")
+    return value
+
+
+def is_valid_investigator_name(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    # Reject phone-like strings and any names containing digits.
+    if re.search(r"\d", text):
+        return False
+    if re.search(r"\+?\d[\d\-\(\)\s]{6,}", text):
+        return False
+    # Reject obvious company/entity suffixes.
+    if re.search(r"\b(inc|corp|corporation|llc|ltd|plc|gmbh)\.?\b", text, flags=re.IGNORECASE):
+        return False
+    return True
+
+
 def split_name(raw_name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     """
     Attempt to split a human name into first and last.
@@ -275,13 +300,19 @@ def extract_investigators(study: Dict, nct_id: str) -> List[InvestigatorRecord]:
 
     investigators: List[InvestigatorRecord] = []
     seen_signatures: Set[Tuple[str, str, str]] = set()
+    allowed_roles = {"PRINCIPAL_INVESTIGATOR", "SUB_INVESTIGATOR"}
 
     def add_person(raw_name: Optional[str], role: Optional[str]) -> None:
         first_name, last_name = split_name(raw_name)
         source_text = normalize_space(raw_name) or ""
         role_norm = normalize_space(role) or "investigator"
+        role_key = normalize_role_key(role_norm)
 
         if not source_text:
+            return
+        if role_key not in allowed_roles:
+            return
+        if not is_valid_investigator_name(source_text):
             return
         sig = (normalize_key(first_name), normalize_key(last_name), normalize_key(role_norm))
         if sig in seen_signatures:
@@ -423,6 +454,13 @@ def match_hcp_id(
     last = normalize_key(investigator.last_name)
     if first and last and (first, last) in hcp_name_map:
         return hcp_name_map[(first, last)]
+
+    # Fallback fuzzy match: exact last name + first initial.
+    if first and last:
+        first_initial = first[0]
+        for (hcp_first, hcp_last), hcp_id in hcp_name_map.items():
+            if hcp_last == last and hcp_first and hcp_first[0] == first_initial:
+                return hcp_id
     return None
 
 
@@ -439,11 +477,15 @@ def upsert_trial_investigators(
             continue
 
         hcp_id = match_hcp_id(investigator, hcp_name_map)
+        investigator_name = " ".join(
+            part for part in [investigator.first_name, investigator.last_name] if part
+        ).strip()
         rows.append(
             {
                 "hcp_id": hcp_id,
                 "trial_id": trial_id,
                 "role": investigator.role,
+                "investigator_name": investigator_name if investigator_name else None,
             }
         )
 

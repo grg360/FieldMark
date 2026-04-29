@@ -15,7 +15,7 @@ Optional environment variables:
 - PUBMED_EMAIL (recommended by NCBI)
 - PUBMED_TOOL (default: fieldmark_pubmed_pipeline)
 - PUBMED_DAYS_BACK (default: 365)
-- PUBMED_MAX_RESULTS (default: 200)
+- PUBMED_MAX_RESULTS (default: 500, per therapeutic area query)
 - PUBMED_RETMAX_PER_CALL (default: 100)
 - PUBMED_API_BASE (default: https://eutils.ncbi.nlm.nih.gov/entrez/eutils)
 """
@@ -41,17 +41,7 @@ from urllib3.util.retry import Retry
 # Domain-targeted query for rare disease + relevant therapy/oncology areas.
 PUBMED_QUERY = """
 (
-  ("rare disease"[Title/Abstract] OR "orphan disease"[Title/Abstract]
-   OR "rare genetic disorder*"[Title/Abstract]
-   OR "inborn error*"[Title/Abstract])
-  AND
-  ("gene therap*"[Title/Abstract]
-   OR "CAR-T"[Title/Abstract]
-   OR "chimeric antigen receptor"[Title/Abstract]
-   OR "hematologic oncology"[Title/Abstract]
-   OR leukemia[Title/Abstract]
-   OR lymphoma[Title/Abstract]
-   OR myeloma[Title/Abstract])
+("rare disease"[Title/Abstract] OR "orphan disease"[Title/Abstract] OR "rare genetic disorder"[Title/Abstract] OR "inborn error of metabolism"[Title/Abstract] OR "spinal muscular atrophy"[Title/Abstract] OR "Duchenne muscular dystrophy"[Title/Abstract] OR "phenylketonuria"[Title/Abstract] OR "lysosomal storage"[Title/Abstract] OR "hereditary angioedema"[Title/Abstract] OR "Fabry disease"[Title/Abstract] OR "Gaucher disease"[Title/Abstract] OR "cystic fibrosis"[Title/Abstract] OR "hemophilia"[Title/Abstract] OR "sickle cell disease"[Title/Abstract] OR "thalassemia"[Title/Abstract] OR "Wilson disease"[Title/Abstract] OR "Huntington disease"[Title/Abstract])
 )
 """.strip()
 
@@ -71,12 +61,109 @@ PUBMED_QUERY_HEPATOLOGY = """
 )
 """.strip()
 
+PUBMED_QUERY_NSCLC = """
+(
+  ("non-small cell lung cancer"[Title/Abstract]
+   OR "NSCLC"[Title/Abstract]
+   OR "lung adenocarcinoma"[Title/Abstract]
+   OR "lung squamous cell carcinoma"[Title/Abstract]
+   OR "large cell lung carcinoma"[Title/Abstract]
+   OR "PD-L1"[Title/Abstract]
+   OR "PD-1 inhibitor"[Title/Abstract]
+   OR "pembrolizumab"[Title/Abstract]
+   OR "atezolizumab"[Title/Abstract]
+   OR "durvalumab"[Title/Abstract]
+   OR "nivolumab"[Title/Abstract]
+   OR "checkpoint inhibitor lung"[Title/Abstract]
+   OR "EGFR mutation"[Title/Abstract]
+   OR "osimertinib"[Title/Abstract]
+   OR "erlotinib"[Title/Abstract]
+   OR "gefitinib"[Title/Abstract]
+   OR "afatinib"[Title/Abstract]
+   OR "EGFR exon 20"[Title/Abstract]
+   OR "ALK inhibitor"[Title/Abstract]
+   OR "alectinib"[Title/Abstract]
+   OR "lorlatinib"[Title/Abstract]
+   OR "crizotinib"[Title/Abstract]
+   OR "ROS1 fusion"[Title/Abstract]
+   OR "RET fusion lung"[Title/Abstract]
+   OR "KRAS G12C"[Title/Abstract]
+   OR "sotorasib"[Title/Abstract]
+   OR "adagrasib"[Title/Abstract]
+   OR "HER2 lung"[Title/Abstract]
+   OR "MET exon 14"[Title/Abstract]
+   OR "TROP-2 lung"[Title/Abstract]
+   OR "antibody drug conjugate lung"[Title/Abstract])
+)
+""".strip()
+
+PUBMED_QUERY_HEPATOLOGY_US = """
+(
+  ("primary biliary cholangitis"[Title/Abstract]
+   OR "primary biliary cirrhosis"[Title/Abstract]
+   OR "biliary cholangitis"[Title/Abstract]
+   OR "cholestatic liver disease"[Title/Abstract]
+   OR "linerixibat"[Title/Abstract]
+   OR "IBAT inhibitor"[Title/Abstract]
+   OR "ileal bile acid transporter"[Title/Abstract]
+   OR "obeticholic acid"[Title/Abstract]
+   OR "NASH"[Title/Abstract]
+   OR "MAFLD"[Title/Abstract]
+   OR "non-alcoholic steatohepatitis"[Title/Abstract])
+  AND
+  ("United States"[Affiliation] OR "USA"[Affiliation])
+)
+""".strip()
+
+PUBMED_QUERY_NSCLC_US = """
+(
+  ("non-small cell lung cancer"[Title/Abstract]
+   OR "NSCLC"[Title/Abstract]
+   OR "lung adenocarcinoma"[Title/Abstract]
+   OR "lung squamous cell carcinoma"[Title/Abstract]
+   OR "large cell lung carcinoma"[Title/Abstract]
+   OR "PD-L1"[Title/Abstract]
+   OR "PD-1 inhibitor"[Title/Abstract]
+   OR "pembrolizumab"[Title/Abstract]
+   OR "atezolizumab"[Title/Abstract]
+   OR "durvalumab"[Title/Abstract]
+   OR "nivolumab"[Title/Abstract]
+   OR "checkpoint inhibitor lung"[Title/Abstract]
+   OR "EGFR mutation"[Title/Abstract]
+   OR "osimertinib"[Title/Abstract]
+   OR "erlotinib"[Title/Abstract]
+   OR "gefitinib"[Title/Abstract]
+   OR "afatinib"[Title/Abstract]
+   OR "EGFR exon 20"[Title/Abstract]
+   OR "ALK inhibitor"[Title/Abstract]
+   OR "alectinib"[Title/Abstract]
+   OR "lorlatinib"[Title/Abstract]
+   OR "crizotinib"[Title/Abstract]
+   OR "ROS1 fusion"[Title/Abstract]
+   OR "RET fusion lung"[Title/Abstract]
+   OR "KRAS G12C"[Title/Abstract]
+   OR "sotorasib"[Title/Abstract]
+   OR "adagrasib"[Title/Abstract]
+   OR "HER2 lung"[Title/Abstract]
+   OR "MET exon 14"[Title/Abstract]
+   OR "TROP-2 lung"[Title/Abstract]
+   OR "antibody drug conjugate lung"[Title/Abstract])
+  AND
+  ("United States"[Affiliation] OR "USA"[Affiliation])
+)
+""".strip()
+
+PUBMED_QUERY_RARE_DISEASE_US = """
+("rare disease"[Title/Abstract] OR "orphan disease"[Title/Abstract] OR "rare genetic disorder"[Title/Abstract] OR "inborn error of metabolism"[Title/Abstract] OR "spinal muscular atrophy"[Title/Abstract] OR "Duchenne muscular dystrophy"[Title/Abstract] OR "phenylketonuria"[Title/Abstract] OR "lysosomal storage"[Title/Abstract] OR "hereditary angioedema"[Title/Abstract] OR "Fabry disease"[Title/Abstract] OR "Gaucher disease"[Title/Abstract] OR "cystic fibrosis"[Title/Abstract] OR "hemophilia"[Title/Abstract] OR "sickle cell disease"[Title/Abstract] OR "thalassemia"[Title/Abstract] OR "Wilson disease"[Title/Abstract] OR "Huntington disease"[Title/Abstract]) AND ("United States"[Affiliation] OR "USA"[Affiliation])
+""".strip()
+
 @dataclass
 class HCPRecord:
     first_name: Optional[str]
     last_name: Optional[str]
     credentials: Optional[str]
     institution: Optional[str]
+    institution_full: Optional[str]
     city: Optional[str]
     state: Optional[str]
     zip_code: Optional[str]
@@ -165,6 +252,50 @@ def infer_credentials(last_name_or_suffix: Optional[str]) -> Optional[str]:
     return suffix if suffix in allowed else None
 
 
+def parse_country_from_affiliation(affiliation: Optional[str]) -> Optional[str]:
+    if not affiliation:
+        return None
+
+    value = affiliation.strip()
+    # Explicit US matching anywhere in the string.
+    if re.search(r"\b(USA|U\.S\.A\.|United States)\b", value, flags=re.IGNORECASE):
+        return "USA"
+
+    # Look at the last comma-separated segment for country-like endings.
+    parts = [p.strip(" .;") for p in value.split(",") if p.strip()]
+    last = parts[-1] if parts else value.strip(" .;")
+
+    # Two-letter terminal country code.
+    match_code = re.search(r"\b([A-Z]{2})\b$", last)
+    if match_code:
+        return match_code.group(1)
+
+    known_countries = {
+        "canada": "Canada",
+        "united kingdom": "United Kingdom",
+        "uk": "UK",
+        "germany": "Germany",
+        "france": "France",
+        "italy": "Italy",
+        "spain": "Spain",
+        "australia": "Australia",
+        "japan": "Japan",
+        "china": "China",
+        "india": "India",
+        "brazil": "Brazil",
+        "netherlands": "Netherlands",
+        "switzerland": "Switzerland",
+        "sweden": "Sweden",
+        "norway": "Norway",
+        "denmark": "Denmark",
+        "belgium": "Belgium",
+        "ireland": "Ireland",
+        "israel": "Israel",
+    }
+    normalized_last = normalize_token(last)
+    return known_countries.get(normalized_last)
+
+
 def parse_affiliation(affiliation: Optional[str]) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
     Parse institution/city/state/zip/country from a free-text affiliation.
@@ -174,8 +305,8 @@ def parse_affiliation(affiliation: Optional[str]) -> Tuple[Optional[str], Option
         return None, None, None, None, None
 
     parts = [p.strip() for p in affiliation.split(",") if p.strip()]
-    institution = parts[0] if parts else None
-    country = parts[-1] if parts else None
+    institution = affiliation.strip() if affiliation else None
+    country = parse_country_from_affiliation(affiliation)
 
     city = parts[-3] if len(parts) >= 3 else None
     state = None
@@ -319,6 +450,10 @@ def parse_doi(article: ET.Element) -> Optional[str]:
     for aid in article.findall("./PubmedData/ArticleIdList/ArticleId"):
         if aid.attrib.get("IdType", "").lower() == "doi" and aid.text:
             return aid.text.strip()
+    # Many records only carry the DOI on ELocationID under Article (not in ArticleIdList).
+    for eloc in article.findall("./MedlineCitation/Article/ELocationID"):
+        if eloc.attrib.get("EIdType", "").lower() == "doi" and eloc.text:
+            return eloc.text.strip()
     return None
 
 
@@ -517,6 +652,7 @@ def extract_records(articles: Sequence[ET.Element]) -> Tuple[Dict[str, HCPRecord
                     last_name=last_name,
                     credentials=credentials,
                     institution=institution,
+                    institution_full=affiliation,
                     city=city,
                     state=state,
                     zip_code=zip_code,
@@ -547,66 +683,121 @@ def init_supabase() -> Client:
     return create_client(supabase_url, supabase_key)
 
 
+def _hcp_row_dict(hcp: HCPRecord) -> Dict[str, object]:
+    return {
+        "npi_number": None,
+        "first_name": hcp.first_name,
+        "last_name": hcp.last_name,
+        "credentials": hcp.credentials,
+        "institution": hcp.institution,
+        "institution_full": hcp.institution_full,
+        "city": hcp.city,
+        "state": hcp.state,
+        "zip_code": hcp.zip_code,
+        "country": hcp.country,
+        "specialty": hcp.specialty,
+        "subspecialty": hcp.subspecialty,
+        "opt_out": False,
+        "is_claimed": False,
+    }
+
+
+def _postgrest_eq_quoted(col: str, value: str) -> str:
+    escaped = str(value).replace('"', '\\"')
+    return f'{col}.eq."{escaped}"'
+
+
+def _postgrest_and_clause_for_hcp(hcp: HCPRecord) -> str:
+    """Single and(...) filter matching this HCP's natural key (PostgREST or= syntax)."""
+    fn = hcp.first_name if hcp.first_name is not None else ""
+    ln = hcp.last_name if hcp.last_name is not None else ""
+    parts = [
+        _postgrest_eq_quoted("first_name", fn),
+        _postgrest_eq_quoted("last_name", ln),
+    ]
+    if hcp.institution is None:
+        parts.append("institution.is.null")
+    else:
+        parts.append(_postgrest_eq_quoted("institution", hcp.institution))
+    return f"and({','.join(parts)})"
+
+
+def _fetch_hcp_ids_for_batch(supabase: Client, batch: Sequence[HCPRecord]) -> Dict[str, str]:
+    """Resolve dedupe_key -> id for a batch via one select filtered by natural keys."""
+    if not batch:
+        return {}
+
+    or_filter = ",".join(_postgrest_and_clause_for_hcp(h) for h in batch)
+    try:
+        response = (
+            supabase.table("hcps")
+            .select("id,first_name,last_name,institution")
+            .or_(or_filter)
+            .execute()
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed batch select for HCP ids: {exc}") from exc
+
+    id_map: Dict[str, str] = {}
+    for row in response.data or []:
+        rid = row.get("id")
+        if not rid:
+            continue
+        key = build_dedupe_key(
+            row.get("first_name"),
+            row.get("last_name"),
+            row.get("institution"),
+        )
+        if key not in id_map:
+            id_map[key] = rid
+    return id_map
+
+
 def upsert_hcps(supabase: Client, hcps: Sequence[HCPRecord]) -> Dict[str, str]:
     if not hcps:
         return {}
 
-    # Upsert one-by-one to reliably get back each row id, even with nullable fields.
+    batch_size = 50
     id_map: Dict[str, str] = {}
-    for hcp in hcps:
-        row = {
-            "npi_number": None,
-            "first_name": hcp.first_name,
-            "last_name": hcp.last_name,
-            "credentials": hcp.credentials,
-            "institution": hcp.institution,
-            "city": hcp.city,
-            "state": hcp.state,
-            "zip_code": hcp.zip_code,
-            "country": hcp.country,
-            "specialty": hcp.specialty,
-            "subspecialty": hcp.subspecialty,
-            "opt_out": False,
-            "is_claimed": False,
-        }
 
-        # Upsert using natural uniqueness proxies. Requires a matching unique constraint in DB.
-        # If your table does not have this constraint, add one on (first_name, last_name, institution).
+    for i in range(0, len(hcps), batch_size):
+        batch = list(hcps[i : i + batch_size])
+        rows = [_hcp_row_dict(h) for h in batch]
+
         try:
-            response = (
-                supabase.table("hcps")
-                .upsert(
-                    row,
-                    on_conflict="first_name,last_name,institution",
-                    returning="representation",
+            supabase.table("hcps").upsert(
+                rows,
+                on_conflict="first_name,last_name,institution",
+                returning="representation",
+            ).execute()
+        except Exception as exc:
+            raise RuntimeError(f"Failed batch upsert HCPs (batch starting at {i}): {exc}") from exc
+
+        batch_ids = _fetch_hcp_ids_for_batch(supabase, batch)
+        for hcp in batch:
+            rid = batch_ids.get(hcp.dedupe_key)
+            if rid:
+                id_map[hcp.dedupe_key] = rid
+
+        missing = [h for h in batch if h.dedupe_key not in id_map]
+        for hcp in missing:
+            try:
+                q = (
+                    supabase.table("hcps")
+                    .select("id")
+                    .eq("first_name", hcp.first_name)
+                    .eq("last_name", hcp.last_name)
                 )
-                .execute()
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to upsert HCP record {hcp.dedupe_key}: {exc}") from exc
-
-        rows = response.data or []
-        if rows and rows[0].get("id"):
-            id_map[hcp.dedupe_key] = rows[0]["id"]
-
-    # Fallback query for any missed IDs (e.g., if API config returns minimal response).
-    missing = [hcp for hcp in hcps if hcp.dedupe_key not in id_map]
-    for hcp in missing:
-        try:
-            query = (
-                supabase.table("hcps")
-                .select("id")
-                .eq("first_name", hcp.first_name)
-                .eq("last_name", hcp.last_name)
-                .eq("institution", hcp.institution)
-                .limit(1)
-                .execute()
-            )
-            rows = query.data or []
-            if rows:
-                id_map[hcp.dedupe_key] = rows[0]["id"]
-        except Exception as exc:
-            raise RuntimeError(f"Failed to fetch HCP id for key {hcp.dedupe_key}: {exc}") from exc
+                if hcp.institution is None:
+                    q = q.is_("institution", "null")
+                else:
+                    q = q.eq("institution", hcp.institution)
+                query = q.limit(1).execute()
+                qrows = query.data or []
+                if qrows:
+                    id_map[hcp.dedupe_key] = qrows[0]["id"]
+            except Exception as exc:
+                raise RuntimeError(f"Failed to fetch HCP id for key {hcp.dedupe_key}: {exc}") from exc
 
     return id_map
 
@@ -636,14 +827,31 @@ def upsert_publications(
     if not publication_rows:
         return 0
 
-    try:
-        # Upsert assumes unique constraint on (hcp_id, pubmed_id).
-        supabase.table("publications").upsert(
-            publication_rows,
-            on_conflict="hcp_id,pubmed_id",
-        ).execute()
-    except Exception as exc:
-        raise RuntimeError(f"Failed to upsert publication records: {exc}") from exc
+    deduped: Dict[Tuple[str, str], Dict[str, object]] = {}
+    for row in publication_rows:
+        key = (row["hcp_id"], row["pubmed_id"])
+        if key not in deduped:
+            deduped[key] = row
+    publication_rows = list(deduped.values())
+
+    batch_size = 200
+    progress_every = 1000
+    processed = 0
+
+    for i in range(0, len(publication_rows), batch_size):
+        batch = publication_rows[i : i + batch_size]
+        try:
+            # Upsert assumes unique constraint on (hcp_id, pubmed_id).
+            supabase.table("publications").upsert(
+                batch,
+                on_conflict="hcp_id,pubmed_id",
+            ).execute()
+        except Exception as exc:
+            raise RuntimeError(f"Failed to upsert publication records batch starting at {i}: {exc}") from exc
+
+        processed += len(batch)
+        if processed % progress_every == 0:
+            print(f"Publication upsert progress: {processed}/{len(publication_rows)}")
 
     return len(publication_rows)
 
@@ -694,7 +902,7 @@ def run_author_enrichment_second_pass(
     For HCPs with sparse publication history, fetch career-spanning author publications.
     """
     low_pub_hcps = fetch_hcps_with_low_publication_counts(supabase, max_publications=2)
-    low_pub_hcps = low_pub_hcps[:200]
+    low_pub_hcps = low_pub_hcps[:500]
     if not low_pub_hcps:
         print("Second pass: no HCPs with fewer than 3 publications found.")
         return 0
@@ -753,56 +961,125 @@ def run_author_enrichment_second_pass(
     return total_upserted
 
 
+def get_therapeutic_area_id_by_slug(supabase: Client, slug: str) -> str:
+    try:
+        response = (
+            supabase.table("therapeutic_areas")
+            .select("id")
+            .eq("slug", slug)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to query therapeutic area slug '{slug}': {exc}") from exc
+
+    rows = response.data or []
+    if not rows or not rows[0].get("id"):
+        raise RuntimeError(f"No therapeutic_areas row found for slug '{slug}'.")
+    return rows[0]["id"]
+
+
+def upsert_hcp_therapeutic_area_links(
+    supabase: Client,
+    hcp_ids: Sequence[str],
+    therapeutic_area_id: str,
+) -> int:
+    if not hcp_ids:
+        return 0
+
+    unique_hcp_ids = list({hcp_id for hcp_id in hcp_ids if hcp_id})
+    if not unique_hcp_ids:
+        return 0
+
+    rows = [
+        {
+            "hcp_id": hcp_id,
+            "therapeutic_area_id": therapeutic_area_id,
+            "strength_score": 0,
+        }
+        for hcp_id in unique_hcp_ids
+    ]
+
+    try:
+        supabase.table("hcp_therapeutic_areas").upsert(
+            rows,
+            on_conflict="hcp_id,therapeutic_area_id",
+        ).execute()
+    except Exception as exc:
+        raise RuntimeError(f"Failed to upsert hcp_therapeutic_areas links: {exc}") from exc
+
+    return len(rows)
+
+
 def run_pipeline() -> None:
     base_url = os.getenv("PUBMED_API_BASE", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils")
     tool_name = os.getenv("PUBMED_TOOL", "fieldmark_pubmed_pipeline")
     email = os.getenv("PUBMED_EMAIL")
-    days_back = int(os.getenv("PUBMED_DAYS_BACK", "365"))
-    max_results = int(os.getenv("PUBMED_MAX_RESULTS", "200"))
+    days_back = int(os.getenv("PUBMED_DAYS_BACK", "1460"))
+    max_results = int(os.getenv("PUBMED_MAX_RESULTS", "2000"))
     per_call = int(os.getenv("PUBMED_RETMAX_PER_CALL", "100"))
 
     session = build_http_session()
     supabase = init_supabase()
 
-    print("Searching PubMed...")
-    pmids = pubmed_esearch(
-        session=session,
-        base_url=base_url,
-        query=PUBMED_QUERY,
-        days_back=days_back,
-        max_results=max_results,
-        per_call=per_call,
-        email=email,
-        tool_name=tool_name,
-    )
-    if not pmids:
-        print("No PubMed results found for the specified query window.")
-        return
-    print(f"Found {len(pmids)} publication IDs.")
+    query_plan = [
+    ("hepatology", PUBMED_QUERY_HEPATOLOGY_US, "Hepatology US"),
+    ("nsclc", PUBMED_QUERY_NSCLC_US, "NSCLC US"),
+    ]
 
-    print("Fetching publication details...")
-    articles = pubmed_efetch(
-        session=session,
-        base_url=base_url,
-        pmids=pmids,
-        email=email,
-        tool_name=tool_name,
-    )
-    if not articles:
-        print("No article payloads returned by efetch.")
-        return
+    for ta_slug, query_text, query_label in query_plan:
+        print(f"\n--- Processing query: {query_label} ({ta_slug}) ---")
 
-    hcps_by_key, publication_records = extract_records(articles)
-    unique_hcps = list(hcps_by_key.values())
-    print(f"Extracted {len(unique_hcps)} unique HCP profiles and {len(publication_records)} author-publication links.")
+        therapeutic_area_id = get_therapeutic_area_id_by_slug(supabase, ta_slug)
+        print(f"Resolved therapeutic_area_id={therapeutic_area_id}")
 
-    print("Upserting HCPs into Supabase...")
-    hcp_id_map = upsert_hcps(supabase, unique_hcps)
-    print(f"Mapped {len(hcp_id_map)} HCP keys to DB IDs.")
+        print("Searching PubMed...")
+        pmids = pubmed_esearch(
+            session=session,
+            base_url=base_url,
+            query=query_text,
+            days_back=days_back,
+            max_results=max_results,
+            per_call=per_call,
+            email=email,
+            tool_name=tool_name,
+        )
+        if not pmids:
+            print(f"No PubMed results found for {query_label}.")
+            continue
+        print(f"Found {len(pmids)} publication IDs.")
 
-    print("Upserting publications into Supabase...")
-    inserted_or_updated = upsert_publications(supabase, publication_records, hcp_id_map)
-    print(f"Upserted {inserted_or_updated} publication rows.")
+        print("Fetching publication details...")
+        articles = pubmed_efetch(
+            session=session,
+            base_url=base_url,
+            pmids=pmids,
+            email=email,
+            tool_name=tool_name,
+        )
+        if not articles:
+            print(f"No article payloads returned by efetch for {query_label}.")
+            continue
+
+        hcps_by_key, publication_records = extract_records(articles)
+        unique_hcps = list(hcps_by_key.values())
+        print(f"Extracted {len(unique_hcps)} unique HCP profiles and {len(publication_records)} author-publication links.")
+
+        print("Upserting HCPs into Supabase...")
+        hcp_id_map = upsert_hcps(supabase, unique_hcps)
+        print(f"Mapped {len(hcp_id_map)} HCP keys to DB IDs.")
+
+        print("Upserting publications into Supabase...")
+        inserted_or_updated = upsert_publications(supabase, publication_records, hcp_id_map)
+        print(f"Upserted {inserted_or_updated} publication rows.")
+
+        print("Upserting HCP therapeutic area links...")
+        link_count = upsert_hcp_therapeutic_area_links(
+            supabase=supabase,
+            hcp_ids=list(hcp_id_map.values()),
+            therapeutic_area_id=therapeutic_area_id,
+        )
+        print(f"Upserted {link_count} hcp_therapeutic_areas rows for {query_label}.")
 
     print("Starting second pass author enrichment...")
     second_pass_count = run_author_enrichment_second_pass(

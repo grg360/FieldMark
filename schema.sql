@@ -36,6 +36,7 @@ create table hcps (
   subspecialty   text,                  -- e.g. 'CAR-T / Cell Therapy'
   opt_out        boolean default false, -- HCP privacy: opt-out flag
   is_claimed     boolean default false, -- HCP has verified their own profile
+  total_career_pubs integer,            -- OpenAlex author works_count when enriched
   created_at     timestamp with time zone default now(),
   updated_at     timestamp with time zone default now()
 );
@@ -205,3 +206,8 @@ create policy "contributions_auth_read" on msl_contributions
   for select to authenticated using (true);
 create policy "contributions_owner_insert" on msl_contributions
   for insert with check (auth.uid() = contributor_id);
+
+-- Migration for databases created before total_career_pubs existed on hcps:
+-- alter table hcps add column if not exists total_career_pubs integer;
+-- alter table hcps add column if not exists institution_full text;
+-- alter table hcps add column if not exists country text;
