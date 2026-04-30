@@ -5,6 +5,8 @@ export interface HCP {
   institution: string;
   country: string;
   therapeutic_area: string;
+  narrative?: string | null;
+  tier?: string | null;
 }
 
 export interface HCPScore {
@@ -16,6 +18,7 @@ export interface HCPScore {
   career_multiplier: number;
   first_pub_year: number;
   stored_pubs: number;
+  tier?: string | null;
 }
 
 export interface RisingStar extends HCP, HCPScore {}

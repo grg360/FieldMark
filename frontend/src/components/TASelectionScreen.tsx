@@ -9,26 +9,26 @@ const taOptions = [
   {
     name: "Rare Disease",
     descriptor: "Ultra-orphan and orphan conditions",
-    count: "847 rising stars identified",
-    darkHorses: "47 dark horses",
+    count: "2,034 rising stars",
+    darkHorses: "40 dark horses",
   },
   {
     name: "Oncology",
     descriptor: "Solid tumors, hematologic malignancies, immunotherapy",
-    count: "2,341 rising stars identified",
-    darkHorses: "183 dark horses",
+    count: "6,549 rising stars",
+    darkHorses: "40 dark horses",
   },
   {
     name: "Immunology",
     descriptor: "Autoimmune, inflammatory, and allergic conditions",
-    count: "1,204 rising stars identified",
-    darkHorses: "94 dark horses",
+    count: "Pipeline launching Q3 2026",
+    darkHorses: "",
   },
   {
     name: "Hepatology",
     descriptor: "Liver disease, cholestatic and metabolic conditions",
-    count: "612 rising stars identified",
-    darkHorses: "41 dark horses",
+    count: "2,753 rising stars",
+    darkHorses: "40 dark horses",
   },
 ];
 
@@ -97,27 +97,31 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
         >
           {taOptions.map((ta) => {
             const isSelected = selected === ta.name;
+            const isImmunology = ta.name === "Immunology";
             return (
               <button
                 key={ta.name}
-                onClick={() => setSelected(ta.name)}
+                onClick={() => {
+                  if (!isImmunology) setSelected(ta.name);
+                }}
                 className="fm-ta-card"
                 style={{
                   width: "100%",
                   borderRadius: 4,
                   padding: 16,
-                  border: isSelected ? "1px solid #E8A020" : "1px solid #1E1E22",
-                  backgroundColor: isSelected ? "#0D0D0A" : "#111113",
-                  cursor: "pointer",
+                  border: isImmunology ? "1px solid #1E1E22" : isSelected ? "1px solid #E8A020" : "1px solid #1E1E22",
+                  backgroundColor: isSelected && !isImmunology ? "#0D0D0A" : "#111113",
+                  cursor: isImmunology ? "not-allowed" : "pointer",
                   textAlign: "left",
                   color: "inherit",
+                  pointerEvents: isImmunology ? "none" : "auto",
                 }}
               >
                 <div
                   style={{
                     fontSize: 15,
                     fontWeight: 500,
-                    color: isSelected ? "#E8A020" : "#E8E6DF",
+                    color: isImmunology ? "#6B6A65" : isSelected ? "#E8A020" : "#E8E6DF",
                   }}
                 >
                   {ta.name}
@@ -132,37 +136,43 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                   {ta.descriptor}
                 </div>
                 <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      fontSize: 11,
-                      fontFamily: "monospace",
-                      backgroundColor: "#1A1200",
-                      border: "1px solid #E8A020",
-                      color: "#E8A020",
-                      padding: "2px 8px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    {ta.count}
-                  </span>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      fontSize: 11,
-                      fontFamily: "monospace",
-                      backgroundColor: "#0D0A1A",
-                      border: "1px solid #9B6DFF",
-                      color: "#9B6DFF",
-                      padding: "2px 8px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    <span style={{ fontSize: 10 }}>♞</span>
-                    {ta.darkHorses}
-                  </span>
+                  {isImmunology ? (
+                    <span style={{ fontSize: 11, color: "#3A3A3F" }}>{ta.count}</span>
+                  ) : (
+                    <>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          fontSize: 11,
+                          fontFamily: "monospace",
+                          backgroundColor: "#1A1200",
+                          border: "1px solid #E8A020",
+                          color: "#E8A020",
+                          padding: "2px 8px",
+                          borderRadius: 3,
+                        }}
+                      >
+                        {ta.count}
+                      </span>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: 11,
+                          fontFamily: "monospace",
+                          backgroundColor: "#0D0A1A",
+                          border: "1px solid #9B6DFF",
+                          color: "#9B6DFF",
+                          padding: "2px 8px",
+                          borderRadius: 3,
+                        }}
+                      >
+                        <span style={{ fontSize: 10 }}>♞</span>
+                        {ta.darkHorses}
+                      </span>
+                    </>
+                  )}
                 </div>
               </button>
             );

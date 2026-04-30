@@ -3,6 +3,56 @@ import { HCP } from "../data/hcpData";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
+const getCountryCode = (country: string | null): string | null => {
+  if (!country) return null;
+  const c = country.trim().replace(/\.$/, "").toLowerCase();
+  const codes: Record<string, string> = {
+    usa: "us",
+    "united states": "us",
+    us: "us",
+    germany: "de",
+    japan: "jp",
+    uk: "gb",
+    "united kingdom": "gb",
+    france: "fr",
+    italy: "it",
+    spain: "es",
+    canada: "ca",
+    australia: "au",
+    netherlands: "nl",
+    sweden: "se",
+    norway: "no",
+    denmark: "dk",
+    finland: "fi",
+    switzerland: "ch",
+    austria: "at",
+    belgium: "be",
+    israel: "il",
+    china: "cn",
+    "south korea": "kr",
+    korea: "kr",
+    india: "in",
+    brazil: "br",
+    argentina: "ar",
+    mexico: "mx",
+    singapore: "sg",
+    taiwan: "tw",
+    portugal: "pt",
+    greece: "gr",
+    poland: "pl",
+    turkey: "tr",
+    russia: "ru",
+    ireland: "ie",
+    "south africa": "za",
+    egypt: "eg",
+    "saudi arabia": "sa",
+    nigeria: "ng",
+    kenya: "ke",
+    ghana: "gh",
+  };
+  return codes[c] || null;
+};
+
 function isDarkHorse(hcp: HCP): boolean {
   if (hcp.score < 85) return false;
   const citNum = parseFloat(hcp.citTraj.replace("%", "").replace("+", ""));
@@ -22,6 +72,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const darkHorse = isDarkHorse(hcp);
+  const countryCode = getCountryCode(hcp.country ?? null);
 
   function handleCardClick() {
     if (activeTooltip) {
@@ -51,29 +102,44 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
           cursor: "pointer",
         }}
       >
-        {/* Row 1: Name + Score */}
+        {/* Row 1: Name + Country + Score */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
+          <span style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
             {hcp.name}
           </span>
-          <button
-            onClick={handleScoreBadgeClick}
-            onTouchEnd={handleScoreBadgeClick}
-            style={{
-              fontSize: 12,
-              fontFamily: "monospace",
-              color: "#E8A020",
-              backgroundColor: "#1A1200",
-              border: "1px solid #E8A020",
-              borderRadius: 3,
-              padding: "2px 8px",
-              cursor: "pointer",
-              userSelect: "none",
-              lineHeight: "inherit",
-            }}
-          >
-            {hcp.score.toFixed(1)}
-          </button>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {countryCode && (
+              <img
+                src={`https://flagcdn.com/16x12/${countryCode}.png`}
+                srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
+                width="16"
+                height="12"
+                alt={hcp.country || ""}
+                style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0, marginRight: "6px" }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            )}
+            <button
+              onClick={handleScoreBadgeClick}
+              onTouchEnd={handleScoreBadgeClick}
+              style={{
+                fontSize: 14,
+                fontFamily: "monospace",
+                color: "#E8A020",
+                backgroundColor: "#1A1200",
+                border: "1px solid #E8A020",
+                borderRadius: 3,
+                padding: "2px 8px",
+                cursor: "pointer",
+                userSelect: "none",
+                lineHeight: "inherit",
+              }}
+            >
+              {hcp.score.toFixed(1)}
+            </button>
+          </div>
         </div>
 
         {/* Dark Horse badge */}
@@ -96,14 +162,30 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
           </div>
         )}
 
-        {/* Row 2: Institution + Specialty */}
-        <div style={{ fontSize: 12, color: "#6B6A65", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
-          {hcp.institution} · {hcp.specialty}
+        {/* Row 2: Institution */}
+        <div style={{ fontSize: 14, color: "#6B6A65", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
+          {hcp.institution}
         </div>
 
-        {/* Row 3: Explanation */}
-        <div style={{ fontSize: 12, color: "#B8B4AC", fontFamily: "system-ui, sans-serif", lineHeight: 1.5, marginTop: 8 }}>
-        </div>
+        {/* Row 3: Narrative */}
+        {hcp.narrative ? (
+          <div
+            style={{
+              fontSize: 14,
+              color: "#B8B4AC",
+              fontFamily: "system-ui, sans-serif",
+              lineHeight: 1.5,
+              marginTop: 8,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {hcp.narrative}
+          </div>
+        ) : null}
 
         {/* Row 4: Stat pills */}
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>

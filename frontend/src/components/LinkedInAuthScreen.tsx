@@ -122,7 +122,7 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
             lineHeight: 1.4,
           }}
         >
-          Rising stars your KOL database misses.
+          We see the nebula. Not just the star.
         </div>
         <div
           style={{
@@ -132,7 +132,7 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
             marginTop: 12,
           }}
         >
-          Built for MSLs. Verified field intelligence on emerging HCPs in Rare Disease, Oncology, and Immunology.
+          Rising star intelligence for pharma field medical teams. Find the experts before the field does.
         </div>
       </div>
 

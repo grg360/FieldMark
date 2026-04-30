@@ -29,8 +29,8 @@ const EMPTY_HCP: AppHCP = {
   score: 0,
   explanation: "",
   pubVel: "0.0x",
-  citTraj: "+0%",
-  trials: "0 active",
+  citTraj: "—",
+  trials: "—",
 };
 
 function getTASlug(ta: string): string {
@@ -51,14 +51,24 @@ function formatPublicationVelocity(value: number): string {
 }
 
 function formatCitationTrajectory(value: number): string {
-  if (!Number.isFinite(value)) return "+0%";
+  if (!Number.isFinite(value) || value <= 0) return "—";
   const rounded = Math.round(value);
   return `${rounded >= 0 ? "+" : ""}${rounded}%`;
 }
 
 function formatTrials(value: number): string {
-  const count = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  const count = Math.max(0, Math.round(value));
   return `${count} active`;
+}
+
+function formatTherapeuticAreaLabel(value: string): string {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "nsclc") return "NSCLC";
+  if (v === "rare-disease") return "Rare Disease";
+  if (v === "hepatology") return "Hepatology";
+  if (v === "oncology") return "Oncology";
+  return value;
 }
 
 function mapRisingStarToHCP(item: RisingStar): AppHCP {
@@ -67,12 +77,15 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     hcp_id: item.hcp_id ?? item.id ?? "",
     name: `${item.first_name} ${item.last_name}`.trim(),
     institution: item.institution,
-    specialty: item.therapeutic_area,
+    specialty: formatTherapeuticAreaLabel(item.therapeutic_area),
     score: item.composite_score,
-    explanation: "Supabase profile",
+    explanation: item.narrative ?? "Narrative generating — check back soon.",
     pubVel: formatPublicationVelocity(item.pub_velocity),
     citTraj: formatCitationTrajectory(item.citation_trajectory),
     trials: formatTrials(item.trial_score),
+    country: item.country ?? null,
+    narrative: item.narrative ?? null,
+    tier: item.tier ?? null,
   };
 }
 
@@ -91,7 +104,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("auth");
   const [selectedTA, setSelectedTA] = useState("Rare Disease");
   const [selectedIndication, setSelectedIndication] = useState("All");
-  const [indicationCount, setIndicationCount] = useState(847);
+  const [indicationCount, setIndicationCount] = useState(2034);
   const [trayOpen, setTrayOpen] = useState(false);
   const [activeHCP, setActiveHCP] = useState<AppHCP | null>(null);
   const [detailHCP, setDetailHCP] = useState<AppHCP>(EMPTY_HCP);
@@ -101,11 +114,37 @@ export default function App() {
   const [darkHorseFilter, setDarkHorseFilter] = useState(false);
   const [hcpList, setHcpList] = useState<AppHCP[]>([]);
   const [loadingHCPs, setLoadingHCPs] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [refreshingFeed, setRefreshingFeed] = useState(false);
+
+  function formatUpdatedLabel() {
+    if (!lastUpdatedAt) return "Updated just now";
+    const diffMs = Date.now() - lastUpdatedAt.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins <= 0) return "Updated just now";
+    if (mins === 1) return "Updated 1 min ago";
+    return `Updated ${mins} mins ago`;
+  }
+
+  async function fetchHCPs(loadingAsRefresh = false) {
+    try {
+      if (loadingAsRefresh) setRefreshingFeed(true);
+      else setLoadingHCPs(true);
+      const taSlug = getTASlug(selectedTA);
+      const { data } = await getRisingStars(taSlug, 20);
+      const mapped = (data ?? []).map(mapRisingStarToHCP);
+      setHcpList(mapped);
+      setLastUpdatedAt(new Date());
+    } finally {
+      if (loadingAsRefresh) setRefreshingFeed(false);
+      else setLoadingHCPs(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchHCPs() {
+    async function fetchData() {
       setLoadingHCPs(true);
       const taSlug = getTASlug(selectedTA);
       const { data } = await getRisingStars(taSlug, 20);
@@ -113,10 +152,11 @@ export default function App() {
 
       const mapped = (data ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
+      setLastUpdatedAt(new Date());
       setLoadingHCPs(false);
     }
 
-    fetchHCPs();
+    fetchData();
 
     return () => {
       cancelled = true;
@@ -280,7 +320,12 @@ export default function App() {
         overflowX: "hidden",
       }}
     >
-      <TopBar onSearchPress={() => setCurrentScreen("search")} onProfilePress={() => setCurrentScreen("profile")} />
+      <TopBar
+        onSearchPress={() => setCurrentScreen("search")}
+        onProfilePress={() => setCurrentScreen("profile")}
+        onRefreshPress={() => void fetchHCPs(true)}
+        refreshing={refreshingFeed}
+      />
 
       {/* Dark Horse filter chip */}
       <div style={{ padding: "8px 16px 0" }}>
@@ -301,10 +346,9 @@ export default function App() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, color: "#9B6DFF" }}>♞</span>
-            <span className="fm-dh-chip-label" style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horses</span>
-            <span className="fm-dh-chip-sub" style={{ fontSize: 12, color: "#6B6A65", fontFamily: "system-ui, sans-serif" }}>· your territory</span>
+            <span className="fm-dh-chip-label" style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horses · your territory</span>
           </div>
-          <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>8 identified</span>
+          <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>40 identified</span>
         </button>
       </div>
 
@@ -319,6 +363,9 @@ export default function App() {
           setIndicationCount(count);
         }}
       />
+      <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
+        {formatUpdatedLabel()}
+      </div>
 
       {/* Section header */}
       <div
@@ -332,7 +379,7 @@ export default function App() {
         <span
           className="fm-section-header-left"
           style={{
-            fontSize: 13,
+            fontSize: 15,
             fontWeight: 500,
             color: darkHorseFilter ? "#9B6DFF" : "#E8E6DF",
             fontFamily: "system-ui, sans-serif",
@@ -348,12 +395,12 @@ export default function App() {
           <span
             className="fm-section-header-right"
             style={{
-              fontSize: 12,
+              fontSize: 15,
               color: darkHorseFilter ? "#9B6DFF" : "#6B6A65",
               fontFamily: "monospace",
             }}
           >
-            {darkHorseFilter ? "8 identified" : `${indicationCount.toLocaleString()} identified`}
+            {darkHorseFilter ? "40 identified" : `${indicationCount.toLocaleString()} identified`}
           </span>
           <button
             onClick={() => setCurrentScreen("landscape")}
@@ -387,7 +434,7 @@ export default function App() {
           <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
         ) : (
           hcpList
-          .filter((hcp) => !darkHorseFilter || isDarkHorse(hcp))
+          .filter((hcp) => !darkHorseFilter || hcp.tier === "dark_horse" || isDarkHorse(hcp))
           .map((hcp) => (
             <HCPCard
               key={hcp.id}

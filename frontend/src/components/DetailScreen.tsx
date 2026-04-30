@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { supabase } from "../lib/supabase";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -48,10 +47,10 @@ const MetricPill = ({ label, value }: { label: string; value: string | number })
       gap: 4,
     }}
   >
-    <span style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+    <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em" }}>
       {label}
     </span>
-    <span style={{ fontSize: 16, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500 }}>{value}</span>
+    <span style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500 }}>{value}</span>
   </div>
 );
 
@@ -85,8 +84,7 @@ function ScoreRow({ label, value, percent, activeTooltip, onTooltipChange }: {
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
-  const [narrative, setNarrative] = useState("");
-  const [narrativeLoading, setNarrativeLoading] = useState(true);
+  const narrative = hcp.narrative || "Narrative generating — check back soon.";
 
   const pubTimeline = [
     { year: 2020, value: 2 },
@@ -108,56 +106,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
   const allValidated =
     validation.dataMatch && validation.engagement && validation.credibility && validation.momentum;
-
-  useEffect(() => {
-    const resolvedHcpId = (hcp as HCP & { hcp_id?: string | number | null }).hcp_id ?? hcp.id;
-    if (
-      resolvedHcpId === null ||
-      resolvedHcpId === undefined ||
-      (typeof resolvedHcpId === "string" && resolvedHcpId.trim() === "")
-    ) {
-      setNarrative("Narrative generating — check back soon.");
-      setNarrativeLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function fetchNarrative() {
-      setNarrativeLoading(true);
-      console.log("DetailScreen narrative query hcp id:", {
-        hcpId: resolvedHcpId,
-        hcp_id: (hcp as HCP & { hcp_id?: string | number | null }).hcp_id,
-        id: hcp.id,
-      });
-
-      try {
-        const { data } = await supabase
-          .from("hcp_narratives")
-          .select("narrative")
-          .eq("hcp_id", String(resolvedHcpId))
-          .maybeSingle();
-
-        if (!cancelled) {
-          setNarrative(data?.narrative ?? "Narrative generating — check back soon.");
-        }
-      } catch {
-        if (!cancelled) {
-          setNarrative("Narrative generating — check back soon.");
-        }
-      } finally {
-        if (!cancelled) {
-          setNarrativeLoading(false);
-        }
-      }
-    }
-
-    fetchNarrative();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hcp]);
 
   return (
     <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto" }}>
@@ -187,7 +135,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           }}
         >
           <BackArrow />
-          <span style={{ fontSize: 13, color: "#6B6A65" }}>Rising stars</span>
+          <span style={{ fontSize: 15, color: "#6B6A65" }}>Rising stars</span>
         </button>
         <button style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <ShareIcon />
@@ -205,8 +153,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           }}
         >
           <div className="fm-detail-heading" style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}>{hcp.name}</div>
-          <div className="fm-detail-subheading" style={{ fontSize: 13, color: "#6B6A65", marginBottom: 12 }}>
-            {hcp.institution} · {hcp.specialty}
+          <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
+            {hcp.institution}
           </div>
           {/* Metric pills: hidden on tablet (shown in right column instead) */}
           <div className="fm-detail-metric-pills-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -254,33 +202,19 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 11, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
             Why rising star
           </div>
           <div
             style={{
               borderLeft: "3px solid #E8A020",
               paddingLeft: 12,
-              fontSize: 13,
+              fontSize: 14,
               color: "#B8B4AC",
               lineHeight: 1.6,
             }}
           >
-            {narrativeLoading ? (
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 14,
-                  height: 14,
-                  border: "2px solid #3A3A3F",
-                  borderTop: "2px solid #E8A020",
-                  borderRadius: "50%",
-                  animation: "fm-spin 1s linear infinite",
-                }}
-              />
-            ) : (
-              narrative
-            )}
+            {narrative}
           </div>
         </div>
 
@@ -291,7 +225,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 11, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Score breakdown
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -309,7 +243,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 11, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Publication timeline
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
@@ -376,7 +310,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 11, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Validate this signal
           </div>
 
@@ -463,7 +397,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
         {/* Field notes */}
         <div style={{ padding: "16px 0 24px" }}>
-          <div style={{ fontSize: 11, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Field notes
           </div>
 

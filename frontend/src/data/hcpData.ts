@@ -8,6 +8,10 @@ export interface HCP {
   pubVel: string;
   citTraj: string;
   trials: string;
+  country?: string | null;
+  narrative?: string | null;
+  tier?: string | null;
+  hcp_id?: string;
 }
 
 export const hcpData: HCP[] = [

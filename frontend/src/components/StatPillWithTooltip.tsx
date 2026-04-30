@@ -138,10 +138,10 @@ export function StatPillWithTooltip({
               gap: 2,
             }}
           >
-            <span style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {label}
             </span>
-            <span style={{ fontSize: 11, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500 }}>
+            <span style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500 }}>
               {value}
             </span>
           </div>

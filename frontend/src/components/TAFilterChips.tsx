@@ -9,7 +9,7 @@ interface IndicationInfo {
 
 const INDICATIONS: Record<string, IndicationInfo[]> = {
   "Rare Disease": [
-    { label: "All", count: 847 },
+    { label: "All", count: 2034 },
     { label: "Fabry disease", count: 94 },
     { label: "Huntington's", count: 67 },
     { label: "Sickle cell", count: 143 },
@@ -18,7 +18,7 @@ const INDICATIONS: Record<string, IndicationInfo[]> = {
     { label: "Pompe", count: 49 },
   ],
   Oncology: [
-    { label: "All", count: 2341 },
+    { label: "All", count: 6549 },
     { label: "NSCLC", count: 287 },
     { label: "CAR-T", count: 198 },
     { label: "DLBCL", count: 124 },
@@ -35,7 +35,7 @@ const INDICATIONS: Record<string, IndicationInfo[]> = {
     { label: "CIDP", count: 61 },
   ],
   Hepatology: [
-    { label: "All", count: 612 },
+    { label: "All", count: 2753 },
     { label: "PBC", count: 134 },
     { label: "NASH", count: 247 },
     { label: "PSC", count: 71 },
@@ -55,6 +55,7 @@ export default function TAFilterChips({ selected, onSelect, onIndicationChange }
   const [selectedIndication, setSelectedIndication] = useState("All");
 
   function handleTAClick(chip: string) {
+    if (chip === "Immunology") return;
     if (chip === selected) {
       setIndicationOpen((prev) => !prev);
     } else {
@@ -91,6 +92,7 @@ export default function TAFilterChips({ selected, onSelect, onIndicationChange }
       >
         {TA_CHIPS.map((chip) => {
           const isSelected = chip === selected;
+          const isImmunology = chip === "Immunology";
           return (
             <button
               key={chip}
@@ -100,21 +102,22 @@ export default function TAFilterChips({ selected, onSelect, onIndicationChange }
                 flexShrink: 0,
                 padding: "6px 12px",
                 borderRadius: 4,
-                fontSize: 12,
+                fontSize: 14,
                 fontFamily: "system-ui, sans-serif",
-                cursor: "pointer",
+                cursor: isImmunology ? "not-allowed" : "pointer",
                 whiteSpace: "nowrap",
-                background: isSelected ? "#1A1A1E" : "transparent",
-                border: isSelected ? "1px solid #E8A020" : "1px solid #16161A",
-                color: isSelected ? "#E8A020" : "#3A3A3F",
+                background: isSelected && !isImmunology ? "#1A1A1E" : "transparent",
+                border: isImmunology ? "1px solid #1E1E22" : isSelected ? "1px solid #E8A020" : "1px solid #16161A",
+                color: isImmunology ? "#3A3A3F" : isSelected ? "#E8A020" : "#3A3A3F",
                 transition: "all 0.15s ease",
                 display: "flex",
                 alignItems: "center",
                 gap: 4,
+                pointerEvents: isImmunology ? "none" : "auto",
               }}
             >
               {chip}
-              {isSelected && (
+              {isSelected && !isImmunology && (
                 <svg
                   width="8"
                   height="8"
@@ -176,7 +179,7 @@ export default function TAFilterChips({ selected, onSelect, onIndicationChange }
                   flexShrink: 0,
                   padding: "4px 12px",
                   borderRadius: 4,
-                  fontSize: 11,
+                  fontSize: 13,
                   fontFamily: "system-ui, sans-serif",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
