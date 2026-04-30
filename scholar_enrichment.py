@@ -169,6 +169,73 @@ def extract_scholar_profile_link(search_html: str, first_name: str, last_name: s
     return None, None, "rejected: no scholar profile link found"
 
 
+def _parse_metric_int_from_text(text: str) -> Optional[int]:
+    text = (text or "").replace(",", "").strip()
+    match = re.search(r"\d+", text)
+    return int(match.group()) if match else None
+
+
+def _parse_metric_cell(cell) -> Optional[int]:
+    if cell is None:
+        return None
+    return _parse_metric_int_from_text(cell.get_text(" ", strip=True))
+
+
+def _all_time_td_index(tds: list) -> int:
+    """
+    Current Scholar rows: [label, all-time, since] -> all-time is td[1] (0-based).
+    Older rows with <th> label: [all-time, since] -> all-time is td[0].
+    """
+    if len(tds) >= 3:
+        return 1
+    if len(tds) == 2:
+        return 0
+    return 0
+
+
+def _is_gsc_rsb_header_row(tr) -> bool:
+    """First row is often empty / 'All' / 'Since 20xx' column headers."""
+    joined = tr.get_text(" ", strip=True).lower()
+    if "since" in joined and "all" in joined:
+        return True
+    ths = tr.find_all("th")
+    tds = tr.find_all("td")
+    if ths and not tds:
+        return True
+    if tds and len(tds) >= 2:
+        t0 = tds[0].get_text(strip=True).lower()
+        t1 = tds[1].get_text(strip=True).lower() if len(tds) > 1 else ""
+        if t0 == "" and t1 == "all":
+            return True
+    return False
+
+
+def _metrics_from_gsc_rsb_std_cells(std_cells: list) -> Dict[str, Optional[int]]:
+    """
+    Fallback: .gsc_rsb_std cells are usually ordered all, since, all, since, ...
+    for Citations, h-index, i10-index (6 cells) or three all-time-only cells.
+    """
+    out: Dict[str, Optional[int]] = {
+        "scholar_citations_total": None,
+        "scholar_h_index": None,
+        "scholar_i10_index": None,
+    }
+    if not std_cells:
+        return out
+    values: List[Optional[int]] = []
+    for cell in std_cells:
+        values.append(_parse_metric_cell(cell))
+    if len(values) >= 6:
+        out["scholar_citations_total"] = values[0]
+        out["scholar_h_index"] = values[2]
+        out["scholar_i10_index"] = values[4]
+    elif len(values) >= 3:
+        out["scholar_citations_total"] = values[0]
+        out["scholar_h_index"] = values[1]
+        out["scholar_i10_index"] = values[2]
+    return out
+
+
 def parse_profile_metrics(profile_html: str) -> Dict[str, Optional[int]]:
     soup = BeautifulSoup(profile_html, "html.parser")
     metric_values: Dict[str, Optional[int]] = {
@@ -177,28 +244,47 @@ def parse_profile_metrics(profile_html: str) -> Dict[str, Optional[int]]:
         "scholar_i10_index": None,
     }
 
-    # Google Scholar profile metrics table id usually gsc_rsb_st.
-    for row in soup.select("#gsc_rsb_st tr"):
-        cells = row.find_all(["th", "td"])
-        if len(cells) < 2:
-            continue
-        label = normalize_name(cells[0].get_text(" ", strip=True))
-        value_text = cells[1].get_text(" ", strip=True).replace(",", "")
-        match = re.search(r"\d+", value_text)
-        value = int(match.group()) if match else None
-        if value is None:
-            continue
-        if "citations" in label:
-            metric_values["scholar_citations_total"] = value
-        elif "h-index" in label or "h index" in label:
-            metric_values["scholar_h_index"] = value
-        elif "i10-index" in label or "i10 index" in label:
-            metric_values["scholar_i10_index"] = value
+    table = soup.select_one("table#gsc_rsb_st") or soup.select_one("#gsc_rsb_st")
+
+    if table is not None:
+        rows = table.find_all("tr")
+        start = 1 if rows and _is_gsc_rsb_header_row(rows[0]) else 0
+        data_rows: list = []
+        for tr in rows[start:]:
+            tds = tr.find_all("td")
+            if len(tds) < 2:
+                continue
+            data_rows.append(tr)
+
+        if len(data_rows) >= 1:
+            tds0 = data_rows[0].find_all("td")
+            i0 = _all_time_td_index(tds0)
+            metric_values["scholar_citations_total"] = _parse_metric_cell(tds0[i0]) if i0 < len(tds0) else None
+        if len(data_rows) >= 2:
+            tds1 = data_rows[1].find_all("td")
+            i1 = _all_time_td_index(tds1)
+            metric_values["scholar_h_index"] = _parse_metric_cell(tds1[i1]) if i1 < len(tds1) else None
+        if len(data_rows) >= 3:
+            tds2 = data_rows[2].find_all("td")
+            i2 = _all_time_td_index(tds2)
+            metric_values["scholar_i10_index"] = _parse_metric_cell(tds2[i2]) if i2 < len(tds2) else None
+
+    if any(metric_values[k] is None for k in metric_values):
+        scope = table if table is not None else soup
+        std_cells = scope.select(".gsc_rsb_std")
+        if not std_cells and table is None:
+            std_cells = soup.select(".gsc_rsb_std")
+        fb = _metrics_from_gsc_rsb_std_cells(std_cells)
+        for key in metric_values:
+            if metric_values[key] is None:
+                metric_values[key] = fb[key]
 
     return metric_values
 
 
-def scholar_lookup(first_name: str, last_name: str, scraper_api_key: str) -> Optional[Dict]:
+def scholar_lookup(
+    first_name: str, last_name: str, scraper_api_key: str
+) -> Optional[Dict]:
     query = quote(f"{first_name} {last_name}".strip())
     search_url = f"https://scholar.google.com/scholar?q={query}&as_sdt=0%2C5"
     search_html = scraperapi_fetch_html(scraper_api_key, search_url)
@@ -299,6 +385,13 @@ def run_pipeline() -> None:
             else:
                 update_hcp_scholar(supabase, hcp_id, payload)
                 stats.matched += 1
+                print(
+                    f"[Scholar matched] {first_name} {last_name} | "
+                    f"h={payload.get('scholar_h_index')} "
+                    f"cites={payload.get('scholar_citations_total')} "
+                    f"i10={payload.get('scholar_i10_index')}",
+                    flush=True,
+                )
         except Exception:
             # Graceful per-HCP exception handling.
             stats.failed += 1

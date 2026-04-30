@@ -164,11 +164,7 @@ def build_username_guesses(first_name: str, last_name: str) -> List[str]:
     return deduped
 
 
-def lookup_twitter_users_by_usernames(
-    session: requests.Session,
-    usernames: List[str],
-    debug_response: bool = False,
-) -> List[Dict]:
+def lookup_twitter_users_by_usernames(session: requests.Session, usernames: List[str]) -> List[Dict]:
     if not usernames:
         return []
     params = {
@@ -177,10 +173,6 @@ def lookup_twitter_users_by_usernames(
     }
     try:
         response = session.get(TWITTER_LOOKUP_URL, params=params, timeout=(5, 20))
-        if debug_response:
-            print(f"[DEBUG] Twitter URL: {response.url}", flush=True)
-            print(f"[DEBUG] Twitter status: {response.status_code}", flush=True)
-            print(f"[DEBUG] Twitter body: {response.text}", flush=True)
         response.raise_for_status()
         payload = response.json()
     except (requests.RequestException, ValueError):
@@ -265,7 +257,6 @@ def run_pipeline() -> None:
 
     started = time.time()
     processed_in_run = 0
-    first_api_debug_pending = True
     for hcp in hcps:
         hcp_id = hcp.get("id")
         first_name = str(hcp.get("first_name") or "").strip()
@@ -281,13 +272,7 @@ def run_pipeline() -> None:
         users: List[Dict] = []
         guesses = build_username_guesses(first_name, last_name)
         for guess in guesses:
-            users = lookup_twitter_users_by_usernames(
-                twitter_session,
-                [guess],
-                debug_response=first_api_debug_pending,
-            )
-            if first_api_debug_pending:
-                first_api_debug_pending = False
+            users = lookup_twitter_users_by_usernames(twitter_session, [guess])
             chosen_for_guess = select_candidate(users)
             if chosen_for_guess is not None:
                 users = [chosen_for_guess]

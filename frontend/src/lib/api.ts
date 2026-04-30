@@ -19,6 +19,8 @@ export interface HCPDetail extends RisingStar {
   trial_count: number;
 }
 
+type RisingStarWithNarrative = RisingStar & { narrative: string | null };
+
 function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
   const hcp = row.hcps ?? {};
 
@@ -47,7 +49,7 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
 export async function getRisingStars(
   therapeuticArea: string,
   limit: number = 20,
-): Promise<ApiResult<RisingStar[]>> {
+): Promise<ApiResult<RisingStarWithNarrative[]>> {
   try {
     const TA_ID_MAP: Record<string, string> = {
       "rare-disease": "833e7b38-d01b-409e-82c0-71eb29e138a0",
@@ -59,6 +61,7 @@ export async function getRisingStars(
 
     const taSlug = therapeuticArea.toLowerCase().trim();
     const taId = TA_ID_MAP[taSlug];
+    console.log("taId being used:", taId);
 
     if (!taId) {
       return { data: [], error: null };
@@ -82,6 +85,7 @@ export async function getRisingStars(
     }
 
     const hcpIds = scoreData.map((r) => r.hcp_id);
+    console.log("hcpIds being queried:", hcpIds);
     const { data: hcpData, error: hcpError } = await supabase
       .from("hcps")
       .select("id, first_name, last_name, institution, country")
@@ -93,15 +97,31 @@ export async function getRisingStars(
       return { data: null, error: hcpError.message };
     }
 
+    const { data: narrativeData } = await supabase
+      .from("hcp_narratives")
+      .select("hcp_id, narrative")
+      .in("hcp_id", hcpIds)
+      .eq("therapeutic_area_id", taId);
+    console.log("narrativeData returned:", narrativeData);
+
+    const narrativeMap = new Map(
+      (narrativeData || []).map((n) => [String(n.hcp_id), n.narrative as string | null]),
+    );
+    console.log("narrativeMap size:", narrativeMap?.size);
+
     const hcpById = new Map((hcpData ?? []).map((hcp) => [String(hcp.id), hcp]));
 
-    const risingStars: RisingStar[] = scoreData
+    const risingStars: RisingStarWithNarrative[] = scoreData
       .map((scoreRow) => {
         const hcp = hcpById.get(String(scoreRow.hcp_id));
         if (!hcp) return null;
-        return mapRisingStarRow({ ...scoreRow, hcps: hcp }, therapeuticArea);
+        const row = mapRisingStarRow({ ...scoreRow, hcps: hcp }, therapeuticArea);
+        return {
+          ...row,
+          narrative: narrativeMap.get(String(row.id)) || null,
+        };
       })
-      .filter((row): row is RisingStar => row !== null)
+      .filter((row): row is RisingStarWithNarrative => row !== null)
       .slice(0, limit);
 
     return { data: risingStars, error: null };
