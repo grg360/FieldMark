@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAllTACounts } from "../lib/api";
+import type { TACounts } from "../lib/types";
 
 interface TASelectionScreenProps {
   onContinue: (ta: string) => void;
@@ -9,31 +11,48 @@ const taOptions = [
   {
     name: "Rare Disease",
     descriptor: "Ultra-orphan and orphan conditions",
-    count: "2,034 rising stars",
-    darkHorses: "40 dark horses",
   },
   {
     name: "Oncology",
     descriptor: "Solid tumors, hematologic malignancies, immunotherapy",
-    count: "6,549 rising stars",
-    darkHorses: "40 dark horses",
-  },
-  {
-    name: "Immunology",
-    descriptor: "Autoimmune, inflammatory, and allergic conditions",
-    count: "Pipeline launching Q3 2026",
-    darkHorses: "",
   },
   {
     name: "Hepatology",
     descriptor: "Liver disease, cholestatic and metabolic conditions",
-    count: "2,753 rising stars",
-    darkHorses: "40 dark horses",
+  },
+  {
+    name: "Immunology",
+    descriptor: "Autoimmune, inflammatory, and allergic conditions",
   },
 ];
 
+function getSlugForTAName(name: string): string {
+  if (name === "Rare Disease") return "rare-disease";
+  if (name === "Oncology") return "nsclc";
+  if (name === "Hepatology") return "hepatology";
+  if (name === "Immunology") return "immunology";
+  return "rare-disease";
+}
+
 function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [counts, setCounts] = useState<Record<string, TACounts>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCounts() {
+      const { data } = await getAllTACounts();
+      if (cancelled) return;
+      setCounts(data ?? {});
+    }
+
+    loadCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div
@@ -98,6 +117,9 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
           {taOptions.map((ta) => {
             const isSelected = selected === ta.name;
             const isImmunology = ta.name === "Immunology";
+            const taCounts = counts[getSlugForTAName(ta.name)];
+            const risingStarsLabel = taCounts ? `${taCounts.rising_stars.toLocaleString()} rising stars` : "— rising stars";
+            const darkHorsesLabel = taCounts ? `${taCounts.dark_horses.toLocaleString()} dark horses` : "— dark horses";
             return (
               <button
                 key={ta.name}
@@ -117,62 +139,96 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                   pointerEvents: isImmunology ? "none" : "auto",
                 }}
               >
-                <div
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 500,
-                    color: isImmunology ? "#6B6A65" : isSelected ? "#E8A020" : "#E8E6DF",
-                  }}
-                >
-                  {ta.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#6B6A65",
-                    marginTop: 4,
-                  }}
-                >
-                  {ta.descriptor}
-                </div>
-                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {isImmunology ? (
-                    <span style={{ fontSize: 11, color: "#3A3A3F" }}>{ta.count}</span>
-                  ) : (
-                    <>
-                      <span
-                        style={{
-                          display: "inline-block",
-                          fontSize: 11,
-                          fontFamily: "monospace",
-                          backgroundColor: "#1A1200",
-                          border: "1px solid #E8A020",
-                          color: "#E8A020",
-                          padding: "2px 8px",
-                          borderRadius: 3,
-                        }}
-                      >
-                        {ta.count}
-                      </span>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: 11,
-                          fontFamily: "monospace",
-                          backgroundColor: "#0D0A1A",
-                          border: "1px solid #9B6DFF",
-                          color: "#9B6DFF",
-                          padding: "2px 8px",
-                          borderRadius: 3,
-                        }}
-                      >
-                        <span style={{ fontSize: 10 }}>♞</span>
-                        {ta.darkHorses}
-                      </span>
-                    </>
-                  )}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 500,
+                      color: isImmunology ? "#E8E6DF" : isSelected ? "#E8A020" : "#E8E6DF",
+                    }}
+                  >
+                    {ta.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#6B6A65",
+                      marginTop: 4,
+                      minHeight: 32,
+                      lineHeight: 1.35,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {ta.descriptor}
+                  </div>
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6, minHeight: 24 }}>
+                    {isImmunology ? (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            textTransform: "uppercase",
+                            backgroundColor: "#1F0D0D",
+                            border: "1px solid #D44A4A",
+                            color: "#D44A4A",
+                            padding: "2px 8px",
+                            borderRadius: 3,
+                          }}
+                        >
+                          COMING SOON
+                        </span>
+                        <span
+                          style={{
+                            marginTop: 8,
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            color: "#6B6A65",
+                          }}
+                        >
+                          Fall 2026
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            backgroundColor: "#1A1200",
+                            border: "1px solid #E8A020",
+                            color: "#E8A020",
+                            padding: "2px 8px",
+                            borderRadius: 3,
+                          }}
+                        >
+                          {risingStarsLabel}
+                        </span>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            backgroundColor: "#0D0A1A",
+                            border: "1px solid #9B6DFF",
+                            color: "#9B6DFF",
+                            padding: "2px 8px",
+                            borderRadius: 3,
+                          }}
+                        >
+                          <span style={{ fontSize: 10 }}>♞</span>
+                          {darkHorsesLabel}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </button>
             );

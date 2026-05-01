@@ -73,7 +73,6 @@ export default function TopBar({ onSearchPress, onProfilePress, onRefreshPress, 
         >
           <span
             style={{
-              fontSize: 10,
               fontSize: 12,
               color: "#6B6A65",
               fontFamily: "system-ui, sans-serif",

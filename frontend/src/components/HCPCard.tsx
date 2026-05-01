@@ -55,9 +55,9 @@ const getCountryCode = (country: string | null): string | null => {
 
 function isDarkHorse(hcp: HCP): boolean {
   if (hcp.score < 85) return false;
-  const citNum = parseFloat(hcp.citTraj.replace("%", "").replace("+", ""));
+  const citNum = Number(hcp.citTraj);
   if (isNaN(citNum) || citNum < 40) return false;
-  const trialsNum = parseInt(hcp.trials, 10);
+  const trialsNum = Number(hcp.trialScore);
   if (isNaN(trialsNum) || trialsNum < 2) return false;
   return true;
 }
@@ -71,7 +71,7 @@ interface HCPCardProps {
 export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
-  const darkHorse = isDarkHorse(hcp);
+  const darkHorse = hcp.tier === "dark_horse";
   const countryCode = getCountryCode(hcp.country ?? null);
 
   function handleCardClick() {
@@ -95,7 +95,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
         style={{
           backgroundColor: "#111113",
           border: "1px solid #1E1E22",
-          borderLeft: "3px solid #E8A020",
+          borderLeft: darkHorse ? "3px solid #9B6DFF" : "3px solid #E8A020",
           borderRadius: 4,
           margin: "0 16px 8px",
           padding: 12,
@@ -125,19 +125,20 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
               onClick={handleScoreBadgeClick}
               onTouchEnd={handleScoreBadgeClick}
               style={{
-                fontSize: 14,
+                fontSize: darkHorse ? 11 : 14,
                 fontFamily: "monospace",
-                color: "#E8A020",
-                backgroundColor: "#1A1200",
-                border: "1px solid #E8A020",
-                borderRadius: 3,
-                padding: "2px 8px",
+                color: darkHorse ? "#9B6DFF" : "#E8A020",
+                backgroundColor: darkHorse ? "#0D0A1A" : "#1A1200",
+                border: darkHorse ? "1px solid #9B6DFF" : "1px solid #E8A020",
+                borderRadius: darkHorse ? 2 : 3,
+                padding: darkHorse ? "2px 6px" : "2px 8px",
+                minHeight: 0,
                 cursor: "pointer",
                 userSelect: "none",
-                lineHeight: "inherit",
+                lineHeight: 1,
               }}
             >
-              {hcp.score.toFixed(1)}
+              {darkHorse ? "Top 5%" : hcp.score.toFixed(1)}
             </button>
           </div>
         </div>
@@ -189,11 +190,25 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
 
         {/* Row 4: Stat pills */}
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          {(["PUB VEL", "CIT TRAJ", "TRIALS"] as const).map((key) => (
+          {((darkHorse ? ["PUB VEL", "CIT TRAJ", "CAREER AGE"] : ["PUB VEL", "CIT TRAJ", "TRIALS"]) as const).map((key) => (
             <StatPillWithTooltip
               key={key}
               label={key}
-              value={key === "PUB VEL" ? hcp.pubVel : key === "CIT TRAJ" ? hcp.citTraj : hcp.trials}
+              value={
+                key === "PUB VEL"
+                  ? hcp.pubVel
+                  : key === "CIT TRAJ"
+                    ? hcp.citTraj == null
+                      ? "—"
+                      : `${Number(hcp.citTraj) >= 0 ? "+" : ""}${Number(hcp.citTraj).toFixed(1)}%`
+                    : key === "CAREER AGE"
+                      ? !hcp.firstPubYear || hcp.firstPubYear === 0
+                        ? "—"
+                        : `${new Date().getFullYear() - hcp.firstPubYear} yrs`
+                    : hcp.trialScore == null || hcp.trialScore === 0
+                      ? "—"
+                      : `${hcp.trialScore} active`
+              }
               tooltipKey={key}
               activeTooltip={activeTooltip}
               onTooltipChange={setActiveTooltip}

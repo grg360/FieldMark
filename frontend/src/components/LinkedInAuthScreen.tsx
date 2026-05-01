@@ -132,7 +132,9 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
             marginTop: 12,
           }}
         >
-          Rising star intelligence for pharma field medical teams. Find the experts before the field does.
+          Rising star intelligence for pharma field medical teams.
+          <br />
+          Find the experts before the field does.
         </div>
       </div>
 

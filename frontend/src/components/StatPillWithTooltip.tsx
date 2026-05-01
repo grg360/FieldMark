@@ -8,27 +8,31 @@ interface TooltipDef {
 const TOOLTIP_MAP: Record<string, TooltipDef> = {
   "PUB VEL": {
     title: "Publication velocity",
-    body: "Rate of new publications compared to the HCP's own historical baseline. 3.2x means publishing 3.2 times faster than their prior 3-year average.",
+    body: "Publication velocity measures how prolifically this HCP is publishing recently, expressed as a multiple of the field's typical pace for their specialty and career stage. A value of 3.0x means publishing three times as fast as peers.",
   },
   "CIT TRAJ": {
     title: "Citation trajectory",
-    body: "+41% means citations to this HCP's work are growing 41% faster than the field average for their specialty and career stage.",
+    body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
   },
   "TRIALS": {
     title: "Trial activity",
-    body: "Number of active clinical trials where this HCP holds an investigator or principal investigator role. Sourced from ClinicalTrials.gov.",
+    body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
+  },
+  "CAREER AGE": {
+    title: "Career age",
+    body: "Career age is calculated as years since this HCP's first published paper. A useful proxy for research career stage when CV data is unavailable.",
   },
   "Publication velocity": {
     title: "Publication velocity",
-    body: "Rate of new publications compared to the HCP's own historical baseline. 3.2x means publishing 3.2 times faster than their prior 3-year average.",
+    body: "Publication velocity measures how prolifically this HCP is publishing recently, expressed as a multiple of the field's typical pace for their specialty and career stage. A value of 3.0x means publishing three times as fast as peers.",
   },
   "Citation trajectory": {
     title: "Citation trajectory",
-    body: "+41% means citations to this HCP's work are growing 41% faster than the field average for their specialty and career stage.",
+    body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
   },
   "Trial activity": {
     title: "Trial activity",
-    body: "Number of active clinical trials where this HCP holds an investigator or principal investigator role. Sourced from ClinicalTrials.gov.",
+    body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
   },
   "Career age multiplier": {
     title: "Career age multiplier",

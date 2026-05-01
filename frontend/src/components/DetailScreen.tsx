@@ -3,15 +3,6 @@ import { HCP } from "../data/hcpData";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
-function isDarkHorse(hcp: HCP): boolean {
-  if (hcp.score < 85) return false;
-  const citNum = parseFloat(hcp.citTraj.replace("%", "").replace("+", ""));
-  if (isNaN(citNum) || citNum < 40) return false;
-  const trialsNum = parseInt(hcp.trials, 10);
-  if (isNaN(trialsNum) || trialsNum < 2) return false;
-  return true;
-}
-
 interface DetailScreenProps {
   hcp: HCP;
   onBack: () => void;
@@ -85,6 +76,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const narrative = hcp.narrative || "Narrative generating — check back soon.";
+  const formattedCitTraj =
+    hcp.citTraj == null ? "—" : `${Number(hcp.citTraj) >= 0 ? "+" : ""}${Number(hcp.citTraj)}%`;
 
   const pubTimeline = [
     { year: 2020, value: 2 },
@@ -167,12 +160,12 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             </button>
             <MetricPill label="Career age" value="4.2 yrs" />
             <MetricPill label="Pub velocity" value={hcp.pubVel} />
-            <MetricPill label="Citation trajectory" value={hcp.citTraj} />
+            <MetricPill label="Citation trajectory" value={formattedCitTraj} />
           </div>
         </div>
 
         {/* Dark Horse callout */}
-        {isDarkHorse(hcp) && (
+        {hcp.tier === "dark_horse" && (
           <div style={{ padding: "12px 16px 0" }}>
             <div
               style={{
@@ -189,7 +182,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                 <span style={{ fontSize: 11, color: "#6B6A65" }}>· top 8% of rising stars</span>
               </div>
               <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5, marginTop: 8 }}>
-                Dr. {hcp.name.split(" ").slice(1).join(" ")} meets all four Dark Horse criteria — composite score 85+, citation trajectory +40%, 2+ active trials, and career age under 8 years. Fewer than 1 in 12 rising stars qualify.
+                Dr. {hcp.last_name || hcp.name.split(" ").pop()} ranks in the top 5% of {hcp.specialty} rising stars by normalized score, with active publication velocity and citation momentum. Fewer than 2% of scored HCPs in this therapeutic area qualify.
               </div>
             </div>
           </div>
@@ -392,7 +385,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             </button>
             <MetricPill label="Career age" value="4.2 yrs" />
             <MetricPill label="Pub velocity" value={hcp.pubVel} />
-            <MetricPill label="Citation trajectory" value={hcp.citTraj} />
+            <MetricPill label="Citation trajectory" value={formattedCitTraj} />
           </div>
 
         {/* Field notes */}

@@ -12,9 +12,10 @@ import BibliographyScreen from "./components/BibliographyScreen";
 import ProfileScreen from "./components/ProfileScreen";
 import LandscapeScreen from "./components/LandscapeScreen";
 import CityFeedScreen from "./components/CityFeedScreen";
+import DOLHeroPanel from "./components/DOLHeroPanel";
 import type { HCP as UIHCP } from "./data/hcpData";
-import { getRisingStars } from "./lib/api";
-import type { RisingStar } from "./lib/types";
+import { getRisingStars, getTACounts } from "./lib/api";
+import type { RisingStar, TACounts } from "./lib/types";
 
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
@@ -27,10 +28,12 @@ const EMPTY_HCP: AppHCP = {
   institution: "",
   specialty: "",
   score: 0,
+  normalizedScore: 0,
+  firstPubYear: 0,
   explanation: "",
   pubVel: "0.0x",
-  citTraj: "—",
-  trials: "—",
+  citTraj: null,
+  trialScore: null,
 };
 
 function getTASlug(ta: string): string {
@@ -50,18 +53,6 @@ function formatPublicationVelocity(value: number): string {
   return `${value.toFixed(1)}x`;
 }
 
-function formatCitationTrajectory(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "—";
-  const rounded = Math.round(value);
-  return `${rounded >= 0 ? "+" : ""}${rounded}%`;
-}
-
-function formatTrials(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "—";
-  const count = Math.max(0, Math.round(value));
-  return `${count} active`;
-}
-
 function formatTherapeuticAreaLabel(value: string): string {
   const v = String(value || "").trim().toLowerCase();
   if (v === "nsclc") return "NSCLC";
@@ -79,10 +70,12 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     institution: item.institution,
     specialty: formatTherapeuticAreaLabel(item.therapeutic_area),
     score: item.composite_score,
+    normalizedScore: Number(item.normalized_score ?? 0),
+    firstPubYear: Number(item.first_pub_year ?? 0),
     explanation: item.narrative ?? "Narrative generating — check back soon.",
     pubVel: formatPublicationVelocity(item.pub_velocity),
-    citTraj: formatCitationTrajectory(item.citation_trajectory),
-    trials: formatTrials(item.trial_score),
+    citTraj: item.citTraj ?? null,
+    trialScore: item.trialScore ?? null,
     country: item.country ?? null,
     narrative: item.narrative ?? null,
     tier: item.tier ?? null,
@@ -91,9 +84,9 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
 
 function isDarkHorse(hcp: AppHCP): boolean {
   if (hcp.score < 85) return false;
-  const citNum = parseFloat(hcp.citTraj.replace("%", "").replace("+", ""));
+  const citNum = Number(hcp.citTraj);
   if (isNaN(citNum) || citNum < 40) return false;
-  const trialsNum = parseInt(hcp.trials, 10);
+  const trialsNum = Number(hcp.trialScore);
   if (isNaN(trialsNum) || trialsNum < 2) return false;
   return true;
 }
@@ -116,6 +109,7 @@ export default function App() {
   const [loadingHCPs, setLoadingHCPs] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
+  const [taCounts, setTaCounts] = useState<TACounts | null>(null);
 
   function formatUpdatedLabel() {
     if (!lastUpdatedAt) return "Updated just now";
@@ -131,7 +125,8 @@ export default function App() {
       if (loadingAsRefresh) setRefreshingFeed(true);
       else setLoadingHCPs(true);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(taSlug, 20);
+      const tier = darkHorseFilter ? "dark_horse" : undefined;
+      const { data } = await getRisingStars(taSlug, 20, { tier });
       const mapped = (data ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
       setLastUpdatedAt(new Date());
@@ -147,7 +142,8 @@ export default function App() {
     async function fetchData() {
       setLoadingHCPs(true);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(taSlug, 20);
+      const tier = darkHorseFilter ? "dark_horse" : undefined;
+      const { data } = await getRisingStars(taSlug, 20, { tier });
       if (cancelled) return;
 
       const mapped = (data ?? []).map(mapRisingStarToHCP);
@@ -157,6 +153,23 @@ export default function App() {
     }
 
     fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTA, darkHorseFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchCounts() {
+      const taSlug = getTASlug(selectedTA);
+      const { data } = await getTACounts(taSlug);
+      if (cancelled) return;
+      setTaCounts(data);
+    }
+
+    fetchCounts();
 
     return () => {
       cancelled = true;
@@ -346,9 +359,11 @@ export default function App() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, color: "#9B6DFF" }}>♞</span>
-            <span className="fm-dh-chip-label" style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horses · your territory</span>
+            <span className="fm-dh-chip-label" style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horses</span>
           </div>
-          <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>40 identified</span>
+          <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>
+            {`${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`}
+          </span>
         </button>
       </div>
 
@@ -366,6 +381,8 @@ export default function App() {
       <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
         {formatUpdatedLabel()}
       </div>
+
+      {!darkHorseFilter && <DOLHeroPanel taSlug={getTASlug(selectedTA)} />}
 
       {/* Section header */}
       <div
@@ -400,7 +417,9 @@ export default function App() {
               fontFamily: "monospace",
             }}
           >
-            {darkHorseFilter ? "40 identified" : `${indicationCount.toLocaleString()} identified`}
+            {darkHorseFilter
+              ? `${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`
+              : `${(taCounts?.rising_stars ?? indicationCount).toLocaleString()} identified`}
           </span>
           <button
             onClick={() => setCurrentScreen("landscape")}
@@ -434,7 +453,6 @@ export default function App() {
           <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
         ) : (
           hcpList
-          .filter((hcp) => !darkHorseFilter || hcp.tier === "dark_horse" || isDarkHorse(hcp))
           .map((hcp) => (
             <HCPCard
               key={hcp.id}

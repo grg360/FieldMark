@@ -4,10 +4,13 @@ export interface HCP {
   institution: string;
   specialty: string;
   score: number;
+  normalizedScore?: number;
+  firstPubYear?: number;
   explanation: string;
   pubVel: string;
-  citTraj: string;
-  trials: string;
+  citTraj: number | string | null;
+  trialScore?: number | null;
+  trials?: string;
   country?: string | null;
   narrative?: string | null;
   tier?: string | null;

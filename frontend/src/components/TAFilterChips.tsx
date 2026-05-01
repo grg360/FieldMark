@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-const TA_CHIPS = ["Rare Disease", "Oncology", "Immunology", "Hepatology"];
+const TA_CHIPS = ["Rare Disease", "Oncology", "Hepatology", "Immunology"];
+const DISABLED_INDICATIONS = ["CAR-T", "DLBCL", "Melanoma", "CLL", "AML"];
 
 interface IndicationInfo {
   label: string;
@@ -96,8 +97,9 @@ export default function TAFilterChips({ selected, onSelect, onIndicationChange }
           return (
             <button
               key={chip}
-              onClick={() => handleTAClick(chip)}
+              onClick={isImmunology ? undefined : () => handleTAClick(chip)}
               className="fm-ta-chip"
+              disabled={isImmunology}
               style={{
                 flexShrink: 0,
                 padding: "6px 12px",
@@ -106,14 +108,14 @@ export default function TAFilterChips({ selected, onSelect, onIndicationChange }
                 fontFamily: "system-ui, sans-serif",
                 cursor: isImmunology ? "not-allowed" : "pointer",
                 whiteSpace: "nowrap",
-                background: isSelected && !isImmunology ? "#1A1A1E" : "transparent",
+                background: isImmunology ? "#0A0A0B" : isSelected ? "#1A1A1E" : "transparent",
                 border: isImmunology ? "1px solid #1E1E22" : isSelected ? "1px solid #E8A020" : "1px solid #16161A",
-                color: isImmunology ? "#3A3A3F" : isSelected ? "#E8A020" : "#3A3A3F",
+                color: isImmunology ? "#6B6A65" : isSelected ? "#E8A020" : "#3A3A3F",
                 transition: "all 0.15s ease",
                 display: "flex",
                 alignItems: "center",
                 gap: 4,
-                pointerEvents: isImmunology ? "none" : "auto",
+                opacity: isImmunology ? 0.5 : 1,
               }}
             >
               {chip}
@@ -170,23 +172,28 @@ export default function TAFilterChips({ selected, onSelect, onIndicationChange }
           </span>
           {indications.map((info) => {
             const isSelected = info.label === selectedIndication;
+            const isDisabled = DISABLED_INDICATIONS.includes(info.label);
             return (
               <button
                 key={info.label}
-                onClick={() => handleIndicationClick(info)}
+                onClick={isDisabled ? undefined : () => handleIndicationClick(info)}
                 className="fm-indication-chip"
+                disabled={isDisabled}
                 style={{
                   flexShrink: 0,
                   padding: "4px 12px",
                   borderRadius: 4,
                   fontSize: 13,
                   fontFamily: "system-ui, sans-serif",
-                  cursor: "pointer",
+                  cursor: isDisabled ? "not-allowed" : "pointer",
                   whiteSpace: "nowrap",
-                  background: isSelected ? "#0D0D0A" : "transparent",
-                  border: isSelected ? "1px solid #E8A020" : "1px solid #1E1E22",
-                  color: isSelected ? "#E8A020" : "#6B6A65",
+                  background: isDisabled ? "#0A0A0B" : isSelected ? "#0D0D0A" : "transparent",
+                  border: isDisabled ? "1px solid #1E1E22" : isSelected ? "1px solid #E8A020" : "1px solid #1E1E22",
+                  color: isDisabled ? "#6B6A65" : isSelected ? "#E8A020" : "#6B6A65",
+                  opacity: isDisabled ? 0.5 : 1,
                   transition: "all 0.15s ease",
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
                 {info.label}
