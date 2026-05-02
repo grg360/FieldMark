@@ -92,7 +92,7 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
       {/* Content */}
       <div style={{ padding: "24px 24px 32px" }}>
         {/* Header */}
-        <div style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF" }}>Your therapeutic area</div>
+        <div style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF" }}>Select Your Therapeutic Area:</div>
         <div
           style={{
             fontSize: 13,

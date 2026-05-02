@@ -27,6 +27,17 @@ const TA_ID_MAP: Record<string, string> = {
   immunology: "4cf07827-ff1c-451e-832e-0e0a14ea9c86",
 };
 
+const INDUSTRY_PATTERNS = [
+  "pfizer", "merck", "novartis", "roche", "genentech", "astrazeneca",
+  "glaxosmithkline", "gsk", "sanofi", "bristol myers", "bristol-myers",
+  "eli lilly", "johnson & johnson", "janssen", "abbvie", "vertex",
+  "regeneron", "amgen", "biogen", "moderna", "gilead", "takeda",
+  "bayer", "boehringer", "daiichi", "astellas", "servier", "novo nordisk",
+  "eisai", "biomarin", "alnylam", "ionis", "blueprint", "mirati",
+  "arvinas", "seagen", "incyte", "jazz pharm", "bluebird bio",
+  "iqvia", "parexel", "syneos", "icon plc", "charles river",
+];
+
 function deriveProfileUrl(platform: "twitter" | "bluesky", handle: string): string {
   const normalizedHandle = handle.trim().replace(/^@/, "");
   if (platform === "twitter") return `https://twitter.com/${normalizedHandle}`;
@@ -116,6 +127,12 @@ export async function getRisingStars(
       return { data: null, error: hcpError.message };
     }
 
+    const filteredHcpData = (hcpData ?? []).filter((hcp) => {
+      if (!hcp.institution) return true;
+      const inst = hcp.institution.toLowerCase();
+      return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
+    });
+
     const { data: narrativeData } = await supabase
       .from("hcp_narratives")
       .select("hcp_id, narrative")
@@ -126,7 +143,7 @@ export async function getRisingStars(
       (narrativeData || []).map((n) => [String(n.hcp_id), n.narrative as string | null]),
     );
 
-    const hcpById = new Map((hcpData ?? []).map((hcp) => [String(hcp.id), hcp]));
+    const hcpById = new Map((filteredHcpData ?? []).map((hcp) => [String(hcp.id), hcp]));
 
     const risingStars: RisingStar[] = scoreData
       .flatMap((scoreRow) => {
@@ -216,6 +233,46 @@ export async function getTACounts(
     }
     if (verifiedDolsResult.error) {
       return { data: null, error: verifiedDolsResult.error.message };
+    }
+
+    const { data: industryHcps } = await supabase
+      .from("hcps")
+      .select("id, institution")
+      .not("institution", "is", null);
+
+    const industryHcpIds = (industryHcps ?? [])
+      .filter((h) => {
+        const inst = String(h.institution ?? "").toLowerCase();
+        return INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
+      })
+      .map((h) => h.id);
+
+    if (industryHcpIds.length > 0) {
+      const { count: risingIndustryCount } = await supabase
+        .from("hcp_scores")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "rising_star")
+        .in("hcp_id", industryHcpIds);
+
+      const { count: darkHorseIndustryCount } = await supabase
+        .from("hcp_scores")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "dark_horse")
+        .in("hcp_id", industryHcpIds);
+
+      const adjustedRising = (risingRes.count ?? 0) - (risingIndustryCount ?? 0);
+      const adjustedDarkHorses = (darkHorseRes.count ?? 0) - (darkHorseIndustryCount ?? 0);
+
+      return {
+        data: {
+          rising_stars: adjustedRising,
+          dark_horses: adjustedDarkHorses,
+          verified_dols: verifiedDolsResult.count ?? 0,
+        },
+        error: null,
+      };
     }
 
     return {

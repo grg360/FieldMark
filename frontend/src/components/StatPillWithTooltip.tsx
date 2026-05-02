@@ -18,9 +18,9 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Trial activity",
     body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
   },
-  "CAREER AGE": {
-    title: "Career age",
-    body: "Career age is calculated as years since this HCP's first published paper. A useful proxy for research career stage when CV data is unavailable.",
+  "PUB YEARS": {
+    title: "Pub years",
+    body: "The number of years since this HCP's first published paper, used as a proxy for research career stage when CV data is unavailable.",
   },
   "Publication velocity": {
     title: "Publication velocity",

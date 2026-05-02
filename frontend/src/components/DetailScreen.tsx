@@ -158,7 +158,14 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             >
               <MetricPill label="Rising star score" value={hcp.score.toFixed(1)} />
             </button>
-            <MetricPill label="Career age" value="4.2 yrs" />
+            <MetricPill
+              label="Years publishing"
+              value={
+                hcp.firstPubYear && hcp.firstPubYear > 0
+                  ? `${new Date().getFullYear() - hcp.firstPubYear}`
+                  : "—"
+              }
+            />
             <MetricPill label="Pub velocity" value={hcp.pubVel} />
             <MetricPill label="Citation trajectory" value={formattedCitTraj} />
           </div>
@@ -383,7 +390,14 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             >
               <MetricPill label="Rising star score" value={hcp.score.toFixed(1)} />
             </button>
-            <MetricPill label="Career age" value="4.2 yrs" />
+            <MetricPill
+              label="Years publishing"
+              value={
+                hcp.firstPubYear && hcp.firstPubYear > 0
+                  ? `${new Date().getFullYear() - hcp.firstPubYear}`
+                  : "—"
+              }
+            />
             <MetricPill label="Pub velocity" value={hcp.pubVel} />
             <MetricPill label="Citation trajectory" value={formattedCitTraj} />
           </div>

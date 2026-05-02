@@ -1,11 +1,12 @@
 interface TopBarProps {
+  onLogoPress?: () => void;
   onSearchPress?: () => void;
   onProfilePress?: () => void;
   onRefreshPress?: () => void;
   refreshing?: boolean;
 }
 
-export default function TopBar({ onSearchPress, onProfilePress, onRefreshPress, refreshing }: TopBarProps) {
+export default function TopBar({ onLogoPress, onSearchPress, onProfilePress, onRefreshPress, refreshing }: TopBarProps) {
   return (
     <div
       className="fm-topbar flex items-center justify-between px-4"
@@ -15,18 +16,26 @@ export default function TopBar({ onSearchPress, onProfilePress, onRefreshPress, 
         backgroundColor: "#0A0A0B",
       }}
     >
-      <span
+      <button
+        type="button"
+        onClick={onLogoPress}
         className="fm-logo"
         style={{
-          fontFamily: "monospace",
-          fontSize: 15,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: onLogoPress ? "pointer" : "default",
+          fontSize: 22,
           fontWeight: 700,
           color: "#E8A020",
-          letterSpacing: "0.05em",
+          fontFamily: "system-ui, sans-serif",
+          minHeight: 0,
+          lineHeight: 1,
         }}
+        aria-label="Return to home feed"
       >
         FM
-      </span>
+      </button>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button
           onClick={onRefreshPress}

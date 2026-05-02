@@ -334,6 +334,11 @@ export default function App() {
       }}
     >
       <TopBar
+        onLogoPress={() => {
+          setDarkHorseFilter(false);
+          setSelectedIndication("All");
+          setCurrentScreen("feed");
+        }}
         onSearchPress={() => setCurrentScreen("search")}
         onProfilePress={() => setCurrentScreen("profile")}
         onRefreshPress={() => void fetchHCPs(true)}
@@ -361,9 +366,24 @@ export default function App() {
             <span style={{ fontSize: 12, color: "#9B6DFF" }}>♞</span>
             <span className="fm-dh-chip-label" style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horses</span>
           </div>
-          <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>
-            {`${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`}
-          </span>
+          {darkHorseFilter ? (
+            <span
+              style={{
+                fontSize: 14,
+                color: "#9B6DFF",
+                fontFamily: "monospace",
+                padding: "0 4px",
+                cursor: "pointer",
+              }}
+              aria-label="Exit dark horse filter"
+            >
+              ✕
+            </span>
+          ) : (
+            <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>
+              {`${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`}
+            </span>
+          )}
         </button>
       </div>
 

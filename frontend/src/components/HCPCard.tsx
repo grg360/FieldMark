@@ -190,7 +190,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
 
         {/* Row 4: Stat pills */}
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          {((darkHorse ? ["PUB VEL", "CIT TRAJ", "CAREER AGE"] : ["PUB VEL", "CIT TRAJ", "TRIALS"]) as const).map((key) => (
+          {((darkHorse ? ["PUB VEL", "CIT TRAJ", "PUB YEARS"] : ["PUB VEL", "CIT TRAJ", "TRIALS"]) as const).map((key) => (
             <StatPillWithTooltip
               key={key}
               label={key}
@@ -201,10 +201,10 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
                     ? hcp.citTraj == null
                       ? "—"
                       : `${Number(hcp.citTraj) >= 0 ? "+" : ""}${Number(hcp.citTraj).toFixed(1)}%`
-                    : key === "CAREER AGE"
+                    : key === "PUB YEARS"
                       ? !hcp.firstPubYear || hcp.firstPubYear === 0
                         ? "—"
-                        : `${new Date().getFullYear() - hcp.firstPubYear} yrs`
+                        : `${new Date().getFullYear() - hcp.firstPubYear}`
                     : hcp.trialScore == null || hcp.trialScore === 0
                       ? "—"
                       : `${hcp.trialScore} active`
