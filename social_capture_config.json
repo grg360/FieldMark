@@ -1,0 +1,58 @@
+{
+  "twitter": {
+    "enabled": true,
+    "active_hashtags": [
+      {
+        "tag": "#ASCO2026",
+        "min_faves": 5,
+        "active_until": "2026-06-15",
+        "therapeutic_area": "oncology",
+        "rationale": "ASCO 2026 May 29-June 2"
+      },
+      {
+        "tag": "#EASL2026",
+        "min_faves": 3,
+        "active_until": "2026-07-01",
+        "therapeutic_area": "hepatology",
+        "rationale": "EASL Congress June 17-20"
+      },
+      {
+        "tag": "#AASLD2026",
+        "min_faves": 3,
+        "active_until": "2026-12-15",
+        "therapeutic_area": "hepatology",
+        "rationale": "AASLD The Liver Meeting November"
+      },
+      {
+        "tag": "#ESMO2026",
+        "min_faves": 5,
+        "active_until": "2026-10-31",
+        "therapeutic_area": "oncology",
+        "rationale": "ESMO Congress September"
+      }
+    ],
+    "topic_queries": [
+      {
+        "query": "(NSCLC OR \"non-small cell lung cancer\")",
+        "min_faves": 20,
+        "therapeutic_area": "oncology"
+      },
+      {
+        "query": "(MASLD OR NASH OR \"non-alcoholic steatohepatitis\")",
+        "min_faves": 10,
+        "therapeutic_area": "hepatology"
+      }
+    ]
+  },
+  "bluesky": {
+    "enabled": true,
+    "active_hashtags": [
+      "#medsky",
+      "#oncology",
+      "#hepatology",
+      "#nash",
+      "#raredisease"
+    ],
+    "feeds": []
+  }
+}
