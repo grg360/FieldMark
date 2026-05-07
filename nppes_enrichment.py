@@ -608,22 +608,31 @@ if __name__ == "__main__":
             payload = []
             for r in enriched_rows:
                 row = dict(r)
+                # hcps primary key is `id`, not `hcp_id` — rename for upsert
+                row["id"] = row.pop("hcp_id")
                 row["nppes_enriched_at"] = now_iso
                 payload.append(row)
 
-            for start_idx in range(0, len(payload), WRITE_BATCH_SIZE):
-                batch = payload[start_idx : start_idx + WRITE_BATCH_SIZE]
+            # PostgREST upsert does INSERT-then-UPDATE which fails not-null
+            # constraints on unspecified columns. Use per-row UPDATE instead
+            # since these IDs all exist in the database already.
+            updates_per_progress = 500
+            for idx, row in enumerate(payload):
+                row_id = row["id"]
+                update_payload = {k: v for k, v in row.items() if k != "id"}
                 try:
-                    client.table("hcps").upsert(batch, on_conflict="id").execute()
-                    rows_written["updated_count"] += len(batch)
-                    print(
-                        f"Upserted batch {start_idx // WRITE_BATCH_SIZE + 1} "
-                        f"({rows_written['updated_count']}/{len(payload)})"
-                    )
+                    client.table("hcps").update(update_payload).eq("id", row_id).execute()
+                    rows_written["updated_count"] += 1
                 except Exception as exc:
-                    rows_written["errors"] += len(batch)
-                    errors.append(f"upsert_batch_{start_idx}: {repr(exc)}")
-                    print(f"Batch failed at offset {start_idx}: {exc}")
+                    rows_written["errors"] += 1
+                    errors.append(f"update_row_{row_id}: {repr(exc)}")
+                    print(f"Update failed for {row_id}: {exc}")
+
+                if (idx + 1) % updates_per_progress == 0 or (idx + 1) == len(payload):
+                    print(
+                        f"Updated {rows_written['updated_count']}/{len(payload)} rows "
+                        f"({rows_written['errors']} errors)"
+                    )
 
     elapsed = time.time() - started
     log_payload = {
