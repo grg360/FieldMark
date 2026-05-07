@@ -1,5 +1,5 @@
 """
-FieldMark scoring pipeline (v1.1).
+FieldMark scoring pipeline (v1.3).
 
 This script:
 1) Reads data from Supabase tables:
@@ -33,7 +33,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-SCORE_VERSION = "v1.2"
+SCORE_VERSION = "v1.3"
 # When OpenAlex has enriched hcps.total_career_pubs, require this minimum for rankings / non-zero composite.
 MIN_TOTAL_CAREER_PUBS_FOR_RANKINGS = 10
 # If total_career_pubs is null, fall back to counting publication rows in our DB.
@@ -82,6 +82,12 @@ def init_supabase() -> Client:
 
 
 def fetch_all_rows(supabase: Client, table: str, columns: str, page_size: int = 1000) -> List[Dict]:
+    try:
+        count_response = supabase.table(table).select("*", count="estimated").limit(1).execute()
+    except Exception as exc:
+        raise RuntimeError(f"Failed counting rows for table '{table}': {exc}") from exc
+    expected_count = int(count_response.count or 0)
+
     rows: List[Dict] = []
     offset = 0
     while True:
@@ -99,13 +105,28 @@ def fetch_all_rows(supabase: Client, table: str, columns: str, page_size: int = 
         if not batch:
             break
         rows.extend(batch)
-        if len(batch) < page_size:
-            break
         offset += page_size
+
+        if offset > expected_count + page_size:
+            logger_msg = (
+                f"Pagination safety bail for table '{table}': "
+                f"offset={offset} expected_count={expected_count}"
+            )
+            raise RuntimeError(logger_msg)
+
+    print(f"Loaded {len(rows)} of ~{expected_count} rows from {table}")
+    if len(rows) < (expected_count * 0.95):
+        raise RuntimeError(f"Loaded only {len(rows)} of ~{expected_count} rows from {table}")
     return rows
 
 
-def fetch_us_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
+def fetch_all_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
+    try:
+        count_response = supabase.table("hcps").select("*", count="estimated").limit(1).execute()
+    except Exception as exc:
+        raise RuntimeError(f"Failed counting rows for table 'hcps': {exc}") from exc
+    expected_count = int(count_response.count or 0)
+
     rows: List[Dict] = []
     offset = 0
     while True:
@@ -113,20 +134,26 @@ def fetch_us_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
             response = (
                 supabase.table("hcps")
                 .select("id,first_name,last_name,country,total_career_pubs,first_pub_year")
-                .eq("country", "USA")
                 .range(offset, offset + page_size - 1)
                 .execute()
             )
         except Exception as exc:
-            raise RuntimeError(f"Failed reading USA HCP rows: {exc}") from exc
+            raise RuntimeError(f"Failed reading HCP rows: {exc}") from exc
 
         batch = response.data or []
         if not batch:
             break
         rows.extend(batch)
-        if len(batch) < page_size:
-            break
         offset += page_size
+
+        if offset > expected_count + page_size:
+            raise RuntimeError(
+                f"Pagination safety bail for table 'hcps': offset={offset} expected_count={expected_count}"
+            )
+
+    print(f"Loaded {len(rows)} of ~{expected_count} rows from hcps")
+    if len(rows) < (expected_count * 0.95):
+        raise RuntimeError(f"Loaded only {len(rows)} of ~{expected_count} rows from hcps")
     return rows
 
 
@@ -532,11 +559,31 @@ def compute_scores(
         if first_pub_year_enriched_by_hcp.get(hcp_id) is not None:
             career_multiplier = first_pub_year_override_multiplier(first_pub_year)
 
+        # Documented Rising Stars composite weights (methodology v1.3+):
+        #   pub_velocity        25%
+        #   citation_trajectory 20%
+        #   trial_investigator  25%
+        #   congress            10%
+        #   msl_signal          10%
+        #   h_index              5%
+        #   institution_tier     5%
+        # Components without populated data contribute 0 to the composite but
+        # remain in the formula so activation is a data change, not a code change.
+        # Recency is encoded as a multiplier on the trial matrix and as the
+        # recent-window in citation trajectory — NOT as a standalone component.
+        congress = 0.0           # v1.2 placeholder; activates via congress data ingestion
+        msl_signal = 0.0         # v1.2 placeholder; activates via MSL contributor onboarding
+        h_index = 0.0            # v1.5 backlog: wire from hcps.scholar_h_index
+        institution_tier = 0.0   # v1.5 backlog: wire from institution tier lists
+
         weighted_base = (
-            (0.50 * pub_velocity)
-            + (0.15 * citation_for_scoring)
-            + (0.10 * trial_score)
-            + (0.05 * recency)
+            (0.25 * pub_velocity)
+            + (0.20 * citation_for_scoring)
+            + (0.25 * trial_score)
+            + (0.10 * congress)
+            + (0.10 * msl_signal)
+            + (0.05 * h_index)
+            + (0.05 * institution_tier)
         )
         # Cross-signal and career multipliers are applied after base weighting.
         composite_uncapped = weighted_base * cross_multiplier * career_multiplier
@@ -598,7 +645,7 @@ def upsert_scores(supabase: Client, score_rows: Sequence[ScoreRow]) -> int:
             # unique (hcp_id, therapeutic_area_id, score_version)
             supabase.table("hcp_scores").upsert(
                 batch,
-                on_conflict="hcp_id,therapeutic_area_id,score_version",
+                on_conflict="hcp_id,therapeutic_area_id",
             ).execute()
         except Exception as exc:
             raise RuntimeError(f"Failed to upsert hcp_scores batch starting at {start}: {exc}") from exc
@@ -677,8 +724,8 @@ def run_pipeline() -> None:
     supabase = init_supabase()
 
     print("Loading Supabase data...")
-    hcps = fetch_us_hcps(supabase)
-    print(f"Loaded {len(hcps)} US HCPs (country='USA').")
+    hcps = fetch_all_hcps(supabase)
+    print(f"Loaded {len(hcps)} HCPs (all countries).")
     publications = fetch_all_rows(supabase, "publications", "hcp_id,pub_year,citation_count")
     clinical_trials = fetch_all_rows(
         supabase,
@@ -697,9 +744,11 @@ def run_pipeline() -> None:
     )
     therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
 
-    original_hcp_count = len(hcps)
-    hcps = dedupe_hcps_by_name(hcps, publications)
-    print(f"Deduped HCPs by name: {original_hcp_count} -> {len(hcps)}")
+    # Dedupe disabled — was dropping ~27K HCPs incorrectly (e.g., Rohit Loomba
+    # was being collapsed despite being the only one in the database). Real
+    # duplicate handling needs reimplementation against NPI-verified Phase A
+    # data. For now, operate on the raw HCP set.
+    print(f"Operating on full HCP set: {len(hcps)} (dedupe disabled)")
 
     print(
         f"Loaded hcps={len(hcps)}, pubs={len(publications)}, trials={len(clinical_trials)}, "

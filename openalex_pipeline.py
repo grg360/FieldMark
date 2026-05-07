@@ -3,21 +3,25 @@ from __future__ import annotations
 """
 FieldMark OpenAlex pipeline: DOI citation enrichment and HCP career publication counts.
 
-1) For each publication with a DOI, fetch OpenAlex work metadata and update citation_count.
+1) For each publication with a DOI and no openalex_enriched_at yet, batch-fetch OpenAlex work
+   metadata and update citation_count plus related OpenAlex fields.
 2) For each HCP (optionally only those without total_career_pubs), search OpenAlex authors
    by name; on a confident match, store works_count as total_career_pubs on hcps.
 
 Environment: SUPABASE_URL, SUPABASE_KEY, PUBMED_EMAIL (polite pool mailto for OpenAlex).
 """
 
-import os
 import argparse
+import json
+import logging
+import os
 import re
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Sequence
-from urllib.parse import quote
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence, Set
 
 import requests
 from dotenv import load_dotenv
@@ -29,6 +33,14 @@ PROGRESS_EVERY = 100
 SLEEP_SECONDS = 0.2
 DEFAULT_TIMEOUT_SECONDS = 20
 AUTHOR_MATCH_SCORE_THRESHOLD = 0.75
+
+BATCH_SIZE = 100  # OpenAlex's max OR values per filter
+BATCH_SLEEP_SECONDS = 0.1  # Sleep between batches; well under 100 req/sec rate limit
+CHECKPOINT_FILE = "openalex_checkpoint.json"
+CHECKPOINT_EVERY_N_BATCHES = 10
+PROGRESS_EVERY_N_BATCHES = 10
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -89,6 +101,12 @@ def init_supabase() -> Client:
 
 
 def fetch_publications_with_doi(supabase: Client) -> List[Dict]:
+    """
+    Returns publications with non-null DOI that have not been enriched by the new
+    pipeline (no openalex_enriched_at timestamp). This catches both the
+    original-pipeline-only cohort and any publications where the new pipeline failed
+    to write.
+    """
     publications: List[Dict] = []
     offset = 0
 
@@ -98,6 +116,7 @@ def fetch_publications_with_doi(supabase: Client) -> List[Dict]:
                 supabase.table("publications")
                 .select("id,doi,citation_count")
                 .not_.is_("doi", "null")
+                .is_("openalex_enriched_at", "null")
                 .range(offset, offset + FETCH_PAGE_SIZE - 1)
                 .execute()
             )
@@ -130,29 +149,138 @@ def format_eta(total_seconds: float) -> str:
     return f"{hours}h {remaining_minutes}m"
 
 
-def fetch_openalex_work_by_doi(
+def load_checkpoint() -> Set[str]:
+    """Load processed publication IDs from checkpoint file. Returns empty set if file doesn't exist."""
+    path = Path(CHECKPOINT_FILE)
+    if not path.is_file():
+        return set()
+    try:
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        if not isinstance(data, list):
+            logger.warning("Checkpoint file %s: expected JSON list, got %s", CHECKPOINT_FILE, type(data).__name__)
+            return set()
+        return {str(x) for x in data}
+    except json.JSONDecodeError as exc:
+        logger.warning("Checkpoint file %s corrupt or invalid JSON (%s); starting fresh", CHECKPOINT_FILE, exc)
+        return set()
+    except OSError as exc:
+        logger.warning("Could not read checkpoint file %s (%s); starting fresh", CHECKPOINT_FILE, exc)
+        return set()
+
+
+def save_checkpoint(processed_ids: Set[str]) -> None:
+    """Write processed publication IDs to checkpoint file as JSON list."""
+    path = Path(CHECKPOINT_FILE)
+    try:
+        path.write_text(json.dumps(sorted(processed_ids), indent=2), encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not write checkpoint file %s: %s", CHECKPOINT_FILE, exc)
+
+
+def fetch_openalex_works_batch(
     session: requests.Session,
-    doi: str,
+    dois: List[str],
     polite_mailto: str,
-) -> Optional[Dict]:
-    encoded_doi = quote(doi, safe="")
-    url = f"{OPENALEX_BASE_URL}/works/https://doi.org/{encoded_doi}"
+) -> Optional[Dict[str, Dict]]:
+    """
+    Fetch up to 100 OpenAlex works by DOI in a single API call.
+    Returns dict mapping normalized DOI -> work payload for DOIs found in OpenAlex.
+    DOIs not in the response are simply absent from the returned dict.
+    Returns None if the batch call fails entirely (transient error after retry).
+    """
+    if len(dois) > BATCH_SIZE:
+        raise ValueError(f"DOI batch size {len(dois)} exceeds maximum {BATCH_SIZE}")
+    if not dois:
+        return {}
+
+    dois_input_set = set(dois)
+    filter_value = "doi:" + "|".join(dois)
     openalex_api_key = os.getenv("OPENALEX_API_KEY")
+    params: Dict[str, str] = {
+        "filter": filter_value,
+        "per-page": "100",
+        "mailto": polite_mailto,
+    }
+    if openalex_api_key:
+        params["api_key"] = openalex_api_key
+    url = f"{OPENALEX_BASE_URL}/works"
+
+    def do_get() -> requests.Response:
+        return session.get(url, params=params, timeout=(10, 30))
+
+    def apply_429_backoff(resp: requests.Response) -> Optional[requests.Response]:
+        if resp.status_code == 429:
+            time.sleep(5)
+            resp = do_get()
+        if resp.status_code == 429:
+            time.sleep(15)
+            resp = do_get()
+        if resp.status_code == 429:
+            logger.warning("OpenAlex batch: persistent HTTP 429 after backoff; batch failed")
+            return None
+        return resp
 
     try:
-        params = {"mailto": polite_mailto}
-        if openalex_api_key:
-            params["api_key"] = openalex_api_key
-        response = session.get(url, params=params, timeout=(5, 15))
-        if response.status_code == 404:
+        try:
+            response = do_get()
+        except requests.RequestException as exc:
+            logger.warning("OpenAlex batch: request error on first attempt: %s", exc)
+            time.sleep(5)
+            try:
+                response = do_get()
+            except requests.RequestException as exc2:
+                logger.warning("OpenAlex batch: second attempt failed after 5s wait: %s", exc2)
+                return None
+        response = apply_429_backoff(response)
+        if response is None:
             return None
         response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, dict):
+    except requests.HTTPError as exc:
+        if response.status_code >= 500:
+            time.sleep(5)
+            try:
+                try:
+                    response = do_get()
+                except requests.RequestException as exc2:
+                    logger.warning("OpenAlex batch: request error on 5xx retry: %s", exc2)
+                    return None
+                response = apply_429_backoff(response)
+                if response is None:
+                    return None
+                response.raise_for_status()
+            except (requests.HTTPError, requests.RequestException) as exc3:
+                logger.warning("OpenAlex batch: failed after 5xx retry: %s", exc3)
+                return None
+        else:
+            logger.warning("OpenAlex batch: HTTP error %s: %s", response.status_code, exc)
             return None
-        return payload
-    except (requests.RequestException, ValueError):
+    except requests.RequestException as exc:
+        logger.warning("OpenAlex batch: unexpected request error after status handling: %s", exc)
         return None
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        logger.warning("OpenAlex batch: invalid JSON in response: %s", exc)
+        return None
+
+    results = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(results, list):
+        logger.warning("OpenAlex batch: missing or invalid 'results' in response")
+        return None
+
+    out: Dict[str, Dict] = {}
+    for work in results:
+        if not isinstance(work, dict):
+            continue
+        doi_raw = work.get("doi")
+        if not isinstance(doi_raw, str):
+            continue
+        norm = normalize_doi(doi_raw)
+        if norm and norm in dois_input_set:
+            out[norm] = work
+    return out
 
 
 def extract_cited_by_count(work_payload: Optional[Dict]) -> Optional[int]:
@@ -168,9 +296,71 @@ def extract_cited_by_count(work_payload: Optional[Dict]) -> Optional[int]:
     return max(0, parsed)
 
 
-def update_citation_count(supabase: Client, publication_id: str, citation_count: int) -> None:
+def extract_publication_fields(work_payload: Dict) -> Dict:
+    """
+    Extract the fields we capture from an OpenAlex work payload.
+    Returns dict with keys matching the publications table columns:
+    citation_count, citation_counts_by_year, authorships, primary_location,
+    publication_type, openalex_concepts, open_access.
+    Each value is either the parsed value or None if not present.
+    """
+    cby = work_payload.get("counts_by_year")
+    citation_counts_by_year = cby if isinstance(cby, list) else None
+
+    auth = work_payload.get("authorships")
+    authorships = auth if isinstance(auth, list) else None
+
+    ploc = work_payload.get("primary_location")
+    primary_location = ploc if isinstance(ploc, dict) else None
+
+    ptype = work_payload.get("type")
+    publication_type = ptype if isinstance(ptype, str) else None
+
+    concepts = work_payload.get("concepts")
+    openalex_concepts = concepts if isinstance(concepts, list) else None
+
+    oa = work_payload.get("open_access")
+    open_access = oa if isinstance(oa, dict) else None
+
+    return {
+        "citation_count": extract_cited_by_count(work_payload),
+        "citation_counts_by_year": citation_counts_by_year,
+        "authorships": authorships,
+        "primary_location": primary_location,
+        "publication_type": publication_type,
+        "openalex_concepts": openalex_concepts,
+        "open_access": open_access,
+    }
+
+
+def update_publication_enrichment(
+    supabase: Client,
+    publication_id: str,
+    fields: Dict,
+) -> None:
+    """
+    Update a publication row with extracted OpenAlex fields.
+    Writes all non-None values and always sets openalex_enriched_at to current UTC.
+    """
+    update_dict: Dict = {}
+    if fields.get("citation_count") is not None:
+        update_dict["citation_count"] = fields["citation_count"]
+    for key in (
+        "citation_counts_by_year",
+        "authorships",
+        "primary_location",
+        "openalex_concepts",
+        "open_access",
+    ):
+        if fields.get(key) is not None:
+            update_dict[key] = fields[key]
+    if fields.get("publication_type") is not None:
+        update_dict["publication_type"] = fields["publication_type"]
+
+    update_dict["openalex_enriched_at"] = datetime.now(timezone.utc).isoformat()
+
     try:
-        supabase.table("publications").update({"citation_count": citation_count}).eq("id", publication_id).execute()
+        supabase.table("publications").update(update_dict).eq("id", publication_id).execute()
     except Exception as exc:
         raise RuntimeError(f"Failed updating publication {publication_id}: {exc}") from exc
 
@@ -336,7 +526,29 @@ def run_career_enrichment(
     print(f"Career pub enrichment done: {updated} HCPs updated with total_career_pubs.")
 
 
-def run_pipeline(skip_doi_enrichment: bool = False) -> None:
+def _print_doi_batch_progress(
+    stats: PipelineStats,
+    batch_index: int,
+    total_batches: int,
+    start_time: float,
+) -> None:
+    elapsed = time.time() - start_time
+    avg_per_batch = elapsed / max(batch_index, 1)
+    remaining_batches = max(total_batches - batch_index, 0)
+    eta = format_eta(avg_per_batch * remaining_batches)
+    print(
+        f"[batch {batch_index}/{total_batches}] "
+        f"Processed: {stats.processed} | Updated: {stats.updated} | Unchanged: {stats.unchanged} | "
+        f"Not found/missing citations: {stats.not_found_or_missing_citations} | Failed: {stats.failed} | "
+        f"Elapsed: {elapsed:.0f}s | ETA: {eta}"
+    )
+
+
+def run_pipeline(
+    skip_doi_enrichment: bool = False,
+    skip_career_enrichment: bool = False,
+    reset_checkpoint: bool = False,
+) -> None:
     load_dotenv()
     supabase = init_supabase()
     session = build_http_session()
@@ -345,49 +557,78 @@ def run_pipeline(skip_doi_enrichment: bool = False) -> None:
     if skip_doi_enrichment:
         print("SKIP_DOI_ENRICHMENT enabled: skipping DOI citation enrichment phase.")
     else:
-        print("Loading publications with DOI...")
+        if reset_checkpoint:
+            checkpoint_path = Path(CHECKPOINT_FILE)
+            if checkpoint_path.exists():
+                checkpoint_path.unlink()
+                print("Checkpoint reset; processing full cohort.")
+        print("Loading unenriched publications with DOI (openalex_enriched_at is null)...")
         publications = fetch_publications_with_doi(supabase)
+        processed_ids = load_checkpoint()
+        publications_to_process = [p for p in publications if str(p["id"]) not in processed_ids]
         stats = PipelineStats(total_loaded=len(publications))
-        print(f"Loaded {stats.total_loaded} publications with non-null DOI.")
+        already = len(publications) - len(publications_to_process)
+        k = len(publications_to_process)
+        print(
+            f"Loaded {stats.total_loaded} publications, {already} already in checkpoint, processing {k}"
+        )
         start_time = time.time()
 
-        for idx, publication in enumerate(publications, start=1):
-            publication_id = publication.get("id")
-            doi = publication.get("doi")
-            old_citation = publication.get("citation_count")
-            old_value = int(old_citation) if old_citation is not None else 0
+        if not publications_to_process:
+            print("Nothing to process (all IDs in checkpoint or no rows).")
+        else:
+            total_batches = (k + BATCH_SIZE - 1) // BATCH_SIZE
+            batch_index = 0
+            for batch_start in range(0, k, BATCH_SIZE):
+                batch_index += 1
+                batch = publications_to_process[batch_start : batch_start + BATCH_SIZE]
+                doi_to_pub: Dict[str, Dict] = {p["doi"]: p for p in batch if p.get("doi")}
+                dois: List[str] = list(dict.fromkeys(doi_to_pub.keys()))
 
-            if not publication_id or not doi:
-                stats.failed += 1
-                continue
+                works_map = fetch_openalex_works_batch(session, dois, polite_mailto=polite_mailto)
+                if works_map is None:
+                    stats.failed += len(batch)
+                    time.sleep(BATCH_SLEEP_SECONDS)
+                    if batch_index % CHECKPOINT_EVERY_N_BATCHES == 0:
+                        save_checkpoint(processed_ids)
+                    if batch_index % PROGRESS_EVERY_N_BATCHES == 0 or batch_index == total_batches:
+                        _print_doi_batch_progress(stats, batch_index, total_batches, start_time)
+                    continue
 
-            work = fetch_openalex_work_by_doi(session, doi, polite_mailto=polite_mailto)
-            new_citation = extract_cited_by_count(work)
+                for publication in batch:
+                    publication_id = publication.get("id")
+                    doi = publication.get("doi")
 
-            if new_citation is None:
-                stats.not_found_or_missing_citations += 1
-            elif new_citation == old_value:
-                stats.unchanged += 1
-            else:
-                try:
-                    update_citation_count(supabase, publication_id, new_citation)
-                    stats.updated += 1
-                except RuntimeError:
-                    stats.failed += 1
+                    if not publication_id or not doi:
+                        stats.failed += 1
+                    else:
+                        work = works_map.get(doi)
+                        if work is None:
+                            stats.not_found_or_missing_citations += 1
+                        else:
+                            fields = extract_publication_fields(work)
+                            has_any_field = any(value is not None for value in fields.values())
+                            if not has_any_field:
+                                stats.not_found_or_missing_citations += 1
+                                processed_ids.add(str(publication["id"]))
+                                continue
+                            try:
+                                update_publication_enrichment(supabase, str(publication_id), fields)
+                            except RuntimeError:
+                                stats.failed += 1
+                            else:
+                                stats.updated += 1
+                    processed_ids.add(str(publication["id"]))
 
-            stats.processed += 1
-            if idx % PROGRESS_EVERY == 0:
-                elapsed = time.time() - start_time
-                avg_per_pub = elapsed / max(stats.processed, 1)
-                remaining = max(stats.total_loaded - idx, 0)
-                eta = format_eta(avg_per_pub * remaining)
-                pct = (idx / max(stats.total_loaded, 1)) * 100
-                print(
-                    f"[{idx}/{stats.total_loaded}] {pct:.1f}% | "
-                    f"Updated: {stats.updated} | Failed: {stats.failed} | ETA: {eta}"
-                )
+                stats.processed += len(batch)
+                time.sleep(BATCH_SLEEP_SECONDS)
 
-            time.sleep(SLEEP_SECONDS)
+                if batch_index % CHECKPOINT_EVERY_N_BATCHES == 0:
+                    save_checkpoint(processed_ids)
+                if batch_index % PROGRESS_EVERY_N_BATCHES == 0 or batch_index == total_batches:
+                    _print_doi_batch_progress(stats, batch_index, total_batches, start_time)
+
+        save_checkpoint(processed_ids)
 
         print("\n=== OpenAlex DOI Enrichment Summary ===")
         print(f"Total loaded: {stats.total_loaded}")
@@ -397,20 +638,38 @@ def run_pipeline(skip_doi_enrichment: bool = False) -> None:
         print(f"Not found/missing citation count: {stats.not_found_or_missing_citations}")
         print(f"Failed: {stats.failed}")
 
-    print("\nStarting HCP total_career_pubs enrichment (OpenAlex author match)...")
-    run_career_enrichment(supabase, session, polite_mailto)
+    if not skip_career_enrichment:
+        print("\nStarting HCP total_career_pubs enrichment (OpenAlex author match)...")
+        run_career_enrichment(supabase, session, polite_mailto)
+    else:
+        print("Career enrichment skipped per --skip-career-enrichment flag.")
 
 
 if __name__ == "__main__":
     try:
+        logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
         parser = argparse.ArgumentParser(description="FieldMark OpenAlex enrichment pipeline")
         parser.add_argument(
             "--skip-doi-enrichment",
             action="store_true",
             help="Skip DOI citation enrichment and run only HCP career enrichment.",
         )
+        parser.add_argument(
+            "--skip-career-enrichment",
+            action="store_true",
+            help="Skip the HCP career enrichment phase (run only DOI enrichment).",
+        )
+        parser.add_argument(
+            "--reset-checkpoint",
+            action="store_true",
+            help="Delete the checkpoint file before starting (forces re-processing of all matching publications).",
+        )
         args = parser.parse_args()
-        run_pipeline(skip_doi_enrichment=args.skip_doi_enrichment or env_flag_true("SKIP_DOI_ENRICHMENT"))
+        run_pipeline(
+            skip_doi_enrichment=args.skip_doi_enrichment or env_flag_true("SKIP_DOI_ENRICHMENT"),
+            skip_career_enrichment=args.skip_career_enrichment,
+            reset_checkpoint=args.reset_checkpoint,
+        )
     except Exception as error:
         print(f"[ERROR] OpenAlex pipeline failed: {error}")
         raise

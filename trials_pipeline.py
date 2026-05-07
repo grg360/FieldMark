@@ -1,571 +1,622 @@
-"""
-ClinicalTrials.gov -> Supabase pipeline for FieldMark.
-
-This script:
-1) Queries ClinicalTrials.gov v2 API for rare disease / gene therapy / CAR-T /
-   hematologic oncology trials.
-2) Extracts trial metadata.
-3) Extracts investigators and contact persons from each study.
-4) Matches investigators to existing HCP records in Supabase by name when possible.
-5) Stores trial rows in `clinical_trials` and investigator links in
-   `trial_investigators`.
-
-Environment variables are loaded from .env using python-dotenv.
-Required:
-- SUPABASE_URL
-- SUPABASE_KEY
-
-Optional:
-- CTGOV_BASE_URL (default: https://clinicaltrials.gov/api/v2)
-- CTGOV_PAGE_SIZE (default: 100)
-- CTGOV_MAX_STUDIES (default: 1000)
-"""
-
 from __future__ import annotations
 
+import argparse
+import json
+import logging
 import os
+import random
 import re
 import time
+from collections import Counter
 from dataclasses import dataclass
-from datetime import date, datetime
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from datetime import UTC, datetime
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import requests
 from dotenv import load_dotenv
-from requests.adapters import HTTPAdapter
 from supabase import Client, create_client
-from urllib3.util.retry import Retry
 
+URL = "https://clinicaltrials.gov/api/v2/studies"
+CKPT = "trials_pipeline_checkpoint.json"
+ROLES = {"PRINCIPAL_INVESTIGATOR", "SUB_INVESTIGATOR", "STUDY_CHAIR", "STUDY_DIRECTOR"}
 
-TRIAL_QUERY = (
-    "(rare disease OR orphan disease OR rare genetic disorder OR inborn error) "
-    "AND "
-    "(gene therapy OR CAR-T OR chimeric antigen receptor OR hematologic oncology "
-    "OR leukemia OR lymphoma OR myeloma)"
-)
+STATE_ABBREV_TO_NAME = {
+    "AL": "alabama", "AK": "alaska", "AZ": "arizona", "AR": "arkansas", "CA": "california",
+    "CO": "colorado", "CT": "connecticut", "DE": "delaware", "FL": "florida", "GA": "georgia",
+    "HI": "hawaii", "ID": "idaho", "IL": "illinois", "IN": "indiana", "IA": "iowa", "KS": "kansas",
+    "KY": "kentucky", "LA": "louisiana", "ME": "maine", "MD": "maryland", "MA": "massachusetts",
+    "MI": "michigan", "MN": "minnesota", "MS": "mississippi", "MO": "missouri", "MT": "montana",
+    "NE": "nebraska", "NV": "nevada", "NH": "new hampshire", "NJ": "new jersey", "NM": "new mexico",
+    "NY": "new york", "NC": "north carolina", "ND": "north dakota", "OH": "ohio", "OK": "oklahoma",
+    "OR": "oregon", "PA": "pennsylvania", "RI": "rhode island", "SC": "south carolina", "SD": "south dakota",
+    "TN": "tennessee", "TX": "texas", "UT": "utah", "VT": "vermont", "VA": "virginia",
+    "WA": "washington", "WV": "west virginia", "WI": "wisconsin", "WY": "wyoming", "DC": "district of columbia",
+}
+
+logger = logging.getLogger("trials_pipeline")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 @dataclass
-class TrialRecord:
-    nct_id: str
-    title: Optional[str]
-    phase: Optional[str]
-    status: Optional[str]
-    sponsor: Optional[str]
-    start_date: Optional[str]
-    completion_date: Optional[str]
+class S:
+    processed: int = 0
+    skipped: int = 0
+    linked_hcps: int = 0
+    trials: int = 0
+    links: int = 0
+    start: float = 0.0
+    matched_high_hcps: int = 0
+    matched_medium_hcps: int = 0
+    rejected_low_hcps: int = 0
 
 
-@dataclass
-class InvestigatorRecord:
-    trial_nct_id: str
-    first_name: Optional[str]
-    last_name: Optional[str]
-    role: Optional[str]
-    source_text: str
+def env(name: str) -> str:
+    v = os.getenv(name)
+    if not v:
+        raise EnvironmentError(f"Missing env var: {name}")
+    return v
 
 
-def get_required_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise EnvironmentError(f"Missing required environment variable: {name}")
-    return value
+def sb() -> Client:
+    return create_client(env("SUPABASE_URL"), env("SUPABASE_KEY"))
 
 
-def build_session() -> requests.Session:
-    session = requests.Session()
-    retries = Retry(
-        total=5,
-        read=5,
-        connect=5,
-        backoff_factor=0.8,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=("GET",),
-    )
-    adapter = HTTPAdapter(max_retries=retries)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
+def ns(v: Optional[str]) -> str:
+    return " ".join(str(v or "").strip().split())
 
 
-def safe_get_json(
-    session: requests.Session,
-    url: str,
-    params: Dict[str, str],
-    timeout: int = 45,
-) -> Dict:
-    try:
-        response = session.get(url, params=params, timeout=timeout)
-        response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise RuntimeError("API response is not a JSON object.")
-        return payload
-    except requests.RequestException as exc:
-        raise RuntimeError(f"HTTP request failed for {url}: {exc}") from exc
-    except ValueError as exc:
-        raise RuntimeError(f"Invalid JSON response from {url}: {exc}") from exc
+def nk(v: Optional[str]) -> str:
+    return re.sub(r"[^a-z0-9\s\-']", " ", ns(v).lower()).strip()
 
 
-def normalize_space(value: Optional[str]) -> Optional[str]:
-    if value is None:
+def dt(raw: Optional[str]) -> Optional[str]:
+    s = ns(raw)
+    if not s:
         return None
-    cleaned = re.sub(r"\s+", " ", value).strip()
-    return cleaned or None
-
-
-def normalize_key(value: Optional[str]) -> str:
-    if not value:
-        return ""
-    return re.sub(r"\s+", " ", value).strip().lower()
-
-
-def normalize_role_key(value: Optional[str]) -> str:
-    if not value:
-        return ""
-    value = re.sub(r"[^A-Za-z0-9]+", "_", value.strip().upper())
-    value = re.sub(r"_+", "_", value).strip("_")
-    return value
-
-
-def is_valid_investigator_name(value: Optional[str]) -> bool:
-    if not value:
-        return False
-    text = value.strip()
-    if not text:
-        return False
-    # Reject phone-like strings and any names containing digits.
-    if re.search(r"\d", text):
-        return False
-    if re.search(r"\+?\d[\d\-\(\)\s]{6,}", text):
-        return False
-    # Reject obvious company/entity suffixes.
-    if re.search(r"\b(inc|corp|corporation|llc|ltd|plc|gmbh)\.?\b", text, flags=re.IGNORECASE):
-        return False
-    return True
-
-
-def split_name(raw_name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Attempt to split a human name into first and last.
-    Handles "Last, First" and "First Middle Last" forms.
-    """
-    raw_name = normalize_space(raw_name)
-    if not raw_name:
-        return None, None
-
-    # Remove credential suffixes from matching purposes.
-    raw_name = re.sub(
-        r",?\s*(MD|DO|PHD|MBBS|FRCP|MSC|MPH|RN|NP|PA-C|PA)\.?$",
-        "",
-        raw_name,
-        flags=re.IGNORECASE,
-    )
-    raw_name = normalize_space(raw_name)
-    if not raw_name:
-        return None, None
-
-    if "," in raw_name:
-        parts = [p.strip() for p in raw_name.split(",") if p.strip()]
-        if len(parts) >= 2:
-            last = parts[0]
-            first = parts[1].split()[0] if parts[1].split() else parts[1]
-            return normalize_space(first), normalize_space(last)
-
-    tokens = raw_name.split()
-    if len(tokens) == 1:
-        return None, normalize_space(tokens[0])
-    first = tokens[0]
-    last = tokens[-1]
-    return normalize_space(first), normalize_space(last)
-
-
-def parse_iso_date(raw: Optional[str]) -> Optional[str]:
-    """
-    Parse common ClinicalTrials.gov date values into YYYY-MM-DD.
-    """
-    raw = normalize_space(raw)
-    if not raw:
-        return None
-
-    # Already ISO date.
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", raw):
-        return raw
-
-    # Year-month.
-    if re.match(r"^\d{4}-\d{2}$", raw):
-        return f"{raw}-01"
-
-    # Year only.
-    if re.match(r"^\d{4}$", raw):
-        return f"{raw}-01-01"
-
-    # Month Year (e.g., "January 2024").
-    for fmt in ("%B %Y", "%b %Y"):
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+        return s
+    if re.match(r"^\d{4}-\d{2}$", s):
+        return f"{s}-01"
+    if re.match(r"^\d{4}$", s):
+        return f"{s}-01-01"
+    for f in ("%B %Y", "%b %Y"):
         try:
-            parsed = datetime.strptime(raw, fmt)
-            return date(parsed.year, parsed.month, 1).isoformat()
+            return datetime.strptime(s, f).strftime("%Y-%m-01")
         except ValueError:
-            continue
-
+            pass
     return None
 
 
-def flatten_phase(phases: Optional[Sequence[str]]) -> Optional[str]:
+def ph(phases: Optional[Sequence[str]]) -> Optional[str]:
     if not phases:
         return None
-    normalized = [normalize_space(p) for p in phases if normalize_space(p)]
-    if not normalized:
-        return None
-    return "; ".join(sorted(set(normalized)))
+    v = sorted(set(ns(x) for x in phases if ns(x)))
+    return "; ".join(v) if v else None
 
 
-def query_trials(
-    session: requests.Session,
-    base_url: str,
-    query: str,
-    page_size: int,
-    max_studies: int,
-) -> List[Dict]:
-    """
-    Query ClinicalTrials.gov v2 studies endpoint with pagination.
-    """
-    studies_url = f"{base_url}/studies"
-    studies: List[Dict] = []
-    next_page_token: Optional[str] = None
+def lev(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    p = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        c = [i]
+        for j, cb in enumerate(b, 1):
+            c.append(min(c[j - 1] + 1, p[j] + 1, p[j - 1] + (0 if ca == cb else 1)))
+        p = c
+    return p[-1]
 
-    while len(studies) < max_studies:
-        params: Dict[str, str] = {
-            "query.term": query,
-            "pageSize": str(min(page_size, max_studies - len(studies))),
-            "format": "json",
-        }
-        if next_page_token:
-            params["pageToken"] = next_page_token
 
-        payload = safe_get_json(session=session, url=studies_url, params=params)
-        batch = payload.get("studies", [])
-        if not isinstance(batch, list):
-            raise RuntimeError("ClinicalTrials.gov payload missing expected 'studies' list.")
-
-        studies.extend(study for study in batch if isinstance(study, dict))
-        next_page_token = payload.get("nextPageToken")
-        if not next_page_token or not batch:
+def splitn(raw: Optional[str]) -> Tuple[str, str]:
+    s = ns(raw)
+    # Strip trailing credentials repeatedly to handle multiple suffixes (e.g., "M.D., Ph.D.")
+    pattern = r",?\s*(m\.?d\.?|d\.?o\.?|ph\.?d\.?|m\.?b\.?b\.?s\.?|m\.?p\.?h\.?|m\.?s\.?c\.?|r\.?n\.?|n\.?p\.?|pa-c|p\.?a\.?)$"
+    while True:
+        new_s = re.sub(pattern, "", s, flags=re.I)
+        if new_s == s:
             break
-
-        time.sleep(0.2)
-
-    return studies
-
-
-def extract_trial_record(study: Dict) -> Optional[TrialRecord]:
-    protocol = study.get("protocolSection", {}) or {}
-    identification = protocol.get("identificationModule", {}) or {}
-    status_module = protocol.get("statusModule", {}) or {}
-    design_module = protocol.get("designModule", {}) or {}
-    sponsor_module = protocol.get("sponsorCollaboratorsModule", {}) or {}
-
-    nct_id = normalize_space(identification.get("nctId"))
-    if not nct_id:
-        return None
-
-    title = normalize_space(identification.get("briefTitle"))
-    phase = flatten_phase(design_module.get("phases"))
-    status = normalize_space(status_module.get("overallStatus"))
-
-    lead_sponsor = sponsor_module.get("leadSponsor", {}) or {}
-    sponsor = normalize_space(lead_sponsor.get("name"))
-
-    start_date = parse_iso_date(
-        (status_module.get("startDateStruct", {}) or {}).get("date")
-    )
-    completion_date = parse_iso_date(
-        (status_module.get("completionDateStruct", {}) or {}).get("date")
-    )
-
-    return TrialRecord(
-        nct_id=nct_id,
-        title=title,
-        phase=phase,
-        status=status,
-        sponsor=sponsor,
-        start_date=start_date,
-        completion_date=completion_date,
-    )
+        s = new_s
+    if "," in s:
+        p = [x.strip() for x in s.split(",") if x.strip()]
+        if len(p) >= 2:
+            return nk(p[1].split()[0] if p[1].split() else p[1]), nk(p[0])
+    t = nk(s).split()
+    if not t:
+        return "", ""
+    if len(t) == 1:
+        return "", t[0]
+    return t[0], t[-1]
 
 
-def extract_investigators(study: Dict, nct_id: str) -> List[InvestigatorRecord]:
-    protocol = study.get("protocolSection", {}) or {}
-    contacts_module = protocol.get("contactsLocationsModule", {}) or {}
+def name_ok(first: str, last: str, off_name: str) -> bool:
+    hf, hl = nk(first), nk(last)
+    of, ol = splitn(off_name)
+    if not hl or not ol:
+        return False
+    if hl == ol and hf and of and hf[0] == of[0]:
+        return True
+    return lev(f"{hf} {hl}".strip(), f"{of} {ol}".strip()) <= 2
 
-    investigators: List[InvestigatorRecord] = []
-    seen_signatures: Set[Tuple[str, str, str]] = set()
-    allowed_roles = {"PRINCIPAL_INVESTIGATOR", "SUB_INVESTIGATOR"}
 
-    def add_person(raw_name: Optional[str], role: Optional[str]) -> None:
-        first_name, last_name = split_name(raw_name)
-        source_text = normalize_space(raw_name) or ""
-        role_norm = normalize_space(role) or "investigator"
-        role_key = normalize_role_key(role_norm)
+def _affiliation_score_details(hcp: Dict, official: Dict, trial_locations: List[Dict]) -> Tuple[int, List[str]]:
+    score = 0
+    signals: List[str] = []
+    hcp_inst_short = nk(hcp.get("institution_short"))
+    hcp_inst_full = nk(hcp.get("institution_full"))
+    hcp_city = nk(hcp.get("city"))
+    hcp_state = nk(hcp.get("state"))
+    off_aff = nk(official.get("affiliation"))
 
-        if not source_text:
-            return
-        if role_key not in allowed_roles:
-            return
-        if not is_valid_investigator_name(source_text):
-            return
-        sig = (normalize_key(first_name), normalize_key(last_name), normalize_key(role_norm))
-        if sig in seen_signatures:
-            return
-        seen_signatures.add(sig)
-        investigators.append(
-            InvestigatorRecord(
-                trial_nct_id=nct_id,
-                first_name=first_name,
-                last_name=last_name,
-                role=role_norm,
-                source_text=source_text,
-            )
-        )
-
-    # Central contacts.
-    for contact in contacts_module.get("centralContacts", []) or []:
-        if not isinstance(contact, dict):
-            continue
-        add_person(contact.get("name"), contact.get("role") or "central_contact")
-
-    # Overall officials.
-    for official in contacts_module.get("overallOfficials", []) or []:
-        if not isinstance(official, dict):
-            continue
-        add_person(official.get("name"), official.get("role") or "overall_official")
-
-    # Location contacts and investigators.
-    for location in contacts_module.get("locations", []) or []:
-        if not isinstance(location, dict):
-            continue
-        contact = location.get("contact", {}) or {}
-        add_person(contact.get("name"), contact.get("role") or "site_contact")
-
-        for official in location.get("contacts", []) or []:
-            if not isinstance(official, dict):
+    if off_aff:
+        for cand in [hcp_inst_short, hcp_inst_full]:
+            if not cand:
                 continue
-            add_person(official.get("name"), official.get("role") or "site_contact")
+            if cand in off_aff or off_aff in cand:
+                score += 50
+                signals.append("institution_in_official_affiliation")
+                break
+            toks = [t for t in cand.split() if len(t) > 2]
+            if toks and sum(1 for t in toks if t in off_aff) >= max(1, min(3, len(toks))):
+                score += 50
+                signals.append("institution_token_overlap_in_official_affiliation")
+                break
 
-    return investigators
+    if hcp_city and off_aff and hcp_city in off_aff:
+        score += 40
+        signals.append("city_in_official_affiliation")
+    elif hcp_city and trial_locations:
+        for loc in trial_locations:
+            loc_city = nk((loc or {}).get("city", ""))
+            if loc_city == hcp_city:
+                score += 40
+                signals.append("city_match_in_trial_locations")
+                break
+
+    if hcp_state and trial_locations:
+        hcp_state_full = STATE_ABBREV_TO_NAME.get(hcp_state.upper(), hcp_state)
+        for loc in trial_locations:
+            loc_state = nk((loc or {}).get("state", ""))
+            if loc_state == hcp_state or loc_state == nk(hcp_state_full):
+                score += 30
+                signals.append("state_match_in_trial_locations")
+                break
+
+    if hcp_inst_short and trial_locations:
+        for loc in trial_locations:
+            facility = nk((loc or {}).get("facility", ""))
+            if facility and (hcp_inst_short in facility or facility in hcp_inst_short):
+                score += 20
+                signals.append("facility_matches_hcp_institution_short")
+                break
+
+    return min(score, 100), signals
 
 
-def init_supabase() -> Client:
-    supabase_url = get_required_env("SUPABASE_URL")
-    supabase_key = get_required_env("SUPABASE_KEY")
-    return create_client(supabase_url, supabase_key)
+def compute_affiliation_confidence(hcp: Dict, official: Dict, trial_locations: List[Dict]) -> int:
+    score, _signals = _affiliation_score_details(hcp, official, trial_locations)
+    return score
 
 
-def chunked(items: Sequence, size: int) -> Iterable[Sequence]:
-    for idx in range(0, len(items), size):
-        yield items[idx : idx + size]
+def load_ckpt() -> Set[str]:
+    if not os.path.exists(CKPT):
+        return set()
+    try:
+        with open(CKPT, "r", encoding="utf-8") as f:
+            return set((json.load(f).get("processed_hcp_ids") or []))
+    except Exception:
+        return set()
 
 
-def upsert_trials(supabase: Client, trials: Sequence[TrialRecord]) -> Dict[str, str]:
-    if not trials:
+def save_ckpt(ids: Set[str]) -> None:
+    with open(CKPT, "w", encoding="utf-8") as f:
+        json.dump({"processed_hcp_ids": sorted(ids), "saved_at": datetime.now(UTC).isoformat()}, f, indent=2)
+
+
+def get_hcps(c: Client) -> List[Dict]:
+    rows: List[Dict] = []
+    o = 0
+    while True:
+        b = (
+            c.table("hcps")
+            .select("id,first_name,last_name,institution_short,institution_full,city,state,npi_number")
+            .not_.is_("npi_number", "null")
+            .order("id")
+            .range(o, o + 999)
+            .execute()
+            .data
+            or []
+        )
+        if not b:
+            break
+        rows.extend(b)
+        if len(b) < 1000:
+            break
+        o += 1000
+    return rows
+
+
+def stratified_test_sample(hcps: List[Dict], limit: int) -> List[Dict]:
+    if limit < 50:
+        return hcps[:limit]
+    g1 = [h for h in hcps if h.get("institution_short") is not None]
+    g2 = [h for h in hcps if h.get("institution_short") is None and h.get("city") is not None]
+    all_ids = set()
+    out: List[Dict] = []
+    for group, n in [(g1, 10), (g2, 10)]:
+        for h in group[:n]:
+            hid = str(h.get("id"))
+            if hid not in all_ids:
+                out.append(h)
+                all_ids.add(hid)
+    remaining_pool = [h for h in hcps if str(h.get("id")) not in all_ids]
+    random.Random(42).shuffle(remaining_pool)
+    for h in remaining_pool[:30]:
+        out.append(h)
+    return out[:limit]
+
+
+def ct(session: requests.Session, term: str, locn: Optional[str]) -> List[Dict]:
+    p = {"query.term": term, "query.locn": locn or "", "pageSize": "50", "countTotal": "true", "format": "json"}
+    d = 0.5
+    for i in range(3):
+        try:
+            r = session.get(URL, params=p, timeout=(6, 40))
+            if r.status_code == 429 or 500 <= r.status_code < 600:
+                raise requests.HTTPError(response=r)
+            r.raise_for_status()
+            x = r.json().get("studies", [])
+            return [s for s in x if isinstance(s, dict)] if isinstance(x, list) else []
+        except Exception:
+            if i == 2:
+                return []
+            time.sleep(d)
+            d *= 2
+    return []
+
+
+def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], int, List[Dict]]:
+    h_id = h.get("id")
+    first = str(h.get("first_name") or "")
+    last = str(h.get("last_name") or "")
+    trials: Dict[str, Dict] = {}
+    links: List[Dict] = []
+    best_conf = -1
+    sample_matches: List[Dict] = []
+    for st in studies:
+        p = st.get("protocolSection", {}) or {}
+        idm = p.get("identificationModule", {}) or {}
+        sm = p.get("statusModule", {}) or {}
+        dm = p.get("designModule", {}) or {}
+        scm = p.get("sponsorCollaboratorsModule", {}) or {}
+        cm = p.get("contactsLocationsModule", {}) or {}
+        nct = ns(idm.get("nctId"))
+        if not nct:
+            continue
+        trial_locations = cm.get("locations", []) or []
+        if not isinstance(trial_locations, list):
+            trial_locations = []
+        offs = cm.get("overallOfficials", []) or []
+        if not isinstance(offs, list):
+            continue
+        captured_links: List[Dict] = []
+        for o in offs:
+            if not isinstance(o, dict):
+                continue
+            role = ns(o.get("role")).upper()
+            if role == "CONTACT" or role not in ROLES:
+                continue
+            nm = ns(o.get("name"))
+            if not nm:
+                continue
+            raw_first, raw_last = splitn(nm)
+            raw_affiliation = ns(o.get("affiliation")) or None
+
+            matched_hcp_id: Optional[str] = None
+            matched_confidence: Optional[int] = None
+            if name_ok(first, last, nm):
+                confidence = compute_affiliation_confidence(h, o, trial_locations)
+                best_conf = max(best_conf, confidence)
+                if confidence >= 40:
+                    matched_hcp_id = h_id
+                    matched_confidence = confidence
+                    score, signals = _affiliation_score_details(h, o, trial_locations)
+                    if confidence < 60:
+                        logger.debug(f"medium confidence match: {first} {last} <-> {nm} (score={confidence})")
+                    if len(sample_matches) < 5:
+                        sample_matches.append(
+                            {
+                                "hcp_name": f"{first} {last}".strip(),
+                                "official_name": nm,
+                                "nct_id": nct,
+                                "score": score,
+                                "signals": signals,
+                            }
+                        )
+
+            captured_links.append(
+                {
+                    "hcp_id": matched_hcp_id,
+                    "match_confidence": matched_confidence,
+                    "nct_id": nct,
+                    "role": role,
+                    "investigator_name": nm or None,
+                    "investigator_raw_first_name": raw_first or None,
+                    "investigator_raw_last_name": raw_last or None,
+                    "investigator_raw_affiliation": raw_affiliation,
+                    "investigator_raw_facility": None,
+                    "investigator_raw_city": None,
+                    "investigator_raw_state": None,
+                    "investigator_raw_country": None,
+                    "source": "overall_official",
+                }
+            )
+
+        locations = cm.get("locations", []) or []
+        if not isinstance(locations, list):
+            locations = []
+
+        for loc in locations:
+            if not isinstance(loc, dict):
+                continue
+
+            facility = ns(loc.get("facility")) or None
+            city = ns(loc.get("city")) or None
+            state = ns(loc.get("state")) or None
+            country = ns(loc.get("country")) or None
+
+            site_contacts = loc.get("contacts", []) or []
+            if not isinstance(site_contacts, list):
+                continue
+
+            for sc in site_contacts:
+                if not isinstance(sc, dict):
+                    continue
+
+                sc_role = ns(sc.get("role")).upper()
+                if sc_role == "CONTACT" or sc_role not in ROLES:
+                    continue
+
+                sc_name = ns(sc.get("name"))
+                if not sc_name:
+                    continue
+
+                sc_first, sc_last = splitn(sc_name)
+                is_queried_match = name_ok(first, last, sc_name)
+
+                if is_queried_match:
+                    synthetic_official = {
+                        "name": sc_name,
+                        "affiliation": facility or "",
+                    }
+                    synthetic_locations = [{"facility": facility, "city": city, "state": state}]
+                    confidence = compute_affiliation_confidence(h, synthetic_official, synthetic_locations)
+                    best_conf = max(best_conf, confidence)
+                    if confidence >= 40:
+                        captured_links.append(
+                            {
+                                "hcp_id": h_id,
+                                "nct_id": nct,
+                                "role": sc_role,
+                                "investigator_name": sc_name,
+                                "investigator_raw_first_name": sc_first or None,
+                                "investigator_raw_last_name": sc_last or None,
+                                "investigator_raw_affiliation": facility,
+                                "investigator_raw_facility": facility,
+                                "investigator_raw_city": city,
+                                "investigator_raw_state": state,
+                                "investigator_raw_country": country,
+                                "match_confidence": confidence,
+                                "source": "site_contact",
+                            }
+                        )
+                        continue
+
+                captured_links.append(
+                    {
+                        "hcp_id": None,
+                        "nct_id": nct,
+                        "role": sc_role,
+                        "investigator_name": sc_name,
+                        "investigator_raw_first_name": sc_first or None,
+                        "investigator_raw_last_name": sc_last or None,
+                        "investigator_raw_affiliation": facility,
+                        "investigator_raw_facility": facility,
+                        "investigator_raw_city": city,
+                        "investigator_raw_state": state,
+                        "investigator_raw_country": country,
+                        "match_confidence": None,
+                        "source": "site_contact",
+                    }
+                )
+        if not captured_links:
+            continue
+        lead = scm.get("leadSponsor", {}) or {}
+        rp = scm.get("responsibleParty", {}) or {}
+        trials[nct] = {
+            "nct_id": nct,
+            "title": ns(idm.get("briefTitle")) or None,
+            "phase": ph(dm.get("phases")),
+            "status": ns(sm.get("overallStatus")) or None,
+            "sponsor": ns(lead.get("name")) or None,
+            "lead_sponsor_class": ns(lead.get("class")) or None,
+            "study_type": ns(dm.get("studyType")) or None,
+            "responsible_party_type": ns(rp.get("type")) or None,
+            "start_date": dt(((sm.get("startDateStruct", {}) or {}).get("date"))),
+            "completion_date": dt(((sm.get("completionDateStruct", {}) or {}).get("date"))),
+            "locations": trial_locations if trial_locations else [],
+        }
+        links.extend(captured_links)
+    return list(trials.values()), links, best_conf, sample_matches
+
+
+def upsert_trials(c: Client, rows: List[Dict]) -> Dict[str, str]:
+    if not rows:
         return {}
+    # Omit locations from clinical_trials upsert (site data is on trial_investigators).
+    upsert_rows = [{k: v for k, v in r.items() if k != "locations"} for r in rows]
+    # Batch in chunks of 5 to avoid statement timeouts on heavy trial payloads
+    for i in range(0, len(upsert_rows), 5):
+        batch = upsert_rows[i : i + 5]
+        c.table("clinical_trials").upsert(batch, on_conflict="nct_id").execute()
+    ids = [r["nct_id"] for r in rows if r.get("nct_id")]
+    m: Dict[str, str] = {}
+    for i in range(0, len(ids), 100):
+        q = c.table("clinical_trials").select("id,nct_id").in_("nct_id", ids[i : i + 100]).execute().data or []
+        for r in q:
+            m[str(r["nct_id"])] = str(r["id"])
+    return m
 
-    trial_id_map: Dict[str, str] = {}
+
+def insert_links(c: Client, links: List[Dict], m: Dict[str, str]) -> int:
     rows = [
         {
-            "nct_id": trial.nct_id,
-            "title": trial.title,
-            "phase": trial.phase,
-            "status": trial.status,
-            "sponsor": trial.sponsor,
-            "start_date": trial.start_date,
-            "completion_date": trial.completion_date,
+            "hcp_id": l["hcp_id"],
+            "trial_id": m.get(str(l.get("nct_id") or "")),
+            "role": l["role"],
+            "investigator_name": l["investigator_name"],
+            "investigator_raw_first_name": l["investigator_raw_first_name"],
+            "investigator_raw_last_name": l["investigator_raw_last_name"],
+            "investigator_raw_affiliation": l.get("investigator_raw_affiliation"),
+            "investigator_raw_facility": l.get("investigator_raw_facility"),
+            "investigator_raw_city": l.get("investigator_raw_city"),
+            "investigator_raw_state": l.get("investigator_raw_state"),
+            "investigator_raw_country": l.get("investigator_raw_country"),
+            "match_confidence": l["match_confidence"],
+            "source": l["source"],
         }
-        for trial in trials
+        for l in links
     ]
-
-    try:
-        supabase.table("clinical_trials").upsert(
-            rows,
-            on_conflict="nct_id",
-        ).execute()
-    except Exception as exc:
-        raise RuntimeError(f"Failed to upsert clinical_trials: {exc}") from exc
-
-    # Fetch trial IDs for mapping.
-    nct_ids = [trial.nct_id for trial in trials]
-    for batch in chunked(nct_ids, 100):
-        try:
-            query = (
-                supabase.table("clinical_trials")
-                .select("id,nct_id")
-                .in_("nct_id", list(batch))
-                .execute()
-            )
-            for row in query.data or []:
-                trial_id_map[row["nct_id"]] = row["id"]
-        except Exception as exc:
-            raise RuntimeError(f"Failed to fetch clinical trial IDs: {exc}") from exc
-
-    return trial_id_map
-
-
-def load_hcp_name_map(supabase: Client) -> Dict[Tuple[str, str], str]:
-    """
-    Build a name-based lookup from hcps(first_name,last_name) -> id.
-    """
-    name_map: Dict[Tuple[str, str], str] = {}
-    offset = 0
-    page_size = 1000
-
-    while True:
-        try:
-            result = (
-                supabase.table("hcps")
-                .select("id,first_name,last_name")
-                .range(offset, offset + page_size - 1)
-                .execute()
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to fetch HCP names from Supabase: {exc}") from exc
-
-        rows = result.data or []
-        if not rows:
-            break
-
-        for row in rows:
-            first = normalize_key(row.get("first_name"))
-            last = normalize_key(row.get("last_name"))
-            if first and last:
-                name_map[(first, last)] = row["id"]
-
-        if len(rows) < page_size:
-            break
-        offset += page_size
-
-    return name_map
-
-
-def match_hcp_id(
-    investigator: InvestigatorRecord,
-    hcp_name_map: Dict[Tuple[str, str], str],
-) -> Optional[str]:
-    first = normalize_key(investigator.first_name)
-    last = normalize_key(investigator.last_name)
-    if first and last and (first, last) in hcp_name_map:
-        return hcp_name_map[(first, last)]
-
-    # Fallback fuzzy match: exact last name + first initial.
-    if first and last:
-        first_initial = first[0]
-        for (hcp_first, hcp_last), hcp_id in hcp_name_map.items():
-            if hcp_last == last and hcp_first and hcp_first[0] == first_initial:
-                return hcp_id
-    return None
-
-
-def upsert_trial_investigators(
-    supabase: Client,
-    investigators: Sequence[InvestigatorRecord],
-    trial_id_map: Dict[str, str],
-    hcp_name_map: Dict[Tuple[str, str], str],
-) -> int:
-    rows = []
-    for investigator in investigators:
-        trial_id = trial_id_map.get(investigator.trial_nct_id)
-        if not trial_id:
-            continue
-
-        hcp_id = match_hcp_id(investigator, hcp_name_map)
-        investigator_name = " ".join(
-            part for part in [investigator.first_name, investigator.last_name] if part
-        ).strip()
-        rows.append(
-            {
-                "hcp_id": hcp_id,
-                "trial_id": trial_id,
-                "role": investigator.role,
-                "investigator_name": investigator_name if investigator_name else None,
-            }
-        )
-
+    rows = [r for r in rows if r["trial_id"]]
     if not rows:
         return 0
 
-    try:
-        # If you can, enforce a unique constraint like (trial_id, hcp_id, role) in DB.
-        supabase.table("trial_investigators").insert(
-            rows,
-            returning="minimal",
-        ).execute()
-    except Exception as exc:
-        raise RuntimeError(f"Failed to upsert trial_investigators: {exc}") from exc
+    dedup_map: Dict[Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]], Dict] = {}
+    for r in rows:
+        key = (
+            r["trial_id"],
+            r["investigator_raw_first_name"],
+            r["investigator_raw_last_name"],
+            r["role"],
+            r["source"],
+            r.get("investigator_raw_facility"),
+        )
+        existing = dedup_map.get(key)
+        if existing is None:
+            dedup_map[key] = r
+        elif existing.get("hcp_id") is None and r.get("hcp_id") is not None:
+            dedup_map[key] = r
 
+    rows = list(dedup_map.values())
+    if not rows:
+        return 0
+
+    for i in range(0, len(rows), 500):
+        c.table("trial_investigators").upsert(
+            rows[i : i + 500],
+            on_conflict="trial_id,investigator_raw_first_name,investigator_raw_last_name,role,source,investigator_raw_facility",
+        ).execute()
     return len(rows)
 
 
-def run_pipeline() -> None:
+def eta(done: int, total: int, start: float) -> str:
+    if done <= 0:
+        return "?:??"
+    rem = ((time.time() - start) / done) * max(0, total - done)
+    m = int(rem // 60)
+    return f"{m // 60}:{m % 60:02d}"
+
+
+def run(test: bool, limit: Optional[int]) -> None:
     load_dotenv()
-
-    base_url = os.getenv("CTGOV_BASE_URL", "https://clinicaltrials.gov/api/v2")
-    page_size = int(os.getenv("CTGOV_PAGE_SIZE", "100"))
-    max_studies = int(os.getenv("CTGOV_MAX_STUDIES", "1000"))
-
-    session = build_session()
-    supabase = init_supabase()
-
-    print("Querying ClinicalTrials.gov...")
-    studies = query_trials(
-        session=session,
-        base_url=base_url,
-        query=TRIAL_QUERY,
-        page_size=page_size,
-        max_studies=max_studies,
-    )
-    if not studies:
-        print("No studies found.")
-        return
-    print(f"Fetched {len(studies)} studies.")
-
-    trial_records: List[TrialRecord] = []
-    investigator_records: List[InvestigatorRecord] = []
-    seen_nct_ids: Set[str] = set()
-
-    for study in studies:
-        trial = extract_trial_record(study)
-        if not trial:
+    c = sb()
+    s = requests.Session()
+    s.headers.update({"User-Agent": "FieldMark/1.0"})
+    hcps = get_hcps(c)
+    seen = load_ckpt()
+    todo = [h for h in hcps if str(h.get("id")) not in seen]
+    if test:
+        todo = stratified_test_sample(todo, limit or 50)
+    elif limit:
+        todo = todo[:limit]
+    print("Run this SQL in Supabase SQL editor before full rerun:")
+    print("TRUNCATE trial_investigators;")
+    print("TRUNCATE clinical_trials;")
+    print(f"Loaded HCPs: {len(hcps)} | Pending after checkpoint: {len(todo)}")
+    if test:
+        print(f"TEST MODE: limit={limit or 50} (stratified 10 short/non-null + 10 short/null city/non-null + 30 random)")
+    st = S(start=time.time())
+    role = Counter()
+    sponsor = Counter()
+    sample_matches: List[Dict] = []
+    for i, h in enumerate(todo, 1):
+        hid = str(h.get("id") or "")
+        nm = f"{ns(h.get('first_name'))} {ns(h.get('last_name'))}".strip()
+        if not hid or not nm:
+            st.skipped += 1
             continue
-        if trial.nct_id in seen_nct_ids:
+        studies = ct(s, nm, ns(h.get("city")) or ns(h.get("state")) or None)
+        time.sleep(0.1)
+        st.processed += 1
+        seen.add(hid)
+        if not studies:
+            st.skipped += 1
             continue
-        seen_nct_ids.add(trial.nct_id)
-        trial_records.append(trial)
-        investigator_records.extend(extract_investigators(study, trial.nct_id))
-
-    print(f"Prepared {len(trial_records)} unique trial records.")
-    print(f"Prepared {len(investigator_records)} investigator/contact records.")
-
-    print("Upserting clinical_trials...")
-    trial_id_map = upsert_trials(supabase, trial_records)
-    print(f"Mapped {len(trial_id_map)} trial IDs.")
-
-    print("Loading HCP lookup map...")
-    hcp_name_map = load_hcp_name_map(supabase)
-    print(f"Loaded {len(hcp_name_map)} HCP name keys.")
-
-    print("Upserting trial_investigators...")
-    inserted_links = upsert_trial_investigators(
-        supabase=supabase,
-        investigators=investigator_records,
-        trial_id_map=trial_id_map,
-        hcp_name_map=hcp_name_map,
-    )
-    print(f"Upserted {inserted_links} trial-investigator links.")
-    print("Pipeline completed successfully.")
+        trials, links, best_conf, sample = extract(h, studies)
+        for x in sample:
+            if len(sample_matches) < 5:
+                sample_matches.append(x)
+        if best_conf >= 60:
+            st.matched_high_hcps += 1
+        elif best_conf >= 40:
+            st.matched_medium_hcps += 1
+        elif best_conf >= 0:
+            st.rejected_low_hcps += 1
+        if not trials or not links:
+            st.skipped += 1
+            continue
+        m = upsert_trials(c, trials)
+        ins = insert_links(c, links, m)
+        st.linked_hcps += 1
+        st.trials += len(trials)
+        st.links += ins
+        for l in links:
+            role[str(l.get("role") or "")] += 1
+        for t in trials:
+            sponsor[str(t.get("lead_sponsor_class") or "(null)")] += 1
+        if i % 10 == 0 or i == len(todo):
+            print(
+                f"[{i}/{len(todo)}] HCPs processed | Trials added: {st.trials} | "
+                f"Investigators added: {st.links} | Skipped: {st.skipped} | ETA: {eta(i, len(todo), st.start)}"
+            )
+        if i % 100 == 0:
+            save_ckpt(seen)
+            print(f"Checkpoint saved at {i} HCPs.")
+    save_ckpt(seen)
+    print("\n=== Trials Pipeline Summary ===")
+    print(f"Total HCPs processed: {st.processed}")
+    print(f"Total HCPs with at least one verified trial link: {st.linked_hcps}")
+    print(f"Total trials ingested: {st.trials}")
+    print(f"Total trial_investigator links (excluding CONTACT): {st.links}")
+    print(f"HCPs matched with high confidence (60-100): {st.matched_high_hcps}")
+    print(f"HCPs matched with medium confidence (40-59): {st.matched_medium_hcps}")
+    print(f"HCPs rejected for low confidence (<40): {st.rejected_low_hcps}")
+    print("Distribution by role:")
+    for k, v in role.most_common():
+        print(f"  {k}: {v}")
+    print("Distribution by lead_sponsor_class:")
+    for k, v in sponsor.most_common():
+        print(f"  {k}: {v}")
+    print("Sample matched links (up to 5):")
+    for sm in sample_matches[:5]:
+        print(json.dumps(sm))
 
 
 if __name__ == "__main__":
-    try:
-        run_pipeline()
-    except Exception as error:
-        print(f"[ERROR] Pipeline failed: {error}")
-        raise
+    p = argparse.ArgumentParser(description="Investigator-first CTGov pipeline")
+    p.add_argument("--test", action="store_true")
+    p.add_argument("--limit", type=int, default=None)
+    a = p.parse_args()
+    run(a.test, a.limit)
