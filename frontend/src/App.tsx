@@ -106,6 +106,9 @@ export default function App() {
   const [cityFeedTA, setCityFeedTA] = useState<string>("Rare Disease");
   const [darkHorseFilter, setDarkHorseFilter] = useState(false);
   const [hcpList, setHcpList] = useState<AppHCP[]>([]);
+  const [feedOffset, setFeedOffset] = useState(0);
+  const [feedTotal, setFeedTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loadingHCPs, setLoadingHCPs] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
@@ -124,11 +127,13 @@ export default function App() {
     try {
       if (loadingAsRefresh) setRefreshingFeed(true);
       else setLoadingHCPs(true);
+      setFeedOffset(0);
       const taSlug = getTASlug(selectedTA);
       const tier = darkHorseFilter ? "dark_horse" : undefined;
-      const { data } = await getRisingStars(taSlug, 20, { tier });
-      const mapped = (data ?? []).map(mapRisingStarToHCP);
+      const { data } = await getRisingStars(taSlug, 20, { tier, offset: 0 });
+      const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
+      if (data) setFeedTotal(data.total);
       setLastUpdatedAt(new Date());
     } finally {
       if (loadingAsRefresh) setRefreshingFeed(false);
@@ -141,13 +146,16 @@ export default function App() {
 
     async function fetchData() {
       setLoadingHCPs(true);
+      setFeedOffset(0);
+      setFeedTotal(0);
       const taSlug = getTASlug(selectedTA);
       const tier = darkHorseFilter ? "dark_horse" : undefined;
-      const { data } = await getRisingStars(taSlug, 20, { tier });
+      const { data } = await getRisingStars(taSlug, 20, { tier, offset: 0 });
       if (cancelled) return;
 
-      const mapped = (data ?? []).map(mapRisingStarToHCP);
+      const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
+      if (data) setFeedTotal(data.total);
       setLastUpdatedAt(new Date());
       setLoadingHCPs(false);
     }
@@ -158,6 +166,22 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedTA, darkHorseFilter]);
+
+  async function loadMore() {
+    const nextOffset = feedOffset + 20;
+    const taSlug = getTASlug(selectedTA);
+    const tier = darkHorseFilter ? "dark_horse" : undefined;
+    setLoadingMore(true);
+    try {
+      const { data } = await getRisingStars(taSlug, 20, { tier, offset: nextOffset });
+      const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
+      setHcpList((prev) => [...prev, ...mapped]);
+      setFeedOffset(nextOffset);
+      if (data) setFeedTotal(data.total);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -439,7 +463,9 @@ export default function App() {
           >
             {darkHorseFilter
               ? `${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`
-              : `${(taCounts?.rising_stars ?? indicationCount).toLocaleString()} identified`}
+              : feedTotal > 0 && hcpList.length < feedTotal
+                ? `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`
+                : `${(taCounts?.rising_stars ?? indicationCount).toLocaleString()} identified`}
           </span>
           <button
             onClick={() => setCurrentScreen("landscape")}
@@ -472,15 +498,43 @@ export default function App() {
         {loadingHCPs ? (
           <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
         ) : (
-          hcpList
-          .map((hcp) => (
-            <HCPCard
-              key={hcp.id}
-              hcp={hcp as unknown as UIHCP}
-              onAddPress={(cardHcp) => handleAddPress(cardHcp as unknown as AppHCP)}
-              onCardPress={(cardHcp) => handleCardPress(cardHcp as unknown as AppHCP)}
-            />
-          ))
+          <>
+            {hcpList.map((hcp) => (
+              <HCPCard
+                key={hcp.id}
+                hcp={hcp as unknown as UIHCP}
+                onAddPress={(cardHcp) => handleAddPress(cardHcp as unknown as AppHCP)}
+                onCardPress={(cardHcp) => handleCardPress(cardHcp as unknown as AppHCP)}
+              />
+            ))}
+            {hcpList.length < feedTotal && (
+              <div style={{ padding: "0 16px 8px", width: "100%" }}>
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    textAlign: "center",
+                    backgroundColor: "#1A3D2E",
+                    border: "1px solid #4ADE80",
+                    borderRadius: 3,
+                    padding: "10px 16px",
+                    cursor: loadingMore ? "not-allowed" : "pointer",
+                    opacity: loadingMore ? 0.6 : 1,
+                    fontFamily: "monospace",
+                    fontSize: 13,
+                    color: "#4ADE80",
+                  }}
+                >
+                  {loadingMore ? "Loading..." : "Load more"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

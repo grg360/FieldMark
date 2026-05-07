@@ -77,8 +77,8 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
 export async function getRisingStars(
   therapeuticArea: string,
   limit: number = 20,
-  options: { tier?: string } = {},
-): Promise<ApiResult<RisingStar[]>> {
+  options: { tier?: string; offset?: number } = {},
+): Promise<ApiResult<{ rows: RisingStar[]; total: number }>> {
   try {
     const TA_ID_MAP: Record<string, string> = {
       "rare-disease": "833e7b38-d01b-409e-82c0-71eb29e138a0",
@@ -92,7 +92,24 @@ export async function getRisingStars(
     const taId = TA_ID_MAP[taSlug];
 
     if (!taId) {
-      return { data: [], error: null };
+      return { data: { rows: [], total: 0 }, error: null };
+    }
+
+    const offset = options.offset ?? 0;
+
+    let countQuery = supabase
+      .from("hcp_normalized_scores")
+      .select("hcp_id", { count: "exact", head: true })
+      .eq("therapeutic_area_id", taId);
+
+    if (options.tier) {
+      countQuery = countQuery.eq("tier", options.tier);
+    }
+
+    const { count: totalCount, error: countError } = await countQuery;
+
+    if (countError) {
+      return { data: null, error: countError.message };
     }
 
     let scoreQuery = supabase
@@ -106,14 +123,14 @@ export async function getRisingStars(
 
     const { data: scoreData, error: scoreError } = await scoreQuery
       .order("normalized_score", { ascending: false })
-      .limit(200);
+      .range(offset, offset + limit - 1);
 
     if (scoreError) {
       return { data: null, error: scoreError.message };
     }
 
     if (!scoreData || scoreData.length === 0) {
-      return { data: [], error: null };
+      return { data: { rows: [], total: totalCount ?? 0 }, error: null };
     }
 
     const hcpIds = scoreData.map((r) => r.hcp_id);
@@ -163,10 +180,9 @@ export async function getRisingStars(
           normalized_score: Number(scoreRow.normalized_score ?? 0),
           narrative: narrativeMap.get(String(row.id)) ?? null,
         }];
-      })
-      .slice(0, limit);
+      });
 
-    return { data: risingStars, error: null };
+    return { data: { rows: risingStars, total: totalCount ?? 0 }, error: null };
   } catch (err) {
     return {
       data: null,
