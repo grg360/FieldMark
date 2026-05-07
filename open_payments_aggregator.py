@@ -1,0 +1,561 @@
+import argparse
+import json
+import os
+import time
+from collections import Counter
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+import duckdb
+from dotenv import load_dotenv
+from supabase import Client, create_client
+
+
+PARQUET_FILES = [
+    r"C:\Users\garre\Desktop\FieldMark\OpenPayments\op_general_pgyr2022.parquet",
+    r"C:\Users\garre\Desktop\FieldMark\OpenPayments\op_general_pgyr2023.parquet",
+    r"C:\Users\garre\Desktop\FieldMark\OpenPayments\op_general_pgyr2024.parquet",
+]
+OUTPUT_LOG_PATH = r"C:\Users\garre\Desktop\FieldMark\open_payments_aggregator_log_may6.json"
+PAGE_SIZE = 1000
+WRITE_BATCH_SIZE = 500
+DELETE_GUARD_ID = "00000000-0000-0000-0000-000000000000"
+
+SPEAKER_CATEGORIES = [
+    "Compensation for services other than consulting, including serving as faculty or as a speaker at a venue other than a continuing education program",
+    "Compensation for serving as faculty or as a speaker for a medical education program",
+]
+
+CANONICALS = [
+    {
+        "label": "Loomba",
+        "hcp_id": "9339ead6-2023-4e69-9eda-2914553a2e20",
+        "npi": "1578593521",
+        "expected_ta": "Hepatology",
+    },
+    {
+        "label": "Sanyal",
+        "hcp_id": "32495742-222a-45c6-bb96-cc44d5227e7e",
+        "npi": "1629168273",
+        "expected_ta": "Hepatology",
+    },
+    {
+        "label": "Chalasani",
+        "hcp_id": "6f9dd309-bd67-4260-a9c2-8a22129f988c",
+        "npi": "1588628002",
+        "expected_ta": "Hepatology",
+    },
+    {
+        "label": "Garassino",
+        "hcp_id": "dc645bf0-b7e0-4c3c-9aaf-9e7bc35d6331",
+        "npi": "1053999599",
+        "expected_ta": "NSCLC",
+    },
+]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--execute", action="store_true", default=False)
+    return parser.parse_args()
+
+
+def get_required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise EnvironmentError(f"Missing required environment variable: {name}")
+    return value
+
+
+def init_supabase() -> Client:
+    return create_client(get_required_env("SUPABASE_URL"), get_required_env("SUPABASE_KEY"))
+
+
+def fetch_all_pages(
+    client: Client,
+    table: str,
+    columns: str,
+    not_null_column: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    offset = 0
+    page_size = PAGE_SIZE
+    while True:
+        try:
+            q = client.table(table).select(columns).order("id").range(offset, offset + page_size - 1)
+            if not_null_column:
+                q = q.not_.is_(not_null_column, "null")
+            batch = q.execute().data or []
+        except Exception as exc:
+            if "57014" in str(exc) and page_size > 250:
+                page_size = 250
+                continue
+            raise
+        if not batch:
+            break
+        rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return rows
+
+
+def fetch_ta_drug_keywords(client: Client) -> List[Dict[str, Any]]:
+    return (
+        client.table("ta_drug_keywords")
+        .select("id,therapeutic_area_id,drug_name,drug_brand_name,drug_generic_name")
+        .execute()
+        .data
+        or []
+    )
+
+
+def fetch_therapeutic_areas(client: Client) -> List[Dict[str, Any]]:
+    return client.table("therapeutic_areas").select("id,name").execute().data or []
+
+
+def sql_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def rows_to_dicts(cursor_result: Any) -> List[Dict[str, Any]]:
+    cols = [d[0] for d in cursor_result.description]
+    out = []
+    for row in cursor_result.fetchall():
+        out.append({cols[i]: row[i] for i in range(len(cols))})
+    return out
+
+
+def bucket_amount(x: float) -> str:
+    if x == 0:
+        return "0"
+    if 0 < x <= 100:
+        return "0-100"
+    if x <= 1000:
+        return "100-1K"
+    if x <= 10000:
+        return "1K-10K"
+    if x <= 100000:
+        return "10K-100K"
+    if x <= 1000000:
+        return "100K-1M"
+    return "1M+"
+
+
+if __name__ == "__main__":
+    started = time.time()
+    args = parse_args()
+    execute = bool(args.execute)
+    mode = "execute" if execute else "dry_run"
+    errors: List[str] = []
+
+    load_dotenv()
+    client = init_supabase()
+    con = duckdb.connect()
+    con.execute("SET memory_limit = '4GB'")
+
+    # Phase 2a/b: hcps cohort and mapping
+    hcps_npi_rows = fetch_all_pages(client, "hcps", "id,npi_number", not_null_column="npi_number")
+    npi_set = {str(r.get("npi_number")).strip() for r in hcps_npi_rows if str(r.get("npi_number") or "").strip()}
+    npi_to_hcp = {str(r["npi_number"]).strip(): str(r["id"]) for r in hcps_npi_rows if r.get("npi_number")}
+    print(f"Loaded {len(npi_set)} FieldMark NPIs")
+
+    # Phase 2c/d/e
+    ta_drug_keywords = fetch_ta_drug_keywords(client)
+    therapeutic_areas = fetch_therapeutic_areas(client)
+    ta_name_by_id = {str(r["id"]): str(r["name"]) for r in therapeutic_areas if r.get("id")}
+    ta_id_by_name = {str(r["name"]): str(r["id"]) for r in therapeutic_areas if r.get("id")}
+    hcp_ta_rows = fetch_all_pages(client, "hcp_therapeutic_areas", "id,hcp_id,therapeutic_area_id")
+    hcp_to_tas: Dict[str, set] = {}
+    for r in hcp_ta_rows:
+        h = str(r.get("hcp_id") or "")
+        t = str(r.get("therapeutic_area_id") or "")
+        if not h or not t:
+            continue
+        if h not in hcp_to_tas:
+            hcp_to_tas[h] = set()
+        hcp_to_tas[h].add(t)
+
+    # Phase 3: register in duckdb
+    parquet_list_sql = ", ".join(sql_literal(p) for p in PARQUET_FILES)
+    con.execute(
+        f"""
+        CREATE VIEW op_payments AS
+        SELECT * FROM read_parquet([{parquet_list_sql}])
+        """
+    )
+
+    con.execute("CREATE TEMP TABLE fieldmark_npis (npi VARCHAR PRIMARY KEY)")
+    con.executemany("INSERT INTO fieldmark_npis VALUES (?)", [(n,) for n in sorted(npi_set)])
+
+    con.execute("CREATE TEMP TABLE hcp_npi_map (hcp_id VARCHAR, npi VARCHAR)")
+    con.executemany(
+        "INSERT INTO hcp_npi_map VALUES (?, ?)",
+        [(hcp_id, npi) for npi, hcp_id in npi_to_hcp.items()],
+    )
+
+    con.execute(
+        """
+        CREATE TEMP TABLE drug_keywords (
+          keyword_id VARCHAR,
+          therapeutic_area_id VARCHAR,
+          drug_name VARCHAR,
+          drug_brand_name VARCHAR,
+          drug_generic_name VARCHAR
+        )
+        """
+    )
+    con.executemany(
+        "INSERT INTO drug_keywords VALUES (?, ?, ?, ?, ?)",
+        [
+            (
+                str(r.get("id") or ""),
+                str(r.get("therapeutic_area_id") or ""),
+                str(r.get("drug_name") or ""),
+                str(r.get("drug_brand_name") or ""),
+                str(r.get("drug_generic_name") or ""),
+            )
+            for r in ta_drug_keywords
+        ],
+    )
+
+    con.execute("CREATE TEMP TABLE hcp_ta (hcp_id VARCHAR, therapeutic_area_id VARCHAR)")
+    con.executemany(
+        "INSERT INTO hcp_ta VALUES (?, ?)",
+        [
+            (str(r.get("hcp_id") or ""), str(r.get("therapeutic_area_id") or ""))
+            for r in hcp_ta_rows
+            if r.get("hcp_id") and r.get("therapeutic_area_id")
+        ],
+    )
+
+    # Phase 4
+    con.execute(
+        """
+        CREATE TEMP TABLE filtered_payments AS
+        SELECT
+          op.npi,
+          op.program_year,
+          op.payment_amount_usd,
+          op.payment_date,
+          op.nature_of_payment,
+          op.manufacturer_name,
+          op.drug_indicator,
+          op.drug_name,
+          op.drug_slot,
+          hmap.hcp_id
+        FROM op_payments op
+        INNER JOIN hcp_npi_map hmap ON op.npi = hmap.npi
+        """
+    )
+    filtered_payment_rows = con.execute("SELECT COUNT(*) AS c FROM filtered_payments").fetchone()[0]
+    print(f"filtered_payments rows: {filtered_payment_rows}")
+
+    pharma_filter = "(drug_indicator IN ('Drug','Biological') OR drug_indicator IS NULL OR drug_slot = 0)"
+    speaker_list_sql = ", ".join(sql_literal(x) for x in SPEAKER_CATEGORIES)
+
+    # Phase 5 summary agg
+    summary_query = f"""
+    SELECT
+      hcp_id,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment NOT IN ('Food and Beverage','Travel and Lodging') THEN payment_amount_usd ELSE 0 END) AS total_payments_3yr,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment IN ({speaker_list_sql}) THEN payment_amount_usd ELSE 0 END) AS speaker_bureau_3yr,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment = 'Consulting Fee' THEN payment_amount_usd ELSE 0 END) AS consulting_3yr,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment = 'Honoraria' THEN payment_amount_usd ELSE 0 END) AS honoraria_3yr,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment = 'Education' THEN payment_amount_usd ELSE 0 END) AS education_3yr,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment = 'Royalty or License' THEN payment_amount_usd ELSE 0 END) AS royalty_3yr,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment = 'Food and Beverage' THEN payment_amount_usd ELSE 0 END) AS food_beverage_3yr,
+      SUM(CASE WHEN {pharma_filter} AND nature_of_payment = 'Travel and Lodging' THEN payment_amount_usd ELSE 0 END) AS travel_lodging_3yr,
+      SUM(CASE WHEN {pharma_filter} AND program_year = 2022 THEN payment_amount_usd ELSE 0 END) AS py2022_total,
+      SUM(CASE WHEN {pharma_filter} AND program_year = 2023 THEN payment_amount_usd ELSE 0 END) AS py2023_total,
+      SUM(CASE WHEN {pharma_filter} AND program_year = 2024 THEN payment_amount_usd ELSE 0 END) AS py2024_total,
+      SUM(CASE WHEN {pharma_filter} THEN payment_amount_usd ELSE 0 END) AS total_payments_lifetime,
+      SUM(CASE WHEN {pharma_filter} THEN 1 ELSE 0 END) AS total_payments_count_lifetime,
+      COUNT(DISTINCT CASE WHEN {pharma_filter} THEN manufacturer_name ELSE NULL END) AS distinct_companies_lifetime,
+      MAX(CASE WHEN {pharma_filter} AND payment_date IS NOT NULL AND payment_date <> '' THEN strptime(payment_date, '%m/%d/%Y') ELSE NULL END) AS most_recent_payment_date
+    FROM filtered_payments
+    GROUP BY hcp_id
+    """
+    summary_rows_raw = rows_to_dicts(con.execute(summary_query))
+    summary_rows: List[Dict[str, Any]] = []
+    for r in summary_rows_raw:
+        py2022_total = float(r.get("py2022_total") or 0.0)
+        py2024_total = float(r.get("py2024_total") or 0.0)
+        trend = None
+        if py2022_total != 0:
+            trend = ((py2024_total - py2022_total) / py2022_total) * 100.0
+        summary_rows.append(
+            {
+                "hcp_id": r["hcp_id"],
+                "total_payments_3yr": float(r.get("total_payments_3yr") or 0.0),
+                "speaker_bureau_3yr": float(r.get("speaker_bureau_3yr") or 0.0),
+                "consulting_3yr": float(r.get("consulting_3yr") or 0.0),
+                "honoraria_3yr": float(r.get("honoraria_3yr") or 0.0),
+                "education_3yr": float(r.get("education_3yr") or 0.0),
+                "royalty_3yr": float(r.get("royalty_3yr") or 0.0),
+                "food_beverage_3yr": float(r.get("food_beverage_3yr") or 0.0),
+                "travel_lodging_3yr": float(r.get("travel_lodging_3yr") or 0.0),
+                "py2022_total": py2022_total,
+                "py2023_total": float(r.get("py2023_total") or 0.0),
+                "py2024_total": py2024_total,
+                "total_payments_lifetime": float(r.get("total_payments_lifetime") or 0.0),
+                "total_payments_count_lifetime": int(r.get("total_payments_count_lifetime") or 0),
+                "distinct_companies_lifetime": int(r.get("distinct_companies_lifetime") or 0),
+                "most_recent_payment_date": (
+                    r["most_recent_payment_date"].date().isoformat()
+                    if r.get("most_recent_payment_date") is not None
+                    else None
+                ),
+                "year_over_year_trend_pct": trend,
+            }
+        )
+
+    # Phase 6 by_ta agg
+    by_ta_query = f"""
+    SELECT
+      fp.hcp_id,
+      dk.therapeutic_area_id,
+      SUM(fp.payment_amount_usd) AS ta_payments_3yr,
+      COUNT(*) AS ta_payments_count_3yr,
+      COUNT(DISTINCT dk.keyword_id) AS ta_distinct_drugs_3yr,
+      COUNT(DISTINCT fp.manufacturer_name) AS ta_distinct_companies_3yr,
+      SUM(CASE WHEN fp.nature_of_payment IN ({speaker_list_sql}) THEN fp.payment_amount_usd ELSE 0 END) AS ta_speaker_bureau_3yr,
+      SUM(CASE WHEN fp.nature_of_payment = 'Consulting Fee' THEN fp.payment_amount_usd ELSE 0 END) AS ta_consulting_3yr,
+      SUM(CASE WHEN fp.nature_of_payment = 'Honoraria' THEN fp.payment_amount_usd ELSE 0 END) AS ta_honoraria_3yr
+    FROM filtered_payments fp
+    INNER JOIN hcp_ta ht
+      ON ht.hcp_id = fp.hcp_id
+    INNER JOIN drug_keywords dk
+      ON dk.therapeutic_area_id = ht.therapeutic_area_id
+     AND (
+       lower(fp.drug_name) = lower(dk.drug_name)
+       OR (dk.drug_brand_name IS NOT NULL AND dk.drug_brand_name <> '' AND lower(fp.drug_name) LIKE '%' || lower(dk.drug_brand_name) || '%')
+     )
+    WHERE fp.drug_indicator IN ('Drug','Biological')
+      AND fp.drug_name IS NOT NULL
+      AND fp.drug_name <> ''
+    GROUP BY fp.hcp_id, dk.therapeutic_area_id
+    """
+    by_ta_rows_raw = rows_to_dicts(con.execute(by_ta_query))
+    by_ta_rows = [
+        {
+            "hcp_id": r["hcp_id"],
+            "therapeutic_area_id": r["therapeutic_area_id"],
+            "ta_payments_3yr": float(r.get("ta_payments_3yr") or 0.0),
+            "ta_payments_count_3yr": int(r.get("ta_payments_count_3yr") or 0),
+            "ta_distinct_drugs_3yr": int(r.get("ta_distinct_drugs_3yr") or 0),
+            "ta_distinct_companies_3yr": int(r.get("ta_distinct_companies_3yr") or 0),
+            "ta_speaker_bureau_3yr": float(r.get("ta_speaker_bureau_3yr") or 0.0),
+            "ta_consulting_3yr": float(r.get("ta_consulting_3yr") or 0.0),
+            "ta_honoraria_3yr": float(r.get("ta_honoraria_3yr") or 0.0),
+        }
+        for r in by_ta_rows_raw
+    ]
+
+    print(f"Computed {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows")
+
+    # Phase 8 - Level 1 stats
+    hcp_with_summary = len(summary_rows)
+    hcp_with_by_ta = len({r["hcp_id"] for r in by_ta_rows})
+    total_bucket_counts: Counter[str] = Counter()
+    speaker_bucket_counts: Counter[str] = Counter()
+    for r in summary_rows:
+        total_bucket_counts[bucket_amount(float(r["total_payments_3yr"]))] += 1
+        speaker_bucket_counts[bucket_amount(float(r["speaker_bureau_3yr"]))] += 1
+    ta_row_counts: Counter[str] = Counter()
+    for r in by_ta_rows:
+        ta_row_counts[ta_name_by_id.get(r["therapeutic_area_id"], r["therapeutic_area_id"])] += 1
+
+    level_1_stats = {
+        "hcp_count_summary_rows": hcp_with_summary,
+        "hcp_count_with_by_ta_rows": hcp_with_by_ta,
+        "total_payments_3yr_buckets": dict(total_bucket_counts),
+        "speaker_bureau_3yr_buckets": dict(speaker_bucket_counts),
+        "by_ta_row_count": dict(ta_row_counts),
+    }
+    print("Level 1 stats:", level_1_stats)
+
+    # Phase 8 - Level 2 canonical validation
+    summary_by_hcp = {r["hcp_id"]: r for r in summary_rows}
+    by_ta_index = {(r["hcp_id"], r["therapeutic_area_id"]): r for r in by_ta_rows}
+    level_2_canonicals: List[Dict[str, Any]] = []
+
+    for c in CANONICALS:
+        entry: Dict[str, Any] = {
+            "label": c["label"],
+            "hcp_id": c["hcp_id"],
+            "npi": c["npi"],
+            "expected_ta": c["expected_ta"],
+            "summary_exists": False,
+            "summary_metrics": None,
+            "expected_ta_row_exists": False,
+            "expected_ta_payments_3yr": None,
+            "error": None,
+        }
+        try:
+            s = summary_by_hcp.get(c["hcp_id"])
+            if s:
+                entry["summary_exists"] = True
+                entry["summary_metrics"] = {
+                    "total_payments_3yr": s["total_payments_3yr"],
+                    "speaker_bureau_3yr": s["speaker_bureau_3yr"],
+                    "consulting_3yr": s["consulting_3yr"],
+                }
+            ta_id = ta_id_by_name.get(c["expected_ta"])
+            if ta_id and (c["hcp_id"], ta_id) in by_ta_index:
+                entry["expected_ta_row_exists"] = True
+                entry["expected_ta_payments_3yr"] = by_ta_index[(c["hcp_id"], ta_id)]["ta_payments_3yr"]
+        except Exception as exc:
+            entry["error"] = repr(exc)
+            errors.append(f"canonical_validation_{c['label']}: {repr(exc)}")
+        level_2_canonicals.append(entry)
+        print("Canonical:", entry)
+
+    for name, first_like in [("Wakelee", "Heather%"), ("Lam", "%")]:
+        entry: Dict[str, Any] = {
+            "label": name,
+            "lookup_method": "supabase_hcps_name_lookup",
+            "found_hcps": [],
+            "summary_rows": [],
+            "by_ta_rows": [],
+            "error": None,
+        }
+        try:
+            q = client.table("hcps").select("id,npi_number,first_name,last_name").eq("last_name", name)
+            if name == "Wakelee":
+                q = q.ilike("first_name", first_like)
+            rows = q.execute().data or []
+            entry["found_hcps"] = rows
+            for r in rows:
+                hid = str(r.get("id"))
+                if hid in summary_by_hcp:
+                    entry["summary_rows"].append(summary_by_hcp[hid])
+                entry["by_ta_rows"].extend([x for x in by_ta_rows if x["hcp_id"] == hid])
+        except Exception as exc:
+            entry["error"] = repr(exc)
+            errors.append(f"canonical_lookup_{name}: {repr(exc)}")
+        level_2_canonicals.append(entry)
+        print("Canonical merged check:", entry)
+
+    # Phase 8 - Level 3 unmatched per TA
+    level_3_unmatched: Dict[str, List[Dict[str, Any]]] = {}
+    for ta_id, ta_name in ta_name_by_id.items():
+        unmatched_query = f"""
+        SELECT
+          fp.drug_name,
+          COUNT(*) AS payment_count,
+          SUM(fp.payment_amount_usd) AS total_amount_usd
+        FROM filtered_payments fp
+        INNER JOIN hcp_ta ht
+          ON ht.hcp_id = fp.hcp_id
+         AND ht.therapeutic_area_id = {sql_literal(ta_id)}
+        LEFT JOIN drug_keywords dk
+          ON dk.therapeutic_area_id = {sql_literal(ta_id)}
+         AND (
+           lower(fp.drug_name) = lower(dk.drug_name)
+           OR (dk.drug_brand_name IS NOT NULL AND dk.drug_brand_name <> '' AND lower(fp.drug_name) LIKE '%' || lower(dk.drug_brand_name) || '%')
+         )
+        WHERE fp.drug_indicator IN ('Drug','Biological')
+          AND fp.drug_name IS NOT NULL
+          AND fp.drug_name <> ''
+          AND dk.keyword_id IS NULL
+        GROUP BY fp.drug_name
+        ORDER BY SUM(fp.payment_amount_usd) DESC
+        LIMIT 50
+        """
+        rows = rows_to_dicts(con.execute(unmatched_query))
+        normalized = [
+            {
+                "drug_name": r["drug_name"],
+                "payment_count": int(r["payment_count"]),
+                "total_amount_usd": float(r["total_amount_usd"] or 0.0),
+            }
+            for r in rows
+        ]
+        level_3_unmatched[ta_name] = normalized
+        print(f"Top unmatched for {ta_name} (count={len(normalized)})")
+        for row in normalized:
+            print(f"  {row['drug_name']}: count={row['payment_count']} amount={row['total_amount_usd']}")
+
+    rows_inserted: Optional[Dict[str, int]] = None
+
+    # Phase 9 writes
+    if not execute:
+        print("[DRY-RUN] Skipping Supabase write.")
+    else:
+        confirm = input(
+            f"About to TRUNCATE and rewrite hcp_open_payments_summary and hcp_open_payments_by_ta.\n"
+            f"Will write {len(summary_rows)} summary rows and {len(by_ta_rows)} by_ta rows. Continue? (yes/no): "
+        )
+        if confirm != "yes":
+            print("Execution cancelled.")
+        else:
+            inserted_summary = 0
+            inserted_by_ta = 0
+
+            # truncate (delete-all)
+            trunc_summary_resp = (
+                client.table("hcp_open_payments_summary").delete().neq("id", DELETE_GUARD_ID).execute()
+            )
+            trunc_summary_count = len(trunc_summary_resp.data or [])
+            print(f"Truncated hcp_open_payments_summary ({trunc_summary_count})")
+
+            for start_idx in range(0, len(summary_rows), WRITE_BATCH_SIZE):
+                batch = summary_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
+                try:
+                    client.table("hcp_open_payments_summary").insert(batch).execute()
+                    inserted_summary += len(batch)
+                    print(
+                        f"Inserted summary batch {start_idx // WRITE_BATCH_SIZE + 1} "
+                        f"({inserted_summary}/{len(summary_rows)})"
+                    )
+                except Exception as exc:
+                    errors.append(f"summary_insert_batch_{start_idx}: {repr(exc)}")
+                    print(f"Summary batch failed at offset {start_idx}: {exc}")
+
+            trunc_by_ta_resp = client.table("hcp_open_payments_by_ta").delete().neq("id", DELETE_GUARD_ID).execute()
+            trunc_by_ta_count = len(trunc_by_ta_resp.data or [])
+            print(f"Truncated hcp_open_payments_by_ta ({trunc_by_ta_count})")
+
+            for start_idx in range(0, len(by_ta_rows), WRITE_BATCH_SIZE):
+                batch = by_ta_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
+                try:
+                    client.table("hcp_open_payments_by_ta").insert(batch).execute()
+                    inserted_by_ta += len(batch)
+                    print(
+                        f"Inserted by_ta batch {start_idx // WRITE_BATCH_SIZE + 1} "
+                        f"({inserted_by_ta}/{len(by_ta_rows)})"
+                    )
+                except Exception as exc:
+                    errors.append(f"by_ta_insert_batch_{start_idx}: {repr(exc)}")
+                    print(f"by_ta batch failed at offset {start_idx}: {exc}")
+
+            rows_inserted = {
+                "summary_rows_inserted": inserted_summary,
+                "by_ta_rows_inserted": inserted_by_ta,
+            }
+            print(
+                f"Execute complete. Inserted summary={inserted_summary}/{len(summary_rows)}, "
+                f"by_ta={inserted_by_ta}/{len(by_ta_rows)}"
+            )
+
+    elapsed_seconds = time.time() - started
+    log_payload: Dict[str, Any] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": mode,
+        "elapsed_seconds": elapsed_seconds,
+        "cohort_size": len(npi_set),
+        "filtered_payment_rows": int(filtered_payment_rows),
+        "summary_rows_computed": len(summary_rows),
+        "by_ta_rows_computed": len(by_ta_rows),
+        "level_1_stats": level_1_stats,
+        "level_2_canonicals": level_2_canonicals,
+        "level_3_unmatched": level_3_unmatched,
+        "errors": errors,
+    }
+    if rows_inserted is not None:
+        log_payload["rows_inserted"] = rows_inserted
+
+    with open(OUTPUT_LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(log_payload, f, indent=2)
+    print(f"Saved log: {OUTPUT_LOG_PATH}")
