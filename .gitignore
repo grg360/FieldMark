@@ -57,6 +57,7 @@ www/
 *.dump
 *.sql.gz
 *.bak
+backups/
 
 # --- Large data files at root ---
 *.parquet
