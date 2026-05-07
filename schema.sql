@@ -211,3 +211,6 @@ create policy "contributions_owner_insert" on msl_contributions
 -- alter table hcps add column if not exists total_career_pubs integer;
 -- alter table hcps add column if not exists institution_full text;
 -- alter table hcps add column if not exists country text;
+-- NPPES-derived taxonomy (see npi_gap_audit.py); also in sql/add_npi_taxonomy_specialty.sql
+-- alter table hcps add column if not exists npi_taxonomy text;
+-- alter table hcps add column if not exists npi_specialty text;
