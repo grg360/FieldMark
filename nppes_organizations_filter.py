@@ -1,5 +1,5 @@
 """
-NPPES chunked filter -> compact Parquet for HCP matching.
+NPPES chunked filter -> compact Parquet for organization cross-reference.
 
 If needed, install dependency:
     pip install pyarrow
@@ -14,45 +14,32 @@ from typing import Dict, List
 import pandas as pd
 
 INPUT_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\npidata_pfile_20050523-20260412.csv"
-OUTPUT_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
+OUTPUT_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_organizations.parquet"
 CHUNK_SIZE = 50_000
 
 COLUMN_RENAME_MAP: Dict[str, str] = {
     "NPI": "npi",
     "Entity Type Code": "entity_type_code",
-    "Provider Last Name (Legal Name)": "last_name",
-    "Provider First Name": "first_name",
-    "Provider Middle Name": "middle_name",
-    "Provider Name Suffix Text": "name_suffix",
-    "Provider Credential Text": "credentials",
+    "Provider Organization Name (Legal Business Name)": "organization_name_legal",
+    "Provider Other Organization Name": "organization_name_other",
     "Provider First Line Business Practice Location Address": "practice_address",
     "Provider Business Practice Location Address City Name": "practice_city",
     "Provider Business Practice Location Address State Name": "practice_state",
     "Provider Business Practice Location Address Postal Code": "practice_zip",
     "Provider Business Practice Location Address Country Code (If outside U.S.)": "practice_country_code",
-    "Provider Business Practice Location Address Telephone Number": "practice_phone",
-    "Provider Enumeration Date": "enumeration_date",
-    "Provider Sex Code": "sex_code",
-    "Provider Organization Name (Legal Business Name)": "organization_name_legal",
-    "Provider Other Organization Name": "organization_name_other",
-    "Is Sole Proprietor": "is_sole_proprietor",
     "Healthcare Provider Taxonomy Code_1": "taxonomy_1",
     "Healthcare Provider Primary Taxonomy Switch_1": "primary_taxonomy_switch_1",
     "Healthcare Provider Taxonomy Code_2": "taxonomy_2",
     "Healthcare Provider Primary Taxonomy Switch_2": "primary_taxonomy_switch_2",
     "Healthcare Provider Taxonomy Code_3": "taxonomy_3",
     "Healthcare Provider Primary Taxonomy Switch_3": "primary_taxonomy_switch_3",
-    "Healthcare Provider Taxonomy Code_4": "taxonomy_4",
-    "Healthcare Provider Primary Taxonomy Switch_4": "primary_taxonomy_switch_4",
-    "Healthcare Provider Taxonomy Code_5": "taxonomy_5",
-    "Healthcare Provider Primary Taxonomy Switch_5": "primary_taxonomy_switch_5",
     "NPI Deactivation Date": "npi_deactivation_date",
 }
 
 
 def _pick_primary_taxonomy(df: pd.DataFrame) -> pd.Series:
     primary = pd.Series([""] * len(df), index=df.index, dtype="string")
-    for i in range(1, 6):
+    for i in range(1, 4):
         switch_col = f"primary_taxonomy_switch_{i}"
         tax_col = f"taxonomy_{i}"
         is_primary = df[switch_col].fillna("").str.upper().eq("Y")
@@ -80,7 +67,7 @@ def main() -> None:
         chunk_count += 1
         total_rows_scanned += len(chunk)
 
-        entity_mask = chunk["Entity Type Code"].fillna("").str.strip().eq("1")
+        entity_mask = chunk["Entity Type Code"].fillna("").str.strip().eq("2")
         active_mask = chunk["NPI Deactivation Date"].fillna("").str.strip().eq("")
         filtered = chunk[entity_mask & active_mask].copy()
 
@@ -92,7 +79,7 @@ def main() -> None:
             scanned_estimate = chunk_count * CHUNK_SIZE
             print(
                 f"Processed {chunk_count} chunks "
-                f"({scanned_estimate} rows scanned, {total_retained} individual active providers retained)"
+                f"({scanned_estimate} rows scanned, {total_retained} active organizations retained)"
             )
 
     if filtered_chunks:
@@ -111,9 +98,9 @@ def main() -> None:
     primary_taxonomy = _pick_primary_taxonomy(final_df)
     output_size_bytes = os.path.getsize(output_path)
 
-    print("\n=== NPPES Filter Summary ===")
+    print("\n=== NPPES Organizations Filter Summary ===")
     print(f"Total rows scanned: {total_rows_scanned}")
-    print(f"Total individual active providers retained: {len(final_df)}")
+    print(f"Total Type 2 active organizations retained: {len(final_df)}")
     print("\nTop 10 practice_state:")
     print(final_df["practice_state"].fillna("").value_counts(dropna=False).head(10))
     print("\nTop 20 primary taxonomy code:")
@@ -124,4 +111,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
