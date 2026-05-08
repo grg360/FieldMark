@@ -13,10 +13,11 @@ import ProfileScreen from "./components/ProfileScreen";
 import LandscapeScreen from "./components/LandscapeScreen";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
+import SocialTrackEmpty from "./components/SocialTrackEmpty";
 import TrackSwitch from "./components/TrackSwitch";
 import type { HCP as UIHCP } from "./data/hcpData";
 import { getRisingStars, getTACounts } from "./lib/api";
-import { TrackProvider } from "./lib/TrackContext";
+import { TrackProvider, useTrack } from "./lib/TrackContext";
 import type { RisingStar, TACounts } from "./lib/types";
 
 type AppHCP = Omit<UIHCP, "id"> & {
@@ -84,18 +85,10 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
   };
 }
 
-function isDarkHorse(hcp: AppHCP): boolean {
-  if (hcp.score < 85) return false;
-  const citNum = Number(hcp.citTraj);
-  if (isNaN(citNum) || citNum < 40) return false;
-  const trialsNum = Number(hcp.trialScore);
-  if (isNaN(trialsNum) || trialsNum < 2) return false;
-  return true;
-}
-
 type Screen = "auth" | "ta-select" | "feed" | "detail" | "note" | "search" | "bibliography" | "profile" | "landscape" | "city-feed";
 
-export default function App() {
+function AppContent() {
+  const { track } = useTrack();
   const [currentScreen, setCurrentScreen] = useState<Screen>("auth");
   const [selectedTA, setSelectedTA] = useState("Rare Disease");
   const [selectedIndication, setSelectedIndication] = useState("All");
@@ -126,6 +119,11 @@ export default function App() {
   }
 
   async function fetchHCPs(loadingAsRefresh = false) {
+    if (track === "social") {
+      setHcpList([]);
+      setFeedTotal(0);
+      return;
+    }
     try {
       if (loadingAsRefresh) setRefreshingFeed(true);
       else setLoadingHCPs(true);
@@ -147,6 +145,14 @@ export default function App() {
     let cancelled = false;
 
     async function fetchData() {
+      if (track === "social") {
+        setHcpList([]);
+        setFeedOffset(0);
+        setFeedTotal(0);
+        setLastUpdatedAt(new Date());
+        setLoadingHCPs(false);
+        return;
+      }
       setLoadingHCPs(true);
       setFeedOffset(0);
       setFeedTotal(0);
@@ -167,9 +173,10 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, darkHorseFilter]);
+  }, [selectedTA, darkHorseFilter, track]);
 
   async function loadMore() {
+    if (track === "social") return;
     const nextOffset = feedOffset + 20;
     const taSlug = getTASlug(selectedTA);
     const tier = darkHorseFilter ? "dark_horse" : undefined;
@@ -323,7 +330,7 @@ export default function App() {
         city={cityFeedCity}
         ta={cityFeedTA}
         onBack={() => setCurrentScreen("landscape")}
-        onDetailHCPChange={setDetailHCP}
+        onDetailHCPChange={(hcp) => setDetailHCP(hcp as unknown as AppHCP)}
         onNavigateTo={(screen) => setCurrentScreen(screen)}
         bibYear={bibYear}
         onBibYearChange={setBibYear}
@@ -356,46 +363,48 @@ export default function App() {
       />
 
       {/* Dark Horse filter chip */}
-      <div style={{ padding: "8px 16px 0" }}>
-        <button
-          onClick={() => setDarkHorseFilter((v) => !v)}
-          className="fm-dh-chip"
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            backgroundColor: darkHorseFilter ? "#130D24" : "#0D0A1A",
-            border: darkHorseFilter ? "2px solid #9B6DFF" : "1px solid #9B6DFF",
-            borderRadius: 4,
-            padding: "8px 16px",
-            cursor: "pointer",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "#9B6DFF" }}>♞</span>
-            <span className="fm-dh-chip-label" style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horses</span>
-          </div>
-          {darkHorseFilter ? (
-            <span
-              style={{
-                fontSize: 14,
-                color: "#9B6DFF",
-                fontFamily: "monospace",
-                padding: "0 4px",
-                cursor: "pointer",
-              }}
-              aria-label="Exit dark horse filter"
-            >
-              ✕
-            </span>
-          ) : (
-            <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>
-              {`${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`}
-            </span>
-          )}
-        </button>
-      </div>
+      {track !== "social" && (
+        <div style={{ padding: "8px 16px 0" }}>
+          <button
+            onClick={() => setDarkHorseFilter((v) => !v)}
+            className="fm-dh-chip"
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              backgroundColor: darkHorseFilter ? "#130D24" : "#0D0A1A",
+              border: darkHorseFilter ? "2px solid #9B6DFF" : "1px solid #9B6DFF",
+              borderRadius: 4,
+              padding: "8px 16px",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "#9B6DFF" }}>♞</span>
+              <span className="fm-dh-chip-label" style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horses</span>
+            </div>
+            {darkHorseFilter ? (
+              <span
+                style={{
+                  fontSize: 14,
+                  color: "#9B6DFF",
+                  fontFamily: "monospace",
+                  padding: "0 4px",
+                  cursor: "pointer",
+                }}
+                aria-label="Exit dark horse filter"
+              >
+                ✕
+              </span>
+            ) : (
+              <span className="fm-dh-chip-count" style={{ fontSize: 12, fontFamily: "monospace", color: "#9B6DFF" }}>
+                {`${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       <TrackSwitch />
       <TAFilterChips
@@ -413,7 +422,7 @@ export default function App() {
         {formatUpdatedLabel()}
       </div>
 
-      {!darkHorseFilter && <DOLHeroPanel taSlug={getTASlug(selectedTA)} />}
+      {!darkHorseFilter && track !== "social" && <DOLHeroPanel taSlug={getTASlug(selectedTA)} />}
 
       {/* Section header */}
       <div
@@ -439,91 +448,96 @@ export default function App() {
               ? selectedTA
               : `${selectedTA} · ${selectedIndication}`}
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
-            className="fm-section-header-right"
-            style={{
-              fontSize: 15,
-              color: darkHorseFilter ? "#9B6DFF" : "#6B6A65",
-              fontFamily: "monospace",
-            }}
-          >
-            {darkHorseFilter
-              ? `${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`
-              : feedTotal > 0 && hcpList.length < feedTotal
-                ? `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`
-                : `${(taCounts?.rising_stars ?? indicationCount).toLocaleString()} identified`}
-          </span>
-          <button
-            onClick={() => setCurrentScreen("landscape")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              borderRadius: 3,
-              padding: "3px 8px",
-              cursor: "pointer",
-              fontFamily: "system-ui, -apple-system, sans-serif",
-            }}
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <rect x="0" y="6" width="2" height="4" fill="#6B6A65" />
-              <rect x="4" y="3" width="2" height="7" fill="#6B6A65" />
-              <rect x="8" y="0" width="2" height="10" fill="#6B6A65" />
-            </svg>
-            <span style={{ fontSize: 11, color: "#6B6A65" }}>
-              {selectedIndication !== "All" ? `${selectedIndication} landscape` : "Landscape"}
+        {track !== "social" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              className="fm-section-header-right"
+              style={{
+                fontSize: 15,
+                color: darkHorseFilter ? "#9B6DFF" : "#6B6A65",
+                fontFamily: "monospace",
+              }}
+            >
+              {darkHorseFilter
+                ? `${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`
+                : feedTotal > 0 && hcpList.length < feedTotal
+                  ? `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`
+                  : `${(taCounts?.rising_stars ?? indicationCount).toLocaleString()} identified`}
             </span>
-          </button>
-        </div>
-      </div>
-
-      {/* HCP Cards */}
-      <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
-        {loadingHCPs ? (
-          <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
-        ) : (
-          <>
-            {hcpList.map((hcp) => (
-              <HCPCard
-                key={hcp.id}
-                hcp={hcp as unknown as UIHCP}
-                onAddPress={(cardHcp) => handleAddPress(cardHcp as unknown as AppHCP)}
-                onCardPress={(cardHcp) => handleCardPress(cardHcp as unknown as AppHCP)}
-              />
-            ))}
-            {hcpList.length < feedTotal && (
-              <div style={{ padding: "0 16px 8px", width: "100%" }}>
-                <button
-                  type="button"
-                  onClick={() => void loadMore()}
-                  disabled={loadingMore}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    textAlign: "center",
-                    backgroundColor: "#1A3D2E",
-                    border: "1px solid #4ADE80",
-                    borderRadius: 3,
-                    padding: "10px 16px",
-                    cursor: loadingMore ? "not-allowed" : "pointer",
-                    opacity: loadingMore ? 0.6 : 1,
-                    fontFamily: "monospace",
-                    fontSize: 13,
-                    color: "#4ADE80",
-                  }}
-                >
-                  {loadingMore ? "Loading..." : "Load more"}
-                </button>
-              </div>
-            )}
-          </>
+            <button
+              onClick={() => setCurrentScreen("landscape")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: "#0D0D10",
+                border: "1px solid #1E1E22",
+                borderRadius: 3,
+                padding: "3px 8px",
+                cursor: "pointer",
+                fontFamily: "system-ui, -apple-system, sans-serif",
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="0" y="6" width="2" height="4" fill="#6B6A65" />
+                <rect x="4" y="3" width="2" height="7" fill="#6B6A65" />
+                <rect x="8" y="0" width="2" height="10" fill="#6B6A65" />
+              </svg>
+              <span style={{ fontSize: 11, color: "#6B6A65" }}>
+                {selectedIndication !== "All" ? `${selectedIndication} landscape` : "Landscape"}
+              </span>
+            </button>
+          </div>
         )}
       </div>
+
+      {track === "social" ? (
+        <SocialTrackEmpty selectedTA={selectedTA} />
+      ) : (
+        <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
+          {loadingHCPs ? (
+            <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
+          ) : (
+            <>
+              {hcpList.map((hcp) => (
+                <HCPCard
+                  key={hcp.id}
+                  hcp={hcp as unknown as UIHCP}
+                  onAddPress={(cardHcp) => handleAddPress(cardHcp as unknown as AppHCP)}
+                  onCardPress={(cardHcp) => handleCardPress(cardHcp as unknown as AppHCP)}
+                />
+              ))}
+              {hcpList.length < feedTotal && (
+                <div style={{ padding: "0 16px 8px", width: "100%" }}>
+                  <button
+                    type="button"
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      textAlign: "center",
+                      backgroundColor: "#1A3D2E",
+                      border: "1px solid #4ADE80",
+                      borderRadius: 3,
+                      padding: "10px 16px",
+                      cursor: loadingMore ? "not-allowed" : "pointer",
+                      opacity: loadingMore ? 0.6 : 1,
+                      fontFamily: "monospace",
+                      fontSize: 13,
+                      color: "#4ADE80",
+                    }}
+                  >
+                    {loadingMore ? "Loading..." : "Load more"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Action Tray */}
         <ActionTray
@@ -536,5 +550,13 @@ export default function App() {
     );
   }
 
-  return <TrackProvider>{screenContent}</TrackProvider>;
+  return screenContent;
+}
+
+export default function App() {
+  return (
+    <TrackProvider>
+      <AppContent />
+    </TrackProvider>
+  );
 }

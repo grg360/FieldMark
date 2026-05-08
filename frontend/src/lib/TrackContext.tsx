@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-export type Track = "community" | "rising-stars" | "established";
+export type Track = "community" | "rising-stars" | "established" | "social";
 
 interface TrackContextValue {
   track: Track;
@@ -16,7 +16,12 @@ export function TrackProvider({ children }: { children: ReactNode }) {
   const [track, setTrackState] = useState<Track>(() => {
     if (typeof window === "undefined") return DEFAULT_TRACK;
     const stored = window.sessionStorage.getItem(STORAGE_KEY);
-    if (stored === "community" || stored === "rising-stars" || stored === "established") {
+    if (
+      stored === "community" ||
+      stored === "rising-stars" ||
+      stored === "established" ||
+      stored === "social"
+    ) {
       return stored;
     }
     return DEFAULT_TRACK;

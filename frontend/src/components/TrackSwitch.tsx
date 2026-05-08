@@ -4,6 +4,7 @@ const TRACKS: { value: Track; label: string }[] = [
   { value: "community", label: "Community" },
   { value: "rising-stars", label: "Rising Stars" },
   { value: "established", label: "Established" },
+  { value: "social", label: "Social" },
 ];
 
 export default function TrackSwitch() {
@@ -26,6 +27,16 @@ export default function TrackSwitch() {
     >
       {TRACKS.map((t) => {
         const active = t.value === track;
+        const isSocial = t.value === "social";
+        const activeBg = active
+          ? (isSocial ? "#1A2530" : "#E8A020")
+          : "transparent";
+        const activeFg = active
+          ? (isSocial ? "#6BA3D8" : "#0A0A0B")
+          : "#6B6A65";
+        const activeBorder = active && isSocial
+          ? "1px solid #2A3848"
+          : "none";
         return (
           <button
             key={t.value}
@@ -36,10 +47,10 @@ export default function TrackSwitch() {
               flex: 1,
               padding: "8px 4px",
               minHeight: 36,
-              backgroundColor: active ? "#E8A020" : "transparent",
-              border: "none",
+              backgroundColor: activeBg,
+              border: activeBorder,
               borderRadius: 3,
-              color: active ? "#0A0A0B" : "#6B6A65",
+              color: activeFg,
               fontWeight: active ? 600 : 400,
               fontSize: 14,
               fontFamily: "system-ui, sans-serif",
