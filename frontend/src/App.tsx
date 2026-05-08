@@ -13,8 +13,10 @@ import ProfileScreen from "./components/ProfileScreen";
 import LandscapeScreen from "./components/LandscapeScreen";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
+import TrackSwitch from "./components/TrackSwitch";
 import type { HCP as UIHCP } from "./data/hcpData";
 import { getRisingStars, getTACounts } from "./lib/api";
+import { TrackProvider } from "./lib/TrackContext";
 import type { RisingStar, TACounts } from "./lib/types";
 
 type AppHCP = Omit<UIHCP, "id"> & {
@@ -248,16 +250,13 @@ export default function App() {
     setCurrentScreen("detail");
   }
 
+  let screenContent;
   if (currentScreen === "auth") {
-    return <LinkedInAuthScreen onAuth={handleAuth} />;
-  }
-
-  if (currentScreen === "ta-select") {
-    return <TASelectionScreen onContinue={handleTAContinue} onSkip={handleTASkip} />;
-  }
-
-  if (currentScreen === "search") {
-    return (
+    screenContent = <LinkedInAuthScreen onAuth={handleAuth} />;
+  } else if (currentScreen === "ta-select") {
+    screenContent = <TASelectionScreen onContinue={handleTAContinue} onSkip={handleTASkip} />;
+  } else if (currentScreen === "search") {
+    screenContent = (
       <SearchScreen
         onBack={() => setCurrentScreen("feed")}
         onCardPress={(hcp) => {
@@ -266,20 +265,16 @@ export default function App() {
         }}
       />
     );
-  }
-
-  if (currentScreen === "bibliography") {
-    return (
+  } else if (currentScreen === "bibliography") {
+    screenContent = (
       <BibliographyScreen
         hcp={detailHCP as unknown as UIHCP}
         year={bibYear}
         onBack={() => setCurrentScreen("detail")}
       />
     );
-  }
-
-  if (currentScreen === "detail") {
-    return (
+  } else if (currentScreen === "detail") {
+    screenContent = (
       <DetailScreen
         hcp={detailHCP as unknown as UIHCP}
         onBack={handleBackFromDetail}
@@ -290,19 +285,15 @@ export default function App() {
         }}
       />
     );
-  }
-
-  if (currentScreen === "note") {
-    return (
+  } else if (currentScreen === "note") {
+    screenContent = (
       <NoteEntryScreen
         hcp={detailHCP as unknown as UIHCP}
         onBack={handleBackFromNote}
       />
     );
-  }
-
-  if (currentScreen === "profile") {
-    return (
+  } else if (currentScreen === "profile") {
+    screenContent = (
       <ProfileScreen
         initialTA={selectedTA}
         onBack={() => setCurrentScreen("feed")}
@@ -313,10 +304,8 @@ export default function App() {
         }}
       />
     );
-  }
-
-  if (currentScreen === "landscape") {
-    return (
+  } else if (currentScreen === "landscape") {
+    screenContent = (
       <LandscapeScreen
         ta={selectedTA}
         indication={selectedIndication}
@@ -328,10 +317,8 @@ export default function App() {
         }}
       />
     );
-  }
-
-  if (currentScreen === "city-feed") {
-    return (
+  } else if (currentScreen === "city-feed") {
+    screenContent = (
       <CityFeedScreen
         city={cityFeedCity}
         ta={cityFeedTA}
@@ -342,21 +329,20 @@ export default function App() {
         onBibYearChange={setBibYear}
       />
     );
-  }
-
-  // Feed screen
-  return (
-    <div
-      className="fm-screen"
-      style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100dvh",
-        maxWidth: 480,
-        margin: "0 auto",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        overflowX: "hidden",
-      }}
-    >
+  } else {
+    // Feed screen (default)
+    screenContent = (
+      <div
+        className="fm-screen"
+        style={{
+          backgroundColor: "#0A0A0B",
+          minHeight: "100dvh",
+          maxWidth: 480,
+          margin: "0 auto",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          overflowX: "hidden",
+        }}
+      >
       <TopBar
         onLogoPress={() => {
           setDarkHorseFilter(false);
@@ -411,6 +397,7 @@ export default function App() {
         </button>
       </div>
 
+      <TrackSwitch />
       <TAFilterChips
         selected={selectedTA}
         onSelect={(ta) => {
@@ -539,12 +526,15 @@ export default function App() {
       </div>
 
       {/* Action Tray */}
-      <ActionTray
-        open={trayOpen}
-        onClose={handleCloseTray}
-        hcpName={activeHCP?.name ?? ""}
-        onAddNote={handleAddNoteFromTray}
-      />
-    </div>
-  );
+        <ActionTray
+          open={trayOpen}
+          onClose={handleCloseTray}
+          hcpName={activeHCP?.name ?? ""}
+          onAddNote={handleAddNoteFromTray}
+        />
+      </div>
+    );
+  }
+
+  return <TrackProvider>{screenContent}</TrackProvider>;
 }

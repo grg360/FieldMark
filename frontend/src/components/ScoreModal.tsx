@@ -1,3 +1,5 @@
+import { useTrack } from "../lib/TrackContext";
+
 interface ScoreModalProps {
   hcpName: string;
   ta: string;
@@ -19,6 +21,19 @@ const SOURCES = [
 ];
 
 export default function ScoreModal({ hcpName, ta, score, onClose }: ScoreModalProps) {
+  const { track } = useTrack();
+  const scoreHeading =
+    track === "community" ? "Community Score" : track === "established" ? "Established Score" : "Rising Star Score";
+  const breakdownText =
+    track === "community"
+      ? `Community Score: ${score.toFixed(1)}
+This score reflects practice volume (40%), engagement signal (30%), practice setting (15%), career stage (10%), and publication context (5%) — weighted to identify high-impact community HCPs that traditional KOL databases consistently miss.`
+      : track === "established"
+        ? `Established Score: ${score.toFixed(1)}
+This score reflects total publication impact, citation accumulation, trial portfolio breadth, and current institutional standing. Established figures are widely recognized across pharma; this score provides a unified view of their measurable footprint.`
+        : `Rising Star Score: ${score.toFixed(1)}
+This score reflects publication velocity, citation trajectory, trial activity, and career age multiplier. Higher scores indicate stronger emerging trajectory.`;
+
   return (
     <div
       onClick={onClose}
@@ -54,7 +69,7 @@ export default function ScoreModal({ hcpName, ta, score, onClose }: ScoreModalPr
         {/* Header */}
         <div style={{ borderBottom: "1px solid #1E1E22", paddingBottom: 16 }}>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65" }}>
-            Rising star score
+            {scoreHeading}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 2, marginTop: 4 }}>
             <span style={{ fontSize: 32, fontFamily: "monospace", fontWeight: 500, color: "#E8A020", lineHeight: 1 }}>
@@ -71,6 +86,9 @@ export default function ScoreModal({ hcpName, ta, score, onClose }: ScoreModalPr
         <div style={{ paddingTop: 16 }}>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginBottom: 12 }}>
             How this score is calculated
+          </div>
+          <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5, whiteSpace: "pre-line", marginBottom: 14 }}>
+            {breakdownText}
           </div>
           {COMPONENTS.map(({ label, weight, score: cs, percent }) => (
             <div key={label} style={{ marginBottom: 16 }}>

@@ -9,6 +9,14 @@ html {
   text-size-adjust: 100%;
 }
 
+@media (min-width: 768px) and (orientation: landscape) {
+  .fm-track-switch {
+    max-width: 480px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
 body {
   font-size: 16px;
   min-height: 100dvh;

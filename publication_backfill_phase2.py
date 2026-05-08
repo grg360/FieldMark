@@ -134,7 +134,7 @@ def fetch_loomba_snapshot(database_url: str) -> Dict[str, Any]:
 def call_openalex_with_retries(search_name: str, mailto: str) -> Dict[str, Any]:
     last_error = None
     for attempt in range(3):
-        time.sleep(0.1)
+        time.sleep(0.2)
         try:
             url = (
                 f"{OPENALEX_BASE}?search={quote_plus(search_name)}"
@@ -145,14 +145,32 @@ def call_openalex_with_retries(search_name: str, mailto: str) -> Dict[str, Any]:
                 body = resp.read().decode("utf-8")
             return json.loads(body)
         except HTTPError as exc:
+            if exc.code == 429:
+                # Rate limited — back off aggressively. OpenAlex doesn't
+                # always return Retry-After but when it does we honor it.
+                retry_after_header = None
+                try:
+                    retry_after_header = exc.headers.get("Retry-After") if exc.headers else None
+                except Exception:
+                    retry_after_header = None
+                if retry_after_header:
+                    try:
+                        backoff = int(retry_after_header)
+                    except (TypeError, ValueError):
+                        backoff = 60
+                else:
+                    backoff = 30 * (attempt + 1)  # 30s, 60s, 90s
+                last_error = exc
+                time.sleep(backoff)
+                continue
             if 500 <= exc.code < 600:
                 last_error = exc
-                time.sleep(2**attempt)
+                time.sleep(5 * (attempt + 1))  # 5s, 10s, 15s
                 continue
             raise
         except (URLError, TimeoutError, ConnectionError) as exc:
             last_error = exc
-            time.sleep(2**attempt)
+            time.sleep(5 * (attempt + 1))  # 5s, 10s, 15s
             continue
     raise RuntimeError(f"OpenAlex request failed after retries: {repr(last_error)}")
 
@@ -189,7 +207,14 @@ if __name__ == "__main__":
     resolved_medium = 0
     resolved_low = 0
     ambiguous_count = 0
+    ambiguous_no_candidates_returned = 0
+    ambiguous_no_name_match = 0
+    ambiguous_score_tie = 0
+    ambiguous_api_error = 0
+    candidates_returned_zero_count = 0
     processed_count = 0
+    consecutive_api_errors = 0
+    CIRCUIT_BREAKER_THRESHOLD = 20
 
     window_errors = 0
     window_processed = 0
@@ -223,6 +248,9 @@ if __name__ == "__main__":
         try:
             response = call_openalex_with_retries(f"{first_name} {last_name}", polite_mailto)
             candidates = response.get("results") or []
+            consecutive_api_errors = 0  # Reset on success
+            if not candidates:
+                candidates_returned_zero_count += 1
 
             for cand in candidates:
                 display_name = normalize_text(cand.get("display_name"))
@@ -303,12 +331,18 @@ if __name__ == "__main__":
 
             if not candidate_scores:
                 chosen_confidence = "ambiguous"
-                chosen_reason = "no_candidate_matched_name_rules"
+                if not candidates:
+                    chosen_reason = "no_candidates_returned"
+                    ambiguous_no_candidates_returned += 1
+                else:
+                    chosen_reason = "no_candidate_matched_name_rules"
+                    ambiguous_no_name_match += 1
                 ambiguous_count += 1
             elif len(candidate_scores) > 1 and abs(candidate_scores[0]["score"] - candidate_scores[1]["score"]) <= 0.5:
                 chosen_confidence = "ambiguous"
                 chosen_reason = "top_score_tie_within_0_5"
                 ambiguous_count += 1
+                ambiguous_score_tie += 1
             else:
                 best = candidate_scores[0]
                 cand_id = str(best["openalex_author_id"])
@@ -332,6 +366,36 @@ if __name__ == "__main__":
             chosen_confidence = "ambiguous"
             chosen_reason = "persistent_openalex_error"
             ambiguous_count += 1
+            ambiguous_api_error += 1
+            consecutive_api_errors += 1
+            if consecutive_api_errors >= CIRCUIT_BREAKER_THRESHOLD:
+                print(f"CIRCUIT BREAKER: {consecutive_api_errors} consecutive API errors. Aborting to avoid wasted work.")
+                save_checkpoint(processed_ids)
+                # Save partial log
+                log_payload = {
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "mode": mode,
+                    "elapsed_seconds": time.time() - started,
+                    "cohort_size": cohort_size,
+                    "processed_count": processed_count,
+                    "resolved_high": resolved_high,
+                    "resolved_medium": resolved_medium,
+                    "resolved_low": resolved_low,
+                    "ambiguous_count": ambiguous_count,
+                    "ambiguous_breakdown": {
+                        "no_candidates_returned": ambiguous_no_candidates_returned,
+                        "no_name_match_among_candidates": ambiguous_no_name_match,
+                        "score_tie_within_0_5": ambiguous_score_tie,
+                        "persistent_api_error": ambiguous_api_error,
+                    },
+                    "candidates_returned_zero_count": candidates_returned_zero_count,
+                    "errors": errors,
+                    "circuit_breaker_tripped": True,
+                }
+                with open(OUTPUT_LOG_PATH, "w", encoding="utf-8") as f:
+                    json.dump(log_payload, f, indent=2)
+                print(f"Saved log: {OUTPUT_LOG_PATH}")
+                raise SystemExit(2)
 
         row_result = {
             "id": hcp_id,
@@ -378,7 +442,11 @@ if __name__ == "__main__":
             )
             print(
                 f"  confidence: high={resolved_high} medium={resolved_medium} "
-                f"low={resolved_low} ambiguous={ambiguous_count}"
+                f"low={resolved_low} ambiguous={ambiguous_count} "
+                f"(no_results={ambiguous_no_candidates_returned} "
+                f"no_match={ambiguous_no_name_match} "
+                f"tie={ambiguous_score_tie} "
+                f"api_err={ambiguous_api_error})"
             )
             window_error_rate = (window_errors / window_processed) if window_processed > 0 else 0.0
             if window_error_rate > 0.20:
@@ -428,6 +496,13 @@ if __name__ == "__main__":
         "resolved_medium": resolved_medium,
         "resolved_low": resolved_low,
         "ambiguous_count": ambiguous_count,
+        "ambiguous_breakdown": {
+            "no_candidates_returned": ambiguous_no_candidates_returned,
+            "no_name_match_among_candidates": ambiguous_no_name_match,
+            "score_tie_within_0_5": ambiguous_score_tie,
+            "persistent_api_error": ambiguous_api_error,
+        },
+        "candidates_returned_zero_count": candidates_returned_zero_count,
         "errors": errors,
         "canonical_results": canonical_results,
     }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { HCP } from "../data/hcpData";
+import { useTrack } from "../lib/TrackContext";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -72,6 +73,16 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const darkHorse = hcp.tier === "dark_horse";
+  const { track } = useTrack();
+  const statPillKeys: readonly string[] = (() => {
+    if (track === "community") {
+      return ["VOLUME", "SETTING", "EXP"] as const;
+    }
+    if (track === "established") {
+      return ["PUBS", "CITATIONS", "TRIALS"] as const;
+    }
+    return (darkHorse ? ["PUB VEL", "CIT TRAJ", "PUB YEARS"] : ["PUB VEL", "CIT TRAJ", "TRIALS"]) as const;
+  })();
   const countryCode = getCountryCode(hcp.country ?? null);
 
   function handleCardClick() {
@@ -190,30 +201,49 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
 
         {/* Row 4: Stat pills */}
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          {((darkHorse ? ["PUB VEL", "CIT TRAJ", "PUB YEARS"] : ["PUB VEL", "CIT TRAJ", "TRIALS"]) as const).map((key) => (
-            <StatPillWithTooltip
-              key={key}
-              label={key}
-              value={
-                key === "PUB VEL"
-                  ? hcp.pubVel
-                  : key === "CIT TRAJ"
-                    ? hcp.citTraj == null
-                      ? "—"
-                      : `${Number(hcp.citTraj) >= 0 ? "+" : ""}${Number(hcp.citTraj).toFixed(1)}%`
-                    : key === "PUB YEARS"
-                      ? !hcp.firstPubYear || hcp.firstPubYear === 0
-                        ? "—"
-                        : `${new Date().getFullYear() - hcp.firstPubYear}`
-                    : hcp.trialScore == null || hcp.trialScore === 0
-                      ? "—"
-                      : `${hcp.trialScore} active`
+          {statPillKeys.map((key) => {
+            let value: string;
+            if (track === "community") {
+              // Placeholder values — will be wired to community composite data later.
+              if (key === "VOLUME") value = "—";
+              else if (key === "SETTING") value = "—";
+              else if (key === "EXP") value = "—";
+              else value = "—";
+            } else if (track === "established") {
+              // Placeholder values — will be wired to established cumulative data later.
+              if (key === "PUBS") value = "—";
+              else if (key === "CITATIONS") value = "—";
+              else if (key === "TRIALS") value = hcp.trialScore == null || hcp.trialScore === 0 ? "—" : `${hcp.trialScore}`;
+              else value = "—";
+            } else {
+              // Existing rising stars behavior.
+              if (key === "PUB VEL") value = hcp.pubVel;
+              else if (key === "CIT TRAJ") {
+                value = hcp.citTraj == null
+                  ? "—"
+                  : `${Number(hcp.citTraj) >= 0 ? "+" : ""}${Number(hcp.citTraj).toFixed(1)}%`;
+              } else if (key === "PUB YEARS") {
+                value = !hcp.firstPubYear || hcp.firstPubYear === 0
+                  ? "—"
+                  : `${new Date().getFullYear() - hcp.firstPubYear}`;
+              } else if (key === "TRIALS") {
+                value = hcp.trialScore == null || hcp.trialScore === 0 ? "—" : `${hcp.trialScore} active`;
+              } else {
+                value = "—";
               }
-              tooltipKey={key}
-              activeTooltip={activeTooltip}
-              onTooltipChange={setActiveTooltip}
-            />
-          ))}
+            }
+
+            return (
+              <StatPillWithTooltip
+                key={key}
+                label={key}
+                value={value}
+                tooltipKey={key}
+                activeTooltip={activeTooltip}
+                onTooltipChange={setActiveTooltip}
+              />
+            );
+          })}
         </div>
 
         {/* Row 5: Action row */}
