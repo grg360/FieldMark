@@ -38,6 +38,22 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Career age multiplier",
     body: "Boosts scores for researchers earlier in their career. A rising star 4 years post-training outranks an equivalent researcher 20 years in — same output from a younger career is a stronger signal.",
   },
+  Followers: {
+    title: "Followers",
+    body: "Total follower count on the platform where this account was captured. Indicates audience size, not engagement quality — see Engage % for that signal.",
+  },
+  Engage: {
+    title: "Engagement rate",
+    body: "Likes + replies + reposts per post, normalized by follower count. A higher rate means the audience is actively engaging, not just lurking. 1% is a typical baseline; anything above 4% is notable.",
+  },
+  "Posts/90d": {
+    title: "Posts in last 90 days",
+    body: "How many original posts this account made on TA-relevant topics in the last 90 days. Low numbers don't necessarily mean low impact — some voices post rarely but with high engagement.",
+  },
+  Source: {
+    title: "Source hashtag",
+    body: "The hashtag where FieldMark first captured this account. Indicates which conversation surfaced them. Accounts captured on conference hashtags (#ASCO26, #EASL26) and persistent community hashtags (#LCSM, #livertwitter) are weighted equally.",
+  },
 };
 
 const TOOLTIP_WIDTH = 220;
@@ -82,7 +98,7 @@ export function StatPillWithTooltip({
     left = Math.max(MARGIN, left);
     left = Math.min(viewportWidth - TOOLTIP_WIDTH - MARGIN, left);
 
-    const top = rect.top + window.scrollY - tooltipHeight - 10;
+    const top = rect.top - tooltipHeight - 10;
 
     const pillCenter = rect.left + rect.width / 2;
     const pointerLeft = Math.min(Math.max(pillCenter - left, 8), TOOLTIP_WIDTH - 8);

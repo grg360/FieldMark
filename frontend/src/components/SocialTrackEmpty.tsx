@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SocialAnalyticsBanner from "./SocialAnalyticsBanner";
 import SocialCard from "./SocialCard";
 import SuggestHashtagModal from "./SuggestHashtagModal";
 import { getMockSocialCandidates } from "../data/socialMockData";
@@ -83,6 +84,10 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
           + Suggest a hashtag
         </button>
       </div>
+
+      {candidates.length > 0 && (
+        <SocialAnalyticsBanner selectedTA={selectedTA} />
+      )}
 
       {/* Mock candidates or empty state */}
       {candidates.length > 0 ? (

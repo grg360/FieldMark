@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { SocialCandidate } from "../data/socialMockData";
+import { StatPillWithTooltip } from "./StatPillWithTooltip";
 
 interface SocialCardProps {
   candidate: SocialCandidate;
@@ -28,6 +30,7 @@ function getCohortBadge(cohort: string): { bg: string; border: string; fg: strin
 }
 
 export default function SocialCard({ candidate }: SocialCardProps) {
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const confidenceColors = getConfidenceTierColors(candidate.confidenceTier);
   const cohortBadge = candidate.matchedHcpCohort
     ? getCohortBadge(candidate.matchedHcpCohort)
@@ -161,31 +164,54 @@ export default function SocialCard({ candidate }: SocialCardProps) {
         </span>
       </div>
 
+      <div style={{
+        fontSize: 12,
+        color: "#8E8B82",
+        lineHeight: 1.5,
+        marginTop: 10,
+        marginBottom: 4,
+        fontStyle: "italic",
+      }}>
+        {candidate.narrative}
+      </div>
+
       {/* Row 6: Stat pills */}
       <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-        <div style={{ flex: 1, backgroundColor: "#0D0D10", border: "1px solid #1E1E22", borderRadius: 3, padding: "6px 8px" }}>
-          <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Followers
-          </div>
-          <div style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace" }}>
-            {formatFollowerCount(candidate.followerCount)}
-          </div>
+        <div style={{ flex: 1 }}>
+          <StatPillWithTooltip
+            label="Followers"
+            value={formatFollowerCount(candidate.followerCount)}
+            tooltipKey="Followers"
+            activeTooltip={activeTooltip}
+            onTooltipChange={setActiveTooltip}
+          />
         </div>
-        <div style={{ flex: 1, backgroundColor: "#0D0D10", border: "1px solid #1E1E22", borderRadius: 3, padding: "6px 8px" }}>
-          <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Posts/90d
-          </div>
-          <div style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace" }}>
-            {candidate.postsLast90Days}
-          </div>
+        <div style={{ flex: 1 }}>
+          <StatPillWithTooltip
+            label="Engage"
+            value={`${(candidate.engagementRate * 100).toFixed(1)}%`}
+            tooltipKey="Engage"
+            activeTooltip={activeTooltip}
+            onTooltipChange={setActiveTooltip}
+          />
         </div>
-        <div style={{ flex: 1, backgroundColor: "#0D0D10", border: "1px solid #1E1E22", borderRadius: 3, padding: "6px 8px" }}>
-          <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Source
-          </div>
-          <div style={{ fontSize: 12, color: "#E8E6DF", fontFamily: "monospace" }}>
-            {candidate.sourceHashtag}
-          </div>
+        <div style={{ flex: 1 }}>
+          <StatPillWithTooltip
+            label="Posts/90d"
+            value={candidate.postsLast90Days}
+            tooltipKey="Posts/90d"
+            activeTooltip={activeTooltip}
+            onTooltipChange={setActiveTooltip}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <StatPillWithTooltip
+            label="Source"
+            value={candidate.sourceHashtag}
+            tooltipKey="Source"
+            activeTooltip={activeTooltip}
+            onTooltipChange={setActiveTooltip}
+          />
         </div>
       </div>
     </div>
