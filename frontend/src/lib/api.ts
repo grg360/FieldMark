@@ -219,6 +219,15 @@ export async function getRisingStars(
       return { data: null, error: listError.message };
     }
 
+    console.log(
+      "[CHECKPOINT 1] Raw API response, first row open_payments:",
+      hcpRows?.[0]?.hcp_open_payments_summary,
+    );
+    console.log(
+      "[CHECKPOINT 1] Raw API response, first row medicare:",
+      hcpRows?.[0]?.hcp_medicare_summary,
+    );
+
     if (!hcpRows || hcpRows.length === 0) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: totalCount ?? 0 }, error: null };
     }
@@ -276,6 +285,14 @@ export async function getRisingStars(
       };
 
       const mapped = mapRisingStarRow(enrichedRow, therapeuticArea);
+      console.log(
+        "[CHECKPOINT 2] After mapRisingStarRow, mapped open_payments_lifetime:",
+        mapped.open_payments_lifetime,
+      );
+      console.log(
+        "[CHECKPOINT 2] After mapRisingStarRow, mapped distinct_companies:",
+        mapped.distinct_companies,
+      );
       return [
         {
           ...mapped,
