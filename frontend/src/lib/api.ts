@@ -148,10 +148,10 @@ export async function getRisingStars(
         cohort_classification,
         nppes_career_stage_years,
         total_career_pubs,
-        hcp_medicare_summary (
+        hcp_medicare_summary!left (
           total_beneficiaries_3yr_unique_est
         ),
-        hcp_open_payments_summary (
+        hcp_open_payments_summary!left (
           distinct_companies_lifetime,
           total_payments_lifetime
         ),
