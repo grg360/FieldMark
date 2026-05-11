@@ -197,6 +197,29 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </div>
         )}
 
+        {hcp.cohort_classification === "workhorse" && (
+          <div style={{ padding: "12px 16px 0" }}>
+            <div
+              style={{
+                backgroundColor: "#0A1A18",
+                border: "1px solid #4ECDC4",
+                borderLeft: "3px solid #4ECDC4",
+                borderRadius: 4,
+                padding: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "#4ECDC4" }}>⚡</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: "#4ECDC4", fontFamily: "system-ui, sans-serif" }}>Workhorse</span>
+                <span style={{ fontSize: 11, color: "#6B6A65" }}>· community cohort</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5, marginTop: 8 }}>
+                Dr. {hcp.name.split(/\s+/).filter(Boolean).pop() ?? ""} is a Workhorse — a high-volume practitioner in {hcp.specialty} with strong Medicare patient volume and minimal pharma engagement. Underleveraged influence in the field.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Why rising star section */}
         <div
           style={{

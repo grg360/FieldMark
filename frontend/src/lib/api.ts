@@ -79,10 +79,17 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
   };
 }
 
+export type FeedCohort = "rising_star" | "community" | "established";
+
 export async function getRisingStars(
   therapeuticArea: string,
   limit: number = 20,
-  options: { darkHorseOnly?: boolean; offset?: number } = {},
+  options: {
+    cohort?: FeedCohort;
+    darkHorseOnly?: boolean;
+    workhorseOnly?: boolean;
+    offset?: number;
+  } = {},
 ): Promise<ApiResult<{ rows: RisingStar[]; total: number }>> {
   try {
     const TA_ID_MAP: Record<string, string> = {
@@ -101,27 +108,23 @@ export async function getRisingStars(
     }
 
     const offset = options.offset ?? 0;
-    const darkHorseOnly = options.darkHorseOnly ?? false;
-    const cohortValues = darkHorseOnly
-      ? ["dark_horse"]
-      : ["rising_star", "dark_horse"];
+    const cohort = options.cohort ?? "rising_star";
+    const darkHorseOnly =
+      cohort === "rising_star" && (options.darkHorseOnly ?? false);
+    const workhorseOnly =
+      cohort === "community" && (options.workhorseOnly ?? false);
 
-    let countQuery = supabase
-      .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .in("cohort_classification", cohortValues);
+    const countBase = () =>
+      supabase
+        .from("hcps")
+        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+        .eq("hcp_scores.therapeutic_area_id", taId);
 
-    const { count: totalCount, error: countError } = await countQuery;
-
-    if (countError) {
-      return { data: null, error: countError.message };
-    }
-
-    const listQuery = supabase
-      .from("hcps")
-      .select(
-        `
+    const listBase = () =>
+      supabase
+        .from("hcps")
+        .select(
+          `
         id,
         first_name,
         last_name,
@@ -140,29 +143,54 @@ export async function getRisingStars(
           therapeutic_area_id
         )
       `,
-      )
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .in("cohort_classification", cohortValues)
-      .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
-      .range(offset, offset + limit - 1);
+        )
+        .eq("hcp_scores.therapeutic_area_id", taId);
 
-    console.log("[getRisingStars] About to execute listQuery");
-    console.log("[getRisingStars] cohortValues:", cohortValues);
-    console.log("[getRisingStars] taId:", taId);
-    const listQueryUrl = (listQuery as unknown as { url?: URL }).url?.href;
-    console.log("[getRisingStars] listQuery URL:", listQueryUrl ?? "(not exposed on query builder)");
-
-    let hcpRows;
-    let listError;
-    try {
-      const result = await listQuery;
-      hcpRows = result.data;
-      listError = result.error;
-      console.log("[getRisingStars] listQuery returned, rows:", hcpRows?.length, "error:", listError);
-    } catch (err) {
-      console.error("[getRisingStars] listQuery threw:", err);
-      throw err;
+    let countQuery;
+    let listQuery;
+    if (cohort === "rising_star") {
+      if (darkHorseOnly) {
+        countQuery = countBase().eq("cohort_classification", "dark_horse");
+        listQuery = listBase()
+          .eq("cohort_classification", "dark_horse")
+          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .range(offset, offset + limit - 1);
+      } else {
+        countQuery = countBase().eq("cohort_classification", "rising_star");
+        listQuery = listBase()
+          .eq("cohort_classification", "rising_star")
+          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .range(offset, offset + limit - 1);
+      }
+    } else if (cohort === "community") {
+      if (workhorseOnly) {
+        countQuery = countBase().eq("cohort_classification", "workhorse");
+        listQuery = listBase()
+          .eq("cohort_classification", "workhorse")
+          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .range(offset, offset + limit - 1);
+      } else {
+        countQuery = countBase().eq("cohort_classification", "community");
+        listQuery = listBase()
+          .eq("cohort_classification", "community")
+          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .range(offset, offset + limit - 1);
+      }
+    } else {
+      countQuery = countBase().eq("cohort_classification", "established");
+      listQuery = listBase()
+        .eq("cohort_classification", "established")
+        .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+        .range(offset, offset + limit - 1);
     }
+
+    const { count: totalCount, error: countError } = await countQuery;
+
+    if (countError) {
+      return { data: null, error: countError.message };
+    }
+
+    const { data: hcpRows, error: listError } = await listQuery;
 
     if (listError) {
       return { data: null, error: listError.message };
@@ -249,7 +277,13 @@ export async function getTACounts(
     const taId = TA_ID_MAP[taSlug];
     if (!taId) {
       return {
-        data: { rising_stars: 0, dark_horses: 0, verified_dols: 0 },
+        data: {
+          rising_stars: 0,
+          dark_horses: 0,
+          verified_dols: 0,
+          community_pool: 0,
+          workhorses: 0,
+        },
         error: null,
       };
     }
@@ -269,7 +303,7 @@ export async function getTACounts(
       .from("hcps")
       .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
       .eq("hcp_scores.therapeutic_area_id", taId)
-      .in("cohort_classification", ["rising_star", "dark_horse"]);
+      .eq("cohort_classification", "rising_star");
 
     const darkHorsePromise = supabase
       .from("hcps")
@@ -277,9 +311,23 @@ export async function getTACounts(
       .eq("hcp_scores.therapeutic_area_id", taId)
       .eq("cohort_classification", "dark_horse");
 
-    const [risingRes, darkHorseRes] = await Promise.all([
+    const communityPoolPromise = supabase
+      .from("hcps")
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .eq("hcp_scores.therapeutic_area_id", taId)
+      .eq("cohort_classification", "community");
+
+    const workhorsePromise = supabase
+      .from("hcps")
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .eq("hcp_scores.therapeutic_area_id", taId)
+      .eq("cohort_classification", "workhorse");
+
+    const [risingRes, darkHorseRes, communityPoolRes, workhorseRes] = await Promise.all([
       risingPromise,
       darkHorsePromise,
+      communityPoolPromise,
+      workhorsePromise,
     ]);
 
     const verifiedDolsResult = verifiedIds.length === 0
@@ -295,6 +343,12 @@ export async function getTACounts(
     }
     if (darkHorseRes.error) {
       return { data: null, error: darkHorseRes.error.message };
+    }
+    if (communityPoolRes.error) {
+      return { data: null, error: communityPoolRes.error.message };
+    }
+    if (workhorseRes.error) {
+      return { data: null, error: workhorseRes.error.message };
     }
     if (verifiedDolsResult.error) {
       return { data: null, error: verifiedDolsResult.error.message };
@@ -317,7 +371,7 @@ export async function getTACounts(
         .from("hcps")
         .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
         .eq("hcp_scores.therapeutic_area_id", taId)
-        .in("cohort_classification", ["rising_star", "dark_horse"])
+        .eq("cohort_classification", "rising_star")
         .in("id", industryHcpIds);
 
       const { count: darkHorseIndustryCount } = await supabase
@@ -335,6 +389,8 @@ export async function getTACounts(
           rising_stars: adjustedRising,
           dark_horses: adjustedDarkHorses,
           verified_dols: verifiedDolsResult.count ?? 0,
+          community_pool: communityPoolRes.count ?? 0,
+          workhorses: workhorseRes.count ?? 0,
         },
         error: null,
       };
@@ -345,6 +401,8 @@ export async function getTACounts(
         rising_stars: risingRes.count ?? 0,
         dark_horses: darkHorseRes.count ?? 0,
         verified_dols: verifiedDolsResult.count ?? 0,
+        community_pool: communityPoolRes.count ?? 0,
+        workhorses: workhorseRes.count ?? 0,
       },
       error: null,
     };
@@ -367,7 +425,13 @@ export async function getAllTACounts(): Promise<ApiResult<Record<string, TACount
       if (res.error) {
         return { data: null, error: `Failed loading counts for ${slug}: ${res.error}` };
       }
-      output[slug] = res.data ?? { rising_stars: 0, dark_horses: 0, verified_dols: 0 };
+      output[slug] = res.data ?? {
+        rising_stars: 0,
+        dark_horses: 0,
+        verified_dols: 0,
+        community_pool: 0,
+        workhorses: 0,
+      };
     }
     return { data: output, error: null };
   } catch (err) {

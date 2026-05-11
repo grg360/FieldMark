@@ -65,7 +65,10 @@ interface HCPCardProps {
 export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
-  const darkHorse = hcp.cohort_classification === "dark_horse";
+  const isDarkHorse = hcp.cohort_classification === "dark_horse";
+  const isWorkhorse = hcp.cohort_classification === "workhorse";
+  const accentColor = isDarkHorse ? "#9B6DFF" : isWorkhorse ? "#4ECDC4" : "#E8A020";
+  const accentBg = isDarkHorse ? "#0D0A1A" : isWorkhorse ? "#0A1A18" : "#1A1200";
   const { track } = useTrack();
   const statPillKeys: readonly string[] = (() => {
     if (track === "community") {
@@ -74,7 +77,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
     if (track === "established") {
       return ["PUBS", "CITATIONS", "TRIALS"] as const;
     }
-    return darkHorse
+    return isDarkHorse
       ? (["PUB VEL", "CIT TRAJ", "PUB YEARS"] as const)
       : (["PUB VEL", "CIT TRAJ", "TRIALS"] as const);
   })();
@@ -101,7 +104,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
         style={{
           backgroundColor: "#111113",
           border: "1px solid #1E1E22",
-          borderLeft: darkHorse ? "3px solid #9B6DFF" : "3px solid #E8A020",
+          borderLeft: `3px solid ${accentColor}`,
           borderRadius: 4,
           margin: "0 16px 8px",
           padding: 12,
@@ -131,26 +134,26 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
               onClick={handleScoreBadgeClick}
               onTouchEnd={handleScoreBadgeClick}
               style={{
-                fontSize: darkHorse ? 11 : 14,
+                fontSize: isDarkHorse || isWorkhorse ? 11 : 14,
                 fontFamily: "monospace",
-                color: darkHorse ? "#9B6DFF" : "#E8A020",
-                backgroundColor: darkHorse ? "#0D0A1A" : "#1A1200",
-                border: darkHorse ? "1px solid #9B6DFF" : "1px solid #E8A020",
-                borderRadius: darkHorse ? 2 : 3,
-                padding: darkHorse ? "2px 6px" : "2px 8px",
+                color: accentColor,
+                backgroundColor: accentBg,
+                border: `1px solid ${accentColor}`,
+                borderRadius: isDarkHorse || isWorkhorse ? 2 : 3,
+                padding: isDarkHorse || isWorkhorse ? "2px 6px" : "2px 8px",
                 minHeight: 0,
                 cursor: "pointer",
                 userSelect: "none",
                 lineHeight: 1,
               }}
             >
-              {darkHorse ? "Top 5%" : hcp.score.toFixed(1)}
+              {isDarkHorse ? "Top 5%" : isWorkhorse ? "Workhorse" : hcp.score.toFixed(1)}
             </button>
           </div>
         </div>
 
-        {/* Dark Horse badge */}
-        {darkHorse && (
+        {/* Dark Horse / Workhorse cohort badges */}
+        {isDarkHorse && (
           <div style={{ marginTop: 6 }}>
             <span
               style={{
@@ -165,6 +168,24 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
             >
               <span style={{ fontSize: 10, color: "#9B6DFF", lineHeight: 1 }}>♞</span>
               <span style={{ fontSize: 10, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horse</span>
+            </span>
+          </div>
+        )}
+        {isWorkhorse && (
+          <div style={{ marginTop: 6 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: "#0A1A18",
+                border: "1px solid #4ECDC4",
+                borderRadius: 3,
+                padding: "2px 8px",
+              }}
+            >
+              <span style={{ fontSize: 10, color: "#4ECDC4", lineHeight: 1 }}>⚡</span>
+              <span style={{ fontSize: 10, color: "#4ECDC4", fontFamily: "system-ui, sans-serif" }}>Workhorse</span>
             </span>
           </div>
         )}

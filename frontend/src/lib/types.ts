@@ -55,4 +55,8 @@ export interface TACounts {
   rising_stars: number;
   dark_horses: number;
   verified_dols: number;
+  /** HCPs with cohort_classification = community for this TA (discovery count). */
+  community_pool?: number;
+  /** HCPs with cohort_classification = workhorse for this TA (discovery count). */
+  workhorses?: number;
 }
