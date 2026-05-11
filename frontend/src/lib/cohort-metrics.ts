@@ -17,6 +17,15 @@ export function formatIntDisplay(n: number | null | undefined): string {
   return Math.round(n).toLocaleString();
 }
 
+/** Lifetime engagement dollars with K/M suffixes. */
+export function formatEngagementDollar(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return "—";
+  const v = Math.round(n);
+  if (v < 1000) return `$${v.toLocaleString()}`;
+  if (v < 1000000) return `$${(v / 1000).toFixed(1)}K`;
+  return `$${(v / 1000000).toFixed(1)}M`;
+}
+
 /**
  * Assumes normalized_score is a 0–100 percentile where higher = stronger;
  * maps to a "Top X%" label (e.g. 93 → Top 7%).

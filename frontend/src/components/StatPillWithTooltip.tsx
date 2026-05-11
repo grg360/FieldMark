@@ -54,6 +54,10 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Source hashtag",
     body: "The hashtag where FieldMark first captured this account. Indicates which conversation surfaced them. Accounts captured on conference hashtags (#ASCO26, #EASL26) and persistent community hashtags (#LCSM, #livertwitter) are weighted equally.",
   },
+  ENGAGEMENT: {
+    title: "Pharma engagement",
+    body: "Total pharma engagement (consulting, speaking, honoraria, food, travel) over the HCP's lifetime as reported under the Sunshine Act.",
+  },
   VOLUME: {
     title: "Medicare volume",
     body: "Estimated distinct Medicare beneficiaries served across recent program years (de-duplicated across HCPCS), from CMS utilization data. Higher values indicate broader practice reach.",

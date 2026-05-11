@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { HCP } from "../data/hcpData";
-import { formatIntDisplay, formatTopPercentileLabel, formatVolumeK } from "../lib/cohort-metrics";
+import { formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -64,7 +64,7 @@ interface HCPCardProps {
 
 function cohortStatKeys(cohort: string): readonly string[] {
   if (cohort === "established") return ["PUBS", "CITATIONS", "TRIALS"] as const;
-  if (cohort === "community" || cohort === "workhorse") return ["VOLUME", "COMPANIES", "YEARS"] as const;
+  if (cohort === "community" || cohort === "workhorse") return ["ENGAGEMENT", "COMPANIES", "YEARS"] as const;
   return ["PUB VEL", "CIT TRAJ", "PUB YEARS"] as const;
 }
 
@@ -80,7 +80,7 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
     return "—";
   }
   if (cohort === "community" || cohort === "workhorse") {
-    if (key === "VOLUME") return formatVolumeK(hcp.medicareVolume ?? null);
+    if (key === "ENGAGEMENT") return formatEngagementDollar(hcp.openPaymentsLifetime ?? null);
     if (key === "COMPANIES") return formatIntDisplay(hcp.distinctCompanies ?? null);
     if (key === "YEARS") return formatIntDisplay(hcp.careerYears ?? null);
     return "—";
