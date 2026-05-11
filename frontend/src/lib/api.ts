@@ -147,7 +147,23 @@ export async function getRisingStars(
       .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
       .range(offset, offset + limit - 1);
 
-    const { data: hcpRows, error: listError } = await listQuery;
+    console.log("[getRisingStars] About to execute listQuery");
+    console.log("[getRisingStars] cohortValues:", cohortValues);
+    console.log("[getRisingStars] taId:", taId);
+    const listQueryUrl = (listQuery as unknown as { url?: URL }).url?.href;
+    console.log("[getRisingStars] listQuery URL:", listQueryUrl ?? "(not exposed on query builder)");
+
+    let hcpRows;
+    let listError;
+    try {
+      const result = await listQuery;
+      hcpRows = result.data;
+      listError = result.error;
+      console.log("[getRisingStars] listQuery returned, rows:", hcpRows?.length, "error:", listError);
+    } catch (err) {
+      console.error("[getRisingStars] listQuery threw:", err);
+      throw err;
+    }
 
     if (listError) {
       return { data: null, error: listError.message };
