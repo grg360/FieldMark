@@ -54,6 +54,26 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Source hashtag",
     body: "The hashtag where FieldMark first captured this account. Indicates which conversation surfaced them. Accounts captured on conference hashtags (#ASCO26, #EASL26) and persistent community hashtags (#LCSM, #livertwitter) are weighted equally.",
   },
+  VOLUME: {
+    title: "Medicare volume",
+    body: "Estimated distinct Medicare beneficiaries served across recent program years (de-duplicated across HCPCS), from CMS utilization data. Higher values indicate broader practice reach.",
+  },
+  COMPANIES: {
+    title: "Pharma companies",
+    body: "Count of distinct manufacturers that reported Open Payments to this HCP over their lifetime in the program. A higher count usually indicates broader industry engagement.",
+  },
+  YEARS: {
+    title: "Career stage (years)",
+    body: "Years in practice derived from NPPES career-stage signals when available. Used as a lightweight experience proxy for community cohort HCPs.",
+  },
+  PUBS: {
+    title: "Career publications",
+    body: "Total career publications attributed to this HCP (OpenAlex / career enrichment). Used as a volume signal for established researchers.",
+  },
+  CITATIONS: {
+    title: "Citations",
+    body: "Aggregate citation signal for this HCP is not yet wired in the feed card. Placeholder until citation totals are available.",
+  },
 };
 
 const TOOLTIP_WIDTH = 220;

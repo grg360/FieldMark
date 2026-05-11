@@ -1,0 +1,29 @@
+/** First row when Supabase returns embedded one-to-one as object or single-element array. */
+export function firstEmbedded<T>(v: T | T[] | null | undefined): T | undefined {
+  if (v == null) return undefined;
+  return Array.isArray(v) ? v[0] : v;
+}
+
+/** Medicare-style volume: K suffix only when strictly > 1000. */
+export function formatVolumeK(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const v = Math.round(n);
+  if (v > 1000) return `${(v / 1000).toFixed(1)}K`;
+  return String(v);
+}
+
+export function formatIntDisplay(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return Math.round(n).toLocaleString();
+}
+
+/**
+ * Assumes normalized_score is a 0–100 percentile where higher = stronger;
+ * maps to a "Top X%" label (e.g. 93 → Top 7%).
+ */
+export function formatTopPercentileLabel(normalized: number): string | null {
+  if (!Number.isFinite(normalized) || normalized <= 0) return null;
+  const pct = normalized <= 1 ? normalized * 100 : normalized;
+  const top = Math.max(1, Math.min(99, Math.round(100 - pct)));
+  return `Top ${top}%`;
+}

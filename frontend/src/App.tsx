@@ -25,6 +25,11 @@ type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
   cohort_classification?: string | null;
+  medicareVolume?: number | null;
+  distinctCompanies?: number | null;
+  careerYears?: number | null;
+  totalCareerPubs?: number | null;
+  openPaymentsLifetime?: number | null;
 };
 
 const EMPTY_HCP: AppHCP = {
@@ -39,6 +44,11 @@ const EMPTY_HCP: AppHCP = {
   pubVel: "0.0x",
   citTraj: null,
   trialScore: null,
+  medicareVolume: null,
+  distinctCompanies: null,
+  careerYears: null,
+  totalCareerPubs: null,
+  openPaymentsLifetime: null,
 };
 
 function getTASlug(ta: string): string {
@@ -92,6 +102,11 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     narrative: item.narrative ?? null,
     tier: item.tier ?? null,
     cohort_classification: item.cohort_classification ?? null,
+    medicareVolume: item.medicare_volume ?? null,
+    distinctCompanies: item.distinct_companies ?? null,
+    careerYears: item.career_years ?? null,
+    totalCareerPubs: item.total_career_pubs ?? null,
+    openPaymentsLifetime: item.open_payments_lifetime ?? null,
   };
 }
 

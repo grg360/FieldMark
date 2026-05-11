@@ -1,9 +1,10 @@
 import React, { useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
+import { formatIntDisplay, formatTopPercentileLabel, formatVolumeK } from "../lib/cohort-metrics";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
-type DetailHCP = HCP & { cohort_classification?: string | null };
+type DetailHCP = HCP;
 
 interface DetailScreenProps {
   hcp: DetailHCP;
@@ -47,6 +48,89 @@ const MetricPill = ({ label, value }: { label: string; value: string | number })
   </div>
 );
 
+function detailCitTrajDisplay(citTraj: HCP["citTraj"]): string {
+  return citTraj == null ? "—" : `${Number(citTraj) >= 0 ? "+" : ""}${Number(citTraj)}%`;
+}
+
+function DetailHeaderMetrics({
+  hcp,
+  onScorePress,
+}: {
+  hcp: DetailHCP;
+  onScorePress: () => void;
+}) {
+  const cohort = (hcp.cohort_classification ?? "").trim() || "rising_star";
+  const scoreSummary =
+    formatTopPercentileLabel(hcp.normalizedScore ?? 0) ?? hcp.score.toFixed(1);
+
+  if (cohort === "community" || cohort === "workhorse") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <MetricPill label="Volume (Medicare)" value={formatVolumeK(hcp.medicareVolume ?? null)} />
+        <MetricPill label="Companies" value={formatIntDisplay(hcp.distinctCompanies ?? null)} />
+        <MetricPill label="Years (NPPES)" value={formatIntDisplay(hcp.careerYears ?? null)} />
+      </div>
+    );
+  }
+
+  if (cohort === "established") {
+    const top = formatTopPercentileLabel(hcp.normalizedScore ?? 0);
+    const trials =
+      hcp.trialScore == null || !Number.isFinite(hcp.trialScore) || hcp.trialScore === 0
+        ? "—"
+        : String(Math.round(hcp.trialScore));
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {top ? (
+          <button
+            type="button"
+            onClick={onScorePress}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onScorePress();
+            }}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "block", width: "100%" }}
+          >
+            <MetricPill label="Rank" value={top} />
+          </button>
+        ) : (
+          <MetricPill label="Rank" value="—" />
+        )}
+        <MetricPill label="Career pubs" value={formatIntDisplay(hcp.totalCareerPubs ?? null)} />
+        <MetricPill label="Citations" value="—" />
+        <MetricPill label="Trial score" value={trials} />
+      </div>
+    );
+  }
+
+  const pubYears =
+    hcp.firstPubYear && hcp.firstPubYear > 0 ? `${new Date().getFullYear() - hcp.firstPubYear}` : "—";
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      <button
+        type="button"
+        onClick={onScorePress}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onScorePress();
+        }}
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "block", width: "100%" }}
+      >
+        <MetricPill
+          label={cohort === "dark_horse" ? "Dark Horse rank" : "Score"}
+          value={cohort === "dark_horse" ? "Top 5%" : scoreSummary}
+        />
+      </button>
+      <MetricPill label="Years publishing" value={pubYears} />
+      <MetricPill label="Pub velocity" value={hcp.pubVel} />
+      <MetricPill label="Citation trajectory" value={detailCitTrajDisplay(hcp.citTraj)} />
+    </div>
+  );
+}
+
 function ScoreRow({ label, value, percent, activeTooltip, onTooltipChange }: {
   label: string;
   value: number;
@@ -78,8 +162,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const narrative = hcp.narrative || "Narrative generating — check back soon.";
-  const formattedCitTraj =
-    hcp.citTraj == null ? "—" : `${Number(hcp.citTraj) >= 0 ? "+" : ""}${Number(hcp.citTraj)}%`;
 
   const pubTimeline = [
     { year: 2020, value: 2 },
@@ -152,24 +234,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             {hcp.institution}
           </div>
           {/* Metric pills: hidden on tablet (shown in right column instead) */}
-          <div className="fm-detail-metric-pills-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button
-              onClick={(e) => { e.stopPropagation(); setScoreModalOpen(true); }}
-              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setScoreModalOpen(true); }}
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "block", width: "100%" }}
-            >
-              <MetricPill label="Rising star score" value={hcp.score.toFixed(1)} />
-            </button>
-            <MetricPill
-              label="Years publishing"
-              value={
-                hcp.firstPubYear && hcp.firstPubYear > 0
-                  ? `${new Date().getFullYear() - hcp.firstPubYear}`
-                  : "—"
-              }
-            />
-            <MetricPill label="Pub velocity" value={hcp.pubVel} />
-            <MetricPill label="Citation trajectory" value={formattedCitTraj} />
+          <div className="fm-detail-metric-pills-mobile" style={{ display: "block" }}>
+            <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
           </div>
         </div>
 
@@ -407,24 +473,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         {/* RIGHT COLUMN: Metric pills + Field notes */}
         <div className="fm-detail-right">
           {/* Metric pills: visible on tablet only */}
-          <div className="fm-detail-metric-pills-tablet" style={{ display: "none", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-            <button
-              onClick={(e) => { e.stopPropagation(); setScoreModalOpen(true); }}
-              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setScoreModalOpen(true); }}
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "block", width: "100%" }}
-            >
-              <MetricPill label="Rising star score" value={hcp.score.toFixed(1)} />
-            </button>
-            <MetricPill
-              label="Years publishing"
-              value={
-                hcp.firstPubYear && hcp.firstPubYear > 0
-                  ? `${new Date().getFullYear() - hcp.firstPubYear}`
-                  : "—"
-              }
-            />
-            <MetricPill label="Pub velocity" value={hcp.pubVel} />
-            <MetricPill label="Citation trajectory" value={formattedCitTraj} />
+          <div className="fm-detail-metric-pills-tablet" style={{ display: "none", marginBottom: 16 }}>
+            <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
           </div>
 
         {/* Field notes */}

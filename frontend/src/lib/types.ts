@@ -8,6 +8,16 @@ export interface HCP {
   narrative?: string | null;
   tier?: string | null;
   cohort_classification?: string | null;
+  /** From hcp_medicare_summary.total_beneficiaries_3yr_unique_est when loaded. */
+  medicare_volume?: number | null;
+  /** From hcp_open_payments_summary.distinct_companies_lifetime when loaded. */
+  distinct_companies?: number | null;
+  /** From hcps.nppes_career_stage_years when loaded. */
+  career_years?: number | null;
+  /** From hcp_open_payments_summary.total_payments_lifetime when loaded. */
+  open_payments_lifetime?: number | null;
+  /** From hcps.total_career_pubs when loaded (e.g. Established PUBS pill). */
+  total_career_pubs?: number | null;
 }
 
 export interface HCPScore {

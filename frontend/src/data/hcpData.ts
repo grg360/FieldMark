@@ -15,6 +15,12 @@ export interface HCP {
   narrative?: string | null;
   tier?: string | null;
   hcp_id?: string;
+  cohort_classification?: string | null;
+  medicareVolume?: number | null;
+  distinctCompanies?: number | null;
+  careerYears?: number | null;
+  totalCareerPubs?: number | null;
+  openPaymentsLifetime?: number | null;
 }
 
 export const hcpData: HCP[] = [

@@ -1,3 +1,4 @@
+import { firstEmbedded } from "./cohort-metrics";
 import { dedupeHCPs } from "./hcp-dedupe";
 import { supabase } from "./supabase";
 import type { HCP, HCPScore, RisingStar, SocialUser, TACounts, VerifiedDOL } from "./types";
@@ -45,8 +46,16 @@ function deriveProfileUrl(platform: "twitter" | "bluesky", handle: string): stri
   return `https://bsky.app/profile/${normalizedHandle}`;
 }
 
+function parseOptionalNumber(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
   const hcp = row.hcps ?? {};
+  const med = firstEmbedded(hcp.hcp_medicare_summary ?? row.hcp_medicare_summary);
+  const pay = firstEmbedded(hcp.hcp_open_payments_summary ?? row.hcp_open_payments_summary);
 
   return {
     id: hcp.id ?? row.hcp_id ?? "",
@@ -76,6 +85,11 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
       hcp.cohort_classification != null && hcp.cohort_classification !== ""
         ? String(hcp.cohort_classification)
         : null,
+    medicare_volume: parseOptionalNumber(med?.total_beneficiaries_3yr_unique_est),
+    distinct_companies: parseOptionalNumber(pay?.distinct_companies_lifetime),
+    open_payments_lifetime: parseOptionalNumber(pay?.total_payments_lifetime),
+    career_years: parseOptionalNumber(hcp.nppes_career_stage_years ?? row.nppes_career_stage_years),
+    total_career_pubs: parseOptionalNumber(hcp.total_career_pubs ?? row.total_career_pubs),
   };
 }
 
@@ -132,6 +146,15 @@ export async function getRisingStars(
         country,
         first_pub_year,
         cohort_classification,
+        nppes_career_stage_years,
+        total_career_pubs,
+        hcp_medicare_summary (
+          total_beneficiaries_3yr_unique_est
+        ),
+        hcp_open_payments_summary (
+          distinct_companies_lifetime,
+          total_payments_lifetime
+        ),
         hcp_scores!inner(
           hcp_id,
           composite_score,
@@ -237,6 +260,10 @@ export async function getRisingStars(
         first_pub_year: row.first_pub_year,
         therapeutic_area: therapeuticArea,
         cohort_classification: row.cohort_classification,
+        nppes_career_stage_years: row.nppes_career_stage_years,
+        total_career_pubs: row.total_career_pubs,
+        hcp_medicare_summary: row.hcp_medicare_summary,
+        hcp_open_payments_summary: row.hcp_open_payments_summary,
       };
 
       const enrichedRow = {
@@ -604,19 +631,31 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
         `
         hcp_id,
         composite_score,
+        normalized_score,
         pub_velocity,
         citation_trajectory,
         trial_score,
         career_multiplier,
         first_pub_year,
         stored_pubs,
+        tier,
         hcps!inner (
           id,
           first_name,
           last_name,
           institution,
           country,
-          therapeutic_area
+          therapeutic_area,
+          cohort_classification,
+          nppes_career_stage_years,
+          total_career_pubs,
+          hcp_medicare_summary (
+            total_beneficiaries_3yr_unique_est
+          ),
+          hcp_open_payments_summary (
+            distinct_companies_lifetime,
+            total_payments_lifetime
+          )
         )
       `,
       )
