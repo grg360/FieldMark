@@ -131,7 +131,7 @@ export async function getRisingStars(
     const countBase = () =>
       supabase
         .from("hcps")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
         .eq("hcp_scores.therapeutic_area_id", taId);
 
     const listBase = () =>
@@ -328,25 +328,25 @@ export async function getTACounts(
 
     const risingPromise = supabase
       .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
       .eq("hcp_scores.therapeutic_area_id", taId)
       .eq("cohort_classification", "rising_star");
 
     const darkHorsePromise = supabase
       .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
       .eq("hcp_scores.therapeutic_area_id", taId)
       .eq("cohort_classification", "dark_horse");
 
     const communityPoolPromise = supabase
       .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
       .eq("hcp_scores.therapeutic_area_id", taId)
       .eq("cohort_classification", "community");
 
     const workhorsePromise = supabase
       .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
       .eq("hcp_scores.therapeutic_area_id", taId)
       .eq("cohort_classification", "workhorse");
 
@@ -361,7 +361,7 @@ export async function getTACounts(
       ? { count: 0, error: null }
       : await supabase
           .from("hcp_therapeutic_areas")
-          .select("hcp_id", { count: "exact", head: true })
+          .select("hcp_id", { count: "estimated", head: true })
           .eq("therapeutic_area_id", taId)
           .in("hcp_id", verifiedIds);
 
@@ -396,14 +396,14 @@ export async function getTACounts(
     if (industryHcpIds.length > 0) {
       const { count: risingIndustryCount } = await supabase
         .from("hcps")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
         .eq("hcp_scores.therapeutic_area_id", taId)
         .eq("cohort_classification", "rising_star")
         .in("id", industryHcpIds);
 
       const { count: darkHorseIndustryCount } = await supabase
         .from("hcps")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
         .eq("hcp_scores.therapeutic_area_id", taId)
         .eq("cohort_classification", "dark_horse")
         .in("id", industryHcpIds);
