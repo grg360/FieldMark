@@ -129,7 +129,6 @@ export async function getRisingStars(
         country,
         first_pub_year,
         cohort_classification,
-        therapeutic_area,
         hcp_scores!inner(
           hcp_id,
           composite_score,
@@ -208,7 +207,7 @@ export async function getRisingStars(
         institution: row.institution,
         country: row.country,
         first_pub_year: row.first_pub_year,
-        therapeutic_area: row.therapeutic_area,
+        therapeutic_area: therapeuticArea,
         cohort_classification: row.cohort_classification,
       };
 
