@@ -23,6 +23,7 @@ import type { RisingStar, TACounts } from "./lib/types";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
+  cohort_classification?: string | null;
 };
 
 const EMPTY_HCP: AppHCP = {
@@ -82,6 +83,7 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     country: item.country ?? null,
     narrative: item.narrative ?? null,
     tier: item.tier ?? null,
+    cohort_classification: item.cohort_classification ?? null,
   };
 }
 
@@ -129,8 +131,10 @@ function AppContent() {
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = getTASlug(selectedTA);
-      const tier = darkHorseFilter ? "dark_horse" : undefined;
-      const { data } = await getRisingStars(taSlug, 20, { tier, offset: 0 });
+      const { data } = await getRisingStars(taSlug, 20, {
+        darkHorseOnly: darkHorseFilter,
+        offset: 0,
+      });
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
       if (data) setFeedTotal(data.total);
@@ -157,8 +161,10 @@ function AppContent() {
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = getTASlug(selectedTA);
-      const tier = darkHorseFilter ? "dark_horse" : undefined;
-      const { data } = await getRisingStars(taSlug, 20, { tier, offset: 0 });
+      const { data } = await getRisingStars(taSlug, 20, {
+        darkHorseOnly: darkHorseFilter,
+        offset: 0,
+      });
       if (cancelled) return;
 
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
@@ -179,10 +185,12 @@ function AppContent() {
     if (track === "social") return;
     const nextOffset = feedOffset + 20;
     const taSlug = getTASlug(selectedTA);
-    const tier = darkHorseFilter ? "dark_horse" : undefined;
     setLoadingMore(true);
     try {
-      const { data } = await getRisingStars(taSlug, 20, { tier, offset: nextOffset });
+      const { data } = await getRisingStars(taSlug, 20, {
+        darkHorseOnly: darkHorseFilter,
+        offset: nextOffset,
+      });
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList((prev) => [...prev, ...mapped]);
       setFeedOffset(nextOffset);

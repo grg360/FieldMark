@@ -1,3 +1,4 @@
+import { dedupeHCPs } from "./hcp-dedupe";
 import { supabase } from "./supabase";
 import type { HCP, HCPScore, RisingStar, SocialUser, TACounts, VerifiedDOL } from "./types";
 
@@ -71,13 +72,17 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     stored_pubs: Number(row.stored_pubs ?? 0),
     narrative: row.narrative ?? null,
     tier: row.tier ?? null,
+    cohort_classification:
+      hcp.cohort_classification != null && hcp.cohort_classification !== ""
+        ? String(hcp.cohort_classification)
+        : null,
   };
 }
 
 export async function getRisingStars(
   therapeuticArea: string,
   limit: number = 20,
-  options: { tier?: string; offset?: number } = {},
+  options: { darkHorseOnly?: boolean; offset?: number } = {},
 ): Promise<ApiResult<{ rows: RisingStar[]; total: number }>> {
   try {
     const TA_ID_MAP: Record<string, string> = {
@@ -92,19 +97,20 @@ export async function getRisingStars(
     const taId = TA_ID_MAP[taSlug];
 
     if (!taId) {
-      return { data: { rows: [], total: 0 }, error: null };
+      return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
     }
 
     const offset = options.offset ?? 0;
+    const darkHorseOnly = options.darkHorseOnly ?? false;
+    const cohortValues = darkHorseOnly
+      ? ["dark_horse"]
+      : ["rising_star", "dark_horse"];
 
     let countQuery = supabase
-      .from("hcp_normalized_scores")
-      .select("hcp_id", { count: "exact", head: true })
-      .eq("therapeutic_area_id", taId);
-
-    if (options.tier) {
-      countQuery = countQuery.eq("tier", options.tier);
-    }
+      .from("hcps")
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .eq("hcp_scores.therapeutic_area_id", taId)
+      .in("cohort_classification", cohortValues);
 
     const { count: totalCount, error: countError } = await countQuery;
 
@@ -112,43 +118,52 @@ export async function getRisingStars(
       return { data: null, error: countError.message };
     }
 
-    let scoreQuery = supabase
-      .from("hcp_normalized_scores")
-      .select("hcp_id, raw_score, normalized_score, pub_velocity_score, citation_trajectory_score, trial_investigator_score, tier")
-      .eq("therapeutic_area_id", taId);
-
-    if (options.tier) {
-      scoreQuery = scoreQuery.eq("tier", options.tier);
-    }
-
-    const { data: scoreData, error: scoreError } = await scoreQuery
-      .order("normalized_score", { ascending: false })
+    const listQuery = supabase
+      .from("hcps")
+      .select(
+        `
+        id,
+        first_name,
+        last_name,
+        institution,
+        country,
+        first_pub_year,
+        cohort_classification,
+        therapeutic_area,
+        hcp_scores!inner(
+          hcp_id,
+          composite_score,
+          normalized_score,
+          pub_velocity_score,
+          citation_trajectory_score,
+          trial_investigator_score,
+          tier,
+          therapeutic_area_id
+        )
+      `,
+      )
+      .eq("hcp_scores.therapeutic_area_id", taId)
+      .in("cohort_classification", cohortValues)
+      .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (scoreError) {
-      return { data: null, error: scoreError.message };
+    const { data: hcpRows, error: listError } = await listQuery;
+
+    if (listError) {
+      return { data: null, error: listError.message };
     }
 
-    if (!scoreData || scoreData.length === 0) {
-      return { data: { rows: [], total: totalCount ?? 0 }, error: null };
+    if (!hcpRows || hcpRows.length === 0) {
+      return { data: { rows: dedupeHCPs<RisingStar>([]), total: totalCount ?? 0 }, error: null };
     }
 
-    const hcpIds = scoreData.map((r) => r.hcp_id);
-
-    const { data: hcpData, error: hcpError } = await supabase
-      .from("hcps")
-      .select("id, first_name, last_name, institution, country, first_pub_year")
-      .in("id", hcpIds);
-
-    if (hcpError) {
-      return { data: null, error: hcpError.message };
-    }
-
-    const filteredHcpData = (hcpData ?? []).filter((hcp) => {
-      if (!hcp.institution) return true;
-      const inst = hcp.institution.toLowerCase();
+    const filteredRows = (hcpRows ?? []).filter((row) => {
+      const inst = String(row.institution ?? "").toLowerCase();
+      if (!inst) return true;
       return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
     });
+
+    const hcpIds = filteredRows.map((r) => r.id);
 
     const { data: narrativeData } = await supabase
       .from("hcp_narratives")
@@ -160,29 +175,49 @@ export async function getRisingStars(
       (narrativeData || []).map((n) => [String(n.hcp_id), n.narrative as string | null]),
     );
 
-    const hcpById = new Map((filteredHcpData ?? []).map((hcp) => [String(hcp.id), hcp]));
+    const risingStars: RisingStar[] = filteredRows.flatMap((row) => {
+      const scoresRaw = row.hcp_scores;
+      const scoresArr = Array.isArray(scoresRaw)
+        ? scoresRaw
+        : scoresRaw
+          ? [scoresRaw]
+          : [];
+      const scoreRow = scoresArr[0];
+      if (!scoreRow) return [];
 
-    const risingStars: RisingStar[] = scoreData
-      .flatMap((scoreRow) => {
-        const hcp = hcpById.get(String(scoreRow.hcp_id));
-        if (!hcp) return [];
-        const enrichedRow = {
-          ...scoreRow,
-          composite_score: scoreRow.raw_score,
-          normalized_score: scoreRow.normalized_score,
-          tier: scoreRow.tier,
-          first_pub_year: hcp.first_pub_year,
-          hcps: hcp,
-        };
-        const row = mapRisingStarRow(enrichedRow, therapeuticArea);
-        return [{
-          ...row,
+      const hcp = {
+        id: row.id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        institution: row.institution,
+        country: row.country,
+        first_pub_year: row.first_pub_year,
+        therapeutic_area: row.therapeutic_area,
+        cohort_classification: row.cohort_classification,
+      };
+
+      const enrichedRow = {
+        ...scoreRow,
+        composite_score: scoreRow.composite_score,
+        normalized_score: scoreRow.normalized_score,
+        tier: scoreRow.tier ?? null,
+        first_pub_year: row.first_pub_year,
+        hcps: hcp,
+      };
+
+      const mapped = mapRisingStarRow(enrichedRow, therapeuticArea);
+      return [
+        {
+          ...mapped,
           normalized_score: Number(scoreRow.normalized_score ?? 0),
-          narrative: narrativeMap.get(String(row.id)) ?? null,
-        }];
-      });
+          narrative: narrativeMap.get(String(mapped.id)) ?? null,
+        },
+      ];
+    });
 
-    return { data: { rows: risingStars, total: totalCount ?? 0 }, error: null };
+    const rows = dedupeHCPs(risingStars);
+
+    return { data: { rows, total: totalCount ?? 0 }, error: null };
   } catch (err) {
     return {
       data: null,
@@ -216,17 +251,16 @@ export async function getTACounts(
     const verifiedIds = (verifiedHcps ?? []).map((h) => h.id);
 
     const risingPromise = supabase
-      .from("hcp_scores")
-      .select("hcp_id", { count: "exact" })
-      .eq("therapeutic_area_id", taId)
-      .eq("tier", "rising_star")
-      .limit(1);
+      .from("hcps")
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .eq("hcp_scores.therapeutic_area_id", taId)
+      .in("cohort_classification", ["rising_star", "dark_horse"]);
 
     const darkHorsePromise = supabase
-      .from("hcp_scores")
-      .select("hcp_id", { count: "exact", head: true })
-      .eq("therapeutic_area_id", taId)
-      .eq("tier", "dark_horse");
+      .from("hcps")
+      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+      .eq("hcp_scores.therapeutic_area_id", taId)
+      .eq("cohort_classification", "dark_horse");
 
     const [risingRes, darkHorseRes] = await Promise.all([
       risingPromise,
@@ -265,18 +299,18 @@ export async function getTACounts(
 
     if (industryHcpIds.length > 0) {
       const { count: risingIndustryCount } = await supabase
-        .from("hcp_scores")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .eq("tier", "rising_star")
-        .in("hcp_id", industryHcpIds);
+        .from("hcps")
+        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+        .eq("hcp_scores.therapeutic_area_id", taId)
+        .in("cohort_classification", ["rising_star", "dark_horse"])
+        .in("id", industryHcpIds);
 
       const { count: darkHorseIndustryCount } = await supabase
-        .from("hcp_scores")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .eq("tier", "dark_horse")
-        .in("hcp_id", industryHcpIds);
+        .from("hcps")
+        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "exact", head: true })
+        .eq("hcp_scores.therapeutic_area_id", taId)
+        .eq("cohort_classification", "dark_horse")
+        .in("id", industryHcpIds);
 
       const adjustedRising = (risingRes.count ?? 0) - (risingIndustryCount ?? 0);
       const adjustedDarkHorses = (darkHorseRes.count ?? 0) - (darkHorseIndustryCount ?? 0);
@@ -425,7 +459,7 @@ export async function getVerifiedDOLs(
     const socialById = new Map((socialRows ?? []).map((s) => [String(s.id), s]));
 
     const joined: VerifiedDOL[] = matches
-      .map((match) => {
+      .map((match): VerifiedDOL | null => {
         const hcp = hcpById.get(String(match.hcp_id));
         const social = socialById.get(String(match.social_user_id));
         if (!hcp || !social) return null;
@@ -445,7 +479,7 @@ export async function getVerifiedDOLs(
           profile_url: social.profile_url ?? deriveProfileUrl(platform, handle),
         };
 
-        return {
+        const row: VerifiedDOL = {
           hcp_id: String(hcp.id),
           first_name: String(hcp.first_name ?? ""),
           last_name: String(hcp.last_name ?? ""),
@@ -455,7 +489,8 @@ export async function getVerifiedDOLs(
           total_career_pubs: hcp.total_career_pubs == null ? null : Number(hcp.total_career_pubs),
           match_confidence: "high",
           social_user: socialUser,
-        } satisfies VerifiedDOL;
+        };
+        return row;
       })
       .filter((row): row is VerifiedDOL => row !== null)
       .sort((a, b) => {
@@ -469,7 +504,11 @@ export async function getVerifiedDOLs(
       .slice(0, limit);
     console.log("[getVerifiedDOLs] social count=", socialRows?.length, "joined count=", joined.length);
 
-    return { data: joined, error: null };
+    const dedupedDols = dedupeHCPs(
+      joined.map((row) => ({ ...row, institution: row.institution ?? undefined })),
+    ) as VerifiedDOL[];
+
+    return { data: dedupedDols, error: null };
   } catch (err) {
     return {
       data: null,
@@ -553,7 +592,7 @@ export async function searchHCPs(
   try {
     const search = query.trim();
     if (!search) {
-      return { data: [], error: null };
+      return { data: dedupeHCPs<RisingStar>([]), error: null };
     }
 
     const searchPattern = `%${search}%`;
@@ -604,7 +643,7 @@ export async function searchHCPs(
       mapRisingStarRow(row, therapeuticArea),
     );
 
-    return { data: result, error: null };
+    return { data: dedupeHCPs(result), error: null };
   } catch (err) {
     return {
       data: null,

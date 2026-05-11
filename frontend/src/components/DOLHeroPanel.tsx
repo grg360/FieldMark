@@ -103,7 +103,8 @@ export default function DOLHeroPanel({ taSlug }: DOLHeroPanelProps) {
           <button
             key={`${dol.hcp_id}-${dol.social_user.id}`}
             onClick={() => {
-              window.open(dol.social_user.profile_url, "_blank", "noopener,noreferrer");
+              const url = dol.social_user.profile_url ?? undefined;
+              if (url) window.open(url, "_blank", "noopener,noreferrer");
             }}
             style={{
               width: 280,

@@ -7,6 +7,7 @@ export interface HCP {
   therapeutic_area: string;
   narrative?: string | null;
   tier?: string | null;
+  cohort_classification?: string | null;
 }
 
 export interface HCPScore {
@@ -22,6 +23,7 @@ export interface HCPScore {
   first_pub_year: number;
   stored_pubs: number;
   tier?: string | null;
+  cohort_classification?: string | null;
 }
 
 export interface RisingStar extends HCP, HCPScore {}

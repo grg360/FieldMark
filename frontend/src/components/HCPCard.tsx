@@ -54,25 +54,18 @@ const getCountryCode = (country: string | null): string | null => {
   return codes[c] || null;
 };
 
-function isDarkHorse(hcp: HCP): boolean {
-  if (hcp.score < 85) return false;
-  const citNum = Number(hcp.citTraj);
-  if (isNaN(citNum) || citNum < 40) return false;
-  const trialsNum = Number(hcp.trialScore);
-  if (isNaN(trialsNum) || trialsNum < 2) return false;
-  return true;
-}
+type HCPCardHCP = HCP & { cohort_classification?: string | null };
 
 interface HCPCardProps {
-  hcp: HCP;
-  onAddPress: (hcp: HCP) => void;
-  onCardPress: (hcp: HCP) => void;
+  hcp: HCPCardHCP;
+  onAddPress: (hcp: HCPCardHCP) => void;
+  onCardPress: (hcp: HCPCardHCP) => void;
 }
 
 export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
-  const darkHorse = hcp.tier === "dark_horse";
+  const darkHorse = hcp.cohort_classification === "dark_horse";
   const { track } = useTrack();
   const statPillKeys: readonly string[] = (() => {
     if (track === "community") {
@@ -81,7 +74,9 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
     if (track === "established") {
       return ["PUBS", "CITATIONS", "TRIALS"] as const;
     }
-    return (darkHorse ? ["PUB VEL", "CIT TRAJ", "PUB YEARS"] : ["PUB VEL", "CIT TRAJ", "TRIALS"]) as const;
+    return darkHorse
+      ? (["PUB VEL", "CIT TRAJ", "PUB YEARS"] as const)
+      : (["PUB VEL", "CIT TRAJ", "TRIALS"] as const);
   })();
   const countryCode = getCountryCode(hcp.country ?? null);
 

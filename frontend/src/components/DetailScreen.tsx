@@ -3,8 +3,10 @@ import { HCP } from "../data/hcpData";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
+type DetailHCP = HCP & { cohort_classification?: string | null };
+
 interface DetailScreenProps {
-  hcp: HCP;
+  hcp: DetailHCP;
   onBack: () => void;
   onAddNote: () => void;
   onYearPress: (year: number) => void;
@@ -172,7 +174,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         </div>
 
         {/* Dark Horse callout */}
-        {hcp.tier === "dark_horse" && (
+        {hcp.cohort_classification === "dark_horse" && (
           <div style={{ padding: "12px 16px 0" }}>
             <div
               style={{
@@ -189,7 +191,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                 <span style={{ fontSize: 11, color: "#6B6A65" }}>· top 8% of rising stars</span>
               </div>
               <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5, marginTop: 8 }}>
-                Dr. {hcp.last_name || hcp.name.split(" ").pop()} ranks in the top 5% of {hcp.specialty} rising stars by normalized score, with active publication velocity and citation momentum. Fewer than 2% of scored HCPs in this therapeutic area qualify.
+                Dr. {hcp.name.split(/\s+/).filter(Boolean).pop() ?? ""} ranks in the top 5% of {hcp.specialty} rising stars by normalized score, with active publication velocity and citation momentum. Fewer than 2% of scored HCPs in this therapeutic area qualify.
               </div>
             </div>
           </div>
