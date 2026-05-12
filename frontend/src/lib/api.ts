@@ -193,6 +193,32 @@ export async function getRisingStars(
         )
         .eq("hcp_scores.therapeutic_area_id", taId);
 
+    const listBaseViaHTA = () =>
+      supabase
+        .from("hcps")
+        .select(
+          `
+        id,
+        first_name,
+        last_name,
+        institution,
+        institution_short,
+        country,
+        first_pub_year,
+        cohort_classification,
+        cohort_score,
+        nppes_career_stage_years,
+        nppes_practice_city,
+        nppes_practice_state,
+        nppes_practice_setting,
+        total_career_pubs,
+        hcp_therapeutic_areas!inner(
+          therapeutic_area_id
+        )
+      `,
+        )
+        .eq("hcp_therapeutic_areas.therapeutic_area_id", taId);
+
     let countQuery;
     let listQuery;
     if (cohort === "rising_star") {
@@ -212,13 +238,13 @@ export async function getRisingStars(
     } else if (cohort === "community") {
       if (workhorseOnly) {
         countQuery = countBase().eq("cohort_classification", "workhorse");
-        listQuery = listBase()
+        listQuery = listBaseViaHTA()
           .eq("cohort_classification", "workhorse")
           .order("cohort_score", { ascending: false, nullsFirst: false })
           .range(offset, offset + limit - 1);
       } else {
         countQuery = countBase().eq("cohort_classification", "community");
-        listQuery = listBase()
+        listQuery = listBaseViaHTA()
           .eq("cohort_classification", "community")
           .order("cohort_score", { ascending: false, nullsFirst: false })
           .range(offset, offset + limit - 1);
@@ -317,13 +343,27 @@ export async function getRisingStars(
     );
 
     const risingStars: RisingStar[] = filteredRows.flatMap((row) => {
-      const scoresRaw = row.hcp_scores;
+      const scoresRaw = (row as { hcp_scores?: unknown }).hcp_scores;
       const scoresArr = Array.isArray(scoresRaw)
         ? scoresRaw
         : scoresRaw
           ? [scoresRaw]
           : [];
-      const scoreRow = scoresArr[0];
+      let scoreRow: (typeof scoresArr)[0] | Record<string, unknown> | undefined = scoresArr[0];
+      if (!scoreRow && cohort === "community") {
+        scoreRow = {
+          hcp_id: row.id,
+          composite_score: 0,
+          normalized_score: 0,
+          pub_velocity_score: 0,
+          citation_trajectory_score: null,
+          trial_investigator_score: null,
+          tier: null,
+          therapeutic_area_id: taId,
+          career_multiplier: 0,
+          stored_pubs: 0,
+        };
+      }
       if (!scoreRow) return [];
 
       const hcp = {
