@@ -243,11 +243,6 @@ export async function getRisingStars(
       (opResult.data || []).map((r) => [String(r.hcp_id), r]),
     );
 
-    console.log("[CHECKPOINT 1] Separate query - medicareMap size:", medicareMap.size);
-    console.log("[CHECKPOINT 1] Separate query - opMap size:", opMap.size);
-    console.log("[CHECKPOINT 1] First medicare entry:", medicareResult.data?.[0]);
-    console.log("[CHECKPOINT 1] First op entry:", opResult.data?.[0]);
-
     const filteredRows = (hcpRows ?? []).filter((row) => {
       const inst = String(row.institution ?? "").toLowerCase();
       if (!inst) return true;
@@ -308,14 +303,6 @@ export async function getRisingStars(
       };
 
       const mapped = mapRisingStarRow(enrichedRow, therapeuticArea);
-      console.log(
-        "[CHECKPOINT 2] After mapRisingStarRow, mapped open_payments_lifetime:",
-        mapped.open_payments_lifetime,
-      );
-      console.log(
-        "[CHECKPOINT 2] After mapRisingStarRow, mapped distinct_companies:",
-        mapped.distinct_companies,
-      );
       return [
         {
           ...mapped,

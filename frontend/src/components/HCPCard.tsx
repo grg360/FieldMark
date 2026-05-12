@@ -69,13 +69,6 @@ function cohortStatKeys(cohort: string): readonly string[] {
 }
 
 function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
-  console.log("[CHECKPOINT 3] HCPCard received hcp:", {
-    name: hcp.name,
-    cohort: hcp.cohort_classification,
-    openPaymentsLifetime: hcp.openPaymentsLifetime,
-    distinctCompanies: hcp.distinctCompanies,
-    careerYears: hcp.careerYears,
-  });
   if (cohort === "established") {
     if (key === "PUBS") return formatIntDisplay(hcp.totalCareerPubs ?? null);
     if (key === "CITATIONS") return "—";
