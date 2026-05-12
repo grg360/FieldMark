@@ -238,6 +238,7 @@ button {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 12px !important;
+    align-items: stretch !important;
   }
   .fm-ta-card {
     padding: 20px !important;

@@ -61,6 +61,8 @@ interface HCPCardProps {
   hcp: HCPCardHCP;
   onAddPress: (hcp: HCPCardHCP) => void;
   onCardPress: (hcp: HCPCardHCP) => void;
+  /** Opens methodology modal scrolled to Community or Workhorse section. */
+  onScoringExplainedPress?: (section: "community" | "workhorse") => void;
 }
 
 function cohortStatKeys(cohort: string): readonly string[] {
@@ -117,8 +119,18 @@ function CohortScoreChipWithTip(props: {
   chipButtonStyle: React.CSSProperties;
   scoreLabel: string;
   subtitle?: React.ReactNode;
+  onMethodologyPress?: () => void;
 }) {
-  const { variant, open, onOpenChange, touchDevice, chipButtonStyle, scoreLabel, subtitle } = props;
+  const {
+    variant,
+    open,
+    onOpenChange,
+    touchDevice,
+    chipButtonStyle,
+    scoreLabel,
+    subtitle,
+    onMethodologyPress,
+  } = props;
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -153,6 +165,11 @@ function CohortScoreChipWithTip(props: {
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          if (onMethodologyPress) {
+            onOpenChange(false);
+            onMethodologyPress();
+            return;
+          }
           if (touchDevice) {
             e.preventDefault();
             onOpenChange((v) => !v);
@@ -206,7 +223,7 @@ function CohortScoreChipWithTip(props: {
   );
 }
 
-export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) {
+export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
@@ -271,6 +288,9 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
             userSelect: "none",
             lineHeight: 1,
           }}
+          onMethodologyPress={
+            onScoringExplainedPress ? () => onScoringExplainedPress("community") : undefined
+          }
         />
       );
     }
@@ -325,6 +345,9 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
           }}
           subtitle={
             <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.85 }}>Workhorse</span>
+          }
+          onMethodologyPress={
+            onScoringExplainedPress ? () => onScoringExplainedPress("workhorse") : undefined
           }
         />
       );

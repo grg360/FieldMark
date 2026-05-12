@@ -15,6 +15,9 @@ import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
 import TrackSwitch from "./components/TrackSwitch";
+import ScoringExplainedModal, {
+  type ScoringExplainedScrollTarget,
+} from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
 import type { FeedCohort } from "./lib/api";
 import { getRisingStars, getTACounts } from "./lib/api";
@@ -149,6 +152,13 @@ function AppContent() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
   const [taCounts, setTaCounts] = useState<TACounts | null>(null);
+  const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
+  const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
+
+  useEffect(() => {
+    setScoringExplainedOpen(false);
+    setScoringExplainedScroll(null);
+  }, [currentScreen]);
 
   useEffect(() => {
     if (track !== "rising-stars") setDarkHorseFilter(false);
@@ -418,6 +428,10 @@ function AppContent() {
         onSearchPress={() => setCurrentScreen("search")}
         onProfilePress={() => setCurrentScreen("profile")}
         onRefreshPress={() => void fetchHCPs(true)}
+        onScoringExplainedPress={() => {
+          setScoringExplainedScroll(null);
+          setScoringExplainedOpen(true);
+        }}
         refreshing={refreshingFeed}
       />
 
@@ -638,6 +652,10 @@ function AppContent() {
                   hcp={hcp as unknown as UIHCP}
                   onAddPress={(cardHcp) => handleAddPress(cardHcp as unknown as AppHCP)}
                   onCardPress={(cardHcp) => handleCardPress(cardHcp as unknown as AppHCP)}
+                  onScoringExplainedPress={(section) => {
+                    setScoringExplainedScroll(section);
+                    setScoringExplainedOpen(true);
+                  }}
                 />
               ))}
               {hcpList.length < feedTotal && (
@@ -683,7 +701,19 @@ function AppContent() {
     );
   }
 
-  return screenContent;
+  return (
+    <>
+      {screenContent}
+      <ScoringExplainedModal
+        open={scoringExplainedOpen}
+        onClose={() => {
+          setScoringExplainedOpen(false);
+          setScoringExplainedScroll(null);
+        }}
+        scrollToSection={scoringExplainedScroll ?? undefined}
+      />
+    </>
+  );
 }
 
 export default function App() {

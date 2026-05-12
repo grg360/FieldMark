@@ -93,16 +93,6 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
       <div style={{ padding: "24px 24px 32px" }}>
         {/* Header */}
         <div style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF" }}>Select Your Therapeutic Area:</div>
-        <div
-          style={{
-            fontSize: 13,
-            color: "#6B6A65",
-            lineHeight: 1.5,
-            marginTop: 8,
-          }}
-        >
-          We'll surface rising stars here by default. Change anytime.
-        </div>
 
         {/* TA option cards */}
         <div
@@ -111,7 +101,7 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
             display: "flex",
             flexDirection: "column",
             gap: 12,
-            marginTop: 32,
+            marginTop: 20,
           }}
         >
           {taOptions.map((ta) => {
@@ -132,6 +122,10 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                 className="fm-ta-card"
                 style={{
                   width: "100%",
+                  height: "100%",
+                  alignSelf: "stretch",
+                  display: "flex",
+                  flexDirection: "column",
                   borderRadius: 4,
                   padding: 16,
                   border: isImmunology ? "1px solid #1E1E22" : isSelected ? "1px solid #E8A020" : "1px solid #1E1E22",
@@ -142,7 +136,15 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                   pointerEvents: isImmunology ? "none" : "auto",
                 }}
               >
-                <div style={{ display: "flex", flexDirection: "column" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: 1,
+                    minHeight: 0,
+                    width: "100%",
+                  }}
+                >
                   <div
                     style={{
                       fontSize: 15,
@@ -175,10 +177,21 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                       gap: 6,
                       alignItems: "stretch",
                       width: "100%",
+                      flex: isImmunology ? 1 : undefined,
+                      minHeight: isImmunology ? 0 : undefined,
                     }}
                   >
                     {isImmunology ? (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          flex: 1,
+                          minHeight: 0,
+                          width: "100%",
+                        }}
+                      >
                         <span
                           style={{
                             display: "inline-block",
@@ -204,12 +217,15 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                         >
                           Fall 2026
                         </span>
+                        <div aria-hidden style={{ flex: 1, minHeight: 1, width: "100%" }} />
                       </div>
                     ) : (
                       <>
                         <span
                           style={{
-                            display: "block",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
                             width: "100%",
                             boxSizing: "border-box",
                             fontSize: 11,
@@ -221,6 +237,7 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                             borderRadius: 3,
                           }}
                         >
+                          <span style={{ fontSize: 10, color: "#E8A020" }}>★</span>
                           {risingStarsLabel}
                         </span>
                         <span

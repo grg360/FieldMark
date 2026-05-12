@@ -3,10 +3,18 @@ interface TopBarProps {
   onSearchPress?: () => void;
   onProfilePress?: () => void;
   onRefreshPress?: () => void;
+  onScoringExplainedPress?: () => void;
   refreshing?: boolean;
 }
 
-export default function TopBar({ onLogoPress, onSearchPress, onProfilePress, onRefreshPress, refreshing }: TopBarProps) {
+export default function TopBar({
+  onLogoPress,
+  onSearchPress,
+  onProfilePress,
+  onRefreshPress,
+  onScoringExplainedPress,
+  refreshing,
+}: TopBarProps) {
   return (
     <div
       className="fm-topbar flex items-center justify-between px-4"
@@ -36,7 +44,31 @@ export default function TopBar({ onLogoPress, onSearchPress, onProfilePress, onR
       >
         FM
       </button>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {onScoringExplainedPress ? (
+          <button
+            type="button"
+            onClick={onScoringExplainedPress}
+            title="Scoring methodology"
+            aria-label="Scoring methodology"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 2px",
+              fontSize: 11,
+              fontWeight: 500,
+              color: "#6B6A65",
+              textDecoration: "underline",
+              textUnderlineOffset: 2,
+              fontFamily: "system-ui, sans-serif",
+              whiteSpace: "nowrap",
+              minHeight: 0,
+            }}
+          >
+            How scoring works
+          </button>
+        ) : null}
         <button
           onClick={onRefreshPress}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
