@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
+import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { buildSubline } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
@@ -104,9 +104,9 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
 
 const COHORT_SCORE_TIP_TEXT = {
   community:
-    "Composite score (0-100). Weighted combination of pharma engagement total (45%), engagement breadth across companies (25%), Medicare patient volume (15%), and career stage (15%).",
+    "Cohort score (0-100). Weighted combination of pharma engagement total (45%), engagement breadth across companies (25%), Medicare patient volume (15%), and career stage (15%).",
   workhorse:
-    "Workhorse score (0-100). Weighted combination of Medicare patient volume (60%) and career stage (40%). Identifies high-volume practitioners with low pharma engagement — underleveraged influence.",
+    "Cohort score (0-100). Weighted combination of Medicare patient volume (60%) and career stage (40%). Identifies high-volume practitioners with low pharma engagement — underleveraged influence.",
 } as const;
 
 type CohortScoreTipVariant = keyof typeof COHORT_SCORE_TIP_TEXT;
@@ -262,19 +262,17 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
     setScoreModalOpen(true);
   }
 
-  const topPctRising = formatTopPercentileLabel(hcp.normalizedScore ?? 0);
-  const topPctEstablished = formatTopPercentileLabel(hcp.normalizedScore ?? 0);
+  const cohortScoreLabel = formatCohortScore(hcp.cohortScore ?? null);
 
   function renderScoreChip() {
     if (isCommunityPlain) {
-      const label = formatCohortScore(hcp.cohortScore ?? null);
       return (
         <CohortScoreChipWithTip
           variant="community"
           open={cohortScoreTipOpen}
           onOpenChange={setCohortScoreTipOpen}
           touchDevice={touchDevice}
-          scoreLabel={label}
+          scoreLabel={cohortScoreLabel}
           chipButtonStyle={{
             fontSize: 12,
             fontFamily: "monospace",
@@ -301,32 +299,31 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           onClick={handleScoreBadgeClick}
           onTouchEnd={handleScoreBadgeClick}
           style={{
-            fontSize: 11,
+            fontSize: 12,
             fontFamily: "monospace",
             color: accentColor,
             backgroundColor: accentBg,
             border: `1px solid ${accentColor}`,
             borderRadius: 2,
-            padding: "2px 6px",
+            padding: "2px 8px",
             minHeight: 0,
             cursor: "pointer",
             userSelect: "none",
             lineHeight: 1,
           }}
         >
-          Top 5%
+          {cohortScoreLabel}
         </button>
       );
     }
     if (isWorkhorse) {
-      const scoreLabel = formatCohortScore(hcp.cohortScore ?? null);
       return (
         <CohortScoreChipWithTip
           variant="workhorse"
           open={cohortScoreTipOpen}
           onOpenChange={setCohortScoreTipOpen}
           touchDevice={touchDevice}
-          scoreLabel={scoreLabel}
+          scoreLabel={cohortScoreLabel}
           chipButtonStyle={{
             display: "flex",
             flexDirection: "column",
@@ -353,51 +350,49 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
       );
     }
     if (cohort === "established") {
-      if (!topPctEstablished) return null;
       return (
         <button
           type="button"
           onClick={handleScoreBadgeClick}
           onTouchEnd={handleScoreBadgeClick}
           style={{
-            fontSize: 11,
+            fontSize: 12,
             fontFamily: "monospace",
             color: accentColor,
             backgroundColor: accentBg,
             border: `1px solid ${accentColor}`,
             borderRadius: 2,
-            padding: "2px 6px",
+            padding: "2px 8px",
             minHeight: 0,
             cursor: "pointer",
             userSelect: "none",
             lineHeight: 1,
           }}
         >
-          {topPctEstablished}
+          {cohortScoreLabel}
         </button>
       );
     }
-    const label = topPctRising ?? hcp.score.toFixed(1);
     return (
       <button
         type="button"
         onClick={handleScoreBadgeClick}
         onTouchEnd={handleScoreBadgeClick}
         style={{
-          fontSize: topPctRising ? 11 : 14,
+          fontSize: 12,
           fontFamily: "monospace",
           color: accentColor,
           backgroundColor: accentBg,
           border: `1px solid ${accentColor}`,
           borderRadius: 3,
-          padding: topPctRising ? "2px 6px" : "2px 8px",
+          padding: "2px 8px",
           minHeight: 0,
           cursor: "pointer",
           userSelect: "none",
           lineHeight: 1,
         }}
       >
-        {label}
+        {cohortScoreLabel}
       </button>
     );
   }

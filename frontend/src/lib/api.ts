@@ -226,13 +226,13 @@ export async function getRisingStars(
         countQuery = countBase().eq("cohort_classification", "dark_horse");
         listQuery = listBase()
           .eq("cohort_classification", "dark_horse")
-          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .order("cohort_score", { ascending: false, nullsFirst: false })
           .range(offset, offset + limit - 1);
       } else {
         countQuery = countBase().eq("cohort_classification", "rising_star");
         listQuery = listBase()
           .eq("cohort_classification", "rising_star")
-          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .order("cohort_score", { ascending: false, nullsFirst: false })
           .range(offset, offset + limit - 1);
       }
     } else if (cohort === "community") {
@@ -253,7 +253,7 @@ export async function getRisingStars(
       countQuery = countBase().eq("cohort_classification", "established");
       listQuery = listBase()
         .eq("cohort_classification", "established")
-        .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+        .order("cohort_score", { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1);
     }
 
