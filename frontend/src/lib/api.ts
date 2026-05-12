@@ -231,10 +231,34 @@ export async function getRisingStars(
         .range(offset, offset + limit - 1);
     }
 
-    const { count: totalCount, error: countError } = await countQuery;
+    let cachedTotalCount: number | null = null;
+    if (cohort === "community") {
+      const { data: cacheRow, error: cacheError } = await supabase
+        .from("ta_cohort_counts_cache")
+        .select("community, workhorses")
+        .eq("therapeutic_area_id", taId)
+        .maybeSingle();
 
-    if (countError) {
-      return { data: null, error: countError.message };
+      if (cacheError) {
+        return { data: null, error: cacheError.message };
+      }
+
+      if (cacheRow) {
+        cachedTotalCount = workhorseOnly ? (cacheRow.workhorses ?? 0) : (cacheRow.community ?? 0);
+      } else {
+        cachedTotalCount = 0;
+      }
+    }
+
+    let totalCount: number | null;
+    if (cachedTotalCount !== null) {
+      totalCount = cachedTotalCount;
+    } else {
+      const { count: countResult, error: countError } = await countQuery;
+      if (countError) {
+        return { data: null, error: countError.message };
+      }
+      totalCount = countResult;
     }
 
     const { data: hcpRows, error: listError } = await listQuery;
