@@ -393,16 +393,16 @@ export async function getTACounts(
       .eq("cohort_classification", "dark_horse");
 
     const communityPoolPromise = supabase
-      .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .eq("cohort_classification", "community");
+      .from("hcp_therapeutic_areas")
+      .select("hcp_id, hcps!inner(cohort_classification)", { count: "estimated", head: true })
+      .eq("therapeutic_area_id", taId)
+      .eq("hcps.cohort_classification", "community");
 
     const workhorsePromise = supabase
-      .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .eq("cohort_classification", "workhorse");
+      .from("hcp_therapeutic_areas")
+      .select("hcp_id, hcps!inner(cohort_classification)", { count: "estimated", head: true })
+      .eq("therapeutic_area_id", taId)
+      .eq("hcps.cohort_classification", "workhorse");
 
     const [risingRes, darkHorseRes, communityPoolRes, workhorseRes] = await Promise.all([
       risingPromise,
@@ -433,48 +433,6 @@ export async function getTACounts(
     }
     if (verifiedDolsResult.error) {
       return { data: null, error: verifiedDolsResult.error.message };
-    }
-
-    const { data: industryHcps } = await supabase
-      .from("hcps")
-      .select("id, institution")
-      .not("institution", "is", null);
-
-    const industryHcpIds = (industryHcps ?? [])
-      .filter((h) => {
-        const inst = String(h.institution ?? "").toLowerCase();
-        return INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
-      })
-      .map((h) => h.id);
-
-    if (industryHcpIds.length > 0) {
-      const { count: risingIndustryCount } = await supabase
-        .from("hcps")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-        .eq("hcp_scores.therapeutic_area_id", taId)
-        .eq("cohort_classification", "rising_star")
-        .in("id", industryHcpIds);
-
-      const { count: darkHorseIndustryCount } = await supabase
-        .from("hcps")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-        .eq("hcp_scores.therapeutic_area_id", taId)
-        .eq("cohort_classification", "dark_horse")
-        .in("id", industryHcpIds);
-
-      const adjustedRising = (risingRes.count ?? 0) - (risingIndustryCount ?? 0);
-      const adjustedDarkHorses = (darkHorseRes.count ?? 0) - (darkHorseIndustryCount ?? 0);
-
-      return {
-        data: {
-          rising_stars: adjustedRising,
-          dark_horses: adjustedDarkHorses,
-          verified_dols: verifiedDolsResult.count ?? 0,
-          community_pool: communityPoolRes.count ?? 0,
-          workhorses: workhorseRes.count ?? 0,
-        },
-        error: null,
-      };
     }
 
     return {
