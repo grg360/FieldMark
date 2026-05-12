@@ -382,7 +382,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
           borderLeft: `3px solid ${accentColor}`,
           borderRadius: 4,
           margin: "0 16px 8px",
-          padding: "12px 12px 40px 12px",
+          padding: "12px 12px 36px 12px",
           cursor: "pointer",
         }}
       >
@@ -499,8 +499,8 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
             position: "absolute",
             bottom: 8,
             right: 8,
-            width: 28,
-            height: 28,
+            width: 20,
+            height: 20,
             borderRadius: "50%",
             border: "none",
             background: "transparent",
@@ -514,14 +514,14 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
             transition: "transform 0.15s ease",
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden={true} style={{ display: "block" }}>
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden={true} style={{ display: "block" }}>
             <rect
               x="2"
               y="8.5"
               width="16"
               height="3"
               rx="1.5"
-              fill={addButtonHovered ? "#86EFAC" : "#4ADE80"}
+              fill={addButtonHovered ? "#7AB89A" : "#5A9B7F"}
               style={{ transition: "fill 0.15s ease" }}
             />
             <rect
@@ -530,7 +530,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
               width="3"
               height="16"
               rx="1.5"
-              fill={addButtonHovered ? "#86EFAC" : "#4ADE80"}
+              fill={addButtonHovered ? "#7AB89A" : "#5A9B7F"}
               style={{ transition: "fill 0.15s ease" }}
             />
           </svg>
