@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
+import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -65,10 +65,13 @@ function DetailHeaderMetrics({
 
   if (cohort === "community" || cohort === "workhorse") {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-        <MetricPill label="Engagement" value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)} />
-        <MetricPill label="Companies" value={formatIntDisplay(hcp.distinctCompanies ?? null)} />
-        <MetricPill label="Years (NPPES)" value={formatIntDisplay(hcp.careerYears ?? null)} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <MetricPill label="Cohort score" value={formatCohortScore(hcp.cohortScore ?? null)} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <MetricPill label="Engagement" value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)} />
+          <MetricPill label="Companies" value={formatIntDisplay(hcp.distinctCompanies ?? null)} />
+          <MetricPill label="Years (NPPES)" value={formatIntDisplay(hcp.careerYears ?? null)} />
+        </div>
       </div>
     );
   }

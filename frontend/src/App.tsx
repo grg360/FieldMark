@@ -30,6 +30,7 @@ type AppHCP = Omit<UIHCP, "id"> & {
   careerYears?: number | null;
   totalCareerPubs?: number | null;
   openPaymentsLifetime?: number | null;
+  cohortScore?: number | null;
 };
 
 const EMPTY_HCP: AppHCP = {
@@ -49,6 +50,7 @@ const EMPTY_HCP: AppHCP = {
   careerYears: null,
   totalCareerPubs: null,
   openPaymentsLifetime: null,
+  cohortScore: null,
 };
 
 function getTASlug(ta: string): string {
@@ -107,6 +109,7 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     careerYears: item.career_years ?? null,
     totalCareerPubs: item.total_career_pubs ?? null,
     openPaymentsLifetime: item.open_payments_lifetime ?? null,
+    cohortScore: item.cohort_score ?? null,
   };
 }
 

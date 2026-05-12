@@ -8,6 +8,8 @@ export interface HCP {
   narrative?: string | null;
   tier?: string | null;
   cohort_classification?: string | null;
+  /** hcps.cohort_score — community / workhorse percentile (0–100). */
+  cohort_score?: number | null;
   /** From hcp_medicare_summary.total_beneficiaries_3yr_unique_est when loaded. */
   medicare_volume?: number | null;
   /** From hcp_open_payments_summary.distinct_companies_lifetime when loaded. */

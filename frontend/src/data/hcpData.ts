@@ -21,6 +21,7 @@ export interface HCP {
   careerYears?: number | null;
   totalCareerPubs?: number | null;
   openPaymentsLifetime?: number | null;
+  cohortScore?: number | null;
 }
 
 export const hcpData: HCP[] = [

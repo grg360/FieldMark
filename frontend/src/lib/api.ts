@@ -90,6 +90,7 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     open_payments_lifetime: parseOptionalNumber(pay?.total_payments_lifetime),
     career_years: parseOptionalNumber(hcp.nppes_career_stage_years ?? row.nppes_career_stage_years),
     total_career_pubs: parseOptionalNumber(hcp.total_career_pubs ?? row.total_career_pubs),
+    cohort_score: parseOptionalNumber(hcp.cohort_score ?? row.cohort_score),
   };
 }
 
@@ -146,6 +147,7 @@ export async function getRisingStars(
         country,
         first_pub_year,
         cohort_classification,
+        cohort_score,
         nppes_career_stage_years,
         total_career_pubs,
         hcp_scores!inner(
@@ -183,13 +185,13 @@ export async function getRisingStars(
         countQuery = countBase().eq("cohort_classification", "workhorse");
         listQuery = listBase()
           .eq("cohort_classification", "workhorse")
-          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .order("cohort_score", { ascending: false, nullsFirst: false })
           .range(offset, offset + limit - 1);
       } else {
         countQuery = countBase().eq("cohort_classification", "community");
         listQuery = listBase()
           .eq("cohort_classification", "community")
-          .order("normalized_score", { foreignTable: "hcp_scores", ascending: false })
+          .order("cohort_score", { ascending: false, nullsFirst: false })
           .range(offset, offset + limit - 1);
       }
     } else {
@@ -280,6 +282,7 @@ export async function getRisingStars(
         first_pub_year: row.first_pub_year,
         therapeutic_area: therapeuticArea,
         cohort_classification: row.cohort_classification,
+        cohort_score: row.cohort_score,
         nppes_career_stage_years: row.nppes_career_stage_years,
         total_career_pubs: row.total_career_pubs,
       };
@@ -674,6 +677,7 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
           country,
           therapeutic_area,
           cohort_classification,
+          cohort_score,
           nppes_career_stage_years,
           total_career_pubs,
           hcp_medicare_summary (

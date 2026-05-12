@@ -26,6 +26,12 @@ export function formatEngagementDollar(n: number | null | undefined): string {
   return `$${(v / 1000000).toFixed(1)}M`;
 }
 
+/** hcps.cohort_score percentile (0–100); two decimals for display. */
+export function formatCohortScore(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return Number(n).toFixed(2);
+}
+
 /**
  * Assumes normalized_score is a 0–100 percentile where higher = stronger;
  * maps to a "Top X%" label (e.g. 93 → Top 7%).

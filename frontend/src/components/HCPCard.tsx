@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { HCP } from "../data/hcpData";
-import { formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
+import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -133,7 +133,31 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
   const topPctEstablished = formatTopPercentileLabel(hcp.normalizedScore ?? 0);
 
   function renderScoreChip() {
-    if (isCommunityPlain) return null;
+    if (isCommunityPlain) {
+      const label = formatCohortScore(hcp.cohortScore ?? null);
+      return (
+        <button
+          type="button"
+          onClick={handleScoreBadgeClick}
+          onTouchEnd={handleScoreBadgeClick}
+          style={{
+            fontSize: 12,
+            fontFamily: "monospace",
+            color: "#E8A020",
+            backgroundColor: "#1A1200",
+            border: "1px solid #E8A020",
+            borderRadius: 3,
+            padding: "2px 8px",
+            minHeight: 0,
+            cursor: "pointer",
+            userSelect: "none",
+            lineHeight: 1,
+          }}
+        >
+          {label}
+        </button>
+      );
+    }
     if (isDarkHorse) {
       return (
         <button
@@ -159,26 +183,31 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
       );
     }
     if (isWorkhorse) {
+      const scoreLabel = formatCohortScore(hcp.cohortScore ?? null);
       return (
         <button
           type="button"
           onClick={handleScoreBadgeClick}
           onTouchEnd={handleScoreBadgeClick}
           style={{
-            fontSize: 11,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 1,
             fontFamily: "monospace",
-            color: accentColor,
-            backgroundColor: accentBg,
-            border: `1px solid ${accentColor}`,
+            color: "#4ECDC4",
+            backgroundColor: "#0A1A18",
+            border: "1px solid #4ECDC4",
             borderRadius: 2,
-            padding: "2px 6px",
+            padding: "3px 8px",
             minHeight: 0,
             cursor: "pointer",
             userSelect: "none",
-            lineHeight: 1,
+            lineHeight: 1.1,
           }}
         >
-          Workhorse
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{scoreLabel}</span>
+          <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.85 }}>Workhorse</span>
         </button>
       );
     }
@@ -312,8 +341,8 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
           {hcp.institution}
         </div>
 
-        {/* Row 3: Narrative */}
-        {hcp.narrative ? (
+        {/* Row 3: Narrative (hidden on Community / Workhorse — stats carry the card) */}
+        {hcp.narrative && cohort !== "community" && cohort !== "workhorse" ? (
           <div
             style={{
               fontSize: 14,
