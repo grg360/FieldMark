@@ -148,13 +148,6 @@ export async function getRisingStars(
         cohort_classification,
         nppes_career_stage_years,
         total_career_pubs,
-        hcp_medicare_summary!left (
-          total_beneficiaries_3yr_unique_est
-        ),
-        hcp_open_payments_summary!left (
-          distinct_companies_lifetime,
-          total_payments_lifetime
-        ),
         hcp_scores!inner(
           hcp_id,
           composite_score,
@@ -219,18 +212,41 @@ export async function getRisingStars(
       return { data: null, error: listError.message };
     }
 
-    console.log(
-      "[CHECKPOINT 1] Raw API response, first row open_payments:",
-      hcpRows?.[0]?.hcp_open_payments_summary,
-    );
-    console.log(
-      "[CHECKPOINT 1] Raw API response, first row medicare:",
-      hcpRows?.[0]?.hcp_medicare_summary,
-    );
-
     if (!hcpRows || hcpRows.length === 0) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: totalCount ?? 0 }, error: null };
     }
+
+    const hcpIds = (hcpRows || []).map((r) => r.id);
+
+    const [medicareResult, opResult] = await Promise.all([
+      supabase
+        .from("hcp_medicare_summary")
+        .select("hcp_id, total_beneficiaries_3yr_unique_est")
+        .in("hcp_id", hcpIds),
+      supabase
+        .from("hcp_open_payments_summary")
+        .select("hcp_id, distinct_companies_lifetime, total_payments_lifetime")
+        .in("hcp_id", hcpIds),
+    ]);
+
+    if (medicareResult.error) {
+      return { data: null, error: medicareResult.error.message };
+    }
+    if (opResult.error) {
+      return { data: null, error: opResult.error.message };
+    }
+
+    const medicareMap = new Map(
+      (medicareResult.data || []).map((r) => [String(r.hcp_id), r]),
+    );
+    const opMap = new Map(
+      (opResult.data || []).map((r) => [String(r.hcp_id), r]),
+    );
+
+    console.log("[CHECKPOINT 1] Separate query - medicareMap size:", medicareMap.size);
+    console.log("[CHECKPOINT 1] Separate query - opMap size:", opMap.size);
+    console.log("[CHECKPOINT 1] First medicare entry:", medicareResult.data?.[0]);
+    console.log("[CHECKPOINT 1] First op entry:", opResult.data?.[0]);
 
     const filteredRows = (hcpRows ?? []).filter((row) => {
       const inst = String(row.institution ?? "").toLowerCase();
@@ -238,12 +254,12 @@ export async function getRisingStars(
       return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
     });
 
-    const hcpIds = filteredRows.map((r) => r.id);
+    const narrativeHcpIds = filteredRows.map((r) => r.id);
 
     const { data: narrativeData } = await supabase
       .from("hcp_narratives")
       .select("hcp_id, narrative")
-      .in("hcp_id", hcpIds)
+      .in("hcp_id", narrativeHcpIds)
       .eq("therapeutic_area_id", taId);
 
     const narrativeMap = new Map(
@@ -271,8 +287,15 @@ export async function getRisingStars(
         cohort_classification: row.cohort_classification,
         nppes_career_stage_years: row.nppes_career_stage_years,
         total_career_pubs: row.total_career_pubs,
-        hcp_medicare_summary: row.hcp_medicare_summary,
-        hcp_open_payments_summary: row.hcp_open_payments_summary,
+      };
+
+      const medicareData = medicareMap.get(String(row.id));
+      const opData = opMap.get(String(row.id));
+
+      const hcpWithSummaries = {
+        ...hcp,
+        hcp_medicare_summary: medicareData ? [medicareData] : null,
+        hcp_open_payments_summary: opData ? [opData] : null,
       };
 
       const enrichedRow = {
@@ -281,7 +304,7 @@ export async function getRisingStars(
         normalized_score: scoreRow.normalized_score,
         tier: scoreRow.tier ?? null,
         first_pub_year: row.first_pub_year,
-        hcps: hcp,
+        hcps: hcpWithSummaries,
       };
 
       const mapped = mapRisingStarRow(enrichedRow, therapeuticArea);
