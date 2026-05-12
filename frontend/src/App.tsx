@@ -31,6 +31,10 @@ type AppHCP = Omit<UIHCP, "id"> & {
   totalCareerPubs?: number | null;
   openPaymentsLifetime?: number | null;
   cohortScore?: number | null;
+  institutionShort?: string | null;
+  nppesPracticeCity?: string | null;
+  nppesPracticeState?: string | null;
+  nppesPracticeSetting?: string | null;
 };
 
 const EMPTY_HCP: AppHCP = {
@@ -51,6 +55,10 @@ const EMPTY_HCP: AppHCP = {
   totalCareerPubs: null,
   openPaymentsLifetime: null,
   cohortScore: null,
+  institutionShort: null,
+  nppesPracticeCity: null,
+  nppesPracticeState: null,
+  nppesPracticeSetting: null,
 };
 
 function getTASlug(ta: string): string {
@@ -110,6 +118,10 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     totalCareerPubs: item.total_career_pubs ?? null,
     openPaymentsLifetime: item.open_payments_lifetime ?? null,
     cohortScore: item.cohort_score ?? null,
+    institutionShort: item.institution_short ?? null,
+    nppesPracticeCity: item.nppes_practice_city ?? null,
+    nppesPracticeState: item.nppes_practice_state ?? null,
+    nppesPracticeSetting: item.nppes_practice_setting ?? null,
   };
 }
 

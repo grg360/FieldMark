@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
+import { buildSubline } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -234,7 +235,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         >
           <div className="fm-detail-heading" style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}>{hcp.name}</div>
           <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
-            {hcp.institution}
+            {buildSubline(hcp)}
           </div>
           {/* Metric pills: hidden on tablet (shown in right column instead) */}
           <div className="fm-detail-metric-pills-mobile" style={{ display: "block" }}>

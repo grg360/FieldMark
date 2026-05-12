@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
+import { buildSubline } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -218,6 +219,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
   const accentBg = isDarkHorse ? "#0D0A1A" : isWorkhorse ? "#0A1A18" : "#1A1200";
   const statPillKeys = cohortStatKeys(effectiveCohort);
   const countryCode = getCountryCode(hcp.country ?? null);
+  const subline = buildSubline(hcp);
 
   function handleCardClick() {
     if (activeTooltip) {
@@ -447,9 +449,9 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
           </div>
         )}
 
-        {/* Row 2: Institution */}
+        {/* Row 2: Institution / location subline */}
         <div style={{ fontSize: 14, color: "#6B6A65", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
-          {hcp.institution}
+          {subline}
         </div>
 
         {/* Row 3: Narrative (hidden on Community / Workhorse — stats carry the card) */}

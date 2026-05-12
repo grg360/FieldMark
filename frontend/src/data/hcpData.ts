@@ -22,6 +22,10 @@ export interface HCP {
   totalCareerPubs?: number | null;
   openPaymentsLifetime?: number | null;
   cohortScore?: number | null;
+  institutionShort?: string | null;
+  nppesPracticeCity?: string | null;
+  nppesPracticeState?: string | null;
+  nppesPracticeSetting?: string | null;
 }
 
 export const hcpData: HCP[] = [

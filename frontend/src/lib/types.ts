@@ -3,6 +3,10 @@ export interface HCP {
   first_name: string;
   last_name: string;
   institution: string;
+  institution_short?: string | null;
+  nppes_practice_city?: string | null;
+  nppes_practice_state?: string | null;
+  nppes_practice_setting?: string | null;
   country: string;
   therapeutic_area: string;
   narrative?: string | null;

@@ -61,7 +61,23 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     id: hcp.id ?? row.hcp_id ?? "",
     first_name: String(hcp.first_name ?? ""),
     last_name: String(hcp.last_name ?? ""),
-    institution: String(hcp.institution ?? ""),
+    institution: String(hcp.institution ?? hcp.institution_short ?? ""),
+    institution_short:
+      hcp.institution_short != null && hcp.institution_short !== ""
+        ? String(hcp.institution_short)
+        : null,
+    nppes_practice_city:
+      hcp.nppes_practice_city != null && String(hcp.nppes_practice_city).trim() !== ""
+        ? String(hcp.nppes_practice_city)
+        : null,
+    nppes_practice_state:
+      hcp.nppes_practice_state != null && String(hcp.nppes_practice_state).trim() !== ""
+        ? String(hcp.nppes_practice_state)
+        : null,
+    nppes_practice_setting:
+      hcp.nppes_practice_setting != null && String(hcp.nppes_practice_setting).trim() !== ""
+        ? String(hcp.nppes_practice_setting)
+        : null,
     country: String(hcp.country ?? ""),
     therapeutic_area: String(
       hcp.therapeutic_area ?? therapeuticArea,
@@ -144,11 +160,15 @@ export async function getRisingStars(
         first_name,
         last_name,
         institution,
+        institution_short,
         country,
         first_pub_year,
         cohort_classification,
         cohort_score,
         nppes_career_stage_years,
+        nppes_practice_city,
+        nppes_practice_state,
+        nppes_practice_setting,
         total_career_pubs,
         hcp_scores!inner(
           hcp_id,
@@ -246,7 +266,7 @@ export async function getRisingStars(
     );
 
     const filteredRows = (hcpRows ?? []).filter((row) => {
-      const inst = String(row.institution ?? "").toLowerCase();
+      const inst = String(row.institution ?? row.institution_short ?? "").toLowerCase();
       if (!inst) return true;
       return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
     });
@@ -278,12 +298,16 @@ export async function getRisingStars(
         first_name: row.first_name,
         last_name: row.last_name,
         institution: row.institution,
+        institution_short: row.institution_short,
         country: row.country,
         first_pub_year: row.first_pub_year,
         therapeutic_area: therapeuticArea,
         cohort_classification: row.cohort_classification,
         cohort_score: row.cohort_score,
         nppes_career_stage_years: row.nppes_career_stage_years,
+        nppes_practice_city: row.nppes_practice_city,
+        nppes_practice_state: row.nppes_practice_state,
+        nppes_practice_setting: row.nppes_practice_setting,
         total_career_pubs: row.total_career_pubs,
       };
 
@@ -674,11 +698,15 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
           first_name,
           last_name,
           institution,
+          institution_short,
           country,
           therapeutic_area,
           cohort_classification,
           cohort_score,
           nppes_career_stage_years,
+          nppes_practice_city,
+          nppes_practice_state,
+          nppes_practice_setting,
           total_career_pubs,
           hcp_medicare_summary (
             total_beneficiaries_3yr_unique_est
@@ -763,8 +791,12 @@ export async function searchHCPs(
           first_name,
           last_name,
           institution,
+          institution_short,
           country,
           therapeutic_area,
+          nppes_practice_city,
+          nppes_practice_state,
+          nppes_practice_setting,
           hcp_therapeutic_areas!inner (
             therapeutic_areas!inner (
               slug
