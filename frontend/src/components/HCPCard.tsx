@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
@@ -99,9 +99,113 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
   return "—";
 }
 
+const COHORT_SCORE_TIP_TEXT = {
+  community:
+    "Composite score (0-100). Weighted combination of pharma engagement total (45%), engagement breadth across companies (25%), Medicare patient volume (15%), and career stage (15%).",
+  workhorse:
+    "Workhorse score (0-100). Weighted combination of Medicare patient volume (60%) and career stage (40%). Identifies high-volume practitioners with low pharma engagement — underleveraged influence.",
+} as const;
+
+type CohortScoreTipVariant = keyof typeof COHORT_SCORE_TIP_TEXT;
+
+function CohortScoreChipWithTip(props: {
+  variant: CohortScoreTipVariant;
+  open: boolean;
+  onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
+  touchDevice: boolean;
+  chipButtonStyle: React.CSSProperties;
+  scoreLabel: string;
+  subtitle?: React.ReactNode;
+}) {
+  const { variant, open, onOpenChange, touchDevice, chipButtonStyle, scoreLabel, subtitle } = props;
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (ev: MouseEvent | TouchEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(ev.target as Node)) {
+        onOpenChange(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [open, onOpenChange]);
+
+  const borderCol = variant === "community" ? "#E8A020" : "#4ECDC4";
+
+  return (
+    <div
+      ref={wrapRef}
+      style={{ position: "relative", display: "inline-flex", alignItems: "flex-start" }}
+      onMouseEnter={() => {
+        if (!touchDevice) onOpenChange(true);
+      }}
+      onMouseLeave={() => {
+        if (!touchDevice) onOpenChange(false);
+      }}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (touchDevice) {
+            e.preventDefault();
+            onOpenChange((v) => !v);
+          }
+        }}
+        style={chipButtonStyle}
+      >
+        <span
+          style={{
+            fontSize: subtitle ? 13 : 12,
+            fontWeight: subtitle ? 600 : undefined,
+            fontFamily: "monospace",
+            display: "block",
+          }}
+        >
+          {scoreLabel}
+        </span>
+        {subtitle}
+      </button>
+      {open ? (
+        <div
+          role="tooltip"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: 6,
+            maxWidth: 280,
+            padding: "10px 12px",
+            backgroundColor: "#111113",
+            border: `1px solid ${borderCol}`,
+            borderRadius: 4,
+            zIndex: 300,
+            fontSize: 11,
+            color: "#9B9892",
+            lineHeight: 1.5,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.45)",
+          }}
+        >
+          {COHORT_SCORE_TIP_TEXT[variant]}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
+  const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
+  const [addButtonHovered, setAddButtonHovered] = useState(false);
+  const touchDevice =
+    typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
   const cohort = (hcp.cohort_classification ?? "").trim();
   const effectiveCohort =
     cohort === ""
@@ -120,6 +224,10 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
       setActiveTooltip(null);
       return;
     }
+    if (cohortScoreTipOpen) {
+      setCohortScoreTipOpen(false);
+      return;
+    }
     onCardPress(hcp);
   }
 
@@ -136,11 +244,13 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
     if (isCommunityPlain) {
       const label = formatCohortScore(hcp.cohortScore ?? null);
       return (
-        <button
-          type="button"
-          onClick={handleScoreBadgeClick}
-          onTouchEnd={handleScoreBadgeClick}
-          style={{
+        <CohortScoreChipWithTip
+          variant="community"
+          open={cohortScoreTipOpen}
+          onOpenChange={setCohortScoreTipOpen}
+          touchDevice={touchDevice}
+          scoreLabel={label}
+          chipButtonStyle={{
             fontSize: 12,
             fontFamily: "monospace",
             color: "#E8A020",
@@ -153,9 +263,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
             userSelect: "none",
             lineHeight: 1,
           }}
-        >
-          {label}
-        </button>
+        />
       );
     }
     if (isDarkHorse) {
@@ -185,11 +293,13 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
     if (isWorkhorse) {
       const scoreLabel = formatCohortScore(hcp.cohortScore ?? null);
       return (
-        <button
-          type="button"
-          onClick={handleScoreBadgeClick}
-          onTouchEnd={handleScoreBadgeClick}
-          style={{
+        <CohortScoreChipWithTip
+          variant="workhorse"
+          open={cohortScoreTipOpen}
+          onOpenChange={setCohortScoreTipOpen}
+          touchDevice={touchDevice}
+          scoreLabel={scoreLabel}
+          chipButtonStyle={{
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
@@ -205,10 +315,10 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
             userSelect: "none",
             lineHeight: 1.1,
           }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{scoreLabel}</span>
-          <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.85 }}>Workhorse</span>
-        </button>
+          subtitle={
+            <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.85 }}>Workhorse</span>
+          }
+        />
       );
     }
     if (cohort === "established") {
@@ -266,12 +376,13 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
       <div
         onClick={handleCardClick}
         style={{
+          position: "relative",
           backgroundColor: "#111113",
           border: "1px solid #1E1E22",
           borderLeft: `3px solid ${accentColor}`,
           borderRadius: 4,
           margin: "0 16px 8px",
-          padding: 12,
+          padding: "12px 12px 40px 12px",
           cursor: "pointer",
         }}
       >
@@ -375,33 +486,55 @@ export default function HCPCard({ hcp, onAddPress, onCardPress }: HCPCardProps) 
           ))}
         </div>
 
-        {/* Row 5: Action row */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddPress(hcp);
-            }}
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: "50%",
-              border: "1px solid #1E1E22",
-              backgroundColor: "#0D0D10",
-              color: "#6B6A65",
-              fontSize: 16,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-              lineHeight: 1,
-            }}
-            aria-label={`Add action for ${hcp.name}`}
-          >
-            +
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddPress(hcp);
+          }}
+          onMouseEnter={() => setAddButtonHovered(true)}
+          onMouseLeave={() => setAddButtonHovered(false)}
+          aria-label={`Add action for ${hcp.name}`}
+          style={{
+            position: "absolute",
+            bottom: 8,
+            right: 8,
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            border: "none",
+            background: "transparent",
+            padding: 0,
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transform: addButtonHovered ? "scale(1.05)" : "scale(1)",
+            transition: "transform 0.15s ease",
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden={true} style={{ display: "block" }}>
+            <rect
+              x="2"
+              y="8.5"
+              width="16"
+              height="3"
+              rx="1.5"
+              fill={addButtonHovered ? "#86EFAC" : "#4ADE80"}
+              style={{ transition: "fill 0.15s ease" }}
+            />
+            <rect
+              x="8.5"
+              y="2"
+              width="3"
+              height="16"
+              rx="1.5"
+              fill={addButtonHovered ? "#86EFAC" : "#4ADE80"}
+              style={{ transition: "fill 0.15s ease" }}
+            />
+          </svg>
+        </button>
       </div>
 
       {scoreModalOpen && (
