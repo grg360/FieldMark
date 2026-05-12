@@ -29,6 +29,15 @@ const TA_ID_MAP: Record<string, string> = {
   immunology: "4cf07827-ff1c-451e-832e-0e0a14ea9c86",
 };
 
+/** Indication UUIDs that roll up to each TA for `ta_cohort_counts_cache` (onboarding counts). */
+const TA_INDICATION_IDS: Record<string, string[]> = {
+  "rare-disease": ["833e7b38-d01b-409e-82c0-71eb29e138a0"],
+  hepatology: ["9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e"],
+  oncology: ["c0065b03-a25e-4e9a-bde4-4b4d0db7827d"], // NSCLC; add more oncology indication ids as they're loaded
+  nsclc: ["c0065b03-a25e-4e9a-bde4-4b4d0db7827d"], // same rollup as oncology; slug used by getAllTACounts / getTASlug("Oncology")
+  immunology: [], // coming soon
+};
+
 const INDUSTRY_PATTERNS = [
   "pfizer", "merck", "novartis", "roche", "genentech", "astrazeneca",
   "glaxosmithkline", "gsk", "sanofi", "bristol myers", "bristol-myers",
@@ -355,8 +364,9 @@ export async function getTACounts(
 ): Promise<ApiResult<TACounts>> {
   try {
     const taSlug = therapeuticArea.toLowerCase().trim();
-    const taId = TA_ID_MAP[taSlug];
-    if (!taId) {
+    const indicationIds = TA_INDICATION_IDS[taSlug] ?? [];
+
+    if (indicationIds.length === 0) {
       return {
         data: {
           rising_stars: 0,
@@ -369,6 +379,25 @@ export async function getTACounts(
       };
     }
 
+    const { data: countRows, error: countsError } = await supabase
+      .from("ta_cohort_counts_cache")
+      .select("rising_stars, dark_horses, community, workhorses")
+      .in("therapeutic_area_id", indicationIds);
+
+    if (countsError) {
+      return { data: null, error: countsError.message };
+    }
+
+    const totals = (countRows ?? []).reduce(
+      (acc, row) => ({
+        rising_stars: acc.rising_stars + (Number(row.rising_stars) || 0),
+        dark_horses: acc.dark_horses + (Number(row.dark_horses) || 0),
+        community: acc.community + (Number(row.community) || 0),
+        workhorses: acc.workhorses + (Number(row.workhorses) || 0),
+      }),
+      { rising_stars: 0, dark_horses: 0, community: 0, workhorses: 0 },
+    );
+
     const { data: verifiedHcps, error: verifiedHcpsError } = await supabase
       .from("hcps")
       .select("id")
@@ -380,110 +409,26 @@ export async function getTACounts(
 
     const verifiedIds = (verifiedHcps ?? []).map((h) => h.id);
 
-    const risingPromise = supabase
-      .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .eq("cohort_classification", "rising_star");
+    const verifiedDolsResult =
+      verifiedIds.length === 0
+        ? { count: 0, error: null }
+        : await supabase
+            .from("hcp_therapeutic_areas")
+            .select("hcp_id", { count: "estimated", head: true })
+            .in("therapeutic_area_id", indicationIds)
+            .in("hcp_id", verifiedIds);
 
-    const darkHorsePromise = supabase
-      .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .eq("cohort_classification", "dark_horse");
-
-    const communityPoolPromise = supabase
-      .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .eq("cohort_classification", "community");
-
-    const workhorsePromise = supabase
-      .from("hcps")
-      .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-      .eq("hcp_scores.therapeutic_area_id", taId)
-      .eq("cohort_classification", "workhorse");
-
-    const [risingRes, darkHorseRes, communityPoolRes, workhorseRes] = await Promise.all([
-      risingPromise,
-      darkHorsePromise,
-      communityPoolPromise,
-      workhorsePromise,
-    ]);
-
-    const verifiedDolsResult = verifiedIds.length === 0
-      ? { count: 0, error: null }
-      : await supabase
-          .from("hcp_therapeutic_areas")
-          .select("hcp_id", { count: "estimated", head: true })
-          .eq("therapeutic_area_id", taId)
-          .in("hcp_id", verifiedIds);
-
-    if (risingRes.error) {
-      return { data: null, error: risingRes.error.message };
-    }
-    if (darkHorseRes.error) {
-      return { data: null, error: darkHorseRes.error.message };
-    }
-    if (communityPoolRes.error) {
-      return { data: null, error: communityPoolRes.error.message };
-    }
-    if (workhorseRes.error) {
-      return { data: null, error: workhorseRes.error.message };
-    }
     if (verifiedDolsResult.error) {
       return { data: null, error: verifiedDolsResult.error.message };
     }
 
-    const { data: industryHcps } = await supabase
-      .from("hcps")
-      .select("id, institution")
-      .not("institution", "is", null);
-
-    const industryHcpIds = (industryHcps ?? [])
-      .filter((h) => {
-        const inst = String(h.institution ?? "").toLowerCase();
-        return INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
-      })
-      .map((h) => h.id);
-
-    if (industryHcpIds.length > 0) {
-      const { count: risingIndustryCount } = await supabase
-        .from("hcps")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-        .eq("hcp_scores.therapeutic_area_id", taId)
-        .eq("cohort_classification", "rising_star")
-        .in("id", industryHcpIds);
-
-      const { count: darkHorseIndustryCount } = await supabase
-        .from("hcps")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-        .eq("hcp_scores.therapeutic_area_id", taId)
-        .eq("cohort_classification", "dark_horse")
-        .in("id", industryHcpIds);
-
-      const adjustedRising = (risingRes.count ?? 0) - (risingIndustryCount ?? 0);
-      const adjustedDarkHorses = (darkHorseRes.count ?? 0) - (darkHorseIndustryCount ?? 0);
-
-      return {
-        data: {
-          rising_stars: adjustedRising,
-          dark_horses: adjustedDarkHorses,
-          verified_dols: verifiedDolsResult.count ?? 0,
-          community_pool: communityPoolRes.count ?? 0,
-          workhorses: workhorseRes.count ?? 0,
-        },
-        error: null,
-      };
-    }
-
     return {
       data: {
-        rising_stars: risingRes.count ?? 0,
-        dark_horses: darkHorseRes.count ?? 0,
+        rising_stars: totals.rising_stars,
+        dark_horses: totals.dark_horses,
         verified_dols: verifiedDolsResult.count ?? 0,
-        community_pool: communityPoolRes.count ?? 0,
-        workhorses: workhorseRes.count ?? 0,
+        community_pool: totals.community,
+        workhorses: totals.workhorses,
       },
       error: null,
     };
