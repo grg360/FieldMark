@@ -120,6 +120,9 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
             const taCounts = counts[getSlugForTAName(ta.name)];
             const risingStarsLabel = taCounts ? `${taCounts.rising_stars.toLocaleString()} rising stars` : "— rising stars";
             const darkHorsesLabel = taCounts ? `${taCounts.dark_horses.toLocaleString()} dark horses` : "— dark horses";
+            const workhorsesLabel = taCounts
+              ? `${(taCounts.workhorses ?? 0).toLocaleString()} workhorses`
+              : "— workhorses";
             return (
               <button
                 key={ta.name}
@@ -164,7 +167,16 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                   >
                     {ta.descriptor}
                   </div>
-                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6, minHeight: 24 }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      alignItems: "stretch",
+                      width: "100%",
+                    }}
+                  >
                     {isImmunology ? (
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
                         <span
@@ -197,7 +209,9 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                       <>
                         <span
                           style={{
-                            display: "inline-block",
+                            display: "block",
+                            width: "100%",
+                            boxSizing: "border-box",
                             fontSize: 11,
                             fontFamily: "monospace",
                             backgroundColor: "#1A1200",
@@ -214,6 +228,8 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 4,
+                            width: "100%",
+                            boxSizing: "border-box",
                             fontSize: 11,
                             fontFamily: "monospace",
                             backgroundColor: "#0D0A1A",
@@ -225,6 +241,25 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                         >
                           <span style={{ fontSize: 10 }}>♞</span>
                           {darkHorsesLabel}
+                        </span>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            width: "100%",
+                            boxSizing: "border-box",
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            backgroundColor: "#0A1A18",
+                            border: "1px solid #4ECDC4",
+                            color: "#4ECDC4",
+                            padding: "2px 8px",
+                            borderRadius: 3,
+                          }}
+                        >
+                          <span style={{ fontSize: 10 }}>⚡</span>
+                          {workhorsesLabel}
                         </span>
                       </>
                     )}
