@@ -517,7 +517,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         className="fm-nav"
         style={{
           height: 48,
-          borderBottom: "1px solid #1E1E22",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
