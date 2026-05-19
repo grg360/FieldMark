@@ -257,22 +257,22 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                         <CohortChip
                           icon="★"
                           label={`${fmt(taCounts?.rising_stars)} rising stars`}
-                          borderColor="#FFB84D"
-                          backgroundColor="#1A1200"
-                          color="#FFB84D"
+                          borderColor="#9B6DFF"
+                          backgroundColor="#1A0E2E"
+                          color="#9B6DFF"
                         />
                         <CohortChip
                           icon="▲"
                           label={`${fmt(taCounts?.established)} established`}
                           borderColor="#FFD700"
-                          backgroundColor="#1A1800"
+                          backgroundColor="#1F1A00"
                           color="#FFD700"
                         />
                         <CohortChip
                           icon="◆"
                           label={`${fmt(taCounts?.community_pool)} community`}
                           borderColor="#7B9EBD"
-                          backgroundColor="#0A121A"
+                          backgroundColor="#0D1A26"
                           color="#7B9EBD"
                         />
                         <CohortChip
@@ -285,9 +285,9 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                         <CohortChip
                           icon="#"
                           label={`${fmt(taCounts?.total_hcps)} total HCPs`}
-                          borderColor="#6B6A65"
-                          backgroundColor="#141413"
-                          color="#6B6A65"
+                          borderColor="#FFFFFF"
+                          backgroundColor="#1A1A1A"
+                          color="#FFFFFF"
                         />
                       </>
                     )}

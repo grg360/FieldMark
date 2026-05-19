@@ -9,7 +9,7 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230A0A0B'/><circle cx='50' cy='50' r='42' stroke='%23E8A020' stroke-width='5' fill='none'/><text x='50' y='58' font-size='52' text-anchor='middle' font-family='system-ui' fill='%239B6DFF'>♞</text><circle cx='72' cy='72' r='6' fill='%23E8A020'/></svg>",
+      "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
