@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { ArrowUp } from "lucide-react";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import TASelectionScreen from "./components/TASelectionScreen";
 import TopBar from "./components/TopBar";
@@ -39,6 +40,8 @@ type AppHCP = Omit<UIHCP, "id"> & {
   nppesPracticeState?: string | null;
   nppesPracticeSetting?: string | null;
 };
+
+const FEED_PAGE_SIZE = 20;
 
 const EMPTY_HCP: AppHCP = {
   id: "",
@@ -152,10 +155,27 @@ function AppContent() {
   const [taCounts, setTaCounts] = useState<TACounts | null>(null);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [backToTopHovered, setBackToTopHovered] = useState(false);
 
   useEffect(() => {
     setScoringExplainedOpen(false);
     setScoringExplainedScroll(null);
+  }, [currentScreen]);
+
+  useEffect(() => {
+    if (currentScreen !== "feed") {
+      setShowBackToTop(false);
+      return;
+    }
+
+    function onScroll() {
+      setShowBackToTop(window.scrollY > 400);
+    }
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, [currentScreen]);
 
   function formatUpdatedLabel() {
@@ -178,7 +198,7 @@ function AppContent() {
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(taSlug, 20, {
+      const { data } = await getRisingStars(taSlug, FEED_PAGE_SIZE, {
         cohort: feedCohortForTrack(track),
         offset: 0,
       });
@@ -208,7 +228,7 @@ function AppContent() {
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(taSlug, 20, {
+      const { data } = await getRisingStars(taSlug, FEED_PAGE_SIZE, {
         cohort: feedCohortForTrack(track),
         offset: 0,
       });
@@ -230,11 +250,11 @@ function AppContent() {
 
   async function loadMore() {
     if (track === "social") return;
-    const nextOffset = feedOffset + 20;
+    const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = getTASlug(selectedTA);
     setLoadingMore(true);
     try {
-      const { data } = await getRisingStars(taSlug, 20, {
+      const { data } = await getRisingStars(taSlug, FEED_PAGE_SIZE, {
         cohort: feedCohortForTrack(track),
         offset: nextOffset,
       });
@@ -531,7 +551,15 @@ function AppContent() {
                 />
               ))}
               {hcpList.length < feedTotal && (
-                <div style={{ padding: "0 16px 8px", width: "100%" }}>
+                <div
+                  style={{
+                    gridColumn: "1 / -1",
+                    display: "flex",
+                    justifyContent: "center",
+                    width: "100%",
+                    padding: "0 0 8px",
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => void loadMore()}
@@ -541,6 +569,7 @@ function AppContent() {
                       alignItems: "center",
                       justifyContent: "center",
                       width: "100%",
+                      maxWidth: 400,
                       textAlign: "center",
                       backgroundColor: "#1A3D2E",
                       border: "1px solid #4ADE80",
@@ -553,7 +582,7 @@ function AppContent() {
                       color: "#4ADE80",
                     }}
                   >
-                    {loadingMore ? "Loading..." : "Load more"}
+                    {loadingMore ? "Loading..." : `Load ${FEED_PAGE_SIZE} More HCPs`}
                   </button>
                 </div>
               )}
@@ -573,9 +602,44 @@ function AppContent() {
     );
   }
 
+  const backToTopVisible = currentScreen === "feed" && showBackToTop && !trayOpen;
+
   return (
     <>
       {screenContent}
+      {currentScreen === "feed" && (
+        <button
+          type="button"
+          aria-label="Back to top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          onMouseEnter={() => setBackToTopHovered(true)}
+          onMouseLeave={() => setBackToTopHovered(false)}
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            width: 40,
+            height: 40,
+            minHeight: 0,
+            minWidth: 40,
+            borderRadius: "50%",
+            backgroundColor: "#0D0D10",
+            border: `1px solid ${backToTopHovered ? "#6B6A65" : "#1E1E22"}`,
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            cursor: "pointer",
+            zIndex: 100,
+            opacity: backToTopVisible ? 1 : 0,
+            pointerEvents: backToTopVisible ? "auto" : "none",
+            transition: "opacity 200ms ease, border-color 200ms ease",
+          }}
+        >
+          <ArrowUp size={18} color="#E8E6DF" aria-hidden />
+        </button>
+      )}
       <ScoringExplainedModal
         open={scoringExplainedOpen}
         onClose={() => {
