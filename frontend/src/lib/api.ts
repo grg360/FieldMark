@@ -489,28 +489,14 @@ export async function getTACounts(
       return { data: null, error: verifiedDolsResult.error.message };
     }
 
-    const { data: establishedHcps, error: establishedError } = await supabase
-      .from("hcps")
-      .select("id")
-      .eq("cohort_classification", "established");
+    const { count: establishedCount, error: establishedError } = await supabase
+      .from("hcp_therapeutic_areas")
+      .select("hcp_id, hcps!inner(cohort_classification)", { count: "estimated", head: true })
+      .in("therapeutic_area_id", indicationIds)
+      .eq("hcps.cohort_classification", "established");
 
     if (establishedError) {
       return { data: null, error: establishedError.message };
-    }
-
-    const establishedIds = (establishedHcps ?? []).map((h) => h.id);
-
-    const establishedResult =
-      establishedIds.length === 0
-        ? { count: 0, error: null }
-        : await supabase
-            .from("hcp_therapeutic_areas")
-            .select("hcp_id", { count: "estimated", head: true })
-            .in("therapeutic_area_id", indicationIds)
-            .in("hcp_id", establishedIds);
-
-    if (establishedResult.error) {
-      return { data: null, error: establishedResult.error.message };
     }
 
     return {
@@ -520,7 +506,7 @@ export async function getTACounts(
         verified_dols: verifiedDolsResult.count ?? 0,
         community_pool: totals.community,
         workhorses: totals.workhorses,
-        established: establishedResult.count ?? 0,
+        established: establishedCount ?? 0,
         total_hcps: totals.total_hcps,
       },
       error: null,
