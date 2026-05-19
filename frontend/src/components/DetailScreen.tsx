@@ -1,10 +1,8 @@
 import React, { useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
+import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { buildSubline, titleCaseCity } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
-import ScoreModal from "./ScoreModal";
-
 type DetailHCP = HCP;
 
 const COMMUNITY_MAX_ENGAGEMENT = 8400000;
@@ -23,6 +21,32 @@ function cohortAccentColor(cohort: string | null | undefined): string {
 function cappedPercent(value: number | null | undefined, max: number): number {
   if (value == null || !Number.isFinite(value) || max <= 0) return 0;
   return Math.min(100, (value / max) * 100);
+}
+
+function cappedScorePercent(value: number | null | undefined): number {
+  if (value == null || !Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, value));
+}
+
+function parsePubVelNumeric(pubVel: string): number | null {
+  const n = Number(String(pubVel).replace(/x$/i, "").trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatResearchScoreValue(n: number | null | undefined): string | number {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return Number(n).toFixed(1);
+}
+
+function formatCitTrajScoreValue(citTraj: HCP["citTraj"]): string | number {
+  if (citTraj == null || !Number.isFinite(Number(citTraj))) return "—";
+  const n = Number(citTraj);
+  return `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
+}
+
+function citTrajScorePercent(citTraj: HCP["citTraj"]): number {
+  if (citTraj == null || !Number.isFinite(Number(citTraj))) return 0;
+  return cappedScorePercent(Math.abs(Number(citTraj)));
 }
 
 interface DetailScreenProps {
@@ -46,27 +70,6 @@ const ShareIcon = () => (
     <line x1="5.3" y1="7.2" x2="10.7" y2="4.3" stroke="#6B6A65" strokeWidth="1.4" strokeLinecap="round" />
     <line x1="5.3" y1="8.8" x2="10.7" y2="11.7" stroke="#6B6A65" strokeWidth="1.4" strokeLinecap="round" />
   </svg>
-);
-
-const MetricPill = ({ label, value }: { label: string; value: string | number }) => (
-  <div
-    style={{
-      backgroundColor: "#0D0D10",
-      border: "1px solid #1E1E22",
-      borderRadius: 4,
-      padding: "10px 12px",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 4,
-    }}
-  >
-    <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center" }}>
-      {label}
-    </span>
-    <span style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500, textAlign: "center" }}>{value}</span>
-  </div>
 );
 
 function CohortScorePill({ value }: { value: string | number }) {
@@ -94,81 +97,8 @@ function CohortScorePill({ value }: { value: string | number }) {
   );
 }
 
-function detailCitTrajDisplay(citTraj: HCP["citTraj"]): string {
-  return citTraj == null ? "—" : `${Number(citTraj) >= 0 ? "+" : ""}${Number(citTraj)}%`;
-}
-
-function DetailHeaderMetrics({
-  hcp,
-  onScorePress,
-}: {
-  hcp: DetailHCP;
-  onScorePress: () => void;
-}) {
-  const cohort = (hcp.cohort_classification ?? "").trim() || "rising_star";
-  const scoreSummary =
-    formatTopPercentileLabel(hcp.normalizedScore ?? 0) ?? hcp.score.toFixed(1);
-
-  if (cohort === "community" || cohort === "workhorse") {
-    return <CohortScorePill value={formatCohortScore(hcp.cohortScore ?? null)} />;
-  }
-
-  if (cohort === "established") {
-    const top = formatTopPercentileLabel(hcp.normalizedScore ?? 0);
-    const trials =
-      hcp.trialScore == null || !Number.isFinite(hcp.trialScore) || hcp.trialScore === 0
-        ? "—"
-        : String(Math.round(hcp.trialScore));
-    return (
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {top ? (
-          <button
-            type="button"
-            onClick={onScorePress}
-            onTouchEnd={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onScorePress();
-            }}
-            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "block", width: "100%" }}
-          >
-            <MetricPill label="Rank" value={top} />
-          </button>
-        ) : (
-          <MetricPill label="Rank" value="—" />
-        )}
-        <MetricPill label="Career pubs" value={formatIntDisplay(hcp.totalCareerPubs ?? null)} />
-        <MetricPill label="Citations" value="—" />
-        <MetricPill label="Trial score" value={trials} />
-      </div>
-    );
-  }
-
-  const pubYears =
-    hcp.firstPubYear && hcp.firstPubYear > 0 ? `${new Date().getFullYear() - hcp.firstPubYear}` : "—";
-
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-      <button
-        type="button"
-        onClick={onScorePress}
-        onTouchEnd={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          onScorePress();
-        }}
-        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "block", width: "100%" }}
-      >
-        <MetricPill
-          label={cohort === "dark_horse" ? "Dark Horse rank" : "Score"}
-          value={cohort === "dark_horse" ? "Top 5%" : scoreSummary}
-        />
-      </button>
-      <MetricPill label="Years publishing" value={pubYears} />
-      <MetricPill label="Pub velocity" value={hcp.pubVel} />
-      <MetricPill label="Citation trajectory" value={detailCitTrajDisplay(hcp.citTraj)} />
-    </div>
-  );
+function DetailHeaderMetrics({ hcp }: { hcp: DetailHCP }) {
+  return <CohortScorePill value={formatCohortScore(hcp.cohortScore ?? null)} />;
 }
 
 function ScoreRow({
@@ -459,7 +389,6 @@ function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
 
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-  const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [engagementTooltipYear, setEngagementTooltipYear] = useState<number | null>(null);
   const [volumeTooltipYear, setVolumeTooltipYear] = useState<number | null>(null);
   const narrative = hcp.narrative || "Narrative generating — check back soon.";
@@ -467,6 +396,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const isCommunityCohort =
     hcp.cohort_classification === "community" || hcp.cohort_classification === "workhorse";
   const cohortBarColor = cohortAccentColor(hcp.cohort_classification);
+
+  const pubVelNumeric = parsePubVelNumeric(hcp.pubVel);
 
   const pubTimeline = [
     { year: 2020, value: 2 },
@@ -570,12 +501,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
             {buildSubline(hcp)}
           </div>
-          {/* Metric pills: hidden on tablet (shown in right column instead); community cohort score lives in right column */}
-          {!isCommunityCohort && (
-            <div className="fm-detail-metric-pills-mobile" style={{ display: "block" }}>
-              <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
-            </div>
-          )}
         </div>
 
         {/* Dark Horse callout */}
@@ -698,10 +623,30 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
               </>
             ) : (
               <>
-                <ScoreRow label="Publication Velocity" value={94} percent={94} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-                <ScoreRow label="Citation Trajectory" value={88} percent={88} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-                <ScoreRow label="Trial Activity" value={81} percent={81} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-                <ScoreRow label="Career Age Multiplier" value={76} percent={76} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow
+                  label="Publication Velocity"
+                  value={formatResearchScoreValue(pubVelNumeric)}
+                  percent={cappedScorePercent(pubVelNumeric)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+                <ScoreRow
+                  label="Citation Trajectory"
+                  value={formatCitTrajScoreValue(hcp.citTraj)}
+                  percent={citTrajScorePercent(hcp.citTraj)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+                <ScoreRow
+                  label="Trial Activity"
+                  value={formatResearchScoreValue(hcp.trialScore)}
+                  percent={cappedScorePercent(hcp.trialScore)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
               </>
             )}
           </div>
@@ -937,18 +882,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             )}
           </div>
 
-          {isCommunityCohort && (
-            <div style={{ marginBottom: 16 }}>
-              <CohortScorePill value={formatCohortScore(hcp.cohortScore ?? null)} />
-            </div>
-          )}
-
-          {/* Metric pills: visible on tablet only (non-community) */}
-          {!isCommunityCohort && (
-            <div className="fm-detail-metric-pills-tablet" style={{ display: "none", marginBottom: 16 }}>
-              <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
-            </div>
-          )}
+          <div style={{ marginBottom: 16 }}>
+            <DetailHeaderMetrics hcp={hcp} />
+          </div>
 
         {/* Field notes */}
         <div style={{ padding: "16px 0 24px" }}>
@@ -989,14 +925,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         </div>{/* end fm-detail-right */}
       </div>{/* end fm-detail-body */}
 
-      {scoreModalOpen && (
-        <ScoreModal
-          hcpName={hcp.name}
-          ta={hcp.specialty}
-          score={hcp.score}
-          onClose={() => setScoreModalOpen(false)}
-        />
-      )}
     </div>
   );
 }
