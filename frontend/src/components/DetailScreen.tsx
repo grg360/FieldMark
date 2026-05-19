@@ -17,7 +17,7 @@ function cohortAccentColor(cohort: string | null | undefined): string {
   if (c === "rising_star" || c === "dark_horse") return "#9B6DFF";
   if (c === "established") return "#FFD700";
   if (c === "community" || c === "workhorse") return "#7B9EBD";
-  return "#E8A020";
+  return "#E8A020"; // fallback
 }
 
 function cappedPercent(value: number | null | undefined, max: number): number {
@@ -534,7 +534,22 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         </button>
       </div>
 
-      <div className="fm-detail-body" style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div
+        className="fm-detail-body"
+        style={{
+          borderTop: `3px solid ${cohortAccentColor(hcp.cohort_classification)}`,
+          borderRight: "1px solid #1E1E22",
+          borderBottom: "1px solid #1E1E22",
+          borderLeft: "1px solid #1E1E22",
+          borderRadius: 6,
+          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.5)",
+          margin: "0 16px 24px 16px",
+          backgroundColor: "#0A0A0B",
+          overflowX: "hidden",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
         {/* LEFT COLUMN: Header + main content */}
         <div className="fm-detail-left">
         {/* Header section */}
