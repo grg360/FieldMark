@@ -13,7 +13,8 @@ export interface HCP {
   npi_number?: string | null;
   npi_specialty?: string | null;
   country: string;
-  therapeutic_area: string;
+  /** TODO: load via hcp_therapeutic_areas join; not stored on hcps. */
+  therapeutic_area: string | null;
   narrative?: string | null;
   tier?: string | null;
   cohort_classification?: string | null;

@@ -103,8 +103,8 @@ function feedCohortForTrack(track: Track): FeedCohort {
   return "rising_star";
 }
 
-function formatTherapeuticAreaLabel(value: string): string {
-  const v = String(value || "").trim().toLowerCase();
+function formatTherapeuticAreaLabel(value: string | null | undefined): string {
+  const v = String(value ?? "").trim().toLowerCase();
   if (v === "nsclc") return "NSCLC";
   if (v === "rare-disease") return "Rare Disease";
   if (v === "hepatology") return "Hepatology";

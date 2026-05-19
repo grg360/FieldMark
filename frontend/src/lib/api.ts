@@ -130,9 +130,8 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
         ? String(hcp.npi_specialty)
         : null,
     country: String(hcp.country ?? ""),
-    therapeutic_area: String(
-      hcp.therapeutic_area ?? therapeuticArea,
-    ),
+    // TODO: Source therapeutic_area via hcp_therapeutic_areas join (not an hcps column).
+    therapeutic_area: therapeuticArea.trim() !== "" ? therapeuticArea : null,
     hcp_id: row.hcp_id ?? hcp.id ?? "",
     composite_score: Number(row.composite_score ?? 0),
     normalized_score: Number(row.normalized_score ?? 0),
@@ -742,7 +741,6 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
           institution_short,
           institution_full,
           country,
-          therapeutic_area,
           cohort_classification,
           cohort_score,
           first_pub_year,
@@ -845,7 +843,6 @@ export async function searchHCPs(
           institution,
           institution_short,
           country,
-          therapeutic_area,
           first_pub_year,
           nppes_practice_city,
           nppes_practice_state,
