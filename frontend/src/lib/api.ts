@@ -530,9 +530,10 @@ export async function getTACounts(
 
     const { count: establishedCount, error: establishedError } = await supabase
       .from("hcp_therapeutic_areas")
-      .select("hcp_id, hcps!inner(cohort_classification)", { count: "estimated", head: true })
+      .select("hcp_id, hcps!inner(cohort_classification, country)", { count: "estimated", head: true })
       .in("therapeutic_area_id", indicationIds)
-      .eq("hcps.cohort_classification", "established");
+      .eq("hcps.cohort_classification", "established")
+      .eq("hcps.country", "USA");
 
     if (establishedError) {
       return { data: null, error: establishedError.message };
