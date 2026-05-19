@@ -71,6 +71,22 @@ function cohortStatKeys(cohort: string): readonly string[] {
   return ["PUB VEL", "CIT TRAJ", "PUB YEARS"] as const;
 }
 
+/** Left-border accent on feed cards — matches TA selection cohort colors. */
+function cohortBorderAccentColor(cohortClassification: string): string {
+  switch (cohortClassification) {
+    case "rising_star":
+    case "dark_horse":
+      return "#9B6DFF";
+    case "established":
+      return "#FFD700";
+    case "community":
+    case "workhorse":
+      return "#7B9EBD";
+    default:
+      return "#E8A020";
+  }
+}
+
 function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
   if (cohort === "established") {
     if (key === "PUBS") return formatIntDisplay(hcp.totalCareerPubs ?? null);
@@ -240,6 +256,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const isCommunityPlain = cohort === "community";
   const accentColor = isDarkHorse ? "#9B6DFF" : isWorkhorse ? "#4ECDC4" : "#E8A020";
   const accentBg = isDarkHorse ? "#0D0A1A" : isWorkhorse ? "#0A1A18" : "#1A1200";
+  const borderAccentColor = cohortBorderAccentColor(effectiveCohort);
   const statPillKeys = cohortStatKeys(effectiveCohort);
   const countryCode = getCountryCode(hcp.country ?? null);
   const subline = buildSubline(hcp);
@@ -406,7 +423,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           position: "relative",
           backgroundColor: "#111113",
           border: "1px solid #1E1E22",
-          borderLeft: `3px solid ${accentColor}`,
+          borderLeft: `3px solid ${borderAccentColor}`,
           borderRadius: 4,
           margin: "0 16px 8px",
           padding: "12px",
