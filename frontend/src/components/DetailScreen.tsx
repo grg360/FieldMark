@@ -407,7 +407,7 @@ function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
 
   return (
     <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #1E1E22" }}>
-      <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+      <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
         Engagement Mix
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -635,7 +635,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
             {narrativeSectionLabel(hcp.cohort_classification)}
           </div>
           <div
@@ -658,7 +658,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Score breakdown
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -716,7 +716,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           <>
             {hcp.paymentsByYear && (
               <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
-                <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
                   Engagement Timeline
                 </div>
                 <YearBarChart
@@ -730,7 +730,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             )}
             {hcp.beneficiariesByYear && (
               <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
-                <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
                   Patient Volume
                 </div>
                 <YearBarChart
@@ -745,7 +745,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </>
         ) : (
           <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
-            <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
               Publication timeline
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
@@ -813,7 +813,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Validate this signal
           </div>
 
@@ -885,7 +885,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         {/* RIGHT COLUMN: Metric pills + Field notes */}
         <div className="fm-detail-right">
           <div style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}>
-            <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
               Identification
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontFamily: "monospace" }}>
@@ -955,7 +955,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
         {/* Field notes */}
         <div style={{ padding: "16px 0 24px" }}>
-          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Field notes
           </div>
 
