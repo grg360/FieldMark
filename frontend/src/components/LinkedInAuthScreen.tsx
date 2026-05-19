@@ -90,7 +90,7 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
         <div
           className="fm-auth-logo"
           style={{
-            fontSize: 48,
+            fontSize: 104,
             fontFamily: "monospace",
             fontWeight: 700,
             color: "#E8A020",
@@ -101,11 +101,11 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
         </div>
         <div
           style={{
-            fontSize: 13,
+            fontSize: 23,
             color: "#6B6A65",
             letterSpacing: "0.2em",
             textTransform: "uppercase",
-            marginTop: 6,
+            marginTop: 3,
           }}
         >
           FieldMark
