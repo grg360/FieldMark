@@ -38,12 +38,6 @@ function formatResearchScoreValue(n: number | null | undefined): string | number
   return Number(n).toFixed(1);
 }
 
-function formatCitTrajScoreValue(citTraj: HCP["citTraj"]): string | number {
-  if (citTraj == null || !Number.isFinite(Number(citTraj))) return "—";
-  const n = Number(citTraj);
-  return `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
-}
-
 function citTrajScorePercent(citTraj: HCP["citTraj"]): number {
   if (citTraj == null || !Number.isFinite(Number(citTraj))) return 0;
   return cappedScorePercent(Math.abs(Number(citTraj)));
@@ -480,6 +474,15 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
   const pubVelNumeric = parsePubVelNumeric(hcp.pubVel);
 
+  const citTrajNumeric =
+    hcp.citTraj == null || !Number.isFinite(Number(hcp.citTraj)) ? null : Number(hcp.citTraj);
+  const citTrajDisplay =
+    citTrajNumeric == null
+      ? "—"
+      : citTrajNumeric === 0
+        ? "0.0"
+        : `${citTrajNumeric > 0 ? "+" : ""}${citTrajNumeric.toFixed(1)}`;
+
   const pubTimeline = [
     { year: 2020, value: 2 },
     { year: 2021, value: 3 },
@@ -712,7 +715,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                 />
                 <ScoreRow
                   label="Citation Trajectory"
-                  value={formatCitTrajScoreValue(hcp.citTraj)}
+                  value={citTrajDisplay}
                   percent={citTrajScorePercent(hcp.citTraj)}
                   barColor={cohortBarColor}
                   activeTooltip={activeTooltip}
