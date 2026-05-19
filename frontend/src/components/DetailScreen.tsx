@@ -7,6 +7,24 @@ import ScoreModal from "./ScoreModal";
 
 type DetailHCP = HCP;
 
+const COMMUNITY_MAX_ENGAGEMENT = 8400000;
+const COMMUNITY_MAX_COMPANIES = 82;
+const COMMUNITY_MAX_PATIENTS = 63449;
+const COMMUNITY_MAX_YEARS = 72;
+
+function cohortAccentColor(cohort: string | null | undefined): string {
+  const c = (cohort ?? "").trim();
+  if (c === "rising_star" || c === "dark_horse") return "#9B6DFF";
+  if (c === "established") return "#FFD700";
+  if (c === "community" || c === "workhorse") return "#7B9EBD";
+  return "#E8A020";
+}
+
+function cappedPercent(value: number | null | undefined, max: number): number {
+  if (value == null || !Number.isFinite(value) || max <= 0) return 0;
+  return Math.min(100, (value / max) * 100);
+}
+
 interface DetailScreenProps {
   hcp: DetailHCP;
   onBack: () => void;
@@ -39,13 +57,15 @@ const MetricPill = ({ label, value }: { label: string; value: string | number })
       padding: "10px 12px",
       display: "flex",
       flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
       gap: 4,
     }}
   >
-    <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+    <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center" }}>
       {label}
     </span>
-    <span style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500 }}>{value}</span>
+    <span style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500, textAlign: "center" }}>{value}</span>
   </div>
 );
 
@@ -135,10 +155,18 @@ function DetailHeaderMetrics({
   );
 }
 
-function ScoreRow({ label, value, percent, activeTooltip, onTooltipChange }: {
+function ScoreRow({
+  label,
+  value,
+  percent,
+  barColor = "#E8A020",
+  activeTooltip,
+  onTooltipChange,
+}: {
   label: string;
-  value: number;
+  value: string | number;
   percent: number;
+  barColor?: string;
   activeTooltip: string | null;
   onTooltipChange: (k: string | null) => void;
 }) {
@@ -153,10 +181,10 @@ function ScoreRow({ label, value, percent, activeTooltip, onTooltipChange }: {
         >
           <span style={{ fontSize: 13, color: "#E8E6DF", cursor: "pointer" }}>{label}</span>
         </StatPillWithTooltip>
-        <span style={{ fontSize: 13, color: "#E8A020", fontFamily: "monospace" }}>{value}</span>
+        <span style={{ fontSize: 13, color: barColor, fontFamily: "monospace" }}>{value}</span>
       </div>
       <div style={{ height: 3, backgroundColor: "#1E1E22", borderRadius: 0, overflow: "hidden" }}>
-        <div style={{ height: "100%", backgroundColor: "#E8A020", width: `${percent}%` }} />
+        <div style={{ height: "100%", backgroundColor: barColor, width: `${percent}%` }} />
       </div>
     </div>
   );
@@ -178,10 +206,105 @@ function narrativeSectionLabel(cohort: string | null | undefined): string {
   return "Profile";
 }
 
+const COMMUNITY_TIMELINE_COLOR = "#7B9EBD";
+
+type YearBarPoint = { year: number; value: number | null };
+
+function YearBarChart({
+  bars,
+  activeYear,
+  onActiveYearChange,
+  mobileTimerRef,
+  formatTooltipValue,
+}: {
+  bars: YearBarPoint[];
+  activeYear: number | null;
+  onActiveYearChange: (year: number | null) => void;
+  mobileTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  formatTooltipValue: (value: number) => string;
+}) {
+  const numericValues = bars
+    .map((b) => b.value)
+    .filter((v): v is number => v != null && Number.isFinite(v));
+  const maxValue = Math.max(1, ...numericValues);
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
+      {bars.map((p) => {
+        const isActive = activeYear === p.year;
+        const hasValue = p.value != null && Number.isFinite(p.value);
+        const barHeight = hasValue ? (p.value! / maxValue) * 80 : 2;
+        return (
+          <div
+            key={p.year}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              position: "relative",
+              cursor: hasValue ? "pointer" : "default",
+            }}
+            onMouseEnter={() => (hasValue ? onActiveYearChange(p.year) : undefined)}
+            onMouseLeave={() => onActiveYearChange(null)}
+            onTouchStart={(e) => {
+              if (!hasValue) return;
+              e.preventDefault();
+              if (mobileTimerRef.current) clearTimeout(mobileTimerRef.current);
+              onActiveYearChange(p.year);
+              mobileTimerRef.current = setTimeout(() => onActiveYearChange(null), 2000);
+            }}
+          >
+            {isActive && hasValue && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: `${barHeight + 8 + 16}px`,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  backgroundColor: "#1E1E22",
+                  border: `1px solid ${COMMUNITY_TIMELINE_COLOR}`,
+                  borderRadius: 3,
+                  padding: "4px 8px",
+                  whiteSpace: "nowrap",
+                  pointerEvents: "none",
+                  zIndex: 10,
+                }}
+              >
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6B6A65" }}>
+                  {p.year}
+                </div>
+                <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 500, color: COMMUNITY_TIMELINE_COLOR }}>
+                  {formatTooltipValue(p.value!)}
+                </div>
+              </div>
+            )}
+            <div
+              style={{
+                width: "100%",
+                backgroundColor: hasValue ? COMMUNITY_TIMELINE_COLOR : "#1E1E22",
+                height: `${barHeight}px`,
+                marginBottom: 8,
+              }}
+            />
+            <span style={{ fontSize: 10, color: "#6B6A65", fontFamily: "monospace" }}>{p.year}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
+  const [engagementTooltipYear, setEngagementTooltipYear] = useState<number | null>(null);
+  const [volumeTooltipYear, setVolumeTooltipYear] = useState<number | null>(null);
   const narrative = hcp.narrative || "Narrative generating — check back soon.";
+
+  const isCommunityCohort =
+    hcp.cohort_classification === "community" || hcp.cohort_classification === "workhorse";
+  const cohortBarColor = cohortAccentColor(hcp.cohort_classification);
 
   const pubTimeline = [
     { year: 2020, value: 2 },
@@ -193,6 +316,24 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const maxValue = Math.max(...pubTimeline.map((p) => p.value));
   const [tooltip, setTooltip] = React.useState<number | null>(null);
   const mobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const engagementMobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const volumeMobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const engagementBars: YearBarPoint[] = hcp.paymentsByYear
+    ? [
+        { year: 2022, value: hcp.paymentsByYear.py2022 ?? null },
+        { year: 2023, value: hcp.paymentsByYear.py2023 ?? null },
+        { year: 2024, value: hcp.paymentsByYear.py2024 ?? null },
+      ]
+    : [];
+
+  const volumeBars: YearBarPoint[] = hcp.beneficiariesByYear
+    ? [
+        { year: 2021, value: hcp.beneficiariesByYear.y2021 ?? null },
+        { year: 2022, value: hcp.beneficiariesByYear.y2022 ?? null },
+        { year: 2023, value: hcp.beneficiariesByYear.y2023 ?? null },
+      ]
+    : [];
 
   const [validation, setValidation] = React.useState({
     dataMatch: null as string | null,
@@ -340,24 +481,91 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             Score breakdown
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <ScoreRow label="Publication velocity" value={94} percent={94} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-            <ScoreRow label="Citation trajectory" value={88} percent={88} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-            <ScoreRow label="Trial activity" value={81} percent={81} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-            <ScoreRow label="Career age multiplier" value={76} percent={76} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+            {isCommunityCohort ? (
+              <>
+                <ScoreRow
+                  label="Pharma engagement"
+                  value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)}
+                  percent={cappedPercent(hcp.openPaymentsLifetime, COMMUNITY_MAX_ENGAGEMENT)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+                <ScoreRow
+                  label="Pharma companies"
+                  value={formatIntDisplay(hcp.distinctCompanies ?? null)}
+                  percent={cappedPercent(hcp.distinctCompanies, COMMUNITY_MAX_COMPANIES)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+                {hcp.medicareVolume != null && (
+                  <ScoreRow
+                    label="Patient volume"
+                    value={formatIntDisplay(hcp.medicareVolume)}
+                    percent={cappedPercent(hcp.medicareVolume, COMMUNITY_MAX_PATIENTS)}
+                    barColor={cohortBarColor}
+                    activeTooltip={activeTooltip}
+                    onTooltipChange={setActiveTooltip}
+                  />
+                )}
+                <ScoreRow
+                  label="Years in practice"
+                  value={formatIntDisplay(hcp.careerYears ?? null)}
+                  percent={cappedPercent(hcp.careerYears, COMMUNITY_MAX_YEARS)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+              </>
+            ) : (
+              <>
+                <ScoreRow label="Publication velocity" value={94} percent={94} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow label="Citation trajectory" value={88} percent={88} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow label="Trial activity" value={81} percent={81} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow label="Career age multiplier" value={76} percent={76} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+              </>
+            )}
           </div>
         </div>
 
-        {/* Publication timeline */}
-        <div
-          style={{
-            padding: "16px 16px 12px",
-            borderBottom: "1px solid #1E1E22",
-          }}
-        >
-          <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-            Publication timeline
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
+        {isCommunityCohort ? (
+          <>
+            {hcp.paymentsByYear && (
+              <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
+                <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                  Engagement Timeline
+                </div>
+                <YearBarChart
+                  bars={engagementBars}
+                  activeYear={engagementTooltipYear}
+                  onActiveYearChange={setEngagementTooltipYear}
+                  mobileTimerRef={engagementMobileTimerRef}
+                  formatTooltipValue={(v) => formatEngagementDollar(v)}
+                />
+              </div>
+            )}
+            {hcp.beneficiariesByYear && (
+              <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
+                <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                  Patient Volume
+                </div>
+                <YearBarChart
+                  bars={volumeBars}
+                  activeYear={volumeTooltipYear}
+                  onActiveYearChange={setVolumeTooltipYear}
+                  mobileTimerRef={volumeMobileTimerRef}
+                  formatTooltipValue={(v) => `${formatIntDisplay(v)} beneficiaries`}
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
+            <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+              Publication timeline
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
             {pubTimeline.map((p) => {
               const isActive = tooltip === p.year;
               const barHeight = (p.value / maxValue) * 80;
@@ -383,7 +591,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                         left: "50%",
                         transform: "translateX(-50%)",
                         backgroundColor: "#1E1E22",
-                        border: "1px solid #E8A020",
+                        border: `1px solid ${cohortBarColor}`,
                         borderRadius: 3,
                         padding: "4px 8px",
                         whiteSpace: "nowrap",
@@ -394,7 +602,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6B6A65" }}>
                         {p.year}
                       </div>
-                      <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 500, color: "#E8A020" }}>
+                      <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 500, color: cohortBarColor }}>
                         {p.value} papers
                       </div>
                     </div>
@@ -402,7 +610,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                   <div
                     style={{
                       width: "100%",
-                      backgroundColor: "#E8A020",
+                      backgroundColor: cohortBarColor,
                       height: `${barHeight}px`,
                       marginBottom: 8,
                     }}
@@ -413,6 +621,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             })}
           </div>
         </div>
+        )}
 
         {/* Field validation */}
         <div

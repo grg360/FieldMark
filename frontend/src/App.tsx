@@ -44,6 +44,8 @@ type AppHCP = Omit<UIHCP, "id"> & {
   institutionFull?: string | null;
   npiNumber?: string | null;
   npiSpecialty?: string | null;
+  paymentsByYear?: UIHCP["paymentsByYear"];
+  beneficiariesByYear?: UIHCP["beneficiariesByYear"];
 };
 
 const FEED_PAGE_SIZE = 20;
@@ -143,6 +145,8 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     institutionFull: item.institution_full ?? null,
     npiNumber: item.npi_number ?? null,
     npiSpecialty: item.npi_specialty ?? null,
+    paymentsByYear: item.paymentsByYear ?? null,
+    beneficiariesByYear: item.beneficiariesByYear ?? null,
   };
 }
 

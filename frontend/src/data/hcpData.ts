@@ -31,6 +31,16 @@ export interface HCP {
   institutionFull?: string | null;
   npiNumber?: string | null;
   npiSpecialty?: string | null;
+  paymentsByYear?: {
+    py2022?: number | null;
+    py2023?: number | null;
+    py2024?: number | null;
+  } | null;
+  beneficiariesByYear?: {
+    y2021?: number | null;
+    y2022?: number | null;
+    y2023?: number | null;
+  } | null;
 }
 
 export const hcpData: HCP[] = [

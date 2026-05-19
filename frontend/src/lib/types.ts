@@ -29,6 +29,16 @@ export interface HCP {
   open_payments_lifetime?: number | null;
   /** From hcps.total_career_pubs when loaded (e.g. Established PUBS pill). */
   total_career_pubs?: number | null;
+  paymentsByYear?: {
+    py2022?: number | null;
+    py2023?: number | null;
+    py2024?: number | null;
+  } | null;
+  beneficiariesByYear?: {
+    y2021?: number | null;
+    y2022?: number | null;
+    y2023?: number | null;
+  } | null;
 }
 
 export interface HCPScore {

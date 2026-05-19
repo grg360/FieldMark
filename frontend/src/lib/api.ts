@@ -61,6 +61,28 @@ function parseOptionalNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function mapPaymentsByYear(
+  pay: Record<string, unknown> | null | undefined,
+): HCP["paymentsByYear"] {
+  if (!pay) return null;
+  const py2022 = parseOptionalNumber(pay.py2022_total);
+  const py2023 = parseOptionalNumber(pay.py2023_total);
+  const py2024 = parseOptionalNumber(pay.py2024_total);
+  if (py2022 == null && py2023 == null && py2024 == null) return null;
+  return { py2022, py2023, py2024 };
+}
+
+function mapBeneficiariesByYear(
+  med: Record<string, unknown> | null | undefined,
+): HCP["beneficiariesByYear"] {
+  if (!med) return null;
+  const y2021 = parseOptionalNumber(med.beneficiaries_2021);
+  const y2022 = parseOptionalNumber(med.beneficiaries_2022);
+  const y2023 = parseOptionalNumber(med.beneficiaries_2023);
+  if (y2021 == null && y2022 == null && y2023 == null) return null;
+  return { y2021, y2022, y2023 };
+}
+
 function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
   const hcp = row.hcps ?? {};
   const med = firstEmbedded(hcp.hcp_medicare_summary ?? row.hcp_medicare_summary);
@@ -134,6 +156,8 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     career_years: parseOptionalNumber(hcp.nppes_career_stage_years ?? row.nppes_career_stage_years),
     total_career_pubs: parseOptionalNumber(hcp.total_career_pubs ?? row.total_career_pubs),
     cohort_score: parseOptionalNumber(hcp.cohort_score ?? row.cohort_score),
+    paymentsByYear: mapPaymentsByYear(pay as Record<string, unknown> | undefined),
+    beneficiariesByYear: mapBeneficiariesByYear(med as Record<string, unknown> | undefined),
   };
 }
 
@@ -732,11 +756,17 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
           npi_specialty,
           total_career_pubs,
           hcp_medicare_summary (
-            total_beneficiaries_3yr_unique_est
+            total_beneficiaries_3yr_unique_est,
+            beneficiaries_2021,
+            beneficiaries_2022,
+            beneficiaries_2023
           ),
           hcp_open_payments_summary (
             distinct_companies_lifetime,
-            total_payments_lifetime
+            total_payments_lifetime,
+            py2022_total,
+            py2023_total,
+            py2024_total
           )
         )
       `,
