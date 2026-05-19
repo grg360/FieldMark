@@ -816,38 +816,38 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8 }}>Community confidence</div>
+            <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8 }}>Community Confidence</div>
             <div style={{ height: 6, backgroundColor: "#1E1E22", borderRadius: 0, marginBottom: 8 }}>
-              <div style={{ height: "100%", backgroundColor: cohortBarColor, width: "73%" }} />
+              <div style={{ height: "100%", backgroundColor: cohortBarColor, width: "0%" }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 13, color: cohortBarColor, fontFamily: "monospace" }}>73%</span>
-              <span style={{ fontSize: 11, color: "#6B6A65" }}>41 MSLs</span>
+              <span style={{ fontSize: 13, color: cohortBarColor, fontFamily: "monospace" }}>0%</span>
+              <span style={{ fontSize: 11, color: "#6B6A65" }}>0 MSLs</span>
             </div>
           </div>
 
           {/* Validation buttons */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
             <ValidationField
-              label="Data matches field reality"
+              label="Data Matches Field Reality"
               options={["Confirms", "Partial", "Disputes"]}
               selected={validation.dataMatch}
               onSelect={(val) => setValidation({ ...validation, dataMatch: val })}
             />
             <ValidationField
-              label="Engagement potential"
+              label="Engagement Potential"
               options={["High", "Moderate", "Low"]}
               selected={validation.engagement}
               onSelect={(val) => setValidation({ ...validation, engagement: val })}
             />
             <ValidationField
-              label="Scientific credibility"
+              label="Scientific Credibility"
               options={["Strong", "Moderate", "Early"]}
               selected={validation.credibility}
               onSelect={(val) => setValidation({ ...validation, credibility: val })}
             />
             <ValidationField
-              label="Momentum trajectory"
+              label="Momentum Trajectory"
               options={["Accelerating", "Steady", "Plateauing"]}
               selected={validation.momentum}
               onSelect={(val) => setValidation({ ...validation, momentum: val })}
@@ -1011,7 +1011,7 @@ function ValidationField({
   label: string;
   options: string[];
   selected: string | null;
-  onSelect: (val: string) => void;
+  onSelect: (val: string | null) => void;
 }) {
   return (
     <div>
@@ -1042,7 +1042,7 @@ function ValidationField({
           return (
             <button
               key={opt}
-              onClick={() => onSelect(opt)}
+              onClick={() => onSelect(selected === opt ? null : opt)}
               style={{
                 flex: 1,
                 backgroundColor: bgColor,
