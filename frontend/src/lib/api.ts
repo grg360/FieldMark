@@ -276,21 +276,24 @@ export async function getRisingStars(
     let countQuery;
     let listQuery;
     if (cohort === "rising_star") {
-      countQuery = countBase().eq("cohort_classification", "rising_star");
+      countQuery = countBase().eq("cohort_classification", "rising_star").eq("country", "USA");
       listQuery = listBase()
         .eq("cohort_classification", "rising_star")
+        .eq("country", "USA")
         .order("cohort_score", { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1);
     } else if (cohort === "community") {
+      // Community requires NPI (US-only); no country filter needed here.
       countQuery = countBase().eq("cohort_classification", "community");
       listQuery = listBaseViaHTA()
         .eq("cohort_classification", "community")
         .order("cohort_score", { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1);
     } else {
-      countQuery = countBase().eq("cohort_classification", "established");
+      countQuery = countBase().eq("cohort_classification", "established").eq("country", "USA");
       listQuery = listBase()
         .eq("cohort_classification", "established")
+        .eq("country", "USA")
         .order("cohort_score", { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1);
     }
