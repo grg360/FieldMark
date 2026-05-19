@@ -47,6 +47,8 @@ export type BuildSublineHcp = {
   institution?: string | null;
   institutionShort?: string | null;
   institution_short?: string | null;
+  institutionFull?: string | null;
+  institution_full?: string | null;
   nppesPracticeCity?: string | null;
   nppesPracticeState?: string | null;
   nppesPracticeSetting?: string | null;
@@ -59,7 +61,7 @@ function norm(s: string | null | undefined): string {
   return String(s ?? "").trim();
 }
 
-function titleCaseCity(city: string): string {
+export function titleCaseCity(city: string): string {
   const t = city.trim();
   if (!t) return "";
   return t
@@ -119,6 +121,7 @@ function practiceSettingLabel(settingRaw: string): string | null {
  * always appending City, State when available.
  */
 export function buildSubline(hcp: BuildSublineHcp): string {
+  const institutionFull = norm(hcp.institutionFull ?? hcp.institution_full);
   const rawShort = norm(hcp.institutionShort ?? hcp.institution_short);
   const legacy = norm(hcp.institution);
   const affil = rawShort || legacy;
@@ -128,6 +131,11 @@ export function buildSubline(hcp: BuildSublineHcp): string {
   const settingRaw = norm(hcp.nppesPracticeSetting ?? hcp.nppes_practice_setting);
 
   const { locationPart } = formatCityState(city, state);
+
+  if (institutionFull) {
+    if (locationPart) return `${institutionFull} · ${locationPart}`;
+    return institutionFull;
+  }
 
   if (!locationPart) {
     if (affil) return affil;

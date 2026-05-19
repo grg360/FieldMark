@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatTopPercentileLabel } from "../lib/cohort-metrics";
-import { buildSubline } from "../lib/subline";
+import { buildSubline, titleCaseCity } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
@@ -492,6 +492,62 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
         {/* RIGHT COLUMN: Metric pills + Field notes */}
         <div className="fm-detail-right">
+          <div style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}>
+            <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+              Identification
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontFamily: "monospace" }}>
+              {hcp.npiNumber && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6B6A65" }}>NPI</span>
+                  <span style={{ color: "#E8E6DF" }}>{hcp.npiNumber}</span>
+                </div>
+              )}
+              {(hcp.nppesPracticeAddress || hcp.nppesPracticeCity) && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{ color: "#6B6A65" }}>Address</span>
+                  <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>
+                    {hcp.nppesPracticeAddress && <div>{hcp.nppesPracticeAddress}</div>}
+                    {hcp.nppesPracticeCity && (
+                      <div>
+                        {titleCaseCity(hcp.nppesPracticeCity)}
+                        {hcp.nppesPracticeState ? `, ${hcp.nppesPracticeState.trim().toUpperCase()}` : ""}
+                        {hcp.nppesPracticeZip ? ` ${hcp.nppesPracticeZip.trim()}` : ""}
+                      </div>
+                    )}
+                  </span>
+                </div>
+              )}
+              {hcp.npiSpecialty && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{ color: "#6B6A65", flexShrink: 0 }}>Specialty</span>
+                  <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{hcp.npiSpecialty}</span>
+                </div>
+              )}
+            </div>
+            {hcp.npiNumber && (
+              <a
+                href={`https://npiregistry.cms.hhs.gov/provider-view/${hcp.npiNumber}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "block",
+                  marginTop: 12,
+                  padding: "8px 12px",
+                  backgroundColor: "transparent",
+                  border: "1px solid #1E1E22",
+                  color: "#6B6A65",
+                  fontSize: 12,
+                  textDecoration: "none",
+                  textAlign: "center",
+                  borderRadius: 4,
+                }}
+              >
+                View on NPI Registry →
+              </a>
+            )}
+          </div>
+
           {/* Metric pills: visible on tablet only */}
           <div className="fm-detail-metric-pills-tablet" style={{ display: "none", marginBottom: 16 }}>
             <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />

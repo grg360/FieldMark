@@ -21,7 +21,7 @@ import ScoringExplainedModal, {
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
 import type { FeedCohort } from "./lib/api";
-import { getRisingStars, getTACounts } from "./lib/api";
+import { getHCPDetail, getRisingStars, getTACounts } from "./lib/api";
 import { TrackProvider, useTrack, type Track } from "./lib/TrackContext";
 import type { RisingStar, TACounts } from "./lib/types";
 
@@ -39,6 +39,11 @@ type AppHCP = Omit<UIHCP, "id"> & {
   nppesPracticeCity?: string | null;
   nppesPracticeState?: string | null;
   nppesPracticeSetting?: string | null;
+  nppesPracticeAddress?: string | null;
+  nppesPracticeZip?: string | null;
+  institutionFull?: string | null;
+  npiNumber?: string | null;
+  npiSpecialty?: string | null;
 };
 
 const FEED_PAGE_SIZE = 20;
@@ -65,6 +70,11 @@ const EMPTY_HCP: AppHCP = {
   nppesPracticeCity: null,
   nppesPracticeState: null,
   nppesPracticeSetting: null,
+  nppesPracticeAddress: null,
+  nppesPracticeZip: null,
+  institutionFull: null,
+  npiNumber: null,
+  npiSpecialty: null,
 };
 
 function getTASlug(ta: string): string {
@@ -128,6 +138,11 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     nppesPracticeCity: item.nppes_practice_city ?? null,
     nppesPracticeState: item.nppes_practice_state ?? null,
     nppesPracticeSetting: item.nppes_practice_setting ?? null,
+    nppesPracticeAddress: item.nppes_practice_address ?? null,
+    nppesPracticeZip: item.nppes_practice_zip ?? null,
+    institutionFull: item.institution_full ?? null,
+    npiNumber: item.npi_number ?? null,
+    npiSpecialty: item.npi_specialty ?? null,
   };
 }
 
@@ -162,6 +177,23 @@ function AppContent() {
     setScoringExplainedOpen(false);
     setScoringExplainedScroll(null);
   }, [currentScreen]);
+
+  useEffect(() => {
+    if (currentScreen !== "detail") return;
+    const hcpId = detailHCP.id || detailHCP.hcp_id;
+    if (!hcpId) return;
+
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await getHCPDetail(hcpId);
+      if (cancelled || error || !data) return;
+      setDetailHCP(mapRisingStarToHCP(data));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentScreen, detailHCP.id, detailHCP.hcp_id]);
 
   useEffect(() => {
     if (currentScreen !== "feed") {

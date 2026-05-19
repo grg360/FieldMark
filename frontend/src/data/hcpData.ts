@@ -26,6 +26,11 @@ export interface HCP {
   nppesPracticeCity?: string | null;
   nppesPracticeState?: string | null;
   nppesPracticeSetting?: string | null;
+  nppesPracticeAddress?: string | null;
+  nppesPracticeZip?: string | null;
+  institutionFull?: string | null;
+  npiNumber?: string | null;
+  npiSpecialty?: string | null;
 }
 
 export const hcpData: HCP[] = [

@@ -7,6 +7,11 @@ export interface HCP {
   nppes_practice_city?: string | null;
   nppes_practice_state?: string | null;
   nppes_practice_setting?: string | null;
+  nppes_practice_address?: string | null;
+  nppes_practice_zip?: string | null;
+  institution_full?: string | null;
+  npi_number?: string | null;
+  npi_specialty?: string | null;
   country: string;
   therapeutic_area: string;
   narrative?: string | null;

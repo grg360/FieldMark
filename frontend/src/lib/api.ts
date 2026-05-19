@@ -87,6 +87,26 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
       hcp.nppes_practice_setting != null && String(hcp.nppes_practice_setting).trim() !== ""
         ? String(hcp.nppes_practice_setting)
         : null,
+    nppes_practice_address:
+      hcp.nppes_practice_address != null && String(hcp.nppes_practice_address).trim() !== ""
+        ? String(hcp.nppes_practice_address)
+        : null,
+    nppes_practice_zip:
+      hcp.nppes_practice_zip != null && String(hcp.nppes_practice_zip).trim() !== ""
+        ? String(hcp.nppes_practice_zip)
+        : null,
+    institution_full:
+      hcp.institution_full != null && String(hcp.institution_full).trim() !== ""
+        ? String(hcp.institution_full)
+        : null,
+    npi_number:
+      hcp.npi_number != null && String(hcp.npi_number).trim() !== ""
+        ? String(hcp.npi_number)
+        : null,
+    npi_specialty:
+      hcp.npi_specialty != null && String(hcp.npi_specialty).trim() !== ""
+        ? String(hcp.npi_specialty)
+        : null,
     country: String(hcp.country ?? ""),
     therapeutic_area: String(
       hcp.therapeutic_area ?? therapeuticArea,
@@ -703,6 +723,7 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
           last_name,
           institution,
           institution_short,
+          institution_full,
           country,
           therapeutic_area,
           cohort_classification,
@@ -710,7 +731,11 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
           nppes_career_stage_years,
           nppes_practice_city,
           nppes_practice_state,
+          nppes_practice_zip,
+          nppes_practice_address,
           nppes_practice_setting,
+          npi_number,
+          npi_specialty,
           total_career_pubs,
           hcp_medicare_summary (
             total_beneficiaries_3yr_unique_est
