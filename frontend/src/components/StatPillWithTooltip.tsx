@@ -26,17 +26,49 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Publication velocity",
     body: "Publication velocity measures how prolifically this HCP is publishing recently, expressed as a multiple of the field's typical pace for their specialty and career stage. A value of 3.0x means publishing three times as fast as peers.",
   },
+  "Publication Velocity": {
+    title: "Publication Velocity",
+    body: "Publication velocity measures how prolifically this HCP is publishing recently, expressed as a multiple of the field's typical pace for their specialty and career stage. A value of 3.0x means publishing three times as fast as peers.",
+  },
   "Citation trajectory": {
     title: "Citation trajectory",
+    body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
+  },
+  "Citation Trajectory": {
+    title: "Citation Trajectory",
     body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
   },
   "Trial activity": {
     title: "Trial activity",
     body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
   },
+  "Trial Activity": {
+    title: "Trial Activity",
+    body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
+  },
   "Career age multiplier": {
     title: "Career age multiplier",
     body: "Boosts scores for researchers earlier in their career. A rising star 4 years post-training outranks an equivalent researcher 20 years in — same output from a younger career is a stronger signal.",
+  },
+  "Career Age Multiplier": {
+    title: "Career Age Multiplier",
+    body: "Boosts scores for researchers earlier in their career. A rising star 4 years post-training outranks an equivalent researcher 20 years in — same output from a younger career is a stronger signal.",
+  },
+  "Pharma Engagement": {
+    title: "Pharma Engagement",
+    body: "Total pharma engagement (consulting, speaking, honoraria, food, travel) over the HCP's lifetime as reported under the Sunshine Act.",
+  },
+  "Pharma Companies": {
+    title: "Pharma Companies",
+    body: "Count of distinct manufacturers that reported Open Payments to this HCP over their lifetime in the program. A higher count usually indicates broader industry engagement.",
+  },
+  "Patient Volume": {
+    title: "Patient Volume",
+    body: "Unique Medicare beneficiaries seen over the most recent 3-year window. A practice-scale signal derived from CMS Medicare Part B data.",
+  },
+  "Years in Practice": {
+    title: "Years in Practice",
+    body: "Years in practice derived from NPPES career-stage signals when available. Used as a lightweight experience proxy for community cohort HCPs.",
   },
   Followers: {
     title: "Followers",

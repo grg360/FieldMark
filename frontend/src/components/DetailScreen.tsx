@@ -69,6 +69,31 @@ const MetricPill = ({ label, value }: { label: string; value: string | number })
   </div>
 );
 
+function CohortScorePill({ value }: { value: string | number }) {
+  return (
+    <div
+      style={{
+        backgroundColor: "#0D0D10",
+        border: "1px solid #1E1E22",
+        borderRadius: 4,
+        padding: "16px 12px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+      }}
+    >
+      <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center" }}>
+        Cohort score
+      </span>
+      <span style={{ fontSize: 28, color: "#FFB84D", fontFamily: "monospace", fontWeight: 700, textAlign: "center" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function detailCitTrajDisplay(citTraj: HCP["citTraj"]): string {
   return citTraj == null ? "—" : `${Number(citTraj) >= 0 ? "+" : ""}${Number(citTraj)}%`;
 }
@@ -85,16 +110,7 @@ function DetailHeaderMetrics({
     formatTopPercentileLabel(hcp.normalizedScore ?? 0) ?? hcp.score.toFixed(1);
 
   if (cohort === "community" || cohort === "workhorse") {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <MetricPill label="Cohort score" value={formatCohortScore(hcp.cohortScore ?? null)} />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          <MetricPill label="Engagement" value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)} />
-          <MetricPill label="Companies" value={formatIntDisplay(hcp.distinctCompanies ?? null)} />
-          <MetricPill label="Years (NPPES)" value={formatIntDisplay(hcp.careerYears ?? null)} />
-        </div>
-      </div>
-    );
+    return <CohortScorePill value={formatCohortScore(hcp.cohortScore ?? null)} />;
   }
 
   if (cohort === "established") {
@@ -394,10 +410,12 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
             {buildSubline(hcp)}
           </div>
-          {/* Metric pills: hidden on tablet (shown in right column instead) */}
-          <div className="fm-detail-metric-pills-mobile" style={{ display: "block" }}>
-            <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
-          </div>
+          {/* Metric pills: hidden on tablet (shown in right column instead); community cohort score lives in right column */}
+          {!isCommunityCohort && (
+            <div className="fm-detail-metric-pills-mobile" style={{ display: "block" }}>
+              <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
+            </div>
+          )}
         </div>
 
         {/* Dark Horse callout */}
@@ -459,7 +477,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </div>
           <div
             style={{
-              borderLeft: "3px solid #E8A020",
+              borderLeft: `3px solid ${cohortBarColor}`,
               paddingLeft: 12,
               fontSize: 14,
               color: "#B8B4AC",
@@ -484,7 +502,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             {isCommunityCohort ? (
               <>
                 <ScoreRow
-                  label="Pharma engagement"
+                  label="Pharma Engagement"
                   value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)}
                   percent={cappedPercent(hcp.openPaymentsLifetime, COMMUNITY_MAX_ENGAGEMENT)}
                   barColor={cohortBarColor}
@@ -492,7 +510,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                   onTooltipChange={setActiveTooltip}
                 />
                 <ScoreRow
-                  label="Pharma companies"
+                  label="Pharma Companies"
                   value={formatIntDisplay(hcp.distinctCompanies ?? null)}
                   percent={cappedPercent(hcp.distinctCompanies, COMMUNITY_MAX_COMPANIES)}
                   barColor={cohortBarColor}
@@ -501,7 +519,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                 />
                 {hcp.medicareVolume != null && (
                   <ScoreRow
-                    label="Patient volume"
+                    label="Patient Volume"
                     value={formatIntDisplay(hcp.medicareVolume)}
                     percent={cappedPercent(hcp.medicareVolume, COMMUNITY_MAX_PATIENTS)}
                     barColor={cohortBarColor}
@@ -510,7 +528,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                   />
                 )}
                 <ScoreRow
-                  label="Years in practice"
+                  label="Years in Practice"
                   value={formatIntDisplay(hcp.careerYears ?? null)}
                   percent={cappedPercent(hcp.careerYears, COMMUNITY_MAX_YEARS)}
                   barColor={cohortBarColor}
@@ -520,10 +538,10 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
               </>
             ) : (
               <>
-                <ScoreRow label="Publication velocity" value={94} percent={94} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-                <ScoreRow label="Citation trajectory" value={88} percent={88} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-                <ScoreRow label="Trial activity" value={81} percent={81} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
-                <ScoreRow label="Career age multiplier" value={76} percent={76} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow label="Publication Velocity" value={94} percent={94} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow label="Citation Trajectory" value={88} percent={88} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow label="Trial Activity" value={81} percent={81} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
+                <ScoreRow label="Career Age Multiplier" value={76} percent={76} barColor={cohortBarColor} activeTooltip={activeTooltip} onTooltipChange={setActiveTooltip} />
               </>
             )}
           </div>
@@ -637,10 +655,10 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8 }}>Community confidence</div>
             <div style={{ height: 6, backgroundColor: "#1E1E22", borderRadius: 0, marginBottom: 8 }}>
-              <div style={{ height: "100%", backgroundColor: "#1D9E75", width: "73%" }} />
+              <div style={{ height: "100%", backgroundColor: cohortBarColor, width: "73%" }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 13, color: "#1D9E75", fontFamily: "monospace" }}>73%</span>
+              <span style={{ fontSize: 13, color: cohortBarColor, fontFamily: "monospace" }}>73%</span>
               <span style={{ fontSize: 11, color: "#6B6A65" }}>41 MSLs</span>
             </div>
           </div>
@@ -757,10 +775,18 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             )}
           </div>
 
-          {/* Metric pills: visible on tablet only */}
-          <div className="fm-detail-metric-pills-tablet" style={{ display: "none", marginBottom: 16 }}>
-            <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
-          </div>
+          {isCommunityCohort && (
+            <div style={{ marginBottom: 16 }}>
+              <CohortScorePill value={formatCohortScore(hcp.cohortScore ?? null)} />
+            </div>
+          )}
+
+          {/* Metric pills: visible on tablet only (non-community) */}
+          {!isCommunityCohort && (
+            <div className="fm-detail-metric-pills-tablet" style={{ display: "none", marginBottom: 16 }}>
+              <DetailHeaderMetrics hcp={hcp} onScorePress={() => setScoreModalOpen(true)} />
+            </div>
+          )}
 
         {/* Field notes */}
         <div style={{ padding: "16px 0 24px" }}>
@@ -774,34 +800,11 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
               border: "1px solid #1E1E22",
               borderRadius: 4,
               padding: 12,
-              marginBottom: 8,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 11, color: "#6B6A65" }}>
-              <span>MSL · Rare Disease · Northeast</span>
-              <span style={{ color: "#3A3A3F" }}>Mar 2025</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5 }}>
-              Interaction type: Conference presentation. Evidence: Strong signal. Presented unprompted to 40+ attendees at NORD 2025,
-              fielded questions from 3 senior KOLs.
-            </div>
-          </div>
-
-          <div
-            style={{
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              borderRadius: 4,
-              padding: 12,
               marginBottom: 16,
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 11, color: "#6B6A65" }}>
-              <span>MSL · Rare Disease · Northeast</span>
-              <span style={{ color: "#3A3A3F" }}>Feb 2025</span>
-            </div>
             <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5 }}>
-              Interaction type: Peer nomination. Evidence: Strong signal. Named specifically by Dr. Chen at MGH as 'the person to watch in lysosomal storage' — unsolicited.
+              Crowdsourced MSL intelligence — coming Q3 2026
             </div>
           </div>
 
