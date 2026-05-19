@@ -328,7 +328,25 @@ function buildEngagementMixSlices(mix: HCP["engagementMix"]): EngagementMixSlice
   });
 }
 
-function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
+function countNonZeroEngagementTypes(mix: HCP["engagementMix"]): number {
+  if (!mix) return 0;
+  return Object.values(mix).filter((v) => v != null && v > 0).length;
+}
+
+const ENGAGEMENT_MIX_SECTION_STYLE: React.CSSProperties = {
+  padding: "12px 16px 8px",
+  borderBottom: "1px solid #1E1E22",
+};
+
+function EngagementMixHeader() {
+  return (
+    <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+      Engagement Mix
+    </div>
+  );
+}
+
+function EngagementMixDonutSection({ slices }: { slices: EngagementMixSlice[] }) {
   const size = 140;
   const cx = size / 2;
   const cy = size / 2;
@@ -336,10 +354,8 @@ function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
   const rInner = 23;
 
   return (
-    <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #1E1E22" }}>
-      <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-        Engagement Mix
-      </div>
+    <div style={ENGAGEMENT_MIX_SECTION_STYLE}>
+      <EngagementMixHeader />
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
           {slices.map((slice) => (
@@ -387,6 +403,71 @@ function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
   );
 }
 
+function EngagementMixBlock({
+  mix,
+  cohortClassification,
+}: {
+  mix: HCP["engagementMix"];
+  cohortClassification: string | null | undefined;
+}) {
+  const nonZeroCount = countNonZeroEngagementTypes(mix);
+  const cohort = (cohortClassification ?? "").trim();
+  const isResearchCohort =
+    cohort === "rising_star" || cohort === "dark_horse" || cohort === "established";
+  const noteColor = isResearchCohort ? cohortAccentColor(cohortClassification) : "#6B6A65";
+  const slices = buildEngagementMixSlices(mix);
+
+  if (nonZeroCount >= 3) {
+    return <EngagementMixDonutSection slices={slices} />;
+  }
+
+  if (nonZeroCount >= 1) {
+    return (
+      <div style={ENGAGEMENT_MIX_SECTION_STYLE}>
+        <EngagementMixHeader />
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {slices.map((slice) => (
+            <div key={slice.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 2,
+                  backgroundColor: slice.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.4 }}>
+                {slice.percent}% {slice.label} ·{" "}
+                <span style={{ fontFamily: "monospace" }}>{formatEngagementDollar(slice.value)}</span>
+              </span>
+            </div>
+          ))}
+          <p style={{ fontSize: 12, fontStyle: "italic", color: noteColor, margin: "4px 0 0", lineHeight: 1.4 }}>
+            {isResearchCohort
+              ? "Sparse engagement footprint — potential greenfield for early MSL outreach."
+              : "Limited industry engagement reported."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={ENGAGEMENT_MIX_SECTION_STYLE}>
+      <EngagementMixHeader />
+      <p style={{ fontSize: 14, color: "#E8E6DF", margin: "0 0 8px", lineHeight: 1.4 }}>
+        No reported industry engagement
+      </p>
+      <p style={{ fontSize: 12, fontStyle: "italic", color: noteColor, margin: 0, lineHeight: 1.4 }}>
+        {isResearchCohort
+          ? "No Open Payments record in CMS database. Greenfield for first-mover MSL relationships."
+          : "No Open Payments record. This HCP may operate outside typical industry engagement channels."}
+      </p>
+    </div>
+  );
+}
+
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [engagementTooltipYear, setEngagementTooltipYear] = useState<number | null>(null);
@@ -427,8 +508,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         { year: 2023, value: hcp.beneficiariesByYear.y2023 ?? null },
       ]
     : [];
-
-  const engagementMixSlices = buildEngagementMixSlices(hcp.engagementMix);
 
   const [validation, setValidation] = React.useState({
     dataMatch: null as string | null,
@@ -652,7 +731,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </div>
         </div>
 
-        {engagementMixSlices.length > 0 && <EngagementMixSection slices={engagementMixSlices} />}
+        <EngagementMixBlock mix={hcp.engagementMix} cohortClassification={hcp.cohort_classification} />
 
         {isCommunityCohort ? (
           <>
