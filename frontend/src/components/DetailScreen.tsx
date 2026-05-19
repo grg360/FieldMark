@@ -162,6 +162,22 @@ function ScoreRow({ label, value, percent, activeTooltip, onTooltipChange }: {
   );
 }
 
+function backLinkLabel(cohort: string | null | undefined): string {
+  const c = (cohort ?? "").trim();
+  if (c === "established") return "Established";
+  if (c === "community" || c === "workhorse") return "Community";
+  if (c === "rising_star" || c === "dark_horse") return "Rising stars";
+  return "Back";
+}
+
+function narrativeSectionLabel(cohort: string | null | undefined): string {
+  const c = (cohort ?? "").trim();
+  if (c === "established") return "Why this expert";
+  if (c === "community" || c === "workhorse") return "Why this practitioner";
+  if (c === "rising_star" || c === "dark_horse") return "Why rising star";
+  return "Profile";
+}
+
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
@@ -216,7 +232,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           }}
         >
           <BackArrow />
-          <span style={{ fontSize: 15, color: "#6B6A65" }}>Rising stars</span>
+          <span style={{ fontSize: 15, color: "#6B6A65" }}>{backLinkLabel(hcp.cohort_classification)}</span>
         </button>
         <button style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <ShareIcon />
@@ -298,7 +314,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           }}
         >
           <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-            Why rising star
+            {narrativeSectionLabel(hcp.cohort_classification)}
           </div>
           <div
             style={{
