@@ -501,14 +501,15 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
         {/* Row 4: Stat pills (cohort_classification-driven) */}
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           {statPillKeys.map((key) => (
-            <StatPillWithTooltip
-              key={key}
-              label={key}
-              value={statValueForKey(hcp, effectiveCohort, key)}
-              tooltipKey={key}
-              activeTooltip={activeTooltip}
-              onTooltipChange={setActiveTooltip}
-            />
+            <div key={key} style={{ flex: 1, minWidth: 0 }}>
+              <StatPillWithTooltip
+                label={key}
+                value={statValueForKey(hcp, effectiveCohort, key)}
+                tooltipKey={key}
+                activeTooltip={activeTooltip}
+                onTooltipChange={setActiveTooltip}
+              />
+            </div>
           ))}
         </div>
 

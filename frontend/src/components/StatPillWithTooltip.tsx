@@ -55,7 +55,7 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     body: "The hashtag where FieldMark first captured this account. Indicates which conversation surfaced them. Accounts captured on conference hashtags (#ASCO26, #EASL26) and persistent community hashtags (#LCSM, #livertwitter) are weighted equally.",
   },
   ENGAGEMENT: {
-    title: "Pharma engagement",
+    title: "Pharma Engagement",
     body: "Total pharma engagement (consulting, speaking, honoraria, food, travel) over the HCP's lifetime as reported under the Sunshine Act.",
   },
   VOLUME: {
@@ -63,11 +63,11 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     body: "Estimated distinct Medicare beneficiaries served across recent program years (de-duplicated across HCPCS), from CMS utilization data. Higher values indicate broader practice reach.",
   },
   COMPANIES: {
-    title: "Pharma companies",
+    title: "Pharma Companies",
     body: "Count of distinct manufacturers that reported Open Payments to this HCP over their lifetime in the program. A higher count usually indicates broader industry engagement.",
   },
   YEARS: {
-    title: "Career stage (years)",
+    title: "Career Stage",
     body: "Years in practice derived from NPPES career-stage signals when available. Used as a lightweight experience proxy for community cohort HCPs.",
   },
   PUBS: {
@@ -168,7 +168,7 @@ export function StatPillWithTooltip({
         onClick={handleClick}
         onMouseEnter={() => onTooltipChange(tooltipKey)}
         onMouseLeave={() => onTooltipChange(null)}
-        style={{ display: "inline-block", cursor: "pointer", position: "relative" }}
+        style={{ display: "block", width: "100%", cursor: "pointer", position: "relative" }}
       >
         {children ?? (
           <div
@@ -179,13 +179,37 @@ export function StatPillWithTooltip({
               padding: "4px 8px",
               display: "flex",
               flexDirection: "column",
+              alignItems: "center",
               gap: 2,
+              width: "100%",
+              boxSizing: "border-box",
+              textAlign: "center",
             }}
           >
-            <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <span
+              className="fm-stat-label"
+              style={{
+                fontSize: 12,
+                color: "#6B6A65",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                textAlign: "center",
+                width: "100%",
+              }}
+            >
               {label}
             </span>
-            <span style={{ fontSize: 14, color: "#E8E6DF", fontFamily: "monospace", fontWeight: 500 }}>
+            <span
+              className="fm-stat-value"
+              style={{
+                fontSize: 14,
+                color: "#E8E6DF",
+                fontFamily: "monospace",
+                fontWeight: 500,
+                textAlign: "center",
+                width: "100%",
+              }}
+            >
               {value}
             </span>
           </div>
