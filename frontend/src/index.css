@@ -48,6 +48,21 @@ button {
   appearance: none;
 }
 
+/* HCP card add control: anchored bottom-right; exempt from global tap-target min-height */
+.fm-hcp-card {
+  position: relative;
+}
+
+.fm-hcp-add-btn {
+  position: absolute !important;
+  bottom: 12px !important;
+  right: 12px !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  z-index: 2;
+}
+
 /* ─── Tablet layout (≥600px) ─────────────────────────────────────────── */
 @media (min-width: 600px) {
 
@@ -276,6 +291,10 @@ button {
   /* ── General: minimum tap target ── */
   button {
     min-height: 44px;
+  }
+
+  .fm-hcp-add-btn {
+    min-height: 0 !important;
   }
 }
 

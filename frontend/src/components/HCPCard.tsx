@@ -400,6 +400,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   return (
     <>
       <div
+        className="fm-hcp-card"
         onClick={handleCardClick}
         style={{
           position: "relative",
@@ -408,7 +409,8 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           borderLeft: `3px solid ${accentColor}`,
           borderRadius: 4,
           margin: "0 16px 8px",
-          padding: "12px 12px 36px 12px",
+          padding: "12px",
+          paddingBottom: 40,
           cursor: "pointer",
         }}
       >
@@ -515,6 +517,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
 
         <button
           type="button"
+          className="fm-hcp-add-btn"
           onClick={(e) => {
             e.stopPropagation();
             onAddPress(hcp);
@@ -524,10 +527,12 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           aria-label={`Add action for ${hcp.name}`}
           style={{
             position: "absolute",
-            bottom: 8,
-            right: 8,
+            bottom: 12,
+            right: 12,
             width: 20,
             height: 20,
+            minHeight: 0,
+            minWidth: 20,
             borderRadius: "50%",
             border: "none",
             background: "transparent",
@@ -537,6 +542,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
+            zIndex: 2,
             transform: addButtonHovered ? "scale(1.05)" : "scale(1)",
             transition: "transform 0.15s ease",
           }}
