@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 interface TopBarProps {
   onLogoPress?: () => void;
   onSearchPress?: () => void;
@@ -15,6 +17,8 @@ export default function TopBar({
   onScoringExplainedPress,
   refreshing,
 }: TopBarProps) {
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
   return (
     <div
       className="fm-topbar flex items-center justify-between px-4"
@@ -33,16 +37,17 @@ export default function TopBar({
           border: "none",
           padding: 0,
           cursor: onLogoPress ? "pointer" : "default",
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: 700,
           color: "#E8A020",
           fontFamily: "system-ui, sans-serif",
           minHeight: 0,
           lineHeight: 1,
+          letterSpacing: "0.06em",
         }}
         aria-label="Return to home feed"
       >
-        FM
+        FIELDMARK
       </button>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {onScoringExplainedPress ? (
@@ -99,8 +104,8 @@ export default function TopBar({
         <button
           onClick={onProfilePress}
           style={{
-            width: 28,
-            height: 28,
+            width: 36,
+            height: 36,
             borderRadius: "50%",
             backgroundColor: "#1A1A1E",
             border: "1px solid #1E1E22",
@@ -109,20 +114,38 @@ export default function TopBar({
             justifyContent: "center",
             cursor: "pointer",
             padding: 0,
+            overflow: "hidden",
           }}
           aria-label="Profile"
         >
-          <span
-            style={{
-              fontSize: 12,
-              color: "#6B6A65",
-              fontFamily: "system-ui, sans-serif",
-              fontWeight: 500,
-              letterSpacing: "0.02em",
-            }}
-          >
-            PN
-          </span>
+          {avatarFailed ? (
+            <span
+              style={{
+                fontSize: 12,
+                color: "#6B6A65",
+                fontFamily: "system-ui, sans-serif",
+                fontWeight: 500,
+                letterSpacing: "0.02em",
+              }}
+            >
+              PN
+            </span>
+          ) : (
+            <img
+              src="/avatars/demo-user.jpg"
+              alt="User avatar"
+              width={36}
+              height={36}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                objectFit: "cover",
+                display: "block",
+              }}
+              onError={() => setAvatarFailed(true)}
+            />
+          )}
         </button>
       </div>
     </div>

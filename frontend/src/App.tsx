@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import TASelectionScreen from "./components/TASelectionScreen";
 import TopBar from "./components/TopBar";
@@ -142,8 +142,6 @@ function AppContent() {
   const [bibYear, setBibYear] = useState<number>(2024);
   const [cityFeedCity, setCityFeedCity] = useState<string>("Chicago, IL");
   const [cityFeedTA, setCityFeedTA] = useState<string>("Rare Disease");
-  const [darkHorseFilter, setDarkHorseFilter] = useState(false);
-  const [workhorseFilter, setWorkhorseFilter] = useState(false);
   const [hcpList, setHcpList] = useState<AppHCP[]>([]);
   const [feedOffset, setFeedOffset] = useState(0);
   const [feedTotal, setFeedTotal] = useState(0);
@@ -159,11 +157,6 @@ function AppContent() {
     setScoringExplainedOpen(false);
     setScoringExplainedScroll(null);
   }, [currentScreen]);
-
-  useEffect(() => {
-    if (track !== "rising-stars") setDarkHorseFilter(false);
-    if (track !== "community") setWorkhorseFilter(false);
-  }, [track]);
 
   function formatUpdatedLabel() {
     if (!lastUpdatedAt) return "Updated just now";
@@ -187,8 +180,6 @@ function AppContent() {
       const taSlug = getTASlug(selectedTA);
       const { data } = await getRisingStars(taSlug, 20, {
         cohort: feedCohortForTrack(track),
-        darkHorseOnly: darkHorseFilter,
-        workhorseOnly: workhorseFilter,
         offset: 0,
       });
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
@@ -219,8 +210,6 @@ function AppContent() {
       const taSlug = getTASlug(selectedTA);
       const { data } = await getRisingStars(taSlug, 20, {
         cohort: feedCohortForTrack(track),
-        darkHorseOnly: darkHorseFilter,
-        workhorseOnly: workhorseFilter,
         offset: 0,
       });
       if (cancelled) return;
@@ -237,7 +226,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, darkHorseFilter, workhorseFilter, track]);
+  }, [selectedTA, track]);
 
   async function loadMore() {
     if (track === "social") return;
@@ -247,8 +236,6 @@ function AppContent() {
     try {
       const { data } = await getRisingStars(taSlug, 20, {
         cohort: feedCohortForTrack(track),
-        darkHorseOnly: darkHorseFilter,
-        workhorseOnly: workhorseFilter,
         offset: nextOffset,
       });
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
@@ -312,7 +299,7 @@ function AppContent() {
     setTrayOpen(false);
   }
 
-  // Detail → Note
+  // Detail â†’ Note
   function handleAddNoteFromDetail() {
     setCurrentScreen("note");
   }
@@ -420,8 +407,6 @@ function AppContent() {
       >
       <TopBar
         onLogoPress={() => {
-          setDarkHorseFilter(false);
-          setWorkhorseFilter(false);
           setSelectedIndication("All");
           setCurrentScreen("feed");
         }}
@@ -437,109 +422,6 @@ function AppContent() {
 
       <TrackSwitch />
 
-      {/* Track-scoped discovery banner: Rising Stars → Dark Horses; Community → Workhorses (not on Established / Social) */}
-      {(track === "rising-stars" || track === "community") && (
-        <div style={{ padding: "8px 16px 0" }}>
-          {track === "rising-stars" && (
-            <button
-              type="button"
-              onClick={() => setDarkHorseFilter((v) => !v)}
-              className="fm-dh-chip"
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-                backgroundColor: darkHorseFilter ? "#130D24" : "#0D0A1A",
-                border: darkHorseFilter ? "2px solid #9B6DFF" : "1px solid #9B6DFF",
-                borderRadius: 4,
-                padding: "8px 16px",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-                <span style={{ fontSize: 14, color: "#9B6DFF", flexShrink: 0 }} aria-hidden>
-                  ♞
-                </span>
-                <span
-                  className="fm-dh-chip-label"
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "#9B6DFF",
-                    fontFamily: "system-ui, sans-serif",
-                  }}
-                >
-                  {`Dark Horses · ${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`}
-                </span>
-              </div>
-              {darkHorseFilter && (
-                <span
-                  style={{
-                    fontSize: 14,
-                    color: "#9B6DFF",
-                    fontFamily: "monospace",
-                    flexShrink: 0,
-                  }}
-                  aria-label="Exit dark horse filter"
-                >
-                  ✕
-                </span>
-              )}
-            </button>
-          )}
-          {track === "community" && (
-            <button
-              type="button"
-              onClick={() => setWorkhorseFilter((v) => !v)}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-                backgroundColor: workhorseFilter ? "#0A1F1C" : "#0A1A18",
-                border: workhorseFilter ? "2px solid #4ECDC4" : "1px solid #4ECDC4",
-                borderRadius: 4,
-                padding: "8px 16px",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-                <span style={{ fontSize: 14, color: "#4ECDC4", flexShrink: 0 }} aria-hidden>
-                  ⚡
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "#4ECDC4",
-                    fontFamily: "system-ui, sans-serif",
-                  }}
-                >
-                  {`Workhorses · ${taCounts?.workhorses?.toLocaleString() ?? "—"} identified`}
-                </span>
-              </div>
-              {workhorseFilter && (
-                <span
-                  style={{
-                    fontSize: 14,
-                    color: "#4ECDC4",
-                    fontFamily: "monospace",
-                    flexShrink: 0,
-                  }}
-                  aria-label="Exit workhorse filter"
-                >
-                  ✕
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-      )}
       <TAFilterChips
         selected={selectedTA}
         onSelect={(ta) => {
@@ -555,9 +437,7 @@ function AppContent() {
         {formatUpdatedLabel()}
       </div>
 
-      {!darkHorseFilter && !workhorseFilter && track !== "social" && (
-        <DOLHeroPanel taSlug={getTASlug(selectedTA)} />
-      )}
+      {track !== "social" && <DOLHeroPanel taSlug={getTASlug(selectedTA)} />}
 
       {/* Section header */}
       <div
@@ -573,17 +453,13 @@ function AppContent() {
           style={{
             fontSize: 15,
             fontWeight: 500,
-            color: darkHorseFilter ? "#9B6DFF" : workhorseFilter ? "#4ECDC4" : "#E8E6DF",
+            color: "#E8E6DF",
             fontFamily: "system-ui, sans-serif",
           }}
         >
-          {darkHorseFilter
-            ? `Dark Horses · ${selectedTA}`
-            : workhorseFilter
-              ? `Workhorses · ${selectedTA}`
-              : selectedIndication === "All"
-                ? selectedTA
-                : `${selectedTA} · ${selectedIndication}`}
+          {selectedIndication === "All"
+            ? selectedTA
+            : `${selectedTA} · ${selectedIndication}`}
         </span>
         {track !== "social" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -591,25 +467,21 @@ function AppContent() {
               className="fm-section-header-right"
               style={{
                 fontSize: 15,
-                color: darkHorseFilter ? "#9B6DFF" : workhorseFilter ? "#4ECDC4" : "#6B6A65",
+                color: "#6B6A65",
                 fontFamily: "monospace",
               }}
             >
-              {darkHorseFilter
-                ? `${taCounts?.dark_horses?.toLocaleString() ?? "—"} identified`
-                : workhorseFilter
-                  ? `${taCounts?.workhorses?.toLocaleString() ?? "—"} identified`
-                  : feedTotal > 0 && hcpList.length < feedTotal
-                    ? `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`
-                    : `${(
-                        track === "rising-stars"
-                          ? (taCounts?.rising_stars ?? indicationCount)
-                          : track === "community"
-                            ? (taCounts?.community_pool ?? indicationCount)
-                            : track === "established" && feedTotal > 0
-                              ? feedTotal
-                              : indicationCount
-                      ).toLocaleString()} identified`}
+              {feedTotal > 0 && hcpList.length < feedTotal
+                ? `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`
+                : `${(
+                    track === "rising-stars"
+                      ? (taCounts?.rising_stars ?? indicationCount)
+                      : track === "community"
+                        ? (taCounts?.community_pool ?? indicationCount)
+                        : track === "established" && feedTotal > 0
+                          ? feedTotal
+                          : indicationCount
+                  ).toLocaleString()} identified`}
             </span>
             <button
               onClick={() => setCurrentScreen("landscape")}

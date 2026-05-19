@@ -126,8 +126,6 @@ export async function getRisingStars(
   limit: number = 20,
   options: {
     cohort?: FeedCohort;
-    darkHorseOnly?: boolean;
-    workhorseOnly?: boolean;
     offset?: number;
   } = {},
 ): Promise<ApiResult<{ rows: RisingStar[]; total: number }>> {
@@ -149,10 +147,6 @@ export async function getRisingStars(
 
     const offset = options.offset ?? 0;
     const cohort = options.cohort ?? "rising_star";
-    const darkHorseOnly =
-      cohort === "rising_star" && (options.darkHorseOnly ?? false);
-    const workhorseOnly =
-      cohort === "community" && (options.workhorseOnly ?? false);
 
     const countBase = () =>
       supabase
@@ -222,33 +216,17 @@ export async function getRisingStars(
     let countQuery;
     let listQuery;
     if (cohort === "rising_star") {
-      if (darkHorseOnly) {
-        countQuery = countBase().eq("cohort_classification", "dark_horse");
-        listQuery = listBase()
-          .eq("cohort_classification", "dark_horse")
-          .order("cohort_score", { ascending: false, nullsFirst: false })
-          .range(offset, offset + limit - 1);
-      } else {
-        countQuery = countBase().eq("cohort_classification", "rising_star");
-        listQuery = listBase()
-          .eq("cohort_classification", "rising_star")
-          .order("cohort_score", { ascending: false, nullsFirst: false })
-          .range(offset, offset + limit - 1);
-      }
+      countQuery = countBase().eq("cohort_classification", "rising_star");
+      listQuery = listBase()
+        .eq("cohort_classification", "rising_star")
+        .order("cohort_score", { ascending: false, nullsFirst: false })
+        .range(offset, offset + limit - 1);
     } else if (cohort === "community") {
-      if (workhorseOnly) {
-        countQuery = countBase().eq("cohort_classification", "workhorse");
-        listQuery = listBaseViaHTA()
-          .eq("cohort_classification", "workhorse")
-          .order("cohort_score", { ascending: false, nullsFirst: false })
-          .range(offset, offset + limit - 1);
-      } else {
-        countQuery = countBase().eq("cohort_classification", "community");
-        listQuery = listBaseViaHTA()
-          .eq("cohort_classification", "community")
-          .order("cohort_score", { ascending: false, nullsFirst: false })
-          .range(offset, offset + limit - 1);
-      }
+      countQuery = countBase().eq("cohort_classification", "community");
+      listQuery = listBaseViaHTA()
+        .eq("cohort_classification", "community")
+        .order("cohort_score", { ascending: false, nullsFirst: false })
+        .range(offset, offset + limit - 1);
     } else {
       countQuery = countBase().eq("cohort_classification", "established");
       listQuery = listBase()
@@ -270,7 +248,7 @@ export async function getRisingStars(
       }
 
       if (cacheRow) {
-        cachedTotalCount = workhorseOnly ? (cacheRow.workhorses ?? 0) : (cacheRow.community ?? 0);
+        cachedTotalCount = cacheRow.community ?? 0;
       } else {
         cachedTotalCount = 0;
       }
