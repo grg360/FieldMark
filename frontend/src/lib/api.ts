@@ -438,6 +438,8 @@ export async function getTACounts(
           verified_dols: 0,
           community_pool: 0,
           workhorses: 0,
+          established: 0,
+          total_hcps: 0,
         },
         error: null,
       };
@@ -445,7 +447,7 @@ export async function getTACounts(
 
     const { data: countRows, error: countsError } = await supabase
       .from("ta_cohort_counts_cache")
-      .select("rising_stars, dark_horses, community, workhorses")
+      .select("rising_stars, dark_horses, community, workhorses, total_hcps")
       .in("therapeutic_area_id", indicationIds);
 
     if (countsError) {
@@ -458,8 +460,9 @@ export async function getTACounts(
         dark_horses: acc.dark_horses + (Number(row.dark_horses) || 0),
         community: acc.community + (Number(row.community) || 0),
         workhorses: acc.workhorses + (Number(row.workhorses) || 0),
+        total_hcps: acc.total_hcps + (Number(row.total_hcps) || 0),
       }),
-      { rising_stars: 0, dark_horses: 0, community: 0, workhorses: 0 },
+      { rising_stars: 0, dark_horses: 0, community: 0, workhorses: 0, total_hcps: 0 },
     );
 
     const { data: verifiedHcps, error: verifiedHcpsError } = await supabase
@@ -486,6 +489,30 @@ export async function getTACounts(
       return { data: null, error: verifiedDolsResult.error.message };
     }
 
+    const { data: establishedHcps, error: establishedError } = await supabase
+      .from("hcps")
+      .select("id")
+      .eq("cohort_classification", "established");
+
+    if (establishedError) {
+      return { data: null, error: establishedError.message };
+    }
+
+    const establishedIds = (establishedHcps ?? []).map((h) => h.id);
+
+    const establishedResult =
+      establishedIds.length === 0
+        ? { count: 0, error: null }
+        : await supabase
+            .from("hcp_therapeutic_areas")
+            .select("hcp_id", { count: "estimated", head: true })
+            .in("therapeutic_area_id", indicationIds)
+            .in("hcp_id", establishedIds);
+
+    if (establishedResult.error) {
+      return { data: null, error: establishedResult.error.message };
+    }
+
     return {
       data: {
         rising_stars: totals.rising_stars,
@@ -493,6 +520,8 @@ export async function getTACounts(
         verified_dols: verifiedDolsResult.count ?? 0,
         community_pool: totals.community,
         workhorses: totals.workhorses,
+        established: establishedResult.count ?? 0,
+        total_hcps: totals.total_hcps,
       },
       error: null,
     };
@@ -521,6 +550,8 @@ export async function getAllTACounts(): Promise<ApiResult<Record<string, TACount
         verified_dols: 0,
         community_pool: 0,
         workhorses: 0,
+        established: 0,
+        total_hcps: 0,
       };
     }
     return { data: output, error: null };

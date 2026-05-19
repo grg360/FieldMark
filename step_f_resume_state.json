@@ -1,0 +1,10 @@
+{
+  "saved_at_utc": "2026-05-15T21:23:54.259109+00:00",
+  "pubs_processed_this_run": 280350,
+  "last_completed_publication_id": "e365e253-cb03-4c39-b507-5ae60ce3c76a",
+  "pagination_cursor_after_id": "e365e404-21ac-483c-874e-0eef9ebff021",
+  "rows_written": 90015,
+  "logical_rows": 90315,
+  "authorships_scanned": 1032577,
+  "error_message": "{'message': 'canceling statement due to statement timeout', 'code': '57014', 'hint': None, 'details': None}"
+}

@@ -139,11 +139,37 @@ def fetch_candidates(c: Client, last_lower: str, state_abbrev: str) -> List[Dict
         c.table("hcps")
         .select("id,first_name,last_name,city,state,institution_short")
         .not_.is_("npi_number", "null")
-        .ilike("last_name", last_lower)
-        .ilike("state", state_abbrev)
+        .eq("last_name_lower", last_lower)
+        .eq("state_lower", state_abbrev)
         .execute()
     )
     return list(resp.data or [])
+
+
+def load_existing_proposed_ids(c: Client) -> set:
+    """Load all trial_investigator_id values that already have a proposal."""
+    existing = set()
+    offset = 0
+    page_size = 1000
+    while True:
+        resp = (
+            c.table("trial_investigator_match_proposals")
+            .select("trial_investigator_id")
+            .order("trial_investigator_id")
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        batch = list(resp.data or [])
+        if not batch:
+            break
+        for row in batch:
+            tid = row.get("trial_investigator_id")
+            if tid:
+                existing.add(str(tid))
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return existing
 
 
 def decide_match(
@@ -248,6 +274,15 @@ def proposal_row(
 def main() -> None:
     load_dotenv()
     c = sb()
+
+    # HTTP/2 stream ID exhaustion mitigation
+    # Track Supabase operations and recycle the client before hitting the ~20K limit
+    op_counter = 0
+    RECYCLE_THRESHOLD = 15000
+
+    logger.info("Loading existing proposed trial_investigator_ids...")
+    already_proposed = load_existing_proposed_ids(c)
+    logger.info("Found %s existing proposed ids; these will be skipped.", len(already_proposed))
     t0 = time.time()
     candidate_cache: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
 
@@ -283,10 +318,22 @@ def main() -> None:
             raise
 
         batch = list(resp.data or [])
+        op_counter += 1
         if not batch:
             break
 
         for row in batch:
+            # Recycle Supabase client to prevent HTTP/2 stream exhaustion
+            if op_counter >= RECYCLE_THRESHOLD:
+                try:
+                    logger.info(f"[recycle] Recycling Supabase client after {op_counter} operations")
+                    c = sb()
+                    op_counter = 0
+                except Exception as exc:
+                    logger.warning(f"[recycle] Failed to recycle client: {exc}")
+
+            if str(row["id"]) in already_proposed:
+                continue
             total_processed += 1
             last_key = ns(row.get("investigator_raw_last_name")).lower()
             state_abbrev = normalize_state_to_abbrev(row.get("investigator_raw_state"))
@@ -306,6 +353,7 @@ def main() -> None:
                 pending_inserts.append(prop)
                 if len(pending_inserts) >= INSERT_BATCH:
                     c.table("trial_investigator_match_proposals").insert(pending_inserts).execute()
+                    op_counter += 1
                     pending_inserts.clear()
                 if total_processed % PAGE_SIZE == 0:
                     logger.info("Processed %s rows...", total_processed)
@@ -314,6 +362,7 @@ def main() -> None:
             cache_key = (last_key, state_abbrev)
             if cache_key not in candidate_cache:
                 candidate_cache[cache_key] = fetch_candidates(c, last_key, state_abbrev)
+                op_counter += 1
             candidates = candidate_cache[cache_key]
 
             pid, conf, st, dpath, matched = decide_match(row, candidates)
@@ -326,6 +375,7 @@ def main() -> None:
             pending_inserts.append(prop)
             if len(pending_inserts) >= INSERT_BATCH:
                 c.table("trial_investigator_match_proposals").insert(pending_inserts).execute()
+                op_counter += 1
                 pending_inserts.clear()
 
             if total_processed % PAGE_SIZE == 0:
@@ -337,6 +387,7 @@ def main() -> None:
 
     if pending_inserts:
         c.table("trial_investigator_match_proposals").insert(pending_inserts).execute()
+        op_counter += 1
 
     elapsed = time.time() - t0
 

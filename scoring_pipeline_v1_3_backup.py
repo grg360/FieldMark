@@ -1,16 +1,5 @@
 """
-FieldMark scoring pipeline (v1.4).
-
-CHANGES IN v1.4 (2026-05-18):
-- Added per-TA normalization step: composite_score is normalized 0-100 within
-  each therapeutic area separately. Result written to normalized_score.
-- Added tier assignment based on normalized_score thresholds:
-    normalized >= 95 AND (pub_vel > 0 OR trial > 0) -> dark_horse
-    normalized >= 85                                 -> rising_star
-    normalized >= 30                                 -> emerging
-    otherwise                                        -> unranked
-- ScoreRow dataclass now includes normalized_score and tier.
-- upsert_scores payload now writes normalized_score and tier columns.
+FieldMark scoring pipeline (v1.3).
 
 This script:
 1) Reads data from Supabase tables:
@@ -23,10 +12,8 @@ This script:
    - Cross signal bonus multiplier (1.15 if both pub+trial signals)
    - Recency weight (10%)
 3) Computes composite score (0-100).
-4) Normalizes composite_score per TA -> normalized_score (0-100).
-5) Assigns tier based on normalized_score.
-6) Writes results to hcp_scores (composite, normalized, tier, components).
-7) Prints top 20 rising stars per therapeutic area.
+4) Writes results to hcp_scores.
+5) Prints top 20 rising stars per therapeutic area.
 
 Uses python-dotenv for environment variables.
 Required env vars:
@@ -40,25 +27,20 @@ import argparse
 import math
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-SCORE_VERSION = "v1.4"
+SCORE_VERSION = "v1.3"
 # When OpenAlex has enriched hcps.total_career_pubs, require this minimum for rankings / non-zero composite.
 MIN_TOTAL_CAREER_PUBS_FOR_RANKINGS = 10
 # If total_career_pubs is null, fall back to counting publication rows in our DB.
 MIN_STORED_PUBLICATIONS_FALLBACK = 3
 MAX_STORED_PUBLICATIONS_FOR_RANKINGS = 200
 RECENT_PUBLICATION_YEAR_CUTOFF = 2022
-
-# Tier assignment thresholds (against normalized_score, per TA)
-TIER_DARK_HORSE_THRESHOLD = 95.0
-TIER_RISING_STAR_THRESHOLD = 85.0
-TIER_EMERGING_THRESHOLD = 30.0
 
 
 def passes_ranking_publication_threshold(total_career_pubs: Optional[int], stored_pub_count: int) -> bool:
@@ -85,8 +67,6 @@ class ScoreRow:
     career_multiplier: float
     publications_count: int
     total_career_pubs: Optional[int]
-    normalized_score: float = 0.0
-    tier: str = "unranked"
 
 
 def get_required_env(name: str) -> str:
@@ -541,27 +521,6 @@ def build_lookup_maps(
     return pubs_by_hcp, links_by_hcp, trials_by_id
 
 
-def assign_tier(normalized: float, composite: float, pub_vel: float, trial: float) -> str:
-    """
-    Assign tier based on per-TA normalized_score thresholds.
-
-    - dark_horse: normalized >= 95 AND has signal evidence (pub_vel or trial > 0)
-    - rising_star: normalized >= 85
-    - emerging: normalized >= 30
-    - unranked: below 30, or composite is 0 (failed ranking threshold)
-    """
-    # HCPs that failed the ranking publication threshold have composite_score=0
-    if composite == 0.0:
-        return "unranked"
-    if normalized >= TIER_DARK_HORSE_THRESHOLD and (pub_vel > 0 or trial > 0):
-        return "dark_horse"
-    if normalized >= TIER_RISING_STAR_THRESHOLD:
-        return "rising_star"
-    if normalized >= TIER_EMERGING_THRESHOLD:
-        return "emerging"
-    return "unranked"
-
-
 def compute_scores(
     hcp_tas: Sequence[Dict],
     publications: Sequence[Dict],
@@ -659,12 +618,7 @@ def compute_scores(
     pub_velocity_scores = normalize_0_100(raw_pub_velocity)
     citation_scores = normalize_0_100(raw_citation)
 
-    # First pass: compute composite_score for every (hcp, ta) pair
     rows: List[ScoreRow] = []
-    composite_by_pair: Dict[Tuple[str, str], float] = {}
-    pub_vel_by_pair: Dict[Tuple[str, str], float] = {}
-    trial_by_pair: Dict[Tuple[str, str], float] = {}
-
     now_iso = datetime.now(timezone.utc).isoformat()
     for key in valid_pairs:
         hcp_id, ta_id = key
@@ -717,11 +671,6 @@ def compute_scores(
         if not passes_ranking_publication_threshold(total_career_pubs, publications_count):
             composite = 0.0
 
-        # Track for per-TA normalization step
-        composite_by_pair[key] = composite
-        pub_vel_by_pair[key] = pub_velocity
-        trial_by_pair[key] = trial_score
-
         rows.append(
             ScoreRow(
                 hcp_id=hcp_id,
@@ -738,67 +687,10 @@ def compute_scores(
                 career_multiplier=round(career_multiplier, 4),
                 publications_count=publications_count,
                 total_career_pubs=total_career_pubs,
-                normalized_score=0.0,  # filled in second pass below
-                tier="unranked",        # filled in second pass below
             )
         )
 
-    # Second pass: per-TA normalization + tier assignment
-    print("Normalizing composite_score per therapeutic area...")
-    tas_seen = {key[1] for key in composite_by_pair.keys()}
-
-    normalized_by_pair: Dict[Tuple[str, str], float] = {}
-    for ta_id in tas_seen:
-        # Build per-TA dict of composite scores
-        ta_pairs = {
-            k: v for k, v in composite_by_pair.items() if k[1] == ta_id
-        }
-        # Normalize 0-100 within this TA
-        ta_normalized = normalize_0_100(ta_pairs)
-        normalized_by_pair.update(ta_normalized)
-        ta_count = len(ta_pairs)
-        ta_nonzero = sum(1 for v in ta_normalized.values() if v > 0)
-        print(f"  TA {ta_id}: {ta_count} pairs normalized, {ta_nonzero} above zero")
-
-    # Assign normalized_score and tier to each row
-    updated_rows: List[ScoreRow] = []
-    for r in rows:
-        key = (r.hcp_id, r.therapeutic_area_id)
-        norm = normalized_by_pair.get(key, 0.0)
-        tier = assign_tier(
-            normalized=norm,
-            composite=r.composite_score,
-            pub_vel=pub_vel_by_pair.get(key, 0.0),
-            trial=trial_by_pair.get(key, 0.0),
-        )
-        # Build new ScoreRow with normalization + tier filled in
-        r_new = ScoreRow(
-            hcp_id=r.hcp_id,
-            therapeutic_area_id=r.therapeutic_area_id,
-            composite_score=r.composite_score,
-            pub_velocity_score=r.pub_velocity_score,
-            citation_trajectory_score=r.citation_trajectory_score,
-            trial_investigator_score=r.trial_investigator_score,
-            congress_score=r.congress_score,
-            msl_signal_score=r.msl_signal_score,
-            score_version=r.score_version,
-            calculated_at=r.calculated_at,
-            first_pub_year=r.first_pub_year,
-            career_multiplier=r.career_multiplier,
-            publications_count=r.publications_count,
-            total_career_pubs=r.total_career_pubs,
-            normalized_score=round(norm, 4),
-            tier=tier,
-        )
-        updated_rows.append(r_new)
-
-    # Log tier distribution for sanity
-    tier_counts: Dict[str, int] = {}
-    for r in updated_rows:
-        tier_counts[r.tier] = tier_counts.get(r.tier, 0) + 1
-    print(f"Tier distribution: {tier_counts}")
-
-    return updated_rows
+    return rows
 
 
 def upsert_scores(supabase: Client, score_rows: Sequence[ScoreRow]) -> int:
@@ -817,8 +709,6 @@ def upsert_scores(supabase: Client, score_rows: Sequence[ScoreRow]) -> int:
             "msl_signal_score": row.msl_signal_score,
             "score_version": row.score_version,
             "calculated_at": row.calculated_at,
-            "normalized_score": row.normalized_score,
-            "tier": row.tier,
         }
         for row in score_rows
     ]
@@ -887,7 +777,7 @@ def print_top_rising_stars(
         ta_name = ta_name_map.get(ta_id, ta_id)
         unique_hcp_count = len({row.hcp_id for row in rows})
         top_n = get_top_n_for_ta(unique_hcp_count)
-        sorted_rows = sorted(rows, key=lambda r: r.normalized_score, reverse=True)[:top_n]
+        sorted_rows = sorted(rows, key=lambda r: r.composite_score, reverse=True)[:top_n]
         print(f"\n[{ta_name}] Top {len(sorted_rows)} of {unique_hcp_count} HCPs")
         for idx, row in enumerate(sorted_rows, start=1):
             hcp_name = hcp_name_map.get(row.hcp_id, row.hcp_id)
@@ -898,13 +788,13 @@ def print_top_rising_stars(
             )
             print(
                 f"{idx:>2}. {hcp_name:<35} "
-                f"Norm={row.normalized_score:6.2f} "
-                f"Tier={row.tier:<12} "
                 f"Composite={row.composite_score:6.2f} "
                 f"StoredPubs={row.publications_count:<3} {career_part} "
                 f"(PubVel={row.pub_velocity_score:6.2f}, "
                 f"CitTraj={row.citation_trajectory_score:6.2f}, "
-                f"Trial={row.trial_investigator_score:6.2f})"
+                f"Trial={row.trial_investigator_score:6.2f}, "
+                f"FirstPub={row.first_pub_year}, "
+                f"CareerMult={row.career_multiplier:4.2f})"
             )
 
 

@@ -10,7 +10,7 @@ import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -112,8 +112,8 @@ def lev(a: str, b: str) -> int:
 
 def splitn(raw: Optional[str]) -> Tuple[str, str]:
     s = ns(raw)
-    # Strip trailing credentials repeatedly to handle multiple suffixes (e.g., "M.D., Ph.D.")
-    pattern = r",?\s*(m\.?d\.?|d\.?o\.?|ph\.?d\.?|m\.?b\.?b\.?s\.?|m\.?p\.?h\.?|m\.?s\.?c\.?|r\.?n\.?|n\.?p\.?|pa-c|p\.?a\.?)$"
+    # Strip trailing credentials repeatedly (MD, PhD, M.H.Sc, DrPH, FACP, etc.)
+    pattern = r",?\s*(m\.?d\.?|d\.?o\.?|ph\.?d\.?|m\.?b\.?b\.?s\.?|m\.?p\.?h\.?|m\.?s\.?c\.?|m\.?h\.?s\.?c\.?|m\.?s\.?c\.?e\.?|d\.?s\.?c\.?|s\.?c\.?d\.?|dr\.?p\.?h\.?|f\.?a\.?[a-z]{2,4}\.?|r\.?n\.?|n\.?p\.?|pa-c|p\.?a\.?)$"
     while True:
         new_s = re.sub(pattern, "", s, flags=re.I)
         if new_s == s:
@@ -216,13 +216,14 @@ def save_ckpt(ids: Set[str]) -> None:
 
 
 def get_hcps(c: Client) -> List[Dict]:
+    """Load HCPs with non-null state (includes Step C OpenAlex HCPs; NPI not required)."""
     rows: List[Dict] = []
     o = 0
     while True:
         b = (
             c.table("hcps")
             .select("id,first_name,last_name,institution_short,institution_full,city,state,npi_number")
-            .not_.is_("npi_number", "null")
+            .not_.is_("state", "null")
             .order("id")
             .range(o, o + 999)
             .execute()
@@ -259,7 +260,7 @@ def stratified_test_sample(hcps: List[Dict], limit: int) -> List[Dict]:
 
 
 def ct(session: requests.Session, term: str, locn: Optional[str]) -> List[Dict]:
-    p = {"query.term": term, "query.locn": locn or "", "pageSize": "50", "countTotal": "true", "format": "json"}
+    p = {"query.term": term, "query.locn": locn or "", "pageSize": "1000", "countTotal": "true", "format": "json"}
     d = 0.5
     for i in range(3):
         try:
@@ -435,6 +436,25 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
             continue
         lead = scm.get("leadSponsor", {}) or {}
         rp = scm.get("responsibleParty", {}) or {}
+
+        collaborators_raw = scm.get("collaborators", []) or []
+        collaborators_clean = [
+            {"name": ns(c.get("name")), "class": ns(c.get("class"))}
+            for c in collaborators_raw
+            if isinstance(c, dict) and ns(c.get("name"))
+        ]
+
+        conditions_mod = p.get("conditionsModule", {}) or {}
+        conditions_clean = [ns(c) for c in (conditions_mod.get("conditions", []) or []) if ns(c)]
+
+        aim = p.get("armsInterventionsModule", {}) or {}
+        interventions_raw = aim.get("interventions", []) or []
+        interventions_clean = [
+            {"type": ns(i.get("type")), "name": ns(i.get("name"))}
+            for i in interventions_raw
+            if isinstance(i, dict) and ns(i.get("name"))
+        ]
+
         trials[nct] = {
             "nct_id": nct,
             "title": ns(idm.get("briefTitle")) or None,
@@ -447,6 +467,9 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
             "start_date": dt(((sm.get("startDateStruct", {}) or {}).get("date"))),
             "completion_date": dt(((sm.get("completionDateStruct", {}) or {}).get("date"))),
             "locations": trial_locations if trial_locations else [],
+            "collaborators": collaborators_clean if collaborators_clean else None,
+            "conditions": conditions_clean if conditions_clean else None,
+            "interventions": interventions_clean if interventions_clean else None,
         }
         links.extend(captured_links)
     return list(trials.values()), links, best_conf, sample_matches
@@ -457,8 +480,8 @@ def upsert_trials(c: Client, rows: List[Dict]) -> Dict[str, str]:
         return {}
     # Omit locations from clinical_trials upsert (site data is on trial_investigators).
     upsert_rows = [{k: v for k, v in r.items() if k != "locations"} for r in rows]
-    # Batch in chunks of 5 to avoid statement timeouts on heavy trial payloads
-    for i in range(0, len(upsert_rows), 5):
+    # Batch in chunks of 20 to avoid statement timeouts on heavy trial payloads
+    for i in range(0, len(upsert_rows), 20):
         batch = upsert_rows[i : i + 5]
         c.table("clinical_trials").upsert(batch, on_conflict="nct_id").execute()
     ids = [r["nct_id"] for r in rows if r.get("nct_id")]
@@ -493,7 +516,7 @@ def insert_links(c: Client, links: List[Dict], m: Dict[str, str]) -> int:
     if not rows:
         return 0
 
-    dedup_map: Dict[Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]], Dict] = {}
+    dedup_map: Dict[Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]], Dict] = {}
     for r in rows:
         key = (
             r["trial_id"],
@@ -501,7 +524,6 @@ def insert_links(c: Client, links: List[Dict], m: Dict[str, str]) -> int:
             r["investigator_raw_last_name"],
             r["role"],
             r["source"],
-            r.get("investigator_raw_facility"),
         )
         existing = dedup_map.get(key)
         if existing is None:
@@ -514,10 +536,21 @@ def insert_links(c: Client, links: List[Dict], m: Dict[str, str]) -> int:
         return 0
 
     for i in range(0, len(rows), 500):
-        c.table("trial_investigators").upsert(
-            rows[i : i + 500],
-            on_conflict="trial_id,investigator_raw_first_name,investigator_raw_last_name,role,source,investigator_raw_facility",
-        ).execute()
+        batch = rows[i : i + 500]
+        batch_serializable: List[Dict] = []
+        for r in batch:
+            serialized: Dict[str, Any] = {}
+            for k, v in r.items():
+                if v is None:
+                    serialized[k] = None
+                else:
+                    serialized[k] = str(v) if not isinstance(v, (str, int, float, bool)) else v
+            batch_serializable.append(serialized)
+        try:
+            c.rpc("upsert_trial_investigators_preserving_match", {"rows_data": batch_serializable}).execute()
+        except Exception as e:
+            logger.error(f"[rpc] upsert failed for batch {i}: {e}")
+            raise
     return len(rows)
 
 
@@ -529,11 +562,20 @@ def eta(done: int, total: int, start: float) -> str:
     return f"{m // 60}:{m % 60:02d}"
 
 
-def run(test: bool, limit: Optional[int]) -> None:
+def run(test: bool, limit: Optional[int], reset_checkpoint: bool = False) -> None:
     load_dotenv()
     c = sb()
     s = requests.Session()
     s.headers.update({"User-Agent": "FieldMark/1.0"})
+
+    # HTTP/2 stream ID exhaustion mitigation
+    # Track Supabase operations and recycle the client before hitting the ~20K limit
+    op_counter = 0
+    RECYCLE_THRESHOLD = 15000
+
+    if reset_checkpoint and os.path.exists(CKPT):
+        os.remove(CKPT)
+        print("Checkpoint deleted; will re-process all HCPs from scratch.")
     hcps = get_hcps(c)
     seen = load_ckpt()
     todo = [h for h in hcps if str(h.get("id")) not in seen]
@@ -541,9 +583,6 @@ def run(test: bool, limit: Optional[int]) -> None:
         todo = stratified_test_sample(todo, limit or 50)
     elif limit:
         todo = todo[:limit]
-    print("Run this SQL in Supabase SQL editor before full rerun:")
-    print("TRUNCATE trial_investigators;")
-    print("TRUNCATE clinical_trials;")
     print(f"Loaded HCPs: {len(hcps)} | Pending after checkpoint: {len(todo)}")
     if test:
         print(f"TEST MODE: limit={limit or 50} (stratified 10 short/non-null + 10 short/null city/non-null + 30 random)")
@@ -552,12 +591,21 @@ def run(test: bool, limit: Optional[int]) -> None:
     sponsor = Counter()
     sample_matches: List[Dict] = []
     for i, h in enumerate(todo, 1):
+        # Recycle Supabase client to prevent HTTP/2 stream exhaustion
+        if op_counter >= RECYCLE_THRESHOLD:
+            try:
+                logger.info(f"[recycle] Recycling Supabase client after {op_counter} operations")
+                c = sb()
+                op_counter = 0
+            except Exception as exc:
+                logger.warning(f"[recycle] Failed to recycle client: {exc}")
+
         hid = str(h.get("id") or "")
         nm = f"{ns(h.get('first_name'))} {ns(h.get('last_name'))}".strip()
         if not hid or not nm:
             st.skipped += 1
             continue
-        studies = ct(s, nm, ns(h.get("city")) or ns(h.get("state")) or None)
+        studies = ct(s, nm, None)
         time.sleep(0.1)
         st.processed += 1
         seen.add(hid)
@@ -578,7 +626,9 @@ def run(test: bool, limit: Optional[int]) -> None:
             st.skipped += 1
             continue
         m = upsert_trials(c, trials)
+        op_counter += len(trials) * 2  # estimate: 1 upsert + 1 select per trial batch
         ins = insert_links(c, links, m)
+        op_counter += max(len(links) // 500, 1) * 2  # estimate: 1 fetch + 1 upsert per 500-row batch
         st.linked_hcps += 1
         st.trials += len(trials)
         st.links += ins
@@ -586,12 +636,12 @@ def run(test: bool, limit: Optional[int]) -> None:
             role[str(l.get("role") or "")] += 1
         for t in trials:
             sponsor[str(t.get("lead_sponsor_class") or "(null)")] += 1
-        if i % 10 == 0 or i == len(todo):
+        if i % 500 == 0 or i == len(todo):
             print(
                 f"[{i}/{len(todo)}] HCPs processed | Trials added: {st.trials} | "
                 f"Investigators added: {st.links} | Skipped: {st.skipped} | ETA: {eta(i, len(todo), st.start)}"
             )
-        if i % 100 == 0:
+        if i % 500 == 0:
             save_ckpt(seen)
             print(f"Checkpoint saved at {i} HCPs.")
     save_ckpt(seen)
@@ -618,5 +668,10 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Investigator-first CTGov pipeline")
     p.add_argument("--test", action="store_true")
     p.add_argument("--limit", type=int, default=None)
+    p.add_argument(
+        "--reset-checkpoint",
+        action="store_true",
+        help="Delete checkpoint file before starting (forces full re-processing of all HCPs)",
+    )
     a = p.parse_args()
-    run(a.test, a.limit)
+    run(a.test, a.limit, a.reset_checkpoint)

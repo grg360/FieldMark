@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Download } from "lucide-react";
 
 interface LinkedInAuthScreenProps {
   onAuth: () => void;
@@ -132,7 +133,7 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
             marginTop: 12,
           }}
         >
-          Rising star intelligence for pharma field medical teams.
+          Discover the experts shaping your therapeutic area.
           <br />
           Find the experts before the field does.
         </div>
@@ -200,7 +201,7 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
               cursor: "pointer",
             }}
           >
-            <span style={{ fontSize: 13, color: "#9B6DFF", lineHeight: 1 }}>♞</span>
+            <Download size={16} />
             Install app
           </button>
         )}

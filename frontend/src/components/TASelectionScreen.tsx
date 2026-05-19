@@ -34,6 +34,42 @@ function getSlugForTAName(name: string): string {
   return "rare-disease";
 }
 
+function CohortChip({
+  icon,
+  label,
+  borderColor,
+  backgroundColor,
+  color,
+}: {
+  icon: string;
+  label: string;
+  borderColor: string;
+  backgroundColor: string;
+  color: string;
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        width: "100%",
+        boxSizing: "border-box",
+        fontSize: 11,
+        fontFamily: "monospace",
+        backgroundColor,
+        border: `1px solid ${borderColor}`,
+        color,
+        padding: "2px 8px",
+        borderRadius: 3,
+      }}
+    >
+      <span style={{ fontSize: 10, color }}>{icon}</span>
+      {label}
+    </span>
+  );
+}
+
 function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [counts, setCounts] = useState<Record<string, TACounts>>({});
@@ -108,11 +144,8 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
             const isSelected = selected === ta.name;
             const isImmunology = ta.name === "Immunology";
             const taCounts = counts[getSlugForTAName(ta.name)];
-            const risingStarsLabel = taCounts ? `${taCounts.rising_stars.toLocaleString()} rising stars` : "— rising stars";
-            const darkHorsesLabel = taCounts ? `${taCounts.dark_horses.toLocaleString()} dark horses` : "— dark horses";
-            const workhorsesLabel = taCounts
-              ? `${(taCounts.workhorses ?? 0).toLocaleString()} workhorses`
-              : "— workhorses";
+            const fmt = (n: number | undefined) =>
+              taCounts != null && n != null ? n.toLocaleString() : "—";
             return (
               <button
                 key={ta.name}
@@ -221,63 +254,41 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
                       </div>
                     ) : (
                       <>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            width: "100%",
-                            boxSizing: "border-box",
-                            fontSize: 11,
-                            fontFamily: "monospace",
-                            backgroundColor: "#1A1200",
-                            border: "1px solid #E8A020",
-                            color: "#E8A020",
-                            padding: "2px 8px",
-                            borderRadius: 3,
-                          }}
-                        >
-                          <span style={{ fontSize: 10, color: "#E8A020" }}>★</span>
-                          {risingStarsLabel}
-                        </span>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            width: "100%",
-                            boxSizing: "border-box",
-                            fontSize: 11,
-                            fontFamily: "monospace",
-                            backgroundColor: "#0D0A1A",
-                            border: "1px solid #9B6DFF",
-                            color: "#9B6DFF",
-                            padding: "2px 8px",
-                            borderRadius: 3,
-                          }}
-                        >
-                          <span style={{ fontSize: 10 }}>♞</span>
-                          {darkHorsesLabel}
-                        </span>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            width: "100%",
-                            boxSizing: "border-box",
-                            fontSize: 11,
-                            fontFamily: "monospace",
-                            backgroundColor: "#0A1A18",
-                            border: "1px solid #4ECDC4",
-                            color: "#4ECDC4",
-                            padding: "2px 8px",
-                            borderRadius: 3,
-                          }}
-                        >
-                          <span style={{ fontSize: 10 }}>⚡</span>
-                          {workhorsesLabel}
-                        </span>
+                        <CohortChip
+                          icon="★"
+                          label={`${fmt(taCounts?.rising_stars)} rising stars`}
+                          borderColor="#FFB84D"
+                          backgroundColor="#1A1200"
+                          color="#FFB84D"
+                        />
+                        <CohortChip
+                          icon="▲"
+                          label={`${fmt(taCounts?.established)} established`}
+                          borderColor="#FFD700"
+                          backgroundColor="#1A1800"
+                          color="#FFD700"
+                        />
+                        <CohortChip
+                          icon="◆"
+                          label={`${fmt(taCounts?.community_pool)} community`}
+                          borderColor="#7B9EBD"
+                          backgroundColor="#0A121A"
+                          color="#7B9EBD"
+                        />
+                        <CohortChip
+                          icon="✓"
+                          label={`${fmt(taCounts?.verified_dols)} verified DOLs`}
+                          borderColor="#4ECDC4"
+                          backgroundColor="#0A1A18"
+                          color="#4ECDC4"
+                        />
+                        <CohortChip
+                          icon="#"
+                          label={`${fmt(taCounts?.total_hcps)} total HCPs`}
+                          borderColor="#6B6A65"
+                          backgroundColor="#141413"
+                          color="#6B6A65"
+                        />
                       </>
                     )}
                   </div>
@@ -305,7 +316,7 @@ function TASelectionScreen({ onContinue, onSkip }: TASelectionScreenProps) {
             cursor: selected ? "pointer" : "not-allowed",
           }}
         >
-          {selected ? "Continue to FieldMark" : "Select a therapeutic area"}
+          {selected ? "Continue to FieldMark" : "Select a Therapeutic Area"}
         </button>
       </div>
     </div>
