@@ -547,11 +547,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
       <div
         className="fm-detail-body"
         style={{
-          borderTop: "1px solid #1E1E22",
-          borderRight: "1px solid #1E1E22",
-          borderBottom: "1px solid #1E1E22",
-          borderLeft: "1px solid #1E1E22",
+          border: "1px solid #1E1E22",
           borderRadius: 6,
+          boxSizing: "border-box",
           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.5)",
           margin: "0 16px 24px 16px",
           backgroundColor: "#0A0A0B",
