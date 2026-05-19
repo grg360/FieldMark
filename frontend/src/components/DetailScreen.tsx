@@ -311,6 +311,142 @@ function YearBarChart({
   );
 }
 
+type EngagementMixKey = keyof NonNullable<HCP["engagementMix"]>;
+
+type EngagementMixSlice = {
+  label: string;
+  color: string;
+  value: number;
+  percent: number;
+  startAngle: number;
+  endAngle: number;
+};
+
+const ENGAGEMENT_MIX_DEFS: { key: EngagementMixKey; label: string; color: string }[] = [
+  { key: "speakerBureau", label: "Speaker Bureau", color: "#9B6DFF" },
+  { key: "consulting", label: "Consulting", color: "#4ECDC4" },
+  { key: "honoraria", label: "Honoraria", color: "#FFD700" },
+  { key: "education", label: "Education", color: "#7B9EBD" },
+  { key: "royalty", label: "Royalty", color: "#E8A020" },
+  { key: "foodBeverage", label: "Food & Beverage", color: "#4A9D5F" },
+  { key: "travelLodging", label: "Travel & Lodging", color: "#C95E83" },
+];
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function donutSlicePath(
+  cx: number,
+  cy: number,
+  rOuter: number,
+  rInner: number,
+  startAngle: number,
+  endAngle: number,
+): string {
+  const span = endAngle - startAngle;
+  if (span >= 359.99) {
+    return [
+      `M ${cx} ${cy - rOuter}`,
+      `A ${rOuter} ${rOuter} 0 1 1 ${cx - 0.001} ${cy - rOuter}`,
+      `A ${rOuter} ${rOuter} 0 1 1 ${cx} ${cy - rOuter}`,
+      `M ${cx} ${cy - rInner}`,
+      `A ${rInner} ${rInner} 0 1 0 ${cx + 0.001} ${cy - rInner}`,
+      `A ${rInner} ${rInner} 0 1 0 ${cx} ${cy - rInner}`,
+      "Z",
+    ].join(" ");
+  }
+  const startOuter = polarToCartesian(cx, cy, rOuter, endAngle);
+  const endOuter = polarToCartesian(cx, cy, rOuter, startAngle);
+  const startInner = polarToCartesian(cx, cy, rInner, startAngle);
+  const endInner = polarToCartesian(cx, cy, rInner, endAngle);
+  const largeArc = span > 180 ? 1 : 0;
+  return [
+    `M ${startOuter.x} ${startOuter.y}`,
+    `A ${rOuter} ${rOuter} 0 ${largeArc} 0 ${endOuter.x} ${endOuter.y}`,
+    `L ${startInner.x} ${startInner.y}`,
+    `A ${rInner} ${rInner} 0 ${largeArc} 1 ${endInner.x} ${endInner.y}`,
+    "Z",
+  ].join(" ");
+}
+
+function buildEngagementMixSlices(mix: HCP["engagementMix"]): EngagementMixSlice[] {
+  if (!mix) return [];
+  const items = ENGAGEMENT_MIX_DEFS.map((d) => ({
+    label: d.label,
+    color: d.color,
+    value: mix[d.key] ?? 0,
+  })).filter((i) => i.value > 0);
+  const total = items.reduce((sum, i) => sum + i.value, 0);
+  if (total <= 0) return [];
+
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+  let angle = 0;
+  return sorted.map((item, idx) => {
+    const isLast = idx === sorted.length - 1;
+    const sliceAngle = isLast ? 360 - angle : (item.value / total) * 360;
+    const startAngle = angle;
+    const endAngle = angle + sliceAngle;
+    angle = endAngle;
+    return {
+      ...item,
+      percent: Math.round((item.value / total) * 100),
+      startAngle,
+      endAngle,
+    };
+  });
+}
+
+function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
+  const size = 180;
+  const cx = size / 2;
+  const cy = size / 2;
+  const rOuter = size / 2 - 2;
+  const rInner = 30;
+
+  return (
+    <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
+      <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+        Engagement Mix
+      </div>
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+          {slices.map((slice) => (
+            <path
+              key={slice.label}
+              d={donutSlicePath(cx, cy, rOuter, rInner, slice.startAngle, slice.endAngle)}
+              fill={slice.color}
+            />
+          ))}
+        </svg>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 140 }}>
+          {slices.map((slice) => (
+            <div key={slice.label} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 2,
+                  backgroundColor: slice.color,
+                  flexShrink: 0,
+                  marginTop: 3,
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: "#E8E6DF", lineHeight: 1.3 }}>{slice.label}</div>
+                <div style={{ fontSize: 11, color: "#6B6A65", fontFamily: "monospace", marginTop: 2 }}>
+                  {formatEngagementDollar(slice.value)} ({slice.percent}%)
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
@@ -350,6 +486,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         { year: 2023, value: hcp.beneficiariesByYear.y2023 ?? null },
       ]
     : [];
+
+  const engagementMixSlices = buildEngagementMixSlices(hcp.engagementMix);
 
   const [validation, setValidation] = React.useState({
     dataMatch: null as string | null,
@@ -546,6 +684,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             )}
           </div>
         </div>
+
+        {engagementMixSlices.length > 0 && <EngagementMixSection slices={engagementMixSlices} />}
 
         {isCommunityCohort ? (
           <>

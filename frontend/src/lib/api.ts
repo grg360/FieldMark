@@ -83,6 +83,24 @@ function mapBeneficiariesByYear(
   return { y2021, y2022, y2023 };
 }
 
+function mapEngagementMix(
+  pay: Record<string, unknown> | null | undefined,
+): HCP["engagementMix"] {
+  if (!pay) return null;
+  const mix = {
+    speakerBureau: parseOptionalNumber(pay.speaker_bureau_3yr),
+    consulting: parseOptionalNumber(pay.consulting_3yr),
+    honoraria: parseOptionalNumber(pay.honoraria_3yr),
+    education: parseOptionalNumber(pay.education_3yr),
+    royalty: parseOptionalNumber(pay.royalty_3yr),
+    foodBeverage: parseOptionalNumber(pay.food_beverage_3yr),
+    travelLodging: parseOptionalNumber(pay.travel_lodging_3yr),
+  };
+  const hasValue = Object.values(mix).some((v) => v != null && v > 0);
+  if (!hasValue) return null;
+  return mix;
+}
+
 function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
   const hcp = row.hcps ?? {};
   const med = firstEmbedded(hcp.hcp_medicare_summary ?? row.hcp_medicare_summary);
@@ -157,6 +175,7 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     cohort_score: parseOptionalNumber(hcp.cohort_score ?? row.cohort_score),
     paymentsByYear: mapPaymentsByYear(pay as Record<string, unknown> | undefined),
     beneficiariesByYear: mapBeneficiariesByYear(med as Record<string, unknown> | undefined),
+    engagementMix: mapEngagementMix(pay as Record<string, unknown> | undefined),
   };
 }
 
@@ -764,7 +783,14 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
             total_payments_lifetime,
             py2022_total,
             py2023_total,
-            py2024_total
+            py2024_total,
+            speaker_bureau_3yr,
+            consulting_3yr,
+            honoraria_3yr,
+            education_3yr,
+            royalty_3yr,
+            food_beverage_3yr,
+            travel_lodging_3yr
           )
         )
       `,

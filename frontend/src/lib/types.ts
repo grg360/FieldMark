@@ -40,6 +40,15 @@ export interface HCP {
     y2022?: number | null;
     y2023?: number | null;
   } | null;
+  engagementMix?: {
+    speakerBureau?: number | null;
+    consulting?: number | null;
+    honoraria?: number | null;
+    education?: number | null;
+    royalty?: number | null;
+    foodBeverage?: number | null;
+    travelLodging?: number | null;
+  } | null;
 }
 
 export interface HCPScore {
