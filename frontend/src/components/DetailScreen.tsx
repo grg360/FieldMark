@@ -399,18 +399,18 @@ function buildEngagementMixSlices(mix: HCP["engagementMix"]): EngagementMixSlice
 }
 
 function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
-  const size = 180;
+  const size = 140;
   const cx = size / 2;
   const cy = size / 2;
   const rOuter = size / 2 - 2;
-  const rInner = 30;
+  const rInner = 23;
 
   return (
-    <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
-      <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+    <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #1E1E22" }}>
+      <div style={{ fontSize: 15, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
         Engagement Mix
       </div>
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
           {slices.map((slice) => (
             <path
@@ -420,9 +420,19 @@ function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
             />
           ))}
         </svg>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 140 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            rowGap: 8,
+            columnGap: 16,
+            flex: 1,
+            minWidth: 0,
+            alignContent: "start",
+          }}
+        >
           {slices.map((slice) => (
-            <div key={slice.label} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <div key={slice.label} style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
               <span
                 style={{
                   width: 8,
@@ -430,12 +440,12 @@ function EngagementMixSection({ slices }: { slices: EngagementMixSlice[] }) {
                   borderRadius: 2,
                   backgroundColor: slice.color,
                   flexShrink: 0,
-                  marginTop: 3,
+                  marginTop: 2,
                 }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: "#E8E6DF", lineHeight: 1.3 }}>{slice.label}</div>
-                <div style={{ fontSize: 11, color: "#6B6A65", fontFamily: "monospace", marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: "#E8E6DF", lineHeight: 1.2 }}>{slice.label}</div>
+                <div style={{ fontSize: 11, color: "#6B6A65", fontFamily: "monospace", marginTop: 1, lineHeight: 1.2 }}>
                   {formatEngagementDollar(slice.value)} ({slice.percent}%)
                 </div>
               </div>
@@ -537,7 +547,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
       <div
         className="fm-detail-body"
         style={{
-          borderTop: `3px solid ${cohortAccentColor(hcp.cohort_classification)}`,
+          borderTop: "1px solid #1E1E22",
           borderRight: "1px solid #1E1E22",
           borderBottom: "1px solid #1E1E22",
           borderLeft: "1px solid #1E1E22",
