@@ -306,7 +306,7 @@ export async function getRisingStars(
       const taName = taNameForSlug(taSlug);
       countQuery = supabase
         .from("established_leaderboard_display_v1")
-        .select("id", { count: "estimated", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("ta_name", taName);
       listQuery = supabase
         .from("established_leaderboard_display_v1")
