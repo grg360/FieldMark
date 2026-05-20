@@ -4,7 +4,45 @@ import { getHCPNarrative } from "../lib/api";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { buildSubline, titleCaseCity } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
-type DetailHCP = HCP;
+type DetailHCP = HCP & {
+  derivedState?: string | null;
+};
+
+function identificationAddressContent(hcp: DetailHCP): React.ReactNode | null {
+  const derivedState = (hcp.derivedState ?? "").trim();
+  const practiceState = (hcp.nppesPracticeState ?? "").trim().toUpperCase() || derivedState.toUpperCase();
+  const practiceCity = (hcp.nppesPracticeCity ?? "").trim();
+  const practiceAddress = (hcp.nppesPracticeAddress ?? "").trim();
+  const practiceZip = (hcp.nppesPracticeZip ?? "").trim();
+
+  if (!practiceAddress && !practiceCity && !practiceState) {
+    return null;
+  }
+
+  const cityStateLine = [
+    practiceCity ? titleCaseCity(practiceCity) : "",
+    practiceState,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const zipSuffix = practiceZip ? ` ${practiceZip}` : "";
+
+  if (practiceAddress) {
+    return (
+      <>
+        <div>{practiceAddress}</div>
+        {(cityStateLine || practiceZip) && <div>{cityStateLine}{zipSuffix}</div>}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {cityStateLine}
+      {zipSuffix}
+    </>
+  );
+}
 
 const COMMUNITY_MAX_ENGAGEMENT = 8400000;
 const COMMUNITY_MAX_COMPANIES = 82;
@@ -76,7 +114,7 @@ const ShareIcon = () => (
   </svg>
 );
 
-function CohortScorePill({ value }: { value: string | number }) {
+function CohortScorePill({ value, muted }: { value: string | number; muted?: boolean }) {
   return (
     <div
       style={{
@@ -94,7 +132,15 @@ function CohortScorePill({ value }: { value: string | number }) {
       <span style={{ fontSize: 12, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center" }}>
         Cohort score
       </span>
-      <span style={{ fontSize: 28, color: "#FFB84D", fontFamily: "monospace", fontWeight: 700, textAlign: "center" }}>
+      <span
+        style={{
+          fontSize: muted ? 16 : 28,
+          color: muted ? "#6B6A65" : "#FFB84D",
+          fontFamily: "monospace",
+          fontWeight: muted ? 500 : 700,
+          textAlign: "center",
+        }}
+      >
         {value}
       </span>
     </div>
@@ -102,6 +148,9 @@ function CohortScorePill({ value }: { value: string | number }) {
 }
 
 function DetailHeaderMetrics({ hcp }: { hcp: DetailHCP }) {
+  if (isUnclassifiedCohort(hcp.cohort_classification)) {
+    return <CohortScorePill value="Unclassified" muted />;
+  }
   return <CohortScorePill value={formatCohortScore(hcp.cohortScore ?? null)} />;
 }
 
@@ -154,6 +203,12 @@ function narrativeSectionLabel(cohort: string | null | undefined): string {
   if (c === "community" || c === "workhorse") return "Why this practitioner";
   if (c === "rising_star" || c === "dark_horse") return "Why rising star";
   return "Profile";
+}
+
+function isUnclassifiedCohort(cohort: string | null | undefined): boolean {
+  const c = (cohort ?? "").trim().toLowerCase();
+  if (!c) return true;
+  return !["established", "rising_star", "dark_horse", "community", "workhorse"].includes(c);
 }
 
 const COMMUNITY_TIMELINE_COLOR = "#7B9EBD";
@@ -503,6 +558,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
     };
   }, [hcp.hcp_id, hcp.id, hcp.specialty]);
 
+  const isUnclassified = isUnclassifiedCohort(hcp.cohort_classification);
   const isCommunityCohort =
     hcp.cohort_classification === "community" || hcp.cohort_classification === "workhorse";
   const isEstablishedCohort = hcp.cohort_classification === "established";
@@ -668,31 +724,48 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </div>
         )}
 
-        {/* Why rising star section */}
+        {/* Narrative / unclassified notice */}
         <div
           style={{
             padding: "16px 16px 12px",
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-            {narrativeSectionLabel(hcp.cohort_classification)}
-          </div>
-          <div
-            style={{
-              borderLeft: `3px solid ${cohortBarColor}`,
-              paddingLeft: 12,
-              fontSize: 14,
-              color: "#B8B4AC",
-              lineHeight: 1.6,
-            }}
-          >
-            {narrativeLoading
-              ? "Loading..."
-              : narrative
-                ? narrative
-                : "Narrative generating — check back soon."}
-          </div>
+          {isUnclassified ? (
+            <div
+              style={{
+                backgroundColor: "#18181B",
+                borderLeft: "4px solid #71717A",
+                padding: 16,
+                borderRadius: 4,
+              }}
+            >
+              <p style={{ fontSize: 14, color: "#A1A1AA", lineHeight: 1.6, margin: 0 }}>
+                Unclassified — this HCP is in our database but hasn&apos;t met cohort criteria. Available data shown below.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                {narrativeSectionLabel(hcp.cohort_classification)}
+              </div>
+              <div
+                style={{
+                  borderLeft: `3px solid ${cohortBarColor}`,
+                  paddingLeft: 12,
+                  fontSize: 14,
+                  color: "#B8B4AC",
+                  lineHeight: 1.6,
+                }}
+              >
+                {narrativeLoading
+                  ? "Loading..."
+                  : narrative
+                    ? narrative
+                    : "Narrative generating — check back soon."}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Score breakdown */}
@@ -988,33 +1061,28 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
               Identification
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontFamily: "monospace" }}>
-              {hcp.npiNumber && (
+              {hcp.npiNumber ? (
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: "#6B6A65" }}>NPI</span>
                   <span style={{ color: "#E8E6DF" }}>{hcp.npiNumber}</span>
                 </div>
-              )}
-              {(hcp.nppesPracticeAddress || hcp.nppesPracticeCity) && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{ color: "#6B6A65" }}>Address</span>
-                  <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>
-                    {hcp.nppesPracticeAddress && <div>{hcp.nppesPracticeAddress}</div>}
-                    {hcp.nppesPracticeCity && (
-                      <div>
-                        {titleCaseCity(hcp.nppesPracticeCity)}
-                        {hcp.nppesPracticeState ? `, ${hcp.nppesPracticeState.trim().toUpperCase()}` : ""}
-                        {hcp.nppesPracticeZip ? ` ${hcp.nppesPracticeZip.trim()}` : ""}
-                      </div>
-                    )}
-                  </span>
-                </div>
-              )}
-              {hcp.npiSpecialty && (
+              ) : null}
+              {(() => {
+                const addressContent = identificationAddressContent(hcp);
+                if (!addressContent) return null;
+                return (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <span style={{ color: "#6B6A65" }}>Address</span>
+                    <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{addressContent}</span>
+                  </div>
+                );
+              })()}
+              {hcp.npiSpecialty ? (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <span style={{ color: "#6B6A65", flexShrink: 0 }}>Specialty</span>
                   <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{hcp.npiSpecialty}</span>
                 </div>
-              )}
+              ) : null}
             </div>
             {hcp.npiNumber && (
               <a
