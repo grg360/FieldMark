@@ -1,5 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
+import { getHCPNarrative } from "../lib/api";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { buildSubline, titleCaseCity } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
@@ -475,7 +476,32 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [engagementTooltipYear, setEngagementTooltipYear] = useState<number | null>(null);
   const [volumeTooltipYear, setVolumeTooltipYear] = useState<number | null>(null);
-  const narrative = hcp.narrative || "Narrative generating — check back soon.";
+  const [narrative, setNarrative] = useState<string | null>(hcp.narrative ?? null);
+  const [narrativeLoading, setNarrativeLoading] = useState(true);
+
+  useEffect(() => {
+    const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
+    if (!hcpId) {
+      setNarrativeLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setNarrativeLoading(true);
+
+    void (async () => {
+      const { data, error } = await getHCPNarrative(hcpId, hcp.specialty);
+      if (cancelled) return;
+      if (!error) {
+        setNarrative(data);
+      }
+      setNarrativeLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id, hcp.specialty]);
 
   const isCommunityCohort =
     hcp.cohort_classification === "community" || hcp.cohort_classification === "workhorse";
@@ -661,7 +687,11 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
               lineHeight: 1.6,
             }}
           >
-            {narrative}
+            {narrativeLoading
+              ? "Loading..."
+              : narrative
+                ? narrative
+                : "Narrative generating — check back soon."}
           </div>
         </div>
 

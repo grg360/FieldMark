@@ -181,6 +181,65 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
 
 export type FeedCohort = "rising_star" | "community" | "established";
 
+function resolveTAId(therapeuticArea: string | undefined): string | undefined {
+  if (!therapeuticArea?.trim()) return undefined;
+  const normalized = therapeuticArea.toLowerCase().trim();
+  const slugByLabel: Record<string, string> = {
+    "rare disease": "rare-disease",
+    hepatology: "hepatology",
+    nsclc: "nsclc",
+    oncology: "oncology",
+    immunology: "immunology",
+  };
+  const slug = slugByLabel[normalized] ?? normalized.replace(/\s+/g, "-");
+  return TA_ID_MAP[slug];
+}
+
+/** TA-specific narrative first, then most recent narrative for this HCP. */
+export async function getHCPNarrative(
+  hcpId: string,
+  therapeuticArea?: string,
+): Promise<ApiResult<string | null>> {
+  try {
+    const taId = resolveTAId(therapeuticArea);
+
+    if (taId) {
+      const { data, error } = await supabase
+        .from("hcp_narratives")
+        .select("narrative")
+        .eq("hcp_id", hcpId)
+        .eq("therapeutic_area_id", taId)
+        .maybeSingle();
+
+      if (error) {
+        return { data: null, error: error.message };
+      }
+      if (data?.narrative) {
+        return { data: data.narrative as string, error: null };
+      }
+    }
+
+    const fallback = await supabase
+      .from("hcp_narratives")
+      .select("narrative")
+      .eq("hcp_id", hcpId)
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fallback.error) {
+      return { data: null, error: fallback.error.message };
+    }
+
+    return { data: (fallback.data?.narrative as string | null) ?? null, error: null };
+  } catch (err) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : "Unknown error occurred",
+    };
+  }
+}
+
 export async function getRisingStars(
   therapeuticArea: string,
   limit: number = 20,
@@ -373,15 +432,46 @@ export async function getRisingStars(
 
     const narrativeHcpIds = filteredRows.map((r) => r.id);
 
-    const { data: narrativeData } = await supabase
-      .from("hcp_narratives")
-      .select("hcp_id, narrative")
-      .in("hcp_id", narrativeHcpIds)
-      .eq("therapeutic_area_id", taId);
+    const narrativeMap = new Map<string, string | null>();
 
-    const narrativeMap = new Map(
-      (narrativeData || []).map((n) => [String(n.hcp_id), n.narrative as string | null]),
-    );
+    if (narrativeHcpIds.length > 0) {
+      const { data: narrativeData, error: narrativeError } = await supabase
+        .from("hcp_narratives")
+        .select("hcp_id, narrative")
+        .in("hcp_id", narrativeHcpIds)
+        .eq("therapeutic_area_id", taId);
+
+      if (narrativeError) {
+        return { data: null, error: narrativeError.message };
+      }
+
+      for (const n of narrativeData || []) {
+        narrativeMap.set(String(n.hcp_id), n.narrative as string | null);
+      }
+
+      const missingNarrativeIds = narrativeHcpIds.filter(
+        (id) => !narrativeMap.get(String(id)),
+      );
+
+      if (missingNarrativeIds.length > 0) {
+        const { data: fallbackRows, error: fallbackError } = await supabase
+          .from("hcp_narratives")
+          .select("hcp_id, narrative, generated_at")
+          .in("hcp_id", missingNarrativeIds)
+          .order("generated_at", { ascending: false });
+
+        if (fallbackError) {
+          return { data: null, error: fallbackError.message };
+        }
+
+        for (const n of fallbackRows || []) {
+          const hid = String(n.hcp_id);
+          if (!narrativeMap.get(hid)) {
+            narrativeMap.set(hid, n.narrative as string | null);
+          }
+        }
+      }
+    }
 
     const risingStars: RisingStar[] = filteredRows.flatMap((row) => {
       const scoresRaw = (row as { hcp_scores?: unknown }).hcp_scores;
@@ -743,7 +833,10 @@ export async function getVerifiedDOLs(
   }
 }
 
-export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>> {
+export async function getHCPDetail(
+  hcpId: string,
+  therapeuticArea?: string,
+): Promise<ApiResult<HCPDetail>> {
   try {
     const { data: scoreRow, error: scoreError } = await supabase
       .from("hcp_scores")
@@ -826,10 +919,12 @@ export async function getHCPDetail(hcpId: string): Promise<ApiResult<HCPDetail>>
       return { data: null, error: trialError.message };
     }
 
-    const base = mapRisingStarRow(scoreRow, "");
+    const base = mapRisingStarRow(scoreRow, therapeuticArea ?? "");
+    const narrativeResult = await getHCPNarrative(hcpId, therapeuticArea);
 
     const detail: HCPDetail = {
       ...base,
+      narrative: narrativeResult.data ?? base.narrative ?? null,
       publications: (publications ?? []) as HCPPublication[],
       trial_count: trialCount ?? 0,
     };
