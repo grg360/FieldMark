@@ -304,6 +304,7 @@ export async function getRisingStars(
         .range(offset, offset + limit - 1);
     } else {
       const taName = taNameForSlug(taSlug);
+      console.log("[Established] taSlug=", taSlug, "→ taName=", taName, "taId=", taId);
       countQuery = supabase
         .from("established_leaderboard_display_v1")
         .select("id", { count: "exact" })
@@ -358,6 +359,8 @@ export async function getRisingStars(
     }
 
     let rowsForFeed: Array<Record<string, unknown>> = hcpRows as Array<Record<string, unknown>>;
+    console.log("[Established] hcpRows count=", (hcpRows ?? []).length,
+                "first row keys=", hcpRows?.[0] ? Object.keys(hcpRows[0]) : "none");
     if (cohort === "established") {
       const establishedIds = rowsForFeed.map((r) => String(r.id));
       const { data: scoreRows, error: scoresError } = await supabase
@@ -409,6 +412,7 @@ export async function getRisingStars(
       if (!inst) return true;
       return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
     });
+    console.log("[Established] after INDUSTRY_PATTERNS filter, filteredRows count=", filteredRows.length);
 
     const narrativeHcpIds = filteredRows.map((r) => String(r.id));
 
@@ -489,6 +493,8 @@ export async function getRisingStars(
         },
       ];
     });
+    console.log("[Established] final risingStars count=", risingStars.length,
+                "first=", risingStars[0]);
 
     const rows = dedupeHCPs(risingStars);
 
