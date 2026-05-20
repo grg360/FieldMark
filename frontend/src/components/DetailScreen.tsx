@@ -10,6 +10,11 @@ const COMMUNITY_MAX_COMPANIES = 82;
 const COMMUNITY_MAX_PATIENTS = 63449;
 const COMMUNITY_MAX_YEARS = 72;
 
+const ESTABLISHED_MAX_PUBS = 7206;
+const ESTABLISHED_MAX_YEARS = 47;
+const ESTABLISHED_MAX_ENGAGEMENT = 3886191;
+const ESTABLISHED_MAX_TRIAL = 96;
+
 function cohortAccentColor(cohort: string | null | undefined): string {
   const c = (cohort ?? "").trim();
   if (c === "rising_star" || c === "dark_horse") return "#9B6DFF";
@@ -36,6 +41,11 @@ function parsePubVelNumeric(pubVel: string): number | null {
 function formatResearchScoreValue(n: number | null | undefined): string | number {
   if (n == null || !Number.isFinite(n)) return "—";
   return Number(n).toFixed(1);
+}
+
+function formatEstablishedTrialValue(n: number | null | undefined): string | number {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return String(Math.round(n));
 }
 
 function citTrajScorePercent(citTraj: HCP["citTraj"]): number {
@@ -100,6 +110,7 @@ function ScoreRow({
   value,
   percent,
   barColor = "#E8A020",
+  tooltipKey,
   activeTooltip,
   onTooltipChange,
 }: {
@@ -107,15 +118,17 @@ function ScoreRow({
   value: string | number;
   percent: number;
   barColor?: string;
+  tooltipKey?: string;
   activeTooltip: string | null;
   onTooltipChange: (k: string | null) => void;
 }) {
+  const resolvedTooltipKey = tooltipKey ?? label;
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
         <StatPillWithTooltip
           label={label}
-          tooltipKey={label}
+          tooltipKey={resolvedTooltipKey}
           activeTooltip={activeTooltip}
           onTooltipChange={onTooltipChange}
         >
@@ -470,6 +483,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
   const isCommunityCohort =
     hcp.cohort_classification === "community" || hcp.cohort_classification === "workhorse";
+  const isEstablishedCohort = hcp.cohort_classification === "established";
   const cohortBarColor = cohortAccentColor(hcp.cohort_classification);
 
   const pubVelNumeric = parsePubVelNumeric(hcp.pubVel);
@@ -698,6 +712,42 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                   label="Years in Practice"
                   value={formatIntDisplay(hcp.careerYears ?? null)}
                   percent={cappedPercent(hcp.careerYears, COMMUNITY_MAX_YEARS)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+              </>
+            ) : isEstablishedCohort ? (
+              <>
+                <ScoreRow
+                  label="Career Publications"
+                  value={formatIntDisplay(hcp.totalCareerPubs ?? null)}
+                  percent={cappedPercent(hcp.totalCareerPubs, ESTABLISHED_MAX_PUBS)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+                <ScoreRow
+                  label="Career Years"
+                  value={formatIntDisplay(hcp.careerYears ?? null)}
+                  percent={cappedPercent(hcp.careerYears, ESTABLISHED_MAX_YEARS)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+                <ScoreRow
+                  label="Pharma Engagement"
+                  value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)}
+                  percent={cappedPercent(hcp.openPaymentsLifetime, ESTABLISHED_MAX_ENGAGEMENT)}
+                  barColor={cohortBarColor}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+                <ScoreRow
+                  label="Trial Activity"
+                  tooltipKey="Established Trial Activity"
+                  value={formatEstablishedTrialValue(hcp.trialScore)}
+                  percent={cappedPercent(hcp.trialScore, ESTABLISHED_MAX_TRIAL)}
                   barColor={cohortBarColor}
                   activeTooltip={activeTooltip}
                   onTooltipChange={setActiveTooltip}

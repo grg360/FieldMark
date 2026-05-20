@@ -38,6 +38,19 @@ const TA_INDICATION_IDS: Record<string, string[]> = {
   immunology: [], // coming soon
 };
 
+/** therapeutic_areas.name values used by established_leaderboard_display_v1.ta_name */
+const TA_NAME_BY_SLUG: Record<string, string> = {
+  "rare-disease": "Rare Disease",
+  hepatology: "Hepatology",
+  nsclc: "NSCLC",
+  oncology: "Oncology",
+  immunology: "Immunology",
+};
+
+function taNameForSlug(slug: string): string {
+  return TA_NAME_BY_SLUG[slug.toLowerCase().trim()] ?? slug;
+}
+
 const INDUSTRY_PATTERNS = [
   "pfizer", "merck", "novartis", "roche", "genentech", "astrazeneca",
   "glaxosmithkline", "gsk", "sanofi", "bristol myers", "bristol-myers",
@@ -290,10 +303,15 @@ export async function getRisingStars(
         .order("cohort_score", { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1);
     } else {
-      countQuery = countBase().eq("cohort_classification", "established").eq("country", "USA");
-      listQuery = listBase()
-        .eq("cohort_classification", "established")
-        .eq("country", "USA")
+      const taName = taNameForSlug(taSlug);
+      countQuery = supabase
+        .from("established_leaderboard_display_v1")
+        .select("id", { count: "estimated", head: true })
+        .eq("ta_name", taName);
+      listQuery = supabase
+        .from("established_leaderboard_display_v1")
+        .select("*")
+        .eq("ta_name", taName)
         .order("cohort_score", { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1);
     }
@@ -338,7 +356,27 @@ export async function getRisingStars(
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: totalCount ?? 0 }, error: null };
     }
 
-    const hcpIds = (hcpRows || []).map((r) => r.id);
+    let rowsForFeed: Array<Record<string, unknown>> = hcpRows as Array<Record<string, unknown>>;
+    if (cohort === "established") {
+      const establishedIds = rowsForFeed.map((r) => String(r.id));
+      const { data: scoreRows, error: scoresError } = await supabase
+        .from("hcp_scores")
+        .select(
+          "hcp_id, composite_score, normalized_score, pub_velocity_score, citation_trajectory_score, trial_investigator_score, tier, therapeutic_area_id",
+        )
+        .in("hcp_id", establishedIds)
+        .eq("therapeutic_area_id", taId);
+      if (scoresError) {
+        return { data: null, error: scoresError.message };
+      }
+      const scoreByHcp = new Map((scoreRows ?? []).map((s) => [String(s.hcp_id), s]));
+      rowsForFeed = rowsForFeed.map((row) => ({
+        ...row,
+        hcp_scores: scoreByHcp.get(String(row.id)) ?? null,
+      }));
+    }
+
+    const hcpIds = rowsForFeed.map((r) => String(r.id));
 
     const [medicareResult, opResult] = await Promise.all([
       supabase
@@ -365,13 +403,13 @@ export async function getRisingStars(
       (opResult.data || []).map((r) => [String(r.hcp_id), r]),
     );
 
-    const filteredRows = (hcpRows ?? []).filter((row) => {
+    const filteredRows = rowsForFeed.filter((row) => {
       const inst = String(row.institution ?? row.institution_short ?? "").toLowerCase();
       if (!inst) return true;
       return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
     });
 
-    const narrativeHcpIds = filteredRows.map((r) => r.id);
+    const narrativeHcpIds = filteredRows.map((r) => String(r.id));
 
     const { data: narrativeData } = await supabase
       .from("hcp_narratives")
@@ -384,7 +422,7 @@ export async function getRisingStars(
     );
 
     const risingStars: RisingStar[] = filteredRows.flatMap((row) => {
-      const scoresRaw = (row as { hcp_scores?: unknown }).hcp_scores;
+      const scoresRaw = row.hcp_scores;
       const scoresArr = Array.isArray(scoresRaw)
         ? scoresRaw
         : scoresRaw

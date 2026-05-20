@@ -44,7 +44,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -130,6 +130,30 @@ def fetch_all_rows(supabase: Client, table: str, columns: str, page_size: int = 
             break
         offset += page_size
     return rows
+
+
+def load_existing_narrative_keys(supabase: Client, model_version: str) -> Set[Tuple[str, str]]:
+    existing: Set[Tuple[str, str]] = set()
+    page_size = 1000
+    offset = 0
+    while True:
+        response = (
+            supabase.table("hcp_narratives")
+            .select("hcp_id, therapeutic_area_id")
+            .eq("model_version", model_version)
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        batch = response.data or []
+        if not batch:
+            break
+        for row in batch:
+            if row.get("hcp_id") and row.get("therapeutic_area_id"):
+                existing.add((row["hcp_id"], row["therapeutic_area_id"]))
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return existing
 
 
 def safe_int(value: object) -> Optional[int]:
@@ -586,6 +610,23 @@ def run_pipeline(target_cohorts: List[str], community_top_n: int, dry_run: bool,
     if not contexts:
         print("No HCPs found for target cohorts. Exiting.")
         return
+
+    if not force:
+        print("Checking for existing narratives...")
+        existing_keys = load_existing_narrative_keys(supabase, ANTHROPIC_MODEL)
+        original_count = len(contexts)
+        contexts = [
+            ctx for ctx in contexts
+            if (ctx.hcp_id, ctx.therapeutic_area_id) not in existing_keys
+        ]
+        skipped = original_count - len(contexts)
+        if skipped > 0:
+            print(f"Skipping {skipped} HCP×TA pairs that already have narratives from this model version.")
+            print(f"Generating {len(contexts)} new narratives.")
+
+        if not contexts:
+            print("No new narratives to generate. All target HCPs already have narratives.")
+            return
 
     # Cost estimate
     estimated_cost = estimate_cost(len(contexts))
