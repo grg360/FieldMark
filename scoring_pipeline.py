@@ -46,6 +46,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from tqdm import tqdm
 
 SCORE_VERSION = "v1.4"
 # When OpenAlex has enriched hcps.total_career_pubs, require this minimum for rankings / non-zero composite.
@@ -666,7 +667,7 @@ def compute_scores(
     trial_by_pair: Dict[Tuple[str, str], float] = {}
 
     now_iso = datetime.now(timezone.utc).isoformat()
-    for key in valid_pairs:
+    for key in tqdm(valid_pairs, desc="computing scores", unit="pair"):
         hcp_id, ta_id = key
         pub_velocity = pub_velocity_scores.get(key, 0.0)
         citation = citation_scores.get(key, 0.0)

@@ -6,9 +6,21 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import sys
+import io
+
+# Force UTF-8 stdout/stderr on Windows where default cp1252 chokes on
+# Unicode characters that appear in pharma data (e.g. Bristol-Myers Squibb
+# uses a Unicode hyphen, accented HCP names, etc.)
+if sys.stdout.encoding != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if sys.stderr.encoding != "utf-8":
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 import duckdb
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from tqdm import tqdm
 
 
 PARQUET_FILES = [
@@ -352,7 +364,53 @@ if __name__ == "__main__":
         for r in by_ta_rows_raw
     ]
 
-    print(f"Computed {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows")
+    # Phase 6.5 top_companies agg - aggregate per HCP per manufacturer, keep top 10
+    top_companies_query = f"""
+    WITH per_company AS (
+      SELECT
+        hcp_id,
+        manufacturer_name,
+        SUM(payment_amount_usd) AS total_amount_usd,
+        COUNT(*) AS payment_count,
+        MAX(CASE WHEN payment_date IS NOT NULL AND payment_date <> '' THEN strptime(payment_date, '%m/%d/%Y') ELSE NULL END) AS most_recent_payment_date
+      FROM filtered_payments
+      WHERE {pharma_filter}
+        AND manufacturer_name IS NOT NULL
+        AND manufacturer_name <> ''
+      GROUP BY hcp_id, manufacturer_name
+    ),
+    ranked AS (
+      SELECT
+        hcp_id,
+        manufacturer_name,
+        total_amount_usd,
+        payment_count,
+        most_recent_payment_date,
+        ROW_NUMBER() OVER (PARTITION BY hcp_id ORDER BY total_amount_usd DESC, manufacturer_name ASC) AS rank_by_amount
+      FROM per_company
+    )
+    SELECT *
+    FROM ranked
+    WHERE rank_by_amount <= 10
+    """
+    top_companies_rows_raw = rows_to_dicts(con.execute(top_companies_query))
+    top_companies_rows = [
+        {
+            "hcp_id": r["hcp_id"],
+            "manufacturer_name": r["manufacturer_name"],
+            "total_amount_usd": float(r.get("total_amount_usd") or 0.0),
+            "payment_count": int(r.get("payment_count") or 0),
+            "most_recent_payment_date": (
+                r["most_recent_payment_date"].date().isoformat()
+                if r.get("most_recent_payment_date") is not None
+                else None
+            ),
+            "rank_by_amount": int(r.get("rank_by_amount") or 0),
+        }
+        for r in top_companies_rows_raw
+    ]
+
+    print(f"Computed {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows, {len(top_companies_rows)} top_companies rows")
 
     # Phase 8 - Level 1 stats
     hcp_with_summary = len(summary_rows)
@@ -500,7 +558,9 @@ if __name__ == "__main__":
             trunc_summary_count = len(trunc_summary_resp.data or [])
             print(f"Truncated hcp_open_payments_summary ({trunc_summary_count})")
 
-            for start_idx in range(0, len(summary_rows), WRITE_BATCH_SIZE):
+            for start_idx in tqdm(
+                range(0, len(summary_rows), WRITE_BATCH_SIZE), desc="summary", unit="batch"
+            ):
                 batch = summary_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
                     client.table("hcp_open_payments_summary").insert(batch).execute()
@@ -517,7 +577,9 @@ if __name__ == "__main__":
             trunc_by_ta_count = len(trunc_by_ta_resp.data or [])
             print(f"Truncated hcp_open_payments_by_ta ({trunc_by_ta_count})")
 
-            for start_idx in range(0, len(by_ta_rows), WRITE_BATCH_SIZE):
+            for start_idx in tqdm(
+                range(0, len(by_ta_rows), WRITE_BATCH_SIZE), desc="by_ta", unit="batch"
+            ):
                 batch = by_ta_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
                     client.table("hcp_open_payments_by_ta").insert(batch).execute()
@@ -530,13 +592,36 @@ if __name__ == "__main__":
                     errors.append(f"by_ta_insert_batch_{start_idx}: {repr(exc)}")
                     print(f"by_ta batch failed at offset {start_idx}: {exc}")
 
+            inserted_top_companies = 0
+
+            trunc_top_companies_resp = client.table("hcp_open_payments_top_companies").delete().neq("id", DELETE_GUARD_ID).execute()
+            trunc_top_companies_count = len(trunc_top_companies_resp.data or [])
+            print(f"Truncated hcp_open_payments_top_companies ({trunc_top_companies_count})")
+
+            for start_idx in tqdm(
+                range(0, len(top_companies_rows), WRITE_BATCH_SIZE), desc="top_companies", unit="batch"
+            ):
+                batch = top_companies_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
+                try:
+                    client.table("hcp_open_payments_top_companies").insert(batch).execute()
+                    inserted_top_companies += len(batch)
+                    print(
+                        f"Inserted top_companies batch {start_idx // WRITE_BATCH_SIZE + 1} "
+                        f"({inserted_top_companies}/{len(top_companies_rows)})"
+                    )
+                except Exception as exc:
+                    errors.append(f"top_companies_insert_batch_{start_idx}: {repr(exc)}")
+                    print(f"top_companies batch failed at offset {start_idx}: {exc}")
+
             rows_inserted = {
                 "summary_rows_inserted": inserted_summary,
                 "by_ta_rows_inserted": inserted_by_ta,
+                "top_companies_rows_inserted": inserted_top_companies,
             }
             print(
                 f"Execute complete. Inserted summary={inserted_summary}/{len(summary_rows)}, "
-                f"by_ta={inserted_by_ta}/{len(by_ta_rows)}"
+                f"by_ta={inserted_by_ta}/{len(by_ta_rows)}, "
+                f"top_companies={inserted_top_companies}/{len(top_companies_rows)}"
             )
 
     elapsed_seconds = time.time() - started
@@ -548,6 +633,7 @@ if __name__ == "__main__":
         "filtered_payment_rows": int(filtered_payment_rows),
         "summary_rows_computed": len(summary_rows),
         "by_ta_rows_computed": len(by_ta_rows),
+        "top_companies_rows_computed": len(top_companies_rows),
         "level_1_stats": level_1_stats,
         "level_2_canonicals": level_2_canonicals,
         "level_3_unmatched": level_3_unmatched,

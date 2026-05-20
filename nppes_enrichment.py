@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import duckdb
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from tqdm import tqdm
 
 
 INDIVIDUALS_PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
@@ -415,7 +416,7 @@ if __name__ == "__main__":
 
     today = datetime.now(timezone.utc).date()
     enriched_rows: List[Dict[str, Any]] = []
-    for r in final_rows:
+    for r in tqdm(final_rows, desc="enriching HCPs", unit="hcp"):
         org_name = (r.get("matched_organization_name_legal") or r.get("matched_organization_name_other") or "").upper()
         sole = (r.get("is_sole_proprietor") or "").strip().upper()
         coloc = int(r.get("co_located_npi_count") or 0)

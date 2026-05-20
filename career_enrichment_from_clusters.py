@@ -31,6 +31,7 @@ import requests
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from supabase import Client, create_client
+from tqdm import tqdm
 
 OPENALEX_BASE_URL = "https://api.openalex.org"
 FETCH_PAGE_SIZE = 1000
@@ -338,7 +339,7 @@ def run_pipeline(args: argparse.Namespace) -> EnrichmentStats:
 
     start_time = time.time()
 
-    for idx, cand in enumerate(candidates, start=1):
+    for idx, cand in enumerate(tqdm(candidates, desc="enriching careers (clusters)", unit="hcp"), start=1):
         if not cand.author_ids:
             stats.no_cluster += 1
             stats.skipped += 1

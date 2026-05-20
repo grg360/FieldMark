@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+from tqdm import tqdm
+
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
@@ -605,7 +607,7 @@ def insert_publication_authors_batch(
     except Exception as exc:
         eprint(f"[insert batch n={len(rows)}] {exc}")
         nok = 0
-        for r in rows:
+        for r in tqdm(rows, desc="insert fallback (per row)", unit="row"):
             try:
                 supabase.table("publication_authors").insert([r]).execute()
                 nok += 1
@@ -869,7 +871,7 @@ def main() -> None:
         if not batch:
             break
 
-        for pub in batch:
+        for pub in tqdm(batch, desc="processing publications", unit="pub"):
             if args.limit is not None and pubs_processed >= args.limit:
                 break
             pubs_processed += 1

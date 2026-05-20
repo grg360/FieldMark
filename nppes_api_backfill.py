@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from tqdm import tqdm
 
 NPPES_API_URL = "https://npiregistry.cms.hhs.gov/api/"
 DEFAULT_RATE_LIMIT_SECONDS = 0.2
@@ -409,7 +410,7 @@ def main() -> None:
         "invalid_npi": 0,
     }
 
-    for idx, hcp in enumerate(hcps_to_process):
+    for idx, hcp in enumerate(tqdm(hcps_to_process, desc="backfilling NPPES taxonomy", unit="hcp")):
         try:
             result = enrich_hcp_taxonomy(client, hcp, args.rate_limit, args.dry_run)
         except Exception as exc:

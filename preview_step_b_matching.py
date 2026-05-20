@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
 # Config
@@ -1053,7 +1054,7 @@ def main() -> None:
 
     out_rows: List[Dict[str, Any]] = []
     processed = 0
-    for h in hcp_iter:
+    for h in tqdm(hcp_iter, desc="matching HCPs", unit="hcp"):
         if cat_filter is not None and effective_input_category(h, canonical_ids) != cat_filter:
             continue
         mr = match_hcp(

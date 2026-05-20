@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from dotenv import load_dotenv
 from supabase import Client
+from tqdm import tqdm
 
 import preview_step_b_matching as stepb
 
@@ -281,7 +282,7 @@ def upsert_join_batch(
     written = 0
     hcp_ids = list(by_hcp.keys())
 
-    for i in range(0, len(hcp_ids), batch_size):
+    for i in tqdm(range(0, len(hcp_ids), batch_size), desc="upserting join rows", unit="batch"):
         hcp_chunk = hcp_ids[i : i + batch_size]
 
         # Delete existing rows for these HCPs
@@ -520,7 +521,7 @@ def run() -> None:
         hcps = stepb.fetch_hcps_by_ids(supabase, ids)
         hcps.sort(key=lambda x: str(x.get("id")))
         print(f"Canonical-only mode: {len(hcps)} HCP row(s)\n")
-        for i, h in enumerate(hcps, start=1):
+        for i, h in enumerate(tqdm(hcps, desc="matching HCPs", unit="hcp"), start=1):
             if not handle_one_hcp(h):
                 break
             if i % KEYSET_BATCH_SIZE == 0:
@@ -529,7 +530,7 @@ def run() -> None:
     elif args.random_sample is not None:
         hcps = stepb.load_hcps_random_sample(supabase, args.random_sample)
         print(f"Random sample: {len(hcps)} HCP row(s)\n")
-        for i, h in enumerate(hcps, start=1):
+        for i, h in enumerate(tqdm(hcps, desc="matching HCPs", unit="hcp"), start=1):
             if not handle_one_hcp(h):
                 break
             if i % KEYSET_BATCH_SIZE == 0:
@@ -544,7 +545,7 @@ def run() -> None:
             rows, last_id = fetch_hcp_keyset_batch(supabase, last_id=last_id, batch_size=KEYSET_BATCH_SIZE)
             if not rows:
                 break
-            for h in rows:
+            for h in tqdm(rows, desc="matching HCPs", unit="hcp"):
                 if not handle_one_hcp(h):
                     stop_all = True
                     break

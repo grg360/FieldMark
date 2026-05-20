@@ -28,6 +28,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from tqdm import tqdm
+
 import requests
 from supabase import Client, create_client
 
@@ -446,7 +448,26 @@ def update_hcp_with_nppes(
         print(f"[DRY RUN] Would update hcp_id={hcp_id} with payload={json.dumps(payload)}")
         return False
 
-    supabase_client.table("hcps").update(payload).eq("id", hcp_id).execute()
+    try:
+        supabase_client.table("hcps").update(payload).eq("id", hcp_id).execute()
+    except Exception as exc:
+        error_msg = str(exc)
+        if "duplicate key" in error_msg.lower() or "23505" in error_msg or "hcps_npi_number_key" in error_msg:
+            print(f"[DUPLICATE_NPI] hcp_id={hcp_id} npi={npi} -- NPI already assigned to another HCP row. Logging and skipping.")
+            try:
+                supabase_client.table("nppes_enrichment_log").insert({
+                    "hcp_id": hcp_id,
+                    "matched_npi": npi,
+                    "match_confidence": "ambiguous",
+                    "match_reason": f"Duplicate NPI conflict: NPI {npi} already exists on another hcp_id. Likely HCP duplicate.",
+                    "candidates_considered": nppes_data,
+                }).execute()
+            except Exception as log_exc:
+                print(f"[LOG_FAILED] hcp_id={hcp_id}: {log_exc}")
+            return False
+        else:
+            print(f"[UPDATE_FAILED] hcp_id={hcp_id}: {error_msg}")
+            return False
 
     log_payload = {
         "hcp_id": hcp_id,
@@ -455,7 +476,10 @@ def update_hcp_with_nppes(
         "match_reason": "Applied targeted publication-source-to-NPPES enrichment update.",
         "candidates_considered": nppes_data,
     }
-    supabase_client.table("nppes_enrichment_log").insert(log_payload).execute()
+    try:
+        supabase_client.table("nppes_enrichment_log").insert(log_payload).execute()
+    except Exception as log_exc:
+        print(f"[LOG_FAILED] hcp_id={hcp_id}: {log_exc}")
 
     print(f"[UPDATE] hcp_id={hcp_id} updated and logged with matched NPI {npi}.")
     return True
@@ -486,7 +510,7 @@ def build_enrichment_log_table(supabase_client: Client) -> None:
 def main() -> None:
     dry_run = False
     # Set to None to process all candidates. Set to an integer for a small test run.
-    sample_limit = 20
+    sample_limit = None
 
     supabase_client = create_supabase_client()
     build_enrichment_log_table(supabase_client)
@@ -505,7 +529,7 @@ def main() -> None:
     no_match = 0
     updated = 0
 
-    for hcp in candidates:
+    for hcp in tqdm(candidates, desc="processing HCPs", unit="hcp"):
         total_processed += 1
         hcp_id = str(hcp.get("id"))
         first_name = str(hcp.get("first_name") or "")

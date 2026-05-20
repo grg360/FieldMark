@@ -25,6 +25,7 @@ import requests
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from supabase import Client, create_client
+from tqdm import tqdm
 
 OPENALEX_BASE_URL = "https://api.openalex.org"
 AUTHOR_MATCH_SCORE_THRESHOLD = 0.75
@@ -210,7 +211,7 @@ def run_pipeline() -> None:
     print(f"Loaded {stats.total_candidates} HCPs with null total_career_pubs.", flush=True)
     start_time = time.time()
 
-    for idx, hcp in enumerate(hcps, start=1):
+    for idx, hcp in enumerate(tqdm(hcps, desc="enriching careers (OpenAlex)", unit="hcp"), start=1):
         hcp_id = hcp.get("id")
         first_name = (hcp.get("first_name") or "").strip() or None
         last_name = (hcp.get("last_name") or "").strip() or None

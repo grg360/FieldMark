@@ -35,6 +35,7 @@ import requests
 from requests import Response
 from requests.adapters import HTTPAdapter
 from supabase import Client, create_client
+from tqdm import tqdm
 from urllib3.util.retry import Retry
 
 
@@ -414,7 +415,7 @@ def pubmed_efetch(
     api_key = os.getenv("PUBMED_API_KEY")
     sleep_seconds = 0.11 if api_key else 0.34
     all_articles: List[ET.Element] = []
-    for batch in chunked(list(pmids), 100):
+    for batch in tqdm(list(chunked(list(pmids), 100)), desc="fetching publications", unit="batch"):
         params = {
             "db": "pubmed",
             "id": ",".join(batch),
@@ -614,7 +615,7 @@ def extract_records(articles: Sequence[ET.Element]) -> Tuple[Dict[str, HCPRecord
     hcps_by_key: Dict[str, HCPRecord] = {}
     publication_records: List[PublicationRecord] = []
 
-    for article in articles:
+    for article in tqdm(articles, desc="ingesting publications", unit="pub"):
         pmid = text_or_none(article.find("./MedlineCitation/PMID"))
         if not pmid:
             continue
@@ -760,7 +761,7 @@ def upsert_hcps(supabase: Client, hcps: Sequence[HCPRecord]) -> Dict[str, str]:
     batch_size = 50
     id_map: Dict[str, str] = {}
 
-    for i in range(0, len(hcps), batch_size):
+    for i in tqdm(range(0, len(hcps), batch_size), desc="upserting HCPs", unit="batch"):
         batch = list(hcps[i : i + batch_size])
         rows = [_hcp_row_dict(h) for h in batch]
 
@@ -909,7 +910,7 @@ def run_author_enrichment_second_pass(
 
     print(f"Second pass: found {len(low_pub_hcps)} HCPs with fewer than 3 publications.")
     total_upserted = 0
-    for hcp in low_pub_hcps:
+    for hcp in tqdm(low_pub_hcps, desc="enriching authors", unit="hcp"):
         hcp_id = hcp.get("id")
         first_name = clean_person_name(hcp.get("first_name"))
         last_name = clean_person_name(hcp.get("last_name"))

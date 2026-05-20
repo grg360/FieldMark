@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 import pandas as pd
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from tqdm import tqdm
 
 
 PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
@@ -240,7 +241,11 @@ def main() -> None:
     print(f"NPPES rows matching NSCLC ∪ Rare Disease taxonomies: {total_matching_rows:,}")
 
     agg_rows: List[Tuple[str, pd.Series, List[str]]] = []
-    for npi_raw, grp in filtered.groupby(filtered["npi"].astype(str).str.strip()):
+    for npi_raw, grp in tqdm(
+        filtered.groupby(filtered["npi"].astype(str).str.strip()),
+        desc="aggregating NPIs",
+        unit="npi",
+    ):
         npi_norm = normalize_npi_digits(npi_raw)
         if not npi_norm:
             continue
@@ -283,7 +288,7 @@ def main() -> None:
         for tid in ta_ids:
             ta_dist[tid] += 1
 
-    for start in range(0, total_new, BATCH_HCPS):
+    for start in tqdm(range(0, total_new, BATCH_HCPS), desc="ingesting HCPs", unit="batch"):
         slab = to_ingest[start : start + BATCH_HCPS]
         hcp_batch: List[Dict[str, Any]] = []
         ta_batch: List[Dict[str, Any]] = []
