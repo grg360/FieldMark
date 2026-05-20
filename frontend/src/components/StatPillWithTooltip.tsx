@@ -58,18 +58,6 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Pharma Engagement",
     body: "Total pharma engagement (consulting, speaking, honoraria, food, travel) over the HCP's lifetime as reported under the Sunshine Act.",
   },
-  "Career Publications": {
-    title: "Career Publications",
-    body: "Total career publications across all therapeutic areas as captured in our publication database. A volume signal of sustained research productivity.",
-  },
-  "Career Years": {
-    title: "Career Years",
-    body: "Years in practice derived from NPPES career-stage signals. A length-of-career signal indicating depth of experience and sustained presence in the field.",
-  },
-  "Established Trial Activity": {
-    title: "Trial Activity",
-    body: "Clinical trial investigator score based on Principal Investigator and Co-Investigator roles weighted by trial phase. Established experts often anchor late-phase trials.",
-  },
   "Pharma Companies": {
     title: "Pharma Companies",
     body: "Count of distinct manufacturers that reported Open Payments to this HCP over their lifetime in the program. A higher count usually indicates broader industry engagement.",

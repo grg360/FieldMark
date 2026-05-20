@@ -579,8 +579,6 @@ def wipe_publication_authors_batched(supabase: Client, errors: List[str]) -> int
                 errors.append(f"wipe delete: {exc}")
                 eprint(errors[-1])
                 raise
-        if len(rows) < WIPE_DELETE_CHUNK:
-            break
     return deleted_total
 
 

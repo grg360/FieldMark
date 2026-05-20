@@ -266,27 +266,63 @@ def upsert_join_batch(
 ) -> int:
     if dry_run or not rows:
         return 0
+
+    # Group rows by hcp_id so we can delete-then-insert atomically per HCP.
+    # This ensures orphan rows from previous runs (where match logic produced
+    # more rows than today's run) are removed.
+    from collections import defaultdict
+
+    by_hcp: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        hid = str(r.get("hcp_id") or "")
+        if hid:
+            by_hcp[hid].append(r)
+
     written = 0
-    for i in range(0, len(rows), batch_size):
-        chunk = list(rows[i : i + batch_size])
+    hcp_ids = list(by_hcp.keys())
+
+    for i in range(0, len(hcp_ids), batch_size):
+        hcp_chunk = hcp_ids[i : i + batch_size]
+
+        # Delete existing rows for these HCPs
         try:
-            supabase.table("hcp_openalex_authors").upsert(
-                chunk,
-                on_conflict="hcp_id,openalex_author_id",
+            supabase.table("hcp_openalex_authors").delete().in_(
+                "hcp_id", hcp_chunk
             ).execute()
-            written += len(chunk)
         except Exception as exc:
-            for r in chunk:
+            # Fall back to per-HCP deletes
+            for hid in hcp_chunk:
                 try:
-                    supabase.table("hcp_openalex_authors").upsert(
-                        [r],
-                        on_conflict="hcp_id,openalex_author_id",
+                    supabase.table("hcp_openalex_authors").delete().eq(
+                        "hcp_id", hid
                     ).execute()
+                except Exception as exc2:
+                    msg = f"delete hcp_id={hid}: {exc2}"
+                    errors.append(msg)
+                    eprint("[join delete]", msg)
+
+        # Insert the new rows for these HCPs
+        rows_to_insert: List[Dict[str, Any]] = []
+        for hid in hcp_chunk:
+            rows_to_insert.extend(by_hcp[hid])
+
+        if not rows_to_insert:
+            continue
+
+        try:
+            supabase.table("hcp_openalex_authors").insert(rows_to_insert).execute()
+            written += len(rows_to_insert)
+        except Exception as exc:
+            # Fall back to per-row insert to identify offenders
+            for r in rows_to_insert:
+                try:
+                    supabase.table("hcp_openalex_authors").insert(r).execute()
                     written += 1
                 except Exception as exc2:
-                    msg = f"hcp_id={r.get('hcp_id')} openalex={r.get('openalex_author_id')}: {exc2}"
+                    msg = f"insert hcp_id={r.get('hcp_id')} openalex={r.get('openalex_author_id')}: {exc2}"
                     errors.append(msg)
-                    eprint("[join upsert]", msg)
+                    eprint("[join insert]", msg)
+
     return written
 
 

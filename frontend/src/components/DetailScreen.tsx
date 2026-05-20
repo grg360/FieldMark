@@ -10,7 +10,11 @@ const COMMUNITY_MAX_COMPANIES = 82;
 const COMMUNITY_MAX_PATIENTS = 63449;
 const COMMUNITY_MAX_YEARS = 72;
 
-const ESTABLISHED_MAX_PUBS = 7206;
+// Established cohort max values for bar normalization.
+// NOTE: These were derived from pre-fix inflated data and will need
+// recalibration after the OpenAlex disambiguation + scoring pipeline rerun
+// completes. Track this in v1.1 backlog.
+const ESTABLISHED_MAX_PUBS = 2500;
 const ESTABLISHED_MAX_YEARS = 47;
 const ESTABLISHED_MAX_ENGAGEMENT = 3886191;
 const ESTABLISHED_MAX_TRIAL = 96;
@@ -41,11 +45,6 @@ function parsePubVelNumeric(pubVel: string): number | null {
 function formatResearchScoreValue(n: number | null | undefined): string | number {
   if (n == null || !Number.isFinite(n)) return "—";
   return Number(n).toFixed(1);
-}
-
-function formatEstablishedTrialValue(n: number | null | undefined): string | number {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return String(Math.round(n));
 }
 
 function citTrajScorePercent(citTraj: HCP["citTraj"]): number {
@@ -110,7 +109,6 @@ function ScoreRow({
   value,
   percent,
   barColor = "#E8A020",
-  tooltipKey,
   activeTooltip,
   onTooltipChange,
 }: {
@@ -118,17 +116,15 @@ function ScoreRow({
   value: string | number;
   percent: number;
   barColor?: string;
-  tooltipKey?: string;
   activeTooltip: string | null;
   onTooltipChange: (k: string | null) => void;
 }) {
-  const resolvedTooltipKey = tooltipKey ?? label;
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
         <StatPillWithTooltip
           label={label}
-          tooltipKey={resolvedTooltipKey}
+          tooltipKey={label}
           activeTooltip={activeTooltip}
           onTooltipChange={onTooltipChange}
         >
@@ -745,8 +741,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                 />
                 <ScoreRow
                   label="Trial Activity"
-                  tooltipKey="Established Trial Activity"
-                  value={formatEstablishedTrialValue(hcp.trialScore)}
+                  value={formatResearchScoreValue(hcp.trialScore)}
                   percent={cappedPercent(hcp.trialScore, ESTABLISHED_MAX_TRIAL)}
                   barColor={cohortBarColor}
                   activeTooltip={activeTooltip}

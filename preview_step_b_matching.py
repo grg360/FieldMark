@@ -450,52 +450,78 @@ def aggressive_name_discovery(
             notes="",
         )
 
-    buckets: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    # ROR-anchored grouping (v2): group candidates by ROR.
+    # Rows without a ROR are excluded from clustering — too ambiguous for
+    # common-name HCPs.
+    by_ror: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    no_ror_count = 0
     for row in matching:
-        b = institution_bucket(row) or "__empty__"
-        buckets[b].append(row)
+        row_ror = normalize_ror(row.get("last_known_institution_ror"))
+        if row_ror:
+            by_ror[row_ror].append(row)
+        else:
+            no_ror_count += 1
 
-    if len(buckets) == 1:
-        rows = next(iter(buckets.values()))
+    if not by_ror:
+        # All candidates lacked a ROR — too ambiguous
+        if status_prefix == "canonical_discovered":
+            return MatchResult(
+                1, "canonical_discovered_ambiguous", [],
+                match_confidence="none",
+                notes=f"{len(matching)} same-name candidates, none with ROR",
+            )
+        return MatchResult(
+            1, "openalex_id_below_corpus_threshold", [],
+            match_confidence="none",
+            notes=f"{NOT_IN_INVENTORY_NOTE} Rediscovery ambiguous: {len(matching)} same-name candidates, none with ROR",
+        )
+
+    if len(by_ror) == 1:
+        # Exactly one ROR group — clean cluster
+        rows = next(iter(by_ror.values()))
         primary_row = max(rows, key=row_corpus)
         mids = order_cluster_ids_primary_first(rows, primary_row)
+        notes_parts = []
+        if len(mids) > 1:
+            notes_parts.append(f"{len(mids)} inventory rows same ROR")
+        if no_ror_count > 0:
+            notes_parts.append(f"{no_ror_count} same-name candidate(s) without ROR excluded")
         return MatchResult(
             1,
-            f"{status_prefix}_cluster",
+            f"{status_prefix}_cluster" if len(mids) > 1 else f"{status_prefix}_unique",
             mids,
             primary_display=str(primary_row.get("display_name") or ""),
             primary_ror=str(primary_row.get("last_known_institution_ror") or ""),
             match_confidence="high",
-            notes=f"{len(mids)} inventory rows same institution bucket",
+            notes="; ".join(notes_parts),
         )
 
-    bucket_sums = {bk: sum(row_corpus(r) for r in bl) for bk, bl in buckets.items()}
-    total_sum = sum(bucket_sums.values())
+    # Multiple distinct RORs — different real people sharing a name.
+    # Pick the dominant ROR by total corpus_pub_count IF it has > 70% of the
+    # corpus across all candidates. Otherwise, ambiguous.
+    ror_sums = {r: sum(row_corpus(row) for row in rows) for r, rows in by_ror.items()}
+    total_sum = sum(ror_sums.values())
     if total_sum <= 0:
         cand = ";".join(
-            sorted(
-                {
-                    normalize_openalex_author_id(r.get("openalex_author_id"))
-                    for r in matching
-                    if normalize_openalex_author_id(r.get("openalex_author_id"))
-                }
-            )
+            sorted({
+                normalize_openalex_author_id(r.get("openalex_author_id"))
+                for r in matching
+                if normalize_openalex_author_id(r.get("openalex_author_id"))
+            })
         )
         notes = f"candidates (no corpus totals): {cand}"
         if status_prefix == "canonical_discovered":
             return MatchResult(1, "canonical_discovered_ambiguous", [], match_confidence="none", notes=notes)
         return MatchResult(
-            1,
-            "openalex_id_below_corpus_threshold",
-            [],
+            1, "openalex_id_below_corpus_threshold", [],
             match_confidence="none",
             notes=f"Below-threshold rediscovery ambiguous. {notes}",
         )
 
-    best_bucket = max(bucket_sums, key=lambda k: bucket_sums[k])
-    dominant_ratio = bucket_sums[best_bucket] / total_sum
+    best_ror = max(ror_sums, key=lambda k: ror_sums[k])
+    dominant_ratio = ror_sums[best_ror] / total_sum
     if dominant_ratio > 0.7:
-        rows = buckets[best_bucket]
+        rows = by_ror[best_ror]
         primary_row = max(rows, key=row_corpus)
         mids = order_cluster_ids_primary_first(rows, primary_row)
         pct = 100.0 * dominant_ratio
@@ -506,24 +532,19 @@ def aggressive_name_discovery(
             primary_display=str(primary_row.get("display_name") or ""),
             primary_ror=str(primary_row.get("last_known_institution_ror") or ""),
             match_confidence="high",
-            notes=f"dominant bucket {best_bucket}: {pct:.1f}% of corpus pubs across name matches ({total_sum} total)",
+            notes=f"dominant ROR ror:{best_ror}: {pct:.1f}% of corpus pubs ({total_sum} total across {len(by_ror)} RORs)",
         )
 
-    cand_ids = sorted(
-        {
-            normalize_openalex_author_id(r.get("openalex_author_id"))
-            for r in matching
-            if normalize_openalex_author_id(r.get("openalex_author_id"))
-        }
-    )
-    cand_ids = [i for i in cand_ids if i]
-    notes = "candidate_openalex_ids: " + ";".join(cand_ids)
+    cand_ids = sorted({
+        normalize_openalex_author_id(r.get("openalex_author_id"))
+        for r in matching
+        if normalize_openalex_author_id(r.get("openalex_author_id"))
+    })
+    notes = f"name matches span {len(by_ror)} distinct RORs (no dominant); candidate_openalex_ids: {';'.join(cand_ids)}"
     if status_prefix == "canonical_discovered":
         return MatchResult(1, "canonical_discovered_ambiguous", [], match_confidence="none", notes=notes)
     return MatchResult(
-        1,
-        "openalex_id_below_corpus_threshold",
-        [],
+        1, "openalex_id_below_corpus_threshold", [],
         match_confidence="none",
         notes=f"{NOT_IN_INVENTORY_NOTE} Rediscovery ambiguous. {notes}",
     )
@@ -557,29 +578,57 @@ def category_1_match(
             return redisc
         return below_threshold
 
-    cluster_by_id: Dict[str, Dict[str, Any]] = {}
-    cluster_by_id[seed_id] = seed_row
+    # ROR-anchored cluster widening (v2)
+    cluster_by_id: Dict[str, Dict[str, Any]] = {seed_id: seed_row}
+    seed_ror = normalize_ror(seed_row.get("last_known_institution_ror"))
+    cluster_rors: Set[str] = {seed_ror} if seed_ror else set()
 
-    # Full same-name inventory cluster (widened beyond seed ROR so max-corpus primary can relocate)
-    for row in inv.by_normalized_name.get((hcp_nf, hcp_nl), []):
-        oid = normalize_openalex_author_id(row.get("openalex_author_id"))
-        if oid:
-            cluster_by_id[oid] = row
+    candidates = inv.by_normalized_name.get((hcp_nf, hcp_nl), [])
+
+    # Iteratively include same-name rows whose ROR matches any cluster ROR.
+    # Loop in case earlier-rejected rows become eligible after later ones widen the set.
+    if cluster_rors:
+        changed = True
+        while changed:
+            changed = False
+            for row in candidates:
+                oid = normalize_openalex_author_id(row.get("openalex_author_id"))
+                if not oid or oid in cluster_by_id:
+                    continue
+                row_ror = normalize_ror(row.get("last_known_institution_ror"))
+                if row_ror and row_ror in cluster_rors:
+                    cluster_by_id[oid] = row
+                    changed = True
+
+    # If seed had no ROR, the cluster stays as seed-only — conservative under-clustering.
 
     cluster = list(cluster_by_id.values())
     primary_row = max(cluster, key=row_corpus)
     primary_id = normalize_openalex_author_id(primary_row.get("openalex_author_id"))
     matched_ids = order_cluster_ids_primary_first(cluster, primary_row)
 
+    rejected_count = sum(
+        1 for r in candidates
+        if normalize_openalex_author_id(r.get("openalex_author_id")) not in cluster_by_id
+    )
+
     if primary_id == seed_id:
         status = "verified_primary_found"
-        notes = f"{len(matched_ids) - 1} additional fragment(s)" if len(matched_ids) > 1 else ""
+        notes_parts = []
+        if len(matched_ids) > 1:
+            notes_parts.append(f"{len(matched_ids) - 1} additional fragment(s) same ROR")
+        if rejected_count > 0:
+            notes_parts.append(f"{rejected_count} same-name candidate(s) excluded by ROR gate")
+        notes = "; ".join(notes_parts)
     else:
         status = "verified_primary_relocated"
-        notes = (
+        notes_parts = [
             f"Original seed {openalex_id_tail(seed_id)} ({row_corpus(seed_row)} pubs); "
             f"relocated primary to {openalex_id_tail(primary_id)} ({row_corpus(primary_row)} pubs)"
-        )
+        ]
+        if rejected_count > 0:
+            notes_parts.append(f"{rejected_count} same-name candidate(s) excluded by ROR gate")
+        notes = "; ".join(notes_parts)
 
     return MatchResult(
         1,
