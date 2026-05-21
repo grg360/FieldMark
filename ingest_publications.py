@@ -54,6 +54,20 @@ PROGRESS_PRINT_EVERY = 500         # Print progress every N PMIDs processed
 
 
 # ============================================================
+# Table routing (v1 vs v2)
+# ============================================================
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """
+    Returns the correct table name based on --target-version flag.
+    v1 returns base_name unchanged. v2 appends _v2 suffix.
+    """
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
+# ============================================================
 # Data classes
 # ============================================================
 
@@ -503,15 +517,16 @@ def article_to_record(article: ET.Element) -> Optional[PublicationRecord]:
 # DB existence check + insert
 # ============================================================
 
-def fetch_existing_pubmed_ids(supabase: Client, pmids: Sequence[str]) -> Set[str]:
+def fetch_existing_pubmed_ids(supabase: Client, pmids: Sequence[str], target_version: str = "v1") -> Set[str]:
     """
     Returns subset of given PMIDs that already exist in publications table.
     Batched to avoid URL length limits.
     """
+    publications_table = get_table_name("publications", target_version)
     existing: Set[str] = set()
     for chunk in chunked(list(pmids), 200):
         r = (
-            supabase.table("publications")
+            supabase.table(publications_table)
             .select("pubmed_id")
             .in_("pubmed_id", list(chunk))
             .execute()
@@ -524,13 +539,14 @@ def fetch_existing_pubmed_ids(supabase: Client, pmids: Sequence[str]) -> Set[str
 
 
 def fetch_publication_state_by_pmid(
-    supabase: Client, pmids: Sequence[str]
+    supabase: Client, pmids: Sequence[str], target_version: str = "v1"
 ) -> Dict[str, Dict[str, Any]]:
     """Returns {pubmed_id: {id, source_therapeutic_area_id}} for given pmids."""
+    publications_table = get_table_name("publications", target_version)
     out: Dict[str, Dict[str, Any]] = {}
     for chunk in chunked(list(pmids), 200):
         r = (
-            supabase.table("publications")
+            supabase.table(publications_table)
             .select("id, pubmed_id, source_therapeutic_area_id")
             .in_("pubmed_id", list(chunk))
             .execute()
@@ -549,11 +565,13 @@ def upsert_publication_ta_tags(
     supabase: Client,
     rows: List[Dict[str, Any]],
     stats: IngestionStats,
+    target_version: str = "v1",
 ) -> None:
     if not rows:
         return
+    pub_ta_table = get_table_name("publication_therapeutic_areas", target_version)
     try:
-        supabase.table("publication_therapeutic_areas").upsert(
+        supabase.table(pub_ta_table).upsert(
             rows,
             on_conflict="publication_id,therapeutic_area_id",
             ignore_duplicates=True,
@@ -562,7 +580,7 @@ def upsert_publication_ta_tags(
     except Exception:
         for r in rows:
             try:
-                supabase.table("publication_therapeutic_areas").upsert(
+                supabase.table(pub_ta_table).upsert(
                     [r],
                     on_conflict="publication_id,therapeutic_area_id",
                     ignore_duplicates=True,
@@ -600,19 +618,21 @@ def insert_publications_batch(
     *,
     ta_chain: List[str],
     ts_iso: str,
+    target_version: str = "v1",
 ) -> None:
     if not rows:
         return
+    publications_table = get_table_name("publications", target_version)
     inserted_pmids: List[str] = []
     try:
-        supabase.table("publications").insert(rows).execute()
+        supabase.table(publications_table).insert(rows).execute()
         stats.publications_inserted += len(rows)
         inserted_pmids = [str(r["pubmed_id"]) for r in rows if r.get("pubmed_id")]
     except Exception:
         # On batch fail, try one-by-one to identify offenders
         for r in rows:
             try:
-                supabase.table("publications").insert(r).execute()
+                supabase.table(publications_table).insert(r).execute()
                 stats.publications_inserted += 1
                 if r.get("pubmed_id"):
                     inserted_pmids.append(str(r["pubmed_id"]))
@@ -622,7 +642,7 @@ def insert_publications_batch(
                 stats.errors.append(err)
 
     if inserted_pmids and ta_chain:
-        pub_state = fetch_publication_state_by_pmid(supabase, inserted_pmids)
+        pub_state = fetch_publication_state_by_pmid(supabase, inserted_pmids, target_version)
         new_ta_tags: List[Dict[str, Any]] = []
         for _pmid, info in pub_state.items():
             for ta_id in ta_chain:
@@ -633,7 +653,7 @@ def insert_publications_batch(
                     "tagged_at": ts_iso,
                 })
         if new_ta_tags:
-            upsert_publication_ta_tags(supabase, new_ta_tags, stats)
+            upsert_publication_ta_tags(supabase, new_ta_tags, stats, target_version)
 
 
 # ============================================================
@@ -647,6 +667,8 @@ def ingest_for_ta(
     args: argparse.Namespace,
     ta_ancestry: Dict[str, List[str]],
 ) -> IngestionStats:
+    target_version = args.target_version
+    publications_table = get_table_name("publications", target_version)
     stats = IngestionStats(ta_slug=config["ta_slug"])
     stats.started_at = datetime.now(timezone.utc)
 
@@ -758,7 +780,7 @@ def ingest_for_ta(
             if batch_records and not args.dry_run:
                 batch_pmids = [r.pubmed_id for r in batch_records]
 
-                existing_pubs = fetch_publication_state_by_pmid(supabase, batch_pmids)
+                existing_pubs = fetch_publication_state_by_pmid(supabase, batch_pmids, target_version)
 
                 new_records = [r for r in batch_records if r.pubmed_id not in existing_pubs]
                 existing_records = [r for r in batch_records if r.pubmed_id in existing_pubs]
@@ -786,12 +808,12 @@ def ingest_for_ta(
                         pending_source_backfills.append(pub_id)
 
                 if pending_ta_tags:
-                    upsert_publication_ta_tags(supabase, pending_ta_tags, stats)
+                    upsert_publication_ta_tags(supabase, pending_ta_tags, stats, target_version)
 
                 if pending_source_backfills:
                     for pub_id in pending_source_backfills:
                         try:
-                            supabase.table("publications").update(
+                            supabase.table(publications_table).update(
                                 {"source_therapeutic_area_id": config["therapeutic_area_id"]}
                             ).eq("id", pub_id).execute()
                             stats.source_ta_backfilled += 1
@@ -802,7 +824,8 @@ def ingest_for_ta(
 
                 if len(pending_insert) >= DB_INSERT_BATCH_SIZE:
                     insert_publications_batch(
-                        supabase, pending_insert, stats, ta_chain=ta_chain, ts_iso=ts_iso
+                        supabase, pending_insert, stats, ta_chain=ta_chain, ts_iso=ts_iso,
+                        target_version=target_version,
                     )
                     pending_insert = []
 
@@ -825,7 +848,8 @@ def ingest_for_ta(
     # Flush remaining
     if not args.dry_run and pending_insert:
         insert_publications_batch(
-            supabase, pending_insert, stats, ta_chain=ta_chain, ts_iso=ts_iso
+            supabase, pending_insert, stats, ta_chain=ta_chain, ts_iso=ts_iso,
+            target_version=target_version,
         )
 
     stats.completed_at = datetime.now(timezone.utc)
@@ -841,6 +865,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Don't write to DB")
     parser.add_argument("--ta", type=str, default=None, help="Run for specific TA slug only")
     parser.add_argument("--limit", type=int, default=None, help="Cap PMIDs per TA (testing)")
+    parser.add_argument("--target-version", choices=["v1", "v2"], default="v1",
+                        help="Schema version to write to. v1=legacy tables, v2=rebuild tables.")
     args = parser.parse_args()
 
     load_dotenv()
