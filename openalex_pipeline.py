@@ -27,6 +27,20 @@ import requests
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+# ============================================================
+# Table routing (v1 vs v2)
+# ============================================================
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """
+    Returns the correct table name based on --target-version flag.
+    v1 returns base_name unchanged. v2 appends _v2 suffix.
+    """
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 OPENALEX_BASE_URL = "https://api.openalex.org"
 FETCH_PAGE_SIZE = 1000
 PROGRESS_EVERY = 100
@@ -36,7 +50,17 @@ AUTHOR_MATCH_SCORE_THRESHOLD = 0.75
 
 BATCH_SIZE = 100  # OpenAlex's max OR values per filter
 BATCH_SLEEP_SECONDS = 0.1  # Sleep between batches; well under 100 req/sec rate limit
-CHECKPOINT_FILE = "openalex_checkpoint.json"
+CHECKPOINT_FILE_V1 = "openalex_checkpoint_v1.json"
+CHECKPOINT_FILE_V2 = "openalex_checkpoint_v2.json"
+
+
+def get_checkpoint_file(target_version: str) -> str:
+    """Returns the appropriate checkpoint filename for the target schema version."""
+    if target_version == "v2":
+        return CHECKPOINT_FILE_V2
+    return CHECKPOINT_FILE_V1
+
+
 CHECKPOINT_EVERY_N_BATCHES = 10
 PROGRESS_EVERY_N_BATCHES = 10
 
@@ -100,20 +124,21 @@ def init_supabase() -> Client:
     return create_client(supabase_url, supabase_key)
 
 
-def fetch_publications_with_doi(supabase: Client) -> List[Dict]:
+def fetch_publications_with_doi(supabase: Client, target_version: str = "v1") -> List[Dict]:
     """
     Returns publications with non-null DOI that have not been enriched by the new
     pipeline (no openalex_enriched_at timestamp). This catches both the
     original-pipeline-only cohort and any publications where the new pipeline failed
     to write.
     """
+    publications_table = get_table_name("publications", target_version)
     publications: List[Dict] = []
     offset = 0
 
     while True:
         try:
             response = (
-                supabase.table("publications")
+                supabase.table(publications_table)
                 .select("id,doi,citation_count")
                 .not_.is_("doi", "null")
                 .is_("openalex_enriched_at", "null")
@@ -149,33 +174,33 @@ def format_eta(total_seconds: float) -> str:
     return f"{hours}h {remaining_minutes}m"
 
 
-def load_checkpoint() -> Set[str]:
+def load_checkpoint(target_version: str = "v1") -> Set[str]:
     """Load processed publication IDs from checkpoint file. Returns empty set if file doesn't exist."""
-    path = Path(CHECKPOINT_FILE)
+    path = Path(get_checkpoint_file(target_version))
     if not path.is_file():
         return set()
     try:
         raw = path.read_text(encoding="utf-8")
         data = json.loads(raw)
         if not isinstance(data, list):
-            logger.warning("Checkpoint file %s: expected JSON list, got %s", CHECKPOINT_FILE, type(data).__name__)
+            logger.warning("Checkpoint file %s: expected JSON list, got %s", get_checkpoint_file(target_version), type(data).__name__)
             return set()
         return {str(x) for x in data}
     except json.JSONDecodeError as exc:
-        logger.warning("Checkpoint file %s corrupt or invalid JSON (%s); starting fresh", CHECKPOINT_FILE, exc)
+        logger.warning("Checkpoint file %s corrupt or invalid JSON (%s); starting fresh", get_checkpoint_file(target_version), exc)
         return set()
     except OSError as exc:
-        logger.warning("Could not read checkpoint file %s (%s); starting fresh", CHECKPOINT_FILE, exc)
+        logger.warning("Could not read checkpoint file %s (%s); starting fresh", get_checkpoint_file(target_version), exc)
         return set()
 
 
-def save_checkpoint(processed_ids: Set[str]) -> None:
+def save_checkpoint(processed_ids: Set[str], target_version: str = "v1") -> None:
     """Write processed publication IDs to checkpoint file as JSON list."""
-    path = Path(CHECKPOINT_FILE)
+    path = Path(get_checkpoint_file(target_version))
     try:
         path.write_text(json.dumps(sorted(processed_ids), indent=2), encoding="utf-8")
     except OSError as exc:
-        logger.warning("Could not write checkpoint file %s: %s", CHECKPOINT_FILE, exc)
+        logger.warning("Could not write checkpoint file %s: %s", get_checkpoint_file(target_version), exc)
 
 
 def fetch_openalex_works_batch(
@@ -337,11 +362,13 @@ def update_publication_enrichment(
     supabase: Client,
     publication_id: str,
     fields: Dict,
+    target_version: str = "v1",
 ) -> None:
     """
     Update a publication row with extracted OpenAlex fields.
     Writes all non-None values and always sets openalex_enriched_at to current UTC.
     """
+    publications_table = get_table_name("publications", target_version)
     update_dict: Dict = {}
     if fields.get("citation_count") is not None:
         update_dict["citation_count"] = fields["citation_count"]
@@ -360,7 +387,7 @@ def update_publication_enrichment(
     update_dict["openalex_enriched_at"] = datetime.now(timezone.utc).isoformat()
 
     try:
-        supabase.table("publications").update(update_dict).eq("id", publication_id).execute()
+        supabase.table(publications_table).update(update_dict).eq("id", publication_id).execute()
     except Exception as exc:
         raise RuntimeError(f"Failed updating publication {publication_id}: {exc}") from exc
 
@@ -548,6 +575,7 @@ def run_pipeline(
     skip_doi_enrichment: bool = False,
     skip_career_enrichment: bool = False,
     reset_checkpoint: bool = False,
+    target_version: str = "v1",
 ) -> None:
     load_dotenv()
     supabase = init_supabase()
@@ -558,13 +586,13 @@ def run_pipeline(
         print("SKIP_DOI_ENRICHMENT enabled: skipping DOI citation enrichment phase.")
     else:
         if reset_checkpoint:
-            checkpoint_path = Path(CHECKPOINT_FILE)
+            checkpoint_path = Path(get_checkpoint_file(target_version))
             if checkpoint_path.exists():
                 checkpoint_path.unlink()
                 print("Checkpoint reset; processing full cohort.")
         print("Loading unenriched publications with DOI (openalex_enriched_at is null)...")
-        publications = fetch_publications_with_doi(supabase)
-        processed_ids = load_checkpoint()
+        publications = fetch_publications_with_doi(supabase, target_version)
+        processed_ids = load_checkpoint(target_version)
         publications_to_process = [p for p in publications if str(p["id"]) not in processed_ids]
         stats = PipelineStats(total_loaded=len(publications))
         already = len(publications) - len(publications_to_process)
@@ -590,7 +618,7 @@ def run_pipeline(
                     stats.failed += len(batch)
                     time.sleep(BATCH_SLEEP_SECONDS)
                     if batch_index % CHECKPOINT_EVERY_N_BATCHES == 0:
-                        save_checkpoint(processed_ids)
+                        save_checkpoint(processed_ids, target_version)
                     if batch_index % PROGRESS_EVERY_N_BATCHES == 0 or batch_index == total_batches:
                         _print_doi_batch_progress(stats, batch_index, total_batches, start_time)
                     continue
@@ -613,7 +641,7 @@ def run_pipeline(
                                 processed_ids.add(str(publication["id"]))
                                 continue
                             try:
-                                update_publication_enrichment(supabase, str(publication_id), fields)
+                                update_publication_enrichment(supabase, str(publication_id), fields, target_version)
                             except RuntimeError:
                                 stats.failed += 1
                             else:
@@ -624,11 +652,11 @@ def run_pipeline(
                 time.sleep(BATCH_SLEEP_SECONDS)
 
                 if batch_index % CHECKPOINT_EVERY_N_BATCHES == 0:
-                    save_checkpoint(processed_ids)
+                    save_checkpoint(processed_ids, target_version)
                 if batch_index % PROGRESS_EVERY_N_BATCHES == 0 or batch_index == total_batches:
                     _print_doi_batch_progress(stats, batch_index, total_batches, start_time)
 
-        save_checkpoint(processed_ids)
+        save_checkpoint(processed_ids, target_version)
 
         print("\n=== OpenAlex DOI Enrichment Summary ===")
         print(f"Total loaded: {stats.total_loaded}")
@@ -638,7 +666,14 @@ def run_pipeline(
         print(f"Not found/missing citation count: {stats.not_found_or_missing_citations}")
         print(f"Failed: {stats.failed}")
 
-    if not skip_career_enrichment:
+    if target_version == "v2":
+        print(
+            "\nSKIPPING career enrichment phase: target-version is v2. "
+            "v2 career enrichment is handled by career_enrichment_from_clusters.py "
+            "(multi-shard aggregation). This script's single-shard career enrichment "
+            "is incompatible with the v2 multi-shard architecture."
+        )
+    elif not skip_career_enrichment:
         print("\nStarting HCP total_career_pubs enrichment (OpenAlex author match)...")
         run_career_enrichment(supabase, session, polite_mailto)
     else:
@@ -664,11 +699,18 @@ if __name__ == "__main__":
             action="store_true",
             help="Delete the checkpoint file before starting (forces re-processing of all matching publications).",
         )
+        parser.add_argument(
+            "--target-version",
+            choices=["v1", "v2"],
+            default="v1",
+            help="Schema version to write to. v1=legacy tables, v2=rebuild tables.",
+        )
         args = parser.parse_args()
         run_pipeline(
             skip_doi_enrichment=args.skip_doi_enrichment or env_flag_true("SKIP_DOI_ENRICHMENT"),
             skip_career_enrichment=args.skip_career_enrichment,
             reset_checkpoint=args.reset_checkpoint,
+            target_version=args.target_version,
         )
     except Exception as error:
         print(f"[ERROR] OpenAlex pipeline failed: {error}")
