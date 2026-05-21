@@ -33,6 +33,20 @@ from requests.adapters import HTTPAdapter
 from supabase import Client, create_client
 from tqdm import tqdm
 
+# ============================================================
+# Table routing (v1 vs v2)
+# ============================================================
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """
+    Returns the correct table name based on --target-version flag.
+    v1 returns base_name unchanged. v2 appends _v2 suffix.
+    """
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 OPENALEX_BASE_URL = "https://api.openalex.org"
 FETCH_PAGE_SIZE = 1000
 SLEEP_SECONDS = 0.2
@@ -159,9 +173,11 @@ def update_hcp_career_fields(
     hcp_id: str,
     works_count: int,
     first_pub_year: Optional[int],
+    target_version: str = "v1",
 ) -> None:
+    hcps_table = get_table_name("hcps", target_version)
     try:
-        supabase.table("hcps").update(
+        supabase.table(hcps_table).update(
             {"total_career_pubs": works_count, "first_pub_year": first_pub_year}
         ).eq("id", hcp_id).execute()
     except Exception as exc:
@@ -193,12 +209,13 @@ def today_start_utc_iso() -> str:
     return start.isoformat()
 
 
-def fetch_all_join_rows(supabase: Client) -> List[Dict[str, Any]]:
+def fetch_all_join_rows(supabase: Client, target_version: str = "v1") -> List[Dict[str, Any]]:
+    hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
     rows: List[Dict[str, Any]] = []
     offset = 0
     while True:
         response = (
-            supabase.table("hcp_openalex_authors")
+            supabase.table(hcp_oa_table)
             .select("hcp_id,openalex_author_id,created_at")
             .order("hcp_id")
             .range(offset, offset + FETCH_PAGE_SIZE - 1)
@@ -245,13 +262,15 @@ def fetch_hcps_for_ids(
     hcp_ids: Sequence[str],
     *,
     include_null_only: bool,
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
+    hcps_table = get_table_name("hcps", target_version)
     out: List[Dict[str, Any]] = []
     ids = [str(i) for i in hcp_ids if i]
     for i in range(0, len(ids), 200):
         chunk = ids[i : i + 200]
         q = (
-            supabase.table("hcps")
+            supabase.table(hcps_table)
             .select("id,first_name,last_name,total_career_pubs,first_pub_year")
             .in_("id", chunk)
         )
@@ -270,7 +289,7 @@ def load_candidates(supabase: Client, args: argparse.Namespace) -> List[Candidat
             raise ValueError(f"No HCP IDs found in {args.hcp_ids_file}")
 
     today_iso = today_start_utc_iso()
-    join_rows = fetch_all_join_rows(supabase)
+    join_rows = fetch_all_join_rows(supabase, args.target_version)
     clusters = build_author_clusters(
         join_rows,
         only_changed_today=args.only_changed_today,
@@ -285,6 +304,7 @@ def load_candidates(supabase: Client, args: argparse.Namespace) -> List[Candidat
         supabase,
         list(clusters.keys()),
         include_null_only=args.include_null_only,
+        target_version=args.target_version,
     )
 
     candidates: List[CandidateHCP] = []
@@ -386,7 +406,7 @@ def run_pipeline(args: argparse.Namespace) -> EnrichmentStats:
             stats.updated += 1
         else:
             try:
-                update_hcp_career_fields(supabase, cand.hcp_id, new_total, new_first_year)
+                update_hcp_career_fields(supabase, cand.hcp_id, new_total, new_first_year, target_version=args.target_version)
                 stats.updated += 1
             except RuntimeError as exc:
                 eprint(str(exc))
@@ -450,6 +470,12 @@ def parse_args() -> argparse.Namespace:
         "--include-null-only",
         action="store_true",
         help="Only HCPs where total_career_pubs IS NULL.",
+    )
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version to write to. v1=legacy tables, v2=rebuild tables.",
     )
     return parser.parse_args()
 
