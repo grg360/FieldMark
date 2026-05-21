@@ -38,14 +38,14 @@ function AscoActiveBadge() {
           width: 8,
           height: 8,
           borderRadius: "50%",
-          backgroundColor: "#10b981",
+          backgroundColor: "#ef4444",
           animation: "fmAscoPulse 2s ease-in-out infinite",
         }}
       />
       <span
         style={{
           fontSize: 11,
-          color: "#10b981",
+          color: "#ef4444",
           fontFamily: "system-ui, sans-serif",
           fontWeight: 500,
           letterSpacing: 0.3,
