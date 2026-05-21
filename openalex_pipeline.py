@@ -49,7 +49,7 @@ DEFAULT_TIMEOUT_SECONDS = 20
 AUTHOR_MATCH_SCORE_THRESHOLD = 0.75
 
 BATCH_SIZE = 100  # OpenAlex's max OR values per filter
-BATCH_SLEEP_SECONDS = 0.1  # Sleep between batches; well under 100 req/sec rate limit
+BATCH_SLEEP_SECONDS = 0.0  # No sleep with OpenAlex API key (well under 100 req/sec limit)
 CHECKPOINT_FILE_V1 = "openalex_checkpoint_v1.json"
 CHECKPOINT_FILE_V2 = "openalex_checkpoint_v2.json"
 
