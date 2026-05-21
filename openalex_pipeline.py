@@ -358,17 +358,20 @@ def extract_publication_fields(work_payload: Dict) -> Dict:
     }
 
 
-def build_publication_update_row(
+def update_publication_enrichment(
+    supabase: Client,
     publication_id: str,
     fields: Dict,
-) -> Dict:
+    target_version: str = "v1",
+) -> None:
     """
-    Build a single publication update row from extracted OpenAlex fields.
-    Returns dict including the id and all non-None enrichment fields.
+    Update a publication row with extracted OpenAlex fields.
+    Writes all non-None values and always sets openalex_enriched_at to current UTC.
     """
-    row: Dict = {"id": publication_id}
+    publications_table = get_table_name("publications", target_version)
+    update_dict: Dict = {}
     if fields.get("citation_count") is not None:
-        row["citation_count"] = fields["citation_count"]
+        update_dict["citation_count"] = fields["citation_count"]
     for key in (
         "citation_counts_by_year",
         "authorships",
@@ -377,40 +380,16 @@ def build_publication_update_row(
         "open_access",
     ):
         if fields.get(key) is not None:
-            row[key] = fields[key]
+            update_dict[key] = fields[key]
     if fields.get("publication_type") is not None:
-        row["publication_type"] = fields["publication_type"]
+        update_dict["publication_type"] = fields["publication_type"]
 
-    row["openalex_enriched_at"] = datetime.now(timezone.utc).isoformat()
-    return row
+    update_dict["openalex_enriched_at"] = datetime.now(timezone.utc).isoformat()
 
-
-def upsert_publications_batch(
-    supabase: Client,
-    rows: List[Dict],
-    target_version: str = "v1",
-) -> int:
-    """
-    Upsert a batch of publication enrichment rows via Supabase.
-    Returns the count of rows successfully written.
-    On batch failure, falls back to per-row writes to identify offenders.
-    """
-    if not rows:
-        return 0
-    publications_table = get_table_name("publications", target_version)
     try:
-        supabase.table(publications_table).upsert(rows, on_conflict="id").execute()
-        return len(rows)
+        supabase.table(publications_table).update(update_dict).eq("id", publication_id).execute()
     except Exception as exc:
-        logger.warning("Bulk upsert failed (%s); falling back to per-row writes", exc)
-        written = 0
-        for row in rows:
-            try:
-                supabase.table(publications_table).upsert(row, on_conflict="id").execute()
-                written += 1
-            except Exception as exc2:
-                logger.warning("Failed publication %s: %s", row.get("id"), exc2)
-        return written
+        raise RuntimeError(f"Failed updating publication {publication_id}: {exc}") from exc
 
 
 def search_openalex_authors(
@@ -644,36 +623,30 @@ def run_pipeline(
                         _print_doi_batch_progress(stats, batch_index, total_batches, start_time)
                     continue
 
-                pending_updates: List[Dict] = []
-                pending_update_ids: List[str] = []
                 for publication in batch:
                     publication_id = publication.get("id")
                     doi = publication.get("doi")
 
                     if not publication_id or not doi:
                         stats.failed += 1
-                        continue
-                    work = works_map.get(doi)
-                    if work is None:
-                        stats.not_found_or_missing_citations += 1
-                        processed_ids.add(str(publication["id"]))
-                        continue
-                    fields = extract_publication_fields(work)
-                    has_any_field = any(value is not None for value in fields.values())
-                    if not has_any_field:
-                        stats.not_found_or_missing_citations += 1
-                        processed_ids.add(str(publication["id"]))
-                        continue
-                    pending_updates.append(build_publication_update_row(str(publication_id), fields))
-                    pending_update_ids.append(str(publication["id"]))
-
-                if pending_updates:
-                    written = upsert_publications_batch(supabase, pending_updates, target_version)
-                    stats.updated += written
-                    if written < len(pending_updates):
-                        stats.failed += (len(pending_updates) - written)
-                    for pid in pending_update_ids:
-                        processed_ids.add(pid)
+                    else:
+                        work = works_map.get(doi)
+                        if work is None:
+                            stats.not_found_or_missing_citations += 1
+                        else:
+                            fields = extract_publication_fields(work)
+                            has_any_field = any(value is not None for value in fields.values())
+                            if not has_any_field:
+                                stats.not_found_or_missing_citations += 1
+                                processed_ids.add(str(publication["id"]))
+                                continue
+                            try:
+                                update_publication_enrichment(supabase, str(publication_id), fields, target_version)
+                            except RuntimeError:
+                                stats.failed += 1
+                            else:
+                                stats.updated += 1
+                    processed_ids.add(str(publication["id"]))
 
                 stats.processed += len(batch)
                 time.sleep(BATCH_SLEEP_SECONDS)
