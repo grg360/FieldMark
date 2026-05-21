@@ -35,6 +35,19 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+# ============================================================
+# Table routing (v1 vs v2)
+# ============================================================
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """
+    Returns the correct table name based on --target-version flag.
+    v1 returns base_name unchanged. v2 appends _v2 suffix.
+    """
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
 
 # ============================================================
 # Config
@@ -215,20 +228,21 @@ def parse_authorship_entry(entry: Dict[str, Any], pub_year: Optional[int]) -> Op
 # DB scan
 # ============================================================
 
-def fetch_publications_with_authorships(supabase: Client) -> Iterable[Dict]:
+def fetch_publications_with_authorships(supabase: Client, target_version: str = "v1") -> Iterable[Dict]:
     """
     Yield publications with authorships JSONB populated, in batches.
     Uses keyset pagination (id > last_id) instead of offset-based pagination
     to avoid statement timeouts at high page numbers. Each yielded item is
     a row: {id, pub_year, authorships}.
     """
+    publications_table = get_table_name("publications", target_version)
     last_id: Optional[str] = None
     page_size = 200  # smaller batches since authorships JSONB is heavy
 
     while True:
         try:
             query = (
-                supabase.table("publications")
+                supabase.table(publications_table)
                 .select("id, pub_year, authorships")
                 .not_.is_("authorships", "null")
                 .order("id")
@@ -320,6 +334,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Don't write to DB")
     parser.add_argument("--truncate", action="store_true",
                         help="Truncate openalex_author_inventory before populating")
+    parser.add_argument("--target-version", choices=["v1", "v2"], default="v1",
+                        help="Schema version to read from. v1=legacy tables, v2=rebuild tables.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -346,7 +362,7 @@ def main():
     accumulators: Dict[str, AuthorAccumulator] = {}
     scan_started = datetime.now(timezone.utc)
 
-    for pub in fetch_publications_with_authorships(supabase):
+    for pub in fetch_publications_with_authorships(supabase, args.target_version):
         stats.publications_scanned += 1
         authorships = pub.get("authorships")
         if not isinstance(authorships, list):
