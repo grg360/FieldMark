@@ -49,7 +49,7 @@ DEFAULT_TIMEOUT_SECONDS = 20
 AUTHOR_MATCH_SCORE_THRESHOLD = 0.75
 
 BATCH_SIZE = 100  # OpenAlex's max OR values per filter
-BATCH_SLEEP_SECONDS = 0.0  # No sleep with OpenAlex API key (well under 100 req/sec limit)
+BATCH_SLEEP_SECONDS = 0.25  # Modest pacing to avoid OpenAlex slow-response degradation
 CHECKPOINT_FILE_V1 = "openalex_checkpoint_v1.json"
 CHECKPOINT_FILE_V2 = "openalex_checkpoint_v2.json"
 
@@ -232,7 +232,7 @@ def fetch_openalex_works_batch(
     url = f"{OPENALEX_BASE_URL}/works"
 
     def do_get() -> requests.Response:
-        return session.get(url, params=params, timeout=(10, 30))
+        return session.get(url, params=params, timeout=(10, 60))
 
     def apply_429_backoff(resp: requests.Response) -> Optional[requests.Response]:
         if resp.status_code == 429:
