@@ -52,7 +52,19 @@ function AscoActiveBadge() {
           whiteSpace: "nowrap",
         }}
       >
-        Live · ASCO
+        Live
+      </span>
+      <span
+        style={{
+          fontSize: 11,
+          color: "#E8E6DF",
+          fontFamily: "system-ui, sans-serif",
+          fontWeight: 500,
+          letterSpacing: 0.3,
+          whiteSpace: "nowrap",
+        }}
+      >
+        - ASCO
       </span>
     </div>
   );
