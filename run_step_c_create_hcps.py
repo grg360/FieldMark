@@ -34,6 +34,20 @@ from supabase import Client, create_client
 
 import preview_step_b_matching as stepb
 
+# ============================================================
+# Table routing (v1 vs v2)
+# ============================================================
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """
+    Returns the correct table name based on --target-version flag.
+    v1 returns base_name unchanged. v2 appends _v2 suffix.
+    """
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 INVENTORY_PAGE_SIZE = 1000
 JOIN_PAGE_SIZE = 1000
 ROR_COUNTRY_PAGE_SIZE = 1000
@@ -77,16 +91,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--limit", type=int, default=None, metavar="N", help="Cap number of new HCPs (clusters) to process")
     p.add_argument("--csv-also", metavar="PATH", default=None, help="Write CSV of planned/created new HCPs")
     p.add_argument("--batch-size", type=int, default=100, help="hcps insert batch size (default 100)")
+    p.add_argument("--target-version", choices=["v1", "v2"], default="v1",
+                   help="Schema version to write to. v1=legacy tables, v2=rebuild tables.")
     return p.parse_args()
 
 
-def fetch_linked_openalex_ids(supabase: Client) -> Set[str]:
+def fetch_linked_openalex_ids(supabase: Client, target_version: str = "v1") -> Set[str]:
     """All openalex_author_id values present in hcp_openalex_authors."""
+    hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
     out: Set[str] = set()
     last_id: Optional[str] = None
     while True:
         q = (
-            supabase.table("hcp_openalex_authors")
+            supabase.table(hcp_oa_table)
             .select("id,openalex_author_id")
             .order("id")
             .limit(JOIN_PAGE_SIZE)
@@ -324,14 +341,16 @@ def insert_hcps_batch(
     *,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> Set[str]:
     """Insert hcps batch; return set of hcp ids successfully inserted."""
+    hcps_table = get_table_name("hcps", target_version)
     ok: Set[str] = set()
     if dry_run or not rows:
         return ok
     chunk = list(rows)
     try:
-        supabase.table("hcps").insert(chunk).execute()
+        supabase.table(hcps_table).insert(chunk).execute()
         for r in chunk:
             hid = r.get("id")
             if hid:
@@ -341,7 +360,7 @@ def insert_hcps_batch(
         eprint(f"[hcps insert batch n={len(chunk)}] {exc}")
         for r in chunk:
             try:
-                supabase.table("hcps").insert([r]).execute()
+                supabase.table(hcps_table).insert([r]).execute()
                 hid = r.get("id")
                 if hid:
                     ok.add(str(hid))
@@ -362,14 +381,16 @@ def upsert_join_rows(
     *,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> int:
     if dry_run or not rows:
         return 0
+    hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
     n = 0
     for i in range(0, len(rows), JOIN_UPSERT_CHUNK):
         chunk = list(rows[i : i + JOIN_UPSERT_CHUNK])
         try:
-            supabase.table("hcp_openalex_authors").upsert(
+            supabase.table(hcp_oa_table).upsert(
                 chunk,
                 on_conflict="hcp_id,openalex_author_id",
             ).execute()
@@ -378,7 +399,7 @@ def upsert_join_rows(
             eprint(f"[join upsert batch] {exc}")
             for r in chunk:
                 try:
-                    supabase.table("hcp_openalex_authors").upsert(
+                    supabase.table(hcp_oa_table).upsert(
                         [r],
                         on_conflict="hcp_id,openalex_author_id",
                     ).execute()
@@ -396,14 +417,16 @@ def upsert_ta_rows(
     *,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> int:
     if dry_run or not rows:
         return 0
+    hcp_ta_table = get_table_name("hcp_therapeutic_areas", target_version)
     n = 0
     for i in range(0, len(rows), TA_INSERT_CHUNK):
         chunk = list(rows[i : i + TA_INSERT_CHUNK])
         try:
-            supabase.table("hcp_therapeutic_areas").upsert(
+            supabase.table(hcp_ta_table).upsert(
                 chunk,
                 on_conflict="hcp_id,therapeutic_area_id",
                 ignore_duplicates=True,
@@ -413,7 +436,7 @@ def upsert_ta_rows(
             eprint(f"[hcp_therapeutic_areas upsert batch] {exc}")
             for r in chunk:
                 try:
-                    supabase.table("hcp_therapeutic_areas").upsert(
+                    supabase.table(hcp_ta_table).upsert(
                         [r],
                         on_conflict="hcp_id,therapeutic_area_id",
                         ignore_duplicates=True,
@@ -431,14 +454,14 @@ class ClusterPlan:
     hcp_id: str
     hcp_row: Dict[str, Any]
     join_rows: List[Dict[str, Any]]
-    ta_row: Dict[str, Any]
+    ta_row: Optional[Dict[str, Any]]
     csv_row: Dict[str, Any]
 
 
 def plan_cluster(
     cluster_rows: List[Dict[str, Any]],
     ror_country: Dict[str, str],
-    hepatology_ta_id: str,
+    hepatology_ta_id: Optional[str],
     ts_iso: str,
 ) -> ClusterPlan:
     primary = pick_primary_row(cluster_rows)
@@ -454,7 +477,10 @@ def plan_cluster(
         ts_iso=ts_iso,
     )
     join_rows = build_join_rows_for_cluster(hcp_id, cluster_rows, primary, name_flag)
-    ta_row = {"hcp_id": hcp_id, "therapeutic_area_id": hepatology_ta_id, "strength_score": None}
+    if hepatology_ta_id is not None:
+        ta_row = {"hcp_id": hcp_id, "therapeutic_area_id": hepatology_ta_id, "strength_score": None}
+    else:
+        ta_row = None
     csv_row = {
         "hcp_id": hcp_id,
         "first_name": hcp_row.get("first_name") or "",
@@ -474,29 +500,46 @@ def main() -> None:
     if args.limit is not None and args.limit < 1:
         raise SystemExit("--limit N requires N >= 1")
     bs = max(1, int(args.batch_size))
+    target_version = args.target_version
 
     load_dotenv()
     supabase = init_supabase()
 
     print("Pre-flight: required tables...")
-    for tbl in ("hcp_openalex_authors", "openalex_author_inventory", "ror_to_country", "therapeutic_areas"):
+    # hcp_openalex_authors gets v2 suffix in v2 mode; the others are shared
+    preflight_tables = [
+        get_table_name("hcp_openalex_authors", target_version),
+        "openalex_author_inventory",
+        "ror_to_country",
+        "therapeutic_areas",
+    ]
+    for tbl in preflight_tables:
         if not table_exists(supabase, tbl):
             eprint(f"Missing or inaccessible table: {tbl}")
             raise SystemExit(1)
         print(f"  OK: {tbl}")
 
-    hta_exists = table_exists(supabase, "hcp_therapeutic_areas")
-    if not hta_exists:
-        eprint("Warning: hcp_therapeutic_areas not accessible; TA tagging will be skipped.")
+    if target_version == "v2":
+        print(
+            "  NOTE: target-version is v2. Skipping default Hepatology TA tagging. "
+            "v2 TA assignment is handled by a separate script (ta_tagging_rebuild.py) "
+            "that uses publication evidence rather than defaults."
+        )
+        hta_exists = False
+        hepatology_id = None
+    else:
+        hta_exists = table_exists(supabase, "hcp_therapeutic_areas")
+        if not hta_exists:
+            eprint("Warning: hcp_therapeutic_areas not accessible; TA tagging will be skipped.")
 
-    hepatology_id = fetch_hepatology_ta_id(supabase)
-    if not hepatology_id:
-        eprint("Hepatology broad_ta not found in therapeutic_areas (name='Hepatology', ta_level='broad_ta').")
-        raise SystemExit(1)
-    print(f"  Hepatology TA id: {hepatology_id}")
+        hepatology_id = fetch_hepatology_ta_id(supabase)
+        if not hepatology_id:
+            eprint("Hepatology broad_ta not found in therapeutic_areas (name='Hepatology', ta_level='broad_ta').")
+            raise SystemExit(1)
+        print(f"  Hepatology TA id: {hepatology_id}")
 
     print("\nLoading linked OpenAlex IDs from hcp_openalex_authors...")
-    linked = fetch_linked_openalex_ids(supabase)
+    linked = fetch_linked_openalex_ids(supabase, target_version)
     print(f"  Distinct linked OpenAlex IDs: {len(linked):,}")
 
     print("\nScanning openalex_author_inventory for unlinked rows...")
@@ -559,7 +602,7 @@ def main() -> None:
     for start in range(0, len(plans), bs):
         batch = plans[start : start + bs]
         hcp_payloads = [p.hcp_row for p in batch]
-        ok_ids = insert_hcps_batch(supabase, hcp_payloads, dry_run=False, errors=errors)
+        ok_ids = insert_hcps_batch(supabase, hcp_payloads, dry_run=False, errors=errors, target_version=target_version)
         clusters_failed += len(batch) - len(ok_ids)
         hcps_created += len(ok_ids)
 
@@ -571,12 +614,12 @@ def main() -> None:
             joins_to_write.extend(p.join_rows)
             cc = p.hcp_row.get("country") or "(null)"
             country_live[str(cc)] += 1
-            if hta_exists:
+            if hta_exists and p.ta_row is not None:
                 tas_to_write.append(p.ta_row)
 
-        joins_written += upsert_join_rows(supabase, joins_to_write, dry_run=False, errors=errors)
+        joins_written += upsert_join_rows(supabase, joins_to_write, dry_run=False, errors=errors, target_version=target_version)
         if hta_exists and tas_to_write:
-            ta_written += upsert_ta_rows(supabase, tas_to_write, dry_run=False, errors=errors)
+            ta_written += upsert_ta_rows(supabase, tas_to_write, dry_run=False, errors=errors, target_version=target_version)
 
         done = min(start + len(batch), len(plans))
         if done % PROGRESS_EVERY_CLUSTERS == 0 or done == len(plans):
