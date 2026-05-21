@@ -80,6 +80,19 @@ export interface SocialUser {
   profile_url: string | null;
 }
 
+export interface LatestPost {
+  platform: string;
+  handle: string;
+  post_text: string | null;
+  posted_at: string;
+  engagement_likes: number;
+  engagement_replies: number;
+  engagement_reposts: number;
+  engagement_quotes: number;
+  hashtags: string[];
+  captured_via_query: string | null;
+}
+
 export interface VerifiedDOL {
   hcp_id: string;
   first_name: string;

@@ -1,7 +1,15 @@
 import { firstEmbedded } from "./cohort-metrics";
 import { dedupeHCPs } from "./hcp-dedupe";
 import { supabase } from "./supabase";
-import type { HCP, HCPScore, RisingStar, SocialUser, TACounts, VerifiedDOL } from "./types";
+import type {
+  HCP,
+  HCPScore,
+  LatestPost,
+  RisingStar,
+  SocialUser,
+  TACounts,
+  VerifiedDOL,
+} from "./types";
 
 export interface ApiResult<T> {
   data: T | null;
@@ -1117,4 +1125,50 @@ export async function searchHCPs(
   };
 }
 
-export type { HCP, HCPScore };
+export async function getLatestPostForHandle(
+  platform: string,
+  handle: string,
+): Promise<ApiResult<LatestPost | null>> {
+  try {
+    const { data, error } = await supabase
+      .from("social_posts")
+      .select(
+        "platform, handle, post_text, posted_at, engagement_likes, engagement_replies, engagement_reposts, engagement_quotes, hashtags, captured_via_query",
+      )
+      .eq("platform", platform)
+      .eq("handle", handle.toLowerCase())
+      .order("posted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    if (!data) {
+      return { data: null, error: null };
+    }
+
+    const post: LatestPost = {
+      platform: String(data.platform),
+      handle: String(data.handle),
+      post_text: data.post_text ?? null,
+      posted_at: String(data.posted_at),
+      engagement_likes: Number(data.engagement_likes ?? 0),
+      engagement_replies: Number(data.engagement_replies ?? 0),
+      engagement_reposts: Number(data.engagement_reposts ?? 0),
+      engagement_quotes: Number(data.engagement_quotes ?? 0),
+      hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
+      captured_via_query: data.captured_via_query ?? null,
+    };
+
+    return { data: post, error: null };
+  } catch (err) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : "Unknown error occurred",
+    };
+  }
+}
+
+export type { HCP, HCPScore, LatestPost };

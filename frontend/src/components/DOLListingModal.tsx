@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { VerifiedDOL } from "../lib/types";
+import DOLPostModal from "./DOLPostModal";
 
 const ACCENT_COLOR = "#4DD0E1";
 
@@ -22,9 +23,67 @@ function formatFollowerCount(value: number | null): string {
   return `${(value / 1000000).toFixed(1)}M`;
 }
 
-function buildDisplayName(dol: VerifiedDOL): string {
+const KNOWN_CREDENTIALS = new Set([
+  "md",
+  "phd",
+  "mph",
+  "mpa",
+  "do",
+  "pharmd",
+  "rn",
+  "np",
+  "pa",
+  "mba",
+  "msc",
+  "mhs",
+  "msn",
+  "msph",
+  "dnp",
+  "edd",
+  "dsc",
+  "dvm",
+  "fasco",
+  "facp",
+  "facs",
+  "fashp",
+  "fastro",
+  "bs",
+  "ba",
+  "ms",
+  "ma",
+]);
+
+function titleCaseIfNeeded(name: string): string {
+  if (/[A-Z]/.test(name)) return name;
+  return name
+    .split(/\s+/)
+    .map((token) => {
+      if (!token) return token;
+      const cleanToken = token.replace(/[,.]/g, "").toLowerCase();
+      if (KNOWN_CREDENTIALS.has(cleanToken)) {
+        return token.toUpperCase();
+      }
+      return token[0].toUpperCase() + token.slice(1);
+    })
+    .join(" ");
+}
+
+function addMiddleInitialPeriods(name: string): string {
+  const tokens = name.split(/\s+/);
+  return tokens
+    .map((token, idx) => {
+      if (idx === 0 || idx === tokens.length - 1) return token;
+      if (/^[A-Z]$/.test(token)) return `${token}.`;
+      return token;
+    })
+    .join(" ");
+}
+
+export function buildDOLDisplayName(dol: VerifiedDOL): string {
   const displayName = dol.social_user.display_name?.trim();
-  if (displayName) return displayName;
+  if (displayName) {
+    return addMiddleInitialPeriods(titleCaseIfNeeded(displayName));
+  }
   return `${dol.first_name} ${dol.last_name}`.trim();
 }
 
@@ -32,28 +91,28 @@ interface DOLCardProps {
   dol: VerifiedDOL;
   bioLineClamp?: number;
   fullWidth?: boolean;
+  onLatestPost?: (dol: VerifiedDOL) => void;
 }
 
-export function DOLCard({ dol, bioLineClamp = 2, fullWidth = false }: DOLCardProps) {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        const url = dol.social_user.profile_url ?? undefined;
-        if (url) window.open(url, "_blank", "noopener,noreferrer");
-      }}
-      style={{
-        width: fullWidth ? "100%" : 280,
-        minWidth: fullWidth ? undefined : 280,
-        textAlign: "left",
-        backgroundColor: "#111113",
-        border: "1px solid #1E1E22",
-        borderLeft: `3px solid ${ACCENT_COLOR}`,
-        borderRadius: 4,
-        padding: 10,
-        cursor: "pointer",
-      }}
-    >
+export function DOLCard({ dol, bioLineClamp = 2, fullWidth = false, onLatestPost }: DOLCardProps) {
+  const cardStyle = {
+    width: fullWidth ? "100%" : 280,
+    minWidth: fullWidth ? undefined : 280,
+    textAlign: "left" as const,
+    backgroundColor: "#111113",
+    border: "1px solid #1E1E22",
+    borderLeft: `3px solid ${ACCENT_COLOR}`,
+    borderRadius: 4,
+    padding: 10,
+  };
+
+  const openProfile = () => {
+    const url = dol.social_user.profile_url ?? undefined;
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const cardBody = (
+    <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <span
           style={{
@@ -66,7 +125,7 @@ export function DOLCard({ dol, bioLineClamp = 2, fullWidth = false }: DOLCardPro
             whiteSpace: "nowrap",
           }}
         >
-          {buildDisplayName(dol)}
+          {buildDOLDisplayName(dol)}
         </span>
         <span
           style={{
@@ -123,6 +182,61 @@ export function DOLCard({ dol, bioLineClamp = 2, fullWidth = false }: DOLCardPro
       >
         {dol.social_user.bio ?? "No bio available."}
       </div>
+    </>
+  );
+
+  if (onLatestPost) {
+    return (
+      <div style={cardStyle}>
+        <button
+          type="button"
+          onClick={openProfile}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+          }}
+        >
+          {cardBody}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onLatestPost(dol);
+          }}
+          style={{
+            marginTop: 8,
+            padding: 0,
+            background: "none",
+            border: "none",
+            fontSize: 12,
+            color: ACCENT_COLOR,
+            fontFamily: "system-ui, sans-serif",
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textDecoration = "underline";
+            e.currentTarget.style.filter = "brightness(1.15)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textDecoration = "none";
+            e.currentTarget.style.filter = "none";
+          }}
+        >
+          Latest post →
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" onClick={openProfile} style={{ ...cardStyle, cursor: "pointer" }}>
+      {cardBody}
     </button>
   );
 }
@@ -134,6 +248,7 @@ interface DOLListingModalProps {
 }
 
 export default function DOLListingModal({ taSlug, dols, onClose }: DOLListingModalProps) {
+  const [selectedDOL, setSelectedDOL] = useState<VerifiedDOL | null>(null);
   const [isWide, setIsWide] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
   );
@@ -248,11 +363,16 @@ export default function DOLListingModal({ taSlug, dols, onClose }: DOLListingMod
                 dol={dol}
                 bioLineClamp={4}
                 fullWidth
+                onLatestPost={(d) => setSelectedDOL(d)}
               />
             ))}
           </div>
         </div>
       </div>
+
+      {selectedDOL ? (
+        <DOLPostModal dol={selectedDOL} onClose={() => setSelectedDOL(null)} />
+      ) : null}
     </div>
   );
 }
