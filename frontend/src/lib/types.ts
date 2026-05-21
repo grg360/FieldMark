@@ -103,6 +103,7 @@ export interface VerifiedDOL {
   total_career_pubs: number | null;
   match_confidence: "high" | "medium" | "low";
   social_user: SocialUser;
+  is_asco_active: boolean;
 }
 
 export interface TACounts {

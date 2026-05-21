@@ -779,6 +779,43 @@ export async function getVerifiedDOLs(
       return { data: null, error: socialError.message };
     }
 
+    const ascoActiveSocialIds = new Set<string>();
+    if (socialUserIds.length > 0) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const handles = (socialRows ?? [])
+        .map((s) => String(s.handle ?? "").toLowerCase())
+        .filter(Boolean);
+
+      if (handles.length > 0) {
+        const { data: ascoPosts } = await supabase
+          .from("social_posts")
+          .select("handle, platform, hashtags")
+          .in("handle", handles)
+          .gte("posted_at", sevenDaysAgo.toISOString());
+
+        const ascoTagsLower = new Set(["#asco", "#asco26", "#asco2026"]);
+        for (const post of ascoPosts ?? []) {
+          const hashtags = Array.isArray(post.hashtags) ? post.hashtags : [];
+          const hasAscoTag = hashtags.some((tag) =>
+            ascoTagsLower.has(String(tag).toLowerCase()),
+          );
+          if (hasAscoTag) {
+            const postHandle = String(post.handle ?? "").toLowerCase();
+            const matchingSocial = (socialRows ?? []).find(
+              (s) =>
+                String(s.handle ?? "").toLowerCase() === postHandle &&
+                String(s.platform) === String(post.platform),
+            );
+            if (matchingSocial) {
+              ascoActiveSocialIds.add(String(matchingSocial.id));
+            }
+          }
+        }
+      }
+    }
+
     const hcpById = new Map(filteredHcps.map((h) => [String(h.id), h]));
     const socialById = new Map((socialRows ?? []).map((s) => [String(s.id), s]));
 
@@ -813,6 +850,7 @@ export async function getVerifiedDOLs(
           total_career_pubs: hcp.total_career_pubs == null ? null : Number(hcp.total_career_pubs),
           match_confidence: "high",
           social_user: socialUser,
+          is_asco_active: ascoActiveSocialIds.has(String(social.id)),
         };
         return row;
       })

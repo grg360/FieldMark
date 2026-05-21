@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { getVerifiedDOLs } from "../lib/api";
 import type { VerifiedDOL } from "../lib/types";
-import DOLListingModal, { DOLCard, formatTALabel } from "./DOLListingModal";
+import DOLListingModal, { DOLCard, ensureAscoPulseStyles, formatTALabel } from "./DOLListingModal";
+
+ensureAscoPulseStyles();
 
 interface DOLHeroPanelProps {
   taSlug: string;

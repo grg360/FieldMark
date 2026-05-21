@@ -4,6 +4,40 @@ import DOLPostModal from "./DOLPostModal";
 
 const ACCENT_COLOR = "#4DD0E1";
 
+export function ensureAscoPulseStyles(): void {
+  if (typeof document === "undefined") return;
+  if (document.getElementById("fm-asco-pulse-styles")) return;
+  const styleEl = document.createElement("style");
+  styleEl.id = "fm-asco-pulse-styles";
+  styleEl.textContent = `
+    @keyframes fmAscoPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  `;
+  document.head.appendChild(styleEl);
+}
+
+ensureAscoPulseStyles();
+
+function AscoActiveDot() {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        backgroundColor: "#10b981",
+        animation: "fmAscoPulse 2s ease-in-out infinite",
+        flexShrink: 0,
+      }}
+      title="Active during ASCO"
+      aria-label="Active during ASCO"
+    />
+  );
+}
+
 export function formatTALabel(taSlug: string): string {
   const slug = taSlug.trim().toLowerCase();
   if (slug === "nsclc") return "NSCLC";
@@ -127,18 +161,20 @@ export function DOLCard({ dol, bioLineClamp = 2, fullWidth = false, onLatestPost
         >
           {buildDOLDisplayName(dol)}
         </span>
-        <span
-          style={{
-            fontSize: 12,
-            color: ACCENT_COLOR,
-            fontFamily: "system-ui, sans-serif",
-            flexShrink: 0,
-          }}
-          aria-label={dol.social_user.platform}
-          title={dol.social_user.platform}
-        >
-          {dol.social_user.platform === "twitter" ? "𝕏" : "bsky"}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          {dol.is_asco_active ? <AscoActiveDot /> : null}
+          <span
+            style={{
+              fontSize: 12,
+              color: ACCENT_COLOR,
+              fontFamily: "system-ui, sans-serif",
+            }}
+            aria-label={dol.social_user.platform}
+            title={dol.social_user.platform}
+          >
+            {dol.social_user.platform === "twitter" ? "𝕏" : "bsky"}
+          </span>
+        </div>
       </div>
 
       <div
