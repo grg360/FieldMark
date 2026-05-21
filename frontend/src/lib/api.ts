@@ -938,74 +938,183 @@ export async function getHCPDetail(
   }
 }
 
+export interface HCPSearchResult {
+  id: string;
+  firstName: string;
+  lastName: string;
+  institution: string | null;
+  cohortClassification: "established" | "rising_star" | "community" | "unclassified" | null;
+  cohortScore: number | null;
+  therapeuticAreaIds: string[];
+  therapeuticAreaName?: string;
+}
+
+const TA_DISPLAY_BY_ID: Record<string, string> = {
+  "833e7b38-d01b-409e-82c0-71eb29e138a0": "Rare Disease",
+  "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e": "Hepatology",
+  "c0065b03-a25e-4e9a-bde4-4b4d0db7827d": "Oncology",
+  "095bc902-c3dc-48a3-8167-52ee55795d60": "Oncology",
+  "4cf07827-ff1c-451e-832e-0e0a14ea9c86": "Immunology",
+};
+
+const SEARCH_COHORT_ORDER: Record<string, number> = {
+  established: 0,
+  rising_star: 1,
+  community: 2,
+  unclassified: 3,
+};
+
+export function getTAIdForLabel(therapeuticArea: string): string | undefined {
+  return resolveTAId(therapeuticArea);
+}
+
+export function getTADisplayName(taId: string): string {
+  return TA_DISPLAY_BY_ID[taId] ?? "Other TA";
+}
+
+function mapSearchCohortClassification(
+  raw: string | null | undefined,
+): HCPSearchResult["cohortClassification"] {
+  if (raw == null || String(raw).trim() === "") return "unclassified";
+  const v = String(raw).trim().toLowerCase();
+  if (v === "established") return "established";
+  if (v === "rising_star" || v === "dark_horse") return "rising_star";
+  if (v === "community" || v === "workhorse") return "community";
+  return "unclassified";
+}
+
+function parseTherapeuticAreaLinks(
+  links: unknown,
+): { ids: string[]; names: string[] } {
+  const arr = Array.isArray(links) ? links : links ? [links] : [];
+  const ids: string[] = [];
+  const names: string[] = [];
+  for (const link of arr) {
+    if (!link || typeof link !== "object") continue;
+    const row = link as Record<string, unknown>;
+    const tid = row.therapeutic_area_id;
+    if (tid != null && String(tid).trim() !== "") {
+      ids.push(String(tid));
+    }
+    const ta = row.therapeutic_areas;
+    const taRow = Array.isArray(ta) ? ta[0] : ta;
+    if (taRow && typeof taRow === "object" && "name" in taRow) {
+      const name = (taRow as { name?: unknown }).name;
+      if (name != null && String(name).trim() !== "") {
+        names.push(String(name));
+      }
+    }
+  }
+  return { ids: [...new Set(ids)], names };
+}
+
+function sortInCurrentTA(results: HCPSearchResult[]): HCPSearchResult[] {
+  return [...results].sort((a, b) => {
+    const cohortA = a.cohortClassification ?? "unclassified";
+    const cohortB = b.cohortClassification ?? "unclassified";
+    const orderA = SEARCH_COHORT_ORDER[cohortA] ?? 3;
+    const orderB = SEARCH_COHORT_ORDER[cohortB] ?? 3;
+    if (orderA !== orderB) return orderA - orderB;
+    if (cohortA === "unclassified" || cohortB === "unclassified") {
+      return a.lastName.localeCompare(b.lastName);
+    }
+    return (b.cohortScore ?? -Infinity) - (a.cohortScore ?? -Infinity);
+  });
+}
+
+function sortOtherTAs(results: HCPSearchResult[]): HCPSearchResult[] {
+  return [...results].sort((a, b) => a.lastName.localeCompare(b.lastName));
+}
+
 export async function searchHCPs(
   query: string,
-  therapeuticArea: string,
-): Promise<ApiResult<RisingStar[]>> {
-  try {
-    const search = query.trim();
-    if (!search) {
-      return { data: dedupeHCPs<RisingStar>([]), error: null };
-    }
-
-    const searchPattern = `%${search}%`;
-
-    const { data, error } = await supabase
-      .from("hcp_scores")
-      .select(
-        `
-        hcp_id,
-        composite_score,
-        normalized_score,
-        pub_velocity_score,
-        citation_trajectory_score,
-        trial_investigator_score,
-        tier,
-        hcps!inner (
-          id,
-          first_name,
-          last_name,
-          institution,
-          institution_short,
-          country,
-          first_pub_year,
-          nppes_practice_city,
-          nppes_practice_state,
-          nppes_practice_setting,
-          hcp_therapeutic_areas!inner (
-            therapeutic_areas!inner (
-              slug
-            )
-          )
-        )
-      `,
-      )
-      .eq("hcps.country", "USA")
-      .eq(
-        "hcps.hcp_therapeutic_areas.therapeutic_areas.slug",
-        therapeuticArea,
-      )
-      .or(
-        `first_name.ilike.${searchPattern},last_name.ilike.${searchPattern}`,
-        { foreignTable: "hcps" },
-      )
-      .order("composite_score", { ascending: false });
-
-    if (error) {
-      return { data: null, error: error.message };
-    }
-
-    const result: RisingStar[] = (data ?? []).map((row) =>
-      mapRisingStarRow(row, therapeuticArea),
-    );
-
-    return { data: dedupeHCPs(result), error: null };
-  } catch (err) {
-    return {
-      data: null,
-      error: err instanceof Error ? err.message : "Unknown error occurred",
-    };
+  currentTaId: string,
+): Promise<{ inCurrentTA: HCPSearchResult[]; inOtherTAs: HCPSearchResult[] }> {
+  const sanitized = query.trim();
+  if (sanitized.length < 2) {
+    return { inCurrentTA: [], inOtherTAs: [] };
   }
+
+  const searchPattern = `%${sanitized.replace(/%/g, "\\%")}%`;
+
+  const { data, error } = await supabase
+    .from("hcps")
+    .select(
+      `
+      id,
+      first_name,
+      last_name,
+      institution,
+      cohort_classification,
+      cohort_score,
+      hcp_therapeutic_areas (
+        therapeutic_area_id,
+        therapeutic_areas ( name )
+      )
+    `,
+    )
+    .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern}`)
+    .limit(50);
+
+  if (error || !data) {
+    return { inCurrentTA: [], inOtherTAs: [] };
+  }
+
+  const byHcpId = new Map<string, HCPSearchResult>();
+
+  for (const row of data) {
+    const id = String(row.id ?? "");
+    if (!id) continue;
+
+    const { ids: therapeuticAreaIds } = parseTherapeuticAreaLinks(row.hcp_therapeutic_areas);
+
+    if (!byHcpId.has(id)) {
+      byHcpId.set(id, {
+        id,
+        firstName: String(row.first_name ?? ""),
+        lastName: String(row.last_name ?? ""),
+        institution: row.institution != null ? String(row.institution) : null,
+        cohortClassification: mapSearchCohortClassification(row.cohort_classification),
+        cohortScore:
+          row.cohort_score == null ? null : Number(row.cohort_score),
+        therapeuticAreaIds,
+      });
+    } else {
+      const existing = byHcpId.get(id)!;
+      existing.therapeuticAreaIds = [
+        ...new Set([...existing.therapeuticAreaIds, ...therapeuticAreaIds]),
+      ];
+    }
+  }
+
+  const inCurrentTA: HCPSearchResult[] = [];
+  const inOtherTAs: HCPSearchResult[] = [];
+
+  for (const hcp of byHcpId.values()) {
+    const hasCurrentTa = hcp.therapeuticAreaIds.includes(currentTaId);
+    if (hasCurrentTa) {
+      inCurrentTA.push(hcp);
+      continue;
+    }
+
+    const otherTaId = hcp.therapeuticAreaIds.find((tid) => tid !== currentTaId);
+    const label =
+      hcp.therapeuticAreaIds.length === 0
+        ? "Untagged"
+        : otherTaId
+          ? getTADisplayName(otherTaId)
+          : "Other TA";
+
+    inOtherTAs.push({
+      ...hcp,
+      therapeuticAreaName: label,
+    });
+  }
+
+  return {
+    inCurrentTA: sortInCurrentTA(inCurrentTA),
+    inOtherTAs: sortOtherTAs(inOtherTAs),
+  };
 }
 
 export type { HCP, HCPScore };

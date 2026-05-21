@@ -29,6 +29,48 @@
         "active_until": "2026-10-31",
         "therapeutic_area": "oncology",
         "rationale": "ESMO Congress September"
+      },
+      {
+        "tag": "#ASCO26",
+        "min_faves": 5,
+        "active_until": "2026-06-15",
+        "therapeutic_area": "oncology",
+        "rationale": "ASCO 2026 â€” 2-digit year variant"
+      },
+      {
+        "tag": "#lcsm",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Lung Cancer Social Media community â€” major MSL-relevant signal"
+      },
+      {
+        "tag": "#bcsm",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Breast Cancer Social Media community"
+      },
+      {
+        "tag": "#gynonc",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Gynecologic Oncology community"
+      },
+      {
+        "tag": "#oncodaily",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Active oncology community/publication"
+      },
+      {
+        "tag": "#livertwitter",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "hepatology",
+        "rationale": "Active hepatology community tag"
       }
     ],
     "topic_queries": [
@@ -56,3 +98,4 @@
     "feeds": []
   }
 }
+

@@ -21,7 +21,7 @@ import ScoringExplainedModal, {
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
 import type { FeedCohort } from "./lib/api";
-import { getHCPDetail, getRisingStars, getTACounts } from "./lib/api";
+import { getHCPDetail, getRisingStars, getTACounts, getTAIdForLabel, getTADisplayName } from "./lib/api";
 import { TrackProvider, useTrack, type Track } from "./lib/TrackContext";
 import type { RisingStar, TACounts } from "./lib/types";
 
@@ -370,6 +370,18 @@ function AppContent() {
     setCurrentScreen("detail");
   }
 
+  async function handleSearchSelect(hcpId: string, taId: string) {
+    const taLabel = getTADisplayName(taId);
+    if (taLabel && taLabel !== "Other TA") {
+      setSelectedTA(taLabel);
+      setSelectedIndication("All");
+    }
+    const { data, error } = await getHCPDetail(hcpId, getTASlug(taLabel !== "Other TA" ? taLabel : selectedTA));
+    if (error || !data) return;
+    setDetailHCP(mapRisingStarToHCP(data));
+    setCurrentScreen("detail");
+  }
+
   let screenContent;
   if (currentScreen === "auth") {
     screenContent = <LinkedInAuthScreen onAuth={handleAuth} />;
@@ -468,7 +480,6 @@ function AppContent() {
           setSelectedIndication("All");
           setCurrentScreen("feed");
         }}
-        onSearchPress={() => setCurrentScreen("search")}
         onProfilePress={() => setCurrentScreen("profile")}
         onRefreshPress={() => void fetchHCPs(true)}
         onScoringExplainedPress={() => {
@@ -476,6 +487,8 @@ function AppContent() {
           setScoringExplainedOpen(true);
         }}
         refreshing={refreshingFeed}
+        currentTaId={getTAIdForLabel(selectedTA)}
+        onSearchSelect={(hcpId, taId) => void handleSearchSelect(hcpId, taId)}
       />
 
       <TrackSwitch />
