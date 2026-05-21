@@ -20,21 +20,41 @@ export function ensureAscoPulseStyles(): void {
 
 ensureAscoPulseStyles();
 
-function AscoActiveDot() {
+function AscoActiveBadge() {
   return (
-    <span
+    <div
       style={{
-        display: "inline-block",
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        backgroundColor: "#10b981",
-        animation: "fmAscoPulse 2s ease-in-out infinite",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
         flexShrink: 0,
       }}
-      title="Active during ASCO"
-      aria-label="Active during ASCO"
-    />
+      title="Active in ASCO conversation (last 7 days)"
+      aria-label="Active in ASCO conversation"
+    >
+      <span
+        style={{
+          display: "inline-block",
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          backgroundColor: "#10b981",
+          animation: "fmAscoPulse 2s ease-in-out infinite",
+        }}
+      />
+      <span
+        style={{
+          fontSize: 11,
+          color: "#10b981",
+          fontFamily: "system-ui, sans-serif",
+          fontWeight: 500,
+          letterSpacing: 0.3,
+          whiteSpace: "nowrap",
+        }}
+      >
+        Live · ASCO
+      </span>
+    </div>
   );
 }
 
@@ -162,7 +182,7 @@ export function DOLCard({ dol, bioLineClamp = 2, fullWidth = false, onLatestPost
           {buildDOLDisplayName(dol)}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          {dol.is_asco_active ? <AscoActiveDot /> : null}
+          {dol.is_asco_active ? <AscoActiveBadge /> : null}
           <span
             style={{
               fontSize: 12,
