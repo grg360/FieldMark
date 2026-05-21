@@ -42,7 +42,7 @@ export default function DOLHeroPanel({ taSlug }: DOLHeroPanelProps) {
 
     async function fetchDols() {
       setLoading(true);
-      const { data } = await getVerifiedDOLs(taSlug, 10);
+      const { data } = await getVerifiedDOLs(taSlug, 50);
       if (cancelled) return;
       setDols(data ?? []);
       setLoading(false);
