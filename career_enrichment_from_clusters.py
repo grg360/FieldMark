@@ -218,12 +218,17 @@ def today_start_utc_iso() -> str:
 
 def fetch_all_join_rows(supabase: Client, target_version: str = "v1") -> List[Dict[str, Any]]:
     hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
+    # v1 uses created_at; v2 renamed this column to linked_at.
+    # Select the appropriate column and normalize to "created_at" key in
+    # returned dicts so downstream code (build_author_clusters) is unchanged.
+    timestamp_column = "linked_at" if target_version == "v2" else "created_at"
+    select_cols = f"hcp_id,openalex_author_id,{timestamp_column}"
     rows: List[Dict[str, Any]] = []
     offset = 0
     while True:
         response = (
             supabase.table(hcp_oa_table)
-            .select("hcp_id,openalex_author_id,created_at")
+            .select(select_cols)
             .order("hcp_id")
             .range(offset, offset + FETCH_PAGE_SIZE - 1)
             .execute()
@@ -231,6 +236,11 @@ def fetch_all_join_rows(supabase: Client, target_version: str = "v1") -> List[Di
         batch = response.data or []
         if not batch:
             break
+        if target_version == "v2":
+            # Normalize linked_at -> created_at so downstream code is unchanged
+            for row in batch:
+                if "linked_at" in row:
+                    row["created_at"] = row.pop("linked_at")
         rows.extend(batch)
         if len(batch) < FETCH_PAGE_SIZE:
             break
