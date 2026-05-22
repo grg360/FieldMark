@@ -50,9 +50,17 @@ import requests
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 # Anthropic API config
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_MODEL = "claude-sonnet-4-6"
+PROMPT_VERSION = "v1.0"
 ANTHROPIC_VERSION = "2023-06-01"
 
 # Pricing (per million tokens) — Sonnet 4.6
@@ -91,6 +99,7 @@ class HCPContext:
     total_career_pubs: Optional[int]
     pharma_engagement_lifetime: Optional[float]
     pharma_companies_distinct: Optional[int]
+    therapeutic_area_slug: str = ""
 
 
 def get_required_env(name: str) -> str:
@@ -107,7 +116,9 @@ def init_supabase() -> Client:
     )
 
 
-def fetch_all_rows(supabase: Client, table: str, columns: str, page_size: int = 1000) -> List[Dict]:
+def fetch_all_rows(
+    supabase: Client, table: str, columns: str, page_size: int = 1000, target_version: str = "v1"
+) -> List[Dict]:
     """Paginate through a table, fetching all rows."""
     rows: List[Dict] = []
     offset = 0
@@ -182,6 +193,7 @@ def load_hcp_contexts(
     supabase: Client,
     target_cohorts: List[str],
     community_top_n: int,
+    target_version: str = "v1",
 ) -> List[HCPContext]:
     """
     Load HCP context for narrative generation, filtered by cohort.
@@ -192,13 +204,24 @@ def load_hcp_contexts(
     print("Loading HCPs by cohort_classification...")
 
     # Build cohort filter — only HCPs in target cohorts (paginated past 1000-row cap)
+    hcps_table = get_table_name("hcps", target_version)
+    if target_version == "v2":
+        hcp_select_cols = (
+            "id,first_name,last_name,institution_normalized,country,"
+            "cohort_classification,cohort_score,total_career_pubs,career_first_pub_year"
+        )
+    else:
+        hcp_select_cols = (
+            "id,first_name,last_name,institution,country,cohort_classification,"
+            "cohort_score,total_career_pubs,first_pub_year"
+        )
     hcps: List[Dict] = []
     page_size = 1000
     offset = 0
     while True:
         response = (
-            supabase.table("hcps")
-            .select("id,first_name,last_name,institution,country,cohort_classification,cohort_score,total_career_pubs,first_pub_year")
+            supabase.table(hcps_table)
+            .select(hcp_select_cols)
             .in_("cohort_classification", target_cohorts)
             .range(offset, offset + page_size - 1)
             .execute()
@@ -206,6 +229,12 @@ def load_hcp_contexts(
         batch = response.data or []
         if not batch:
             break
+        if target_version == "v2":
+            for row in batch:
+                if "institution_normalized" in row:
+                    row["institution"] = row.pop("institution_normalized")
+                if "career_first_pub_year" in row:
+                    row["first_pub_year"] = row.pop("career_first_pub_year")
         hcps.extend(batch)
         if len(batch) < page_size:
             break
@@ -231,7 +260,12 @@ def load_hcp_contexts(
     hcp_ids = {h["id"] for h in hcps if h.get("id")}
 
     print("Loading hcp_therapeutic_areas membership...")
-    hcp_tas = fetch_all_rows(supabase, "hcp_therapeutic_areas", "hcp_id,therapeutic_area_id")
+    hcp_tas = fetch_all_rows(
+        supabase,
+        get_table_name("hcp_therapeutic_areas", target_version),
+        "hcp_id,therapeutic_area_id",
+        target_version=target_version,
+    )
     ta_membership = {
         (row.get("hcp_id"), row.get("therapeutic_area_id"))
         for row in hcp_tas
@@ -240,20 +274,34 @@ def load_hcp_contexts(
     print(f"Filtered to {len(ta_membership)} HCP×TA membership pairs for target cohorts")
 
     print("Loading therapeutic_areas...")
-    tas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
+    ta_columns = "id,name,slug" if target_version == "v2" else "id,name"
+    tas = fetch_all_rows(supabase, "therapeutic_areas", ta_columns)
     ta_name_map = {row["id"]: row.get("name", row["id"]) for row in tas if row.get("id")}
+    ta_slug_map = {row["id"]: row.get("slug", "") for row in tas if row.get("id")}
 
     print("Loading hcp_scores...")
-    scores = fetch_all_rows(
-        supabase,
-        "hcp_scores",
-        "hcp_id,therapeutic_area_id,composite_score,pub_velocity_score,citation_trajectory_score,trial_investigator_score,calculated_at",
-    )
+    scores_table = get_table_name("hcp_scores", target_version)
+    if target_version == "v2":
+        scores_select = (
+            "hcp_id,therapeutic_area_id,composite_score,pub_velocity_score,"
+            "citation_trajectory_score,trial_investigator_score,scored_at"
+        )
+    else:
+        scores_select = (
+            "hcp_id,therapeutic_area_id,composite_score,pub_velocity_score,"
+            "citation_trajectory_score,trial_investigator_score,calculated_at"
+        )
+    scores = fetch_all_rows(supabase, scores_table, scores_select, target_version=target_version)
+    if target_version == "v2":
+        for row in scores:
+            if "scored_at" in row:
+                row["calculated_at"] = row.pop("scored_at")
     latest_scores = pick_latest_scores(scores)
 
+    ops_table = get_table_name("hcp_open_payments_summary", target_version)
     print("Loading hcp_open_payments_summary...")
     ops_raw = (
-        supabase.table("hcp_open_payments_summary")
+        supabase.table(ops_table)
         .select("hcp_id,total_payments_lifetime,distinct_companies_lifetime")
         .in_("hcp_id", list(hcp_ids) if len(hcp_ids) < 1000 else None)
         .execute()
@@ -262,7 +310,11 @@ def load_hcp_contexts(
     )
     if ops_raw is None:
         # Fallback: fetch all
-        ops_raw = supabase.table("hcp_open_payments_summary").select("hcp_id,total_payments_lifetime,distinct_companies_lifetime").execute()
+        ops_raw = (
+            supabase.table(ops_table)
+            .select("hcp_id,total_payments_lifetime,distinct_companies_lifetime")
+            .execute()
+        )
     ops_by_hcp = {row["hcp_id"]: row for row in (ops_raw.data or []) if row.get("hcp_id")}
 
     hcp_map = {row["id"]: row for row in hcps if row.get("id")}
@@ -324,6 +376,7 @@ def load_hcp_contexts(
             total_career_pubs=safe_int(hcp.get("total_career_pubs")),
             pharma_engagement_lifetime=safe_float(ops.get("total_payments_lifetime")),
             pharma_companies_distinct=safe_int(ops.get("distinct_companies_lifetime")),
+            therapeutic_area_slug=ta_slug_map.get(ta_id, ""),
         )
         contexts.append(ctx)
 
@@ -541,29 +594,53 @@ def generate_narrative(ctx: HCPContext, anthropic_api_key: str) -> Dict[str, Opt
     }
 
 
-def upsert_narrative(supabase: Client, ctx: HCPContext, output: Dict[str, Optional[str]]) -> None:
+def upsert_narrative(
+    supabase: Client,
+    ctx: HCPContext,
+    output: Dict[str, Optional[str]],
+    target_version: str = "v1",
+) -> None:
     """Write narrative to hcp_narratives."""
-    row = {
-        "hcp_id": ctx.hcp_id,
-        "therapeutic_area_id": ctx.therapeutic_area_id,
-        "narrative": output["narrative"],
-        "why_now": output["why_now"],
-        "engagement_angle": output["engagement_angle"],
-        "signal_strength": output["signal_strength"],
-        "caution_flags": output["caution_flags"],
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "model_version": ANTHROPIC_MODEL,
-    }
+    generated_at = datetime.now(timezone.utc).isoformat()
+    if target_version == "v2":
+        row = {
+            "hcp_id": ctx.hcp_id,
+            "therapeutic_area_slug": ctx.therapeutic_area_slug,
+            "narrative_text": output["narrative"],
+            "why_now": output["why_now"],
+            "engagement_angle": output["engagement_angle"],
+            "signal_strength": output["signal_strength"],
+            "caution_flags": output["caution_flags"],
+            "generated_at": generated_at,
+            "model_used": ANTHROPIC_MODEL,
+            "prompt_version": PROMPT_VERSION,
+        }
+        narratives_table = "hcp_narratives_v2"
+        on_conflict = "hcp_id,therapeutic_area_slug"
+    else:
+        row = {
+            "hcp_id": ctx.hcp_id,
+            "therapeutic_area_id": ctx.therapeutic_area_id,
+            "narrative": output["narrative"],
+            "why_now": output["why_now"],
+            "engagement_angle": output["engagement_angle"],
+            "signal_strength": output["signal_strength"],
+            "caution_flags": output["caution_flags"],
+            "generated_at": generated_at,
+            "model_version": ANTHROPIC_MODEL,
+        }
+        narratives_table = "hcp_narratives"
+        on_conflict = "hcp_id,therapeutic_area_id,model_version"
     try:
         # Assumes unique constraint or just inserts. If on_conflict is needed,
         # the existing constraint (hcp_id, therapeutic_area_id, model_version)
         # will handle dedupe in the older script's schema.
-        supabase.table("hcp_narratives").upsert(
+        supabase.table(narratives_table).upsert(
             row,
-            on_conflict="hcp_id,therapeutic_area_id,model_version",
+            on_conflict=on_conflict,
         ).execute()
     except Exception as exc:
-        raise RuntimeError(f"Failed writing hcp_narratives for HCP {ctx.hcp_id}: {exc}") from exc
+        raise RuntimeError(f"Failed writing {narratives_table} for HCP {ctx.hcp_id}: {exc}") from exc
 
 
 def estimate_cost(num_calls: int) -> float:
@@ -573,7 +650,13 @@ def estimate_cost(num_calls: int) -> float:
     return input_cost + output_cost
 
 
-def run_pipeline(target_cohorts: List[str], community_top_n: int, dry_run: bool, force: bool) -> None:
+def run_pipeline(
+    target_cohorts: List[str],
+    community_top_n: int,
+    dry_run: bool,
+    force: bool,
+    target_version: str = "v1",
+) -> None:
     load_dotenv()
     supabase = init_supabase()
 
@@ -582,7 +665,9 @@ def run_pipeline(target_cohorts: List[str], community_top_n: int, dry_run: bool,
         print(f"Community downselect: top {community_top_n} by cohort_score")
     print()
 
-    contexts = load_hcp_contexts(supabase, target_cohorts, community_top_n)
+    contexts = load_hcp_contexts(
+        supabase, target_cohorts, community_top_n, target_version=target_version
+    )
     if not contexts:
         print("No HCPs found for target cohorts. Exiting.")
         return
@@ -623,7 +708,7 @@ def run_pipeline(target_cohorts: List[str], community_top_n: int, dry_run: bool,
     for idx, ctx in enumerate(contexts, start=1):
         try:
             output = generate_narrative(ctx, anthropic_api_key)
-            upsert_narrative(supabase, ctx, output)
+            upsert_narrative(supabase, ctx, output, target_version=target_version)
             success += 1
         except Exception as exc:
             failed += 1
@@ -671,6 +756,12 @@ def main() -> int:
         action="store_true",
         help="Regenerate narratives even if fresh ones exist (default: only generate missing)",
     )
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
     args = parser.parse_args()
 
     if args.cohort == "all":
@@ -684,6 +775,7 @@ def main() -> int:
             community_top_n=args.community_top,
             dry_run=args.dry_run,
             force=args.force,
+            target_version=args.target_version,
         )
         return 0
     except Exception as exc:
