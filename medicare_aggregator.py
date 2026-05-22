@@ -12,6 +12,12 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 
 
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 PARQUET_FILES = [
     r"C:\Users\garre\Desktop\FieldMark\Medicare\medicare_provider_service_2021.parquet",
     r"C:\Users\garre\Desktop\FieldMark\Medicare\medicare_provider_service_2022.parquet",
@@ -50,6 +56,12 @@ CANONICALS = [
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true", default=False)
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
     return parser.parse_args()
 
 
@@ -69,6 +81,7 @@ def fetch_all_pages(
     table: str,
     columns: str,
     not_null_column: Optional[str] = None,
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     offset = 0
@@ -156,6 +169,7 @@ if __name__ == "__main__":
     started = time.time()
     args = parse_args()
     execute = bool(args.execute)
+    target_version: str = args.target_version
     mode = "execute" if execute else "dry_run"
     errors: List[str] = []
 
@@ -165,7 +179,13 @@ if __name__ == "__main__":
     con.execute("SET memory_limit = '4GB'")
 
     # Phase 2a,b: cohort and NPI mapping
-    hcps_npi_rows = fetch_all_pages(client, "hcps", "id,npi_number", not_null_column="npi_number")
+    hcps_npi_rows = fetch_all_pages(
+        client,
+        get_table_name("hcps", target_version),
+        "id,npi_number",
+        not_null_column="npi_number",
+        target_version=target_version,
+    )
     npi_set = {str(r.get("npi_number")).strip() for r in hcps_npi_rows if str(r.get("npi_number") or "").strip()}
     npi_to_hcp = {str(r["npi_number"]).strip(): str(r["id"]) for r in hcps_npi_rows if r.get("npi_number")}
     hcp_to_npi = {str(r["id"]): str(r["npi_number"]).strip() for r in hcps_npi_rows if r.get("npi_number")}
@@ -184,7 +204,12 @@ if __name__ == "__main__":
     ta_name_by_id = {str(r["id"]): str(r["name"]) for r in therapeutic_areas if r.get("id")}
     ta_id_by_name = {str(r["name"]): str(r["id"]) for r in therapeutic_areas if r.get("id")}
 
-    hcp_ta_rows = fetch_all_pages(client, "hcp_therapeutic_areas", "id,hcp_id,therapeutic_area_id")
+    hcp_ta_rows = fetch_all_pages(
+        client,
+        get_table_name("hcp_therapeutic_areas", target_version),
+        "id,hcp_id,therapeutic_area_id",
+        target_version=target_version,
+    )
     hcp_to_tas: Dict[str, set] = {}
     for r in hcp_ta_rows:
         h = str(r.get("hcp_id") or "")
@@ -642,7 +667,7 @@ if __name__ == "__main__":
         }
 
     def by_ta_row_for_insert(r: Dict[str, Any]) -> Dict[str, Any]:
-        return {
+        row = {
             "hcp_id": r["hcp_id"],
             "therapeutic_area_id": r["therapeutic_area_id"],
             "ta_beneficiaries_3yr_high_confidence": int(r["ta_beneficiaries_3yr_high_confidence"]),
@@ -656,8 +681,13 @@ if __name__ == "__main__":
             "ta_drug_admin_volume_3yr": int(r["ta_drug_admin_volume_3yr"]),
             "ta_procedure_volume_3yr": int(r["ta_procedure_volume_3yr"]),
             "ta_beneficiaries_yoy_trend_pct": r.get("ta_beneficiaries_yoy_trend_pct"),
-            "calculated_at": r.get("calculated_at") or now_iso,
         }
+        ts_val = r.get("calculated_at") or now_iso
+        if target_version == "v2":
+            row["aggregated_at"] = ts_val
+        else:
+            row["calculated_at"] = ts_val
+        return row
 
     summary_insert_payload = [summary_row_for_insert(r) for r in enriched_summary]
     by_ta_insert_payload = [by_ta_row_for_insert(r) for r in by_ta_rows]
@@ -778,32 +808,45 @@ if __name__ == "__main__":
     if not execute:
         print("[DRY-RUN] Skipping Supabase write.")
     else:
-        confirm = input(
-            "About to TRUNCATE and rewrite hcp_medicare_summary and hcp_medicare_by_ta.\n"
-            f"Will write {len(summary_insert_payload)} summary rows and {len(by_ta_insert_payload)} by_ta rows. Continue? (yes/no): "
-        )
+        if target_version == "v2":
+            confirm = input(
+                "About to UPSERT to hcp_medicare_summary_v2 and hcp_medicare_by_ta_v2.\n"
+                f"Will write {len(summary_insert_payload)} summary rows and "
+                f"{len(by_ta_insert_payload)} by_ta rows. Continue? (yes/no): "
+            )
+        else:
+            confirm = input(
+                "About to TRUNCATE and rewrite hcp_medicare_summary and hcp_medicare_by_ta.\n"
+                f"Will write {len(summary_insert_payload)} summary rows and {len(by_ta_insert_payload)} by_ta rows. Continue? (yes/no): "
+            )
         if confirm != "yes":
             print("Execution cancelled.")
             errors.append("execute_cancelled_by_user")
         else:
             inserted_summary = 0
             inserted_by_ta = 0
+            summary_table = get_table_name("hcp_medicare_summary", target_version)
+            by_ta_table = get_table_name("hcp_medicare_by_ta", target_version)
 
-            try:
-                trunc_summary_resp = (
-                    client.table("hcp_medicare_summary").delete().neq("id", DELETE_GUARD_ID).execute()
-                )
-                trunc_summary_count = len(trunc_summary_resp.data or [])
-                print(f"Truncated hcp_medicare_summary ({trunc_summary_count})")
-            except Exception as exc:
-                errors.append(f"truncate_summary: {repr(exc)}")
-                print(f"Truncate summary failed: {exc}")
+            if target_version == "v1":
+                try:
+                    trunc_summary_resp = (
+                        client.table(summary_table).delete().neq("id", DELETE_GUARD_ID).execute()
+                    )
+                    trunc_summary_count = len(trunc_summary_resp.data or [])
+                    print(f"Truncated hcp_medicare_summary ({trunc_summary_count})")
+                except Exception as exc:
+                    errors.append(f"truncate_summary: {repr(exc)}")
+                    print(f"Truncate summary failed: {exc}")
 
             try:
                 for start_idx in range(0, len(summary_insert_payload), WRITE_BATCH_SIZE):
                     batch = summary_insert_payload[start_idx : start_idx + WRITE_BATCH_SIZE]
                     try:
-                        client.table("hcp_medicare_summary").insert(batch).execute()
+                        if target_version == "v2":
+                            client.table(summary_table).upsert(batch, on_conflict="hcp_id").execute()
+                        else:
+                            client.table(summary_table).insert(batch).execute()
                         inserted_summary += len(batch)
                         print(
                             f"Inserted summary batch {start_idx // WRITE_BATCH_SIZE + 1} "
@@ -816,21 +859,27 @@ if __name__ == "__main__":
                 errors.append(f"summary_insert_fatal: {repr(exc)}")
                 print(f"Summary insert aborted: {exc}")
 
-            try:
-                trunc_by_ta_resp = (
-                    client.table("hcp_medicare_by_ta").delete().neq("id", DELETE_GUARD_ID).execute()
-                )
-                trunc_by_ta_count = len(trunc_by_ta_resp.data or [])
-                print(f"Truncated hcp_medicare_by_ta ({trunc_by_ta_count})")
-            except Exception as exc:
-                errors.append(f"truncate_by_ta: {repr(exc)}")
-                print(f"Truncate by_ta failed: {exc}")
+            if target_version == "v1":
+                try:
+                    trunc_by_ta_resp = (
+                        client.table(by_ta_table).delete().neq("id", DELETE_GUARD_ID).execute()
+                    )
+                    trunc_by_ta_count = len(trunc_by_ta_resp.data or [])
+                    print(f"Truncated hcp_medicare_by_ta ({trunc_by_ta_count})")
+                except Exception as exc:
+                    errors.append(f"truncate_by_ta: {repr(exc)}")
+                    print(f"Truncate by_ta failed: {exc}")
 
             try:
                 for start_idx in range(0, len(by_ta_insert_payload), WRITE_BATCH_SIZE):
                     batch = by_ta_insert_payload[start_idx : start_idx + WRITE_BATCH_SIZE]
                     try:
-                        client.table("hcp_medicare_by_ta").insert(batch).execute()
+                        if target_version == "v2":
+                            client.table(by_ta_table).upsert(
+                                batch, on_conflict="hcp_id,therapeutic_area_id"
+                            ).execute()
+                        else:
+                            client.table(by_ta_table).insert(batch).execute()
                         inserted_by_ta += len(batch)
                         print(
                             f"Inserted by_ta batch {start_idx // WRITE_BATCH_SIZE + 1} "
