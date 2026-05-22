@@ -49,7 +49,7 @@ def get_table_name(base_name: str, target_version: str) -> str:
 
 OPENALEX_BASE_URL = "https://api.openalex.org"
 FETCH_PAGE_SIZE = 1000
-SLEEP_SECONDS = 0.2
+SLEEP_SECONDS = 0.05
 PROGRESS_EVERY = 25
 DEFAULT_TIMEOUT_SECONDS = 20
 
