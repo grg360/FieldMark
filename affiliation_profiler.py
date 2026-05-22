@@ -10,6 +10,13 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 HCP_PAGE_SIZE = 1000
 UPSERT_BATCH_SIZE = 500
 PROFILE_VERSION = "v1.1"
@@ -222,46 +229,215 @@ def find_industry_keywords(strings: Sequence[str]) -> List[str]:
     return sorted(matched)
 
 
-def fetch_pending_hcp_count(supabase: Client) -> int:
-    response = (
-        supabase.table("hcps")
-        .select("id", count="exact")
-        .is_("affiliation_profile_calculated_at", "null")
-        .limit(1)
-        .execute()
-    )
-    return int(response.count or 0)
+def fetch_pending_hcp_count(supabase: Client, target_version: str = "v1") -> int:
+    if target_version == "v1":
+        response = (
+            supabase.table("hcps")
+            .select("id", count="exact")
+            .is_("affiliation_profile_calculated_at", "null")
+            .limit(1)
+            .execute()
+        )
+        return int(response.count or 0)
+
+    hcps_table = get_table_name("hcps", target_version)
+    aff_table = get_table_name("hcp_affiliation_profile", target_version)
+
+    all_hcp_ids: set[str] = set()
+    scan_offset = 0
+    while True:
+        batch = (
+            supabase.table(hcps_table)
+            .select("id")
+            .order("id")
+            .range(scan_offset, scan_offset + HCP_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            if row.get("id"):
+                all_hcp_ids.add(str(row["id"]))
+        if len(batch) < HCP_PAGE_SIZE:
+            break
+        scan_offset += HCP_PAGE_SIZE
+
+    profiled_ids: set[str] = set()
+    scan_offset = 0
+    while True:
+        batch = (
+            supabase.table(aff_table)
+            .select("hcp_id")
+            .order("hcp_id")
+            .range(scan_offset, scan_offset + HCP_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            if row.get("hcp_id"):
+                profiled_ids.add(str(row["hcp_id"]))
+        if len(batch) < HCP_PAGE_SIZE:
+            break
+        scan_offset += HCP_PAGE_SIZE
+
+    return len(all_hcp_ids - profiled_ids)
 
 
-def fetch_hcp_page(supabase: Client, offset: int, limit: int) -> List[Dict[str, Any]]:
-    response = (
-        supabase.table("hcps")
-        .select("id,first_name,last_name")
-        .is_("affiliation_profile_calculated_at", "null")
-        .order("id")
-        .range(offset, offset + limit - 1)
-        .execute()
-    )
-    return response.data or []
+def fetch_hcp_page(
+    supabase: Client, offset: int, limit: int, target_version: str = "v1"
+) -> List[Dict[str, Any]]:
+    if target_version == "v1":
+        response = (
+            supabase.table("hcps")
+            .select("id,first_name,last_name")
+            .is_("affiliation_profile_calculated_at", "null")
+            .order("id")
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        return response.data or []
+
+    hcps_table = get_table_name("hcps", target_version)
+    aff_table = get_table_name("hcp_affiliation_profile", target_version)
+
+    pending_rows: List[Dict[str, Any]] = []
+    scan_offset = 0
+
+    while len(pending_rows) < limit:
+        id_batch = (
+            supabase.table(hcps_table)
+            .select("id")
+            .order("id")
+            .range(scan_offset, scan_offset + HCP_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not id_batch:
+            break
+
+        hcp_ids = [str(r["id"]) for r in id_batch if r.get("id")]
+        profiled_ids: set[str] = set()
+        chunk_size = 100
+        for start in range(0, len(hcp_ids), chunk_size):
+            chunk = hcp_ids[start : start + chunk_size]
+            if not chunk:
+                continue
+            prof_resp = (
+                supabase.table(aff_table)
+                .select("hcp_id")
+                .in_("hcp_id", chunk)
+                .execute()
+            )
+            for row in prof_resp.data or []:
+                if row.get("hcp_id"):
+                    profiled_ids.add(str(row["hcp_id"]))
+
+        pending_ids = [hid for hid in hcp_ids if hid not in profiled_ids]
+        for start in range(0, len(pending_ids), chunk_size):
+            chunk = pending_ids[start : start + chunk_size]
+            if not chunk:
+                continue
+            full_resp = (
+                supabase.table(hcps_table)
+                .select("id,first_name,last_name")
+                .in_("id", chunk)
+                .execute()
+            )
+            pending_rows.extend(full_resp.data or [])
+
+        scan_offset += HCP_PAGE_SIZE
+        if len(id_batch) < HCP_PAGE_SIZE:
+            break
+
+    return pending_rows[:limit]
 
 
-def fetch_publications_for_hcps(supabase: Client, hcp_ids: Sequence[str]) -> List[Dict[str, Any]]:
+def fetch_publications_for_hcps(
+    supabase: Client, hcp_ids: Sequence[str], target_version: str = "v1"
+) -> List[Dict[str, Any]]:
     if not hcp_ids:
         return []
-    out: List[Dict[str, Any]] = []
     chunk_size = 100
     hcp_id_list = list(hcp_ids)
+
+    if target_version == "v1":
+        out: List[Dict[str, Any]] = []
+        for start in range(0, len(hcp_id_list), chunk_size):
+            chunk = hcp_id_list[start : start + chunk_size]
+            response = (
+                supabase.table("publications")
+                .select("id,hcp_id,authorships")
+                .in_("hcp_id", chunk)
+                .not_.is_("authorships", "null")
+                .execute()
+            )
+            out.extend(response.data or [])
+        return out
+
+    pub_authors_table = get_table_name("publication_authors", target_version)
+    publications_table = get_table_name("publications", target_version)
+
+    pub_id_to_hcp: Dict[str, List[str]] = {}
     for start in range(0, len(hcp_id_list), chunk_size):
         chunk = hcp_id_list[start : start + chunk_size]
+        offset = 0
+        while True:
+            link_batch = (
+                supabase.table(pub_authors_table)
+                .select("hcp_id,publication_id")
+                .in_("hcp_id", chunk)
+                .range(offset, offset + HCP_PAGE_SIZE - 1)
+                .execute()
+                .data
+                or []
+            )
+            if not link_batch:
+                break
+            for row in link_batch:
+                hcp_id = row.get("hcp_id")
+                pub_id = row.get("publication_id")
+                if not hcp_id or not pub_id:
+                    continue
+                pub_id_str = str(pub_id)
+                pub_id_to_hcp.setdefault(pub_id_str, []).append(str(hcp_id))
+            if len(link_batch) < HCP_PAGE_SIZE:
+                break
+            offset += HCP_PAGE_SIZE
+
+    publication_ids = list(pub_id_to_hcp.keys())
+    if not publication_ids:
+        return []
+
+    pubs_by_id: Dict[str, Dict[str, Any]] = {}
+    for start in range(0, len(publication_ids), chunk_size):
+        chunk = publication_ids[start : start + chunk_size]
         response = (
-            supabase.table("publications")
-            .select("id,hcp_id,authorships")
-            .in_("hcp_id", chunk)
+            supabase.table(publications_table)
+            .select("id,authorships")
+            .in_("id", chunk)
             .not_.is_("authorships", "null")
             .execute()
         )
-        out.extend(response.data or [])
-    return out
+        for row in response.data or []:
+            pub_id = row.get("id")
+            if pub_id:
+                pubs_by_id[str(pub_id)] = row
+
+    out_v2: List[Dict[str, Any]] = []
+    for pub_id, hcp_list in pub_id_to_hcp.items():
+        pub_row = pubs_by_id.get(pub_id)
+        if not pub_row:
+            continue
+        authorships = pub_row.get("authorships")
+        for hcp_id in hcp_list:
+            out_v2.append({"id": pub_id, "hcp_id": hcp_id, "authorships": authorships})
+    return out_v2
 
 
 def classify_from_publications(publications: Sequence[Dict[str, Any]], hcp_first: str, hcp_last: str) -> Tuple[Dict[str, Any], Optional[float], str]:
@@ -369,34 +545,67 @@ def classify_from_publications(publications: Sequence[Dict[str, Any]], hcp_first
     return profile, clinician_score, classification
 
 
-def bulk_upsert_hcp_profiles(supabase: Client, updates: Sequence[Dict[str, Any]]) -> None:
+def bulk_upsert_hcp_profiles(
+    supabase: Client, updates: Sequence[Dict[str, Any]], target_version: str = "v1"
+) -> None:
     if not updates:
         return
+    aff_table = get_table_name("hcp_affiliation_profile", target_version)
     for start in range(0, len(updates), UPSERT_BATCH_SIZE):
         batch = updates[start : start + UPSERT_BATCH_SIZE]
         failed = 0
-        for item in batch:
+        if target_version == "v2":
+            payload = [
+                {
+                    "hcp_id": item["id"],
+                    "affiliation_profile": item["affiliation_profile"],
+                    "clinician_score": item["clinician_score"],
+                    "affiliation_classification": item["affiliation_classification"],
+                    "profile_version": PROFILE_VERSION,
+                    "affiliation_profile_calculated_at": item["affiliation_profile_calculated_at"],
+                }
+                for item in batch
+            ]
             try:
-                supabase.table("hcps").update(
-                    {
-                        "affiliation_profile": item["affiliation_profile"],
-                        "clinician_score": item["clinician_score"],
-                        "affiliation_classification": item["affiliation_classification"],
-                        "affiliation_profile_calculated_at": item["affiliation_profile_calculated_at"],
-                    }
-                ).eq("id", item["id"]).execute()
+                supabase.table(aff_table).upsert(payload, on_conflict="hcp_id").execute()
             except Exception as exc:
-                failed += 1
-                print(f"Warning: failed affiliation update for hcp_id={item.get('id')}: {exc}")
+                failed = len(batch)
+                print(f"Warning: failed affiliation upsert batch at offset {start}: {exc}")
+        else:
+            for item in batch:
+                try:
+                    supabase.table("hcps").update(
+                        {
+                            "affiliation_profile": item["affiliation_profile"],
+                            "clinician_score": item["clinician_score"],
+                            "affiliation_classification": item["affiliation_classification"],
+                            "affiliation_profile_calculated_at": item["affiliation_profile_calculated_at"],
+                        }
+                    ).eq("id", item["id"]).execute()
+                except Exception as exc:
+                    failed += 1
+                    print(f"Warning: failed affiliation update for hcp_id={item.get('id')}: {exc}")
         print(f"Batch update progress: {start + len(batch)}/{len(updates)} (failed {failed})")
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
+    args = parser.parse_args()
+    target_version = args.target_version
+
     load_dotenv()
     supabase = init_supabase()
     start_time = time.time()
 
-    total_pending = fetch_pending_hcp_count(supabase)
+    total_pending = fetch_pending_hcp_count(supabase, target_version=target_version)
     skipped_already_classified = 0
     print(f"Loaded {total_pending} pending HCPs (affiliation_profile_calculated_at is null)")
 
@@ -404,12 +613,12 @@ def main() -> None:
     processed = 0
 
     while True:
-        hcp_page = fetch_hcp_page(supabase, 0, HCP_PAGE_SIZE)
+        hcp_page = fetch_hcp_page(supabase, 0, HCP_PAGE_SIZE, target_version=target_version)
         if not hcp_page:
             break
 
         hcp_ids = [str(h["id"]) for h in hcp_page if h.get("id")]
-        pubs = fetch_publications_for_hcps(supabase, hcp_ids)
+        pubs = fetch_publications_for_hcps(supabase, hcp_ids, target_version=target_version)
 
         pubs_by_hcp: Dict[str, List[Dict[str, Any]]] = {}
         for pub in pubs:
@@ -460,7 +669,7 @@ def main() -> None:
                 }
             )
 
-        bulk_upsert_hcp_profiles(supabase, updates)
+        bulk_upsert_hcp_profiles(supabase, updates, target_version=target_version)
 
         processed += len(hcp_page)
         if processed % 1000 == 0 or processed == total_pending:
