@@ -279,9 +279,10 @@ def fetch_publications_with_authorships(supabase: Client, target_version: str = 
 def truncate_inventory(supabase: Client) -> None:
     """Delete all rows in openalex_author_inventory (idempotent reset)."""
     try:
-        # Supabase python client doesn't have native TRUNCATE; use delete with no filter
-        # Safer: delete in batches matching ALL rows via a guaranteed-true filter
-        supabase.table("openalex_author_inventory").delete().neq("openalex_author_id", "").execute()
+        response = supabase.table("openalex_author_inventory").delete().neq("openalex_author_id", "").execute()
+        # Note: response.data may be empty if table was already empty,
+        # which is a valid state (idempotent). We only flag silent failure
+        # by allowing the .execute() exception to bubble.
     except Exception as exc:
         raise RuntimeError(f"Failed to truncate inventory: {exc}") from exc
 
@@ -306,19 +307,29 @@ def upsert_inventory_batch(supabase: Client, rows: List[Dict[str, Any]], stats: 
     if not rows:
         return
     try:
-        supabase.table("openalex_author_inventory").upsert(
+        response = supabase.table("openalex_author_inventory").upsert(
             rows,
             on_conflict="openalex_author_id",
         ).execute()
-        stats.inventory_rows_written += len(rows)
+        if not response.data:
+            raise RuntimeError(
+                f"Batch upsert returned empty data ({len(rows)} rows) - "
+                f"writes may have been silently dropped"
+            )
+        stats.inventory_rows_written += len(response.data)
     except Exception as exc:
         # On batch failure, fall back to row-by-row to identify offenders
         for r in rows:
             try:
-                supabase.table("openalex_author_inventory").upsert(
+                row_response = supabase.table("openalex_author_inventory").upsert(
                     r, on_conflict="openalex_author_id"
                 ).execute()
-                stats.inventory_rows_written += 1
+                if not row_response.data:
+                    stats.errors.append(
+                        f"author {r.get('openalex_author_id')}: upsert returned empty data"
+                    )
+                else:
+                    stats.inventory_rows_written += 1
             except Exception as e2:
                 stats.errors.append(f"author {r.get('openalex_author_id')}: {repr(e2)[:200]}")
 
