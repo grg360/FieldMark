@@ -1,13 +1,28 @@
 from __future__ import annotations
 
 """
-FieldMark Claude narrative generation layer.
+FieldMark Claude narrative generation layer (ORIGINAL, SUPERSEDED).
 
-This script:
-1) Loads HCPs and score context from Supabase.
-2) Selects top 50 HCPs per therapeutic area by composite score.
-3) Calls Anthropic Claude Sonnet to generate compliant rising-star narratives.
-4) Stores results in hcp_narratives.
+================================================================
+SUPERSEDED BY generate_narratives_v2.py — DO NOT USE FOR V2 DATA
+================================================================
+
+This is the ORIGINAL narrative generation script from the initial FieldMark
+build. It has been superseded by generate_narratives_v2.py, which provides:
+  - Cohort-aware prompts (rising_star/established/community)
+  - 5 structured output fields (vs 3 here)
+  - Percentile-based context (vs raw scores here)
+  - Establishment override handling
+  - Dry-run cost preview
+
+This script writes ONLY to v1 hcp_narratives. It has no --target-version
+flag and cannot be safely pointed at v2 schema (hcps_v2 lacks the columns
+this script reads; publications_v2 has no hcp_id column).
+
+If you want to generate narratives against v2 data, use:
+  python generate_narratives_v2.py --target-version v2
+
+Kept in the repo for historical reference and v1 legacy invocations.
 
 Required env vars (.env):
 - SUPABASE_URL
@@ -332,6 +347,16 @@ def upsert_narrative(
 
 
 def run_pipeline() -> None:
+    print("=" * 70)
+    print("WARNING: claude_layer.py is the ORIGINAL narrative script.")
+    print("It has been SUPERSEDED by generate_narratives_v2.py.")
+    print("This script writes only to v1 hcp_narratives and is incompatible")
+    print("with v2 schema. If you need v2 narratives, cancel now (Ctrl+C)")
+    print("and run: python generate_narratives_v2.py --target-version v2")
+    print("=" * 70)
+    print("Continuing in 5 seconds...")
+    time.sleep(5)
+
     load_dotenv()
     supabase = init_supabase()
     anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
