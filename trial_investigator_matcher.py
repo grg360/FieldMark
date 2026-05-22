@@ -15,6 +15,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 STATE_ABBREV_TO_NAME = {
     "AL": "alabama",
     "AK": "alaska",
@@ -133,27 +140,50 @@ def institution_overlaps(raw_facility: Optional[str], hcp_institution: Optional[
     return bool(toks and any(t in a for t in toks))
 
 
-def fetch_candidates(c: Client, last_lower: str, state_abbrev: str) -> List[Dict[str, Any]]:
+def fetch_candidates(
+    c: Client, last_lower: str, state_abbrev: str, target_version: str = "v1"
+) -> List[Dict[str, Any]]:
     """HCPs with same last name (case-insensitive) and state, NPI present."""
+    hcps_table = get_table_name("hcps", target_version)
+    if target_version == "v2":
+        select_cols = (
+            "id,first_name,last_name,nppes_practice_city,nppes_practice_state,institution_normalized"
+        )
+    else:
+        select_cols = "id,first_name,last_name,city,state,institution_short"
     resp = (
-        c.table("hcps")
-        .select("id,first_name,last_name,city,state,institution_short")
+        c.table(hcps_table)
+        .select(select_cols)
         .not_.is_("npi_number", "null")
         .eq("last_name_lower", last_lower)
         .eq("state_lower", state_abbrev)
         .execute()
     )
-    return list(resp.data or [])
+    rows = list(resp.data or [])
+    if target_version == "v2":
+        renamed: List[Dict[str, Any]] = []
+        for row in rows:
+            r = dict(row)
+            if "nppes_practice_city" in r:
+                r["city"] = r.pop("nppes_practice_city")
+            if "nppes_practice_state" in r:
+                r["state"] = r.pop("nppes_practice_state")
+            if "institution_normalized" in r:
+                r["institution_short"] = r.pop("institution_normalized")
+            renamed.append(r)
+        return renamed
+    return rows
 
 
-def load_existing_proposed_ids(c: Client) -> set:
+def load_existing_proposed_ids(c: Client, target_version: str = "v1") -> set:
     """Load all trial_investigator_id values that already have a proposal."""
+    proposals_table = get_table_name("trial_investigator_match_proposals", target_version)
     existing = set()
     offset = 0
     page_size = 1000
     while True:
         resp = (
-            c.table("trial_investigator_match_proposals")
+            c.table(proposals_table)
             .select("trial_investigator_id")
             .order("trial_investigator_id")
             .range(offset, offset + page_size - 1)
@@ -250,8 +280,10 @@ def proposal_row(
     decision_path: str,
     n_candidates: int,
     matched: Optional[Dict[str, Any]],
+    target_version: str = "v1",
 ) -> Dict[str, Any]:
-    return {
+    institution_value = matched.get("institution_short") if matched else None
+    base = {
         "trial_investigator_id": row["id"],
         "proposed_hcp_id": proposed_hcp_id,
         "proposed_match_confidence": confidence,
@@ -265,15 +297,33 @@ def proposal_row(
         "raw_state": row.get("investigator_raw_state"),
         "hcp_first_name": matched.get("first_name") if matched else None,
         "hcp_last_name": matched.get("last_name") if matched else None,
-        "hcp_institution_short": matched.get("institution_short") if matched else None,
         "hcp_city": matched.get("city") if matched else None,
         "hcp_state": matched.get("state") if matched else None,
     }
+    if target_version == "v2":
+        base["hcp_institution_normalized"] = institution_value
+    else:
+        base["hcp_institution_short"] = institution_value
+    return base
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
+    args = parser.parse_args()
+    target_version = args.target_version
+
     load_dotenv()
     c = sb()
+    proposals_table = get_table_name("trial_investigator_match_proposals", target_version)
+    trial_investigators_table = get_table_name("trial_investigators", target_version)
 
     # HTTP/2 stream ID exhaustion mitigation
     # Track Supabase operations and recycle the client before hitting the ~20K limit
@@ -281,7 +331,7 @@ def main() -> None:
     RECYCLE_THRESHOLD = 15000
 
     logger.info("Loading existing proposed trial_investigator_ids...")
-    already_proposed = load_existing_proposed_ids(c)
+    already_proposed = load_existing_proposed_ids(c, target_version=target_version)
     logger.info("Found %s existing proposed ids; these will be skipped.", len(already_proposed))
     t0 = time.time()
     candidate_cache: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
@@ -297,7 +347,7 @@ def main() -> None:
     while True:
         try:
             resp = (
-                c.table("trial_investigators")
+                c.table(trial_investigators_table)
                 .select(
                     "id,investigator_raw_first_name,investigator_raw_last_name,"
                     "investigator_raw_facility,investigator_raw_city,investigator_raw_state,"
@@ -347,12 +397,13 @@ def main() -> None:
                     "invalid_state_normalization",
                     0,
                     None,
+                    target_version=target_version,
                 )
                 status_counts[prop["proposed_match_status"]] += 1
                 path_counts[prop["decision_path"]] += 1
                 pending_inserts.append(prop)
                 if len(pending_inserts) >= INSERT_BATCH:
-                    c.table("trial_investigator_match_proposals").insert(pending_inserts).execute()
+                    c.table(proposals_table).insert(pending_inserts).execute()
                     op_counter += 1
                     pending_inserts.clear()
                 if total_processed % PAGE_SIZE == 0:
@@ -361,12 +412,16 @@ def main() -> None:
 
             cache_key = (last_key, state_abbrev)
             if cache_key not in candidate_cache:
-                candidate_cache[cache_key] = fetch_candidates(c, last_key, state_abbrev)
+                candidate_cache[cache_key] = fetch_candidates(
+                    c, last_key, state_abbrev, target_version=target_version
+                )
                 op_counter += 1
             candidates = candidate_cache[cache_key]
 
             pid, conf, st, dpath, matched = decide_match(row, candidates)
-            prop = proposal_row(row, pid, conf, st, dpath, len(candidates), matched)
+            prop = proposal_row(
+                row, pid, conf, st, dpath, len(candidates), matched, target_version=target_version
+            )
             status_counts[st] += 1
             path_counts[dpath] += 1
             if conf is not None:
@@ -374,7 +429,7 @@ def main() -> None:
 
             pending_inserts.append(prop)
             if len(pending_inserts) >= INSERT_BATCH:
-                c.table("trial_investigator_match_proposals").insert(pending_inserts).execute()
+                c.table(proposals_table).insert(pending_inserts).execute()
                 op_counter += 1
                 pending_inserts.clear()
 
@@ -386,7 +441,7 @@ def main() -> None:
         offset += PAGE_SIZE
 
     if pending_inserts:
-        c.table("trial_investigator_match_proposals").insert(pending_inserts).execute()
+        c.table(proposals_table).insert(pending_inserts).execute()
         op_counter += 1
 
     elapsed = time.time() - t0
