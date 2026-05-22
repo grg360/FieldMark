@@ -40,6 +40,7 @@ import argparse
 import math
 import os
 import re
+import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
@@ -47,6 +48,13 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 from tqdm import tqdm
+
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
 
 SCORE_VERSION = "v1.4"
 # When OpenAlex has enriched hcps.total_career_pubs, require this minimum for rankings / non-zero composite.
@@ -84,6 +92,7 @@ class ScoreRow:
     calculated_at: str
     first_pub_year: Optional[int]
     career_multiplier: float
+    career_age_multiplier: float = 1.0
     publications_count: int
     total_career_pubs: Optional[int]
     normalized_score: float = 0.0
@@ -103,7 +112,9 @@ def init_supabase() -> Client:
     return create_client(supabase_url, supabase_key)
 
 
-def fetch_all_rows(supabase: Client, table: str, columns: str, page_size: int = 1000) -> List[Dict]:
+def fetch_all_rows(
+    supabase: Client, table: str, columns: str, page_size: int = 1000, target_version: str = "v1"
+) -> List[Dict]:
     try:
         count_response = supabase.table(table).select("*", count="estimated").limit(1).execute()
     except Exception as exc:
@@ -142,9 +153,14 @@ def fetch_all_rows(supabase: Client, table: str, columns: str, page_size: int = 
     return rows
 
 
-def fetch_all_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
+def fetch_all_hcps(supabase: Client, page_size: int = 1000, target_version: str = "v1") -> List[Dict]:
+    hcps_table = get_table_name("hcps", target_version)
+    if target_version == "v2":
+        select_cols = "id,first_name,last_name,country,total_career_pubs,career_first_pub_year"
+    else:
+        select_cols = "id,first_name,last_name,country,total_career_pubs,first_pub_year"
     try:
-        count_response = supabase.table("hcps").select("*", count="estimated").limit(1).execute()
+        count_response = supabase.table(hcps_table).select("*", count="estimated").limit(1).execute()
     except Exception as exc:
         raise RuntimeError(f"Failed counting rows for table 'hcps': {exc}") from exc
     expected_count = int(count_response.count or 0)
@@ -154,8 +170,8 @@ def fetch_all_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
     while True:
         try:
             response = (
-                supabase.table("hcps")
-                .select("id,first_name,last_name,country,total_career_pubs,first_pub_year")
+                supabase.table(hcps_table)
+                .select(select_cols)
                 .range(offset, offset + page_size - 1)
                 .execute()
             )
@@ -165,6 +181,10 @@ def fetch_all_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
         batch = response.data or []
         if not batch:
             break
+        if target_version == "v2":
+            for row in batch:
+                if "career_first_pub_year" in row:
+                    row["first_pub_year"] = row.pop("career_first_pub_year")
         rows.extend(batch)
         offset += page_size
 
@@ -179,13 +199,18 @@ def fetch_all_hcps(supabase: Client, page_size: int = 1000) -> List[Dict]:
     return rows
 
 
-def fetch_all_publication_authors(supabase: Client, page_size: int = 1000) -> List[Dict]:
+def fetch_all_publication_authors(
+    supabase: Client, page_size: int = 1000, target_version: str = "v1"
+) -> List[Dict]:
     """
     Fetch all publication_authors rows. Returns list of dicts with publication_id and hcp_id.
     These are the canonical many-to-many linkages between publications and HCPs.
     """
+    pub_authors_table = get_table_name("publication_authors", target_version)
     try:
-        count_response = supabase.table("publication_authors").select("*", count="estimated").limit(1).execute()
+        count_response = (
+            supabase.table(pub_authors_table).select("*", count="estimated").limit(1).execute()
+        )
     except Exception as exc:
         raise RuntimeError(f"Failed counting rows for table 'publication_authors': {exc}") from exc
     expected_count = int(count_response.count or 0)
@@ -195,7 +220,7 @@ def fetch_all_publication_authors(supabase: Client, page_size: int = 1000) -> Li
     while True:
         try:
             response = (
-                supabase.table("publication_authors")
+                supabase.table(pub_authors_table)
                 .select("publication_id,hcp_id")
                 .range(offset, offset + page_size - 1)
                 .execute()
@@ -681,9 +706,11 @@ def compute_scores(
         cross_multiplier = 1.15 if has_pub_and_trial.get(key, False) else 1.0
         first_pub_year = first_pub_year_by_hcp.get(hcp_id)
         career_multiplier = recent_pub_multiplier_by_hcp.get(hcp_id, 1.0)
+        career_age_multiplier = 1.0
         # Secondary override: if enriched first_pub_year exists on hcps, it takes precedence.
         if first_pub_year_enriched_by_hcp.get(hcp_id) is not None:
             career_multiplier = first_pub_year_override_multiplier(first_pub_year, total_career_pubs)
+            career_age_multiplier = career_multiplier
 
         # Components without populated data contribute 0 to the composite but
         # remain in the formula so activation is a data change, not a code change.
@@ -737,6 +764,7 @@ def compute_scores(
                 calculated_at=now_iso,
                 first_pub_year=first_pub_year,
                 career_multiplier=round(career_multiplier, 4),
+                career_age_multiplier=round(career_age_multiplier, 4),
                 publications_count=publications_count,
                 total_career_pubs=total_career_pubs,
                 normalized_score=0.0,  # filled in second pass below
@@ -786,6 +814,7 @@ def compute_scores(
             calculated_at=r.calculated_at,
             first_pub_year=r.first_pub_year,
             career_multiplier=r.career_multiplier,
+            career_age_multiplier=r.career_age_multiplier,
             publications_count=r.publications_count,
             total_career_pubs=r.total_career_pubs,
             normalized_score=round(norm, 4),
@@ -802,27 +831,53 @@ def compute_scores(
     return updated_rows
 
 
-def upsert_scores(supabase: Client, score_rows: Sequence[ScoreRow]) -> int:
+def upsert_scores(
+    supabase: Client,
+    score_rows: Sequence[ScoreRow],
+    target_version: str = "v1",
+    scoring_run_id: Optional[str] = None,
+) -> int:
     if not score_rows:
         return 0
 
-    payload = [
-        {
-            "hcp_id": row.hcp_id,
-            "therapeutic_area_id": row.therapeutic_area_id,
-            "composite_score": row.composite_score,
-            "pub_velocity_score": row.pub_velocity_score,
-            "citation_trajectory_score": row.citation_trajectory_score,
-            "trial_investigator_score": row.trial_investigator_score,
-            "congress_score": row.congress_score,
-            "msl_signal_score": row.msl_signal_score,
-            "score_version": row.score_version,
-            "calculated_at": row.calculated_at,
-            "normalized_score": row.normalized_score,
-            "tier": row.tier,
-        }
-        for row in score_rows
-    ]
+    scores_table = get_table_name("hcp_scores", target_version)
+    if target_version == "v2":
+        payload = [
+            {
+                "hcp_id": row.hcp_id,
+                "therapeutic_area_id": row.therapeutic_area_id,
+                "composite_score": row.composite_score,
+                "pub_velocity_score": row.pub_velocity_score,
+                "citation_trajectory_score": row.citation_trajectory_score,
+                "trial_investigator_score": row.trial_investigator_score,
+                "congress_score": row.congress_score,
+                "msl_signal_score": row.msl_signal_score,
+                "career_age_multiplier": row.career_age_multiplier,
+                "scored_at": row.calculated_at,
+                "scoring_run_id": scoring_run_id,
+                "normalized_score": row.normalized_score,
+                "tier": row.tier,
+            }
+            for row in score_rows
+        ]
+    else:
+        payload = [
+            {
+                "hcp_id": row.hcp_id,
+                "therapeutic_area_id": row.therapeutic_area_id,
+                "composite_score": row.composite_score,
+                "pub_velocity_score": row.pub_velocity_score,
+                "citation_trajectory_score": row.citation_trajectory_score,
+                "trial_investigator_score": row.trial_investigator_score,
+                "congress_score": row.congress_score,
+                "msl_signal_score": row.msl_signal_score,
+                "score_version": row.score_version,
+                "calculated_at": row.calculated_at,
+                "normalized_score": row.normalized_score,
+                "tier": row.tier,
+            }
+            for row in score_rows
+        ]
 
     batch_size = 100
     progress_every = 5000
@@ -833,7 +888,7 @@ def upsert_scores(supabase: Client, score_rows: Sequence[ScoreRow]) -> int:
         try:
             # Recommended unique index for deterministic updates:
             # unique (hcp_id, therapeutic_area_id, score_version)
-            supabase.table("hcp_scores").upsert(
+            supabase.table(scores_table).upsert(
                 batch,
                 on_conflict="hcp_id,therapeutic_area_id",
             ).execute()
@@ -909,31 +964,42 @@ def print_top_rising_stars(
             )
 
 
-def run_pipeline(dry_run: bool = False) -> None:
+def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
     load_dotenv()
     supabase = init_supabase()
 
+    scoring_run_id: Optional[str] = None
+    if target_version == "v2":
+        scoring_run_id = str(uuid.uuid4())
+        print(f"Scoring run ID (v2): {scoring_run_id}")
+
     print("Loading Supabase data...")
-    hcps = fetch_all_hcps(supabase)
+    hcps = fetch_all_hcps(supabase, target_version=target_version)
     print(f"Loaded {len(hcps)} HCPs (all countries).")
     publications = fetch_all_rows(
-        supabase, "publications", "id,pub_year,citation_count,citation_counts_by_year"
+        supabase,
+        get_table_name("publications", target_version),
+        "id,pub_year,citation_count,citation_counts_by_year",
+        target_version=target_version,
     )
-    publication_authors = fetch_all_publication_authors(supabase)
+    publication_authors = fetch_all_publication_authors(supabase, target_version=target_version)
     clinical_trials = fetch_all_rows(
         supabase,
-        "clinical_trials",
+        get_table_name("clinical_trials", target_version),
         "id,nct_id,phase,start_date,completion_date",
+        target_version=target_version,
     )
     trial_investigators = fetch_all_rows(
         supabase,
-        "trial_investigators",
+        get_table_name("trial_investigators", target_version),
         "hcp_id,trial_id,role",
+        target_version=target_version,
     )
     hcp_tas = fetch_all_rows(
         supabase,
-        "hcp_therapeutic_areas",
+        get_table_name("hcp_therapeutic_areas", target_version),
         "hcp_id,therapeutic_area_id",
+        target_version=target_version,
     )
     therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
 
@@ -959,7 +1025,9 @@ def run_pipeline(dry_run: bool = False) -> None:
         print("[DRY RUN] Skipping hcp_scores upsert. Scores computed but not persisted.")
     else:
         print("Upserting hcp_scores...")
-        upserted = upsert_scores(supabase, scores)
+        upserted = upsert_scores(
+            supabase, scores, target_version=target_version, scoring_run_id=scoring_run_id
+        )
         print(f"Upserted {upserted} hcp_scores records.")
 
     print_top_rising_stars(scores, hcps, therapeutic_areas)
@@ -969,10 +1037,16 @@ def run_pipeline(dry_run: bool = False) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FieldMark scoring pipeline")
     parser.add_argument("--dry-run", action="store_true", help="Compute and print scores without writing to hcp_scores")
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
     args = parser.parse_args()
 
     try:
-        run_pipeline(dry_run=args.dry_run)
+        run_pipeline(dry_run=args.dry_run, target_version=args.target_version)
     except Exception as error:
         print(f"[ERROR] Scoring pipeline failed: {error}")
         raise
