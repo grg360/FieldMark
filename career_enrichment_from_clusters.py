@@ -176,10 +176,12 @@ def update_hcp_career_fields(
     target_version: str = "v1",
 ) -> None:
     hcps_table = get_table_name("hcps", target_version)
+    if target_version == "v2":
+        update_payload = {"total_career_pubs": works_count, "career_first_pub_year": first_pub_year}
+    else:
+        update_payload = {"total_career_pubs": works_count, "first_pub_year": first_pub_year}
     try:
-        supabase.table(hcps_table).update(
-            {"total_career_pubs": works_count, "first_pub_year": first_pub_year}
-        ).eq("id", hcp_id).execute()
+        supabase.table(hcps_table).update(update_payload).eq("id", hcp_id).execute()
     except Exception as exc:
         raise RuntimeError(f"Failed updating HCP {hcp_id}: {exc}") from exc
 
@@ -265,18 +267,27 @@ def fetch_hcps_for_ids(
     target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
     hcps_table = get_table_name("hcps", target_version)
+    if target_version == "v2":
+        year_col = "career_first_pub_year"
+    else:
+        year_col = "first_pub_year"
+    select_cols = f"id,first_name,last_name,total_career_pubs,{year_col}"
     out: List[Dict[str, Any]] = []
     ids = [str(i) for i in hcp_ids if i]
     for i in range(0, len(ids), 200):
         chunk = ids[i : i + 200]
         q = (
             supabase.table(hcps_table)
-            .select("id,first_name,last_name,total_career_pubs,first_pub_year")
+            .select(select_cols)
             .in_("id", chunk)
         )
         if include_null_only:
             q = q.is_("total_career_pubs", "null")
         rows = q.execute().data or []
+        if target_version == "v2":
+            for row in rows:
+                if "career_first_pub_year" in row:
+                    row["first_pub_year"] = row.pop("career_first_pub_year")
         out.extend(rows)
     return out
 

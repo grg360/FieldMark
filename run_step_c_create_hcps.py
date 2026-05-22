@@ -262,6 +262,7 @@ def build_hcp_insert_row(
     cluster_rows: Sequence[Dict[str, Any]],
     country: Optional[str],
     ts_iso: str,
+    target_version: str = "v1",
 ) -> Dict[str, Any]:
     disp = primary.get("display_name")
     first_name, last_name, name_flag = parse_display_name_for_hcp(disp)
@@ -276,6 +277,20 @@ def build_hcp_insert_row(
     inst = stepb.normalize_org_name(primary.get("last_known_institution")) or None
     ror_raw = primary.get("last_known_institution_ror")
     ror_norm = stepb.normalize_ror(ror_raw) or None
+
+    if target_version == "v2":
+        return {
+            "id": hcp_id,
+            "first_name": first_name or None,
+            "last_name": last_name,
+            "institution_normalized": inst,
+            "institution_raw": inst,
+            "country": country,
+            "total_career_pubs": total_pubs,
+            "career_first_pub_year": first_pub_year,
+            "created_at": ts_iso,
+            "updated_at": ts_iso,
+        }
 
     payload: Dict[str, Any] = {
         "id": hcp_id,
@@ -310,6 +325,7 @@ def build_join_rows_for_cluster(
     cluster_rows: Sequence[Dict[str, Any]],
     primary: Dict[str, Any],
     name_flag: str,
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
     primary_oid = stepb.normalize_openalex_author_id(primary.get("openalex_author_id"))
     total_pubs = sum(row_corpus(r) for r in cluster_rows)
@@ -321,17 +337,28 @@ def build_join_rows_for_cluster(
         oid = stepb.normalize_openalex_author_id(r.get("openalex_author_id"))
         if not oid:
             continue
-        out.append(
-            {
-                "hcp_id": hcp_id,
-                "openalex_author_id": oid,
-                "is_primary": oid == primary_oid,
-                "match_status": "created_from_inventory",
-                "match_confidence": "high",
-                "match_method": "step_c_cluster_creation",
-                "notes": notes,
-            }
-        )
+        if target_version == "v2":
+            out.append(
+                {
+                    "hcp_id": hcp_id,
+                    "openalex_author_id": oid,
+                    "is_primary": oid == primary_oid,
+                    "match_confidence": 0.9,
+                    "match_method": "step_c_cluster_creation",
+                }
+            )
+        else:
+            out.append(
+                {
+                    "hcp_id": hcp_id,
+                    "openalex_author_id": oid,
+                    "is_primary": oid == primary_oid,
+                    "match_status": "created_from_inventory",
+                    "match_confidence": "high",
+                    "match_method": "step_c_cluster_creation",
+                    "notes": notes,
+                }
+            )
     return out
 
 
@@ -463,6 +490,7 @@ def plan_cluster(
     ror_country: Dict[str, str],
     hepatology_ta_id: Optional[str],
     ts_iso: str,
+    target_version: str = "v1",
 ) -> ClusterPlan:
     primary = pick_primary_row(cluster_rows)
     hcp_id = str(uuid.uuid4())
@@ -475,23 +503,44 @@ def plan_cluster(
         cluster_rows=cluster_rows,
         country=country,
         ts_iso=ts_iso,
+        target_version=target_version,
     )
-    join_rows = build_join_rows_for_cluster(hcp_id, cluster_rows, primary, name_flag)
+    join_rows = build_join_rows_for_cluster(
+        hcp_id, cluster_rows, primary, name_flag, target_version=target_version
+    )
     if hepatology_ta_id is not None:
         ta_row = {"hcp_id": hcp_id, "therapeutic_area_id": hepatology_ta_id, "strength_score": None}
     else:
         ta_row = None
-    csv_row = {
-        "hcp_id": hcp_id,
-        "first_name": hcp_row.get("first_name") or "",
-        "last_name": hcp_row.get("last_name") or "",
-        "openalex_author_id": hcp_row.get("openalex_author_id") or "",
-        "institution": hcp_row.get("institution") or "",
-        "country": hcp_row.get("country") or "",
-        "cluster_size": len(cluster_rows),
-        "total_career_pubs": hcp_row.get("total_career_pubs"),
-        "first_pub_year": hcp_row.get("first_pub_year"),
-    }
+    if target_version == "v2":
+        primary_oa = ""
+        for jr in join_rows:
+            if jr.get("is_primary"):
+                primary_oa = jr.get("openalex_author_id") or ""
+                break
+        csv_row = {
+            "hcp_id": hcp_id,
+            "first_name": hcp_row.get("first_name") or "",
+            "last_name": hcp_row.get("last_name") or "",
+            "openalex_author_id": primary_oa,
+            "institution": hcp_row.get("institution_normalized") or "",
+            "country": hcp_row.get("country") or "",
+            "cluster_size": len(cluster_rows),
+            "total_career_pubs": hcp_row.get("total_career_pubs"),
+            "first_pub_year": hcp_row.get("career_first_pub_year"),
+        }
+    else:
+        csv_row = {
+            "hcp_id": hcp_id,
+            "first_name": hcp_row.get("first_name") or "",
+            "last_name": hcp_row.get("last_name") or "",
+            "openalex_author_id": hcp_row.get("openalex_author_id") or "",
+            "institution": hcp_row.get("institution") or "",
+            "country": hcp_row.get("country") or "",
+            "cluster_size": len(cluster_rows),
+            "total_career_pubs": hcp_row.get("total_career_pubs"),
+            "first_pub_year": hcp_row.get("first_pub_year"),
+        }
     return ClusterPlan(hcp_id=hcp_id, hcp_row=hcp_row, join_rows=join_rows, ta_row=ta_row, csv_row=csv_row)
 
 
@@ -566,7 +615,7 @@ def main() -> None:
 
     plans: List[ClusterPlan] = []
     for crows in clusters:
-        plans.append(plan_cluster(crows, ror_country, hepatology_id, ts_iso))
+        plans.append(plan_cluster(crows, ror_country, hepatology_id, ts_iso, target_version))
 
     if args.dry_run:
         join_total = sum(len(p.join_rows) for p in plans)
