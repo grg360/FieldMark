@@ -37,9 +37,16 @@ from supabase import Client, create_client
 load_dotenv(Path(__file__).parent / ".env")
 
 
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 NPPES_API_URL = "https://npiregistry.cms.hhs.gov/api/?version=2.1"
 REQUEST_TIMEOUT_SECONDS = 20
 API_SLEEP_SECONDS = 0.1
+HCPS_PAGE_SIZE = 1000
 
 US_STATES_AND_TERRITORIES = [
     "AL",
@@ -114,47 +121,125 @@ def get_candidate_hcps(
     min_career_pubs: int = 500,
     us_only: bool = True,
     limit: Optional[int] = None,
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
-    query = (
-        supabase_client.table("hcps")
-        .select(
-            "id, first_name, last_name, derived_state, institution_short, "
-            "total_career_pubs, openalex_author_id, npi_number"
+    if target_version == "v1":
+        query = (
+            supabase_client.table("hcps")
+            .select(
+                "id, first_name, last_name, derived_state, institution_short, "
+                "total_career_pubs, openalex_author_id, npi_number"
+            )
+            .is_("npi_number", "null")
+            .not_.is_("openalex_author_id", "null")
+            .gte("total_career_pubs", min_career_pubs)
+            .not_.is_("first_name", "null")
+            .not_.is_("last_name", "null")
         )
-        .is_("npi_number", "null")
-        .not_.is_("openalex_author_id", "null")
-        .gte("total_career_pubs", min_career_pubs)
-        .not_.is_("first_name", "null")
-        .not_.is_("last_name", "null")
-    )
 
-    if us_only:
-        query = query.in_("derived_state", US_STATES_AND_TERRITORIES)
+        if us_only:
+            query = query.in_("derived_state", US_STATES_AND_TERRITORIES)
 
-    if limit is not None:
-        query = query.limit(limit)
+        if limit is not None:
+            query = query.limit(limit)
 
-    response = query.execute()
-    rows = response.data or []
+        response = query.execute()
+        rows = response.data or []
 
-    filtered: List[Dict[str, Any]] = []
-    for row in rows:
+        filtered: List[Dict[str, Any]] = []
+        for row in rows:
+            first = str(row.get("first_name") or "").strip()
+            last = str(row.get("last_name") or "").strip()
+            if not first or not last:
+                continue
+            filtered.append(
+                {
+                    "id": row.get("id"),
+                    "first_name": first,
+                    "last_name": last,
+                    "derived_state": row.get("derived_state"),
+                    "institution_short": row.get("institution_short"),
+                    "total_career_pubs": row.get("total_career_pubs"),
+                }
+            )
+
+        return filtered
+
+    hcps_table = get_table_name("hcps", target_version)
+    oa_table = get_table_name("hcp_openalex_authors", target_version)
+
+    oa_by_hcp: Dict[str, Any] = {}
+    offset = 0
+    while True:
+        oa_batch = (
+            supabase_client.table(oa_table)
+            .select("hcp_id,openalex_author_id")
+            .eq("is_primary", True)
+            .range(offset, offset + HCPS_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not oa_batch:
+            break
+        for row in oa_batch:
+            hcp_id = row.get("hcp_id")
+            oa_id = row.get("openalex_author_id")
+            if hcp_id and oa_id:
+                oa_by_hcp[str(hcp_id)] = oa_id
+        if len(oa_batch) < HCPS_PAGE_SIZE:
+            break
+        offset += HCPS_PAGE_SIZE
+
+    raw_hcps: List[Dict[str, Any]] = []
+    offset = 0
+    while True:
+        if limit is not None and len(raw_hcps) >= limit:
+            break
+        q = (
+            supabase_client.table(hcps_table)
+            .select(
+                "id,first_name,last_name,nppes_practice_state,institution_normalized,"
+                "total_career_pubs,npi_number"
+            )
+            .is_("npi_number", "null")
+            .gte("total_career_pubs", min_career_pubs)
+            .not_.is_("first_name", "null")
+            .not_.is_("last_name", "null")
+        )
+        if us_only:
+            q = q.in_("nppes_practice_state", US_STATES_AND_TERRITORIES)
+        batch = q.range(offset, offset + HCPS_PAGE_SIZE - 1).execute().data or []
+        if not batch:
+            break
+        raw_hcps.extend(batch)
+        if len(batch) < HCPS_PAGE_SIZE:
+            break
+        offset += HCPS_PAGE_SIZE
+
+    filtered_v2: List[Dict[str, Any]] = []
+    for row in raw_hcps:
+        if limit is not None and len(filtered_v2) >= limit:
+            break
+        hcp_id = str(row.get("id") or "")
+        if not hcp_id or oa_by_hcp.get(hcp_id) is None:
+            continue
         first = str(row.get("first_name") or "").strip()
         last = str(row.get("last_name") or "").strip()
         if not first or not last:
             continue
-        filtered.append(
+        filtered_v2.append(
             {
                 "id": row.get("id"),
                 "first_name": first,
                 "last_name": last,
-                "derived_state": row.get("derived_state"),
-                "institution_short": row.get("institution_short"),
+                "derived_state": row.get("nppes_practice_state"),
+                "institution_short": row.get("institution_normalized"),
                 "total_career_pubs": row.get("total_career_pubs"),
             }
         )
 
-    return filtered
+    return filtered_v2
 
 
 def search_nppes(
@@ -414,6 +499,7 @@ def update_hcp_with_nppes(
     npi: str,
     nppes_data: Dict[str, Any],
     dry_run: bool = True,
+    target_version: str = "v1",
 ) -> bool:
     addresses = nppes_data.get("addresses") or []
     basic = nppes_data.get("basic") or {}
@@ -444,30 +530,74 @@ def update_hcp_with_nppes(
         "nppes_enriched_at": datetime.now(timezone.utc).isoformat(),
     }
 
+    log_table = get_table_name("nppes_enrichment_log", target_version)
+    hcps_table = get_table_name("hcps", target_version)
+    detail_table = get_table_name("hcp_nppes_detail", target_version)
+
     if dry_run:
         print(f"[DRY RUN] Would update hcp_id={hcp_id} with payload={json.dumps(payload)}")
         return False
 
-    try:
-        supabase_client.table("hcps").update(payload).eq("id", hcp_id).execute()
-    except Exception as exc:
-        error_msg = str(exc)
-        if "duplicate key" in error_msg.lower() or "23505" in error_msg or "hcps_npi_number_key" in error_msg:
-            print(f"[DUPLICATE_NPI] hcp_id={hcp_id} npi={npi} -- NPI already assigned to another HCP row. Logging and skipping.")
-            try:
-                supabase_client.table("nppes_enrichment_log").insert({
+    if target_version == "v1":
+        try:
+            supabase_client.table(hcps_table).update(payload).eq("id", hcp_id).execute()
+        except Exception as exc:
+            error_msg = str(exc)
+            if "duplicate key" in error_msg.lower() or "23505" in error_msg or "hcps_npi_number_key" in error_msg:
+                print(f"[DUPLICATE_NPI] hcp_id={hcp_id} npi={npi} -- NPI already assigned to another HCP row. Logging and skipping.")
+                try:
+                    supabase_client.table(log_table).insert({
+                        "hcp_id": hcp_id,
+                        "matched_npi": npi,
+                        "match_confidence": "ambiguous",
+                        "match_reason": f"Duplicate NPI conflict: NPI {npi} already exists on another hcp_id. Likely HCP duplicate.",
+                        "candidates_considered": nppes_data,
+                    }).execute()
+                except Exception as log_exc:
+                    print(f"[LOG_FAILED] hcp_id={hcp_id}: {log_exc}")
+                return False
+            else:
+                print(f"[UPDATE_FAILED] hcp_id={hcp_id}: {error_msg}")
+                return False
+    else:
+        try:
+            supabase_client.table(hcps_table).update(
+                {
+                    "npi_number": npi,
+                    "nppes_career_stage_years": nppes_career_stage_years,
+                }
+            ).eq("id", hcp_id).execute()
+        except Exception as exc:
+            error_msg = str(exc)
+            if "duplicate key" in error_msg.lower() or "23505" in error_msg or "hcps_npi_number_key" in error_msg:
+                print(f"[DUPLICATE_NPI] hcp_id={hcp_id} npi={npi} -- NPI already assigned to another HCP row. Logging and skipping.")
+                try:
+                    supabase_client.table(log_table).insert({
+                        "hcp_id": hcp_id,
+                        "matched_npi": npi,
+                        "match_confidence": "ambiguous",
+                        "match_reason": f"Duplicate NPI conflict: NPI {npi} already exists on another hcp_id. Likely HCP duplicate.",
+                        "candidates_considered": nppes_data,
+                    }).execute()
+                except Exception as log_exc:
+                    print(f"[LOG_FAILED] hcp_id={hcp_id}: {log_exc}")
+                return False
+            else:
+                print(f"[UPDATE_FAILED] hcp_id={hcp_id}: {error_msg}")
+                return False
+
+        try:
+            supabase_client.table(detail_table).upsert(
+                {
                     "hcp_id": hcp_id,
-                    "matched_npi": npi,
-                    "match_confidence": "ambiguous",
-                    "match_reason": f"Duplicate NPI conflict: NPI {npi} already exists on another hcp_id. Likely HCP duplicate.",
-                    "candidates_considered": nppes_data,
-                }).execute()
-            except Exception as log_exc:
-                print(f"[LOG_FAILED] hcp_id={hcp_id}: {log_exc}")
-            return False
-        else:
-            print(f"[UPDATE_FAILED] hcp_id={hcp_id}: {error_msg}")
-            return False
+                    "nppes_practice_address": practice_address_line,
+                    "nppes_organization_npi": organization_npi,
+                    "nppes_enriched_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="hcp_id",
+            ).execute()
+        except Exception as exc:
+            print(f"[DETAIL_UPSERT_FAILED] hcp_id={hcp_id}: {exc}")
 
     log_payload = {
         "hcp_id": hcp_id,
@@ -477,7 +607,7 @@ def update_hcp_with_nppes(
         "candidates_considered": nppes_data,
     }
     try:
-        supabase_client.table("nppes_enrichment_log").insert(log_payload).execute()
+        supabase_client.table(log_table).insert(log_payload).execute()
     except Exception as log_exc:
         print(f"[LOG_FAILED] hcp_id={hcp_id}: {log_exc}")
 
@@ -485,7 +615,7 @@ def update_hcp_with_nppes(
     return True
 
 
-def build_enrichment_log_table(supabase_client: Client) -> None:
+def build_enrichment_log_table(supabase_client: Client, target_version: str = "v1") -> None:
     """
     # TO CREATE THIS TABLE, RUN THE SQL BELOW IN SUPABASE SQL EDITOR FIRST
 
@@ -500,6 +630,11 @@ def build_enrichment_log_table(supabase_client: Client) -> None:
       reverted_at timestamp NULL
     );
     """
+    if target_version == "v2":
+        print(
+            "Skipping build_enrichment_log_table in v2 mode (nppes_enrichment_log_v2 already exists)"
+        )
+        return
     _ = supabase_client
     print(
         "[INFO] build_enrichment_log_table is documentation-only in this script. "
@@ -508,15 +643,31 @@ def build_enrichment_log_table(supabase_client: Client) -> None:
 
 
 def main() -> None:
-    dry_run = False
-    # Set to None to process all candidates. Set to an integer for a small test run.
-    sample_limit = None
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true", default=False)
+    parser.add_argument("--sample-limit", type=int, default=None)
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
+    args = parser.parse_args()
+    dry_run = args.dry_run
+    sample_limit = args.sample_limit
+    target_version = args.target_version
 
     supabase_client = create_supabase_client()
-    build_enrichment_log_table(supabase_client)
+    build_enrichment_log_table(supabase_client, target_version=target_version)
 
     candidates = get_candidate_hcps(
-        supabase_client, min_career_pubs=500, us_only=True, limit=sample_limit
+        supabase_client,
+        min_career_pubs=500,
+        us_only=True,
+        limit=sample_limit,
+        target_version=target_version,
     )
     print(
         f"[START] Candidate HCP count: {len(candidates)} "
@@ -563,6 +714,7 @@ def main() -> None:
                 npi=str(decision.get("npi")),
                 nppes_data=decision.get("nppes_data") or {},
                 dry_run=dry_run,
+                target_version=target_version,
             )
             if did_update:
                 updated += 1
@@ -574,7 +726,9 @@ def main() -> None:
                 f"candidates={json.dumps(decision.get('candidates') or [])}"
             )
             if not dry_run:
-                supabase_client.table("nppes_enrichment_log").insert(
+                supabase_client.table(
+                    get_table_name("nppes_enrichment_log", target_version)
+                ).insert(
                     {
                         "hcp_id": hcp_id,
                         "matched_npi": None,
