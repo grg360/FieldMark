@@ -100,6 +100,33 @@ def fetch_linked_openalex_ids(supabase: Client, target_version: str = "v1") -> S
     """All openalex_author_id values present in hcp_openalex_authors."""
     hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
     out: Set[str] = set()
+    if target_version == "v2":
+        # v2 schema: composite PK (hcp_id, openalex_author_id), no surrogate id.
+        # Paginate by hcp_id alone. Multiple rows per hcp_id are aggregated into
+        # the same set, so within-hcp_id ordering does not matter.
+        last_hcp_id: Optional[str] = None
+        while True:
+            q = (
+                supabase.table(hcp_oa_table)
+                .select("hcp_id,openalex_author_id")
+                .order("hcp_id")
+                .limit(JOIN_PAGE_SIZE)
+            )
+            if last_hcp_id is not None:
+                q = q.gt("hcp_id", last_hcp_id)
+            batch = q.execute().data or []
+            if not batch:
+                break
+            for row in batch:
+                oid = stepb.normalize_openalex_author_id(row.get("openalex_author_id"))
+                if oid:
+                    out.add(oid)
+            last_hcp_id = batch[-1].get("hcp_id")
+            if not last_hcp_id or len(batch) < JOIN_PAGE_SIZE:
+                break
+        return out
+
+    # v1 schema: surrogate id PK, paginate by id (original behavior).
     last_id: Optional[str] = None
     while True:
         q = (
