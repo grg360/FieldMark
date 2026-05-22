@@ -20,6 +20,12 @@ from supabase import Client, create_client
 from tqdm import tqdm
 
 
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
 
 NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
@@ -112,12 +118,13 @@ def taxonomy_match_mask(df: pd.DataFrame, codes: Set[str]) -> pd.Series:
     return m
 
 
-def fetch_existing_npis(client: Client) -> Set[str]:
+def fetch_existing_npis(client: Client, target_version: str = "v1") -> Set[str]:
+    hcps_table = get_table_name("hcps", target_version)
     existing: Set[str] = set()
     offset = 0
     while True:
         response = (
-            client.table("hcps")
+            client.table(hcps_table)
             .select("id,npi_number")
             .not_.is_("npi_number", "null")
             .range(offset, offset + PREFLIGHT_PAGE_SIZE - 1)
@@ -142,6 +149,7 @@ def build_hcp_payload(
     npi: str,
     row: pd.Series,
     ts_iso: str,
+    target_version: str = "v1",
 ) -> Dict[str, Any]:
     first = title_name(row.get("first_name"))
     last = title_name(row.get("last_name"))
@@ -149,6 +157,21 @@ def build_hcp_payload(
     middle = title_name(middle_raw) if middle_raw else None
     city = ns(str(row.get("practice_city")))
     state = ns(str(row.get("practice_state")))
+    if target_version == "v2":
+        return {
+            "id": hcp_id,
+            "first_name": first or "Unknown",
+            "last_name": last or "Unknown",
+            "middle_name": middle,
+            "npi_number": npi,
+            "credentials": normalize_credentials(row.get("credentials")),
+            "nppes_practice_city": city if city else None,
+            "nppes_practice_state": state if state else None,
+            "country": "USA",
+            "total_career_pubs": 0,
+            "career_first_pub_year": None,
+            "cohort_classification": "community",
+        }
     payload: Dict[str, Any] = {
         "id": hcp_id,
         "first_name": first or "Unknown",
@@ -172,15 +195,25 @@ def build_hcp_payload(
     return payload
 
 
-def ta_rows_for_hcp(hcp_id: str, ta_ids: Sequence[str]) -> List[Dict[str, Any]]:
+def ta_rows_for_hcp(
+    hcp_id: str, ta_ids: Sequence[str], target_version: str = "v1"
+) -> List[Dict[str, Any]]:
+    if target_version == "v2":
+        return [
+            {"hcp_id": hcp_id, "therapeutic_area_id": tid, "publication_count": 0}
+            for tid in ta_ids
+        ]
     return [{"hcp_id": hcp_id, "therapeutic_area_id": tid, "strength_score": None} for tid in ta_ids]
 
 
-def _write_table_batch(client: Client, table: str, rows: List[Dict[str, Any]]) -> None:
+def _write_table_batch(
+    client: Client, table: str, rows: List[Dict[str, Any]], target_version: str = "v1"
+) -> None:
+    routed_table = get_table_name(table, target_version)
     if table == "hcps":
-        client.table(table).upsert(rows, on_conflict="npi_number", ignore_duplicates=True).execute()
+        client.table(routed_table).upsert(rows, on_conflict="npi_number", ignore_duplicates=True).execute()
     else:
-        client.table(table).insert(rows).execute()
+        client.table(routed_table).insert(rows).execute()
 
 
 def insert_batch(
@@ -188,6 +221,7 @@ def insert_batch(
     table: str,
     batch: List[Dict[str, Any]],
     failed_batches_out: List[Dict[str, Any]],
+    target_version: str = "v1",
 ) -> int:
     """
     Insert one batch. On statement timeout only, split batch into chunks of RETRY_CHUNK and retry each once.
@@ -197,7 +231,7 @@ def insert_batch(
     if not batch:
         return 0
     try:
-        _write_table_batch(client, table, batch)
+        _write_table_batch(client, table, batch, target_version=target_version)
         return len(batch)
     except Exception as exc:
         if is_statement_timeout(exc) and len(batch) > RETRY_CHUNK:
@@ -205,7 +239,7 @@ def insert_batch(
             for j in range(0, len(batch), RETRY_CHUNK):
                 sub = batch[j : j + RETRY_CHUNK]
                 try:
-                    _write_table_batch(client, table, sub)
+                    _write_table_batch(client, table, sub, target_version=target_version)
                     inserted += len(sub)
                 except Exception as exc2:
                     failed_batches_out.append(
@@ -217,6 +251,18 @@ def insert_batch(
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
+    args = parser.parse_args()
+    target_version = args.target_version
+
     load_dotenv()
     client = init_supabase()
     ts_iso = datetime.now(timezone.utc).isoformat()
@@ -262,7 +308,7 @@ def main() -> None:
     total_unique_matching = len(agg_rows)
     print(f"Unique 10-digit NPIs in filter: {total_unique_matching:,}")
 
-    existing = fetch_existing_npis(client)
+    existing = fetch_existing_npis(client, target_version=target_version)
     to_ingest: List[Tuple[str, pd.Series, List[str]]] = [
         (npi, row, tas) for npi, row, tas in agg_rows if npi not in existing
     ]
@@ -294,16 +340,20 @@ def main() -> None:
         ta_batch: List[Dict[str, Any]] = []
         for npi, row, ta_ids in slab:
             hcp_id = str(uuid.uuid4())
-            hcp_batch.append(build_hcp_payload(hcp_id, npi, row, ts_iso))
-            ta_batch.extend(ta_rows_for_hcp(hcp_id, ta_ids))
+            hcp_batch.append(build_hcp_payload(hcp_id, npi, row, ts_iso, target_version=target_version))
+            ta_batch.extend(ta_rows_for_hcp(hcp_id, ta_ids, target_version=target_version))
 
-        nh = insert_batch(client, "hcps", hcp_batch, failed_batches)
+        nh = insert_batch(client, "hcps", hcp_batch, failed_batches, target_version=target_version)
         inserted_hcps += nh
         if nh == len(hcp_batch):
             for t_start in range(0, len(ta_batch), BATCH_TA):
                 sub_t = ta_batch[t_start : t_start + BATCH_TA]
                 inserted_ta_rows += insert_batch(
-                    client, "hcp_therapeutic_areas", sub_t, failed_batches
+                    client,
+                    "hcp_therapeutic_areas",
+                    sub_t,
+                    failed_batches,
+                    target_version=target_version,
                 )
         else:
             failed_batches.append(
