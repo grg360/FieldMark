@@ -509,8 +509,13 @@ def upsert_trials(c: Client, rows: List[Dict], target_version: str = "v1") -> Di
     upsert_rows = [{k: v for k, v in r.items() if k != "locations"} for r in rows]
     # Batch in chunks of 20 to avoid statement timeouts on heavy trial payloads
     for i in range(0, len(upsert_rows), 20):
-        batch = upsert_rows[i : i + 5]
-        c.table(trials_table).upsert(batch, on_conflict="nct_id").execute()
+        batch = upsert_rows[i : i + 20]
+        response = c.table(trials_table).upsert(batch, on_conflict="nct_id").execute()
+        if not response.data:
+            raise RuntimeError(
+                f"Trials upsert returned empty data ({len(batch)} rows submitted) - "
+                f"writes may have been silently dropped"
+            )
     ids = [r["nct_id"] for r in rows if r.get("nct_id")]
     m: Dict[str, str] = {}
     for i in range(0, len(ids), 100):
@@ -576,10 +581,15 @@ def insert_links(c: Client, links: List[Dict], m: Dict[str, str], target_version
         try:
             if target_version == "v2":
                 investigators_table = get_table_name("trial_investigators", target_version)
-                c.table(investigators_table).upsert(
+                response = c.table(investigators_table).upsert(
                     batch_serializable,
                     on_conflict="trial_id,investigator_raw_first_name,investigator_raw_last_name,role,source",
                 ).execute()
+                if not response.data:
+                    raise RuntimeError(
+                        f"Investigator upsert returned empty data ({len(batch_serializable)} rows) - "
+                        f"writes may have been silently dropped"
+                    )
             else:
                 c.rpc("upsert_trial_investigators_preserving_match", {"rows_data": batch_serializable}).execute()
         except Exception as e:
