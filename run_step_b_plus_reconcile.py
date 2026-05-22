@@ -30,6 +30,15 @@ from supabase import Client, create_client
 
 import preview_step_b_matching as stepb
 
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """Returns the correct table name based on --target-version flag.
+    v1 returns base_name unchanged. v2 appends _v2 suffix."""
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 INVENTORY_PAGE_SIZE = 1000
 WIPE_PAGE_SIZE = 1000
 PROGRESS_EVERY = 1000
@@ -37,6 +46,7 @@ NOTES_MAX = 8000
 
 MATCH_METHOD = "step_b_plus_name_reconcile"
 CONFIDENCE = "low"
+CONFIDENCE_NUMERIC = 0.5  # v2 equivalent of "low"
 
 STATUS_NO_MATCH = "reconcile_no_inventory_match"
 STATUS_NAME_ONLY = "reconcile_name_only_rescue"
@@ -145,6 +155,7 @@ def build_join_rows(
     matches: Sequence[Dict[str, Any]],
     primary: Dict[str, Any],
     match_status: str,
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
     primary_oid = stepb.normalize_openalex_author_id(primary.get("openalex_author_id"))
     notes = f"step_b_plus;{len(matches)} inventory match(es);primary={primary_oid}"[:NOTES_MAX]
@@ -153,17 +164,28 @@ def build_join_rows(
         oid = stepb.normalize_openalex_author_id(r.get("openalex_author_id"))
         if not oid:
             continue
-        out.append(
-            {
-                "hcp_id": hcp_id,
-                "openalex_author_id": oid,
-                "is_primary": oid == primary_oid,
-                "match_status": match_status,
-                "match_confidence": CONFIDENCE,
-                "match_method": MATCH_METHOD,
-                "notes": notes,
-            }
-        )
+        if target_version == "v2":
+            out.append(
+                {
+                    "hcp_id": hcp_id,
+                    "openalex_author_id": oid,
+                    "is_primary": oid == primary_oid,
+                    "match_confidence": CONFIDENCE_NUMERIC,
+                    "match_method": MATCH_METHOD,
+                }
+            )
+        else:
+            out.append(
+                {
+                    "hcp_id": hcp_id,
+                    "openalex_author_id": oid,
+                    "is_primary": oid == primary_oid,
+                    "match_status": match_status,
+                    "match_confidence": CONFIDENCE,
+                    "match_method": MATCH_METHOD,
+                    "notes": notes,
+                }
+            )
     return out
 
 
@@ -174,14 +196,16 @@ def upsert_join_batch(
     batch_size: int,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> int:
     if dry_run or not rows:
         return 0
+    hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
     written = 0
     for i in range(0, len(rows), batch_size):
         chunk = list(rows[i : i + batch_size])
         try:
-            supabase.table("hcp_openalex_authors").upsert(
+            supabase.table(hcp_oa_table).upsert(
                 chunk,
                 on_conflict="hcp_id,openalex_author_id",
             ).execute()
@@ -190,7 +214,7 @@ def upsert_join_batch(
             eprint(f"[join batch] {exc}")
             for r in chunk:
                 try:
-                    supabase.table("hcp_openalex_authors").upsert(
+                    supabase.table(hcp_oa_table).upsert(
                         [r],
                         on_conflict="hcp_id,openalex_author_id",
                     ).execute()
@@ -208,7 +232,13 @@ def apply_hcp_openalex_updates(
     *,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> int:
+    if target_version == "v2":
+        if not getattr(apply_hcp_openalex_updates, "_v2_skip_logged", False):
+            print("Skipping hcps openalex_author_id updates in v2 mode (join table is source of truth)")
+            apply_hcp_openalex_updates._v2_skip_logged = True
+        return 0
     if dry_run or not updates:
         return 0
     n = 0
@@ -230,7 +260,10 @@ def mark_audit_rescued_batch(
     *,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> int:
+    if target_version == "v2":
+        return 0
     if dry_run or not audit_row_ids:
         return 0
     n = 0
@@ -304,6 +337,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true", help="Compute outcomes only; no DB writes")
     p.add_argument("--csv-also", metavar="PATH", default=None, help="Write CSV of rescue decisions")
     p.add_argument("--batch-size", type=int, default=100, help="hcp_openalex_authors upsert batch size")
+    p.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version to write to. v1=legacy tables, v2=rebuild tables.",
+    )
     return p.parse_args()
 
 
@@ -314,8 +353,14 @@ def main() -> None:
 
     load_dotenv()
     supabase = init_supabase()
+    target_version = args.target_version
 
-    for tbl in ("wipe_candidates_audit", "openalex_author_inventory", "hcp_openalex_authors", "hcps"):
+    for tbl in (
+        "wipe_candidates_audit",
+        "openalex_author_inventory",
+        get_table_name("hcp_openalex_authors", target_version),
+        get_table_name("hcps", target_version),
+    ):
         if not table_exists(supabase, tbl):
             eprint(f"Required table missing or inaccessible: {tbl}")
             raise SystemExit(1)
@@ -353,7 +398,12 @@ def main() -> None:
         if not pending_joins:
             return
         joins_written_total += upsert_join_batch(
-            supabase, pending_joins, batch_size=args.batch_size, dry_run=args.dry_run, errors=errors
+            supabase,
+            pending_joins,
+            batch_size=args.batch_size,
+            dry_run=args.dry_run,
+            errors=errors,
+            target_version=target_version,
         )
         pending_joins.clear()
 
@@ -362,7 +412,11 @@ def main() -> None:
         if not pending_hcp_updates:
             return
         hcp_updates_total += apply_hcp_openalex_updates(
-            supabase, pending_hcp_updates, dry_run=args.dry_run, errors=errors
+            supabase,
+            pending_hcp_updates,
+            dry_run=args.dry_run,
+            errors=errors,
+            target_version=target_version,
         )
         pending_hcp_updates.clear()
 
@@ -371,7 +425,12 @@ def main() -> None:
         if not pending_audit_ids:
             return
         audit_updated_total += mark_audit_rescued_batch(
-            supabase, args.audit_run_id, pending_audit_ids, dry_run=args.dry_run, errors=errors
+            supabase,
+            args.audit_run_id,
+            pending_audit_ids,
+            dry_run=args.dry_run,
+            errors=errors,
+            target_version=target_version,
         )
         pending_audit_ids.clear()
 
@@ -423,7 +482,7 @@ def main() -> None:
                 _progress(processed, total, rescued_queued, counters, errors, t0)
             continue
 
-        pending_joins.extend(build_join_rows(hcp_id, to_link, primary, status))
+        pending_joins.extend(build_join_rows(hcp_id, to_link, primary, status, target_version))
         pending_hcp_updates.append((hcp_id, primary_oa))
         pending_audit_ids.append(audit_pk)
 

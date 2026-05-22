@@ -34,6 +34,15 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 from tqdm import tqdm
 
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """Returns the correct table name based on target_version.
+    v1 returns base_name unchanged. v2 appends _v2 suffix."""
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -192,13 +201,15 @@ def fetch_hcps_keyset(
     *,
     limit_total: Optional[int],
     last_id_cursor: Optional[str] = None,
+    target_version: str = "v1",
 ) -> Iterable[Dict[str, Any]]:
     """Yield HCP rows ordered by id (UUID keyset)."""
+    hcps_table = get_table_name("hcps", target_version)
     last_id: Optional[str] = last_id_cursor
     yielded = 0
     while True:
         q = (
-            supabase.table("hcps")
+            supabase.table(hcps_table)
             .select(HCP_SELECT_COLUMNS)
             .order("id")
             .limit(HCP_PAGE_SIZE)
@@ -224,12 +235,13 @@ NOT_IN_INVENTORY_NOTE = (
 )
 
 
-def fetch_all_hcp_ids_keyset(supabase: Client) -> List[str]:
+def fetch_all_hcp_ids_keyset(supabase: Client, target_version: str = "v1") -> List[str]:
     """Load every hcp id via keyset pagination (id column only)."""
+    hcps_table = get_table_name("hcps", target_version)
     ids: List[str] = []
     last_id: Optional[str] = None
     while True:
-        q = supabase.table("hcps").select("id").order("id").limit(HCP_PAGE_SIZE)
+        q = supabase.table(hcps_table).select("id").order("id").limit(HCP_PAGE_SIZE)
         if last_id is not None:
             q = q.gt("id", last_id)
         batch = q.execute().data or []
@@ -245,30 +257,35 @@ def fetch_all_hcp_ids_keyset(supabase: Client) -> List[str]:
     return ids
 
 
-def load_hcps_random_sample(supabase: Client, n: int) -> List[Dict[str, Any]]:
+def load_hcps_random_sample(
+    supabase: Client, n: int, target_version: str = "v1"
+) -> List[Dict[str, Any]]:
     """
     Representative sample: fetch all HCP ids (light keyset scan), shuffle in Python
     with random.seed(42), take the first n ids, then load full rows for those ids.
     """
     print("Fetching all HCP ids (id column only, keyset pagination)...")
-    all_ids = fetch_all_hcp_ids_keyset(supabase)
+    all_ids = fetch_all_hcp_ids_keyset(supabase, target_version)
     print(f"  Total HCP ids: {len(all_ids)}")
     random.seed(42)
     random.shuffle(all_ids)
     pick = all_ids[:n]
     print(f"  Shuffled with random.seed(42); selected first {len(pick)} id(s) for full-row load.")
-    rows = fetch_hcps_by_ids(supabase, pick)
+    rows = fetch_hcps_by_ids(supabase, pick, target_version)
     row_by = {str(r.get("id")): r for r in rows}
     return [row_by[i] for i in pick if i in row_by]
 
 
-def fetch_hcps_by_ids(supabase: Client, ids: Sequence[str]) -> List[Dict[str, Any]]:
+def fetch_hcps_by_ids(
+    supabase: Client, ids: Sequence[str], target_version: str = "v1"
+) -> List[Dict[str, Any]]:
+    hcps_table = get_table_name("hcps", target_version)
     out: List[Dict[str, Any]] = []
     ids = [str(i) for i in ids if i]
     chunk = 50
     for i in range(0, len(ids), chunk):
         part = ids[i : i + chunk]
-        rows = supabase.table("hcps").select(HCP_SELECT_COLUMNS).in_("id", part).execute().data or []
+        rows = supabase.table(hcps_table).select(HCP_SELECT_COLUMNS).in_("id", part).execute().data or []
         out.extend(rows)
     return out
 
@@ -995,6 +1012,12 @@ def parse_args() -> argparse.Namespace:
         help="Restrict to HCP category after rows are selected (may reduce row count vs --limit / --random-sample)",
     )
     p.add_argument("--output", default="step_b_preview.csv", help="CSV output path")
+    p.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version to read HCPs from. v1=legacy tables, v2=rebuild tables.",
+    )
     return p.parse_args()
 
 
@@ -1040,17 +1063,19 @@ def main() -> None:
     if args.canonicals_only:
         ids = list(canonical_ids)
         print(f"canonical_hcps_snapshot: {len(ids)} id(s) (--random-sample / --limit ignored)")
-        hcps = fetch_hcps_by_ids(supabase, ids)
+        hcps = fetch_hcps_by_ids(supabase, ids, args.target_version)
         hcps.sort(key=lambda x: str(x.get("id")))
         hcp_iter = hcps
     elif args.random_sample is not None:
-        hcp_iter = load_hcps_random_sample(supabase, args.random_sample)
+        hcp_iter = load_hcps_random_sample(supabase, args.random_sample, args.target_version)
         print(
             "Note: --category filter applies after this sample is loaded; "
             "CSV row count may be less than N."
         )
     else:
-        hcp_iter = fetch_hcps_keyset(supabase, limit_total=args.limit)
+        hcp_iter = fetch_hcps_keyset(
+            supabase, limit_total=args.limit, target_version=args.target_version
+        )
 
     out_rows: List[Dict[str, Any]] = []
     processed = 0

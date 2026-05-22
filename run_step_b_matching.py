@@ -28,6 +28,15 @@ from tqdm import tqdm
 
 import preview_step_b_matching as stepb
 
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    """Returns the correct table name based on --target-version flag.
+    v1 returns base_name unchanged. v2 appends _v2 suffix."""
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -134,6 +143,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true", help="Compute matches only; no DB writes")
     p.add_argument("--csv-also", metavar="PATH", default=None, help="Also write audit CSV to PATH")
     p.add_argument("--batch-size", type=int, default=100, help="hcp_openalex_authors rows per upsert batch")
+    p.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version to write to. v1=legacy tables, v2=rebuild tables.",
+    )
     return p.parse_args()
 
 
@@ -145,6 +160,16 @@ def match_confidence_for_status(status: str) -> str:
     if status in LOW_CONF_STATUSES:
         return "low"
     return "none"
+
+
+def match_confidence_numeric_for_status(status: str) -> float:
+    if status in HIGH_CONF_STATUSES:
+        return 0.9
+    if status in MEDIUM_CONF_STATUSES:
+        return 0.7
+    if status in LOW_CONF_STATUSES:
+        return 0.5
+    return 0.0
 
 
 def match_method_for_status(status: str) -> str:
@@ -186,12 +211,18 @@ def prereq_exit_message() -> str:
     )
 
 
-def sanity_checks(supabase: Client) -> Dict[str, int]:
-    if not table_exists(supabase, "hcp_openalex_authors"):
+def sanity_checks(supabase: Client, target_version: str = "v1") -> Dict[str, int]:
+    hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
+    if not table_exists(supabase, hcp_oa_table):
         eprint(prereq_exit_message())
         raise SystemExit(1)
     counts: Dict[str, int] = {}
-    for tbl in ("hcps", "openalex_author_inventory", "nppes_org_to_ror", "hcp_openalex_authors"):
+    for tbl in (
+        get_table_name("hcps", target_version),
+        "openalex_author_inventory",
+        "nppes_org_to_ror",
+        hcp_oa_table,
+    ):
         try:
             counts[tbl] = count_table(supabase, tbl)
         except Exception as exc:
@@ -205,9 +236,11 @@ def fetch_hcp_keyset_batch(
     *,
     last_id: Optional[str],
     batch_size: int,
+    target_version: str = "v1",
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    hcps_table = get_table_name("hcps", target_version)
     q = (
-        supabase.table("hcps")
+        supabase.table(hcps_table)
         .select(stepb.HCP_SELECT_COLUMNS)
         .order("id")
         .limit(batch_size)
@@ -219,7 +252,9 @@ def fetch_hcp_keyset_batch(
     return rows, next_cursor
 
 
-def build_join_rows(h: Dict[str, Any], mr: stepb.MatchResult) -> List[Dict[str, Any]]:
+def build_join_rows(
+    h: Dict[str, Any], mr: stepb.MatchResult, target_version: str = "v1"
+) -> List[Dict[str, Any]]:
     if not mr.matched_ids:
         return []
     if mr.match_status in NO_JOIN_WRITE_STATUSES:
@@ -230,17 +265,28 @@ def build_join_rows(h: Dict[str, Any], mr: stepb.MatchResult) -> List[Dict[str, 
     hid = str(h.get("id") or "")
     out: List[Dict[str, Any]] = []
     for oid in mr.matched_ids:
-        out.append(
-            {
-                "hcp_id": hid,
-                "openalex_author_id": oid,
-                "is_primary": oid == primary_id,
-                "match_status": mr.match_status,
-                "match_confidence": conf,
-                "match_method": method,
-                "notes": ((mr.notes or "")[:8000]) if mr.notes else "",
-            }
-        )
+        if target_version == "v2":
+            out.append(
+                {
+                    "hcp_id": hid,
+                    "openalex_author_id": oid,
+                    "is_primary": oid == primary_id,
+                    "match_confidence": match_confidence_numeric_for_status(mr.match_status),
+                    "match_method": method,
+                }
+            )
+        else:
+            out.append(
+                {
+                    "hcp_id": hid,
+                    "openalex_author_id": oid,
+                    "is_primary": oid == primary_id,
+                    "match_status": mr.match_status,
+                    "match_confidence": conf,
+                    "match_method": method,
+                    "notes": ((mr.notes or "")[:8000]) if mr.notes else "",
+                }
+            )
     return out
 
 
@@ -264,9 +310,12 @@ def upsert_join_batch(
     batch_size: int,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> int:
     if dry_run or not rows:
         return 0
+
+    hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
 
     # Group rows by hcp_id so we can delete-then-insert atomically per HCP.
     # This ensures orphan rows from previous runs (where match logic produced
@@ -287,14 +336,14 @@ def upsert_join_batch(
 
         # Delete existing rows for these HCPs
         try:
-            supabase.table("hcp_openalex_authors").delete().in_(
+            supabase.table(hcp_oa_table).delete().in_(
                 "hcp_id", hcp_chunk
             ).execute()
         except Exception as exc:
             # Fall back to per-HCP deletes
             for hid in hcp_chunk:
                 try:
-                    supabase.table("hcp_openalex_authors").delete().eq(
+                    supabase.table(hcp_oa_table).delete().eq(
                         "hcp_id", hid
                     ).execute()
                 except Exception as exc2:
@@ -311,13 +360,13 @@ def upsert_join_batch(
             continue
 
         try:
-            supabase.table("hcp_openalex_authors").insert(rows_to_insert).execute()
+            supabase.table(hcp_oa_table).insert(rows_to_insert).execute()
             written += len(rows_to_insert)
         except Exception as exc:
             # Fall back to per-row insert to identify offenders
             for r in rows_to_insert:
                 try:
-                    supabase.table("hcp_openalex_authors").insert(r).execute()
+                    supabase.table(hcp_oa_table).insert(r).execute()
                     written += 1
                 except Exception as exc2:
                     msg = f"insert hcp_id={r.get('hcp_id')} openalex={r.get('openalex_author_id')}: {exc2}"
@@ -333,12 +382,18 @@ def apply_hcp_openalex_updates_sequential(
     *,
     dry_run: bool,
     errors: List[str],
+    target_version: str = "v1",
 ) -> int:
     """
     Set hcps.openalex_author_id one row at a time via UPDATE (avoids upsert INSERT
     paths that omit NOT NULL columns). Last write wins if the same hcp_id appears
     more than once in updates.
     """
+    if target_version == "v2":
+        if not getattr(apply_hcp_openalex_updates_sequential, "_v2_skip_logged", False):
+            print("Skipping hcps openalex_author_id updates in v2 mode (join table is source of truth)")
+            apply_hcp_openalex_updates_sequential._v2_skip_logged = True
+        return 0
     if dry_run or not updates:
         return 0
     by_id: Dict[str, str] = {}
@@ -373,9 +428,10 @@ def run() -> None:
 
     load_dotenv()
     supabase = stepb.init_supabase()
+    target_version = args.target_version
 
     print("Pre-run sanity checks...")
-    counts = sanity_checks(supabase)
+    counts = sanity_checks(supabase, target_version)
     for k, v in counts.items():
         print(f"  {k}: {v} rows")
 
@@ -399,7 +455,7 @@ def run() -> None:
     elif args.limit is not None:
         total_run = args.limit
     else:
-        total_run = counts.get("hcps")
+        total_run = counts.get(get_table_name("hcps", target_version))
 
     dry = args.dry_run
     if dry:
@@ -447,7 +503,12 @@ def run() -> None:
         nonlocal join_rows_written, pending_joins
         if pending_joins:
             join_rows_written += upsert_join_batch(
-                supabase, pending_joins, batch_size=args.batch_size, dry_run=dry, errors=errors
+                supabase,
+                pending_joins,
+                batch_size=args.batch_size,
+                dry_run=dry,
+                errors=errors,
+                target_version=target_version,
             )
             pending_joins = []
 
@@ -460,6 +521,7 @@ def run() -> None:
             pending_hcp_updates,
             dry_run=dry,
             errors=errors,
+            target_version=target_version,
         )
         pending_hcp_updates = []
 
@@ -499,7 +561,7 @@ def run() -> None:
         )
         csv_rows.append(stepb.result_to_csv_row(h, mr, inventory_indexes.by_id))
 
-        joins = build_join_rows(h, mr)
+        joins = build_join_rows(h, mr, target_version=target_version)
         if joins:
             hcps_with_join_rows += 1
             pending_joins.extend(joins)
@@ -542,7 +604,9 @@ def run() -> None:
         while True:
             if args.limit is not None and processed >= args.limit:
                 break
-            rows, last_id = fetch_hcp_keyset_batch(supabase, last_id=last_id, batch_size=KEYSET_BATCH_SIZE)
+            rows, last_id = fetch_hcp_keyset_batch(
+                supabase, last_id=last_id, batch_size=KEYSET_BATCH_SIZE, target_version=target_version
+            )
             if not rows:
                 break
             for h in tqdm(rows, desc="matching HCPs", unit="hcp"):
