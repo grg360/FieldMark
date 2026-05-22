@@ -181,7 +181,12 @@ def update_hcp_career_fields(
     else:
         update_payload = {"total_career_pubs": works_count, "first_pub_year": first_pub_year}
     try:
-        supabase.table(hcps_table).update(update_payload).eq("id", hcp_id).execute()
+        response = supabase.table(hcps_table).update(update_payload).eq("id", hcp_id).execute()
+        if not response.data:
+            raise RuntimeError(
+                f"Update returned empty data for HCP {hcp_id} - "
+                f"row not matched or write silently dropped"
+            )
     except Exception as exc:
         raise RuntimeError(f"Failed updating HCP {hcp_id}: {exc}") from exc
 
