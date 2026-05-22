@@ -23,6 +23,13 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 from tqdm import tqdm
 
+
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 NPPES_API_URL = "https://npiregistry.cms.hhs.gov/api/"
 DEFAULT_RATE_LIMIT_SECONDS = 0.2
 PAGE_SIZE = 1000
@@ -76,6 +83,12 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Re-process rows with status api_error or no_data (skip enriched)",
     )
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
     return parser.parse_args()
 
 
@@ -88,51 +101,141 @@ def normalize_npi(npi: str) -> str:
     return re.sub(r"\D", "", str(npi or "").strip())
 
 
+def _row_needs_enrichment(
+    npi_taxonomy: Optional[str],
+    enrichment_status: Optional[str],
+    reset_status: bool,
+) -> bool:
+    if reset_status:
+        return npi_taxonomy is None or enrichment_status in ("api_error", "no_data")
+    return npi_taxonomy is None
+
+
 def fetch_hcps_needing_enrichment(
     client: Client,
     *,
     reset_status: bool,
     limit: Optional[int],
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
     """Paginate hcps with NPI; default = missing taxonomy only."""
-    rows: List[Dict[str, Any]] = []
-    offset = 0
+    if target_version == "v1":
+        rows: List[Dict[str, Any]] = []
+        offset = 0
+        page_size = PAGE_SIZE
+
+        while True:
+            if limit is not None and len(rows) >= limit:
+                break
+            try:
+                q = (
+                    client.table("hcps")
+                    .select("id,npi_number,first_name,last_name,npi_taxonomy,npi_taxonomy_enrichment_status")
+                    .not_.is_("npi_number", "null")
+                    .order("id")
+                    .range(offset, offset + page_size - 1)
+                )
+                if reset_status:
+                    q = q.or_(
+                        "npi_taxonomy.is.null,"
+                        "npi_taxonomy_enrichment_status.in.(api_error,no_data)"
+                    )
+                else:
+                    q = q.is_("npi_taxonomy", "null")
+                batch = q.execute().data or []
+            except Exception as exc:
+                logger.exception("Failed to fetch hcps page at offset %s: %s", offset, exc)
+                raise
+
+            if not batch:
+                break
+
+            for row in batch:
+                if limit is not None and len(rows) >= limit:
+                    break
+                rows.append(row)
+
+            if len(batch) < page_size:
+                break
+            offset += page_size
+
+        return rows
+
+    hcps_table = get_table_name("hcps", target_version)
+    detail_table = get_table_name("hcp_nppes_detail", target_version)
     page_size = PAGE_SIZE
 
+    all_hcps: List[Dict[str, Any]] = []
+    offset = 0
     while True:
-        if limit is not None and len(rows) >= limit:
-            break
         try:
-            q = (
-                client.table("hcps")
-                .select("id,npi_number,first_name,last_name,npi_taxonomy,npi_taxonomy_enrichment_status")
+            batch = (
+                client.table(hcps_table)
+                .select("id,npi_number,first_name,last_name")
                 .not_.is_("npi_number", "null")
                 .order("id")
                 .range(offset, offset + page_size - 1)
+                .execute()
+                .data
+                or []
             )
-            if reset_status:
-                q = q.or_(
-                    "npi_taxonomy.is.null,"
-                    "npi_taxonomy_enrichment_status.in.(api_error,no_data)"
-                )
-            else:
-                q = q.is_("npi_taxonomy", "null")
-            batch = q.execute().data or []
         except Exception as exc:
-            logger.exception("Failed to fetch hcps page at offset %s: %s", offset, exc)
+            logger.exception("Failed to fetch %s page at offset %s: %s", hcps_table, offset, exc)
             raise
-
         if not batch:
             break
-
-        for row in batch:
-            if limit is not None and len(rows) >= limit:
-                break
-            rows.append(row)
-
+        all_hcps.extend(batch)
         if len(batch) < page_size:
             break
         offset += page_size
+
+    detail_by_hcp: Dict[str, Dict[str, Any]] = {}
+    offset = 0
+    while True:
+        try:
+            batch = (
+                client.table(detail_table)
+                .select("hcp_id,npi_taxonomy,npi_taxonomy_enrichment_status")
+                .order("hcp_id")
+                .range(offset, offset + page_size - 1)
+                .execute()
+                .data
+                or []
+            )
+        except Exception as exc:
+            logger.exception("Failed to fetch %s page at offset %s: %s", detail_table, offset, exc)
+            raise
+        if not batch:
+            break
+        for row in batch:
+            hcp_id = row.get("hcp_id")
+            if not hcp_id:
+                continue
+            detail_by_hcp[str(hcp_id)] = {
+                "npi_taxonomy": row.get("npi_taxonomy"),
+                "npi_taxonomy_enrichment_status": row.get("npi_taxonomy_enrichment_status"),
+            }
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    rows: List[Dict[str, Any]] = []
+    for hcp in all_hcps:
+        if limit is not None and len(rows) >= limit:
+            break
+        hcp_id = str(hcp.get("id") or "")
+        detail = detail_by_hcp.get(hcp_id, {})
+        npi_taxonomy = detail.get("npi_taxonomy")
+        enrichment_status = detail.get("npi_taxonomy_enrichment_status")
+        if not _row_needs_enrichment(npi_taxonomy, enrichment_status, reset_status):
+            continue
+        rows.append(
+            {
+                **hcp,
+                "npi_taxonomy": npi_taxonomy,
+                "npi_taxonomy_enrichment_status": enrichment_status,
+            }
+        )
 
     return rows
 
@@ -222,29 +325,73 @@ def write_update(
     taxonomy_code: Optional[str],
     specialty_desc: Optional[str],
     status: str,
+    target_version: str = "v1",
 ) -> bool:
     now_iso = datetime.now(timezone.utc).isoformat()
+    if target_version == "v1":
+        if status == "enriched":
+            payload = {
+                "npi_taxonomy": taxonomy_code,
+                "npi_specialty": specialty_desc,
+                "npi_taxonomy_enrichment_status": status,
+                "npi_taxonomy_enriched_at": now_iso,
+            }
+        else:
+            payload = {
+                "npi_taxonomy": None,
+                "npi_specialty": None,
+                "npi_taxonomy_enrichment_status": status,
+                "npi_taxonomy_enriched_at": now_iso,
+            }
+
+        try:
+            client.table("hcps").update(payload).eq("id", hcp_id).execute()
+            return True
+        except Exception as exc:
+            logger.error("Supabase update failed for hcp_id=%s status=%s: %s", hcp_id, status, exc)
+            return False
+
+    hcps_table = get_table_name("hcps", target_version)
+    detail_table = get_table_name("hcp_nppes_detail", target_version)
     if status == "enriched":
-        payload = {
-            "npi_taxonomy": taxonomy_code,
-            "npi_specialty": specialty_desc,
-            "npi_taxonomy_enrichment_status": status,
-            "npi_taxonomy_enriched_at": now_iso,
-        }
+        detail_taxonomy = taxonomy_code
     else:
-        payload = {
-            "npi_taxonomy": None,
-            "npi_specialty": None,
-            "npi_taxonomy_enrichment_status": status,
-            "npi_taxonomy_enriched_at": now_iso,
-        }
+        detail_taxonomy = None
+        specialty_desc = None
 
     try:
-        client.table("hcps").update(payload).eq("id", hcp_id).execute()
-        return True
+        client.table(hcps_table).update({"npi_specialty": specialty_desc}).eq("id", hcp_id).execute()
     except Exception as exc:
-        logger.error("Supabase update failed for hcp_id=%s status=%s: %s", hcp_id, status, exc)
+        logger.error(
+            "Supabase %s npi_specialty update failed for hcp_id=%s status=%s: %s",
+            hcps_table,
+            hcp_id,
+            status,
+            exc,
+        )
         return False
+
+    try:
+        client.table(detail_table).upsert(
+            {
+                "hcp_id": hcp_id,
+                "npi_taxonomy": detail_taxonomy,
+                "npi_taxonomy_enrichment_status": status,
+                "npi_taxonomy_enriched_at": now_iso,
+            },
+            on_conflict="hcp_id",
+        ).execute()
+    except Exception as exc:
+        logger.error(
+            "Supabase %s upsert failed for hcp_id=%s status=%s: %s",
+            detail_table,
+            hcp_id,
+            status,
+            exc,
+        )
+        return False
+
+    return True
 
 
 def enrich_hcp_taxonomy(
@@ -252,6 +399,7 @@ def enrich_hcp_taxonomy(
     hcp: Dict[str, Any],
     rate_limit_seconds: float,
     dry_run: bool,
+    target_version: str = "v1",
 ) -> str:
     hcp_id = str(hcp.get("id") or "")
     raw_npi = str(hcp.get("npi_number") or "").strip()
@@ -272,7 +420,7 @@ def enrich_hcp_taxonomy(
                     status,
                 )
             else:
-                if not write_update(client, hcp_id, None, None, status):
+                if not write_update(client, hcp_id, None, None, status, target_version=target_version):
                     return "api_error"
             return status
 
@@ -292,7 +440,7 @@ def enrich_hcp_taxonomy(
                     status,
                 )
             else:
-                if not write_update(client, hcp_id, None, None, status):
+                if not write_update(client, hcp_id, None, None, status, target_version=target_version):
                     return "api_error"
             return status
 
@@ -313,7 +461,7 @@ def enrich_hcp_taxonomy(
                     status,
                 )
             else:
-                if not write_update(client, hcp_id, None, None, status):
+                if not write_update(client, hcp_id, None, None, status, target_version=target_version):
                     return "api_error"
             return status
 
@@ -330,7 +478,7 @@ def enrich_hcp_taxonomy(
                     status,
                 )
             else:
-                if not write_update(client, hcp_id, None, None, status):
+                if not write_update(client, hcp_id, None, None, status, target_version=target_version):
                     return "api_error"
             return status
 
@@ -347,7 +495,7 @@ def enrich_hcp_taxonomy(
                 status,
             )
         else:
-            if not write_update(client, hcp_id, code, desc, status):
+            if not write_update(client, hcp_id, code, desc, status, target_version=target_version):
                 return "api_error"
         return status
 
@@ -360,7 +508,7 @@ def enrich_hcp_taxonomy(
             exc,
         )
         if not dry_run:
-            if write_update(client, hcp_id, None, None, "api_error"):
+            if write_update(client, hcp_id, None, None, "api_error", target_version=target_version):
                 pass
         return "api_error"
     finally:
@@ -394,6 +542,7 @@ def main() -> None:
         client,
         reset_status=args.reset_status,
         limit=args.limit,
+        target_version=args.target_version,
     )
 
     logger.info("Found %s HCPs needing taxonomy enrichment", len(hcps_to_process))
@@ -412,7 +561,9 @@ def main() -> None:
 
     for idx, hcp in enumerate(tqdm(hcps_to_process, desc="backfilling NPPES taxonomy", unit="hcp")):
         try:
-            result = enrich_hcp_taxonomy(client, hcp, args.rate_limit, args.dry_run)
+            result = enrich_hcp_taxonomy(
+                client, hcp, args.rate_limit, args.dry_run, target_version=args.target_version
+            )
         except Exception as exc:
             logger.exception(
                 "Unhandled error on row %s; continuing: %s",
