@@ -12,6 +12,12 @@ from supabase import Client, create_client
 from tqdm import tqdm
 
 
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 INDIVIDUALS_PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
 ORGANIZATIONS_PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_organizations.parquet"
 OUTPUT_LOG_PATH = r"C:\Users\garre\Desktop\FieldMark\nppes_enrichment_log.json"
@@ -32,6 +38,12 @@ CANONICALS = [
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true", default=False)
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
     return parser.parse_args()
 
 
@@ -51,6 +63,7 @@ def fetch_all_pages(
     table: str,
     columns: str,
     not_null_column: Optional[str] = None,
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     offset = 0
@@ -75,22 +88,98 @@ def fetch_all_pages(
     return rows
 
 
-def fetch_first_publication_year_per_hcp(client: Client) -> Dict[str, int]:
+def fetch_first_publication_year_per_hcp(
+    client: Client, target_version: str = "v1"
+) -> Dict[str, int]:
     """
     Returns mapping of hcp_id -> earliest publication_year for HCPs that
     have publications. Uses Postgres aggregation via the supabase client.
     """
-    # Use the Supabase rpc-like pattern via direct query through PostgREST.
-    # Fetch all publications with hcp_id and publication_year, paginated.
-    rows: List[Dict[str, Any]] = []
+    if target_version == "v1":
+        # Use the Supabase rpc-like pattern via direct query through PostgREST.
+        # Fetch all publications with hcp_id and publication_year, paginated.
+        rows: List[Dict[str, Any]] = []
+        offset = 0
+        page_size = 200
+        while True:
+            try:
+                batch = (
+                    client.table("publications")
+                    .select("hcp_id,pub_year")
+                    .not_.is_("hcp_id", "null")
+                    .not_.is_("pub_year", "null")
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception:
+                if page_size > 100:
+                    page_size = 100
+                    continue
+                raise
+            if not batch:
+                break
+            rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += page_size
+
+        # Aggregate to min publication_year per hcp_id
+        result: Dict[str, int] = {}
+        for row in rows:
+            hcp_id = str(row.get("hcp_id") or "")
+            year = row.get("pub_year")
+            if not hcp_id or year is None:
+                continue
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                continue
+            if year_int < 1950 or year_int > 2030:
+                continue  # skip implausible years
+            existing = result.get(hcp_id)
+            if existing is None or year_int < existing:
+                result[hcp_id] = year_int
+        return result
+
+    pub_authors_table = get_table_name("publication_authors", target_version)
+    publications_table = get_table_name("publications", target_version)
+
+    pub_author_rows: List[Dict[str, Any]] = []
     offset = 0
     page_size = 200
     while True:
         try:
             batch = (
-                client.table("publications")
-                .select("hcp_id,pub_year")
+                client.table(pub_authors_table)
+                .select("hcp_id,publication_id")
                 .not_.is_("hcp_id", "null")
+                .range(offset, offset + page_size - 1)
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            if page_size > 100:
+                page_size = 100
+                continue
+            raise
+        if not batch:
+            break
+        pub_author_rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    pub_year_by_id: Dict[str, int] = {}
+    offset = 0
+    page_size = 200
+    while True:
+        try:
+            batch = (
+                client.table(publications_table)
+                .select("id,pub_year")
                 .not_.is_("pub_year", "null")
                 .range(offset, offset + page_size - 1)
                 .execute()
@@ -104,28 +193,35 @@ def fetch_first_publication_year_per_hcp(client: Client) -> Dict[str, int]:
             raise
         if not batch:
             break
-        rows.extend(batch)
+        for row in batch:
+            pub_id = str(row.get("id") or "")
+            year = row.get("pub_year")
+            if not pub_id or year is None:
+                continue
+            try:
+                year_int = int(year)
+            except (TypeError, ValueError):
+                continue
+            if year_int < 1950 or year_int > 2030:
+                continue
+            pub_year_by_id[pub_id] = year_int
         if len(batch) < page_size:
             break
         offset += page_size
 
-    # Aggregate to min publication_year per hcp_id
-    result: Dict[str, int] = {}
-    for row in rows:
+    result_v2: Dict[str, int] = {}
+    for row in pub_author_rows:
         hcp_id = str(row.get("hcp_id") or "")
-        year = row.get("pub_year")
-        if not hcp_id or year is None:
+        pub_id = str(row.get("publication_id") or "")
+        if not hcp_id or not pub_id:
             continue
-        try:
-            year_int = int(year)
-        except (TypeError, ValueError):
+        year_int = pub_year_by_id.get(pub_id)
+        if year_int is None:
             continue
-        if year_int < 1950 or year_int > 2030:
-            continue  # skip implausible years
-        existing = result.get(hcp_id)
+        existing = result_v2.get(hcp_id)
         if existing is None or year_int < existing:
-            result[hcp_id] = year_int
-    return result
+            result_v2[hcp_id] = year_int
+    return result_v2
 
 
 def rows_to_dicts(cursor_result: Any) -> List[Dict[str, Any]]:
@@ -140,6 +236,7 @@ if __name__ == "__main__":
     started = time.time()
     args = parse_args()
     execute = bool(args.execute)
+    target_version: str = args.target_version
     mode = "execute" if execute else "dry_run"
     errors: List[str] = []
 
@@ -151,9 +248,10 @@ if __name__ == "__main__":
     # Phase 1: cohort
     hcps_rows = fetch_all_pages(
         client,
-        "hcps",
+        get_table_name("hcps", target_version),
         "id,npi_number,first_name,last_name",
         not_null_column="npi_number",
+        target_version=target_version,
     )
     cohort_rows = []
     for r in hcps_rows:
@@ -171,7 +269,9 @@ if __name__ == "__main__":
     print(f"Cohort size: {len(cohort_rows)}")
     # Fetch first publication year per HCP for career stage fallback
     print("Fetching first publication year per HCP for career stage fallback...")
-    first_pub_year_by_hcp = fetch_first_publication_year_per_hcp(client)
+    first_pub_year_by_hcp = fetch_first_publication_year_per_hcp(
+        client, target_version=target_version
+    )
     print(f"  HCPs with publication history: {len(first_pub_year_by_hcp)}")
 
     con.execute(
@@ -598,9 +698,16 @@ if __name__ == "__main__":
     if not execute:
         print("[DRY-RUN] Skipping Supabase write.")
     else:
-        confirm = input(
-            f"About to upsert {len(enriched_rows)} hcps rows with NPPES enrichment fields. Continue? (yes/no): "
-        )
+        if target_version == "v2":
+            confirm = input(
+                f"About to update {len(enriched_rows)} hcps_v2 rows and upsert "
+                f"{len(enriched_rows)} hcp_nppes_detail_v2 rows with NPPES enrichment fields. "
+                f"Continue? (yes/no): "
+            )
+        else:
+            confirm = input(
+                f"About to upsert {len(enriched_rows)} hcps rows with NPPES enrichment fields. Continue? (yes/no): "
+            )
         if confirm != "yes":
             print("Execution cancelled.")
             errors.append("execute_cancelled_by_user")
@@ -618,16 +725,64 @@ if __name__ == "__main__":
             # constraints on unspecified columns. Use per-row UPDATE instead
             # since these IDs all exist in the database already.
             updates_per_progress = 500
+            hcps_table = get_table_name("hcps", target_version)
+            detail_table = get_table_name("hcp_nppes_detail", target_version)
             for idx, row in enumerate(payload):
                 row_id = row["id"]
-                update_payload = {k: v for k, v in row.items() if k != "id"}
-                try:
-                    client.table("hcps").update(update_payload).eq("id", row_id).execute()
-                    rows_written["updated_count"] += 1
-                except Exception as exc:
-                    rows_written["errors"] += 1
-                    errors.append(f"update_row_{row_id}: {repr(exc)}")
-                    print(f"Update failed for {row_id}: {exc}")
+                if target_version == "v2":
+                    try:
+                        client.table(hcps_table).update(
+                            {
+                                "nppes_practice_city": row.get("nppes_practice_city"),
+                                "nppes_practice_state": row.get("nppes_practice_state"),
+                                "nppes_practice_setting": row.get("nppes_practice_setting"),
+                                "nppes_career_stage_years": row.get("nppes_career_stage_years"),
+                            }
+                        ).eq("id", row_id).execute()
+                    except Exception as exc:
+                        rows_written["errors"] += 1
+                        errors.append(f"update_hcps_v2_{row_id}: {repr(exc)}")
+                        print(f"hcps_v2 update failed for {row_id}: {exc}")
+                        if (idx + 1) % updates_per_progress == 0 or (idx + 1) == len(payload):
+                            print(
+                                f"Updated {rows_written['updated_count']}/{len(payload)} rows "
+                                f"({rows_written['errors']} errors)"
+                            )
+                        continue
+                    try:
+                        client.table(detail_table).upsert(
+                            {
+                                "hcp_id": row_id,
+                                "nppes_enumeration_date": row.get("nppes_enumeration_date"),
+                                "nppes_is_sole_proprietor": row.get("nppes_is_sole_proprietor"),
+                                "nppes_practice_address": row.get("nppes_practice_address"),
+                                "nppes_practice_zip": row.get("nppes_practice_zip"),
+                                "nppes_organization_name": row.get("nppes_organization_name"),
+                                "nppes_organization_npi": row.get("nppes_organization_npi"),
+                                "nppes_organization_match_quality": row.get(
+                                    "nppes_organization_match_quality"
+                                ),
+                                "nppes_co_located_npi_count": row.get("nppes_co_located_npi_count"),
+                                "nppes_career_stage": row.get("nppes_career_stage"),
+                                "nppes_enriched_at": now_iso,
+                            },
+                            on_conflict="hcp_id",
+                        ).execute()
+                    except Exception as exc:
+                        rows_written["errors"] += 1
+                        errors.append(f"upsert_hcp_nppes_detail_v2_{row_id}: {repr(exc)}")
+                        print(f"hcp_nppes_detail_v2 upsert failed for {row_id}: {exc}")
+                    else:
+                        rows_written["updated_count"] += 1
+                else:
+                    update_payload = {k: v for k, v in row.items() if k != "id"}
+                    try:
+                        client.table(hcps_table).update(update_payload).eq("id", row_id).execute()
+                        rows_written["updated_count"] += 1
+                    except Exception as exc:
+                        rows_written["errors"] += 1
+                        errors.append(f"update_row_{row_id}: {repr(exc)}")
+                        print(f"Update failed for {row_id}: {exc}")
 
                 if (idx + 1) % updates_per_progress == 0 or (idx + 1) == len(payload):
                     print(
