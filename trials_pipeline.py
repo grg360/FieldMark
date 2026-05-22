@@ -37,6 +37,12 @@ logger = logging.getLogger("trials_pipeline")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 @dataclass
 class S:
     processed: int = 0
@@ -215,15 +221,25 @@ def save_ckpt(ids: Set[str]) -> None:
         json.dump({"processed_hcp_ids": sorted(ids), "saved_at": datetime.now(UTC).isoformat()}, f, indent=2)
 
 
-def get_hcps(c: Client) -> List[Dict]:
+def get_hcps(c: Client, target_version: str = "v1") -> List[Dict]:
     """Load HCPs with non-null state (includes Step C OpenAlex HCPs; NPI not required)."""
+    hcps_table = get_table_name("hcps", target_version)
+    if target_version == "v2":
+        select_cols = (
+            "id,first_name,last_name,institution_normalized,institution_raw,"
+            "nppes_practice_city,nppes_practice_state,npi_number"
+        )
+        state_col = "nppes_practice_state"
+    else:
+        select_cols = "id,first_name,last_name,institution_short,institution_full,city,state,npi_number"
+        state_col = "state"
     rows: List[Dict] = []
     o = 0
     while True:
         b = (
-            c.table("hcps")
-            .select("id,first_name,last_name,institution_short,institution_full,city,state,npi_number")
-            .not_.is_("state", "null")
+            c.table(hcps_table)
+            .select(select_cols)
+            .not_.is_(state_col, "null")
             .order("id")
             .range(o, o + 999)
             .execute()
@@ -232,6 +248,16 @@ def get_hcps(c: Client) -> List[Dict]:
         )
         if not b:
             break
+        if target_version == "v2":
+            for row in b:
+                if "institution_normalized" in row:
+                    row["institution_short"] = row.pop("institution_normalized")
+                if "institution_raw" in row:
+                    row["institution_full"] = row.pop("institution_raw")
+                if "nppes_practice_city" in row:
+                    row["city"] = row.pop("nppes_practice_city")
+                if "nppes_practice_state" in row:
+                    row["state"] = row.pop("nppes_practice_state")
         rows.extend(b)
         if len(b) < 1000:
             break
@@ -475,25 +501,26 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
     return list(trials.values()), links, best_conf, sample_matches
 
 
-def upsert_trials(c: Client, rows: List[Dict]) -> Dict[str, str]:
+def upsert_trials(c: Client, rows: List[Dict], target_version: str = "v1") -> Dict[str, str]:
     if not rows:
         return {}
+    trials_table = get_table_name("clinical_trials", target_version)
     # Omit locations from clinical_trials upsert (site data is on trial_investigators).
     upsert_rows = [{k: v for k, v in r.items() if k != "locations"} for r in rows]
     # Batch in chunks of 20 to avoid statement timeouts on heavy trial payloads
     for i in range(0, len(upsert_rows), 20):
         batch = upsert_rows[i : i + 5]
-        c.table("clinical_trials").upsert(batch, on_conflict="nct_id").execute()
+        c.table(trials_table).upsert(batch, on_conflict="nct_id").execute()
     ids = [r["nct_id"] for r in rows if r.get("nct_id")]
     m: Dict[str, str] = {}
     for i in range(0, len(ids), 100):
-        q = c.table("clinical_trials").select("id,nct_id").in_("nct_id", ids[i : i + 100]).execute().data or []
+        q = c.table(trials_table).select("id,nct_id").in_("nct_id", ids[i : i + 100]).execute().data or []
         for r in q:
             m[str(r["nct_id"])] = str(r["id"])
     return m
 
 
-def insert_links(c: Client, links: List[Dict], m: Dict[str, str]) -> int:
+def insert_links(c: Client, links: List[Dict], m: Dict[str, str], target_version: str = "v1") -> int:
     rows = [
         {
             "hcp_id": l["hcp_id"],
@@ -547,7 +574,14 @@ def insert_links(c: Client, links: List[Dict], m: Dict[str, str]) -> int:
                     serialized[k] = str(v) if not isinstance(v, (str, int, float, bool)) else v
             batch_serializable.append(serialized)
         try:
-            c.rpc("upsert_trial_investigators_preserving_match", {"rows_data": batch_serializable}).execute()
+            if target_version == "v2":
+                investigators_table = get_table_name("trial_investigators", target_version)
+                c.table(investigators_table).upsert(
+                    batch_serializable,
+                    on_conflict="trial_id,investigator_raw_first_name,investigator_raw_last_name,role,source",
+                ).execute()
+            else:
+                c.rpc("upsert_trial_investigators_preserving_match", {"rows_data": batch_serializable}).execute()
         except Exception as e:
             logger.error(f"[rpc] upsert failed for batch {i}: {e}")
             raise
@@ -562,7 +596,12 @@ def eta(done: int, total: int, start: float) -> str:
     return f"{m // 60}:{m % 60:02d}"
 
 
-def run(test: bool, limit: Optional[int], reset_checkpoint: bool = False) -> None:
+def run(
+    test: bool,
+    limit: Optional[int],
+    reset_checkpoint: bool = False,
+    target_version: str = "v1",
+) -> None:
     load_dotenv()
     c = sb()
     s = requests.Session()
@@ -576,7 +615,7 @@ def run(test: bool, limit: Optional[int], reset_checkpoint: bool = False) -> Non
     if reset_checkpoint and os.path.exists(CKPT):
         os.remove(CKPT)
         print("Checkpoint deleted; will re-process all HCPs from scratch.")
-    hcps = get_hcps(c)
+    hcps = get_hcps(c, target_version)
     seen = load_ckpt()
     todo = [h for h in hcps if str(h.get("id")) not in seen]
     if test:
@@ -625,9 +664,9 @@ def run(test: bool, limit: Optional[int], reset_checkpoint: bool = False) -> Non
         if not trials or not links:
             st.skipped += 1
             continue
-        m = upsert_trials(c, trials)
+        m = upsert_trials(c, trials, target_version)
         op_counter += len(trials) * 2  # estimate: 1 upsert + 1 select per trial batch
-        ins = insert_links(c, links, m)
+        ins = insert_links(c, links, m, target_version)
         op_counter += max(len(links) // 500, 1) * 2  # estimate: 1 fetch + 1 upsert per 500-row batch
         st.linked_hcps += 1
         st.trials += len(trials)
@@ -673,5 +712,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Delete checkpoint file before starting (forces full re-processing of all HCPs)",
     )
+    p.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
     a = p.parse_args()
-    run(a.test, a.limit, a.reset_checkpoint)
+    run(a.test, a.limit, a.reset_checkpoint, a.target_version)
