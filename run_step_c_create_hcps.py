@@ -377,17 +377,36 @@ def insert_hcps_batch(
         return ok
     chunk = list(rows)
     try:
-        supabase.table(hcps_table).insert(chunk).execute()
+        response = supabase.table(hcps_table).insert(chunk).execute()
+        if not response.data:
+            raise RuntimeError(
+                f"Batch insert returned empty data ({len(chunk)} rows submitted) - "
+                f"writes may have been silently dropped"
+            )
+        returned_ids = {str(r.get("id")) for r in response.data if r.get("id")}
         for r in chunk:
             hid = r.get("id")
-            if hid:
+            if hid and str(hid) in returned_ids:
                 ok.add(str(hid))
+        # Surface mismatch between submitted and returned
+        missing = {str(r.get("id")) for r in chunk if r.get("id")} - returned_ids
+        if missing:
+            for mid in missing:
+                msg = f"hcp insert id={mid}: submitted but not returned in response.data"
+                errors.append(msg)
+                eprint("[hcps insert]", msg)
         return ok
     except Exception as exc:
         eprint(f"[hcps insert batch n={len(chunk)}] {exc}")
         for r in chunk:
             try:
-                supabase.table(hcps_table).insert([r]).execute()
+                row_response = supabase.table(hcps_table).insert([r]).execute()
+                if not row_response.data:
+                    hid = r.get("id")
+                    msg = f"hcp insert id={hid}: row insert returned empty data"
+                    errors.append(msg)
+                    eprint("[hcps insert]", msg)
+                    continue
                 hid = r.get("id")
                 if hid:
                     ok.add(str(hid))
@@ -417,19 +436,29 @@ def upsert_join_rows(
     for i in range(0, len(rows), JOIN_UPSERT_CHUNK):
         chunk = list(rows[i : i + JOIN_UPSERT_CHUNK])
         try:
-            supabase.table(hcp_oa_table).upsert(
+            response = supabase.table(hcp_oa_table).upsert(
                 chunk,
                 on_conflict="hcp_id,openalex_author_id",
             ).execute()
-            n += len(chunk)
+            if not response.data:
+                raise RuntimeError(
+                    f"Join upsert returned empty data ({len(chunk)} rows) - "
+                    f"writes may have been silently dropped"
+                )
+            n += len(response.data)
         except Exception as exc:
             eprint(f"[join upsert batch] {exc}")
             for r in chunk:
                 try:
-                    supabase.table(hcp_oa_table).upsert(
+                    row_response = supabase.table(hcp_oa_table).upsert(
                         [r],
                         on_conflict="hcp_id,openalex_author_id",
                     ).execute()
+                    if not row_response.data:
+                        msg = f"hcp_id={r.get('hcp_id')} oa={r.get('openalex_author_id')}: row upsert returned empty data"
+                        errors.append(msg)
+                        eprint("[join upsert]", msg)
+                        continue
                     n += 1
                 except Exception as exc2:
                     msg = f"hcp_id={r.get('hcp_id')} oa={r.get('openalex_author_id')}: {exc2}"
@@ -453,22 +482,26 @@ def upsert_ta_rows(
     for i in range(0, len(rows), TA_INSERT_CHUNK):
         chunk = list(rows[i : i + TA_INSERT_CHUNK])
         try:
-            supabase.table(hcp_ta_table).upsert(
+            response = supabase.table(hcp_ta_table).upsert(
                 chunk,
                 on_conflict="hcp_id,therapeutic_area_id",
                 ignore_duplicates=True,
             ).execute()
-            n += len(chunk)
+            # NOTE: ignore_duplicates=True returns empty data when ALL rows
+            # conflicted (already existed). Empty data is acceptable here
+            # because the script's job is "ensure these rows exist" - if
+            # they already exist, the no-op is correct.
+            n += len(response.data) if response.data else 0
         except Exception as exc:
             eprint(f"[hcp_therapeutic_areas upsert batch] {exc}")
             for r in chunk:
                 try:
-                    supabase.table(hcp_ta_table).upsert(
+                    row_response = supabase.table(hcp_ta_table).upsert(
                         [r],
                         on_conflict="hcp_id,therapeutic_area_id",
                         ignore_duplicates=True,
                     ).execute()
-                    n += 1
+                    n += 1 if row_response.data else 0
                 except Exception as exc2:
                     msg = f"hcp_id={r.get('hcp_id')} ta={r.get('therapeutic_area_id')}: {exc2}"
                     errors.append(msg)
