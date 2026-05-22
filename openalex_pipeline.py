@@ -142,6 +142,7 @@ def fetch_publications_with_doi(supabase: Client, target_version: str = "v1") ->
                 .select("id,doi,citation_count")
                 .not_.is_("doi", "null")
                 .is_("openalex_enriched_at", "null")
+                .order("id")
                 .range(offset, offset + FETCH_PAGE_SIZE - 1)
                 .execute()
             )
@@ -387,7 +388,12 @@ def update_publication_enrichment(
     update_dict["openalex_enriched_at"] = datetime.now(timezone.utc).isoformat()
 
     try:
-        supabase.table(publications_table).update(update_dict).eq("id", publication_id).execute()
+        response = supabase.table(publications_table).update(update_dict).eq("id", publication_id).execute()
+        if not response.data:
+            raise RuntimeError(
+                f"Update returned empty data for publication {publication_id} - "
+                f"row not matched or write silently dropped"
+            )
     except Exception as exc:
         raise RuntimeError(f"Failed updating publication {publication_id}: {exc}") from exc
 
