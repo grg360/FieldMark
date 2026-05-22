@@ -23,6 +23,12 @@ from supabase import Client, create_client
 from tqdm import tqdm
 
 
+def get_table_name(base_name: str, target_version: str) -> str:
+    if target_version == "v2":
+        return f"{base_name}_v2"
+    return base_name
+
+
 PARQUET_FILES = [
     r"C:\Users\garre\Desktop\FieldMark\OpenPayments\op_general_pgyr2022.parquet",
     r"C:\Users\garre\Desktop\FieldMark\OpenPayments\op_general_pgyr2023.parquet",
@@ -69,6 +75,12 @@ CANONICALS = [
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true", default=False)
+    parser.add_argument(
+        "--target-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
     return parser.parse_args()
 
 
@@ -88,6 +100,7 @@ def fetch_all_pages(
     table: str,
     columns: str,
     not_null_column: Optional[str] = None,
+    target_version: str = "v1",
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     offset = 0
@@ -158,6 +171,7 @@ if __name__ == "__main__":
     started = time.time()
     args = parse_args()
     execute = bool(args.execute)
+    target_version: str = args.target_version
     mode = "execute" if execute else "dry_run"
     errors: List[str] = []
 
@@ -167,7 +181,13 @@ if __name__ == "__main__":
     con.execute("SET memory_limit = '4GB'")
 
     # Phase 2a/b: hcps cohort and mapping
-    hcps_npi_rows = fetch_all_pages(client, "hcps", "id,npi_number", not_null_column="npi_number")
+    hcps_npi_rows = fetch_all_pages(
+        client,
+        get_table_name("hcps", target_version),
+        "id,npi_number",
+        not_null_column="npi_number",
+        target_version=target_version,
+    )
     npi_set = {str(r.get("npi_number")).strip() for r in hcps_npi_rows if str(r.get("npi_number") or "").strip()}
     npi_to_hcp = {str(r["npi_number"]).strip(): str(r["id"]) for r in hcps_npi_rows if r.get("npi_number")}
     print(f"Loaded {len(npi_set)} FieldMark NPIs")
@@ -177,7 +197,12 @@ if __name__ == "__main__":
     therapeutic_areas = fetch_therapeutic_areas(client)
     ta_name_by_id = {str(r["id"]): str(r["name"]) for r in therapeutic_areas if r.get("id")}
     ta_id_by_name = {str(r["name"]): str(r["id"]) for r in therapeutic_areas if r.get("id")}
-    hcp_ta_rows = fetch_all_pages(client, "hcp_therapeutic_areas", "id,hcp_id,therapeutic_area_id")
+    hcp_ta_rows = fetch_all_pages(
+        client,
+        get_table_name("hcp_therapeutic_areas", target_version),
+        "id,hcp_id,therapeutic_area_id",
+        target_version=target_version,
+    )
     hcp_to_tas: Dict[str, set] = {}
     for r in hcp_ta_rows:
         h = str(r.get("hcp_id") or "")
@@ -479,7 +504,11 @@ if __name__ == "__main__":
             "error": None,
         }
         try:
-            q = client.table("hcps").select("id,npi_number,first_name,last_name").eq("last_name", name)
+            q = (
+                client.table(get_table_name("hcps", target_version))
+                .select("id,npi_number,first_name,last_name")
+                .eq("last_name", name)
+            )
             if name == "Wakelee":
                 q = q.ilike("first_name", first_like)
             rows = q.execute().data or []
@@ -541,29 +570,44 @@ if __name__ == "__main__":
     if not execute:
         print("[DRY-RUN] Skipping Supabase write.")
     else:
-        confirm = input(
-            f"About to TRUNCATE and rewrite hcp_open_payments_summary and hcp_open_payments_by_ta.\n"
-            f"Will write {len(summary_rows)} summary rows and {len(by_ta_rows)} by_ta rows. Continue? (yes/no): "
-        )
+        if target_version == "v2":
+            confirm = input(
+                f"About to UPSERT into hcp_open_payments_summary_v2, hcp_open_payments_by_ta_v2, "
+                f"and hcp_open_payments_top_companies_v2.\n"
+                f"Will write {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows, "
+                f"and {len(top_companies_rows)} top_companies rows. Continue? (yes/no): "
+            )
+        else:
+            confirm = input(
+                f"About to TRUNCATE and rewrite hcp_open_payments_summary and hcp_open_payments_by_ta.\n"
+                f"Will write {len(summary_rows)} summary rows and {len(by_ta_rows)} by_ta rows. Continue? (yes/no): "
+            )
         if confirm != "yes":
             print("Execution cancelled.")
         else:
             inserted_summary = 0
             inserted_by_ta = 0
+            summary_table = get_table_name("hcp_open_payments_summary", target_version)
+            by_ta_table = get_table_name("hcp_open_payments_by_ta", target_version)
+            top_companies_table = get_table_name("hcp_open_payments_top_companies", target_version)
 
-            # truncate (delete-all)
-            trunc_summary_resp = (
-                client.table("hcp_open_payments_summary").delete().neq("id", DELETE_GUARD_ID).execute()
-            )
-            trunc_summary_count = len(trunc_summary_resp.data or [])
-            print(f"Truncated hcp_open_payments_summary ({trunc_summary_count})")
+            if target_version == "v1":
+                # truncate (delete-all)
+                trunc_summary_resp = (
+                    client.table(summary_table).delete().neq("id", DELETE_GUARD_ID).execute()
+                )
+                trunc_summary_count = len(trunc_summary_resp.data or [])
+                print(f"Truncated hcp_open_payments_summary ({trunc_summary_count})")
 
             for start_idx in tqdm(
                 range(0, len(summary_rows), WRITE_BATCH_SIZE), desc="summary", unit="batch"
             ):
                 batch = summary_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
-                    client.table("hcp_open_payments_summary").insert(batch).execute()
+                    if target_version == "v2":
+                        client.table(summary_table).upsert(batch, on_conflict="hcp_id").execute()
+                    else:
+                        client.table(summary_table).insert(batch).execute()
                     inserted_summary += len(batch)
                     print(
                         f"Inserted summary batch {start_idx // WRITE_BATCH_SIZE + 1} "
@@ -573,16 +617,24 @@ if __name__ == "__main__":
                     errors.append(f"summary_insert_batch_{start_idx}: {repr(exc)}")
                     print(f"Summary batch failed at offset {start_idx}: {exc}")
 
-            trunc_by_ta_resp = client.table("hcp_open_payments_by_ta").delete().neq("id", DELETE_GUARD_ID).execute()
-            trunc_by_ta_count = len(trunc_by_ta_resp.data or [])
-            print(f"Truncated hcp_open_payments_by_ta ({trunc_by_ta_count})")
+            if target_version == "v1":
+                trunc_by_ta_resp = (
+                    client.table(by_ta_table).delete().neq("id", DELETE_GUARD_ID).execute()
+                )
+                trunc_by_ta_count = len(trunc_by_ta_resp.data or [])
+                print(f"Truncated hcp_open_payments_by_ta ({trunc_by_ta_count})")
 
             for start_idx in tqdm(
                 range(0, len(by_ta_rows), WRITE_BATCH_SIZE), desc="by_ta", unit="batch"
             ):
                 batch = by_ta_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
-                    client.table("hcp_open_payments_by_ta").insert(batch).execute()
+                    if target_version == "v2":
+                        client.table(by_ta_table).upsert(
+                            batch, on_conflict="hcp_id,therapeutic_area_id"
+                        ).execute()
+                    else:
+                        client.table(by_ta_table).insert(batch).execute()
                     inserted_by_ta += len(batch)
                     print(
                         f"Inserted by_ta batch {start_idx // WRITE_BATCH_SIZE + 1} "
@@ -594,16 +646,24 @@ if __name__ == "__main__":
 
             inserted_top_companies = 0
 
-            trunc_top_companies_resp = client.table("hcp_open_payments_top_companies").delete().neq("id", DELETE_GUARD_ID).execute()
-            trunc_top_companies_count = len(trunc_top_companies_resp.data or [])
-            print(f"Truncated hcp_open_payments_top_companies ({trunc_top_companies_count})")
+            if target_version == "v1":
+                trunc_top_companies_resp = (
+                    client.table(top_companies_table).delete().neq("id", DELETE_GUARD_ID).execute()
+                )
+                trunc_top_companies_count = len(trunc_top_companies_resp.data or [])
+                print(f"Truncated hcp_open_payments_top_companies ({trunc_top_companies_count})")
 
             for start_idx in tqdm(
                 range(0, len(top_companies_rows), WRITE_BATCH_SIZE), desc="top_companies", unit="batch"
             ):
                 batch = top_companies_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
-                    client.table("hcp_open_payments_top_companies").insert(batch).execute()
+                    if target_version == "v2":
+                        client.table(top_companies_table).upsert(
+                            batch, on_conflict="hcp_id,manufacturer_name"
+                        ).execute()
+                    else:
+                        client.table(top_companies_table).insert(batch).execute()
                     inserted_top_companies += len(batch)
                     print(
                         f"Inserted top_companies batch {start_idx // WRITE_BATCH_SIZE + 1} "
