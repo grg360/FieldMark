@@ -175,6 +175,7 @@ def get_candidate_hcps(
             supabase_client.table(oa_table)
             .select("hcp_id,openalex_author_id")
             .eq("is_primary", True)
+            .order("hcp_id")
             .range(offset, offset + HCPS_PAGE_SIZE - 1)
             .execute()
             .data
@@ -209,7 +210,7 @@ def get_candidate_hcps(
         )
         if us_only:
             q = q.in_("nppes_practice_state", US_STATES_AND_TERRITORIES)
-        batch = q.range(offset, offset + HCPS_PAGE_SIZE - 1).execute().data or []
+        batch = q.order("id").range(offset, offset + HCPS_PAGE_SIZE - 1).execute().data or []
         if not batch:
             break
         raw_hcps.extend(batch)
@@ -561,12 +562,15 @@ def update_hcp_with_nppes(
                 return False
     else:
         try:
-            supabase_client.table(hcps_table).update(
+            response = supabase_client.table(hcps_table).update(
                 {
                     "npi_number": npi,
                     "nppes_career_stage_years": nppes_career_stage_years,
                 }
             ).eq("id", hcp_id).execute()
+            if not response.data:
+                print(f"[UPDATE_NO_DATA] hcp_id={hcp_id} npi={npi} - update returned empty data, possible silent failure")
+                return False
         except Exception as exc:
             error_msg = str(exc)
             if "duplicate key" in error_msg.lower() or "23505" in error_msg or "hcps_npi_number_key" in error_msg:
@@ -587,7 +591,7 @@ def update_hcp_with_nppes(
                 return False
 
         try:
-            supabase_client.table(detail_table).upsert(
+            detail_response = supabase_client.table(detail_table).upsert(
                 {
                     "hcp_id": hcp_id,
                     "nppes_practice_address": practice_address_line,
@@ -596,6 +600,8 @@ def update_hcp_with_nppes(
                 },
                 on_conflict="hcp_id",
             ).execute()
+            if not detail_response.data:
+                print(f"[DETAIL_UPSERT_NO_DATA] hcp_id={hcp_id} - detail upsert returned empty data")
         except Exception as exc:
             print(f"[DETAIL_UPSERT_FAILED] hcp_id={hcp_id}: {exc}")
 

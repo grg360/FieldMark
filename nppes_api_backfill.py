@@ -360,7 +360,15 @@ def write_update(
         specialty_desc = None
 
     try:
-        client.table(hcps_table).update({"npi_specialty": specialty_desc}).eq("id", hcp_id).execute()
+        response = client.table(hcps_table).update({"npi_specialty": specialty_desc}).eq("id", hcp_id).execute()
+        if not response.data:
+            logger.warning(
+                "Supabase %s npi_specialty update returned empty data for hcp_id=%s status=%s - possible silent failure",
+                hcps_table,
+                hcp_id,
+                status,
+            )
+            return False
     except Exception as exc:
         logger.error(
             "Supabase %s npi_specialty update failed for hcp_id=%s status=%s: %s",
@@ -372,7 +380,7 @@ def write_update(
         return False
 
     try:
-        client.table(detail_table).upsert(
+        detail_response = client.table(detail_table).upsert(
             {
                 "hcp_id": hcp_id,
                 "npi_taxonomy": detail_taxonomy,
@@ -381,6 +389,14 @@ def write_update(
             },
             on_conflict="hcp_id",
         ).execute()
+        if not detail_response.data:
+            logger.warning(
+                "Supabase %s upsert returned empty data for hcp_id=%s status=%s - possible silent failure",
+                detail_table,
+                hcp_id,
+                status,
+            )
+            return False
     except Exception as exc:
         logger.error(
             "Supabase %s upsert failed for hcp_id=%s status=%s: %s",
