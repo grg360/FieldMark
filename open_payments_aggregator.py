@@ -605,10 +605,16 @@ if __name__ == "__main__":
                 batch = summary_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
                     if target_version == "v2":
-                        client.table(summary_table).upsert(batch, on_conflict="hcp_id").execute()
+                        response = client.table(summary_table).upsert(batch, on_conflict="hcp_id").execute()
+                        if not response.data:
+                            raise RuntimeError(
+                                f"Summary upsert returned empty data ({len(batch)} rows) - "
+                                f"writes may have been silently dropped"
+                            )
+                        inserted_summary += len(response.data)
                     else:
                         client.table(summary_table).insert(batch).execute()
-                    inserted_summary += len(batch)
+                        inserted_summary += len(batch)
                     print(
                         f"Inserted summary batch {start_idx // WRITE_BATCH_SIZE + 1} "
                         f"({inserted_summary}/{len(summary_rows)})"
@@ -630,12 +636,18 @@ if __name__ == "__main__":
                 batch = by_ta_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
                     if target_version == "v2":
-                        client.table(by_ta_table).upsert(
+                        response = client.table(by_ta_table).upsert(
                             batch, on_conflict="hcp_id,therapeutic_area_id"
                         ).execute()
+                        if not response.data:
+                            raise RuntimeError(
+                                f"By_ta upsert returned empty data ({len(batch)} rows) - "
+                                f"writes may have been silently dropped"
+                            )
+                        inserted_by_ta += len(response.data)
                     else:
                         client.table(by_ta_table).insert(batch).execute()
-                    inserted_by_ta += len(batch)
+                        inserted_by_ta += len(batch)
                     print(
                         f"Inserted by_ta batch {start_idx // WRITE_BATCH_SIZE + 1} "
                         f"({inserted_by_ta}/{len(by_ta_rows)})"
@@ -659,12 +671,18 @@ if __name__ == "__main__":
                 batch = top_companies_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
                     if target_version == "v2":
-                        client.table(top_companies_table).upsert(
+                        response = client.table(top_companies_table).upsert(
                             batch, on_conflict="hcp_id,manufacturer_name"
                         ).execute()
+                        if not response.data:
+                            raise RuntimeError(
+                                f"Top_companies upsert returned empty data ({len(batch)} rows) - "
+                                f"writes may have been silently dropped"
+                            )
+                        inserted_top_companies += len(response.data)
                     else:
                         client.table(top_companies_table).insert(batch).execute()
-                    inserted_top_companies += len(batch)
+                        inserted_top_companies += len(batch)
                     print(
                         f"Inserted top_companies batch {start_idx // WRITE_BATCH_SIZE + 1} "
                         f"({inserted_top_companies}/{len(top_companies_rows)})"
