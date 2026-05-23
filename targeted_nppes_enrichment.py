@@ -655,6 +655,12 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", default=False)
     parser.add_argument("--sample-limit", type=int, default=None)
     parser.add_argument(
+        "--min-career-pubs",
+        type=int,
+        default=500,
+        help="Minimum total_career_pubs threshold for candidate selection (default 500).",
+    )
+    parser.add_argument(
         "--target-version",
         choices=["v1", "v2"],
         default="v1",
@@ -663,6 +669,7 @@ def main() -> None:
     args = parser.parse_args()
     dry_run = args.dry_run
     sample_limit = args.sample_limit
+    min_career_pubs = args.min_career_pubs
     target_version = args.target_version
 
     supabase_client = create_supabase_client()
@@ -670,7 +677,7 @@ def main() -> None:
 
     candidates = get_candidate_hcps(
         supabase_client,
-        min_career_pubs=500,
+        min_career_pubs=min_career_pubs,
         us_only=True,
         limit=sample_limit,
         target_version=target_version,
