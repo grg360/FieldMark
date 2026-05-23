@@ -32,13 +32,19 @@ NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
 HEPATOLOGY_TA_ID = "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e"  # v1 ingestion defers hepatology taxonomy matching
 RARE_DISEASE_TA_ID = "833e7b38-d01b-409e-82c0-71eb29e138a0"
 
-NSCLC_TAXONOMIES = ["207RH0000X", "207RX0202X"]
+NSCLC_TAXONOMIES = ["207RX0202X"]  # Internal Medicine - Medical Oncology
 
 RARE_DISEASE_TAXONOMIES = [
     "2080N0001X",
     "2080P0207X",
     "207RA0401X",
     "207RM1200X",
+]
+
+HEPATOLOGY_TAXONOMIES = [
+    "207RI0008X",  # Internal Medicine - Hepatology
+    "207RT0003X",  # Internal Medicine - Transplant Hepatology
+    "207RG0100X",  # Internal Medicine - Gastroenterology (broad; refined by --npi-filter)
 ]
 
 BATCH_HCPS = 500
@@ -127,6 +133,7 @@ def fetch_existing_npis(client: Client, target_version: str = "v1") -> Set[str]:
             client.table(hcps_table)
             .select("id,npi_number")
             .not_.is_("npi_number", "null")
+            .order("id")
             .range(offset, offset + PREFLIGHT_PAGE_SIZE - 1)
             .execute()
         )
@@ -211,9 +218,16 @@ def _write_table_batch(
 ) -> None:
     routed_table = get_table_name(table, target_version)
     if table == "hcps":
+        # ignore_duplicates=True legitimately returns empty data when all rows
+        # already exist (by npi_number). Don't raise on empty response in that case.
         client.table(routed_table).upsert(rows, on_conflict="npi_number", ignore_duplicates=True).execute()
     else:
-        client.table(routed_table).insert(rows).execute()
+        response = client.table(routed_table).insert(rows).execute()
+        if not response.data:
+            raise RuntimeError(
+                f"Insert into {routed_table} returned empty data ({len(rows)} rows) - "
+                f"writes may have been silently dropped"
+            )
 
 
 def insert_batch(
@@ -260,8 +274,16 @@ def main() -> None:
         default="v1",
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
     )
+    parser.add_argument(
+        "--npi-filter",
+        type=str,
+        default=None,
+        help="Optional CSV path with 'npi' column. Restrict ingest to NPIs in this list "
+             "(intersected with taxonomy filter).",
+    )
     args = parser.parse_args()
     target_version = args.target_version
+    npi_filter_path = args.npi_filter
 
     load_dotenv()
     client = init_supabase()
@@ -277,11 +299,29 @@ def main() -> None:
 
     mask_nsclc = taxonomy_match_mask(df, set(NSCLC_TAXONOMIES))
     mask_rare = taxonomy_match_mask(df, set(RARE_DISEASE_TAXONOMIES))
-    mask_union = mask_nsclc | mask_rare
+    mask_hepa = taxonomy_match_mask(df, set(HEPATOLOGY_TAXONOMIES))
+    mask_union = mask_nsclc | mask_rare | mask_hepa
+
+    # If --npi-filter provided, intersect with the NPI list from CSV
+    if npi_filter_path:
+        import csv
+        allowed_npis = set()
+        with open(npi_filter_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                npi_val = row.get("npi", "").strip()
+                if npi_val:
+                    allowed_npis.add(npi_val)
+        print(f"Loaded {len(allowed_npis):,} NPIs from --npi-filter ({npi_filter_path})")
+        npi_str = df["npi"].astype(str).str.strip()
+        mask_in_filter = npi_str.isin(allowed_npis)
+        mask_union = mask_union & mask_in_filter
+        print(f"Applied --npi-filter intersection")
 
     filtered = df.loc[mask_union].copy()
     filtered["_match_nsclc"] = mask_nsclc.loc[filtered.index]
     filtered["_match_rare"] = mask_rare.loc[filtered.index]
+    filtered["_match_hepa"] = mask_hepa.loc[filtered.index]
 
     total_matching_rows = len(filtered)
     print(f"NPPES rows matching NSCLC ∪ Rare Disease taxonomies: {total_matching_rows:,}")
@@ -297,11 +337,14 @@ def main() -> None:
             continue
         match_nsclc = bool(grp["_match_nsclc"].any())
         match_rare = bool(grp["_match_rare"].any())
+        match_hepa = bool(grp["_match_hepa"].any())
         ta_ids: List[str] = []
         if match_nsclc:
             ta_ids.append(NSCLC_TA_ID)
         if match_rare:
             ta_ids.append(RARE_DISEASE_TA_ID)
+        if match_hepa:
+            ta_ids.append(HEPATOLOGY_TA_ID)
         row0 = grp.sort_index().iloc[0]
         agg_rows.append((npi_norm, row0, ta_ids))
 
@@ -383,7 +426,7 @@ def main() -> None:
     ta_labels = {
         NSCLC_TA_ID: "NSCLC",
         RARE_DISEASE_TA_ID: "RARE_DISEASE",
-        HEPATOLOGY_TA_ID: "HEPATOLOGY (no v1 taxonomy ingest)",
+        HEPATOLOGY_TA_ID: "HEPATOLOGY",
     }
     for tid, cnt in sorted(ta_dist.items(), key=lambda kv: (-kv[1], kv[0])):
         print(f"  {ta_labels.get(tid, tid)}: {cnt:,}")
