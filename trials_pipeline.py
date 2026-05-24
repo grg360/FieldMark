@@ -116,7 +116,7 @@ def lev(a: str, b: str) -> int:
     return p[-1]
 
 
-def splitn(raw: Optional[str]) -> Tuple[str, str]:
+def splitn(raw: Optional[str]) -> Tuple[str, str, str]:
     s = ns(raw)
     # Strip trailing credentials repeatedly (MD, PhD, M.H.Sc, DrPH, FACP, etc.)
     pattern = r",?\s*(m\.?d\.?|d\.?o\.?|ph\.?d\.?|m\.?b\.?b\.?s\.?|m\.?p\.?h\.?|m\.?s\.?c\.?|m\.?h\.?s\.?c\.?|m\.?s\.?c\.?e\.?|d\.?s\.?c\.?|s\.?c\.?d\.?|dr\.?p\.?h\.?|f\.?a\.?[a-z]{2,4}\.?|r\.?n\.?|n\.?p\.?|pa-c|p\.?a\.?)$"
@@ -126,20 +126,30 @@ def splitn(raw: Optional[str]) -> Tuple[str, str]:
             break
         s = new_s
     if "," in s:
+        # "Last, First Middle..." format
         p = [x.strip() for x in s.split(",") if x.strip()]
         if len(p) >= 2:
-            return nk(p[1].split()[0] if p[1].split() else p[1]), nk(p[0])
+            last = nk(p[0])
+            given_tokens = p[1].split()
+            if not given_tokens:
+                return "", "", last
+            first = nk(given_tokens[0])
+            middle = nk(" ".join(given_tokens[1:])) if len(given_tokens) > 1 else ""
+            return first, middle, last
+    # "First Middle... Last" format
     t = nk(s).split()
     if not t:
-        return "", ""
+        return "", "", ""
     if len(t) == 1:
-        return "", t[0]
-    return t[0], t[-1]
+        return "", "", t[0]
+    if len(t) == 2:
+        return t[0], "", t[1]
+    return t[0], " ".join(t[1:-1]), t[-1]
 
 
 def name_ok(first: str, last: str, off_name: str) -> bool:
     hf, hl = nk(first), nk(last)
-    of, ol = splitn(off_name)
+    of, _, ol = splitn(off_name)
     if not hl or not ol:
         return False
     if hl == ol and hf and of and hf[0] == of[0]:
@@ -338,7 +348,7 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
             nm = ns(o.get("name"))
             if not nm:
                 continue
-            raw_first, raw_last = splitn(nm)
+            raw_first, raw_middle, raw_last = splitn(nm)
             raw_affiliation = ns(o.get("affiliation")) or None
 
             matched_hcp_id: Optional[str] = None
@@ -371,6 +381,7 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
                     "role": role,
                     "investigator_name": nm or None,
                     "investigator_raw_first_name": raw_first or None,
+                    "investigator_raw_middle_name": raw_middle or None,
                     "investigator_raw_last_name": raw_last or None,
                     "investigator_raw_affiliation": raw_affiliation,
                     "investigator_raw_facility": None,
@@ -410,7 +421,7 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
                 if not sc_name:
                     continue
 
-                sc_first, sc_last = splitn(sc_name)
+                sc_first, sc_middle, sc_last = splitn(sc_name)
                 is_queried_match = name_ok(first, last, sc_name)
 
                 if is_queried_match:
@@ -429,6 +440,7 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
                                 "role": sc_role,
                                 "investigator_name": sc_name,
                                 "investigator_raw_first_name": sc_first or None,
+                                "investigator_raw_middle_name": sc_middle or None,
                                 "investigator_raw_last_name": sc_last or None,
                                 "investigator_raw_affiliation": facility,
                                 "investigator_raw_facility": facility,
@@ -448,6 +460,7 @@ def extract(h: Dict, studies: Sequence[Dict]) -> Tuple[List[Dict], List[Dict], i
                         "role": sc_role,
                         "investigator_name": sc_name,
                         "investigator_raw_first_name": sc_first or None,
+                        "investigator_raw_middle_name": sc_middle or None,
                         "investigator_raw_last_name": sc_last or None,
                         "investigator_raw_affiliation": facility,
                         "investigator_raw_facility": facility,
@@ -533,6 +546,7 @@ def insert_links(c: Client, links: List[Dict], m: Dict[str, str], target_version
             "role": l["role"],
             "investigator_name": l["investigator_name"],
             "investigator_raw_first_name": l["investigator_raw_first_name"],
+            "investigator_raw_middle_name": l.get("investigator_raw_middle_name"),
             "investigator_raw_last_name": l["investigator_raw_last_name"],
             "investigator_raw_affiliation": l.get("investigator_raw_affiliation"),
             "investigator_raw_facility": l.get("investigator_raw_facility"),
