@@ -82,13 +82,14 @@ def fetch_all_pages(
     columns: str,
     not_null_column: Optional[str] = None,
     target_version: str = "v1",
+    order_column: str = "id",
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     offset = 0
     page_size = PAGE_SIZE
     while True:
         try:
-            q = client.table(table).select(columns).order("id").range(offset, offset + page_size - 1)
+            q = client.table(table).select(columns).order(order_column).range(offset, offset + page_size - 1)
             if not_null_column:
                 q = q.not_.is_(not_null_column, "null")
             batch = q.execute().data or []
@@ -204,12 +205,23 @@ if __name__ == "__main__":
     ta_name_by_id = {str(r["id"]): str(r["name"]) for r in therapeutic_areas if r.get("id")}
     ta_id_by_name = {str(r["name"]): str(r["id"]) for r in therapeutic_areas if r.get("id")}
 
-    hcp_ta_rows = fetch_all_pages(
-        client,
-        get_table_name("hcp_therapeutic_areas", target_version),
-        "id,hcp_id,therapeutic_area_id",
-        target_version=target_version,
-    )
+    if target_version == "v2":
+        # v2 schema: hcp_therapeutic_areas_v2 has composite PK (hcp_id, therapeutic_area_id),
+        # no surrogate id column. Paginate by hcp_id.
+        hcp_ta_rows = fetch_all_pages(
+            client,
+            get_table_name("hcp_therapeutic_areas", target_version),
+            "hcp_id,therapeutic_area_id",
+            target_version=target_version,
+            order_column="hcp_id",
+        )
+    else:
+        hcp_ta_rows = fetch_all_pages(
+            client,
+            get_table_name("hcp_therapeutic_areas", target_version),
+            "id,hcp_id,therapeutic_area_id",
+            target_version=target_version,
+        )
     hcp_to_tas: Dict[str, set] = {}
     for r in hcp_ta_rows:
         h = str(r.get("hcp_id") or "")
@@ -844,10 +856,16 @@ if __name__ == "__main__":
                     batch = summary_insert_payload[start_idx : start_idx + WRITE_BATCH_SIZE]
                     try:
                         if target_version == "v2":
-                            client.table(summary_table).upsert(batch, on_conflict="hcp_id").execute()
+                            response = client.table(summary_table).upsert(batch, on_conflict="hcp_id").execute()
+                            if not response.data:
+                                raise RuntimeError(
+                                    f"Summary upsert returned empty data ({len(batch)} rows) - "
+                                    f"writes may have been silently dropped"
+                                )
+                            inserted_summary += len(response.data)
                         else:
                             client.table(summary_table).insert(batch).execute()
-                        inserted_summary += len(batch)
+                            inserted_summary += len(batch)
                         print(
                             f"Inserted summary batch {start_idx // WRITE_BATCH_SIZE + 1} "
                             f"({inserted_summary}/{len(summary_insert_payload)})"
@@ -875,12 +893,18 @@ if __name__ == "__main__":
                     batch = by_ta_insert_payload[start_idx : start_idx + WRITE_BATCH_SIZE]
                     try:
                         if target_version == "v2":
-                            client.table(by_ta_table).upsert(
+                            response = client.table(by_ta_table).upsert(
                                 batch, on_conflict="hcp_id,therapeutic_area_id"
                             ).execute()
+                            if not response.data:
+                                raise RuntimeError(
+                                    f"By_ta upsert returned empty data ({len(batch)} rows) - "
+                                    f"writes may have been silently dropped"
+                                )
+                            inserted_by_ta += len(response.data)
                         else:
                             client.table(by_ta_table).insert(batch).execute()
-                        inserted_by_ta += len(batch)
+                            inserted_by_ta += len(batch)
                         print(
                             f"Inserted by_ta batch {start_idx // WRITE_BATCH_SIZE + 1} "
                             f"({inserted_by_ta}/{len(by_ta_insert_payload)})"
