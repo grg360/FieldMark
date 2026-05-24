@@ -101,13 +101,14 @@ def fetch_all_pages(
     columns: str,
     not_null_column: Optional[str] = None,
     target_version: str = "v1",
+    order_column: str = "id",
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     offset = 0
     page_size = PAGE_SIZE
     while True:
         try:
-            q = client.table(table).select(columns).order("id").range(offset, offset + page_size - 1)
+            q = client.table(table).select(columns).order(order_column).range(offset, offset + page_size - 1)
             if not_null_column:
                 q = q.not_.is_(not_null_column, "null")
             batch = q.execute().data or []
@@ -197,12 +198,23 @@ if __name__ == "__main__":
     therapeutic_areas = fetch_therapeutic_areas(client)
     ta_name_by_id = {str(r["id"]): str(r["name"]) for r in therapeutic_areas if r.get("id")}
     ta_id_by_name = {str(r["name"]): str(r["id"]) for r in therapeutic_areas if r.get("id")}
-    hcp_ta_rows = fetch_all_pages(
-        client,
-        get_table_name("hcp_therapeutic_areas", target_version),
-        "id,hcp_id,therapeutic_area_id",
-        target_version=target_version,
-    )
+    if target_version == "v2":
+        # v2 schema: hcp_therapeutic_areas_v2 has composite PK (hcp_id, therapeutic_area_id),
+        # no surrogate id column. Paginate by hcp_id.
+        hcp_ta_rows = fetch_all_pages(
+            client,
+            get_table_name("hcp_therapeutic_areas", target_version),
+            "hcp_id,therapeutic_area_id",
+            target_version=target_version,
+            order_column="hcp_id",
+        )
+    else:
+        hcp_ta_rows = fetch_all_pages(
+            client,
+            get_table_name("hcp_therapeutic_areas", target_version),
+            "id,hcp_id,therapeutic_area_id",
+            target_version=target_version,
+        )
     hcp_to_tas: Dict[str, set] = {}
     for r in hcp_ta_rows:
         h = str(r.get("hcp_id") or "")
