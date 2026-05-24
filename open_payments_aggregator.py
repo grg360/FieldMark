@@ -465,7 +465,7 @@ if __name__ == "__main__":
     WHERE {pharma_filter}
       AND drug_name IS NOT NULL
       AND drug_name <> ''
-      AND nature_of_payment NOT IN ('Food and Beverage','Travel and Lodging')
+      AND nature_of_payment NOT IN ('Food and Beverage')
     GROUP BY hcp_id, UPPER(drug_name), COALESCE(NULLIF(TRIM(manufacturer_name), ''), 'UNKNOWN')
     """
     by_drug_rows_raw = rows_to_dicts(con.execute(by_drug_query))
