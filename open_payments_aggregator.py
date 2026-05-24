@@ -447,7 +447,52 @@ if __name__ == "__main__":
         for r in top_companies_rows_raw
     ]
 
-    print(f"Computed {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows, {len(top_companies_rows)} top_companies rows")
+    # Phase 6.6 by_drug agg - aggregate per HCP per drug per manufacturer
+    # for all pharmaceutical/biologic payments excluding food/travel.
+    by_drug_query = f"""
+    SELECT
+      hcp_id,
+      UPPER(drug_name) AS drug_name,
+      COALESCE(NULLIF(TRIM(manufacturer_name), ''), 'UNKNOWN') AS manufacturer_name,
+      SUM(payment_amount_usd) AS total_amount_usd,
+      COUNT(*) AS payment_count,
+      MAX(CASE WHEN payment_date IS NOT NULL AND payment_date <> ''
+               THEN strptime(payment_date, '%m/%d/%Y') ELSE NULL END
+      ) AS most_recent_payment_date,
+      SUM(CASE WHEN program_year = 2022 THEN payment_amount_usd ELSE 0 END) AS py2022_total,
+      SUM(CASE WHEN program_year = 2024 THEN payment_amount_usd ELSE 0 END) AS py2024_total
+    FROM filtered_payments
+    WHERE {pharma_filter}
+      AND drug_name IS NOT NULL
+      AND drug_name <> ''
+      AND nature_of_payment NOT IN ('Food and Beverage','Travel and Lodging')
+    GROUP BY hcp_id, UPPER(drug_name), COALESCE(NULLIF(TRIM(manufacturer_name), ''), 'UNKNOWN')
+    """
+    by_drug_rows_raw = rows_to_dicts(con.execute(by_drug_query))
+    by_drug_rows = []
+    for r in by_drug_rows_raw:
+        py2022 = float(r.get("py2022_total") or 0.0)
+        py2024 = float(r.get("py2024_total") or 0.0)
+        trend = None
+        if py2022 != 0:
+            trend = ((py2024 - py2022) / py2022) * 100.0
+        by_drug_rows.append({
+            "hcp_id": r["hcp_id"],
+            "drug_name": r["drug_name"],
+            "manufacturer_name": r["manufacturer_name"],
+            "total_amount_usd": float(r.get("total_amount_usd") or 0.0),
+            "payment_count": int(r.get("payment_count") or 0),
+            "most_recent_payment_date": (
+                r["most_recent_payment_date"].date().isoformat()
+                if r.get("most_recent_payment_date") is not None
+                else None
+            ),
+            "year_over_year_trend_pct": trend,
+        })
+
+    print(f"Computed {len(by_drug_rows)} by_drug rows")
+
+    print(f"Computed {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows, {len(top_companies_rows)} top_companies rows, {len(by_drug_rows)} by_drug rows")
 
     # Phase 8 - Level 1 stats
     hcp_with_summary = len(summary_rows)
@@ -585,9 +630,10 @@ if __name__ == "__main__":
         if target_version == "v2":
             confirm = input(
                 f"About to UPSERT into hcp_open_payments_summary_v2, hcp_open_payments_by_ta_v2, "
-                f"and hcp_open_payments_top_companies_v2.\n"
+                f"hcp_open_payments_top_companies_v2, and hcp_open_payments_by_drug_v2.\n"
                 f"Will write {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows, "
-                f"and {len(top_companies_rows)} top_companies rows. Continue? (yes/no): "
+                f"{len(top_companies_rows)} top_companies rows, "
+                f"and {len(by_drug_rows)} by_drug rows. Continue? (yes/no): "
             )
         else:
             confirm = input(
@@ -703,15 +749,46 @@ if __name__ == "__main__":
                     errors.append(f"top_companies_insert_batch_{start_idx}: {repr(exc)}")
                     print(f"top_companies batch failed at offset {start_idx}: {exc}")
 
+            inserted_by_drug = 0
+            by_drug_table = get_table_name("hcp_open_payments_by_drug", target_version)
+
+            for start_idx in tqdm(
+                range(0, len(by_drug_rows), WRITE_BATCH_SIZE), desc="by_drug", unit="batch"
+            ):
+                batch = by_drug_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
+                try:
+                    if target_version == "v2":
+                        response = client.table(by_drug_table).upsert(
+                            batch, on_conflict="hcp_id,drug_name,manufacturer_name"
+                        ).execute()
+                        if not response.data:
+                            raise RuntimeError(
+                                f"By_drug upsert returned empty data ({len(batch)} rows) - "
+                                f"writes may have been silently dropped"
+                            )
+                        inserted_by_drug += len(response.data)
+                    else:
+                        client.table(by_drug_table).insert(batch).execute()
+                        inserted_by_drug += len(batch)
+                    print(
+                        f"Inserted by_drug batch {start_idx // WRITE_BATCH_SIZE + 1} "
+                        f"({inserted_by_drug}/{len(by_drug_rows)})"
+                    )
+                except Exception as exc:
+                    errors.append(f"by_drug_insert_batch_{start_idx}: {repr(exc)}")
+                    print(f"by_drug batch failed at offset {start_idx}: {exc}")
+
             rows_inserted = {
                 "summary_rows_inserted": inserted_summary,
                 "by_ta_rows_inserted": inserted_by_ta,
                 "top_companies_rows_inserted": inserted_top_companies,
+                "by_drug_rows_inserted": inserted_by_drug,
             }
             print(
                 f"Execute complete. Inserted summary={inserted_summary}/{len(summary_rows)}, "
                 f"by_ta={inserted_by_ta}/{len(by_ta_rows)}, "
-                f"top_companies={inserted_top_companies}/{len(top_companies_rows)}"
+                f"top_companies={inserted_top_companies}/{len(top_companies_rows)}, "
+                f"by_drug={inserted_by_drug}/{len(by_drug_rows)}"
             )
 
     elapsed_seconds = time.time() - started
@@ -724,6 +801,7 @@ if __name__ == "__main__":
         "summary_rows_computed": len(summary_rows),
         "by_ta_rows_computed": len(by_ta_rows),
         "top_companies_rows_computed": len(top_companies_rows),
+        "by_drug_rows_computed": len(by_drug_rows),
         "level_1_stats": level_1_stats,
         "level_2_canonicals": level_2_canonicals,
         "level_3_unmatched": level_3_unmatched,
