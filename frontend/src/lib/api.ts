@@ -46,6 +46,65 @@ const TA_INDICATION_IDS: Record<string, string[]> = {
   immunology: [], // coming soon
 };
 
+async function fetchLiveCohortCountsForTAIds(
+  indicationIds: string[],
+): Promise<
+  ApiResult<
+    Record<
+      string,
+      { established: number; rising_stars: number; community: number; total_hcps: number }
+    >
+  >
+> {
+  const { data, error } = await supabase
+    .from("hcp_therapeutic_areas_v2")
+    .select("therapeutic_area_id, hcp_id, hcps_v2!inner(id, cohort_classification)")
+    .in("therapeutic_area_id", indicationIds);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  const countsByTa: Record<
+    string,
+    { established: number; rising_stars: number; community: number; total_hcps: number }
+  > = {};
+  const seenByTa: Record<string, Set<string>> = {};
+
+  for (const row of data ?? []) {
+    const taId = String(row.therapeutic_area_id ?? "");
+    if (!taId) continue;
+    if (!countsByTa[taId]) {
+      countsByTa[taId] = {
+        established: 0,
+        rising_stars: 0,
+        community: 0,
+        total_hcps: 0,
+      };
+      seenByTa[taId] = new Set<string>();
+    }
+
+    const hcpRaw = firstEmbedded((row as { hcps_v2?: unknown }).hcps_v2);
+    const hcpId = String(
+      ((hcpRaw as { id?: unknown } | null)?.id ?? row.hcp_id ?? ""),
+    );
+    if (!hcpId || seenByTa[taId].has(hcpId)) continue;
+    seenByTa[taId].add(hcpId);
+
+    countsByTa[taId].total_hcps += 1;
+
+    const cohort = String(
+      (hcpRaw as { cohort_classification?: unknown } | null)
+        ?.cohort_classification ?? "",
+    ).toLowerCase();
+    if (cohort === "established") countsByTa[taId].established += 1;
+    else if (cohort === "rising_star") countsByTa[taId].rising_stars += 1;
+    else if (cohort === "community") countsByTa[taId].community += 1;
+  }
+
+  return { data: countsByTa, error: null };
+}
+
 const INDUSTRY_PATTERNS = [
   "pfizer", "merck", "novartis", "roche", "genentech", "astrazeneca",
   "glaxosmithkline", "gsk", "sanofi", "bristol myers", "bristol-myers",
@@ -213,7 +272,7 @@ export async function getHCPNarrative(
 
     if (taId) {
       const { data, error } = await supabase
-        .from("hcp_narratives")
+        .from("hcp_narratives_v2")
         .select("narrative")
         .eq("hcp_id", hcpId)
         .eq("therapeutic_area_id", taId)
@@ -228,7 +287,7 @@ export async function getHCPNarrative(
     }
 
     const fallback = await supabase
-      .from("hcp_narratives")
+      .from("hcp_narratives_v2")
       .select("narrative")
       .eq("hcp_id", hcpId)
       .order("generated_at", { ascending: false })
@@ -277,13 +336,13 @@ export async function getRisingStars(
 
     const countBase = () =>
       supabase
-        .from("hcps")
+        .from("hcps_v2")
         .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
         .eq("hcp_scores.therapeutic_area_id", taId);
 
     const listBase = () =>
       supabase
-        .from("hcps")
+        .from("hcps_v2")
         .select(
           `
         id,
@@ -316,7 +375,7 @@ export async function getRisingStars(
 
     const listBaseViaHTA = () =>
       supabase
-        .from("hcps")
+        .from("hcps_v2")
         .select(
           `
         id,
@@ -367,21 +426,11 @@ export async function getRisingStars(
 
     let cachedTotalCount: number | null = null;
     if (cohort === "community") {
-      const { data: cacheRow, error: cacheError } = await supabase
-        .from("ta_cohort_counts_cache")
-        .select("community, workhorses")
-        .eq("therapeutic_area_id", taId)
-        .maybeSingle();
-
-      if (cacheError) {
-        return { data: null, error: cacheError.message };
+      const liveCounts = await fetchLiveCohortCountsForTAIds([taId]);
+      if (liveCounts.error) {
+        return { data: null, error: liveCounts.error };
       }
-
-      if (cacheRow) {
-        cachedTotalCount = cacheRow.community ?? 0;
-      } else {
-        cachedTotalCount = 0;
-      }
+      cachedTotalCount = liveCounts.data?.[taId]?.community ?? 0;
     }
 
     let totalCount: number | null;
@@ -409,11 +458,11 @@ export async function getRisingStars(
 
     const [medicareResult, opResult] = await Promise.all([
       supabase
-        .from("hcp_medicare_summary")
+        .from("hcp_medicare_summary_v2")
         .select("hcp_id, total_beneficiaries_3yr_unique_est")
         .in("hcp_id", hcpIds),
       supabase
-        .from("hcp_open_payments_summary")
+        .from("hcp_open_payments_summary_v2")
         .select("hcp_id, distinct_companies_lifetime, total_payments_lifetime")
         .in("hcp_id", hcpIds),
     ]);
@@ -444,7 +493,7 @@ export async function getRisingStars(
 
     if (narrativeHcpIds.length > 0) {
       const { data: narrativeData, error: narrativeError } = await supabase
-        .from("hcp_narratives")
+        .from("hcp_narratives_v2")
         .select("hcp_id, narrative")
         .in("hcp_id", narrativeHcpIds)
         .eq("therapeutic_area_id", taId);
@@ -463,7 +512,7 @@ export async function getRisingStars(
 
       if (missingNarrativeIds.length > 0) {
         const { data: fallbackRows, error: fallbackError } = await supabase
-          .from("hcp_narratives")
+          .from("hcp_narratives_v2")
           .select("hcp_id, narrative, generated_at")
           .in("hcp_id", missingNarrativeIds)
           .order("generated_at", { ascending: false });
@@ -582,28 +631,24 @@ export async function getTACounts(
       };
     }
 
-    const { data: countRows, error: countsError } = await supabase
-      .from("ta_cohort_counts_cache")
-      .select("rising_stars, dark_horses, community, workhorses, total_hcps")
-      .in("therapeutic_area_id", indicationIds);
-
-    if (countsError) {
-      return { data: null, error: countsError.message };
+    const liveCounts = await fetchLiveCohortCountsForTAIds(indicationIds);
+    if (liveCounts.error) {
+      return { data: null, error: liveCounts.error };
     }
 
-    const totals = (countRows ?? []).reduce(
+    const totals = Object.values(liveCounts.data ?? {}).reduce(
       (acc, row) => ({
         rising_stars: acc.rising_stars + (Number(row.rising_stars) || 0),
-        dark_horses: acc.dark_horses + (Number(row.dark_horses) || 0),
+        dark_horses: 0,
         community: acc.community + (Number(row.community) || 0),
-        workhorses: acc.workhorses + (Number(row.workhorses) || 0),
+        workhorses: 0,
         total_hcps: acc.total_hcps + (Number(row.total_hcps) || 0),
       }),
       { rising_stars: 0, dark_horses: 0, community: 0, workhorses: 0, total_hcps: 0 },
     );
 
     const { data: verifiedHcps, error: verifiedHcpsError } = await supabase
-      .from("hcps")
+      .from("hcps_v2")
       .select("id")
       .eq("is_verified_dol", true);
 
@@ -617,7 +662,7 @@ export async function getTACounts(
       verifiedIds.length === 0
         ? { count: 0, error: null }
         : await supabase
-            .from("hcp_therapeutic_areas")
+            .from("hcp_therapeutic_areas_v2")
             .select("hcp_id", { count: "estimated", head: true })
             .in("therapeutic_area_id", indicationIds)
             .in("hcp_id", verifiedIds);
@@ -627,7 +672,7 @@ export async function getTACounts(
     }
 
     const { count: establishedCount, error: establishedError } = await supabase
-      .from("hcp_therapeutic_areas")
+      .from("hcp_therapeutic_areas_v2")
       .select("hcp_id, hcps!inner(cohort_classification, country)", { count: "estimated", head: true })
       .in("therapeutic_area_id", indicationIds)
       .eq("hcps.cohort_classification", "established")
@@ -700,7 +745,7 @@ export async function getVerifiedDOLs(
     }
 
     const { data: hcpRows, error: hcpError } = await supabase
-      .from("hcps")
+      .from("hcps_v2")
       .select("id, first_name, last_name, institution_short, country, total_career_pubs")
       .eq("is_verified_dol", true);
     console.log(
@@ -725,7 +770,7 @@ export async function getVerifiedDOLs(
     }
 
     const { data: taRows, error: taError } = await supabase
-      .from("hcp_therapeutic_areas")
+      .from("hcp_therapeutic_areas_v2")
       .select("hcp_id, therapeutic_area_id")
       .in("hcp_id", verifiedHcpIds);
 
@@ -753,7 +798,7 @@ export async function getVerifiedDOLs(
     }
 
     const { data: matchRows, error: matchError } = await supabase
-      .from("dol_matches")
+      .from("dol_matches_v2")
       .select("hcp_id, social_user_id, match_confidence")
       .in("hcp_id", filteredHcpIds)
       .eq("match_confidence", "high");
@@ -770,7 +815,7 @@ export async function getVerifiedDOLs(
 
     const socialUserIds = [...new Set(matches.map((m) => String(m.social_user_id)).filter(Boolean))];
     const { data: socialRows, error: socialError } = await supabase
-      .from("social_users")
+      .from("social_users_v2")
       .select("id, platform, handle, display_name, bio, follower_count, verified, profile_url, data_quality_flag")
       .in("id", socialUserIds)
       .neq("data_quality_flag", "rejected");
@@ -790,7 +835,7 @@ export async function getVerifiedDOLs(
 
       if (handles.length > 0) {
         const { data: ascoPosts } = await supabase
-          .from("social_posts")
+          .from("social_posts_v2")
           .select("handle, platform, hashtags")
           .in("handle", handles)
           .gte("posted_at", sevenDaysAgo.toISOString());
@@ -885,7 +930,7 @@ export async function getHCPDetail(
 ): Promise<ApiResult<HCPDetail>> {
   try {
     const { data: scoreRow, error: scoreError } = await supabase
-      .from("hcp_scores")
+      .from("hcp_scores_v2")
       .select(
         `
         hcp_id,
@@ -946,7 +991,7 @@ export async function getHCPDetail(
     }
 
     const { data: publications, error: publicationsError } = await supabase
-      .from("publications")
+      .from("publications_v2")
       .select("*")
       .eq("hcp_id", hcpId)
       .order("pub_year", { ascending: false })
@@ -957,7 +1002,7 @@ export async function getHCPDetail(
     }
 
     const { count: trialCount, error: trialError } = await supabase
-      .from("trials")
+      .from("clinical_trials_v2")
       .select("id", { count: "exact", head: true })
       .eq("hcp_id", hcpId);
 
@@ -1084,7 +1129,7 @@ export async function searchHCPs(
   const searchPattern = `%${sanitized.replace(/%/g, "\\%")}%`;
 
   const { data, error } = await supabase
-    .from("hcps")
+    .from("hcps_v2")
     .select(
       `
       id,
@@ -1169,7 +1214,7 @@ export async function getLatestPostForHandle(
 ): Promise<ApiResult<LatestPost | null>> {
   try {
     const { data, error } = await supabase
-      .from("social_posts")
+      .from("social_posts_v2")
       .select(
         "platform, handle, post_text, posted_at, engagement_likes, engagement_replies, engagement_reposts, engagement_quotes, hashtags, captured_via_query",
       )
