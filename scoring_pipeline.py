@@ -60,7 +60,7 @@ SCORE_VERSION = "v1.4"
 # When OpenAlex has enriched hcps.total_career_pubs, require this minimum for rankings / non-zero composite.
 MIN_TOTAL_CAREER_PUBS_FOR_RANKINGS = 10
 # If total_career_pubs is null, fall back to counting publication rows in our DB.
-MIN_STORED_PUBLICATIONS_FALLBACK = 3
+MIN_STORED_PUBLICATIONS_FALLBACK = 6
 MAX_STORED_PUBLICATIONS_FOR_RANKINGS = 200
 RECENT_PUBLICATION_YEAR_CUTOFF = 2022
 
