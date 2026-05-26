@@ -113,7 +113,8 @@ def init_supabase() -> Client:
 
 
 def fetch_all_rows(
-    supabase: Client, table: str, columns: str, page_size: int = 1000, target_version: str = "v1"
+    supabase: Client, table: str, columns: str, page_size: int = 1000, target_version: str = "v1",
+    order_column: str = "id",
 ) -> List[Dict]:
     try:
         count_response = supabase.table(table).select("*", count="estimated").limit(1).execute()
@@ -128,6 +129,7 @@ def fetch_all_rows(
             response = (
                 supabase.table(table)
                 .select(columns)
+                .order(order_column)
                 .range(offset, offset + page_size - 1)
                 .execute()
             )
@@ -172,6 +174,7 @@ def fetch_all_hcps(supabase: Client, page_size: int = 1000, target_version: str 
             response = (
                 supabase.table(hcps_table)
                 .select(select_cols)
+                .order("id")
                 .range(offset, offset + page_size - 1)
                 .execute()
             )
@@ -222,6 +225,7 @@ def fetch_all_publication_authors(
             response = (
                 supabase.table(pub_authors_table)
                 .select("publication_id,hcp_id")
+                .order("publication_id" if target_version == "v2" else "id")
                 .range(offset, offset + page_size - 1)
                 .execute()
             )
@@ -888,10 +892,15 @@ def upsert_scores(
         try:
             # Recommended unique index for deterministic updates:
             # unique (hcp_id, therapeutic_area_id, score_version)
-            supabase.table(scores_table).upsert(
+            response = supabase.table(scores_table).upsert(
                 batch,
                 on_conflict="hcp_id,therapeutic_area_id",
             ).execute()
+            if not response.data:
+                raise RuntimeError(
+                    f"hcp_scores upsert returned empty data ({len(batch)} rows) - "
+                    f"writes may have been silently dropped"
+                )
         except Exception as exc:
             raise RuntimeError(f"Failed to upsert hcp_scores batch starting at {start}: {exc}") from exc
 
@@ -995,12 +1004,21 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
         "hcp_id,trial_id,role",
         target_version=target_version,
     )
-    hcp_tas = fetch_all_rows(
-        supabase,
-        get_table_name("hcp_therapeutic_areas", target_version),
-        "hcp_id,therapeutic_area_id",
-        target_version=target_version,
-    )
+    if target_version == "v2":
+        hcp_tas = fetch_all_rows(
+            supabase,
+            get_table_name("hcp_therapeutic_areas", target_version),
+            "hcp_id,therapeutic_area_id",
+            target_version=target_version,
+            order_column="hcp_id",
+        )
+    else:
+        hcp_tas = fetch_all_rows(
+            supabase,
+            get_table_name("hcp_therapeutic_areas", target_version),
+            "hcp_id,therapeutic_area_id",
+            target_version=target_version,
+        )
     therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
 
     print(f"Operating on full HCP set: {len(hcps)}")
