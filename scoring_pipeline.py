@@ -68,6 +68,7 @@ RECENT_PUBLICATION_YEAR_CUTOFF = 2022
 TIER_DARK_HORSE_THRESHOLD = 95.0
 TIER_RISING_STAR_THRESHOLD = 85.0
 TIER_EMERGING_THRESHOLD = 30.0
+CONCEPT_SCORE_THRESHOLD = 0.4
 
 
 def passes_ranking_publication_threshold(total_career_pubs: Optional[int], stored_pub_count: int) -> bool:
@@ -92,9 +93,9 @@ class ScoreRow:
     calculated_at: str
     first_pub_year: Optional[int]
     career_multiplier: float
-    career_age_multiplier: float = 1.0
     publications_count: int
     total_career_pubs: Optional[int]
+    career_age_multiplier: float = 1.0
     normalized_score: float = 0.0
     tier: str = "unranked"
 
@@ -247,6 +248,63 @@ def fetch_all_publication_authors(
     if len(rows) < (expected_count * 0.95):
         raise RuntimeError(f"Loaded only {len(rows)} of ~{expected_count} rows from publication_authors")
     return rows
+
+
+def fetch_curated_concepts_by_ta(supabase: Client) -> Dict[str, set]:
+    """Return {ta_id: set(openalex_concept_ids)}."""
+    rows = (
+        supabase.table("curated_ta_concepts")
+        .select("therapeutic_area_id,openalex_concept_id")
+        .execute()
+        .data
+        or []
+    )
+    by_ta: Dict[str, set] = {}
+    for r in rows:
+        ta_id = str(r.get("therapeutic_area_id") or "")
+        c_id = str(r.get("openalex_concept_id") or "")
+        if ta_id and c_id:
+            by_ta.setdefault(ta_id, set()).add(c_id)
+    return by_ta
+
+
+def compute_pub_ta_relevance(
+    publications: Sequence[Dict],
+    curated_by_ta: Dict[str, set],
+) -> Dict[str, set]:
+    """For each publication, identify which TAs it is relevant to.
+    Returns: {publication_id: set(ta_ids)}
+    A pub is TA-relevant if any of its openalex_concepts is in the
+    TA's curated list with score >= CONCEPT_SCORE_THRESHOLD.
+    """
+    pub_tas: Dict[str, set] = {}
+    for pub in publications:
+        pub_id = pub.get("id")
+        if not pub_id:
+            continue
+        concepts = pub.get("openalex_concepts") or []
+        if not isinstance(concepts, list):
+            continue
+        relevant_concept_ids = set()
+        for c in concepts:
+            if not isinstance(c, dict):
+                continue
+            c_id = c.get("id")
+            try:
+                c_score = float(c.get("score") or 0)
+            except (TypeError, ValueError):
+                continue
+            if c_id and c_score >= CONCEPT_SCORE_THRESHOLD:
+                relevant_concept_ids.add(str(c_id))
+        if not relevant_concept_ids:
+            continue
+        tas_for_pub = set()
+        for ta_id, curated_set in curated_by_ta.items():
+            if relevant_concept_ids & curated_set:
+                tas_for_pub.add(ta_id)
+        if tas_for_pub:
+            pub_tas[str(pub_id)] = tas_for_pub
+    return pub_tas
 
 
 def normalize_0_100(values: Dict[Tuple[str, str], float]) -> Dict[Tuple[str, str], float]:
@@ -599,6 +657,7 @@ def compute_scores(
     trial_investigators: Sequence[Dict],
     clinical_trials: Sequence[Dict],
     hcps: Sequence[Dict],
+    pub_tas: Optional[Dict[str, set]] = None,
 ) -> List[ScoreRow]:
     now_dt = datetime.now(timezone.utc).date()
     current_year = now_dt.year
@@ -653,8 +712,18 @@ def compute_scores(
         key = (hcp_id, ta_id)
         valid_pairs.append(key)
 
-        hcp_pubs = pubs_by_hcp.get(hcp_id, [])
+        all_hcp_pubs = pubs_by_hcp.get(hcp_id, [])
         hcp_links = links_by_hcp.get(hcp_id, [])
+
+        # Per-TA filter: only count publications relevant to this TA.
+        # If pub_tas is None (v1 mode), pass through unfiltered.
+        if pub_tas is not None:
+            hcp_pubs = [
+                pub for pub in all_hcp_pubs
+                if pub.get("id") and ta_id in pub_tas.get(str(pub.get("id")), set())
+            ]
+        else:
+            hcp_pubs = all_hcp_pubs
 
         pub_years = [safe_int(pub.get("pub_year"), 0) for pub in hcp_pubs if safe_int(pub.get("pub_year"), 0) > 0]
         # Priority order:
@@ -988,7 +1057,7 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
     publications = fetch_all_rows(
         supabase,
         get_table_name("publications", target_version),
-        "id,pub_year,citation_count,citation_counts_by_year",
+        "id,pub_year,citation_count,citation_counts_by_year,openalex_concepts",
         target_version=target_version,
     )
     publication_authors = fetch_all_publication_authors(supabase, target_version=target_version)
@@ -1021,6 +1090,12 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
         )
     therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
 
+    print("Loading curated_ta_concepts and computing per-pub TA relevance...")
+    curated_by_ta = fetch_curated_concepts_by_ta(supabase)
+    pub_tas = compute_pub_ta_relevance(publications, curated_by_ta)
+    print(f"  Curated concepts loaded for {len(curated_by_ta)} TAs")
+    print(f"  {len(pub_tas)} publications have TA relevance")
+
     print(f"Operating on full HCP set: {len(hcps)}")
 
     print(
@@ -1036,6 +1111,7 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
         trial_investigators=trial_investigators,
         clinical_trials=clinical_trials,
         hcps=hcps,
+        pub_tas=pub_tas,
     )
     print(f"Computed {len(scores)} score rows.")
 
