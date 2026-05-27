@@ -164,7 +164,7 @@ def upsert_scores(client: Client, rows: Sequence[Dict[str, Any]]) -> int:
         batch = list(rows[i : i + WRITE_BATCH_SIZE])
         resp = (
             client.table("hcp_community_scores_v2")
-            .upsert(batch, on_conflict="hcp_id,ta_id")
+            .upsert(batch, on_conflict="hcp_id,therapeutic_area_id")
             .execute()
         )
         if not resp.data:
@@ -331,7 +331,7 @@ def main() -> None:
         rows_to_write.append(
             {
                 "hcp_id": hid,
-                "ta_id": ta_id,
+                "therapeutic_area_id": ta_id,
                 "composite_score": round(composite_raw[key], 4),
                 "normalized_score": round(normalized_score.get(key, 0.0), 4),
                 "patient_volume": round(raw_patient_volume[key], 4),
@@ -354,7 +354,7 @@ def main() -> None:
     print("\nTop 20 per TA by normalized_score:")
     rows_by_ta: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for r in rows_to_write:
-        rows_by_ta[str(r["ta_id"])].append(r)
+        rows_by_ta[str(r["therapeutic_area_id"])].append(r)
     for ta_id in sorted(rows_by_ta.keys()):
         print(f"\nTA {ta_id} (pairs={len(rows_by_ta[ta_id]):,})")
         top = sorted(rows_by_ta[ta_id], key=lambda r: float(r["normalized_score"]), reverse=True)[:20]
