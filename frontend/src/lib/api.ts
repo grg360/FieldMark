@@ -548,16 +548,26 @@ export async function getTACounts(
       return query;
     };
 
-    // Rising-star selected count comes directly from pre-joined view.
-    let risingStarsQuery = supabase
-      .from("hcp_rising_star_ranks_v2")
-      .select("hcp_id", { count: "exact", head: true })
-      .eq("therapeutic_area_id", taId)
-      .eq("scope_type", scope.scopeType);
-    if (scope.scopeValue === null) {
-      risingStarsQuery = risingStarsQuery.is("scope_value", null);
+    let risingStarsQuery: any;
+    if (scope.scopeType === "global") {
+      // Global rising-star count comes from scores directly (no scope filter).
+      risingStarsQuery = supabase
+        .from("hcp_scores_v2")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "rising_star");
     } else {
-      risingStarsQuery = risingStarsQuery.eq("scope_value", scope.scopeValue);
+      // Region-aware count from the pre-joined rank view.
+      risingStarsQuery = supabase
+        .from("hcp_rising_star_ranks_v2")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", scope.scopeType);
+      if (scope.scopeValue === null) {
+        risingStarsQuery = risingStarsQuery.is("scope_value", null);
+      } else {
+        risingStarsQuery = risingStarsQuery.eq("scope_value", scope.scopeValue);
+      }
     }
     const risingStarCountResult = await risingStarsQuery;
     if (risingStarCountResult.error) {
@@ -587,17 +597,35 @@ export async function getTACounts(
     const establishedTierIds = (establishedTierResult.data ?? []).map((r: any) => String(r.hcp_id));
     const communityTierIds = (communityTierResult.data ?? []).map((r: any) => String(r.hcp_id));
 
+    let risingPoolQuery: any;
+    if (scope.scopeType === "global") {
+      // Global branch: scope_type='global' rows only to avoid per-region duplicates.
+      risingPoolQuery = supabase
+        .from("hcp_score_ranks_v2")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("cohort", "rising")
+        .eq("scope_type", "global");
+    } else {
+      risingPoolQuery = supabase
+        .from("hcp_score_ranks_v2")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("cohort", "rising")
+        .eq("scope_type", scope.scopeType);
+      if (scope.scopeValue === null) {
+        risingPoolQuery = risingPoolQuery.is("scope_value", null);
+      } else {
+        risingPoolQuery = risingPoolQuery.eq("scope_value", scope.scopeValue);
+      }
+    }
+
     const [
       risingPoolResult,
       establishedResult,
       communityResult,
     ] = await Promise.all([
-      applyScope(
-        supabase
-          .from("hcp_score_ranks_v2")
-          .select("hcp_id", { count: "exact", head: true })
-          .eq("cohort", "rising"),
-      ),
+      risingPoolQuery,
       establishedTierIds.length > 0
         ? applyScope(
             supabase
@@ -695,7 +723,9 @@ export async function getTACounts(
 export async function getAllTACounts(): Promise<ApiResult<Record<string, TACounts>>> {
   try {
     const slugs = ["rare-disease", "hepatology", "nsclc", "immunology"] as const;
-    const results = await Promise.all(slugs.map((slug) => getTACounts(slug)));
+    const results = await Promise.all(
+      slugs.map((slug) => getTACounts({ therapeuticArea: slug, scope: "global" })),
+    );
     const output: Record<string, TACounts> = {};
     for (let i = 0; i < slugs.length; i += 1) {
       const slug = slugs[i];
