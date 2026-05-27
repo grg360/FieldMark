@@ -603,15 +603,9 @@ export async function getTACounts(
     ] = await Promise.all([
       risingPoolQuery,
       supabase
-        .from("hcp_scores_v2")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .eq("tier", "established"),
+        .from("hcp_established_scores_v2").select("hcp_id", { count: "exact", head: true }).eq("therapeutic_area_id", taId),
       supabase
-        .from("hcp_scores_v2")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .eq("tier", "community"),
+        .from("hcp_community_scores_v2").select("hcp_id", { count: "exact", head: true }).eq("therapeutic_area_id", taId),
     ]);
 
     if (risingPoolResult.error) {
