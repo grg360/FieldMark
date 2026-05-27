@@ -310,7 +310,7 @@ def upsert_social_posts(client: Client, rows: List[Dict[str, Any]], dry_run: boo
     if dry_run:
         return len(rows)
     # Supabase python maps to UPSERT with conflict target.
-    client.table("social_posts").upsert(rows, on_conflict="platform,platform_post_id", ignore_duplicates=True).execute()
+    client.table("social_posts_v2").upsert(rows, on_conflict="platform,platform_post_id", ignore_duplicates=True).execute()
     return len(rows)
 
 
@@ -327,7 +327,7 @@ def extract_unique_handles(posts: List[Dict[str, Any]]) -> Set[str]:
 def social_user_exists(client: Client, platform: str, handle: str) -> bool:
     """Check if social_users row already exists for (platform, handle)."""
     resp = (
-        client.table("social_users")
+        client.table("social_users_v2")
         .select("id", count="exact")
         .eq("platform", platform)
         .eq("handle", handle.lower())
@@ -397,7 +397,7 @@ def upsert_social_user(client: Client, row: Dict[str, Any], dry_run: bool) -> bo
         return False
     if dry_run:
         return True
-    client.table("social_users").upsert(row, on_conflict="platform,handle", ignore_duplicates=True).execute()
+    client.table("social_users_v2").upsert(row, on_conflict="platform,handle", ignore_duplicates=True).execute()
     return True
 
 
@@ -438,11 +438,13 @@ def run_capture_for_query(
     """Capture loop for one hashtag/topic query, with checkpoint cursor."""
     queries = checkpoint.setdefault("queries", {})
     state = queries.setdefault(query_key, {"next_token": None, "completed": False})
+    # For continuous capture (live conferences, etc.), reset completion on each run.
+    # The recent-search API only goes back ~7 days, so the previous "completed" state
+    # just means "no more *historical* results"; new posts may exist since last run.
     next_token = state.get("next_token")
-    completed = bool(state.get("completed", False))
-    if completed and not dry_run:
-        print(f"Skipping completed query_key={query_key}")
-        return
+    # Reset completed state so each invocation re-checks for new posts
+    state["completed"] = False
+    completed = False
 
     while True:
         payloads, new_next_token = fetch_twitter_posts(
@@ -486,7 +488,9 @@ def run_capture_for_query(
                 stats.new_users_discovered += 1
 
         state["next_token"] = new_next_token
-        state["completed"] = not bool(new_next_token)
+        # Don't set completed=true permanently. Reaching the end of available results
+        # for THIS run is normal; we want the next scheduled run to check for new posts.
+        state["completed"] = False
         save_checkpoint(CHECKPOINT_PATH, checkpoint)
 
         if not new_next_token:
