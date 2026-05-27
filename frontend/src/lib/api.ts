@@ -263,44 +263,11 @@ export async function getRisingStars(
     const scope = resolveFilterScope(filters);
     const offset = options.offset ?? 0;
 
-    // 1) Find TA-scoped score rows with tier='rising_star' (no embedded join).
-    const tierResult = await supabase
-      .from("hcp_scores_v2")
-      .select(
-        `
-          hcp_id,
-          tier,
-          therapeutic_area_id,
-          composite_score,
-          normalized_score,
-          pub_velocity_score,
-          citation_trajectory_score,
-          trial_investigator_score
-        `,
-      )
-      .eq("therapeutic_area_id", taId)
-      .eq("tier", "rising_star");
-
-    if (tierResult.error) {
-      return { data: null, error: `Tier query failed: ${tierResult.error.message}` };
-    }
-
-    const tieredHcpIds = (tierResult.data ?? []).map((r: any) => String(r.hcp_id));
-    const scoreById = new Map<string, any>(
-      (tierResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
-    );
-
-    if (tieredHcpIds.length === 0) {
-      return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
-    }
-
-    // 2) Count scoped rank rows for the tier-selected HCP IDs.
+    // 1) Count scoped rising-star rank rows from pre-joined view.
     let countQuery = supabase
-      .from("hcp_score_ranks_v2")
+      .from("hcp_rising_star_ranks_v2")
       .select("hcp_id", { count: "exact", head: true })
-      .eq("cohort", "rising")
       .eq("therapeutic_area_id", taId)
-      .in("hcp_id", tieredHcpIds)
       .eq("scope_type", scope.scopeType);
     if (scope.scopeValue === null) {
       countQuery = countQuery.is("scope_value", null);
@@ -312,17 +279,15 @@ export async function getRisingStars(
       return { data: null, error: `Rising star count query failed: ${countError.message}` };
     }
 
-    // 3) Fetch scoped rank rows for those HCP IDs.
+    // 2) Fetch scoped rank rows from pre-joined view.
     let rankQuery = supabase
-      .from("hcp_score_ranks_v2")
-      .select("hcp_id, rank, percentile, scope_size, score_at_rank")
-      .eq("cohort", "rising")
+      .from("hcp_rising_star_ranks_v2")
+      .select("hcp_id, rank, percentile, scope_size, normalized_score, score_at_rank")
       .eq("therapeutic_area_id", taId)
-      .in("hcp_id", tieredHcpIds)
+      .eq("scope_type", scope.scopeType)
       .order("rank", { ascending: true })
       .range(offset, offset + limit - 1);
 
-    rankQuery = rankQuery.eq("scope_type", scope.scopeType);
     if (scope.scopeValue === null) {
       rankQuery = rankQuery.is("scope_value", null);
     } else {
@@ -478,18 +443,19 @@ export async function getRisingStars(
     const risingStars: RisingStar[] = filteredRankRows.flatMap((rr: any): RisingStar[] => {
       const hcp = hcpById.get(String(rr.hcp_id));
       if (!hcp) return [];
-      const scoreRow = scoreById.get(String(rr.hcp_id));
-      if (!scoreRow) return [];
+      const normalizedScore = Number(rr.normalized_score ?? 0);
 
       const medicareData = medicareMap.get(String(rr.hcp_id));
       const opData = opById.get(String(rr.hcp_id));
 
       // Compose enriched row for mapRisingStarRow (which expects hcps, hcp_medicare_summary, hcp_open_payments_summary fields).
       const enrichedRow = {
-        ...scoreRow,
-        composite_score: (scoreRow as any).composite_score,
-        normalized_score: (scoreRow as any).normalized_score,
-        tier: (scoreRow as any).tier ?? null,
+        composite_score: Number(rr.score_at_rank ?? normalizedScore),
+        normalized_score: normalizedScore,
+        pub_velocity_score: 0,
+        citation_trajectory_score: 0,
+        trial_investigator_score: 0,
+        tier: "rising_star",
         hcps: {
           ...hcp,
           therapeutic_area: filters.therapeuticArea,
@@ -503,7 +469,7 @@ export async function getRisingStars(
       return [
         {
           ...mapped,
-          normalized_score: Number((scoreRow as any).normalized_score ?? 0),
+          normalized_score: normalizedScore,
           narrative: narrativeMap.get(String(rr.hcp_id)) ?? null,
           // Rank-forward fields:
           rank: Number(rr.rank),
@@ -582,15 +548,23 @@ export async function getTACounts(
       return query;
     };
 
-    // Rising pool is direct from ranks. Tier-selected counts use two-step flow:
-    // 1) query hcp_scores_v2 for tier-matching HCP IDs in this TA,
-    // 2) count scoped rank rows in hcp_score_ranks_v2 for those IDs.
-    const [risingTierResult, establishedTierResult, communityTierResult] = await Promise.all([
-      supabase
-        .from("hcp_scores_v2")
-        .select("hcp_id")
-        .eq("therapeutic_area_id", taId)
-        .eq("tier", "rising_star"),
+    // Rising-star selected count comes directly from pre-joined view.
+    let risingStarsQuery = supabase
+      .from("hcp_rising_star_ranks_v2")
+      .select("hcp_id", { count: "exact", head: true })
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", scope.scopeType);
+    if (scope.scopeValue === null) {
+      risingStarsQuery = risingStarsQuery.is("scope_value", null);
+    } else {
+      risingStarsQuery = risingStarsQuery.eq("scope_value", scope.scopeValue);
+    }
+    const risingStarCountResult = await risingStarsQuery;
+    if (risingStarCountResult.error) {
+      return { data: null, error: `Rising star selected count failed: ${risingStarCountResult.error.message}` };
+    }
+
+    const [establishedTierResult, communityTierResult] = await Promise.all([
       supabase
         .from("hcp_scores_v2")
         .select("hcp_id")
@@ -603,9 +577,6 @@ export async function getTACounts(
         .eq("tier", "community"),
     ]);
 
-    if (risingTierResult.error) {
-      return { data: null, error: `Rising star tier query failed: ${risingTierResult.error.message}` };
-    }
     if (establishedTierResult.error) {
       return { data: null, error: `Established tier query failed: ${establishedTierResult.error.message}` };
     }
@@ -613,13 +584,11 @@ export async function getTACounts(
       return { data: null, error: `Community tier query failed: ${communityTierResult.error.message}` };
     }
 
-    const risingTierIds = (risingTierResult.data ?? []).map((r: any) => String(r.hcp_id));
     const establishedTierIds = (establishedTierResult.data ?? []).map((r: any) => String(r.hcp_id));
     const communityTierIds = (communityTierResult.data ?? []).map((r: any) => String(r.hcp_id));
 
     const [
       risingPoolResult,
-      risingSelectedResult,
       establishedResult,
       communityResult,
     ] = await Promise.all([
@@ -629,15 +598,6 @@ export async function getTACounts(
           .select("hcp_id", { count: "exact", head: true })
           .eq("cohort", "rising"),
       ),
-      risingTierIds.length > 0
-        ? applyScope(
-            supabase
-              .from("hcp_score_ranks_v2")
-              .select("hcp_id", { count: "exact", head: true })
-              .eq("cohort", "rising")
-              .in("hcp_id", risingTierIds),
-          )
-        : Promise.resolve({ count: 0, error: null }),
       establishedTierIds.length > 0
         ? applyScope(
             supabase
@@ -661,9 +621,6 @@ export async function getTACounts(
     if (risingPoolResult.error) {
       return { data: null, error: `Rising star pool count failed: ${risingPoolResult.error.message}` };
     }
-    if (risingSelectedResult.error) {
-      return { data: null, error: `Rising star selected count failed: ${risingSelectedResult.error.message}` };
-    }
     if (establishedResult.error) {
       return { data: null, error: `Established count failed: ${establishedResult.error.message}` };
     }
@@ -672,7 +629,7 @@ export async function getTACounts(
     }
 
     const risingPool = risingPoolResult.count ?? 0;
-    const risingSelected = risingSelectedResult.count ?? 0;
+    const risingSelected = risingStarCountResult.count ?? 0;
     const established = establishedResult.count ?? 0;
     const community = communityResult.count ?? 0;
 
