@@ -24,8 +24,6 @@ import { getHCPDetail, getRisingStars, getTACounts, getTAIdForLabel, getTADispla
 import { useFilterContext } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
 import type { HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
-import { RegionSelector } from "./components/RegionSelector";
-
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
@@ -605,11 +603,7 @@ function AppContent() {
           setSelectedIndication(indication);
           setIndicationCount(count);
         }}
-      />
-      <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 16px 8px" }}>
-        <RegionSelector />
-      </div>
-      <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
+      />      <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
         {formatUpdatedLabel()}
       </div>
 
