@@ -68,7 +68,7 @@ interface HCPCardProps {
 function cohortStatKeys(cohort: string): readonly string[] {
   if (cohort === "established") return ["PUBS", "CITATIONS", "TRIALS"] as const;
   if (cohort === "community" || cohort === "workhorse") return ["ENGAGEMENT", "COMPANIES", "YEARS"] as const;
-  return ["PUB VEL", "CIT TRAJ", "PUB YEARS"] as const;
+  return ["PUB SCORE", "CIT TRAJ", "PUB YEARS"] as const;
 }
 
 /** Left-border accent on feed cards — matches TA selection cohort colors. */
@@ -104,7 +104,7 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
     if (key === "YEARS") return formatIntDisplay(hcp.careerYears ?? null);
     return "—";
   }
-  if (key === "PUB VEL") return hcp.pubVel;
+  if (key === "PUB SCORE") return hcp.pubVel;
   if (key === "CIT TRAJ") {
     return hcp.citTraj == null
       ? "—"

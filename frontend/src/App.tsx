@@ -59,7 +59,7 @@ const EMPTY_HCP: AppHCP = {
   normalizedScore: 0,
   firstPubYear: 0,
   explanation: "",
-  pubVel: "0.0x",
+  pubVel: "--",
   citTraj: null,
   trialScore: null,
   medicareVolume: null,
@@ -92,8 +92,8 @@ function getTASlug(ta: string): string {
 }
 
 function formatPublicationVelocity(value: number): string {
-  if (!Number.isFinite(value)) return "0.0x";
-  return `${value.toFixed(1)}x`;
+  if (!Number.isFinite(value)) return "--";
+  return `${value.toFixed(1)}`;
 }
 
 function formatTherapeuticAreaLabel(value: string | null | undefined): string {
@@ -209,7 +209,7 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     score: item.composite_score,
     normalizedScore: Number(item.normalized_score ?? 0),
     firstPubYear: Number(item.first_pub_year ?? 0),
-    explanation: item.narrative ?? "Narrative generating — check back soon.",
+    explanation: item.narrative ?? "Narrative generating ï¿½ check back soon.",
     pubVel: formatPublicationVelocity(item.pub_velocity),
     citTraj: item.citTraj ?? null,
     trialScore: item.trialScore ?? null,
@@ -629,7 +629,7 @@ function AppContent() {
         >
           {selectedIndication === "All"
             ? selectedTA
-            : `${selectedTA} · ${selectedIndication}`}
+            : `${selectedTA} ï¿½ ${selectedIndication}`}
         </span>
         {track !== "social" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

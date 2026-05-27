@@ -6,9 +6,9 @@ interface TooltipDef {
 }
 
 const TOOLTIP_MAP: Record<string, TooltipDef> = {
-  "PUB VEL": {
+  "PUB SCORE": {
     title: "Publication velocity",
-    body: "Publication velocity measures how prolifically this HCP is publishing recently, expressed as a multiple of the field's typical pace for their specialty and career stage. A value of 3.0x means publishing three times as fast as peers.",
+    body: "Publication score (0-100) measuring this HCP's recent publication output, normalized within their therapeutic area and career stage cohort. Higher scores indicate more prolific publishing relative to peers.",
   },
   "CIT TRAJ": {
     title: "Citation trajectory",
@@ -24,11 +24,11 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
   },
   "Publication velocity": {
     title: "Publication velocity",
-    body: "Publication velocity measures how prolifically this HCP is publishing recently, expressed as a multiple of the field's typical pace for their specialty and career stage. A value of 3.0x means publishing three times as fast as peers.",
+    body: "Publication score (0-100) measuring this HCP's recent publication output, normalized within their therapeutic area and career stage cohort. Higher scores indicate more prolific publishing relative to peers.",
   },
   "Publication Velocity": {
     title: "Publication Velocity",
-    body: "Publication velocity measures how prolifically this HCP is publishing recently, expressed as a multiple of the field's typical pace for their specialty and career stage. A value of 3.0x means publishing three times as fast as peers.",
+    body: "Publication score (0-100) measuring this HCP's recent publication output, normalized within their therapeutic area and career stage cohort. Higher scores indicate more prolific publishing relative to peers.",
   },
   "Citation trajectory": {
     title: "Citation trajectory",
