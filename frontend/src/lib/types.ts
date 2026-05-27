@@ -184,15 +184,15 @@ export interface RankRow {
 }
 
 export interface HCPDetailResponse {
-  hcp: Record<string, unknown>;
-  score: Record<string, unknown> | null;
-  rank: Record<string, unknown> | null;
+  hcp: Record<string, any>;
+  score: Record<string, any> | null;
+  rank: Record<string, any> | null;
   narrative: { narrative_text: string | null; generated_at: string | null } | null;
-  medicare: Record<string, unknown> | null;
-  openPayments: Record<string, unknown> | null;
+  medicare: Record<string, any> | null;
+  openPayments: Record<string, any> | null;
   publications: Array<Record<string, unknown>>;
   trials: Array<Record<string, unknown>>;
   therapeuticArea: string;
   scope: { type: "country" | "region" | "global"; value: string | null };
-  authorMetrics: Record<string, unknown> | null;
+  authorMetrics: Record<string, any> | null;
 }
