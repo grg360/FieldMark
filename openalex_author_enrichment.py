@@ -27,9 +27,11 @@ import argparse
 import os
 import signal
 import sys
+import threading
 import time
 import uuid
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -45,6 +47,7 @@ from supabase import Client, create_client
 
 OPENALEX_BASE = "https://api.openalex.org"
 DEFAULT_BATCH_SIZE = 200            # Supabase upsert batch size
+DEFAULT_WORKERS = 1                 # serial by default; --workers N for concurrent
 REQUEST_TIMEOUT = 30                # seconds
 MAX_RETRIES = 4                     # per HCP, with exponential backoff
 RETRY_BACKOFF_BASE = 2.0            # 2, 4, 8, 16 seconds
@@ -308,19 +311,26 @@ def run(args: argparse.Namespace) -> int:
     stats = RunStats(total_input=len(links))
     pending: List[MetricsRow] = []
 
-    for idx, link in enumerate(links, start=1):
-        if INTERRUPTED:
-            print("[openalex_enrich] interrupt acknowledged; flushing in-flight batch")
-            break
+    # Concurrency setup
+    pending_lock = threading.Lock()
+    stats_lock = threading.Lock()
+    flush_lock = threading.Lock()
+    stop_event = threading.Event()
 
-        if link.hcp_id in done_today:
-            stats.skipped_already_done += 1
-            continue
+    # Reinstall signal handler to set stop_event in addition to global flag
+    def _handle_interrupt(signum, frame):
+        global INTERRUPTED
+        INTERRUPTED = True
+        stop_event.set()
+        print("\n[openalex_enrich] interrupt received; workers will finish in-flight requests then exit")
+    signal.signal(signal.SIGINT, _handle_interrupt)
 
+    def fetch_one(link: LinkRow) -> MetricsRow:
+        """Worker: fetch + parse one author. Returns a MetricsRow. Updates stats under lock."""
         t0 = time.monotonic()
-        fetch_status: Optional[str] = None
-        fetch_error: Optional[str] = None
-        parsed: Dict[str, Any] = {
+        fetch_status = None
+        fetch_error = None
+        parsed = {
             "cited_by_count": None,
             "works_count": None,
             "h_index": None,
@@ -332,19 +342,23 @@ def run(args: argparse.Namespace) -> int:
         try:
             payload = fetch_author(link.openalex_author_id, openalex_key, POLITE_POOL_EMAIL)
             parsed = parse_author_payload(payload)
-            stats.fetched_ok += 1
+            with stats_lock:
+                stats.fetched_ok += 1
         except ValueError as ve:
             fetch_status = "not_found"
             fetch_error = str(ve)
-            stats.fetched_not_found += 1
+            with stats_lock:
+                stats.fetched_not_found += 1
         except Exception as exc:
             fetch_status = "error"
             fetch_error = f"{type(exc).__name__}: {exc}"[:500]
-            stats.fetched_error += 1
+            with stats_lock:
+                stats.fetched_error += 1
 
-        stats.recent_durations.append(time.monotonic() - t0)
+        with stats_lock:
+            stats.recent_durations.append(time.monotonic() - t0)
 
-        pending.append(MetricsRow(
+        return MetricsRow(
             hcp_id=link.hcp_id,
             openalex_author_id=link.openalex_author_id,
             snapshot_date=today,
@@ -357,23 +371,64 @@ def run(args: argparse.Namespace) -> int:
             enrichment_run_id=enrichment_run_id,
             fetch_status=fetch_status,
             fetch_error=fetch_error,
-        ))
+        )
 
-        if len(pending) >= args.batch_size:
-            upsert_batch(client, pending, args.dry_run)
-            pending = []
+    # Filter out skipped links before dispatching
+    work_items = [link for link in links if link.hcp_id not in done_today]
+    skipped_count = len(links) - len(work_items)
+    if skipped_count:
+        with stats_lock:
+            stats.skipped_already_done = skipped_count
 
-        if idx % PROGRESS_INTERVAL == 0:
-            if stats.recent_durations:
-                avg = sum(stats.recent_durations) / len(stats.recent_durations)
-                remaining = len(links) - idx
-                eta_seconds = avg * remaining
-                eta_min = eta_seconds / 60.0
-                print(
-                    f"[openalex_enrich] {idx}/{len(links)} | "
-                    f"ok={stats.fetched_ok} 404={stats.fetched_not_found} err={stats.fetched_error} skip={stats.skipped_already_done} | "
-                    f"avg={avg*1000:.0f}ms/req eta={eta_min:.1f}min"
-                )
+    print(f"[openalex_enrich] dispatching {len(work_items)} fetches across {args.workers} worker(s)")
+
+    processed = 0
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        # Submit all work upfront. Each future resolves independently as fetches complete.
+        futures = [executor.submit(fetch_one, link) for link in work_items]
+
+        for future in as_completed(futures):
+            if INTERRUPTED:
+                # Don't cancel in-flight requests; let them finish naturally for clean shutdown
+                pass
+
+            try:
+                metrics_row = future.result()
+            except Exception as exc:
+                # Should not happen — fetch_one catches all exceptions. Defensive guard.
+                print(f"[openalex_enrich] WARN: unexpected worker exception: {exc}")
+                continue
+
+            # Thread-safe append to pending buffer
+            should_flush = False
+            with pending_lock:
+                pending.append(metrics_row)
+                if len(pending) >= args.batch_size:
+                    should_flush = True
+
+            # Flush outside pending_lock so we don't block workers during the upsert
+            if should_flush:
+                with flush_lock:
+                    # Re-grab pending under lock, swap with empty list
+                    with pending_lock:
+                        batch_to_write = pending
+                        pending = []
+                    upsert_batch(client, batch_to_write, args.dry_run)
+
+            processed += 1
+            if processed % PROGRESS_INTERVAL == 0:
+                with stats_lock:
+                    if stats.recent_durations:
+                        avg = sum(stats.recent_durations) / len(stats.recent_durations)
+                        remaining = len(work_items) - processed
+                        # With concurrency, effective rate is avg/workers
+                        eta_seconds = (avg * remaining) / max(1, args.workers)
+                        eta_min = eta_seconds / 60.0
+                        print(
+                            f"[openalex_enrich] {processed}/{len(work_items)} | "
+                            f"ok={stats.fetched_ok} 404={stats.fetched_not_found} err={stats.fetched_error} skip={stats.skipped_already_done} | "
+                            f"workers={args.workers} avg={avg*1000:.0f}ms/req eta={eta_min:.1f}min"
+                        )
 
     # Final flush
     if pending:
@@ -398,6 +453,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--offset", type=int, default=0, help="Skip the first N link rows.")
     p.add_argument("--resume", action="store_true", help="Skip HCPs already snapshotted today.")
     p.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Supabase upsert batch size.")
+    p.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
+                   help="Number of concurrent fetch workers (default 1, safe ceiling 8).")
     return p.parse_args()
 
 
