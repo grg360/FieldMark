@@ -22,8 +22,10 @@ import ScoringExplainedModal, {
 import type { HCP as UIHCP } from "./data/hcpData";
 import type { FeedCohort } from "./lib/api";
 import { getHCPDetail, getRisingStars, getTACounts, getTAIdForLabel, getTADisplayName } from "./lib/api";
+import { useFilterContext } from "./lib/filter-context";
 import { TrackProvider, useTrack, type Track } from "./lib/TrackContext";
 import type { RisingStar, TACounts } from "./lib/types";
+import { RegionSelector } from "./components/RegionSelector";
 
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
@@ -156,6 +158,7 @@ type Screen = "auth" | "ta-select" | "feed" | "detail" | "note" | "search" | "bi
 
 function AppContent() {
   const { track } = useTrack();
+  const { region } = useFilterContext();
   const [currentScreen, setCurrentScreen] = useState<Screen>("auth");
   const [selectedTA, setSelectedTA] = useState("Rare Disease");
   const [selectedIndication, setSelectedIndication] = useState("All");
@@ -188,10 +191,14 @@ function AppContent() {
     if (currentScreen !== "detail") return;
     const hcpId = detailHCP.id || detailHCP.hcp_id;
     if (!hcpId) return;
+    const taSlug = getTASlug(selectedTA);
 
     let cancelled = false;
     void (async () => {
-      const { data, error } = await getHCPDetail(hcpId);
+      const { data, error } = await getHCPDetail(hcpId, {
+        therapeuticArea: taSlug,
+        region,
+      });
       if (cancelled || error || !data) return;
       setDetailHCP(mapRisingStarToHCP(data));
     })();
@@ -199,7 +206,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [currentScreen, detailHCP.id, detailHCP.hcp_id]);
+  }, [currentScreen, detailHCP.id, detailHCP.hcp_id, selectedTA, region]);
 
   useEffect(() => {
     if (currentScreen !== "feed") {
@@ -236,10 +243,11 @@ function AppContent() {
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(taSlug, FEED_PAGE_SIZE, {
-        cohort: feedCohortForTrack(track),
-        offset: 0,
-      });
+      const { data } = await getRisingStars(
+        { therapeuticArea: taSlug, region },
+        FEED_PAGE_SIZE,
+        { offset: 0 },
+      );
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
       if (data) setFeedTotal(data.total);
@@ -266,10 +274,11 @@ function AppContent() {
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(taSlug, FEED_PAGE_SIZE, {
-        cohort: feedCohortForTrack(track),
-        offset: 0,
-      });
+      const { data } = await getRisingStars(
+        { therapeuticArea: taSlug, region },
+        FEED_PAGE_SIZE,
+        { offset: 0 },
+      );
       if (cancelled) return;
 
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
@@ -284,7 +293,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, track]);
+  }, [selectedTA, track, region]);
 
   async function loadMore() {
     if (track === "social") return;
@@ -292,10 +301,11 @@ function AppContent() {
     const taSlug = getTASlug(selectedTA);
     setLoadingMore(true);
     try {
-      const { data } = await getRisingStars(taSlug, FEED_PAGE_SIZE, {
-        cohort: feedCohortForTrack(track),
-        offset: nextOffset,
-      });
+      const { data } = await getRisingStars(
+        { therapeuticArea: taSlug, region },
+        FEED_PAGE_SIZE,
+        { offset: nextOffset },
+      );
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList((prev) => [...prev, ...mapped]);
       setFeedOffset(nextOffset);
@@ -310,7 +320,10 @@ function AppContent() {
 
     async function fetchCounts() {
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getTACounts(taSlug);
+      const { data } = await getTACounts({
+        therapeuticArea: taSlug,
+        region,
+      });
       if (cancelled) return;
       setTaCounts(data);
     }
@@ -320,7 +333,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTA]);
+  }, [selectedTA, region]);
 
   // Auth flow
   function handleAuth() {
@@ -376,7 +389,11 @@ function AppContent() {
       setSelectedTA(taLabel);
       setSelectedIndication("All");
     }
-    const { data, error } = await getHCPDetail(hcpId, getTASlug(taLabel !== "Other TA" ? taLabel : selectedTA));
+    const effectiveTaLabel = taLabel !== "Other TA" ? taLabel : selectedTA;
+    const { data, error } = await getHCPDetail(hcpId, {
+      therapeuticArea: getTASlug(effectiveTaLabel),
+      region,
+    });
     if (error || !data) return;
     setDetailHCP(mapRisingStarToHCP(data));
     setCurrentScreen("detail");
@@ -504,6 +521,9 @@ function AppContent() {
           setIndicationCount(count);
         }}
       />
+      <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 16px 8px" }}>
+        <RegionSelector />
+      </div>
       <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
         {formatUpdatedLabel()}
       </div>
