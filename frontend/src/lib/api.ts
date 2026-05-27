@@ -310,293 +310,254 @@ export async function getHCPNarrative(
 }
 
 export async function getRisingStars(
-  therapeuticArea: string,
+  filtersOrSlug: FilterState | string,
   limit: number = 20,
-  options: {
-    cohort?: FeedCohort;
-    offset?: number;
-  } = {},
+  options: { offset?: number } = {},
 ): Promise<ApiResult<{ rows: RisingStar[]; total: number }>> {
   try {
-    const TA_ID_MAP: Record<string, string> = {
-      "rare-disease": "833e7b38-d01b-409e-82c0-71eb29e138a0",
-      hepatology: "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e",
-      nsclc: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
-      oncology: "095bc902-c3dc-48a3-8167-52ee55795d60",
-      immunology: "4cf07827-ff1c-451e-832e-0e0a14ea9c86",
-    };
+    const filters: FilterState =
+      typeof filtersOrSlug === "string"
+        ? { therapeuticArea: filtersOrSlug }
+        : filtersOrSlug;
 
-    const taSlug = therapeuticArea.toLowerCase().trim();
+    const taSlug = filters.therapeuticArea.toLowerCase().trim();
     const taId = TA_ID_MAP[taSlug];
 
     if (!taId) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
     }
 
+    const scope = resolveFilterScope(filters);
     const offset = options.offset ?? 0;
-    const cohort = options.cohort ?? "rising_star";
 
-    const countBase = () =>
-      supabase
-        .from("hcps_v2")
-        .select("id, hcp_scores!inner(therapeutic_area_id)", { count: "estimated", head: true })
-        .eq("hcp_scores.therapeutic_area_id", taId);
+    // Build a scope-aware builder. scope_value can be null for global.
+    const applyScope = <T>(q: T): T => {
+      let query = (q as any).eq("therapeutic_area_id", taId).eq("scope_type", scope.scopeType);
+      if (scope.scopeValue === null) {
+        query = query.is("scope_value", null);
+      } else {
+        query = query.eq("scope_value", scope.scopeValue);
+      }
+      return query as T;
+    };
 
-    const listBase = () =>
+    // 1) Count threshold-selected rising stars in scope.
+    // Filter joins to hcp_scores_v2 where tier='rising_star'.
+    const countQuery = applyScope(
       supabase
-        .from("hcps_v2")
+        .from("hcp_score_ranks_v2")
+        .select("hcp_id, hcp_scores_v2!inner(tier, therapeutic_area_id)", {
+          count: "exact",
+          head: true,
+        })
+        .eq("cohort", "rising")
+        .eq("hcp_scores_v2.therapeutic_area_id", taId)
+        .eq("hcp_scores_v2.tier", "rising_star"),
+    );
+    const { count: totalCount, error: countError } = await countQuery;
+    if (countError) {
+      return { data: null, error: `Rising star count query failed: ${countError.message}` };
+    }
+
+    // 2) Fetch the page of ranks. Same scope + tier filter. Order by rank ASC.
+    const listQuery = applyScope(
+      supabase
+        .from("hcp_score_ranks_v2")
         .select(
           `
-        id,
-        first_name,
-        last_name,
-        institution,
-        institution_short,
-        country,
-        first_pub_year,
-        cohort_classification,
-        cohort_score,
-        nppes_career_stage_years,
-        nppes_practice_city,
-        nppes_practice_state,
-        nppes_practice_setting,
-        total_career_pubs,
-        hcp_scores!inner(
-          hcp_id,
-          composite_score,
-          normalized_score,
-          pub_velocity_score,
-          citation_trajectory_score,
-          trial_investigator_score,
-          tier,
-          therapeutic_area_id
+            hcp_id,
+            rank,
+            percentile,
+            scope_size,
+            score_at_rank,
+            hcp_scores_v2!inner(
+              tier,
+              therapeutic_area_id,
+              composite_score,
+              normalized_score,
+              pub_velocity_score,
+              citation_trajectory_score,
+              trial_investigator_score
+            )
+          `,
         )
-      `,
-        )
-        .eq("hcp_scores.therapeutic_area_id", taId);
+        .eq("cohort", "rising")
+        .eq("hcp_scores_v2.therapeutic_area_id", taId)
+        .eq("hcp_scores_v2.tier", "rising_star")
+        .order("rank", { ascending: true })
+        .range(offset, offset + limit - 1),
+    );
 
-    const listBaseViaHTA = () =>
-      supabase
-        .from("hcps_v2")
-        .select(
-          `
-        id,
-        first_name,
-        last_name,
-        institution,
-        institution_short,
-        country,
-        first_pub_year,
-        cohort_classification,
-        cohort_score,
-        nppes_career_stage_years,
-        nppes_practice_city,
-        nppes_practice_state,
-        nppes_practice_setting,
-        total_career_pubs,
-        hcp_therapeutic_areas!inner(
-          therapeutic_area_id
-        )
-      `,
-        )
-        .eq("hcp_therapeutic_areas.therapeutic_area_id", taId);
-
-    let countQuery;
-    let listQuery;
-    if (cohort === "rising_star") {
-      countQuery = countBase().eq("cohort_classification", "rising_star").eq("country", "USA");
-      listQuery = listBase()
-        .eq("cohort_classification", "rising_star")
-        .eq("country", "USA")
-        .order("cohort_score", { ascending: false, nullsFirst: false })
-        .range(offset, offset + limit - 1);
-    } else if (cohort === "community") {
-      // Community requires NPI (US-only); no country filter needed here.
-      countQuery = countBase().eq("cohort_classification", "community");
-      listQuery = listBaseViaHTA()
-        .eq("cohort_classification", "community")
-        .order("cohort_score", { ascending: false, nullsFirst: false })
-        .range(offset, offset + limit - 1);
-    } else {
-      countQuery = countBase().eq("cohort_classification", "established").eq("country", "USA");
-      listQuery = listBase()
-        .eq("cohort_classification", "established")
-        .eq("country", "USA")
-        .order("cohort_score", { ascending: false, nullsFirst: false })
-        .range(offset, offset + limit - 1);
+    const { data: rankRows, error: rankError } = await listQuery;
+    if (rankError) {
+      return { data: null, error: `Rising star list query failed: ${rankError.message}` };
     }
-
-    let cachedTotalCount: number | null = null;
-    if (cohort === "community") {
-      const liveCounts = await fetchLiveCohortCountsForTAIds([taId]);
-      if (liveCounts.error) {
-        return { data: null, error: liveCounts.error };
-      }
-      cachedTotalCount = liveCounts.data?.[taId]?.community ?? 0;
-    }
-
-    let totalCount: number | null;
-    if (cachedTotalCount !== null) {
-      totalCount = cachedTotalCount;
-    } else {
-      const { count: countResult, error: countError } = await countQuery;
-      if (countError) {
-        return { data: null, error: countError.message };
-      }
-      totalCount = countResult;
-    }
-
-    const { data: hcpRows, error: listError } = await listQuery;
-
-    if (listError) {
-      return { data: null, error: listError.message };
-    }
-
-    if (!hcpRows || hcpRows.length === 0) {
+    if (!rankRows || rankRows.length === 0) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: totalCount ?? 0 }, error: null };
     }
 
-    const hcpIds = (hcpRows || []).map((r) => r.id);
+    const hcpIds = rankRows.map((r: any) => String(r.hcp_id));
 
-    const [medicareResult, opResult] = await Promise.all([
+    // 3) Fetch HCP details, Medicare summary, Open Payments summary in parallel.
+    const [hcpResult, medicareResult, opResult] = await Promise.all([
+      supabase
+        .from("hcps_v2")
+        .select(
+          `
+            id,
+            first_name,
+            last_name,
+            institution_normalized,
+            institution_raw,
+            country,
+            career_first_pub_year,
+            cohort_classification,
+            cohort_score,
+            nppes_career_stage_years,
+            nppes_practice_city,
+            nppes_practice_state,
+            nppes_practice_setting,
+            nppes_practice_address,
+            nppes_practice_zip,
+            npi_number,
+            npi_specialty,
+            total_career_pubs
+          `,
+        )
+        .in("id", hcpIds),
       supabase
         .from("hcp_medicare_summary_v2")
-        .select("hcp_id, total_beneficiaries_3yr_unique_est")
+        .select(
+          "hcp_id, total_beneficiaries_3yr_unique_est, beneficiaries_2021, beneficiaries_2022, beneficiaries_2023",
+        )
         .in("hcp_id", hcpIds),
       supabase
         .from("hcp_open_payments_summary_v2")
-        .select("hcp_id, distinct_companies_lifetime, total_payments_lifetime")
+        .select(
+          `
+            hcp_id,
+            distinct_companies_lifetime,
+            total_payments_lifetime,
+            py2022_total,
+            py2023_total,
+            py2024_total,
+            speaker_bureau_3yr,
+            consulting_3yr,
+            honoraria_3yr,
+            education_3yr,
+            royalty_3yr,
+            food_beverage_3yr,
+            travel_lodging_3yr
+          `,
+        )
         .in("hcp_id", hcpIds),
     ]);
 
+    if (hcpResult.error) {
+      return { data: null, error: `HCP details query failed: ${hcpResult.error.message}` };
+    }
     if (medicareResult.error) {
-      return { data: null, error: medicareResult.error.message };
+      return { data: null, error: `Medicare query failed: ${medicareResult.error.message}` };
     }
     if (opResult.error) {
-      return { data: null, error: opResult.error.message };
+      return { data: null, error: `Open Payments query failed: ${opResult.error.message}` };
     }
 
-    const medicareMap = new Map(
-      (medicareResult.data || []).map((r) => [String(r.hcp_id), r]),
+    const hcpById = new Map(
+      (hcpResult.data ?? []).map((h: any) => [String(h.id), h]),
     );
-    const opMap = new Map(
-      (opResult.data || []).map((r) => [String(r.hcp_id), r]),
+    const medicareMap = new Map(
+      (medicareResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
+    );
+    const opById = new Map(
+      (opResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
     );
 
-    const filteredRows = (hcpRows ?? []).filter((row) => {
-      const inst = String(row.institution ?? row.institution_short ?? "").toLowerCase();
-      if (!inst) return true;
+    // 4) Apply industry filter (preserve existing behavior — pharma HCPs excluded from surface).
+    const filteredRankRows = rankRows.filter((rr: any) => {
+      const hcp = hcpById.get(String(rr.hcp_id));
+      if (!hcp) return false;
+      const inst = String(hcp.institution_normalized ?? hcp.institution_raw ?? "").toLowerCase();
+      if (!inst) return true; // No institution string → don't filter (community HCPs have null institution)
       return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
     });
 
-    const narrativeHcpIds = filteredRows.map((r) => r.id);
-
+    // 5) Fetch narratives for the surviving HCPs.
+    const narrativeIds = filteredRankRows.map((r: any) => String(r.hcp_id));
     const narrativeMap = new Map<string, string | null>();
 
-    if (narrativeHcpIds.length > 0) {
-      const { data: narrativeData, error: narrativeError } = await supabase
+    if (narrativeIds.length > 0) {
+      // TA-specific narrative first
+      const { data: taNarratives, error: taNarrError } = await supabase
         .from("hcp_narratives_v2")
-        .select("hcp_id, narrative")
-        .in("hcp_id", narrativeHcpIds)
-        .eq("therapeutic_area_id", taId);
+        .select("hcp_id, narrative_text, therapeutic_area_slug")
+        .in("hcp_id", narrativeIds)
+        .eq("therapeutic_area_slug", taSlug);
 
-      if (narrativeError) {
-        return { data: null, error: narrativeError.message };
+      if (taNarrError) {
+        return { data: null, error: `Narrative query failed: ${taNarrError.message}` };
+      }
+      for (const n of taNarratives ?? []) {
+        narrativeMap.set(String(n.hcp_id), (n as any).narrative_text ?? null);
       }
 
-      for (const n of narrativeData || []) {
-        narrativeMap.set(String(n.hcp_id), n.narrative as string | null);
-      }
-
-      const missingNarrativeIds = narrativeHcpIds.filter(
-        (id) => !narrativeMap.get(String(id)),
-      );
-
-      if (missingNarrativeIds.length > 0) {
-        const { data: fallbackRows, error: fallbackError } = await supabase
+      // Fallback: most recent narrative for any TA, for HCPs missing TA-specific
+      const missingIds = narrativeIds.filter((id) => !narrativeMap.has(id));
+      if (missingIds.length > 0) {
+        const { data: fallbackNarratives, error: fbError } = await supabase
           .from("hcp_narratives_v2")
-          .select("hcp_id, narrative, generated_at")
-          .in("hcp_id", missingNarrativeIds)
+          .select("hcp_id, narrative_text, generated_at")
+          .in("hcp_id", missingIds)
           .order("generated_at", { ascending: false });
 
-        if (fallbackError) {
-          return { data: null, error: fallbackError.message };
+        if (fbError) {
+          return { data: null, error: `Narrative fallback query failed: ${fbError.message}` };
         }
-
-        for (const n of fallbackRows || []) {
+        for (const n of fallbackNarratives ?? []) {
           const hid = String(n.hcp_id);
-          if (!narrativeMap.get(hid)) {
-            narrativeMap.set(hid, n.narrative as string | null);
+          if (!narrativeMap.has(hid)) {
+            narrativeMap.set(hid, (n as any).narrative_text ?? null);
           }
         }
       }
     }
 
-    const risingStars: RisingStar[] = filteredRows.flatMap((row) => {
-      const scoresRaw = (row as { hcp_scores?: unknown }).hcp_scores;
-      const scoresArr = Array.isArray(scoresRaw)
-        ? scoresRaw
-        : scoresRaw
-          ? [scoresRaw]
-          : [];
-      let scoreRow: (typeof scoresArr)[0] | Record<string, unknown> | undefined = scoresArr[0];
-      if (!scoreRow && cohort === "community") {
-        scoreRow = {
-          hcp_id: row.id,
-          composite_score: 0,
-          normalized_score: 0,
-          pub_velocity_score: 0,
-          citation_trajectory_score: null,
-          trial_investigator_score: null,
-          tier: null,
-          therapeutic_area_id: taId,
-        };
-      }
+    // 6) Build RisingStar rows. Compose data shape compatible with mapRisingStarRow.
+    const risingStars: RisingStar[] = filteredRankRows.flatMap((rr: any): RisingStar[] => {
+      const hcp = hcpById.get(String(rr.hcp_id));
+      if (!hcp) return [];
+      const scoreRaw = (rr as { hcp_scores_v2?: unknown }).hcp_scores_v2;
+      const scoreRow = Array.isArray(scoreRaw) ? scoreRaw[0] : scoreRaw;
       if (!scoreRow) return [];
 
-      const hcp = {
-        id: row.id,
-        first_name: row.first_name,
-        last_name: row.last_name,
-        institution: row.institution,
-        institution_short: row.institution_short,
-        country: row.country,
-        first_pub_year: row.first_pub_year,
-        therapeutic_area: therapeuticArea,
-        cohort_classification: row.cohort_classification,
-        cohort_score: row.cohort_score,
-        nppes_career_stage_years: row.nppes_career_stage_years,
-        nppes_practice_city: row.nppes_practice_city,
-        nppes_practice_state: row.nppes_practice_state,
-        nppes_practice_setting: row.nppes_practice_setting,
-        total_career_pubs: row.total_career_pubs,
-      };
+      const medicareData = medicareMap.get(String(rr.hcp_id));
+      const opData = opById.get(String(rr.hcp_id));
 
-      const medicareData = medicareMap.get(String(row.id));
-      const opData = opMap.get(String(row.id));
-
-      const hcpWithSummaries = {
-        ...hcp,
-        hcp_medicare_summary: medicareData ? [medicareData] : null,
-        hcp_open_payments_summary: opData ? [opData] : null,
-      };
-
+      // Compose enriched row for mapRisingStarRow (which expects hcps, hcp_medicare_summary, hcp_open_payments_summary fields).
       const enrichedRow = {
         ...scoreRow,
-        composite_score: scoreRow.composite_score,
-        normalized_score: scoreRow.normalized_score,
-        tier: scoreRow.tier ?? null,
-        first_pub_year: row.first_pub_year,
-        hcps: hcpWithSummaries,
+        composite_score: (scoreRow as any).composite_score,
+        normalized_score: (scoreRow as any).normalized_score,
+        tier: (scoreRow as any).tier ?? null,
+        hcps: {
+          ...hcp,
+          therapeutic_area: filters.therapeuticArea,
+          hcp_medicare_summary: medicareData ? [medicareData] : null,
+          hcp_open_payments_summary: opData ? [opData] : null,
+        },
       };
 
-      const mapped = mapRisingStarRow(enrichedRow, therapeuticArea);
+      const mapped = mapRisingStarRow(enrichedRow, filters.therapeuticArea);
       return [
         {
           ...mapped,
-          normalized_score: Number(scoreRow.normalized_score ?? 0),
-          narrative: narrativeMap.get(String(mapped.id)) ?? null,
-        },
+          normalized_score: Number((scoreRow as any).normalized_score ?? 0),
+          narrative: narrativeMap.get(String(rr.hcp_id)) ?? null,
+          // Rank-forward fields:
+          rank: Number(rr.rank),
+          percentile: Number(rr.percentile),
+          scope_size: Number(rr.scope_size),
+        } as RisingStar,
       ];
     });
 

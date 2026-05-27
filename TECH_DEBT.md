@@ -148,3 +148,17 @@ Lean toward keeping tier as the membership flag. Threshold tuning is rare; consi
 4. (Defer) Decision on dark_horse value in assign_tier() — keep as archaeology or remove from the enum. Not blocking anything.
 
 Total cleanup effort: ~2-3 hours of focused work. Not demo-blocking. Best done in a single focused session after the frontend refactor stabilizes.
+
+## dark_horse tier threshold inconsistency
+
+TIER_DARK_HORSE_THRESHOLD = 95.0 in scoring_pipeline.py, but assign_tier()
+appears to apply the threshold against a different score field than
+normalized_score (or there's a separate normalization step). Empirical
+behavior: dark_horse fires at normalized_score ≥ 80, not 95.
+
+Impact: dark_horse cohort is ~30x larger than the constant suggests (121
+vs expected ~4). Does not affect rising_star count or any user-facing
+surface since dark_horse is deprecated as a product concept.
+
+Investigate when: cleaning up the broader Dark Horse / Workhorse
+deprecation. Not blocking.

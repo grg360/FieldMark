@@ -26,6 +26,10 @@ export interface ResolvedScope {
  *   4. Else default to region=DEFAULT_REGION ("US").
  */
 export function resolveFilterScope(filters: FilterState): ResolvedScope {
+  if (filters.scope === "global") {
+    return { scopeType: "global", scopeValue: null };
+  }
+
   if (filters.country && filters.country.trim() !== "") {
     return { scopeType: "country", scopeValue: filters.country.toUpperCase() };
   }

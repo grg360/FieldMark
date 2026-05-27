@@ -67,7 +67,14 @@ export interface HCPScore {
   cohort_classification?: string | null;
 }
 
-export interface RisingStar extends HCP, HCPScore {}
+export interface RisingStar extends HCP, HCPScore {
+  /** Precomputed rank within scope. Set by rank-aware queries. */
+  rank?: number;
+  /** Percentile within scope (0-100). */
+  percentile?: number;
+  /** Total HCPs in scope (denominator for "rank #X of Y"). */
+  scope_size?: number;
+}
 
 export interface SocialUser {
   id: string;
@@ -136,6 +143,7 @@ export interface FilterState {
   therapeuticArea: string;
   region?: string;       // RegionKey from regions.ts; defaults to "US" if undefined
   country?: string;      // ISO 3166-1 alpha-2 country code; overrides region if both set
+  scope?: "global" | "regional"; // When 'global', returns unfiltered counts. Defaults to 'regional'.
   // Future filters land here. Adding them does NOT require api.ts changes
   // until the resolver/query layer is taught to consume them.
 }
