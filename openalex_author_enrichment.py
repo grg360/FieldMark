@@ -58,6 +58,20 @@ POLITE_POOL_EMAIL = "garrett@fieldmark.local"   # used in mailto for polite pool
 
 
 # ============================================================
+# Disambiguation conflation thresholds
+# ============================================================
+# OpenAlex author disambiguation can over-aggregate (multiple distinct humans
+# merged into one author entity). Detected by extreme divergence between
+# OpenAlex works_count and our v2 corpus' total_career_pubs, combined with
+# superstar-tier absolute metrics.
+
+CONFLATION_RATIO_THRESHOLD = 5.0     # works_count / total_career_pubs ratio
+CONFLATION_WORKS_FLOOR = 1500         # min OpenAlex works_count to consider
+CONFLATION_CITES_FLOOR = 100000       # OR min lifetime citations
+CONFLATION_H_FLOOR = 150              # OR min h-index
+
+
+# ============================================================
 # Globals (set in main)
 # ============================================================
 
@@ -80,6 +94,7 @@ def install_signal_handler() -> None:
 class LinkRow:
     hcp_id: str
     openalex_author_id: str  # full URL form, e.g. https://openalex.org/A5003437583
+    total_career_pubs: Optional[int] = None
 
 
 @dataclass
@@ -104,6 +119,7 @@ class RunStats:
     fetched_ok: int = 0
     fetched_not_found: int = 0
     fetched_error: int = 0
+    flagged_disambiguation_suspect: int = 0
     skipped_already_done: int = 0
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     recent_durations: deque = field(default_factory=lambda: deque(maxlen=RATE_WINDOW))
@@ -179,9 +195,9 @@ def parse_author_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def load_link_rows(client: Client, limit: Optional[int], offset: int) -> List[LinkRow]:
     """
-    Load (hcp_id, openalex_author_id) pairs from hcp_openalex_authors_v2.
-    Only is_primary=true links are fetched (one author per HCP at a time).
-    Paginated via Supabase range() because the table has 239K rows.
+    Load (hcp_id, openalex_author_id, total_career_pubs) tuples.
+    total_career_pubs is from hcps_v2 and used downstream for disambiguation
+    conflation detection.
     """
     page_size = 1000
     out: List[LinkRow] = []
@@ -194,7 +210,7 @@ def load_link_rows(client: Client, limit: Optional[int], offset: int) -> List[Li
         end = cur + page_size - 1
         q = (
             client.table("hcp_openalex_authors_v2")
-            .select("hcp_id, openalex_author_id")
+            .select("hcp_id, openalex_author_id, hcps_v2!inner(total_career_pubs)")
             .eq("is_primary", True)
             .order("hcp_id")
             .range(cur, end)
@@ -206,7 +222,16 @@ def load_link_rows(client: Client, limit: Optional[int], offset: int) -> List[Li
         for r in rows:
             if limit is not None and fetched >= limit:
                 break
-            out.append(LinkRow(hcp_id=r["hcp_id"], openalex_author_id=r["openalex_author_id"]))
+            hcp_join = r.get("hcps_v2")
+            # The embedded join may come back as object or single-element list
+            if isinstance(hcp_join, list):
+                hcp_join = hcp_join[0] if hcp_join else None
+            total_career_pubs = hcp_join.get("total_career_pubs") if hcp_join else None
+            out.append(LinkRow(
+                hcp_id=r["hcp_id"],
+                openalex_author_id=r["openalex_author_id"],
+                total_career_pubs=total_career_pubs,
+            ))
             fetched += 1
         if len(rows) < page_size:
             break
@@ -342,8 +367,41 @@ def run(args: argparse.Namespace) -> int:
         try:
             payload = fetch_author(link.openalex_author_id, openalex_key, POLITE_POOL_EMAIL)
             parsed = parse_author_payload(payload)
-            with stats_lock:
-                stats.fetched_ok += 1
+
+            # Disambiguation conflation check: extreme divergence between OpenAlex
+            # works_count and our v2 corpus' total_career_pubs, combined with
+            # superstar-tier metrics, signals likely author-entity over-aggregation.
+            works_count = parsed.get("works_count")
+            cited_by_count = parsed.get("cited_by_count")
+            h_index = parsed.get("h_index")
+            corpus_pubs = link.total_career_pubs
+
+            is_superstar_tier = (
+                (works_count is not None and works_count > CONFLATION_WORKS_FLOOR)
+                or (cited_by_count is not None and cited_by_count > CONFLATION_CITES_FLOOR)
+                or (h_index is not None and h_index > CONFLATION_H_FLOOR)
+            )
+
+            ratio_excessive = False
+            if (
+                corpus_pubs is not None
+                and corpus_pubs > 0
+                and works_count is not None
+                and works_count > 0
+            ):
+                ratio_excessive = (works_count / corpus_pubs) > CONFLATION_RATIO_THRESHOLD
+
+            if is_superstar_tier and ratio_excessive:
+                fetch_status = "disambiguation_suspect"
+                fetch_error = (
+                    f"works_count={works_count} vs total_career_pubs={corpus_pubs} "
+                    f"(ratio>{CONFLATION_RATIO_THRESHOLD}); h_index={h_index} cites={cited_by_count}"
+                )
+                with stats_lock:
+                    stats.flagged_disambiguation_suspect += 1
+            else:
+                with stats_lock:
+                    stats.fetched_ok += 1
         except ValueError as ve:
             fetch_status = "not_found"
             fetch_error = str(ve)
@@ -426,7 +484,8 @@ def run(args: argparse.Namespace) -> int:
                         eta_min = eta_seconds / 60.0
                         print(
                             f"[openalex_enrich] {processed}/{len(work_items)} | "
-                            f"ok={stats.fetched_ok} 404={stats.fetched_not_found} err={stats.fetched_error} skip={stats.skipped_already_done} | "
+                            f"ok={stats.fetched_ok} 404={stats.fetched_not_found} err={stats.fetched_error} "
+                            f"flag={stats.flagged_disambiguation_suspect} skip={stats.skipped_already_done} | "
                             f"workers={args.workers} avg={avg*1000:.0f}ms/req eta={eta_min:.1f}min"
                         )
 
@@ -440,6 +499,7 @@ def run(args: argparse.Namespace) -> int:
     print(f"[openalex_enrich] fetched_ok={stats.fetched_ok}")
     print(f"[openalex_enrich] fetched_not_found={stats.fetched_not_found}")
     print(f"[openalex_enrich] fetched_error={stats.fetched_error}")
+    print(f"[openalex_enrich] flagged_disambiguation_suspect={stats.flagged_disambiguation_suspect}")
     print(f"[openalex_enrich] skipped_already_done={stats.skipped_already_done}")
     print(f"[openalex_enrich] elapsed={elapsed/60:.1f}min ({elapsed:.0f}s)")
     print(f"[openalex_enrich] enrichment_run_id={enrichment_run_id}")
