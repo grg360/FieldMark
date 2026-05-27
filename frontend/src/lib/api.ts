@@ -400,7 +400,7 @@ export async function getRisingStars(
     const hcpIds = rankRows.map((r: any) => String(r.hcp_id));
 
     // 3) Fetch HCP details, Medicare summary, Open Payments summary in parallel.
-    const [hcpResult, medicareResult, opResult] = await Promise.all([
+    const [hcpResult, medicareResult, opResult, metricsResult] = await Promise.all([
       supabase
         .from("hcps_v2")
         .select(
@@ -452,6 +452,10 @@ export async function getRisingStars(
           `,
         )
         .in("hcp_id", hcpIds),
+      supabase
+        .from("hcp_author_metrics_latest_v2")
+        .select("hcp_id, cited_by_count, h_index, works_count, i10_index")
+        .in("hcp_id", hcpIds),
     ]);
 
     if (hcpResult.error) {
@@ -463,6 +467,9 @@ export async function getRisingStars(
     if (opResult.error) {
       return { data: null, error: `Open Payments query failed: ${opResult.error.message}` };
     }
+    if (metricsResult.error) {
+      return { data: null, error: `Author metrics query failed: ${metricsResult.error.message}` };
+    }
 
     const hcpById = new Map(
       (hcpResult.data ?? []).map((h: any) => [String(h.id), h]),
@@ -472,6 +479,9 @@ export async function getRisingStars(
     );
     const opById = new Map(
       (opResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
+    );
+    const metricsById = new Map(
+      (metricsResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
     );
 
     // 4) Apply industry filter (preserve existing behavior — pharma HCPs excluded from surface).
@@ -549,6 +559,7 @@ export async function getRisingStars(
       };
 
       const mapped = mapRisingStarRow(enrichedRow, filters.therapeuticArea);
+      const metricsData = metricsById.get(String(rr.hcp_id));
       return [
         {
           ...mapped,
@@ -558,6 +569,10 @@ export async function getRisingStars(
           rank: Number(rr.rank),
           percentile: Number(rr.percentile),
           scope_size: Number(rr.scope_size),
+          // Author metrics (from hcp_author_metrics_latest_v2):
+          total_citations: metricsData?.cited_by_count ?? null,
+          h_index: metricsData?.h_index ?? null,
+          works_count: metricsData?.works_count ?? null,
         } as RisingStar,
       ];
     });
@@ -1130,6 +1145,12 @@ export async function getHCPDetail(
       .eq("clinical_trials_v2.source_therapeutic_area_id", taId)
       .limit(50);
 
+    const metricsPromise = supabase
+      .from("hcp_author_metrics_latest_v2")
+      .select("cited_by_count, h_index, works_count, i10_index, two_yr_mean_citedness, counts_by_year")
+      .eq("hcp_id", hcpId)
+      .maybeSingle();
+
     const [
       scoreResult,
       rankResult,
@@ -1138,6 +1159,7 @@ export async function getHCPDetail(
       opResult,
       pubsResult,
       trialsResult,
+      metricsResult,
     ] = await Promise.all([
       scorePromise,
       rankPromise,
@@ -1146,6 +1168,7 @@ export async function getHCPDetail(
       openPaymentsPromise,
       publicationsPromise,
       trialsPromise,
+      metricsPromise,
     ]);
 
     // 5) Compose response.
@@ -1179,6 +1202,7 @@ export async function getHCPDetail(
       trials,
       therapeuticArea: taSlug,
       scope: { type: scope.scopeType, value: scope.scopeValue },
+      authorMetrics: (metricsResult as { data?: unknown }).data ?? null,
     };
 
     return { data: response, error: null };

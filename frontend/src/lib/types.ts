@@ -30,6 +30,12 @@ export interface HCP {
   open_payments_lifetime?: number | null;
   /** From hcps.total_career_pubs when loaded (e.g. Established PUBS pill). */
   total_career_pubs?: number | null;
+  /** Lifetime citations from OpenAlex (most recent snapshot). */
+  total_citations?: number | null;
+  /** h-index from OpenAlex (most recent snapshot). */
+  h_index?: number | null;
+  /** Lifetime works count from OpenAlex. */
+  works_count?: number | null;
   paymentsByYear?: {
     py2022?: number | null;
     py2023?: number | null;
@@ -188,4 +194,5 @@ export interface HCPDetailResponse {
   trials: Array<Record<string, unknown>>;
   therapeuticArea: string;
   scope: { type: "country" | "region" | "global"; value: string | null };
+  authorMetrics: Record<string, unknown> | null;
 }
