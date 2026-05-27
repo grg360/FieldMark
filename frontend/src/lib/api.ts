@@ -280,7 +280,7 @@ export async function getRisingStars(
     // 2) Fetch scoped rank rows from pre-joined view.
     let rankQuery = supabase
       .from("hcp_rising_star_ranks_v2")
-      .select("hcp_id, rank, percentile, scope_size, normalized_score, score_at_rank")
+      .select("hcp_id, rank, percentile, scope_size, normalized_score, score_at_rank, composite_score, pub_velocity_score, citation_trajectory_score, trial_investigator_score, career_first_pub_year, total_career_pubs")
       .eq("therapeutic_area_id", taId)
       .eq("scope_type", scope.scopeType)
       .order("rank", { ascending: true })
