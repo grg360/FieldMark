@@ -49,6 +49,8 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 from tqdm import tqdm
 
+from score_ranking import compute_and_write_ranks
+
 
 def get_table_name(base_name: str, target_version: str) -> str:
     if target_version == "v2":
@@ -1123,6 +1125,20 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
             supabase, scores, target_version=target_version, scoring_run_id=scoring_run_id
         )
         print(f"Upserted {upserted} hcp_scores records.")
+
+    # Rank computation is v2-only because hcp_score_ranks_v2 only exists in v2.
+    # Respects the dry_run flag (computes ranks and prints stats, no writes).
+    if target_version == "v2":
+        print("\nComputing country/region/global ranks for rising stars...")
+        compute_and_write_ranks(
+            client=supabase,
+            score_rows=scores,
+            cohort="rising",
+            scoring_run_id=scoring_run_id,
+            dry_run=dry_run,
+        )
+    else:
+        print("\nSkipping rank computation (target_version=v1; ranks are v2-only).")
 
     print_top_rising_stars(scores, hcps, therapeutic_areas)
     print("\nScoring pipeline complete.")
