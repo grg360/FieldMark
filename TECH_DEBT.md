@@ -214,3 +214,102 @@ Eventual schema (refine before building):
 This is a Phase 8+ item — tied to identity infrastructure, not to filter UX.
 
 Effort: ~4-6 hours once LinkedIn OAuth is in place. Not demo-blocking.
+
+## v2 enrichment audit (May 28, 2026)
+
+Audit of v2 table population revealed several enrichment workstreams that were structurally rebuilt but not run-to-completion. The link tables exist; the payload fetches did not finish.
+
+### Empty v2 tables (zero rows):
+- `hcp_narratives_v2` (Claude API narrative regeneration pending; ~3 hours runtime, ~$15)
+- `hcp_affiliation_profile_v2` (purpose unclear — investigate before populating)
+- `dol_matches_v2` (DOL matching layer never ran)
+- `npi_match_proposals_v2` (NPI matching proposals never generated or merged)
+- `trial_investigator_match_proposals_v2` (trial investigator matching never ran or merged)
+
+### Partially populated tables (link exists, payload missing):
+- `hcp_openalex_authors_v2`: 239,306 rows, BUT `corpus_pub_count`, `first_seen_pub_year`, `last_seen_pub_year` are 0% populated. The author identity resolution (Step C) completed but the author payload fetch (citations, h-index, works count, career year range) never ran. Being addressed in the OpenAlex author metrics enrichment work (separate TECH_DEBT entry).
+
+### Sparsely populated tables (expected, monitored):
+- `social_posts_v2`: 914 rows. Twitter capture is active but new; #ASCO26 capture should grow this rapidly through the conference.
+- `social_users_v2`: 392 rows. Growing alongside posts.
+
+### Action items in priority order:
+1. OpenAlex author metrics enrichment (separate entry — actively building)
+2. Narratives regeneration (~3 hours Claude API run, ~$15) — high visual impact on detail pages
+3. Investigate `hcp_affiliation_profile_v2` purpose — schema exists but no documentation of intended population
+4. Audit `dol_matches_v2`, `npi_match_proposals_v2`, `trial_investigator_match_proposals_v2` for whether they're abandoned or intended-but-not-yet-run
+
+Lesson: Future v2-style rebuilds need a completion checklist that distinguishes "schema migrated" from "data populated" from "downstream consumers wired." All three states must be tracked separately.
+
+## Citation source decision: OpenAlex primary, Scholar/Scopus deferred
+
+After evaluation, OpenAlex is the chosen primary citation source for FieldMark. Decision rationale and the deferred alternatives are documented here for future reference.
+
+### Why OpenAlex (primary):
+- Free at any scale, no commercial license restrictions
+- Stable API contract, predictable rate limits with paid key
+- Identity resolution already complete: `hcp_openalex_authors_v2` has 239K HCP-to-author mappings
+- Author payload returns four useful fields in one call: `cited_by_count`, `works_count`, `summary_stats.h_index`, `summary_stats.i10_index`, plus `counts_by_year` time series
+- Methodology is reproducible, peer-reviewed corpus only (no grey literature inflation)
+- Redistribution unrestricted — appropriate for commercial B2B SaaS
+
+### Why Scholar was rejected (for now):
+- API access is brittle: Google actively blocks scrapers, requires ScraperAPI ($150/mo at scale)
+- Author matching is heuristic (name + institution); ambiguity rate ~5-15% with no clean resolution path
+- Dual-source attribution risk: if Scholar and OpenAlex disambiguate the same name differently, we'd display competing numbers attributed to different humans — worse than showing no Scholar data
+- Methodology mixes grey literature, conference abstracts, theses — inflates numbers in ways that are not auditable
+- Could be added as a Phase 8+ supplementary source against threshold-selected Rising Stars + Established only, with explicit second-field labeling and cross-validation logic
+
+### Why Scopus was rejected:
+- Commercial API license: $50K-$250K/year, "contact us for pricing" enterprise sales motion
+- Redistribution restrictions: cannot display Scopus-derived data to non-Scopus-subscribers, blocking most MSL prospects
+- Termination clause risk: Elsevier owns SciVal, which competes directly with FieldMark's positioning; access could be revoked
+- Free tier is academic/non-commercial only — FieldMark is commercial B2B SaaS, ineligible
+- Even at full pricing, the redistribution and termination risks remain
+
+### Methodology framing for product copy:
+"FieldMark uses OpenAlex as our citation backbone. OpenAlex applies algorithmic author disambiguation, indexes only peer-reviewed content, and provides openly auditable methodology. This stands in contrast to Scopus (paywalled, contractually restrictive) and Google Scholar (no formal methodology, includes grey literature). Our choice reflects a commitment to reproducible, transparent intelligence."
+
+Surface this on a future Methodology page (Phase 8).
+
+## Snapshot-based author metrics architecture
+
+Author metrics (citation count, h-index, works count) are deliberately stored as time-stamped snapshots, not as inline rollups on `hcps_v2` or extensions to `hcp_openalex_authors_v2`.
+
+### Decision: new table `hcp_author_metrics_v2`, PRIMARY KEY (hcp_id, snapshot_date)
+
+### Rationale:
+- Metrics change continuously (citations accumulate, h-index increments). Inline rollup is always slightly stale.
+- Time-series data IS the rising-star detection signal. "Citation velocity over the last 90 days" requires snapshots, not point-in-time values.
+- Collaborative Orbit and Network Intelligence features (Phase 2) will read from this table for "what changed" displays
+- Snapshot history accumulates value: 6 months from now we have 26 weeks of trajectory per HCP. 1 year, 52 weeks. The longer the platform runs, the richer the temporal signal.
+- Re-runs are safe: new snapshot row, old snapshots preserved.
+
+### Schema (to be migrated separately):
+```sql
+CREATE TABLE hcp_author_metrics_v2 (
+  hcp_id UUID NOT NULL REFERENCES hcps_v2(id) ON DELETE CASCADE,
+  openalex_author_id TEXT NOT NULL,
+  snapshot_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  cited_by_count INTEGER,
+  works_count INTEGER,
+  h_index INTEGER,
+  i10_index INTEGER,
+  counts_by_year JSONB,
+  two_yr_mean_citedness NUMERIC,
+  enrichment_run_id UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (hcp_id, snapshot_date)
+);
+
+CREATE INDEX hcp_author_metrics_v2_hcp_idx ON hcp_author_metrics_v2 (hcp_id);
+CREATE INDEX hcp_author_metrics_v2_snapshot_idx ON hcp_author_metrics_v2 (snapshot_date DESC);
+```
+
+### Read pattern for frontend:
+A view or materialized view `hcp_author_metrics_latest_v2` returns the most recent snapshot per HCP. The `getRisingStars` and `getEstablished` functions read from this view. Refresh after each enrichment run.
+
+### Future:
+- Weekly refresh pipeline (Phase 8)
+- "Citation velocity over last N days" computed from snapshot deltas
+- Wire to Collaborative Orbit ("growing connection" detection)
