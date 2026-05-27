@@ -573,29 +573,6 @@ export async function getTACounts(
       return { data: null, error: `Rising star selected count failed: ${risingStarCountResult.error.message}` };
     }
 
-    const [establishedTierResult, communityTierResult] = await Promise.all([
-      supabase
-        .from("hcp_scores_v2")
-        .select("hcp_id")
-        .eq("therapeutic_area_id", taId)
-        .eq("tier", "established"),
-      supabase
-        .from("hcp_scores_v2")
-        .select("hcp_id")
-        .eq("therapeutic_area_id", taId)
-        .eq("tier", "community"),
-    ]);
-
-    if (establishedTierResult.error) {
-      return { data: null, error: `Established tier query failed: ${establishedTierResult.error.message}` };
-    }
-    if (communityTierResult.error) {
-      return { data: null, error: `Community tier query failed: ${communityTierResult.error.message}` };
-    }
-
-    const establishedTierIds = (establishedTierResult.data ?? []).map((r: any) => String(r.hcp_id));
-    const communityTierIds = (communityTierResult.data ?? []).map((r: any) => String(r.hcp_id));
-
     let risingPoolQuery: any;
     if (scope.scopeType === "global") {
       // Global branch: scope_type='global' rows only to avoid per-region duplicates.
@@ -625,24 +602,16 @@ export async function getTACounts(
       communityResult,
     ] = await Promise.all([
       risingPoolQuery,
-      establishedTierIds.length > 0
-        ? applyScope(
-            supabase
-              .from("hcp_score_ranks_v2")
-              .select("hcp_id", { count: "exact", head: true })
-              .eq("cohort", "established")
-              .in("hcp_id", establishedTierIds),
-          )
-        : Promise.resolve({ count: 0, error: null }),
-      communityTierIds.length > 0
-        ? applyScope(
-            supabase
-              .from("hcp_score_ranks_v2")
-              .select("hcp_id", { count: "exact", head: true })
-              .eq("cohort", "community")
-              .in("hcp_id", communityTierIds),
-          )
-        : Promise.resolve({ count: 0, error: null }),
+      supabase
+        .from("hcp_scores_v2")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "established"),
+      supabase
+        .from("hcp_scores_v2")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "community"),
     ]);
 
     if (risingPoolResult.error) {

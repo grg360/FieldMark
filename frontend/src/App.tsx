@@ -208,7 +208,7 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     specialty: formatTherapeuticAreaLabel(item.therapeutic_area),
     score: item.composite_score,
     normalizedScore: Number(item.normalized_score ?? 0),
-    firstPubYear: Number(item.first_pub_year ?? 0),
+    firstPubYear: Number(item.firstPubYear ?? item.first_pub_year ?? 0),
     explanation: item.narrative ?? "Narrative generating � check back soon.",
     pubVel: formatPublicationVelocity(item.pub_velocity),
     citTraj: item.citTraj ?? null,
