@@ -58,17 +58,25 @@ POLITE_POOL_EMAIL = "garrett@fieldmark.local"   # used in mailto for polite pool
 
 
 # ============================================================
-# Disambiguation conflation thresholds
+# Data quality / conflation detection thresholds
 # ============================================================
 # OpenAlex author disambiguation can over-aggregate (multiple distinct humans
-# merged into one author entity). Detected by extreme divergence between
-# OpenAlex works_count and our v2 corpus' total_career_pubs, combined with
-# superstar-tier absolute metrics.
+# merged into one author entity, especially for common Chinese/Indian names).
+# We use two independent plausibility checks, computed from OpenAlex's own
+# data but applying human-output constraints.
 
-CONFLATION_RATIO_THRESHOLD = 5.0     # works_count / total_career_pubs ratio
-CONFLATION_WORKS_FLOOR = 1500         # min OpenAlex works_count to consider
-CONFLATION_CITES_FLOOR = 100000       # OR min lifetime citations
-CONFLATION_H_FLOOR = 150              # OR min h-index
+# Check 1: pubs-per-year heuristic.
+# The most productive human researchers sustain ~30-40 pubs/year. Anything
+# above 40 sustained over a long career strongly suggests entity aggregation.
+PUBS_PER_YEAR_THRESHOLD = 40.0
+PUBS_PER_YEAR_MIN_CAREER = 10        # Only apply if career span is at least 10 years
+PUBS_PER_YEAR_MIN_WORKS = 500        # Only apply if works_count is meaningful
+
+# Check 2: h-index disproportionality.
+# h-index > 150 with works_count > 2000 is essentially impossible for one
+# human — combined they indicate aggregation of multiple researchers' careers.
+H_INDEX_DISPROPORTION_H = 150
+H_INDEX_DISPROPORTION_WORKS = 2000
 
 
 # ============================================================
@@ -111,6 +119,7 @@ class MetricsRow:
     enrichment_run_id: str
     fetch_status: Optional[str]
     fetch_error: Optional[str]
+    data_quality_flags: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -186,6 +195,56 @@ def parse_author_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "i10_index": summary_stats.get("i10_index"),
         "two_yr_mean_citedness": summary_stats.get("2yr_mean_citedness"),
         "counts_by_year": payload.get("counts_by_year"),
+    }
+
+
+def compute_data_quality_flags(parsed: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Compute structured data quality flags for a fetched author payload.
+
+    Returns None if no checks failed (no flags needed).
+    Returns a dict with conflation_suspected=true and checks_failed list if
+    any plausibility check failed.
+
+    Checks are independent of our v2 corpus — they use OpenAlex's own counts_by_year
+    and summary_stats and apply human-plausibility constraints.
+    """
+    works_count = parsed.get("works_count") or 0
+    h_index = parsed.get("h_index") or 0
+    counts_by_year = parsed.get("counts_by_year") or []
+
+    checks_failed: List[str] = []
+    pubs_per_year: Optional[float] = None
+
+    # Check 1: pubs-per-year heuristic
+    if works_count >= PUBS_PER_YEAR_MIN_WORKS and len(counts_by_year) > 0:
+        # counts_by_year is a list of {year, works_count, cited_by_count} from OpenAlex,
+        # covering up to the last ~10 years. We need the full career span though,
+        # so we use the year range observed.
+        years = [item.get("year") for item in counts_by_year if item.get("year") is not None]
+        if years:
+            year_min = min(years)
+            year_max = max(years)
+            career_span = max(1, year_max - year_min + 1)
+            if career_span >= PUBS_PER_YEAR_MIN_CAREER:
+                pubs_per_year = works_count / career_span
+                if pubs_per_year > PUBS_PER_YEAR_THRESHOLD:
+                    checks_failed.append("pubs_per_year_excessive")
+
+    # Check 2: h-index disproportionality
+    if h_index > H_INDEX_DISPROPORTION_H and works_count > H_INDEX_DISPROPORTION_WORKS:
+        checks_failed.append("h_index_disproportionate_to_works")
+
+    if not checks_failed:
+        return None
+
+    return {
+        "conflation_suspected": True,
+        "checks_failed": checks_failed,
+        "pubs_per_year": pubs_per_year,
+        "h_index": h_index,
+        "works_count": works_count,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -289,6 +348,7 @@ def upsert_batch(client: Client, rows: List[MetricsRow], dry_run: bool) -> None:
             "enrichment_run_id": r.enrichment_run_id,
             "fetch_status": r.fetch_status,
             "fetch_error": r.fetch_error,
+            "data_quality_flags": r.data_quality_flags,
         })
     client.table("hcp_author_metrics_v2").upsert(
         payload,
@@ -355,6 +415,7 @@ def run(args: argparse.Namespace) -> int:
         t0 = time.monotonic()
         fetch_status = None
         fetch_error = None
+        quality_flags = None
         parsed = {
             "cited_by_count": None,
             "works_count": None,
@@ -367,36 +428,9 @@ def run(args: argparse.Namespace) -> int:
         try:
             payload = fetch_author(link.openalex_author_id, openalex_key, POLITE_POOL_EMAIL)
             parsed = parse_author_payload(payload)
+            quality_flags = compute_data_quality_flags(parsed)
 
-            # Disambiguation conflation check: extreme divergence between OpenAlex
-            # works_count and our v2 corpus' total_career_pubs, combined with
-            # superstar-tier metrics, signals likely author-entity over-aggregation.
-            works_count = parsed.get("works_count")
-            cited_by_count = parsed.get("cited_by_count")
-            h_index = parsed.get("h_index")
-            corpus_pubs = link.total_career_pubs
-
-            is_superstar_tier = (
-                (works_count is not None and works_count > CONFLATION_WORKS_FLOOR)
-                or (cited_by_count is not None and cited_by_count > CONFLATION_CITES_FLOOR)
-                or (h_index is not None and h_index > CONFLATION_H_FLOOR)
-            )
-
-            ratio_excessive = False
-            if (
-                corpus_pubs is not None
-                and corpus_pubs > 0
-                and works_count is not None
-                and works_count > 0
-            ):
-                ratio_excessive = (works_count / corpus_pubs) > CONFLATION_RATIO_THRESHOLD
-
-            if is_superstar_tier and ratio_excessive:
-                fetch_status = "disambiguation_suspect"
-                fetch_error = (
-                    f"works_count={works_count} vs total_career_pubs={corpus_pubs} "
-                    f"(ratio>{CONFLATION_RATIO_THRESHOLD}); h_index={h_index} cites={cited_by_count}"
-                )
+            if quality_flags is not None and quality_flags.get("conflation_suspected"):
                 with stats_lock:
                     stats.flagged_disambiguation_suspect += 1
             else:
@@ -429,6 +463,7 @@ def run(args: argparse.Namespace) -> int:
             enrichment_run_id=enrichment_run_id,
             fetch_status=fetch_status,
             fetch_error=fetch_error,
+            data_quality_flags=quality_flags,
         )
 
     # Filter out skipped links before dispatching
