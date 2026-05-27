@@ -264,14 +264,14 @@ export async function getRisingStars(
     const offset = options.offset ?? 0;
 
     // Build a scope-aware builder. scope_value can be null for global.
-    const applyScope = <T>(q: T): T => {
-      let query = (q as any).eq("therapeutic_area_id", taId).eq("scope_type", scope.scopeType);
+    const applyScope = (q: any): any => {
+      let query = q.eq("therapeutic_area_id", taId).eq("scope_type", scope.scopeType);
       if (scope.scopeValue === null) {
         query = query.is("scope_value", null);
       } else {
         query = query.eq("scope_value", scope.scopeValue);
       }
-      return query as T;
+      return query;
     };
 
     // 1) Count threshold-selected rising stars in scope.
@@ -564,7 +564,7 @@ export async function getTACounts(
 
     // Build the scope filter for hcp_score_ranks_v2. Note: scope_value can be
     // null (global scope), so we use .is() for null comparisons.
-    const applyScope = (q: ReturnType<typeof supabase.from>) => {
+    const applyScope = (q: any): any => {
       let query = q.eq("therapeutic_area_id", taId).eq("scope_type", scope.scopeType);
       if (scope.scopeValue === null) {
         query = query.is("scope_value", null);
