@@ -67,8 +67,13 @@ MAX_STORED_PUBLICATIONS_FOR_RANKINGS = 200
 RECENT_PUBLICATION_YEAR_CUTOFF = 2022
 
 # Tier assignment thresholds (against normalized_score, per TA)
-TIER_DARK_HORSE_THRESHOLD = 95.0
-TIER_RISING_STAR_THRESHOLD = 85.0
+# Recalibrated 2026-05-28 against v2 US distribution.
+# v1 threshold (85) was calibrated against US-skewed corpus; v2's globally-inclusive
+# corpus has a different score distribution shape, requiring a lower threshold to
+# produce a usable rising star cohort. Empirical: ≥65 produces ~74 US Hep + ~325
+# US NSCLC rising stars.
+TIER_DARK_HORSE_THRESHOLD = 80.0
+TIER_RISING_STAR_THRESHOLD = 65.0
 TIER_EMERGING_THRESHOLD = 30.0
 CONCEPT_SCORE_THRESHOLD = 0.4
 

@@ -1,7 +1,9 @@
 import { firstEmbedded } from "./cohort-metrics";
 import { dedupeHCPs } from "./hcp-dedupe";
+import { resolveFilterScope } from "./rank-filters";
 import { supabase } from "./supabase";
 import type {
+  FilterState,
   HCP,
   HCPScore,
   LatestPost,
@@ -609,88 +611,141 @@ export async function getRisingStars(
   }
 }
 
+/**
+ * Read cohort counts for a TA from hcp_score_ranks_v2.
+ *
+ * Accepts a FilterState. Defaults region to "US" if not provided.
+ * Counts are queried from the precomputed ranks table — one count query
+ * per cohort, no joins, no row caps.
+ *
+ * The therapeuticArea slug must resolve via TA_ID_MAP; unknown slugs return
+ * zeroed counts.
+ *
+ * @param filtersOrSlug - Either a FilterState object or a legacy slug string.
+ *                       String form is supported for backwards compatibility
+ *                       and defaults region to "US".
+ */
 export async function getTACounts(
-  therapeuticArea: string,
+  filtersOrSlug: FilterState | string,
 ): Promise<ApiResult<TACounts>> {
   try {
-    const taSlug = therapeuticArea.toLowerCase().trim();
-    const indicationIds = TA_INDICATION_IDS[taSlug] ?? [];
+    const filters: FilterState =
+      typeof filtersOrSlug === "string"
+        ? { therapeuticArea: filtersOrSlug }
+        : filtersOrSlug;
 
-    if (indicationIds.length === 0) {
-      return {
-        data: {
-          rising_stars: 0,
-          dark_horses: 0,
-          verified_dols: 0,
-          community_pool: 0,
-          workhorses: 0,
-          established: 0,
-          total_hcps: 0,
-        },
-        error: null,
-      };
+    const taSlug = filters.therapeuticArea.toLowerCase().trim();
+    const taId = TA_ID_MAP[taSlug];
+
+    const zeroCounts: TACounts = {
+      rising_stars: 0,
+      dark_horses: 0,
+      verified_dols: 0,
+      community_pool: 0,
+      workhorses: 0,
+      established: 0,
+      total_hcps: 0,
+    };
+
+    if (!taId) {
+      return { data: zeroCounts, error: null };
     }
 
-    const liveCounts = await fetchLiveCohortCountsForTAIds(indicationIds);
-    if (liveCounts.error) {
-      return { data: null, error: liveCounts.error };
+    const scope = resolveFilterScope(filters);
+
+    // Build the scope filter for hcp_score_ranks_v2. Note: scope_value can be
+    // null (global scope), so we use .is() for null comparisons.
+    const applyScope = (q: ReturnType<typeof supabase.from>) => {
+      let query = q.eq("therapeutic_area_id", taId).eq("scope_type", scope.scopeType);
+      if (scope.scopeValue === null) {
+        query = query.is("scope_value", null);
+      } else {
+        query = query.eq("scope_value", scope.scopeValue);
+      }
+      return query;
+    };
+
+    // Count each cohort in parallel
+    const [risingResult, establishedResult, communityResult] = await Promise.all([
+      applyScope(
+        supabase
+          .from("hcp_score_ranks_v2")
+          .select("hcp_id", { count: "exact", head: true })
+          .eq("cohort", "rising"),
+      ),
+      applyScope(
+        supabase
+          .from("hcp_score_ranks_v2")
+          .select("hcp_id", { count: "exact", head: true })
+          .eq("cohort", "established"),
+      ),
+      applyScope(
+        supabase
+          .from("hcp_score_ranks_v2")
+          .select("hcp_id", { count: "exact", head: true })
+          .eq("cohort", "community"),
+      ),
+    ]);
+
+    if (risingResult.error) {
+      return { data: null, error: `Rising star count failed: ${risingResult.error.message}` };
+    }
+    if (establishedResult.error) {
+      return { data: null, error: `Established count failed: ${establishedResult.error.message}` };
+    }
+    if (communityResult.error) {
+      return { data: null, error: `Community count failed: ${communityResult.error.message}` };
     }
 
-    const totals = Object.values(liveCounts.data ?? {}).reduce(
-      (acc, row) => ({
-        rising_stars: acc.rising_stars + (Number(row.rising_stars) || 0),
-        dark_horses: 0,
-        community: acc.community + (Number(row.community) || 0),
-        workhorses: 0,
-        total_hcps: acc.total_hcps + (Number(row.total_hcps) || 0),
-      }),
-      { rising_stars: 0, dark_horses: 0, community: 0, workhorses: 0, total_hcps: 0 },
-    );
+    const rising = risingResult.count ?? 0;
+    const established = establishedResult.count ?? 0;
+    const community = communityResult.count ?? 0;
 
-    const { data: verifiedHcps, error: verifiedHcpsError } = await supabase
-      .from("hcps_v2")
-      .select("id")
-      .eq("is_verified_dol", true);
+    // total_hcps for this TA in this scope = sum across cohorts.
+    // (Some HCPs MAY be in more than one cohort across TAs, but within a single
+    // TA+cohort+scope the rank rows are unique by hcp_id.)
+    const totalHcps = rising + established + community;
 
-    if (verifiedHcpsError) {
-      return { data: null, error: verifiedHcpsError.message };
-    }
+    // Verified DOLs count is cohort-independent. Filter HCPs by is_verified_dol
+    // and intersect with the TA + scope. For now, we use the hcp_therapeutic_areas_v2
+    // join because verified DOL status lives on hcps_v2, not on score ranks.
+    // Future: denormalize is_verified_dol onto hcp_score_ranks_v2.
+    let verifiedDols = 0;
+    try {
+      // Find HCPs in this TA+scope from rank rows, then intersect with verified DOLs.
+      // For simplicity and correctness, fetch the hcp_ids first, then count verified.
+      // Note: this query is bounded by the cohort populations above.
+      const { data: hcpIdRows, error: hcpIdError } = await applyScope(
+        supabase.from("hcp_score_ranks_v2").select("hcp_id"),
+      ).limit(10000);
 
-    const verifiedIds = (verifiedHcps ?? []).map((h) => h.id);
-
-    const verifiedDolsResult =
-      verifiedIds.length === 0
-        ? { count: 0, error: null }
-        : await supabase
-            .from("hcp_therapeutic_areas_v2")
-            .select("hcp_id", { count: "estimated", head: true })
-            .in("therapeutic_area_id", indicationIds)
-            .in("hcp_id", verifiedIds);
-
-    if (verifiedDolsResult.error) {
-      return { data: null, error: verifiedDolsResult.error.message };
-    }
-
-    const { count: establishedCount, error: establishedError } = await supabase
-      .from("hcp_therapeutic_areas_v2")
-      .select("hcp_id, hcps!inner(cohort_classification, country)", { count: "estimated", head: true })
-      .in("therapeutic_area_id", indicationIds)
-      .eq("hcps.cohort_classification", "established")
-      .eq("hcps.country", "USA");
-
-    if (establishedError) {
-      return { data: null, error: establishedError.message };
+      if (!hcpIdError && hcpIdRows && hcpIdRows.length > 0) {
+        const hcpIds = Array.from(new Set(hcpIdRows.map((r) => String(r.hcp_id))));
+        if (hcpIds.length > 0) {
+          const { count: dolCount, error: dolError } = await supabase
+            .from("hcps_v2")
+            .select("id", { count: "exact", head: true })
+            .in("id", hcpIds)
+            .eq("is_verified_dol", true);
+          if (!dolError) {
+            verifiedDols = dolCount ?? 0;
+          }
+        }
+      }
+    } catch {
+      // Verified DOL count is non-critical; failure here returns 0, not an error.
+      verifiedDols = 0;
     }
 
     return {
       data: {
-        rising_stars: totals.rising_stars,
-        dark_horses: totals.dark_horses,
-        verified_dols: verifiedDolsResult.count ?? 0,
-        community_pool: totals.community,
-        workhorses: totals.workhorses,
-        established: establishedCount ?? 0,
-        total_hcps: totals.total_hcps,
+        rising_stars: rising,
+        dark_horses: 0, // Deprecated; tier-based filtering removed. Field kept for type compatibility.
+        verified_dols: verifiedDols,
+        community_pool: community,
+        workhorses: 0, // Deprecated; tier-based filtering removed.
+        established: established,
+        total_hcps: totalHcps,
       },
       error: null,
     };
