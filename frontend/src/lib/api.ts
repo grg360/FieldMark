@@ -129,10 +129,6 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
       hcp.nppes_practice_setting != null && String(hcp.nppes_practice_setting).trim() !== ""
         ? String(hcp.nppes_practice_setting)
         : null,
-    nppes_practice_address:
-      hcp.nppes_practice_address != null && String(hcp.nppes_practice_address).trim() !== ""
-        ? String(hcp.nppes_practice_address)
-        : null,
     nppes_practice_zip:
       hcp.nppes_practice_zip != null && String(hcp.nppes_practice_zip).trim() !== ""
         ? String(hcp.nppes_practice_zip)
@@ -324,7 +320,6 @@ export async function getRisingStars(
             nppes_practice_city,
             nppes_practice_state,
             nppes_practice_setting,
-            nppes_practice_address,
             nppes_practice_zip,
             npi_number,
             npi_specialty,
@@ -979,7 +974,6 @@ export async function getHCPDetail(
           nppes_career_stage_years,
           nppes_practice_city,
           nppes_practice_state,
-          nppes_practice_address,
           nppes_practice_zip,
           nppes_practice_setting,
           is_verified_dol

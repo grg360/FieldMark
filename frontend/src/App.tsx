@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import TASelectionScreen from "./components/TASelectionScreen";
@@ -158,7 +158,6 @@ function detailResponseToRisingStar(detail: HCPDetailResponse): RisingStar {
     nppes_practice_city: optionalString(hcp.nppes_practice_city),
     nppes_practice_state: optionalString(hcp.nppes_practice_state),
     nppes_practice_setting: optionalString(hcp.nppes_practice_setting),
-    nppes_practice_address: optionalString(hcp.nppes_practice_address),
     nppes_practice_zip: optionalString(hcp.nppes_practice_zip),
     institution_full: optionalString(hcp.institution_full),
     npi_number: optionalString(hcp.npi_number),
@@ -212,7 +211,7 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     score: item.composite_score,
     normalizedScore: Number(item.normalized_score ?? 0),
     firstPubYear: Number(item.first_pub_year ?? 0),
-    explanation: item.narrative ?? "Narrative generating — check back soon.",
+    explanation: item.narrative ?? "Narrative generating � check back soon.",
     pubVel: formatPublicationVelocity(item.pub_velocity),
     citTraj: item.citTraj ?? null,
     trialScore: item.trialScore ?? null,
@@ -230,7 +229,6 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     nppesPracticeCity: item.nppes_practice_city ?? null,
     nppesPracticeState: item.nppes_practice_state ?? null,
     nppesPracticeSetting: item.nppes_practice_setting ?? null,
-    nppesPracticeAddress: item.nppes_practice_address ?? null,
     nppesPracticeZip: item.nppes_practice_zip ?? null,
     institutionFull: item.institution_full ?? null,
     npiNumber: item.npi_number ?? null,
@@ -457,7 +455,7 @@ function AppContent() {
     setTrayOpen(false);
   }
 
-  // Detail â†’ Note
+  // Detail → Note
   function handleAddNoteFromDetail() {
     setCurrentScreen("note");
   }
@@ -637,7 +635,7 @@ function AppContent() {
         >
           {selectedIndication === "All"
             ? selectedTA
-            : `${selectedTA} · ${selectedIndication}`}
+            : `${selectedTA} � ${selectedIndication}`}
         </span>
         {track !== "social" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -817,3 +815,4 @@ export default function App() {
     </TrackProvider>
   );
 }
+

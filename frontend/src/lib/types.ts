@@ -7,7 +7,6 @@ export interface HCP {
   nppes_practice_city?: string | null;
   nppes_practice_state?: string | null;
   nppes_practice_setting?: string | null;
-  nppes_practice_address?: string | null;
   nppes_practice_zip?: string | null;
   institution_full?: string | null;
   npi_number?: string | null;
@@ -196,3 +195,4 @@ export interface HCPDetailResponse {
   scope: { type: "country" | "region" | "global"; value: string | null };
   authorMetrics: Record<string, any> | null;
 }
+
