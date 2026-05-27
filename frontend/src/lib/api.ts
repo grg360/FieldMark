@@ -155,7 +155,7 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     citation_trajectory: Number(row.citation_trajectory_score ?? 0),
     trial_score: Number(row.trial_investigator_score ?? 0),
     citTraj: row.citation_trajectory_score ?? null,
-    pubVel: row.pub_velocity_score == null ? "�" : `${Number(row.pub_velocity_score).toFixed(1)}`,
+    pubVel: row.pub_velocity_score == null ? "?" : `${Number(row.pub_velocity_score).toFixed(1)}`,
     firstPubYear: row.career_first_pub_year ?? null,
     trialScore: row.trial_investigator_score ?? null,
     career_multiplier: 1,
@@ -387,12 +387,12 @@ export async function getRisingStars(
       (metricsResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
     );
 
-    // 4) Apply industry filter (preserve existing behavior — pharma HCPs excluded from surface).
+    // 4) Apply industry filter (preserve existing behavior ? pharma HCPs excluded from surface).
     const filteredRankRows = rankRows.filter((rr: any) => {
       const hcp = hcpById.get(String(rr.hcp_id));
       if (!hcp) return false;
       const inst = String(hcp.institution_normalized ?? hcp.institution_raw ?? "").toLowerCase();
-      if (!inst) return true; // No institution string → don't filter (community HCPs have null institution)
+      if (!inst) return true; // No institution string ? don't filter (community HCPs have null institution)
       return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
     });
 
@@ -447,11 +447,13 @@ export async function getRisingStars(
 
       // Compose enriched row for mapRisingStarRow (which expects hcps, hcp_medicare_summary, hcp_open_payments_summary fields).
       const enrichedRow = {
-        composite_score: Number(rr.score_at_rank ?? normalizedScore),
+        composite_score: Number(rr.composite_score ?? rr.score_at_rank ?? normalizedScore),
         normalized_score: normalizedScore,
-        pub_velocity_score: 0,
-        citation_trajectory_score: 0,
-        trial_investigator_score: 0,
+        pub_velocity_score: rr.pub_velocity_score ?? null,
+        citation_trajectory_score: rr.citation_trajectory_score ?? null,
+        trial_investigator_score: rr.trial_investigator_score ?? null,
+        career_first_pub_year: rr.career_first_pub_year ?? null,
+        total_career_pubs: rr.total_career_pubs ?? null,
         tier: "rising_star",
         hcps: {
           ...hcp,
@@ -495,7 +497,7 @@ export async function getRisingStars(
  * Read cohort counts for a TA from hcp_score_ranks_v2.
  *
  * Accepts a FilterState. Defaults region to "US" if not provided.
- * Counts are queried from the precomputed ranks table — one count query
+ * Counts are queried from the precomputed ranks table ? one count query
  * per cohort, no joins, no row caps.
  *
  * The therapeuticArea slug must resolve via TA_ID_MAP; unknown slugs return
@@ -1066,7 +1068,7 @@ export async function getHCPDetail(
       .eq("hcp_id", hcpId)
       .maybeSingle();
 
-    // Publications: join publication_therapeutic_areas_v2 (filter to TA) → publications_v2.
+    // Publications: join publication_therapeutic_areas_v2 (filter to TA) ? publications_v2.
     const publicationsPromise = supabase
       .from("publication_therapeutic_areas_v2")
       .select(
