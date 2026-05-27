@@ -20,10 +20,9 @@ import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
-import type { FeedCohort } from "./lib/api";
 import { getHCPDetail, getRisingStars, getTACounts, getTAIdForLabel, getTADisplayName } from "./lib/api";
 import { useFilterContext } from "./lib/filter-context";
-import { TrackProvider, useTrack, type Track } from "./lib/TrackContext";
+import { TrackProvider, useTrack } from "./lib/TrackContext";
 import type { HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
 import { RegionSelector } from "./components/RegionSelector";
 
@@ -97,13 +96,6 @@ function getTASlug(ta: string): string {
 function formatPublicationVelocity(value: number): string {
   if (!Number.isFinite(value)) return "0.0x";
   return `${value.toFixed(1)}x`;
-}
-
-function feedCohortForTrack(track: Track): FeedCohort {
-  if (track === "rising-stars") return "rising_star";
-  if (track === "community") return "community";
-  if (track === "established") return "established";
-  return "rising_star";
 }
 
 function formatTherapeuticAreaLabel(value: string | null | undefined): string {

@@ -40,74 +40,6 @@ const TA_ID_MAP: Record<string, string> = {
   immunology: "4cf07827-ff1c-451e-832e-0e0a14ea9c86",
 };
 
-/** Indication UUIDs that roll up to each TA for `ta_cohort_counts_cache` (onboarding counts). */
-const TA_INDICATION_IDS: Record<string, string[]> = {
-  "rare-disease": ["833e7b38-d01b-409e-82c0-71eb29e138a0"],
-  hepatology: ["9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e"],
-  oncology: ["c0065b03-a25e-4e9a-bde4-4b4d0db7827d"], // NSCLC; add more oncology indication ids as they're loaded
-  nsclc: ["c0065b03-a25e-4e9a-bde4-4b4d0db7827d"], // same rollup as oncology; slug used by getAllTACounts / getTASlug("Oncology")
-  immunology: [], // coming soon
-};
-
-async function fetchLiveCohortCountsForTAIds(
-  indicationIds: string[],
-): Promise<
-  ApiResult<
-    Record<
-      string,
-      { established: number; rising_stars: number; community: number; total_hcps: number }
-    >
-  >
-> {
-  const { data, error } = await supabase
-    .from("hcp_therapeutic_areas_v2")
-    .select("therapeutic_area_id, hcp_id, hcps_v2!inner(id, cohort_classification)")
-    .in("therapeutic_area_id", indicationIds);
-
-  if (error) {
-    return { data: null, error: error.message };
-  }
-
-  const countsByTa: Record<
-    string,
-    { established: number; rising_stars: number; community: number; total_hcps: number }
-  > = {};
-  const seenByTa: Record<string, Set<string>> = {};
-
-  for (const row of data ?? []) {
-    const taId = String(row.therapeutic_area_id ?? "");
-    if (!taId) continue;
-    if (!countsByTa[taId]) {
-      countsByTa[taId] = {
-        established: 0,
-        rising_stars: 0,
-        community: 0,
-        total_hcps: 0,
-      };
-      seenByTa[taId] = new Set<string>();
-    }
-
-    const hcpRaw = firstEmbedded((row as { hcps_v2?: unknown }).hcps_v2);
-    const hcpId = String(
-      ((hcpRaw as { id?: unknown } | null)?.id ?? row.hcp_id ?? ""),
-    );
-    if (!hcpId || seenByTa[taId].has(hcpId)) continue;
-    seenByTa[taId].add(hcpId);
-
-    countsByTa[taId].total_hcps += 1;
-
-    const cohort = String(
-      (hcpRaw as { cohort_classification?: unknown } | null)
-        ?.cohort_classification ?? "",
-    ).toLowerCase();
-    if (cohort === "established") countsByTa[taId].established += 1;
-    else if (cohort === "rising_star") countsByTa[taId].rising_stars += 1;
-    else if (cohort === "community") countsByTa[taId].community += 1;
-  }
-
-  return { data: countsByTa, error: null };
-}
-
 const INDUSTRY_PATTERNS = [
   "pfizer", "merck", "novartis", "roche", "genentech", "astrazeneca",
   "glaxosmithkline", "gsk", "sanofi", "bristol myers", "bristol-myers",
@@ -714,7 +646,7 @@ export async function getTACounts(
       ).limit(10000);
 
       if (!hcpIdError && hcpIdRows && hcpIdRows.length > 0) {
-        const hcpIds = Array.from(new Set(hcpIdRows.map((r) => String(r.hcp_id))));
+        const hcpIds = Array.from(new Set(hcpIdRows.map((r: any) => String(r.hcp_id))));
         if (hcpIds.length > 0) {
           const { count: dolCount, error: dolError } = await supabase
             .from("hcps_v2")
