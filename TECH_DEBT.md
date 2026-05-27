@@ -162,3 +162,55 @@ surface since dark_horse is deprecated as a product concept.
 
 Investigate when: cleaning up the broader Dark Horse / Workhorse
 deprecation. Not blocking.
+
+## URL parameter synchronization for FilterState
+
+The region selector (Step 5) persists user selection to localStorage but does not sync to URL parameters. This means:
+- Users cannot bookmark a filtered view (e.g., "US Hep Rising Stars" vs "APAC Hep Rising Stars")
+- Sharing a link does not preserve the filter context
+- Browser back/forward navigation does not restore prior filter state
+- Server-side or static rendering cannot pre-scope the page based on URL
+
+Implementation plan when ready:
+- Add a useFilterSync() hook that reads/writes URL search params for region, country, ta, scope
+- Sync direction: URL is the source of truth on initial load; React Context updates URL on user changes
+- Use the existing routing library (react-router, Next.js router, etc.) — verify which is in use before designing
+- Preserve the current localStorage behavior as a fallback when no URL params present
+
+Edge cases:
+- Multi-tab behavior: changing region in tab A should not affect tab B's URL — only the localStorage which acts as a cross-tab cache
+- Deep links that include a region the user lacks access to (future role-based view): silently fall back to DEFAULT_REGION
+- Stale URL params after a refactor (e.g., old region codes): validate against REGIONS map and ignore invalid values
+
+Effort: ~3-4 hours. Not demo-blocking. Sequence after the basic dashboards are working end-to-end.
+
+## Region persistence: migrate from localStorage to Supabase user_preferences
+
+The region selector currently persists via localStorage (key: "fieldmark.user.region"). This is correct for the pre-auth phase but has limits:
+
+- localStorage is per-device — a user on phone and laptop sees different defaults
+- No way to seed sensible defaults based on user attributes (e.g., default APAC region for users with APAC employer)
+- No telemetry on actual region usage patterns across the user base
+- localStorage can be cleared by user accidentally
+
+Migration prerequisite: LinkedIn OAuth must be in place so users have stable identity to attach preferences to.
+
+Implementation plan when LinkedIn OAuth lands:
+- Create user_preferences table (user_id PK, region, ta_default, dashboard_layout_json, updated_at)
+- Hydration order in FilterProvider: (1) check Supabase, (2) fall back to localStorage if no Supabase row, (3) fall back to DEFAULT_REGION
+- Write-through: setRegion updates Context immediately, writes localStorage immediately, writes Supabase async (debounced)
+- Handle offline gracefully: localStorage remains source of truth if Supabase write fails
+
+Eventual schema (refine before building):
+  CREATE TABLE user_preferences (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    region TEXT NOT NULL DEFAULT 'US',
+    default_therapeutic_area TEXT,
+    last_viewed_hcp_id UUID,
+    dashboard_settings JSONB,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+This is a Phase 8+ item — tied to identity infrastructure, not to filter UX.
+
+Effort: ~4-6 hours once LinkedIn OAuth is in place. Not demo-blocking.
