@@ -582,37 +582,80 @@ export async function getTACounts(
       return query;
     };
 
-    // Rising star pool count + threshold-selected count + established + community.
-    // The rising star tier filter requires joining rank rows to hcp_scores_v2 to read tier.
-    const [risingPoolResult, risingSelectedResult, establishedResult, communityResult] = await Promise.all([
-      // Pool: all scored rising-cohort HCPs in scope
+    // Rising pool is direct from ranks. Tier-selected counts use two-step flow:
+    // 1) query hcp_scores_v2 for tier-matching HCP IDs in this TA,
+    // 2) count scoped rank rows in hcp_score_ranks_v2 for those IDs.
+    const [risingTierResult, establishedTierResult, communityTierResult] = await Promise.all([
+      supabase
+        .from("hcp_scores_v2")
+        .select("hcp_id")
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "rising_star"),
+      supabase
+        .from("hcp_scores_v2")
+        .select("hcp_id")
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "established"),
+      supabase
+        .from("hcp_scores_v2")
+        .select("hcp_id")
+        .eq("therapeutic_area_id", taId)
+        .eq("tier", "community"),
+    ]);
+
+    if (risingTierResult.error) {
+      return { data: null, error: `Rising star tier query failed: ${risingTierResult.error.message}` };
+    }
+    if (establishedTierResult.error) {
+      return { data: null, error: `Established tier query failed: ${establishedTierResult.error.message}` };
+    }
+    if (communityTierResult.error) {
+      return { data: null, error: `Community tier query failed: ${communityTierResult.error.message}` };
+    }
+
+    const risingTierIds = (risingTierResult.data ?? []).map((r: any) => String(r.hcp_id));
+    const establishedTierIds = (establishedTierResult.data ?? []).map((r: any) => String(r.hcp_id));
+    const communityTierIds = (communityTierResult.data ?? []).map((r: any) => String(r.hcp_id));
+
+    const [
+      risingPoolResult,
+      risingSelectedResult,
+      establishedResult,
+      communityResult,
+    ] = await Promise.all([
       applyScope(
         supabase
           .from("hcp_score_ranks_v2")
           .select("hcp_id", { count: "exact", head: true })
           .eq("cohort", "rising"),
       ),
-      // Selected: rank rows in scope where the joined score's tier = 'rising_star'
-      applyScope(
-        supabase
-          .from("hcp_score_ranks_v2")
-          .select("hcp_id, hcp_scores_v2!inner(tier)", { count: "exact", head: true })
-          .eq("cohort", "rising")
-          .eq("hcp_scores_v2.therapeutic_area_id", taId)
-          .eq("hcp_scores_v2.tier", "rising_star"),
-      ),
-      applyScope(
-        supabase
-          .from("hcp_score_ranks_v2")
-          .select("hcp_id", { count: "exact", head: true })
-          .eq("cohort", "established"),
-      ),
-      applyScope(
-        supabase
-          .from("hcp_score_ranks_v2")
-          .select("hcp_id", { count: "exact", head: true })
-          .eq("cohort", "community"),
-      ),
+      risingTierIds.length > 0
+        ? applyScope(
+            supabase
+              .from("hcp_score_ranks_v2")
+              .select("hcp_id", { count: "exact", head: true })
+              .eq("cohort", "rising")
+              .in("hcp_id", risingTierIds),
+          )
+        : Promise.resolve({ count: 0, error: null }),
+      establishedTierIds.length > 0
+        ? applyScope(
+            supabase
+              .from("hcp_score_ranks_v2")
+              .select("hcp_id", { count: "exact", head: true })
+              .eq("cohort", "established")
+              .in("hcp_id", establishedTierIds),
+          )
+        : Promise.resolve({ count: 0, error: null }),
+      communityTierIds.length > 0
+        ? applyScope(
+            supabase
+              .from("hcp_score_ranks_v2")
+              .select("hcp_id", { count: "exact", head: true })
+              .eq("cohort", "community")
+              .in("hcp_id", communityTierIds),
+          )
+        : Promise.resolve({ count: 0, error: null }),
     ]);
 
     if (risingPoolResult.error) {
