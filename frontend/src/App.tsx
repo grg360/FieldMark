@@ -24,7 +24,7 @@ import type { FeedCohort } from "./lib/api";
 import { getHCPDetail, getRisingStars, getTACounts, getTAIdForLabel, getTADisplayName } from "./lib/api";
 import { useFilterContext } from "./lib/filter-context";
 import { TrackProvider, useTrack, type Track } from "./lib/TrackContext";
-import type { RisingStar, TACounts } from "./lib/types";
+import type { HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
 import { RegionSelector } from "./components/RegionSelector";
 
 type AppHCP = Omit<UIHCP, "id"> & {
@@ -112,7 +112,102 @@ function formatTherapeuticAreaLabel(value: string | null | undefined): string {
   if (v === "rare-disease") return "Rare Disease";
   if (v === "hepatology") return "Hepatology";
   if (v === "oncology") return "Oncology";
-  return value;
+  return value ?? "";
+}
+
+function parseOptionalNumber(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function optionalString(v: unknown): string | null {
+  if (v == null || String(v).trim() === "") return null;
+  return String(v);
+}
+
+function detailResponseToRisingStar(detail: HCPDetailResponse): RisingStar {
+  const hcp = detail.hcp;
+  const score = detail.score ?? {};
+  const rank = detail.rank ?? {};
+  const medicare = detail.medicare;
+  const pay = detail.openPayments;
+  const metrics = detail.authorMetrics;
+
+  const id = String(hcp.id ?? "");
+  const py2022 = parseOptionalNumber(pay?.py2022_total);
+  const py2023 = parseOptionalNumber(pay?.py2023_total);
+  const py2024 = parseOptionalNumber(pay?.py2024_total);
+  const y2021 = parseOptionalNumber(medicare?.beneficiaries_2021);
+  const y2022 = parseOptionalNumber(medicare?.beneficiaries_2022);
+  const y2023 = parseOptionalNumber(medicare?.beneficiaries_2023);
+  const engagementMix = pay
+    ? {
+        speakerBureau: parseOptionalNumber(pay.speaker_bureau_3yr),
+        consulting: parseOptionalNumber(pay.consulting_3yr),
+        honoraria: parseOptionalNumber(pay.honoraria_3yr),
+        education: parseOptionalNumber(pay.education_3yr),
+        royalty: parseOptionalNumber(pay.royalty_3yr),
+        foodBeverage: parseOptionalNumber(pay.food_beverage_3yr),
+        travelLodging: parseOptionalNumber(pay.travel_lodging_3yr),
+      }
+    : null;
+  const hasEngagementMix =
+    engagementMix != null &&
+    Object.values(engagementMix).some((v) => v != null && v > 0);
+
+  return {
+    id,
+    hcp_id: id,
+    first_name: String(hcp.first_name ?? ""),
+    last_name: String(hcp.last_name ?? ""),
+    institution: String(hcp.institution_normalized ?? hcp.institution_raw ?? ""),
+    institution_short: optionalString(hcp.institution_short),
+    nppes_practice_city: optionalString(hcp.nppes_practice_city),
+    nppes_practice_state: optionalString(hcp.nppes_practice_state),
+    nppes_practice_setting: optionalString(hcp.nppes_practice_setting),
+    nppes_practice_address: optionalString(hcp.nppes_practice_address),
+    nppes_practice_zip: optionalString(hcp.nppes_practice_zip),
+    institution_full: optionalString(hcp.institution_full),
+    npi_number: optionalString(hcp.npi_number),
+    npi_specialty: optionalString(hcp.npi_specialty),
+    country: String(hcp.country ?? ""),
+    therapeutic_area: detail.therapeuticArea,
+    narrative: detail.narrative?.narrative_text ?? null,
+    tier: score.tier != null ? String(score.tier) : null,
+    cohort_classification: optionalString(hcp.cohort_classification),
+    cohort_score: parseOptionalNumber(hcp.cohort_score),
+    composite_score: Number(score.composite_score ?? 0),
+    normalized_score: Number(score.normalized_score ?? 0),
+    pub_velocity: Number(score.pub_velocity_score ?? 0),
+    citation_trajectory: Number(score.citation_trajectory_score ?? 0),
+    trial_score: Number(score.trial_investigator_score ?? 0),
+    citTraj: parseOptionalNumber(score.citation_trajectory_score),
+    trialScore: parseOptionalNumber(score.trial_investigator_score),
+    career_multiplier: 1,
+    first_pub_year: Number(hcp.career_first_pub_year ?? 0),
+    stored_pubs: Number(hcp.total_career_pubs ?? 0),
+    medicare_volume: parseOptionalNumber(medicare?.total_beneficiaries_3yr_unique_est),
+    distinct_companies: parseOptionalNumber(pay?.distinct_companies_lifetime),
+    open_payments_lifetime: parseOptionalNumber(pay?.total_payments_lifetime),
+    career_years: parseOptionalNumber(hcp.nppes_career_stage_years),
+    total_career_pubs: parseOptionalNumber(hcp.total_career_pubs),
+    total_citations: parseOptionalNumber(metrics?.cited_by_count),
+    h_index: parseOptionalNumber(metrics?.h_index),
+    works_count: parseOptionalNumber(metrics?.works_count),
+    paymentsByYear:
+      py2022 == null && py2023 == null && py2024 == null
+        ? null
+        : { py2022, py2023, py2024 },
+    beneficiariesByYear:
+      y2021 == null && y2022 == null && y2023 == null
+        ? null
+        : { y2021, y2022, y2023 },
+    engagementMix: hasEngagementMix ? engagementMix : null,
+    rank: rank.rank != null ? Number(rank.rank) : undefined,
+    percentile: rank.percentile != null ? Number(rank.percentile) : undefined,
+    scope_size: rank.scope_size != null ? Number(rank.scope_size) : undefined,
+  };
 }
 
 function mapRisingStarToHCP(item: RisingStar): AppHCP {
@@ -200,7 +295,7 @@ function AppContent() {
         region,
       });
       if (cancelled || error || !data) return;
-      setDetailHCP(mapRisingStarToHCP(data));
+      setDetailHCP(mapRisingStarToHCP(detailResponseToRisingStar(data)));
     })();
 
     return () => {
@@ -395,7 +490,7 @@ function AppContent() {
       region,
     });
     if (error || !data) return;
-    setDetailHCP(mapRisingStarToHCP(data));
+    setDetailHCP(mapRisingStarToHCP(detailResponseToRisingStar(data)));
     setCurrentScreen("detail");
   }
 
