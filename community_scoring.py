@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+from score_ranking import compute_and_write_ranks
+
 READ_PAGE_SIZE = 1000
 WRITE_BATCH_SIZE = 500
 CURRENT_YEAR = 2026
@@ -350,6 +352,16 @@ def main() -> None:
         print(f"\nUpserting {len(rows_to_write):,} rows into hcp_community_scores_v2 ...")
         written = upsert_scores(client, rows_to_write)
         print(f"Upserted {written:,} rows")
+
+    # Rank computation respects dry_run.
+    print("\nComputing country/region/global ranks for community cohort...")
+    compute_and_write_ranks(
+        client=client,
+        score_rows=rows_to_write,
+        cohort="community",
+        scoring_run_id=scoring_run_id,
+        dry_run=dry_run,
+    )
 
     print("\nTop 20 per TA by normalized_score:")
     rows_by_ta: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
