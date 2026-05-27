@@ -46,7 +46,7 @@ const PRACTICE_SETTING_LABELS: Record<string, string> = {
 export type BuildSublineHcp = {
   institution?: string | null;
   institutionShort?: string | null;
-  institution_short?: string | null;
+  institution_normalized?: string | null;
   institutionFull?: string | null;
   institution_full?: string | null;
   nppesPracticeCity?: string | null;
@@ -122,7 +122,7 @@ function practiceSettingLabel(settingRaw: string): string | null {
  */
 export function buildSubline(hcp: BuildSublineHcp): string {
   const institutionFull = norm(hcp.institutionFull ?? hcp.institution_full);
-  const rawShort = norm(hcp.institutionShort ?? hcp.institution_short);
+  const rawShort = norm(hcp.institutionShort ?? hcp.institution_normalized);
   const legacy = norm(hcp.institution);
   const affil = rawShort || legacy;
 

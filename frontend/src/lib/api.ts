@@ -112,10 +112,10 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     id: hcp.id ?? row.hcp_id ?? "",
     first_name: String(hcp.first_name ?? ""),
     last_name: String(hcp.last_name ?? ""),
-    institution: String(hcp.institution ?? hcp.institution_short ?? ""),
-    institution_short:
-      hcp.institution_short != null && hcp.institution_short !== ""
-        ? String(hcp.institution_short)
+    institution: String(hcp.institution ?? hcp.institution_normalized ?? ""),
+    institution_normalized:
+      hcp.institution_normalized != null && hcp.institution_normalized !== ""
+        ? String(hcp.institution_normalized)
         : null,
     nppes_practice_city:
       hcp.nppes_practice_city != null && String(hcp.nppes_practice_city).trim() !== ""
@@ -263,69 +263,78 @@ export async function getRisingStars(
     const scope = resolveFilterScope(filters);
     const offset = options.offset ?? 0;
 
-    // Build a scope-aware builder. scope_value can be null for global.
-    const applyScope = (q: any): any => {
-      let query = q.eq("therapeutic_area_id", taId).eq("scope_type", scope.scopeType);
-      if (scope.scopeValue === null) {
-        query = query.is("scope_value", null);
-      } else {
-        query = query.eq("scope_value", scope.scopeValue);
-      }
-      return query;
-    };
+    // 1) Find TA-scoped score rows with tier='rising_star' (no embedded join).
+    const tierResult = await supabase
+      .from("hcp_scores_v2")
+      .select(
+        `
+          hcp_id,
+          tier,
+          therapeutic_area_id,
+          composite_score,
+          normalized_score,
+          pub_velocity_score,
+          citation_trajectory_score,
+          trial_investigator_score
+        `,
+      )
+      .eq("therapeutic_area_id", taId)
+      .eq("tier", "rising_star");
 
-    // 1) Count threshold-selected rising stars in scope.
-    // Filter joins to hcp_scores_v2 where tier='rising_star'.
-    const countQuery = applyScope(
-      supabase
-        .from("hcp_score_ranks_v2")
-        .select("hcp_id, hcp_scores_v2!inner(tier, therapeutic_area_id)", {
-          count: "exact",
-          head: true,
-        })
-        .eq("cohort", "rising")
-        .eq("hcp_scores_v2.therapeutic_area_id", taId)
-        .eq("hcp_scores_v2.tier", "rising_star"),
+    if (tierResult.error) {
+      return { data: null, error: `Tier query failed: ${tierResult.error.message}` };
+    }
+
+    const tieredHcpIds = (tierResult.data ?? []).map((r: any) => String(r.hcp_id));
+    const scoreById = new Map<string, any>(
+      (tierResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
     );
+
+    if (tieredHcpIds.length === 0) {
+      return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
+    }
+
+    // 2) Count scoped rank rows for the tier-selected HCP IDs.
+    let countQuery = supabase
+      .from("hcp_score_ranks_v2")
+      .select("hcp_id", { count: "exact", head: true })
+      .eq("cohort", "rising")
+      .eq("therapeutic_area_id", taId)
+      .in("hcp_id", tieredHcpIds)
+      .eq("scope_type", scope.scopeType);
+    if (scope.scopeValue === null) {
+      countQuery = countQuery.is("scope_value", null);
+    } else {
+      countQuery = countQuery.eq("scope_value", scope.scopeValue);
+    }
     const { count: totalCount, error: countError } = await countQuery;
     if (countError) {
       return { data: null, error: `Rising star count query failed: ${countError.message}` };
     }
 
-    // 2) Fetch the page of ranks. Same scope + tier filter. Order by rank ASC.
-    const listQuery = applyScope(
-      supabase
-        .from("hcp_score_ranks_v2")
-        .select(
-          `
-            hcp_id,
-            rank,
-            percentile,
-            scope_size,
-            score_at_rank,
-            hcp_scores_v2!inner(
-              tier,
-              therapeutic_area_id,
-              composite_score,
-              normalized_score,
-              pub_velocity_score,
-              citation_trajectory_score,
-              trial_investigator_score
-            )
-          `,
-        )
-        .eq("cohort", "rising")
-        .eq("hcp_scores_v2.therapeutic_area_id", taId)
-        .eq("hcp_scores_v2.tier", "rising_star")
-        .order("rank", { ascending: true })
-        .range(offset, offset + limit - 1),
-    );
+    // 3) Fetch scoped rank rows for those HCP IDs.
+    let rankQuery = supabase
+      .from("hcp_score_ranks_v2")
+      .select("hcp_id, rank, percentile, scope_size, score_at_rank")
+      .eq("cohort", "rising")
+      .eq("therapeutic_area_id", taId)
+      .in("hcp_id", tieredHcpIds)
+      .order("rank", { ascending: true })
+      .range(offset, offset + limit - 1);
 
-    const { data: rankRows, error: rankError } = await listQuery;
-    if (rankError) {
-      return { data: null, error: `Rising star list query failed: ${rankError.message}` };
+    rankQuery = rankQuery.eq("scope_type", scope.scopeType);
+    if (scope.scopeValue === null) {
+      rankQuery = rankQuery.is("scope_value", null);
+    } else {
+      rankQuery = rankQuery.eq("scope_value", scope.scopeValue);
     }
-    if (!rankRows || rankRows.length === 0) {
+
+    const rankResult = await rankQuery;
+    if (rankResult.error) {
+      return { data: null, error: `Rank query failed: ${rankResult.error.message}` };
+    }
+    const rankRows = rankResult.data ?? [];
+    if (rankRows.length === 0) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: totalCount ?? 0 }, error: null };
     }
 
@@ -469,8 +478,7 @@ export async function getRisingStars(
     const risingStars: RisingStar[] = filteredRankRows.flatMap((rr: any): RisingStar[] => {
       const hcp = hcpById.get(String(rr.hcp_id));
       if (!hcp) return [];
-      const scoreRaw = (rr as { hcp_scores_v2?: unknown }).hcp_scores_v2;
-      const scoreRow = Array.isArray(scoreRaw) ? scoreRaw[0] : scoreRaw;
+      const scoreRow = scoreById.get(String(rr.hcp_id));
       if (!scoreRow) return [];
 
       const medicareData = medicareMap.get(String(rr.hcp_id));
@@ -728,7 +736,7 @@ export async function getVerifiedDOLs(
 
     const { data: hcpRows, error: hcpError } = await supabase
       .from("hcps_v2")
-      .select("id, first_name, last_name, institution_short, country, total_career_pubs")
+      .select("id, first_name, last_name, institution_normalized, country, total_career_pubs")
       .eq("is_verified_dol", true);
     console.log(
       "[getVerifiedDOLs] hcps query error=",
@@ -871,7 +879,7 @@ export async function getVerifiedDOLs(
           hcp_id: String(hcp.id),
           first_name: String(hcp.first_name ?? ""),
           last_name: String(hcp.last_name ?? ""),
-          institution: hcp.institution_short ?? null,
+          institution: hcp.institution_normalized ?? null,
           country: hcp.country ?? null,
           therapeutic_area: taSlug,
           total_career_pubs: hcp.total_career_pubs == null ? null : Number(hcp.total_career_pubs),

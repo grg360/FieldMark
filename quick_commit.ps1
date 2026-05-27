@@ -85,7 +85,7 @@ foreach ($arg in $args) {
 if (-not $noPush) {
     Write-Host "Pushing to origin/main..."
     try {
-        git push origin main
+        git push origin HEAD:main
         $pushExit = $LASTEXITCODE
     } catch {
         Exit-WithError $_.Exception.Message
