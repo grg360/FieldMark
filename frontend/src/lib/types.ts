@@ -62,6 +62,8 @@ export interface HCPScore {
   normalized_score: number;
   pub_velocity: number;
   citation_trajectory: number;
+  pubVel?: string | null;
+  firstPubYear?: number | null;
   trial_score: number;
   citTraj: number | null;
   trialScore: number | null;

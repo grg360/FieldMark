@@ -155,6 +155,8 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     citation_trajectory: Number(row.citation_trajectory_score ?? 0),
     trial_score: Number(row.trial_investigator_score ?? 0),
     citTraj: row.citation_trajectory_score ?? null,
+    pubVel: row.pub_velocity_score == null ? "—" : `${Number(row.pub_velocity_score).toFixed(1)}`,
+    firstPubYear: row.career_first_pub_year ?? null,
     trialScore: row.trial_investigator_score ?? null,
     career_multiplier: 1,
     first_pub_year: Number(hcp.first_pub_year ?? 0),
