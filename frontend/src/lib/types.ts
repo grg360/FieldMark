@@ -117,3 +117,55 @@ export interface TACounts {
   /** HCPs with cohort_classification = workhorse for this TA (discovery count). */
   workhorses?: number;
 }
+
+/**
+ * FilterState - the filter object passed into rank-aware API functions.
+ *
+ * Today only therapeuticArea (required) and region (optional, defaults to US)
+ * are consumed. Future filter dimensions land here:
+ *   - country: optional override of region (e.g., "DE" for Germany-only)
+ *   - careerStage: 'early' | 'mid' | 'established'
+ *   - pharmaEngagementBand: 'none' | 'light' | 'moderate' | 'heavy'
+ *   - practiceSetting: 'academic' | 'hospital' | 'community' | 'solo'
+ *   - specialty: NPPES taxonomy codes
+ *   - trialActive: boolean
+ *
+ * The shape is intentionally permissive: callers populate what they have,
+ * resolveFilterScope() decides what makes it into the actual query.
+ */
+export interface FilterState {
+  therapeuticArea: string;
+  region?: string;       // RegionKey from regions.ts; defaults to "US" if undefined
+  country?: string;      // ISO 3166-1 alpha-2 country code; overrides region if both set
+  // Future filters land here. Adding them does NOT require api.ts changes
+  // until the resolver/query layer is taught to consume them.
+}
+
+/**
+ * RankRow - a single row from hcp_score_ranks_v2 joined to HCP details.
+ *
+ * Returned by rank-aware list queries (getRisingStars, getEstablished, getCommunity).
+ * The frontend uses rank + percentile + scope_size for rank-forward display:
+ *   "Rank #3 of 142 (98th percentile)"
+ */
+export interface RankRow {
+  hcp_id: string;
+  therapeutic_area_id: string;
+  cohort: "rising" | "established" | "community";
+  scope_type: "country" | "region" | "global";
+  scope_value: string | null;
+  rank: number;
+  percentile: number;
+  scope_size: number;
+  score_at_rank: number;
+  // HCP detail fields, joined at query time
+  first_name: string;
+  last_name: string;
+  institution: string | null;
+  institution_short: string | null;
+  country: string | null;
+  nppes_practice_state: string | null;
+  nppes_practice_city: string | null;
+  total_career_pubs: number | null;
+  career_first_pub_year: number | null;
+}
