@@ -445,7 +445,7 @@ export async function getRisingStars(
       }
 
       // Fallback: most recent narrative for any TA, for HCPs missing TA-specific
-      const missingIds = narrativeIds.filter((id) => !narrativeMap.has(id));
+      const missingIds = narrativeIds.filter((id: string) => !narrativeMap.has(id));
       if (missingIds.length > 0) {
         const { data: fallbackNarratives, error: fbError } = await supabase
           .from("hcp_narratives_v2")
