@@ -115,3 +115,36 @@ Steps 8-10 (schema + display + list surface) before any external demo conversati
 - LinkedIn OAuth (if not already in place): 1 day
 
 Total: ~3 days of focused work, plus LinkedIn OAuth which is a prerequisite for the whole feature working with real users.
+
+## Dark Horse / Workhorse deprecation
+
+Dark Horse (top 5% of Rising Stars) and Workhorse (top 5% of Community) were product labels in v1 that have been retired. They were never differentiated cohorts — just within-cohort tier badges that didn't carry independent product meaning. The Shadow KOL cohort (separate TECH_DEBT entry) is structurally different and replaces any conceptual need for sub-tiers.
+
+These references remain in the codebase and need cleanup:
+
+### Schema and types
+- TACounts interface in frontend/src/lib/types.ts retains dark_horses and workhorses fields. getTACounts currently returns them as 0 to preserve type compatibility. Future pass: remove from the type, remove all consumers.
+- hcp_scores_v2.tier column still accepts 'dark_horse' as a value via assign_tier() in scoring_pipeline.py. TIER_DARK_HORSE_THRESHOLD = 95.0 remains unchanged after the rising star recalibration. The threshold produces ~4 HCPs globally — effectively vestigial. Decide: drop dark_horse from assign_tier() entirely, or leave as archaeology since nothing reads it.
+
+### Code references to audit and clean
+- Yesterday's HANDOFF.md flagged "Dark Horse / Workhorse rendering cleanup" as a known frontend issue. Search frontend/src for "dark_horse", "Dark Horse", "workhorse", "Workhorse" — any remaining UI strings should be removed.
+- Yesterday's chat noted the cache table ta_cohort_counts_cache has dark_horses and workhorses columns. The table is no longer the source of truth (replaced by hcp_score_ranks_v2 via getTACounts rewrite). Drop the table entirely once we confirm nothing reads it.
+- Search api.ts and other frontend files for any logic that maps cohort_classification = 'dark_horse' or = 'workhorse' to anything. Those values were never written to cohort_classification in v2, but stale mapping code may still exist.
+- searchHCPs in api.ts has a mapSearchCohortClassification helper that maps "dark_horse" → "rising_star" and "workhorse" → "community". This was a v1-compatibility shim. After full deprecation, simplify.
+
+### Tier column itself (broader question)
+With ranks now precomputed in hcp_score_ranks_v2, the tier column in hcp_scores_v2 has only one remaining job: serving the threshold-selected Rising Star membership count (tier = 'rising_star' filter). Everything else — display ranking, percentile, scope-aware filtering — is rank-driven.
+
+Two possible futures:
+1. Keep tier as the canonical "Rising Star membership flag." Single source of truth for "is this person a Rising Star?" Useful, queryable, stable.
+2. Compute Rising Star membership at query time via a percentile or score threshold on the ranks table. More flexible (thresholds can be tuned without re-running scoring) but distributed across more code.
+
+Lean toward keeping tier as the membership flag. Threshold tuning is rare; consistency of the cohort definition matters more than tuning convenience.
+
+### Sequence
+1. (Optional, low-risk) Remove dark_horses/workhorses fields from TACounts in types.ts and downstream consumers. ~1 hour.
+2. (Low-risk) Search frontend for any UI strings or dead code referencing Dark Horse / Workhorse. ~30 min.
+3. (Medium-risk) Drop ta_cohort_counts_cache table once confirmed unused. ~15 min.
+4. (Defer) Decision on dark_horse value in assign_tier() — keep as archaeology or remove from the enum. Not blocking anything.
+
+Total cleanup effort: ~2-3 hours of focused work. Not demo-blocking. Best done in a single focused session after the frontend refactor stabilizes.

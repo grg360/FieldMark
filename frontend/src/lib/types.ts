@@ -107,15 +107,14 @@ export interface VerifiedDOL {
 }
 
 export interface TACounts {
-  rising_stars: number;
-  dark_horses: number;
+  rising_stars: number;       // threshold-selected (tier='rising_star')
+  rising_stars_pool?: number; // full candidate pool (all scored, regardless of tier)
+  dark_horses: number;        // DEPRECATED — always 0
   verified_dols: number;
+  community_pool: number;
+  workhorses: number;         // DEPRECATED — always 0
   established: number;
   total_hcps: number;
-  /** HCPs with cohort_classification = community for this TA (discovery count). */
-  community_pool?: number;
-  /** HCPs with cohort_classification = workhorse for this TA (discovery count). */
-  workhorses?: number;
 }
 
 /**

@@ -665,13 +665,24 @@ export async function getTACounts(
       return query;
     };
 
-    // Count each cohort in parallel
-    const [risingResult, establishedResult, communityResult] = await Promise.all([
+    // Rising star pool count + threshold-selected count + established + community.
+    // The rising star tier filter requires joining rank rows to hcp_scores_v2 to read tier.
+    const [risingPoolResult, risingSelectedResult, establishedResult, communityResult] = await Promise.all([
+      // Pool: all scored rising-cohort HCPs in scope
       applyScope(
         supabase
           .from("hcp_score_ranks_v2")
           .select("hcp_id", { count: "exact", head: true })
           .eq("cohort", "rising"),
+      ),
+      // Selected: rank rows in scope where the joined score's tier = 'rising_star'
+      applyScope(
+        supabase
+          .from("hcp_score_ranks_v2")
+          .select("hcp_id, hcp_scores_v2!inner(tier)", { count: "exact", head: true })
+          .eq("cohort", "rising")
+          .eq("hcp_scores_v2.therapeutic_area_id", taId)
+          .eq("hcp_scores_v2.tier", "rising_star"),
       ),
       applyScope(
         supabase
@@ -687,8 +698,11 @@ export async function getTACounts(
       ),
     ]);
 
-    if (risingResult.error) {
-      return { data: null, error: `Rising star count failed: ${risingResult.error.message}` };
+    if (risingPoolResult.error) {
+      return { data: null, error: `Rising star pool count failed: ${risingPoolResult.error.message}` };
+    }
+    if (risingSelectedResult.error) {
+      return { data: null, error: `Rising star selected count failed: ${risingSelectedResult.error.message}` };
     }
     if (establishedResult.error) {
       return { data: null, error: `Established count failed: ${establishedResult.error.message}` };
@@ -697,14 +711,17 @@ export async function getTACounts(
       return { data: null, error: `Community count failed: ${communityResult.error.message}` };
     }
 
-    const rising = risingResult.count ?? 0;
+    const risingPool = risingPoolResult.count ?? 0;
+    const risingSelected = risingSelectedResult.count ?? 0;
     const established = establishedResult.count ?? 0;
     const community = communityResult.count ?? 0;
 
     // total_hcps for this TA in this scope = sum across cohorts.
     // (Some HCPs MAY be in more than one cohort across TAs, but within a single
     // TA+cohort+scope the rank rows are unique by hcp_id.)
-    const totalHcps = rising + established + community;
+    // total_hcps uses the candidate pool, not the threshold-selected count.
+    // This is the "how deep is the platform's coverage in this TA+scope" number.
+    const totalHcps = risingPool + established + community;
 
     // Verified DOLs count is cohort-independent. Filter HCPs by is_verified_dol
     // and intersect with the TA + scope. For now, we use the hcp_therapeutic_areas_v2
@@ -739,7 +756,8 @@ export async function getTACounts(
 
     return {
       data: {
-        rising_stars: rising,
+        rising_stars: risingSelected,
+        rising_stars_pool: risingPool,
         dark_horses: 0, // Deprecated; tier-based filtering removed. Field kept for type compatibility.
         verified_dols: verifiedDols,
         community_pool: community,
