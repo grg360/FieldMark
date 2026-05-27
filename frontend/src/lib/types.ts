@@ -176,3 +176,16 @@ export interface RankRow {
   total_career_pubs: number | null;
   career_first_pub_year: number | null;
 }
+
+export interface HCPDetailResponse {
+  hcp: Record<string, unknown>;
+  score: Record<string, unknown> | null;
+  rank: Record<string, unknown> | null;
+  narrative: { narrative_text: string | null; generated_at: string | null } | null;
+  medicare: Record<string, unknown> | null;
+  openPayments: Record<string, unknown> | null;
+  publications: Array<Record<string, unknown>>;
+  trials: Array<Record<string, unknown>>;
+  therapeuticArea: string;
+  scope: { type: "country" | "region" | "global"; value: string | null };
+}

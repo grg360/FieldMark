@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import type {
   FilterState,
   HCP,
+  HCPDetailResponse,
   HCPScore,
   LatestPost,
   RisingStar,
@@ -960,101 +961,227 @@ export async function getVerifiedDOLs(
 
 export async function getHCPDetail(
   hcpId: string,
-  therapeuticArea?: string,
-): Promise<ApiResult<HCPDetail>> {
+  filters: FilterState,
+): Promise<ApiResult<HCPDetailResponse>> {
   try {
-    const { data: scoreRow, error: scoreError } = await supabase
-      .from("hcp_scores_v2")
+    // 1) TA is required. Reject if missing or unknown.
+    if (!filters?.therapeuticArea) {
+      return { data: null, error: "Therapeutic area is required for HCP detail." };
+    }
+    const taSlug = filters.therapeuticArea.toLowerCase().trim();
+    const taId = TA_ID_MAP[taSlug];
+    if (!taId) {
+      return { data: null, error: `Unknown therapeutic area: ${taSlug}` };
+    }
+
+    // 2) Fetch core HCP profile (TA-independent fields only).
+    const { data: hcpData, error: hcpError } = await supabase
+      .from("hcps_v2")
       .select(
         `
-        hcp_id,
-        composite_score,
-        normalized_score,
-        pub_velocity_score,
-        citation_trajectory_score,
-        trial_investigator_score,
-        tier,
-        hcps!inner (
           id,
           first_name,
           last_name,
-          institution,
-          institution_short,
-          institution_full,
+          institution_normalized,
+          institution_raw,
           country,
           cohort_classification,
           cohort_score,
-          first_pub_year,
+          career_first_pub_year,
+          total_career_pubs,
+          npi_number,
+          npi_specialty,
           nppes_career_stage_years,
           nppes_practice_city,
           nppes_practice_state,
-          nppes_practice_zip,
           nppes_practice_address,
+          nppes_practice_zip,
           nppes_practice_setting,
-          npi_number,
-          npi_specialty,
-          total_career_pubs,
-          hcp_medicare_summary (
-            total_beneficiaries_3yr_unique_est,
-            beneficiaries_2021,
-            beneficiaries_2022,
-            beneficiaries_2023
-          ),
-          hcp_open_payments_summary (
-            distinct_companies_lifetime,
-            total_payments_lifetime,
-            py2022_total,
-            py2023_total,
-            py2024_total,
-            speaker_bureau_3yr,
-            consulting_3yr,
-            honoraria_3yr,
-            education_3yr,
-            royalty_3yr,
-            food_beverage_3yr,
-            travel_lodging_3yr
-          )
-        )
-      `,
+          is_verified_dol
+        `,
+      )
+      .eq("id", hcpId)
+      .maybeSingle();
+
+    if (hcpError) {
+      return { data: null, error: `HCP fetch failed: ${hcpError.message}` };
+    }
+    if (!hcpData) {
+      return { data: null, error: `HCP not found: ${hcpId}` };
+    }
+
+    // 3) Resolve scope from FilterState (or default to US region).
+    const scope = resolveFilterScope(filters);
+
+    // 4) Fetch TA-scoped data in parallel.
+    const scorePromise = supabase
+      .from("hcp_scores_v2")
+      .select(
+        `
+          composite_score,
+          normalized_score,
+          tier,
+          pub_velocity_score,
+          citation_trajectory_score,
+          trial_investigator_score,
+          recency_bonus,
+          cross_signal_bonus
+        `,
       )
       .eq("hcp_id", hcpId)
-      .single();
+      .eq("therapeutic_area_id", taId)
+      .maybeSingle();
 
-    if (scoreError) {
-      return { data: null, error: scoreError.message };
-    }
+    const rankPromise = (() => {
+      let q = supabase
+        .from("hcp_score_ranks_v2")
+        .select("rank, percentile, scope_size, score_at_rank, cohort, scope_type, scope_value")
+        .eq("hcp_id", hcpId)
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", scope.scopeType);
+      if (scope.scopeValue === null) {
+        q = q.is("scope_value", null);
+      } else {
+        q = q.eq("scope_value", scope.scopeValue);
+      }
+      return q.maybeSingle();
+    })();
 
-    const { data: publications, error: publicationsError } = await supabase
-      .from("publications_v2")
-      .select("*")
+    // Narrative is TA-strict: NO fallback to other TAs. If the HCP has no
+    // narrative for this TA, narrative is null.
+    const narrativePromise = supabase
+      .from("hcp_narratives_v2")
+      .select("narrative_text, generated_at, therapeutic_area_slug")
       .eq("hcp_id", hcpId)
-      .order("pub_year", { ascending: false })
-      .limit(10);
+      .eq("therapeutic_area_slug", taSlug)
+      .maybeSingle();
 
-    if (publicationsError) {
-      return { data: null, error: publicationsError.message };
-    }
+    const medicarePromise = supabase
+      .from("hcp_medicare_summary_v2")
+      .select(
+        "total_beneficiaries_3yr_unique_est, beneficiaries_2021, beneficiaries_2022, beneficiaries_2023",
+      )
+      .eq("hcp_id", hcpId)
+      .maybeSingle();
 
-    const { count: trialCount, error: trialError } = await supabase
-      .from("clinical_trials_v2")
-      .select("id", { count: "exact", head: true })
-      .eq("hcp_id", hcpId);
+    const openPaymentsPromise = supabase
+      .from("hcp_open_payments_summary_v2")
+      .select(
+        `
+          distinct_companies_lifetime,
+          total_payments_lifetime,
+          py2022_total,
+          py2023_total,
+          py2024_total,
+          speaker_bureau_3yr,
+          consulting_3yr,
+          honoraria_3yr,
+          education_3yr,
+          royalty_3yr,
+          food_beverage_3yr,
+          travel_lodging_3yr
+        `,
+      )
+      .eq("hcp_id", hcpId)
+      .maybeSingle();
 
-    if (trialError) {
-      return { data: null, error: trialError.message };
-    }
+    // Publications: join publication_therapeutic_areas_v2 (filter to TA) → publications_v2.
+    const publicationsPromise = supabase
+      .from("publication_therapeutic_areas_v2")
+      .select(
+        `
+          publications_v2!inner(
+            id,
+            pmid,
+            title,
+            journal,
+            pub_year,
+            pub_date,
+            citation_count,
+            doi
+          )
+        `,
+      )
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .order("publications_v2(pub_date)", { ascending: false })
+      .limit(50);
 
-    const base = mapRisingStarRow(scoreRow, therapeuticArea ?? "");
-    const narrativeResult = await getHCPNarrative(hcpId, therapeuticArea);
+    // Trials: filter to source_therapeutic_area_id = taId.
+    const trialsPromise = supabase
+      .from("trial_investigators_v2")
+      .select(
+        `
+          role,
+          clinical_trials_v2!inner(
+            id,
+            nct_id,
+            title,
+            phase,
+            status,
+            sponsor_name,
+            start_date,
+            completion_date,
+            source_therapeutic_area_id
+          )
+        `,
+      )
+      .eq("hcp_id", hcpId)
+      .eq("clinical_trials_v2.source_therapeutic_area_id", taId)
+      .limit(50);
 
-    const detail: HCPDetail = {
-      ...base,
-      narrative: narrativeResult.data ?? base.narrative ?? null,
-      publications: (publications ?? []) as HCPPublication[],
-      trial_count: trialCount ?? 0,
+    const [
+      scoreResult,
+      rankResult,
+      narrativeResult,
+      medicareResult,
+      opResult,
+      pubsResult,
+      trialsResult,
+    ] = await Promise.all([
+      scorePromise,
+      rankPromise,
+      narrativePromise,
+      medicarePromise,
+      openPaymentsPromise,
+      publicationsPromise,
+      trialsPromise,
+    ]);
+
+    // 5) Compose response.
+    const publicationsRows = (pubsResult as { data?: Array<{ publications_v2?: unknown }> | null }).data ?? [];
+    const publications = publicationsRows
+      .map((row) => {
+        const p = (row as { publications_v2?: unknown }).publications_v2;
+        return Array.isArray(p) ? p[0] : p;
+      })
+      .filter(Boolean);
+
+    const trialsRows = (trialsResult as { data?: Array<{ role?: string; clinical_trials_v2?: unknown }> | null }).data ?? [];
+    const trials = trialsRows
+      .map((row) => {
+        const t = (row as { clinical_trials_v2?: unknown }).clinical_trials_v2;
+        const trial = Array.isArray(t) ? t[0] : t;
+        return trial ? { ...trial, role: row.role ?? null } : null;
+      })
+      .filter(Boolean);
+
+    const narrativeData = (narrativeResult as { data?: { narrative_text: string | null; generated_at: string | null } | null }).data ?? null;
+
+    const response: HCPDetailResponse = {
+      hcp: hcpData,
+      score: (scoreResult as { data?: unknown }).data ?? null,
+      rank: (rankResult as { data?: unknown }).data ?? null,
+      narrative: narrativeData,
+      medicare: (medicareResult as { data?: unknown }).data ?? null,
+      openPayments: (opResult as { data?: unknown }).data ?? null,
+      publications,
+      trials,
+      therapeuticArea: taSlug,
+      scope: { type: scope.scopeType, value: scope.scopeValue },
     };
 
-    return { data: detail, error: null };
+    return { data: response, error: null };
   } catch (err) {
     return {
       data: null,
