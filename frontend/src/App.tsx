@@ -245,7 +245,7 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("auth");
   const [selectedTA, setSelectedTA] = useState("Rare Disease");
   const [selectedIndication, setSelectedIndication] = useState("All");
-  const [indicationCount, setIndicationCount] = useState(2034);
+  const [indicationCount, setIndicationCount] = useState<number | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [activeHCP, setActiveHCP] = useState<AppHCP | null>(null);
   const [detailHCP, setDetailHCP] = useState<AppHCP>(EMPTY_HCP);
@@ -641,17 +641,22 @@ function AppContent() {
                 fontFamily: "monospace",
               }}
             >
-              {feedTotal > 0 && hcpList.length < feedTotal
-                ? `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`
-                : `${(
-                    track === "rising-stars"
-                      ? (taCounts?.rising_stars ?? indicationCount)
-                      : track === "community"
-                        ? (taCounts?.community_pool ?? indicationCount)
-                        : track === "established" && feedTotal > 0
-                          ? feedTotal
-                          : indicationCount
-                  ).toLocaleString()} identified`}
+              {(() => {
+                if (feedTotal > 0 && hcpList.length < feedTotal) {
+                  return `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`;
+                }
+                const cohortCount =
+                  track === "rising-stars"
+                    ? taCounts?.rising_stars ?? null
+                    : track === "community"
+                      ? taCounts?.community_pool ?? null
+                      : track === "established"
+                        ? (feedTotal > 0 ? feedTotal : taCounts?.established ?? null)
+                        : null;
+                const resolved = cohortCount ?? (feedTotal > 0 ? feedTotal : indicationCount);
+                if (resolved == null) return "— identified";
+                return `${resolved.toLocaleString()} identified`;
+              })()}
             </span>
             <button
               onClick={() => setCurrentScreen("landscape")}

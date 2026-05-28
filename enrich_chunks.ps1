@@ -1,7 +1,7 @@
 # Save this as enrich_chunks.ps1 - ASCII characters only
 
 $chunkSize = 5000
-$startOffset = 12900
+$startOffset = 163500
 $endOffset = 229252
 $logFile = "enrich_chunks.log"
 
