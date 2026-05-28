@@ -469,6 +469,7 @@ export async function getRisingStars(
         {
           ...mapped,
           normalized_score: normalizedScore,
+          cohort_score: normalizedScore,
           narrative: narrativeMap.get(String(rr.hcp_id)) ?? null,
           // Rank-forward fields:
           rank: Number(rr.rank),
