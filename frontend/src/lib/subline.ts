@@ -49,6 +49,8 @@ export type BuildSublineHcp = {
   institution_normalized?: string | null;
   institutionFull?: string | null;
   institution_full?: string | null;
+  npiSpecialty?: string | null;
+  npi_specialty?: string | null;
   nppesPracticeCity?: string | null;
   nppesPracticeState?: string | null;
   nppesPracticeSetting?: string | null;
@@ -116,6 +118,14 @@ function practiceSettingLabel(settingRaw: string): string | null {
   return PRACTICE_SETTING_LABELS[k] ?? null;
 }
 
+function extractPrimarySpecialty(raw: string): string | null {
+  const cleaned = raw.trim();
+  if (!cleaned) return null;
+  const parts = cleaned.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts[parts.length - 1];
+}
+
 /**
  * Normalized affiliation subline: institution when “clean”, else practice setting,
  * always appending City, State when available.
@@ -147,6 +157,10 @@ export function buildSubline(hcp: BuildSublineHcp): string {
     return `${affil}, ${locationPart}`;
   }
 
+  const specialty = extractPrimarySpecialty(norm(hcp.npiSpecialty ?? hcp.npi_specialty));
+  if (specialty) {
+    return `${specialty} · ${locationPart}`;
+  }
   const label = practiceSettingLabel(settingRaw);
   if (label) {
     return `${label}, ${locationPart}`;

@@ -847,7 +847,6 @@ export async function getCommunity(
             last_name,
             institution_normalized,
             institution_raw,
-            institution_full,
             country,
             career_first_pub_year,
             cohort_classification,
