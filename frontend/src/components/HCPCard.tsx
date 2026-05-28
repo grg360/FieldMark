@@ -427,7 +427,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           borderRadius: 4,
           margin: "0 16px 8px",
           padding: "12px",
-          paddingBottom: 40,
+          paddingBottom: 28,
           cursor: "pointer",
         }}
       >
@@ -544,8 +544,8 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           aria-label={`Add action for ${hcp.name}`}
           style={{
             position: "absolute",
-            bottom: 12,
-            right: 12,
+            bottom: 10,
+            right: 10,
             width: 20,
             height: 20,
             minHeight: 0,
