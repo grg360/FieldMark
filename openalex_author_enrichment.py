@@ -31,7 +31,7 @@ import threading
 import time
 import uuid
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -333,6 +333,19 @@ def upsert_batch(client: Client, rows: List[MetricsRow], dry_run: bool) -> None:
     if dry_run:
         print(f"[openalex_enrich] [DRY RUN] would upsert {len(rows)} rows")
         return
+    # Deduplicate by (hcp_id, snapshot_date) keeping highest works_count.
+    # ON CONFLICT cannot update the same constrained row twice in one batch;
+    # duplicates arise when one hcp_id has multiple OpenAlex profiles (conflation).
+    _seen: dict = {}
+    for _r in rows:
+        _key = (_r.hcp_id, _r.snapshot_date)
+        _existing = _seen.get(_key)
+        if _existing is None or (_r.works_count or 0) > (_existing.works_count or 0):
+            _seen[_key] = _r
+    _deduped = list(_seen.values())
+    if len(_deduped) < len(rows):
+        print(f"[openalex_enrich] dedup: {len(rows)} -> {len(_deduped)} rows (dropped {len(rows) - len(_deduped)} duplicate hcp_id+snapshot)")
+    rows = _deduped
     payload = []
     for r in rows:
         payload.append({
@@ -377,7 +390,12 @@ def run(args: argparse.Namespace) -> int:
 
     client = create_client(supabase_url, supabase_key)
     enrichment_run_id = str(uuid.uuid4())
-    today = date.today().isoformat()
+    today = args.snapshot_date if args.snapshot_date else date.today().isoformat()
+    try:
+        datetime.strptime(today, "%Y-%m-%d")
+    except ValueError:
+        print(f"[openalex_enrich] ERROR: --snapshot-date must be YYYY-MM-DD, got {today!r}")
+        return 2
 
     print(f"[openalex_enrich] enrichment_run_id={enrichment_run_id}")
     print(f"[openalex_enrich] snapshot_date={today}")
@@ -473,56 +491,67 @@ def run(args: argparse.Namespace) -> int:
         with stats_lock:
             stats.skipped_already_done = skipped_count
 
-    print(f"[openalex_enrich] dispatching {len(work_items)} fetches across {args.workers} worker(s)")
+    print(f"[openalex_enrich] dispatching {len(work_items)} fetches across {args.workers} worker(s) (bounded window)")
 
     processed = 0
+    max_in_flight = max(args.workers * 2, args.workers + 4)
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        # Submit all work upfront. Each future resolves independently as fetches complete.
-        futures = [executor.submit(fetch_one, link) for link in work_items]
-
-        for future in as_completed(futures):
-            if INTERRUPTED:
-                # Don't cancel in-flight requests; let them finish naturally for clean shutdown
-                pass
-
+        work_iter = iter(work_items)
+        in_flight = set()
+        # Prime the window
+        for _ in range(max_in_flight):
             try:
-                metrics_row = future.result()
-            except Exception as exc:
-                # Should not happen — fetch_one catches all exceptions. Defensive guard.
-                print(f"[openalex_enrich] WARN: unexpected worker exception: {exc}")
-                continue
+                link = next(work_iter)
+            except StopIteration:
+                break
+            in_flight.add(executor.submit(fetch_one, link))
+        while in_flight:
+            done, in_flight = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in done:
+                # Refill: submit one new task per completed task, unless interrupted or exhausted
+                if not INTERRUPTED:
+                    try:
+                        link = next(work_iter)
+                        in_flight.add(executor.submit(fetch_one, link))
+                    except StopIteration:
+                        pass
+                try:
+                    metrics_row = future.result()
+                except Exception as exc:
+                    print(f"[openalex_enrich] WARN: unexpected worker exception: {exc}")
+                    continue
 
-            # Thread-safe append to pending buffer
-            should_flush = False
-            with pending_lock:
-                pending.append(metrics_row)
-                if len(pending) >= args.batch_size:
-                    should_flush = True
+                # Thread-safe append to pending buffer
+                should_flush = False
+                with pending_lock:
+                    pending.append(metrics_row)
+                    if len(pending) >= args.batch_size:
+                        should_flush = True
 
-            # Flush outside pending_lock so we don't block workers during the upsert
-            if should_flush:
-                with flush_lock:
-                    # Re-grab pending under lock, swap with empty list
-                    with pending_lock:
-                        batch_to_write = pending
-                        pending = []
-                    upsert_batch(client, batch_to_write, args.dry_run)
+                # Flush outside pending_lock so we don't block workers during the upsert
+                if should_flush:
+                    with flush_lock:
+                        # Re-grab pending under lock, swap with empty list
+                        with pending_lock:
+                            batch_to_write = pending
+                            pending = []
+                        upsert_batch(client, batch_to_write, args.dry_run)
 
-            processed += 1
-            if processed % PROGRESS_INTERVAL == 0:
-                with stats_lock:
-                    if stats.recent_durations:
-                        avg = sum(stats.recent_durations) / len(stats.recent_durations)
-                        remaining = len(work_items) - processed
-                        # With concurrency, effective rate is avg/workers
-                        eta_seconds = (avg * remaining) / max(1, args.workers)
-                        eta_min = eta_seconds / 60.0
-                        print(
-                            f"[openalex_enrich] {processed}/{len(work_items)} | "
-                            f"ok={stats.fetched_ok} 404={stats.fetched_not_found} err={stats.fetched_error} "
-                            f"flag={stats.flagged_disambiguation_suspect} skip={stats.skipped_already_done} | "
-                            f"workers={args.workers} avg={avg*1000:.0f}ms/req eta={eta_min:.1f}min"
-                        )
+                processed += 1
+                if processed % PROGRESS_INTERVAL == 0:
+                    with stats_lock:
+                        if stats.recent_durations:
+                            avg = sum(stats.recent_durations) / len(stats.recent_durations)
+                            remaining = len(work_items) - processed
+                            # With concurrency, effective rate is avg/workers
+                            eta_seconds = (avg * remaining) / max(1, args.workers)
+                            eta_min = eta_seconds / 60.0
+                            print(
+                                f"[openalex_enrich] {processed}/{len(work_items)} | "
+                                f"ok={stats.fetched_ok} 404={stats.fetched_not_found} err={stats.fetched_error} "
+                                f"flag={stats.flagged_disambiguation_suspect} skip={stats.skipped_already_done} | "
+                                f"workers={args.workers} avg={avg*1000:.0f}ms/req eta={eta_min:.1f}min"
+                            )
 
     # Final flush
     if pending:
@@ -547,6 +576,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--limit", type=int, default=None, help="Only process the first N link rows.")
     p.add_argument("--offset", type=int, default=0, help="Skip the first N link rows.")
     p.add_argument("--resume", action="store_true", help="Skip HCPs already snapshotted today.")
+    p.add_argument(
+        "--snapshot-date",
+        type=str,
+        default=None,
+        help="Snapshot date to write/resume (YYYY-MM-DD). Defaults to today. Use to resume an interrupted run into its original snapshot.",
+    )
     p.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Supabase upsert batch size.")
     p.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
                    help="Number of concurrent fetch workers (default 1, safe ceiling 8).")

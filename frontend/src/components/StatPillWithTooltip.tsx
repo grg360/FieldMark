@@ -7,19 +7,19 @@ interface TooltipDef {
 
 const TOOLTIP_MAP: Record<string, TooltipDef> = {
   "PUB SCORE": {
-    title: "Publication velocity",
+    title: "Publication Score",
     body: "Publication score (0-100) measuring this HCP's recent publication output, normalized within their therapeutic area and career stage cohort. Higher scores indicate more prolific publishing relative to peers.",
   },
   "CIT TRAJ": {
-    title: "Citation trajectory",
+    title: "Citation Trajectory",
     body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
   },
   "TRIALS": {
-    title: "Trial activity",
+    title: "Trial Activity",
     body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
   },
   "PUB YEARS": {
-    title: "Pub years",
+    title: "Publication Years",
     body: "The number of years since this HCP's first published paper, used as a proxy for research career stage when CV data is unavailable.",
   },
   "Publication velocity": {
