@@ -20,7 +20,14 @@ import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
-import { getHCPDetail, getRisingStars, getTACounts, getTAIdForLabel, getTADisplayName } from "./lib/api";
+import {
+  getEstablished,
+  getHCPDetail,
+  getRisingStars,
+  getTACounts,
+  getTAIdForLabel,
+  getTADisplayName,
+} from "./lib/api";
 import { useFilterContext } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
 import type { HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
@@ -326,11 +333,18 @@ function AppContent() {
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(
-        { therapeuticArea: taSlug, region },
-        FEED_PAGE_SIZE,
-        { offset: 0 },
-      );
+      const filters = { therapeuticArea: taSlug, region };
+      let data;
+      if (track === "established") {
+        ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
+      } else if (track === "community") {
+        setHcpList([]);
+        setFeedTotal(0);
+        setLastUpdatedAt(new Date());
+        return;
+      } else {
+        ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: 0 }));
+      }
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
       if (data) setFeedTotal(data.total);
@@ -357,11 +371,19 @@ function AppContent() {
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = getTASlug(selectedTA);
-      const { data } = await getRisingStars(
-        { therapeuticArea: taSlug, region },
-        FEED_PAGE_SIZE,
-        { offset: 0 },
-      );
+      const filters = { therapeuticArea: taSlug, region };
+      let data;
+      if (track === "established") {
+        ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
+      } else if (track === "community") {
+        setHcpList([]);
+        setFeedTotal(0);
+        setLastUpdatedAt(new Date());
+        setLoadingHCPs(false);
+        return;
+      } else {
+        ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: 0 }));
+      }
       if (cancelled) return;
 
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
@@ -379,16 +401,18 @@ function AppContent() {
   }, [selectedTA, track, region]);
 
   async function loadMore() {
-    if (track === "social") return;
+    if (track === "social" || track === "community") return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = getTASlug(selectedTA);
+    const filters = { therapeuticArea: taSlug, region };
     setLoadingMore(true);
     try {
-      const { data } = await getRisingStars(
-        { therapeuticArea: taSlug, region },
-        FEED_PAGE_SIZE,
-        { offset: nextOffset },
-      );
+      let data;
+      if (track === "established") {
+        ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
+      } else {
+        ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
+      }
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList((prev) => [...prev, ...mapped]);
       setFeedOffset(nextOffset);
