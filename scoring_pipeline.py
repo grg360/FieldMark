@@ -166,7 +166,7 @@ def fetch_all_rows(
 def fetch_all_hcps(supabase: Client, page_size: int = 1000, target_version: str = "v1") -> List[Dict]:
     hcps_table = get_table_name("hcps", target_version)
     if target_version == "v2":
-        select_cols = "id,first_name,last_name,country,total_career_pubs,career_first_pub_year"
+        select_cols = "id,first_name,last_name,country,total_career_pubs,career_first_pub_year_v2"
     else:
         select_cols = "id,first_name,last_name,country,total_career_pubs,first_pub_year"
     try:
@@ -194,8 +194,8 @@ def fetch_all_hcps(supabase: Client, page_size: int = 1000, target_version: str 
             break
         if target_version == "v2":
             for row in batch:
-                if "career_first_pub_year" in row:
-                    row["first_pub_year"] = row.pop("career_first_pub_year")
+                if "career_first_pub_year_v2" in row:
+                    row["first_pub_year"] = row.pop("career_first_pub_year_v2")
         rows.extend(batch)
         offset += page_size
 
