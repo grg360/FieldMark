@@ -21,6 +21,7 @@ import ScoringExplainedModal, {
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
 import {
+  getCommunity,
   getEstablished,
   getHCPDetail,
   getRisingStars,
@@ -338,10 +339,7 @@ function AppContent() {
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
       } else if (track === "community") {
-        setHcpList([]);
-        setFeedTotal(0);
-        setLastUpdatedAt(new Date());
-        return;
+        ({ data } = await getCommunity(filters, FEED_PAGE_SIZE, { offset: 0 }));
       } else {
         ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: 0 }));
       }
@@ -376,11 +374,7 @@ function AppContent() {
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
       } else if (track === "community") {
-        setHcpList([]);
-        setFeedTotal(0);
-        setLastUpdatedAt(new Date());
-        setLoadingHCPs(false);
-        return;
+        ({ data } = await getCommunity(filters, FEED_PAGE_SIZE, { offset: 0 }));
       } else {
         ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: 0 }));
       }
@@ -401,7 +395,7 @@ function AppContent() {
   }, [selectedTA, track, region]);
 
   async function loadMore() {
-    if (track === "social" || track === "community") return;
+    if (track === "social") return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = getTASlug(selectedTA);
     const filters = { therapeuticArea: taSlug, region };
@@ -410,6 +404,8 @@ function AppContent() {
       let data;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
+      } else if (track === "community") {
+        ({ data } = await getCommunity(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
       } else {
         ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
       }

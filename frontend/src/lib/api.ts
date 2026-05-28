@@ -771,6 +771,281 @@ export async function getEstablished(
   }
 }
 
+export async function getCommunity(
+  filtersOrSlug: FilterState | string,
+  limit: number = 20,
+  options: { offset?: number } = {},
+): Promise<ApiResult<{ rows: RisingStar[]; total: number }>> {
+  try {
+    const filters: FilterState =
+      typeof filtersOrSlug === "string"
+        ? { therapeuticArea: filtersOrSlug }
+        : filtersOrSlug;
+
+    const taSlug = filters.therapeuticArea.toLowerCase().trim();
+    const taId = TA_ID_MAP[taSlug];
+
+    if (!taId) {
+      return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
+    }
+
+    const scope = resolveFilterScope(filters);
+    const offset = options.offset ?? 0;
+
+    // 1) Count scoped community rank rows from pre-joined view.
+    let countQuery = supabase
+      .from("hcp_community_ranks_v2")
+      .select("hcp_id", { count: "exact", head: true })
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", scope.scopeType);
+    if (scope.scopeValue === null) {
+      countQuery = countQuery.is("scope_value", null);
+    } else {
+      countQuery = countQuery.eq("scope_value", scope.scopeValue);
+    }
+    const { count: totalCount, error: countError } = await countQuery;
+    if (countError) {
+      return { data: null, error: `Community count query failed: ${countError.message}` };
+    }
+
+    // 2) Fetch scoped rank rows from pre-joined view.
+    let rankQuery = supabase
+      .from("hcp_community_ranks_v2")
+      .select(
+        "hcp_id, rank, scope_size, normalized_score, composite_score, patient_volume, pharma_engagement, group_practice_signal, career_years, publication_signal, country, first_name, last_name, institution_normalized, career_first_pub_year, total_career_pubs, nppes_career_stage_years, nppes_practice_city, nppes_practice_state, nppes_practice_setting, npi_specialty",
+      )
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", scope.scopeType)
+      .order("rank", { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (scope.scopeValue === null) {
+      rankQuery = rankQuery.is("scope_value", null);
+    } else {
+      rankQuery = rankQuery.eq("scope_value", scope.scopeValue);
+    }
+
+    const rankResult = await rankQuery;
+    if (rankResult.error) {
+      return { data: null, error: `Community rank query failed: ${rankResult.error.message}` };
+    }
+    const rankRows = rankResult.data ?? [];
+    if (rankRows.length === 0) {
+      return { data: { rows: dedupeHCPs<RisingStar>([]), total: totalCount ?? 0 }, error: null };
+    }
+
+    const hcpIds = rankRows.map((r: any) => String(r.hcp_id));
+
+    // 3) Fetch enrichment details in parallel.
+    const [hcpResult, medicareResult, opResult, metricsResult] = await Promise.all([
+      supabase
+        .from("hcps_v2")
+        .select(
+          `
+            id,
+            first_name,
+            last_name,
+            institution_normalized,
+            institution_raw,
+            institution_full,
+            country,
+            career_first_pub_year,
+            cohort_classification,
+            cohort_score,
+            nppes_career_stage_years,
+            nppes_practice_city,
+            nppes_practice_state,
+            nppes_practice_setting,
+            nppes_practice_zip,
+            npi_number,
+            npi_specialty,
+            total_career_pubs
+          `,
+        )
+        .in("id", hcpIds),
+      supabase
+        .from("hcp_medicare_summary_v2")
+        .select(
+          "hcp_id, total_beneficiaries_3yr_unique_est, beneficiaries_2021, beneficiaries_2022, beneficiaries_2023",
+        )
+        .in("hcp_id", hcpIds),
+      supabase
+        .from("hcp_open_payments_summary_v2")
+        .select(
+          `
+            hcp_id,
+            distinct_companies_lifetime,
+            total_payments_lifetime,
+            py2022_total,
+            py2023_total,
+            py2024_total,
+            speaker_bureau_3yr,
+            consulting_3yr,
+            honoraria_3yr,
+            education_3yr,
+            royalty_3yr,
+            food_beverage_3yr,
+            travel_lodging_3yr
+          `,
+        )
+        .in("hcp_id", hcpIds),
+      supabase
+        .from("hcp_author_metrics_latest_v2")
+        .select("hcp_id, cited_by_count, h_index, works_count, i10_index")
+        .in("hcp_id", hcpIds),
+    ]);
+
+    if (hcpResult.error) {
+      return { data: null, error: `HCP details query failed: ${hcpResult.error.message}` };
+    }
+    if (medicareResult.error) {
+      return { data: null, error: `Medicare query failed: ${medicareResult.error.message}` };
+    }
+    if (opResult.error) {
+      return { data: null, error: `Open Payments query failed: ${opResult.error.message}` };
+    }
+    if (metricsResult.error) {
+      return { data: null, error: `Author metrics query failed: ${metricsResult.error.message}` };
+    }
+
+    const hcpById = new Map(
+      (hcpResult.data ?? []).map((h: any) => [String(h.id), h]),
+    );
+    const medicareMap = new Map(
+      (medicareResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
+    );
+    const opById = new Map(
+      (opResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
+    );
+    const metricsById = new Map(
+      (metricsResult.data ?? []).map((r: any) => [String(r.hcp_id), r]),
+    );
+
+    // 4) Apply industry filter on institution.
+    const filteredRankRows = rankRows.filter((rr: any) => {
+      const hcp = hcpById.get(String(rr.hcp_id));
+      const inst = String(
+        rr.institution_normalized ??
+          hcp?.institution_normalized ??
+          hcp?.institution_raw ??
+          "",
+      ).toLowerCase();
+      if (!inst) return true;
+      return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
+    });
+
+    // 5) Fetch narratives for the surviving HCPs.
+    const narrativeIds = filteredRankRows.map((r: any) => String(r.hcp_id));
+    const narrativeMap = new Map<string, string | null>();
+
+    if (narrativeIds.length > 0) {
+      const { data: taNarratives, error: taNarrError } = await supabase
+        .from("hcp_narratives_v2")
+        .select("hcp_id, narrative_text, therapeutic_area_slug")
+        .in("hcp_id", narrativeIds)
+        .eq("therapeutic_area_slug", taSlug);
+
+      if (taNarrError) {
+        return { data: null, error: `Narrative query failed: ${taNarrError.message}` };
+      }
+      for (const n of taNarratives ?? []) {
+        narrativeMap.set(String(n.hcp_id), (n as any).narrative_text ?? null);
+      }
+
+      const missingIds = narrativeIds.filter((id: string) => !narrativeMap.has(id));
+      if (missingIds.length > 0) {
+        const { data: fallbackNarratives, error: fbError } = await supabase
+          .from("hcp_narratives_v2")
+          .select("hcp_id, narrative_text, generated_at")
+          .in("hcp_id", missingIds)
+          .order("generated_at", { ascending: false });
+
+        if (fbError) {
+          return { data: null, error: `Narrative fallback query failed: ${fbError.message}` };
+        }
+        for (const n of fallbackNarratives ?? []) {
+          const hid = String(n.hcp_id);
+          if (!narrativeMap.has(hid)) {
+            narrativeMap.set(hid, (n as any).narrative_text ?? null);
+          }
+        }
+      }
+    }
+
+    // 6) Build RisingStar rows.
+    const communityRows: RisingStar[] = filteredRankRows.flatMap((rr: any): RisingStar[] => {
+      const hcp = hcpById.get(String(rr.hcp_id));
+      if (!hcp) return [];
+      const normalizedScore = Number(rr.normalized_score ?? 0);
+      const rank = Number(rr.rank);
+      const scopeSize = Number(rr.scope_size);
+      const percentile = scopeSize > 0 ? 100 - (rank / scopeSize) * 100 : 100;
+
+      const medicareData = medicareMap.get(String(rr.hcp_id));
+      const opData = opById.get(String(rr.hcp_id));
+      const metricsData = metricsById.get(String(rr.hcp_id));
+
+      const enrichedRow = {
+        composite_score: Number(rr.composite_score ?? normalizedScore),
+        normalized_score: normalizedScore,
+        cohort_score: normalizedScore,
+        pub_velocity_score: null,
+        citation_trajectory_score: null,
+        trial_investigator_score: null,
+        career_first_pub_year: rr.career_first_pub_year ?? null,
+        total_career_pubs: rr.total_career_pubs ?? null,
+        tier: "community",
+        hcps: {
+          ...hcp,
+          first_name: rr.first_name ?? hcp.first_name,
+          last_name: rr.last_name ?? hcp.last_name,
+          institution_normalized: rr.institution_normalized ?? hcp.institution_normalized,
+          country: rr.country ?? hcp.country,
+          career_first_pub_year: rr.career_first_pub_year ?? hcp.career_first_pub_year,
+          total_career_pubs: rr.total_career_pubs ?? hcp.total_career_pubs,
+          nppes_career_stage_years: rr.nppes_career_stage_years ?? hcp.nppes_career_stage_years,
+          nppes_practice_city: rr.nppes_practice_city ?? hcp.nppes_practice_city,
+          nppes_practice_state: rr.nppes_practice_state ?? hcp.nppes_practice_state,
+          nppes_practice_setting: rr.nppes_practice_setting ?? hcp.nppes_practice_setting,
+          npi_specialty: rr.npi_specialty ?? hcp.npi_specialty,
+          cohort_classification: "community",
+          therapeutic_area: filters.therapeuticArea,
+          hcp_medicare_summary: medicareData ? [medicareData] : null,
+          hcp_open_payments_summary: opData ? [opData] : null,
+        },
+      };
+
+      const mapped = mapRisingStarRow(enrichedRow, filters.therapeuticArea);
+      return [
+        {
+          ...mapped,
+          cohort_classification: "community",
+          tier: "community",
+          cohort_score: normalizedScore,
+          normalized_score: normalizedScore,
+          composite_score: Number(rr.composite_score ?? normalizedScore),
+          narrative: narrativeMap.get(String(rr.hcp_id)) ?? null,
+          rank,
+          percentile,
+          scope_size: scopeSize,
+          total_citations: metricsData?.cited_by_count ?? null,
+          h_index: metricsData?.h_index ?? null,
+          works_count: metricsData?.works_count ?? null,
+        } as RisingStar,
+      ];
+    });
+
+    const rows = dedupeHCPs(communityRows);
+
+    return { data: { rows, total: totalCount ?? 0 }, error: null };
+  } catch (err) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : "Unknown error occurred",
+    };
+  }
+}
+
 /**
  * Read cohort counts for a TA from hcp_score_ranks_v2.
  *
