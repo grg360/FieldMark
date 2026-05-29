@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import SocialAnalyticsBanner from "./SocialAnalyticsBanner";
 import SocialCard from "./SocialCard";
-import { getMockSocialCandidates } from "../data/socialMockData";
+import { getSocialCandidates, type SocialCandidateRow } from "../lib/api";
 import RisingVoicesChart from "./RisingVoicesChart";
 
 // Inject pulse animation once for the live banner
@@ -21,7 +22,20 @@ interface SocialTrackEmptyProps {
 }
 
 export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) {
-  const candidates = getMockSocialCandidates(selectedTA);
+  const [candidates, setCandidates] = useState<SocialCandidateRow[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCandidatesLoading(true);
+    getSocialCandidates(selectedTA).then((res) => {
+      if (cancelled) return;
+      setCandidates(res.data || []);
+      setCandidatesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedTA]);
+
   const humanTAName = selectedTA;
 
   let emptyStateSubline: string;

@@ -2118,4 +2118,224 @@ export async function getSocialAnalytics(
   };
 }
 
+export interface SocialCandidateRow {
+  id: string;
+  handle: string;
+  displayName: string;
+  affiliation: string;
+  specialty: string;
+  bio: string;
+  confidenceTier: "likely_hcp" | "possibly_hcp" | "unverified";
+  platform: "twitter" | "bluesky";
+  followerCount: number;
+  postsLast90Days: number;
+  sourceHashtag: string;
+  engagementCount: number;
+  engagementRate: number;
+  narrative: string;
+  matchedHcpName?: string;
+  matchedHcpCohort?: "rising_stars" | "community" | "established";
+  matchedHcpScore?: number;
+}
+
+function deriveConfidenceTier(bio: string | null): "likely_hcp" | "possibly_hcp" | "unverified" {
+  if (!bio) return "unverified";
+  const b = bio.toLowerCase();
+
+  // Strong HCP signals: clinical credentials + role
+  const strongPatterns = [
+    /\bm\.?d\.?\b/,
+    /\bph\.?d\.?\b/,
+    /\bd\.?o\.?\b/,
+    /\bpharm\.?d\.?\b/,
+    /\boncologist\b/,
+    /\bhepatologist\b/,
+    /\bcardiologist\b/,
+    /\bpathologist\b/,
+    /\bsurgeon\b/,
+    /\bradiologist\b/,
+    /\bnephrologist\b/,
+    /\bgastroenterologist\b/,
+    /\bendocrinologist\b/,
+    /\bprofessor\b/,
+    /\bfellow\b/,
+    /\battending\b/,
+    /\bphysician\b/,
+    /\bchief\b.*\b(oncology|medicine|cancer|surgery|cardiology)\b/,
+  ];
+  if (strongPatterns.some((p) => p.test(b))) return "likely_hcp";
+
+  // Weak HCP signals: clinical/research context without explicit credential
+  const weakPatterns = [
+    /\boncology\b/,
+    /\bcancer\b/,
+    /\bresearch\b/,
+    /\bclinical\b/,
+    /\bhepatology\b/,
+    /\bliver\b/,
+    /\bhematology\b/,
+    /\bmedicine\b/,
+    /\bhospital\b/,
+    /\buniversity\b/,
+    /\bcenter\b.*\b(cancer|medical)\b/,
+  ];
+  if (weakPatterns.some((p) => p.test(b))) return "possibly_hcp";
+
+  return "unverified";
+}
+
+function buildNarrative(row: {
+  handle: string;
+  displayName: string | null;
+  postsLast90Days: number;
+  engagementCount: number;
+  followerCount: number;
+  sourceHashtag: string;
+  confidenceTier: string;
+}): string {
+  const engagementRate = row.followerCount > 0 ? row.engagementCount / row.followerCount : 0;
+  const name = row.displayName || row.handle;
+
+  const parts: string[] = [];
+
+  // Lead with posting cadence
+  if (row.postsLast90Days >= 20) {
+    parts.push(`${name} posts at a high cadence (${row.postsLast90Days} posts in 90 days)`);
+  } else if (row.postsLast90Days >= 5) {
+    parts.push(`${name} posts at a measured cadence (${row.postsLast90Days} posts in 90 days)`);
+  } else {
+    parts.push(`${name} has limited recent posting volume (${row.postsLast90Days} posts in 90 days)`);
+  }
+
+  // Engagement context
+  if (engagementRate >= 0.05) {
+    parts.push("with notably high engagement-per-follower, suggesting an actively engaged audience");
+  } else if (engagementRate >= 0.02) {
+    parts.push("with healthy engagement relative to follower count");
+  } else {
+    parts.push("with modest engagement relative to follower count");
+  }
+
+  // Source signal
+  parts.push(`. Captured via ${row.sourceHashtag}.`);
+
+  // Confidence framing
+  if (row.confidenceTier === "likely_hcp") {
+    parts.push(" Bio shows clinical credentials.");
+  } else if (row.confidenceTier === "possibly_hcp") {
+    parts.push(" Bio shows clinical context but no explicit credential.");
+  } else {
+    parts.push(" Bio is sparse or non-clinical — verify before engaging.");
+  }
+
+  return parts.join(" ").replace(/ \./g, ".");
+}
+
+export async function getSocialCandidates(
+  taSlug: string
+): Promise<{ data: SocialCandidateRow[] | null; error: any }> {
+  const slugMap: Record<string, string> = {
+    Oncology: "oncology",
+    Hepatology: "hepatology",
+    "Rare Disease": "rare-disease",
+  };
+  const mvSlug = slugMap[taSlug] ?? taSlug.toLowerCase();
+
+  // Step 1: Get social_users who have posts in this TA via the voice emergence view
+  // (uses the same filter we use for the chart: >=100 followers, >=20 engagement, >=4 posts)
+  const { data: voiceData, error: voiceErr } = await supabase
+    .from("mv_social_voice_emergence_by_ta")
+    .select("handle, display_name, follower_count, post_count, total_engagement, engagement_per_follower, bio, platform")
+    .eq("ta_slug", mvSlug)
+    .not("engagement_per_follower", "is", null)
+    .gte("follower_count", 100)
+    .gte("total_engagement", 20)
+    .gte("post_count", 4)
+    .order("total_engagement", { ascending: false })
+    .limit(50);
+
+  if (voiceErr) {
+    return { data: null, error: voiceErr };
+  }
+
+  if (!voiceData || voiceData.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // Step 2: For each handle, get their most-frequent source hashtag from social_posts_v2
+  const handles = voiceData.map((v: any) => v.handle);
+  const { data: sourceData } = await supabase
+    .from("social_posts_v2")
+    .select("handle, captured_via_query")
+    .in("handle", handles)
+    .gte("posted_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+  // Build a handle -> most-frequent-hashtag map
+  const sourceCounts = new Map<string, Map<string, number>>();
+  for (const row of sourceData || []) {
+    const h = (row as any).handle?.toLowerCase();
+    const q = (row as any).captured_via_query;
+    if (!h || !q) continue;
+    if (!sourceCounts.has(h)) sourceCounts.set(h, new Map());
+    const inner = sourceCounts.get(h)!;
+    inner.set(q, (inner.get(q) || 0) + 1);
+  }
+  const handleToSource = new Map<string, string>();
+  for (const [h, counts] of sourceCounts.entries()) {
+    let topQ = "";
+    let topN = 0;
+    for (const [q, n] of counts.entries()) {
+      if (n > topN) {
+        topQ = q;
+        topN = n;
+      }
+    }
+    if (topQ) handleToSource.set(h, topQ);
+  }
+
+  // Step 3: Build SocialCandidateRow objects
+  const candidates: SocialCandidateRow[] = voiceData.map((v: any) => {
+    const handle: string = v.handle;
+    const bio: string = v.bio || "";
+    const confidenceTier = deriveConfidenceTier(bio);
+    const sourceHashtag = handleToSource.get(handle.toLowerCase()) || "—";
+    const followerCount: number = v.follower_count || 0;
+    const totalEngagement: number = v.total_engagement || 0;
+    const postCount: number = v.post_count || 0;
+    const engagementRate = followerCount > 0 ? totalEngagement / followerCount : 0;
+    const platform = (v.platform === "bluesky" ? "bluesky" : "twitter") as "twitter" | "bluesky";
+
+    const displayName: string = v.display_name || handle;
+
+    const narrative = buildNarrative({
+      handle,
+      displayName: v.display_name,
+      postsLast90Days: postCount,
+      engagementCount: totalEngagement,
+      followerCount,
+      sourceHashtag,
+      confidenceTier,
+    });
+
+    return {
+      id: `soc_${handle}`,
+      handle,
+      displayName,
+      affiliation: "—",
+      specialty: "—",
+      bio,
+      confidenceTier,
+      platform,
+      followerCount,
+      postsLast90Days: postCount,
+      sourceHashtag,
+      engagementCount: totalEngagement,
+      engagementRate,
+      narrative,
+    };
+  });
+
+  return { data: candidates, error: null };
+}
+
 export type { HCP, HCPScore, LatestPost };
