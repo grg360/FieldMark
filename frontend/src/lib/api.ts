@@ -2028,6 +2028,8 @@ export async function getRisingVoices(
     .eq("ta_slug", mvSlug)
     .not("engagement_per_follower", "is", null)
     .gte("post_count", 4)
+    .gte("follower_count", 100)
+    .gte("total_engagement", 20)
     .order("engagement_per_follower", { ascending: false })
     .limit(200);
 
