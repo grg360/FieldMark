@@ -263,10 +263,13 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
                 type="number"
                 dataKey="y"
                 name="Engagement/follower"
-                tickFormatter={(v) => `${(v * 100).toFixed(1)}%`}
+                scale="log"
+                domain={[0.001, 1.0]}
+                ticks={[0.001, 0.01, 0.1, 1.0]}
+                tickFormatter={(v) => `${(v * 100).toFixed(v < 0.01 ? 1 : 0)}%`}
                 tick={{ fill: "#8A8884", fontSize: 11 }}
                 label={{
-                  value: "Engagement per follower",
+                  value: "Engagement per follower (log)",
                   angle: -90,
                   position: "insideLeft",
                   offset: 8,
