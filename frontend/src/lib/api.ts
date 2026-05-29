@@ -2039,4 +2039,83 @@ export async function getRisingVoices(
   return { data: data as RisingVoiceRow[], error: null };
 }
 
+export interface ShareOfVoiceRow {
+  handle: string;
+  display_name: string | null;
+  total_engagement: number;
+  engagement_pct: number;
+  rank_within_ta: number;
+}
+
+export interface HotTopicRow {
+  hashtag: string;
+  post_count: number;
+  total_engagement: number;
+  engagement_pct: number;
+  rank_within_ta: number;
+}
+
+export interface TrendingTopicRow {
+  hashtag: string;
+  current_engagement: number;
+  prior_engagement: number;
+  trend: "new" | "gone" | "rising" | "falling" | "flat";
+  pct_change: number | null;
+}
+
+export interface SocialAnalyticsBundle {
+  shareOfVoice: ShareOfVoiceRow[];
+  hotTopics: HotTopicRow[];
+  trending: TrendingTopicRow[];
+}
+
+export async function getSocialAnalytics(
+  taSlug: string
+): Promise<{ data: SocialAnalyticsBundle | null; error: any }> {
+  const slugMap: Record<string, string> = {
+    Oncology: "oncology",
+    Hepatology: "hepatology",
+    "Rare Disease": "rare-disease",
+  };
+  const mvSlug = slugMap[taSlug] ?? taSlug.toLowerCase();
+
+  const [sovResult, topicsResult, trendingResult] = await Promise.all([
+    supabase
+      .from("mv_social_share_of_voice_by_ta")
+      .select("handle, display_name, total_engagement, engagement_pct, rank_within_ta")
+      .eq("ta_slug", mvSlug)
+      .order("rank_within_ta", { ascending: true })
+      .limit(50),
+    supabase
+      .from("mv_social_hot_topics_by_ta")
+      .select("hashtag, post_count, total_engagement, engagement_pct, rank_within_ta")
+      .eq("ta_slug", mvSlug)
+      .order("rank_within_ta", { ascending: true })
+      .limit(6),
+    supabase
+      .from("mv_social_trending_topics_by_ta")
+      .select("hashtag, current_engagement, prior_engagement, trend, pct_change")
+      .eq("ta_slug", mvSlug)
+      .gte("prior_engagement", 50)
+      .order("current_engagement", { ascending: false })
+      .limit(6),
+  ]);
+
+  if (sovResult.error || topicsResult.error || trendingResult.error) {
+    return {
+      data: null,
+      error: sovResult.error || topicsResult.error || trendingResult.error,
+    };
+  }
+
+  return {
+    data: {
+      shareOfVoice: (sovResult.data as ShareOfVoiceRow[]) || [],
+      hotTopics: (topicsResult.data as HotTopicRow[]) || [],
+      trending: (trendingResult.data as TrendingTopicRow[]) || [],
+    },
+    error: null,
+  };
+}
+
 export type { HCP, HCPScore, LatestPost };
