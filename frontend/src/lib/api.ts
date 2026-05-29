@@ -1997,4 +1997,44 @@ export async function getLatestPostForHandle(
   }
 }
 
+export interface RisingVoiceRow {
+  handle: string;
+  display_name: string | null;
+  follower_count: number;
+  post_count: number;
+  total_engagement: number;
+  engagement_per_follower: number | null;
+  bio: string | null;
+  platform: string | null;
+  hcp_matched: boolean;
+}
+
+export async function getRisingVoices(
+  taSlug: string
+): Promise<{ data: RisingVoiceRow[] | null; error: any }> {
+  // Map UI-friendly TA names to the slug used in the materialized view.
+  const slugMap: Record<string, string> = {
+    Oncology: "oncology",
+    Hepatology: "hepatology",
+    "Rare Disease": "rare-disease",
+  };
+  const mvSlug = slugMap[taSlug] ?? taSlug.toLowerCase();
+
+  const { data, error } = await supabase
+    .from("mv_social_voice_emergence_by_ta")
+    .select(
+      "handle, display_name, follower_count, post_count, total_engagement, engagement_per_follower, bio, platform, hcp_matched"
+    )
+    .eq("ta_slug", mvSlug)
+    .not("engagement_per_follower", "is", null)
+    .gte("post_count", 4)
+    .order("engagement_per_follower", { ascending: false })
+    .limit(200);
+
+  if (error) {
+    return { data: null, error };
+  }
+  return { data: data as RisingVoiceRow[], error: null };
+}
+
 export type { HCP, HCPScore, LatestPost };

@@ -143,6 +143,7 @@ def fetch_unmatched_social_users(client: Client, platform_filter: Optional[str])
     Optional platform filter: twitter|bluesky.
     """
     existing_ids = fetch_existing_match_user_ids(client)
+    print(f"[DEBUG] existing matched user IDs count: {len(existing_ids)}")
     q = (
         client.table("social_users_v2")
         .select("id,platform,handle,display_name,bio,location,website,verified,data_quality_flag")
@@ -150,15 +151,27 @@ def fetch_unmatched_social_users(client: Client, platform_filter: Optional[str])
     )
     if platform_filter and platform_filter != "both":
         q = q.eq("platform", platform_filter)
+        print(f"[DEBUG] platform filter active: {platform_filter}")
+    else:
+        print(f"[DEBUG] no platform filter (querying both twitter and bluesky)")
     users = fetch_all_rows(q)
+    print(f"[DEBUG] fetch_all_rows returned {len(users)} social users from social_users_v2")
+    if len(users) > 0:
+        sample = users[0]
+        print(f"[DEBUG] first user sample: platform={sample.get('platform')!r}, handle={sample.get('handle')!r}, data_quality_flag={sample.get('data_quality_flag')!r}")
     out: List[Dict[str, Any]] = []
+    skipped_no_id = 0
+    skipped_already_matched = 0
     for u in users:
         uid = str(u.get("id") or "")
         if not uid:
+            skipped_no_id += 1
             continue
         if uid in existing_ids:
+            skipped_already_matched += 1
             continue
         out.append(u)
+    print(f"[DEBUG] after filtering: {len(out)} eligible | skipped_no_id={skipped_no_id} | skipped_already_matched={skipped_already_matched}")
     return out
 
 

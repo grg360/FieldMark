@@ -3,6 +3,7 @@ import SocialAnalyticsBanner from "./SocialAnalyticsBanner";
 import SocialCard from "./SocialCard";
 import SuggestHashtagModal from "./SuggestHashtagModal";
 import { getMockSocialCandidates } from "../data/socialMockData";
+import RisingVoicesChart from "./RisingVoicesChart";
 
 interface SocialTrackEmptyProps {
   selectedTA: string;
@@ -27,6 +28,7 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
 
   return (
     <div style={{ width: "100%" }}>
+      <RisingVoicesChart selectedTA={selectedTA} />
       {/* Disclosure card */}
       <div
         style={{
