@@ -252,6 +252,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
   const [addButtonHovered, setAddButtonHovered] = useState(false);
+  const [whyNowExpanded, setWhyNowExpanded] = useState(false);
   const touchDevice =
     typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
   const cohort = (hcp.cohort_classification ?? "").trim();
@@ -259,6 +260,10 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
     cohort === ""
       ? "rising_star"
       : cohort;
+  const scoreTooltipKey =
+    effectiveCohort === "established" ? "FIELDMARK_SCORE_ESTABLISHED"
+    : (effectiveCohort === "community" || effectiveCohort === "workhorse") ? "FIELDMARK_SCORE_COMMUNITY"
+    : "FIELDMARK_SCORE_RISING";
   const isDarkHorse = cohort === "dark_horse";
   const isWorkhorse = cohort === "workhorse";
   const isCommunityPlain = cohort === "community";
@@ -268,7 +273,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const statPillKeys = cohortStatKeys(effectiveCohort);
   const countryCode = getCountryCode(hcp.country ?? null);
   const subline = buildSubline(hcp);
-  if (typeof window !== "undefined" && ((hcp as { last_name?: string }).last_name === "McKean" || hcp.name?.includes("McKean"))) {
+  if (typeof window !== "undefined" && (hcp as { last_name?: string }).last_name === "McKean") {
     console.log("[McKean subline debug]", {
       hcp_id: hcp.id,
       institution: (hcp as any).institution,
@@ -277,7 +282,6 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
       nppes_practice_city: (hcp as any).nppes_practice_city,
       nppes_practice_state: (hcp as any).nppes_practice_state,
       nppes_practice_setting: (hcp as any).nppes_practice_setting,
-      npi_specialty: (hcp as any).npi_specialty,
       computed_subline: subline,
     });
   }
@@ -452,70 +456,84 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           cursor: "pointer",
         }}
       >
-        {/* Row 1: Name+flag grouped left, score-as-headline with two-rank stack on right */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 17, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
-                {hcp.name}
-              </span>
-              {countryCode && (
-                <img
-                  src={`https://flagcdn.com/16x12/${countryCode}.png`}
-                  srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
-                  width="16"
-                  height="12"
-                  alt={hcp.country || ""}
-                  style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              )}
+        {/* Name + flag — top-left, tight to corner */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 90 }}>
+          <span style={{ fontSize: 17, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
+            {hcp.name}
+          </span>
+          {countryCode && (
+            <img
+              src={`https://flagcdn.com/16x12/${countryCode}.png`}
+              srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
+              width="16"
+              height="12"
+              alt={hcp.country || ""}
+              style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          )}
+        </div>
+
+        {/* Score — absolute-positioned top-right corner */}
+        <button
+          type="button"
+          onClick={handleScoreBadgeClick}
+          onTouchEnd={handleScoreBadgeClick}
+          onMouseEnter={() => setActiveTooltip(scoreTooltipKey)}
+          onMouseLeave={() => setActiveTooltip(null)}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontFamily: "monospace",
+            textAlign: "right",
+            zIndex: 1,
+          }}
+          aria-label={`FieldMark Score ${formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}`}
+        >
+          <div style={{ fontSize: 28, fontWeight: 600, color: accentColor, lineHeight: 1 }}>
+            {formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}
+          </div>
+          {hcp.rank != null && (
+            <div style={{ fontSize: 10, color: "#E8E6DF", marginTop: 6, lineHeight: 1.4, letterSpacing: 0.4 }}>
+              #{hcp.rank} {(hcp.scope ?? "US").toUpperCase()}
+              {hcp.global_rank != null ? ` · #${hcp.global_rank} GLOBAL` : ""}
+            </div>
+          )}
+        </button>
+
+        {/* Score tooltip — rendered when activeTooltip matches */}
+        {activeTooltip === scoreTooltipKey && (
+          <div
+            style={{
+              position: "absolute",
+              top: 56,
+              right: 12,
+              width: 240,
+              backgroundColor: "#111113",
+              border: "1px solid #E8A020",
+              borderRadius: 4,
+              padding: "10px 12px",
+              zIndex: 200,
+              pointerEvents: "none",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 500, color: "#E8E6DF" }}>FieldMark Score</div>
+            <div style={{ fontSize: 11, color: "#9B9892", marginTop: 4, lineHeight: 1.5 }}>
+              {scoreTooltipKey === "FIELDMARK_SCORE_RISING"
+                ? "Composite signal of publication velocity, citation trajectory, and clinical trial activity within the therapeutic area, with career-stage adjustment. Normalized 0–100 within the rising star cohort."
+                : scoreTooltipKey === "FIELDMARK_SCORE_ESTABLISHED"
+                ? "Composite signal of publication volume, recent productivity, lead authorship density, clinical trial activity, career length, and pharma engagement breadth. Normalized 0–100 within the established cohort."
+                : "Composite signal of pharma engagement, engagement breadth across companies, Medicare patient volume, and career stage. Normalized 0–100 within the community cohort."}
             </div>
           </div>
-
-          {/* Score as headline + two-rank stack */}
-          <button
-            type="button"
-            onClick={handleScoreBadgeClick}
-            onTouchEnd={handleScoreBadgeClick}
-            title="FieldMark Score: composite signal of publication velocity, citation trajectory, and trial activity within therapeutic area (0-100)"
-            style={{
-              flexShrink: 0,
-              background: "#1A1200",
-              border: `1px solid ${accentColor}`,
-              borderRadius: 4,
-              padding: "8px 12px",
-              cursor: "pointer",
-              fontFamily: "monospace",
-              minWidth: 84,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 4,
-            }}
-            aria-label={`FieldMark Score ${formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}`}
-          >
-            <div style={{ fontSize: 20, fontWeight: 500, color: accentColor, lineHeight: 1 }}>
-              {formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}
-            </div>
-            <div style={{ fontSize: 8, color: "#BA7517", letterSpacing: 0.8, lineHeight: 1, textTransform: "uppercase" }}>
-              FieldMark Score
-            </div>
-            {hcp.rank != null && (
-              <div style={{ fontSize: 10, color: "#BA7517", marginTop: 4, lineHeight: 1.4, letterSpacing: 0.4, textAlign: "center" }}>
-                #{hcp.rank} {(hcp.scope ?? "US").toUpperCase()}
-                {hcp.global_rank != null && (
-                  <>
-                    <br/>
-                    #{hcp.global_rank} GLOBAL
-                  </>
-                )}
-              </div>
-            )}
-          </button>
-        </div>
+        )}
 
         {/* Dark Horse / Workhorse cohort badges */}
         {isDarkHorse && (
@@ -556,11 +574,11 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
         )}
 
         {/* Row 2: Institution / location subline */}
-        <div style={{ fontSize: 14, color: "#6B6A65", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
+        <div style={{ fontSize: 14, color: "#6B6A65", fontFamily: "system-ui, sans-serif", marginTop: 2 }}>
           {subline}
         </div>
 
-        {/* Why_now insight band — fixed min-height for cross-card consistency, content vertically centered */}
+        {/* Why_now insight band — Read More expand for variable-length content */}
         {hcp.why_now && cohort !== "community" && cohort !== "workhorse" ? (
           <div
             style={{
@@ -568,9 +586,6 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
               padding: "12px 14px",
               background: "#2A2A30",
               borderRadius: 4,
-              minHeight: 110,
-              display: "flex",
-              alignItems: "center",
             }}
           >
             <span style={{
@@ -578,9 +593,35 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
               color: "#D0CCC4",
               fontFamily: "system-ui, sans-serif",
               lineHeight: 1.55,
+              display: "-webkit-box",
+              WebkitLineClamp: whyNowExpanded ? "unset" : 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
             }}>
               {hcp.why_now}
             </span>
+            {hcp.why_now.length > 130 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setWhyNowExpanded(!whyNowExpanded);
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  marginTop: 6,
+                  color: "#E8A020",
+                  fontSize: 11,
+                  fontFamily: "system-ui, sans-serif",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                {whyNowExpanded ? "Read less" : "Read more"}
+              </button>
+            )}
           </div>
         ) : null}
 

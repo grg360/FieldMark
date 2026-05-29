@@ -310,6 +310,19 @@ export async function getRisingStars(
 
     const hcpIds = rankRows.map((r: any) => String(r.hcp_id));
 
+    // Fetch global-scope rank for the same HCPs (for "#N Global" display)
+    const { data: globalRankRows } = await supabase
+      .from("hcp_rising_star_ranks_v2")
+      .select("hcp_id, rank")
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", "global")
+      .is("scope_value", null)
+      .in("hcp_id", hcpIds);
+    const globalRankByHcp = new Map<string, number>();
+    for (const r of globalRankRows ?? []) {
+      globalRankByHcp.set(String(r.hcp_id), Number(r.rank));
+    }
+
     // 3) Fetch HCP details, Medicare summary, Open Payments summary in parallel.
     const [hcpResult, medicareResult, opResult, metricsResult] = await Promise.all([
       supabase
@@ -489,6 +502,7 @@ export async function getRisingStars(
           rank: Number(rr.rank),
           percentile: Number(rr.percentile),
           scope_size: Number(rr.scope_size),
+          global_rank: globalRankByHcp.get(String(rr.hcp_id)) ?? null,
           scope: scopeLabel,
           // Author metrics (from hcp_author_metrics_latest_v2):
           total_citations: metricsData?.cited_by_count ?? null,
@@ -574,6 +588,19 @@ export async function getEstablished(
     }
 
     const hcpIds = rankRows.map((r: any) => String(r.hcp_id));
+
+    // Fetch global-scope rank for the same HCPs (for "#N Global" display)
+    const { data: globalRankRows } = await supabase
+      .from("hcp_established_ranks_v2")
+      .select("hcp_id, rank")
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", "global")
+      .is("scope_value", null)
+      .in("hcp_id", hcpIds);
+    const globalRankByHcp = new Map<string, number>();
+    for (const r of globalRankRows ?? []) {
+      globalRankByHcp.set(String(r.hcp_id), Number(r.rank));
+    }
 
     // 3) Fetch HCP details, Medicare summary, Open Payments summary, author metrics in parallel.
     const [hcpResult, medicareResult, opResult, metricsResult] = await Promise.all([
@@ -776,6 +803,7 @@ export async function getEstablished(
           rank,
           percentile,
           scope_size: scopeSize,
+          global_rank: globalRankByHcp.get(String(rr.hcp_id)) ?? null,
           scope: scopeLabel,
           total_citations: metricsData?.cited_by_count ?? null,
           h_index: metricsData?.h_index ?? null,
@@ -860,6 +888,19 @@ export async function getCommunity(
     }
 
     const hcpIds = rankRows.map((r: any) => String(r.hcp_id));
+
+    // Fetch global-scope rank for the same HCPs (for "#N Global" display)
+    const { data: globalRankRows } = await supabase
+      .from("hcp_community_ranks_v2")
+      .select("hcp_id, rank")
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", "global")
+      .is("scope_value", null)
+      .in("hcp_id", hcpIds);
+    const globalRankByHcp = new Map<string, number>();
+    for (const r of globalRankRows ?? []) {
+      globalRankByHcp.set(String(r.hcp_id), Number(r.rank));
+    }
 
     // 3) Fetch enrichment details in parallel.
     const [hcpResult, medicareResult, opResult, metricsResult] = await Promise.all([
@@ -1059,6 +1100,7 @@ export async function getCommunity(
           rank,
           percentile,
           scope_size: scopeSize,
+          global_rank: globalRankByHcp.get(String(rr.hcp_id)) ?? null,
           scope: scopeLabel,
           total_citations: metricsData?.cited_by_count ?? null,
           h_index: metricsData?.h_index ?? null,

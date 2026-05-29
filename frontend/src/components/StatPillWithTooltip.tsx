@@ -14,6 +14,22 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Citation Trajectory",
     body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
   },
+  "H-INDEX": {
+    title: "H-Index",
+    body: "Hirsch index — a measure of how often a researcher's work is cited. Higher values indicate sustained scientific influence rather than publication volume alone.",
+  },
+  "FIELDMARK_SCORE_RISING": {
+    title: "FieldMark Score",
+    body: "Composite signal of publication velocity, citation trajectory, and clinical trial activity within the therapeutic area, with career-stage adjustment. Normalized 0–100 within the rising star cohort.",
+  },
+  "FIELDMARK_SCORE_ESTABLISHED": {
+    title: "FieldMark Score",
+    body: "Composite signal of publication volume, recent productivity, lead authorship density, clinical trial activity, career length, and pharma engagement breadth. Normalized 0–100 within the established cohort.",
+  },
+  "FIELDMARK_SCORE_COMMUNITY": {
+    title: "FieldMark Score",
+    body: "Composite signal of pharma engagement, engagement breadth across companies, Medicare patient volume, and career stage. Normalized 0–100 within the community cohort.",
+  },
   "TRIALS": {
     title: "Trial Activity",
     body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
@@ -206,7 +222,7 @@ export function StatPillWithTooltip({
           <div
             style={{
               backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
+              border: "1px solid #3A3A40",
               borderRadius: 3,
               padding: "4px 8px",
               display: "flex",
