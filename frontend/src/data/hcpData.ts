@@ -13,6 +13,12 @@ export interface HCP {
   trials?: string;
   country?: string | null;
   narrative?: string | null;
+  /** From hcp_narratives_v2.why_now — card insight band. */
+  why_now?: string | null;
+  h_index?: number | null;
+  rank?: number;
+  scope?: string;
+  global_rank?: number | null;
   tier?: string | null;
   hcp_id?: string;
   cohort_classification?: string | null;

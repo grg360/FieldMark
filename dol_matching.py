@@ -129,7 +129,7 @@ def fetch_all_rows(query_builder) -> List[Dict[str, Any]]:
 
 
 def fetch_existing_match_user_ids(client: Client) -> set[str]:
-    rows = fetch_all_rows(client.table("dol_matches").select("social_user_id"))
+    rows = fetch_all_rows(client.table("dol_matches_v2").select("social_user_id"))
     return {
         str(r.get("social_user_id"))
         for r in rows
@@ -144,7 +144,7 @@ def fetch_unmatched_social_users(client: Client, platform_filter: Optional[str])
     """
     existing_ids = fetch_existing_match_user_ids(client)
     q = (
-        client.table("social_users")
+        client.table("social_users_v2")
         .select("id,platform,handle,display_name,bio,location,website,verified,data_quality_flag")
         .neq("data_quality_flag", "rejected")
     )
@@ -190,8 +190,8 @@ def find_hcp_candidates(client: Client, first_name: Optional[str], last_name: Op
     if not first_name or not last_name:
         return []
     q = (
-        client.table("hcps")
-        .select("id,first_name,last_name,institution_short,total_career_pubs")
+        client.table("hcps_v2")
+        .select("id,first_name,last_name,institution_normalized,total_career_pubs")
         .ilike("first_name", f"%{first_name}%")
         .ilike("last_name", last_name)
     )
@@ -206,7 +206,7 @@ def fetch_candidate_ta_slugs(client: Client, hcp_ids: Sequence[str]) -> Dict[str
     for i in range(0, len(hcp_ids), 200):
         chunk = hcp_ids[i : i + 200]
         rows = (
-            client.table("hcp_therapeutic_areas")
+            client.table("hcp_therapeutic_areas_v2")
             .select("hcp_id,therapeutic_area_id")
             .in_("hcp_id", chunk)
             .execute()
@@ -237,26 +237,26 @@ def fetch_candidate_ta_slugs(client: Client, hcp_ids: Sequence[str]) -> Dict[str
 
 def score_institution_signal(social_bio: str, hcp: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
     """+50 if institution signal matches."""
-    inst = normalize_alnum(hcp.get("institution_short"))
+    inst = normalize_alnum(hcp.get("institution_normalized"))
     bio = normalize_alnum(social_bio)
     if not inst or not bio:
-        return 0, {"institution_match": False, "institution_short": hcp.get("institution_short")}
+        return 0, {"institution_match": False, "institution_normalized": hcp.get("institution_normalized")}
 
     # Strong substring check first.
     if inst in bio:
-        return 50, {"institution_match": True, "institution_short": hcp.get("institution_short"), "method": "substring"}
+        return 50, {"institution_match": True, "institution_normalized": hcp.get("institution_normalized"), "method": "substring"}
 
     # Token overlap fallback for institution-like keywords.
     inst_tokens = [t for t in inst.split() if len(t) >= 4]
     if inst_tokens and any(t in bio for t in inst_tokens):
         return 50, {
             "institution_match": True,
-            "institution_short": hcp.get("institution_short"),
+            "institution_normalized": hcp.get("institution_normalized"),
             "method": "token_overlap",
             "matched_tokens": [t for t in inst_tokens if t in bio],
         }
 
-    return 0, {"institution_match": False, "institution_short": hcp.get("institution_short")}
+    return 0, {"institution_match": False, "institution_normalized": hcp.get("institution_normalized")}
 
 
 def score_medical_credential_signal(
@@ -333,12 +333,12 @@ def insert_dol_match(client: Client, match: MatchResult) -> None:
         "match_confidence": match.confidence,
         "match_signals": match.signals,
     }
-    client.table("dol_matches").upsert(row, on_conflict="hcp_id,social_user_id", ignore_duplicates=True).execute()
+    client.table("dol_matches_v2").upsert(row, on_conflict="hcp_id,social_user_id", ignore_duplicates=True).execute()
 
 
 def set_hcp_verified_dol(client: Client, hcp_id: str) -> None:
     """Set hcps.is_verified_dol=true for high-confidence matches."""
-    client.table("hcps").update({"is_verified_dol": True}).eq("id", hcp_id).execute()
+    client.table("hcps_v2").update({"is_verified_dol": True}).eq("id", hcp_id).execute()
 
 
 def floor_allows(confidence: str, confidence_floor: str) -> bool:

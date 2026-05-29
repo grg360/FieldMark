@@ -15,6 +15,8 @@ export interface HCP {
   /** TODO: load via hcp_therapeutic_areas join; not stored on hcps. */
   therapeutic_area: string | null;
   narrative?: string | null;
+  /** From hcp_narratives_v2.why_now — single-sentence timing insight for the card insight band. */
+  why_now?: string | null;
   tier?: string | null;
   cohort_classification?: string | null;
   /** hcps.cohort_score — community / workhorse percentile (0–100). */
@@ -81,6 +83,9 @@ export interface RisingStar extends HCP, HCPScore {
   percentile?: number;
   /** Total HCPs in scope (denominator for "rank #X of Y"). */
   scope_size?: number;
+  /** Display label for rank stack (e.g. US, GLOBAL). */
+  scope?: string;
+  global_rank?: number | null;
 }
 
 export interface SocialUser {

@@ -68,7 +68,7 @@ interface HCPCardProps {
 function cohortStatKeys(cohort: string): readonly string[] {
   if (cohort === "established") return ["PUBS", "CITATIONS", "TRIALS"] as const;
   if (cohort === "community" || cohort === "workhorse") return ["ENGAGEMENT", "COMPANIES", "YEARS"] as const;
-  return ["PUB SCORE", "CIT TRAJ", "PUB YEARS"] as const;
+  return ["PUB SCORE", "H-INDEX", "PUB YEARS"] as const;
 }
 
 /** Left-border accent on feed cards — matches TA selection cohort colors. */
@@ -105,10 +105,8 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
     return "—";
   }
   if (key === "PUB SCORE") return hcp.pubVel;
-  if (key === "CIT TRAJ") {
-    return hcp.citTraj == null
-      ? "—"
-      : `${Number(hcp.citTraj) >= 0 ? "+" : ""}${Number(hcp.citTraj).toFixed(1)}%`;
+  if (key === "H-INDEX") {
+    return hcp.h_index == null ? "—" : String(hcp.h_index);
   }
   if (key === "PUB YEARS") {
     return !hcp.firstPubYear || hcp.firstPubYear === 0
@@ -421,8 +419,8 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
         onClick={handleCardClick}
         style={{
           position: "relative",
-          backgroundColor: "#111113",
-          border: "1px solid #1E1E22",
+          backgroundColor: "#1C1C20",
+          border: "1px solid #2A2A2E",
           borderLeft: `3px solid ${borderAccentColor}`,
           borderRadius: 4,
           margin: "0 16px 8px",
@@ -431,27 +429,55 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           cursor: "pointer",
         }}
       >
-        {/* Row 1: Name + Country + Score */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
-            {hcp.name}
-          </span>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            {countryCode && (
-              <img
-                src={`https://flagcdn.com/16x12/${countryCode}.png`}
-                srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
-                width="16"
-                height="12"
-                alt={hcp.country || ""}
-                style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0, marginRight: "6px" }}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            )}
-            {renderScoreChip()}
+        {/* Row 1: Name+flag grouped left, score-as-headline with two-rank stack on right */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
+                {hcp.name}
+              </span>
+              {countryCode && (
+                <img
+                  src={`https://flagcdn.com/16x12/${countryCode}.png`}
+                  srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
+                  width="16"
+                  height="12"
+                  alt={hcp.country || ""}
+                  style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              )}
+            </div>
           </div>
+
+          {/* Score as headline + two-rank stack */}
+          <button
+            type="button"
+            onClick={handleScoreBadgeClick}
+            onTouchEnd={handleScoreBadgeClick}
+            style={{
+              flexShrink: 0,
+              textAlign: "right",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: "monospace",
+            }}
+            aria-label={`Score ${cohortScoreLabel}`}
+          >
+            <div style={{ fontSize: 26, fontWeight: 500, color: accentColor, lineHeight: 1 }}>
+              {cohortScoreLabel}
+            </div>
+            {hcp.rank != null && (
+              <div style={{ fontSize: 10, color: "#8A8884", marginTop: 6, lineHeight: 1.4, letterSpacing: 0.5 }}>
+                #{hcp.rank} {hcp.scope?.toUpperCase() ?? "US"}<br/>
+                {hcp.global_rank != null ? `#${hcp.global_rank} GLOBAL` : ""}
+              </div>
+            )}
+          </button>
         </div>
 
         {/* Dark Horse / Workhorse cohort badges */}
@@ -497,23 +523,29 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           {subline}
         </div>
 
-        {/* Row 3: Narrative (hidden on Community / Workhorse — stats carry the card) */}
-        {hcp.narrative && cohort !== "community" && cohort !== "workhorse" ? (
+        {/* Why_now insight band — italic, contained background, trending icon */}
+        {hcp.why_now && cohort !== "community" && cohort !== "workhorse" ? (
           <div
             style={{
-              fontSize: 14,
-              color: "#B8B4AC",
-              fontFamily: "system-ui, sans-serif",
-              lineHeight: 1.5,
-              marginTop: 8,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              marginTop: 14,
+              padding: "10px 12px",
+              background: "#232328",
+              borderRadius: 4,
             }}
           >
-            {hcp.narrative}
+            <span style={{ fontSize: 13, color: "#E8A020", flexShrink: 0, lineHeight: 1.5 }}>↗</span>
+            <span style={{
+              fontSize: 12,
+              color: "#C8C4BC",
+              fontFamily: "system-ui, sans-serif",
+              lineHeight: 1.5,
+              fontStyle: "italic",
+            }}>
+              {hcp.why_now}
+            </span>
           </div>
         ) : null}
 

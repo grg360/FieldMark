@@ -103,6 +103,12 @@ function mapEngagementMix(
   return mix;
 }
 
+function scopeDisplayLabel(scope: { scopeType: string; scopeValue: string | null }): string {
+  if (scope.scopeValue) return scope.scopeValue.toUpperCase();
+  if (scope.scopeType === "global") return "GLOBAL";
+  return scope.scopeType.toUpperCase();
+}
+
 function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
   const hcp = row.hcps ?? {};
   const med = firstEmbedded(hcp.hcp_medicare_summary ?? row.hcp_medicare_summary);
@@ -259,6 +265,7 @@ export async function getRisingStars(
     }
 
     const scope = resolveFilterScope(filters);
+    const scopeLabel = scopeDisplayLabel(scope);
     const offset = options.offset ?? 0;
 
     // 1) Count scoped rising-star rank rows from pre-joined view.
@@ -398,13 +405,13 @@ export async function getRisingStars(
 
     // 5) Fetch narratives for the surviving HCPs.
     const narrativeIds = filteredRankRows.map((r: any) => String(r.hcp_id));
-    const narrativeMap = new Map<string, string | null>();
+    const narrativeMap = new Map<string, { narrative_text: string | null; why_now: string | null }>();
 
     if (narrativeIds.length > 0) {
       // TA-specific narrative first
       const { data: taNarratives, error: taNarrError } = await supabase
         .from("hcp_narratives_v2")
-        .select("hcp_id, narrative_text, therapeutic_area_slug")
+        .select("hcp_id, narrative_text, why_now, therapeutic_area_slug")
         .in("hcp_id", narrativeIds)
         .eq("therapeutic_area_slug", taSlug);
 
@@ -412,7 +419,10 @@ export async function getRisingStars(
         return { data: null, error: `Narrative query failed: ${taNarrError.message}` };
       }
       for (const n of taNarratives ?? []) {
-        narrativeMap.set(String(n.hcp_id), (n as any).narrative_text ?? null);
+        narrativeMap.set(String(n.hcp_id), {
+          narrative_text: (n as any).narrative_text ?? null,
+          why_now: (n as any).why_now ?? null,
+        });
       }
 
       // Fallback: most recent narrative for any TA, for HCPs missing TA-specific
@@ -420,7 +430,7 @@ export async function getRisingStars(
       if (missingIds.length > 0) {
         const { data: fallbackNarratives, error: fbError } = await supabase
           .from("hcp_narratives_v2")
-          .select("hcp_id, narrative_text, generated_at")
+          .select("hcp_id, narrative_text, why_now, generated_at")
           .in("hcp_id", missingIds)
           .order("generated_at", { ascending: false });
 
@@ -430,7 +440,10 @@ export async function getRisingStars(
         for (const n of fallbackNarratives ?? []) {
           const hid = String(n.hcp_id);
           if (!narrativeMap.has(hid)) {
-            narrativeMap.set(hid, (n as any).narrative_text ?? null);
+            narrativeMap.set(hid, {
+              narrative_text: (n as any).narrative_text ?? null,
+              why_now: (n as any).why_now ?? null,
+            });
           }
         }
       }
@@ -470,11 +483,13 @@ export async function getRisingStars(
           ...mapped,
           normalized_score: normalizedScore,
           cohort_score: normalizedScore,
-          narrative: narrativeMap.get(String(rr.hcp_id)) ?? null,
+          narrative: narrativeMap.get(String(rr.hcp_id))?.narrative_text ?? null,
+          why_now: narrativeMap.get(String(rr.hcp_id))?.why_now ?? null,
           // Rank-forward fields:
           rank: Number(rr.rank),
           percentile: Number(rr.percentile),
           scope_size: Number(rr.scope_size),
+          scope: scopeLabel,
           // Author metrics (from hcp_author_metrics_latest_v2):
           total_citations: metricsData?.cited_by_count ?? null,
           h_index: metricsData?.h_index ?? null,
@@ -513,6 +528,7 @@ export async function getEstablished(
     }
 
     const scope = resolveFilterScope(filters);
+    const scopeLabel = scopeDisplayLabel(scope);
     const offset = options.offset ?? 0;
 
     // 1) Count scoped established rank rows from pre-joined view.
@@ -658,12 +674,12 @@ export async function getEstablished(
 
     // 5) Fetch narratives for the surviving HCPs.
     const narrativeIds = filteredRankRows.map((r: any) => String(r.hcp_id));
-    const narrativeMap = new Map<string, string | null>();
+    const narrativeMap = new Map<string, { narrative_text: string | null; why_now: string | null }>();
 
     if (narrativeIds.length > 0) {
       const { data: taNarratives, error: taNarrError } = await supabase
         .from("hcp_narratives_v2")
-        .select("hcp_id, narrative_text, therapeutic_area_slug")
+        .select("hcp_id, narrative_text, why_now, therapeutic_area_slug")
         .in("hcp_id", narrativeIds)
         .eq("therapeutic_area_slug", taSlug);
 
@@ -671,14 +687,17 @@ export async function getEstablished(
         return { data: null, error: `Narrative query failed: ${taNarrError.message}` };
       }
       for (const n of taNarratives ?? []) {
-        narrativeMap.set(String(n.hcp_id), (n as any).narrative_text ?? null);
+        narrativeMap.set(String(n.hcp_id), {
+          narrative_text: (n as any).narrative_text ?? null,
+          why_now: (n as any).why_now ?? null,
+        });
       }
 
       const missingIds = narrativeIds.filter((id: string) => !narrativeMap.has(id));
       if (missingIds.length > 0) {
         const { data: fallbackNarratives, error: fbError } = await supabase
           .from("hcp_narratives_v2")
-          .select("hcp_id, narrative_text, generated_at")
+          .select("hcp_id, narrative_text, why_now, generated_at")
           .in("hcp_id", missingIds)
           .order("generated_at", { ascending: false });
 
@@ -688,7 +707,10 @@ export async function getEstablished(
         for (const n of fallbackNarratives ?? []) {
           const hid = String(n.hcp_id);
           if (!narrativeMap.has(hid)) {
-            narrativeMap.set(hid, (n as any).narrative_text ?? null);
+            narrativeMap.set(hid, {
+              narrative_text: (n as any).narrative_text ?? null,
+              why_now: (n as any).why_now ?? null,
+            });
           }
         }
       }
@@ -749,10 +771,12 @@ export async function getEstablished(
           trialScore: rr.trial_score ?? null,
           firstPubYear: rr.career_first_pub_year ?? null,
           total_career_pubs: parseOptionalNumber(rr.total_career_pubs),
-          narrative: narrativeMap.get(String(rr.hcp_id)) ?? null,
+          narrative: narrativeMap.get(String(rr.hcp_id))?.narrative_text ?? null,
+          why_now: narrativeMap.get(String(rr.hcp_id))?.why_now ?? null,
           rank,
           percentile,
           scope_size: scopeSize,
+          scope: scopeLabel,
           total_citations: metricsData?.cited_by_count ?? null,
           h_index: metricsData?.h_index ?? null,
           works_count: metricsData?.works_count ?? null,
@@ -790,6 +814,7 @@ export async function getCommunity(
     }
 
     const scope = resolveFilterScope(filters);
+    const scopeLabel = scopeDisplayLabel(scope);
     const offset = options.offset ?? 0;
 
     // 1) Count scoped community rank rows from pre-joined view.
@@ -935,12 +960,12 @@ export async function getCommunity(
 
     // 5) Fetch narratives for the surviving HCPs.
     const narrativeIds = filteredRankRows.map((r: any) => String(r.hcp_id));
-    const narrativeMap = new Map<string, string | null>();
+    const narrativeMap = new Map<string, { narrative_text: string | null; why_now: string | null }>();
 
     if (narrativeIds.length > 0) {
       const { data: taNarratives, error: taNarrError } = await supabase
         .from("hcp_narratives_v2")
-        .select("hcp_id, narrative_text, therapeutic_area_slug")
+        .select("hcp_id, narrative_text, why_now, therapeutic_area_slug")
         .in("hcp_id", narrativeIds)
         .eq("therapeutic_area_slug", taSlug);
 
@@ -948,14 +973,17 @@ export async function getCommunity(
         return { data: null, error: `Narrative query failed: ${taNarrError.message}` };
       }
       for (const n of taNarratives ?? []) {
-        narrativeMap.set(String(n.hcp_id), (n as any).narrative_text ?? null);
+        narrativeMap.set(String(n.hcp_id), {
+          narrative_text: (n as any).narrative_text ?? null,
+          why_now: (n as any).why_now ?? null,
+        });
       }
 
       const missingIds = narrativeIds.filter((id: string) => !narrativeMap.has(id));
       if (missingIds.length > 0) {
         const { data: fallbackNarratives, error: fbError } = await supabase
           .from("hcp_narratives_v2")
-          .select("hcp_id, narrative_text, generated_at")
+          .select("hcp_id, narrative_text, why_now, generated_at")
           .in("hcp_id", missingIds)
           .order("generated_at", { ascending: false });
 
@@ -965,7 +993,10 @@ export async function getCommunity(
         for (const n of fallbackNarratives ?? []) {
           const hid = String(n.hcp_id);
           if (!narrativeMap.has(hid)) {
-            narrativeMap.set(hid, (n as any).narrative_text ?? null);
+            narrativeMap.set(hid, {
+              narrative_text: (n as any).narrative_text ?? null,
+              why_now: (n as any).why_now ?? null,
+            });
           }
         }
       }
@@ -1023,10 +1054,12 @@ export async function getCommunity(
           cohort_score: normalizedScore,
           normalized_score: normalizedScore,
           composite_score: Number(rr.composite_score ?? normalizedScore),
-          narrative: narrativeMap.get(String(rr.hcp_id)) ?? null,
+          narrative: narrativeMap.get(String(rr.hcp_id))?.narrative_text ?? null,
+          why_now: narrativeMap.get(String(rr.hcp_id))?.why_now ?? null,
           rank,
           percentile,
           scope_size: scopeSize,
+          scope: scopeLabel,
           total_citations: metricsData?.cited_by_count ?? null,
           h_index: metricsData?.h_index ?? null,
           works_count: metricsData?.works_count ?? null,
