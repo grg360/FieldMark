@@ -2245,7 +2245,7 @@ export async function getSocialCandidates(
   // (uses the same filter we use for the chart: >=100 followers, >=20 engagement, >=4 posts)
   const { data: voiceData, error: voiceErr } = await supabase
     .from("mv_social_voice_emergence_by_ta")
-    .select("handle, display_name, follower_count, post_count, total_engagement, engagement_per_follower, bio, platform")
+    .select("handle, display_name, follower_count, post_count, total_engagement, engagement_per_follower, bio, platform, dominant_source_hashtag")
     .eq("ta_slug", mvSlug)
     .not("engagement_per_follower", "is", null)
     .gte("follower_count", 100)
@@ -2262,54 +2262,12 @@ export async function getSocialCandidates(
     return { data: [], error: null };
   }
 
-  // Step 2: For each handle, get their most-frequent source hashtag from social_posts_v2
-  const handles = voiceData.map((v: any) => v.handle);
-  console.log("[getSocialCandidates] handles being queried:", handles.length, "first 3:", handles.slice(0, 3));
-  const { data: sourceData, error: sourceErr } = await supabase
-    .from("social_posts_v2")
-    .select("handle, captured_via_query")
-    .in("handle", handles)
-    .gte("posted_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-  console.log("[getSocialCandidates] sourceData rows returned:", sourceData?.length || 0, "error:", sourceErr);
-  if (sourceData && sourceData.length > 0) {
-    console.log("[getSocialCandidates] sourceData sample:", sourceData.slice(0, 3));
-  }
-
-  // Build a handle -> most-frequent-hashtag map
-  const sourceCounts = new Map<string, Map<string, number>>();
-  for (const row of sourceData || []) {
-    const h = (row as any).handle?.toLowerCase();
-    const q = (row as any).captured_via_query;
-    if (!h || !q) continue;
-    if (!sourceCounts.has(h)) sourceCounts.set(h, new Map());
-    const inner = sourceCounts.get(h)!;
-    inner.set(q, (inner.get(q) || 0) + 1);
-  }
-  const handleToSource = new Map<string, string>();
-  for (const [h, counts] of sourceCounts.entries()) {
-    let topQ = "";
-    let topN = 0;
-    for (const [q, n] of counts.entries()) {
-      if (n > topN) {
-        topQ = q;
-        topN = n;
-      }
-    }
-    if (topQ) handleToSource.set(h, topQ);
-  }
-  console.log("[getSocialCandidates] handleToSource map size:", handleToSource.size);
-  console.log("[getSocialCandidates] sample handleToSource entries:", Array.from(handleToSource.entries()).slice(0, 3));
-  const testHandle = handles[0]?.toLowerCase();
-  if (testHandle) {
-    console.log("[getSocialCandidates] test lookup for", testHandle, "→", handleToSource.get(testHandle));
-  }
-
   // Step 3: Build SocialCandidateRow objects
   const candidates: SocialCandidateRow[] = voiceData.map((v: any) => {
     const handle: string = v.handle;
     const bio: string = v.bio || "";
     const confidenceTier = deriveConfidenceTier(bio);
-    const sourceHashtag = handleToSource.get(handle.toLowerCase()) || "—";
+    const sourceHashtag = v.dominant_source_hashtag || "—";
     const followerCount: number = v.follower_count || 0;
     const totalEngagement: number = v.total_engagement || 0;
     const postCount: number = v.post_count || 0;
