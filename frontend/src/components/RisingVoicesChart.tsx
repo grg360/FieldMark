@@ -29,9 +29,18 @@ type ChartPoint = {
   hcpMatched: boolean;
 };
 
+function buildProfileUrl(p: ChartPoint): string {
+  const platform = (p.platform || "twitter").toLowerCase();
+  return platform === "bluesky"
+    ? `https://bsky.app/profile/${p.handle}`
+    : `https://twitter.com/${p.handle}`;
+}
+
 function CustomTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
   const p: ChartPoint = payload[0].payload;
+  const url = buildProfileUrl(p);
+  const platformLabel = (p.platform || "twitter").toLowerCase() === "bluesky" ? "Bluesky" : "Twitter";
   return (
     <div
       style={{
@@ -41,7 +50,9 @@ function CustomTooltip({ active, payload }: any) {
         padding: "10px 12px",
         fontFamily: "system-ui, sans-serif",
         maxWidth: 260,
+        pointerEvents: "auto",
       }}
+      onClick={(e) => e.stopPropagation()}
     >
       <div style={{ fontSize: 13, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}>
         {p.displayName || p.handle}
@@ -55,35 +66,42 @@ function CustomTooltip({ active, payload }: any) {
         <div>Engagement: {p.totalEngagement.toLocaleString()}</div>
         <div>Eng/follower: {(p.engagementPerFollower * 100).toFixed(2)}%</div>
       </div>
-      <div style={{ fontSize: 10, color: "#6B6A65", marginTop: 8, fontStyle: "italic" }}>
-        Click to view profile
-      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: "inline-block",
+          marginTop: 10,
+          padding: "6px 10px",
+          fontSize: 11,
+          fontWeight: 500,
+          color: "#E8A020",
+          background: "transparent",
+          border: "1px solid #E8A020",
+          borderRadius: 3,
+          textDecoration: "none",
+          cursor: "pointer",
+        }}
+      >
+        View on {platformLabel} ↗
+      </a>
     </div>
   );
 }
 
 function getDotColor(p: ChartPoint): string {
-  // Upper-left quadrant = rising voice (small audience, high engagement)
   if (p.followerCount < 5000 && p.engagementPerFollower > 0.05) return "#E8A020"; // amber: rising voice
   if (p.followerCount >= 5000 && p.engagementPerFollower > 0.02) return "#6BA3D8"; // blue: established with engagement
-  return "#5A6B75"; // slate: other voices in conversation
-}
-
-function handleDotClick(p: ChartPoint) {
-  const platform = (p.platform || "twitter").toLowerCase();
-  const url =
-    platform === "bluesky"
-      ? `https://bsky.app/profile/${p.handle}`
-      : `https://twitter.com/${p.handle}`;
-  if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+  return "#8AA0AC"; // brighter slate: other voices
 }
 
 export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps) {
   const [points, setPoints] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pinnedPoint, setPinnedPoint] = useState<ChartPoint | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +139,22 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
       cancelled = true;
     };
   }, [selectedTA]);
+
+  useEffect(() => {
+    if (pinnedPoint === null) return;
+    function handleOutsideClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      // Don't unpin if clicking the tooltip itself or its children
+      const tooltipEl = target.closest(".recharts-tooltip-wrapper");
+      if (tooltipEl) return;
+      // Don't unpin if clicking a chart dot (that triggers a new pin)
+      const dotEl = target.closest(".recharts-symbols");
+      if (dotEl) return;
+      setPinnedPoint(null);
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [pinnedPoint]);
 
   return (
     <div
@@ -182,7 +216,7 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
             width: 10,
             height: 10,
             borderRadius: "50%",
-            backgroundColor: "#5A6B75",
+            backgroundColor: "#8AA0AC",
             display: "inline-block",
             flexShrink: 0,
           }} />
@@ -241,16 +275,25 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
                   style: { textAnchor: "middle" },
                 }}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: "3 3" }} />
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{ strokeDasharray: "3 3" }}
+                wrapperStyle={{ pointerEvents: "auto", outline: "none" }}
+                active={pinnedPoint !== null ? true : undefined}
+                payload={pinnedPoint ? [{ payload: pinnedPoint }] : undefined}
+              />
               <Scatter
                 name="Voices"
                 data={points}
-                onClick={(p: any) => handleDotClick(p.payload)}
+                onClick={(p: any) => setPinnedPoint(p.payload)}
               >
                 {points.map((p, idx) => (
                   <Cell
                     key={`cell-${idx}`}
                     fill={getDotColor(p)}
+                    fillOpacity={0.85}
+                    stroke="#111113"
+                    strokeWidth={1}
                     style={{ cursor: "pointer" }}
                   />
                 ))}

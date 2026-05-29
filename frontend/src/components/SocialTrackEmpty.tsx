@@ -5,6 +5,19 @@ import SuggestHashtagModal from "./SuggestHashtagModal";
 import { getMockSocialCandidates } from "../data/socialMockData";
 import RisingVoicesChart from "./RisingVoicesChart";
 
+// Inject pulse animation once for the live banner
+if (typeof document !== "undefined" && !document.getElementById("fm-pulse-styles")) {
+  const style = document.createElement("style");
+  style.id = "fm-pulse-styles";
+  style.textContent = `
+    @keyframes fm-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 interface SocialTrackEmptyProps {
   selectedTA: string;
 }
@@ -28,6 +41,54 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
 
   return (
     <div style={{ width: "100%" }}>
+      {/* ASCO Live banner — only shows for Oncology while ASCO is active */}
+      {selectedTA === "Oncology" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            backgroundColor: "#2A1F0A",
+            border: "1px solid #E8A020",
+            borderRadius: 4,
+            padding: "8px 14px",
+            margin: "0 16px 12px",
+            fontFamily: "system-ui, sans-serif",
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              backgroundColor: "#E8A020",
+              flexShrink: 0,
+              animation: "fm-pulse 2s ease-in-out infinite",
+            }}
+          />
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#E8A020",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            ASCO 2026 · Live
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              color: "#B8B4AC",
+              marginLeft: 4,
+            }}
+          >
+            Conference coverage active through June 2
+          </span>
+        </div>
+      )}
+
       {/* Disclosure card */}
       <div
         style={{
