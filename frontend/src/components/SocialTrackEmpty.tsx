@@ -1,7 +1,5 @@
-import { useState } from "react";
 import SocialAnalyticsBanner from "./SocialAnalyticsBanner";
 import SocialCard from "./SocialCard";
-import SuggestHashtagModal from "./SuggestHashtagModal";
 import { getMockSocialCandidates } from "../data/socialMockData";
 import RisingVoicesChart from "./RisingVoicesChart";
 
@@ -23,7 +21,6 @@ interface SocialTrackEmptyProps {
 }
 
 export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) {
-  const [hashtagModalOpen, setHashtagModalOpen] = useState(false);
   const candidates = getMockSocialCandidates(selectedTA);
   const humanTAName = selectedTA;
 
@@ -130,25 +127,6 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
 
       <RisingVoicesChart selectedTA={selectedTA} />
 
-      {/* Suggest a hashtag CTA */}
-      <div style={{ margin: "0 16px 12px", display: "flex", justifyContent: "flex-end" }}>
-        <button
-          onClick={() => setHashtagModalOpen(true)}
-          style={{
-            backgroundColor: "#0D0D10",
-            border: "1px solid #2A3848",
-            color: "#6BA3D8",
-            fontSize: 12,
-            padding: "6px 12px",
-            borderRadius: 4,
-            cursor: "pointer",
-            fontFamily: "system-ui, sans-serif",
-          }}
-        >
-          + Suggest a hashtag
-        </button>
-      </div>
-
       {candidates.length > 0 && (
         <SocialAnalyticsBanner selectedTA={selectedTA} />
       )}
@@ -171,10 +149,6 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
         </div>
       )}
 
-      <SuggestHashtagModal
-        open={hashtagModalOpen}
-        onClose={() => setHashtagModalOpen(false)}
-      />
     </div>
   );
 }
