@@ -64,9 +64,9 @@ function CustomTooltip({ active, payload }: any) {
 
 function getDotColor(p: ChartPoint): string {
   // Upper-left quadrant = rising voice (small audience, high engagement)
-  if (p.followerCount < 5000 && p.engagementPerFollower > 0.05) return "#E8A020"; // amber: rising
+  if (p.followerCount < 5000 && p.engagementPerFollower > 0.05) return "#E8A020"; // amber: rising voice
   if (p.followerCount >= 5000 && p.engagementPerFollower > 0.02) return "#6BA3D8"; // blue: established with engagement
-  return "#4A4A50"; // gray: lower signal
+  return "#5A6B75"; // slate: other voices in conversation
 }
 
 function handleDotClick(p: ChartPoint) {
@@ -151,6 +151,43 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
       </div>
       <div style={{ fontSize: 12, color: "#8A8884", marginBottom: 12, lineHeight: 1.4 }}>
         Engagement-per-follower vs. follower count. Upper-left = small audience, high engagement. Click any dot to open profile.
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 12, fontSize: 11, color: "#8A8884", fontFamily: "system-ui, sans-serif", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            backgroundColor: "#E8A020",
+            display: "inline-block",
+            flexShrink: 0,
+          }} />
+          <span>Rising voice</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            backgroundColor: "#6BA3D8",
+            display: "inline-block",
+            flexShrink: 0,
+          }} />
+          <span>Established with engagement</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            backgroundColor: "#5A6B75",
+            display: "inline-block",
+            flexShrink: 0,
+          }} />
+          <span>Other voices</span>
+        </div>
       </div>
 
       {error && (

@@ -28,7 +28,6 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
 
   return (
     <div style={{ width: "100%" }}>
-      <RisingVoicesChart selectedTA={selectedTA} />
       {/* Disclosure card */}
       <div
         style={{
@@ -36,14 +35,14 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
           border: "1px solid #2A3848",
           borderLeft: "3px solid #6BA3D8",
           borderRadius: 4,
-          padding: "12px 16px",
+          padding: "10px 14px",
           margin: "0 16px 12px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 500,
               color: "#6BA3D8",
               textTransform: "uppercase",
@@ -54,19 +53,21 @@ export default function SocialTrackEmpty({ selectedTA }: SocialTrackEmptyProps) 
             Social signal · preview
           </span>
         </div>
-        <p style={{ fontSize: 13, lineHeight: 1.6, color: "#B8B4AC", margin: "0 0 8px", fontFamily: "system-ui, sans-serif" }}>
+        <p style={{ fontSize: 12, lineHeight: 1.5, color: "#B8B4AC", margin: "0 0 6px", fontFamily: "system-ui, sans-serif" }}>
           Identifying digital opinion leaders is hard. There&apos;s no authoritative list — and traditional KOL databases mostly don&apos;t try.
         </p>
-        <p style={{ fontSize: 13, lineHeight: 1.6, color: "#B8B4AC", margin: "0 0 8px", fontFamily: "system-ui, sans-serif" }}>
+        <p style={{ fontSize: 12, lineHeight: 1.5, color: "#B8B4AC", margin: "0 0 6px", fontFamily: "system-ui, sans-serif" }}>
           This view captures voices active in {humanTAName} conversations on Twitter/X and Bluesky. Some entries are credentialed clinicians whose identity we&apos;ve verified through publications, trials, or NPPES. Others are accounts we&apos;ve captured but haven&apos;t matched to credentialed identity yet — they may be HCPs, fellows, researchers, or other participants in the public dialogue.
         </p>
-        <p style={{ fontSize: 13, lineHeight: 1.6, color: "#B8B4AC", margin: "0 0 8px", fontFamily: "system-ui, sans-serif" }}>
+        <p style={{ fontSize: 12, lineHeight: 1.5, color: "#B8B4AC", margin: "0 0 6px", fontFamily: "system-ui, sans-serif" }}>
           Each card shows our algorithmic confidence assessment based on bio analysis. MSL community verification is coming in v1.1 — when LinkedIn-verified MSL identity launches, MSLs will be able to tag HCPs they recognize as verified clinicians.
         </p>
-        <p style={{ fontSize: 13, lineHeight: 1.6, color: "#E8E6DF", fontWeight: 500, margin: 0, fontFamily: "system-ui, sans-serif" }}>
+        <p style={{ fontSize: 12, lineHeight: 1.5, color: "#E8E6DF", fontWeight: 500, margin: 0, fontFamily: "system-ui, sans-serif" }}>
           We&apos;re showing you our work, including the parts that aren&apos;t finished. That&apos;s the deal.
         </p>
       </div>
+
+      <RisingVoicesChart selectedTA={selectedTA} />
 
       {/* Suggest a hashtag CTA */}
       <div style={{ margin: "0 16px 12px", display: "flex", justifyContent: "flex-end" }}>
