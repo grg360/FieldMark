@@ -2264,11 +2264,16 @@ export async function getSocialCandidates(
 
   // Step 2: For each handle, get their most-frequent source hashtag from social_posts_v2
   const handles = voiceData.map((v: any) => v.handle);
-  const { data: sourceData } = await supabase
+  console.log("[getSocialCandidates] handles being queried:", handles.length, "first 3:", handles.slice(0, 3));
+  const { data: sourceData, error: sourceErr } = await supabase
     .from("social_posts_v2")
     .select("handle, captured_via_query")
     .in("handle", handles)
     .gte("posted_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+  console.log("[getSocialCandidates] sourceData rows returned:", sourceData?.length || 0, "error:", sourceErr);
+  if (sourceData && sourceData.length > 0) {
+    console.log("[getSocialCandidates] sourceData sample:", sourceData.slice(0, 3));
+  }
 
   // Build a handle -> most-frequent-hashtag map
   const sourceCounts = new Map<string, Map<string, number>>();
@@ -2291,6 +2296,12 @@ export async function getSocialCandidates(
       }
     }
     if (topQ) handleToSource.set(h, topQ);
+  }
+  console.log("[getSocialCandidates] handleToSource map size:", handleToSource.size);
+  console.log("[getSocialCandidates] sample handleToSource entries:", Array.from(handleToSource.entries()).slice(0, 3));
+  const testHandle = handles[0]?.toLowerCase();
+  if (testHandle) {
+    console.log("[getSocialCandidates] test lookup for", testHandle, "→", handleToSource.get(testHandle));
   }
 
   // Step 3: Build SocialCandidateRow objects
