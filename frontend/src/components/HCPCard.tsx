@@ -55,6 +55,13 @@ const getCountryCode = (country: string | null): string | null => {
   return codes[c] || null;
 };
 
+function formatScoreInt(score: number | null | undefined): string {
+  if (score == null) return "—";
+  const n = Number(score);
+  if (!Number.isFinite(n)) return "—";
+  return String(Math.round(n));
+}
+
 type HCPCardHCP = HCP;
 
 interface HCPCardProps {
@@ -104,7 +111,10 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
     if (key === "YEARS") return formatIntDisplay(hcp.careerYears ?? null);
     return "—";
   }
-  if (key === "PUB SCORE") return hcp.pubVel;
+  if (key === "PUB SCORE") {
+    const v = Number(hcp.pubVel);
+    return Number.isFinite(v) ? String(Math.round(v)) : (hcp.pubVel ?? "—");
+  }
   if (key === "H-INDEX") {
     return hcp.h_index == null ? "—" : String(hcp.h_index);
   }
@@ -258,6 +268,19 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const statPillKeys = cohortStatKeys(effectiveCohort);
   const countryCode = getCountryCode(hcp.country ?? null);
   const subline = buildSubline(hcp);
+  if (typeof window !== "undefined" && ((hcp as { last_name?: string }).last_name === "McKean" || hcp.name?.includes("McKean"))) {
+    console.log("[McKean subline debug]", {
+      hcp_id: hcp.id,
+      institution: (hcp as any).institution,
+      institution_normalized: (hcp as any).institution_normalized,
+      institution_full: (hcp as any).institution_full,
+      nppes_practice_city: (hcp as any).nppes_practice_city,
+      nppes_practice_state: (hcp as any).nppes_practice_state,
+      nppes_practice_setting: (hcp as any).nppes_practice_setting,
+      npi_specialty: (hcp as any).npi_specialty,
+      computed_subline: subline,
+    });
+  }
 
   function handleCardClick() {
     if (activeTooltip) {
@@ -425,15 +448,15 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           borderRadius: 4,
           margin: "0 16px 8px",
           padding: "12px",
-          paddingBottom: 28,
+          paddingBottom: 36,
           cursor: "pointer",
         }}
       >
         {/* Row 1: Name+flag grouped left, score-as-headline with two-rank stack on right */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
+              <span style={{ fontSize: 17, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
                 {hcp.name}
               </span>
               {countryCode && (
@@ -457,24 +480,38 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
             type="button"
             onClick={handleScoreBadgeClick}
             onTouchEnd={handleScoreBadgeClick}
+            title="FieldMark Score: composite signal of publication velocity, citation trajectory, and trial activity within therapeutic area (0-100)"
             style={{
               flexShrink: 0,
-              textAlign: "right",
-              background: "transparent",
-              border: "none",
-              padding: 0,
+              background: "#1A1200",
+              border: `1px solid ${accentColor}`,
+              borderRadius: 4,
+              padding: "8px 12px",
               cursor: "pointer",
               fontFamily: "monospace",
+              minWidth: 84,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 4,
             }}
-            aria-label={`Score ${cohortScoreLabel}`}
+            aria-label={`FieldMark Score ${formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}`}
           >
-            <div style={{ fontSize: 26, fontWeight: 500, color: accentColor, lineHeight: 1 }}>
-              {cohortScoreLabel}
+            <div style={{ fontSize: 20, fontWeight: 500, color: accentColor, lineHeight: 1 }}>
+              {formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}
+            </div>
+            <div style={{ fontSize: 8, color: "#BA7517", letterSpacing: 0.8, lineHeight: 1, textTransform: "uppercase" }}>
+              FieldMark Score
             </div>
             {hcp.rank != null && (
-              <div style={{ fontSize: 10, color: "#8A8884", marginTop: 6, lineHeight: 1.4, letterSpacing: 0.5 }}>
-                #{hcp.rank} {hcp.scope?.toUpperCase() ?? "US"}<br/>
-                {hcp.global_rank != null ? `#${hcp.global_rank} GLOBAL` : ""}
+              <div style={{ fontSize: 10, color: "#BA7517", marginTop: 4, lineHeight: 1.4, letterSpacing: 0.4, textAlign: "center" }}>
+                #{hcp.rank} {(hcp.scope ?? "US").toUpperCase()}
+                {hcp.global_rank != null && (
+                  <>
+                    <br/>
+                    #{hcp.global_rank} GLOBAL
+                  </>
+                )}
               </div>
             )}
           </button>
@@ -523,26 +560,24 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           {subline}
         </div>
 
-        {/* Why_now insight band — italic, contained background, trending icon */}
+        {/* Why_now insight band — fixed min-height for cross-card consistency, content vertically centered */}
         {hcp.why_now && cohort !== "community" && cohort !== "workhorse" ? (
           <div
             style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 8,
               marginTop: 14,
-              padding: "10px 12px",
-              background: "#232328",
+              padding: "12px 14px",
+              background: "#2A2A30",
               borderRadius: 4,
+              minHeight: 110,
+              display: "flex",
+              alignItems: "center",
             }}
           >
-            <span style={{ fontSize: 13, color: "#E8A020", flexShrink: 0, lineHeight: 1.5 }}>↗</span>
             <span style={{
               fontSize: 12,
-              color: "#C8C4BC",
+              color: "#D0CCC4",
               fontFamily: "system-ui, sans-serif",
-              lineHeight: 1.5,
-              fontStyle: "italic",
+              lineHeight: 1.55,
             }}>
               {hcp.why_now}
             </span>
@@ -576,8 +611,8 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           aria-label={`Add action for ${hcp.name}`}
           style={{
             position: "absolute",
-            bottom: 10,
-            right: 10,
+            bottom: 12,
+            right: 12,
             width: 20,
             height: 20,
             minHeight: 0,
