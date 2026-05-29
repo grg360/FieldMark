@@ -59,6 +59,12 @@ def get_table_name(base_name: str, target_version: str) -> str:
 
 
 SCORE_VERSION = "v1.4"
+# Rising-star citation acceleration band + thresholds (CitTraj v2).
+# Author-level citation acceleration replaces the old per-paper slope.
+RISING_STAR_MIN_CAREER_AGE = 3   # below this, too little history to measure a ramp
+RISING_STAR_MAX_CAREER_AGE = 10  # above this, established by definition -> Established cohort
+CITATION_RECENT_WINDOW_YEARS = 4 # number of recent complete years used for the slope
+CITATION_MAGNITUDE_FLOOR = 5     # min recent citation mass for acceleration to count (tunable)
 # When OpenAlex has enriched hcps.total_career_pubs, require this minimum for rankings / non-zero composite.
 MIN_TOTAL_CAREER_PUBS_FOR_RANKINGS = 10
 # If total_career_pubs is null, fall back to counting publication rows in our DB.
@@ -560,6 +566,68 @@ def citation_trajectory_raw(publications: Sequence[Dict], current_year: int) -> 
     return sum(qualifying_slopes) / len(qualifying_slopes)
 
 
+def citation_acceleration_raw(
+    counts_by_year: Optional[Sequence[Dict]],
+    career_age: Optional[int],
+    current_year: int,
+) -> float:
+    """
+    Author-level citation acceleration for rising-star detection.
+
+    Reads hcp_author_metrics_v2.counts_by_year (list of
+    {"year", "cited_by_count", ...}). Returns 0.0 for HCPs outside the
+    rising-star career-age band [MIN, MAX], or without enough recent
+    citation mass to trust the ramp. Otherwise returns a career-stage-
+    weighted slope of recent annual citations: a steep ramp off a young
+    base scores high.
+    """
+    if career_age is None:
+        return 0.0
+    if career_age < RISING_STAR_MIN_CAREER_AGE or career_age > RISING_STAR_MAX_CAREER_AGE:
+        return 0.0
+    if not counts_by_year:
+        return 0.0
+
+    # Recent complete-year window (exclude current year as partial)
+    window_years = [current_year - i for i in range(1, CITATION_RECENT_WINDOW_YEARS + 1)]
+    window_years.sort()
+
+    year_to_citations: Dict[int, int] = {}
+    for entry in counts_by_year:
+        if not isinstance(entry, dict):
+            continue
+        y = safe_int(entry.get("year"), 0)
+        c = safe_int(entry.get("cited_by_count"), 0)
+        if y > 0:
+            year_to_citations[y] = c
+
+    series = [year_to_citations.get(y, 0) for y in window_years]
+
+    # Magnitude floor: require enough recent citation mass to trust the ramp
+    if sum(series) < CITATION_MAGNITUDE_FLOOR:
+        return 0.0
+
+    # Linear regression slope over the window (x = 0..n-1)
+    n = len(series)
+    if n < 2:
+        return 0.0
+    x_mean = (n - 1) / 2.0
+    y_mean = sum(series) / n
+    numerator = sum((i - x_mean) * (series[i] - y_mean) for i in range(n))
+    denominator = sum((i - x_mean) ** 2 for i in range(n))
+    if denominator == 0:
+        return 0.0
+    slope = numerator / denominator
+
+    if slope <= 0:
+        return 0.0
+
+    # Career-stage weighting: same ramp counts for more at a younger career age.
+    # Youngest in band (3) gets the largest boost; oldest (10) the smallest.
+    stage_weight = (RISING_STAR_MAX_CAREER_AGE - career_age + 1)
+    return slope * stage_weight
+
+
 def recency_score(last_activity: Optional[date], now_date: date) -> float:
     """
     10% decay per year of inactivity beyond 12 months.
@@ -665,6 +733,7 @@ def compute_scores(
     clinical_trials: Sequence[Dict],
     hcps: Sequence[Dict],
     pub_tas: Optional[Dict[str, set]] = None,
+    author_metrics: Optional[Sequence[Dict]] = None,
 ) -> List[ScoreRow]:
     now_dt = datetime.now(timezone.utc).date()
     current_year = now_dt.year
@@ -702,6 +771,12 @@ def compute_scores(
                 total_career_by_hcp[hid] = None
 
     raw_pub_velocity: Dict[Tuple[str, str], float] = {}
+    author_counts_by_year_by_hcp: Dict[str, Optional[Sequence[Dict]]] = {}
+    if author_metrics:
+        for am in author_metrics:
+            amid = am.get("hcp_id")
+            if amid:
+                author_counts_by_year_by_hcp[amid] = am.get("counts_by_year")
     raw_citation: Dict[Tuple[str, str], float] = {}
     trial_scores: Dict[Tuple[str, str], float] = {}
     recency_scores: Dict[Tuple[str, str], float] = {}
@@ -709,11 +784,35 @@ def compute_scores(
     first_pub_year_by_hcp: Dict[str, Optional[int]] = {}
     recent_pub_multiplier_by_hcp: Dict[str, float] = {}
 
+    # Rising-star cohort eligibility: career age must be in [MIN, MAX] band.
+    # HCPs outside this band (too young to measure a ramp, or established) are
+    # excluded from the Rising Star cohort entirely - they do not appear in
+    # hcp_scores_v2 at all. Established HCPs CANNOT be Rising Stars.
+    # Null career_first_pub_year_v2 -> ineligible (we can't verify youth).
+    first_pub_year_lookup: Dict[str, Optional[int]] = {
+        h["id"]: h.get("first_pub_year") for h in hcps if h.get("id")
+    }
+
     valid_pairs: List[Tuple[str, str]] = []
+    excluded_null_career = 0
+    excluded_too_young = 0
+    excluded_established = 0
     for rel in hcp_tas:
         hcp_id = rel.get("hcp_id")
         ta_id = rel.get("therapeutic_area_id")
         if not hcp_id or not ta_id or hcp_id not in allowed_hcp_ids:
+            continue
+
+        fpy = first_pub_year_lookup.get(hcp_id)
+        if fpy is None:
+            excluded_null_career += 1
+            continue
+        career_age = current_year - fpy
+        if career_age < RISING_STAR_MIN_CAREER_AGE:
+            excluded_too_young += 1
+            continue
+        if career_age > RISING_STAR_MAX_CAREER_AGE:
+            excluded_established += 1
             continue
 
         key = (hcp_id, ta_id)
@@ -744,7 +843,14 @@ def compute_scores(
         )
         recent_pub_multiplier_by_hcp[hcp_id] = recent_publication_ratio_multiplier(pub_years)
         raw_pub_velocity[key] = publication_velocity_raw(pub_years, current_year) if pub_years else -1.0
-        raw_citation[key] = citation_trajectory_raw(hcp_pubs, current_year) if hcp_pubs else -1.0
+        _hcp_id_for_cit = key[0]
+        _career_year = first_pub_year_by_hcp.get(_hcp_id_for_cit)
+        _career_age = (current_year - _career_year) if _career_year else None
+        raw_citation[key] = citation_acceleration_raw(
+            author_counts_by_year_by_hcp.get(_hcp_id_for_cit),
+            _career_age,
+            current_year,
+        )
         trial_scores[key] = compute_trial_score(hcp_links, trials_by_id)
 
         pub_activity_dates = [parse_year_to_date(pub.get("pub_year")) for pub in hcp_pubs]
@@ -762,8 +868,24 @@ def compute_scores(
 
         has_pub_and_trial[key] = bool(hcp_pubs) and bool(hcp_links)
 
+    print(
+        f"[cohort gate] Rising-star eligibility: "
+        f"in-band={len(valid_pairs)} pairs, "
+        f"excluded null_career={excluded_null_career}, "
+        f"too_young={excluded_too_young}, "
+        f"established={excluded_established}"
+    )
+
     pub_velocity_scores = normalize_0_100(raw_pub_velocity)
-    citation_scores = normalize_0_100(raw_citation)
+    # Citation trajectory: only HCPs with a genuine qualifying slope (>0) carry
+    # a citation signal. The 0.0 mass (has pubs, but <2 papers with citation-year
+    # data) and the -1.0 sentinel (no pubs) are NO-SIGNAL, not low-signal. They
+    # must NOT enter min-max normalization, or the honest zero gets promoted to
+    # a competitive score (was landing ~76 for 99% of the board). Normalize only
+    # the real-signal subset; everyone else gets a true 0.
+    real_citation = {k: v for k, v in raw_citation.items() if v > 0.0}
+    normalized_real = normalize_0_100(real_citation)
+    citation_scores = {k: normalized_real.get(k, 0.0) for k in raw_citation}
 
     # First pass: compute composite_score for every (hcp, ta) pair
     rows: List[ScoreRow] = []
@@ -1080,6 +1202,13 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
         "hcp_id,trial_id,role",
         target_version=target_version,
     )
+    author_metrics = fetch_all_rows(
+        supabase,
+        "hcp_author_metrics_v2",
+        "hcp_id,counts_by_year,snapshot_date",
+        target_version=target_version,
+        order_column="hcp_id",
+    ) if target_version == "v2" else []
     if target_version == "v2":
         hcp_tas = fetch_all_rows(
             supabase,
@@ -1119,6 +1248,7 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
         clinical_trials=clinical_trials,
         hcps=hcps,
         pub_tas=pub_tas,
+        author_metrics=author_metrics,
     )
     print(f"Computed {len(scores)} score rows.")
 

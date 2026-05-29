@@ -217,11 +217,14 @@ def compute_and_write_ranks(
     written = 0
     for i in range(0, len(rank_rows), batch_size):
         batch = rank_rows[i : i + batch_size]
-        client.table("hcp_score_ranks_v2").upsert(
+        response = client.table("hcp_score_ranks_v2").upsert(
             batch,
             on_conflict="hcp_id,therapeutic_area_id,cohort,scope_type,scope_value",
         ).execute()
-        written += len(batch)
+        returned = len(response.data) if response.data else 0
+        if returned != len(batch):
+            print(f"[score_ranking] WARNING: batch i={i} sent {len(batch)} rows, db returned {returned}")
+        written += returned
         if (i // batch_size) % 10 == 0:
             print(f"[score_ranking]   upserted {written}/{len(rank_rows)}...")
 

@@ -161,6 +161,36 @@ def iter_active_hashtag_queries(config: Dict[str, Any]) -> Iterable[Dict[str, An
         }
 
 
+def iter_profile_queries(config: Dict[str, Any], profile_name: str) -> Iterable[Dict[str, Any]]:
+    """Yield hashtag queries for a named profile (primary + secondary tags)."""
+    profiles = config.get("profiles", {})
+    profile = profiles.get(profile_name)
+    if not profile:
+        raise ValueError(f"Profile {profile_name!r} not found in config. Available: {list(profiles.keys())}")
+
+    # Build a lookup of existing active_hashtags by tag, so profile entries inherit min_faves
+    existing_tags = {
+        h["tag"].lower(): h
+        for h in config.get("twitter", {}).get("active_hashtags", [])
+    }
+
+    all_tags = list(profile.get("primary_hashtags", [])) + list(profile.get("secondary_hashtags", []))
+    for tag in all_tags:
+        existing = existing_tags.get(tag.lower())
+        if existing:
+            # Inherit min_faves and other settings from existing config
+            yield existing
+        else:
+            # Fall back to defaults if tag isn't in active_hashtags
+            yield {
+                "tag": tag,
+                "min_faves": 3,
+                "active_until": None,
+                "therapeutic_area": "unknown",
+                "rationale": f"From profile: {profile_name}",
+            }
+
+
 def iter_topic_queries(config: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
     """Yield configured topic queries and thresholds."""
     topics = config.get("twitter", {}).get("topic_queries", [])
@@ -581,6 +611,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Twitter/X social capture (architecture outline).")
     parser.add_argument("--tag", type=str, default=None, help="Single hashtag to capture, e.g. #ASCO2026")
     parser.add_argument("--all", action="store_true", help="Capture all active hashtags and topic queries")
+    parser.add_argument(
+        "--profile",
+        type=str,
+        default=None,
+        help="Named congress profile from config (e.g., ASCO, ESMO, EASL, AASLD, EHA). Captures all primary + secondary hashtags for that profile.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="No DB writes, no paid API calls (cached fixtures)")
     parser.add_argument("--max-results", type=int, default=100, help="Tweets per API page (10-100).")
     args = parser.parse_args()
@@ -590,10 +626,9 @@ def main() -> None:
         print("Twitter capture disabled by config: twitter.enabled=false")
         return
 
-    if args.tag and args.all:
-        raise ValueError("Use either --tag or --all, not both.")
-    if not args.tag and not args.all:
-        raise ValueError("Specify one mode: --tag or --all.")
+    mode_flags = [bool(args.tag), bool(args.all), bool(args.profile)]
+    if sum(mode_flags) != 1:
+        raise ValueError("Specify exactly one mode: --tag, --all, or --profile.")
 
     client = init_supabase()
     if args.tag:
@@ -604,13 +639,32 @@ def main() -> None:
             dry_run=args.dry_run,
             max_results=args.max_results,
         )
-    else:
+    elif args.all:
         stats = run_all(
             client,
             config,
             dry_run=args.dry_run,
             max_results=args.max_results,
         )
+    elif args.profile:
+        print(f"=== Running profile: {args.profile} ===")
+        stats = CaptureStats()
+        for hashtag_config in iter_profile_queries(config, args.profile):
+            tag = hashtag_config["tag"]
+            print(f"\n--- Capturing {tag} ---")
+            tag_stats = run_single_tag(
+                client,
+                config,
+                tag,
+                dry_run=args.dry_run,
+                max_results=args.max_results,
+            )
+            stats.posts_read += tag_stats.posts_read
+            stats.users_read += tag_stats.users_read
+            stats.posts_captured += tag_stats.posts_captured
+            stats.new_users_discovered += tag_stats.new_users_discovered
+            stats.requests_made += tag_stats.requests_made
+        recalc_estimated_cost(stats)
     print_summary(stats)
 
 

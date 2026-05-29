@@ -1,0 +1,14 @@
+FILE: <exact path, e.g. scoring_pipeline.py>
+
+LOCATE: <how to find the spot — a unique anchor string, function name, or current exact code. Quote the existing code verbatim if you have it.>
+
+CHANGE: <the exact replacement. Quote the full new code. State the indentation level explicitly if it matters.>
+
+CONSTRAINTS:
+- Change ONLY what is specified above. Do not refactor, rename, reformat, reorder imports, or "improve" adjacent code.
+- Do not touch any other function, line, weight, or constant.
+- Preserve existing indentation and style exactly.
+- If the LOCATE anchor is not found, or is found more than once, STOP and tell me — do not guess at the intended location.
+- If applying the change requires modifying anything beyond what CHANGE specifies, STOP and explain what else would need to change before proceeding.
+
+OUTPUT: Show me the diff of exactly what changed. Nothing else.

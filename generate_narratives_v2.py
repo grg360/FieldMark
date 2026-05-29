@@ -44,7 +44,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -70,6 +70,27 @@ COST_OUTPUT_PER_MTOK = 15.00
 # Estimated tokens per call
 EST_INPUT_TOKENS_PER_CALL = 600
 EST_OUTPUT_TOKENS_PER_CALL = 250
+
+VISIBLE_SCOPES = [
+    ("global", None),
+    ("country", "US"),
+    ("region", "EU5"),
+]
+VISIBLE_TA_IDS = [
+    "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e",
+    "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
+]
+
+
+def ta_slug_from_name(ta_name: Optional[str]) -> str:
+    """Convert a TA display name to its slug form used in hcp_narratives_v2."""
+    if not ta_name:
+        return "unknown"
+    return ta_name.lower().replace(' ', '_').replace('-', '_')
+
+
+RISING_DEFAULT_TOP_N = 100
+ESTABLISHED_DEFAULT_TOP_N = 100
 
 # Pipeline behavior
 COMMUNITY_DEFAULT_TOP_N = 500
@@ -166,7 +187,7 @@ def percentile_within_ta(value: float, all_values_in_ta: List[float]) -> float:
     if not all_values_in_ta:
         return 0.0
     below_count = sum(1 for v in all_values_in_ta if v < value)
-    return round(100.0 * below_count / len(all_values_in_ta), 1)
+    return int(round(100.0 * below_count / len(all_values_in_ta)))
 
 
 def pick_latest_scores(score_rows: List[Dict]) -> Dict[Tuple[str, str], Dict]:
@@ -189,73 +210,203 @@ def pick_latest_scores(score_rows: List[Dict]) -> Dict[Tuple[str, str], Dict]:
     return latest
 
 
-def load_hcp_contexts(
+def fetch_top_n_hcp_ids_from_rank_view(
     supabase: Client,
-    target_cohorts: List[str],
-    community_top_n: int,
-    target_version: str = "v1",
-) -> List[HCPContext]:
-    """
-    Load HCP context for narrative generation, filtered by cohort.
+    rank_table: str,
+    top_n: int,
+) -> Set[str]:
+    """Top N hcp_ids per (TA x visible scope) from a precomputed rank view."""
+    selected: Set[str] = set()
+    for scope_type, scope_value in VISIBLE_SCOPES:
+        for ta_id in VISIBLE_TA_IDS:
+            query = (
+                supabase.table(rank_table)
+                .select("hcp_id,rank")
+                .eq("therapeutic_area_id", ta_id)
+                .eq("scope_type", scope_type)
+                .order("rank", desc=False)
+                .range(0, top_n - 1)
+            )
+            if scope_value is None:
+                query = query.is_("scope_value", None)
+            else:
+                query = query.eq("scope_value", scope_value)
+            response = query.execute()
+            rows = response.data or []
+            for row in rows:
+                hcp_id = row.get("hcp_id")
+                if hcp_id:
+                    selected.add(str(hcp_id))
+    return selected
 
-    For rising_star and established: include all HCPs in that cohort.
-    For community: include top N by cohort_score (default 500).
-    """
-    print("Loading HCPs by cohort_classification...")
 
-    # Build cohort filter — only HCPs in target cohorts (paginated past 1000-row cap)
+def fetch_established_top_hcp_ids(supabase: Client, top_n: int) -> Set[str]:
+    """Established cohort selection from rank view, with scores-table fallback."""
+    try:
+        return fetch_top_n_hcp_ids_from_rank_view(
+            supabase, "hcp_established_ranks_v2", top_n
+        )
+    except Exception as exc:
+        print(
+            f"[load] hcp_established_ranks_v2 unavailable ({exc}); "
+            "falling back to hcp_scores_v2 tier=established"
+        )
+        selected: Set[str] = set()
+        for ta_id in VISIBLE_TA_IDS:
+            response = (
+                supabase.table("hcp_scores_v2")
+                .select("hcp_id")
+                .eq("therapeutic_area_id", ta_id)
+                .eq("tier", "established")
+                .order("normalized_score", desc=True)
+                .range(0, top_n - 1)
+                .execute()
+            )
+            for row in response.data or []:
+                hcp_id = row.get("hcp_id")
+                if hcp_id:
+                    selected.add(str(hcp_id))
+        return selected
+
+
+def fetch_hcps_by_ids(
+    supabase: Client,
+    hcp_ids: Set[str],
+    target_version: str,
+) -> List[Dict]:
+    """Load HCP rows for a set of ids (batched to avoid URL limits)."""
+    if not hcp_ids:
+        return []
     hcps_table = get_table_name("hcps", target_version)
     if target_version == "v2":
         hcp_select_cols = (
             "id,first_name,last_name,institution_normalized,country,"
-            "cohort_classification,cohort_score,total_career_pubs,career_first_pub_year"
+            "cohort_classification,cohort_score,total_career_pubs,career_first_pub_year_v2"
         )
     else:
         hcp_select_cols = (
             "id,first_name,last_name,institution,country,cohort_classification,"
             "cohort_score,total_career_pubs,first_pub_year"
         )
+    ids_list = list(hcp_ids)
     hcps: List[Dict] = []
-    page_size = 1000
-    offset = 0
-    while True:
+    batch_size = 500
+    for i in range(0, len(ids_list), batch_size):
+        batch_ids = ids_list[i : i + batch_size]
         response = (
             supabase.table(hcps_table)
             .select(hcp_select_cols)
-            .in_("cohort_classification", target_cohorts)
-            .range(offset, offset + page_size - 1)
+            .in_("id", batch_ids)
             .execute()
         )
         batch = response.data or []
-        if not batch:
-            break
         if target_version == "v2":
             for row in batch:
                 if "institution_normalized" in row:
                     row["institution"] = row.pop("institution_normalized")
-                if "career_first_pub_year" in row:
-                    row["first_pub_year"] = row.pop("career_first_pub_year")
+                if "career_first_pub_year_v2" in row:
+                    row["first_pub_year"] = row.pop("career_first_pub_year_v2")
         hcps.extend(batch)
-        if len(batch) < page_size:
-            break
-        offset += page_size
-    print(f"Loaded {len(hcps)} HCPs across cohorts {target_cohorts}")
+    return hcps
 
-    # For community, downselect to top N by cohort_score
+
+def load_hcp_contexts(
+    supabase: Client,
+    target_cohorts: List[str],
+    community_top_n: int,
+    rising_top_n: int,
+    established_top_n: int,
+    target_version: str = "v1",
+) -> Tuple[List[HCPContext], Dict[str, str]]:
+    """
+    Load HCP context for narrative generation, filtered by cohort.
+
+    For rising_star and established: top N per (TA x visible scope) from rank views.
+    For community: top N by cohort_score (default 500).
+    """
+    hcps: List[Dict] = []
+    cohort_by_hcp: Dict[str, str] = {}
+
+    if "rising_star" in target_cohorts:
+        print(f"Selecting rising_star top-{rising_top_n} per (TA x visible scope) from rank table...")
+        rising_ids = fetch_top_n_hcp_ids_from_rank_view(
+            supabase, "hcp_rising_star_ranks_v2", rising_top_n
+        )
+        print(f"Rising star rank selection: {len(rising_ids)} unique HCPs")
+        for hcp_id in rising_ids:
+            cohort_by_hcp[hcp_id] = "rising_star"
+        hcps.extend(fetch_hcps_by_ids(supabase, rising_ids, target_version))
+
+    if "established" in target_cohorts:
+        print(f"Selecting established top-{established_top_n} per (TA x visible scope) from rank table...")
+        established_ids = fetch_established_top_hcp_ids(supabase, established_top_n)
+        print(f"Established rank selection: {len(established_ids)} unique HCPs")
+        for hcp_id in established_ids:
+            cohort_by_hcp[hcp_id] = "established"
+        hcps.extend(fetch_hcps_by_ids(supabase, established_ids, target_version))
+
     if "community" in target_cohorts:
-        community_hcps = [h for h in hcps if h.get("cohort_classification") == "community"]
+        print("Loading community HCPs by cohort_classification...")
+        hcps_table = get_table_name("hcps", target_version)
+        if target_version == "v2":
+            hcp_select_cols = (
+                "id,first_name,last_name,institution_normalized,country,"
+                "cohort_classification,cohort_score,total_career_pubs,career_first_pub_year_v2"
+            )
+        else:
+            hcp_select_cols = (
+                "id,first_name,last_name,institution,country,cohort_classification,"
+                "cohort_score,total_career_pubs,first_pub_year"
+            )
+        community_hcps: List[Dict] = []
+        page_size = 1000
+        offset = 0
+        while True:
+            response = (
+                supabase.table(hcps_table)
+                .select(hcp_select_cols)
+                .eq("cohort_classification", "community")
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+            batch = response.data or []
+            if not batch:
+                break
+            if target_version == "v2":
+                for row in batch:
+                    if "institution_normalized" in row:
+                        row["institution"] = row.pop("institution_normalized")
+                    if "career_first_pub_year_v2" in row:
+                        row["first_pub_year"] = row.pop("career_first_pub_year_v2")
+            community_hcps.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += page_size
         community_hcps.sort(
             key=lambda h: h.get("cohort_score") if h.get("cohort_score") is not None else -1.0,
             reverse=True,
         )
         community_keep = community_hcps[:community_top_n]
-        community_keep_ids = {h["id"] for h in community_keep}
-        # Filter hcps list: keep all non-community AND top-N community
-        hcps = [
-            h for h in hcps
-            if h.get("cohort_classification") != "community" or h["id"] in community_keep_ids
-        ]
-        print(f"After community top-{community_top_n} downselect: {len(hcps)} HCPs total")
+        print(f"After community top-{community_top_n} downselect: {len(community_keep)} HCPs")
+        for row in community_keep:
+            hcp_id = row.get("id")
+            if hcp_id:
+                cohort_by_hcp[str(hcp_id)] = "community"
+        hcps.extend(community_keep)
+
+    # Dedupe by HCP id (same HCP may appear in multiple cohort selections)
+    seen_ids: Set[str] = set()
+    deduped_hcps: List[Dict] = []
+    for row in hcps:
+        hcp_id = row.get("id")
+        if not hcp_id or hcp_id in seen_ids:
+            continue
+        seen_ids.add(hcp_id)
+        if hcp_id in cohort_by_hcp:
+            row["cohort_classification"] = cohort_by_hcp[hcp_id]
+        deduped_hcps.append(row)
+    hcps = deduped_hcps
+    print(f"Loaded {len(hcps)} HCPs across cohorts {target_cohorts}")
 
     hcp_ids = {h["id"] for h in hcps if h.get("id")}
 
@@ -381,7 +532,73 @@ def load_hcp_contexts(
         contexts.append(ctx)
 
     print(f"Built {len(contexts)} HCP×TA contexts for narrative generation")
-    return contexts
+    return contexts, ta_name_map
+
+
+def freshness_filter(
+    contexts: List[HCPContext],
+    supabase: Client,
+    ta_name_map: Dict[str, str],
+    target_version: str = "v1",
+) -> List[HCPContext]:
+    """Drop contexts whose narrative is newer than the latest score row."""
+    if not contexts:
+        return contexts
+
+    narratives_table = get_table_name("hcp_narratives", target_version)
+    scores_table = get_table_name("hcp_scores", target_version)
+    score_ts_col = "scored_at" if target_version == "v2" else "calculated_at"
+
+    kept: List[HCPContext] = []
+    skipped = 0
+    for ctx in contexts:
+        ta_id = ctx.therapeutic_area_id
+        ta_slug = ta_slug_from_name(ta_name_map.get(ta_id))
+        try:
+            narr_resp = (
+                supabase.table(narratives_table)
+                .select("generated_at")
+                .eq("hcp_id", ctx.hcp_id)
+                .eq("therapeutic_area_slug", ta_slug)
+                .limit(1)
+                .execute()
+            )
+            narr_rows = narr_resp.data or []
+            if not narr_rows:
+                kept.append(ctx)
+                continue
+            generated_at = narr_rows[0].get("generated_at")
+            if not generated_at:
+                kept.append(ctx)
+                continue
+
+            score_resp = (
+                supabase.table(scores_table)
+                .select(score_ts_col)
+                .eq("hcp_id", ctx.hcp_id)
+                .eq("therapeutic_area_id", ctx.therapeutic_area_id)
+                .order(score_ts_col, desc=True)
+                .limit(1)
+                .execute()
+            )
+            score_rows = score_resp.data or []
+            if not score_rows:
+                kept.append(ctx)
+                continue
+            scored_at = score_rows[0].get(score_ts_col)
+            if scored_at and str(generated_at) > str(scored_at):
+                skipped += 1
+                continue
+            kept.append(ctx)
+        except Exception as exc:
+            print(
+                f"[freshness] WARN: could not check hcp_id={ctx.hcp_id} "
+                f"ta_id={ta_id} slug={ta_slug}: {exc}; keeping context"
+            )
+            kept.append(ctx)
+
+    print(f"[freshness] Skipped {skipped} contexts with narratives newer than latest score")
+    return kept
 
 
 def format_hcp_facts(ctx: HCPContext) -> str:
@@ -414,7 +631,7 @@ def format_hcp_facts(ctx: HCPContext) -> str:
 
 def build_prompt_rising_star(ctx: HCPContext) -> str:
     """Prompt for Rising Star cohort — emerging voice framing."""
-    return f"""You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about an emerging scientific voice. The HCP is classified as a Rising Star — a mid-career researcher with publication momentum, citation growth, or clinical trial activity that signals emerging influence in their therapeutic area.
+    return f"""You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about an emerging scientific voice. This HCP has been algorithmically selected as a top-100 Rising Star within their therapeutic area, drawn from researchers in the early-to-mid career band (3-10 years since first publication). They are by definition a high-priority name on a curated MSL surfacing board. The percentile data below is computed against the full scored population (tens of thousands of HCPs across all career stages), so percentiles in the middle ranges still represent meaningful emerging signal for someone in this curated top tier. Frame the HCP as a scientifically credible emerging voice worth MSL engagement; identify what specifically makes them notable rather than dwelling on what they haven't yet achieved. The HCP is classified as a Rising Star — a mid-career researcher with publication momentum, citation growth, or clinical trial activity that signals emerging influence in their therapeutic area.
 
 Return ONLY valid JSON with exactly these five fields:
 {{
@@ -430,7 +647,7 @@ Constraints:
 - why_now: exactly 1 sentence. Concrete timing signal (recent acceleration, recent trial role, etc.).
 - engagement_angle: exactly 2 sentences. Suggest scientific topics the MSL could productively focus on based on the HCP's activity. Be specific to therapeutic area.
 - signal_strength: exactly 1 sentence. Honest confidence statement — strong if data is consistent across publications and trials, weaker if mixed signals.
-- caution_flags: 1 sentence OR the JSON literal null. Use null if no caution flags. Include if there's something an MSL should know (high engagement with competitors, limited recent activity, geographic challenges).
+- caution_flags: 1 sentence OR the JSON literal null. Use null in most cases — the absence of strong signal is NOT a caution flag, it's just part of being early-career. Only populate caution_flags when there is a SPECIFIC, ACTIONABLE concern an MSL should know about: significant pharma engagement with direct competitors (>$50K with a competing company), affiliation with an institution that has restrictive industry-engagement policies, evidence of recent inactivity (no publications in 24+ months), or other concrete red flags. Do NOT use this field to re-state low percentile data or to hedge engagement expectations — those belong in signal_strength, not caution_flags. If you find yourself writing "MSL engagement should be framed around scientific exchange," use null instead.
 - No markdown. No text outside JSON.
 - Do not name specific drug brands or NCT trial numbers.
 
@@ -610,7 +827,7 @@ def upsert_narrative(
             "why_now": output["why_now"],
             "engagement_angle": output["engagement_angle"],
             "signal_strength": output["signal_strength"],
-            "caution_flags": output["caution_flags"],
+            "caution_flags": [output["caution_flags"]] if output["caution_flags"] else None,
             "generated_at": generated_at,
             "model_used": ANTHROPIC_MODEL,
             "prompt_version": PROMPT_VERSION,
@@ -653,6 +870,8 @@ def estimate_cost(num_calls: int) -> float:
 def run_pipeline(
     target_cohorts: List[str],
     community_top_n: int,
+    rising_top_n: int,
+    established_top_n: int,
     dry_run: bool,
     force: bool,
     target_version: str = "v1",
@@ -661,28 +880,57 @@ def run_pipeline(
     supabase = init_supabase()
 
     print(f"Target cohorts: {target_cohorts}")
+    if "rising_star" in target_cohorts:
+        print(f"Rising star downselect: top {rising_top_n} per (TA x visible scope) from ranks")
+    if "established" in target_cohorts:
+        print(f"Established downselect: top {established_top_n} per (TA x visible scope) from ranks")
     if "community" in target_cohorts:
         print(f"Community downselect: top {community_top_n} by cohort_score")
     print()
 
-    contexts = load_hcp_contexts(
-        supabase, target_cohorts, community_top_n, target_version=target_version
+    contexts, ta_name_map = load_hcp_contexts(
+        supabase,
+        target_cohorts,
+        community_top_n,
+        rising_top_n,
+        established_top_n,
+        target_version=target_version,
     )
     if not contexts:
         print("No HCPs found for target cohorts. Exiting.")
         return
 
-    # Cost estimate
-    estimated_cost = estimate_cost(len(contexts))
+    if not force:
+        contexts = freshness_filter(
+            contexts, supabase, ta_name_map, target_version=target_version
+        )
+        if not contexts:
+            print("All contexts filtered by freshness. Exiting.")
+            return
+
+    # Cost estimate (+1 sample call in dry-run)
+    num_calls = len(contexts) + (1 if dry_run else 0)
+    estimated_cost = estimate_cost(num_calls)
     print(f"\n=== Cost Estimate ===")
-    print(f"Total narrative calls: {len(contexts)}")
-    print(f"Estimated input tokens: {len(contexts) * EST_INPUT_TOKENS_PER_CALL:,}")
-    print(f"Estimated output tokens: {len(contexts) * EST_OUTPUT_TOKENS_PER_CALL:,}")
+    print(f"Total narrative calls: {len(contexts)}" + (" (+1 sample in dry-run)" if dry_run else ""))
+    print(f"Estimated input tokens: {num_calls * EST_INPUT_TOKENS_PER_CALL:,}")
+    print(f"Estimated output tokens: {num_calls * EST_OUTPUT_TOKENS_PER_CALL:,}")
     print(f"Estimated cost: ${estimated_cost:.2f}")
     print()
 
     if dry_run:
-        print("[DRY RUN] Exiting without API calls or database writes.")
+        print("[DRY RUN] Generating one sample narrative, then exiting without DB writes.")
+        if contexts:
+            anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
+            sample_ctx = contexts[0]
+            print(f"\n=== Sample narrative (hcp_id={sample_ctx.hcp_id}, TA={sample_ctx.therapeutic_area_name}) ===")
+            try:
+                output = generate_narrative(sample_ctx, anthropic_api_key)
+                print(json.dumps(output, indent=2))
+            except Exception as exc:
+                print(f"[DRY RUN] Sample generation failed: {exc}")
+        else:
+            print("[DRY RUN] No contexts available for sample narrative.")
         return
 
     # Cohort breakdown for transparency
@@ -747,6 +995,18 @@ def main() -> int:
         help=f"Number of top Community HCPs by cohort_score to include (default: {COMMUNITY_DEFAULT_TOP_N})",
     )
     parser.add_argument(
+        "--rising-top",
+        type=int,
+        default=RISING_DEFAULT_TOP_N,
+        help="Top N per (TA x visible scope) for rising_star cohort",
+    )
+    parser.add_argument(
+        "--established-top",
+        type=int,
+        default=ESTABLISHED_DEFAULT_TOP_N,
+        help="Top N per (TA x visible scope) for established cohort",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Compute cohort sizes and estimated cost, but don't call API or write to DB",
@@ -773,6 +1033,8 @@ def main() -> int:
         run_pipeline(
             target_cohorts=target_cohorts,
             community_top_n=args.community_top,
+            rising_top_n=args.rising_top,
+            established_top_n=args.established_top,
             dry_run=args.dry_run,
             force=args.force,
             target_version=args.target_version,
