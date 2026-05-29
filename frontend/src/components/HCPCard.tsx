@@ -252,7 +252,6 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
   const [addButtonHovered, setAddButtonHovered] = useState(false);
-  const [whyNowExpanded, setWhyNowExpanded] = useState(false);
   const touchDevice =
     typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
   const cohort = (hcp.cohort_classification ?? "").trim();
@@ -456,24 +455,36 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           cursor: "pointer",
         }}
       >
-        {/* Name + flag — top-left, tight to corner */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 90 }}>
-          <span style={{ fontSize: 17, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
-            {hcp.name}
-          </span>
-          {countryCode && (
-            <img
-              src={`https://flagcdn.com/16x12/${countryCode}.png`}
-              srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
-              width="16"
-              height="12"
-              alt={hcp.country || ""}
-              style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          )}
+        {/* Identity block — name+flag and institution wrapped with padding-right to reserve space for absolute-positioned score corner */}
+        <div style={{ paddingRight: 90 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 17, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
+              {hcp.name}
+            </span>
+            {countryCode && (
+              <img
+                src={`https://flagcdn.com/16x12/${countryCode}.png`}
+                srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
+                width="16"
+                height="12"
+                alt={hcp.country || ""}
+                style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            )}
+          </div>
+
+          <div style={{
+            fontSize: 13,
+            color: "#B8B4AC",
+            fontFamily: "system-ui, sans-serif",
+            marginTop: 4,
+            lineHeight: 1.4,
+          }}>
+            {subline}
+          </div>
         </div>
 
         {/* Score — absolute-positioned top-right corner */}
@@ -573,12 +584,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           </div>
         )}
 
-        {/* Row 2: Institution / location subline */}
-        <div style={{ fontSize: 14, color: "#6B6A65", fontFamily: "system-ui, sans-serif", marginTop: 2 }}>
-          {subline}
-        </div>
-
-        {/* Why_now insight band — Read More expand for variable-length content */}
+        {/* Why_now insight band — 3-line clamp; full narrative on card click → detail */}
         {hcp.why_now && cohort !== "community" && cohort !== "workhorse" ? (
           <div
             style={{
@@ -594,34 +600,13 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
               fontFamily: "system-ui, sans-serif",
               lineHeight: 1.55,
               display: "-webkit-box",
-              WebkitLineClamp: whyNowExpanded ? "unset" : 2,
+              WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
+              textOverflow: "ellipsis",
             }}>
               {hcp.why_now}
             </span>
-            {hcp.why_now.length > 130 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setWhyNowExpanded(!whyNowExpanded);
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  marginTop: 6,
-                  color: "#E8A020",
-                  fontSize: 11,
-                  fontFamily: "system-ui, sans-serif",
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                }}
-              >
-                {whyNowExpanded ? "Read less" : "Read more"}
-              </button>
-            )}
           </div>
         ) : null}
 
