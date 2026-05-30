@@ -528,6 +528,30 @@ function EngagementMixBlock({
 }
 
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
+  if (typeof window !== "undefined") {
+    console.log("[DetailScreen diagnostic]", {
+      name: hcp.name,
+      cohort_classification: hcp.cohort_classification,
+      cohortScore: hcp.cohortScore,
+      score: hcp.score,
+      normalizedScore: hcp.normalizedScore,
+      pubVel: hcp.pubVel,
+      citTraj: hcp.citTraj,
+      trialScore: hcp.trialScore,
+      h_index: hcp.h_index,
+      npiNumber: hcp.npiNumber,
+      npiSpecialty: hcp.npiSpecialty,
+      nppesPracticeCity: hcp.nppesPracticeCity,
+      nppesPracticeState: hcp.nppesPracticeState,
+      nppesPracticeAddress: hcp.nppesPracticeAddress,
+      institutionShort: hcp.institutionShort,
+      totalCareerPubs: hcp.totalCareerPubs,
+      careerYears: hcp.careerYears,
+      firstPubYear: hcp.firstPubYear,
+      narrative: hcp.narrative ? "[present]" : null,
+      why_now: hcp.why_now ? "[present]" : null,
+    });
+  }
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [engagementTooltipYear, setEngagementTooltipYear] = useState<number | null>(null);
   const [volumeTooltipYear, setVolumeTooltipYear] = useState<number | null>(null);
