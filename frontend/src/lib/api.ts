@@ -1596,9 +1596,7 @@ export async function getHCPDetail(
           tier,
           pub_velocity_score,
           citation_trajectory_score,
-          trial_investigator_score,
-          recency_bonus,
-          cross_signal_bonus
+          trial_investigator_score
         `,
       )
       .eq("hcp_id", hcpId)
