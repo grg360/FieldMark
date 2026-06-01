@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
+import Telescope from "./components/Telescope";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import TASelectionScreen from "./components/TASelectionScreen";
 import TopBar from "./components/TopBar";
@@ -832,7 +833,13 @@ function AppContent() {
   );
 }
 
+const SHOW_TELESCOPE_PROTOTYPE = true;
+
 export default function App() {
+  if (SHOW_TELESCOPE_PROTOTYPE) {
+    return <Telescope />;
+  }
+
   return (
     <TrackProvider>
       <AppContent />
