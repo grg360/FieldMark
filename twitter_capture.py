@@ -5,6 +5,9 @@ Twitter/X capture pipeline (Phase 3 implementation).
 
 Reads social_capture_config.json, captures posts by hashtag/topic query,
 stores platform-tagged posts/users, and supports checkpointed resume.
+
+Also supports --capture-replies mode for pulling reply chains on existing
+ASCO root posts via conversation_id queries.
 """
 
 import argparse
@@ -29,8 +32,8 @@ TWITTER_SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent"
 TWITTER_USER_BY_USERNAME_URL = "https://api.twitter.com/2/users/by/username/{username}"
 REQUEST_TIMEOUT = (5, 30)
 API_SLEEP_SECONDS = 1.0
-BACKOFF_429_SECONDS = 60.0
-MAX_RETRIES = 3
+BACKOFF_429_FALLBACK_SECONDS = 60.0
+MAX_RETRIES = 5
 POST_READ_COST_USD = 0.005
 USER_READ_COST_USD = 0.010
 
@@ -93,17 +96,19 @@ def load_config(path: Path) -> Dict[str, Any]:
 
 
 def load_checkpoint(path: Path) -> Dict[str, Any]:
-    """Load checkpoint state (last query cursor per hashtag/topic)."""
+    """Load checkpoint state (last query cursor per hashtag/topic/reply root)."""
     if not path.is_file():
-        return {"queries": {}}
+        return {"queries": {}, "reply_captures": {}}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {"queries": {}}
+        return {"queries": {}, "reply_captures": {}}
     if not isinstance(data, dict):
-        return {"queries": {}}
+        return {"queries": {}, "reply_captures": {}}
     if "queries" not in data or not isinstance(data["queries"], dict):
         data["queries"] = {}
+    if "reply_captures" not in data or not isinstance(data["reply_captures"], dict):
+        data["reply_captures"] = {}
     return data
 
 
@@ -126,6 +131,11 @@ def build_hashtag_query(tag: str, min_faves: int) -> str:
 def build_topic_query(base_query: str, min_faves: int) -> str:
     _ = min_faves  # retained for potential client-side filtering
     return f"{base_query} -is:retweet -is:reply"
+
+
+def build_reply_query(root_id: str) -> str:
+    """Build Twitter API query for all replies in a conversation thread."""
+    return f"conversation_id:{root_id} -is:retweet"
 
 
 def is_active_until(active_until: Optional[str]) -> bool:
@@ -224,6 +234,7 @@ def dry_run_fixture_page() -> Dict[str, Any]:
                 "id": "dryrun-1",
                 "text": "Excited for #ASCO2026 updates.",
                 "created_at": "2026-05-01T12:00:00Z",
+                "conversation_id": "dryrun-1",
                 "public_metrics": {"like_count": 12, "reply_count": 1, "retweet_count": 2, "quote_count": 0},
                 "author_id": "u1",
                 "entities": {"hashtags": [{"tag": "ASCO2026"}]},
@@ -247,6 +258,20 @@ def dry_run_fixture_page() -> Dict[str, Any]:
     }
 
 
+def sleep_for_rate_limit(resp: requests.Response) -> None:
+    """Sleep until Twitter rate-limit reset, using x-rate-limit-reset header."""
+    sleep_seconds = BACKOFF_429_FALLBACK_SECONDS
+    reset_header = resp.headers.get("x-rate-limit-reset")
+    if reset_header:
+        try:
+            reset_timestamp = float(reset_header)
+            sleep_seconds = max(5.0, reset_timestamp - time.time() + 2)
+        except (ValueError, TypeError):
+            pass
+    print(f"Rate limited; sleeping {sleep_seconds:.0f}s until reset.")
+    time.sleep(sleep_seconds)
+
+
 def fetch_twitter_posts(
     query: str,
     cursor: Optional[str],
@@ -258,7 +283,7 @@ def fetch_twitter_posts(
     Returns (posts, next_cursor).
     Implements:
     - 1 second spacing between requests
-    - 429 => 60s backoff + retry
+    - 429 => sleep until x-rate-limit-reset + retry
     """
     if dry_run:
         fixture = dry_run_fixture_page()
@@ -269,7 +294,7 @@ def fetch_twitter_posts(
     params: Dict[str, Any] = {
         "query": query,
         "max_results": max(10, min(100, int(max_results))),
-        "tweet.fields": "created_at,public_metrics,entities,author_id",
+        "tweet.fields": "created_at,public_metrics,entities,author_id,conversation_id,referenced_tweets",
         "expansions": "author_id",
         "user.fields": "username,name,description,location,url,verified,public_metrics",
     }
@@ -288,7 +313,7 @@ def fetch_twitter_posts(
         if resp.status_code == 429:
             if attempt == MAX_RETRIES - 1:
                 raise RuntimeError("Twitter API rate-limited repeatedly (429).")
-            time.sleep(BACKOFF_429_SECONDS)
+            sleep_for_rate_limit(resp)
             continue
 
         if resp.status_code >= 400:
@@ -314,6 +339,21 @@ def map_post_to_social_posts_row(post: Dict[str, Any], captured_via_query: str) 
     handle = post.get("_author_username")
     if not handle:
         handle = ""
+
+    parent_platform_post_id: Optional[str] = None
+    referenced = post.get("referenced_tweets")
+    if isinstance(referenced, list):
+        for ref in referenced:
+            if isinstance(ref, dict) and ref.get("type") == "replied_to":
+                ref_id = ref.get("id")
+                if ref_id is not None:
+                    parent_platform_post_id = str(ref_id)
+                break
+
+    conversation_id = post.get("conversation_id")
+    if conversation_id is not None:
+        conversation_id = str(conversation_id)
+
     return {
         "platform": "twitter",
         "platform_post_id": str(post.get("id")),
@@ -327,6 +367,9 @@ def map_post_to_social_posts_row(post: Dict[str, Any], captured_via_query: str) 
         "engagement_quotes": int(metrics.get("quote_count") or 0),
         "hashtags": hashtags,
         "captured_via_query": captured_via_query,
+        "conversation_id": conversation_id,
+        "parent_platform_post_id": parent_platform_post_id,
+        "is_reply": parent_platform_post_id is not None,
     }
 
 
@@ -388,7 +431,7 @@ def fetch_twitter_profile(handle: str, dry_run: bool) -> Dict[str, Any]:
         if resp.status_code == 429:
             if attempt == MAX_RETRIES - 1:
                 raise RuntimeError(f"Twitter profile rate-limited for @{handle}")
-            time.sleep(BACKOFF_429_SECONDS)
+            sleep_for_rate_limit(resp)
             continue
         if resp.status_code == 404:
             return {}
@@ -402,7 +445,7 @@ def fetch_twitter_profile(handle: str, dry_run: bool) -> Dict[str, Any]:
     return {}
 
 
-def map_profile_to_social_users_row(profile: Dict[str, Any]) -> Dict[str, Any]:
+def map_profile_to_social_users_row(profile: Dict[str, Any], discovery_source: str) -> Dict[str, Any]:
     """Map profile payload into social_users row with platform='twitter'."""
     metrics = profile.get("public_metrics") or {}
     username = str(profile.get("username") or "").strip().lower()
@@ -418,6 +461,7 @@ def map_profile_to_social_users_row(profile: Dict[str, Any]) -> Dict[str, Any]:
         "post_count": int(metrics.get("tweet_count") or 0),
         "verified": bool(profile.get("verified", False)),
         "profile_url": f"https://x.com/{username}" if username else None,
+        "discovery_source": discovery_source,
     }
 
 
@@ -460,21 +504,28 @@ def run_capture_for_query(
     query: str,
     query_key: str,
     captured_via_query: str,
+    discovery_source: str,
     checkpoint: Dict[str, Any],
     stats: CaptureStats,
     dry_run: bool,
     max_results: int,
+    checkpoint_namespace: str = "queries",
 ) -> None:
-    """Capture loop for one hashtag/topic query, with checkpoint cursor."""
-    queries = checkpoint.setdefault("queries", {})
-    state = queries.setdefault(query_key, {"next_token": None, "completed": False})
-    # For continuous capture (live conferences, etc.), reset completion on each run.
-    # The recent-search API only goes back ~7 days, so the previous "completed" state
-    # just means "no more *historical* results"; new posts may exist since last run.
-    next_token = state.get("next_token")
-    # Reset completed state so each invocation re-checks for new posts
-    state["completed"] = False
-    completed = False
+    """Capture loop for one query, with checkpoint cursor."""
+    namespace = checkpoint.setdefault(checkpoint_namespace, {})
+    state = namespace.setdefault(query_key, {"next_token": None, "completed": False})
+
+    if checkpoint_namespace == "reply_captures":
+        if state.get("completed"):
+            return
+        next_token = state.get("next_token")
+    else:
+        # For continuous capture (live conferences, etc.), reset completion on each run.
+        # The recent-search API only goes back ~7 days, so the previous "completed" state
+        # just means "no more *historical* results"; new posts may exist since last run.
+        next_token = state.get("next_token")
+        # Reset completed state so each invocation re-checks for new posts
+        state["completed"] = False
 
     while True:
         payloads, new_next_token = fetch_twitter_posts(
@@ -513,14 +564,20 @@ def run_capture_for_query(
                 continue
             stats.users_read += 1
             recalc_estimated_cost(stats)
-            user_row = map_profile_to_social_users_row(profile)
+            user_row = map_profile_to_social_users_row(profile, discovery_source)
             if upsert_social_user(client, user_row, dry_run=dry_run):
                 stats.new_users_discovered += 1
 
         state["next_token"] = new_next_token
-        # Don't set completed=true permanently. Reaching the end of available results
-        # for THIS run is normal; we want the next scheduled run to check for new posts.
-        state["completed"] = False
+        if checkpoint_namespace == "reply_captures":
+            # Reply trees don't grow under conversation_id the way hashtag feeds do;
+            # once pagination is exhausted, mark this root done for this window.
+            if not new_next_token:
+                state["completed"] = True
+        else:
+            # Don't set completed=true permanently. Reaching the end of available results
+            # for THIS run is normal; we want the next scheduled run to check for new posts.
+            state["completed"] = False
         save_checkpoint(CHECKPOINT_PATH, checkpoint)
 
         if not new_next_token:
@@ -562,10 +619,12 @@ def run_single_tag(
         query=target["query"],
         query_key=target["query_key"],
         captured_via_query=target["captured_via_query"],
+        discovery_source="hashtag_capture",
         checkpoint=checkpoint,
         stats=stats,
         dry_run=dry_run,
         max_results=max_results,
+        checkpoint_namespace="queries",
     )
     return stats
 
@@ -583,15 +642,111 @@ def run_all(client: Client, config: Dict[str, Any], dry_run: bool, max_results: 
             query=q["query"],
             query_key=q["query_key"],
             captured_via_query=q["captured_via_query"],
+            discovery_source="hashtag_capture",
             checkpoint=checkpoint,
             stats=stats,
             dry_run=dry_run,
             max_results=max_results,
+            checkpoint_namespace="queries",
         )
         print(
             f"Running totals: posts={stats.posts_captured}, users={stats.new_users_discovered}, "
             f"requests={stats.requests_made}, est_cost=${stats.estimated_cost_usd:.2f}"
         )
+    return stats
+
+
+DEFAULT_CAPTURED_VIA_TAGS = (
+    "#ASCO26,#ASCO2026,#lcsm,#bcsm,#mmsm,#gyncsm,#kidneycancer,#prostatecancer,"
+    "#bladdercancer,#colorectalcancer,#multiplemyeloma,#sclc,#melanoma,#ctdna,"
+    "#liquidbiopsy,#oncodaily"
+)
+
+
+def run_capture_replies(
+    client: Client,
+    args: argparse.Namespace,
+    dry_run: bool,
+    max_results: int,
+) -> CaptureStats:
+    """Capture reply chains for high-engagement ASCO root posts."""
+    stats = CaptureStats()
+    checkpoint = load_checkpoint(CHECKPOINT_PATH)
+
+    tags = [t.strip() for t in args.captured_via_tags.split(",") if t.strip()]
+    posted_since = args.posted_since.strip()
+    if len(posted_since) == 10:
+        posted_since = f"{posted_since}T00:00:00Z"
+
+    print(
+        f"[replies] Selecting roots: platform=twitter, posted_at>={posted_since}, "
+        f"engagement_replies>={args.min_replies}, tags={len(tags)}"
+    )
+
+    resp = (
+        client.table("social_posts_v2")
+        .select("platform_post_id, engagement_replies")
+        .eq("platform", "twitter")
+        .or_("is_reply.is.null,is_reply.eq.false")
+        .gte("posted_at", posted_since)
+        .gte("engagement_replies", args.min_replies)
+        .in_("captured_via_query", tags)
+        .order("engagement_replies", desc=True)
+        .execute()
+    )
+
+    roots = resp.data or []
+    print(f"[replies] Found {len(roots)} eligible root posts")
+
+    roots_processed = 0
+    roots_skipped = 0
+
+    total_roots = len(roots)
+    for idx, row in enumerate(roots, start=1):
+        root_id = str(row.get("platform_post_id") or "").strip()
+        if not root_id:
+            continue
+
+        query_key = f"reply:{root_id}"
+        reply_ns = checkpoint.setdefault("reply_captures", {})
+        state = reply_ns.get(query_key, {})
+        if state.get("completed"):
+            roots_skipped += 1
+            continue
+
+        roots_processed += 1
+        before_posts = stats.posts_captured
+        before_users = stats.new_users_discovered
+        before_cost = stats.estimated_cost_usd
+
+        run_capture_for_query(
+            client=client,
+            query=build_reply_query(root_id),
+            query_key=query_key,
+            captured_via_query=f"reply_to:{root_id}",
+            discovery_source=args.discovery_source,
+            checkpoint=checkpoint,
+            stats=stats,
+            dry_run=dry_run,
+            max_results=max_results,
+            checkpoint_namespace="reply_captures",
+        )
+
+        n_posts = stats.posts_captured - before_posts
+        n_users = stats.new_users_discovered - before_users
+        cost = stats.estimated_cost_usd - before_cost
+        print(
+            f"[{idx}/{total_roots}] Reply capture: root_id={root_id}, posts={n_posts}, users={n_users}, cost=${cost:.2f}"
+        )
+
+    print("\n=== Reply capture summary ===")
+    print(f"Eligible roots: {len(roots)}")
+    print(f"Roots processed: {roots_processed}")
+    print(f"Roots skipped (completed): {roots_skipped}")
+    print(f"Total replies captured: {stats.posts_captured}")
+    print(f"Total new users discovered: {stats.new_users_discovered}")
+    print(f"Total cost: ${stats.estimated_cost_usd:.2f}")
+
     return stats
 
 
@@ -617,6 +772,35 @@ def main() -> None:
         default=None,
         help="Named congress profile from config (e.g., ASCO, ESMO, EASL, AASLD, EHA). Captures all primary + secondary hashtags for that profile.",
     )
+    parser.add_argument(
+        "--capture-replies",
+        action="store_true",
+        help="Capture reply chains for existing high-engagement root posts",
+    )
+    parser.add_argument(
+        "--min-replies",
+        type=int,
+        default=3,
+        help="Minimum engagement_replies on root post for reply capture selection (default: 3)",
+    )
+    parser.add_argument(
+        "--discovery-source",
+        type=str,
+        default="asco_2026",
+        help="Value written to social_users_v2.discovery_source for new repliers (default: asco_2026)",
+    )
+    parser.add_argument(
+        "--posted-since",
+        type=str,
+        default="2026-05-28",
+        help="Minimum posted_at ISO date for root post selection (default: 2026-05-28)",
+    )
+    parser.add_argument(
+        "--captured-via-tags",
+        type=str,
+        default=DEFAULT_CAPTURED_VIA_TAGS,
+        help="Comma-separated captured_via_query tags eligible as reply-capture parents",
+    )
     parser.add_argument("--dry-run", action="store_true", help="No DB writes, no paid API calls (cached fixtures)")
     parser.add_argument("--max-results", type=int, default=100, help="Tweets per API page (10-100).")
     args = parser.parse_args()
@@ -626,12 +810,19 @@ def main() -> None:
         print("Twitter capture disabled by config: twitter.enabled=false")
         return
 
-    mode_flags = [bool(args.tag), bool(args.all), bool(args.profile)]
+    mode_flags = [bool(args.tag), bool(args.all), bool(args.profile), bool(args.capture_replies)]
     if sum(mode_flags) != 1:
-        raise ValueError("Specify exactly one mode: --tag, --all, or --profile.")
+        raise ValueError("Specify exactly one mode: --tag, --all, --profile, or --capture-replies.")
 
     client = init_supabase()
-    if args.tag:
+    if args.capture_replies:
+        stats = run_capture_replies(
+            client,
+            args,
+            dry_run=args.dry_run,
+            max_results=args.max_results,
+        )
+    elif args.tag:
         stats = run_single_tag(
             client,
             config,
@@ -665,7 +856,8 @@ def main() -> None:
             stats.new_users_discovered += tag_stats.new_users_discovered
             stats.requests_made += tag_stats.requests_made
         recalc_estimated_cost(stats)
-    print_summary(stats)
+    if not args.capture_replies:
+        print_summary(stats)
 
 
 if __name__ == "__main__":

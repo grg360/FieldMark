@@ -13,6 +13,7 @@ import type {
   TACounts,
   VerifiedDOL,
 } from "./types";
+import type { SocialCandidate, SocialConfidenceTier } from "../types/social";
 
 export interface ApiResult<T> {
   data: T | null;
@@ -2116,27 +2117,9 @@ export async function getSocialAnalytics(
   };
 }
 
-export interface SocialCandidateRow {
-  id: string;
-  handle: string;
-  displayName: string;
-  affiliation: string;
-  specialty: string;
-  bio: string;
-  confidenceTier: "likely_hcp" | "possibly_hcp" | "unverified";
-  platform: "twitter" | "bluesky";
-  followerCount: number;
-  postsLast90Days: number;
-  sourceHashtag: string;
-  engagementCount: number;
-  engagementRate: number;
-  narrative: string;
-  matchedHcpName?: string;
-  matchedHcpCohort?: "rising_stars" | "community" | "established";
-  matchedHcpScore?: number;
-}
+export type SocialCandidateRow = SocialCandidate;
 
-function deriveConfidenceTier(bio: string | null): "likely_hcp" | "possibly_hcp" | "unverified" {
+function deriveConfidenceTier(bio: string | null): SocialConfidenceTier {
   if (!bio) return "unverified";
   const b = bio.toLowerCase();
 
@@ -2182,6 +2165,46 @@ function deriveConfidenceTier(bio: string | null): "likely_hcp" | "possibly_hcp"
   return "unverified";
 }
 
+const TA_TO_DISCOVERY_SOURCE: Record<string, string[]> = {
+  oncology: ["asco_2026", "esmo_2026", "eha_2026"],
+  hepatology: ["easl_2026", "aasld_2026"],
+  "rare-disease": [],
+};
+
+const REPLY_SOURCE_LABELS: Record<string, string> = {
+  asco_2026: "ASCO 2026 · reply",
+  esmo_2026: "ESMO 2026 · reply",
+  easl_2026: "EASL 2026 · reply",
+  aasld_2026: "AASLD 2026 · reply",
+  eha_2026: "EHA 2026 · reply",
+};
+
+function formatReplySourceLabel(discoverySource: string): string {
+  const key = discoverySource.toLowerCase().trim();
+  if (REPLY_SOURCE_LABELS[key]) {
+    return REPLY_SOURCE_LABELS[key];
+  }
+  return `${discoverySource.replace(/_/g, " ").toUpperCase()} · reply`;
+}
+
+function buildReplyNarrative(row: {
+  handle: string;
+  displayName: string | null;
+  followerCount: number;
+  sourceLabel: string;
+  confidenceTier: string;
+}): string {
+  const name = row.displayName || row.handle;
+  const followers = row.followerCount.toLocaleString();
+  let bioFraming = " Bio is sparse or non-clinical — verify before engaging.";
+  if (row.confidenceTier === "likely_hcp") {
+    bioFraming = " Bio shows clinical credentials.";
+  } else if (row.confidenceTier === "possibly_hcp") {
+    bioFraming = " Bio shows clinical context but no explicit credential.";
+  }
+  return `${name} was surfaced through ${row.sourceLabel}. Follower count: ${followers}.${bioFraming}`;
+}
+
 function buildNarrative(row: {
   handle: string;
   displayName: string | null;
@@ -2189,8 +2212,21 @@ function buildNarrative(row: {
   engagementCount: number;
   followerCount: number;
   sourceHashtag: string;
+  sourceLabel: string;
+  discoveryMethod: "hashtag" | "reply";
+  discoverySource: string | null;
   confidenceTier: string;
 }): string {
+  if (row.discoveryMethod === "reply") {
+    return buildReplyNarrative({
+      handle: row.handle,
+      displayName: row.displayName,
+      followerCount: row.followerCount,
+      sourceLabel: row.sourceLabel,
+      confidenceTier: row.confidenceTier,
+    });
+  }
+
   const engagementRate = row.followerCount > 0 ? row.engagementCount / row.followerCount : 0;
   const name = row.displayName || row.handle;
 
@@ -2256,12 +2292,8 @@ export async function getSocialCandidates(
     return { data: null, error: voiceErr };
   }
 
-  if (!voiceData || voiceData.length === 0) {
-    return { data: [], error: null };
-  }
-
   // Step 3: Build SocialCandidateRow objects
-  const candidates: SocialCandidateRow[] = voiceData.map((v: any) => {
+  const candidates: SocialCandidateRow[] = (voiceData || []).map((v: any) => {
     const handle: string = v.handle;
     const bio: string = v.bio || "";
     const confidenceTier = deriveConfidenceTier(bio);
@@ -2281,6 +2313,9 @@ export async function getSocialCandidates(
       engagementCount: totalEngagement,
       followerCount,
       sourceHashtag,
+      sourceLabel: sourceHashtag,
+      discoveryMethod: "hashtag",
+      discoverySource: null,
       confidenceTier,
     });
 
@@ -2296,6 +2331,9 @@ export async function getSocialCandidates(
       followerCount,
       postsLast90Days: postCount,
       sourceHashtag,
+      sourceLabel: sourceHashtag,
+      discoveryMethod: "hashtag" as const,
+      discoverySource: null,
       engagementCount: totalEngagement,
       engagementRate,
       narrative,

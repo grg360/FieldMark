@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SocialCandidate } from "../data/socialMockData";
+import type { SocialCandidate } from "../types/social";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 
 interface SocialCardProps {
@@ -207,7 +207,7 @@ export default function SocialCard({ candidate }: SocialCardProps) {
         <div style={{ flex: 1 }}>
           <StatPillWithTooltip
             label="Source"
-            value={candidate.sourceHashtag}
+            value={candidate.sourceLabel || candidate.sourceHashtag || "—"}
             tooltipKey="Source"
             activeTooltip={activeTooltip}
             onTooltipChange={setActiveTooltip}

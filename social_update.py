@@ -21,6 +21,7 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -91,6 +92,44 @@ def run_capture(args: argparse.Namespace) -> int:
     return result.returncode
 
 
+def compute_discovery_source(args: argparse.Namespace) -> str:
+    """Derive discovery_source for reply capture from CLI args."""
+    if args.reply_discovery_source:
+        return args.reply_discovery_source
+    if args.profile:
+        return f"{args.profile.lower()}_{datetime.now().year}"
+    return "reply_capture"
+
+
+def format_posted_since(t0_epoch: float) -> str:
+    """Return YYYY-MM-DD for the date t0 falls on (for --posted-since)."""
+    return datetime.fromtimestamp(t0_epoch).strftime("%Y-%m-%d")
+
+
+def run_reply_capture(args: argparse.Namespace, t0_epoch: float) -> int:
+    """Run twitter_capture.py --capture-replies scoped to today's roots. Returns exit code."""
+    cmd: List[str] = [
+        sys.executable,
+        str(CAPTURE_SCRIPT),
+        "--capture-replies",
+        "--min-replies",
+        str(args.reply_min_replies),
+        "--posted-since",
+        format_posted_since(t0_epoch),
+        "--discovery-source",
+        compute_discovery_source(args),
+    ]
+    if args.dry_run:
+        cmd.append("--dry-run")
+
+    print(f"\n[replies] Running: {' '.join(cmd)}")
+    print("=" * 60)
+    result = subprocess.run(cmd, cwd=str(SCRIPT_DIR))
+    print("=" * 60)
+    print(f"[replies] Completed with exit code: {result.returncode}")
+    return result.returncode
+
+
 def backfill_ta_tags(client: Client, hashtag_ta_map: Dict[str, str]) -> Dict[str, int]:
     """Tag any NULL therapeutic_areas rows in social_posts_v2 based on captured_via_query.
 
@@ -144,10 +183,12 @@ def refresh_views(client: Client) -> bool:
 
 
 def print_summary(
+    args: argparse.Namespace,
     captured_exit_code: Optional[int],
     backfill_results: Dict[str, int],
     refresh_ok: bool,
     elapsed: float,
+    reply_exit_code: Optional[int],
 ) -> None:
     print("\n" + "=" * 60)
     print("=== social_update summary ===")
@@ -167,6 +208,17 @@ def print_summary(
         print("TA tags: none needed")
 
     print(f"Views refreshed: {'YES' if refresh_ok else 'NO (errored)'}")
+
+    if args.include_replies:
+        if reply_exit_code is None and args.refresh_only:
+            print("Reply capture: skipped (--refresh-only)")
+        elif reply_exit_code is None and args.dry_run:
+            print("Reply capture: skipped (--dry-run)")
+        elif reply_exit_code == 0:
+            print("Reply capture: SUCCESS")
+        elif reply_exit_code is not None:
+            print(f"Reply capture: FAILED (exit code {reply_exit_code})")
+
     print(f"Total time: {elapsed:.1f}s")
     print("=" * 60)
 
@@ -190,6 +242,23 @@ def main() -> int:
         "--dry-run",
         action="store_true",
         help="Pass --dry-run to twitter_capture (no DB writes from capture)",
+    )
+    parser.add_argument(
+        "--include-replies",
+        action="store_true",
+        help="After hashtag capture completes, run reply capture against today's newly-captured roots.",
+    )
+    parser.add_argument(
+        "--reply-min-replies",
+        type=int,
+        default=3,
+        help="Minimum engagement_replies threshold for reply capture (default: 3).",
+    )
+    parser.add_argument(
+        "--reply-discovery-source",
+        type=str,
+        default=None,
+        help="discovery_source value for new repliers. Default derives from --profile (e.g., 'asco_2026') or falls back to 'reply_capture'.",
     )
 
     args = parser.parse_args()
@@ -222,10 +291,21 @@ def main() -> int:
     else:
         refresh_ok = refresh_views(client)
 
-    elapsed = time.time() - t0
-    print_summary(capture_exit_code, backfill_results, refresh_ok, elapsed)
+    reply_exit_code: Optional[int] = None
+    if args.include_replies and not args.refresh_only and not args.dry_run:
+        reply_exit_code = run_reply_capture(args, t0)
 
-    return 0 if (args.refresh_only or capture_exit_code == 0) and (refresh_ok or args.dry_run) else 1
+    elapsed = time.time() - t0
+    print_summary(args, capture_exit_code, backfill_results, refresh_ok, elapsed, reply_exit_code)
+
+    base_success = (args.refresh_only or capture_exit_code == 0) and (refresh_ok or args.dry_run)
+    if not base_success:
+        return 1
+    if reply_exit_code is not None and reply_exit_code != 0:
+        print("\n[warning] Hashtag capture and refresh succeeded, but reply capture failed.")
+        print("[warning] Reply capture can be re-run manually: python twitter_capture.py --capture-replies")
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
