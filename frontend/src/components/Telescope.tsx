@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
 import nodesData from "../data/telescope_nsclc_nodes.json";
 import edgesData from "../data/telescope_nsclc_edges.json";
@@ -43,10 +43,68 @@ function getNodeRadius(cohort: string, rank: number): number {
   return 1.5;
 }
 
-export default function Telescope() {
+interface TelescopeProps {
+  onNodeClick: (node: {
+    id: string;
+    name: string;
+    institution: string;
+    cohort: string;
+    rank: number;
+    score: number;
+  }) => void;
+}
+
+export default function Telescope({ onNodeClick }: TelescopeProps) {
   const reticleRef = useRef<SVGSVGElement>(null);
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const closestNodeIdRef = useRef<string | null>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setDimensions({ width, height });
+      }
+    });
+
+    observer.observe(containerRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (fgRef.current && nodesData.length > 0) {
+        const established = nodesData.filter(
+          (n: { cohort: string }) => n.cohort === "established"
+        ) as Array<{ x?: number; y?: number }>;
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        for (const node of established) {
+          if (typeof node.x === "number" && typeof node.y === "number") {
+            sumX += node.x;
+            sumY += node.y;
+            count++;
+          }
+        }
+        if (count > 0) {
+          const centroidX = sumX / count;
+          const centroidY = sumY / count;
+          fgRef.current.centerAt(centroidX, centroidY, 0);
+          fgRef.current.zoom(1.3, 400);
+        } else {
+          fgRef.current.zoom(1.3, 400);
+        }
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   function hexToRgba(hex: string, alpha: number): string {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -62,13 +120,23 @@ export default function Telescope() {
       .map((e) => ({ source: e.source, target: e.target, value: e.weight })),
   };
 
-  const { topTenEstablishedIds, midRangeEstablishedIds } = useMemo(() => {
+  const { topTenEstablishedIds, midRangeEstablishedIds, topHundredRisingIds } = useMemo(() => {
     const established = nodesData
       .filter((n: { cohort: string }) => n.cohort === "established")
       .sort((a: { rank: number }, b: { rank: number }) => a.rank - b.rank);
     const topTen = new Set(established.slice(0, 10).map((n: { id: string }) => n.id));
     const midRange = new Set(established.slice(10, 50).map((n: { id: string }) => n.id));
-    return { topTenEstablishedIds: topTen, midRangeEstablishedIds: midRange };
+
+    const rising = nodesData
+      .filter((n: { cohort: string }) => n.cohort === "rising")
+      .sort((a: { rank: number }, b: { rank: number }) => a.rank - b.rank);
+    const topHundredRising = new Set(rising.slice(0, 100).map((n: { id: string }) => n.id));
+
+    return {
+      topTenEstablishedIds: topTen,
+      midRangeEstablishedIds: midRange,
+      topHundredRisingIds: topHundredRising,
+    };
   }, []);
 
   const paintNode = (node: TelescopeNode, ctx: CanvasRenderingContext2D) => {
@@ -76,27 +144,20 @@ export default function Telescope() {
       return;
     }
 
-    const MAGNIFIER_RADIUS = 60;
-    const FADE_EDGE_WIDTH = 15;
-    const MAX_MAGNIFICATION = 2.0;
-
     const radius = getNodeRadius(node.cohort, node.rank);
-
-    let magnification = 1.0;
-    if (mousePosRef.current) {
-      const dx = node.x - mousePosRef.current.x;
-      const dy = node.y - mousePosRef.current.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < MAGNIFIER_RADIUS - FADE_EDGE_WIDTH) {
-        magnification = MAX_MAGNIFICATION;
-      } else if (dist < MAGNIFIER_RADIUS) {
-        const t = (MAGNIFIER_RADIUS - dist) / FADE_EDGE_WIDTH;
-        magnification = 1.0 + (MAX_MAGNIFICATION - 1.0) * t;
-      }
+    let finalRadius = radius;
+    if (node.cohort === "rising" && topHundredRisingIds.has(node.id)) {
+      finalRadius = 4.0;
     }
 
-    const effectiveRadius = radius * magnification;
+    const magnification = closestNodeIdRef.current === node.id ? 2.0 : 1.0;
+
+    const effectiveRadius = finalRadius * magnification;
     const color = getNodeColor(node.cohort, node.rank);
+    let finalColor = color;
+    if (node.cohort === "rising" && topHundredRisingIds.has(node.id)) {
+      finalColor = "#C599FF";
+    }
 
     const gradient = ctx.createRadialGradient(
       node.x,
@@ -106,9 +167,9 @@ export default function Telescope() {
       node.y,
       effectiveRadius * 3
     );
-    gradient.addColorStop(0, hexToRgba(color, 1));
-    gradient.addColorStop(0.4, hexToRgba(color, 0.5));
-    gradient.addColorStop(1, hexToRgba(color, 0));
+    gradient.addColorStop(0, hexToRgba(finalColor, 1));
+    gradient.addColorStop(0.4, hexToRgba(finalColor, 0.5));
+    gradient.addColorStop(1, hexToRgba(finalColor, 0));
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -136,7 +197,7 @@ export default function Telescope() {
         spikeOpacity = 0.75;
       }
 
-      ctx.strokeStyle = hexToRgba(color, spikeOpacity);
+      ctx.strokeStyle = hexToRgba(finalColor, spikeOpacity);
       ctx.lineWidth = horizontalSpikeWidth;
       ctx.lineCap = "round";
       ctx.beginPath();
@@ -147,7 +208,7 @@ export default function Telescope() {
       ctx.stroke();
 
       if (node.rank <= 10) {
-        ctx.strokeStyle = hexToRgba(color, diagonalSpikeOpacity);
+        ctx.strokeStyle = hexToRgba(finalColor, diagonalSpikeOpacity);
         ctx.lineWidth = 0.5;
         const diagLength = spikeLength * 0.6;
         const diagOffset = diagLength / Math.sqrt(2);
@@ -160,10 +221,18 @@ export default function Telescope() {
       }
     }
 
-    ctx.fillStyle = color;
+    ctx.fillStyle = finalColor;
     ctx.beginPath();
     ctx.arc(node.x, node.y, effectiveRadius * 0.4, 0, 2 * Math.PI);
     ctx.fill();
+
+    if (node.cohort === "rising" && topHundredRisingIds.has(node.id)) {
+      ctx.strokeStyle = hexToRgba("#C599FF", 0.4);
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, effectiveRadius * 1.8, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
 
     const isTopTen = topTenEstablishedIds.has(node.id);
     const isMidRange = midRangeEstablishedIds.has(node.id);
@@ -225,7 +294,7 @@ export default function Telescope() {
       const lastName = nameParts[nameParts.length - 1];
 
       const fontSize = 9;
-      const textOpacity = Math.min((magnification - 1.0) / (MAX_MAGNIFICATION - 1.0), 1.0);
+      const textOpacity = Math.min((magnification - 1.0) / 1.0, 1.0);
       const borderOpacity = 0.35 * textOpacity;
       const bgOpacity = 0.85 * textOpacity;
       const paddingX = 5;
@@ -275,12 +344,29 @@ export default function Telescope() {
 
   return (
     <div
+      ref={containerRef}
       style={{
-        width: "100vw",
-        height: "100vh",
+        width: "100%",
+        height: "100%",
         background: "#0A0A0F",
         position: "relative",
         overflow: "hidden",
+        cursor: "crosshair",
+      }}
+      onClick={() => {
+        const closestId = closestNodeIdRef.current;
+        if (!closestId) return;
+        const node = (nodesData as TelescopeNode[]).find((n) => n.id === closestId);
+        if (node) {
+          onNodeClick({
+            id: node.id,
+            name: node.name,
+            institution: node.institution,
+            cohort: node.cohort,
+            rank: node.rank,
+            score: node.score,
+          });
+        }
       }}
       onMouseMove={(e) => {
         if (reticleRef.current) {
@@ -293,6 +379,24 @@ export default function Telescope() {
           if (fgRef.current) {
             const graphCoords = fgRef.current.screen2GraphCoords(x, y);
             mousePosRef.current = { x: graphCoords.x, y: graphCoords.y };
+
+            let closestId: string | null = null;
+            let closestDistSq = Infinity;
+            const MAX_TARGET_DISTANCE_SQ = 30 * 30;
+
+            for (const n of nodesData as TelescopeNode[]) {
+              if (typeof n.x === "number" && typeof n.y === "number") {
+                const dx = n.x - graphCoords.x;
+                const dy = n.y - graphCoords.y;
+                const distSq = dx * dx + dy * dy;
+                if (distSq < closestDistSq && distSq < MAX_TARGET_DISTANCE_SQ) {
+                  closestDistSq = distSq;
+                  closestId = n.id;
+                }
+              }
+            }
+
+            closestNodeIdRef.current = closestId;
           }
         }
       }}
@@ -301,6 +405,7 @@ export default function Telescope() {
           reticleRef.current.style.opacity = "0";
         }
         mousePosRef.current = null;
+        closestNodeIdRef.current = null;
       }}
     >
       <ForceGraph2D
@@ -308,8 +413,9 @@ export default function Telescope() {
         graphData={graphData}
         cooldownTicks={Infinity}
         cooldownTime={Infinity}
-        width={window.innerWidth}
-        height={window.innerHeight}
+        nodeLabel={() => ""}
+        width={dimensions.width}
+        height={dimensions.height}
         linkColor={() => "#5A7090"}
         linkWidth={(link) => Math.min(Math.sqrt(link.value || 1) * 0.25, 1.0)}
         linkOpacity={(link) => {
@@ -382,6 +488,7 @@ export default function Telescope() {
           strokeWidth="0.5"
           opacity="0.4"
         />
+        <circle cx="100" cy="100" r="2" fill="#FFFFFF" opacity="0.9" />
       </svg>
     </div>
   );

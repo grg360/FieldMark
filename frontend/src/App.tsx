@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import Telescope from "./components/Telescope";
+import TelescopeDrawer from "./components/TelescopeDrawer";
+import TelescopeLegend from "./components/TelescopeLegend";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import TASelectionScreen from "./components/TASelectionScreen";
 import TopBar from "./components/TopBar";
@@ -276,6 +278,14 @@ function AppContent() {
   const [taCounts, setTaCounts] = useState<TACounts | null>(null);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
+  const [telescopeSelectedHcp, setTelescopeSelectedHcp] = useState<{
+    id: string;
+    name: string;
+    institution: string;
+    cohort: string;
+    rank: number;
+    score: number;
+  } | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [backToTopHovered, setBackToTopHovered] = useState(false);
 
@@ -329,8 +339,17 @@ function AppContent() {
     return `Updated ${mins} mins ago`;
   }
 
+  function formatSectionHeaderLabel(): string {
+    const taLabel =
+      track === "telescope" && selectedTA === "Oncology"
+        ? "Oncology (NSCLC) - Telescope"
+        : selectedTA;
+    if (selectedIndication === "All") return taLabel;
+    return `${taLabel} \u2014 ${selectedIndication}`;
+  }
+
   async function fetchHCPs(loadingAsRefresh = false) {
-    if (track === "social") {
+    if (track === "social" || track === "telescope") {
       setHcpList([]);
       setFeedTotal(0);
       return;
@@ -363,7 +382,7 @@ function AppContent() {
     let cancelled = false;
 
     async function fetchData() {
-      if (track === "social") {
+      if (track === "social" || track === "telescope") {
         setHcpList([]);
         setFeedOffset(0);
         setFeedTotal(0);
@@ -401,7 +420,7 @@ function AppContent() {
   }, [selectedTA, track, region]);
 
   async function loadMore() {
-    if (track === "social") return;
+    if (track === "social" || track === "telescope") return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = getTASlug(selectedTA);
     const filters = { therapeuticArea: taSlug, region };
@@ -633,7 +652,9 @@ function AppContent() {
         {formatUpdatedLabel()}
       </div>
 
-      {track !== "social" && <DOLHeroPanel taSlug={getTASlug(selectedTA)} />}
+      {track !== "social" && track !== "telescope" && (
+        <DOLHeroPanel taSlug={getTASlug(selectedTA)} />
+      )}
 
       {/* Section header */}
       <div
@@ -653,11 +674,9 @@ function AppContent() {
             fontFamily: "system-ui, sans-serif",
           }}
         >
-          {selectedIndication === "All"
-            ? selectedTA
-            : `${selectedTA} � ${selectedIndication}`}
+          {formatSectionHeaderLabel()}
         </span>
-        {track !== "social" && (
+        {track !== "social" && track !== "telescope" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span
               className="fm-section-header-right"
@@ -713,6 +732,87 @@ function AppContent() {
 
       {track === "social" ? (
         <SocialTrackEmpty selectedTA={selectedTA} />
+      ) : track === "telescope" ? (
+        selectedTA === "Oncology" ? (
+          <>
+            <TelescopeLegend />
+            {track === "telescope" && selectedTA === "Oncology" && (
+              <div
+                style={{
+                  marginTop: "16px",
+                  marginBottom: "16px",
+                  padding: "18px 22px",
+                  background: "rgba(255, 255, 255, 0.03)",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "4px",
+                  color: "rgba(232, 230, 223, 0.75)",
+                  fontSize: "13px",
+                  lineHeight: "1.6",
+                  fontWeight: 400,
+                }}
+              >
+                Telescope maps the network of HCPs driving clinical and scientific progress in non-small cell lung cancer. Each star represents a US-based researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in NSCLC — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it.
+              </div>
+            )}
+            <div
+              style={{
+                width: "100%",
+                height: "1000px",
+                minHeight: "1000px",
+                position: "relative",
+                overflow: "hidden",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "4px",
+              }}
+            >
+              <Telescope onNodeClick={(node) => setTelescopeSelectedHcp(node)} />
+              <TelescopeDrawer
+                hcp={telescopeSelectedHcp}
+                onClose={() => setTelescopeSelectedHcp(null)}
+                onViewProfile={(hcpId) => {
+                  setTelescopeSelectedHcp(null);
+                  const taId = getTAIdForLabel(selectedTA);
+                  if (taId) {
+                    void handleSearchSelect(hcpId, taId);
+                  }
+                }}
+                onSelectCollaborator={(collab) => setTelescopeSelectedHcp(collab)}
+              />
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              minHeight: "400px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(13, 13, 16, 0.4)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "4px",
+              color: "rgba(232, 230, 223, 0.7)",
+              textAlign: "center",
+              padding: "40px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "rgba(232, 230, 223, 1.0)",
+                marginBottom: "12px",
+              }}
+            >
+              Telescope is currently available for Oncology (NSCLC)
+            </div>
+            <div style={{ fontSize: "13px", maxWidth: "480px", lineHeight: 1.5 }}>
+              Hepatology, Immunology, and Rare Disease coverage are in development. Select
+              Oncology to explore the NSCLC collaboration network.
+            </div>
+          </div>
+        )
       ) : (
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
           {loadingHCPs ? (
@@ -833,13 +933,7 @@ function AppContent() {
   );
 }
 
-const SHOW_TELESCOPE_PROTOTYPE = true;
-
 export default function App() {
-  if (SHOW_TELESCOPE_PROTOTYPE) {
-    return <Telescope />;
-  }
-
   return (
     <TrackProvider>
       <AppContent />

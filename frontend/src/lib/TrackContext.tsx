@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type Track = "community" | "rising-stars" | "established" | "social";
+export type Track = "community" | "rising-stars" | "established" | "telescope" | "social";
 
 interface TrackContextValue {
   track: Track;
@@ -20,6 +20,7 @@ export function TrackProvider({ children }: { children: ReactNode }) {
       stored === "community" ||
       stored === "rising-stars" ||
       stored === "established" ||
+      stored === "telescope" ||
       stored === "social"
     ) {
       return stored;

@@ -4,6 +4,7 @@ const TRACKS: { value: Track; label: string }[] = [
   { value: "community", label: "Community" },
   { value: "rising-stars", label: "Rising Stars" },
   { value: "established", label: "Established" },
+  { value: "telescope", label: "Telescope" },
   { value: "social", label: "Social" },
 ];
 
