@@ -46,6 +46,7 @@ import DashboardTabs from "./components/DashboardTabs";
 import IndicationFilter from "./components/IndicationFilter";
 import FieldIntelligence from "./components/FieldIntelligence";
 import SurfaceHCPForm from "./components/SurfaceHCPForm";
+import GlobalFooter from "./components/GlobalFooter";
 import { FiToast } from "./components/FieldIntelligenceShared";
 import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
@@ -894,6 +895,8 @@ function FeedLayout({
           hcpName={activeHCP?.name ?? ""}
           onAddNote={handleAddNoteFromTray}
         />
+
+        <GlobalFooter onToast={showFiToast} />
       </div>
 
       {showBackToTop && !trayOpen && (
@@ -1121,6 +1124,7 @@ function FIThreadRoute() {
         onBack={() => navigate(`/${ta ?? "oncology"}/field-intelligence`)}
         onToast={showFiToast}
       />
+      <GlobalFooter onToast={showFiToast} />
       <FiToast message={fiToast} />
     </div>
   );
