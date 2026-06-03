@@ -1,17 +1,41 @@
-import { useEffect, useState } from "react";
+/*
+ * URL routing manual verification checklist:
+ * - Fresh load at / -> Oncology / Established / NSCLC
+ * - Click Hepatology -> /hepatology/established/all (or first active indication)
+ * - Click Rising Stars in Oncology -> /oncology/rising-stars/<current indication>
+ * - Click NSCLC -> /oncology/.../nsclc
+ * - Click inactive indication (Breast) -> /oncology/established/breast, coming soon content
+ * - Click HCP card -> /hcp/<hcpId>, detail renders
+ * - Browser back -> previous TA/dashboard/indication
+ * - Logo -> /, home view
+ * - Field Intelligence tab -> /:ta/field-intelligence
+ * - Thread -> /:ta/field-intelligence/thread/:threadId
+ * - Paste URL in new tab -> auth then same content
+ * - Refresh deep URL -> same content after auth
+ */
+
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { ArrowUp } from "lucide-react";
 import Telescope from "./components/Telescope";
 import TelescopeDrawer from "./components/TelescopeDrawer";
 import TelescopeLegend from "./components/TelescopeLegend";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
-import TASelectionScreen from "./components/TASelectionScreen";
 import TopBar from "./components/TopBar";
+import FieldIntelligenceThread from "./components/FieldIntelligenceThread";
 import TAFilterChips from "./components/TAFilterChips";
 import HCPCard from "./components/HCPCard";
 import ActionTray from "./components/ActionTray";
 import DetailScreen from "./components/DetailScreen";
 import NoteEntryScreen from "./components/NoteEntryScreen";
-import SearchScreen from "./components/SearchScreen";
 import BibliographyScreen from "./components/BibliographyScreen";
 import ProfileScreen from "./components/ProfileScreen";
 import LandscapeScreen from "./components/LandscapeScreen";
@@ -34,10 +58,17 @@ import {
   getRisingStars,
   getTACounts,
   getTAIdForLabel,
-  getTADisplayName,
 } from "./lib/api";
 import { useFilterContext } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
+import {
+  buildFeedPath,
+  buildHcpDetailPath,
+  resolveFeedRoute,
+  taLabelToApiSlug,
+  taLabelToSlug,
+  taSlugToLabel,
+} from "./lib/routeSlugs";
 import type { HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
@@ -101,18 +132,6 @@ const EMPTY_HCP: AppHCP = {
   npiNumber: null,
   npiSpecialty: null,
 };
-
-function getTASlug(ta: string): string {
-  switch (ta) {
-    case "Hepatology":
-      return "hepatology";
-    case "Oncology":
-      return "nsclc";
-    case "Rare Disease":
-    default:
-      return "rare-disease";
-  }
-}
 
 function formatPublicationVelocity(value: number): string {
   if (!Number.isFinite(value)) return "--";
@@ -265,22 +284,58 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
   };
 }
 
-type Screen = "auth" | "ta-select" | "feed" | "detail" | "note" | "search" | "bibliography" | "profile" | "landscape" | "city-feed";
-
-const HOME_TA = "Oncology";
-const HOME_INDICATION = "NSCLC";
 const HOME_INDICATION_COUNT = 287;
 
-function AppContent() {
+type FeedOverlay = "profile" | "landscape" | "city-feed" | null;
+
+function AuthGate({ children }: { children: ReactNode }) {
+  const [authenticated, setAuthenticated] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const redirectRef = useRef<string | null>(null);
+
+  if (!authenticated) {
+    if (redirectRef.current === null && location.pathname !== "/") {
+      redirectRef.current = location.pathname + location.search;
+    }
+    return (
+      <LinkedInAuthScreen
+        onAuth={() => {
+          setAuthenticated(true);
+          const target = redirectRef.current || "/";
+          redirectRef.current = null;
+          navigate(target, { replace: true });
+        }}
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+function FeedLayout({
+  forcedDashboard,
+  forcedIndication,
+}: { forcedDashboard?: string; forcedIndication?: string } = {}) {
   const { track, setTrack } = useTrack();
   const { region } = useFilterContext();
-  const [currentScreen, setCurrentScreen] = useState<Screen>("auth");
-  const [selectedTA, setSelectedTA] = useState("Oncology");
-  const [selectedIndication, setSelectedIndication] = useState(HOME_INDICATION);
-  const [indicationCount, setIndicationCount] = useState<number | null>(HOME_INDICATION_COUNT);
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
+  const route = resolveFeedRoute({
+    ta: params.ta,
+    dashboard: forcedDashboard ?? params.dashboard,
+    indication: forcedIndication ?? params.indication,
+    isHomePath: location.pathname === "/",
+  });
+  const selectedTA = route.taLabel;
+  const selectedIndication = route.indicationLabel;
+  const [indicationCount, setIndicationCount] = useState<number | null>(
+    route.indicationCount ?? HOME_INDICATION_COUNT,
+  );
+  const [feedOverlay, setFeedOverlay] = useState<FeedOverlay>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [activeHCP, setActiveHCP] = useState<AppHCP | null>(null);
-  const [detailHCP, setDetailHCP] = useState<AppHCP>(EMPTY_HCP);
   const [bibYear, setBibYear] = useState<number>(2024);
   const [cityFeedCity, setCityFeedCity] = useState<string>("Chicago, IL");
   const [cityFeedTA, setCityFeedTA] = useState<string>("Rare Disease");
@@ -308,37 +363,14 @@ function AppContent() {
   const [backToTopHovered, setBackToTopHovered] = useState(false);
 
   useEffect(() => {
-    setScoringExplainedOpen(false);
-    setScoringExplainedScroll(null);
-  }, [currentScreen]);
+    setTrack(route.track);
+  }, [route.track, setTrack]);
 
   useEffect(() => {
-    if (currentScreen !== "detail") return;
-    const hcpId = detailHCP.id || detailHCP.hcp_id;
-    if (!hcpId) return;
-    const taSlug = getTASlug(selectedTA);
-
-    let cancelled = false;
-    void (async () => {
-      const { data, error } = await getHCPDetail(hcpId, {
-        therapeuticArea: taSlug,
-        region,
-      });
-      if (cancelled || error || !data) return;
-      setDetailHCP(mapRisingStarToHCP(detailResponseToRisingStar(data)));
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentScreen, detailHCP.id, detailHCP.hcp_id, selectedTA, region]);
+    setIndicationCount(route.indicationCount);
+  }, [route.indicationCount, route.indicationLabel, route.taLabel]);
 
   useEffect(() => {
-    if (currentScreen !== "feed") {
-      setShowBackToTop(false);
-      return;
-    }
-
     function onScroll() {
       setShowBackToTop(window.scrollY > 400);
     }
@@ -346,7 +378,7 @@ function AppContent() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [currentScreen]);
+  }, [location.pathname]);
 
   function formatUpdatedLabel() {
     if (!lastUpdatedAt) return "Updated just now";
@@ -362,14 +394,6 @@ function AppContent() {
     window.setTimeout(() => setFiToast(null), 3000);
   }
 
-  function resetToHomeView() {
-    setSelectedTA(HOME_TA);
-    setTrack("established");
-    setSelectedIndication(HOME_INDICATION);
-    setIndicationCount(HOME_INDICATION_COUNT);
-    setCurrentScreen("feed");
-  }
-
   function formatSectionHeaderLabel(): string {
     if (track === "field-intelligence") {
       return "Field Intelligence";
@@ -382,8 +406,13 @@ function AppContent() {
     return `${taLabel} \u2014 ${selectedIndication}`;
   }
 
+  useEffect(() => {
+    setScoringExplainedOpen(false);
+    setScoringExplainedScroll(null);
+  }, [location.pathname]);
+
   async function fetchHCPs(loadingAsRefresh = false) {
-    if (!isCohortFeedTrack(track)) {
+    if (!isCohortFeedTrack(track) || !route.indicationDataActive) {
       setHcpList([]);
       setFeedTotal(0);
       return;
@@ -392,7 +421,7 @@ function AppContent() {
       if (loadingAsRefresh) setRefreshingFeed(true);
       else setLoadingHCPs(true);
       setFeedOffset(0);
-      const taSlug = getTASlug(selectedTA);
+      const taSlug = taLabelToApiSlug(selectedTA);
       const filters = { therapeuticArea: taSlug, region };
       let data;
       if (track === "established") {
@@ -416,7 +445,7 @@ function AppContent() {
     let cancelled = false;
 
     async function fetchData() {
-      if (!isCohortFeedTrack(track)) {
+      if (!isCohortFeedTrack(track) || !route.indicationDataActive) {
         setHcpList([]);
         setFeedOffset(0);
         setFeedTotal(0);
@@ -427,7 +456,7 @@ function AppContent() {
       setLoadingHCPs(true);
       setFeedOffset(0);
       setFeedTotal(0);
-      const taSlug = getTASlug(selectedTA);
+      const taSlug = taLabelToApiSlug(selectedTA);
       const filters = { therapeuticArea: taSlug, region };
       let data;
       if (track === "established") {
@@ -451,12 +480,12 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, track, region]);
+  }, [selectedTA, track, region, route.indicationDataActive]);
 
   async function loadMore() {
     if (!isCohortFeedTrack(track)) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
-    const taSlug = getTASlug(selectedTA);
+    const taSlug = taLabelToApiSlug(selectedTA);
     const filters = { therapeuticArea: taSlug, region };
     setLoadingMore(true);
     try {
@@ -481,7 +510,7 @@ function AppContent() {
     let cancelled = false;
 
     async function fetchCounts() {
-      const taSlug = getTASlug(selectedTA);
+      const taSlug = taLabelToApiSlug(selectedTA);
       const { data } = await getTACounts({
         therapeuticArea: taSlug,
         region,
@@ -497,25 +526,9 @@ function AppContent() {
     };
   }, [selectedTA, region]);
 
-  // Auth flow
-  function handleAuth() {
-    setCurrentScreen("ta-select");
-  }
-
-  function handleTASkip() {
-    setCurrentScreen("feed");
-  }
-
-  function handleTAContinue(ta: string) {
-    setSelectedTA(ta);
-    setSelectedIndication("All");
-    setCurrentScreen("feed");
-  }
-
-  // Feed interactions
   function handleCardPress(hcp: AppHCP) {
-    setDetailHCP(hcp);
-    setCurrentScreen("detail");
+    const hcpId = hcp.hcp_id ?? hcp.id;
+    if (hcpId) navigate(buildHcpDetailPath(hcpId));
   }
 
   function handleAddPress(hcp: AppHCP) {
@@ -528,121 +541,67 @@ function AppContent() {
   }
 
   function handleAddNoteFromTray() {
-    setCurrentScreen("note");
     setTrayOpen(false);
+    const hcpId = activeHCP?.hcp_id ?? activeHCP?.id;
+    if (hcpId) navigate(buildHcpDetailPath(hcpId));
   }
 
-  // Detail → Note
-  function handleAddNoteFromDetail() {
-    setCurrentScreen("note");
+  async function handleSearchSelect(hcpId: string, _taId: string) {
+    navigate(buildHcpDetailPath(hcpId));
   }
 
-  function handleBackFromDetail() {
-    setCurrentScreen("feed");
-  }
-
-  function handleBackFromNote() {
-    setCurrentScreen("detail");
-  }
-
-  async function handleSearchSelect(hcpId: string, taId: string) {
-    const taLabel = getTADisplayName(taId);
-    if (taLabel && taLabel !== "Other TA") {
-      setSelectedTA(taLabel);
-      setSelectedIndication("All");
-    }
-    const effectiveTaLabel = taLabel !== "Other TA" ? taLabel : selectedTA;
-    const { data, error } = await getHCPDetail(hcpId, {
-      therapeuticArea: getTASlug(effectiveTaLabel),
-      region,
-    });
-    if (error || !data) return;
-    setDetailHCP(mapRisingStarToHCP(detailResponseToRisingStar(data)));
-    setCurrentScreen("detail");
-  }
-
-  let screenContent;
-  if (currentScreen === "auth") {
-    screenContent = <LinkedInAuthScreen onAuth={handleAuth} />;
-  } else if (currentScreen === "ta-select") {
-    screenContent = <TASelectionScreen onContinue={handleTAContinue} onSkip={handleTASkip} />;
-  } else if (currentScreen === "search") {
-    screenContent = (
-      <SearchScreen
-        onBack={() => setCurrentScreen("feed")}
-        onCardPress={(hcp) => {
-          setDetailHCP(hcp as unknown as AppHCP);
-          setCurrentScreen("detail");
-        }}
-      />
-    );
-  } else if (currentScreen === "bibliography") {
-    screenContent = (
-      <BibliographyScreen
-        hcp={detailHCP as unknown as UIHCP}
-        year={bibYear}
-        onBack={() => setCurrentScreen("detail")}
-      />
-    );
-  } else if (currentScreen === "detail") {
-    screenContent = (
-      <DetailScreen
-        hcp={detailHCP as unknown as UIHCP}
-        onBack={handleBackFromDetail}
-        onAddNote={handleAddNoteFromDetail}
-        onYearPress={(year) => {
-          setBibYear(year);
-          setCurrentScreen("bibliography");
-        }}
-      />
-    );
-  } else if (currentScreen === "note") {
-    screenContent = (
-      <NoteEntryScreen
-        hcp={detailHCP as unknown as UIHCP}
-        onBack={handleBackFromNote}
-      />
-    );
-  } else if (currentScreen === "profile") {
-    screenContent = (
+  if (feedOverlay === "profile") {
+    return (
       <ProfileScreen
         initialTA={selectedTA}
-        onBack={() => setCurrentScreen("feed")}
+        onBack={() => setFeedOverlay(null)}
         onSave={(ta) => {
-          setSelectedTA(ta);
-          setSelectedIndication("All");
-          setCurrentScreen("feed");
+          const taSlug = taLabelToSlug(ta);
+          navigate(buildFeedPath(taSlug, "established", "all"));
+          setFeedOverlay(null);
         }}
       />
     );
-  } else if (currentScreen === "landscape") {
-    screenContent = (
+  }
+
+  if (feedOverlay === "landscape") {
+    return (
       <LandscapeScreen
         ta={selectedTA}
         indication={selectedIndication}
-        onBack={() => setCurrentScreen("feed")}
+        onBack={() => setFeedOverlay(null)}
         onCityPress={(city, ta) => {
           setCityFeedCity(city);
           setCityFeedTA(ta);
-          setCurrentScreen("city-feed");
+          setFeedOverlay("city-feed");
         }}
       />
     );
-  } else if (currentScreen === "city-feed") {
-    screenContent = (
+  }
+
+  if (feedOverlay === "city-feed") {
+    return (
       <CityFeedScreen
         city={cityFeedCity}
         ta={cityFeedTA}
-        onBack={() => setCurrentScreen("landscape")}
-        onDetailHCPChange={(hcp) => setDetailHCP(hcp as unknown as AppHCP)}
-        onNavigateTo={(screen) => setCurrentScreen(screen)}
+        onBack={() => setFeedOverlay("landscape")}
+        onDetailHCPChange={(hcp) => {
+          const row = hcp as unknown as AppHCP;
+          const id = row.hcp_id ?? row.id;
+          if (id) navigate(buildHcpDetailPath(String(id)));
+        }}
+        onNavigateTo={() => {}}
         bibYear={bibYear}
         onBibYearChange={setBibYear}
       />
     );
-  } else {
-    // Feed screen (default)
-    screenContent = (
+  }
+
+  const showInactiveIndicationEmpty =
+    isCohortFeedTrack(track) && !route.indicationDataActive;
+
+  return (
+    <>
       <div
         className="fm-screen"
         style={{
@@ -655,8 +614,7 @@ function AppContent() {
         }}
       >
       <TopBar
-        onLogoPress={resetToHomeView}
-        onProfilePress={() => setCurrentScreen("profile")}
+        onProfilePress={() => setFeedOverlay("profile")}
         onRefreshPress={() => void fetchHCPs(true)}
         onScoringExplainedPress={() => {
           setScoringExplainedScroll(null);
@@ -667,21 +625,14 @@ function AppContent() {
         onSearchSelect={(hcpId, taId) => void handleSearchSelect(hcpId, taId)}
       />
 
-      <TAFilterChips
-        selected={selectedTA}
-        onSelect={(ta) => {
-          setSelectedTA(ta);
-          setSelectedIndication("All");
-        }}
-      />
+      <TAFilterChips selected={selectedTA} />
 
       <DashboardTabs />
 
       <IndicationFilter
         therapeuticArea={selectedTA}
         selected={selectedIndication}
-        onSelect={(indication, count) => {
-          setSelectedIndication(indication);
+        onSelect={(_indication, count) => {
           setIndicationCount(count);
         }}
       />
@@ -690,7 +641,7 @@ function AppContent() {
         {formatUpdatedLabel()}
       </div>
 
-      {isCohortFeedTrack(track) && <DOLHeroPanel taSlug={getTASlug(selectedTA)} />}
+      {isCohortFeedTrack(track) && <DOLHeroPanel taSlug={taLabelToApiSlug(selectedTA)} />}
 
       {/* Section header */}
       <div
@@ -740,7 +691,7 @@ function AppContent() {
               })()}
             </span>
             <button
-              onClick={() => setCurrentScreen("landscape")}
+              onClick={() => setFeedOverlay("landscape")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -857,7 +808,29 @@ function AppContent() {
         )
       ) : isCohortFeedTrack(track) ? (
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
-          {loadingHCPs ? (
+          {showInactiveIndicationEmpty ? (
+            <div
+              style={{
+                gridColumn: "1 / -1",
+                padding: "32px 16px",
+                textAlign: "center",
+                color: "rgba(232, 230, 223, 0.55)",
+                fontSize: 13,
+                lineHeight: 1.5,
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: 4,
+                margin: "0 16px",
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#E8E6DF", marginBottom: 8 }}>
+                {selectedIndication} — coming soon
+              </div>
+              <div>
+                This indication is not yet active in FieldMark. Select an active indication to
+                browse the cohort.
+              </div>
+            </div>
+          ) : loadingHCPs ? (
             <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
           ) : (
             <>
@@ -922,15 +895,8 @@ function AppContent() {
           onAddNote={handleAddNoteFromTray}
         />
       </div>
-    );
-  }
 
-  const backToTopVisible = currentScreen === "feed" && showBackToTop && !trayOpen;
-
-  return (
-    <>
-      {screenContent}
-      {currentScreen === "feed" && (
+      {showBackToTop && !trayOpen && (
         <button
           type="button"
           aria-label="Back to top"
@@ -955,9 +921,9 @@ function AppContent() {
             padding: 0,
             cursor: "pointer",
             zIndex: 100,
-            opacity: backToTopVisible ? 1 : 0,
-            pointerEvents: backToTopVisible ? "auto" : "none",
-            transition: "opacity 200ms ease, border-color 200ms ease",
+            opacity: 1,
+            pointerEvents: "auto",
+            transition: "border-color 200ms ease",
           }}
         >
           <ArrowUp size={18} color="#E8E6DF" aria-hidden />
@@ -985,10 +951,213 @@ function AppContent() {
   );
 }
 
+type HcpDetailSubScreen = "detail" | "note" | "bibliography";
+
+function HCPDetailRoute() {
+  const { hcpId } = useParams();
+  const navigate = useNavigate();
+  const { region } = useFilterContext();
+  const [subScreen, setSubScreen] = useState<HcpDetailSubScreen>("detail");
+  const [hcp, setHcp] = useState<AppHCP>(EMPTY_HCP);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [bibYear, setBibYear] = useState(2024);
+  const [trayOpen, setTrayOpen] = useState(false);
+
+  useEffect(() => {
+    if (!hcpId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+
+    void (async () => {
+      const { data, error } = await getHCPDetail(hcpId, {
+        therapeuticArea: "nsclc",
+        region,
+      });
+      if (cancelled) return;
+      if (error || !data) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setHcp(mapRisingStarToHCP(detailResponseToRisingStar(data)));
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hcpId, region]);
+
+  function handleBack() {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  }
+
+  if (loading) {
+    return (
+      <div
+        className="fm-screen"
+        style={{
+          backgroundColor: "#0A0A0B",
+          minHeight: "100dvh",
+          maxWidth: 480,
+          margin: "0 auto",
+          color: "#6B6A65",
+          padding: 24,
+        }}
+      >
+        Loading profile...
+      </div>
+    );
+  }
+
+  if (notFound || !hcpId) {
+    return (
+      <div
+        className="fm-screen"
+        style={{
+          backgroundColor: "#0A0A0B",
+          minHeight: "100dvh",
+          maxWidth: 480,
+          margin: "0 auto",
+          padding: 24,
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <p style={{ color: "#E8E6DF", fontSize: 16, marginBottom: 12 }}>HCP not found</p>
+        <p style={{ color: "#6B6A65", fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>
+          We could not load a profile for this link. The HCP may have been removed or the URL may
+          be incorrect.
+        </p>
+        <Link to="/" style={{ color: "#E8A020", fontSize: 14 }}>
+          Return to home
+        </Link>
+      </div>
+    );
+  }
+
+  if (subScreen === "note") {
+    return (
+      <NoteEntryScreen
+        hcp={hcp as unknown as UIHCP}
+        onBack={() => setSubScreen("detail")}
+      />
+    );
+  }
+
+  if (subScreen === "bibliography") {
+    return (
+      <BibliographyScreen
+        hcp={hcp as unknown as UIHCP}
+        year={bibYear}
+        onBack={() => setSubScreen("detail")}
+      />
+    );
+  }
+
+  return (
+    <>
+      <DetailScreen
+        hcp={hcp as unknown as UIHCP}
+        onBack={handleBack}
+        onAddNote={() => setSubScreen("note")}
+        onYearPress={(year) => {
+          setBibYear(year);
+          setSubScreen("bibliography");
+        }}
+      />
+      <ActionTray
+        open={trayOpen}
+        onClose={() => setTrayOpen(false)}
+        hcpName={hcp.name}
+        onAddNote={() => {
+          setTrayOpen(false);
+          setSubScreen("note");
+        }}
+      />
+    </>
+  );
+}
+
+function FIThreadRoute() {
+  const { ta, threadId } = useParams();
+  const navigate = useNavigate();
+  const taLabel = taSlugToLabel(ta);
+  const [fiToast, setFiToast] = useState<string | null>(null);
+
+  function showFiToast(message: string) {
+    setFiToast(message);
+    window.setTimeout(() => setFiToast(null), 3000);
+  }
+
+  if (!threadId) {
+    return <Navigate to={`/${ta ?? "oncology"}/field-intelligence`} replace />;
+  }
+
+  return (
+    <div
+      className="fm-screen"
+      style={{
+        backgroundColor: "#0A0A0B",
+        minHeight: "100dvh",
+        maxWidth: 480,
+        margin: "0 auto",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}
+    >
+      <TopBar currentTaId={getTAIdForLabel(taLabel)} />
+      <FieldIntelligenceThread
+        postId={threadId}
+        onBack={() => navigate(`/${ta ?? "oncology"}/field-intelligence`)}
+        onToast={showFiToast}
+      />
+      <FiToast message={fiToast} />
+    </div>
+  );
+}
+
+function FieldIntelligenceFeedRoute() {
+  const params = useParams();
+  return (
+    <FeedLayout
+      forcedDashboard="field-intelligence"
+      forcedIndication={params.indication ?? "all"}
+    />
+  );
+}
+
 export default function App() {
   return (
     <TrackProvider>
-      <AppContent />
+      <AuthGate>
+        <Routes>
+          <Route path="/" element={<FeedLayout />} />
+          <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />
+          <Route
+            path="/:ta/field-intelligence/thread/:threadId"
+            element={<FIThreadRoute />}
+          />
+          <Route
+            path="/:ta/field-intelligence/:indication"
+            element={<FieldIntelligenceFeedRoute />}
+          />
+          <Route path="/:ta/field-intelligence" element={<FieldIntelligenceFeedRoute />} />
+          <Route path="/:ta/:dashboard/:indication" element={<FeedLayout />} />
+          <Route path="/:ta/:dashboard" element={<FeedLayout />} />
+          <Route path="/:ta" element={<FeedLayout />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthGate>
     </TrackProvider>
   );
 }

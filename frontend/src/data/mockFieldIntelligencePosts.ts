@@ -16,6 +16,7 @@ export interface FIPost {
   timestamp: string;
   replyCount: number;
   replies: FIReply[];
+  indication?: string;
 }
 
 export const CHANNEL_LABELS: Record<FIChannel, string> = {

@@ -1,10 +1,17 @@
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  buildFeedPath,
+  indicationLabelToSlug,
+  resolveFeedRoute,
+} from "../lib/routeSlugs";
+
 export interface IndicationOption {
   label: string;
   active: boolean;
   count?: number;
 }
 
-const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
+export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
   Oncology: [
     { label: "All", active: true, count: 6549 },
     { label: "NSCLC", active: true, count: 287 },
@@ -51,10 +58,23 @@ const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
   ],
 };
 
+const ONCOLOGY_FI_ACTIVE = new Set(["All", "NSCLC"]);
+
+function indicationsForContext(therapeuticArea: string, isFieldIntelligence: boolean): IndicationOption[] {
+  const base = INDICATIONS_BY_TA[therapeuticArea] ?? [{ label: "All", active: true }];
+  if (!isFieldIntelligence || therapeuticArea !== "Oncology") {
+    return base;
+  }
+  return base.map((option) => ({
+    ...option,
+    active: ONCOLOGY_FI_ACTIVE.has(option.label),
+  }));
+}
+
 interface IndicationFilterProps {
   therapeuticArea: string;
   selected: string;
-  onSelect: (label: string, count: number | null) => void;
+  onSelect?: (label: string, count: number | null) => void;
 }
 
 export default function IndicationFilter({
@@ -62,7 +82,31 @@ export default function IndicationFilter({
   selected,
   onSelect,
 }: IndicationFilterProps) {
-  const indications = INDICATIONS_BY_TA[therapeuticArea] ?? [{ label: "All", active: true }];
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
+  const isFieldIntelligence = location.pathname.includes("/field-intelligence");
+  const route = resolveFeedRoute({
+    ta: params.ta,
+    dashboard: isFieldIntelligence ? "field-intelligence" : params.dashboard,
+    indication: isFieldIntelligence ? (params.indication ?? "all") : params.indication,
+    isHomePath: location.pathname === "/",
+  });
+  const indications = indicationsForContext(therapeuticArea, isFieldIntelligence);
+
+  function handleIndicationSelect(label: string, count: number | null) {
+    onSelect?.(label, count);
+    const indicationSlug = indicationLabelToSlug(therapeuticArea, label);
+    if (isFieldIntelligence) {
+      if (indicationSlug === "all") {
+        navigate(`/${route.taSlug}/field-intelligence`);
+      } else {
+        navigate(`/${route.taSlug}/field-intelligence/${indicationSlug}`);
+      }
+      return;
+    }
+    navigate(buildFeedPath(route.taSlug, route.dashboardSlug, indicationSlug));
+  }
 
   return (
     <div
@@ -92,9 +136,36 @@ export default function IndicationFilter({
       {indications.map((info) => {
         const isSelected = info.label === selected;
         if (!info.active) {
+          if (isFieldIntelligence) {
+            return (
+              <span
+                key={info.label}
+                className="fm-indication-chip"
+                style={{
+                  flexShrink: 0,
+                  padding: "6px 12px",
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontFamily: "system-ui, sans-serif",
+                  whiteSpace: "nowrap",
+                  background: "transparent",
+                  border: "1px solid rgba(255, 255, 255, 0.06)",
+                  color: "rgba(232, 230, 223, 0.3)",
+                  cursor: "not-allowed",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {info.label}
+              </span>
+            );
+          }
+
           return (
-            <span
+            <button
               key={info.label}
+              type="button"
+              onClick={() => handleIndicationSelect(info.label, null)}
               className="fm-indication-chip"
               style={{
                 flexShrink: 0,
@@ -103,16 +174,18 @@ export default function IndicationFilter({
                 fontSize: 12,
                 fontFamily: "system-ui, sans-serif",
                 whiteSpace: "nowrap",
-                background: "transparent",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                color: "rgba(232, 230, 223, 0.3)",
-                cursor: "not-allowed",
+                background: isSelected ? "rgba(255, 255, 255, 0.04)" : "transparent",
+                border: isSelected
+                  ? "1px solid rgba(255, 255, 255, 0.12)"
+                  : "1px solid rgba(255, 255, 255, 0.06)",
+                color: isSelected ? "rgba(232, 230, 223, 0.45)" : "rgba(232, 230, 223, 0.3)",
+                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
               }}
             >
               {info.label}
-            </span>
+            </button>
           );
         }
 
@@ -120,7 +193,7 @@ export default function IndicationFilter({
           <button
             key={info.label}
             type="button"
-            onClick={() => onSelect(info.label, info.count ?? null)}
+            onClick={() => handleIndicationSelect(info.label, info.count ?? null)}
             className="fm-indication-chip"
             style={{
               flexShrink: 0,

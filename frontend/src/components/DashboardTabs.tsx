@@ -1,4 +1,10 @@
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTrack, type Track } from "../lib/TrackContext";
+import {
+  buildFeedPath,
+  resolveFeedRoute,
+  trackToDashboardSlug,
+} from "../lib/routeSlugs";
 
 const DASHBOARDS: { value: Track; label: string }[] = [
   { value: "established", label: "Established" },
@@ -11,6 +17,28 @@ const DASHBOARDS: { value: Track; label: string }[] = [
 
 export default function DashboardTabs() {
   const { track, setTrack } = useTrack();
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
+  const route = resolveFeedRoute({
+    ta: params.ta,
+    dashboard: params.dashboard,
+    indication: params.indication,
+    isHomePath: location.pathname === "/",
+  });
+
+  function handleDashboardClick(nextTrack: Track) {
+    if (nextTrack === track) return;
+    setTrack(nextTrack);
+    const dashboardSlug = trackToDashboardSlug(nextTrack);
+    if (nextTrack === "field-intelligence") {
+      navigate(`/${route.taSlug}/field-intelligence`);
+      return;
+    }
+    navigate(
+      buildFeedPath(route.taSlug, dashboardSlug, route.indicationSlug),
+    );
+  }
 
   return (
     <div
@@ -59,7 +87,7 @@ export default function DashboardTabs() {
             key={t.value}
             role="tab"
             aria-selected={active}
-            onClick={() => setTrack(t.value)}
+            onClick={() => handleDashboardClick(t.value)}
             style={{
               flex: "1 0 auto",
               minWidth: 0,

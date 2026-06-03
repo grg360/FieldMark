@@ -1,16 +1,44 @@
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  buildFeedPath,
+  resolveFeedRoute,
+  resolveIndicationForTaSwitch,
+  taLabelToSlug,
+  trackToDashboardSlug,
+} from "../lib/routeSlugs";
+
 const TA_CHIPS = ["Oncology", "Hepatology", "Immunology", "Rare Disease"];
 
 interface TAFilterChipsProps {
   selected: string;
-  onSelect: (ta: string) => void;
+  onSelect?: (ta: string) => void;
 }
 
 export default function TAFilterChips({ selected, onSelect }: TAFilterChipsProps) {
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
+  const route = resolveFeedRoute({
+    ta: params.ta,
+    dashboard: params.dashboard,
+    indication: params.indication,
+    isHomePath: location.pathname === "/",
+  });
+
   function handleTAClick(chip: string) {
     if (chip === "Immunology") return;
-    if (chip !== selected) {
-      onSelect(chip);
-    }
+    if (chip === selected) return;
+    onSelect?.(chip);
+    const newTaSlug = taLabelToSlug(chip);
+    const { slug: indicationSlug } = resolveIndicationForTaSwitch(
+      chip,
+      route.indicationLabel,
+    );
+    const dashboardSlug =
+      route.dashboardSlug === "field-intelligence"
+        ? trackToDashboardSlug("established")
+        : route.dashboardSlug;
+    navigate(buildFeedPath(newTaSlug, dashboardSlug, indicationSlug));
   }
 
   return (

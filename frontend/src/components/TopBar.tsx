@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SearchBar from "./SearchBar";
 
 interface TopBarProps {
@@ -22,6 +23,7 @@ export default function TopBar({
   currentTaId,
   onSearchSelect,
 }: TopBarProps) {
+  const navigate = useNavigate();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
@@ -52,7 +54,10 @@ export default function TopBar({
     >
       <button
         type="button"
-        onClick={onLogoPress}
+        onClick={() => {
+          onLogoPress?.();
+          navigate("/");
+        }}
         onMouseEnter={() => setLogoHover(true)}
         onMouseLeave={() => setLogoHover(false)}
         className="fm-logo"

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { getRecentPosts, therapeuticAreaToChannel } from "../data/mockFieldIntelligencePosts";
+import { useMemo } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { getRecentPosts, therapeuticAreaToChannel } from "../data/mockFieldIntelligencePosts";import { buildFieldIntelligenceThreadPath, taLabelToSlug } from "../lib/routeSlugs";
 import { FiAvatar, FiMslVerified } from "./FieldIntelligenceShared";
 import FieldIntelligenceThread from "./FieldIntelligenceThread";
 
@@ -16,20 +17,31 @@ export default function FieldIntelligence({
   onToast,
   onSurfaceHcp,
 }: FieldIntelligenceProps) {
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
   const channel = therapeuticAreaToChannel(therapeuticArea);
 
-  if (threadId) {
-    return (
-      <FieldIntelligenceThread
-        postId={threadId}
-        onBack={() => setThreadId(null)}
-        onToast={onToast}
-      />
-    );
+  const recentPosts = useMemo(() => {
+    const taPosts = channel ? getRecentPosts(20, channel) : [];
+    if (!selectedIndication || selectedIndication === "All") {
+      return taPosts;
+    }
+    return taPosts.filter((post) => {
+      if (!post.indication) {
+        return true;
+      }
+      return post.indication === selectedIndication || post.channel === selectedIndication;
+    });
+  }, [channel, selectedIndication]);
+  function openThread(postId: string) {
+    const taSlug =
+      params.ta ??
+      (location.pathname === "/"
+        ? "oncology"
+        : taLabelToSlug(therapeuticArea));
+    navigate(buildFieldIntelligenceThreadPath(taSlug, postId));
   }
-
-  const recentPosts = channel ? getRecentPosts(20, channel) : [];
   const scopeLabel = selectedIndication === "All" ? therapeuticArea : selectedIndication;
 
   return (
@@ -109,7 +121,7 @@ export default function FieldIntelligence({
               <button
                 key={post.id}
                 type="button"
-                onClick={() => setThreadId(post.id)}
+                onClick={() => openThread(post.id)}
                 style={{
                   textAlign: "left",
                   padding: 14,

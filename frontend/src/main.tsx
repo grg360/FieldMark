@@ -1,5 +1,6 @@
 import { StrictMode, Component, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { FilterProvider } from './lib/filter-context';
 import './index.css';
@@ -24,9 +25,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <FilterProvider>
-        <App />
-      </FilterProvider>
+      <BrowserRouter>
+        <FilterProvider>
+          <App />
+        </FilterProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>
 );
