@@ -24,6 +24,7 @@ export default function TopBar({
 }: TopBarProps) {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [logoHover, setLogoHover] = useState(false);
 
   function handleSearchToggle() {
     setIsSearchOpen((open) => !open);
@@ -52,6 +53,8 @@ export default function TopBar({
       <button
         type="button"
         onClick={onLogoPress}
+        onMouseEnter={() => setLogoHover(true)}
+        onMouseLeave={() => setLogoHover(false)}
         className="fm-logo"
         style={{
           background: "transparent",
@@ -60,13 +63,15 @@ export default function TopBar({
           cursor: onLogoPress ? "pointer" : "default",
           fontSize: 20,
           fontWeight: 700,
-          color: "#E8A020",
+          color: logoHover && onLogoPress ? "#F5D060" : "#E8A020",
+          opacity: logoHover && onLogoPress ? 0.92 : 1,
           fontFamily: "system-ui, sans-serif",
           minHeight: 0,
           lineHeight: 1,
           letterSpacing: "0.06em",
+          transition: "color 0.15s ease, opacity 0.15s ease",
         }}
-        aria-label="Return to home feed"
+        aria-label="Return to home"
       >
         FIELDMARK
       </button>

@@ -18,7 +18,11 @@ import LandscapeScreen from "./components/LandscapeScreen";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
-import TrackSwitch from "./components/TrackSwitch";
+import DashboardTabs from "./components/DashboardTabs";
+import IndicationFilter from "./components/IndicationFilter";
+import FieldIntelligence from "./components/FieldIntelligence";
+import SurfaceHCPForm from "./components/SurfaceHCPForm";
+import { FiToast } from "./components/FieldIntelligenceShared";
 import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
 } from "./components/ScoringExplainedModal";
@@ -60,6 +64,14 @@ type AppHCP = Omit<UIHCP, "id"> & {
 };
 
 const FEED_PAGE_SIZE = 20;
+
+function isCohortFeedTrack(track: string): boolean {
+  return track === "established" || track === "community" || track === "rising-stars";
+}
+
+function isTelescopeAvailable(ta: string, indication: string): boolean {
+  return ta === "Oncology" && (indication === "All" || indication === "NSCLC");
+}
 
 const EMPTY_HCP: AppHCP = {
   id: "",
@@ -255,13 +267,17 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
 
 type Screen = "auth" | "ta-select" | "feed" | "detail" | "note" | "search" | "bibliography" | "profile" | "landscape" | "city-feed";
 
+const HOME_TA = "Oncology";
+const HOME_INDICATION = "NSCLC";
+const HOME_INDICATION_COUNT = 287;
+
 function AppContent() {
-  const { track } = useTrack();
+  const { track, setTrack } = useTrack();
   const { region } = useFilterContext();
   const [currentScreen, setCurrentScreen] = useState<Screen>("auth");
-  const [selectedTA, setSelectedTA] = useState("Rare Disease");
-  const [selectedIndication, setSelectedIndication] = useState("All");
-  const [indicationCount, setIndicationCount] = useState<number | null>(null);
+  const [selectedTA, setSelectedTA] = useState("Oncology");
+  const [selectedIndication, setSelectedIndication] = useState(HOME_INDICATION);
+  const [indicationCount, setIndicationCount] = useState<number | null>(HOME_INDICATION_COUNT);
   const [trayOpen, setTrayOpen] = useState(false);
   const [activeHCP, setActiveHCP] = useState<AppHCP | null>(null);
   const [detailHCP, setDetailHCP] = useState<AppHCP>(EMPTY_HCP);
@@ -278,6 +294,8 @@ function AppContent() {
   const [taCounts, setTaCounts] = useState<TACounts | null>(null);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
+  const [surfaceHcpOpen, setSurfaceHcpOpen] = useState(false);
+  const [fiToast, setFiToast] = useState<string | null>(null);
   const [telescopeSelectedHcp, setTelescopeSelectedHcp] = useState<{
     id: string;
     name: string;
@@ -339,9 +357,25 @@ function AppContent() {
     return `Updated ${mins} mins ago`;
   }
 
+  function showFiToast(message: string) {
+    setFiToast(message);
+    window.setTimeout(() => setFiToast(null), 3000);
+  }
+
+  function resetToHomeView() {
+    setSelectedTA(HOME_TA);
+    setTrack("established");
+    setSelectedIndication(HOME_INDICATION);
+    setIndicationCount(HOME_INDICATION_COUNT);
+    setCurrentScreen("feed");
+  }
+
   function formatSectionHeaderLabel(): string {
+    if (track === "field-intelligence") {
+      return "Field Intelligence";
+    }
     const taLabel =
-      track === "telescope" && selectedTA === "Oncology"
+      track === "telescope" && isTelescopeAvailable(selectedTA, selectedIndication)
         ? "Oncology (NSCLC) - Telescope"
         : selectedTA;
     if (selectedIndication === "All") return taLabel;
@@ -349,7 +383,7 @@ function AppContent() {
   }
 
   async function fetchHCPs(loadingAsRefresh = false) {
-    if (track === "social" || track === "telescope") {
+    if (!isCohortFeedTrack(track)) {
       setHcpList([]);
       setFeedTotal(0);
       return;
@@ -382,7 +416,7 @@ function AppContent() {
     let cancelled = false;
 
     async function fetchData() {
-      if (track === "social" || track === "telescope") {
+      if (!isCohortFeedTrack(track)) {
         setHcpList([]);
         setFeedOffset(0);
         setFeedTotal(0);
@@ -420,7 +454,7 @@ function AppContent() {
   }, [selectedTA, track, region]);
 
   async function loadMore() {
-    if (track === "social" || track === "telescope") return;
+    if (!isCohortFeedTrack(track)) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = getTASlug(selectedTA);
     const filters = { therapeuticArea: taSlug, region };
@@ -621,10 +655,7 @@ function AppContent() {
         }}
       >
       <TopBar
-        onLogoPress={() => {
-          setSelectedIndication("All");
-          setCurrentScreen("feed");
-        }}
+        onLogoPress={resetToHomeView}
         onProfilePress={() => setCurrentScreen("profile")}
         onRefreshPress={() => void fetchHCPs(true)}
         onScoringExplainedPress={() => {
@@ -636,25 +667,30 @@ function AppContent() {
         onSearchSelect={(hcpId, taId) => void handleSearchSelect(hcpId, taId)}
       />
 
-      <TrackSwitch />
-
       <TAFilterChips
         selected={selectedTA}
         onSelect={(ta) => {
           setSelectedTA(ta);
           setSelectedIndication("All");
         }}
-        onIndicationChange={(indication, count) => {
+      />
+
+      <DashboardTabs />
+
+      <IndicationFilter
+        therapeuticArea={selectedTA}
+        selected={selectedIndication}
+        onSelect={(indication, count) => {
           setSelectedIndication(indication);
           setIndicationCount(count);
         }}
-      />      <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
+      />
+
+      <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
         {formatUpdatedLabel()}
       </div>
 
-      {track !== "social" && track !== "telescope" && (
-        <DOLHeroPanel taSlug={getTASlug(selectedTA)} />
-      )}
+      {isCohortFeedTrack(track) && <DOLHeroPanel taSlug={getTASlug(selectedTA)} />}
 
       {/* Section header */}
       <div
@@ -676,7 +712,7 @@ function AppContent() {
         >
           {formatSectionHeaderLabel()}
         </span>
-        {track !== "social" && track !== "telescope" && (
+        {isCohortFeedTrack(track) && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span
               className="fm-section-header-right"
@@ -730,30 +766,35 @@ function AppContent() {
         )}
       </div>
 
-      {track === "social" ? (
+      {track === "field-intelligence" ? (
+        <FieldIntelligence
+          therapeuticArea={selectedTA}
+          selectedIndication={selectedIndication}
+          onToast={showFiToast}
+          onSurfaceHcp={() => setSurfaceHcpOpen(true)}
+        />
+      ) : track === "social" ? (
         <SocialTrackEmpty selectedTA={selectedTA} />
       ) : track === "telescope" ? (
-        selectedTA === "Oncology" ? (
+        isTelescopeAvailable(selectedTA, selectedIndication) ? (
           <>
             <TelescopeLegend />
-            {track === "telescope" && selectedTA === "Oncology" && (
-              <div
-                style={{
-                  marginTop: "16px",
-                  marginBottom: "16px",
-                  padding: "18px 22px",
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "4px",
-                  color: "rgba(232, 230, 223, 0.75)",
-                  fontSize: "13px",
-                  lineHeight: "1.6",
-                  fontWeight: 400,
-                }}
-              >
-                Telescope maps the network of HCPs driving clinical and scientific progress in non-small cell lung cancer. Each star represents a US-based researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in NSCLC — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it.
-              </div>
-            )}
+            <div
+              style={{
+                marginTop: "16px",
+                marginBottom: "16px",
+                padding: "18px 22px",
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "4px",
+                color: "rgba(232, 230, 223, 0.75)",
+                fontSize: "13px",
+                lineHeight: "1.6",
+                fontWeight: 400,
+              }}
+            >
+              Telescope maps the network of HCPs driving clinical and scientific progress in non-small cell lung cancer. Each star represents a US-based researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in NSCLC — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it.
+            </div>
             <div
               style={{
                 width: "100%",
@@ -808,12 +849,13 @@ function AppContent() {
               Telescope is currently available for Oncology (NSCLC)
             </div>
             <div style={{ fontSize: "13px", maxWidth: "480px", lineHeight: 1.5 }}>
-              Hepatology, Immunology, and Rare Disease coverage are in development. Select
-              Oncology to explore the NSCLC collaboration network.
+              {selectedTA !== "Oncology"
+                ? "Hepatology, Immunology, and Rare Disease coverage are in development. Select Oncology and the NSCLC indication to explore the collaboration network."
+                : "Select the All or NSCLC indication under Oncology to explore the NSCLC collaboration network. Other oncology indications are in development."}
             </div>
           </div>
         )
-      ) : (
+      ) : isCohortFeedTrack(track) ? (
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
           {loadingHCPs ? (
             <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
@@ -870,7 +912,7 @@ function AppContent() {
             </>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Action Tray */}
         <ActionTray
@@ -929,6 +971,16 @@ function AppContent() {
         }}
         scrollToSection={scoringExplainedScroll ?? undefined}
       />
+      {surfaceHcpOpen && (
+        <SurfaceHCPForm
+          onClose={() => setSurfaceHcpOpen(false)}
+          onSubmit={() => {
+            setSurfaceHcpOpen(false);
+            showFiToast("Thanks — we'll review and add this HCP to the platform when confirmed");
+          }}
+        />
+      )}
+      <FiToast message={fiToast} />
     </>
   );
 }

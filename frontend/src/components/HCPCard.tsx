@@ -455,9 +455,17 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           cursor: "pointer",
         }}
       >
-        {/* Identity block — name+flag and institution wrapped with padding-right to reserve space for absolute-positioned score corner */}
-        <div style={{ paddingRight: 90 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Identity block — left column; max width keeps institution clear of score + rank badge */}
+        <div
+          className="fm-hcp-identity"
+          style={{
+            maxWidth: "min(65%, calc(100% - 136px))",
+            width: "min(65%, calc(100% - 136px))",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             <span style={{ fontSize: 17, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
               {hcp.name}
             </span>
@@ -476,13 +484,18 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
             )}
           </div>
 
-          <div style={{
-            fontSize: 13,
-            color: "#B8B4AC",
-            fontFamily: "system-ui, sans-serif",
-            marginTop: 4,
-            lineHeight: 1.4,
-          }}>
+          <div
+            className="fm-hcp-institution"
+            style={{
+              fontSize: 12,
+              color: "#B8B4AC",
+              fontFamily: "system-ui, sans-serif",
+              marginTop: 4,
+              lineHeight: 1.4,
+              overflowWrap: "break-word",
+              wordBreak: "break-word",
+            }}
+          >
             {subline}
           </div>
         </div>

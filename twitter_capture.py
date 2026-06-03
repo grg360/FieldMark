@@ -8,6 +8,10 @@ stores platform-tagged posts/users, and supports checkpointed resume.
 
 Also supports --capture-replies mode for pulling reply chains on existing
 ASCO root posts via conversation_id queries.
+
+HTTP/2 workaround: Supabase client is recycled every 15,000 requests to avoid
+HTTP/2 stream ID exhaustion (cap of 20,000 per connection). Operations are also
+wrapped in with_supabase_retry() to handle RemoteProtocolError gracefully.
 """
 
 import argparse
@@ -18,11 +22,14 @@ import time
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, TypeVar
 
 import requests
 from dotenv import load_dotenv
+from httpx import RemoteProtocolError
 from supabase import Client, create_client
+
+T = TypeVar("T")
 
 
 CONFIG_PATH = Path("social_capture_config.json")
@@ -37,6 +44,11 @@ MAX_RETRIES = 5
 POST_READ_COST_USD = 0.005
 USER_READ_COST_USD = 0.010
 
+# HTTP/2 stream limit workaround
+SUPABASE_REQUESTS_BEFORE_RECYCLE = 15000  # well under the 20K HTTP/2 stream limit
+_supabase_request_count = 0
+_supabase_client: Optional[Client] = None
+
 
 @dataclass
 class CaptureStats:
@@ -44,7 +56,7 @@ class CaptureStats:
     users_read: int = 0
     posts_captured: int = 0
     new_users_discovered: int = 0
-    estimated_cost_usd: float = 0.0
+    est_max_credits: float = 0.0
     requests_made: int = 0
 
 
@@ -55,8 +67,51 @@ def get_required_env(name: str) -> str:
     return value
 
 
+def get_supabase_client(force_new: bool = False) -> Client:
+    """Returns a Supabase client, recycling if approaching HTTP/2 stream limit."""
+    global _supabase_client, _supabase_request_count
+
+    if force_new or _supabase_client is None or _supabase_request_count >= SUPABASE_REQUESTS_BEFORE_RECYCLE:
+        if _supabase_client is not None:
+            print(
+                f"[supabase] Recycling client after {_supabase_request_count} requests",
+                flush=True,
+            )
+        _supabase_client = create_client(
+            get_required_env("SUPABASE_URL"),
+            get_required_env("SUPABASE_KEY"),
+        )
+        _supabase_request_count = 0
+
+    _supabase_request_count += 1
+    return _supabase_client
+
+
+def with_supabase_retry(operation: Callable[[Client], T], max_attempts: int = 3) -> T:
+    """
+    Execute a Supabase operation with retry on HTTP/2 connection termination.
+    Recreates the client on RemoteProtocolError and retries.
+    """
+    last_exc: Optional[BaseException] = None
+    for attempt in range(max_attempts):
+        try:
+            client = get_supabase_client(force_new=(attempt > 0))
+            return operation(client)
+        except RemoteProtocolError as e:
+            last_exc = e
+            print(
+                f"[supabase] RemoteProtocolError on attempt {attempt + 1}/{max_attempts}: {e}. "
+                f"Recreating client and retrying.",
+                flush=True,
+            )
+            continue
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("with_supabase_retry failed without exception")
+
+
 def init_supabase() -> Client:
-    return create_client(get_required_env("SUPABASE_URL"), get_required_env("SUPABASE_KEY"))
+    return get_supabase_client(force_new=True)
 
 
 def normalized_tag_key(text: str) -> str:
@@ -77,8 +132,8 @@ def twitter_bearer_token() -> str:
     return token
 
 
-def recalc_estimated_cost(stats: CaptureStats) -> None:
-    stats.estimated_cost_usd = (stats.posts_read * POST_READ_COST_USD) + (
+def calculate_est_max_credits(stats: CaptureStats) -> None:
+    stats.est_max_credits = (stats.posts_read * POST_READ_COST_USD) + (
         stats.users_read * USER_READ_COST_USD
     )
 
@@ -378,12 +433,17 @@ def upsert_social_posts(client: Client, rows: List[Dict[str, Any]], dry_run: boo
     Insert into social_posts with ON CONFLICT(platform, platform_post_id) DO NOTHING.
     Returns inserted count.
     """
+    _ = client
     if not rows:
         return 0
     if dry_run:
         return len(rows)
     # Supabase python maps to UPSERT with conflict target.
-    client.table("social_posts_v2").upsert(rows, on_conflict="platform,platform_post_id", ignore_duplicates=True).execute()
+    with_supabase_retry(
+        lambda c: c.table("social_posts_v2")
+        .upsert(rows, on_conflict="platform,platform_post_id", ignore_duplicates=True)
+        .execute()
+    )
     return len(rows)
 
 
@@ -399,14 +459,19 @@ def extract_unique_handles(posts: List[Dict[str, Any]]) -> Set[str]:
 
 def social_user_exists(client: Client, platform: str, handle: str) -> bool:
     """Check if social_users row already exists for (platform, handle)."""
-    resp = (
-        client.table("social_users_v2")
-        .select("id", count="exact")
-        .eq("platform", platform)
-        .eq("handle", handle.lower())
-        .limit(1)
-        .execute()
-    )
+    _ = client
+
+    def _op(c: Client) -> Any:
+        return (
+            c.table("social_users_v2")
+            .select("id", count="exact")
+            .eq("platform", platform)
+            .eq("handle", handle.lower())
+            .limit(1)
+            .execute()
+        )
+
+    resp = with_supabase_retry(_op)
     return int(resp.count or 0) > 0
 
 
@@ -467,11 +532,16 @@ def map_profile_to_social_users_row(profile: Dict[str, Any], discovery_source: s
 
 def upsert_social_user(client: Client, row: Dict[str, Any], dry_run: bool) -> bool:
     """Insert social user with ON CONFLICT(platform, handle) DO NOTHING."""
+    _ = client
     if not row.get("handle"):
         return False
     if dry_run:
         return True
-    client.table("social_users_v2").upsert(row, on_conflict="platform,handle", ignore_duplicates=True).execute()
+    with_supabase_retry(
+        lambda c: c.table("social_users_v2")
+        .upsert(row, on_conflict="platform,handle", ignore_duplicates=True)
+        .execute()
+    )
     return True
 
 
@@ -541,7 +611,7 @@ def run_capture_for_query(
         for payload in payloads:
             all_posts.extend(attach_user_expansions_to_posts(payload))
         stats.posts_read += len(all_posts)
-        recalc_estimated_cost(stats)
+        calculate_est_max_credits(stats)
 
         rows = [map_post_to_social_posts_row(p, captured_via_query=captured_via_query) for p in all_posts]
         rows = [r for r in rows if r.get("platform_post_id") and r.get("handle")]
@@ -563,7 +633,7 @@ def run_capture_for_query(
             if not profile:
                 continue
             stats.users_read += 1
-            recalc_estimated_cost(stats)
+            calculate_est_max_credits(stats)
             user_row = map_profile_to_social_users_row(profile, discovery_source)
             if upsert_social_user(client, user_row, dry_run=dry_run):
                 stats.new_users_discovered += 1
@@ -651,7 +721,7 @@ def run_all(client: Client, config: Dict[str, Any], dry_run: bool, max_results: 
         )
         print(
             f"Running totals: posts={stats.posts_captured}, users={stats.new_users_discovered}, "
-            f"requests={stats.requests_made}, est_cost=${stats.estimated_cost_usd:.2f}"
+            f"requests={stats.requests_made}, est_max_credits=${stats.est_max_credits:.2f}"
         )
     return stats
 
@@ -683,8 +753,9 @@ def run_capture_replies(
         f"engagement_replies>={args.min_replies}, tags={len(tags)}"
     )
 
-    resp = (
-        client.table("social_posts_v2")
+    _ = client
+    resp = with_supabase_retry(
+        lambda c: c.table("social_posts_v2")
         .select("platform_post_id, engagement_replies")
         .eq("platform", "twitter")
         .or_("is_reply.is.null,is_reply.eq.false")
@@ -717,7 +788,7 @@ def run_capture_replies(
         roots_processed += 1
         before_posts = stats.posts_captured
         before_users = stats.new_users_discovered
-        before_cost = stats.estimated_cost_usd
+        before_est_max_credits = stats.est_max_credits
 
         run_capture_for_query(
             client=client,
@@ -734,9 +805,10 @@ def run_capture_replies(
 
         n_posts = stats.posts_captured - before_posts
         n_users = stats.new_users_discovered - before_users
-        cost = stats.estimated_cost_usd - before_cost
+        est_max_credits_delta = stats.est_max_credits - before_est_max_credits
         print(
-            f"[{idx}/{total_roots}] Reply capture: root_id={root_id}, posts={n_posts}, users={n_users}, cost=${cost:.2f}"
+            f"[{idx}/{total_roots}] Reply capture: root_id={root_id}, posts={n_posts}, users={n_users}, "
+            f"est_max_credits=${est_max_credits_delta:.2f}"
         )
 
     print("\n=== Reply capture summary ===")
@@ -745,20 +817,22 @@ def run_capture_replies(
     print(f"Roots skipped (completed): {roots_skipped}")
     print(f"Total replies captured: {stats.posts_captured}")
     print(f"Total new users discovered: {stats.new_users_discovered}")
-    print(f"Total cost: ${stats.estimated_cost_usd:.2f}")
+    print(f"Estimated max credits: ${stats.est_max_credits:.2f}")
 
     return stats
 
 
 def print_summary(stats: CaptureStats) -> None:
-    """Print posts captured, new users discovered, and estimated cost."""
+    """Print posts captured, new users discovered, and estimated max credits."""
     print("\n=== Twitter capture summary ===")
-    print(f"Posts read: {stats.posts_read} @ ${POST_READ_COST_USD:.3f} each")
-    print(f"Users read: {stats.users_read} @ ${USER_READ_COST_USD:.3f} each")
+    print(f"Posts read: {stats.posts_read} @ ${POST_READ_COST_USD:.3f} each (per X pricing)")
+    print(f"Users read: {stats.users_read} @ ${USER_READ_COST_USD:.3f} each (per X pricing)")
     print(f"Posts captured: {stats.posts_captured}")
     print(f"New users discovered: {stats.new_users_discovered}")
     print(f"Requests made: {stats.requests_made}")
-    print(f"Estimated cost: ${stats.estimated_cost_usd:.2f}")
+    print(f"Estimated max credits: ${stats.est_max_credits:.2f}")
+    print(f"  (upper bound assuming no tier quotas or X-side credits;")
+    print(f"   actual billed amount in X dashboard is typically lower)")
 
 
 def main() -> None:
@@ -814,7 +888,7 @@ def main() -> None:
     if sum(mode_flags) != 1:
         raise ValueError("Specify exactly one mode: --tag, --all, --profile, or --capture-replies.")
 
-    client = init_supabase()
+    client = get_supabase_client()
     if args.capture_replies:
         stats = run_capture_replies(
             client,
@@ -855,7 +929,7 @@ def main() -> None:
             stats.posts_captured += tag_stats.posts_captured
             stats.new_users_discovered += tag_stats.new_users_discovered
             stats.requests_made += tag_stats.requests_made
-        recalc_estimated_cost(stats)
+        calculate_est_max_credits(stats)
     if not args.capture_replies:
         print_summary(stats)
 

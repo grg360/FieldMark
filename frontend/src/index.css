@@ -141,23 +141,24 @@ button {
     display: grid !important;
     grid-template-columns: 55% 45% !important;
     gap: 0 !important;
-    align-items: stretch !important;
+    align-items: start !important;
     border: 1px solid #1E1E22 !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
-    max-height: calc(100dvh - 56px - 24px - 2px) !important;
+    overflow: visible !important;
+    max-height: none !important;
   }
   .fm-detail-left {
     border-right: 1px solid #1E1E22 !important;
-    overflow-y: auto !important;
+    overflow-y: visible !important;
     min-height: 0 !important;
   }
   .fm-detail-right {
     padding: 16px !important;
     position: sticky !important;
     top: 0 !important;
-    overflow-y: auto !important;
+    overflow-y: visible !important;
     min-height: 0 !important;
+    align-self: start !important;
   }
   .fm-detail-section-text {
     font-size: 14px !important;
@@ -328,9 +329,9 @@ button {
     font-size: 16px !important;
   }
 
-  /* ── Institution / specialty line: 14px ── */
+  /* ── Institution / specialty line: 12px ── */
   .fm-hcp-institution {
-    font-size: 14px !important;
+    font-size: 12px !important;
   }
 
   /* ── Rising star explanation: 14px ── */

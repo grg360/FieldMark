@@ -13,6 +13,7 @@ import type {
   TACounts,
   VerifiedDOL,
 } from "./types";
+import type { ResearchTheme } from "../types/researchTheme";
 import type { SocialCandidate, SocialConfidenceTier } from "../types/social";
 
 export interface ApiResult<T> {
@@ -239,6 +240,33 @@ export async function getHCPNarrative(
     }
 
     return { data: (fallback.data?.narrative as string | null) ?? null, error: null };
+  } catch (err) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : "Unknown error occurred",
+    };
+  }
+}
+
+export async function fetchHcpThemes(hcpId: string): Promise<ApiResult<ResearchTheme[]>> {
+  try {
+    const { data, error } = await supabase
+      .from("hcp_research_themes_v2")
+      .select("*")
+      .eq("hcp_id", hcpId)
+      .gte("display_rank", 1)
+      .order("display_rank", { ascending: true });
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    const rows = (data ?? []).map((row) => ({
+      ...row,
+      example_pmids: Array.isArray(row.example_pmids) ? row.example_pmids : [],
+    })) as ResearchTheme[];
+
+    return { data: rows, error: null };
   } catch (err) {
     return {
       data: null,

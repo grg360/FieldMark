@@ -1,9 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { getHCPNarrative } from "../lib/api";
+import { fetchHcpThemes, getHCPNarrative } from "../lib/api";
+import ResearchThemesSection from "./ResearchThemesSection";
+import type { ResearchTheme } from "../types/researchTheme";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { buildSubline, titleCaseCity } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
+import ContextualizeHCPForm from "./ContextualizeHCPForm";
+import OptOutRequestForm from "./OptOutRequestForm";
+import { FiChip, FiModal, FiToast } from "./FieldIntelligenceShared";
+import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
 };
@@ -557,6 +563,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const [volumeTooltipYear, setVolumeTooltipYear] = useState<number | null>(null);
   const [narrative, setNarrative] = useState<string | null>(hcp.narrative ?? null);
   const [narrativeLoading, setNarrativeLoading] = useState(true);
+  const [researchThemes, setResearchThemes] = useState<ResearchTheme[]>([]);
+  const [themesLoading, setThemesLoading] = useState(true);
 
   useEffect(() => {
     const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
@@ -581,6 +589,33 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
       cancelled = true;
     };
   }, [hcp.hcp_id, hcp.id, hcp.specialty]);
+
+  useEffect(() => {
+    const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
+    if (!hcpId) {
+      setResearchThemes([]);
+      setThemesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setThemesLoading(true);
+
+    void (async () => {
+      const { data, error } = await fetchHcpThemes(hcpId);
+      if (cancelled) return;
+      if (!error && data) {
+        setResearchThemes(data);
+      } else {
+        setResearchThemes([]);
+      }
+      setThemesLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id]);
 
   const isUnclassified = isUnclassifiedCohort(hcp.cohort_classification);
   const isCommunityCohort =
@@ -638,8 +673,50 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const allValidated =
     validation.dataMatch && validation.engagement && validation.credibility && validation.momentum;
 
+  const hcpId = hcp.hcp_id ?? hcp.id ?? "";
+  const fieldIntelCount = mockFieldIntelContributorCount(hcpId);
+  const doctorLabel = hcp.name.match(/^dr\.?\s/i) ? hcp.name : `Dr. ${hcp.name}`;
+
+  const [contextualizeOpen, setContextualizeOpen] = React.useState(false);
+  const [optOutOpen, setOptOutOpen] = React.useState(false);
+  const [reportIssueOpen, setReportIssueOpen] = React.useState(false);
+  const [fiToast, setFiToast] = React.useState<string | null>(null);
+  const [issueType, setIssueType] = React.useState<string | null>(null);
+  const [issueNotes, setIssueNotes] = React.useState<Set<string>>(new Set());
+
+  function showFiToast(message: string) {
+    setFiToast(message);
+    window.setTimeout(() => setFiToast(null), 3000);
+  }
+
+  const ISSUE_TYPES = [
+    "incorrect institution",
+    "wrong specialty",
+    "outdated info",
+    "other",
+  ] as const;
+
+  const ISSUE_NOTE_CHIPS = [
+    "Affiliation recently changed",
+    "Specialty label mismatch",
+    "Publication count seems stale",
+    "Score inconsistent with field read",
+    "Possible duplicate profile",
+  ] as const;
+
   return (
-    <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto" }}>
+    <div
+      className="fm-screen"
+      style={{
+        backgroundColor: "#0A0A0B",
+        minHeight: "100dvh",
+        maxHeight: "100dvh",
+        maxWidth: 480,
+        margin: "0 auto",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
       <style>{`@keyframes fm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       {/* Nav bar */}
       <div
@@ -681,9 +758,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.5)",
           margin: "0 16px 24px 16px",
           backgroundColor: "#0A0A0B",
-          overflowX: "hidden",
-          overflowY: "auto",
-          WebkitOverflowScrolling: "touch",
+          overflow: "visible",
         }}
       >
         {/* LEFT COLUMN: Header + main content */}
@@ -1002,7 +1077,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         </div>
         )}
 
-        {/* Field validation */}
+        <ResearchThemesSection themes={researchThemes} loading={themesLoading} />
+
+        {/* Field Intelligence */}
         <div
           style={{
             padding: "16px 16px 12px",
@@ -1010,7 +1087,20 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           }}
         >
           <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-            Validate this signal
+            Field Intelligence
+          </div>
+
+          <div
+            style={{
+              fontSize: 12,
+              color: fieldIntelCount >= 3 ? FI_ACCENT_MUTED : "rgba(232, 230, 223, 0.45)",
+              marginBottom: 12,
+              lineHeight: 1.45,
+            }}
+          >
+            {fieldIntelCount >= 3
+              ? `${fieldIntelCount} MSLs have contributed to this profile`
+              : "Field Intelligence pending — be among the first to contribute"}
           </div>
 
           <div style={{ marginBottom: 12 }}>
@@ -1075,6 +1165,42 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           <div style={{ fontSize: 11, color: "#3A3A3F", textAlign: "center", marginTop: 8 }}>
             Your identity is never shared. Contributor UUID only.
           </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={() => setContextualizeOpen(true)}
+              style={fiSecondaryBtnStyle}
+            >
+              Add context
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportIssueOpen(true)}
+              style={fiSecondaryBtnStyle}
+            >
+              Report data issue
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOptOutOpen(true)}
+            style={{
+              marginTop: 16,
+              padding: 0,
+              background: "transparent",
+              border: "none",
+              fontSize: 11,
+              color: "rgba(232, 230, 223, 0.4)",
+              textDecoration: "underline",
+              cursor: "pointer",
+              fontFamily: "system-ui, sans-serif",
+              textAlign: "left",
+            }}
+          >
+            Are you {doctorLabel}? Request opt-out or claim your profile
+          </button>
         </div>
         </div>{/* end fm-detail-left */}
 
@@ -1174,9 +1300,97 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         </div>{/* end fm-detail-right */}
       </div>{/* end fm-detail-body */}
 
+      {contextualizeOpen && (
+        <ContextualizeHCPForm
+          hcpName={doctorLabel}
+          therapeuticArea={
+            hcp.specialty?.toLowerCase().includes("lung") || hcp.specialty?.toLowerCase().includes("onc")
+              ? "Oncology"
+              : undefined
+          }
+          onClose={() => setContextualizeOpen(false)}
+          onSubmit={() => {
+            setContextualizeOpen(false);
+            showFiToast("Saved. Your contribution will appear in aggregate when 3+ MSLs contribute similar context.");
+          }}
+        />
+      )}
+
+      {optOutOpen && (
+        <OptOutRequestForm
+          hcpName={doctorLabel}
+          onClose={() => setOptOutOpen(false)}
+          onSubmit={() => {
+            setOptOutOpen(false);
+            showFiToast("Request received — we'll respond within 5 business days");
+          }}
+        />
+      )}
+
+      {reportIssueOpen && (
+        <FiModal title="Report data issue" onClose={() => setReportIssueOpen(false)}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: "rgba(232, 230, 223, 0.5)", marginBottom: 8 }}>Issue type</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {ISSUE_TYPES.map((opt) => (
+                <FiChip
+                  key={opt}
+                  label={opt}
+                  selected={issueType === opt}
+                  onClick={() => setIssueType(issueType === opt ? null : opt)}
+                />
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, color: "rgba(232, 230, 223, 0.5)", marginBottom: 8 }}>Notes (select all that apply)</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {ISSUE_NOTE_CHIPS.map((opt) => (
+                <FiChip
+                  key={opt}
+                  label={opt}
+                  selected={issueNotes.has(opt)}
+                  multi
+                  onClick={() => {
+                    const next = new Set(issueNotes);
+                    if (next.has(opt)) next.delete(opt);
+                    else next.add(opt);
+                    setIssueNotes(next);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setReportIssueOpen(false);
+              showFiToast("Issue reported — thank you for helping improve this profile");
+            }}
+            style={fiSecondaryBtnStyle}
+          >
+            Submit report
+          </button>
+        </FiModal>
+      )}
+
+      <FiToast message={fiToast} />
     </div>
   );
 }
+
+const fiSecondaryBtnStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  background: "rgba(120, 200, 255, 0.08)",
+  border: "1px solid rgba(120, 200, 255, 0.25)",
+  borderRadius: 4,
+  color: "rgba(120, 200, 255, 1)",
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: "pointer",
+  fontFamily: "system-ui, sans-serif",
+};
 
 function ValidationField({
   label,

@@ -144,10 +144,12 @@ def fetch_unmatched_social_users(client: Client, platform_filter: Optional[str])
     """
     existing_ids = fetch_existing_match_user_ids(client)
     print(f"[DEBUG] existing matched user IDs count: {len(existing_ids)}")
+    # Note: data_quality_flag filtering removed. Was previously .neq("data_quality_flag", "rejected")
+    # but PostgREST's .neq() excludes NULL values, and rows currently have NULL flags. Re-add
+    # filtering once data_quality_flag is actively populated, using a NULL-aware predicate.
     q = (
         client.table("social_users_v2")
         .select("id,platform,handle,display_name,bio,location,website,verified,data_quality_flag")
-        .neq("data_quality_flag", "rejected")
     )
     if platform_filter and platform_filter != "both":
         q = q.eq("platform", platform_filter)

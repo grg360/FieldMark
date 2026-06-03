@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type Track = "community" | "rising-stars" | "established" | "telescope" | "social";
+export type Track =
+  | "community"
+  | "rising-stars"
+  | "established"
+  | "telescope"
+  | "social"
+  | "field-intelligence";
 
 interface TrackContextValue {
   track: Track;
@@ -10,7 +16,7 @@ interface TrackContextValue {
 const TrackContext = createContext<TrackContextValue | null>(null);
 
 const STORAGE_KEY = "fieldmark.track";
-const DEFAULT_TRACK: Track = "community";
+const DEFAULT_TRACK: Track = "established";
 
 export function TrackProvider({ children }: { children: ReactNode }) {
   const [track, setTrackState] = useState<Track>(() => {
@@ -21,7 +27,8 @@ export function TrackProvider({ children }: { children: ReactNode }) {
       stored === "rising-stars" ||
       stored === "established" ||
       stored === "telescope" ||
-      stored === "social"
+      stored === "social" ||
+      stored === "field-intelligence"
     ) {
       return stored;
     }
