@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import anthropic
+import httpx
 import psycopg
 from anthropic import APIConnectionError, APIStatusError, APITimeoutError
 from dotenv import load_dotenv
@@ -363,18 +364,6 @@ def call_claude(
                 time.sleep(delay)
                 continue
             raise
-        except (APITimeoutError, APIConnectionError) as exc:
-            last_error = exc
-            if attempt < MAX_RETRIES - 1:
-                delay = 2**attempt
-                print(
-                    f"[WARN] Transient API error; retrying in {delay}s "
-                    f"(attempt {attempt + 1}/{MAX_RETRIES})...",
-                    flush=True,
-                )
-                time.sleep(delay)
-                continue
-            raise
 
     raise RuntimeError(f"Claude API failed after retries: {last_error}")
 
@@ -531,7 +520,7 @@ def main() -> int:
 
     database_url = get_required_env("DATABASE_URL")
     api_key = get_required_env("ANTHROPIC_API_KEY")
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, timeout=120.0)
 
     if force:
         delete_checkpoint(CHECKPOINT_PATH)
@@ -681,6 +670,14 @@ def main() -> int:
                     ) + 1
                     save_checkpoint(CHECKPOINT_PATH, checkpoint_state)
 
+            except (APITimeoutError, APIConnectionError, httpx.TimeoutException) as e:
+                print(
+                    f"[TIMEOUT] HCP {hcp_id}: {type(e).__name__} after 120s - skipping, will retry on next run",
+                    flush=True,
+                )
+                stats.per_hcp_durations.append(time.monotonic() - hcp_start)
+                print_progress(idx, total, start_time, stats)
+                continue
             except Exception as exc:
                 print(f"[ERROR] HCP {hcp_id}: {exc}", flush=True)
                 stats.failed_count += 1
