@@ -116,9 +116,9 @@ export default function ThemeReactionPanel({
                 {question.prompt}
               </div>
               <div
+                className="fm-theme-reaction-grid"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
                   gap: 8,
                 }}
               >

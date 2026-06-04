@@ -1,5 +1,6 @@
-import { DEFAULT_REGION, type RegionKey } from "./regions";
+import { countriesForRegion, DEFAULT_REGION, REGIONS, type RegionKey } from "./regions";
 import type { FilterState } from "./types";
+import { supabase } from "./supabase";
 
 /**
  * Result of resolving a FilterState into the actual query parameters needed
@@ -50,6 +51,58 @@ export function resolveFilterScope(filters: FilterState): ResolvedScope {
  *   "#3 of 142"
  *   "Top 2% in US Hep"
  */
+export interface RankScopeParams {
+  scope: ResolvedScope;
+  isMultiCountryRegion: boolean;
+  countries: string[] | null;
+  shouldApplyStates: boolean;
+}
+
+export function resolveRankScopeParams(filters: FilterState): RankScopeParams {
+  const scope = resolveFilterScope(filters);
+  const requestedRegion = (filters.region as RegionKey | undefined) ?? DEFAULT_REGION;
+  const isMultiCountryRegion =
+    scope.scopeType === "region" &&
+    requestedRegion !== undefined &&
+    requestedRegion !== "US" &&
+    requestedRegion !== "UK" &&
+    requestedRegion !== "Global" &&
+    requestedRegion !== "Other" &&
+    (REGIONS[requestedRegion as Exclude<RegionKey, "Global" | "Other">] ?? []).length > 1;
+
+  let countries: string[] | null = null;
+  if (isMultiCountryRegion) {
+    countries = countriesForRegion(requestedRegion) ?? [];
+  }
+
+  const shouldApplyStates =
+    Boolean(filters.states && filters.states.length > 0) &&
+    (scope.scopeValue === "US" || (isMultiCountryRegion && (countries?.includes("US") ?? false)));
+
+  return { scope, isMultiCountryRegion, countries, shouldApplyStates };
+}
+
+export async function filterRankRowsByStates<T extends { hcp_id: string }>(
+  rankRows: T[],
+  filters: FilterState,
+  shouldApplyStates: boolean,
+): Promise<T[]> {
+  if (!shouldApplyStates || !filters.states || filters.states.length === 0) {
+    return rankRows;
+  }
+  const rankHcpIds = rankRows.map((r) => r.hcp_id);
+  if (rankHcpIds.length === 0) return rankRows;
+
+  const { data: stateMatches } = await supabase
+    .from("hcps_v2")
+    .select("id")
+    .in("id", rankHcpIds)
+    .in("nppes_practice_state", filters.states);
+
+  const allowedIds = new Set((stateMatches ?? []).map((m) => String(m.id)));
+  return rankRows.filter((r) => allowedIds.has(String(r.hcp_id)));
+}
+
 export function formatRankDisplay(rank: number, scopeSize: number, percentile: number): {
   rankShort: string;
   percentileShort: string;

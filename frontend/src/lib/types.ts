@@ -88,6 +88,13 @@ export interface RisingStar extends HCP, HCPScore {
   global_rank?: number | null;
 }
 
+/** Result payload from cohort feed API functions (getEstablished, getCommunity, getRisingStars). */
+export interface CohortFeedResult {
+  rows: RisingStar[];
+  total: number;
+  emptyReason?: string;
+}
+
 export interface SocialUser {
   id: string;
   platform: "twitter" | "bluesky";
@@ -156,6 +163,7 @@ export interface FilterState {
   region?: string;       // RegionKey from regions.ts; defaults to "US" if undefined
   country?: string;      // ISO 3166-1 alpha-2 country code; overrides region if both set
   scope?: "global" | "regional"; // When 'global', returns unfiltered counts. Defaults to 'regional'.
+  states?: string[];     // US state codes ["NY", "NJ", ...], applied only when region includes "US"
   // Future filters land here. Adding them does NOT require api.ts changes
   // until the resolver/query layer is taught to consume them.
 }

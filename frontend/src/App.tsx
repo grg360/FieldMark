@@ -60,6 +60,9 @@ import {
   getTACounts,
   getTAIdForLabel,
 } from "./lib/api";
+import ActiveFilterPills from "./components/ActiveFilterPills";
+import FilterButton from "./components/FilterButton";
+import FilterDrawer from "./components/FilterDrawer";
 import { useFilterContext } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
 import {
@@ -70,7 +73,7 @@ import {
   taLabelToSlug,
   taSlugToLabel,
 } from "./lib/routeSlugs";
-import type { HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
+import type { CohortFeedResult, HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
@@ -319,7 +322,7 @@ function FeedLayout({
   forcedIndication,
 }: { forcedDashboard?: string; forcedIndication?: string } = {}) {
   const { track, setTrack } = useTrack();
-  const { region } = useFilterContext();
+  const { region, regions, states } = useFilterContext();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -343,10 +346,12 @@ function FeedLayout({
   const [hcpList, setHcpList] = useState<AppHCP[]>([]);
   const [feedOffset, setFeedOffset] = useState(0);
   const [feedTotal, setFeedTotal] = useState(0);
+  const [feedEmptyReason, setFeedEmptyReason] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingHCPs, setLoadingHCPs] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [taCounts, setTaCounts] = useState<TACounts | null>(null);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
@@ -416,6 +421,7 @@ function FeedLayout({
     if (!isCohortFeedTrack(track) || !route.indicationDataActive) {
       setHcpList([]);
       setFeedTotal(0);
+      setFeedEmptyReason(null);
       return;
     }
     try {
@@ -423,8 +429,8 @@ function FeedLayout({
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region };
-      let data;
+      const filters = { therapeuticArea: taSlug, region, states };
+      let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
       } else if (track === "community") {
@@ -434,7 +440,12 @@ function FeedLayout({
       }
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
-      if (data) setFeedTotal(data.total);
+      if (data) {
+        setFeedTotal(data.total);
+        setFeedEmptyReason(data.emptyReason ?? null);
+      } else {
+        setFeedEmptyReason(null);
+      }
       setLastUpdatedAt(new Date());
     } finally {
       if (loadingAsRefresh) setRefreshingFeed(false);
@@ -450,6 +461,7 @@ function FeedLayout({
         setHcpList([]);
         setFeedOffset(0);
         setFeedTotal(0);
+        setFeedEmptyReason(null);
         setLastUpdatedAt(new Date());
         setLoadingHCPs(false);
         return;
@@ -458,8 +470,8 @@ function FeedLayout({
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region };
-      let data;
+      const filters = { therapeuticArea: taSlug, region, states };
+      let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
       } else if (track === "community") {
@@ -471,7 +483,12 @@ function FeedLayout({
 
       const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
       setHcpList(mapped);
-      if (data) setFeedTotal(data.total);
+      if (data) {
+        setFeedTotal(data.total);
+        setFeedEmptyReason(data.emptyReason ?? null);
+      } else {
+        setFeedEmptyReason(null);
+      }
       setLastUpdatedAt(new Date());
       setLoadingHCPs(false);
     }
@@ -481,13 +498,13 @@ function FeedLayout({
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, track, region, route.indicationDataActive]);
+  }, [selectedTA, track, region, regions, states, route.indicationDataActive]);
 
   async function loadMore() {
     if (!isCohortFeedTrack(track)) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = taLabelToApiSlug(selectedTA);
-    const filters = { therapeuticArea: taSlug, region };
+    const filters = { therapeuticArea: taSlug, region, states };
     setLoadingMore(true);
     try {
       let data;
@@ -646,6 +663,7 @@ function FeedLayout({
 
       {/* Section header */}
       <div
+        className="fm-feed-section-header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -675,6 +693,9 @@ function FeedLayout({
               }}
             >
               {(() => {
+                if (feedEmptyReason === "community-non-us") {
+                  return "0 identified";
+                }
                 if (feedTotal > 0 && hcpList.length < feedTotal) {
                   return `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`;
                 }
@@ -682,7 +703,9 @@ function FeedLayout({
                   track === "rising-stars"
                     ? taCounts?.rising_stars ?? null
                     : track === "community"
-                      ? taCounts?.community_pool ?? null
+                      ? feedEmptyReason
+                        ? 0
+                        : taCounts?.community_pool ?? null
                       : track === "established"
                         ? (feedTotal > 0 ? feedTotal : taCounts?.established ?? null)
                         : null;
@@ -691,6 +714,7 @@ function FeedLayout({
                 return `${resolved.toLocaleString()} identified`;
               })()}
             </span>
+            <FilterButton onClick={() => setFilterDrawerOpen(true)} />
             <button
               onClick={() => setFeedOverlay("landscape")}
               style={{
@@ -808,6 +832,8 @@ function FeedLayout({
           </div>
         )
       ) : isCohortFeedTrack(track) ? (
+        <>
+        <ActiveFilterPills />
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
           {showInactiveIndicationEmpty ? (
             <div
@@ -833,6 +859,31 @@ function FeedLayout({
             </div>
           ) : loadingHCPs ? (
             <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
+          ) : feedEmptyReason === "community-non-us" ? (
+            <div
+              style={{
+                gridColumn: "1 / -1",
+                padding: "48px 24px",
+                textAlign: "center",
+                color: "#888076",
+                fontSize: 13,
+                lineHeight: 1.5,
+              }}
+            >
+              <div
+                style={{
+                  color: "#E8E6DF",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  marginBottom: 8,
+                }}
+              >
+                Community cohort not available outside the US
+              </div>
+              The Community cohort is built from US-only data sources (NPPES, CMS Open
+              Payments, Medicare Provider Data). Switch to the US region to see community
+              HCPs, or select a different cohort track for the current region.
+            </div>
           ) : (
             <>
               {hcpList.map((hcp) => (
@@ -853,8 +904,9 @@ function FeedLayout({
                     gridColumn: "1 / -1",
                     display: "flex",
                     justifyContent: "center",
+                    alignItems: "center",
                     width: "100%",
-                    padding: "0 0 8px",
+                    padding: "24px 16px 8px",
                   }}
                 >
                   <button
@@ -862,21 +914,22 @@ function FeedLayout({
                     onClick={() => void loadMore()}
                     disabled={loadingMore}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "100%",
-                      maxWidth: 400,
-                      textAlign: "center",
+                      width: "auto",
+                      minWidth: 200,
+                      maxWidth: 320,
+                      padding: "10px 24px",
                       backgroundColor: "#1A3D2E",
                       border: "1px solid #4ADE80",
+                      color: "#4ADE80",
+                      fontSize: 13,
+                      lineHeight: 1,
                       borderRadius: 3,
-                      padding: "10px 16px",
                       cursor: loadingMore ? "not-allowed" : "pointer",
                       opacity: loadingMore ? 0.6 : 1,
                       fontFamily: "monospace",
-                      fontSize: 13,
-                      color: "#4ADE80",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
                     {loadingMore ? "Loading..." : `Load ${FEED_PAGE_SIZE} More HCPs`}
@@ -886,7 +939,13 @@ function FeedLayout({
             </>
           )}
         </div>
+        </>
       ) : null}
+
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+      />
 
       {/* Action Tray */}
         <ActionTray

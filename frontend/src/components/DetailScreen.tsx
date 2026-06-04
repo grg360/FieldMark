@@ -10,12 +10,16 @@ import ContextualizeHCPForm from "./ContextualizeHCPForm";
 import OptOutRequestForm from "./OptOutRequestForm";
 import { FiChip, FiModal, FiToast } from "./FieldIntelligenceShared";
 import TopPharmaCompanies from "./TopPharmaCompanies";
+import DrugConstellation from "./DrugConstellation";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
 };
 
-function identificationAddressContent(hcp: DetailHCP): React.ReactNode | null {
+function identificationAddressContent(hcp: DetailHCP): {
+  content: React.ReactNode;
+  label: string;
+} | null {
   const derivedState = (hcp.derivedState ?? "").trim();
   const practiceState = (hcp.nppesPracticeState ?? "").trim().toUpperCase() || derivedState.toUpperCase();
   const practiceCity = (hcp.nppesPracticeCity ?? "").trim();
@@ -34,21 +38,34 @@ function identificationAddressContent(hcp: DetailHCP): React.ReactNode | null {
     .join(", ");
   const zipSuffix = practiceZip ? ` ${practiceZip}` : "";
 
+  const hasStreet = Boolean(practiceAddress);
+  const hasCity = Boolean(practiceCity);
+  let label: string;
+  if (hasStreet) label = "Address";
+  else if (hasCity) label = "Location";
+  else label = "State";
+
   if (practiceAddress) {
-    return (
-      <>
-        <div>{practiceAddress}</div>
-        {(cityStateLine || practiceZip) && <div>{cityStateLine}{zipSuffix}</div>}
-      </>
-    );
+    return {
+      label,
+      content: (
+        <>
+          <div>{practiceAddress}</div>
+          {(cityStateLine || practiceZip) && <div>{cityStateLine}{zipSuffix}</div>}
+        </>
+      ),
+    };
   }
 
-  return (
-    <>
-      {cityStateLine}
-      {zipSuffix}
-    </>
-  );
+  return {
+    label,
+    content: (
+      <>
+        {cityStateLine}
+        {zipSuffix}
+      </>
+    ),
+  };
 }
 
 const COMMUNITY_MAX_ENGAGEMENT = 8400000;
@@ -843,6 +860,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
         {/* Narrative / unclassified notice */}
         <div
+          className="fm-detail-section fm-section-narrative"
           style={{
             padding: "16px 16px 12px",
             borderBottom: "1px solid #1E1E22",
@@ -887,6 +905,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
         {/* Score breakdown */}
         <div
+          className="fm-detail-section fm-section-score-breakdown"
           style={{
             padding: "16px 16px 12px",
             borderBottom: "1px solid #1E1E22",
@@ -999,7 +1018,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </div>
         </div>
 
-        <EngagementMixBlock mix={hcp.engagementMix} cohortClassification={hcp.cohort_classification} />
+        <div className="fm-detail-section fm-section-engagement-mix">
+          <EngagementMixBlock mix={hcp.engagementMix} cohortClassification={hcp.cohort_classification} />
+        </div>
 
         {isCommunityCohort ? (
           <>
@@ -1033,7 +1054,10 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             )}
           </>
         ) : (
-          <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
+          <div
+            className="fm-detail-section fm-section-publication-timeline"
+            style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}
+          >
             <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
               Publication timeline
             </div>
@@ -1132,10 +1156,13 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           </div>
         )}
 
-        <ResearchThemesSection themes={researchThemes} loading={themesLoading} />
+        <div className="fm-detail-section fm-section-research-themes">
+          <ResearchThemesSection themes={researchThemes} loading={themesLoading} />
+        </div>
 
         {/* Field Intelligence */}
         <div
+          className="fm-detail-section fm-section-field-intelligence"
           style={{
             padding: "16px 16px 12px",
             borderBottom: "1px solid #1E1E22",
@@ -1261,64 +1288,77 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
 
         {/* RIGHT COLUMN: Metric pills + Field notes */}
         <div className="fm-detail-right">
-          <div style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}>
-            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-              Identification
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontFamily: "monospace" }}>
-              {hcp.npiNumber ? (
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#6B6A65" }}>NPI</span>
-                  <span style={{ color: "#E8E6DF" }}>{hcp.npiNumber}</span>
-                </div>
-              ) : null}
-              {(() => {
-                const addressContent = identificationAddressContent(hcp);
-                if (!addressContent) return null;
-                return (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ color: "#6B6A65" }}>Address</span>
-                    <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{addressContent}</span>
-                  </div>
-                );
-              })()}
-              {hcp.npiSpecialty ? (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{ color: "#6B6A65", flexShrink: 0 }}>Specialty</span>
-                  <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{hcp.npiSpecialty}</span>
-                </div>
-              ) : null}
-            </div>
-            {hcp.npiNumber && (
-              <a
-                href={`https://npiregistry.cms.hhs.gov/provider-view/${hcp.npiNumber}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "block",
-                  marginTop: 12,
-                  padding: "8px 12px",
-                  backgroundColor: "transparent",
-                  border: "1px solid #1E1E22",
-                  color: "#6B6A65",
-                  fontSize: 12,
-                  textDecoration: "none",
-                  textAlign: "center",
-                  borderRadius: 4,
-                }}
+          {(() => {
+            const hasNpi = Boolean(hcp.npiNumber);
+            const addressResult = identificationAddressContent(hcp);
+            const hasAddress = addressResult !== null;
+            const hasSpecialty = Boolean(hcp.npiSpecialty);
+            if (!hasNpi && !hasAddress && !hasSpecialty) return null;
+            return (
+              <div
+                className="fm-detail-section fm-section-identification"
+                style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}
               >
-                View on NPI Registry →
-              </a>
-            )}
-          </div>
+                <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                  Identification
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontFamily: "monospace" }}>
+                  {hcp.npiNumber ? (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#6B6A65" }}>NPI</span>
+                      <span style={{ color: "#E8E6DF" }}>{hcp.npiNumber}</span>
+                    </div>
+                  ) : null}
+                  {addressResult ? (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <span style={{ color: "#6B6A65" }}>{addressResult.label}</span>
+                      <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{addressResult.content}</span>
+                    </div>
+                  ) : null}
+                  {hcp.npiSpecialty ? (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <span style={{ color: "#6B6A65", flexShrink: 0 }}>Specialty</span>
+                      <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{hcp.npiSpecialty}</span>
+                    </div>
+                  ) : null}
+                </div>
+                {hcp.npiNumber && (
+                  <a
+                    href={`https://npiregistry.cms.hhs.gov/provider-view/${hcp.npiNumber}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "block",
+                      marginTop: 12,
+                      padding: "8px 12px",
+                      backgroundColor: "transparent",
+                      border: "1px solid #1E1E22",
+                      color: "#6B6A65",
+                      fontSize: 12,
+                      textDecoration: "none",
+                      textAlign: "center",
+                      borderRadius: 4,
+                    }}
+                  >
+                    View on NPI Registry →
+                  </a>
+                )}
+              </div>
+            );
+          })()}
 
-          <div style={{ marginBottom: 16 }}>
+          <div className="fm-detail-section fm-section-cohort-score" style={{ marginBottom: 16 }}>
             <DetailHeaderMetrics hcp={hcp} />
           </div>
-          <TopPharmaCompanies hcpId={String(hcp.hcp_id ?? hcp.id ?? "")} />
+          <div className="fm-detail-section fm-section-top-pharma">
+            <TopPharmaCompanies hcpId={String(hcp.hcp_id ?? hcp.id ?? "")} />
+          </div>
+          <div className="fm-detail-section fm-section-drug-constellation">
+            <DrugConstellation hcpId={String(hcp.hcp_id ?? hcp.id ?? "")} />
+          </div>
 
         {/* Field notes */}
-        <div style={{ padding: "16px 0 24px" }}>
+        <div className="fm-detail-section fm-section-field-notes" style={{ padding: "16px 0 24px" }}>
           <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
             Field notes
           </div>

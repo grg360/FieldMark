@@ -526,7 +526,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           </div>
           {hcp.rank != null && (
             <div style={{ fontSize: 10, color: "#E8E6DF", marginTop: 6, lineHeight: 1.4, letterSpacing: 0.4 }}>
-              #{hcp.rank} {(hcp.scope ?? "US").toUpperCase()}
+              #{hcp.rank} {(hcp.country ?? "US").toUpperCase()}
               {hcp.global_rank != null ? ` · #${hcp.global_rank} GLOBAL` : ""}
             </div>
           )}

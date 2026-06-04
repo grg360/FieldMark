@@ -311,6 +311,62 @@ button {
     -webkit-text-size-adjust: none;
   }
 
+  .fm-detail-body {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .fm-detail-left,
+  .fm-detail-right {
+    display: contents !important;
+  }
+  .fm-detail-section {
+    order: 99;
+  }
+  .fm-section-identification {
+    order: 1;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .fm-section-cohort-score {
+    order: 2;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .fm-section-narrative { order: 3; }
+  .fm-section-score-breakdown { order: 4; }
+  .fm-section-top-pharma {
+    order: 5;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .fm-section-drug-constellation {
+    order: 6;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .fm-section-engagement-mix { order: 7; }
+  .fm-section-publication-timeline { order: 8; }
+  .fm-section-research-themes { order: 9; }
+  .fm-section-field-intelligence { order: 10; }
+  .fm-section-field-notes {
+    order: 11;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .fm-feed-section-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .fm-feed-section-header .fm-section-header-right {
+    font-size: 13px !important;
+  }
+  .fm-feed-section-header > div {
+    width: 100%;
+    justify-content: space-between !important;
+  }
+
   body {
     font-size: 16px;
   }
@@ -485,5 +541,14 @@ button {
   /* Score badge */
   [style*="fontSize: 12"][style*="E8E6DF"][style*="fontWeight: 500"] {
     font-size: 14px !important;
+  }
+}
+
+.fm-theme-reaction-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 600px) {
+  .fm-theme-reaction-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
