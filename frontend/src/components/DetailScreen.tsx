@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { fetchHcpThemes, getHCPNarrative } from "../lib/api";
+import { fetchHcpThemes, getHCPNarrative, getPublicationTimeline, type PublicationTimelinePoint } from "../lib/api";
 import ResearchThemesSection from "./ResearchThemesSection";
 import type { ResearchTheme } from "../types/researchTheme";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
@@ -634,14 +634,31 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
         ? "0.0"
         : `${citTrajNumeric > 0 ? "+" : ""}${citTrajNumeric.toFixed(1)}`;
 
-  const pubTimeline = [
-    { year: 2020, value: 2 },
-    { year: 2021, value: 3 },
-    { year: 2022, value: 4 },
-    { year: 2023, value: 7 },
-    { year: 2024, value: 11 },
-  ];
-  const maxValue = Math.max(...pubTimeline.map((p) => p.value));
+  const [pubTimeline, setPubTimeline] = React.useState<PublicationTimelinePoint[]>([]);
+  const [pubTimelineLoading, setPubTimelineLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const targetId = hcp.hcp_id ?? hcp.id ?? "";
+    if (!targetId) {
+      setPubTimeline([]);
+      setPubTimelineLoading(false);
+      return;
+    }
+    setPubTimelineLoading(true);
+    void (async () => {
+      const data = await getPublicationTimeline(String(targetId));
+      if (cancelled) return;
+      setPubTimeline(data);
+      setPubTimelineLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id]);
+
+  const maxValue = Math.max(1, ...pubTimeline.map((p) => p.pubCount));
+  const totalPubsInWindow = pubTimeline.reduce((s, p) => s + p.pubCount, 0);
   const [tooltip, setTooltip] = React.useState<number | null>(null);
   const mobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const engagementMobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1019,62 +1036,99 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
               Publication timeline
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
-            {pubTimeline.map((p) => {
-              const isActive = tooltip === p.year;
-              const barHeight = (p.value / maxValue) * 80;
-              return (
-                <div
-                  key={p.year}
-                  style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative", cursor: "pointer" }}
-                  onClick={() => onYearPress(p.year)}
-                  onMouseEnter={() => setTooltip(p.year)}
-                  onMouseLeave={() => setTooltip(null)}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    if (mobileTimerRef.current) clearTimeout(mobileTimerRef.current);
-                    setTooltip(p.year);
-                    mobileTimerRef.current = setTimeout(() => setTooltip(null), 2000);
-                  }}
-                >
-                  {isActive && (
+            {pubTimelineLoading ? (
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
                     <div
                       style={{
-                        position: "absolute",
-                        bottom: `${barHeight + 8 + 16}px`,
-                        left: "50%",
-                        transform: "translateX(-50%)",
+                        width: "100%",
                         backgroundColor: "#1E1E22",
-                        border: `1px solid ${cohortBarColor}`,
-                        borderRadius: 3,
-                        padding: "4px 8px",
-                        whiteSpace: "nowrap",
-                        pointerEvents: "none",
-                        zIndex: 10,
+                        height: `${30 + ((i * 13) % 50)}px`,
+                        marginBottom: 8,
+                      }}
+                    />
+                    <span style={{ fontSize: 10, color: "#3A3A3F", fontFamily: "monospace" }}>—</span>
+                  </div>
+                ))}
+              </div>
+            ) : totalPubsInWindow === 0 ? (
+              <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0", textAlign: "center" }}>
+                No publications since {new Date().getFullYear() - 9}.
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, justifyContent: "center" }}>
+                {pubTimeline.map((p) => {
+                  const isActive = tooltip === p.year;
+                  const barHeight = p.pubCount === 0 ? 0 : Math.max(2, (p.pubCount / maxValue) * 80);
+                  const citationOpacity = p.pubCount === 0
+                    ? 0
+                    : 0.3 + Math.min(1, p.avgCitations / 30) * 0.7;
+                  return (
+                    <div
+                      key={p.year}
+                      style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative", cursor: "pointer" }}
+                      onClick={() => onYearPress(p.year)}
+                      onMouseEnter={() => setTooltip(p.year)}
+                      onMouseLeave={() => setTooltip(null)}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        if (mobileTimerRef.current) clearTimeout(mobileTimerRef.current);
+                        setTooltip(p.year);
+                        mobileTimerRef.current = setTimeout(() => setTooltip(null), 2000);
                       }}
                     >
-                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6B6A65" }}>
-                        {p.year}
-                      </div>
-                      <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 500, color: cohortBarColor }}>
-                        {p.value} papers
-                      </div>
+                      {isActive && p.pubCount > 0 && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: `${barHeight + 8 + 16}px`,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            backgroundColor: "#1E1E22",
+                            border: `1px solid ${cohortBarColor}`,
+                            borderRadius: 3,
+                            padding: "4px 8px",
+                            whiteSpace: "nowrap",
+                            pointerEvents: "none",
+                            zIndex: 10,
+                          }}
+                        >
+                          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6B6A65" }}>
+                            {p.year}
+                          </div>
+                          <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 500, color: cohortBarColor }}>
+                            {p.pubCount} {p.pubCount === 1 ? "paper" : "papers"}
+                          </div>
+                          <div style={{ fontSize: 11, fontFamily: "monospace", color: "#6B6A65" }}>
+                            avg {p.avgCitations.toFixed(1)} citations
+                          </div>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          width: "100%",
+                          backgroundColor: cohortBarColor,
+                          opacity: citationOpacity,
+                          height: `${barHeight}px`,
+                          marginBottom: 8,
+                        }}
+                      />
+                      <span style={{ fontSize: 10, color: "#6B6A65", fontFamily: "monospace" }}>{p.year}</span>
                     </div>
-                  )}
-                  <div
-                    style={{
-                      width: "100%",
-                      backgroundColor: cohortBarColor,
-                      height: `${barHeight}px`,
-                      marginBottom: 8,
-                    }}
-                  />
-                  <span style={{ fontSize: 10, color: "#6B6A65", fontFamily: "monospace" }}>{p.year}</span>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
         )}
 
         <ResearchThemesSection themes={researchThemes} loading={themesLoading} />

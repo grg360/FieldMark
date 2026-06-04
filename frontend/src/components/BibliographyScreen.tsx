@@ -1,5 +1,6 @@
+import React from "react";
 import { HCP } from "../data/hcpData";
-import { bibliographyByYear, Paper } from "../data/bibliographyData";
+import { getPublicationsByYearForHcp, type BibliographyPaper } from "../lib/api";
 
 interface BibliographyScreenProps {
   hcp: HCP;
@@ -13,9 +14,10 @@ const BackArrow = () => (
   </svg>
 );
 
-function PaperCard({ paper }: { paper: Paper }) {
+function PaperCard({ paper }: { paper: BibliographyPaper }) {
   function handleViewAbstract(e: React.MouseEvent) {
     e.stopPropagation();
+    if (!paper.pmid) return;
     window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, "_blank", "noopener,noreferrer");
   }
 
@@ -47,7 +49,7 @@ function PaperCard({ paper }: { paper: Paper }) {
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 3 }}>
           <span className="fm-bib-citation" style={{ fontSize: 16, fontFamily: "monospace", fontWeight: 500, color: "#E8A020", lineHeight: 1 }}>
-            {paper.citations.toLocaleString()}
+            {paper.citations != null ? paper.citations.toLocaleString() : "—"}
           </span>
           <span style={{ fontSize: 10, color: "#6B6A65", lineHeight: 1, marginBottom: 1 }}>citations</span>
         </div>
@@ -72,25 +74,26 @@ function PaperCard({ paper }: { paper: Paper }) {
 
       {/* Row 3: journal + co-authors */}
       <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.4 }}>
-        <span style={{ color: "#E8A020" }}>{paper.journal}</span>
-        <span style={{ color: "#3A3A3F" }}> · </span>
-        <span style={{ color: "#6B6A65" }}>{paper.coAuthors}</span>
+        {paper.journal ? <span style={{ color: "#E8A020" }}>{paper.journal}</span> : null}
+        {paper.journal && paper.coAuthors ? <span style={{ color: "#3A3A3F" }}> · </span> : null}
+        {paper.coAuthors ? <span style={{ color: "#6B6A65" }}>{paper.coAuthors}</span> : null}
       </div>
 
       {/* Row 4: PMID + view abstract */}
       <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontFamily: "monospace", color: "#3A3A3F" }}>
-          PMID {paper.pmid}
+          {paper.pmid ? `PMID ${paper.pmid}` : "—"}
         </span>
         <button
           onClick={handleViewAbstract}
+          disabled={!paper.pmid}
           style={{
             background: "none",
             border: "none",
             padding: 0,
             fontSize: 11,
-            color: "#6B6A65",
-            cursor: "pointer",
+            color: paper.pmid ? "#6B6A65" : "#3A3A3F",
+            cursor: paper.pmid ? "pointer" : "default",
           }}
         >
           View abstract →
@@ -101,7 +104,28 @@ function PaperCard({ paper }: { paper: Paper }) {
 }
 
 export default function BibliographyScreen({ hcp, year, onBack }: BibliographyScreenProps) {
-  const papers = bibliographyByYear[year] ?? [];
+  const [papers, setPapers] = React.useState<BibliographyPaper[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const targetId = hcp.hcp_id ?? hcp.id ?? "";
+    if (!targetId) {
+      setPapers([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    void (async () => {
+      const data = await getPublicationsByYearForHcp(String(targetId), year);
+      if (cancelled) return;
+      setPapers(data);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id, year]);
 
   return (
     <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", fontFamily: "system-ui, -apple-system, sans-serif" }}>
@@ -148,7 +172,7 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
         </span>
 
         <span style={{ fontSize: 12, fontFamily: "monospace", color: "#6B6A65" }}>
-          {papers.length} papers
+          {loading ? "loading..." : `${papers.length} papers`}
         </span>
       </div>
 
@@ -169,11 +193,33 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
         </div>
 
         {/* Paper cards */}
-        <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
-          {papers.map((paper) => (
-            <PaperCard key={paper.id} paper={paper} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundColor: "#111113",
+                  border: "1px solid #1E1E22",
+                  borderLeft: "3px solid #1E1E22",
+                  borderRadius: 4,
+                  padding: 12,
+                  height: 110,
+                }}
+              />
+            ))}
+          </div>
+        ) : papers.length === 0 ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", fontSize: 13, color: "#6B6A65" }}>
+            No publications for {year}.
+          </div>
+        ) : (
+          <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
+            {papers.map((paper) => (
+              <PaperCard key={paper.id} paper={paper} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

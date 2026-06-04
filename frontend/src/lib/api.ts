@@ -1978,6 +1978,160 @@ export async function searchHCPs(
   };
 }
 
+export interface PublicationTimelinePoint {
+  year: number;
+  pubCount: number;
+  avgCitations: number;
+}
+
+export async function getPublicationTimeline(
+  hcpId: string,
+): Promise<PublicationTimelinePoint[]> {
+  if (!hcpId) return [];
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - 9;
+  const { data, error } = await supabase
+    .from("publication_authors_v2")
+    .select(
+      `
+      publication_id,
+      publications_v2!inner (
+        pub_year,
+        citation_count
+      )
+      `,
+    )
+    .eq("hcp_id", hcpId)
+    .gte("publications_v2.pub_year", startYear)
+    .lte("publications_v2.pub_year", currentYear);
+  if (error || !data) return [];
+  const byYear = new Map<number, { count: number; citationSum: number; citationN: number }>();
+  for (let y = startYear; y <= currentYear; y++) {
+    byYear.set(y, { count: 0, citationSum: 0, citationN: 0 });
+  }
+  for (const row of data as unknown as Array<{
+    publications_v2: { pub_year: number | null; citation_count: number | null } | null;
+  }>) {
+    const pub = row.publications_v2;
+    if (!pub || pub.pub_year == null) continue;
+    const bucket = byYear.get(pub.pub_year);
+    if (!bucket) continue;
+    bucket.count += 1;
+    if (pub.citation_count != null) {
+      bucket.citationSum += pub.citation_count;
+      bucket.citationN += 1;
+    }
+  }
+  const result: PublicationTimelinePoint[] = [];
+  for (let y = startYear; y <= currentYear; y++) {
+    const bucket = byYear.get(y)!;
+    result.push({
+      year: y,
+      pubCount: bucket.count,
+      avgCitations: bucket.citationN > 0 ? bucket.citationSum / bucket.citationN : 0,
+    });
+  }
+  return result;
+}
+
+export interface BibliographyPaper {
+  id: string;
+  pmid: string | null;
+  title: string;
+  journal: string | null;
+  citations: number | null;
+  isFirstAuthor: boolean;
+  coAuthors: string;
+}
+
+interface PubmedAuthorshipEntry {
+  position?: number | null;
+  fore_name?: string | null;
+  last_name?: string | null;
+  initials?: string | null;
+}
+
+function formatCoAuthors(
+  pubmedAuthorships: unknown,
+  currentHcpAuthorPosition: number | null,
+): string {
+  if (!Array.isArray(pubmedAuthorships)) return "";
+  const others: string[] = [];
+  for (const entry of pubmedAuthorships as PubmedAuthorshipEntry[]) {
+    if (!entry || typeof entry !== "object") continue;
+    if (
+      currentHcpAuthorPosition != null &&
+      entry.position === currentHcpAuthorPosition
+    ) {
+      continue;
+    }
+    const last = (entry.last_name ?? "").trim();
+    const initials = (entry.initials ?? "").trim();
+    if (!last) continue;
+    others.push(initials ? `${last} ${initials}` : last);
+  }
+  if (others.length === 0) return "";
+  const shown = others.slice(0, 3).join(", ");
+  const remaining = others.length - 3;
+  return remaining > 0 ? `${shown}, + ${remaining} more` : shown;
+}
+
+export async function getPublicationsByYearForHcp(
+  hcpId: string,
+  year: number,
+): Promise<BibliographyPaper[]> {
+  if (!hcpId || !Number.isFinite(year)) return [];
+  const { data, error } = await supabase
+    .from("publication_authors_v2")
+    .select(
+      `
+      author_position,
+      is_first_author,
+      publications_v2!inner (
+        id,
+        pubmed_id,
+        title,
+        journal,
+        citation_count,
+        pub_year,
+        pubmed_authorships
+      )
+      `,
+    )
+    .eq("hcp_id", hcpId)
+    .eq("publications_v2.pub_year", year);
+  if (error || !data) return [];
+  const rows = data as unknown as Array<{
+    author_position: number | null;
+    is_first_author: boolean | null;
+    publications_v2: {
+      id: string;
+      pubmed_id: string | null;
+      title: string | null;
+      journal: string | null;
+      citation_count: number | null;
+      pub_year: number | null;
+      pubmed_authorships: unknown;
+    } | null;
+  }>;
+  const papers: BibliographyPaper[] = [];
+  for (const row of rows) {
+    const pub = row.publications_v2;
+    if (!pub || !pub.id) continue;
+    papers.push({
+      id: pub.id,
+      pmid: pub.pubmed_id,
+      title: pub.title ?? "(Untitled)",
+      journal: pub.journal,
+      citations: pub.citation_count,
+      isFirstAuthor: row.is_first_author === true,
+      coAuthors: formatCoAuthors(pub.pubmed_authorships, row.author_position),
+    });
+  }
+  papers.sort((a, b) => (b.citations ?? 0) - (a.citations ?? 0));
+  return papers;
+}
+
 export async function getLatestPostForHandle(
   platform: string,
   handle: string,
