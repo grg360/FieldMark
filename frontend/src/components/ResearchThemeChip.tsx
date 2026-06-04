@@ -24,52 +24,32 @@ export default function ResearchThemeChip({
       aria-expanded={isActive}
       style={{
         position: "relative",
-        minHeight: 80,
-        padding: 16,
-        borderRadius: 12,
-        border: isActive ? "2px solid rgba(120, 200, 255, 0.55)" : "2px solid transparent",
+        minHeight: 64,
+        padding: "10px 12px",
+        borderRadius: 4,
+        border: isActive ? "1px solid #E8A020" : "1px solid #2B2520",
         backgroundColor,
         color: textColor,
         cursor: "pointer",
         textAlign: "left",
         width: "100%",
         fontFamily: "system-ui, sans-serif",
-        boxShadow: isActive
-          ? "0 6px 20px rgba(0, 0, 0, 0.35)"
-          : "0 2px 8px rgba(0, 0, 0, 0.2)",
-        transform: isActive ? "scale(1.02)" : "scale(1)",
-        transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.transform = "scale(1.02)";
-          e.currentTarget.style.boxShadow = "0 6px 18px rgba(0, 0, 0, 0.3)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.2)";
-        }
+        transition: "border-color 0.15s ease",
       }}
     >
       <span
         style={{
           position: "absolute",
-          top: 10,
-          right: 10,
-          minWidth: 24,
-          height: 24,
-          borderRadius: "50%",
-          backgroundColor: "rgba(0, 0, 0, 0.25)",
-          color: textColor,
+          top: 8,
+          right: 8,
+          backgroundColor: "#1A1A1E",
+          color: "#E8A020",
           fontSize: 11,
-          fontWeight: 600,
           fontFamily: "monospace",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "0 6px",
+          fontWeight: 500,
+          padding: "2px 7px",
+          borderRadius: 3,
+          lineHeight: 1.4,
         }}
       >
         {theme.paper_count}
@@ -77,10 +57,10 @@ export default function ResearchThemeChip({
       <span
         style={{
           display: "block",
-          fontSize: 14,
-          fontWeight: 600,
+          fontSize: 12,
+          fontWeight: 500,
           lineHeight: 1.35,
-          paddingRight: 28,
+          paddingRight: 36,
         }}
       >
         {theme.theme_name}
