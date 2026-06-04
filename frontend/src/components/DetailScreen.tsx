@@ -9,6 +9,7 @@ import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ContextualizeHCPForm from "./ContextualizeHCPForm";
 import OptOutRequestForm from "./OptOutRequestForm";
 import { FiChip, FiModal, FiToast } from "./FieldIntelligenceShared";
+import TopPharmaCompanies from "./TopPharmaCompanies";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
@@ -1314,6 +1315,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
           <div style={{ marginBottom: 16 }}>
             <DetailHeaderMetrics hcp={hcp} />
           </div>
+          <TopPharmaCompanies hcpId={String(hcp.hcp_id ?? hcp.id ?? "")} />
 
         {/* Field notes */}
         <div style={{ padding: "16px 0 24px" }}>

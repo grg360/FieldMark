@@ -2132,6 +2132,81 @@ export async function getPublicationsByYearForHcp(
   return papers;
 }
 
+export type CompanyStatus = "active" | "dormant" | "lapsed";
+
+export interface TopCompanyEntry {
+  manufacturer_name: string;
+  manufacturer_clean: string;
+  total_amount_usd: number;
+  payment_count: number;
+  most_recent_payment_date: string | null;
+  status: CompanyStatus;
+  rank_by_amount: number;
+}
+
+function cleanManufacturerName(raw: string): string {
+  if (!raw) return "";
+  let name = raw.trim();
+  name = name.replace(/,?\s+INC\.?$/i, "");
+  name = name.replace(/,?\s+LLC\.?$/i, "");
+  name = name.replace(/,?\s+LP\.?$/i, "");
+  name = name.replace(/\s+PHARMACEUTICALS$/i, "");
+  name = name.replace(/\s+PHARMACEUTICALS,?$/i, "");
+  const lower = name.toLowerCase();
+  const titled = lower.replace(/\b([a-z])([a-z]*)/g, (_m, first, rest) => first.toUpperCase() + rest);
+  return titled.trim();
+}
+
+function computeCompanyStatus(mostRecentDate: string | null): CompanyStatus {
+  if (!mostRecentDate) return "lapsed";
+  const parsed = new Date(mostRecentDate);
+  if (Number.isNaN(parsed.getTime())) return "lapsed";
+  const now = new Date();
+  const monthsAgo =
+    (now.getFullYear() - parsed.getFullYear()) * 12 + (now.getMonth() - parsed.getMonth());
+  if (monthsAgo <= 18) return "active";
+  if (monthsAgo <= 36) return "dormant";
+  return "lapsed";
+}
+
+export async function getTopCompaniesForHcp(hcpId: string): Promise<TopCompanyEntry[]> {
+  if (!hcpId) return [];
+  const { data, error } = await supabase
+    .from("hcp_open_payments_top_companies_v2")
+    .select(
+      `
+      manufacturer_name,
+      total_amount_usd,
+      payment_count,
+      most_recent_payment_date,
+      rank_by_amount
+    `,
+    )
+    .eq("hcp_id", hcpId)
+    .order("rank_by_amount", { ascending: true })
+    .limit(5);
+  if (error || !data) return [];
+  return (
+    data as Array<{
+      manufacturer_name: string | null;
+      total_amount_usd: number | null;
+      payment_count: number | null;
+      most_recent_payment_date: string | null;
+      rank_by_amount: number | null;
+    }>
+  )
+    .filter((row) => row.manufacturer_name != null)
+    .map((row) => ({
+      manufacturer_name: row.manufacturer_name as string,
+      manufacturer_clean: cleanManufacturerName(row.manufacturer_name as string),
+      total_amount_usd: Number(row.total_amount_usd ?? 0),
+      payment_count: Number(row.payment_count ?? 0),
+      most_recent_payment_date: row.most_recent_payment_date,
+      status: computeCompanyStatus(row.most_recent_payment_date),
+      rank_by_amount: Number(row.rank_by_amount ?? 0),
+    }));
+}
+
 export async function getLatestPostForHandle(
   platform: string,
   handle: string,
