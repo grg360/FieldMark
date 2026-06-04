@@ -1905,10 +1905,10 @@ export async function searchHCPs(
       id,
       first_name,
       last_name,
-      institution,
+      institution_normalized,
       cohort_classification,
       cohort_score,
-      hcp_therapeutic_areas (
+      hcp_therapeutic_areas_v2 (
         therapeutic_area_id,
         therapeutic_areas ( name )
       )
@@ -1927,14 +1927,14 @@ export async function searchHCPs(
     const id = String(row.id ?? "");
     if (!id) continue;
 
-    const { ids: therapeuticAreaIds } = parseTherapeuticAreaLinks(row.hcp_therapeutic_areas);
+    const { ids: therapeuticAreaIds } = parseTherapeuticAreaLinks(row.hcp_therapeutic_areas_v2);
 
     if (!byHcpId.has(id)) {
       byHcpId.set(id, {
         id,
         firstName: String(row.first_name ?? ""),
         lastName: String(row.last_name ?? ""),
-        institution: row.institution != null ? String(row.institution) : null,
+        institution: row.institution_normalized != null ? String(row.institution_normalized) : null,
         cohortClassification: mapSearchCohortClassification(row.cohort_classification),
         cohortScore:
           row.cohort_score == null ? null : Number(row.cohort_score),
