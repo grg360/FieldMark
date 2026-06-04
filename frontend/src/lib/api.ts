@@ -395,6 +395,7 @@ async function fetchCohortViaRpc(
     p_scope_type: rpcScope.scopeType,
     p_scope_values: rpcScope.scopeValues,
     p_states: rpcScope.states,
+    p_canonical_theme_ids: filters.themeIds ?? [],
   };
 
   const { data: countData, error: countErr } = await supabase.rpc(countRpc, rpcParams);

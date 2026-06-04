@@ -164,6 +164,7 @@ export interface FilterState {
   country?: string;      // ISO 3166-1 alpha-2 country code; overrides region if both set
   scope?: "global" | "regional"; // When 'global', returns unfiltered counts. Defaults to 'regional'.
   states?: string[];     // US state codes ["NY", "NJ", ...], applied only when region includes "US"
+  themeIds?: string[];   // uuid array of canonical_id values; empty = no theme filter
   // Future filters land here. Adding them does NOT require api.ts changes
   // until the resolver/query layer is taught to consume them.
 }

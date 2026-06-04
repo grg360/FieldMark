@@ -1,27 +1,39 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { DEFAULT_REGION, REGION_DISPLAY_NAMES, type RegionKey } from "../lib/regions";
 import { useFilterContext } from "../lib/filter-context";
+import { getCanonicalThemes } from "../lib/themes-api";
 
 function isDefaultRegions(regions: RegionKey[]): boolean {
   return regions.length === 1 && regions[0] === "US";
 }
 
-export default function ActiveFilterPills() {
-  const { regions, setRegions, states, setStates } = useFilterContext();
+interface ActiveFilterPillsProps {
+  taSlug: string;
+}
+
+export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
+  const { regions, setRegions, states, setStates, themeIds, setThemeIds } =
+    useFilterContext();
+  const [totalThemeCount, setTotalThemeCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCanonicalThemes(taSlug).then((themes) => {
+      if (!cancelled) setTotalThemeCount(themes.length);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [taSlug]);
 
   const showRegions = !isDefaultRegions(regions);
   const showStates = states.length > 0;
+  const showThemes =
+    themeIds.length > 0 &&
+    totalThemeCount > 0 &&
+    themeIds.length < totalThemeCount;
 
-  if (!showRegions && !showStates) return null;
-
-  function removeRegion(region: RegionKey) {
-    const next = regions.filter((r) => r !== region);
-    setRegions(next.length === 0 ? [DEFAULT_REGION] : next);
-  }
-
-  function removeState(state: string) {
-    setStates(states.filter((s) => s !== state));
-  }
+  if (!showRegions && !showStates && !showThemes) return null;
 
   const pillStyle: CSSProperties = {
     background: "rgba(216, 90, 48, 0.10)",
@@ -46,6 +58,15 @@ export default function ActiveFilterPills() {
     color: "#6B6A65",
     lineHeight: 1,
   };
+
+  function removeRegion(region: RegionKey) {
+    const next = regions.filter((r) => r !== region);
+    setRegions(next.length === 0 ? [DEFAULT_REGION] : next);
+  }
+
+  function removeState(state: string) {
+    setStates(states.filter((s) => s !== state));
+  }
 
   return (
     <div
@@ -96,6 +117,25 @@ export default function ActiveFilterPills() {
             </button>
           </span>
         ))}
+      {showThemes && (
+        <span style={pillStyle}>
+          Themes: {themeIds.length} of {totalThemeCount}
+          <button
+            type="button"
+            aria-label="Remove theme filter"
+            style={removeBtnStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#E8E6DF";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#6B6A65";
+            }}
+            onClick={() => setThemeIds([])}
+          >
+            ×
+          </button>
+        </span>
+      )}
     </div>
   );
 }

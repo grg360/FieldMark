@@ -8,6 +8,9 @@ import ScoreModal from "./ScoreModal";
 const getCountryCode = (country: string | null): string | null => {
   if (!country) return null;
   const c = country.trim().replace(/\.$/, "").toLowerCase();
+  if (/^[a-z]{2}$/.test(c)) {
+    return c;
+  }
   const codes: Record<string, string> = {
     usa: "us",
     "united states": "us",

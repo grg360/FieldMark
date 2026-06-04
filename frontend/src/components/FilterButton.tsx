@@ -1,21 +1,48 @@
 import type { RegionKey } from "../lib/regions";
 import { useFilterContext } from "../lib/filter-context";
+import { useEffect, useState } from "react";
+import { getCanonicalThemes } from "../lib/themes-api";
 
-function countActiveFilters(regions: RegionKey[], states: string[]): number {
+function countActiveFilters(
+  regions: RegionKey[],
+  states: string[],
+  themeIds: string[],
+  totalThemeCount: number,
+): number {
   let count = 0;
   const isDefault = regions.length === 1 && regions[0] === "US";
   if (!isDefault) count += 1;
   if (states.length > 0) count += 1;
+  if (
+    themeIds.length > 0 &&
+    totalThemeCount > 0 &&
+    themeIds.length < totalThemeCount
+  ) {
+    count += 1;
+  }
   return count;
 }
 
 interface FilterButtonProps {
   onClick: () => void;
+  taSlug: string;
 }
 
-export default function FilterButton({ onClick }: FilterButtonProps) {
-  const { regions, states } = useFilterContext();
-  const count = countActiveFilters(regions, states);
+export default function FilterButton({ onClick, taSlug }: FilterButtonProps) {
+  const { regions, states, themeIds } = useFilterContext();
+  const [totalThemeCount, setTotalThemeCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCanonicalThemes(taSlug).then((themes) => {
+      if (!cancelled) setTotalThemeCount(themes.length);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [taSlug]);
+
+  const count = countActiveFilters(regions, states, themeIds, totalThemeCount);
 
   return (
     <button

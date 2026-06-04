@@ -12,6 +12,7 @@ import { DEFAULT_REGION, REGIONS, type RegionKey } from "./regions";
 const STORAGE_KEY = "fieldmark.user.region";
 const REGIONS_STORAGE_KEY = "fieldmark.user.regions";
 const STATES_STORAGE_KEY = "fieldmark.user.states";
+const THEME_IDS_STORAGE_KEY = "fieldmark.user.themeIds";
 
 interface FilterContextValue {
   region: RegionKey;
@@ -19,6 +20,8 @@ interface FilterContextValue {
   setRegions: (regions: RegionKey[]) => void;
   states: string[];
   setStates: (states: string[]) => void;
+  themeIds: string[];
+  setThemeIds: (ids: string[]) => void;
   setRegion: (region: RegionKey) => void;
 }
 
@@ -71,6 +74,25 @@ function readStoredStates(): string[] {
   return [];
 }
 
+function readStoredThemeIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = window.localStorage.getItem(THEME_IDS_STORAGE_KEY);
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored);
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((item) => typeof item === "string" && item.trim() !== "")
+      ) {
+        return parsed.map((item) => String(item));
+      }
+    }
+  } catch {
+    // localStorage unavailable; fall through to default.
+  }
+  return [];
+}
+
 function normalizeRegions(regions: RegionKey[]): RegionKey[] {
   if (regions.length === 0) return [DEFAULT_REGION];
   return regions;
@@ -83,10 +105,12 @@ function normalizeRegions(regions: RegionKey[]): RegionKey[] {
 export function FilterProvider({ children }: { children: ReactNode }) {
   const [regions, setRegionsState] = useState<RegionKey[]>([DEFAULT_REGION]);
   const [states, setStatesState] = useState<string[]>([]);
+  const [themeIds, setThemeIdsState] = useState<string[]>([]);
 
   useEffect(() => {
     setRegionsState(readStoredRegions());
     setStatesState(readStoredStates());
+    setThemeIdsState(readStoredThemeIds());
   }, []);
 
   const region = regions[0] ?? DEFAULT_REGION;
@@ -112,6 +136,15 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setThemeIds = useCallback((nextThemeIds: string[]) => {
+    setThemeIdsState(nextThemeIds);
+    try {
+      window.localStorage.setItem(THEME_IDS_STORAGE_KEY, JSON.stringify(nextThemeIds));
+    } catch {
+      // Storage failed; in-memory state still updates correctly.
+    }
+  }, []);
+
   const setRegion = useCallback(
     (nextRegion: RegionKey) => {
       setRegions([nextRegion]);
@@ -120,8 +153,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<FilterContextValue>(
-    () => ({ region, regions, setRegions, states, setStates, setRegion }),
-    [region, regions, setRegions, states, setStates, setRegion],
+    () => ({ region, regions, setRegions, states, setStates, themeIds, setThemeIds, setRegion }),
+    [region, regions, setRegions, states, setStates, themeIds, setThemeIds, setRegion],
   );
 
   return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>;

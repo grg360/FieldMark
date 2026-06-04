@@ -322,7 +322,7 @@ function FeedLayout({
   forcedIndication,
 }: { forcedDashboard?: string; forcedIndication?: string } = {}) {
   const { track, setTrack } = useTrack();
-  const { region, regions, states } = useFilterContext();
+  const { region, regions, states, themeIds } = useFilterContext();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -429,7 +429,7 @@ function FeedLayout({
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states };
+      const filters = { therapeuticArea: taSlug, region, states, themeIds };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
@@ -470,7 +470,7 @@ function FeedLayout({
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states };
+      const filters = { therapeuticArea: taSlug, region, states, themeIds };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
@@ -498,13 +498,13 @@ function FeedLayout({
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, track, region, regions, states, route.indicationDataActive]);
+  }, [selectedTA, track, region, regions, states, themeIds, route.indicationDataActive]);
 
   async function loadMore() {
     if (!isCohortFeedTrack(track)) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = taLabelToApiSlug(selectedTA);
-    const filters = { therapeuticArea: taSlug, region, states };
+    const filters = { therapeuticArea: taSlug, region, states, themeIds };
     setLoadingMore(true);
     try {
       let data;
@@ -714,7 +714,10 @@ function FeedLayout({
                 return `${resolved.toLocaleString()} identified`;
               })()}
             </span>
-            <FilterButton onClick={() => setFilterDrawerOpen(true)} />
+            <FilterButton
+              onClick={() => setFilterDrawerOpen(true)}
+              taSlug={taLabelToApiSlug(selectedTA)}
+            />
             <button
               onClick={() => setFeedOverlay("landscape")}
               style={{
@@ -833,7 +836,7 @@ function FeedLayout({
         )
       ) : isCohortFeedTrack(track) ? (
         <>
-        <ActiveFilterPills />
+        <ActiveFilterPills taSlug={taLabelToApiSlug(selectedTA)} />
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
           {showInactiveIndicationEmpty ? (
             <div
@@ -945,6 +948,7 @@ function FeedLayout({
       <FilterDrawer
         open={filterDrawerOpen}
         onClose={() => setFilterDrawerOpen(false)}
+        taSlug={taLabelToApiSlug(selectedTA)}
       />
 
       {/* Action Tray */}

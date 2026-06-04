@@ -83,4 +83,5 @@ frontend_dump.md
 
 # --- Existing untracked files we don't want to track ---
 fieldmark_backup_premerge.dump
-Twitter API.txt
+Twitter API.txtno_fit_*.json
+failed_batches_*.json
