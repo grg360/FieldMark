@@ -31,6 +31,10 @@ export interface HCP {
   open_payments_lifetime?: number | null;
   /** From hcps.total_career_pubs when loaded (e.g. Established PUBS pill). */
   total_career_pubs?: number | null;
+  /** Established v3 subscore percentiles (0–100). */
+  scientific_influence_pctile?: number | null;
+  network_influence_pctile?: number | null;
+  pharma_engagement_pctile?: number | null;
   /** Lifetime citations from OpenAlex (most recent snapshot). */
   total_citations?: number | null;
   /** h-index from OpenAlex (most recent snapshot). */

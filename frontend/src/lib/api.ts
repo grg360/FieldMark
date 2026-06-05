@@ -114,6 +114,29 @@ async function enrichAndMapCohortRows(
 
   const hcpIds = rankRows.map((r: any) => String(r.hcp_id));
 
+  let v3ByHcp = new Map<string, Record<string, unknown>>();
+  if (cohort === "established") {
+    const scopeParams = resolveRpcScopeParams(filters);
+    let v3Query = supabase
+      .from("hcp_established_ranks_v3")
+      .select(
+        "hcp_id, rank, cohort_score, scientific_influence_pctile, network_influence_pctile, pharma_engagement_pctile",
+      )
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", scopeParams.scopeType)
+      .in("hcp_id", hcpIds);
+    if (scopeParams.scopeValues.length > 0) {
+      v3Query = v3Query.in("scope_value", scopeParams.scopeValues);
+    }
+    const { data: v3Rows, error: v3Err } = await v3Query;
+    if (v3Err) {
+      return { rows: [], error: `Established v3 ranks query failed: ${v3Err.message}` };
+    }
+    for (const row of v3Rows ?? []) {
+      v3ByHcp.set(String(row.hcp_id), row as Record<string, unknown>);
+    }
+  }
+
   const { data: globalRankRows } = await supabase
     .from(rankTable)
     .select("hcp_id, rank")
@@ -342,11 +365,17 @@ async function enrichAndMapCohortRows(
     }
 
     if (cohort === "established") {
+      const v3 = v3ByHcp.get(String(rr.hcp_id));
+      const v3CohortScore = parseOptionalNumber(v3?.cohort_score);
       return [
         {
           ...base,
+          cohort_score: v3CohortScore ?? normalizedScore,
           cohort_classification: "established",
           tier: "established",
+          scientific_influence_pctile: parseOptionalNumber(v3?.scientific_influence_pctile),
+          network_influence_pctile: parseOptionalNumber(v3?.network_influence_pctile),
+          pharma_engagement_pctile: parseOptionalNumber(v3?.pharma_engagement_pctile),
           pubVel: "—",
           citTraj: null,
           pub_velocity: 0,
@@ -804,7 +833,7 @@ export async function getEstablished(
       offset,
       "get_established_filtered_count",
       "get_established_filtered",
-      "hcp_established_ranks_v2",
+      "hcp_established_ranks_v3",
       "established",
     );
     if (fetchError) {

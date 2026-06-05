@@ -1350,9 +1350,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             );
           })()}
 
-          <div className="fm-detail-section fm-section-cohort-score" style={{ marginBottom: 16 }}>
-            <DetailHeaderMetrics hcp={hcp} />
-          </div>
           <div className="fm-detail-section fm-section-top-pharma">
             <TopPharmaCompanies hcpId={String(hcp.hcp_id ?? hcp.id ?? "")} />
           </div>

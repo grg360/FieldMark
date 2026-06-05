@@ -31,6 +31,9 @@ export interface HCP {
   worksCount?: number | null;
   openPaymentsLifetime?: number | null;
   cohortScore?: number | null;
+  scientificInfluencePctile?: number | null;
+  networkInfluencePctile?: number | null;
+  pharmaEngagementPctile?: number | null;
   institutionShort?: string | null;
   nppesPracticeCity?: string | null;
   nppesPracticeState?: string | null;
