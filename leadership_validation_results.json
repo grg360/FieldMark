@@ -1,0 +1,288 @@
+[
+  {
+    "hcp": "John V. Heymach",
+    "institution": "MD Anderson Cancer Center",
+    "known_roles": [
+      "Chair, Thoracic/Head and Neck Medical Oncology",
+      "NCCN NSCLC panel"
+    ],
+    "pages_fetched": 4,
+    "pages_with_extraction": 3,
+    "evidence_count_raw": 35,
+    "evidence_count_deduped": 13,
+    "evidence": [
+      {
+        "role_type": "department_chair",
+        "role_title": "Chair, Department of Thoracic-Head & Neck Med Onc, Division of Cancer Medicine",
+        "organization": "The University of Texas MD Anderson Cancer Center",
+        "snippet": "Chair, Department of Thoracic-Head & Neck Med Onc, Division of Cancer Medicine, The University of Texas MD Anderson Cancer Center, Houston, TX",
+        "confidence": 1.0,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "endowed_professor",
+        "role_title": "Endowed Chair, Ruth Legett Jones Distinguished Chair",
+        "organization": "The University of Texas MD Anderson Cancer Center",
+        "snippet": "Endowed Chair, Ruth Legett Jones Distinguished Chair, Department of Thoracic-Head & Neck Med Onc, Division of Cancer Medicine, The University of Texas MD Anderson Cancer Center, Houston, Texas",
+        "confidence": 1.0,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "endowed_professor",
+        "role_title": "David Bruton Endowed Chair in Cancer Research",
+        "organization": "MD Anderson Cancer Center",
+        "snippet": "He holds the David Bruton Endowed Chair in Cancer Research.",
+        "confidence": 0.9,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "program_director",
+        "role_title": "Co-Leader, CCSG Experimental Medicine Program",
+        "organization": "The University of Texas MD Anderson Cancer Center",
+        "snippet": "Co-Leader, CCSG Experimental Medicine Program, The University of Texas MD Anderson Cancer Center, Houston, Texas, 2023 - Present",
+        "confidence": 1.0,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "program_director",
+        "role_title": "Leader, CCSG Lung Cancer Program",
+        "organization": "The University of Texas MD Anderson Cancer Center",
+        "snippet": "Leader, CCSG Lung Cancer Program, Department of Thoracic-Head & Neck Med Onc, The University of Texas MD Anderson Cancer Center, Houston, TX, 2012 - Present",
+        "confidence": 1.0,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "program_director",
+        "role_title": "Leader, Lung Cancer Moon Shot Program",
+        "organization": "The University of Texas MD Anderson Cancer Center",
+        "snippet": "Leader, Lung Cancer Moon Shot Program, Department of Thoracic-Head & Neck Med Onc, The University of Texas MD Anderson Cancer Center, Houston, TX, 2012 - Present",
+        "confidence": 1.0,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "society_committee",
+        "role_title": "Vice Chair, NRG Oncology Lung Cancer Committee",
+        "organization": "NRG Oncology",
+        "snippet": "Vice Chair, NRG Oncology Lung Cancer Committee, NRG Oncology, Houston, Texas, 2026 - Present",
+        "confidence": 1.0,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "society_committee",
+        "role_title": "Co-Chair, International Association for the Study of Lung Cancer (IASLC) World Conference Lung Cancer",
+        "organization": "International Association for the Study of Lung Cancer (IASLC)",
+        "snippet": "Co-Chair, International Association for the Study of Lung Cancer (IASLC) World Conference Lung Cancer, Denver, Colorado, 2026 - 2027",
+        "confidence": 0.85,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "society_committee",
+        "role_title": "Chair, Cancer Communications Committee",
+        "organization": "ASCO American Society of Clinical Oncology",
+        "snippet": "Chair, Cancer Communications Committee, ASCO American Society of Clinical Oncology, Houston, Texas, 2017 - 2018",
+        "confidence": 0.75,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "society_committee",
+        "role_title": "Chair, Study Section, Mechanisms of Cancer Therapeutics-1 (MCT-1)",
+        "organization": "National Institute of Health (NIH)",
+        "snippet": "Chair, Study Section, National Institute of Health (NIH), Mechanisms of Cancer Therapeutics-1 (MCT-1), Bethesda, MD, 2019 - 2021",
+        "confidence": 0.75,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "other",
+        "role_title": "Chair, CNAA Review Committee",
+        "organization": "The University of Texas MD Anderson Cancer Center",
+        "snippet": "Chair, CNAA Review Committee, The University of Texas MD Anderson Cancer Center, 2024 - Present",
+        "confidence": 0.95,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "other",
+        "role_title": "Co-Founder",
+        "organization": "Tenaci-T Therapeutics",
+        "snippet": "Co-Founder, Tenaci-T Therapeutics, Houston, TX, 2025 - Present",
+        "confidence": 0.85,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      },
+      {
+        "role_type": "division_chief",
+        "role_title": "Co-Leader, CCSG Experimental Medicine Program",
+        "organization": "The University of Texas MD Anderson Cancer Center",
+        "snippet": "Co-Leader, CCSG Experimental Medicine Program, The University of Texas MD Anderson Cancer Center, Houston, Texas, 2023 - Present",
+        "confidence": 0.9,
+        "source_url": "https://faculty.mdanderson.org/profiles/john_heymach.html"
+      }
+    ]
+  },
+  {
+    "hcp": "Pasi A. Jänne",
+    "institution": "Dana-Farber Cancer Institute",
+    "known_roles": [
+      "Director, Lowe Center for Thoracic Oncology",
+      "Director, Belfer Center for Applied Cancer Science"
+    ],
+    "pages_fetched": 7,
+    "pages_with_extraction": 3,
+    "evidence_count_raw": 6,
+    "evidence_count_deduped": 2,
+    "evidence": [
+      {
+        "role_type": "other",
+        "role_title": "Senior Vice President for Translational Medicine",
+        "organization": "Dana-Farber Cancer Institute",
+        "snippet": "He is the Senior Vice President for Translational Medicine and the Scientific Director of the Belfer Center for Applied Cancer Science.",
+        "confidence": 0.97,
+        "source_url": "https://www.dana-farber.org/find-a-doctor/pasi-a-janne"
+      },
+      {
+        "role_type": "center_director",
+        "role_title": "Scientific Director of the Belfer Center for Applied Cancer Science",
+        "organization": "Dana-Farber Cancer Institute",
+        "snippet": "He is the Senior Vice President for Translational Medicine and the Scientific Director of the Belfer Center for Applied Cancer Science.",
+        "confidence": 0.97,
+        "source_url": "https://www.dana-farber.org/find-a-doctor/pasi-a-janne"
+      }
+    ]
+  },
+  {
+    "hcp": "Charles M. Rudin",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "known_roles": [
+      "Chief, Thoracic Oncology Service",
+      "Co-Director, Druckenmiller Center for Lung Cancer Research"
+    ],
+    "pages_fetched": 7,
+    "pages_with_extraction": 7,
+    "evidence_count_raw": 13,
+    "evidence_count_deduped": 8,
+    "evidence": [
+      {
+        "role_type": "center_director",
+        "role_title": "Deputy Director",
+        "organization": "Memorial Sloan Kettering Cancer Center",
+        "snippet": "I'm Dr. Charles Rudin, Deputy Director of Memorial Sloan Kettering Cancer Center",
+        "confidence": 0.97,
+        "source_url": "https://www.mskcc.org/videos/meet-charles-rudin-thoracic-medical-oncologist-at-msk"
+      },
+      {
+        "role_type": "center_director",
+        "role_title": "Co-Director",
+        "organization": "Druckenmiller Center for Lung Cancer Research",
+        "snippet": "Co-Director of the Druckenmiller Center for Lung Cancer Research",
+        "confidence": 0.97,
+        "source_url": "https://www.mskcc.org/videos/meet-charles-rudin-thoracic-medical-oncologist-at-msk"
+      },
+      {
+        "role_type": "division_chief",
+        "role_title": "Chief of the Thoracic Oncology Service",
+        "organization": "Memorial Sloan Kettering Cancer Center",
+        "snippet": "Physician-scientist Charles M. Rudin, Chief of the Thoracic Oncology Service, leads research that focuses on the development and testing of novel therapeutic approaches to lung cancer",
+        "confidence": 0.97,
+        "source_url": "https://www.mskcc.org/research-areas/labs/charles-rudin"
+      },
+      {
+        "role_type": "center_director",
+        "role_title": "Cancer Center Director",
+        "organization": "Memorial Sloan Kettering Cancer Center",
+        "snippet": "I am Cancer Center Director at MSK.",
+        "confidence": 0.97,
+        "source_url": "https://www.mskcc.org/cancer-care/doctors/charles-rudin"
+      },
+      {
+        "role_type": "center_director",
+        "role_title": "Co-Director, Druckenmiller Center for Lung Cancer Research",
+        "organization": "Memorial Sloan Kettering Cancer Center",
+        "snippet": "I also co-direct the Druckenmiller Center focused on pre-clinical lung cancer research at MSK.",
+        "confidence": 0.97,
+        "source_url": "https://www.mskcc.org/cancer-care/doctors/charles-rudin"
+      },
+      {
+        "role_type": "endowed_professor",
+        "role_title": "Sylvia Hassenfeld Chair in Lung Cancer Research",
+        "organization": "Memorial Sloan Kettering Cancer Center",
+        "snippet": "Sylvia Hassenfeld Chair in Lung Cancer Research",
+        "confidence": 0.95,
+        "source_url": "https://www.mskcc.org/cancer-care/doctors/charles-rudin"
+      },
+      {
+        "role_type": "society_committee",
+        "role_title": "Member, National Cancer Institute Board of Scientific Advisors",
+        "organization": "National Cancer Institute",
+        "snippet": "I serve on the National Cancer Institute Board of Scientific Advisors",
+        "confidence": 0.9,
+        "source_url": "https://www.mskcc.org/cancer-care/doctors/charles-rudin"
+      },
+      {
+        "role_type": "program_director",
+        "role_title": "Leader, Small Cell Lung Cancer Research Consortium",
+        "organization": "National Cancer Institute",
+        "snippet": "have led the National Cancer Institute's Small Cell Lung Cancer Research Consortium since its inception in 2015",
+        "confidence": 0.92,
+        "source_url": "https://www.mskcc.org/cancer-care/doctors/charles-rudin"
+      }
+    ]
+  },
+  {
+    "hcp": "Roy S. Herbst",
+    "institution": "Yale Cancer Center",
+    "known_roles": [
+      "Deputy Director, Yale Cancer Center",
+      "Chief of Medical Oncology",
+      "NCCN NSCLC panel"
+    ],
+    "pages_fetched": 2,
+    "pages_with_extraction": 2,
+    "evidence_count_raw": 6,
+    "evidence_count_deduped": 3,
+    "evidence": [
+      {
+        "role_type": "division_chief",
+        "role_title": "Chief of Medical Oncology",
+        "organization": "Yale School of Medicine / Yale Cancer Center",
+        "snippet": "Roy Herbst, MD, PhD, is chief of medical oncology and a pioneer of personalized medicine and immunotherapy whose goal is to cure lung cancer.",
+        "confidence": 0.97,
+        "source_url": "https://medicine.yale.edu/profile/roy-herbst"
+      },
+      {
+        "role_type": "center_director",
+        "role_title": "Associate Director for Translational Science",
+        "organization": "Yale School of Medicine and Yale Cancer Center",
+        "snippet": "Dr. Herbst, who is also associate director for translational science at Yale School of Medicine and Yale Cancer Center",
+        "confidence": 0.97,
+        "source_url": "https://medicine.yale.edu/profile/roy-herbst"
+      },
+      {
+        "role_type": "endowed_professor",
+        "role_title": "Ensign Professor of Medicine (Medical Oncology) and Professor of Pharmacology",
+        "organization": "Yale School of Medicine",
+        "snippet": "Roy S. Herbst, MD, PhD Ensign Professor of Medicine (Medical Oncology) and Professor of Pharmacology",
+        "confidence": 0.98,
+        "source_url": "https://medicine.yale.edu/profile/roy-herbst"
+      }
+    ]
+  },
+  {
+    "hcp": "Helena A. Yu",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "known_roles": [
+      "Section Head, Lung Cancer Medical Oncology"
+    ],
+    "pages_fetched": 4,
+    "pages_with_extraction": 4,
+    "evidence_count_raw": 4,
+    "evidence_count_deduped": 1,
+    "evidence": [
+      {
+        "role_type": "endowed_professor",
+        "role_title": "Ning Zhao & Ge Li Endowed Chair",
+        "organization": "Memorial Sloan Kettering Cancer Center",
+        "snippet": "Ning Zhao & Ge Li Endowed Chair",
+        "confidence": 0.95,
+        "source_url": "https://www.mskcc.org/cancer-care/doctors/helena-yu"
+      }
+    ]
+  }
+]

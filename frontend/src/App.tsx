@@ -552,7 +552,7 @@ function FeedLayout({
 
   function handleCardPress(hcp: AppHCP) {
     const hcpId = hcp.hcp_id ?? hcp.id;
-    if (hcpId) navigate(buildHcpDetailPath(hcpId));
+    if (hcpId) navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
   }
 
   function handleAddPress(hcp: AppHCP) {
@@ -567,11 +567,11 @@ function FeedLayout({
   function handleAddNoteFromTray() {
     setTrayOpen(false);
     const hcpId = activeHCP?.hcp_id ?? activeHCP?.id;
-    if (hcpId) navigate(buildHcpDetailPath(hcpId));
+    if (hcpId) navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
   }
 
   async function handleSearchSelect(hcpId: string, _taId: string) {
-    navigate(buildHcpDetailPath(hcpId));
+    navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
   }
 
   if (feedOverlay === "profile") {
@@ -612,7 +612,7 @@ function FeedLayout({
         onDetailHCPChange={(hcp) => {
           const row = hcp as unknown as AppHCP;
           const id = row.hcp_id ?? row.id;
-          if (id) navigate(buildHcpDetailPath(String(id)));
+          if (id) navigate(buildHcpDetailPath(String(id)), { state: { taLabel: selectedTA } });
         }}
         onNavigateTo={() => {}}
         bibYear={bibYear}
@@ -1028,7 +1028,9 @@ type HcpDetailSubScreen = "detail" | "note" | "bibliography";
 function HCPDetailRoute() {
   const { hcpId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { region } = useFilterContext();
+  const selectedTA = (location.state as { taLabel?: string } | null)?.taLabel ?? "Oncology";
   const [subScreen, setSubScreen] = useState<HcpDetailSubScreen>("detail");
   const [hcp, setHcp] = useState<AppHCP>(EMPTY_HCP);
   const [loading, setLoading] = useState(true);
@@ -1147,6 +1149,7 @@ function HCPDetailRoute() {
           setBibYear(year);
           setSubScreen("bibliography");
         }}
+        taSlug={taLabelToApiSlug(selectedTA)}
       />
       <ActionTray
         open={trayOpen}

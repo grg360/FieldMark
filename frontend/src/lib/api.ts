@@ -454,6 +454,46 @@ export interface HCPDetail extends RisingStar {
   trial_count: number;
 }
 
+export interface ScientificInfluenceData {
+  percentile: number;
+  senior_pub_count: number;
+  senior_pub_total_citations: number;
+  guideline_pub_count: number;
+  senior_pub_recent_5yr: number;
+}
+
+export interface NetworkInfluenceData {
+  score: number;
+  collaborator_count: number;
+  degree_percentile: number;
+  eigenvector_percentile: number;
+  betweenness_percentile: number;
+}
+
+export interface IndustryEngagementData {
+  percentile: number;
+  total_payments_3yr: number;
+  distinct_companies_3yr: number;
+  distinct_drugs_3yr: number;
+  payment_count_3yr: number;
+}
+
+export interface TopCollaborator {
+  hcp_id: string;
+  rank: number;
+  name: string;
+  institution: string | null;
+  shared_publications: number;
+}
+
+export interface EstablishedScoreBreakdown {
+  cohort_score: number;
+  scientific: ScientificInfluenceData | null;
+  network: NetworkInfluenceData | null;
+  industry: IndustryEngagementData | null;
+  top_collaborators: TopCollaborator[];
+}
+
 const TA_ID_MAP: Record<string, string> = {
   "rare-disease": "833e7b38-d01b-409e-82c0-71eb29e138a0",
   hepatology: "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e",
@@ -1483,6 +1523,142 @@ export async function getHCPDetail(
   }
 }
 
+export async function getEstablishedScoreBreakdown(
+  hcpId: string,
+  taSlug: string,
+): Promise<EstablishedScoreBreakdown | null> {
+  if (!hcpId || !taSlug) return null;
+
+  const { data: taRow } = await supabase
+    .from("therapeutic_areas")
+    .select("id")
+    .eq("slug", taSlug)
+    .single();
+
+  if (!taRow?.id) return null;
+  const taId = taRow.id;
+
+  console.log("[getEstablishedScoreBreakdown] called with hcpId=", hcpId, "taSlug=", taSlug, "taId=", taId);
+
+  const [
+    ranksV3,
+    scientific,
+    network,
+    pharma,
+    collaboratorsRaw,
+  ] = await Promise.all([
+    supabase
+      .from("hcp_established_ranks_v3")
+      .select("cohort_score")
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", "region")
+      .eq("scope_value", "US")
+      .maybeSingle(),
+    supabase
+      .from("hcp_publication_leadership_v2")
+      .select(
+        "percentile_rank, senior_pub_count, senior_pub_total_citations, guideline_pub_count, senior_pub_recent_5yr",
+      )
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .maybeSingle(),
+    supabase
+      .from("hcp_network_centrality_v2")
+      .select(
+        "network_influence_score, collaborator_count, degree_percentile, eigenvector_percentile, betweenness_percentile",
+      )
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .eq("window_type", "10yr")
+      .maybeSingle(),
+    supabase
+      .from("hcp_pharma_engagement_v2")
+      .select(
+        "percentile_rank, total_payments_3yr, distinct_companies_3yr, distinct_drugs_3yr, payment_count_3yr",
+      )
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .maybeSingle(),
+    supabase
+      .from("hcp_top_collaborators_v2")
+      .select("rank, collaborator_hcp_id, shared_publications")
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .eq("window_type", "10yr")
+      .order("rank", { ascending: true })
+      .limit(5),
+  ]);
+
+  console.log("[getEstablishedScoreBreakdown] raw responses:", {
+    ranksV3: ranksV3,
+    scientific: scientific,
+    network: network,
+    pharma: pharma,
+    collaboratorsRaw: collaboratorsRaw,
+  });
+
+  let topCollaborators: TopCollaborator[] = [];
+  if (collaboratorsRaw.data && collaboratorsRaw.data.length > 0) {
+    const collabIds = collaboratorsRaw.data.map((r) => r.collaborator_hcp_id);
+    const { data: collabHcps } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name, institution_normalized")
+      .in("id", collabIds);
+
+    const nameMap = new Map<string, { name: string; institution: string | null }>();
+    (collabHcps || []).forEach((h) => {
+      nameMap.set(String(h.id), {
+        name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim(),
+        institution: h.institution_normalized,
+      });
+    });
+
+    topCollaborators = collaboratorsRaw.data.map((r) => ({
+      hcp_id: r.collaborator_hcp_id,
+      rank: r.rank,
+      name: nameMap.get(String(r.collaborator_hcp_id))?.name ?? "Unknown",
+      institution: nameMap.get(String(r.collaborator_hcp_id))?.institution ?? null,
+      shared_publications: r.shared_publications,
+    }));
+  }
+
+  const result: EstablishedScoreBreakdown = {
+    cohort_score: ranksV3.data?.cohort_score ? Number(ranksV3.data.cohort_score) : 0,
+    scientific: scientific.data
+      ? {
+          percentile: Number(scientific.data.percentile_rank),
+          senior_pub_count: scientific.data.senior_pub_count ?? 0,
+          senior_pub_total_citations: scientific.data.senior_pub_total_citations ?? 0,
+          guideline_pub_count: scientific.data.guideline_pub_count ?? 0,
+          senior_pub_recent_5yr: scientific.data.senior_pub_recent_5yr ?? 0,
+        }
+      : null,
+    network: network.data
+      ? {
+          score: Number(network.data.network_influence_score),
+          collaborator_count: network.data.collaborator_count ?? 0,
+          degree_percentile: network.data.degree_percentile ?? 0,
+          eigenvector_percentile: network.data.eigenvector_percentile ?? 0,
+          betweenness_percentile: network.data.betweenness_percentile ?? 0,
+        }
+      : null,
+    industry: pharma.data
+      ? {
+          percentile: Number(pharma.data.percentile_rank),
+          total_payments_3yr: Number(pharma.data.total_payments_3yr ?? 0),
+          distinct_companies_3yr: pharma.data.distinct_companies_3yr ?? 0,
+          distinct_drugs_3yr: pharma.data.distinct_drugs_3yr ?? 0,
+          payment_count_3yr: pharma.data.payment_count_3yr ?? 0,
+        }
+      : null,
+    top_collaborators: topCollaborators,
+  };
+
+  console.log("[getEstablishedScoreBreakdown] returning:", result);
+  return result;
+}
+
 export interface HCPSearchResult {
   id: string;
   firstName: string;
@@ -1848,8 +2024,8 @@ function computeCompanyStatus(mostRecentDate: string | null): CompanyStatus {
   const now = new Date();
   const monthsAgo =
     (now.getFullYear() - parsed.getFullYear()) * 12 + (now.getMonth() - parsed.getMonth());
-  if (monthsAgo <= 18) return "active";
-  if (monthsAgo <= 36) return "dormant";
+  if (monthsAgo <= 24) return "active";
+  if (monthsAgo <= 48) return "dormant";
   return "lapsed";
 }
 
@@ -1902,6 +2078,7 @@ export interface DrugConstellationPoint {
   most_recent_payment_date: string;
   year_over_year_trend_pct: number | null;
   trend_category: TrendCategory;
+  payments_by_quarter?: Record<string, number> | null;
 }
 
 function computeTrendCategory(yoyPct: number | null): TrendCategory {
@@ -1922,7 +2099,8 @@ export async function getTopDrugsForHcp(hcpId: string): Promise<DrugConstellatio
       total_amount_usd,
       payment_count,
       most_recent_payment_date,
-      year_over_year_trend_pct
+      year_over_year_trend_pct,
+      payments_by_quarter
     `,
     )
     .eq("hcp_id", hcpId)
@@ -1937,6 +2115,7 @@ export async function getTopDrugsForHcp(hcpId: string): Promise<DrugConstellatio
       payment_count: number | null;
       most_recent_payment_date: string | null;
       year_over_year_trend_pct: number | null;
+      payments_by_quarter: Record<string, number> | null;
     }>
   )
     .filter(
@@ -1954,6 +2133,7 @@ export async function getTopDrugsForHcp(hcpId: string): Promise<DrugConstellatio
       most_recent_payment_date: row.most_recent_payment_date as string,
       year_over_year_trend_pct: row.year_over_year_trend_pct,
       trend_category: computeTrendCategory(row.year_over_year_trend_pct),
+      payments_by_quarter: row.payments_by_quarter ?? null,
     }));
 }
 

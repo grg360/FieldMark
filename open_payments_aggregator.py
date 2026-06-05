@@ -459,6 +459,18 @@ if __name__ == "__main__":
       MAX(CASE WHEN payment_date IS NOT NULL AND payment_date <> ''
                THEN strptime(payment_date, '%m/%d/%Y') ELSE NULL END
       ) AS most_recent_payment_date,
+      SUM(CASE WHEN program_year = 2022 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 1 AND 3 THEN payment_amount_usd ELSE 0 END) AS q_2022_q1,
+      SUM(CASE WHEN program_year = 2022 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 4 AND 6 THEN payment_amount_usd ELSE 0 END) AS q_2022_q2,
+      SUM(CASE WHEN program_year = 2022 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 7 AND 9 THEN payment_amount_usd ELSE 0 END) AS q_2022_q3,
+      SUM(CASE WHEN program_year = 2022 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 10 AND 12 THEN payment_amount_usd ELSE 0 END) AS q_2022_q4,
+      SUM(CASE WHEN program_year = 2023 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 1 AND 3 THEN payment_amount_usd ELSE 0 END) AS q_2023_q1,
+      SUM(CASE WHEN program_year = 2023 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 4 AND 6 THEN payment_amount_usd ELSE 0 END) AS q_2023_q2,
+      SUM(CASE WHEN program_year = 2023 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 7 AND 9 THEN payment_amount_usd ELSE 0 END) AS q_2023_q3,
+      SUM(CASE WHEN program_year = 2023 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 10 AND 12 THEN payment_amount_usd ELSE 0 END) AS q_2023_q4,
+      SUM(CASE WHEN program_year = 2024 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 1 AND 3 THEN payment_amount_usd ELSE 0 END) AS q_2024_q1,
+      SUM(CASE WHEN program_year = 2024 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 4 AND 6 THEN payment_amount_usd ELSE 0 END) AS q_2024_q2,
+      SUM(CASE WHEN program_year = 2024 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 7 AND 9 THEN payment_amount_usd ELSE 0 END) AS q_2024_q3,
+      SUM(CASE WHEN program_year = 2024 AND CAST(strftime(strptime(payment_date, '%m/%d/%Y'), '%m') AS INTEGER) BETWEEN 10 AND 12 THEN payment_amount_usd ELSE 0 END) AS q_2024_q4,
       SUM(CASE WHEN program_year = 2022 THEN payment_amount_usd ELSE 0 END) AS py2022_total,
       SUM(CASE WHEN program_year = 2024 THEN payment_amount_usd ELSE 0 END) AS py2024_total
     FROM filtered_payments
@@ -476,12 +488,30 @@ if __name__ == "__main__":
         trend = None
         if py2022 != 0:
             trend = ((py2024 - py2022) / py2022) * 100.0
+        payments_by_quarter = {
+            "2022-Q1": float(r.get("q_2022_q1") or 0.0),
+            "2022-Q2": float(r.get("q_2022_q2") or 0.0),
+            "2022-Q3": float(r.get("q_2022_q3") or 0.0),
+            "2022-Q4": float(r.get("q_2022_q4") or 0.0),
+            "2023-Q1": float(r.get("q_2023_q1") or 0.0),
+            "2023-Q2": float(r.get("q_2023_q2") or 0.0),
+            "2023-Q3": float(r.get("q_2023_q3") or 0.0),
+            "2023-Q4": float(r.get("q_2023_q4") or 0.0),
+            "2024-Q1": float(r.get("q_2024_q1") or 0.0),
+            "2024-Q2": float(r.get("q_2024_q2") or 0.0),
+            "2024-Q3": float(r.get("q_2024_q3") or 0.0),
+            "2024-Q4": float(r.get("q_2024_q4") or 0.0),
+        }
         by_drug_rows.append({
             "hcp_id": r["hcp_id"],
             "drug_name": r["drug_name"],
             "manufacturer_name": r["manufacturer_name"],
             "total_amount_usd": float(r.get("total_amount_usd") or 0.0),
             "payment_count": int(r.get("payment_count") or 0),
+            "py2022_total": float(r.get("py2022_total") or 0.0),
+            "py2023_total": float(r.get("py2023_total") or 0.0),
+            "py2024_total": float(r.get("py2024_total") or 0.0),
+            "payments_by_quarter": payments_by_quarter,
             "most_recent_payment_date": (
                 r["most_recent_payment_date"].date().isoformat()
                 if r.get("most_recent_payment_date") is not None

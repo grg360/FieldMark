@@ -154,8 +154,6 @@ button {
   }
   .fm-detail-right {
     padding: 16px !important;
-    position: sticky !important;
-    top: 0 !important;
     overflow-y: visible !important;
     min-height: 0 !important;
     align-self: start !important;

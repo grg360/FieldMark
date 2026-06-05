@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { fetchHcpThemes, getHCPNarrative, getPublicationTimeline, type PublicationTimelinePoint } from "../lib/api";
+import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getPublicationTimeline, type EstablishedScoreBreakdown, type PublicationTimelinePoint } from "../lib/api";
+import { taLabelToApiSlug } from "../lib/routeSlugs";
 import ResearchThemesSection from "./ResearchThemesSection";
 import type { ResearchTheme } from "../types/researchTheme";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
@@ -11,6 +12,7 @@ import OptOutRequestForm from "./OptOutRequestForm";
 import { FiChip, FiModal, FiToast } from "./FieldIntelligenceShared";
 import TopPharmaCompanies from "./TopPharmaCompanies";
 import DrugConstellation from "./DrugConstellation";
+import ScoreBreakdownV3 from "./ScoreBreakdownV3";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
@@ -120,6 +122,7 @@ interface DetailScreenProps {
   onBack: () => void;
   onAddNote: () => void;
   onYearPress: (year: number) => void;
+  taSlug: string;
 }
 
 const BackArrow = () => (
@@ -551,7 +554,7 @@ function EngagementMixBlock({
   );
 }
 
-export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: DetailScreenProps) {
+export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSlug }: DetailScreenProps) {
   if (typeof window !== "undefined") {
     console.log("[DetailScreen diagnostic]", {
       name: hcp.name,
@@ -583,6 +586,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
   const [narrativeLoading, setNarrativeLoading] = useState(true);
   const [researchThemes, setResearchThemes] = useState<ResearchTheme[]>([]);
   const [themesLoading, setThemesLoading] = useState(true);
+  const [scoreBreakdown, setScoreBreakdown] = useState<EstablishedScoreBreakdown | null>(null);
+  const [scoreBreakdownLoading, setScoreBreakdownLoading] = useState(false);
 
   useEffect(() => {
     const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
@@ -634,6 +639,32 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
       cancelled = true;
     };
   }, [hcp.hcp_id, hcp.id]);
+
+  useEffect(() => {
+    const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
+    if (!hcpId || !taSlug) return;
+    if (hcp.cohort_classification !== "established") return;
+
+    let cancelled = false;
+    setScoreBreakdownLoading(true);
+
+    getEstablishedScoreBreakdown(hcpId, taSlug)
+      .then((data) => {
+        if (cancelled) return;
+        setScoreBreakdown(data);
+      })
+      .catch((err) => {
+        console.error("[DetailScreen] getEstablishedScoreBreakdown failed:", err);
+        if (!cancelled) setScoreBreakdown(null);
+      })
+      .finally(() => {
+        if (!cancelled) setScoreBreakdownLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id, hcp.cohort_classification, taSlug]);
 
   const isUnclassified = isUnclassifiedCohort(hcp.cohort_classification);
   const isCommunityCohort =
@@ -911,9 +942,11 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-            Score breakdown
-          </div>
+          {!isEstablishedCohort && (
+            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+              Score breakdown
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {isCommunityCohort ? (
               <>
@@ -953,40 +986,10 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress }: De
                 />
               </>
             ) : isEstablishedCohort ? (
-              <>
-                <ScoreRow
-                  label="Career Publications"
-                  value={formatIntDisplay(hcp.totalCareerPubs ?? null)}
-                  percent={cappedPercent(hcp.totalCareerPubs, ESTABLISHED_MAX_PUBS)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-                <ScoreRow
-                  label="Career Years"
-                  value={formatIntDisplay(hcp.careerYears ?? null)}
-                  percent={cappedPercent(hcp.careerYears, ESTABLISHED_MAX_YEARS)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-                <ScoreRow
-                  label="Pharma Engagement"
-                  value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)}
-                  percent={cappedPercent(hcp.openPaymentsLifetime, ESTABLISHED_MAX_ENGAGEMENT)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-                <ScoreRow
-                  label="Trial Activity"
-                  value={formatResearchScoreValue(hcp.trialScore)}
-                  percent={cappedPercent(hcp.trialScore, ESTABLISHED_MAX_TRIAL)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-              </>
+              <ScoreBreakdownV3
+                data={scoreBreakdown}
+                loading={scoreBreakdownLoading}
+              />
             ) : (
               <>
                 <ScoreRow

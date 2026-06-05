@@ -101,6 +101,17 @@ export interface CohortFeedResult {
   emptyReason?: string;
 }
 
+/** Per-drug Open Payments row for Drug Engagement detail section. */
+export interface DrugConstellationEntry {
+  drug_name: string;
+  manufacturer_name: string;
+  total_amount_usd: number;
+  payment_count: number;
+  most_recent_payment_date: string;
+  year_over_year_trend_pct: number | null;
+  payments_by_quarter?: Record<string, number> | null;
+}
+
 export interface SocialUser {
   id: string;
   platform: "twitter" | "bluesky";
