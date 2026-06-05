@@ -126,6 +126,18 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "Citations",
     body: "Aggregate citation signal for this HCP is not yet wired in the feed card. Placeholder until citation totals are available.",
   },
+  SCIENTIFIC: {
+    title: "Scientific Influence",
+    body: "Publication leadership ranking (0-100 percentile). Based on senior-author papers, citation impact, guideline authorship, and recent publication activity.",
+  },
+  NETWORK: {
+    title: "Network Influence",
+    body: "Position within the NSCLC collaboration network (0-100 percentile). Combines degree centrality, eigenvector centrality, and betweenness centrality from the 10-year co-authorship graph.",
+  },
+  PHARMA: {
+    title: "Pharma Engagement",
+    body: "Industry engagement breadth (0-100 percentile). Based on Open Payments data: total payments (3yr), distinct companies, distinct drugs, and transaction frequency. Displayed for reference; does not drive ranking.",
+  },
 };
 
 const TOOLTIP_WIDTH = 220;
