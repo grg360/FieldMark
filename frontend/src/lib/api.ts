@@ -329,9 +329,12 @@ async function enrichAndMapCohortRows(
       scope_size: scopeSize,
       global_rank: globalRankByHcp.get(String(rr.hcp_id)) ?? null,
       scope: scopeLabel,
-      total_citations: metricsData?.cited_by_count ?? null,
-      h_index: metricsData?.h_index ?? null,
-      works_count: metricsData?.works_count ?? null,
+      citedByCount: rr.cited_by_count ?? metricsData?.cited_by_count ?? null,
+      hIndex: rr.h_index ?? metricsData?.h_index ?? null,
+      worksCount: rr.works_count ?? metricsData?.works_count ?? null,
+      total_citations: rr.cited_by_count ?? metricsData?.cited_by_count ?? null,
+      h_index: rr.h_index ?? metricsData?.h_index ?? null,
+      works_count: rr.works_count ?? metricsData?.works_count ?? null,
     };
 
     if (cohort === "rising_star") {

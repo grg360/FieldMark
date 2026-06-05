@@ -76,7 +76,7 @@ interface HCPCardProps {
 }
 
 function cohortStatKeys(cohort: string): readonly string[] {
-  if (cohort === "established") return ["PUBS", "CITATIONS", "TRIALS"] as const;
+  if (cohort === "established") return ["PUBS", "CITATIONS", "TRIAL SCORE"] as const;
   if (cohort === "community" || cohort === "workhorse") return ["ENGAGEMENT", "COMPANIES", "YEARS"] as const;
   return ["PUB SCORE", "H-INDEX", "PUB YEARS"] as const;
 }
@@ -100,8 +100,12 @@ function cohortBorderAccentColor(cohortClassification: string): string {
 function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
   if (cohort === "established") {
     if (key === "PUBS") return formatIntDisplay(hcp.totalCareerPubs ?? null);
-    if (key === "CITATIONS") return "—";
-    if (key === "TRIALS") {
+    if (key === "CITATIONS") {
+      return hcp.citedByCount != null
+        ? hcp.citedByCount.toLocaleString()
+        : "—";
+    }
+    if (key === "TRIAL SCORE") {
       return hcp.trialScore == null || !Number.isFinite(hcp.trialScore) || hcp.trialScore === 0
         ? "—"
         : String(Math.round(hcp.trialScore));

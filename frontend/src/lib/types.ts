@@ -86,6 +86,12 @@ export interface RisingStar extends HCP, HCPScore {
   /** Display label for rank stack (e.g. US, GLOBAL). */
   scope?: string;
   global_rank?: number | null;
+  /** Lifetime citations from OpenAlex (card display). */
+  citedByCount?: number | null;
+  /** h-index from OpenAlex (detail page; not shown on cards). */
+  hIndex?: number | null;
+  /** Lifetime works count from OpenAlex (detail page; not shown on cards). */
+  worksCount?: number | null;
 }
 
 /** Result payload from cohort feed API functions (getEstablished, getCommunity, getRisingStars). */

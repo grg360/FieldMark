@@ -30,9 +30,9 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "FieldMark Score",
     body: "Composite signal of pharma engagement, engagement breadth across companies, Medicare patient volume, and career stage. Normalized 0–100 within the community cohort.",
   },
-  "TRIALS": {
-    title: "Trial Activity",
-    body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
+  "TRIAL SCORE": {
+    title: "Trial Score",
+    body: "Normalized score (0-100) reflecting this HCP's clinical trial involvement, weighted by role (PI, sub-investigator, study chair) and trial phase. Scores are calibrated within cohort. Note: ClinicalTrials.gov coverage of site-level investigators is limited, so some major trialists may show lower scores than their actual involvement warrants.",
   },
   "PUB YEARS": {
     title: "Publication Years",
@@ -55,12 +55,12 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
   },
   "Trial activity": {
-    title: "Trial activity",
-    body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
+    title: "Trial Score",
+    body: "Normalized score (0-100) reflecting this HCP's clinical trial involvement, weighted by role (PI, sub-investigator, study chair) and trial phase. Scores are calibrated within cohort. Note: ClinicalTrials.gov coverage of site-level investigators is limited, so some major trialists may show lower scores than their actual involvement warrants.",
   },
   "Trial Activity": {
-    title: "Trial Activity",
-    body: "Trial activity counts the unique active or recently completed clinical trials this HCP is leading or co-leading as principal investigator, sub-investigator, study chair, or study director.",
+    title: "Trial Score",
+    body: "Normalized score (0-100) reflecting this HCP's clinical trial involvement, weighted by role (PI, sub-investigator, study chair) and trial phase. Scores are calibrated within cohort. Note: ClinicalTrials.gov coverage of site-level investigators is limited, so some major trialists may show lower scores than their actual involvement warrants.",
   },
   "Career age multiplier": {
     title: "Career age multiplier",

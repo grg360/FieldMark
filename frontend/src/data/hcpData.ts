@@ -26,6 +26,9 @@ export interface HCP {
   distinctCompanies?: number | null;
   careerYears?: number | null;
   totalCareerPubs?: number | null;
+  citedByCount?: number | null;
+  hIndex?: number | null;
+  worksCount?: number | null;
   openPaymentsLifetime?: number | null;
   cohortScore?: number | null;
   institutionShort?: string | null;
