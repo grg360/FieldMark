@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
 import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getPublicationTimeline, type EstablishedScoreBreakdown, type PublicationTimelinePoint } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import ResearchThemesSection from "./ResearchThemesSection";
 import type { ResearchTheme } from "../types/researchTheme";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
@@ -584,6 +585,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
   const [volumeTooltipYear, setVolumeTooltipYear] = useState<number | null>(null);
   const [narrative, setNarrative] = useState<string | null>(hcp.narrative ?? null);
   const [narrativeLoading, setNarrativeLoading] = useState(true);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [narrativeExpanded, setNarrativeExpanded] = useState(false);
   const [researchThemes, setResearchThemes] = useState<ResearchTheme[]>([]);
   const [themesLoading, setThemesLoading] = useState(true);
   const [scoreBreakdown, setScoreBreakdown] = useState<EstablishedScoreBreakdown | null>(null);
@@ -770,6 +773,61 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     "Possible duplicate profile",
   ] as const;
 
+  const renderNarrative = (): React.ReactNode => {
+    if (narrativeLoading) return "Loading...";
+    if (!narrative) return "Narrative generating — check back soon.";
+
+    const linkButtonStyle: React.CSSProperties = {
+      background: "none",
+      border: "none",
+      padding: 0,
+      color: "#E8A020",
+      fontSize: "inherit",
+      fontFamily: "inherit",
+      cursor: "pointer",
+      textDecoration: "underline",
+    };
+
+    if (isMobile && narrativeExpanded) {
+      return (
+        <>
+          {narrative}{" "}
+          <button
+            type="button"
+            onClick={() => setNarrativeExpanded(false)}
+            style={linkButtonStyle}
+          >
+            Show less
+          </button>
+        </>
+      );
+    }
+
+    if (!isMobile) {
+      return narrative;
+    }
+
+    const TRUNCATE_AT = 180;
+    if (narrative.length <= TRUNCATE_AT) return narrative;
+
+    const truncated = narrative.substring(0, TRUNCATE_AT);
+    const lastSpace = truncated.lastIndexOf(" ");
+    const display = truncated.substring(0, lastSpace > 0 ? lastSpace : TRUNCATE_AT);
+
+    return (
+      <>
+        {display}…{" "}
+        <button
+          type="button"
+          onClick={() => setNarrativeExpanded(true)}
+          style={linkButtonStyle}
+        >
+          Read more
+        </button>
+      </>
+    );
+  };
+
   return (
     <div
       className="fm-screen"
@@ -924,11 +982,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                   lineHeight: 1.6,
                 }}
               >
-                {narrativeLoading
-                  ? "Loading..."
-                  : narrative
-                    ? narrative
-                    : "Narrative generating — check back soon."}
+                {renderNarrative()}
               </div>
             </>
           )}

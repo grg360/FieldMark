@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import type { EstablishedScoreBreakdown } from "../lib/api";
+import InfoTooltip from "./InfoTooltip";
+import MiniCollaboratorNetwork from "./MiniCollaboratorNetwork";
 
 interface ScoreBreakdownV3Props {
   data: EstablishedScoreBreakdown | null;
@@ -15,13 +17,13 @@ const formatCompactDollar = (n: number): string => {
 
 const formatInt = (n: number): string => new Intl.NumberFormat("en-US").format(n);
 
-function networkTier(percentile: number): string {
-  if (percentile >= 99) return "Top 1% of NSCLC collaboration network";
-  if (percentile >= 95) return "Top 5% of NSCLC collaboration network";
-  if (percentile >= 90) return "Top 10% of NSCLC collaboration network";
-  if (percentile >= 75) return "Top 25% of NSCLC collaboration network";
-  return "Active in NSCLC collaboration network";
-}
+const formatCompactNumber = (n: number): string => {
+  if (!Number.isFinite(n) || n < 0) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(0)}K`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return new Intl.NumberFormat("en-US").format(n);
+};
 
 export default function ScoreBreakdownV3({ data, loading }: ScoreBreakdownV3Props) {
   const [expanded, setExpanded] = useState(false);
@@ -48,11 +50,11 @@ export default function ScoreBreakdownV3({ data, loading }: ScoreBreakdownV3Prop
   const ind = data.industry;
 
   const sectionHeaderStyle: React.CSSProperties = {
-    fontSize: 11,
-    color: "#6B6A65",
+    fontSize: 15,
+    color: "#E8E6DF",
     textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    marginBottom: 8,
+    letterSpacing: "0.06em",
+    marginBottom: 12,
     fontWeight: 500,
   };
 
@@ -82,16 +84,50 @@ export default function ScoreBreakdownV3({ data, loading }: ScoreBreakdownV3Prop
     lineHeight: 1.6,
   };
 
-  const subSectionDividerStyle: React.CSSProperties = {
-    height: 1,
+  const scoreBarTrackStyle: React.CSSProperties = {
+    height: 4,
     backgroundColor: "#1E1E22",
-    margin: "12px 0",
+    borderRadius: 2,
+    marginTop: 6,
+    marginBottom: 8,
+    overflow: "hidden",
   };
+
+  const tileContainerStyle: React.CSSProperties = {
+    backgroundColor: "#0D0D10",
+    border: "1px solid #1E1E22",
+    borderRadius: 4,
+    padding: "8px 6px",
+    textAlign: "center",
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+  };
+
+  const renderScoreBar = (hasData: boolean, value: number | null | undefined) => (
+    <div style={scoreBarTrackStyle}>
+      {hasData && value != null && (
+        <div
+          style={{
+            height: "100%",
+            width: `${Math.min(100, Math.max(0, value))}%`,
+            backgroundColor: "#5C5FE8",
+            borderRadius: 2,
+          }}
+        />
+      )}
+    </div>
+  );
 
   return (
     <div style={{ padding: 0, borderBottom: "1px solid #1E1E22" }}>
       <div style={{ marginBottom: 16 }}>
-        <div style={sectionHeaderStyle}>Cohort Score</div>
+        <InfoTooltip content="Composite ranking of Scientific Influence (60%) and Network Influence (40%), normalized within US Established cohort. Pharma Engagement is informational and does not drive ranking.">
+          <div style={sectionHeaderStyle}>Cohort Score</div>
+        </InfoTooltip>
         <div
           style={{
             fontSize: 32,
@@ -108,79 +144,180 @@ export default function ScoreBreakdownV3({ data, loading }: ScoreBreakdownV3Prop
         <div style={sectionHeaderStyle}>Why They Matter</div>
 
         <div style={scoreRowStyle}>
-          <span style={scoreLabelStyle}>Scientific Influence</span>
+          <InfoTooltip content="Publication leadership percentile. Based on senior-author papers, citation impact, guideline authorship, and recent activity.">
+            <span style={scoreLabelStyle}>Scientific Influence</span>
+          </InfoTooltip>
           <span style={scoreValueStyle}>{sci ? Math.round(sci.percentile) : "—"}</span>
         </div>
+        {renderScoreBar(Boolean(sci), sci?.percentile)}
         {expanded && sci && (
-          <div style={{ ...evidenceItemStyle, marginTop: 4, marginBottom: 8 }}>
-            {sci.senior_pub_count > 0 && (
-              <div>{formatInt(sci.senior_pub_count)} senior-author papers</div>
-            )}
-            {sci.senior_pub_total_citations > 0 && (
-              <div>{formatInt(sci.senior_pub_total_citations)} citations</div>
-            )}
-            {sci.guideline_pub_count > 0 && (
-              <div>{formatInt(sci.guideline_pub_count)} guideline papers</div>
-            )}
-            {sci.senior_pub_recent_5yr > 0 && (
-              <div>{formatInt(sci.senior_pub_recent_5yr)} recent (5yr)</div>
-            )}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 6,
+              marginTop: 6,
+              marginBottom: 8,
+            }}
+          >
+            {[
+              {
+                value: sci.senior_pub_count,
+                label: "Sr. Papers",
+                tooltip: "Number of papers published as senior author (last author) in NSCLC.",
+              },
+              {
+                value: sci.senior_pub_total_citations,
+                label: "Citations",
+                tooltip: "Total citations across all senior-author NSCLC papers.",
+              },
+              {
+                value: sci.senior_pub_recent_5yr,
+                label: "Recent (5y)",
+                tooltip: "Senior-author NSCLC papers published in the last 5 years.",
+              },
+              {
+                value: sci.guideline_pub_count,
+                label: "Guidelines",
+                tooltip:
+                  "Number of clinical practice guideline, consensus statement, or expert panel publications in NSCLC.",
+              },
+            ].map((tile, idx) => (
+              <InfoTooltip
+                key={idx}
+                content={tile.tooltip}
+                style={{ display: "block", width: "100%" }}
+              >
+                <div style={tileContainerStyle}>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#E8E6DF",
+                      lineHeight: 1.2,
+                      fontFeatureSettings: '"tnum"',
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {formatCompactNumber(tile.value)}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#6B6A65",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.02em",
+                      marginTop: 2,
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {tile.label}
+                  </div>
+                </div>
+              </InfoTooltip>
+            ))}
           </div>
         )}
 
         <div style={scoreRowStyle}>
-          <span style={scoreLabelStyle}>Network Influence</span>
+          <InfoTooltip content="Collaboration network centrality percentile. Combines degree, eigenvector, and betweenness centrality from 10-year NSCLC co-authorship graph.">
+            <span style={scoreLabelStyle}>Network Influence</span>
+          </InfoTooltip>
           <span style={scoreValueStyle}>{net ? Math.round(net.score) : "—"}</span>
         </div>
+        {renderScoreBar(Boolean(net), net?.score)}
         {expanded && net && (
           <div style={{ ...evidenceItemStyle, marginTop: 4 }}>
-            <div>{networkTier(net.score)}</div>
-            <div>{formatInt(net.collaborator_count)} collaborators</div>
+            <div>{formatInt(net.collaborator_count)} total collaborators</div>
             {data.top_collaborators.length > 0 && (
-              <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 2 }}>
-                  Top collaborators:
-                </div>
-                {data.top_collaborators.map((c) => (
-                  <div
-                    key={c.hcp_id}
-                    style={{ fontSize: 11, color: "#9B9892", lineHeight: 1.5 }}
-                  >
-                    {c.name}
-                    {c.institution && (
-                      <span style={{ color: "#6B6A65" }}>
-                        {" "}
-                        ·{" "}
-                        {c.institution.length > 32
-                          ? `${c.institution.substring(0, 32)}…`
-                          : c.institution}
-                      </span>
-                    )}
-                    <span style={{ color: "#6B6A65" }}> · {c.shared_publications} pubs</span>
-                  </div>
-                ))}
-              </div>
+              <MiniCollaboratorNetwork hcpName="" collaborators={data.top_collaborators} />
             )}
           </div>
         )}
-      </div>
 
-      <div style={subSectionDividerStyle} />
-
-      <div style={{ marginBottom: 12 }}>
-        <div style={sectionHeaderStyle}>Industry Engagement</div>
         <div style={scoreRowStyle}>
-          <span style={scoreLabelStyle}>
-            {ind ? "Pharma Engagement" : "Limited Public Data"}
-          </span>
+          <InfoTooltip content="Industry engagement breadth percentile. Based on Open Payments: total payments, distinct companies, distinct drugs, and contract count. Informational only — does not drive ranking.">
+            <span style={scoreLabelStyle}>
+              {ind ? "Pharma Engagement" : "Limited Public Data"}
+            </span>
+          </InfoTooltip>
           <span style={scoreValueStyle}>{ind ? Math.round(ind.percentile) : "—"}</span>
         </div>
+        {renderScoreBar(Boolean(ind), ind?.percentile)}
         {expanded && ind && (
-          <div style={{ ...evidenceItemStyle, marginTop: 4 }}>
-            <div>{formatCompactDollar(ind.total_payments_3yr)} payments (3yr)</div>
-            <div>{formatInt(ind.distinct_companies_3yr)} companies</div>
-            <div>{formatInt(ind.distinct_drugs_3yr)} drugs</div>
-            <div>{formatInt(ind.payment_count_3yr)} transactions</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 6,
+              marginTop: 6,
+              marginBottom: 8,
+            }}
+          >
+            {[
+              {
+                value: formatCompactDollar(ind.total_payments_3yr),
+                label: "Payments",
+                tooltip:
+                  "Total Open Payments received from pharmaceutical companies in NSCLC over the last 3 years.",
+              },
+              {
+                value: formatCompactNumber(ind.distinct_companies_3yr),
+                label: "Companies",
+                tooltip:
+                  "Number of distinct pharmaceutical companies with payment relationships in the last 3 years.",
+              },
+              {
+                value: formatCompactNumber(ind.distinct_drugs_3yr),
+                label: "Drugs",
+                tooltip:
+                  "Number of distinct drugs covered by payment relationships in the last 3 years.",
+              },
+              {
+                value: formatCompactNumber(ind.payment_count_3yr),
+                label: "Contracts",
+                tooltip: "Total count of distinct payment contracts in the last 3 years.",
+              },
+            ].map((tile, idx) => (
+              <InfoTooltip
+                key={idx}
+                content={tile.tooltip}
+                style={{ display: "block", width: "100%" }}
+              >
+                <div style={tileContainerStyle}>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#E8E6DF",
+                      lineHeight: 1.2,
+                      fontFeatureSettings: '"tnum"',
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {tile.value}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#6B6A65",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.02em",
+                      marginTop: 2,
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {tile.label}
+                  </div>
+                </div>
+              </InfoTooltip>
+            ))}
           </div>
         )}
         {expanded && !ind && (

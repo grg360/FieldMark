@@ -513,6 +513,7 @@ export interface TopCollaborator {
   name: string;
   institution: string | null;
   shared_publications: number;
+  cohort_score: number | null;
 }
 
 export interface EstablishedScoreBreakdown {
@@ -1643,12 +1644,30 @@ export async function getEstablishedScoreBreakdown(
       });
     });
 
+    const collabScoreMap = new Map<string, number>();
+    if (collabIds.length > 0) {
+      const { data: collabRanks } = await supabase
+        .from("hcp_established_ranks_v3")
+        .select("hcp_id, cohort_score")
+        .in("hcp_id", collabIds)
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", "region")
+        .eq("scope_value", "US");
+
+      (collabRanks || []).forEach((r) => {
+        if (r.cohort_score != null) {
+          collabScoreMap.set(String(r.hcp_id), Number(r.cohort_score));
+        }
+      });
+    }
+
     topCollaborators = collaboratorsRaw.data.map((r) => ({
       hcp_id: r.collaborator_hcp_id,
       rank: r.rank,
       name: nameMap.get(String(r.collaborator_hcp_id))?.name ?? "Unknown",
       institution: nameMap.get(String(r.collaborator_hcp_id))?.institution ?? null,
       shared_publications: r.shared_publications,
+      cohort_score: collabScoreMap.get(String(r.collaborator_hcp_id)) ?? null,
     }));
   }
 
