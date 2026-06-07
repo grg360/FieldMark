@@ -76,13 +76,14 @@ function resolveRisingStarRpcScopeParams(filters: FilterState): RpcScopeParams {
   } else if (scope.scopeType === "country") {
     scopeValues = [scope.scopeValue!];
   } else if (scope.scopeType === "region" && requestedRegion) {
-    if (requestedRegion === "Global") {
+    const countries = countriesForRegion(requestedRegion);
+    if (countries === null) {
       scopeType = "global";
       scopeValues = [];
-    } else if (requestedRegion === "Other") {
+    } else if (countries.length === 0) {
       scopeValues = [];
     } else {
-      scopeValues = [requestedRegion];
+      scopeValues = countries;
     }
   } else {
     scopeValues = [scope.scopeValue ?? "US"];
@@ -137,13 +138,16 @@ async function enrichAndMapCohortRows(
     }
   }
 
-  const { data: globalRankRows } = await supabase
-    .from(rankTable)
-    .select("hcp_id, rank")
-    .eq("therapeutic_area_id", taId)
-    .eq("scope_type", "global")
-    .is("scope_value", null)
-    .in("hcp_id", hcpIds);
+  const { data: globalRankRows } =
+    cohort === "rising_star"
+      ? { data: null }
+      : await supabase
+          .from(rankTable)
+          .select("hcp_id, rank")
+          .eq("therapeutic_area_id", taId)
+          .eq("scope_type", "global")
+          .is("scope_value", null)
+          .in("hcp_id", hcpIds);
   const globalRankByHcp = new Map<string, number>();
   for (const r of globalRankRows ?? []) {
     globalRankByHcp.set(String(r.hcp_id), Number(r.rank));
@@ -290,19 +294,94 @@ async function enrichAndMapCohortRows(
     const hcp = hcpById.get(String(rr.hcp_id));
     if (!hcp) return [];
 
+    const medicareData = medicareMap.get(String(rr.hcp_id));
+    const opData = opById.get(String(rr.hcp_id));
+    const metricsData = metricsById.get(String(rr.hcp_id));
+
+    if (cohort === "rising_star") {
+      const risingStarPercentile = parseOptionalNumber(rr.rising_star_percentile) ?? 0;
+      const scopeRank = parseOptionalNumber(rr.scope_rank) ?? parseOptionalNumber(rr.rank) ?? 0;
+      const momentumComponent = parseOptionalNumber(rr.momentum_component);
+      const visibilityComponent = parseOptionalNumber(rr.visibility_component);
+      const archetype = rr.archetype != null ? String(rr.archetype) : null;
+
+      const enrichedRow = {
+        composite_score: 0,
+        normalized_score: risingStarPercentile,
+        cohort_score: risingStarPercentile,
+        pub_velocity_score: null,
+        citation_trajectory_score: null,
+        trial_investigator_score: null,
+        career_first_pub_year: rr.career_first_pub_year ?? null,
+        total_career_pubs: rr.total_career_pubs ?? null,
+        tier: "rising_star",
+        hcps: {
+          ...hcp,
+          first_name: rr.first_name ?? hcp.first_name,
+          last_name: rr.last_name ?? hcp.last_name,
+          institution_normalized:
+            rr.institution_normalized ?? rr.institution_key ?? hcp.institution_normalized,
+          country: rr.country ?? hcp.country,
+          career_first_pub_year: rr.career_first_pub_year ?? hcp.career_first_pub_year,
+          total_career_pubs: rr.total_career_pubs ?? hcp.total_career_pubs,
+          cohort_classification: "rising_star",
+          therapeutic_area: filters.therapeuticArea,
+          hcp_medicare_summary: medicareData ? [medicareData] : null,
+          hcp_open_payments_summary: opData ? [opData] : null,
+          npi_specialty: archetype,
+        },
+      };
+
+      const mapped = mapRisingStarRow(enrichedRow, filters.therapeuticArea);
+      return [
+        {
+          ...mapped,
+          normalized_score: risingStarPercentile,
+          cohort_score: risingStarPercentile,
+          composite_score: 0,
+          pub_velocity: 0,
+          citation_trajectory: 0,
+          pubVel: "—",
+          citTraj: null,
+          trial_score: 0,
+          trialScore: 0,
+          narrative: narrativeMap.get(String(rr.hcp_id))?.narrative_text ?? null,
+          why_now: narrativeMap.get(String(rr.hcp_id))?.why_now ?? null,
+          rank: scopeRank,
+          scope_rank: scopeRank,
+          us_rank: parseOptionalNumber(rr.us_rank),
+          global_rank: parseOptionalNumber(rr.rank),
+          percentile: risingStarPercentile,
+          scope_size: undefined,
+          scope: scopeLabel,
+          tier: "rising_star",
+          cohort_classification: "rising_star",
+          rising_star_percentile: risingStarPercentile,
+          momentum_component: momentumComponent,
+          visibility_component: visibilityComponent,
+          scientific_momentum_percentile: parseOptionalNumber(rr.scientific_momentum_percentile),
+          network_momentum_percentile: parseOptionalNumber(rr.network_momentum_percentile),
+          scientific_visibility_percentile: parseOptionalNumber(rr.scientific_visibility_percentile),
+          network_visibility_percentile: parseOptionalNumber(rr.network_visibility_percentile),
+          archetype,
+          scientific_influence_pctile: momentumComponent,
+          network_influence_pctile: visibilityComponent,
+          pharma_engagement_pctile: null,
+          citedByCount: metricsData?.cited_by_count ?? null,
+          hIndex: metricsData?.h_index ?? null,
+          worksCount: metricsData?.works_count ?? null,
+          total_citations: metricsData?.cited_by_count ?? null,
+          h_index: metricsData?.h_index ?? null,
+          works_count: metricsData?.works_count ?? null,
+        } as RisingStar,
+      ];
+    }
+
     const normalizedScore = Number(rr.normalized_score ?? 0);
     const rank = Number(rr.rank);
     const scopeSize = Number(rr.scope_size);
     const percentile =
-      cohort === "rising_star"
-        ? Number(rr.percentile)
-        : scopeSize > 0
-          ? 100 - (rank / scopeSize) * 100
-          : 100;
-
-    const medicareData = medicareMap.get(String(rr.hcp_id));
-    const opData = opById.get(String(rr.hcp_id));
-    const metricsData = metricsById.get(String(rr.hcp_id));
+      scopeSize > 0 ? 100 - (rank / scopeSize) * 100 : 100;
 
     const enrichedRow = {
       composite_score: Number(
@@ -312,13 +391,10 @@ async function enrichAndMapCohortRows(
       cohort_score: normalizedScore,
       pub_velocity_score: rr.pub_velocity_score ?? null,
       citation_trajectory_score: rr.citation_trajectory_score ?? null,
-      trial_investigator_score:
-        cohort === "rising_star"
-          ? rr.trial_investigator_score ?? null
-          : rr.trial_score ?? null,
+      trial_investigator_score: rr.trial_score ?? null,
       career_first_pub_year: rr.career_first_pub_year ?? null,
       total_career_pubs: rr.total_career_pubs ?? null,
-      tier: cohort === "rising_star" ? "rising_star" : cohort,
+      tier: cohort,
       hcps: {
         ...hcp,
         first_name: rr.first_name ?? hcp.first_name,
@@ -333,7 +409,7 @@ async function enrichAndMapCohortRows(
         nppes_practice_state: rr.nppes_practice_state ?? hcp.nppes_practice_state,
         nppes_practice_setting: rr.nppes_practice_setting ?? hcp.nppes_practice_setting,
         npi_specialty: rr.npi_specialty ?? hcp.npi_specialty,
-        cohort_classification: cohort === "rising_star" ? hcp.cohort_classification : cohort,
+        cohort_classification: cohort,
         therapeutic_area: filters.therapeuticArea,
         hcp_medicare_summary: medicareData ? [medicareData] : null,
         hcp_open_payments_summary: opData ? [opData] : null,
@@ -359,10 +435,6 @@ async function enrichAndMapCohortRows(
       h_index: rr.h_index ?? metricsData?.h_index ?? null,
       works_count: rr.works_count ?? metricsData?.works_count ?? null,
     };
-
-    if (cohort === "rising_star") {
-      return [base];
-    }
 
     if (cohort === "established") {
       const v3 = v3ByHcp.get(String(rr.hcp_id));
@@ -524,6 +596,20 @@ export interface EstablishedScoreBreakdown {
   top_collaborators: TopCollaborator[];
 }
 
+export interface RisingStarScoreBreakdown {
+  hcp_id: string;
+  rising_star_percentile: number;
+  momentum_component: number;
+  visibility_component: number;
+  scientific_momentum_percentile: number;
+  network_momentum_percentile: number;
+  scientific_visibility_percentile: number;
+  network_visibility_percentile: number;
+  archetype: string;
+  rank: number;
+  us_rank: number | null;
+}
+
 const TA_ID_MAP: Record<string, string> = {
   "rare-disease": "833e7b38-d01b-409e-82c0-71eb29e138a0",
   hepatology: "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e",
@@ -674,6 +760,16 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
     paymentsByYear: mapPaymentsByYear(pay as Record<string, unknown> | undefined),
     beneficiariesByYear: mapBeneficiariesByYear(med as Record<string, unknown> | undefined),
     engagementMix: mapEngagementMix(pay as Record<string, unknown> | undefined),
+    rising_star_percentile: parseOptionalNumber(row.rising_star_percentile),
+    momentum_component: parseOptionalNumber(row.momentum_component),
+    visibility_component: parseOptionalNumber(row.visibility_component),
+    scientific_momentum_percentile: parseOptionalNumber(row.scientific_momentum_percentile),
+    network_momentum_percentile: parseOptionalNumber(row.network_momentum_percentile),
+    scientific_visibility_percentile: parseOptionalNumber(row.scientific_visibility_percentile),
+    network_visibility_percentile: parseOptionalNumber(row.network_visibility_percentile),
+    archetype: row.archetype != null ? String(row.archetype) : null,
+    us_rank: parseOptionalNumber(row.us_rank),
+    scope_rank: parseOptionalNumber(row.scope_rank),
   };
 }
 
@@ -792,7 +888,7 @@ export async function getRisingStars(
       offset,
       "get_rising_star_filtered_count",
       "get_rising_star_filtered",
-      "hcp_rising_star_ranks_v2",
+      "hcp_rising_star_ranks_v3",
       "rising_star",
     );
     if (fetchError) {
@@ -958,25 +1054,22 @@ export async function getTACounts(
     };
 
     let risingStarsQuery: any;
-    if (scope.scopeType === "global") {
-      // Global rising-star count comes from scores directly (no scope filter).
+    if (scope.scopeType === "global" || scope.scopeValue === null) {
       risingStarsQuery = supabase
-        .from("hcp_scores_v2")
+        .from("hcp_rising_star_ranks_v3")
+        .select("hcp_id", { count: "exact", head: true })
+        .eq("therapeutic_area_id", taId);
+    } else if (scope.scopeValue === "US") {
+      risingStarsQuery = supabase
+        .from("hcp_rising_star_ranks_v3")
         .select("hcp_id", { count: "exact", head: true })
         .eq("therapeutic_area_id", taId)
-        .eq("tier", "rising_star");
+        .not("us_rank", "is", null);
     } else {
-      // Region-aware count from the pre-joined rank view.
       risingStarsQuery = supabase
-        .from("hcp_rising_star_ranks_v2")
+        .from("hcp_rising_star_ranks_v3")
         .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .eq("scope_type", scope.scopeType);
-      if (scope.scopeValue === null) {
-        risingStarsQuery = risingStarsQuery.is("scope_value", null);
-      } else {
-        risingStarsQuery = risingStarsQuery.eq("scope_value", scope.scopeValue);
-      }
+        .eq("therapeutic_area_id", taId);
     }
     const risingStarCountResult = await risingStarsQuery;
     if (risingStarCountResult.error) {
@@ -1551,6 +1644,51 @@ export async function getHCPDetail(
       error: err instanceof Error ? err.message : "Unknown error occurred",
     };
   }
+}
+
+export async function getRisingStarScoreBreakdown(
+  hcpId: string,
+  taSlug: string,
+): Promise<RisingStarScoreBreakdown | null> {
+  if (!hcpId || !taSlug) return null;
+
+  const taId = TA_ID_MAP[taSlug.toLowerCase().trim()];
+  if (!taId) return null;
+
+  const { data, error } = await supabase
+    .from("hcp_rising_star_ranks_v3")
+    .select(
+      "hcp_id, rank, us_rank, rising_star_percentile, " +
+        "momentum_component, visibility_component, " +
+        "scientific_momentum_percentile, network_momentum_percentile, " +
+        "scientific_visibility_percentile, network_visibility_percentile, " +
+        "archetype",
+    )
+    .eq("hcp_id", hcpId)
+    .eq("therapeutic_area_id", taId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[getRisingStarScoreBreakdown]", error);
+    return null;
+  }
+  if (!data) return null;
+
+  const row = data as unknown as Record<string, unknown>;
+
+  return {
+    hcp_id: String(row.hcp_id),
+    rising_star_percentile: Number(row.rising_star_percentile ?? 0),
+    momentum_component: Number(row.momentum_component ?? 0),
+    visibility_component: Number(row.visibility_component ?? 0),
+    scientific_momentum_percentile: Number(row.scientific_momentum_percentile ?? 0),
+    network_momentum_percentile: Number(row.network_momentum_percentile ?? 0),
+    scientific_visibility_percentile: Number(row.scientific_visibility_percentile ?? 0),
+    network_visibility_percentile: Number(row.network_visibility_percentile ?? 0),
+    archetype: String(row.archetype ?? "Emerging Leader"),
+    rank: Number(row.rank ?? 0),
+    us_rank: row.us_rank == null ? null : Number(row.us_rank),
+  };
 }
 
 export async function getEstablishedScoreBreakdown(

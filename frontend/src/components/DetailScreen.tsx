@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getPublicationTimeline, type EstablishedScoreBreakdown, type PublicationTimelinePoint } from "../lib/api";
+import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import ResearchThemesSection from "./ResearchThemesSection";
@@ -14,6 +14,7 @@ import { FiChip, FiModal, FiToast } from "./FieldIntelligenceShared";
 import TopPharmaCompanies from "./TopPharmaCompanies";
 import DrugConstellation from "./DrugConstellation";
 import ScoreBreakdownV3 from "./ScoreBreakdownV3";
+import ScoreBreakdownV3Rising from "./ScoreBreakdownV3Rising";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
@@ -591,6 +592,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
   const [themesLoading, setThemesLoading] = useState(true);
   const [scoreBreakdown, setScoreBreakdown] = useState<EstablishedScoreBreakdown | null>(null);
   const [scoreBreakdownLoading, setScoreBreakdownLoading] = useState(false);
+  const [risingStarBreakdown, setRisingStarBreakdown] = useState<RisingStarScoreBreakdown | null>(null);
+  const [risingStarBreakdownLoading, setRisingStarBreakdownLoading] = useState(false);
 
   useEffect(() => {
     const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
@@ -669,10 +672,37 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     };
   }, [hcp.hcp_id, hcp.id, hcp.cohort_classification, taSlug]);
 
+  useEffect(() => {
+    const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
+    if (!hcpId || !taSlug) return;
+    if (hcp.cohort_classification !== "rising_star") return;
+
+    let cancelled = false;
+    setRisingStarBreakdownLoading(true);
+
+    getRisingStarScoreBreakdown(hcpId, taSlug)
+      .then((data) => {
+        if (cancelled) return;
+        setRisingStarBreakdown(data);
+      })
+      .catch((err) => {
+        console.error("[DetailScreen] getRisingStarScoreBreakdown failed:", err);
+        if (!cancelled) setRisingStarBreakdown(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRisingStarBreakdownLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id, hcp.cohort_classification, taSlug]);
+
   const isUnclassified = isUnclassifiedCohort(hcp.cohort_classification);
   const isCommunityCohort =
     hcp.cohort_classification === "community" || hcp.cohort_classification === "workhorse";
   const isEstablishedCohort = hcp.cohort_classification === "established";
+  const isRisingStarCohort = hcp.cohort_classification === "rising_star";
   const cohortBarColor = cohortAccentColor(hcp.cohort_classification);
 
   const pubVelNumeric = parsePubVelNumeric(hcp.pubVel);
@@ -996,7 +1026,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          {!isEstablishedCohort && (
+          {!isEstablishedCohort && !isRisingStarCohort && (
             <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
               Score breakdown
             </div>
@@ -1039,6 +1069,11 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                   onTooltipChange={setActiveTooltip}
                 />
               </>
+            ) : isRisingStarCohort ? (
+              <ScoreBreakdownV3Rising
+                data={risingStarBreakdown}
+                loading={risingStarBreakdownLoading}
+              />
             ) : isEstablishedCohort ? (
               <ScoreBreakdownV3
                 data={scoreBreakdown}

@@ -7,6 +7,7 @@ publication co-authorship edges and writes to hcp_network_centrality_v2.
 Usage:
     python network_centrality_scoring.py --ta nsclc
     python network_centrality_scoring.py --ta nsclc --window-years 10 --dry-run
+    python network_centrality_scoring.py --ta nsclc --start-year 2016 --end-year 2020 --window-type hist_2016_2020
     python network_centrality_scoring.py --debug-top 30
 
 Required environment variables (.env):
@@ -51,17 +52,28 @@ def resolve_ta_id(conn, slug: str) -> str:
         return str(row[0])
 
 
-def fetch_edges(conn, ta_id: str, window_years: int) -> list[tuple[str, str, int]]:
+def fetch_edges(
+    conn,
+    ta_id: str,
+    window_years: int | None = None,
+    start_year: int | None = None,
+    end_year: int | None = None,
+) -> list[tuple[str, str, int]]:
     """Returns list of (hcp_a, hcp_b, weight) tuples."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
+    if start_year is not None and end_year is not None:
+        year_filter = "p.pub_year BETWEEN %s AND %s"
+        year_params = (start_year, end_year)
+    else:
+        year_filter = "p.pub_year >= EXTRACT(YEAR FROM now())::int - %s"
+        year_params = (window_years,)
+
+    sql = f"""
             WITH ta_pubs AS (
               SELECT p.id, p.pub_year
               FROM publications_v2 p
               JOIN publication_therapeutic_areas_v2 pta ON pta.publication_id = p.id
               WHERE pta.therapeutic_area_id = %s
-                AND p.pub_year >= EXTRACT(YEAR FROM now())::int - %s
+                AND {year_filter}
             ),
             hcp_pub_pairs AS (
               SELECT
@@ -76,9 +88,10 @@ def fetch_edges(conn, ta_id: str, window_years: int) -> list[tuple[str, str, int
               GROUP BY 1, 2
             )
             SELECT hcp_a, hcp_b, shared_pubs FROM hcp_pub_pairs
-            """,
-            (ta_id, window_years),
-        )
+            """
+
+    with conn.cursor() as cur:
+        cur.execute(sql, (ta_id,) + year_params)
         return [(row[0], row[1], int(row[2])) for row in cur.fetchall()]
 
 
@@ -176,6 +189,18 @@ def upsert_results(
 @click.command()
 @click.option("--ta", default="nsclc", help="Therapeutic area slug")
 @click.option("--window-years", default=10, type=int, help="Publication lookback window in years")
+@click.option(
+    "--start-year",
+    default=None,
+    type=int,
+    help="Start of publication window (inclusive). If set, overrides --window-years.",
+)
+@click.option(
+    "--end-year",
+    default=None,
+    type=int,
+    help="End of publication window (inclusive). If set, overrides --window-years.",
+)
 @click.option("--window-type", default="10yr", help="Label stored in hcp_network_centrality_v2.window_type")
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=20, type=int, help="Print top N by network_influence_score")
@@ -188,17 +213,45 @@ def upsert_results(
 def main(
     ta: str,
     window_years: int,
+    start_year: int | None,
+    end_year: int | None,
     window_type: str,
     dry_run: bool,
     debug_top: int,
     min_edge_weight: int,
 ) -> None:
+    if (start_year is None) != (end_year is None):
+        raise click.UsageError("--start-year and --end-year must be provided together.")
+    if start_year is not None and end_year is not None:
+        if start_year > end_year:
+            raise click.UsageError("--start-year must be <= --end-year.")
+        if window_type == "10yr":
+            raise click.UsageError(
+                "When using --start-year/--end-year, specify --window-type "
+                "(e.g. hist_2016_2020 or recent_2021_2025)."
+            )
+
     conn = get_conn()
     ta_id = resolve_ta_id(conn, ta)
 
-    print(f"Computing network centrality for TA={ta} window={window_years}yr ({window_type})")
+    if start_year is not None:
+        print(
+            f"Computing network centrality for TA={ta} "
+            f"window={start_year}-{end_year} (label={window_type})"
+        )
+    else:
+        print(
+            f"Computing network centrality for TA={ta} "
+            f"window={window_years}yr ({window_type})"
+        )
     print("Fetching edges...")
-    edges_raw = fetch_edges(conn, ta_id, window_years)
+    edges_raw = fetch_edges(
+        conn,
+        ta_id,
+        window_years=window_years if start_year is None else None,
+        start_year=start_year,
+        end_year=end_year,
+    )
     print(f"Found {len(edges_raw)} co-authorship pairs")
 
     if not edges_raw:

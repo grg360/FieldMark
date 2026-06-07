@@ -65,7 +65,48 @@ function formatScoreInt(score: number | null | undefined): string {
   return String(Math.round(n));
 }
 
-type HCPCardHCP = HCP;
+type HCPCardHCP = HCP & {
+  momentum_component?: number | null;
+  visibility_component?: number | null;
+  archetype?: string | null;
+  scope_rank?: number | null;
+};
+
+function shortArchetypeLabel(archetype: string | null | undefined): string {
+  switch (archetype) {
+    case "Balanced Rising Star":
+      return "BALANCED";
+    case "Scientific Accelerator":
+      return "SCI ACCEL";
+    case "Network Accelerator":
+      return "NET ACCEL";
+    case "Emerging Leader":
+      return "EMERGING";
+    default:
+      return "EMERGING";
+  }
+}
+
+function archetypePillStyle(archetype: string | null | undefined): {
+  backgroundColor: string;
+  borderColor: string;
+  color: string;
+} {
+  switch (archetype) {
+    case "Balanced Rising Star":
+      return { backgroundColor: "rgba(155, 109, 255, 0.18)", borderColor: "#9B6DFF", color: "#E8E6DF" };
+    case "Scientific Accelerator":
+      return { backgroundColor: "rgba(63, 184, 175, 0.18)", borderColor: "#3FB8AF", color: "#E8E6DF" };
+    case "Network Accelerator":
+      return { backgroundColor: "rgba(232, 160, 78, 0.18)", borderColor: "#E8A04E", color: "#E8E6DF" };
+    default:
+      return { backgroundColor: "rgba(107, 106, 101, 0.18)", borderColor: "#6B6A65", color: "#E8E6DF" };
+  }
+}
+
+function risingArchetypeLabel(hcp: HCPCardHCP): string | null | undefined {
+  return hcp.archetype ?? hcp.npiSpecialty ?? null;
+}
 
 interface HCPCardProps {
   hcp: HCPCardHCP;
@@ -78,6 +119,9 @@ interface HCPCardProps {
 function cohortStatKeys(cohort: string): readonly string[] {
   if (cohort === "established") return ["SCIENTIFIC", "NETWORK", "PHARMA"] as const;
   if (cohort === "community" || cohort === "workhorse") return ["ENGAGEMENT", "COMPANIES", "YEARS"] as const;
+  if (cohort === "rising_star" || cohort === "dark_horse") {
+    return ["MOMENTUM", "VISIBILITY", "ARCHETYPE"] as const;
+  }
   return ["PUB SCORE", "H-INDEX", "PUB YEARS"] as const;
 }
 
@@ -108,6 +152,18 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
     if (key === "ENGAGEMENT") return formatEngagementDollar(hcp.openPaymentsLifetime ?? null);
     if (key === "COMPANIES") return formatIntDisplay(hcp.distinctCompanies ?? null);
     if (key === "YEARS") return formatIntDisplay(hcp.careerYears ?? null);
+    return "—";
+  }
+  if (cohort === "rising_star" || cohort === "dark_horse") {
+    if (key === "MOMENTUM") {
+      return formatScoreInt(hcp.momentum_component ?? hcp.scientificInfluencePctile ?? null);
+    }
+    if (key === "VISIBILITY") {
+      return formatScoreInt(hcp.visibility_component ?? hcp.networkInfluencePctile ?? null);
+    }
+    if (key === "ARCHETYPE") {
+      return shortArchetypeLabel(risingArchetypeLabel(hcp));
+    }
     return "—";
   }
   if (key === "PUB SCORE") {
@@ -269,6 +325,9 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const accentBg = isDarkHorse ? "#0D0A1A" : isWorkhorse ? "#0A1A18" : "#1A1200";
   const borderAccentColor = cohortBorderAccentColor(effectiveCohort);
   const statPillKeys = cohortStatKeys(effectiveCohort);
+  const isRisingCohort = effectiveCohort === "rising_star" || effectiveCohort === "dark_horse";
+  const risingScopeLabel = hcp.scope === "US" ? "US" : "GLOBAL";
+  const displayRank = isRisingCohort ? (hcp.scope_rank ?? hcp.rank) : hcp.rank;
   const countryCode = getCountryCode(hcp.country ?? null);
   const subline = buildSubline(hcp);
   if (typeof window !== "undefined" && (hcp as { last_name?: string }).last_name === "McKean") {
@@ -526,10 +585,11 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
           <div style={{ fontSize: 28, fontWeight: 600, color: accentColor, lineHeight: 1 }}>
             {formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}
           </div>
-          {hcp.rank != null && (
+          {displayRank != null && (
             <div style={{ fontSize: 10, color: "#E8E6DF", marginTop: 6, lineHeight: 1.4, letterSpacing: 0.4 }}>
-              #{hcp.rank} {(hcp.country ?? "US").toUpperCase()}
-              {hcp.global_rank != null ? ` · #${hcp.global_rank} GLOBAL` : ""}
+              #{displayRank}{" "}
+              {isRisingCohort ? risingScopeLabel : (hcp.country ?? "US").toUpperCase()}
+              {!isRisingCohort && hcp.global_rank != null ? ` · #${hcp.global_rank} GLOBAL` : ""}
             </div>
           )}
         </button>
@@ -629,13 +689,66 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           {statPillKeys.map((key) => (
             <div key={key} style={{ flex: 1, minWidth: 0 }}>
-              <StatPillWithTooltip
-                label={key}
-                value={statValueForKey(hcp, effectiveCohort, key)}
-                tooltipKey={key}
-                activeTooltip={activeTooltip}
-                onTooltipChange={setActiveTooltip}
-              />
+              {isRisingCohort && key === "ARCHETYPE" ? (
+                <StatPillWithTooltip
+                  label=""
+                  tooltipKey={key}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                >
+                  {(() => {
+                    const archetype = risingArchetypeLabel(hcp);
+                    const style = archetypePillStyle(archetype);
+                    return (
+                      <div
+                        style={{
+                          backgroundColor: style.backgroundColor,
+                          border: `1px solid ${style.borderColor}`,
+                          borderRadius: 3,
+                          padding: "4px 8px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: 2,
+                          width: "100%",
+                          boxSizing: "border-box",
+                          textAlign: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: "#6B6A65",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                          }}
+                        >
+                          ARCHETYPE
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: style.color,
+                            fontFamily: "monospace",
+                            fontWeight: 600,
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          {shortArchetypeLabel(archetype)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </StatPillWithTooltip>
+              ) : (
+                <StatPillWithTooltip
+                  label={key}
+                  value={statValueForKey(hcp, effectiveCohort, key)}
+                  tooltipKey={key}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                />
+              )}
             </div>
           ))}
         </div>
