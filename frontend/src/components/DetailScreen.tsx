@@ -18,7 +18,19 @@ import ScoreBreakdownV3Rising from "./ScoreBreakdownV3Rising";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
+  engagement_angle?: string | null;
+  caution_flags?: string | null;
+  signal_strength?: string | null;
 };
+
+function signalStrengthColor(strength: string | null | undefined): string {
+  switch ((strength ?? "").toLowerCase()) {
+    case "high":     return "#3FB8AF";
+    case "moderate": return "#E8A04E";
+    case "early":    return "#6B6A65";
+    default:         return "#6B6A65";
+  }
+}
 
 function identificationAddressContent(hcp: DetailHCP): {
   content: React.ReactNode;
@@ -1017,6 +1029,65 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             </>
           )}
         </div>
+
+        {hcp.cohort_classification === "rising_star" && (
+          hcp.why_now || hcp.engagement_angle || hcp.caution_flags
+        ) && (
+          <div className="fm-detail-section">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Signal Summary
+              </div>
+              {hcp.signal_strength && (
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  padding: "4px 8px",
+                  borderRadius: 4,
+                  backgroundColor: signalStrengthColor(hcp.signal_strength),
+                  color: "#FFFFFF",
+                }}>
+                  Signal: {hcp.signal_strength}
+                </span>
+              )}
+            </div>
+
+            {hcp.why_now && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Why Now
+                </div>
+                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                  {hcp.why_now}
+                </div>
+              </div>
+            )}
+
+            {hcp.engagement_angle && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Engagement Angle
+                </div>
+                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                  {hcp.engagement_angle}
+                </div>
+              </div>
+            )}
+
+            {hcp.caution_flags && (
+              <div>
+                <div style={{ fontSize: 10, color: "#E8A04E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Caution
+                </div>
+                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                  {hcp.caution_flags}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Score breakdown */}
         <div

@@ -17,6 +17,9 @@ export interface HCP {
   narrative?: string | null;
   /** From hcp_narratives_v2.why_now — single-sentence timing insight for the card insight band. */
   why_now?: string | null;
+  engagement_angle?: string | null;
+  caution_flags?: string | null;
+  signal_strength?: string | null;
   tier?: string | null;
   cohort_classification?: string | null;
   /** hcps.cohort_score — community / workhorse percentile (0–100). */
@@ -233,7 +236,14 @@ export interface HCPDetailResponse {
   hcp: Record<string, any>;
   score: Record<string, any> | null;
   rank: Record<string, any> | null;
-  narrative: { narrative_text: string | null; generated_at: string | null } | null;
+  narrative: {
+    narrative_text: string | null;
+    why_now: string | null;
+    engagement_angle: string | null;
+    caution_flags: string | null;
+    signal_strength: string | null;
+    generated_at: string | null;
+  } | null;
   medicare: Record<string, any> | null;
   openPayments: Record<string, any> | null;
   publications: Array<Record<string, unknown>>;

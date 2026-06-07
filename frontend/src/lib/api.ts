@@ -248,12 +248,18 @@ async function enrichAndMapCohortRows(
   });
 
   const narrativeIds = filteredRankRows.map((r: any) => String(r.hcp_id));
-  const narrativeMap = new Map<string, { narrative_text: string | null; why_now: string | null }>();
+  const narrativeMap = new Map<string, {
+    narrative_text: string | null;
+    why_now: string | null;
+    engagement_angle: string | null;
+    caution_flags: string | null;
+    signal_strength: string | null;
+  }>();
 
   if (narrativeIds.length > 0) {
     const { data: taNarratives, error: taNarrError } = await supabase
       .from("hcp_narratives_v2")
-      .select("hcp_id, narrative_text, why_now, therapeutic_area_slug")
+      .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, therapeutic_area_slug")
       .in("hcp_id", narrativeIds)
       .eq("therapeutic_area_slug", taSlug);
 
@@ -264,6 +270,9 @@ async function enrichAndMapCohortRows(
       narrativeMap.set(String(n.hcp_id), {
         narrative_text: (n as any).narrative_text ?? null,
         why_now: (n as any).why_now ?? null,
+        engagement_angle: (n as any).engagement_angle ?? null,
+        caution_flags: (n as any).caution_flags ?? null,
+        signal_strength: (n as any).signal_strength ?? null,
       });
     }
 
@@ -271,7 +280,7 @@ async function enrichAndMapCohortRows(
     if (missingIds.length > 0) {
       const { data: fallbackNarratives, error: fbError } = await supabase
         .from("hcp_narratives_v2")
-        .select("hcp_id, narrative_text, why_now, generated_at")
+        .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at")
         .in("hcp_id", missingIds)
         .order("generated_at", { ascending: false });
 
@@ -284,6 +293,9 @@ async function enrichAndMapCohortRows(
           narrativeMap.set(hid, {
             narrative_text: (n as any).narrative_text ?? null,
             why_now: (n as any).why_now ?? null,
+            engagement_angle: (n as any).engagement_angle ?? null,
+            caution_flags: (n as any).caution_flags ?? null,
+            signal_strength: (n as any).signal_strength ?? null,
           });
         }
       }
@@ -347,6 +359,9 @@ async function enrichAndMapCohortRows(
           trialScore: 0,
           narrative: narrativeMap.get(String(rr.hcp_id))?.narrative_text ?? null,
           why_now: narrativeMap.get(String(rr.hcp_id))?.why_now ?? null,
+          engagement_angle: narrativeMap.get(String(rr.hcp_id))?.engagement_angle ?? null,
+          caution_flags: narrativeMap.get(String(rr.hcp_id))?.caution_flags ?? null,
+          signal_strength: narrativeMap.get(String(rr.hcp_id))?.signal_strength ?? null,
           rank: scopeRank,
           scope_rank: scopeRank,
           us_rank: parseOptionalNumber(rr.us_rank),
@@ -423,6 +438,9 @@ async function enrichAndMapCohortRows(
       cohort_score: normalizedScore,
       narrative: narrativeMap.get(String(rr.hcp_id))?.narrative_text ?? null,
       why_now: narrativeMap.get(String(rr.hcp_id))?.why_now ?? null,
+      engagement_angle: narrativeMap.get(String(rr.hcp_id))?.engagement_angle ?? null,
+      caution_flags: narrativeMap.get(String(rr.hcp_id))?.caution_flags ?? null,
+      signal_strength: narrativeMap.get(String(rr.hcp_id))?.signal_strength ?? null,
       rank,
       percentile,
       scope_size: scopeSize,
@@ -1498,7 +1516,7 @@ export async function getHCPDetail(
     // narrative for this TA, narrative is null.
     const narrativePromise = supabase
       .from("hcp_narratives_v2")
-      .select("narrative_text, generated_at, therapeutic_area_slug")
+      .select("narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug")
       .eq("hcp_id", hcpId)
       .eq("therapeutic_area_slug", taSlug)
       .maybeSingle();
@@ -1621,7 +1639,16 @@ export async function getHCPDetail(
       })
       .filter(Boolean);
 
-    const narrativeData = (narrativeResult as { data?: { narrative_text: string | null; generated_at: string | null } | null }).data ?? null;
+    const narrativeData = (narrativeResult as {
+      data?: {
+        narrative_text: string | null;
+        why_now: string | null;
+        engagement_angle: string | null;
+        caution_flags: string | null;
+        signal_strength: string | null;
+        generated_at: string | null;
+      } | null;
+    }).data ?? null;
 
     const response: HCPDetailResponse = {
       hcp: hcpData,

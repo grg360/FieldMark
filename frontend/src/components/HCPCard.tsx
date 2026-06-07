@@ -5,6 +5,89 @@ import { buildSubline } from "../lib/subline";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
+function risingStarArchetypeShortLabel(archetype: string | null | undefined): string {
+  switch (archetype) {
+    case "Balanced Rising Star":   return "BALANCED";
+    case "Scientific Accelerator": return "SCI ACCEL";
+    case "Network Accelerator":    return "NET ACCEL";
+    case "Emerging Leader":        return "EMERGING";
+    default:                       return "";
+  }
+}
+
+function risingStarArchetypeColor(archetype: string | null | undefined): string {
+  switch (archetype) {
+    case "Balanced Rising Star":   return "#9B6DFF";
+    case "Scientific Accelerator": return "#3FB8AF";
+    case "Network Accelerator":    return "#E8A04E";
+    case "Emerging Leader":        return "#6B6A65";
+    default:                       return "#6B6A65";
+  }
+}
+
+function RisingStarSignalTile({
+  label,
+  value,
+  barColor,
+}: {
+  label: string;
+  value: number;
+  barColor: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "#0F0F0F",
+        border: "1px solid #2A2A2A",
+        borderRadius: 6,
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          color: "#6B6A65",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 600,
+          color: "#FFFFFF",
+          marginTop: 2,
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          height: 3,
+          background: "#1A1A1A",
+          borderRadius: 2,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${value}%`,
+            background: barColor,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 const getCountryCode = (country: string | null): string | null => {
   if (!country) return null;
   const c = country.trim().replace(/\.$/, "").toLowerCase();
@@ -70,6 +153,10 @@ type HCPCardHCP = HCP & {
   visibility_component?: number | null;
   archetype?: string | null;
   scope_rank?: number | null;
+  scientific_momentum_percentile?: number | null;
+  network_momentum_percentile?: number | null;
+  scientific_visibility_percentile?: number | null;
+  network_visibility_percentile?: number | null;
 };
 
 function shortArchetypeLabel(archetype: string | null | undefined): string {
@@ -543,6 +630,28 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
                 }}
               />
             )}
+            {hcp.cohort_classification === "rising_star" && hcp.archetype && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  height: 22,
+                  padding: "3px 8px",
+                  marginLeft: 8,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  borderRadius: 4,
+                  verticalAlign: "middle",
+                  backgroundColor: risingStarArchetypeColor(hcp.archetype),
+                  color: "#FFFFFF",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {risingStarArchetypeShortLabel(hcp.archetype)}
+              </span>
+            )}
           </div>
 
           <div
@@ -686,6 +795,37 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
         ) : null}
 
         {/* Row 4: Stat pills (cohort_classification-driven) */}
+        {cohort === "rising_star" ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              marginTop: 12,
+            }}
+          >
+            <RisingStarSignalTile
+              label="SCI MOM"
+              value={Math.round(hcp.scientific_momentum_percentile ?? 0)}
+              barColor="#3FB8AF"
+            />
+            <RisingStarSignalTile
+              label="NET MOM"
+              value={Math.round(hcp.network_momentum_percentile ?? 0)}
+              barColor="#E8A04E"
+            />
+            <RisingStarSignalTile
+              label="SCI VIS"
+              value={Math.round(hcp.scientific_visibility_percentile ?? 0)}
+              barColor="#3FB8AF"
+            />
+            <RisingStarSignalTile
+              label="NET VIS"
+              value={Math.round(hcp.network_visibility_percentile ?? 0)}
+              barColor="#E8A04E"
+            />
+          </div>
+        ) : (
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           {statPillKeys.map((key) => (
             <div key={key} style={{ flex: 1, minWidth: 0 }}>
@@ -752,6 +892,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
             </div>
           ))}
         </div>
+        )}
 
         <button
           type="button"

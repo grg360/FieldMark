@@ -15,6 +15,9 @@ export interface HCP {
   narrative?: string | null;
   /** From hcp_narratives_v2.why_now — card insight band. */
   why_now?: string | null;
+  engagement_angle?: string | null;
+  caution_flags?: string | null;
+  signal_strength?: string | null;
   h_index?: number | null;
   rank?: number;
   scope?: string;
