@@ -46,8 +46,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import psycopg
 import requests
 from dotenv import load_dotenv
+from psycopg.rows import dict_row
 from supabase import Client, create_client
 
 
@@ -61,6 +63,7 @@ def get_table_name(base_name: str, target_version: str) -> str:
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_MODEL = "claude-sonnet-4-6"
 PROMPT_VERSION = "v1.0"
+RISING_STAR_PROMPT_VERSION = "rising_star_v3.4"
 ANTHROPIC_VERSION = "2023-06-01"
 
 # Pricing (per million tokens) — Sonnet 4.6
@@ -77,15 +80,11 @@ VISIBLE_SCOPES = [
     ("region", "EU5"),
 ]
 
+EU5_COUNTRIES = ["DE", "FR", "IT", "ES", "GB"]
+
 COHORT_SCORE_CONFIG: Dict[str, Dict[str, Any]] = {
     "rising_star": {
-        "score_table": "hcp_scores_v2",
-        "rank_table": "hcp_rising_star_ranks_v2",
-        "score_fields": {
-            "pub_velocity": "pub_velocity_score",
-            "citation_trajectory": "citation_trajectory_score",
-            "trial_investigator": "trial_investigator_score",
-        },
+        "rank_table": "hcp_rising_star_ranks_v3",
     },
     "established": {
         "score_table": "hcp_established_scores_v2",
@@ -182,6 +181,7 @@ class HCPContext:
     pharma_companies_distinct: Optional[int]
     percentile_data: Dict[str, int] = field(default_factory=dict)
     therapeutic_area_slug: str = ""
+    rising_star_v3: Optional[Dict[str, Any]] = None
 
 
 def get_required_env(name: str) -> str:
@@ -243,6 +243,38 @@ def safe_float(value: object) -> Optional[float]:
         return None
 
 
+def format_display_int(value: object) -> str:
+    parsed = safe_float(value)
+    if parsed is None:
+        return "Unknown"
+    return str(int(round(parsed)))
+
+
+def format_signed_int(value: object) -> str:
+    parsed = safe_float(value)
+    if parsed is None:
+        return "Unknown"
+    rounded = int(round(parsed))
+    if rounded > 0:
+        return f"+{rounded}"
+    return str(rounded)
+
+
+def format_percentile_one_decimal(value: object) -> str:
+    parsed = safe_float(value)
+    if parsed is None:
+        return "Unknown"
+    return f"{parsed:.1f}"
+
+
+def get_db_conn():
+    """Direct Postgres connection (port 5432) for joined Rising Star v3 reads."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise EnvironmentError("Missing DATABASE_URL")
+    return psycopg.connect(database_url, row_factory=dict_row)
+
+
 def percentile_within_ta(value: float, all_values_in_ta: List[float]) -> float:
     """Compute simple percentile rank (0-100) of value within its TA peer group."""
     if not all_values_in_ta:
@@ -300,6 +332,104 @@ def fetch_top_n_hcp_ids_from_rank_view(
                 if hcp_id:
                     selected.add(str(hcp_id))
     return selected
+
+
+def fetch_rising_star_top_hcp_ids_v3(
+    supabase: Client,
+    top_n: int,
+    visible_ta_ids: List[str],
+) -> Set[str]:
+    """Top N rising-star HCP ids per (TA x visible scope) from hcp_rising_star_ranks_v3."""
+    selected: Set[str] = set()
+    for scope_type, scope_value in VISIBLE_SCOPES:
+        for ta_id in visible_ta_ids:
+            query = (
+                supabase.table("hcp_rising_star_ranks_v3")
+                .select("hcp_id")
+                .eq("therapeutic_area_id", ta_id)
+            )
+            if scope_type == "global" and scope_value is None:
+                query = query.order("rank", desc=False).range(0, top_n - 1)
+            elif scope_type == "country" and scope_value == "US":
+                query = (
+                    query.not_.is_("us_rank", "null")
+                    .order("us_rank", desc=False)
+                    .range(0, top_n - 1)
+                )
+            elif scope_type == "region" and scope_value == "EU5":
+                query = (
+                    query.in_("country", EU5_COUNTRIES)
+                    .order("rising_star_percentile", desc=True)
+                    .range(0, top_n - 1)
+                )
+            else:
+                continue
+            response = query.execute()
+            rows = response.data or []
+            for row in rows:
+                hcp_id = row.get("hcp_id")
+                if hcp_id:
+                    selected.add(str(hcp_id))
+    return selected
+
+
+def fetch_rising_star_v3_context_rows(
+    hcp_ids: Set[str],
+    visible_ta_ids: List[str],
+) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """Load Rising Star v3 ranks joined to scientific and network momentum signals."""
+    if not hcp_ids or not visible_ta_ids:
+        return {}
+
+    ids_list = list(hcp_ids)
+    ta_list = list(visible_ta_ids)
+    rows_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    batch_size = 500
+
+    sql = """
+        SELECT
+            r.hcp_id,
+            r.therapeutic_area_id,
+            r.rank,
+            r.us_rank,
+            r.rising_star_percentile,
+            r.momentum_component,
+            r.visibility_component,
+            r.scientific_momentum_percentile,
+            r.network_momentum_percentile,
+            r.scientific_visibility_percentile,
+            r.network_visibility_percentile,
+            r.archetype,
+            sm.early_total_pubs,
+            sm.recent_total_pubs,
+            sm.pub_velocity_delta,
+            sm.citation_velocity_delta,
+            sm.authorship_progression_delta,
+            sm.early_senior_author_pct,
+            sm.recent_senior_author_pct,
+            nm.early_collaborator_count,
+            nm.recent_collaborator_count
+        FROM hcp_rising_star_ranks_v3 r
+        LEFT JOIN hcp_scientific_momentum_v1 sm
+            ON sm.hcp_id = r.hcp_id
+           AND sm.therapeutic_area_id = r.therapeutic_area_id
+        LEFT JOIN hcp_network_momentum_v1 nm
+            ON nm.hcp_id = r.hcp_id
+           AND nm.therapeutic_area_id = r.therapeutic_area_id
+        WHERE r.therapeutic_area_id = ANY(%s::uuid[])
+          AND r.hcp_id = ANY(%s::uuid[])
+    """
+
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(ids_list), batch_size):
+                batch_ids = ids_list[i : i + batch_size]
+                cur.execute(sql, (ta_list, batch_ids))
+                for row in cur.fetchall():
+                    hcp_id = str(row["hcp_id"])
+                    ta_id = str(row["therapeutic_area_id"])
+                    rows_by_pair[(hcp_id, ta_id)] = dict(row)
+    return rows_by_pair
 
 
 def fetch_established_top_hcp_ids(
@@ -398,17 +528,22 @@ def load_hcp_contexts(
 
     hcps: List[Dict] = []
     cohort_by_hcp: Dict[str, str] = {}
+    rising_star_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
     if "rising_star" in target_cohorts:
-        print(f"Selecting rising_star top-{rising_top_n} per (TA x visible scope) from rank table...")
-        rank_table = COHORT_SCORE_CONFIG["rising_star"]["rank_table"]
-        rising_ids = fetch_top_n_hcp_ids_from_rank_view(
-            supabase, rank_table, rising_top_n, visible_ta_ids
+        print(
+            f"Selecting rising_star top-{rising_top_n} per (TA x visible scope) "
+            "from hcp_rising_star_ranks_v3..."
+        )
+        rising_ids = fetch_rising_star_top_hcp_ids_v3(
+            supabase, rising_top_n, visible_ta_ids
         )
         print(f"Rising star rank selection: {len(rising_ids)} unique HCPs")
         for hcp_id in rising_ids:
             cohort_by_hcp[hcp_id] = "rising_star"
         hcps.extend(fetch_hcps_by_ids(supabase, rising_ids, target_version))
+        rising_star_v3_by_pair = fetch_rising_star_v3_context_rows(rising_ids, visible_ta_ids)
+        print(f"Loaded {len(rising_star_v3_by_pair)} Rising Star v3 HCP x TA signal rows")
 
     if "established" in target_cohorts:
         print(f"Selecting established top-{established_top_n} per (TA x visible scope) from rank table...")
@@ -512,6 +647,8 @@ def load_hcp_contexts(
 
     scores_by_cohort: Dict[str, Dict[Tuple[str, str], Dict]] = {}
     for cohort in target_cohorts:
+        if cohort == "rising_star":
+            continue
         if cohort not in COHORT_SCORE_CONFIG:
             continue
         cohort_config = COHORT_SCORE_CONFIG[cohort]
@@ -632,6 +769,38 @@ def load_hcp_contexts(
             )
             contexts.append(ctx)
 
+    if "rising_star" in target_cohorts:
+        for (hcp_id, ta_id), v3_row in rising_star_v3_by_pair.items():
+            if (hcp_id, ta_id) not in ta_membership:
+                continue
+            hcp = hcp_map.get(hcp_id)
+            if not hcp:
+                continue
+            ops = ops_by_hcp.get(hcp_id, {})
+            ctx = HCPContext(
+                hcp_id=hcp_id,
+                therapeutic_area_id=ta_id,
+                therapeutic_area_name=ta_name_map.get(ta_id, ta_id),
+                first_name=hcp.get("first_name"),
+                last_name=hcp.get("last_name"),
+                institution=hcp.get("institution"),
+                country=hcp.get("country"),
+                cohort_classification="rising_star",
+                cohort_score=safe_float(v3_row.get("rising_star_percentile")),
+                composite_score=safe_float(v3_row.get("rising_star_percentile")),
+                pub_velocity_pct=None,
+                citation_trajectory_pct=None,
+                trial_investigator_pct=None,
+                first_pub_year=safe_int(hcp.get("first_pub_year")),
+                total_career_pubs=safe_int(hcp.get("total_career_pubs")),
+                pharma_engagement_lifetime=safe_float(ops.get("total_payments_lifetime")),
+                pharma_companies_distinct=safe_int(ops.get("distinct_companies_lifetime")),
+                percentile_data={},
+                therapeutic_area_slug=ta_slug_map.get(ta_id, ""),
+                rising_star_v3=v3_row,
+            )
+            contexts.append(ctx)
+
     print(f"Built {len(contexts)} HCP×TA contexts for narrative generation")
     return contexts, ta_name_map
 
@@ -670,6 +839,26 @@ def freshness_filter(
                 continue
             generated_at = narr_rows[0].get("generated_at")
             if not generated_at:
+                kept.append(ctx)
+                continue
+
+            if ctx.cohort_classification == "rising_star":
+                score_resp = (
+                    supabase.table("hcp_rising_star_ranks_v3")
+                    .select("computed_at")
+                    .eq("hcp_id", ctx.hcp_id)
+                    .eq("therapeutic_area_id", ctx.therapeutic_area_id)
+                    .limit(1)
+                    .execute()
+                )
+                score_rows = score_resp.data or []
+                if not score_rows:
+                    kept.append(ctx)
+                    continue
+                scored_at = score_rows[0].get("computed_at")
+                if scored_at and str(generated_at) > str(scored_at):
+                    skipped += 1
+                    continue
                 kept.append(ctx)
                 continue
 
@@ -808,29 +997,102 @@ def format_hcp_facts(ctx: HCPContext, cohort: str) -> str:
 
 
 def build_prompt_rising_star(ctx: HCPContext) -> str:
-    """Prompt for Rising Star cohort — emerging voice framing."""
-    return f"""You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about an emerging scientific voice. This HCP has been algorithmically selected as a top-100 Rising Star within their therapeutic area, drawn from researchers in the early-to-mid career band (3-10 years since first publication). They are by definition a high-priority name on a curated MSL surfacing board. The percentile data below is computed against the full scored population (tens of thousands of HCPs across all career stages), so percentiles in the middle ranges still represent meaningful emerging signal for someone in this curated top tier. Frame the HCP as a scientifically credible emerging voice worth MSL engagement; identify what specifically makes them notable rather than dwelling on what they haven't yet achieved. The HCP is classified as a Rising Star — a mid-career researcher with publication momentum, citation growth, or clinical trial activity that signals emerging influence in their therapeutic area.
+    """Prompt for Rising Star cohort -- v3 momentum/visibility methodology."""
+    v3 = ctx.rising_star_v3 or {}
+    career_years = "Unknown"
+    if ctx.first_pub_year is not None:
+        career_years = str(datetime.now(timezone.utc).year - ctx.first_pub_year)
 
-Return ONLY valid JSON with exactly these five fields:
+    us_rank = safe_int(v3.get("us_rank"))
+    us_rank_clause = f"Rank {us_rank} US" if us_rank is not None else "Global cohort only"
+
+    return f"""You are writing a structured narrative for an MSL describing why a
+Healthcare Professional is classified as a Rising Star in the
+{ctx.therapeutic_area_name} therapeutic area.
+
+HCP: {ctx.first_name or ''} {ctx.last_name or ''}
+Institution: {ctx.institution or 'Unknown'}
+Career years: {career_years}
+Archetype: {v3.get('archetype') or 'Emerging Leader'}
+
+Rising Star composite percentile: {format_percentile_one_decimal(v3.get('rising_star_percentile'))}
+  (Rank {format_display_int(v3.get('rank'))} global; {us_rank_clause})
+Momentum component: {format_display_int(v3.get('momentum_component'))}
+Visibility component: {format_display_int(v3.get('visibility_component'))}
+
+Scientific Momentum percentile: {format_display_int(v3.get('scientific_momentum_percentile'))}
+  Publications {format_display_int(v3.get('early_total_pubs'))} (2016-2020) -> {format_display_int(v3.get('recent_total_pubs'))}
+    (2021-2025)
+  Senior-author publication delta: {format_signed_int(v3.get('pub_velocity_delta'))}
+  Citation volume growth: {format_signed_int(v3.get('citation_velocity_delta'))}
+  Senior-author share: {format_display_int(v3.get('early_senior_author_pct'))} ->
+    {format_display_int(v3.get('recent_senior_author_pct'))}
+
+Network Momentum percentile: {format_display_int(v3.get('network_momentum_percentile'))}
+  Collaborators {format_display_int(v3.get('early_collaborator_count'))} (2016-2020) ->
+    {format_display_int(v3.get('recent_collaborator_count'))} (2021-2025)
+
+Scientific Visibility percentile: {format_display_int(v3.get('scientific_visibility_percentile'))}
+Network Visibility percentile: {format_display_int(v3.get('network_visibility_percentile'))}
+
+Return STRICT JSON with exactly these fields, no additional fields,
+no preamble, no markdown fences:
+
 {{
-  "narrative": "string",
-  "why_now": "string",
-  "engagement_angle": "string",
-  "signal_strength": "string",
-  "caution_flags": "string or null"
+  "narrative": "...",
+  "why_now": "...",
+  "signal_strength": "high" | "moderate" | "early",
+  "caution_flags": "..." | null,
+  "engagement_angle": "..."
 }}
 
-Constraints:
-- narrative: exactly 3 sentences. Frame as an emerging scientific voice with specific evidence (publication trajectory, citation growth, trial leadership). Avoid promotional or commercial targeting language. Reference percentile context when available.
-- why_now: exactly 1 sentence. Concrete timing signal (recent acceleration, recent trial role, etc.).
-- engagement_angle: exactly 2 sentences. Suggest scientific topics the MSL could productively focus on based on the HCP's activity. Be specific to therapeutic area.
-- signal_strength: exactly 1 sentence. Honest confidence statement — strong if data is consistent across publications and trials, weaker if mixed signals.
-- caution_flags: 1 sentence OR the JSON literal null. Use null in most cases — the absence of strong signal is NOT a caution flag, it's just part of being early-career. Only populate caution_flags when there is a SPECIFIC, ACTIONABLE concern an MSL should know about: significant pharma engagement with direct competitors (>$50K with a competing company), affiliation with an institution that has restrictive industry-engagement policies, evidence of recent inactivity (no publications in 24+ months), or other concrete red flags. Do NOT use this field to re-state low percentile data or to hedge engagement expectations — those belong in signal_strength, not caution_flags. If you find yourself writing "MSL engagement should be framed around scientific exchange," use null instead.
-- No markdown. No text outside JSON.
-- Do not name specific drug brands or NCT trial numbers.
+Field instructions:
 
-HCP context:
-{format_hcp_facts(ctx, "rising_star")}
+narrative: 3-5 sentences, max 110 words. Plain professional English
+for an MSL audience. Anchor every claim in a specific number from
+the data above. Where a growth ratio is striking
+(>=3x), describe it proportionally as well as in raw counts
+(e.g., "publication output increased more than eight-fold, from
+6 to 49 papers" rather than only "from 6 to 49"). Reference the
+archetype EXPLICITLY at least once in the narrative -- either in
+the opening identification ("X is a Scientific Accelerator in
+NSCLC...") or in the interpretation ("This profile is
+characteristic of a Balanced Rising Star..."). Do NOT use
+marketing words ("trajectory," "ascent," "leadership in the
+making," "exceptional," "monster"). End with a MILESTONE-FOCUSED forward-looking statement that
+names a specific observable event rather than predicting an
+outcome. Use constructions like "A transition into X would
+represent the next milestone..." or "First evidence of X would
+mark a meaningful inflection..." Avoid outcome-prediction
+phrasing like "influence could follow," "is likely to," "is a
+reasonable expectation." When one signal clearly dominates the profile (e.g., network
+momentum percentile >= 95 while scientific momentum is moderate,
+or vice versa), give it its own sentence with a short framing
+opener ("The defining feature of the profile is..." or "The
+strongest signal is..."), then state the numbers in the
+following sentence. Avoid compound sentences that combine the
+framing and the data into one long clause.
+
+why_now: One sentence, max 20 words. The single strongest signal
+driving this person's Rising Star status right now. Numbers required.
+
+signal_strength: One of "high", "moderate", "early".
+  high = rising_star_percentile >= 95
+  moderate = rising_star_percentile 85-94
+  early = rising_star_percentile < 85
+
+caution_flags: One sentence, max 25 words, identifying the most
+important caveat to the profile (e.g., senior-author share = 0,
+geographic concentration, collaboration count outlier, etc.).
+Return null if no meaningful caution applies.
+
+engagement_angle: One sentence, max 20 words. A concrete MSL
+engagement suggestion grounded in the profile shape (e.g., "monitor
+for transition into senior authorship," "engage around growing
+collaborator network," "early relationship-building given low
+prior industry visibility").
+
+Output ONLY the JSON object. No code fences. No commentary.
 """
 
 
@@ -1005,18 +1267,23 @@ def upsert_narrative(
 ) -> None:
     """Write narrative to hcp_narratives."""
     generated_at = datetime.now(timezone.utc).isoformat()
+    prompt_version = (
+        RISING_STAR_PROMPT_VERSION
+        if ctx.cohort_classification == "rising_star"
+        else PROMPT_VERSION
+    )
     if target_version == "v2":
         row = {
             "hcp_id": ctx.hcp_id,
             "therapeutic_area_slug": ctx.therapeutic_area_slug,
             "narrative_text": output["narrative"],
-            "why_now": output["why_now"],
-            "engagement_angle": output["engagement_angle"],
-            "signal_strength": output["signal_strength"],
-            "caution_flags": [output["caution_flags"]] if output["caution_flags"] else None,
+            "why_now": output.get("why_now"),
+            "engagement_angle": output.get("engagement_angle"),
+            "signal_strength": output.get("signal_strength"),
+            "caution_flags": [output["caution_flags"]] if output.get("caution_flags") else None,
             "generated_at": generated_at,
             "model_used": ANTHROPIC_MODEL,
-            "prompt_version": PROMPT_VERSION,
+            "prompt_version": prompt_version,
         }
         narratives_table = "hcp_narratives_v2"
         on_conflict = "hcp_id,therapeutic_area_slug"
@@ -1064,6 +1331,10 @@ def run_pipeline(
 ) -> None:
     load_dotenv()
     supabase = init_supabase()
+    if "rising_star" in target_cohorts and not os.getenv("DATABASE_URL"):
+        raise EnvironmentError(
+            "DATABASE_URL is required for rising_star cohort (v3 signal joins via Postgres)."
+        )
 
     print(f"Target cohorts: {target_cohorts}")
     if "rising_star" in target_cohorts:
