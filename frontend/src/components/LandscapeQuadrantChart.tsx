@@ -109,16 +109,13 @@ function renderDot(props: {
   );
 }
 
-const QUADRANT_LABEL_STYLE: CSSProperties = {
-  position: "absolute",
+const LABEL_TEXT_STYLE: CSSProperties = {
   fontSize: 11,
   color: "#4A4A4F",
   fontStyle: "italic",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   pointerEvents: "none",
-  lineHeight: 1.3,
-  maxWidth: "38%",
 };
 
 const ARCHETYPE_LEGEND = [
@@ -138,7 +135,9 @@ function ArchetypeLegend() {
         gap: 16,
         fontSize: 11,
         color: "#9B9892",
-        padding: "12px 0 0",
+        padding: 0,
+        marginTop: 16,
+        marginBottom: 32,
       }}
     >
       {ARCHETYPE_LEGEND.map((item) => (
@@ -206,60 +205,44 @@ export default function LandscapeQuadrantChart({ points, onPointClick, loading }
 
   return (
     <div>
-      <div style={{ position: "relative", width: "100%", height: 480 }}>
-        <div style={{ ...QUADRANT_LABEL_STYLE, top: 4, left: 16, textAlign: "left" }}>
-          Emerging Specialists
-        </div>
-        <div style={{ ...QUADRANT_LABEL_STYLE, top: 4, right: 16, textAlign: "right" }}>
-          Future KOLs
-        </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "0 16px",
+          marginBottom: 8,
+        }}
+      >
+        <span style={LABEL_TEXT_STYLE}>Emerging Specialists</span>
+        <span style={LABEL_TEXT_STYLE}>Future KOLs</span>
+      </div>
 
-        <div style={{ position: "absolute", inset: "36px 16px 40px 48px", pointerEvents: "none" }}>
-          <div style={{ ...QUADRANT_LABEL_STYLE, bottom: 8, left: 8, textAlign: "left" }}>
-            Early Development
-          </div>
-          <div style={{ ...QUADRANT_LABEL_STYLE, bottom: 8, right: 8, textAlign: "right" }}>
-            Established Visibility
-          </div>
-        </div>
-
+      <div style={{ width: "100%", height: 440 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 36, right: 24, bottom: 36, left: 48 }}>
+          <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
           <CartesianGrid stroke="#1E1E22" strokeDasharray="3 3" />
           <XAxis
             type="number"
             dataKey="x"
             domain={[0, 100]}
             tick={false}
+            tickLine={false}
             axisLine={{ stroke: "#2A2A2E" }}
-            label={{
-              value: "Visibility",
-              position: "insideBottom",
-              offset: -8,
-              fill: "#6B6A65",
-              fontSize: 12,
-            }}
+            height={0}
           />
           <YAxis
             type="number"
             dataKey="y"
             domain={[0, 100]}
             tick={false}
+            tickLine={false}
             axisLine={{ stroke: "#2A2A2E" }}
-            label={{
-              value: "Momentum",
-              angle: -90,
-              position: "insideLeft",
-              offset: 8,
-              fill: "#6B6A65",
-              fontSize: 12,
-              style: { textAnchor: "middle" },
-            }}
+            width={0}
           />
-          <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="#3FB8AF" fillOpacity={0.04} stroke="none" />
-          <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#9B6DFF" fillOpacity={0.04} stroke="none" />
-          <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="#6B6A65" fillOpacity={0.03} stroke="none" />
-          <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="#E8A04E" fillOpacity={0.04} stroke="none" />
+          <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="#3FB8AF" fillOpacity={0.07} stroke="none" />
+          <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#9B6DFF" fillOpacity={0.07} stroke="none" />
+          <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="#6B6A65" fillOpacity={0.05} stroke="none" />
+          <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="#E8A04E" fillOpacity={0.07} stroke="none" />
           <Tooltip
             content={<CustomTooltip />}
             cursor={{ strokeDasharray: "3 3" }}
@@ -277,6 +260,18 @@ export default function LandscapeQuadrantChart({ points, onPointClick, loading }
           />
           </ScatterChart>
         </ResponsiveContainer>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "0 16px",
+          marginTop: 8,
+        }}
+      >
+        <span style={LABEL_TEXT_STYLE}>Early Development</span>
+        <span style={LABEL_TEXT_STYLE}>Established Visibility</span>
       </div>
 
       <ArchetypeLegend />
