@@ -300,6 +300,16 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     paymentsByYear: item.paymentsByYear ?? null,
     beneficiariesByYear: item.beneficiariesByYear ?? null,
     engagementMix: item.engagementMix ?? null,
+    rising_star_percentile: item.rising_star_percentile ?? null,
+    momentum_component: item.momentum_component ?? null,
+    visibility_component: item.visibility_component ?? null,
+    scientific_momentum_percentile: item.scientific_momentum_percentile ?? null,
+    network_momentum_percentile: item.network_momentum_percentile ?? null,
+    scientific_visibility_percentile: item.scientific_visibility_percentile ?? null,
+    network_visibility_percentile: item.network_visibility_percentile ?? null,
+    archetype: item.archetype ?? null,
+    us_rank: item.us_rank ?? null,
+    scope_rank: item.scope_rank ?? null,
   };
 }
 

@@ -59,7 +59,7 @@ export default function InfoTooltip({
         onBlur={() => setVisible(false)}
         style={{
           display: "inline-block",
-          cursor: "help",
+          cursor: "default",
           ...style,
         }}
       >
@@ -73,13 +73,13 @@ export default function InfoTooltip({
             left: coords.left,
             top: coords.top,
             width: 240,
-            backgroundColor: "#15131A",
-            border: "1px solid #2A2730",
-            borderRadius: 6,
+            backgroundColor: "#111113",
+            border: "1px solid #E8A020",
+            borderRadius: 4,
             padding: "10px 12px",
             fontSize: 11,
             lineHeight: 1.5,
-            color: "#B8B4AC",
+            color: "#9B9892",
             zIndex: 10000,
             boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
             pointerEvents: "none",

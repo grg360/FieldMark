@@ -59,23 +59,27 @@ export default function MiniCollaboratorNetwork({
               }}
             >
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</span>
-              {c.cohort_score !== null && c.cohort_score !== undefined && (
-                <span
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 600,
-                    color: "#0A0A0B",
-                    backgroundColor: "#FFD700",
-                    padding: "1px 5px",
-                    borderRadius: 3,
-                    lineHeight: 1.2,
-                    flexShrink: 0,
-                    fontFeatureSettings: '"tnum"',
-                  }}
-                >
-                  {Math.round(c.cohort_score)}
-                </span>
-              )}
+              {c.cohort_score !== null && c.cohort_score !== undefined && (() => {
+                const kind = c.cohort_kind ?? "established";
+                const isRisingStar = kind === "rising_star";
+                return (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      color: isRisingStar ? "#FFFFFF" : "#0A0A0B",
+                      backgroundColor: isRisingStar ? "#9B6DFF" : "#FFD700",
+                      padding: "1px 5px",
+                      borderRadius: 3,
+                      lineHeight: 1.2,
+                      flexShrink: 0,
+                      fontFeatureSettings: '"tnum"',
+                    }}
+                  >
+                    {isRisingStar ? "RS" : "EST"} {Math.round(c.cohort_score)}
+                  </span>
+                );
+              })()}
             </div>
             {c.institution && (
               <div

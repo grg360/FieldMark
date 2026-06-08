@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { buildSubline } from "../lib/subline";
+import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import ScoreModal from "./ScoreModal";
 
 function risingStarArchetypeShortLabel(archetype: string | null | undefined): string {
   switch (archetype) {
     case "Balanced Rising Star":   return "BALANCED";
-    case "Scientific Accelerator": return "SCI ACCEL";
-    case "Network Accelerator":    return "NET ACCEL";
+    case "Scientific Accelerator": return "SCIENCE";
+    case "Network Accelerator":    return "NETWORK";
     case "Emerging Leader":        return "EMERGING";
-    default:                       return "";
+    default:                       return "EMERGING";
   }
 }
 
@@ -20,19 +21,32 @@ function risingStarArchetypeColor(archetype: string | null | undefined): string 
     case "Balanced Rising Star":   return "#9B6DFF";
     case "Scientific Accelerator": return "#3FB8AF";
     case "Network Accelerator":    return "#E8A04E";
-    case "Emerging Leader":        return "#6B6A65";
-    default:                       return "#6B6A65";
+    case "Emerging Leader":        return "#E8704E";
+    default:                       return "#E8704E";
   }
 }
+
+const RISING_STAR_TILE_TOOLTIPS: Record<string, string> = {
+  "SCIENTIFIC MOMENTUM":
+    "Growth in publication output, citation volume, and senior-authorship across 2016-2020 vs 2021-2025.",
+  "NETWORK MOMENTUM":
+    "Growth in collaboration network centrality across 2016-2020 vs 2021-2025.",
+  "SCIENTIFIC VISIBILITY":
+    "Current publication footprint and citation impact within the Rising Star cohort.",
+  "NETWORK VISIBILITY":
+    "Current position in the co-authorship network for this therapeutic area.",
+};
 
 function RisingStarSignalTile({
   label,
   value,
   barColor,
+  tooltip,
 }: {
   label: string;
   value: number;
   barColor: string;
+  tooltip: string;
 }) {
   return (
     <div
@@ -45,17 +59,23 @@ function RisingStarSignalTile({
         flexDirection: "column",
       }}
     >
-      <div
-        style={{
-          fontSize: 9,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 600,
-        }}
-      >
-        {label}
-      </div>
+      <InfoTooltip content={tooltip} style={{ display: "block", width: "100%" }}>
+        <div
+          style={{
+            fontSize: 9,
+            color: "#6B6A65",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            width: "100%",
+          }}
+        >
+          {label}
+        </div>
+      </InfoTooltip>
       <div
         style={{
           fontSize: 22,
@@ -159,14 +179,31 @@ type HCPCardHCP = HCP & {
   network_visibility_percentile?: number | null;
 };
 
+function formatCardAffiliationLine(hcp: HCPCardHCP): string {
+  const institution = String(
+    hcp.institutionShort ??
+      (hcp as { institution_normalized?: string | null }).institution_normalized ??
+      hcp.institution ??
+      "",
+  ).trim();
+  const state = String(
+    hcp.nppesPracticeState ??
+      (hcp as { nppes_practice_state?: string | null }).nppes_practice_state ??
+      "",
+  ).trim();
+  if (institution && state) return `${institution} · ${state}`;
+  if (institution) return institution;
+  return buildSubline(hcp);
+}
+
 function shortArchetypeLabel(archetype: string | null | undefined): string {
   switch (archetype) {
     case "Balanced Rising Star":
       return "BALANCED";
     case "Scientific Accelerator":
-      return "SCI ACCEL";
+      return "SCIENCE";
     case "Network Accelerator":
-      return "NET ACCEL";
+      return "NETWORK";
     case "Emerging Leader":
       return "EMERGING";
     default:
@@ -186,8 +223,10 @@ function archetypePillStyle(archetype: string | null | undefined): {
       return { backgroundColor: "rgba(63, 184, 175, 0.18)", borderColor: "#3FB8AF", color: "#E8E6DF" };
     case "Network Accelerator":
       return { backgroundColor: "rgba(232, 160, 78, 0.18)", borderColor: "#E8A04E", color: "#E8E6DF" };
+    case "Emerging Leader":
+      return { backgroundColor: "rgba(232, 112, 78, 0.18)", borderColor: "#E8704E", color: "#E8E6DF" };
     default:
-      return { backgroundColor: "rgba(107, 106, 101, 0.18)", borderColor: "#6B6A65", color: "#E8E6DF" };
+      return { backgroundColor: "rgba(232, 112, 78, 0.18)", borderColor: "#E8704E", color: "#E8E6DF" };
   }
 }
 
@@ -416,7 +455,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const risingScopeLabel = hcp.scope === "US" ? "US" : "GLOBAL";
   const displayRank = isRisingCohort ? (hcp.scope_rank ?? hcp.rank) : hcp.rank;
   const countryCode = getCountryCode(hcp.country ?? null);
-  const subline = buildSubline(hcp);
+  const affiliationLine = formatCardAffiliationLine(hcp);
   if (typeof window !== "undefined" && (hcp as { last_name?: string }).last_name === "McKean") {
     console.log("[McKean subline debug]", {
       hcp_id: hcp.id,
@@ -426,7 +465,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
       nppes_practice_city: (hcp as any).nppes_practice_city,
       nppes_practice_state: (hcp as any).nppes_practice_state,
       nppes_practice_setting: (hcp as any).nppes_practice_setting,
-      computed_subline: subline,
+      computed_subline: affiliationLine,
     });
   }
 
@@ -613,8 +652,20 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
             boxSizing: "border-box",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <span style={{ fontSize: 17, fontWeight: 500, color: "#E8E6DF", fontFamily: "system-ui, sans-serif" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap", minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: 17,
+                fontWeight: 500,
+                color: "#E8E6DF",
+                fontFamily: "system-ui, sans-serif",
+                minWidth: 0,
+                flexShrink: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {hcp.name}
             </span>
             {countryCode && (
@@ -637,7 +688,6 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
                   alignItems: "center",
                   height: 22,
                   padding: "3px 8px",
-                  marginLeft: 8,
                   fontSize: 10,
                   fontWeight: 600,
                   textTransform: "uppercase",
@@ -647,6 +697,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
                   backgroundColor: risingStarArchetypeColor(hcp.archetype),
                   color: "#FFFFFF",
                   whiteSpace: "nowrap",
+                  flexShrink: 0,
                 }}
               >
                 {risingStarArchetypeShortLabel(hcp.archetype)}
@@ -662,11 +713,13 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
               fontFamily: "system-ui, sans-serif",
               marginTop: 4,
               lineHeight: 1.4,
-              overflowWrap: "break-word",
-              wordBreak: "break-word",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "100%",
             }}
           >
-            {subline}
+            {affiliationLine}
           </div>
         </div>
 
@@ -722,10 +775,10 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
             <div style={{ fontSize: 12, fontWeight: 500, color: "#E8E6DF" }}>FieldMark Score</div>
             <div style={{ fontSize: 11, color: "#9B9892", marginTop: 4, lineHeight: 1.5 }}>
               {scoreTooltipKey === "FIELDMARK_SCORE_RISING"
-                ? "Composite signal of publication velocity, citation trajectory, and clinical trial activity within the therapeutic area, with career-stage adjustment. Normalized 0–100 within the rising star cohort."
+                ? "Composite signal of publication velocity, citation trajectory, and clinical trial activity within the therapeutic area, with career-stage adjustment. Normalized 0-100 within the rising star cohort."
                 : scoreTooltipKey === "FIELDMARK_SCORE_ESTABLISHED"
-                ? "Composite signal of publication volume, recent productivity, lead authorship density, clinical trial activity, career length, and pharma engagement breadth. Normalized 0–100 within the established cohort."
-                : "Composite signal of pharma engagement, engagement breadth across companies, Medicare patient volume, and career stage. Normalized 0–100 within the community cohort."}
+                ? "Composite signal of publication volume, recent productivity, lead authorship density, clinical trial activity, career length, and pharma engagement breadth. Normalized 0-100 within the established cohort."
+                : "Composite signal of pharma engagement, engagement breadth across companies, Medicare patient volume, and career stage. Normalized 0-100 within the community cohort."}
             </div>
           </div>
         )}
@@ -805,24 +858,28 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
             }}
           >
             <RisingStarSignalTile
-              label="SCI MOM"
+              label="SCIENTIFIC MOMENTUM"
               value={Math.round(hcp.scientific_momentum_percentile ?? 0)}
               barColor="#3FB8AF"
+              tooltip={RISING_STAR_TILE_TOOLTIPS["SCIENTIFIC MOMENTUM"]}
             />
             <RisingStarSignalTile
-              label="NET MOM"
+              label="NETWORK MOMENTUM"
               value={Math.round(hcp.network_momentum_percentile ?? 0)}
               barColor="#E8A04E"
+              tooltip={RISING_STAR_TILE_TOOLTIPS["NETWORK MOMENTUM"]}
             />
             <RisingStarSignalTile
-              label="SCI VIS"
+              label="SCIENTIFIC VISIBILITY"
               value={Math.round(hcp.scientific_visibility_percentile ?? 0)}
               barColor="#3FB8AF"
+              tooltip={RISING_STAR_TILE_TOOLTIPS["SCIENTIFIC VISIBILITY"]}
             />
             <RisingStarSignalTile
-              label="NET VIS"
+              label="NETWORK VISIBILITY"
               value={Math.round(hcp.network_visibility_percentile ?? 0)}
               barColor="#E8A04E"
+              tooltip={RISING_STAR_TILE_TOOLTIPS["NETWORK VISIBILITY"]}
             />
           </div>
         ) : (

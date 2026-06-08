@@ -23,10 +23,6 @@ function archetypeColor(archetype: string): string {
   }
 }
 
-function clampPercent(value: number): number {
-  return Math.min(100, Math.max(0, Number(value) || 0));
-}
-
 function KpiTile({
   label,
   value,
@@ -36,7 +32,7 @@ function KpiTile({
   value: number;
   barColor: string;
 }) {
-  const pct = clampPercent(value);
+  const pct = Math.min(100, Math.max(0, Number(value) || 0));
   return (
     <div
       style={{
@@ -94,172 +90,6 @@ function KpiTile({
   );
 }
 
-function QuadrantChart({
-  momentum,
-  visibility,
-  dotColor,
-}: {
-  momentum: number;
-  visibility: number;
-  dotColor: string;
-}) {
-  const size = 280;
-  const plotLeft = 36;
-  const plotTop = 12;
-  const plotWidth = 220;
-  const plotHeight = 220;
-  const plotRight = plotLeft + plotWidth;
-  const plotBottom = plotTop + plotHeight;
-  const midX = plotLeft + plotWidth / 2;
-  const midY = plotTop + plotHeight / 2;
-
-  const dotCx = plotLeft + (clampPercent(visibility) / 100) * plotWidth;
-  const dotCy = plotBottom - (clampPercent(momentum) / 100) * plotHeight;
-
-  const gridSteps = [0, 25, 50, 75, 100];
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      style={{ display: "block", margin: "0 auto" }}
-      aria-label="Momentum versus visibility quadrant chart"
-    >
-      {gridSteps.map((step) => {
-        const x = plotLeft + (step / 100) * plotWidth;
-        const y = plotBottom - (step / 100) * plotHeight;
-        return (
-          <g key={step}>
-            <line
-              x1={x}
-              y1={plotTop}
-              x2={x}
-              y2={plotBottom}
-              stroke="#1F1F1F"
-              strokeWidth={1}
-            />
-            <line
-              x1={plotLeft}
-              y1={y}
-              x2={plotRight}
-              y2={y}
-              stroke="#1F1F1F"
-              strokeWidth={1}
-            />
-          </g>
-        );
-      })}
-
-      <rect
-        x={plotLeft}
-        y={plotTop}
-        width={plotWidth}
-        height={plotHeight}
-        fill="none"
-        stroke="#2A2A2A"
-        strokeWidth={1}
-      />
-
-      <line
-        x1={midX}
-        y1={plotTop}
-        x2={midX}
-        y2={plotBottom}
-        stroke="#2A2A2A"
-        strokeWidth={1}
-        strokeDasharray="4 4"
-      />
-      <line
-        x1={plotLeft}
-        y1={midY}
-        x2={plotRight}
-        y2={midY}
-        stroke="#2A2A2A"
-        strokeWidth={1}
-        strokeDasharray="4 4"
-      />
-
-      <text
-        x={plotLeft + 6}
-        y={plotTop + 14}
-        fill="#6B6A65"
-        fontSize={9}
-        fontWeight={500}
-        letterSpacing="0.08em"
-      >
-        EARLY BREAKOUT
-      </text>
-      <text
-        x={plotRight - 6}
-        y={plotTop + 14}
-        fill="#6B6A65"
-        fontSize={9}
-        fontWeight={500}
-        letterSpacing="0.08em"
-        textAnchor="end"
-      >
-        BREAKOUT LEADER
-      </text>
-      <text
-        x={plotLeft + 6}
-        y={plotBottom - 6}
-        fill="#6B6A65"
-        fontSize={9}
-        fontWeight={500}
-        letterSpacing="0.08em"
-      >
-        EMERGING
-      </text>
-      <text
-        x={plotRight - 6}
-        y={plotBottom - 6}
-        fill="#6B6A65"
-        fontSize={9}
-        fontWeight={500}
-        letterSpacing="0.08em"
-        textAnchor="end"
-      >
-        STABILIZING
-      </text>
-
-      <text
-        x={plotLeft + plotWidth / 2}
-        y={size - 6}
-        fill="#6B6A65"
-        fontSize={10}
-        fontWeight={500}
-        letterSpacing="0.08em"
-        textAnchor="middle"
-      >
-        VISIBILITY
-      </text>
-
-      <text
-        x={10}
-        y={plotTop + plotHeight / 2}
-        fill="#6B6A65"
-        fontSize={10}
-        fontWeight={500}
-        letterSpacing="0.08em"
-        textAnchor="middle"
-        transform={`rotate(-90 10 ${plotTop + plotHeight / 2})`}
-      >
-        MOMENTUM
-      </text>
-
-      <circle
-        cx={dotCx}
-        cy={dotCy}
-        r={8}
-        fill={dotColor}
-        stroke="#FFFFFF"
-        strokeWidth={2}
-      />
-    </svg>
-  );
-}
-
 function LoadingSkeleton() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -273,10 +103,10 @@ function LoadingSkeleton() {
       />
       <div
         style={{
-          height: 280,
-          width: 280,
+          height: 24,
+          width: "40%",
           backgroundColor: "#1A1A1A",
-          borderRadius: 4,
+          borderRadius: 14,
           margin: "0 auto",
         }}
       />
@@ -354,7 +184,7 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
         <div style={{ fontSize: 11, color: "#9B9892", marginTop: 8 }}>{rankSubtext}</div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
         <span
           style={{
             display: "inline-block",
@@ -373,19 +203,12 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
         </span>
       </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <QuadrantChart
-          momentum={data.momentum_component}
-          visibility={data.visibility_component}
-          dotColor={badgeColor}
-        />
-      </div>
-
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: 8,
+          marginBottom: 14,
         }}
       >
         <KpiTile

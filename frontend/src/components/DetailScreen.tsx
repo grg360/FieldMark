@@ -15,6 +15,8 @@ import TopPharmaCompanies from "./TopPharmaCompanies";
 import DrugConstellation from "./DrugConstellation";
 import ScoreBreakdownV3 from "./ScoreBreakdownV3";
 import ScoreBreakdownV3Rising from "./ScoreBreakdownV3Rising";
+import MiniCollaboratorNetwork from "./MiniCollaboratorNetwork";
+import GlobalFooter from "./GlobalFooter";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
@@ -234,7 +236,7 @@ function backLinkLabel(cohort: string | null | undefined): string {
   const c = (cohort ?? "").trim();
   if (c === "established") return "Established";
   if (c === "community" || c === "workhorse") return "Community";
-  if (c === "rising_star" || c === "dark_horse") return "Rising stars";
+  if (c === "rising_star" || c === "dark_horse") return "Rising Stars";
   return "Back";
 }
 
@@ -870,6 +872,131 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     );
   };
 
+  const fieldIntelligenceSection = (
+    <div
+      className="fm-detail-section fm-section-field-intelligence"
+      style={{
+        padding: "16px 16px 12px",
+        borderBottom: "1px solid #1E1E22",
+      }}
+    >
+      <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+        Field Intelligence
+      </div>
+
+      <div
+        style={{
+          fontSize: 12,
+          color: fieldIntelCount >= 3 ? FI_ACCENT_MUTED : "rgba(232, 230, 223, 0.45)",
+          marginBottom: 12,
+          lineHeight: 1.45,
+        }}
+      >
+        {fieldIntelCount >= 3
+          ? `${fieldIntelCount} MSLs have contributed to this profile`
+          : "Field Intelligence pending — be among the first to contribute"}
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8 }}>Community Confidence</div>
+        <div style={{ height: 6, backgroundColor: "#1E1E22", borderRadius: 0, marginBottom: 8 }}>
+          <div style={{ height: "100%", backgroundColor: cohortBarColor, width: "0%" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 13, color: cohortBarColor, fontFamily: "monospace" }}>0%</span>
+          <span style={{ fontSize: 11, color: "#6B6A65" }}>0 MSLs</span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
+        <ValidationField
+          label="Data Matches Field Reality"
+          options={["Confirms", "Partial", "Disputes"]}
+          selected={validation.dataMatch}
+          onSelect={(val) => setValidation({ ...validation, dataMatch: val })}
+        />
+        <ValidationField
+          label="Engagement Potential"
+          options={["High", "Moderate", "Low"]}
+          selected={validation.engagement}
+          onSelect={(val) => setValidation({ ...validation, engagement: val })}
+        />
+        <ValidationField
+          label="Scientific Credibility"
+          options={["Strong", "Moderate", "Early"]}
+          selected={validation.credibility}
+          onSelect={(val) => setValidation({ ...validation, credibility: val })}
+        />
+        <ValidationField
+          label="Momentum Trajectory"
+          options={["Accelerating", "Steady", "Plateauing"]}
+          selected={validation.momentum}
+          onSelect={(val) => setValidation({ ...validation, momentum: val })}
+        />
+      </div>
+
+      <button
+        onClick={() => {}}
+        disabled={!allValidated}
+        style={{
+          width: "100%",
+          height: 44,
+          marginTop: 16,
+          backgroundColor: "#0A1F16",
+          border: "1px solid #1D9E75",
+          color: "#1D9E75",
+          fontSize: 13,
+          fontWeight: 500,
+          borderRadius: 4,
+          cursor: allValidated ? "pointer" : "not-allowed",
+          opacity: allValidated ? 1 : 0.4,
+        }}
+      >
+        Submit validation
+      </button>
+
+      <div style={{ fontSize: 11, color: "#3A3A3F", textAlign: "center", marginTop: 8 }}>
+        Your identity is never shared. Contributor UUID only.
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
+        <button
+          type="button"
+          onClick={() => setContextualizeOpen(true)}
+          style={fiSecondaryBtnStyle}
+        >
+          Add context
+        </button>
+        <button
+          type="button"
+          onClick={() => setReportIssueOpen(true)}
+          style={fiSecondaryBtnStyle}
+        >
+          Report data issue
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setOptOutOpen(true)}
+        style={{
+          marginTop: 16,
+          padding: 0,
+          background: "transparent",
+          border: "none",
+          fontSize: 11,
+          color: "rgba(232, 230, 223, 0.4)",
+          textDecoration: "underline",
+          cursor: "pointer",
+          fontFamily: "system-ui, sans-serif",
+          textAlign: "left",
+        }}
+      >
+        Are you {doctorLabel}? Request opt-out or claim your profile
+      </button>
+    </div>
+  );
+
   return (
     <div
       className="fm-screen"
@@ -1033,8 +1160,14 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         {hcp.cohort_classification === "rising_star" && (
           hcp.why_now || hcp.engagement_angle || hcp.caution_flags
         ) && (
-          <div className="fm-detail-section">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div
+            className="fm-detail-section fm-section-signal-summary"
+            style={{
+              padding: "16px 16px 12px",
+              borderBottom: "1px solid #1E1E22",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 Signal Summary
               </div>
@@ -1048,6 +1181,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                   borderRadius: 4,
                   backgroundColor: signalStrengthColor(hcp.signal_strength),
                   color: "#FFFFFF",
+                  flexShrink: 0,
                 }}>
                   Signal: {hcp.signal_strength}
                 </span>
@@ -1055,7 +1189,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             </div>
 
             {hcp.why_now && (
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                   Why Now
                 </div>
@@ -1066,7 +1200,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             )}
 
             {hcp.engagement_angle && (
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                   Engagement Angle
                 </div>
@@ -1323,130 +1457,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           <ResearchThemesSection themes={researchThemes} loading={themesLoading} />
         </div>
 
-        {/* Field Intelligence */}
-        <div
-          className="fm-detail-section fm-section-field-intelligence"
-          style={{
-            padding: "16px 16px 12px",
-            borderBottom: "1px solid #1E1E22",
-          }}
-        >
-          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-            Field Intelligence
-          </div>
-
-          <div
-            style={{
-              fontSize: 12,
-              color: fieldIntelCount >= 3 ? FI_ACCENT_MUTED : "rgba(232, 230, 223, 0.45)",
-              marginBottom: 12,
-              lineHeight: 1.45,
-            }}
-          >
-            {fieldIntelCount >= 3
-              ? `${fieldIntelCount} MSLs have contributed to this profile`
-              : "Field Intelligence pending — be among the first to contribute"}
-          </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8 }}>Community Confidence</div>
-            <div style={{ height: 6, backgroundColor: "#1E1E22", borderRadius: 0, marginBottom: 8 }}>
-              <div style={{ height: "100%", backgroundColor: cohortBarColor, width: "0%" }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 13, color: cohortBarColor, fontFamily: "monospace" }}>0%</span>
-              <span style={{ fontSize: 11, color: "#6B6A65" }}>0 MSLs</span>
-            </div>
-          </div>
-
-          {/* Validation buttons */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
-            <ValidationField
-              label="Data Matches Field Reality"
-              options={["Confirms", "Partial", "Disputes"]}
-              selected={validation.dataMatch}
-              onSelect={(val) => setValidation({ ...validation, dataMatch: val })}
-            />
-            <ValidationField
-              label="Engagement Potential"
-              options={["High", "Moderate", "Low"]}
-              selected={validation.engagement}
-              onSelect={(val) => setValidation({ ...validation, engagement: val })}
-            />
-            <ValidationField
-              label="Scientific Credibility"
-              options={["Strong", "Moderate", "Early"]}
-              selected={validation.credibility}
-              onSelect={(val) => setValidation({ ...validation, credibility: val })}
-            />
-            <ValidationField
-              label="Momentum Trajectory"
-              options={["Accelerating", "Steady", "Plateauing"]}
-              selected={validation.momentum}
-              onSelect={(val) => setValidation({ ...validation, momentum: val })}
-            />
-          </div>
-
-          <button
-            onClick={() => {}}
-            disabled={!allValidated}
-            style={{
-              width: "100%",
-              height: 44,
-              marginTop: 16,
-              backgroundColor: "#0A1F16",
-              border: "1px solid #1D9E75",
-              color: "#1D9E75",
-              fontSize: 13,
-              fontWeight: 500,
-              borderRadius: 4,
-              cursor: allValidated ? "pointer" : "not-allowed",
-              opacity: allValidated ? 1 : 0.4,
-            }}
-          >
-            Submit validation
-          </button>
-
-          <div style={{ fontSize: 11, color: "#3A3A3F", textAlign: "center", marginTop: 8 }}>
-            Your identity is never shared. Contributor UUID only.
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
-            <button
-              type="button"
-              onClick={() => setContextualizeOpen(true)}
-              style={fiSecondaryBtnStyle}
-            >
-              Add context
-            </button>
-            <button
-              type="button"
-              onClick={() => setReportIssueOpen(true)}
-              style={fiSecondaryBtnStyle}
-            >
-              Report data issue
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setOptOutOpen(true)}
-            style={{
-              marginTop: 16,
-              padding: 0,
-              background: "transparent",
-              border: "none",
-              fontSize: 11,
-              color: "rgba(232, 230, 223, 0.4)",
-              textDecoration: "underline",
-              cursor: "pointer",
-              fontFamily: "system-ui, sans-serif",
-              textAlign: "left",
-            }}
-          >
-            Are you {doctorLabel}? Request opt-out or claim your profile
-          </button>
-        </div>
+        {!isRisingStarCohort && fieldIntelligenceSection}
         </div>{/* end fm-detail-left */}
 
         {/* RIGHT COLUMN: Metric pills + Field notes */}
@@ -1517,6 +1528,33 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             <DrugConstellation hcpId={String(hcp.hcp_id ?? hcp.id ?? "")} />
           </div>
 
+          {isRisingStarCohort &&
+            risingStarBreakdown?.top_collaborators &&
+            risingStarBreakdown.top_collaborators.length > 0 && (
+              <div
+                className="fm-detail-section fm-section-top-collaborators"
+                style={{ padding: "8px 16px 16px", borderBottom: "1px solid #1E1E22" }}
+              >
+                <div
+                  style={{
+                    fontSize: 15,
+                    color: "#E8E6DF",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 12,
+                  }}
+                >
+                  Top Collaborators
+                </div>
+                <MiniCollaboratorNetwork
+                  hcpName={hcp.name ?? ""}
+                  collaborators={risingStarBreakdown.top_collaborators}
+                />
+              </div>
+            )}
+
+          {isRisingStarCohort && fieldIntelligenceSection}
+
         {/* Field notes */}
         <div className="fm-detail-section fm-section-field-notes" style={{ padding: "16px 0 24px" }}>
           <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
@@ -1555,6 +1593,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         </div>
         </div>{/* end fm-detail-right */}
       </div>{/* end fm-detail-body */}
+
+      <GlobalFooter onToast={showFiToast} />
 
       {contextualizeOpen && (
         <ContextualizeHCPForm

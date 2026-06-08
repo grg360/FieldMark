@@ -65,6 +65,16 @@ export interface HCP {
     foodBeverage?: number | null;
     travelLodging?: number | null;
   } | null;
+  rising_star_percentile?: number | null;
+  momentum_component?: number | null;
+  visibility_component?: number | null;
+  scientific_momentum_percentile?: number | null;
+  network_momentum_percentile?: number | null;
+  scientific_visibility_percentile?: number | null;
+  network_visibility_percentile?: number | null;
+  archetype?: string | null;
+  us_rank?: number | null;
+  scope_rank?: number | null;
 }
 
 export const hcpData: HCP[] = [

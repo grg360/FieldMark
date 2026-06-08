@@ -351,6 +351,16 @@ async function enrichAndMapCohortRows(
           normalized_score: risingStarPercentile,
           cohort_score: risingStarPercentile,
           composite_score: 0,
+          rising_star_percentile: risingStarPercentile,
+          momentum_component: parseOptionalNumber(rr.momentum_component) ?? 0,
+          visibility_component: parseOptionalNumber(rr.visibility_component) ?? 0,
+          scientific_momentum_percentile: parseOptionalNumber(rr.scientific_momentum_percentile) ?? 0,
+          network_momentum_percentile: parseOptionalNumber(rr.network_momentum_percentile) ?? 0,
+          scientific_visibility_percentile: parseOptionalNumber(rr.scientific_visibility_percentile) ?? 0,
+          network_visibility_percentile: parseOptionalNumber(rr.network_visibility_percentile) ?? 0,
+          archetype: rr.archetype != null ? String(rr.archetype) : null,
+          us_rank: parseOptionalNumber(rr.us_rank),
+          scope_rank: parseOptionalNumber(rr.scope_rank) ?? parseOptionalNumber(rr.rank) ?? 0,
           pub_velocity: 0,
           citation_trajectory: 0,
           pubVel: "—",
@@ -363,22 +373,12 @@ async function enrichAndMapCohortRows(
           caution_flags: narrativeMap.get(String(rr.hcp_id))?.caution_flags ?? null,
           signal_strength: narrativeMap.get(String(rr.hcp_id))?.signal_strength ?? null,
           rank: scopeRank,
-          scope_rank: scopeRank,
-          us_rank: parseOptionalNumber(rr.us_rank),
           global_rank: parseOptionalNumber(rr.rank),
           percentile: risingStarPercentile,
           scope_size: undefined,
           scope: scopeLabel,
           tier: "rising_star",
           cohort_classification: "rising_star",
-          rising_star_percentile: risingStarPercentile,
-          momentum_component: momentumComponent,
-          visibility_component: visibilityComponent,
-          scientific_momentum_percentile: parseOptionalNumber(rr.scientific_momentum_percentile),
-          network_momentum_percentile: parseOptionalNumber(rr.network_momentum_percentile),
-          scientific_visibility_percentile: parseOptionalNumber(rr.scientific_visibility_percentile),
-          network_visibility_percentile: parseOptionalNumber(rr.network_visibility_percentile),
-          archetype,
           scientific_influence_pctile: momentumComponent,
           network_influence_pctile: visibilityComponent,
           pharma_engagement_pctile: null,
@@ -604,6 +604,7 @@ export interface TopCollaborator {
   institution: string | null;
   shared_publications: number;
   cohort_score: number | null;
+  cohort_kind?: "established" | "rising_star" | null;
 }
 
 export interface EstablishedScoreBreakdown {
@@ -626,6 +627,7 @@ export interface RisingStarScoreBreakdown {
   archetype: string;
   rank: number;
   us_rank: number | null;
+  top_collaborators: TopCollaborator[];
 }
 
 const TA_ID_MAP: Record<string, string> = {
@@ -1703,6 +1705,86 @@ export async function getRisingStarScoreBreakdown(
 
   const row = data as unknown as Record<string, unknown>;
 
+  const { data: collaboratorsRaw } = await supabase
+    .from("hcp_top_collaborators_v2")
+    .select("rank, collaborator_hcp_id, shared_publications")
+    .eq("hcp_id", hcpId)
+    .eq("therapeutic_area_id", taId)
+    .order("rank", { ascending: true })
+    .limit(10);
+
+  let topCollaborators: TopCollaborator[] = [];
+  if (collaboratorsRaw && collaboratorsRaw.length > 0) {
+    const collabIds = collaboratorsRaw.map((r) => r.collaborator_hcp_id);
+    const { data: collabHcps } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name, institution_normalized")
+      .in("id", collabIds);
+    const nameMap = new Map<string, { name: string; institution: string | null }>();
+    (collabHcps || []).forEach((h) => {
+      nameMap.set(String(h.id), {
+        name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim(),
+        institution: h.institution_normalized,
+      });
+    });
+
+    const [establishedRanks, risingStarRanks] = await Promise.all([
+      supabase
+        .from("hcp_established_ranks_v3")
+        .select("hcp_id, cohort_score")
+        .in("hcp_id", collabIds)
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", "region")
+        .eq("scope_value", "US"),
+      supabase
+        .from("hcp_rising_star_ranks_v3")
+        .select("hcp_id, rising_star_percentile")
+        .in("hcp_id", collabIds)
+        .eq("therapeutic_area_id", taId),
+    ]);
+
+    const establishedScoreMap = new Map<string, number>();
+    (establishedRanks.data || []).forEach((r) => {
+      if (r.cohort_score != null) {
+        establishedScoreMap.set(String(r.hcp_id), Number(r.cohort_score));
+      }
+    });
+
+    const risingStarScoreMap = new Map<string, number>();
+    (risingStarRanks.data || []).forEach((r) => {
+      const row = r as { hcp_id: string; rising_star_percentile: number | null };
+      if (row.rising_star_percentile != null) {
+        risingStarScoreMap.set(String(row.hcp_id), Number(row.rising_star_percentile));
+      }
+    });
+
+    topCollaborators = collaboratorsRaw.map((r) => {
+      const id = String(r.collaborator_hcp_id);
+      const risingScore = risingStarScoreMap.get(id);
+      const establishedScore = establishedScoreMap.get(id);
+
+      let cohort_kind: "rising_star" | "established" | null = null;
+      let cohort_score: number | null = null;
+      if (risingScore != null) {
+        cohort_kind = "rising_star";
+        cohort_score = risingScore;
+      } else if (establishedScore != null) {
+        cohort_kind = "established";
+        cohort_score = establishedScore;
+      }
+
+      return {
+        hcp_id: id,
+        rank: Number(r.rank),
+        name: nameMap.get(id)?.name ?? "Unknown",
+        institution: nameMap.get(id)?.institution ?? null,
+        shared_publications: Number(r.shared_publications ?? 0),
+        cohort_score,
+        cohort_kind,
+      };
+    });
+  }
+
   return {
     hcp_id: String(row.hcp_id),
     rising_star_percentile: Number(row.rising_star_percentile ?? 0),
@@ -1715,6 +1797,7 @@ export async function getRisingStarScoreBreakdown(
     archetype: String(row.archetype ?? "Emerging Leader"),
     rank: Number(row.rank ?? 0),
     us_rank: row.us_rank == null ? null : Number(row.us_rank),
+    top_collaborators: topCollaborators,
   };
 }
 
