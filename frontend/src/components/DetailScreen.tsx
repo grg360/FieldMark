@@ -1550,6 +1550,60 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                   hcpName={hcp.name ?? ""}
                   collaborators={risingStarBreakdown.top_collaborators}
                 />
+                {risingStarBreakdown?.network_momentum_percentile != null &&
+                  risingStarBreakdown?.early_collaborator_count != null &&
+                  risingStarBreakdown?.recent_collaborator_count != null && (
+                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #1E1E22" }}>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "#6B6A65",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Network Trajectory
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 16,
+                          color: "#E8E6DF",
+                          fontWeight: 600,
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {risingStarBreakdown.early_collaborator_count} {"→"} {risingStarBreakdown.recent_collaborator_count} collaborators
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#9B6DFF",
+                          marginTop: 2,
+                          fontWeight: 500,
+                        }}
+                      >
+                        +
+                        {Math.round(
+                          ((risingStarBreakdown.recent_collaborator_count -
+                            risingStarBreakdown.early_collaborator_count) /
+                            risingStarBreakdown.early_collaborator_count) *
+                            100,
+                        )}
+                        %
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "#9B9892",
+                          marginTop: 10,
+                        }}
+                      >
+                        {Math.round(risingStarBreakdown.network_momentum_percentile)}th percentile
+                        network momentum
+                      </div>
+                    </div>
+                  )}
               </div>
             )}
 

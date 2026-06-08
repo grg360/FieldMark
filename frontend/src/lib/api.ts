@@ -628,6 +628,8 @@ export interface RisingStarScoreBreakdown {
   rank: number;
   us_rank: number | null;
   top_collaborators: TopCollaborator[];
+  early_collaborator_count?: number | null;
+  recent_collaborator_count?: number | null;
 }
 
 const TA_ID_MAP: Record<string, string> = {
@@ -1705,6 +1707,17 @@ export async function getRisingStarScoreBreakdown(
 
   const row = data as unknown as Record<string, unknown>;
 
+  const { data: networkMomentumRow } = await supabase
+    .from("hcp_network_momentum_v1")
+    .select("early_collaborator_count, recent_collaborator_count")
+    .eq("hcp_id", hcpId)
+    .eq("therapeutic_area_id", taId)
+    .maybeSingle();
+
+  const networkMomentum = networkMomentumRow as
+    | { early_collaborator_count: number | null; recent_collaborator_count: number | null }
+    | null;
+
   const { data: collaboratorsRaw } = await supabase
     .from("hcp_top_collaborators_v2")
     .select("rank, collaborator_hcp_id, shared_publications")
@@ -1798,6 +1811,14 @@ export async function getRisingStarScoreBreakdown(
     rank: Number(row.rank ?? 0),
     us_rank: row.us_rank == null ? null : Number(row.us_rank),
     top_collaborators: topCollaborators,
+    early_collaborator_count:
+      networkMomentum?.early_collaborator_count == null
+        ? null
+        : Number(networkMomentum.early_collaborator_count),
+    recent_collaborator_count:
+      networkMomentum?.recent_collaborator_count == null
+        ? null
+        : Number(networkMomentum.recent_collaborator_count),
   };
 }
 

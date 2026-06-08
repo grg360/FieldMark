@@ -105,7 +105,7 @@ export default function MiniCollaboratorNetwork({
               fontFeatureSettings: '"tnum"',
             }}
           >
-            {c.shared_publications} papers
+            {c.shared_publications} co-authored papers
           </div>
         </button>
       ))}

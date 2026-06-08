@@ -51,19 +51,14 @@ SYSTEM_PROMPT = (
 )
 
 TARGET_HCPS_SQL = """
-SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized
+SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.us_rank
 FROM hcps_v2 h
-JOIN publication_authors_v2 pa ON pa.hcp_id = h.id
-JOIN publications_v2 p ON p.id = pa.publication_id
-JOIN publication_therapeutic_areas_v2 pta ON pta.publication_id = p.id
-JOIN therapeutic_areas ta ON ta.id = pta.therapeutic_area_id
+JOIN hcp_rising_star_ranks_v3 r ON r.hcp_id = h.id
+JOIN therapeutic_areas ta ON ta.id = r.therapeutic_area_id
 WHERE ta.name = 'NSCLC'
   AND h.country = 'US'
-  AND (pa.is_first_author = true OR pa.is_senior_author = true)
-  AND p.pub_year >= 2021
-GROUP BY h.id, h.first_name, h.last_name, h.institution_normalized
-HAVING COUNT(DISTINCT p.id) >= 3
-ORDER BY h.id
+  AND r.us_rank IS NOT NULL
+ORDER BY r.us_rank ASC
 """
 
 PAPERS_SQL = """
