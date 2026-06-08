@@ -20,7 +20,7 @@ function archetypeColor(archetype: string): string {
       return SIGNAL_NETWORK;
     case "Emerging Leader":
     default:
-      return "#E8704E";
+      return "#E8E6DF";
   }
 }
 
@@ -32,11 +32,17 @@ function archetypeShortLabel(archetype: string): string {
       return "SCIENCE";
     case "Network Accelerator":
       return "NETWORK";
-    case "Emerging Leader":
-      return "EMERGING";
     default:
-      return "EMERGING";
+      return "";
   }
+}
+
+function showArchetypeBadge(archetype: string): boolean {
+  return (
+    archetype === "Balanced Rising Star" ||
+    archetype === "Scientific Accelerator" ||
+    archetype === "Network Accelerator"
+  );
 }
 
 function KpiTile({
@@ -182,21 +188,23 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
           <div style={{ ...RIGHT_RAIL_HEADER_STYLE, marginBottom: 0 }}>
             Rising Star Score
           </div>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              padding: "4px 8px",
-              borderRadius: 4,
-              backgroundColor: badgeColor,
-              color: "#FFFFFF",
-              flexShrink: 0,
-            }}
-          >
-            {archetypeShortLabel(data.archetype)}
-          </span>
+          {showArchetypeBadge(data.archetype) && (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                padding: "4px 8px",
+                borderRadius: 4,
+                backgroundColor: badgeColor,
+                color: "#FFFFFF",
+                flexShrink: 0,
+              }}
+            >
+              {archetypeShortLabel(data.archetype)}
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
           <span

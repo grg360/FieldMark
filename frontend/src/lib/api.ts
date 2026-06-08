@@ -2877,4 +2877,345 @@ export async function getSocialCandidates(
   return { data: candidates, error: null };
 }
 
+export interface LandscapePoint {
+  hcp_id: string;
+  name: string;
+  institution: string | null;
+  us_rank: number;
+  rising_star_percentile: number;
+  momentum_composite: number;
+  visibility_composite: number;
+  momentum_display: number;
+  visibility_display: number;
+  archetype:
+    | "Balanced Rising Star"
+    | "Scientific Accelerator"
+    | "Network Accelerator"
+    | "Emerging Leader"
+    | null;
+}
+
+export interface LeaderboardEntry {
+  hcp_id: string;
+  name: string;
+  institution: string | null;
+  rank: number;
+  primary_value: number;
+  primary_label: string;
+}
+
+export interface LandscapeLeaderboards {
+  top_rising_stars: LeaderboardEntry[];
+  fastest_scientific_momentum: LeaderboardEntry[];
+  fastest_network_momentum: LeaderboardEntry[];
+  most_balanced: LeaderboardEntry[];
+  momentum_forward: LeaderboardEntry[];
+}
+
+function landscapeTaSlugToName(taSlug: string): string {
+  const map: Record<string, string> = {
+    nsclc: "NSCLC",
+    oncology: "Oncology",
+    hepatology: "Hepatology",
+    immunology: "Immunology",
+    "rare-disease": "Rare Disease",
+  };
+  return map[taSlug.toLowerCase().trim()] ?? taSlug.toUpperCase();
+}
+
+async function resolveLandscapeTaId(taSlug: string): Promise<string | null> {
+  const mapped = TA_ID_MAP[taSlug.toLowerCase().trim()];
+  if (mapped) return mapped;
+
+  const { data: taRow } = await supabase
+    .from("therapeutic_areas")
+    .select("id")
+    .eq("name", landscapeTaSlugToName(taSlug))
+    .maybeSingle();
+
+  return taRow?.id ?? null;
+}
+
+type HcpNameRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  institution_normalized: string | null;
+};
+
+async function fetchHcpNameMap(hcpIds: string[]): Promise<Map<string, { name: string; institution: string | null }>> {
+  const hcpMap = new Map<string, { name: string; institution: string | null }>();
+  if (hcpIds.length === 0) return hcpMap;
+
+  const { data: hcps } = await supabase
+    .from("hcps_v2")
+    .select("id, first_name, last_name, institution_normalized")
+    .in("id", hcpIds);
+
+  (hcps ?? []).forEach((h: HcpNameRow) => {
+    hcpMap.set(String(h.id), {
+      name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
+      institution: h.institution_normalized,
+    });
+  });
+
+  return hcpMap;
+}
+
+function rescaleToPercentile(
+  points: LandscapePoint[],
+  field: "momentum_composite" | "visibility_composite",
+): number[] {
+  if (points.length === 0) return [];
+  if (points.length === 1) return [50];
+
+  const sorted = [...points]
+    .map((p, i) => ({ idx: i, val: p[field] }))
+    .sort((a, b) => a.val - b.val);
+  const result = new Array<number>(points.length);
+  sorted.forEach((entry, sortedIdx) => {
+    result[entry.idx] = (sortedIdx / (sorted.length - 1)) * 100;
+  });
+  return result;
+}
+
+function toLandscapeArchetype(
+  value: unknown,
+): LandscapePoint["archetype"] {
+  const archetype = String(value ?? "");
+  if (archetype === "Balanced Rising Star") return "Balanced Rising Star";
+  if (archetype === "Scientific Accelerator") return "Scientific Accelerator";
+  if (archetype === "Network Accelerator") return "Network Accelerator";
+  if (archetype === "Emerging Leader") return "Emerging Leader";
+  return null;
+}
+
+export async function getLandscapePoints(
+  taSlug: string,
+  limit: number = 100,
+): Promise<LandscapePoint[]> {
+  const taId = await resolveLandscapeTaId(taSlug);
+  if (!taId) return [];
+
+  const { data, error } = await supabase
+    .from("hcp_rising_star_ranks_v3")
+    .select(
+      "hcp_id, us_rank, rising_star_percentile, " +
+        "scientific_momentum_percentile, network_momentum_percentile, " +
+        "scientific_visibility_percentile, network_visibility_percentile, archetype",
+    )
+    .eq("therapeutic_area_id", taId)
+    .not("us_rank", "is", null)
+    .order("us_rank", { ascending: true })
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  const rows = data as unknown as Array<Record<string, unknown>>;
+  const hcpIds = rows.map((r) => String(r.hcp_id));
+  const hcpMap = await fetchHcpNameMap(hcpIds);
+
+  const points: LandscapePoint[] = rows.map((r) => {
+    const hcpId = String(r.hcp_id);
+    const sciMom = Number(r.scientific_momentum_percentile ?? 0);
+    const netMom = Number(r.network_momentum_percentile ?? 0);
+    const sciVis = Number(r.scientific_visibility_percentile ?? 0);
+    const netVis = Number(r.network_visibility_percentile ?? 0);
+
+    return {
+      hcp_id: hcpId,
+      name: hcpMap.get(hcpId)?.name ?? "Unknown",
+      institution: hcpMap.get(hcpId)?.institution ?? null,
+      us_rank: Number(r.us_rank),
+      rising_star_percentile: Number(r.rising_star_percentile ?? 0),
+      momentum_composite: (sciMom + netMom) / 2,
+      visibility_composite: (sciVis + netVis) / 2,
+      momentum_display: 0,
+      visibility_display: 0,
+      archetype: toLandscapeArchetype(r.archetype),
+    };
+  });
+
+  const momentumDisplay = rescaleToPercentile(points, "momentum_composite");
+  const visibilityDisplay = rescaleToPercentile(points, "visibility_composite");
+
+  points.forEach((p, i) => {
+    p.momentum_display = momentumDisplay[i];
+    p.visibility_display = visibilityDisplay[i];
+  });
+
+  return points;
+}
+
+function buildLeaderboardEntries(
+  rows: Array<Record<string, unknown>>,
+  hcpMap: Map<string, { name: string; institution: string | null }>,
+  options: {
+    rankKey: string;
+    valueKey: string;
+    labelFn: (row: Record<string, unknown>) => string;
+  },
+): LeaderboardEntry[] {
+  return rows.map((row) => {
+    const hcpId = String(row.hcp_id);
+    return {
+      hcp_id: hcpId,
+      name: hcpMap.get(hcpId)?.name ?? "Unknown",
+      institution: hcpMap.get(hcpId)?.institution ?? null,
+      rank: Number(row[options.rankKey] ?? 0),
+      primary_value: Number(row[options.valueKey] ?? 0),
+      primary_label: options.labelFn(row),
+    };
+  });
+}
+
+export async function getLandscapeLeaderboards(
+  taSlug: string,
+  limit: number = 5,
+): Promise<LandscapeLeaderboards> {
+  const empty: LandscapeLeaderboards = {
+    top_rising_stars: [],
+    fastest_scientific_momentum: [],
+    fastest_network_momentum: [],
+    most_balanced: [],
+    momentum_forward: [],
+  };
+
+  const taId = await resolveLandscapeTaId(taSlug);
+  if (!taId) return empty;
+
+  const [
+    risingStarsResult,
+    sciMomResult,
+    netMomResult,
+    balancedResult,
+    momForwardResult,
+  ] = await Promise.all([
+    supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select("hcp_id, us_rank, rising_star_percentile")
+      .eq("therapeutic_area_id", taId)
+      .not("us_rank", "is", null)
+      .order("us_rank", { ascending: true })
+      .limit(limit),
+    supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select("hcp_id, us_rank, scientific_momentum_percentile")
+      .eq("therapeutic_area_id", taId)
+      .not("us_rank", "is", null)
+      .order("scientific_momentum_percentile", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select("hcp_id, us_rank, network_momentum_percentile")
+      .eq("therapeutic_area_id", taId)
+      .not("us_rank", "is", null)
+      .order("network_momentum_percentile", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select(
+        "hcp_id, us_rank, rising_star_percentile, scientific_momentum_percentile, network_momentum_percentile",
+      )
+      .eq("therapeutic_area_id", taId)
+      .not("us_rank", "is", null)
+      .limit(100),
+    supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select(
+        "hcp_id, us_rank, rising_star_percentile, " +
+          "scientific_momentum_percentile, network_momentum_percentile, " +
+          "scientific_visibility_percentile, network_visibility_percentile",
+      )
+      .eq("therapeutic_area_id", taId)
+      .not("us_rank", "is", null)
+      .limit(200),
+  ]);
+
+  const momForwardFiltered = ((momForwardResult.data ?? []) as unknown as Array<Record<string, unknown>>)
+    .map((r) => {
+      const mom =
+        (Number(r.scientific_momentum_percentile ?? 0) +
+          Number(r.network_momentum_percentile ?? 0)) /
+        2;
+      const vis =
+        (Number(r.scientific_visibility_percentile ?? 0) +
+          Number(r.network_visibility_percentile ?? 0)) /
+        2;
+      return { row: r, momentum: mom, visibility: vis };
+    })
+    .filter((x) => x.momentum >= 85 && x.visibility >= 50 && x.visibility <= 80)
+    .sort((a, b) => b.momentum - a.momentum)
+    .slice(0, limit);
+
+  const balancedRows = [
+    ...((balancedResult.data ?? []) as unknown as Array<Record<string, unknown>>),
+  ]
+    .sort((a, b) => {
+      const deltaA = Math.abs(
+        Number(a.scientific_momentum_percentile ?? 0) - Number(a.network_momentum_percentile ?? 0),
+      );
+      const deltaB = Math.abs(
+        Number(b.scientific_momentum_percentile ?? 0) - Number(b.network_momentum_percentile ?? 0),
+      );
+      if (deltaA !== deltaB) return deltaA - deltaB;
+      return Number(b.rising_star_percentile ?? 0) - Number(a.rising_star_percentile ?? 0);
+    })
+    .slice(0, limit);
+
+  const allIds = new Set<string>();
+  for (const row of [
+    ...(risingStarsResult.data ?? []),
+    ...(sciMomResult.data ?? []),
+    ...(netMomResult.data ?? []),
+    ...balancedRows,
+    ...momForwardFiltered.map((x) => x.row),
+  ]) {
+    allIds.add(String(row.hcp_id));
+  }
+
+  const hcpMap = await fetchHcpNameMap([...allIds]);
+
+  return {
+    top_rising_stars: buildLeaderboardEntries(risingStarsResult.data ?? [], hcpMap, {
+      rankKey: "us_rank",
+      valueKey: "rising_star_percentile",
+      labelFn: (row) => String(Math.round(Number(row.rising_star_percentile ?? 0))),
+    }),
+    fastest_scientific_momentum: buildLeaderboardEntries(sciMomResult.data ?? [], hcpMap, {
+      rankKey: "us_rank",
+      valueKey: "scientific_momentum_percentile",
+      labelFn: (row) => String(Math.round(Number(row.scientific_momentum_percentile ?? 0))),
+    }),
+    fastest_network_momentum: buildLeaderboardEntries(netMomResult.data ?? [], hcpMap, {
+      rankKey: "us_rank",
+      valueKey: "network_momentum_percentile",
+      labelFn: (row) => String(Math.round(Number(row.network_momentum_percentile ?? 0))),
+    }),
+    most_balanced: balancedRows.map((row) => {
+      const hcpId = String(row.hcp_id);
+      return {
+        hcp_id: hcpId,
+        name: hcpMap.get(hcpId)?.name ?? "Unknown",
+        institution: hcpMap.get(hcpId)?.institution ?? null,
+        rank: Number(row.us_rank ?? 0),
+        primary_value: Number(row.rising_star_percentile ?? 0),
+        primary_label: String(Math.round(Number(row.rising_star_percentile ?? 0))),
+      };
+    }),
+    momentum_forward: momForwardFiltered.map((entry) => {
+      const row = entry.row;
+      const hcpId = String(row.hcp_id);
+      return {
+        hcp_id: hcpId,
+        name: hcpMap.get(hcpId)?.name ?? "Unknown",
+        institution: hcpMap.get(hcpId)?.institution ?? null,
+        rank: Number(row.us_rank ?? 0),
+        primary_value: Number(row.rising_star_percentile ?? 0),
+        primary_label: String(Math.round(Number(row.rising_star_percentile ?? 0))),
+      };
+    }),
+  };
+}
+
 export type { HCP, HCPScore, LatestPost };

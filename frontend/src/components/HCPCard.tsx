@@ -11,8 +11,8 @@ function risingStarArchetypeShortLabel(archetype: string | null | undefined): st
     case "Balanced Rising Star":   return "BALANCED";
     case "Scientific Accelerator": return "SCIENCE";
     case "Network Accelerator":    return "NETWORK";
-    case "Emerging Leader":        return "EMERGING";
-    default:                       return "EMERGING";
+    case "Emerging Leader":        return "RISING STAR";
+    default:                       return "RISING STAR";
   }
 }
 
@@ -21,8 +21,8 @@ function risingStarArchetypeColor(archetype: string | null | undefined): string 
     case "Balanced Rising Star":   return "#9B6DFF";
     case "Scientific Accelerator": return "#3FB8AF";
     case "Network Accelerator":    return "#E8A04E";
-    case "Emerging Leader":        return "#E8704E";
-    default:                       return "#E8704E";
+    case "Emerging Leader":        return "#6B6A65";
+    default:                       return "#6B6A65";
   }
 }
 
@@ -205,9 +205,9 @@ function shortArchetypeLabel(archetype: string | null | undefined): string {
     case "Network Accelerator":
       return "NETWORK";
     case "Emerging Leader":
-      return "EMERGING";
+      return "RISING STAR";
     default:
-      return "EMERGING";
+      return "RISING STAR";
   }
 }
 
@@ -224,9 +224,9 @@ function archetypePillStyle(archetype: string | null | undefined): {
     case "Network Accelerator":
       return { backgroundColor: "rgba(232, 160, 78, 0.18)", borderColor: "#E8A04E", color: "#E8E6DF" };
     case "Emerging Leader":
-      return { backgroundColor: "rgba(232, 112, 78, 0.18)", borderColor: "#E8704E", color: "#E8E6DF" };
+      return { backgroundColor: "rgba(107, 106, 101, 0.18)", borderColor: "#6B6A65", color: "#9B9892" };
     default:
-      return { backgroundColor: "rgba(232, 112, 78, 0.18)", borderColor: "#E8704E", color: "#E8E6DF" };
+      return { backgroundColor: "rgba(107, 106, 101, 0.18)", borderColor: "#6B6A65", color: "#9B9892" };
   }
 }
 
@@ -681,7 +681,9 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
                 }}
               />
             )}
-            {hcp.cohort_classification === "rising_star" && hcp.archetype && (
+            {hcp.cohort_classification === "rising_star" &&
+              hcp.archetype &&
+              hcp.archetype !== "Emerging Leader" && (
               <span
                 style={{
                   display: "inline-flex",

@@ -39,6 +39,7 @@ import NoteEntryScreen from "./components/NoteEntryScreen";
 import BibliographyScreen from "./components/BibliographyScreen";
 import ProfileScreen from "./components/ProfileScreen";
 import LandscapeScreen from "./components/LandscapeScreen";
+import LandscapeRoute from "./components/LandscapeRoute";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
@@ -68,6 +69,7 @@ import { TrackProvider, useTrack } from "./lib/TrackContext";
 import {
   buildFeedPath,
   buildHcpDetailPath,
+  indicationLabelToSlug,
   resolveFeedRoute,
   taLabelToApiSlug,
   taLabelToSlug,
@@ -744,7 +746,10 @@ function FeedLayout({
               taSlug={taLabelToApiSlug(selectedTA)}
             />
             <button
-              onClick={() => setFeedOverlay("landscape")}
+              onClick={() => {
+                const indSlug = indicationLabelToSlug(selectedTA, selectedIndication);
+                navigate(`/landscape/${indSlug === "all" ? "nsclc" : indSlug}`);
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1237,6 +1242,7 @@ export default function App() {
       <AuthGate>
         <Routes>
           <Route path="/" element={<FeedLayout />} />
+          <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />
           <Route
             path="/:ta/field-intelligence/thread/:threadId"
