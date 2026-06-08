@@ -2,6 +2,7 @@ import { firstEmbedded } from "./cohort-metrics";
 import { dedupeHCPs } from "./hcp-dedupe";
 import { countriesForRegion, type RegionKey } from "./regions";
 import { resolveFilterScope } from "./rank-filters";
+import { institutionToSlug } from "./institutionUtils";
 import { supabase } from "./supabase";
 import type { ResearchTheme } from "../types/researchTheme";
 import type { SocialCandidate, SocialConfidenceTier } from "../types/social";
@@ -604,7 +605,7 @@ export interface TopCollaborator {
   institution: string | null;
   shared_publications: number;
   cohort_score: number | null;
-  cohort_kind?: "established" | "rising_star" | null;
+  cohort_kind: "rising_star" | "established" | null;
 }
 
 export interface EstablishedScoreBreakdown {
@@ -628,6 +629,7 @@ export interface RisingStarScoreBreakdown {
   rank: number;
   us_rank: number | null;
   top_collaborators: TopCollaborator[];
+  external_collaborators: TopCollaborator[];
   early_collaborator_count?: number | null;
   recent_collaborator_count?: number | null;
 }
@@ -805,7 +807,7 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
 
 export type FeedCohort = "rising_star" | "community" | "established";
 
-function resolveTAId(therapeuticArea: string | undefined): string | undefined {
+function resolveTASlug(therapeuticArea: string | undefined): string | undefined {
   if (!therapeuticArea?.trim()) return undefined;
   const normalized = therapeuticArea.toLowerCase().trim();
   const slugByLabel: Record<string, string> = {
@@ -815,7 +817,12 @@ function resolveTAId(therapeuticArea: string | undefined): string | undefined {
     oncology: "oncology",
     immunology: "immunology",
   };
-  const slug = slugByLabel[normalized] ?? normalized.replace(/\s+/g, "-");
+  return slugByLabel[normalized] ?? normalized.replace(/\s+/g, "-");
+}
+
+function resolveTAId(therapeuticArea: string | undefined): string | undefined {
+  const slug = resolveTASlug(therapeuticArea);
+  if (!slug) return undefined;
   return TA_ID_MAP[slug];
 }
 
@@ -825,27 +832,27 @@ export async function getHCPNarrative(
   therapeuticArea?: string,
 ): Promise<ApiResult<string | null>> {
   try {
-    const taId = resolveTAId(therapeuticArea);
+    const taSlug = resolveTASlug(therapeuticArea);
 
-    if (taId) {
+    if (taSlug) {
       const { data, error } = await supabase
         .from("hcp_narratives_v2")
-        .select("narrative")
+        .select("narrative_text")
         .eq("hcp_id", hcpId)
-        .eq("therapeutic_area_id", taId)
+        .eq("therapeutic_area_slug", taSlug)
         .maybeSingle();
 
       if (error) {
         return { data: null, error: error.message };
       }
-      if (data?.narrative) {
-        return { data: data.narrative as string, error: null };
+      if (data?.narrative_text) {
+        return { data: data.narrative_text as string, error: null };
       }
     }
 
     const fallback = await supabase
       .from("hcp_narratives_v2")
-      .select("narrative")
+      .select("narrative_text")
       .eq("hcp_id", hcpId)
       .order("generated_at", { ascending: false })
       .limit(1)
@@ -855,7 +862,7 @@ export async function getHCPNarrative(
       return { data: null, error: fallback.error.message };
     }
 
-    return { data: (fallback.data?.narrative as string | null) ?? null, error: null };
+    return { data: (fallback.data?.narrative_text as string | null) ?? null, error: null };
   } catch (err) {
     return {
       data: null,
@@ -1726,15 +1733,25 @@ export async function getRisingStarScoreBreakdown(
     | { early_collaborator_count: number | null; recent_collaborator_count: number | null }
     | null;
 
-  const { data: collaboratorsRaw } = await supabase
-    .from("hcp_top_collaborators_v2")
-    .select("rank, collaborator_hcp_id, shared_publications")
-    .eq("hcp_id", hcpId)
-    .eq("therapeutic_area_id", taId)
-    .order("rank", { ascending: true })
-    .limit(10);
+  const [{ data: sourceHcp }, { data: collaboratorsRaw }] = await Promise.all([
+    supabase
+      .from("hcps_v2")
+      .select("institution_normalized")
+      .eq("id", hcpId)
+      .maybeSingle(),
+    supabase
+      .from("hcp_top_collaborators_v2")
+      .select("rank, collaborator_hcp_id, shared_publications")
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .order("rank", { ascending: true })
+      .limit(10),
+  ]);
+
+  const sourceInstitution = sourceHcp?.institution_normalized ?? null;
 
   let topCollaborators: TopCollaborator[] = [];
+  let externalCollaborators: TopCollaborator[] = [];
   if (collaboratorsRaw && collaboratorsRaw.length > 0) {
     const collabIds = collaboratorsRaw.map((r) => r.collaborator_hcp_id);
     const { data: collabHcps } = await supabase
@@ -1779,7 +1796,7 @@ export async function getRisingStarScoreBreakdown(
       }
     });
 
-    topCollaborators = collaboratorsRaw.map((r) => {
+    const allCollaborators: TopCollaborator[] = collaboratorsRaw.map((r) => {
       const id = String(r.collaborator_hcp_id);
       const risingScore = risingStarScoreMap.get(id);
       const establishedScore = establishedScoreMap.get(id);
@@ -1804,6 +1821,13 @@ export async function getRisingStarScoreBreakdown(
         cohort_kind,
       };
     });
+
+    topCollaborators = allCollaborators.filter(
+      (c) => sourceInstitution && c.institution === sourceInstitution,
+    );
+    externalCollaborators = allCollaborators.filter(
+      (c) => !sourceInstitution || c.institution !== sourceInstitution,
+    );
   }
 
   return {
@@ -1819,6 +1843,7 @@ export async function getRisingStarScoreBreakdown(
     rank: Number(row.rank ?? 0),
     us_rank: row.us_rank == null ? null : Number(row.us_rank),
     top_collaborators: topCollaborators,
+    external_collaborators: externalCollaborators,
     early_collaborator_count:
       networkMomentum?.early_collaborator_count == null
         ? null
@@ -1960,14 +1985,19 @@ export async function getEstablishedScoreBreakdown(
       });
     }
 
-    topCollaborators = collaboratorsRaw.data.map((r) => ({
-      hcp_id: r.collaborator_hcp_id,
-      rank: r.rank,
-      name: nameMap.get(String(r.collaborator_hcp_id))?.name ?? "Unknown",
-      institution: nameMap.get(String(r.collaborator_hcp_id))?.institution ?? null,
-      shared_publications: r.shared_publications,
-      cohort_score: collabScoreMap.get(String(r.collaborator_hcp_id)) ?? null,
-    }));
+    topCollaborators = collaboratorsRaw.data.map((r) => {
+      const id = String(r.collaborator_hcp_id);
+      const cohort_score = collabScoreMap.get(id) ?? null;
+      return {
+        hcp_id: r.collaborator_hcp_id,
+        rank: r.rank,
+        name: nameMap.get(id)?.name ?? "Unknown",
+        institution: nameMap.get(id)?.institution ?? null,
+        shared_publications: r.shared_publications,
+        cohort_score,
+        cohort_kind: cohort_score != null ? ("established" as const) : null,
+      };
+    });
   }
 
   const result: EstablishedScoreBreakdown = {
@@ -3216,6 +3246,497 @@ export async function getLandscapeLeaderboards(
       };
     }),
   };
+}
+
+export interface InstitutionSummary {
+  institution_name: string;
+  slug: string;
+  total_investigators: number;
+  rising_star_count: number;
+  established_count: number;
+  rising_star_pipeline: {
+    elite: number;
+    strong: number;
+    developing: number;
+    early: number;
+  };
+  top_investigator: {
+    hcp_id: string;
+    name: string;
+    cohort: "rising_star" | "established";
+    rank: number;
+    score: number;
+  } | null;
+}
+
+export interface InstitutionLeaderboardEntry {
+  hcp_id: string;
+  name: string;
+  rank: number;
+  primary_value: number;
+  primary_label: string;
+}
+
+export interface InstitutionLeaderboards {
+  top_rising_stars: InstitutionLeaderboardEntry[];
+  top_established: InstitutionLeaderboardEntry[];
+  most_connected: InstitutionLeaderboardEntry[];
+  highest_network_momentum: InstitutionLeaderboardEntry[];
+}
+
+export interface InstitutionCollaboration {
+  hcp1_id: string;
+  hcp1_name: string;
+  hcp2_id: string;
+  hcp2_name: string;
+  shared_publications: number;
+}
+
+type InstitutionHcpRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+const INSTITUTION_HCP_CHUNK_SIZE = 100;
+
+function chunkInstitutionHcpIds(hcpIds: string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let i = 0; i < hcpIds.length; i += INSTITUTION_HCP_CHUNK_SIZE) {
+    chunks.push(hcpIds.slice(i, i + INSTITUTION_HCP_CHUNK_SIZE));
+  }
+  return chunks;
+}
+
+async function fetchInstitutionRowsInChunks<T>(
+  hcpIds: string[],
+  fetchChunk: (chunk: string[]) => Promise<T[]>,
+): Promise<T[]> {
+  if (hcpIds.length <= INSTITUTION_HCP_CHUNK_SIZE) {
+    return fetchChunk(hcpIds);
+  }
+
+  const allRows: T[] = [];
+  for (const chunk of chunkInstitutionHcpIds(hcpIds)) {
+    const rows = await fetchChunk(chunk);
+    allRows.push(...rows);
+  }
+  return allRows;
+}
+
+function buildInstitutionLeaderboardEntries(
+  rows: Array<Record<string, unknown>>,
+  nameMap: Map<string, string>,
+  options: {
+    rankKey: string;
+    valueKey: string;
+    labelFn: (row: Record<string, unknown>) => string;
+    fallbackRank?: (index: number) => number;
+  },
+): InstitutionLeaderboardEntry[] {
+  return rows.map((row, index) => {
+    const hcpId = String(row.hcp_id);
+    return {
+      hcp_id: hcpId,
+      name: nameMap.get(hcpId) ?? "Unknown",
+      rank: row[options.rankKey] != null
+        ? Number(row[options.rankKey])
+        : (options.fallbackRank?.(index) ?? index + 1),
+      primary_value: Number(row[options.valueKey] ?? 0),
+      primary_label: options.labelFn(row),
+    };
+  });
+}
+
+export async function getInstitutionSummary(
+  institutionName: string,
+  taSlug: string = "nsclc",
+): Promise<InstitutionSummary | null> {
+  const taId = await resolveLandscapeTaId(taSlug);
+  if (!taId) return null;
+
+  const { data: hcps } = await supabase
+    .from("hcps_v2")
+    .select("id, first_name, last_name, country")
+    .eq("institution_normalized", institutionName);
+  if (!hcps) return null;
+
+  const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
+  if (hcpIds.length === 0) {
+    return {
+      institution_name: institutionName,
+      slug: institutionToSlug(institutionName),
+      total_investigators: 0,
+      rising_star_count: 0,
+      established_count: 0,
+      rising_star_pipeline: {
+        elite: 0,
+        strong: 0,
+        developing: 0,
+        early: 0,
+      },
+      top_investigator: null,
+    };
+  }
+
+  const [rsRows, estRows] = await Promise.all([
+    fetchInstitutionRowsInChunks(
+      hcpIds,
+      async (chunk) => {
+        const { data, error } = await supabase
+          .from("hcp_rising_star_ranks_v3")
+          .select("hcp_id, us_rank, rising_star_percentile")
+          .eq("therapeutic_area_id", taId)
+          .in("hcp_id", chunk)
+          .not("us_rank", "is", null);
+        if (error) {
+          console.error("[getInstitutionSummary] rs chunk error:", error);
+          return [];
+        }
+        return data ?? [];
+      },
+    ),
+    fetchInstitutionRowsInChunks(
+      hcpIds,
+      async (chunk) => {
+        const { data, error } = await supabase
+          .from("hcp_established_ranks_v3")
+          .select("hcp_id, rank, cohort_score")
+          .eq("therapeutic_area_id", taId)
+          .eq("scope_type", "region")
+          .eq("scope_value", "US")
+          .in("hcp_id", chunk);
+        if (error) {
+          console.error("[getInstitutionSummary] est chunk error:", error);
+          return [];
+        }
+        return data ?? [];
+      },
+    ),
+  ]);
+
+  let top_investigator: InstitutionSummary["top_investigator"] = null;
+  const topRisingStar = [...(rsRows ?? [])].sort(
+    (a, b) => Number(a.us_rank ?? 9999) - Number(b.us_rank ?? 9999),
+  )[0];
+  const topEstablished = [...(estRows ?? [])].sort(
+    (a, b) => Number(a.rank ?? 9999) - Number(b.rank ?? 9999),
+  )[0];
+
+  if (topRisingStar) {
+    const hcp = (hcps as InstitutionHcpRow[]).find(
+      (h) => String(h.id) === String(topRisingStar.hcp_id),
+    );
+    if (hcp) {
+      top_investigator = {
+        hcp_id: String(hcp.id),
+        name: `${hcp.first_name ?? ""} ${hcp.last_name ?? ""}`.trim(),
+        cohort: "rising_star",
+        rank: Number(topRisingStar.us_rank),
+        score: Math.round(Number(topRisingStar.rising_star_percentile ?? 0)),
+      };
+    }
+  } else if (topEstablished) {
+    const hcp = (hcps as InstitutionHcpRow[]).find(
+      (h) => String(h.id) === String(topEstablished.hcp_id),
+    );
+    if (hcp) {
+      top_investigator = {
+        hcp_id: String(hcp.id),
+        name: `${hcp.first_name ?? ""} ${hcp.last_name ?? ""}`.trim(),
+        cohort: "established",
+        rank: Number(topEstablished.rank),
+        score: Math.round(Number(topEstablished.cohort_score ?? 0)),
+      };
+    }
+  }
+
+  const rising_star_pipeline = {
+    elite: 0,
+    strong: 0,
+    developing: 0,
+    early: 0,
+  };
+
+  (rsRows ?? []).forEach((r) => {
+    const pct = Number(r.rising_star_percentile ?? 0);
+    if (pct >= 90) rising_star_pipeline.elite++;
+    else if (pct >= 80) rising_star_pipeline.strong++;
+    else if (pct >= 70) rising_star_pipeline.developing++;
+    else rising_star_pipeline.early++;
+  });
+
+  return {
+    institution_name: institutionName,
+    slug: institutionToSlug(institutionName),
+    total_investigators: hcpIds.length,
+    rising_star_count: (rsRows ?? []).length,
+    established_count: (estRows ?? []).length,
+    rising_star_pipeline,
+    top_investigator,
+  };
+}
+
+export async function getInstitutionLeaderboards(
+  institutionName: string,
+  taSlug: string = "nsclc",
+  limit: number = 5,
+): Promise<InstitutionLeaderboards> {
+  const empty: InstitutionLeaderboards = {
+    top_rising_stars: [],
+    top_established: [],
+    most_connected: [],
+    highest_network_momentum: [],
+  };
+
+  const taId = await resolveLandscapeTaId(taSlug);
+  if (!taId) return empty;
+
+  const { data: hcps } = await supabase
+    .from("hcps_v2")
+    .select("id, first_name, last_name")
+    .eq("institution_normalized", institutionName);
+  if (!hcps || hcps.length === 0) return empty;
+
+  const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
+  const nameMap = new Map(
+    (hcps as InstitutionHcpRow[]).map((h) => [
+      String(h.id),
+      `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
+    ]),
+  );
+
+  const [
+    risingStarsRows,
+    establishedRows,
+    centralityRows,
+    networkMomentumRows,
+  ] = await Promise.all([
+    fetchInstitutionRowsInChunks(
+      hcpIds,
+      async (chunk) => {
+        const { data, error } = await supabase
+          .from("hcp_rising_star_ranks_v3")
+          .select("hcp_id, us_rank, rising_star_percentile")
+          .eq("therapeutic_area_id", taId)
+          .in("hcp_id", chunk)
+          .not("us_rank", "is", null);
+        if (error) {
+          console.error("[getInstitutionLeaderboards] rising stars chunk error:", error);
+          return [];
+        }
+        return data ?? [];
+      },
+    ),
+    fetchInstitutionRowsInChunks(
+      hcpIds,
+      async (chunk) => {
+        const { data, error } = await supabase
+          .from("hcp_established_ranks_v3")
+          .select("hcp_id, rank, cohort_score")
+          .eq("therapeutic_area_id", taId)
+          .eq("scope_type", "region")
+          .eq("scope_value", "US")
+          .in("hcp_id", chunk);
+        if (error) {
+          console.error("[getInstitutionLeaderboards] established chunk error:", error);
+          return [];
+        }
+        return data ?? [];
+      },
+    ),
+    fetchInstitutionRowsInChunks(
+      hcpIds,
+      async (chunk) => {
+        const { data, error } = await supabase
+          .from("hcp_network_centrality_v2")
+          .select("hcp_id, degree_percentile, network_influence_score")
+          .eq("therapeutic_area_id", taId)
+          .eq("window_type", "10yr")
+          .in("hcp_id", chunk);
+        if (error) {
+          console.error("[getInstitutionLeaderboards] centrality chunk error:", error);
+          return [];
+        }
+        return data ?? [];
+      },
+    ),
+    fetchInstitutionRowsInChunks(
+      hcpIds,
+      async (chunk) => {
+        const { data, error } = await supabase
+          .from("hcp_rising_star_ranks_v3")
+          .select("hcp_id, us_rank, network_momentum_percentile")
+          .eq("therapeutic_area_id", taId)
+          .in("hcp_id", chunk)
+          .not("us_rank", "is", null);
+        if (error) {
+          console.error("[getInstitutionLeaderboards] network momentum chunk error:", error);
+          return [];
+        }
+        return data ?? [];
+      },
+    ),
+  ]);
+
+  const risingStarsResult = [...risingStarsRows]
+    .sort((a, b) => Number(a.us_rank ?? 9999) - Number(b.us_rank ?? 9999))
+    .slice(0, limit);
+  const establishedResult = [...establishedRows]
+    .sort((a, b) => Number(a.rank ?? 9999) - Number(b.rank ?? 9999))
+    .slice(0, limit);
+  let mostConnectedRows = [...centralityRows]
+    .sort((a, b) => Number(b.degree_percentile ?? 0) - Number(a.degree_percentile ?? 0))
+    .slice(0, limit) as Array<Record<string, unknown>>;
+
+  if (mostConnectedRows.length === 0) {
+    const visibilityFallback = await fetchInstitutionRowsInChunks(
+      hcpIds,
+      async (chunk) => {
+        const { data, error } = await supabase
+          .from("hcp_rising_star_ranks_v3")
+          .select("hcp_id, us_rank, network_visibility_percentile")
+          .eq("therapeutic_area_id", taId)
+          .in("hcp_id", chunk)
+          .not("us_rank", "is", null);
+        if (error) {
+          console.error("[getInstitutionLeaderboards] visibility fallback chunk error:", error);
+          return [];
+        }
+        return data ?? [];
+      },
+    );
+    mostConnectedRows = [...visibilityFallback]
+      .sort(
+        (a, b) =>
+          Number(b.network_visibility_percentile ?? 0) -
+          Number(a.network_visibility_percentile ?? 0),
+      )
+      .slice(0, limit) as Array<Record<string, unknown>>;
+  }
+
+  const networkMomentumResult = [...networkMomentumRows]
+    .sort(
+      (a, b) =>
+        Number(b.network_momentum_percentile ?? 0) - Number(a.network_momentum_percentile ?? 0),
+    )
+    .slice(0, limit);
+
+  const mostConnectedValueKey =
+    mostConnectedRows.length > 0 && mostConnectedRows[0].degree_percentile != null
+      ? "degree_percentile"
+      : "network_visibility_percentile";
+
+  return {
+    top_rising_stars: buildInstitutionLeaderboardEntries(
+      risingStarsResult as Array<Record<string, unknown>>,
+      nameMap,
+      {
+        rankKey: "us_rank",
+        valueKey: "rising_star_percentile",
+        labelFn: (row) => String(Math.round(Number(row.rising_star_percentile ?? 0))),
+      },
+    ),
+    top_established: buildInstitutionLeaderboardEntries(
+      establishedResult as Array<Record<string, unknown>>,
+      nameMap,
+      {
+        rankKey: "rank",
+        valueKey: "cohort_score",
+        labelFn: (row) => String(Math.round(Number(row.cohort_score ?? 0))),
+      },
+    ),
+    most_connected: mostConnectedRows.map((row, index) => {
+      const hcpId = String(row.hcp_id);
+      return {
+        hcp_id: hcpId,
+        name: nameMap.get(hcpId) ?? "Unknown",
+        rank: index + 1,
+        primary_value: Number(row[mostConnectedValueKey] ?? 0),
+        primary_label: String(Math.round(Number(row[mostConnectedValueKey] ?? 0))),
+      };
+    }),
+    highest_network_momentum: buildInstitutionLeaderboardEntries(
+      networkMomentumResult as Array<Record<string, unknown>>,
+      nameMap,
+      {
+        rankKey: "us_rank",
+        valueKey: "network_momentum_percentile",
+        labelFn: (row) => String(Math.round(Number(row.network_momentum_percentile ?? 0))),
+      },
+    ),
+  };
+}
+
+export async function getInstitutionCollaborations(
+  institutionName: string,
+  limit: number = 8,
+): Promise<InstitutionCollaboration[]> {
+  const { data: hcps } = await supabase
+    .from("hcps_v2")
+    .select("id, first_name, last_name")
+    .eq("institution_normalized", institutionName);
+  if (!hcps || hcps.length === 0) return [];
+
+  const hcpIdSet = new Set((hcps as InstitutionHcpRow[]).map((h) => String(h.id)));
+  const nameMap = new Map(
+    (hcps as InstitutionHcpRow[]).map((h) => [
+      String(h.id),
+      `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
+    ]),
+  );
+
+  const hcpIds = Array.from(hcpIdSet);
+  const allCollabRows: Array<{
+    hcp_id: string;
+    collaborator_hcp_id: string;
+    shared_publications: number;
+  }> = [];
+
+  for (const chunk of chunkInstitutionHcpIds(hcpIds)) {
+    const { data: collabs, error } = await supabase
+      .from("hcp_top_collaborators_v2")
+      .select("hcp_id, collaborator_hcp_id, shared_publications")
+      .in("hcp_id", chunk)
+      .order("shared_publications", { ascending: false });
+
+    if (error) {
+      console.error("[getInstitutionCollaborations] chunk error:", error);
+      continue;
+    }
+    if (collabs) allCollabRows.push(...collabs);
+  }
+
+  const sameInstitutionPairs = allCollabRows.filter((c) =>
+    hcpIdSet.has(String(c.collaborator_hcp_id)),
+  );
+
+  const seenPairs = new Set<string>();
+  const result: InstitutionCollaboration[] = [];
+
+  sameInstitutionPairs.sort(
+    (a, b) => Number(b.shared_publications) - Number(a.shared_publications),
+  );
+
+  for (const c of sameInstitutionPairs) {
+    const id1 = String(c.hcp_id);
+    const id2 = String(c.collaborator_hcp_id);
+    const canonicalKey = id1 < id2 ? `${id1}|${id2}` : `${id2}|${id1}`;
+    if (seenPairs.has(canonicalKey)) continue;
+    seenPairs.add(canonicalKey);
+
+    result.push({
+      hcp1_id: id1,
+      hcp1_name: nameMap.get(id1) ?? "Unknown",
+      hcp2_id: id2,
+      hcp2_name: nameMap.get(id2) ?? "Unknown",
+      shared_publications: Number(c.shared_publications),
+    });
+
+    if (result.length >= limit) break;
+  }
+
+  return result;
 }
 
 export type { HCP, HCPScore, LatestPost };

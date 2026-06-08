@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { HCP } from "../data/hcpData";
+import { institutionToSlug } from "../lib/institutionUtils";
 import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWebSignals, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown, type WebSignal } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -568,6 +570,64 @@ function EngagementMixBlock({
   );
 }
 
+function DetailSubline({ hcp }: { hcp: DetailHCP }) {
+  const navigate = useNavigate();
+  const subline = buildSubline(hcp);
+  const slugSource = (hcp.institutionShort ?? hcp.institution ?? "").trim();
+  const institutionFull = (hcp.institutionFull ?? "").trim();
+
+  if (!slugSource) {
+    return <>{subline}</>;
+  }
+
+  const slug = institutionToSlug(slugSource);
+  const linkStyle = {
+    color: "inherit",
+    textDecoration: "none",
+    borderBottom: "1px dotted #6B6A65",
+  } as const;
+
+  if (institutionFull && subline.startsWith(institutionFull)) {
+    const suffix = subline.slice(institutionFull.length);
+    return (
+      <>
+        <a
+          href={`/institution/${slug}`}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate(`/institution/${slug}`);
+          }}
+          style={linkStyle}
+        >
+          {institutionFull}
+        </a>
+        {suffix}
+      </>
+    );
+  }
+
+  if (subline.startsWith(slugSource)) {
+    const suffix = subline.slice(slugSource.length);
+    return (
+      <>
+        <a
+          href={`/institution/${slug}`}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate(`/institution/${slug}`);
+          }}
+          style={linkStyle}
+        >
+          {slugSource}
+        </a>
+        {suffix}
+      </>
+    );
+  }
+
+  return <>{subline}</>;
+}
+
 export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSlug }: DetailScreenProps) {
   if (typeof window !== "undefined") {
     console.log("[DetailScreen diagnostic]", {
@@ -1091,7 +1151,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         >
           <div className="fm-detail-heading" style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}>{hcp.name}</div>
           <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
-            {buildSubline(hcp)}
+            <DetailSubline hcp={hcp} />
           </div>
         </div>
 
@@ -1716,6 +1776,47 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                   )}
               </div>
             )}
+
+          {isRisingStarCohort && risingStarBreakdown?.external_collaborators && (
+            <div
+              className="fm-detail-section fm-section-external-collaborators"
+              style={RIGHT_RAIL_SECTION_STYLE}
+            >
+              <div style={RIGHT_RAIL_HEADER_STYLE}>
+                External Collaborators
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#6B6A65",
+                  marginTop: -4,
+                  marginBottom: 8,
+                }}
+              >
+                Top co-authors at other institutions
+              </div>
+
+              {risingStarBreakdown.external_collaborators.length > 0 ? (
+                <MiniCollaboratorNetwork
+                  hcpName={hcp.name ?? ""}
+                  collaborators={risingStarBreakdown.external_collaborators}
+                />
+              ) : (
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "#9B9892",
+                    lineHeight: 1.4,
+                    padding: "12px 0",
+                    fontStyle: "italic",
+                  }}
+                >
+                  All top collaborators are at the same institution. This HCP's
+                  publication network is concentrated within their home institution.
+                </div>
+              )}
+            </div>
+          )}
 
           {isRisingStarCohort &&
             renderFieldIntelligenceSection(RIGHT_RAIL_SECTION_STYLE, RIGHT_RAIL_HEADER_STYLE)}

@@ -7,6 +7,7 @@ interface Props {
   onEntryClick: (hcpId: string) => void;
   valueLabel?: string;
   accentColor?: string;
+  showRanks?: boolean;
 }
 
 export default function LandscapeLeaderboard({
@@ -15,6 +16,7 @@ export default function LandscapeLeaderboard({
   entries,
   onEntryClick,
   accentColor = "#E8A020",
+  showRanks = true,
 }: Props) {
   return (
     <div
@@ -69,7 +71,8 @@ export default function LandscapeLeaderboard({
           >
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 14, color: "#E8E6DF", fontWeight: 500 }}>
-                {entry.rank}. {entry.name}
+                {showRanks ? `${entry.rank}. ` : ""}
+                {entry.name}
               </div>
               {entry.institution ? (
                 <div
