@@ -141,22 +141,30 @@ button {
     display: grid !important;
     grid-template-columns: 55% 45% !important;
     gap: 0 !important;
-    align-items: start !important;
+    align-items: stretch !important;
     border: 1px solid #1E1E22 !important;
     box-sizing: border-box !important;
     overflow: visible !important;
     max-height: none !important;
+    background-image: linear-gradient(to right, transparent calc(55% - 0.5px), #1E1E22 calc(55% - 0.5px), #1E1E22 calc(55% + 0.5px), transparent calc(55% + 0.5px)) !important;
   }
   .fm-detail-left {
-    border-right: 1px solid #1E1E22 !important;
     overflow-y: visible !important;
     min-height: 0 !important;
   }
   .fm-detail-right {
-    padding: 16px !important;
     overflow-y: visible !important;
     min-height: 0 !important;
     align-self: start !important;
+  }
+  /* Suppress trailing horizontal rules on the last section of each column */
+  .fm-detail-left > div:last-child,
+  .fm-detail-right > div:last-child {
+    border-bottom: none !important;
+  }
+  .fm-detail-left > div:last-child > div[style*="border-bottom"]:last-child,
+  .fm-detail-right > div:last-child > div[style*="border-bottom"]:last-child {
+    border-bottom: none !important;
   }
   .fm-detail-section-text {
     font-size: 14px !important;
@@ -548,5 +556,12 @@ button {
 @media (max-width: 600px) {
   .fm-theme-reaction-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .fm-network-trajectory-cards {
+    flex-direction: column !important;
+    align-items: stretch !important;
   }
 }

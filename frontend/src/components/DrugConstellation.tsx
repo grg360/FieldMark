@@ -1,6 +1,7 @@
 import React from "react";
 import { getTopDrugsForHcp, type DrugConstellationPoint, type TrendCategory } from "../lib/api";
 import Sparkline from "./Sparkline";
+import { RIGHT_RAIL_HEADER_STYLE, RIGHT_RAIL_SECTION_STYLE } from "./rightRailStyles";
 
 interface DrugConstellationProps {
   hcpId: string;
@@ -99,16 +100,8 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
 
   if (loading) {
     return (
-      <div style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}>
-        <div
-          style={{
-            fontSize: 15,
-            color: "#E8E6DF",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 12,
-          }}
-        >
+      <div style={RIGHT_RAIL_SECTION_STYLE}>
+        <div style={RIGHT_RAIL_HEADER_STYLE}>
           Drug Engagement
         </div>
         <div
@@ -125,16 +118,8 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
 
   if (drugs.length === 0) {
     return (
-      <div style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}>
-        <div
-          style={{
-            fontSize: 15,
-            color: "#E8E6DF",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 12,
-          }}
-        >
+      <div style={RIGHT_RAIL_SECTION_STYLE}>
+        <div style={RIGHT_RAIL_HEADER_STYLE}>
           Drug Engagement
         </div>
         <div style={{ fontSize: 11, color: "#6B6A65", padding: "12px 0", fontFamily: "system-ui, sans-serif" }}>
@@ -180,7 +165,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
   }
 
   return (
-    <div style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}>
+    <div style={RIGHT_RAIL_SECTION_STYLE}>
       <div
         style={{
           display: "flex",
@@ -191,7 +176,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
           flexWrap: "wrap",
         }}
       >
-        <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <div style={{ ...RIGHT_RAIL_HEADER_STYLE, marginBottom: 0 }}>
           Drug Engagement
         </div>
         <div

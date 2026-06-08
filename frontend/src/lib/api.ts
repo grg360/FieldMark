@@ -632,6 +632,14 @@ export interface RisingStarScoreBreakdown {
   recent_collaborator_count?: number | null;
 }
 
+export interface WebSignal {
+  signal_type: string;
+  signal_value: string;
+  source_url: string | null;
+  source_title: string | null;
+  confidence: "high" | "medium" | "low";
+}
+
 const TA_ID_MAP: Record<string, string> = {
   "rare-disease": "833e7b38-d01b-409e-82c0-71eb29e138a0",
   hepatology: "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e",
@@ -1820,6 +1828,28 @@ export async function getRisingStarScoreBreakdown(
         ? null
         : Number(networkMomentum.recent_collaborator_count),
   };
+}
+
+export async function getHcpWebSignals(
+  hcpId: string,
+  phase: "identification" | "rising_star_signals" = "identification",
+): Promise<WebSignal[]> {
+  const { data, error } = await supabase
+    .from("hcp_web_signals_v1")
+    .select("signal_type, signal_value, source_url, source_title, confidence")
+    .eq("hcp_id", hcpId)
+    .eq("phase", phase);
+  if (error) {
+    console.error("[getHcpWebSignals]", error);
+    return [];
+  }
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    signal_type: String(row.signal_type),
+    signal_value: String(row.signal_value),
+    source_url: row.source_url == null ? null : String(row.source_url),
+    source_title: row.source_title == null ? null : String(row.source_title),
+    confidence: row.confidence as "high" | "medium" | "low",
+  }));
 }
 
 export async function getEstablishedScoreBreakdown(

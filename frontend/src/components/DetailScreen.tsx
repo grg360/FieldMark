@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HCP } from "../data/hcpData";
-import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown } from "../lib/api";
+import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWebSignals, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown, type WebSignal } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import ResearchThemesSection from "./ResearchThemesSection";
@@ -17,6 +17,9 @@ import ScoreBreakdownV3 from "./ScoreBreakdownV3";
 import ScoreBreakdownV3Rising from "./ScoreBreakdownV3Rising";
 import MiniCollaboratorNetwork from "./MiniCollaboratorNetwork";
 import GlobalFooter from "./GlobalFooter";
+import ContactAccessCard from "./ContactAccessCard";
+import { RIGHT_RAIL_HEADER_STYLE, RIGHT_RAIL_SECTION_STYLE } from "./rightRailStyles";
+import { RISING_STAR_METHODOLOGY } from "../lib/methodologyConfig";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 type DetailHCP = HCP & {
   derivedState?: string | null;
@@ -435,14 +438,9 @@ function countNonZeroEngagementTypes(mix: HCP["engagementMix"]): number {
   return Object.values(mix).filter((v) => v != null && v > 0).length;
 }
 
-const ENGAGEMENT_MIX_SECTION_STYLE: React.CSSProperties = {
-  padding: "12px 16px 8px",
-  borderBottom: "1px solid #1E1E22",
-};
-
 function EngagementMixHeader() {
   return (
-    <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+    <div style={RIGHT_RAIL_HEADER_STYLE}>
       Engagement Mix
     </div>
   );
@@ -456,7 +454,7 @@ function EngagementMixDonutSection({ slices }: { slices: EngagementMixSlice[] })
   const rInner = 23;
 
   return (
-    <div style={ENGAGEMENT_MIX_SECTION_STYLE}>
+    <div style={RIGHT_RAIL_SECTION_STYLE}>
       <EngagementMixHeader />
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
@@ -525,7 +523,7 @@ function EngagementMixBlock({
 
   if (nonZeroCount >= 1) {
     return (
-      <div style={ENGAGEMENT_MIX_SECTION_STYLE}>
+      <div style={RIGHT_RAIL_SECTION_STYLE}>
         <EngagementMixHeader />
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {slices.map((slice) => (
@@ -556,7 +554,7 @@ function EngagementMixBlock({
   }
 
   return (
-    <div style={ENGAGEMENT_MIX_SECTION_STYLE}>
+    <div style={RIGHT_RAIL_SECTION_STYLE}>
       <EngagementMixHeader />
       <p style={{ fontSize: 14, color: "#E8E6DF", margin: "0 0 8px", lineHeight: 1.4 }}>
         No reported industry engagement
@@ -608,6 +606,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
   const [scoreBreakdownLoading, setScoreBreakdownLoading] = useState(false);
   const [risingStarBreakdown, setRisingStarBreakdown] = useState<RisingStarScoreBreakdown | null>(null);
   const [risingStarBreakdownLoading, setRisingStarBreakdownLoading] = useState(false);
+  const [webSignals, setWebSignals] = useState<WebSignal[]>([]);
+  const [webSignalsLoading, setWebSignalsLoading] = useState(false);
 
   useEffect(() => {
     const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
@@ -711,6 +711,32 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
       cancelled = true;
     };
   }, [hcp.hcp_id, hcp.id, hcp.cohort_classification, taSlug]);
+
+  useEffect(() => {
+    const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
+    if (!hcpId) return;
+    if (hcp.cohort_classification !== "rising_star") return;
+
+    let cancelled = false;
+    setWebSignalsLoading(true);
+
+    getHcpWebSignals(hcpId, "identification")
+      .then((data) => {
+        if (cancelled) return;
+        setWebSignals(data);
+      })
+      .catch((err) => {
+        console.error("[DetailScreen] getHcpWebSignals failed:", err);
+        if (!cancelled) setWebSignals([]);
+      })
+      .finally(() => {
+        if (!cancelled) setWebSignalsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id, hcp.cohort_classification]);
 
   const isUnclassified = isUnclassifiedCohort(hcp.cohort_classification);
   const isCommunityCohort =
@@ -872,15 +898,15 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     );
   };
 
-  const fieldIntelligenceSection = (
+  const renderFieldIntelligenceSection = (
+    sectionStyle: React.CSSProperties,
+    headerStyle: React.CSSProperties,
+  ) => (
     <div
       className="fm-detail-section fm-section-field-intelligence"
-      style={{
-        padding: "16px 16px 12px",
-        borderBottom: "1px solid #1E1E22",
-      }}
+      style={sectionStyle}
     >
-      <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+      <div style={headerStyle}>
         Field Intelligence
       </div>
 
@@ -1457,12 +1483,38 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           <ResearchThemesSection themes={researchThemes} loading={themesLoading} />
         </div>
 
-        {!isRisingStarCohort && fieldIntelligenceSection}
+        {!isRisingStarCohort &&
+          renderFieldIntelligenceSection(
+            {
+              padding: "16px 16px 12px",
+              borderBottom: "1px solid #1E1E22",
+            },
+            {
+              fontSize: 15,
+              color: "#E8E6DF",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 12,
+            },
+          )}
         </div>{/* end fm-detail-left */}
 
         {/* RIGHT COLUMN: Metric pills + Field notes */}
         <div className="fm-detail-right">
-          {(() => {
+          {isRisingStarCohort && (
+            <div
+              className="fm-detail-section fm-section-contact-access"
+              style={RIGHT_RAIL_SECTION_STYLE}
+            >
+              <ContactAccessCard
+                hcpName={hcp.name ?? ""}
+                signals={webSignals}
+                loading={webSignalsLoading}
+              />
+            </div>
+          )}
+
+          {!isRisingStarCohort && (() => {
             const hasNpi = Boolean(hcp.npiNumber);
             const addressResult = identificationAddressContent(hcp);
             const hasAddress = addressResult !== null;
@@ -1471,9 +1523,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             return (
               <div
                 className="fm-detail-section fm-section-identification"
-                style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}
+                style={RIGHT_RAIL_SECTION_STYLE}
               >
-                <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                <div style={RIGHT_RAIL_HEADER_STYLE}>
                   Identification
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontFamily: "monospace" }}>
@@ -1533,17 +1585,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             risingStarBreakdown.top_collaborators.length > 0 && (
               <div
                 className="fm-detail-section fm-section-top-collaborators"
-                style={{ padding: "8px 16px 16px", borderBottom: "1px solid #1E1E22" }}
+                style={RIGHT_RAIL_SECTION_STYLE}
               >
-                <div
-                  style={{
-                    fontSize: 15,
-                    color: "#E8E6DF",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 12,
-                  }}
-                >
+                <div style={RIGHT_RAIL_HEADER_STYLE}>
                   Top Collaborators
                 </div>
                 <MiniCollaboratorNetwork
@@ -1554,64 +1598,131 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                   risingStarBreakdown?.early_collaborator_count != null &&
                   risingStarBreakdown?.recent_collaborator_count != null && (
                     <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #1E1E22" }}>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: "#6B6A65",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          marginBottom: 8,
-                        }}
-                      >
+                      <div style={RIGHT_RAIL_HEADER_STYLE}>
                         Network Trajectory
                       </div>
+
                       <div
+                        className="fm-network-trajectory-cards"
                         style={{
-                          fontSize: 16,
-                          color: "#E8E6DF",
-                          fontWeight: 600,
-                          lineHeight: 1.3,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          marginTop: 12,
                         }}
                       >
-                        {risingStarBreakdown.early_collaborator_count} {"→"} {risingStarBreakdown.recent_collaborator_count} collaborators
+                        <div
+                          style={{
+                            flex: 1,
+                            backgroundColor: "#15131A",
+                            border: "1px solid #2A2730",
+                            borderRadius: 6,
+                            padding: "10px 12px",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#6B6A65",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {RISING_STAR_METHODOLOGY.early_window.label}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 22,
+                              color: "#E8E6DF",
+                              fontWeight: 600,
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            {risingStarBreakdown.early_collaborator_count}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: 18,
+                            color: "#9B6DFF",
+                            fontWeight: 600,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {"→"}
+                        </div>
+
+                        <div
+                          style={{
+                            flex: 1,
+                            backgroundColor: "#15131A",
+                            border: "1px solid #9B6DFF",
+                            borderRadius: 6,
+                            padding: "10px 12px",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#9B6DFF",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {RISING_STAR_METHODOLOGY.recent_window.label}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 22,
+                              color: "#E8E6DF",
+                              fontWeight: 600,
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            {risingStarBreakdown.recent_collaborator_count}
+                          </div>
+                        </div>
                       </div>
+
                       <div
                         style={{
+                          marginTop: 12,
                           fontSize: 13,
-                          color: "#9B6DFF",
-                          marginTop: 2,
-                          fontWeight: 500,
-                        }}
-                      >
-                        +
-                        {Math.round(
-                          ((risingStarBreakdown.recent_collaborator_count -
-                            risingStarBreakdown.early_collaborator_count) /
-                            risingStarBreakdown.early_collaborator_count) *
-                            100,
-                        )}
-                        %
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
                           color: "#9B9892",
-                          marginTop: 10,
+                          lineHeight: 1.4,
                         }}
                       >
-                        {Math.round(risingStarBreakdown.network_momentum_percentile)}th percentile
-                        network momentum
+                        <span style={{ color: "#9B6DFF", fontWeight: 500 }}>
+                          +
+                          {Math.round(
+                            ((risingStarBreakdown.recent_collaborator_count -
+                              risingStarBreakdown.early_collaborator_count) /
+                              risingStarBreakdown.early_collaborator_count) *
+                              100,
+                          )}
+                          % growth
+                        </span>
+                        <span style={{ margin: "0 8px", color: "#3A3A3F" }}>{"·"}</span>
+                        <span>
+                          {Math.round(risingStarBreakdown.network_momentum_percentile)}th percentile network momentum
+                        </span>
                       </div>
                     </div>
                   )}
               </div>
             )}
 
-          {isRisingStarCohort && fieldIntelligenceSection}
+          {isRisingStarCohort &&
+            renderFieldIntelligenceSection(RIGHT_RAIL_SECTION_STYLE, RIGHT_RAIL_HEADER_STYLE)}
 
         {/* Field notes */}
-        <div className="fm-detail-section fm-section-field-notes" style={{ padding: "16px 0 24px" }}>
-          <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+        <div className="fm-detail-section fm-section-field-notes" style={RIGHT_RAIL_SECTION_STYLE}>
+          <div style={RIGHT_RAIL_HEADER_STYLE}>
             Field notes
           </div>
 

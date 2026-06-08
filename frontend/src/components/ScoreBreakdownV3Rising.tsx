@@ -1,5 +1,6 @@
 import React from "react";
 import type { RisingStarScoreBreakdown } from "../lib/api";
+import { RIGHT_RAIL_HEADER_STYLE } from "./rightRailStyles";
 
 interface ScoreBreakdownV3RisingProps {
   data: RisingStarScoreBreakdown | null;
@@ -19,7 +20,22 @@ function archetypeColor(archetype: string): string {
       return SIGNAL_NETWORK;
     case "Emerging Leader":
     default:
-      return "#6B6A65";
+      return "#E8704E";
+  }
+}
+
+function archetypeShortLabel(archetype: string): string {
+  switch (archetype) {
+    case "Balanced Rising Star":
+      return "BALANCED";
+    case "Scientific Accelerator":
+      return "SCIENCE";
+    case "Network Accelerator":
+      return "NETWORK";
+    case "Emerging Leader":
+      return "EMERGING";
+    default:
+      return "EMERGING";
   }
 }
 
@@ -157,15 +173,30 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
       <div style={{ marginBottom: 16 }}>
         <div
           style={{
-            fontSize: 15,
-            color: "#E8E6DF",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 8,
-            fontWeight: 500,
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            marginBottom: 12,
           }}
         >
-          Rising Star Score
+          <div style={{ ...RIGHT_RAIL_HEADER_STYLE, marginBottom: 0 }}>
+            Rising Star Score
+          </div>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              padding: "4px 8px",
+              borderRadius: 4,
+              backgroundColor: badgeColor,
+              color: "#FFFFFF",
+              flexShrink: 0,
+            }}
+          >
+            {archetypeShortLabel(data.archetype)}
+          </span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
           <span
@@ -182,25 +213,6 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
           <span style={{ fontSize: 16, color: "#6B6A65", fontWeight: 500 }}>/ 100</span>
         </div>
         <div style={{ fontSize: 11, color: "#9B9892", marginTop: 8 }}>{rankSubtext}</div>
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-        <span
-          style={{
-            display: "inline-block",
-            backgroundColor: badgeColor,
-            color: "#FFFFFF",
-            fontSize: 12,
-            fontWeight: 600,
-            padding: "6px 14px",
-            borderRadius: 14,
-            lineHeight: "16px",
-            height: 28,
-            boxSizing: "border-box",
-          }}
-        >
-          {data.archetype}
-        </span>
       </div>
 
       <div
