@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   getInstitutionCollaborations,
+  getInstitutionExternalPartners,
   getInstitutionLeaderboards,
   getInstitutionSummary,
+  type ExternalPartnerInstitution,
   type InstitutionCollaboration,
   type InstitutionLeaderboardEntry,
   type InstitutionLeaderboards,
@@ -14,6 +16,7 @@ import { slugToInstitution } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import GlobalFooter from "./GlobalFooter";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
+import InstitutionExternalPartnersPanel from "./InstitutionExternalPartnersPanel";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
 
 function toLeaderboardEntries(entries: InstitutionLeaderboardEntry[]): LeaderboardEntry[] {
@@ -57,6 +60,7 @@ export default function InstitutionRoute() {
   const [summary, setSummary] = useState<InstitutionSummary | null>(null);
   const [boards, setBoards] = useState<InstitutionLeaderboards | null>(null);
   const [collabs, setCollabs] = useState<InstitutionCollaboration[]>([]);
+  const [externalPartners, setExternalPartners] = useState<ExternalPartnerInstitution[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -77,10 +81,11 @@ export default function InstitutionRoute() {
         return;
       }
 
-      const [summaryRes, boardsRes, collabsRes] = await Promise.all([
+      const [summaryRes, boardsRes, collabsRes, partnersRes] = await Promise.all([
         getInstitutionSummary(institutionName, "nsclc"),
         getInstitutionLeaderboards(institutionName, "nsclc", 5),
         getInstitutionCollaborations(institutionName, 8),
+        getInstitutionExternalPartners(institutionName, 8),
       ]);
 
       if (cancelled) return;
@@ -88,6 +93,7 @@ export default function InstitutionRoute() {
       setSummary(summaryRes);
       setBoards(boardsRes);
       setCollabs(collabsRes);
+      setExternalPartners(partnersRes);
       setLoading(false);
     })();
 
@@ -275,6 +281,15 @@ export default function InstitutionRoute() {
       <div style={{ padding: "0 16px 16px" }}>
         <InstitutionCollaborationsPanel collaborations={collabs} onHcpClick={handleHcpClick} />
       </div>
+
+      {summary ? (
+        <div style={{ padding: "0 16px 16px" }}>
+          <InstitutionExternalPartnersPanel
+            partners={externalPartners}
+            sourceInstitutionName={summary.institution_name}
+          />
+        </div>
+      ) : null}
 
       <GlobalFooter />
     </div>

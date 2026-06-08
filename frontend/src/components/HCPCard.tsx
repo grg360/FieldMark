@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { HCP } from "../data/hcpData";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
+import { institutionToSlug } from "../lib/institutionUtils";
+import { supabase } from "../lib/supabase";
 import { buildSubline } from "../lib/subline";
 import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
@@ -180,6 +183,13 @@ type HCPCardHCP = HCP & {
 };
 
 function formatCardAffiliationLine(hcp: HCPCardHCP): string {
+  const { institution, state } = getCardInstitutionAndState(hcp);
+  if (institution && state) return `${institution} · ${state}`;
+  if (institution) return institution;
+  return buildSubline(hcp);
+}
+
+function getCardInstitutionAndState(hcp: HCPCardHCP): { institution: string; state: string } {
   const institution = String(
     hcp.institutionShort ??
       (hcp as { institution_normalized?: string | null }).institution_normalized ??
@@ -191,9 +201,7 @@ function formatCardAffiliationLine(hcp: HCPCardHCP): string {
       (hcp as { nppes_practice_state?: string | null }).nppes_practice_state ??
       "",
   ).trim();
-  if (institution && state) return `${institution} · ${state}`;
-  if (institution) return institution;
-  return buildSubline(hcp);
+  return { institution, state };
 }
 
 function shortArchetypeLabel(archetype: string | null | undefined): string {
@@ -429,6 +437,7 @@ function CohortScoreChipWithTip(props: {
 }
 
 export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
+  const navigate = useNavigate();
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
@@ -455,6 +464,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
   const risingScopeLabel = hcp.scope === "US" ? "US" : "GLOBAL";
   const displayRank = isRisingCohort ? (hcp.scope_rank ?? hcp.rank) : hcp.rank;
   const countryCode = getCountryCode(hcp.country ?? null);
+  const { institution: cardInstitution, state: cardState } = getCardInstitutionAndState(hcp);
   const affiliationLine = formatCardAffiliationLine(hcp);
   if (typeof window !== "undefined" && (hcp as { last_name?: string }).last_name === "McKean") {
     console.log("[McKean subline debug]", {
@@ -467,6 +477,26 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
       nppes_practice_setting: (hcp as any).nppes_practice_setting,
       computed_subline: affiliationLine,
     });
+  }
+
+  async function handleInstitutionClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!cardInstitution) return;
+
+    const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
+    if (!hcpId) {
+      navigate(`/institution/${institutionToSlug(cardInstitution)}`);
+      return;
+    }
+
+    const { data } = await supabase
+      .from("hcps_v2")
+      .select("institution_canonical")
+      .eq("id", hcpId)
+      .maybeSingle();
+
+    const canonical = data?.institution_canonical ?? cardInstitution;
+    navigate(`/institution/${institutionToSlug(canonical)}`);
   }
 
   function handleCardClick() {
@@ -721,7 +751,33 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
               maxWidth: "100%",
             }}
           >
-            {affiliationLine}
+            {cardInstitution ? (
+              <>
+                <span
+                  onClick={handleInstitutionClick}
+                  style={{
+                    cursor: "pointer",
+                    borderBottom: "1px dotted #6B6A65",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#E8E6DF";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "inherit";
+                  }}
+                >
+                  {cardInstitution}
+                </span>
+                {cardState ? (
+                  <>
+                    {" \u00b7 "}
+                    {cardState}
+                  </>
+                ) : null}
+              </>
+            ) : (
+              affiliationLine
+            )}
           </div>
         </div>
 

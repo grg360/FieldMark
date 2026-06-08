@@ -1736,7 +1736,7 @@ export async function getRisingStarScoreBreakdown(
   const [{ data: sourceHcp }, { data: collaboratorsRaw }] = await Promise.all([
     supabase
       .from("hcps_v2")
-      .select("institution_normalized")
+      .select("institution_canonical")
       .eq("id", hcpId)
       .maybeSingle(),
     supabase
@@ -1748,7 +1748,7 @@ export async function getRisingStarScoreBreakdown(
       .limit(10),
   ]);
 
-  const sourceInstitution = sourceHcp?.institution_normalized ?? null;
+  const sourceInstitution = sourceHcp?.institution_canonical ?? null;
 
   let topCollaborators: TopCollaborator[] = [];
   let externalCollaborators: TopCollaborator[] = [];
@@ -1756,13 +1756,13 @@ export async function getRisingStarScoreBreakdown(
     const collabIds = collaboratorsRaw.map((r) => r.collaborator_hcp_id);
     const { data: collabHcps } = await supabase
       .from("hcps_v2")
-      .select("id, first_name, last_name, institution_normalized")
+      .select("id, first_name, last_name, institution_canonical")
       .in("id", collabIds);
     const nameMap = new Map<string, { name: string; institution: string | null }>();
     (collabHcps || []).forEach((h) => {
       nameMap.set(String(h.id), {
         name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim(),
-        institution: h.institution_normalized,
+        institution: h.institution_canonical,
       });
     });
 
@@ -3292,6 +3292,21 @@ export interface InstitutionCollaboration {
   shared_publications: number;
 }
 
+export interface ExternalPartnerInstitution {
+  institution_name: string;
+  slug: string;
+  total_shared_publications: number;
+  source_investigators_count: number;
+  partner_investigators_count: number;
+  top_connection: {
+    source_hcp_id: string;
+    source_name: string;
+    partner_hcp_id: string;
+    partner_name: string;
+    shared_publications: number;
+  } | null;
+}
+
 type InstitutionHcpRow = {
   id: string;
   first_name: string | null;
@@ -3358,7 +3373,7 @@ export async function getInstitutionSummary(
   const { data: hcps } = await supabase
     .from("hcps_v2")
     .select("id, first_name, last_name, country")
-    .eq("institution_normalized", institutionName);
+    .eq("institution_canonical", institutionName);
   if (!hcps) return null;
 
   const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
@@ -3495,7 +3510,7 @@ export async function getInstitutionLeaderboards(
   const { data: hcps } = await supabase
     .from("hcps_v2")
     .select("id, first_name, last_name")
-    .eq("institution_normalized", institutionName);
+    .eq("institution_canonical", institutionName);
   if (!hcps || hcps.length === 0) return empty;
 
   const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
@@ -3675,7 +3690,7 @@ export async function getInstitutionCollaborations(
   const { data: hcps } = await supabase
     .from("hcps_v2")
     .select("id, first_name, last_name")
-    .eq("institution_normalized", institutionName);
+    .eq("institution_canonical", institutionName);
   if (!hcps || hcps.length === 0) return [];
 
   const hcpIdSet = new Set((hcps as InstitutionHcpRow[]).map((h) => String(h.id)));
@@ -3737,6 +3752,363 @@ export async function getInstitutionCollaborations(
   }
 
   return result;
+}
+
+export async function getInstitutionExternalPartners(
+  sourceInstitutionName: string,
+  limit: number = 8,
+): Promise<ExternalPartnerInstitution[]> {
+  const { data: sourceHcps } = await supabase
+    .from("hcps_v2")
+    .select("id")
+    .eq("institution_canonical", sourceInstitutionName);
+  if (!sourceHcps || sourceHcps.length === 0) return [];
+
+  const sourceHcpIds = (sourceHcps as InstitutionHcpRow[]).map((h) => String(h.id));
+  const sourceNameMap = new Map<string, string>();
+
+  for (const chunk of chunkInstitutionHcpIds(sourceHcpIds)) {
+    const { data: hcps } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name")
+      .in("id", chunk);
+    (hcps ?? []).forEach((h) => {
+      sourceNameMap.set(
+        String(h.id),
+        `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
+      );
+    });
+  }
+
+  const allCollabRows: Array<{
+    hcp_id: string;
+    collaborator_hcp_id: string;
+    shared_publications: number;
+  }> = [];
+
+  for (const chunk of chunkInstitutionHcpIds(sourceHcpIds)) {
+    const { data: collabs } = await supabase
+      .from("hcp_top_collaborators_v2")
+      .select("hcp_id, collaborator_hcp_id, shared_publications")
+      .in("hcp_id", chunk);
+    if (collabs) allCollabRows.push(...collabs);
+  }
+
+  if (allCollabRows.length === 0) return [];
+
+  const collaboratorIds = Array.from(
+    new Set(allCollabRows.map((r) => String(r.collaborator_hcp_id))),
+  );
+  const institutionMap = new Map<string, string | null>();
+  const nameMap = new Map<string, string>();
+
+  for (const chunk of chunkInstitutionHcpIds(collaboratorIds)) {
+    const { data: hcps } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name, institution_canonical")
+      .in("id", chunk);
+    (hcps ?? []).forEach((h) => {
+      institutionMap.set(String(h.id), h.institution_canonical);
+      nameMap.set(
+        String(h.id),
+        `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
+      );
+    });
+  }
+
+  const sourceHcpSet = new Set(sourceHcpIds);
+  type PartnerAggregate = {
+    institution: string;
+    total_publications: number;
+    source_hcps: Set<string>;
+    partner_hcps: Set<string>;
+    top_pair: {
+      source_id: string;
+      partner_id: string;
+      shared: number;
+    } | null;
+  };
+  const aggregates = new Map<string, PartnerAggregate>();
+
+  for (const row of allCollabRows) {
+    const sourceId = String(row.hcp_id);
+    const partnerId = String(row.collaborator_hcp_id);
+    const partnerInstitution = institutionMap.get(partnerId);
+
+    if (!partnerInstitution) continue;
+    if (partnerInstitution === sourceInstitutionName) continue;
+    if (sourceHcpSet.has(partnerId)) continue;
+
+    let agg = aggregates.get(partnerInstitution);
+    if (!agg) {
+      agg = {
+        institution: partnerInstitution,
+        total_publications: 0,
+        source_hcps: new Set(),
+        partner_hcps: new Set(),
+        top_pair: null,
+      };
+      aggregates.set(partnerInstitution, agg);
+    }
+    const sharedNum = Number(row.shared_publications);
+    agg.total_publications += sharedNum;
+    agg.source_hcps.add(sourceId);
+    agg.partner_hcps.add(partnerId);
+    if (!agg.top_pair || sharedNum > agg.top_pair.shared) {
+      agg.top_pair = {
+        source_id: sourceId,
+        partner_id: partnerId,
+        shared: sharedNum,
+      };
+    }
+  }
+
+  return Array.from(aggregates.values())
+    .sort((a, b) => b.total_publications - a.total_publications)
+    .slice(0, limit)
+    .map((agg) => ({
+      institution_name: agg.institution,
+      slug: institutionToSlug(agg.institution),
+      total_shared_publications: agg.total_publications,
+      source_investigators_count: agg.source_hcps.size,
+      partner_investigators_count: agg.partner_hcps.size,
+      top_connection: agg.top_pair
+        ? {
+            source_hcp_id: agg.top_pair.source_id,
+            source_name: sourceNameMap.get(agg.top_pair.source_id) ?? "Unknown",
+            partner_hcp_id: agg.top_pair.partner_id,
+            partner_name: nameMap.get(agg.top_pair.partner_id) ?? "Unknown",
+            shared_publications: agg.top_pair.shared,
+          }
+        : null,
+    }));
+}
+
+export interface InstitutionIndexEntry {
+  institution_name: string;
+  slug: string;
+  investigator_count: number;
+  rising_star_count: number;
+  established_count: number;
+  talent_density_pct: number | null;
+  yield_ratio: number | null;
+  external_partner_count: number;
+  top_rising_star_name: string | null;
+  top_rising_star_rank: number | null;
+}
+
+export async function getInstitutionsIndex(
+  taSlug: string,
+): Promise<InstitutionIndexEntry[]> {
+  const taId = await resolveLandscapeTaId(taSlug);
+  if (!taId) return [];
+
+  const [{ data: rsRows }, { data: estRows }] = await Promise.all([
+    supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select("hcp_id, us_rank")
+      .eq("therapeutic_area_id", taId)
+      .not("us_rank", "is", null),
+    supabase
+      .from("hcp_established_ranks_v3")
+      .select("hcp_id")
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", "region")
+      .eq("scope_value", "US"),
+  ]);
+
+  const rsRankMap = new Map<string, number>();
+  (rsRows ?? []).forEach((r) => {
+    rsRankMap.set(String(r.hcp_id), Number(r.us_rank));
+  });
+  const rsHcpIds = new Set(rsRankMap.keys());
+  const estHcpIds = new Set((estRows ?? []).map((r) => String(r.hcp_id)));
+
+  const cohortHcpIds = Array.from(new Set([...rsHcpIds, ...estHcpIds]));
+  if (cohortHcpIds.length === 0) return [];
+
+  type CohortHcpRow = {
+    id: string;
+    institution_canonical: string | null;
+    first_name: string | null;
+    last_name: string | null;
+  };
+
+  const cohortHcps: CohortHcpRow[] = [];
+  for (const chunk of chunkInstitutionHcpIds(cohortHcpIds)) {
+    const { data: hcps } = await supabase
+      .from("hcps_v2")
+      .select("id, institution_canonical, first_name, last_name")
+      .in("id", chunk);
+    if (hcps) cohortHcps.push(...(hcps as CohortHcpRow[]));
+  }
+
+  const cohortInstitutions = new Set<string>();
+  for (const h of cohortHcps) {
+    if (h.institution_canonical) cohortInstitutions.add(h.institution_canonical);
+  }
+
+  const institutionNames = Array.from(cohortInstitutions);
+  const totalInvestigatorCounts = new Map<string, number>();
+  const INST_CHUNK = 50;
+  const PAGE_SIZE = 1000;
+
+  for (let i = 0; i < institutionNames.length; i += INST_CHUNK) {
+    const instChunk = institutionNames.slice(i, i + INST_CHUNK);
+    let offset = 0;
+
+    while (true) {
+      const { data: hcpsAtInst } = await supabase
+        .from("hcps_v2")
+        .select("institution_canonical, id")
+        .in("institution_canonical", instChunk)
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (!hcpsAtInst || hcpsAtInst.length === 0) break;
+
+      hcpsAtInst.forEach((h) => {
+        const inst = h.institution_canonical;
+        if (!inst) return;
+        totalInvestigatorCounts.set(inst, (totalInvestigatorCounts.get(inst) ?? 0) + 1);
+      });
+
+      if (hcpsAtInst.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+  }
+
+  const hcpToInstitution = new Map<string, string>();
+  for (const h of cohortHcps) {
+    if (h.institution_canonical) {
+      hcpToInstitution.set(String(h.id), h.institution_canonical);
+    }
+  }
+
+  const allCollabs: Array<{
+    hcp_id: string;
+    collaborator_hcp_id: string;
+    shared_publications: number;
+  }> = [];
+
+  for (const chunk of chunkInstitutionHcpIds(cohortHcpIds)) {
+    const { data: collabs } = await supabase
+      .from("hcp_top_collaborators_v2")
+      .select("hcp_id, collaborator_hcp_id, shared_publications")
+      .in("hcp_id", chunk);
+    if (collabs) allCollabs.push(...collabs);
+  }
+
+  const collabHcpIds = Array.from(
+    new Set(
+      allCollabs
+        .map((c) => String(c.collaborator_hcp_id))
+        .filter((id) => !hcpToInstitution.has(id)),
+    ),
+  );
+
+  for (const chunk of chunkInstitutionHcpIds(collabHcpIds)) {
+    const { data: hcps } = await supabase
+      .from("hcps_v2")
+      .select("id, institution_canonical")
+      .in("id", chunk);
+    (hcps ?? []).forEach((h) => {
+      if (h.institution_canonical) {
+        hcpToInstitution.set(String(h.id), h.institution_canonical);
+      }
+    });
+  }
+
+  const externalPartnersMap = new Map<string, Set<string>>();
+  for (const c of allCollabs) {
+    const sourceInst = hcpToInstitution.get(String(c.hcp_id));
+    const partnerInst = hcpToInstitution.get(String(c.collaborator_hcp_id));
+    if (!sourceInst || !partnerInst) continue;
+    if (sourceInst === partnerInst) continue;
+    if (Number(c.shared_publications) < 5) continue;
+
+    let partners = externalPartnersMap.get(sourceInst);
+    if (!partners) {
+      partners = new Set();
+      externalPartnersMap.set(sourceInst, partners);
+    }
+    partners.add(partnerInst);
+  }
+
+  type InstitutionIndexAggregate = {
+    institution: string;
+    rs_count: number;
+    est_count: number;
+    best_rs_rank: number;
+    best_rs_name: string | null;
+  };
+  const aggregates = new Map<string, InstitutionIndexAggregate>();
+
+  for (const h of cohortHcps) {
+    const inst = h.institution_canonical;
+    if (!inst) continue;
+
+    let agg = aggregates.get(inst);
+    if (!agg) {
+      agg = {
+        institution: inst,
+        rs_count: 0,
+        est_count: 0,
+        best_rs_rank: Infinity,
+        best_rs_name: null,
+      };
+      aggregates.set(inst, agg);
+    }
+
+    const hcpId = String(h.id);
+    const fullName = `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim();
+
+    if (rsHcpIds.has(hcpId)) {
+      agg.rs_count++;
+      const rank = rsRankMap.get(hcpId);
+      if (rank != null && rank < agg.best_rs_rank) {
+        agg.best_rs_rank = rank;
+        agg.best_rs_name = fullName;
+      }
+    }
+    if (estHcpIds.has(hcpId)) agg.est_count++;
+  }
+
+  const entries: InstitutionIndexEntry[] = [];
+  for (const agg of aggregates.values()) {
+    const investigatorCount = totalInvestigatorCounts.get(agg.institution) ?? 0;
+    const talentDensity =
+      investigatorCount >= 30 && agg.rs_count > 0
+        ? (agg.rs_count / investigatorCount) * 100
+        : null;
+    const totalCohort = agg.rs_count + agg.est_count;
+    const yieldRatio =
+      investigatorCount >= 30 &&
+      agg.est_count > 0 &&
+      totalCohort >= 3
+        ? agg.rs_count / agg.est_count
+        : null;
+
+    entries.push({
+      institution_name: agg.institution,
+      slug: institutionToSlug(agg.institution),
+      investigator_count: investigatorCount,
+      rising_star_count: agg.rs_count,
+      established_count: agg.est_count,
+      talent_density_pct: talentDensity,
+      yield_ratio: yieldRatio,
+      external_partner_count: externalPartnersMap.get(agg.institution)?.size ?? 0,
+      top_rising_star_name: agg.best_rs_name,
+      top_rising_star_rank: agg.best_rs_rank === Infinity ? null : agg.best_rs_rank,
+    });
+  }
+
+  entries.sort(
+    (a, b) =>
+      b.rising_star_count - a.rising_star_count ||
+      b.investigator_count - a.investigator_count,
+  );
+
+  return entries;
 }
 
 export type { HCP, HCPScore, LatestPost };

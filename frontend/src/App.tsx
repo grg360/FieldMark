@@ -41,6 +41,7 @@ import ProfileScreen from "./components/ProfileScreen";
 import LandscapeScreen from "./components/LandscapeScreen";
 import LandscapeRoute from "./components/LandscapeRoute";
 import InstitutionRoute from "./components/InstitutionRoute";
+import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
@@ -772,6 +773,38 @@ function FeedLayout({
                 {selectedIndication !== "All" ? `${selectedIndication} landscape` : "Landscape"}
               </span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const indSlug = indicationLabelToSlug(selectedTA, selectedIndication);
+                navigate(`/institutions/${indSlug === "all" ? "nsclc" : indSlug}`);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: "#0D0D10",
+                border: "1px solid #1E1E22",
+                borderRadius: 3,
+                padding: "3px 8px",
+                cursor: "pointer",
+                fontFamily: "system-ui, -apple-system, sans-serif",
+                marginLeft: 8,
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="1" y="0" width="8" height="10" stroke="#6B6A65" strokeWidth="1" fill="none" />
+                <rect x="3" y="3" width="1" height="1" fill="#6B6A65" />
+                <rect x="6" y="3" width="1" height="1" fill="#6B6A65" />
+                <rect x="3" y="5" width="1" height="1" fill="#6B6A65" />
+                <rect x="6" y="5" width="1" height="1" fill="#6B6A65" />
+                <rect x="3" y="7" width="1" height="1" fill="#6B6A65" />
+                <rect x="6" y="7" width="1" height="1" fill="#6B6A65" />
+              </svg>
+              <span style={{ fontSize: 11, color: "#6B6A65" }}>
+                Institutions
+              </span>
+            </button>
           </div>
         )}
       </div>
@@ -1244,6 +1277,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<FeedLayout />} />
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
+          <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
           <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />
           <Route
