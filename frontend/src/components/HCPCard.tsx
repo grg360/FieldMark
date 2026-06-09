@@ -1057,7 +1057,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           <div
             style={{
               position: "absolute",
-              bottom: 12,
+              bottom: 8,
               right: 12,
               display: "flex",
               alignItems: "center",
