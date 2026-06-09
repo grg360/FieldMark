@@ -13,9 +13,6 @@ export interface Relationship {
   user_id: string;
   hcp_id: string;
   status: RelationshipStatus;
-  next_action_text: string | null;
-  next_action_due_at: string | null;
-  next_action_completed_at: string | null;
   created_from: string | null;
   first_added_at: string;
   last_interaction_at: string;
@@ -333,6 +330,214 @@ export async function updateRelationshipStatus(
   }
 }
 
+export async function createNextAction(
+  userId: string,
+  params: CreateNextActionParams,
+): Promise<NextAction> {
+  const trimmedBody = params.body.trim();
+  if (trimmedBody.length === 0) {
+    throw new Error("Next action body cannot be empty");
+  }
+
+  try {
+    const relationship = await getOrCreateRelationship(
+      userId,
+      params.hcpId,
+      params.createdFrom ?? null,
+    );
+
+    const insertPayload: {
+      relationship_id: string;
+      user_id: string;
+      body: string;
+      due_at?: string | null;
+    } = {
+      relationship_id: relationship.id,
+      user_id: userId,
+      body: trimmedBody,
+    };
+
+    if (params.dueAt !== undefined) {
+      insertPayload.due_at = params.dueAt;
+    }
+
+    const { data, error } = await supabase
+      .from("msl_hcp_next_actions")
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("createNextAction: supabase error", error);
+      throw error;
+    }
+
+    const action = data as NextAction;
+
+    const { error: relError } = await supabase
+      .from("msl_hcp_relationships")
+      .update({ last_interaction_at: new Date().toISOString() })
+      .eq("id", relationship.id)
+      .eq("user_id", userId);
+
+    if (relError) {
+      console.warn("createNextAction: last_interaction_at update error", relError);
+    }
+
+    invalidateUserCaches(userId);
+    return action;
+  } catch (err) {
+    if (!(err instanceof Error && err.message === "Next action body cannot be empty")) {
+      if (!(err && typeof err === "object" && "code" in err)) {
+        console.warn("createNextAction: error", err);
+      }
+    }
+    throw err;
+  }
+}
+
+export async function getOpenNextActionForRelationship(
+  userId: string,
+  relationshipId: string,
+): Promise<NextAction | null> {
+  try {
+    const { data, error } = await supabase
+      .from("msl_hcp_next_actions")
+      .select("*")
+      .eq("relationship_id", relationshipId)
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .is("completed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("getOpenNextActionForRelationship: supabase error", error);
+      throw error;
+    }
+
+    return (data as NextAction | null) ?? null;
+  } catch (err) {
+    console.warn("getOpenNextActionForRelationship: error", err);
+    throw err;
+  }
+}
+
+export async function getNextActionHistoryForRelationship(
+  userId: string,
+  relationshipId: string,
+): Promise<NextAction[]> {
+  try {
+    const { data, error } = await supabase
+      .from("msl_hcp_next_actions")
+      .select("*")
+      .eq("relationship_id", relationshipId)
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("completed_at", { ascending: false, nullsFirst: true })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.warn("getNextActionHistoryForRelationship: supabase error", error);
+      throw error;
+    }
+
+    return (data ?? []) as NextAction[];
+  } catch (err) {
+    console.warn("getNextActionHistoryForRelationship: error", err);
+    throw err;
+  }
+}
+
+export async function updateNextAction(
+  userId: string,
+  actionId: string,
+  updates: UpdateNextActionParams,
+): Promise<NextAction> {
+  if (updates.body !== undefined) {
+    const trimmedBody = updates.body.trim();
+    if (trimmedBody.length === 0) {
+      throw new Error("Next action body cannot be empty");
+    }
+  }
+
+  try {
+    const updatePayload: {
+      body?: string;
+      due_at?: string | null;
+      completed_at?: string | null;
+    } = {};
+
+    if (updates.body !== undefined) {
+      updatePayload.body = updates.body.trim();
+    }
+    if (updates.dueAt !== undefined) {
+      updatePayload.due_at = updates.dueAt;
+    }
+    if (updates.completedAt !== undefined) {
+      updatePayload.completed_at = updates.completedAt;
+    }
+
+    const { data, error } = await supabase
+      .from("msl_hcp_next_actions")
+      .update(updatePayload)
+      .eq("id", actionId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("updateNextAction: supabase error", error);
+      throw error;
+    }
+
+    const action = data as NextAction;
+
+    if (updates.completedAt !== undefined) {
+      const { error: relError } = await supabase
+        .from("msl_hcp_relationships")
+        .update({ last_interaction_at: new Date().toISOString() })
+        .eq("id", action.relationship_id)
+        .eq("user_id", userId);
+
+      if (relError) {
+        console.warn("updateNextAction: last_interaction_at update error", relError);
+      }
+    }
+
+    invalidateUserCaches(userId);
+    return action;
+  } catch (err) {
+    if (!(err instanceof Error && err.message === "Next action body cannot be empty")) {
+      if (!(err && typeof err === "object" && "code" in err)) {
+        console.warn("updateNextAction: error", err);
+      }
+    }
+    throw err;
+  }
+}
+
+export async function softDeleteNextAction(userId: string, actionId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("msl_hcp_next_actions")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", actionId)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.warn("softDeleteNextAction: supabase error", error);
+      throw error;
+    }
+
+    invalidateUserCaches(userId);
+  } catch (err) {
+    console.warn("softDeleteNextAction: error", err);
+    throw err;
+  }
+}
+
 type WatchlistItemRow = WatchlistItem & {
   msl_hcp_relationships: { hcp_id: string } | { hcp_id: string }[] | null;
 };
@@ -398,6 +603,31 @@ export type AIExtractionStatus =
   | "skipped";
 
 export type InsightStrength = "routine" | "notable" | "strategic";
+
+export interface NextAction {
+  id: string;
+  relationship_id: string;
+  user_id: string;
+  body: string;
+  due_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface CreateNextActionParams {
+  hcpId: string;
+  body: string;
+  dueAt?: string | null;
+  createdFrom?: string | null;
+}
+
+export interface UpdateNextActionParams {
+  body?: string;
+  dueAt?: string | null;
+  completedAt?: string | null;
+}
 
 export interface Note {
   id: string;
