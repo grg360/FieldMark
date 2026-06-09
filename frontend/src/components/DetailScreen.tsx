@@ -1200,9 +1200,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           </div>
         </div>
 
-        <FieldInsights hcp={hcp} />
-
         <RelationshipSection hcp={hcp} />
+
+        <FieldInsights hcp={hcp} />
 
         {/* Narrative / unclassified notice */}
         <div

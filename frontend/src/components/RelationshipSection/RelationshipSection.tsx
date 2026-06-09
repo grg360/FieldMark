@@ -67,36 +67,26 @@ export default function RelationshipSection({ hcp }: Props) {
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
-      <div
-        style={{
-          fontSize: 15,
-          color: "#E8E6DF",
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
-        RELATIONSHIP
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div
-          style={{
-            fontSize: 12,
-            color: "#9B9892",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            width: 80,
-            flexShrink: 0,
-          }}
-        >
-          Status
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: "#6B6A65",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              fontWeight: 500,
+              flexShrink: 0,
+            }}
+          >
+            Status
+          </div>
+          <StatusEditor
+            currentStatus={relationship.status}
+            pending={pending}
+            onChange={(status) => void updateStatus(status)}
+          />
         </div>
-        <StatusEditor
-          currentStatus={relationship.status}
-          pending={pending}
-          onChange={(status) => void updateStatus(status)}
-        />
       </div>
     </div>
   );
