@@ -474,11 +474,13 @@ function cardStatusLabel(status: string): string {
 
 export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
   const navigate = useNavigate();
-  const { isSaved, toggleSave, getInsightCount, relationshipMap } = useRelationships();
+  const { isSaved, toggleSave, getInsightCount, getFollowUpInfo, relationshipMap } = useRelationships();
   const [savePending, setSavePending] = useState(false);
   const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
   const saved = hcpId ? isSaved(hcpId) : false;
   const insightCount = hcpId ? getInsightCount(hcpId) : 0;
+  const followUpInfo = hcpId ? getFollowUpInfo(hcpId) : { openCount: 0, hasOverdue: false };
+  const showFollowUpBadge = followUpInfo.openCount > 0;
   const relationship = hcpId ? relationshipMap.get(hcpId) : undefined;
   const status = relationship?.status;
   const showStatus = status && status !== "not_engaged";
@@ -1102,6 +1104,30 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
               >
                 <span style={{ fontSize: 11 }}>{String.fromCodePoint(0x1F4DD)}</span>
                 <span>{insightCount}</span>
+              </div>
+            ) : null}
+
+            {hcpId && showFollowUpBadge ? (
+              <div
+                aria-label={`${followUpInfo.openCount} open follow-up${followUpInfo.openCount === 1 ? "" : "s"}${followUpInfo.hasOverdue ? ", overdue" : ""}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                  lineHeight: 1,
+                  color: "#9B9892",
+                  fontSize: 11,
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  pointerEvents: "none",
+                }}
+              >
+                <span style={{ fontSize: 11 }}>{String.fromCodePoint(0x1F4CC)}</span>
+                <span>{followUpInfo.openCount}</span>
+                {followUpInfo.hasOverdue ? (
+                  <span style={{ color: "#E8A020", fontSize: 11, marginLeft: 2 }}>
+                    {String.fromCharCode(0x26A0)}
+                  </span>
+                ) : null}
               </div>
             ) : null}
 

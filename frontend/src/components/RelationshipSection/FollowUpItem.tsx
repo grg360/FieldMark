@@ -6,6 +6,7 @@ import {
   type NextAction,
   type Priority,
 } from "../../lib/relationships";
+import { useRelationships } from "../../contexts/RelationshipsContext";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -66,6 +67,7 @@ interface Props {
 }
 
 export default function FollowUpItem({ userId, item, onMutate }: Props) {
+  const { refreshFollowUpInfo } = useRelationships();
   const [editingBody, setEditingBody] = useState(false);
   const [bodyDraft, setBodyDraft] = useState(item.body);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -124,6 +126,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
       await updateNextAction(userId, item.id, { body: trimmed });
       setEditingBody(false);
       onMutate();
+      void refreshFollowUpInfo();
     } catch (err) {
       console.error("FollowUpItem save body failed", err);
     } finally {
@@ -145,6 +148,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
     try {
       await updateNextAction(userId, item.id, { dueAt: iso });
       onMutate();
+      void refreshFollowUpInfo();
     } catch (err) {
       console.error("FollowUpItem update due date failed", err);
     } finally {
@@ -160,6 +164,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
     try {
       await updateNextAction(userId, item.id, { priority });
       onMutate();
+      void refreshFollowUpInfo();
     } catch (err) {
       console.error("FollowUpItem update priority failed", err);
     } finally {
@@ -175,6 +180,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
         completedAt: new Date().toISOString(),
       });
       onMutate();
+      void refreshFollowUpInfo();
     } catch (err) {
       console.error("FollowUpItem mark complete failed", err);
     } finally {
@@ -188,6 +194,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
     try {
       await softDeleteNextAction(userId, item.id);
       onMutate();
+      void refreshFollowUpInfo();
     } catch (err) {
       console.error("FollowUpItem delete failed", err);
     } finally {
@@ -235,7 +242,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
           opacity: pending ? 0.6 : 1,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <div ref={priorityMenuRef} style={{ position: "relative", flexShrink: 0 }}>
             <button
               type="button"
@@ -306,7 +313,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
             ) : null}
           </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 80 }}>
             {editingBody ? (
               <input
                 ref={bodyInputRef}
@@ -348,7 +355,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   color: "#E8E6DF",
                   cursor: "pointer",
                   lineHeight: 1.4,
-                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {item.body}
@@ -356,44 +363,6 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => void handleMarkComplete()}
-            disabled={pending}
-            style={{
-              backgroundColor: "#3FB8AF",
-              color: "#0A0A0B",
-              padding: "5px 10px",
-              borderRadius: 4,
-              fontSize: 11,
-              fontWeight: 500,
-              border: "none",
-              cursor: pending ? "default" : "pointer",
-              fontFamily: "system-ui, -apple-system, sans-serif",
-            }}
-          >
-            Mark complete
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            disabled={pending}
-            style={{
-              color: "#6B6A65",
-              fontSize: 11,
-              background: "none",
-              border: "none",
-              cursor: pending ? "default" : "pointer",
-              padding: 0,
-              fontFamily: "system-ui, -apple-system, sans-serif",
-            }}
-          >
-            Delete
-          </button>
-        </div>
-
-        <div style={{ marginTop: 8 }}>
           <div ref={datePickerRef} style={{ position: "relative", display: "inline-block" }}>
             <button
               type="button"
@@ -448,6 +417,42 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
               </div>
             ) : null}
           </div>
+
+          <button
+            type="button"
+            onClick={() => void handleMarkComplete()}
+            disabled={pending}
+            style={{
+              backgroundColor: "#3FB8AF",
+              color: "#0A0A0B",
+              padding: "4px 8px",
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 500,
+              border: "none",
+              cursor: pending ? "default" : "pointer",
+              fontFamily: "system-ui, -apple-system, sans-serif",
+            }}
+          >
+            Mark Complete
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            disabled={pending}
+            style={{
+              color: "#6B6A65",
+              fontSize: 11,
+              background: "none",
+              border: "none",
+              cursor: pending ? "default" : "pointer",
+              padding: 0,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+            }}
+          >
+            Delete
+          </button>
         </div>
       </div>
 

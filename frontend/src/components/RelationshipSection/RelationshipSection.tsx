@@ -137,7 +137,7 @@ export default function RelationshipSection({ hcp }: Props) {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div
             style={{
               fontSize: 11,
@@ -145,13 +145,11 @@ export default function RelationshipSection({ hcp }: Props) {
               textTransform: "uppercase",
               letterSpacing: "0.06em",
               fontWeight: 500,
-              flexShrink: 0,
-              paddingTop: 6,
             }}
           >
             Follow-Ups
           </div>
-          <div style={{ flex: 1, minWidth: 0, opacity: actionsLoading ? 0.6 : 1 }}>
+          <div style={{ opacity: actionsLoading ? 0.6 : 1 }}>
             <FollowUpsList
               userId={userId}
               hcpId={hcpId}

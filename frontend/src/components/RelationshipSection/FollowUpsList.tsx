@@ -5,6 +5,7 @@ import {
   type NextAction,
   type Priority,
 } from "../../lib/relationships";
+import { useRelationships } from "../../contexts/RelationshipsContext";
 import FollowUpItem from "./FollowUpItem";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -105,6 +106,7 @@ export default function FollowUpsList({
   lastCompletedAction,
   onMutate,
 }: Props) {
+  const { refreshFollowUpInfo } = useRelationships();
   const [composerBody, setComposerBody] = useState("");
   const [composerDueAt, setComposerDueAt] = useState<string | null>(null);
   const [composerPriority, setComposerPriority] = useState<Priority>("normal");
@@ -142,6 +144,7 @@ export default function FollowUpsList({
       setComposerPriority("normal");
       setShowComposerDatePicker(false);
       onMutate();
+      void refreshFollowUpInfo();
     } catch (err) {
       console.error("FollowUpsList create failed", err);
     } finally {
@@ -174,7 +177,7 @@ export default function FollowUpsList({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: 6,
           flexWrap: "wrap",
           opacity: composerPending ? 0.6 : 1,
         }}
@@ -195,9 +198,16 @@ export default function FollowUpsList({
           ))}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+          <style>{`
+            .fm-followup-composer-input::placeholder {
+              color: #9B9892;
+              opacity: 1;
+            }
+          `}</style>
           <input
             type="text"
+            className="fm-followup-composer-input"
             value={composerBody}
             onChange={(e) => setComposerBody(e.target.value)}
             placeholder="Add a follow-up..."

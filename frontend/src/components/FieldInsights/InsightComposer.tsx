@@ -240,29 +240,39 @@ export default function InsightComposer({
 
   if (isInline && !showForm) {
     return (
-      <input
-        type="text"
-        className="fm-insight-composer-input"
-        placeholder={`Add an insight about Dr. ${firstName}...`}
-        onFocus={() => setExpanded(true)}
-        readOnly
-        onClick={() => setExpanded(true)}
-        aria-label={`Add an insight about Dr. ${firstName}`}
-        style={{
-          width: "100%",
-          height: 40,
-          borderRadius: 4,
-          backgroundColor: "#0D0D10",
-          border: "1px solid #1E1E22",
-          color: "#E8E6DF",
-          fontSize: 14,
-          padding: "0 12px",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          outline: "none",
-          cursor: "text",
-          marginBottom: 12,
-        }}
-      />
+      <>
+        <style>{`
+          input.fm-insight-composer-input::placeholder,
+          textarea.fm-insight-composer-textarea::placeholder {
+            color: #9B9892 !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: #9B9892 !important;
+          }
+        `}</style>
+        <input
+          type="text"
+          className="fm-insight-composer-input"
+          placeholder={`Add an insight about Dr. ${firstName}...`}
+          onFocus={() => setExpanded(true)}
+          readOnly
+          onClick={() => setExpanded(true)}
+          aria-label={`Add an insight about Dr. ${firstName}`}
+          style={{
+            width: "100%",
+            height: 40,
+            borderRadius: 4,
+            backgroundColor: "#0D0D10",
+            border: "1px solid #1E1E22",
+            color: "#E8E6DF",
+            fontSize: 14,
+            padding: "0 12px",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            outline: "none",
+            cursor: "text",
+            marginBottom: 12,
+          }}
+        />
+      </>
     );
   }
 
@@ -270,11 +280,11 @@ export default function InsightComposer({
     <div style={{ opacity: saving ? 0.6 : 1, marginBottom: 12, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <style>{`
         .fm-insight-composer-textarea::placeholder {
-          color: #6B6A65;
+          color: #9B9892;
           opacity: 1;
         }
         .fm-insight-composer-input::placeholder {
-          color: #6B6A65;
+          color: #9B9892;
           opacity: 1;
         }
       `}</style>

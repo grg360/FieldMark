@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { RelationshipStatus } from "../../lib/relationships";
 
 const STATUS_VALUES: RelationshipStatus[] = [
@@ -115,7 +115,26 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
         >
           {STATUS_VALUES.map((status) => {
             const colors = statusColor(status);
-            const dotColor = colors.bg === "transparent" ? colors.fg : colors.bg;
+            const isOutline = colors.bg === "transparent";
+            const dotStyle: CSSProperties = isOutline
+              ? {
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  backgroundColor: "transparent",
+                  border: `1px solid ${colors.fg}`,
+                  boxSizing: "border-box",
+                  marginRight: 8,
+                  flexShrink: 0,
+                }
+              : {
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  backgroundColor: colors.bg,
+                  marginRight: 8,
+                  flexShrink: 0,
+                };
             return (
               <button
                 key={status}
@@ -133,7 +152,8 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
                   background: "none",
                   border: "none",
                   fontSize: 13,
-                  color: status === currentStatus ? colors.fg : "#E8E6DF",
+                  color: "#E8E6DF",
+                  fontWeight: status === currentStatus ? 600 : 400,
                   cursor: "pointer",
                   fontFamily: "system-ui, -apple-system, sans-serif",
                   listStyle: "none",
@@ -141,16 +161,7 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
                   WebkitAppearance: "none",
                 }}
               >
-                <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    backgroundColor: dotColor,
-                    marginRight: 8,
-                    flexShrink: 0,
-                  }}
-                />
+                <div style={dotStyle} />
                 {statusLabel(status)}
               </button>
             );

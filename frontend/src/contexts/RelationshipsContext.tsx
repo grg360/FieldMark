@@ -41,6 +41,36 @@ async function fetchInsightCountByHcpId(userId: string): Promise<Map<string, num
   return counts;
 }
 
+async function fetchFollowUpInfoByHcpId(userId: string): Promise<Map<string, { openCount: number; hasOverdue: boolean }>> {
+  const { data, error } = await supabase
+    .from("msl_hcp_next_actions")
+    .select("due_at, msl_hcp_relationships!inner(hcp_id, user_id)")
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .is("completed_at", null);
+
+  if (error) {
+    console.warn("fetchFollowUpInfoByHcpId: supabase error", error);
+    return new Map();
+  }
+
+  const now = Date.now();
+  const info = new Map<string, { openCount: number; hasOverdue: boolean }>();
+  for (const row of data ?? []) {
+    const rel = (row as { msl_hcp_relationships: { hcp_id: string } | { hcp_id: string }[] | null; due_at: string | null }).msl_hcp_relationships;
+    const hcpId = Array.isArray(rel) ? rel[0]?.hcp_id : rel?.hcp_id;
+    if (!hcpId) continue;
+    const dueAt = (row as { due_at: string | null }).due_at;
+    const isOverdue = dueAt !== null && new Date(dueAt).getTime() < now;
+    const existing = info.get(hcpId) ?? { openCount: 0, hasOverdue: false };
+    info.set(hcpId, {
+      openCount: existing.openCount + 1,
+      hasOverdue: existing.hasOverdue || isOverdue,
+    });
+  }
+  return info;
+}
+
 interface RelationshipsContextValue {
   relationshipMap: RelationshipMap;
   isSaved: (hcpId: string) => boolean;
@@ -48,6 +78,8 @@ interface RelationshipsContextValue {
   isLoading: boolean;
   getInsightCount: (hcpId: string) => number;
   refreshInsightCounts: () => Promise<void>;
+  getFollowUpInfo: (hcpId: string) => { openCount: number; hasOverdue: boolean };
+  refreshFollowUpInfo: () => Promise<void>;
 }
 
 const RelationshipsContext = createContext<RelationshipsContextValue | undefined>(undefined);
@@ -58,6 +90,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
   const [savedHcpIds, setSavedHcpIds] = useState<Set<string>>(new Set());
   const [defaultWatchlistId, setDefaultWatchlistId] = useState<string | null>(null);
   const [insightCountByHcpId, setInsightCountByHcpId] = useState<Map<string, number>>(new Map());
+  const [followUpInfoByHcpId, setFollowUpInfoByHcpId] = useState<Map<string, { openCount: number; hasOverdue: boolean }>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const loadGenerationRef = useRef(0);
 
@@ -67,6 +100,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     setSavedHcpIds(new Set());
     setDefaultWatchlistId(null);
     setInsightCountByHcpId(new Map());
+    setFollowUpInfoByHcpId(new Map());
     setIsLoading(false);
   }, []);
 
@@ -84,15 +118,17 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     setUserId(user.id);
 
     try {
-      const [map, watchlists, insightCounts] = await Promise.all([
+      const [map, watchlists, insightCounts, followUpInfo] = await Promise.all([
         getRelationshipMap(user.id),
         getWatchlists(user.id),
         fetchInsightCountByHcpId(user.id),
+        fetchFollowUpInfoByHcpId(user.id),
       ]);
       if (myGen !== loadGenerationRef.current) return;
 
       setRelationshipMap(new Map(map));
       setInsightCountByHcpId(insightCounts);
+      setFollowUpInfoByHcpId(followUpInfo);
 
       const defaultList = watchlists.find((w) => w.is_default) ?? watchlists[0] ?? null;
       const listId = defaultList?.id ?? null;
@@ -147,6 +183,22 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       setInsightCountByHcpId(counts);
     } catch (err) {
       console.warn("refreshInsightCounts failed", err);
+    }
+  }, [userId]);
+
+  const getFollowUpInfo = useCallback(
+    (hcpId: string): { openCount: number; hasOverdue: boolean } =>
+      followUpInfoByHcpId.get(hcpId) ?? { openCount: 0, hasOverdue: false },
+    [followUpInfoByHcpId],
+  );
+
+  const refreshFollowUpInfo = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const info = await fetchFollowUpInfoByHcpId(userId);
+      setFollowUpInfoByHcpId(info);
+    } catch (err) {
+      console.warn("refreshFollowUpInfo failed", err);
     }
   }, [userId]);
 
@@ -222,8 +274,10 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       isLoading,
       getInsightCount,
       refreshInsightCounts,
+      getFollowUpInfo,
+      refreshFollowUpInfo,
     }),
-    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts],
+    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo],
   );
 
   return (
