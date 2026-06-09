@@ -8,6 +8,8 @@ export type RelationshipStatus =
   | "active_relationship"
   | "paused";
 
+export type Priority = "low" | "normal" | "high";
+
 export interface Relationship {
   id: string;
   user_id: string;
@@ -351,6 +353,7 @@ export async function createNextAction(
       user_id: string;
       body: string;
       due_at?: string | null;
+      priority?: Priority;
     } = {
       relationship_id: relationship.id,
       user_id: userId,
@@ -359,6 +362,9 @@ export async function createNextAction(
 
     if (params.dueAt !== undefined) {
       insertPayload.due_at = params.dueAt;
+    }
+    if (params.priority !== undefined) {
+      insertPayload.priority = params.priority;
     }
 
     const { data, error } = await supabase
@@ -396,10 +402,31 @@ export async function createNextAction(
   }
 }
 
-export async function getOpenNextActionForRelationship(
+const PRIORITY_RANK: Record<Priority, number> = { high: 0, normal: 1, low: 2 };
+
+function sortFollowUps(items: NextAction[]): NextAction[] {
+  const now = Date.now();
+  return [...items].sort((a, b) => {
+    const aOverdue = a.due_at && new Date(a.due_at).getTime() < now ? 0 : 1;
+    const bOverdue = b.due_at && new Date(b.due_at).getTime() < now ? 0 : 1;
+    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+
+    const aPrio = PRIORITY_RANK[a.priority] ?? 1;
+    const bPrio = PRIORITY_RANK[b.priority] ?? 1;
+    if (aPrio !== bPrio) return aPrio - bPrio;
+
+    const aDue = a.due_at ? new Date(a.due_at).getTime() : Infinity;
+    const bDue = b.due_at ? new Date(b.due_at).getTime() : Infinity;
+    if (aDue !== bDue) return aDue - bDue;
+
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
+export async function getOpenNextActionsForRelationship(
   userId: string,
   relationshipId: string,
-): Promise<NextAction | null> {
+): Promise<NextAction[]> {
   try {
     const { data, error } = await supabase
       .from("msl_hcp_next_actions")
@@ -407,19 +434,17 @@ export async function getOpenNextActionForRelationship(
       .eq("relationship_id", relationshipId)
       .eq("user_id", userId)
       .is("deleted_at", null)
-      .is("completed_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .is("completed_at", null);
 
     if (error) {
-      console.warn("getOpenNextActionForRelationship: supabase error", error);
+      console.warn("getOpenNextActionsForRelationship: supabase error", error);
       throw error;
     }
 
-    return (data as NextAction | null) ?? null;
+    const rows = (data ?? []) as NextAction[];
+    return sortFollowUps(rows);
   } catch (err) {
-    console.warn("getOpenNextActionForRelationship: error", err);
+    console.warn("getOpenNextActionsForRelationship: error", err);
     throw err;
   }
 }
@@ -467,6 +492,7 @@ export async function updateNextAction(
       body?: string;
       due_at?: string | null;
       completed_at?: string | null;
+      priority?: Priority;
     } = {};
 
     if (updates.body !== undefined) {
@@ -477,6 +503,9 @@ export async function updateNextAction(
     }
     if (updates.completedAt !== undefined) {
       updatePayload.completed_at = updates.completedAt;
+    }
+    if (updates.priority !== undefined) {
+      updatePayload.priority = updates.priority;
     }
 
     const { data, error } = await supabase
@@ -611,6 +640,7 @@ export interface NextAction {
   body: string;
   due_at: string | null;
   completed_at: string | null;
+  priority: Priority;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -620,6 +650,7 @@ export interface CreateNextActionParams {
   hcpId: string;
   body: string;
   dueAt?: string | null;
+  priority?: Priority;
   createdFrom?: string | null;
 }
 
@@ -627,6 +658,7 @@ export interface UpdateNextActionParams {
   body?: string;
   dueAt?: string | null;
   completedAt?: string | null;
+  priority?: Priority;
 }
 
 export interface Note {

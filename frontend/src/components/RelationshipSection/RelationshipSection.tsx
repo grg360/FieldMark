@@ -3,14 +3,14 @@ import { HCP } from "../../data/hcpData";
 import { getCurrentUser } from "../../lib/authHelpers";
 import {
   getNextActionHistoryForRelationship,
-  getOpenNextActionForRelationship,
+  getOpenNextActionsForRelationship,
   updateRelationshipStatus,
   type NextAction,
   type Relationship,
   type RelationshipStatus,
 } from "../../lib/relationships";
 import { useRelationships } from "../../contexts/RelationshipsContext";
-import NextActionEditor from "./NextActionEditor";
+import FollowUpsList from "./FollowUpsList";
 import StatusEditor from "./StatusEditor";
 
 interface Props {
@@ -24,7 +24,7 @@ export default function RelationshipSection({ hcp }: Props) {
   const [userId, setUserId] = useState<string | null>(null);
   const [relationship, setRelationship] = useState<Relationship | null>(null);
   const [pending, setPending] = useState(false);
-  const [openAction, setOpenAction] = useState<NextAction | null>(null);
+  const [openActions, setOpenActions] = useState<NextAction[]>([]);
   const [lastCompletedAction, setLastCompletedAction] = useState<NextAction | null>(null);
   const [actionsLoading, setActionsLoading] = useState(true);
   const [actionsNonce, setActionsNonce] = useState(0);
@@ -54,7 +54,7 @@ export default function RelationshipSection({ hcp }: Props) {
 
   useEffect(() => {
     if (!userId || !relationship?.id) {
-      setOpenAction(null);
+      setOpenActions([]);
       setLastCompletedAction(null);
       setActionsLoading(false);
       return;
@@ -64,19 +64,19 @@ export default function RelationshipSection({ hcp }: Props) {
     setActionsLoading(true);
 
     Promise.all([
-      getOpenNextActionForRelationship(userId, relationship.id),
+      getOpenNextActionsForRelationship(userId, relationship.id),
       getNextActionHistoryForRelationship(userId, relationship.id),
     ])
       .then(([open, history]) => {
         if (cancelled) return;
-        setOpenAction(open);
+        setOpenActions(open);
         const completed = history.find((item) => item.completed_at !== null) ?? null;
         setLastCompletedAction(completed);
       })
       .catch((err) => {
         console.error("RelationshipSection load actions failed", err);
         if (!cancelled) {
-          setOpenAction(null);
+          setOpenActions([]);
           setLastCompletedAction(null);
         }
       })
@@ -149,14 +149,14 @@ export default function RelationshipSection({ hcp }: Props) {
               paddingTop: 6,
             }}
           >
-            Next Action
+            Follow-Ups
           </div>
           <div style={{ flex: 1, minWidth: 0, opacity: actionsLoading ? 0.6 : 1 }}>
-            <NextActionEditor
+            <FollowUpsList
               userId={userId}
               hcpId={hcpId}
               relationshipId={relationship.id}
-              openAction={openAction}
+              openActions={openActions}
               lastCompletedAction={lastCompletedAction}
               onMutate={bumpActionsNonce}
             />
