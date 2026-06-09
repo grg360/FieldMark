@@ -26,6 +26,7 @@ import { RIGHT_RAIL_HEADER_STYLE, RIGHT_RAIL_SECTION_STYLE } from "./rightRailSt
 import { RISING_STAR_METHODOLOGY } from "../lib/methodologyConfig";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 import FieldInsights from "./FieldInsights/FieldInsights";
+import RelationshipSection from "./RelationshipSection/RelationshipSection";
 type DetailHCP = HCP & {
   derivedState?: string | null;
   engagement_angle?: string | null;
@@ -1201,52 +1202,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
 
         <FieldInsights hcp={hcp} />
 
-        {/* Dark Horse callout */}
-        {hcp.cohort_classification === "dark_horse" && (
-          <div style={{ padding: "12px 16px 0" }}>
-            <div
-              style={{
-                backgroundColor: "#0D0A1A",
-                border: "1px solid #9B6DFF",
-                borderLeft: "3px solid #9B6DFF",
-                borderRadius: 4,
-                padding: 12,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "#9B6DFF" }}>♞</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horse</span>
-                <span style={{ fontSize: 11, color: "#6B6A65" }}>· top 8% of rising stars</span>
-              </div>
-              <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5, marginTop: 8 }}>
-                Dr. {hcp.name.split(/\s+/).filter(Boolean).pop() ?? ""} ranks in the top 5% of {hcp.specialty} rising stars by normalized score, with active publication velocity and citation momentum. Fewer than 2% of scored HCPs in this therapeutic area qualify.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {hcp.cohort_classification === "workhorse" && (
-          <div style={{ padding: "12px 16px 0" }}>
-            <div
-              style={{
-                backgroundColor: "#0A1A18",
-                border: "1px solid #4ECDC4",
-                borderLeft: "3px solid #4ECDC4",
-                borderRadius: 4,
-                padding: 12,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "#4ECDC4" }}>⚡</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: "#4ECDC4", fontFamily: "system-ui, sans-serif" }}>Workhorse</span>
-                <span style={{ fontSize: 11, color: "#6B6A65" }}>· community cohort</span>
-              </div>
-              <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5, marginTop: 8 }}>
-                Dr. {hcp.name.split(/\s+/).filter(Boolean).pop() ?? ""} is a Workhorse — a high-volume practitioner in {hcp.specialty} with strong Medicare patient volume and minimal pharma engagement. Underleveraged influence in the field.
-              </div>
-            </div>
-          </div>
-        )}
+        <RelationshipSection hcp={hcp} />
 
         {/* Narrative / unclassified notice */}
         <div

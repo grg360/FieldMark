@@ -304,6 +304,35 @@ export async function removeFromWatchlist(
   }
 }
 
+export async function updateRelationshipStatus(
+  userId: string,
+  relationshipId: string,
+  status: RelationshipStatus,
+): Promise<Relationship> {
+  try {
+    const { data, error } = await supabase
+      .from("msl_hcp_relationships")
+      .update({ status })
+      .eq("id", relationshipId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("updateRelationshipStatus: supabase error", error);
+      throw error;
+    }
+
+    invalidateUserCaches(userId);
+    return data as Relationship;
+  } catch (err) {
+    if (!(err && typeof err === "object" && "code" in err)) {
+      console.warn("updateRelationshipStatus: error", err);
+    }
+    throw err;
+  }
+}
+
 type WatchlistItemRow = WatchlistItem & {
   msl_hcp_relationships: { hcp_id: string } | { hcp_id: string }[] | null;
 };
