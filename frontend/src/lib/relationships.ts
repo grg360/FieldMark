@@ -348,3 +348,276 @@ export async function getWatchlistItems(
     throw err;
   }
 }
+
+export type InteractionType =
+  | "general"
+  | "meeting"
+  | "email"
+  | "phone"
+  | "conference"
+  | "publication_review"
+  | "internal"
+  | "other";
+
+export type NoteVisibility = "private" | "team" | "community";
+
+export type AIExtractionStatus =
+  | "pending"
+  | "processing"
+  | "extracted"
+  | "failed"
+  | "skipped";
+
+export interface Note {
+  id: string;
+  relationship_id: string;
+  user_id: string;
+  body: string;
+  interaction_type: InteractionType;
+  visibility: NoteVisibility;
+  occurred_at: string;
+  ai_extraction_status: AIExtractionStatus;
+  ai_extracted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface CreateNoteParams {
+  hcpId: string;
+  body: string;
+  interactionType?: InteractionType;
+  occurredAt?: string;
+  createdFrom?: string | null;
+}
+
+export interface UpdateNoteParams {
+  body?: string;
+  interactionType?: InteractionType;
+  occurredAt?: string;
+}
+
+export async function createNote(userId: string, params: CreateNoteParams): Promise<Note> {
+  const trimmedBody = params.body.trim();
+  if (trimmedBody.length === 0) {
+    throw new Error("Note body cannot be empty");
+  }
+
+  try {
+    const relationship = await getOrCreateRelationship(
+      userId,
+      params.hcpId,
+      params.createdFrom ?? null,
+    );
+
+    const insertPayload: {
+      relationship_id: string;
+      user_id: string;
+      body: string;
+      interaction_type?: InteractionType;
+      occurred_at?: string;
+    } = {
+      relationship_id: relationship.id,
+      user_id: userId,
+      body: trimmedBody,
+    };
+
+    if (params.interactionType) {
+      insertPayload.interaction_type = params.interactionType;
+    }
+    if (params.occurredAt) {
+      insertPayload.occurred_at = params.occurredAt;
+    }
+
+    const { data, error } = await supabase
+      .from("msl_hcp_notes")
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("createNote: supabase error", error);
+      throw error;
+    }
+
+    const note = data as Note;
+
+    const { error: relError } = await supabase
+      .from("msl_hcp_relationships")
+      .update({ last_interaction_at: note.occurred_at })
+      .eq("id", relationship.id)
+      .eq("user_id", userId);
+
+    if (relError) {
+      console.warn("createNote: last_interaction_at update error", relError);
+    }
+
+    clearRelationshipsCache(userId);
+    clearWatchlistsCache(userId);
+    return note;
+  } catch (err) {
+    if (!(err instanceof Error && err.message === "Note body cannot be empty")) {
+      if (!(err && typeof err === "object" && "code" in err)) {
+        console.warn("createNote: error", err);
+      }
+    }
+    throw err;
+  }
+}
+
+export async function getNotesForRelationship(
+  userId: string,
+  relationshipId: string,
+): Promise<Note[]> {
+  try {
+    const { data, error } = await supabase
+      .from("msl_hcp_notes")
+      .select("*")
+      .eq("relationship_id", relationshipId)
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("occurred_at", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.warn("getNotesForRelationship: supabase error", error);
+      throw error;
+    }
+
+    return (data ?? []) as Note[];
+  } catch (err) {
+    console.warn("getNotesForRelationship: error", err);
+    throw err;
+  }
+}
+
+export async function getNotesForHcp(userId: string, hcpId: string): Promise<Note[]> {
+  try {
+    const map = await getRelationshipMap(userId);
+    const relationship = map.get(hcpId);
+    if (!relationship) return [];
+
+    return getNotesForRelationship(userId, relationship.id);
+  } catch (err) {
+    console.warn("getNotesForHcp: error", err);
+    throw err;
+  }
+}
+
+export async function updateNote(
+  userId: string,
+  noteId: string,
+  updates: UpdateNoteParams,
+): Promise<Note> {
+  if (updates.body !== undefined) {
+    const trimmedBody = updates.body.trim();
+    if (trimmedBody.length === 0) {
+      throw new Error("Note body cannot be empty");
+    }
+  }
+
+  try {
+    const updatePayload: {
+      body?: string;
+      interaction_type?: InteractionType;
+      occurred_at?: string;
+    } = {};
+
+    if (updates.body !== undefined) {
+      updatePayload.body = updates.body.trim();
+    }
+    if (updates.interactionType !== undefined) {
+      updatePayload.interaction_type = updates.interactionType;
+    }
+    if (updates.occurredAt !== undefined) {
+      updatePayload.occurred_at = updates.occurredAt;
+    }
+
+    const { data, error } = await supabase
+      .from("msl_hcp_notes")
+      .update(updatePayload)
+      .eq("id", noteId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("updateNote: supabase error", error);
+      throw error;
+    }
+
+    const note = data as Note;
+
+    if (updates.occurredAt !== undefined) {
+      const { error: relError } = await supabase
+        .from("msl_hcp_relationships")
+        .update({ last_interaction_at: updates.occurredAt })
+        .eq("id", note.relationship_id)
+        .eq("user_id", userId);
+
+      if (relError) {
+        console.warn("updateNote: last_interaction_at update error", relError);
+      }
+    }
+
+    clearRelationshipsCache(userId);
+    clearWatchlistsCache(userId);
+    return note;
+  } catch (err) {
+    if (!(err instanceof Error && err.message === "Note body cannot be empty")) {
+      if (!(err && typeof err === "object" && "code" in err)) {
+        console.warn("updateNote: error", err);
+      }
+    }
+    throw err;
+  }
+}
+
+export async function softDeleteNote(userId: string, noteId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("msl_hcp_notes")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", noteId)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.warn("softDeleteNote: supabase error", error);
+      throw error;
+    }
+
+    clearRelationshipsCache(userId);
+    clearWatchlistsCache(userId);
+  } catch (err) {
+    console.warn("softDeleteNote: error", err);
+    throw err;
+  }
+}
+
+export async function getRecentNotesForUser(
+  userId: string,
+  limit: number = 50,
+): Promise<Note[]> {
+  const cappedLimit = Math.min(limit, 200);
+
+  try {
+    const { data, error } = await supabase
+      .from("msl_hcp_notes")
+      .select("*")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("occurred_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(cappedLimit);
+
+    if (error) {
+      console.warn("getRecentNotesForUser: supabase error", error);
+      throw error;
+    }
+
+    return (data ?? []) as Note[];
+  } catch (err) {
+    console.warn("getRecentNotesForUser: error", err);
+    throw err;
+  }
+}
