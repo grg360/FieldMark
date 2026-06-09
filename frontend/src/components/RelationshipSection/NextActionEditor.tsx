@@ -126,7 +126,7 @@ export default function NextActionEditor({
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [showDatePicker]);
 
-  async function handleBlurCreateOrUpdate() {
+  async function handleSaveOrUpdate() {
     const trimmed = body.trim();
     if (!trimmed || pending) return;
 
@@ -245,7 +245,7 @@ export default function NextActionEditor({
           type="text"
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          onBlur={() => void handleBlurCreateOrUpdate()}
+          onBlur={openAction ? () => void handleSaveOrUpdate() : undefined}
           placeholder="What's the next move?"
           disabled={pending}
           aria-label="Next action"
@@ -307,6 +307,28 @@ export default function NextActionEditor({
             </div>
           ) : null}
         </div>
+
+        {!openAction ? (
+          <button
+            type="button"
+            onClick={() => void handleSaveOrUpdate()}
+            disabled={pending || body.trim().length === 0}
+            style={{
+              backgroundColor: "#E8A020",
+              color: "#0A0A0B",
+              padding: "6px 12px",
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 500,
+              border: "none",
+              cursor: pending || body.trim().length === 0 ? "default" : "pointer",
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              opacity: body.trim().length === 0 ? 0.5 : 1,
+            }}
+          >
+            Save
+          </button>
+        ) : null}
 
         {openAction ? (
           <>

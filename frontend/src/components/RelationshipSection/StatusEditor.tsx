@@ -136,6 +136,9 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
                   color: status === currentStatus ? colors.fg : "#E8E6DF",
                   cursor: "pointer",
                   fontFamily: "system-ui, -apple-system, sans-serif",
+                  listStyle: "none",
+                  appearance: "none",
+                  WebkitAppearance: "none",
                 }}
               >
                 <div
