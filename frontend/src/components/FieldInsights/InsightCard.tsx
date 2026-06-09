@@ -19,7 +19,7 @@ function interactionChipStyle(type: InteractionType): CSSProperties | null {
     case "phone":
       return { backgroundColor: "#5A9B7F", color: "#FFFFFF" };
     case "other":
-      return { backgroundColor: "#6B6A65", color: "#FFFFFF" };
+      return { backgroundColor: "#7B7B9C", color: "#FFFFFF" };
     case "conference":
       return { backgroundColor: "#9B6DFF", color: "#FFFFFF" };
     case "publication_review":

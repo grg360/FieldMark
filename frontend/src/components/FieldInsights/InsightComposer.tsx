@@ -37,7 +37,7 @@ function interactionChipStyle(type: InteractionType): CSSProperties {
     case "phone":
       return { backgroundColor: "#5A9B7F", color: "#FFFFFF" };
     case "other":
-      return { backgroundColor: "#6B6A65", color: "#FFFFFF" };
+      return { backgroundColor: "#7B7B9C", color: "#FFFFFF" };
     case "conference":
       return { backgroundColor: "#9B6DFF", color: "#FFFFFF" };
     case "publication_review":
@@ -242,6 +242,7 @@ export default function InsightComposer({
     return (
       <input
         type="text"
+        className="fm-insight-composer-input"
         placeholder={`Add an insight about Dr. ${firstName}...`}
         onFocus={() => setExpanded(true)}
         readOnly
@@ -267,7 +268,18 @@ export default function InsightComposer({
 
   return (
     <div style={{ opacity: saving ? 0.6 : 1, marginBottom: 12, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <style>{`
+        .fm-insight-composer-textarea::placeholder {
+          color: #6B6A65;
+          opacity: 1;
+        }
+        .fm-insight-composer-input::placeholder {
+          color: #6B6A65;
+          opacity: 1;
+        }
+      `}</style>
       <textarea
+        className="fm-insight-composer-textarea"
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder={`Add an insight about Dr. ${firstName}...`}
