@@ -25,6 +25,7 @@ import ContactAccessCard from "./ContactAccessCard";
 import { RIGHT_RAIL_HEADER_STYLE, RIGHT_RAIL_SECTION_STYLE } from "./rightRailStyles";
 import { RISING_STAR_METHODOLOGY } from "../lib/methodologyConfig";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
+import FieldInsights from "./FieldInsights/FieldInsights";
 type DetailHCP = HCP & {
   derivedState?: string | null;
   engagement_angle?: string | null;
@@ -1186,9 +1187,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 }}
               >
                 {saved ? (
-                  <BookmarkCheck size={24} color="#E8A020" fill="#E8A020" />
+                  <BookmarkCheck size={24} color="#3FB8AF" fill="#3FB8AF" />
                 ) : (
-                  <Bookmark size={24} color="#6B6A65" />
+                  <Bookmark size={24} color="#5A9B7F" />
                 )}
               </button>
             ) : null}
@@ -1197,6 +1198,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             <DetailSubline hcp={hcp} />
           </div>
         </div>
+
+        <FieldInsights hcp={hcp} />
 
         {/* Dark Horse callout */}
         {hcp.cohort_classification === "dark_horse" && (

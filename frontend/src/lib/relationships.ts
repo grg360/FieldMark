@@ -368,6 +368,8 @@ export type AIExtractionStatus =
   | "failed"
   | "skipped";
 
+export type InsightStrength = "routine" | "notable" | "strategic";
+
 export interface Note {
   id: string;
   relationship_id: string;
@@ -375,6 +377,7 @@ export interface Note {
   body: string;
   interaction_type: InteractionType;
   visibility: NoteVisibility;
+  insight_strength: InsightStrength;
   occurred_at: string;
   ai_extraction_status: AIExtractionStatus;
   ai_extracted_at: string | null;
@@ -387,6 +390,7 @@ export interface CreateNoteParams {
   hcpId: string;
   body: string;
   interactionType?: InteractionType;
+  insightStrength?: InsightStrength;
   occurredAt?: string;
   createdFrom?: string | null;
 }
@@ -394,6 +398,7 @@ export interface CreateNoteParams {
 export interface UpdateNoteParams {
   body?: string;
   interactionType?: InteractionType;
+  insightStrength?: InsightStrength;
   occurredAt?: string;
 }
 
@@ -415,6 +420,7 @@ export async function createNote(userId: string, params: CreateNoteParams): Prom
       user_id: string;
       body: string;
       interaction_type?: InteractionType;
+      insight_strength?: InsightStrength;
       occurred_at?: string;
     } = {
       relationship_id: relationship.id,
@@ -424,6 +430,9 @@ export async function createNote(userId: string, params: CreateNoteParams): Prom
 
     if (params.interactionType) {
       insertPayload.interaction_type = params.interactionType;
+    }
+    if (params.insightStrength) {
+      insertPayload.insight_strength = params.insightStrength;
     }
     if (params.occurredAt) {
       insertPayload.occurred_at = params.occurredAt;
@@ -520,6 +529,7 @@ export async function updateNote(
     const updatePayload: {
       body?: string;
       interaction_type?: InteractionType;
+      insight_strength?: InsightStrength;
       occurred_at?: string;
     } = {};
 
@@ -528,6 +538,9 @@ export async function updateNote(
     }
     if (updates.interactionType !== undefined) {
       updatePayload.interaction_type = updates.interactionType;
+    }
+    if (updates.insightStrength !== undefined) {
+      updatePayload.insight_strength = updates.insightStrength;
     }
     if (updates.occurredAt !== undefined) {
       updatePayload.occurred_at = updates.occurredAt;
