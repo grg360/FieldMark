@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { HCP } from "../../data/hcpData";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { getNotesForHcp, type Note } from "../../lib/relationships";
+import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import EmptyInsightsState from "./EmptyInsightsState";
 import InsightComposer from "./InsightComposer";
@@ -26,6 +27,7 @@ export default function FieldInsights({ hcp }: Props) {
   const hcpId = resolveHcpId(hcp);
   const firstName = resolveFirstName(hcp);
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const { refreshInsightCounts } = useRelationships();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -77,6 +79,7 @@ export default function FieldInsights({ hcp }: Props) {
   function handleSave() {
     setComposerOpen(false);
     bumpNonce();
+    void refreshInsightCounts();
   }
 
   function handleAddClick() {

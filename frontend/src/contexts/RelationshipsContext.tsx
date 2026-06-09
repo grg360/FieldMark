@@ -19,11 +19,35 @@ import {
 } from "../lib/relationships";
 import { supabase } from "../lib/supabase";
 
+async function fetchInsightCountByHcpId(userId: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from("msl_hcp_notes")
+    .select("relationship_id, msl_hcp_relationships!inner(hcp_id, user_id)")
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.warn("fetchInsightCountByHcpId: supabase error", error);
+    return new Map();
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const rel = (row as { msl_hcp_relationships: { hcp_id: string } | { hcp_id: string }[] | null }).msl_hcp_relationships;
+    const hcpId = Array.isArray(rel) ? rel[0]?.hcp_id : rel?.hcp_id;
+    if (!hcpId) continue;
+    counts.set(hcpId, (counts.get(hcpId) ?? 0) + 1);
+  }
+  return counts;
+}
+
 interface RelationshipsContextValue {
   relationshipMap: RelationshipMap;
   isSaved: (hcpId: string) => boolean;
   toggleSave: (hcpId: string, createdFrom: string) => Promise<void>;
   isLoading: boolean;
+  getInsightCount: (hcpId: string) => number;
+  refreshInsightCounts: () => Promise<void>;
 }
 
 const RelationshipsContext = createContext<RelationshipsContextValue | undefined>(undefined);
@@ -33,6 +57,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
   const [relationshipMap, setRelationshipMap] = useState<RelationshipMap>(new Map());
   const [savedHcpIds, setSavedHcpIds] = useState<Set<string>>(new Set());
   const [defaultWatchlistId, setDefaultWatchlistId] = useState<string | null>(null);
+  const [insightCountByHcpId, setInsightCountByHcpId] = useState<Map<string, number>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const loadGenerationRef = useRef(0);
 
@@ -41,6 +66,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     setRelationshipMap(new Map());
     setSavedHcpIds(new Set());
     setDefaultWatchlistId(null);
+    setInsightCountByHcpId(new Map());
     setIsLoading(false);
   }, []);
 
@@ -58,13 +84,15 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     setUserId(user.id);
 
     try {
-      const [map, watchlists] = await Promise.all([
+      const [map, watchlists, insightCounts] = await Promise.all([
         getRelationshipMap(user.id),
         getWatchlists(user.id),
+        fetchInsightCountByHcpId(user.id),
       ]);
       if (myGen !== loadGenerationRef.current) return;
 
       setRelationshipMap(new Map(map));
+      setInsightCountByHcpId(insightCounts);
 
       const defaultList = watchlists.find((w) => w.is_default) ?? watchlists[0] ?? null;
       const listId = defaultList?.id ?? null;
@@ -106,6 +134,21 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     (hcpId: string) => savedHcpIds.has(hcpId),
     [savedHcpIds],
   );
+
+  const getInsightCount = useCallback(
+    (hcpId: string): number => insightCountByHcpId.get(hcpId) ?? 0,
+    [insightCountByHcpId],
+  );
+
+  const refreshInsightCounts = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const counts = await fetchInsightCountByHcpId(userId);
+      setInsightCountByHcpId(counts);
+    } catch (err) {
+      console.warn("refreshInsightCounts failed", err);
+    }
+  }, [userId]);
 
   const toggleSave = useCallback(
     async (hcpId: string, createdFrom: string) => {
@@ -177,8 +220,10 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       isSaved,
       toggleSave,
       isLoading,
+      getInsightCount,
+      refreshInsightCounts,
     }),
-    [relationshipMap, isSaved, toggleSave, isLoading],
+    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts],
   );
 
   return (

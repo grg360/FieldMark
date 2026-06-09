@@ -440,10 +440,11 @@ function CohortScoreChipWithTip(props: {
 
 export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
   const navigate = useNavigate();
-  const { isSaved, toggleSave } = useRelationships();
+  const { isSaved, toggleSave, getInsightCount } = useRelationships();
   const [savePending, setSavePending] = useState(false);
   const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
   const saved = hcpId ? isSaved(hcpId) : false;
+  const insightCount = hcpId ? getInsightCount(hcpId) : 0;
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
@@ -1014,6 +1015,27 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           ))}
         </div>
         )}
+
+        {hcpId && insightCount > 0 ? (
+          <div
+            aria-label={`${insightCount} insight${insightCount === 1 ? "" : "s"}`}
+            style={{
+              position: "absolute",
+              bottom: 12,
+              right: 40,
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              color: "#9B9892",
+              fontSize: 11,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              pointerEvents: "none",
+            }}
+          >
+            <span style={{ fontSize: 11 }}>{String.fromCodePoint(0x1F4DD)}</span>
+            <span>{insightCount}</span>
+          </div>
+        ) : null}
 
         {hcpId ? (
           <button
