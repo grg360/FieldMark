@@ -45,6 +45,7 @@ import LandscapeScreen from "./components/LandscapeScreen";
 import LandscapeRoute from "./components/LandscapeRoute";
 import InstitutionRoute from "./components/InstitutionRoute";
 import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
+import BriefPage from "./components/BriefPage/BriefPage";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
@@ -1280,6 +1281,7 @@ export default function App() {
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
+          <Route path="/hcp/:hcpId/brief" element={<BriefPage />} />
           <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />
           <Route
             path="/:ta/field-intelligence/thread/:threadId"
