@@ -1026,6 +1026,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
               display: "flex",
               alignItems: "center",
               gap: 3,
+              lineHeight: 1,
               color: "#9B9892",
               fontSize: 11,
               fontFamily: "system-ui, -apple-system, sans-serif",

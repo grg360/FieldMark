@@ -76,10 +76,14 @@ export default function FieldInsights({ hcp }: Props) {
 
   if (!hcpId || !userId) return null;
 
-  function handleSave() {
-    setComposerOpen(false);
+  function handleMutate() {
     bumpNonce();
     void refreshInsightCounts();
+  }
+
+  function handleSave() {
+    setComposerOpen(false);
+    handleMutate();
   }
 
   function handleAddClick() {
@@ -190,7 +194,7 @@ export default function FieldInsights({ hcp }: Props) {
         firstName={firstName}
         userId={userId}
         hcpId={hcpId}
-        onMutate={bumpNonce}
+        onMutate={handleMutate}
       />
 
       {isMobile && composerOpen ? (
