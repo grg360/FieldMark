@@ -17,10 +17,6 @@ export function institutionToSlug(name: string): string {
     .substring(0, 100);
 }
 
-type InstitutionRow = {
-  institution_canonical: string | null;
-};
-
 /**
  * Reverse lookup: given a slug, find the matching institution_canonical.
  * Used when resolving /institution/{slug} routes.
@@ -29,24 +25,31 @@ export async function slugToInstitution(
   slug: string,
   supabase: SupabaseClient,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("hcps_v2")
-    .select("institution_canonical")
-    .not("institution_canonical", "is", null);
-  if (!data) return null;
+  const PAGE_SIZE = 1000;
+  const seen = new Set<string>();
+  let from = 0;
 
-  const uniqueInstitutions = Array.from(
-    new Set(
-      (data as InstitutionRow[])
-        .map((r) => r.institution_canonical)
-        .filter((v): v is string => Boolean(v)),
-    ),
-  );
+  while (true) {
+    const { data, error } = await supabase
+      .from("hcps_v2")
+      .select("institution_canonical")
+      .not("institution_canonical", "is", null)
+      .range(from, from + PAGE_SIZE - 1);
 
-  for (const inst of uniqueInstitutions) {
-    if (institutionToSlug(inst) === slug) {
-      return inst;
+    if (error || !data || data.length === 0) break;
+
+    for (const row of data) {
+      const inst = row.institution_canonical as string;
+      if (!inst || seen.has(inst)) continue;
+      seen.add(inst);
+      if (institutionToSlug(inst) === slug) {
+        return inst;
+      }
     }
+
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
+
   return null;
 }

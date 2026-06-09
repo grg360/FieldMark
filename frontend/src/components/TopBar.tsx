@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchBar from "./SearchBar";
+import UserMenu from "./UserMenu";
 import { useMediaQuery } from "../lib/useMediaQuery";
 
 interface TopBarProps {
@@ -17,13 +18,11 @@ interface TopBarProps {
 export default function TopBar({
   onLogoPress,
   onSearchPress,
-  onProfilePress,
   onScoringExplainedPress,
   currentTaId,
   onSearchSelect,
 }: TopBarProps) {
   const navigate = useNavigate();
-  const [avatarFailed, setAvatarFailed] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -123,52 +122,7 @@ export default function TopBar({
             </svg>
           </button>
         ) : null}
-        <button
-          onClick={onProfilePress}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            backgroundColor: "#1A1A1E",
-            border: "1px solid #1E1E22",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            padding: 0,
-            overflow: "hidden",
-          }}
-          aria-label="Profile"
-        >
-          {avatarFailed ? (
-            <span
-              style={{
-                fontSize: 12,
-                color: "#6B6A65",
-                fontFamily: "system-ui, sans-serif",
-                fontWeight: 500,
-                letterSpacing: "0.02em",
-              }}
-            >
-              PN
-            </span>
-          ) : (
-            <img
-              src="/avatars/demo-user.jpg"
-              alt="User avatar"
-              width={36}
-              height={36}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                objectFit: "cover",
-                display: "block",
-              }}
-              onError={() => setAvatarFailed(true)}
-            />
-          )}
-        </button>
+        <UserMenu />
       </div>
     </div>
     {!isDesktop && isSearchOpen && currentTaId && onSearchSelect ? (

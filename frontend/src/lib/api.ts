@@ -3895,9 +3895,36 @@ export interface InstitutionIndexEntry {
   external_partner_count: number;
   top_rising_star_name: string | null;
   top_rising_star_rank: number | null;
+  states_present: string[];
 }
 
+const institutionsIndexCache = new Map<string, Promise<InstitutionIndexEntry[]>>();
+
 export async function getInstitutionsIndex(
+  taSlug: string,
+): Promise<InstitutionIndexEntry[]> {
+  const existing = institutionsIndexCache.get(taSlug);
+  if (existing) return existing;
+
+  const promise = getInstitutionsIndexUncached(taSlug);
+  institutionsIndexCache.set(taSlug, promise);
+
+  promise.catch(() => {
+    institutionsIndexCache.delete(taSlug);
+  });
+
+  return promise;
+}
+
+export function clearInstitutionsIndexCache(taSlug?: string) {
+  if (taSlug) {
+    institutionsIndexCache.delete(taSlug);
+  } else {
+    institutionsIndexCache.clear();
+  }
+}
+
+async function getInstitutionsIndexUncached(
   taSlug: string,
 ): Promise<InstitutionIndexEntry[]> {
   const taId = await resolveLandscapeTaId(taSlug);
@@ -3932,13 +3959,14 @@ export async function getInstitutionsIndex(
     institution_canonical: string | null;
     first_name: string | null;
     last_name: string | null;
+    nppes_practice_state: string | null;
   };
 
   const cohortHcps: CohortHcpRow[] = [];
   for (const chunk of chunkInstitutionHcpIds(cohortHcpIds)) {
     const { data: hcps } = await supabase
       .from("hcps_v2")
-      .select("id, institution_canonical, first_name, last_name")
+      .select("id, institution_canonical, first_name, last_name, nppes_practice_state")
       .in("id", chunk);
     if (hcps) cohortHcps.push(...(hcps as CohortHcpRow[]));
   }
@@ -4040,6 +4068,7 @@ export async function getInstitutionsIndex(
     est_count: number;
     best_rs_rank: number;
     best_rs_name: string | null;
+    states: Set<string>;
   };
   const aggregates = new Map<string, InstitutionIndexAggregate>();
 
@@ -4055,12 +4084,17 @@ export async function getInstitutionsIndex(
         est_count: 0,
         best_rs_rank: Infinity,
         best_rs_name: null,
+        states: new Set<string>(),
       };
       aggregates.set(inst, agg);
     }
 
     const hcpId = String(h.id);
     const fullName = `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim();
+
+    if (h.nppes_practice_state) {
+      agg.states.add(h.nppes_practice_state.toUpperCase());
+    }
 
     if (rsHcpIds.has(hcpId)) {
       agg.rs_count++;
@@ -4099,6 +4133,7 @@ export async function getInstitutionsIndex(
       external_partner_count: externalPartnersMap.get(agg.institution)?.size ?? 0,
       top_rising_star_name: agg.best_rs_name,
       top_rising_star_rank: agg.best_rs_rank === Infinity ? null : agg.best_rs_rank,
+      states_present: Array.from(agg.states),
     });
   }
 
@@ -4109,6 +4144,129 @@ export async function getInstitutionsIndex(
   );
 
   return entries;
+}
+
+export interface TerritoryInstitution {
+  institution_name: string;
+  slug: string;
+  rising_star_count: number;
+  established_count: number;
+  top_rising_star_name: string | null;
+  top_rising_star_rank: number | null;
+}
+
+export async function getTopInstitutionsInTerritory(
+  taSlug: string,
+  states: string[],
+  limit: number = 8,
+): Promise<TerritoryInstitution[]> {
+  const taId = await resolveLandscapeTaId(taSlug);
+  if (!taId) return [];
+
+  const { data: rsRows } = await supabase
+    .from("hcp_rising_star_ranks_v3")
+    .select("hcp_id, us_rank")
+    .eq("therapeutic_area_id", taId)
+    .not("us_rank", "is", null);
+
+  const { data: estRows } = await supabase
+    .from("hcp_established_ranks_v3")
+    .select("hcp_id")
+    .eq("therapeutic_area_id", taId)
+    .eq("scope_type", "region")
+    .eq("scope_value", "US");
+
+  const rsRankMap = new Map<string, number>();
+  (rsRows ?? []).forEach((r) => {
+    rsRankMap.set(String(r.hcp_id), Number(r.us_rank));
+  });
+  const estSet = new Set<string>((estRows ?? []).map((r) => String(r.hcp_id)));
+
+  const allCohortIds = Array.from(new Set([...rsRankMap.keys(), ...estSet]));
+  if (allCohortIds.length === 0) return [];
+
+  const CHUNK_SIZE = 100;
+  const upperStates =
+    states.length > 0 ? new Set(states.map((s) => s.toUpperCase())) : null;
+
+  type HcpInfo = {
+    id: string;
+    name: string;
+    institution: string | null;
+    state: string | null;
+  };
+  const hcpInfo: HcpInfo[] = [];
+
+  for (let i = 0; i < allCohortIds.length; i += CHUNK_SIZE) {
+    const chunk = allCohortIds.slice(i, i + CHUNK_SIZE);
+    const { data: hcps } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name, institution_canonical, nppes_practice_state")
+      .in("id", chunk);
+    (hcps ?? []).forEach((h) => {
+      const state = h.nppes_practice_state
+        ? String(h.nppes_practice_state).toUpperCase()
+        : null;
+      if (upperStates) {
+        if (!state || !upperStates.has(state)) return;
+      }
+      hcpInfo.push({
+        id: String(h.id),
+        name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim(),
+        institution: h.institution_canonical,
+        state,
+      });
+    });
+  }
+
+  type Agg = {
+    institution: string;
+    rs_count: number;
+    est_count: number;
+    best_rs_rank: number;
+    best_rs_name: string | null;
+  };
+  const aggregates = new Map<string, Agg>();
+
+  for (const h of hcpInfo) {
+    if (!h.institution) continue;
+    let agg = aggregates.get(h.institution);
+    if (!agg) {
+      agg = {
+        institution: h.institution,
+        rs_count: 0,
+        est_count: 0,
+        best_rs_rank: Infinity,
+        best_rs_name: null,
+      };
+      aggregates.set(h.institution, agg);
+    }
+    if (rsRankMap.has(h.id)) {
+      agg.rs_count++;
+      const rank = rsRankMap.get(h.id)!;
+      if (rank < agg.best_rs_rank) {
+        agg.best_rs_rank = rank;
+        agg.best_rs_name = h.name;
+      }
+    }
+    if (estSet.has(h.id)) agg.est_count++;
+  }
+
+  return Array.from(aggregates.values())
+    .sort(
+      (a, b) =>
+        b.rs_count - a.rs_count ||
+        b.est_count - a.est_count,
+    )
+    .slice(0, limit)
+    .map((agg) => ({
+      institution_name: agg.institution,
+      slug: institutionToSlug(agg.institution),
+      rising_star_count: agg.rs_count,
+      established_count: agg.est_count,
+      top_rising_star_name: agg.best_rs_name,
+      top_rising_star_rank: agg.best_rs_rank === Infinity ? null : agg.best_rs_rank,
+    }));
 }
 
 export type { HCP, HCPScore, LatestPost };

@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+import {
+  getCurrentUser,
+  getMslProfile,
+  signOut,
+  clearMslProfileCache,
+  type MslProfile,
+} from "../lib/authHelpers";
 
 interface ProfileScreenProps {
-  initialTA: string;
   onBack: () => void;
-  onSave: (ta: string) => void;
 }
 
 const BackArrow = () => (
@@ -33,6 +39,67 @@ const INDICATIONS: Record<string, string[]> = {
 };
 
 const REGIONS = ["Northeast", "Southeast", "Midwest", "Southwest", "West", "National"];
+
+const TA_NAME_TO_SLUG: Record<string, string> = {
+  "Rare Disease": "rare-disease",
+  "Oncology": "oncology",
+  "Immunology": "immunology",
+  "Hepatology": "hepatology",
+};
+
+const TA_SLUG_TO_NAME: Record<string, string> = {
+  "rare-disease": "Rare Disease",
+  "oncology": "Oncology",
+  "immunology": "Immunology",
+  "hepatology": "Hepatology",
+};
+
+const INDICATION_NAME_TO_SLUG: Record<string, string> = {
+  "All": "all",
+  "NSCLC": "nsclc",
+  "CAR-T": "car-t",
+  "DLBCL": "dlbcl",
+  "Melanoma": "melanoma",
+  "CLL": "cll",
+  "AML": "aml",
+};
+
+const INDICATION_SLUG_TO_NAME: Record<string, string> = {
+  "all": "All",
+  "nsclc": "NSCLC",
+  "car-t": "CAR-T",
+  "dlbcl": "DLBCL",
+  "melanoma": "Melanoma",
+  "cll": "CLL",
+  "aml": "AML",
+};
+
+const REGION_NAME_TO_SLUG: Record<string, string> = {
+  "Northeast": "northeast",
+  "Southeast": "southeast",
+  "Midwest": "midwest",
+  "Southwest": "southwest",
+  "West": "west",
+  "National": "national",
+};
+
+const REGION_SLUG_TO_NAME: Record<string, string> = {
+  "northeast": "Northeast",
+  "southeast": "Southeast",
+  "midwest": "Midwest",
+  "southwest": "Southwest",
+  "west": "West",
+  "national": "National",
+};
+
+const REGION_STATES: Record<string, string[]> = {
+  "Northeast": ["CT", "MA", "ME", "NH", "NY", "RI", "VT", "NJ", "PA"],
+  "Southeast": ["AL", "FL", "GA", "KY", "MS", "NC", "SC", "TN", "VA", "WV"],
+  "Midwest": ["IL", "IN", "IA", "KS", "MI", "MN", "MO", "NE", "ND", "OH", "SD", "WI"],
+  "Southwest": ["AZ", "NM", "OK", "TX"],
+  "West": ["AK", "CA", "CO", "HI", "ID", "MT", "NV", "OR", "UT", "WA", "WY"],
+  "National": [],
+};
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -68,23 +135,129 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   );
 }
 
-export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScreenProps) {
-  const [selectedTA, setSelectedTA] = useState(initialTA);
+export default function ProfileScreen({ onBack }: ProfileScreenProps) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<MslProfile | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const [selectedTA, setSelectedTA] = useState("Oncology");
   const [selectedIndication, setSelectedIndication] = useState("All");
   const [selectedRegion, setSelectedRegion] = useState("Northeast");
-  const [notifications, setNotifications] = useState({ newStars: true, scoreChanges: true, fieldNotes: false });
-  const [saved, setSaved] = useState(false);
+  const [statesCovered, setStatesCovered] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState({
+    newStars: true,
+    scoreChanges: true,
+    fieldNotes: false,
+  });
+
+  useEffect(() => {
+    (async () => {
+      const user = await getCurrentUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      setUserId(user.id);
+      const p = await getMslProfile(user.id);
+      if (!p) {
+        setLoading(false);
+        return;
+      }
+
+      setProfile(p);
+
+      if (p.default_ta_slug && TA_SLUG_TO_NAME[p.default_ta_slug]) {
+        setSelectedTA(TA_SLUG_TO_NAME[p.default_ta_slug]);
+      }
+      if (p.default_indication_slug && INDICATION_SLUG_TO_NAME[p.default_indication_slug]) {
+        setSelectedIndication(INDICATION_SLUG_TO_NAME[p.default_indication_slug]);
+      }
+      if (p.region && REGION_SLUG_TO_NAME[p.region]) {
+        setSelectedRegion(REGION_SLUG_TO_NAME[p.region]);
+      }
+      if (p.states_covered) {
+        setStatesCovered(p.states_covered);
+      }
+
+      setNotifications({
+        newStars: p.notify_new_rising_stars ?? true,
+        scoreChanges: p.notify_score_changes ?? true,
+        fieldNotes: p.notify_field_notes ?? false,
+      });
+
+      setLoading(false);
+    })();
+  }, []);
 
   function handleTAChange(ta: string) {
     setSelectedTA(ta);
     setSelectedIndication("All");
   }
 
-  function handleSave() {
+  function handleRegionChange(region: string) {
+    setSelectedRegion(region);
+    if (REGION_STATES[region]) {
+      setStatesCovered(REGION_STATES[region]);
+    }
+  }
+
+  async function handleSave() {
+    if (!userId) return;
+    setSaving(true);
+    setError(null);
+
+    const taSlug = TA_NAME_TO_SLUG[selectedTA] ?? "oncology";
+    const indSlug = INDICATION_NAME_TO_SLUG[selectedIndication] ?? "all";
+    const regionSlug = REGION_NAME_TO_SLUG[selectedRegion] ?? "northeast";
+
+    const { error: updateErr } = await supabase
+      .from("msl_profiles")
+      .update({
+        default_ta_slug: taSlug,
+        default_indication_slug: indSlug,
+        region: regionSlug,
+        states_covered: statesCovered,
+        notify_new_rising_stars: notifications.newStars,
+        notify_score_changes: notifications.scoreChanges,
+        notify_field_notes: notifications.fieldNotes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    if (updateErr) {
+      setError(updateErr.message);
+      setSaving(false);
+      return;
+    }
+
+    clearMslProfileCache();
     setSaved(true);
-    setTimeout(() => {
-      onSave(selectedTA);
-    }, 1000);
+    setSaving(false);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          backgroundColor: "#0A0A0B",
+          minHeight: "100dvh",
+          maxWidth: 480,
+          margin: "0 auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#6B6A65",
+          fontSize: 13,
+        }}
+      >
+        Loading profile...
+      </div>
+    );
   }
 
   return (
@@ -108,12 +281,21 @@ export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScre
           <BackArrow />
           <span style={{ fontSize: 13, color: "#6B6A65" }}>Feed</span>
         </button>
-        <button
-          onClick={handleSave}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: 4, fontSize: 13, color: saved ? "#1D9E75" : "#1D9E75", fontWeight: 500 }}
-        >
-          {saved ? "Saved ✓" : "Save"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {error ? (
+            <span style={{ fontSize: 11, color: "#E8704E", marginRight: 8 }}>
+              {error}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            style={{ background: "none", border: "none", cursor: saving ? "default" : "pointer", padding: 4, fontSize: 13, color: "#1D9E75", fontWeight: 500 }}
+          >
+            {saving ? "Saving..." : saved ? "Saved ✓" : "Save"}
+          </button>
+        </div>
       </div>
 
       <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
@@ -131,25 +313,38 @@ export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScre
               justifyContent: "center",
             }}
           >
-            <span style={{ fontSize: 18, fontWeight: 500, color: "#E8A020" }}>PN</span>
+            <span style={{ fontSize: 18, fontWeight: 500, color: "#E8A020" }}>
+              {profile?.first_name && profile?.last_name
+                ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+                : "??"}
+            </span>
           </div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginTop: 12, textAlign: "center" }}>Priya Nair</div>
-          <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 4, textAlign: "center" }}>Medical Science Liaison · Rare Disease</div>
-          <div
-            style={{
-              marginTop: 8,
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              borderRadius: 3,
-              padding: "4px 12px",
-            }}
-          >
-            <LinkedInIcon />
-            <span style={{ fontSize: 11, color: "#6B6A65" }}>Verified via LinkedIn</span>
+          <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginTop: 12, textAlign: "center" }}>
+            {profile?.first_name && profile?.last_name
+              ? `${profile.first_name} ${profile.last_name}`
+              : "..."}
           </div>
+          <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 4, textAlign: "center" }}>
+            {profile?.role ?? "Medical Science Liaison"}
+            {profile?.company ? ` · ${profile.company}` : ""}
+          </div>
+          {profile?.linkedin_verified_at ? (
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: "#0D0D10",
+                border: "1px solid #1E1E22",
+                borderRadius: 3,
+                padding: "4px 12px",
+              }}
+            >
+              <LinkedInIcon />
+              <span style={{ fontSize: 11, color: "#6B6A65" }}>Verified via LinkedIn</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="fm-profile-body">
@@ -167,6 +362,7 @@ export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScre
                   return (
                     <button
                       key={ta}
+                      type="button"
                       onClick={() => handleTAChange(ta)}
                       style={{
                         backgroundColor: isSelected ? "#0D0D0A" : "#111113",
@@ -203,6 +399,7 @@ export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScre
                   return (
                     <button
                       key={chip}
+                      type="button"
                       onClick={() => setSelectedIndication(chip)}
                       style={{
                         flexShrink: 0,
@@ -239,7 +436,8 @@ export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScre
                   return (
                     <button
                       key={region}
-                      onClick={() => setSelectedRegion(region)}
+                      type="button"
+                      onClick={() => handleRegionChange(region)}
                       style={{
                         backgroundColor: isSelected ? "#0D0D0A" : "#0D0D10",
                         border: `1px solid ${isSelected ? "#E8A020" : "#1E1E22"}`,
@@ -270,7 +468,7 @@ export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScre
                   color: "#E8E6DF",
                 }}
               >
-                CT, MA, ME, NH, NY, RI, VT
+                {statesCovered.length > 0 ? statesCovered.join(", ") : "No states assigned"}
               </div>
               <div style={{ fontSize: 11, color: "#3A3A3F", marginTop: 8 }}>Set by your MSL manager. Contact your admin to update territory boundaries.</div>
             </div>
@@ -330,16 +528,23 @@ export default function ProfileScreen({ initialTA, onBack, onSave }: ProfileScre
             <ChevronRight />
           </div>
 
-          <div
+          <button
+            type="button"
+            onClick={() => signOut()}
             style={{
               display: "flex",
               alignItems: "center",
               height: 44,
-              cursor: "default",
+              cursor: "pointer",
+              background: "none",
+              border: "none",
+              padding: 0,
+              width: "100%",
+              textAlign: "left",
             }}
           >
             <span style={{ fontSize: 13, color: "#E05555" }}>Sign out</span>
-          </div>
+          </button>
         </div>
       </div>
     </div>

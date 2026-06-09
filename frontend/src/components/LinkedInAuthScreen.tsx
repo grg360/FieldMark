@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Download } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 interface LinkedInAuthScreenProps {
   onAuth: () => void;
@@ -38,8 +40,13 @@ const Spinner = () => (
 
 export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [showInstall, setShowInstall] = useState(false);
   const deferredPrompt = useRef<Event & { prompt: () => void } | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleBeforeInstall(e: Event) {
@@ -57,6 +64,55 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
     setTimeout(() => {
       onAuth();
     }, 1500);
+  }
+
+  async function handleEmailSignIn() {
+    if (emailLoading) return;
+    if (!email.trim() || !password.trim()) {
+      setAuthError("Email and password required.");
+      return;
+    }
+
+    setEmailLoading(true);
+    setAuthError(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        setEmailLoading(false);
+        return;
+      }
+
+      if (!data.user) {
+        setAuthError("Sign-in succeeded but no user returned.");
+        setEmailLoading(false);
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from("msl_profiles")
+        .select("user_id")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      if (!profileData) {
+        navigate("/welcome");
+      } else {
+        onAuth();
+      }
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : "Unknown error");
+      setEmailLoading(false);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleEmailSignIn();
   }
 
   function handleInstall() {
@@ -139,8 +195,111 @@ export default function LinkedInAuthScreen({ onAuth }: LinkedInAuthScreenProps) 
         </div>
       </div>
 
-      {/* Bottom section — LinkedIn button */}
+      {/* Bottom section — Sign-in forms */}
       <div style={{ marginTop: 48 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoComplete="email"
+            style={{
+              width: "100%",
+              height: 44,
+              borderRadius: 4,
+              backgroundColor: "#0F0F12",
+              border: "1px solid #1E1E22",
+              color: "#E8E6DF",
+              fontSize: 14,
+              padding: "0 12px",
+              fontFamily: "system-ui, sans-serif",
+              outline: "none",
+            }}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoComplete="current-password"
+            style={{
+              width: "100%",
+              height: 44,
+              borderRadius: 4,
+              backgroundColor: "#0F0F12",
+              border: "1px solid #1E1E22",
+              color: "#E8E6DF",
+              fontSize: 14,
+              padding: "0 12px",
+              fontFamily: "system-ui, sans-serif",
+              outline: "none",
+            }}
+          />
+
+          {authError ? (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#E8704E",
+                textAlign: "left",
+                marginTop: 2,
+                marginBottom: 2,
+              }}
+            >
+              {authError}
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleEmailSignIn}
+            disabled={emailLoading}
+            style={{
+              width: "100%",
+              height: 44,
+              borderRadius: 4,
+              backgroundColor: "#E8A020",
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              cursor: emailLoading ? "default" : "pointer",
+              marginTop: 4,
+            }}
+          >
+            {emailLoading ? <Spinner /> : null}
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: "#0A0A0B",
+                fontFamily: "system-ui, sans-serif",
+              }}
+            >
+              {emailLoading ? "Signing in..." : "Sign in"}
+            </span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            margin: "24px 0",
+          }}
+        >
+          <div style={{ flex: 1, height: 1, backgroundColor: "#1E1E22" }} />
+          <span style={{ fontSize: 11, color: "#3A3A3F", letterSpacing: "0.1em" }}>
+            OR
+          </span>
+          <div style={{ flex: 1, height: 1, backgroundColor: "#1E1E22" }} />
+        </div>
+
         <button
           onClick={handleLinkedIn}
           className="fm-auth-btn"

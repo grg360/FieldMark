@@ -14,7 +14,7 @@
  * - Refresh deep URL -> same content after auth
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import {
   Link,
   Navigate,
@@ -29,6 +29,8 @@ import Telescope from "./components/Telescope";
 import TelescopeDrawer from "./components/TelescopeDrawer";
 import TelescopeLegend from "./components/TelescopeLegend";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
+import AuthWrapper from "./components/AuthWrapper";
+import WelcomeWizard from "./components/WelcomeWizard";
 import TopBar from "./components/TopBar";
 import FieldIntelligenceThread from "./components/FieldIntelligenceThread";
 import TAFilterChips from "./components/TAFilterChips";
@@ -50,6 +52,8 @@ import IndicationFilter from "./components/IndicationFilter";
 import FieldIntelligence from "./components/FieldIntelligence";
 import SurfaceHCPForm from "./components/SurfaceHCPForm";
 import GlobalFooter from "./components/GlobalFooter";
+import WelcomeBanner from "./components/WelcomeBanner";
+import InstitutionsInTerritoryPanel from "./components/InstitutionsInTerritoryPanel";
 import { FiToast } from "./components/FieldIntelligenceShared";
 import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
@@ -66,15 +70,13 @@ import {
 import ActiveFilterPills from "./components/ActiveFilterPills";
 import FilterButton from "./components/FilterButton";
 import FilterDrawer from "./components/FilterDrawer";
-import { useFilterContext } from "./lib/filter-context";
+import { useFilterContext, statesFromTerritory } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
 import {
-  buildFeedPath,
   buildHcpDetailPath,
   indicationLabelToSlug,
   resolveFeedRoute,
   taLabelToApiSlug,
-  taLabelToSlug,
   taSlugToLabel,
 } from "./lib/routeSlugs";
 import type { CohortFeedResult, HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
@@ -319,31 +321,16 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
 
 const HOME_INDICATION_COUNT = 287;
 
-type FeedOverlay = "profile" | "landscape" | "city-feed" | null;
+type FeedOverlay = "landscape" | "city-feed" | null;
 
-function AuthGate({ children }: { children: ReactNode }) {
-  const [authenticated, setAuthenticated] = useState(false);
-  const location = useLocation();
+function LandingRoute() {
   const navigate = useNavigate();
-  const redirectRef = useRef<string | null>(null);
+  return <LinkedInAuthScreen onAuth={() => navigate("/")} />;
+}
 
-  if (!authenticated) {
-    if (redirectRef.current === null && location.pathname !== "/") {
-      redirectRef.current = location.pathname + location.search;
-    }
-    return (
-      <LinkedInAuthScreen
-        onAuth={() => {
-          setAuthenticated(true);
-          const target = redirectRef.current || "/";
-          redirectRef.current = null;
-          navigate(target, { replace: true });
-        }}
-      />
-    );
-  }
-
-  return <>{children}</>;
+function ProfileRoute() {
+  const navigate = useNavigate();
+  return <ProfileScreen onBack={() => navigate("/")} />;
 }
 
 function FeedLayout({
@@ -351,7 +338,7 @@ function FeedLayout({
   forcedIndication,
 }: { forcedDashboard?: string; forcedIndication?: string } = {}) {
   const { track, setTrack } = useTrack();
-  const { region, regions, states, themeIds } = useFilterContext();
+  const { region, regions, states, themeIds, setStates, userTerritory, hydrateFromProfile } = useFilterContext();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -597,20 +584,6 @@ function FeedLayout({
     navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
   }
 
-  if (feedOverlay === "profile") {
-    return (
-      <ProfileScreen
-        initialTA={selectedTA}
-        onBack={() => setFeedOverlay(null)}
-        onSave={(ta) => {
-          const taSlug = taLabelToSlug(ta);
-          navigate(buildFeedPath(taSlug, "established", "all"));
-          setFeedOverlay(null);
-        }}
-      />
-    );
-  }
-
   if (feedOverlay === "landscape") {
     return (
       <LandscapeScreen
@@ -661,7 +634,6 @@ function FeedLayout({
         }}
       >
       <TopBar
-        onProfilePress={() => setFeedOverlay("profile")}
         onRefreshPress={() => void fetchHCPs(true)}
         onScoringExplainedPress={() => {
           setScoringExplainedScroll(null);
@@ -747,6 +719,28 @@ function FeedLayout({
               onClick={() => setFilterDrawerOpen(true)}
               taSlug={taLabelToApiSlug(selectedTA)}
             />
+            <button
+              type="button"
+              onClick={() => {
+                if (states.length > 0) {
+                  setStates([]);
+                } else {
+                  hydrateFromProfile(userTerritory, statesFromTerritory(userTerritory ?? ""));
+                }
+              }}
+              style={{
+                backgroundColor: states.length > 0 ? "rgba(232,160,32,0.1)" : "#0D0D10",
+                border: `1px solid ${states.length > 0 ? "#E8A020" : "#1E1E22"}`,
+                color: states.length > 0 ? "#E8A020" : "#6B6A65",
+                borderRadius: 3,
+                padding: "3px 10px",
+                fontSize: 11,
+                cursor: "pointer",
+                marginLeft: 8,
+              }}
+            >
+              {states.length > 0 ? `In territory (${states.length} states)` : "All US"}
+            </button>
             <button
               onClick={() => {
                 const indSlug = indicationLabelToSlug(selectedTA, selectedIndication);
@@ -900,6 +894,8 @@ function FeedLayout({
         )
       ) : isCohortFeedTrack(track) ? (
         <>
+        {route.indicationDataActive ? <WelcomeBanner /> : null}
+        {route.indicationDataActive ? <InstitutionsInTerritoryPanel taSlug="nsclc" /> : null}
         <ActiveFilterPills taSlug={taLabelToApiSlug(selectedTA)} />
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
           {showInactiveIndicationEmpty ? (
@@ -1273,8 +1269,11 @@ function FieldIntelligenceFeedRoute() {
 export default function App() {
   return (
     <TrackProvider>
-      <AuthGate>
+      <AuthWrapper>
         <Routes>
+          <Route path="/landing" element={<LandingRoute />} />
+          <Route path="/welcome" element={<WelcomeWizard />} />
+          <Route path="/me" element={<ProfileRoute />} />
           <Route path="/" element={<FeedLayout />} />
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />
@@ -1294,7 +1293,7 @@ export default function App() {
           <Route path="/:ta" element={<FeedLayout />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </AuthGate>
+      </AuthWrapper>
     </TrackProvider>
   );
 }

@@ -14,6 +14,19 @@ const REGIONS_STORAGE_KEY = "fieldmark.user.regions";
 const STATES_STORAGE_KEY = "fieldmark.user.states";
 const THEME_IDS_STORAGE_KEY = "fieldmark.user.themeIds";
 
+export const TERRITORY_STATES: Record<string, string[]> = {
+  northeast: ["CT", "MA", "ME", "NH", "NY", "RI", "VT", "NJ", "PA"],
+  southeast: ["AL", "FL", "GA", "KY", "MS", "NC", "SC", "TN", "VA", "WV"],
+  midwest: ["IL", "IN", "IA", "KS", "MI", "MN", "MO", "NE", "ND", "OH", "SD", "WI"],
+  southwest: ["AZ", "NM", "OK", "TX"],
+  west: ["AK", "CA", "CO", "HI", "ID", "MT", "NV", "OR", "UT", "WA", "WY"],
+  national: [],
+};
+
+export function statesFromTerritory(territory: string): string[] {
+  return TERRITORY_STATES[territory] ?? [];
+}
+
 interface FilterContextValue {
   region: RegionKey;
   regions: RegionKey[];
@@ -23,6 +36,9 @@ interface FilterContextValue {
   themeIds: string[];
   setThemeIds: (ids: string[]) => void;
   setRegion: (region: RegionKey) => void;
+  userTerritory: string | null;
+  setUserTerritory: (territory: string | null) => void;
+  hydrateFromProfile: (regionSlug: string | null, statesCovered: string[]) => void;
 }
 
 const FilterContext = createContext<FilterContextValue | undefined>(undefined);
@@ -106,6 +122,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [regions, setRegionsState] = useState<RegionKey[]>([DEFAULT_REGION]);
   const [states, setStatesState] = useState<string[]>([]);
   const [themeIds, setThemeIdsState] = useState<string[]>([]);
+  const [userTerritory, setUserTerritoryState] = useState<string | null>(null);
 
   useEffect(() => {
     setRegionsState(readStoredRegions());
@@ -152,9 +169,50 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     [setRegions],
   );
 
+  const setUserTerritory = useCallback((territory: string | null) => {
+    setUserTerritoryState(territory);
+  }, []);
+
+  const hydrateFromProfile = useCallback((regionSlug: string | null, statesCovered: string[]) => {
+    setUserTerritoryState(regionSlug);
+    if (statesCovered.length > 0) {
+      const normalized = statesCovered.map((s) => s.toUpperCase());
+      setStatesState(normalized);
+      try {
+        window.localStorage.setItem(STATES_STORAGE_KEY, JSON.stringify(normalized));
+      } catch {
+        // noop
+      }
+    }
+  }, []);
+
   const value = useMemo<FilterContextValue>(
-    () => ({ region, regions, setRegions, states, setStates, themeIds, setThemeIds, setRegion }),
-    [region, regions, setRegions, states, setStates, themeIds, setThemeIds, setRegion],
+    () => ({
+      region,
+      regions,
+      setRegions,
+      states,
+      setStates,
+      themeIds,
+      setThemeIds,
+      setRegion,
+      userTerritory,
+      setUserTerritory,
+      hydrateFromProfile,
+    }),
+    [
+      region,
+      regions,
+      setRegions,
+      states,
+      setStates,
+      themeIds,
+      setThemeIds,
+      setRegion,
+      userTerritory,
+      setUserTerritory,
+      hydrateFromProfile,
+    ],
   );
 
   return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>;

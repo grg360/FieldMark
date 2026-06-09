@@ -9,6 +9,9 @@
  * - "Other" is the catch-all for countries not in any defined region.
  * - "Global" is not a region for filtering; it's the no-filter view.
  * - HCPs with country=NULL are only visible in the Global view.
+ *
+ * MSL territory regions (northeast, southeast, etc.) live separately in FilterContext
+ * as `userTerritory` + US state codes — not as RegionKey values.
  */
 
 export type RegionKey = "US" | "EU5" | "EU" | "UK" | "APAC" | "LATAM" | "MENA" | "Other" | "Global";

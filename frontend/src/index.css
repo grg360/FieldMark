@@ -596,3 +596,11 @@ button {
     align-items: stretch !important;
   }
 }
+
+.fm-horizontal-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.fm-horizontal-scroll::-webkit-scrollbar {
+  display: none;
+}

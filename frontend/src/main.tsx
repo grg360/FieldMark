@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { FilterProvider } from './lib/filter-context';
+import { initAnalytics } from './lib/analytics';
 import './index.css';
+
+initAnalytics();
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
