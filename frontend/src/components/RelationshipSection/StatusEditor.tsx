@@ -51,6 +51,7 @@ interface Props {
 }
 
 export default function StatusEditor({ currentStatus, pending, onChange }: Props) {
+  const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -72,13 +73,15 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
       <button
         type="button"
         onClick={() => setMenuOpen((open) => !open)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         disabled={pending}
         aria-label={`Change relationship status. Current: ${statusLabel(currentStatus)}`}
         aria-expanded={menuOpen}
         style={{
-          padding: "6px 12px",
+          padding: "5px 10px",
           borderRadius: 4,
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: 500,
           cursor: pending ? "default" : "pointer",
           fontFamily: "system-ui, -apple-system, sans-serif",
@@ -88,10 +91,11 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
           opacity: pending ? 0.6 : 1,
           display: "inline-flex",
           alignItems: "center",
+          filter: hovered && !pending ? "brightness(1.1)" : "none",
+          transition: "filter 0.15s ease",
         }}
       >
         {statusLabel(currentStatus)}
-        <span style={{ marginLeft: 6, fontSize: 9 }}>{String.fromCharCode(0x25BE)}</span>
       </button>
 
       {menuOpen ? (
