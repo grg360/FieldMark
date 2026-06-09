@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Bookmark, BookmarkCheck } from "lucide-react";
 import { HCP } from "../data/hcpData";
+import { useRelationships } from "../contexts/RelationshipsContext";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { institutionToSlug } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
@@ -436,12 +438,16 @@ function CohortScoreChipWithTip(props: {
   );
 }
 
-export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
+export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
   const navigate = useNavigate();
+  const { isSaved, toggleSave } = useRelationships();
+  const [savePending, setSavePending] = useState(false);
+  const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
+  const saved = hcpId ? isSaved(hcpId) : false;
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
-  const [addButtonHovered, setAddButtonHovered] = useState(false);
+  const [bookmarkHovered, setBookmarkHovered] = useState(false);
   const touchDevice =
     typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
   const cohort = (hcp.cohort_classification ?? "").trim();
@@ -483,8 +489,8 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
     e.stopPropagation();
     if (!cardInstitution) return;
 
-    const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
-    if (!hcpId) {
+    const instHcpId = String(hcp.hcp_id ?? hcp.id ?? "");
+    if (!instHcpId) {
       navigate(`/institution/${institutionToSlug(cardInstitution)}`);
       return;
     }
@@ -492,7 +498,7 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
     const { data } = await supabase
       .from("hcps_v2")
       .select("institution_canonical")
-      .eq("id", hcpId)
+      .eq("id", instHcpId)
       .maybeSingle();
 
     const canonical = data?.institution_canonical ?? cardInstitution;
@@ -1009,59 +1015,52 @@ export default function HCPCard({ hcp, onAddPress, onCardPress, onScoringExplain
         </div>
         )}
 
-        <button
-          type="button"
-          className="fm-hcp-add-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddPress(hcp);
-          }}
-          onMouseEnter={() => setAddButtonHovered(true)}
-          onMouseLeave={() => setAddButtonHovered(false)}
-          aria-label={`Add action for ${hcp.name}`}
-          style={{
-            position: "absolute",
-            bottom: 12,
-            right: 12,
-            width: 20,
-            height: 20,
-            minHeight: 0,
-            minWidth: 20,
-            borderRadius: "50%",
-            border: "none",
-            background: "transparent",
-            padding: 0,
-            margin: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            zIndex: 2,
-            transform: addButtonHovered ? "scale(1.05)" : "scale(1)",
-            transition: "transform 0.15s ease",
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden={true} style={{ display: "block" }}>
-            <rect
-              x="2"
-              y="8.5"
-              width="16"
-              height="3"
-              rx="1.5"
-              fill={addButtonHovered ? "#7AB89A" : "#5A9B7F"}
-              style={{ transition: "fill 0.15s ease" }}
-            />
-            <rect
-              x="8.5"
-              y="2"
-              width="3"
-              height="16"
-              rx="1.5"
-              fill={addButtonHovered ? "#7AB89A" : "#5A9B7F"}
-              style={{ transition: "fill 0.15s ease" }}
-            />
-          </svg>
-        </button>
+        {hcpId ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (savePending) return;
+              setSavePending(true);
+              void toggleSave(hcpId, "cohort_card")
+                .catch(() => {})
+                .finally(() => setSavePending(false));
+            }}
+            onMouseEnter={() => setBookmarkHovered(true)}
+            onMouseLeave={() => setBookmarkHovered(false)}
+            disabled={savePending}
+            aria-label={saved ? "Unsave HCP" : "Save HCP"}
+            style={{
+              position: "absolute",
+              bottom: 12,
+              right: 12,
+              width: 20,
+              height: 20,
+              minHeight: 0,
+              minWidth: 20,
+              borderRadius: "50%",
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: savePending ? "default" : "pointer",
+              zIndex: 2,
+              opacity: savePending ? 0.6 : 1,
+              transform: bookmarkHovered ? "scale(1.05)" : "scale(1)",
+              transition: "transform 0.15s ease",
+            }}
+          >
+            {saved ? (
+              <BookmarkCheck size={14} color="#3FB8AF" fill="#3FB8AF" />
+            ) : (
+              <Bookmark size={14} color="#5A9B7F" />
+            )}
+          </button>
+        ) : null}
       </div>
 
       {scoreModalOpen && (

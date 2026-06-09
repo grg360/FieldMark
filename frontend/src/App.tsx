@@ -30,6 +30,7 @@ import TelescopeDrawer from "./components/TelescopeDrawer";
 import TelescopeLegend from "./components/TelescopeLegend";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import AuthWrapper from "./components/AuthWrapper";
+import { RelationshipsProvider } from "./contexts/RelationshipsContext";
 import WelcomeWizard from "./components/WelcomeWizard";
 import TopBar from "./components/TopBar";
 import FieldIntelligenceThread from "./components/FieldIntelligenceThread";
@@ -1270,7 +1271,8 @@ export default function App() {
   return (
     <TrackProvider>
       <AuthWrapper>
-        <Routes>
+        <RelationshipsProvider>
+          <Routes>
           <Route path="/landing" element={<LandingRoute />} />
           <Route path="/welcome" element={<WelcomeWizard />} />
           <Route path="/me" element={<ProfileRoute />} />
@@ -1292,7 +1294,8 @@ export default function App() {
           <Route path="/:ta/:dashboard" element={<FeedLayout />} />
           <Route path="/:ta" element={<FeedLayout />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+        </RelationshipsProvider>
       </AuthWrapper>
     </TrackProvider>
   );

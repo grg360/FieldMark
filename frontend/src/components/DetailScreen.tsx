@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Bookmark, BookmarkCheck } from "lucide-react";
 import { HCP } from "../data/hcpData";
+import { useRelationships } from "../contexts/RelationshipsContext";
 import { institutionToSlug } from "../lib/institutionUtils";
 import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWebSignals, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown, type WebSignal } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
@@ -873,7 +875,10 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     validation.dataMatch && validation.engagement && validation.credibility && validation.momentum;
 
   const hcpId = hcp.hcp_id ?? hcp.id ?? "";
-  const fieldIntelCount = mockFieldIntelContributorCount(hcpId);
+  const { isSaved, toggleSave } = useRelationships();
+  const [savePending, setSavePending] = useState(false);
+  const saved = hcpId ? isSaved(String(hcpId)) : false;
+  const fieldIntelCount = mockFieldIntelContributorCount(String(hcpId));
   const doctorLabel = hcp.name.match(/^dr\.?\s/i) ? hcp.name : `Dr. ${hcp.name}`;
 
   const [contextualizeOpen, setContextualizeOpen] = React.useState(false);
@@ -1149,7 +1154,45 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div className="fm-detail-heading" style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}>{hcp.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <div
+              className="fm-detail-heading"
+              style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", flex: 1, minWidth: 0 }}
+            >
+              {hcp.name}
+            </div>
+            {hcpId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (savePending) return;
+                  setSavePending(true);
+                  void toggleSave(String(hcpId), "hcp_detail")
+                    .catch(() => {})
+                    .finally(() => setSavePending(false));
+                }}
+                disabled={savePending}
+                aria-label={saved ? "Unsave HCP" : "Save HCP"}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 4,
+                  cursor: savePending ? "default" : "pointer",
+                  opacity: savePending ? 0.6 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                {saved ? (
+                  <BookmarkCheck size={24} color="#E8A020" fill="#E8A020" />
+                ) : (
+                  <Bookmark size={24} color="#6B6A65" />
+                )}
+              </button>
+            ) : null}
+          </div>
           <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
             <DetailSubline hcp={hcp} />
           </div>
