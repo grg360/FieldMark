@@ -438,13 +438,50 @@ function CohortScoreChipWithTip(props: {
   );
 }
 
+function cardStatusStyle(status: string): { bg: string; fg: string; border?: string } {
+  switch (status) {
+    case "targeted":
+      return { bg: "#1E1E22", fg: "#9B9892" };
+    case "contacted":
+      return { bg: "#9B6DFF", fg: "#FFFFFF" };
+    case "engaged":
+      return { bg: "#3FB8AF", fg: "#0A0A0B" };
+    case "active_relationship":
+      return { bg: "#E8A020", fg: "#0A0A0B" };
+    case "paused":
+      return { bg: "transparent", fg: "#E8A020", border: "1px solid #E8A020" };
+    default:
+      return { bg: "#2A2A30", fg: "#9B9892" };
+  }
+}
+
+function cardStatusLabel(status: string): string {
+  switch (status) {
+    case "targeted":
+      return "TARGETED";
+    case "contacted":
+      return "CONTACTED";
+    case "engaged":
+      return "ENGAGED";
+    case "active_relationship":
+      return "ACTIVE";
+    case "paused":
+      return "PAUSED";
+    default:
+      return status.toUpperCase();
+  }
+}
+
 export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
   const navigate = useNavigate();
-  const { isSaved, toggleSave, getInsightCount } = useRelationships();
+  const { isSaved, toggleSave, getInsightCount, relationshipMap } = useRelationships();
   const [savePending, setSavePending] = useState(false);
   const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
   const saved = hcpId ? isSaved(hcpId) : false;
   const insightCount = hcpId ? getInsightCount(hcpId) : 0;
+  const relationship = hcpId ? relationshipMap.get(hcpId) : undefined;
+  const status = relationship?.status;
+  const showStatus = status && status !== "not_engaged";
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
@@ -1016,73 +1053,99 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
         </div>
         )}
 
-        {hcpId && insightCount > 0 ? (
-          <div
-            aria-label={`${insightCount} insight${insightCount === 1 ? "" : "s"}`}
-            style={{
-              position: "absolute",
-              bottom: 12,
-              right: 40,
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              lineHeight: 1,
-              color: "#9B9892",
-              fontSize: 11,
-              fontFamily: "system-ui, -apple-system, sans-serif",
-              pointerEvents: "none",
-            }}
-          >
-            <span style={{ fontSize: 11 }}>{String.fromCodePoint(0x1F4DD)}</span>
-            <span>{insightCount}</span>
-          </div>
-        ) : null}
-
         {hcpId ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (savePending) return;
-              setSavePending(true);
-              void toggleSave(hcpId, "cohort_card")
-                .catch(() => {})
-                .finally(() => setSavePending(false));
-            }}
-            onMouseEnter={() => setBookmarkHovered(true)}
-            onMouseLeave={() => setBookmarkHovered(false)}
-            disabled={savePending}
-            aria-label={saved ? "Unsave HCP" : "Save HCP"}
+          <div
             style={{
               position: "absolute",
               bottom: 12,
               right: 12,
-              width: 20,
-              height: 20,
-              minHeight: 0,
-              minWidth: 20,
-              borderRadius: "50%",
-              border: "none",
-              background: "transparent",
-              padding: 0,
-              margin: 0,
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              cursor: savePending ? "default" : "pointer",
+              gap: 8,
               zIndex: 2,
-              opacity: savePending ? 0.6 : 1,
-              transform: bookmarkHovered ? "scale(1.05)" : "scale(1)",
-              transition: "transform 0.15s ease",
             }}
           >
-            {saved ? (
-              <BookmarkCheck size={14} color="#3FB8AF" fill="#3FB8AF" />
-            ) : (
-              <Bookmark size={14} color="#5A9B7F" />
-            )}
-          </button>
+            {showStatus ? (
+              <div
+                aria-label={`Relationship status: ${cardStatusLabel(status)}`}
+                style={{
+                  padding: "2px 6px",
+                  borderRadius: 3,
+                  fontSize: 9,
+                  fontWeight: 500,
+                  backgroundColor: cardStatusStyle(status).bg,
+                  color: cardStatusStyle(status).fg,
+                  border: cardStatusStyle(status).border ?? "none",
+                  pointerEvents: "none",
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  lineHeight: 1,
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {cardStatusLabel(status)}
+              </div>
+            ) : null}
+
+            {insightCount > 0 ? (
+              <div
+                aria-label={`${insightCount} insight${insightCount === 1 ? "" : "s"}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                  lineHeight: 1,
+                  color: "#9B9892",
+                  fontSize: 11,
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  pointerEvents: "none",
+                }}
+              >
+                <span style={{ fontSize: 11 }}>{String.fromCodePoint(0x1F4DD)}</span>
+                <span>{insightCount}</span>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (savePending) return;
+                setSavePending(true);
+                void toggleSave(hcpId, "cohort_card")
+                  .catch(() => {})
+                  .finally(() => setSavePending(false));
+              }}
+              onMouseEnter={() => setBookmarkHovered(true)}
+              onMouseLeave={() => setBookmarkHovered(false)}
+              disabled={savePending}
+              aria-label={saved ? "Unsave HCP" : "Save HCP"}
+              style={{
+                width: 20,
+                height: 20,
+                minHeight: 0,
+                minWidth: 20,
+                borderRadius: "50%",
+                border: "none",
+                background: "transparent",
+                padding: 0,
+                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: savePending ? "default" : "pointer",
+                opacity: savePending ? 0.6 : 1,
+                transform: bookmarkHovered ? "scale(1.05)" : "scale(1)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              {saved ? (
+                <BookmarkCheck size={14} color="#3FB8AF" fill="#3FB8AF" />
+              ) : (
+                <Bookmark size={14} color="#5A9B7F" />
+              )}
+            </button>
+          </div>
         ) : null}
       </div>
 
