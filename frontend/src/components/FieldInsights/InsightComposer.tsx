@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
 import {
   createNote,
   updateNote,
@@ -31,9 +33,11 @@ function interactionChipStyle(type: InteractionType): CSSProperties {
     case "meeting":
       return { backgroundColor: "#E8A020", color: "#0A0A0B" };
     case "email":
+      return { backgroundColor: "#4A90E2", color: "#FFFFFF" };
     case "phone":
+      return { backgroundColor: "#5A9B7F", color: "#FFFFFF" };
     case "other":
-      return { backgroundColor: "#2A2A30", color: "#9B9892" };
+      return { backgroundColor: "#6B6A65", color: "#FFFFFF" };
     case "conference":
       return { backgroundColor: "#9B6DFF", color: "#FFFFFF" };
     case "publication_review":
@@ -125,6 +129,7 @@ export default function InsightComposer({
     save: async () => {},
     cancel: () => {},
   });
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
   const isToday = isSameCalendarDay(new Date(dateValue + "T12:00:00"), new Date());
   const showForm = expanded || Boolean(editingNote) || !isInline || forceExpanded;
@@ -133,6 +138,17 @@ export default function InsightComposer({
   useEffect(() => {
     if (forceExpanded) setExpanded(true);
   }, [forceExpanded]);
+
+  useEffect(() => {
+    if (!showDatePicker) return;
+    function onMouseDown(e: MouseEvent) {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setShowDatePicker(false);
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [showDatePicker]);
 
   useEffect(() => {
     handlersRef.current.save = handleSave;
@@ -226,11 +242,11 @@ export default function InsightComposer({
     return (
       <input
         type="text"
-        placeholder={`Add an insight about ${firstName}...`}
+        placeholder={`Add an insight about Dr. ${firstName}...`}
         onFocus={() => setExpanded(true)}
         readOnly
         onClick={() => setExpanded(true)}
-        aria-label={`Add an insight about ${firstName}`}
+        aria-label={`Add an insight about Dr. ${firstName}`}
         style={{
           width: "100%",
           height: 40,
@@ -254,7 +270,7 @@ export default function InsightComposer({
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder={`Add an insight about ${firstName}...`}
+        placeholder={`Add an insight about Dr. ${firstName}...`}
         aria-label="Insight body"
         style={{
           width: "100%",
@@ -273,7 +289,10 @@ export default function InsightComposer({
         }}
       />
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 12 }}>
+        Type
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {INTERACTION_TYPES.map((type) => {
           const selected = interactionType === type;
           return (
@@ -284,6 +303,7 @@ export default function InsightComposer({
               style={{
                 ...pillBase,
                 ...(selected ? interactionChipStyle(type) : { backgroundColor: "#1E1E22", color: "#6B6A65" }),
+                border: selected ? "1px solid #E8E6DF" : "none",
               }}
             >
               {interactionTypeLabel(type)}
@@ -292,27 +312,36 @@ export default function InsightComposer({
         })}
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-        {INSIGHT_STRENGTHS.map((strength) => (
-          <button
-            key={strength}
-            type="button"
-            onClick={() => setInsightStrength(strength)}
-            style={{
-              ...pillBase,
-              ...strengthPillStyle(strength, insightStrength === strength),
-            }}
-          >
-            {strengthLabel(strength)}
-          </button>
-        ))}
+      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 12 }}>
+        Strength
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {INSIGHT_STRENGTHS.map((strength) => {
+          const selected = insightStrength === strength;
+          return (
+            <button
+              key={strength}
+              type="button"
+              onClick={() => setInsightStrength(strength)}
+              style={{
+                ...pillBase,
+                ...strengthPillStyle(strength, selected),
+                border: selected ? "1px solid #E8E6DF" : "none",
+              }}
+            >
+              {strengthLabel(strength)}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ marginTop: 10 }}>
-        {!showDatePicker ? (
+        <div ref={datePickerRef} style={{ position: "relative", display: "inline-block" }}>
           <button
             type="button"
-            onClick={() => setShowDatePicker(true)}
+            onClick={() => setShowDatePicker((open) => !open)}
+            aria-label="Select insight date"
+            aria-expanded={showDatePicker}
             style={{
               background: "none",
               border: "none",
@@ -322,24 +351,46 @@ export default function InsightComposer({
               padding: 0,
             }}
           >
-            {isToday ? "Today" : formatOccurredAt(dateInputToOccurredAt(dateValue, false))}
+            {formatOccurredAt(dateInputToOccurredAt(dateValue, false))}
           </button>
-        ) : (
-          <input
-            type="date"
-            value={dateValue}
-            onChange={(e) => setDateValue(e.target.value)}
-            aria-label="Insight date"
-            style={{
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              color: "#E8E6DF",
-              borderRadius: 4,
-              padding: "4px 8px",
-              fontSize: 12,
-            }}
-          />
-        )}
+          {showDatePicker ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                backgroundColor: "#0D0D10",
+                border: "1px solid #1E1E22",
+                borderRadius: 6,
+                padding: 8,
+                zIndex: 50,
+                marginTop: 6,
+                // @ts-expect-error CSS custom properties for react-day-picker
+                "--rdp-accent-color": "#E8A020",
+                "--rdp-background-color": "#0D0D10",
+                "--rdp-day-color": "#E8E6DF",
+                "--rdp-day-hover-background": "#1E1E22",
+              }}
+            >
+              <DayPicker
+                mode="single"
+                selected={new Date(dateValue + "T12:00:00")}
+                onSelect={(date) => {
+                  if (date) {
+                    setDateValue(toDateInputValue(date.toISOString()));
+                    setShowDatePicker(false);
+                  }
+                }}
+                styles={{
+                  caption: { color: "#E8E6DF", fontSize: 13 },
+                  day: { color: "#E8E6DF", fontSize: 13, fontFamily: "system-ui, -apple-system, sans-serif" },
+                  head_cell: { color: "#9B9892" },
+                  nav_button: { color: "#9B9892" },
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
