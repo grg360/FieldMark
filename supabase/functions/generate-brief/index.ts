@@ -11,6 +11,8 @@ const BRIEF_TTL_MS = 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface BriefOpportunity {
+  priority: "high" | "medium" | "low";
+  category: string;
   recommendation: string;
   supporting_evidence: Array<{
     type: "insight" | "follow_up" | "publication" | "theme" | "collaborator";
@@ -174,22 +176,36 @@ YOUR TASK:
 Generate 3-5 Strategic Engagement Opportunities for ${params.userFirstName}'s upcoming engagement with Dr. ${params.hcpLastName}.
 
 Each opportunity must:
-1. Be grounded in specific evidence from the data above
-2. Synthesize across data sources where possible (e.g., connect an insight ${params.userFirstName} captured with a recent publication)
-3. Be framed as actionable for the meeting (not just observations)
-4. Cite specific evidence used (insight date, publication year, follow-up body, etc.)
+1. Have a clear PRIORITY (high, medium, or low) based on urgency and impact
+2. Have a short CATEGORY label that classifies the type of opportunity. Use one of:
+   - "Relationship Hygiene" (overdue follow-ups, broken commitments, stale relationships)
+   - "Scientific Dialogue" (research-driven conversation hooks based on publications or themes)
+   - "Collaborator Opportunity" (network-driven, stakeholder mapping)
+   - "Continuity Check" (baseline reference probing, status checks)
+   - "Strategic Positioning" (longer-arc relationship building moves)
+3. Be 1-2 sentences MAXIMUM. No filler. No consulting-speak. Briefing-notes style.
+4. Be grounded in specific evidence from the data above
+5. Cite specific evidence used
+
+PRIORITY GUIDELINES:
+- high: Overdue commitments, time-sensitive opportunities, broken promises
+- medium: Active research alignment, scientific dialogue opportunities, immediate-engagement value
+- low: Background context, network mapping, exploratory questions
 
 DO NOT:
 - Invent observations ${params.userFirstName} did not record
 - Recommend specific products, dosages, or clinical actions
 - Reference any data not present in the inputs above
+- Write paragraph-length recommendations
 
 RESPONSE FORMAT -- return ONLY valid JSON, no markdown, no preamble:
 
 {
   "opportunities": [
     {
-      "recommendation": "string -- the actionable recommendation, 1-3 sentences",
+      "priority": "high" | "medium" | "low",
+      "category": "string -- one of the five category labels above",
+      "recommendation": "string -- the actionable recommendation, 1-2 sentences MAXIMUM",
       "supporting_evidence": [
         { "type": "insight" | "follow_up" | "publication" | "theme" | "collaborator", "label": "string -- short identifier" }
       ]
@@ -514,8 +530,13 @@ Deno.serve(async (req) => {
         const responseText = textBlock && textBlock.type === "text" ? textBlock.text : "";
 
         try {
-          const parsed = extractJson(responseText) as { opportunities?: BriefOpportunity[] };
-          opportunities = Array.isArray(parsed.opportunities) ? parsed.opportunities : [];
+          const parsed = extractJson(responseText) as { opportunities?: Partial<BriefOpportunity>[] };
+          opportunities = (parsed.opportunities ?? []).map((opp: Partial<BriefOpportunity>) => ({
+            priority: (opp.priority as "high" | "medium" | "low") ?? "medium",
+            category: typeof opp.category === "string" ? opp.category : "Strategic Positioning",
+            recommendation: typeof opp.recommendation === "string" ? opp.recommendation : "",
+            supporting_evidence: Array.isArray(opp.supporting_evidence) ? opp.supporting_evidence : [],
+          }));
         } catch (parseErr) {
           aiStatus = "failed";
           aiError = parseErr instanceof Error ? parseErr.message : String(parseErr);

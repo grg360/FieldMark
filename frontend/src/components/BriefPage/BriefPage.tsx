@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { generateBrief, type Brief } from "../../lib/briefs";
 import BriefHeader from "./BriefHeader";
+import MeetingReadinessBanner from "./MeetingReadinessBanner";
 import RelationshipSnapshot from "./RelationshipSnapshot";
 import ScientificSnapshot from "./ScientificSnapshot";
 import NetworkAndInstitution from "./NetworkAndInstitution";
@@ -128,6 +129,19 @@ export default function BriefPage() {
           />
 
           {brief.has_relationship ? (
+            <MeetingReadinessBanner
+              followUps={brief.content.follow_ups}
+              insights={brief.content.insights}
+            />
+          ) : null}
+
+          <StrategicOpportunities
+            opportunities={brief.content.opportunities}
+            aiStatus={brief.ai_status}
+            aiError={brief.ai_error}
+          />
+
+          {brief.has_relationship ? (
             <RelationshipSnapshot
               status={brief.content.relationship.status}
               insights={brief.content.insights}
@@ -143,12 +157,6 @@ export default function BriefPage() {
           <NetworkAndInstitution
             collaborators={brief.content.collaborators}
             hcpInstitution={brief.content.hcp.institution}
-          />
-
-          <StrategicOpportunities
-            opportunities={brief.content.opportunities}
-            aiStatus={brief.ai_status}
-            aiError={brief.ai_error}
           />
         </div>
       ) : null}

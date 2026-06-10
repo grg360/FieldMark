@@ -48,7 +48,11 @@ export interface OpportunityEvidence {
   label: string;
 }
 
+export type Priority = "high" | "medium" | "low";
+
 export interface Opportunity {
+  priority: Priority;
+  category: string;
   recommendation: string;
   supporting_evidence: OpportunityEvidence[];
 }
