@@ -1,6 +1,12 @@
 import { supabase } from "./supabase";
 import type { Priority } from "./relationships";
 
+// Therapeutic area UUID lookup. Keys are strings stored in msl_profiles.therapeutic_areas.
+// Migrate to a UUID column on msl_profiles when team features ship.
+const TA_SLUG_TO_UUID: Record<string, string> = {
+  NSCLC: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
+};
+
 export interface HcpRef {
   hcp_id: string;
   name: string;
@@ -63,6 +69,22 @@ export interface HomeSummaryCounts {
   overdue_followups: number;
   open_followups: number;
   watched_hcps: number;
+}
+
+export interface CoverageGapHcp {
+  hcp_id: string;
+  name: string;
+  institution: string | null;
+  state: string | null;
+  us_rank: number;
+  archetype: string | null;
+}
+
+export interface TerritoryCoverageStats {
+  total_rising_stars_in_territory: number;
+  tracked_count: number;
+  coverage_percentage: number;
+  territory_label: string | null;
 }
 
 const PRIORITY_RANK: Record<Priority, number> = { high: 0, normal: 1, low: 2 };
@@ -544,5 +566,211 @@ export async function recordTeamInviteSignal(
   } catch (err) {
     console.warn("recordTeamInviteSignal: error", err);
     throw err;
+  }
+}
+
+async function getUserTerritoryContext(userId: string): Promise<{
+  states: string[];
+  taUuids: string[];
+  territoryLabel: string | null;
+} | null> {
+  const { data, error } = await supabase
+    .from("msl_profiles")
+    .select("territory_label, territory_states, therapeutic_areas")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("getUserTerritoryContext: supabase error", error);
+    return null;
+  }
+  if (!data) return null;
+
+  const states = Array.isArray(data.territory_states) ? data.territory_states : [];
+  const taLabels: string[] = Array.isArray(data.therapeutic_areas) ? data.therapeutic_areas : [];
+  const taUuids = taLabels.map((label) => TA_SLUG_TO_UUID[label]).filter((uuid): uuid is string => Boolean(uuid));
+
+  return {
+    states,
+    taUuids,
+    territoryLabel: data.territory_label ?? null,
+  };
+}
+
+export async function getCoverageGapsForUser(
+  userId: string,
+  limit: number = 5,
+): Promise<CoverageGapHcp[]> {
+  try {
+    const context = await getUserTerritoryContext(userId);
+    if (!context || context.states.length === 0 || context.taUuids.length === 0) {
+      return [];
+    }
+
+    const { data: relationships, error: relError } = await supabase
+      .from("msl_hcp_relationships")
+      .select("hcp_id")
+      .eq("user_id", userId);
+
+    if (relError) {
+      console.warn("getCoverageGapsForUser: relationships error", relError);
+      throw relError;
+    }
+
+    const trackedHcpIds = new Set((relationships ?? []).map((r) => (r as { hcp_id: string }).hcp_id));
+
+    const { data: rankings, error: rankError } = await supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select("hcp_id, us_rank, archetype, therapeutic_area_id")
+      .in("therapeutic_area_id", context.taUuids)
+      .not("us_rank", "is", null)
+      .order("us_rank", { ascending: true })
+      .limit(500);
+
+    if (rankError) {
+      console.warn("getCoverageGapsForUser: rankings error", rankError);
+      throw rankError;
+    }
+
+    const untrackedRanked = (rankings ?? [])
+      .map((row) => row as { hcp_id: string; us_rank: number; archetype: string | null; therapeutic_area_id: string })
+      .filter((row) => !trackedHcpIds.has(row.hcp_id));
+
+    if (untrackedRanked.length === 0) return [];
+
+    const candidateIds = untrackedRanked.slice(0, 100).map((r) => r.hcp_id);
+
+    const { data: hcps, error: hcpError } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name, institution_canonical, institution_normalized, nppes_practice_state, cohort_classification")
+      .in("id", candidateIds)
+      .eq("cohort_classification", "rising_star")
+      .in("nppes_practice_state", context.states);
+
+    if (hcpError) {
+      console.warn("getCoverageGapsForUser: hcps error", hcpError);
+      throw hcpError;
+    }
+
+    const hcpMap = new Map(
+      (hcps ?? []).map((h) => {
+        const row = h as {
+          id: string;
+          first_name: string | null;
+          last_name: string | null;
+          institution_canonical: string | null;
+          institution_normalized: string | null;
+          nppes_practice_state: string | null;
+          cohort_classification: string | null;
+        };
+        return [row.id, row] as const;
+      }),
+    );
+
+    const merged: CoverageGapHcp[] = [];
+    for (const ranked of untrackedRanked) {
+      const hcp = hcpMap.get(ranked.hcp_id);
+      if (!hcp) continue;
+      const name = `${hcp.first_name ?? ""} ${hcp.last_name ?? ""}`.trim() || "Unknown";
+      merged.push({
+        hcp_id: ranked.hcp_id,
+        name,
+        institution: hcp.institution_canonical ?? hcp.institution_normalized ?? null,
+        state: hcp.nppes_practice_state ?? null,
+        us_rank: ranked.us_rank,
+        archetype: ranked.archetype,
+      });
+      if (merged.length >= limit) break;
+    }
+
+    return merged;
+  } catch (err) {
+    console.warn("getCoverageGapsForUser: error", err);
+    throw err;
+  }
+}
+
+export async function getTerritoryCoverageStats(userId: string): Promise<TerritoryCoverageStats> {
+  try {
+    const context = await getUserTerritoryContext(userId);
+    const empty: TerritoryCoverageStats = {
+      total_rising_stars_in_territory: 0,
+      tracked_count: 0,
+      coverage_percentage: 0,
+      territory_label: context?.territoryLabel ?? null,
+    };
+
+    if (!context || context.states.length === 0 || context.taUuids.length === 0) {
+      return empty;
+    }
+
+    const { data: rankings, error: rankError } = await supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select("hcp_id")
+      .in("therapeutic_area_id", context.taUuids);
+
+    if (rankError) {
+      console.warn("getTerritoryCoverageStats: rankings error", rankError);
+      return empty;
+    }
+
+    const rankedHcpIds = (rankings ?? []).map((r) => (r as { hcp_id: string }).hcp_id);
+    if (rankedHcpIds.length === 0) return empty;
+
+    const CHUNK_SIZE = 100;
+    const territoryHcpIds = new Set<string>();
+
+    for (let i = 0; i < rankedHcpIds.length; i += CHUNK_SIZE) {
+      const chunk = rankedHcpIds.slice(i, i + CHUNK_SIZE);
+      const { data: hcps, error: hcpError } = await supabase
+        .from("hcps_v2")
+        .select("id")
+        .in("id", chunk)
+        .eq("cohort_classification", "rising_star")
+        .in("nppes_practice_state", context.states);
+      if (hcpError) {
+        console.warn("getTerritoryCoverageStats: hcps chunk error", hcpError);
+        continue;
+      }
+      for (const h of hcps ?? []) {
+        territoryHcpIds.add((h as { id: string }).id);
+      }
+    }
+
+    const totalInTerritory = territoryHcpIds.size;
+
+    const { data: relationships, error: relError } = await supabase
+      .from("msl_hcp_relationships")
+      .select("hcp_id")
+      .eq("user_id", userId);
+
+    if (relError) {
+      console.warn("getTerritoryCoverageStats: relationships error", relError);
+      return { ...empty, total_rising_stars_in_territory: totalInTerritory };
+    }
+
+    let trackedCount = 0;
+    for (const r of relationships ?? []) {
+      if (territoryHcpIds.has((r as { hcp_id: string }).hcp_id)) {
+        trackedCount += 1;
+      }
+    }
+
+    const coveragePercentage = totalInTerritory > 0 ? Math.round((trackedCount / totalInTerritory) * 100) : 0;
+
+    return {
+      total_rising_stars_in_territory: totalInTerritory,
+      tracked_count: trackedCount,
+      coverage_percentage: coveragePercentage,
+      territory_label: context.territoryLabel,
+    };
+  } catch (err) {
+    console.warn("getTerritoryCoverageStats: error", err);
+    return {
+      total_rising_stars_in_territory: 0,
+      tracked_count: 0,
+      coverage_percentage: 0,
+      territory_label: null,
+    };
   }
 }

@@ -3,6 +3,7 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { supabase } from "../../lib/supabase";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import {
+  getCoverageGapsForUser,
   getHomeSummaryCounts,
   getNextActionsForUser,
   getOpenFollowUpStats,
@@ -10,14 +11,18 @@ import {
   getRecentActivityForUser,
   getRecentBriefsForUser,
   getRecentInsightsForUser,
+  getTerritoryCoverageStats,
   type ActivityEvent,
   type BriefRef,
+  type CoverageGapHcp,
   type HomeSummaryCounts,
   type InsightWithHcp,
   type NextActionWithHcp,
   type OpenFollowUpStats,
+  type TerritoryCoverageStats,
 } from "../../lib/home";
 import GlobalFooter from "../GlobalFooter";
+import CoverageGapsTile from "./CoverageGapsTile";
 import HomeHero from "./HomeHero";
 import HomeNavigationRow from "./HomeNavigationRow";
 import NextActionsTile from "./NextActionsTile";
@@ -38,6 +43,8 @@ export default function HomePage() {
   const [recentInsights, setRecentInsights] = useState<InsightWithHcp[]>([]);
   const [recentBriefs, setRecentBriefs] = useState<BriefRef[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityEvent[]>([]);
+  const [coverageGaps, setCoverageGaps] = useState<CoverageGapHcp[]>([]);
+  const [territoryStats, setTerritoryStats] = useState<TerritoryCoverageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [userFirstName, setUserFirstName] = useState("there");
 
@@ -64,6 +71,8 @@ export default function HomePage() {
           insightsData,
           briefsData,
           activityData,
+          gapsData,
+          territoryStatsData,
         ] = await Promise.all([
           supabase.from("msl_profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
           getHomeSummaryCounts(user.id),
@@ -73,6 +82,8 @@ export default function HomePage() {
           getRecentInsightsForUser(user.id, 5),
           getRecentBriefsForUser(user.id, 5),
           getRecentActivityForUser(user.id, 10),
+          getCoverageGapsForUser(user.id, 5),
+          getTerritoryCoverageStats(user.id),
         ]);
 
         if (cancelled) return;
@@ -88,6 +99,8 @@ export default function HomePage() {
         setRecentInsights(insightsData);
         setRecentBriefs(briefsData);
         setRecentActivity(activityData);
+        setCoverageGaps(gapsData);
+        setTerritoryStats(territoryStatsData);
       } catch (err) {
         console.warn("HomePage: load error", err);
       } finally {
@@ -114,7 +127,7 @@ export default function HomePage() {
     >
       <div
         style={{
-          maxWidth: 1200,
+          maxWidth: 960,
           margin: "0 auto",
           padding: 16,
           paddingBottom: 0,
@@ -146,6 +159,8 @@ export default function HomePage() {
             <HomeHero firstName={userFirstName} summary={summary} />
 
             <NextActionsTile actions={nextActions} />
+
+            <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} />
 
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 16 }}>
               <OverdueFollowUpsTile
