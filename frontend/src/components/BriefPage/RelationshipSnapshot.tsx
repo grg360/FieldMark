@@ -126,15 +126,6 @@ function renderPriorityGlyph(priority: string): ReactNode {
   return null;
 }
 
-const sectionHeaderStyle: CSSProperties = {
-  fontSize: 11,
-  color: "#6B6A65",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  fontWeight: 500,
-  marginBottom: 12,
-};
-
 const subHeaderStyle: CSSProperties = {
   fontSize: 10,
   color: "#6B6A65",
@@ -158,8 +149,6 @@ export default function RelationshipSnapshot({ status, insights, followUps }: Pr
 
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div style={sectionHeaderStyle}>RELATIONSHIP</div>
-
       {status && statusStyle ? (
         <span
           style={{

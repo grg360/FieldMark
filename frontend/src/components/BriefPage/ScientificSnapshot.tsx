@@ -5,20 +5,9 @@ interface Props {
   themes: string[];
 }
 
-const sectionHeaderStyle = {
-  fontSize: 11,
-  color: "#6B6A65",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.06em",
-  fontWeight: 500,
-  marginBottom: 12,
-};
-
 export default function ScientificSnapshot({ publications, themes }: Props) {
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div style={sectionHeaderStyle}>SCIENTIFIC ACTIVITY</div>
-
       {publications.length === 0 ? (
         <div style={{ fontSize: 13, color: "#6B6A65", marginBottom: 16 }}>
           No recent publications indexed.

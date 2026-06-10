@@ -5,15 +5,6 @@ interface Props {
   hcpInstitution: string;
 }
 
-const sectionHeaderStyle = {
-  fontSize: 11,
-  color: "#6B6A65",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.06em",
-  fontWeight: 500,
-  marginBottom: 12,
-};
-
 const subHeaderStyle = {
   fontSize: 10,
   color: "#6B6A65",
@@ -26,8 +17,6 @@ const subHeaderStyle = {
 export default function NetworkAndInstitution({ collaborators, hcpInstitution }: Props) {
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div style={sectionHeaderStyle}>NETWORK & INSTITUTION</div>
-
       <div style={subHeaderStyle}>TOP COLLABORATORS</div>
       {collaborators.length === 0 ? (
         <div style={{ fontSize: 13, color: "#6B6A65", marginBottom: 16 }}>

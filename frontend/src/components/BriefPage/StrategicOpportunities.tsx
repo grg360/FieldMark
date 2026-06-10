@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import type { AiStatus, Opportunity } from "../../lib/briefs";
 import OpportunityCard from "./OpportunityCard";
 
@@ -5,6 +6,8 @@ interface Props {
   opportunities: Opportunity[] | null;
   aiStatus: AiStatus;
   aiError: string | null;
+  hcpId: string;
+  userId: string;
 }
 
 const sectionHeaderStyle = {
@@ -16,7 +19,23 @@ const sectionHeaderStyle = {
   marginBottom: 4,
 };
 
-export default function StrategicOpportunities({ opportunities, aiStatus, aiError }: Props) {
+export default function StrategicOpportunities({
+  opportunities,
+  aiStatus,
+  aiError,
+  hcpId,
+  userId,
+}: Props) {
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
+
+  const markSaved = useCallback((index: number) => {
+    setSavedIndices((prev) => {
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
+  }, []);
+
   const showOpportunities =
     aiStatus === "generated" && opportunities != null && opportunities.length > 0;
 
@@ -28,7 +47,15 @@ export default function StrategicOpportunities({ opportunities, aiStatus, aiErro
       {showOpportunities ? (
         <div>
           {opportunities!.map((opportunity, index) => (
-            <OpportunityCard key={index} opportunity={opportunity} index={index} />
+            <OpportunityCard
+              key={index}
+              opportunity={opportunity}
+              index={index}
+              hcpId={hcpId}
+              userId={userId}
+              isSaved={savedIndices.has(index)}
+              onSaved={() => markSaved(index)}
+            />
           ))}
         </div>
       ) : (

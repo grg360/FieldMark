@@ -1,9 +1,40 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { createNextAction, type Priority as FollowUpPriority } from "../../lib/relationships";
 import type { Opportunity, Priority } from "../../lib/briefs";
 
 interface Props {
   opportunity: Opportunity;
   index: number;
+  hcpId: string;
+  userId: string;
+  isSaved: boolean;
+  onSaved: () => void;
+}
+
+function dueDateFromPriority(priority: Priority): string {
+  const now = new Date();
+  const daysAhead = priority === "high" ? 7 : priority === "medium" ? 14 : 30;
+  const due = new Date(now);
+  due.setDate(due.getDate() + daysAhead);
+  due.setUTCHours(12, 0, 0, 0);
+  return due.toISOString();
+}
+
+function followUpPriorityFromOpportunity(priority: Priority): FollowUpPriority {
+  switch (priority) {
+    case "high":
+      return "high";
+    case "medium":
+      return "normal";
+    case "low":
+      return "low";
+  }
+}
+
+function formatDueDateShort(iso: string): string {
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const date = new Date(iso);
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}`;
 }
 
 function priorityBorderColor(priority: Priority): string {
@@ -56,7 +87,42 @@ function evidencePillStyle(type: string): CSSProperties {
   }
 }
 
-export default function OpportunityCard({ opportunity, index }: Props) {
+export default function OpportunityCard({
+  opportunity,
+  index,
+  hcpId,
+  userId,
+  isSaved,
+  onSaved,
+}: Props) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedDueAt, setSavedDueAt] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (pending || isSaved) return;
+    setPending(true);
+    setError(null);
+
+    try {
+      const dueAt = dueDateFromPriority(opportunity.priority);
+      await createNextAction(userId, {
+        hcpId,
+        body: opportunity.recommendation,
+        dueAt,
+        priority: followUpPriorityFromOpportunity(opportunity.priority),
+        createdFrom: "brief",
+      });
+      setSavedDueAt(dueAt);
+      onSaved();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Save failed";
+      setError(message);
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -157,6 +223,46 @@ export default function OpportunityCard({ opportunity, index }: Props) {
             {evidence.label}
           </span>
         ))}
+      </div>
+
+      <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
+        {error ? (
+          <span style={{ fontSize: 11, color: "#E84545" }}>
+            {error}
+          </span>
+        ) : null}
+
+        {isSaved ? (
+          <span style={{ fontSize: 11, color: "#6B6A65", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ color: "#3FB8AF", fontSize: 12 }}>{String.fromCharCode(0x2713)}</span>
+            Saved{savedDueAt ? ` · Due ${formatDueDateShort(savedDueAt)}` : ""}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="fm-pill-button"
+            onClick={() => void handleSave()}
+            disabled={pending}
+            aria-label="Save as Follow-Up"
+            style={{
+              backgroundColor: "#E8A020",
+              color: "#0A0A0B",
+              border: "none",
+              borderRadius: 3,
+              padding: "3px 8px",
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              lineHeight: 1.2,
+              cursor: pending ? "default" : "pointer",
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              opacity: pending ? 0.6 : 1,
+            }}
+          >
+            {pending ? "Saving..." : "Save as Follow-Up"}
+          </button>
+        )}
       </div>
     </div>
   );

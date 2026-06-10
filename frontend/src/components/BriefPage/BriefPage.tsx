@@ -3,14 +3,29 @@ import { useNavigate, useParams } from "react-router-dom";
 import { generateBrief, type Brief } from "../../lib/briefs";
 import BriefHeader from "./BriefHeader";
 import MeetingReadinessBanner from "./MeetingReadinessBanner";
+import CollapsibleSection from "./CollapsibleSection";
+import GlobalFooter from "../GlobalFooter";
 import RelationshipSnapshot from "./RelationshipSnapshot";
 import ScientificSnapshot from "./ScientificSnapshot";
 import NetworkAndInstitution from "./NetworkAndInstitution";
 import StrategicOpportunities from "./StrategicOpportunities";
 
+function useIsDesktop(breakpoint = 1100): boolean {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`);
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [breakpoint]);
+  return isDesktop;
+}
+
 export default function BriefPage() {
   const { hcpId } = useParams();
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
   const [brief, setBrief] = useState<Brief | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,12 +63,20 @@ export default function BriefPage() {
     <div
       style={{
         backgroundColor: "#0A0A0B",
-        padding: 16,
-        paddingBottom: 80,
         minHeight: "100vh",
+        padding: 0,
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
+      <div
+        style={{
+          maxWidth: isDesktop ? 1200 : 720,
+          margin: "0 auto",
+          padding: 16,
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
         <button
           type="button"
@@ -120,46 +143,112 @@ export default function BriefPage() {
         </div>
       ) : null}
 
-      {!loading && brief ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {!loading && brief ? (() => {
+        const overdueCount = brief.content.follow_ups.filter((f) => f.overdue).length;
+        const relationshipDefaultOpen = overdueCount > 0;
+
+        return (
+        <>
           <BriefHeader
             hcp={brief.content.hcp}
             generatedAt={brief.generated_at}
             hasRelationship={brief.has_relationship}
           />
 
-          {brief.has_relationship ? (
-            <MeetingReadinessBanner
-              followUps={brief.content.follow_ups}
-              insights={brief.content.insights}
-            />
-          ) : null}
+          {isDesktop ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 32, marginTop: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
+                {brief.has_relationship ? (
+                  <MeetingReadinessBanner
+                    followUps={brief.content.follow_ups}
+                    insights={brief.content.insights}
+                  />
+                ) : null}
 
-          <StrategicOpportunities
-            opportunities={brief.content.opportunities}
-            aiStatus={brief.ai_status}
-            aiError={brief.ai_error}
-          />
+                <StrategicOpportunities
+                  opportunities={brief.content.opportunities}
+                  aiStatus={brief.ai_status}
+                  aiError={brief.ai_error}
+                  hcpId={brief.hcp_id}
+                  userId={brief.user_id}
+                />
+              </div>
 
-          {brief.has_relationship ? (
-            <RelationshipSnapshot
-              status={brief.content.relationship.status}
-              insights={brief.content.insights}
-              followUps={brief.content.follow_ups}
-            />
-          ) : null}
+              <div style={{ position: "sticky", top: 16, alignSelf: "start", display: "flex", flexDirection: "column", gap: 0 }}>
+                {brief.has_relationship ? (
+                  <CollapsibleSection title="Relationship Context" defaultOpen={true}>
+                    <RelationshipSnapshot
+                      status={brief.content.relationship.status}
+                      insights={brief.content.insights}
+                      followUps={brief.content.follow_ups}
+                    />
+                  </CollapsibleSection>
+                ) : null}
 
-          <ScientificSnapshot
-            publications={brief.content.publications}
-            themes={brief.content.themes}
-          />
+                <CollapsibleSection title="Scientific Activity" defaultOpen={true}>
+                  <ScientificSnapshot
+                    publications={brief.content.publications}
+                    themes={brief.content.themes}
+                  />
+                </CollapsibleSection>
 
-          <NetworkAndInstitution
-            collaborators={brief.content.collaborators}
-            hcpInstitution={brief.content.hcp.institution}
-          />
-        </div>
-      ) : null}
+                <CollapsibleSection title="Network & Institution" defaultOpen={true}>
+                  <NetworkAndInstitution
+                    collaborators={brief.content.collaborators}
+                    hcpInstitution={brief.content.hcp.institution}
+                  />
+                </CollapsibleSection>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 24 }}>
+              {brief.has_relationship ? (
+                <MeetingReadinessBanner
+                  followUps={brief.content.follow_ups}
+                  insights={brief.content.insights}
+                />
+              ) : null}
+
+              <StrategicOpportunities
+                opportunities={brief.content.opportunities}
+                aiStatus={brief.ai_status}
+                aiError={brief.ai_error}
+                hcpId={brief.hcp_id}
+                userId={brief.user_id}
+              />
+
+              {brief.has_relationship ? (
+                <CollapsibleSection title="Relationship Context" defaultOpen={relationshipDefaultOpen}>
+                  <RelationshipSnapshot
+                    status={brief.content.relationship.status}
+                    insights={brief.content.insights}
+                    followUps={brief.content.follow_ups}
+                  />
+                </CollapsibleSection>
+              ) : null}
+
+              <CollapsibleSection title="Scientific Activity" defaultOpen={false}>
+                <ScientificSnapshot
+                  publications={brief.content.publications}
+                  themes={brief.content.themes}
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection title="Network & Institution" defaultOpen={false}>
+                <NetworkAndInstitution
+                  collaborators={brief.content.collaborators}
+                  hcpInstitution={brief.content.hcp.institution}
+                />
+              </CollapsibleSection>
+            </div>
+          )}
+        </>
+        );
+      })() : null}
+
+      <GlobalFooter />
+
+      </div>
     </div>
   );
 }

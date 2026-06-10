@@ -186,6 +186,7 @@ Each opportunity must:
 3. Be 1-2 sentences MAXIMUM. No filler. No consulting-speak. Briefing-notes style.
 4. Be grounded in specific evidence from the data above
 5. Cite specific evidence used
+6. PREFER DIVERSITY across category labels. Maximum 2 recommendations per category. If two recommendations would be in the same category, combine them into one tighter recommendation OR omit the weaker one. A brief with 5 categories represented beats a brief with 5 recommendations in the same category.
 
 PRIORITY GUIDELINES:
 - high: Overdue commitments, time-sensitive opportunities, broken promises

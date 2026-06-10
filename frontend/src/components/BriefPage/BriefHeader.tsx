@@ -49,7 +49,12 @@ export default function BriefHeader({ hcp, generatedAt, hasRelationship }: Props
       </div>
 
       <div style={{ fontSize: 14, color: "#9B9892", marginTop: 4 }}>
-        {hcp.institution} {String.fromCharCode(0x00B7)} {hcp.specialty}
+        {hcp.institution}
+        {hcp.specialty && hcp.specialty !== "Unknown specialty" ? (
+          <>
+            {" "}{String.fromCharCode(0x00B7)} {hcp.specialty}
+          </>
+        ) : null}
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
