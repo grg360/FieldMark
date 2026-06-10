@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { HCP } from "../data/hcpData";
 import { useRelationships } from "../contexts/RelationshipsContext";
+import { getCurrentUser } from "../lib/authHelpers";
+import AddToWatchlistPopover from "./AddToWatchlistPopover";
 import { institutionToSlug } from "../lib/institutionUtils";
 import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWebSignals, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown, type WebSignal } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
@@ -27,6 +29,7 @@ import { RISING_STAR_METHODOLOGY } from "../lib/methodologyConfig";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 import FieldInsights from "./FieldInsights/FieldInsights";
 import RelationshipSection from "./RelationshipSection/RelationshipSection";
+import UserMenu from "./UserMenu";
 type DetailHCP = HCP & {
   derivedState?: string | null;
   engagement_angle?: string | null;
@@ -878,12 +881,26 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
 
   const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
   const navigate = useNavigate();
-  const { isSaved, toggleSave, hasBrief } = useRelationships();
+  const { isSaved, toggleSave, hasBrief, relationshipMap } = useRelationships();
   const [savePending, setSavePending] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [addToWatchlistAnchor, setAddToWatchlistAnchor] = useState<DOMRect | null>(null);
+  const addToWatchlistButtonRef = useRef<HTMLButtonElement>(null);
   const saved = hcpId ? isSaved(String(hcpId)) : false;
+  const relationship = hcpId ? (relationshipMap.get(hcpId) ?? null) : null;
   const briefExists = hcpId ? hasBrief(hcpId) : false;
   const fieldIntelCount = mockFieldIntelContributorCount(String(hcpId));
   const doctorLabel = hcp.name.match(/^dr\.?\s/i) ? hcp.name : `Dr. ${hcp.name}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUser().then((user) => {
+      if (!cancelled) setUserId(user?.id ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [contextualizeOpen, setContextualizeOpen] = React.useState(false);
   const [optOutOpen, setOptOutOpen] = React.useState(false);
@@ -1132,9 +1149,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           <BackArrow />
           <span style={{ fontSize: 15, color: "#6B6A65" }}>{backLinkLabel(hcp.cohort_classification)}</span>
         </button>
-        <button style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-          <ShareIcon />
-        </button>
+        <UserMenu />
       </div>
 
       <div
@@ -1197,6 +1212,39 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
               >
                 <span style={{ fontSize: 12, lineHeight: 1, color: "#E8A020" }}>{String.fromCodePoint(0x2728)}</span>
                 {briefExists ? "Open Brief" : "Brief"}
+              </button>
+            ) : null}
+            {hcpId && userId && relationship ? (
+              <button
+                ref={addToWatchlistButtonRef}
+                type="button"
+                className="fm-pill-button"
+                aria-label="Add to a watchlist"
+                onClick={() => {
+                  const rect = addToWatchlistButtonRef.current?.getBoundingClientRect() ?? null;
+                  setAddToWatchlistAnchor(rect);
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "3px 8px",
+                  backgroundColor: "transparent",
+                  color: "#9B9892",
+                  border: "1px solid #1E1E22",
+                  borderRadius: 3,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  lineHeight: 1.2,
+                  cursor: "pointer",
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: 11, lineHeight: 1 }}>+</span>
+                <span>List</span>
               </button>
             ) : null}
             {hcpId ? (
@@ -1972,6 +2020,15 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
       )}
 
       <FiToast message={fiToast} />
+
+      {addToWatchlistAnchor && userId && relationship ? (
+        <AddToWatchlistPopover
+          userId={userId}
+          relationshipId={relationship.id}
+          anchorRect={addToWatchlistAnchor}
+          onClose={() => setAddToWatchlistAnchor(null)}
+        />
+      ) : null}
     </div>
   );
 }

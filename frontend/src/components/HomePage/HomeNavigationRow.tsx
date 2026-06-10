@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 const LINKS = [
-  { label: "Watchlists", path: "/watchlists" },
+  { label: "Watchlists", path: "/me/watchlists" },
   { label: "Institutions", path: "/institutions" },
   { label: "Saved HCPs", path: "/saved-hcps" },
   { label: "Cohorts", path: "/cohorts" },

@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import type { HomeSummaryCounts } from "../../lib/home";
+import type { HomeSummaryCounts, TerritoryProfile } from "../../lib/home";
 
 interface Props {
   firstName: string;
   summary: HomeSummaryCounts;
+  territory: TerritoryProfile | null;
 }
 
 function getGreeting(): string {
@@ -32,8 +33,14 @@ const pillStyle = {
   fontFamily: "system-ui, -apple-system, sans-serif",
 };
 
-export default function HomeHero({ firstName, summary }: Props) {
+export default function HomeHero({ firstName, summary, territory }: Props) {
   const navigate = useNavigate();
+  const middot = String.fromCharCode(0x00B7);
+  const label = territory?.territory_label
+    ? `${territory.territory_label} Territory`
+    : null;
+  const states = territory?.territory_states ?? [];
+  const hasTerritoryData = label || states.length > 0;
   const overdueLabel = pluralize(
     summary.overdue_followups,
     "overdue follow-up",
@@ -74,19 +81,20 @@ export default function HomeHero({ firstName, summary }: Props) {
         <button
           type="button"
           className="fm-pill-button"
-          onClick={() => navigate("/watchlists")}
+          onClick={() => navigate("/me/watchlists")}
           style={pillStyle}
         >
-          Open Watchlist
+          Open Watchlists
         </button>
       </div>
 
-      <p style={{ fontSize: 12, color: "#6B6A65", margin: 0, lineHeight: 1.4 }}>
-        Northeast NSCLC Territory {String.fromCharCode(0x00B7)} CT {String.fromCharCode(0x00B7)} MA{" "}
-        {String.fromCharCode(0x00B7)} ME {String.fromCharCode(0x00B7)} NH {String.fromCharCode(0x00B7)} NJ{" "}
-        {String.fromCharCode(0x00B7)} NY {String.fromCharCode(0x00B7)} PA {String.fromCharCode(0x00B7)} RI{" "}
-        {String.fromCharCode(0x00B7)} VT
-      </p>
+      {hasTerritoryData ? (
+        <p style={{ fontSize: 12, color: "#6B6A65", margin: 0, lineHeight: 1.4 }}>
+          {label}
+          {label && states.length > 0 ? ` ${middot} ` : ""}
+          {states.join(` ${middot} `)}
+        </p>
+      ) : null}
     </div>
   );
 }

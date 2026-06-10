@@ -13,6 +13,7 @@ import {
   getRecentBriefsForUser,
   getRecentInsightsForUser,
   getTerritoryCoverageStats,
+  getTerritoryProfile,
   type ActivityEvent,
   type BriefRef,
   type CoverageGapHcp,
@@ -21,8 +22,9 @@ import {
   type NextActionWithHcp,
   type OpenFollowUpStats,
   type TerritoryCoverageStats,
+  type TerritoryProfile,
 } from "../../lib/home";
-import GlobalFooter from "../GlobalFooter";
+import AppLayout from "../AppLayout";
 import CoverageGapsTile from "./CoverageGapsTile";
 import HomeHero from "./HomeHero";
 import HomeNavigationRow from "./HomeNavigationRow";
@@ -46,6 +48,7 @@ export default function HomePage() {
   const [recentActivity, setRecentActivity] = useState<ActivityEvent[]>([]);
   const [coverageGaps, setCoverageGaps] = useState<CoverageGapHcp[]>([]);
   const [territoryStats, setTerritoryStats] = useState<TerritoryCoverageStats | null>(null);
+  const [territoryProfile, setTerritoryProfile] = useState<TerritoryProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [userFirstName, setUserFirstName] = useState("there");
 
@@ -74,6 +77,7 @@ export default function HomePage() {
           activityData,
           gapsData,
           territoryStatsData,
+          territoryProfileData,
         ] = await Promise.all([
           supabase.from("msl_profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
           getHomeSummaryCounts(user.id),
@@ -85,6 +89,7 @@ export default function HomePage() {
           getRecentActivityForUser(user.id, 10),
           getCoverageGapsForUser(user.id, 5),
           getTerritoryCoverageStats(user.id),
+          getTerritoryProfile(user.id),
         ]);
 
         if (cancelled) return;
@@ -102,6 +107,7 @@ export default function HomePage() {
         setRecentActivity(activityData);
         setCoverageGaps(gapsData);
         setTerritoryStats(territoryStatsData);
+        setTerritoryProfile(territoryProfileData);
       } catch (err) {
         console.warn("HomePage: load error", err);
       } finally {
@@ -131,24 +137,7 @@ export default function HomePage() {
   const gridColumns = isDesktop ? "1fr 1fr" : "1fr";
 
   return (
-    <div
-      style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100vh",
-        padding: 0,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 960,
-          margin: "0 auto",
-          padding: 16,
-          paddingBottom: 0,
-          width: "100%",
-          boxSizing: "border-box",
-        }}
-      >
+    <AppLayout>
         {loading ? (
           <div
             style={{
@@ -170,7 +159,7 @@ export default function HomePage() {
           </div>
         ) : summary && userId ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-            <HomeHero firstName={userFirstName} summary={summary} />
+            <HomeHero firstName={userFirstName} summary={summary} territory={territoryProfile} />
 
             <NextActionsTile actions={nextActions} />
 
@@ -196,9 +185,6 @@ export default function HomePage() {
             <HomeNavigationRow />
           </div>
         ) : null}
-      </div>
-
-      <GlobalFooter />
-    </div>
+    </AppLayout>
   );
 }

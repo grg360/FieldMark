@@ -46,6 +46,7 @@ import InstitutionRoute from "./components/InstitutionRoute";
 import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
 import BriefPage from "./components/BriefPage/BriefPage";
 import HomePage from "./components/HomePage/HomePage";
+import WatchlistsPage from "./components/WatchlistsPage/WatchlistsPage";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
@@ -1272,6 +1273,8 @@ export default function App() {
           <Route path="/landing" element={<LandingRoute />} />
           <Route path="/welcome" element={<WelcomeWizard />} />
           <Route path="/me" element={<HomePage />} />
+          <Route path="/me/watchlists" element={<WatchlistsPage />} />
+          <Route path="/me/watchlists/:watchlistId" element={<WatchlistsPage />} />
           <Route path="/" element={<FeedLayout />} />
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />

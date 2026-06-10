@@ -37,6 +37,7 @@ export default function UserMenu() {
     <div ref={menuRef} style={{ position: "relative" }}>
       <button
         type="button"
+        className="fm-pill-button"
         onClick={() => setOpen(!open)}
         style={{
           width: 32,
@@ -97,14 +98,35 @@ export default function UserMenu() {
             }}
             style={menuItemStyle}
           >
-            Your profile
+            Home
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/me/watchlists");
+            }}
+            style={menuItemStyle}
+          >
+            Watchlists
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/me/follow-ups");
+            }}
+            style={menuItemStyle}
+          >
+            Follow-Ups
+          </button>
+          <div style={{ height: 1, backgroundColor: "#1E1E22", margin: "4px 0" }} />
           <button
             type="button"
             onClick={() => signOut()}
             style={{ ...menuItemStyle, color: "#E8704E" }}
           >
-            Sign out
+            Sign Out
           </button>
         </div>
       ) : null}

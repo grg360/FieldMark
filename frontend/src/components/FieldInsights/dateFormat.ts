@@ -4,6 +4,10 @@ function formatShortDate(date: Date): string {
   return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
+function plural(n: number, singular: string): string {
+  return n === 1 ? `${n} ${singular} ago` : `${n} ${singular}s ago`;
+}
+
 export function formatOccurredAt(iso: string): string {
   const then = new Date(iso);
   const now = new Date();
@@ -26,16 +30,16 @@ export function formatRelative(iso: string): string {
   const diffMins = Math.floor(diffMs / (1000 * 60));
 
   if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffMins < 60) return plural(diffMins, "minute");
 
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} hr ago`;
+  if (diffHours < 24) return plural(diffHours, "hour");
 
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 7) return plural(diffDays, "day");
 
   const diffWeeks = Math.floor(diffDays / 7);
-  if (diffWeeks < 5) return `${diffWeeks} weeks ago`;
+  if (diffWeeks < 5) return plural(diffWeeks, "week");
 
   return formatShortDate(then);
 }

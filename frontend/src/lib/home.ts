@@ -87,6 +87,12 @@ export interface TerritoryCoverageStats {
   territory_label: string | null;
 }
 
+export interface TerritoryProfile {
+  territory_label: string | null;
+  territory_states: string[];
+  therapeutic_areas: string[];
+}
+
 const PRIORITY_RANK: Record<Priority, number> = { high: 0, normal: 1, low: 2 };
 
 function compareNextActions(
@@ -594,6 +600,35 @@ async function getUserTerritoryContext(userId: string): Promise<{
     states,
     taUuids,
     territoryLabel: data.territory_label ?? null,
+  };
+}
+
+export async function getTerritoryProfile(userId: string): Promise<TerritoryProfile> {
+  const context = await getUserTerritoryContext(userId);
+  if (!context) {
+    return {
+      territory_label: null,
+      territory_states: [],
+      therapeutic_areas: [],
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("msl_profiles")
+    .select("therapeutic_areas")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("getTerritoryProfile: ta labels error", error);
+  }
+
+  const therapeuticAreas: string[] = Array.isArray(data?.therapeutic_areas) ? data.therapeutic_areas : [];
+
+  return {
+    territory_label: context.territoryLabel,
+    territory_states: context.states,
+    therapeutic_areas: therapeuticAreas,
   };
 }
 
