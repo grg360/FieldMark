@@ -40,12 +40,12 @@ import ActionTray from "./components/ActionTray";
 import DetailScreen from "./components/DetailScreen";
 import NoteEntryScreen from "./components/NoteEntryScreen";
 import BibliographyScreen from "./components/BibliographyScreen";
-import ProfileScreen from "./components/ProfileScreen";
 import LandscapeScreen from "./components/LandscapeScreen";
 import LandscapeRoute from "./components/LandscapeRoute";
 import InstitutionRoute from "./components/InstitutionRoute";
 import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
 import BriefPage from "./components/BriefPage/BriefPage";
+import HomePage from "./components/HomePage/HomePage";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
@@ -328,11 +328,6 @@ type FeedOverlay = "landscape" | "city-feed" | null;
 function LandingRoute() {
   const navigate = useNavigate();
   return <LinkedInAuthScreen onAuth={() => navigate("/")} />;
-}
-
-function ProfileRoute() {
-  const navigate = useNavigate();
-  return <ProfileScreen onBack={() => navigate("/")} />;
 }
 
 function FeedLayout({
@@ -1276,7 +1271,7 @@ export default function App() {
           <Routes>
           <Route path="/landing" element={<LandingRoute />} />
           <Route path="/welcome" element={<WelcomeWizard />} />
-          <Route path="/me" element={<ProfileRoute />} />
+          <Route path="/me" element={<HomePage />} />
           <Route path="/" element={<FeedLayout />} />
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />

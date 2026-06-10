@@ -9,18 +9,7 @@ import RelationshipSnapshot from "./RelationshipSnapshot";
 import ScientificSnapshot from "./ScientificSnapshot";
 import NetworkAndInstitution from "./NetworkAndInstitution";
 import StrategicOpportunities from "./StrategicOpportunities";
-
-function useIsDesktop(breakpoint = 1100): boolean {
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`);
-    setIsDesktop(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [breakpoint]);
-  return isDesktop;
-}
+import { useIsDesktop } from "../../lib/useIsDesktop";
 
 export default function BriefPage() {
   const { hcpId } = useParams();
