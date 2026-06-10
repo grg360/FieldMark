@@ -7,6 +7,13 @@ interface Props {
   activity: ActivityEvent[];
 }
 
+interface CollapsedEntry {
+  kind: "single" | "group";
+  representative: ActivityEvent;
+  count: number;
+  label: string;
+}
+
 const tileStyle = {
   backgroundColor: "#0D0D10",
   border: "1px solid #1E1E22",
@@ -29,6 +36,76 @@ function eventIcon(type: ActivityEventType): ReactNode {
     default:
       return String.fromCharCode(0x2022);
   }
+}
+
+function buildGroupLabel(type: ActivityEventType, hcpName: string, count: number): string {
+  const noun = (() => {
+    switch (type) {
+      case "insight_added":
+        return count === 1 ? "insight" : "insights";
+      case "follow_up_completed":
+        return count === 1 ? "follow-up" : "follow-ups";
+      case "follow_up_created":
+        return count === 1 ? "follow-up" : "follow-ups";
+      case "brief_generated":
+        return count === 1 ? "brief" : "briefs";
+      case "status_changed":
+        return count === 1 ? "status change" : "status changes";
+    }
+  })();
+
+  const verb = (() => {
+    switch (type) {
+      case "insight_added":
+        return "Added";
+      case "follow_up_completed":
+        return "Completed";
+      case "follow_up_created":
+        return "Created";
+      case "brief_generated":
+        return "Generated";
+      case "status_changed":
+        return "Changed";
+    }
+  })();
+
+  return `${verb} ${count} ${noun} for ${hcpName}`;
+}
+
+function collapseEvents(events: ActivityEvent[]): CollapsedEntry[] {
+  const result: CollapsedEntry[] = [];
+  let i = 0;
+  while (i < events.length) {
+    const current = events[i];
+    let j = i + 1;
+    while (
+      j < events.length &&
+      events[j].type === current.type &&
+      events[j].hcp.hcp_id === current.hcp.hcp_id
+    ) {
+      j += 1;
+    }
+    const runLength = j - i;
+    if (runLength >= 3) {
+      result.push({
+        kind: "group",
+        representative: current,
+        count: runLength,
+        label: buildGroupLabel(current.type, current.hcp.name, runLength),
+      });
+    } else {
+      for (let k = i; k < j; k += 1) {
+        result.push({
+          kind: "single",
+          representative: events[k],
+          count: 1,
+          label: events[k].label,
+        });
+      }
+    }
+    i = j;
+  }
+  return result;
 }
 
 function startOfDay(date: Date): Date {
@@ -97,57 +174,63 @@ export default function RecentActivityTile({ activity }: Props) {
         </div>
       ) : (
         <div>
-          {groups.map((group) => (
-            <div key={group.label} style={{ marginBottom: 16 }}>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "#6B6A65",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  fontWeight: 500,
-                  marginBottom: 8,
-                }}
-              >
-                {group.label}
-              </div>
-              {group.events.map((event, index) => (
+          {groups.map((group) => {
+            const collapsed = collapseEvents(group.events);
+            return (
+              <div key={group.label} style={{ marginBottom: 16 }}>
                 <div
-                  key={event.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(`/hcp/${event.hcp.hcp_id}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      navigate(`/hcp/${event.hcp.hcp_id}`);
-                    }
-                  }}
                   style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 12,
-                    padding: "10px 0",
-                    borderBottom:
-                      index < group.events.length - 1 ? "1px solid #1E1E22" : "none",
-                    cursor: "pointer",
+                    fontSize: 10,
+                    color: "#6B6A65",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    fontWeight: 500,
+                    marginBottom: 8,
                   }}
                 >
-                  <span style={{ fontSize: 14, lineHeight: 1.4, flexShrink: 0 }}>
-                    {eventIcon(event.type)}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.4 }}>
-                      {event.label}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 2 }}>
-                      {formatRelative(event.timestamp)}
-                    </div>
-                  </div>
+                  {group.label}
                 </div>
-              ))}
-            </div>
-          ))}
+                {collapsed.map((entry, index) => {
+                  const event = entry.representative;
+                  return (
+                    <div
+                      key={entry.kind === "group" ? `group-${event.id}-${entry.count}` : event.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate(`/hcp/${event.hcp.hcp_id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/hcp/${event.hcp.hcp_id}`);
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "10px 0",
+                        borderBottom:
+                          index < collapsed.length - 1 ? "1px solid #1E1E22" : "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ fontSize: 14, lineHeight: 1.4, flexShrink: 0 }}>
+                        {eventIcon(event.type)}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.4 }}>
+                          {entry.label}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 2 }}>
+                          {formatRelative(event.timestamp)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

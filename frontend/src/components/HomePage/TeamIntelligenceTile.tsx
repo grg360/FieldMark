@@ -54,12 +54,17 @@ export default function TeamIntelligenceTile({ userId }: Props) {
           </span>
         </div>
 
-        <p style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, margin: "0 0 12px 0" }}>
-          FieldMark becomes more valuable when your team contributes intelligence.
+        <p style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.5, margin: "0 0 12px 0" }}>
+          No colleagues connected yet.
         </p>
-        <p style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, margin: "0 0 16px 0" }}>
-          Shared insights, follow-ups, and briefs from colleagues at your organization will appear here.
+        <p style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, margin: "0 0 8px 0" }}>
+          Invite teammates to unlock:
         </p>
+        <ul style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.6, margin: "0 0 16px 0", paddingLeft: 20 }}>
+          <li>Shared field insights</li>
+          <li>Territory coverage visibility</li>
+          <li>Cross-account briefing</li>
+        </ul>
 
         <button
           type="button"

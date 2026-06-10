@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getCurrentUser } from "../../lib/authHelpers";
+import { getOrCreateRelationship } from "../../lib/relationships";
 import { supabase } from "../../lib/supabase";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import {
@@ -114,6 +115,19 @@ export default function HomePage() {
     };
   }, []);
 
+  const handleTrackHcp = useCallback(async (hcpId: string) => {
+    if (!userId) throw new Error("No user");
+    await getOrCreateRelationship(userId, hcpId, "coverage_gaps");
+    const [newGaps, newStats] = await Promise.all([
+      getCoverageGapsForUser(userId, 5),
+      getTerritoryCoverageStats(userId),
+    ]);
+    setCoverageGaps(newGaps);
+    setTerritoryStats(newStats);
+    const newSummary = await getHomeSummaryCounts(userId);
+    setSummary(newSummary);
+  }, [userId]);
+
   const gridColumns = isDesktop ? "1fr 1fr" : "1fr";
 
   return (
@@ -160,7 +174,7 @@ export default function HomePage() {
 
             <NextActionsTile actions={nextActions} />
 
-            <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} />
+            <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} onTrack={handleTrackHcp} />
 
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 16 }}>
               <OverdueFollowUpsTile
@@ -175,9 +189,9 @@ export default function HomePage() {
               <RecentBriefsTile briefs={recentBriefs} />
             </div>
 
-            <RecentActivityTile activity={recentActivity} />
-
             <TeamIntelligenceTile userId={userId} />
+
+            <RecentActivityTile activity={recentActivity} />
 
             <HomeNavigationRow />
           </div>
