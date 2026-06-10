@@ -78,14 +78,23 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
   const datePickerRef = useRef<HTMLDivElement>(null);
   const priorityMenuRef = useRef<HTMLDivElement>(null);
   const bodyInputRef = useRef<HTMLInputElement>(null);
+  const previousItemIdRef = useRef(item.id);
 
   const overdue = isOverdue(item);
 
   useEffect(() => {
-    setBodyDraft(item.body);
-    setEditingBody(false);
-    setConfirmDelete(false);
-  }, [item.id, item.body]);
+    if (previousItemIdRef.current !== item.id) {
+      previousItemIdRef.current = item.id;
+      setBodyDraft(item.body);
+      setEditingBody(false);
+      setConfirmDelete(false);
+      return;
+    }
+
+    if (!editingBody) {
+      setBodyDraft(item.body);
+    }
+  }, [item.id, item.body, editingBody]);
 
   useEffect(() => {
     if (editingBody) bodyInputRef.current?.focus();
