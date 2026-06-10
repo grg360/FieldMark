@@ -71,6 +71,27 @@ async function fetchFollowUpInfoByHcpId(userId: string): Promise<Map<string, { o
   return info;
 }
 
+async function fetchBriefExistsByHcpId(userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("msl_hcp_briefs")
+    .select("hcp_id")
+    .eq("user_id", userId)
+    .eq("ai_status", "generated")
+    .gt("expires_at", new Date().toISOString());
+
+  if (error) {
+    console.warn("fetchBriefExistsByHcpId: supabase error", error);
+    return new Set();
+  }
+
+  const set = new Set<string>();
+  for (const row of data ?? []) {
+    const hcpId = (row as { hcp_id?: string }).hcp_id;
+    if (hcpId) set.add(hcpId);
+  }
+  return set;
+}
+
 interface RelationshipsContextValue {
   relationshipMap: RelationshipMap;
   isSaved: (hcpId: string) => boolean;
@@ -80,6 +101,8 @@ interface RelationshipsContextValue {
   refreshInsightCounts: () => Promise<void>;
   getFollowUpInfo: (hcpId: string) => { openCount: number; hasOverdue: boolean };
   refreshFollowUpInfo: () => Promise<void>;
+  hasBrief: (hcpId: string) => boolean;
+  refreshBriefExists: () => Promise<void>;
 }
 
 const RelationshipsContext = createContext<RelationshipsContextValue | undefined>(undefined);
@@ -91,6 +114,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
   const [defaultWatchlistId, setDefaultWatchlistId] = useState<string | null>(null);
   const [insightCountByHcpId, setInsightCountByHcpId] = useState<Map<string, number>>(new Map());
   const [followUpInfoByHcpId, setFollowUpInfoByHcpId] = useState<Map<string, { openCount: number; hasOverdue: boolean }>>(new Map());
+  const [briefExistsByHcpId, setBriefExistsByHcpId] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const loadGenerationRef = useRef(0);
 
@@ -101,6 +125,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     setDefaultWatchlistId(null);
     setInsightCountByHcpId(new Map());
     setFollowUpInfoByHcpId(new Map());
+    setBriefExistsByHcpId(new Set());
     setIsLoading(false);
   }, []);
 
@@ -118,17 +143,19 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     setUserId(user.id);
 
     try {
-      const [map, watchlists, insightCounts, followUpInfo] = await Promise.all([
+      const [map, watchlists, insightCounts, followUpInfo, briefs] = await Promise.all([
         getRelationshipMap(user.id),
         getWatchlists(user.id),
         fetchInsightCountByHcpId(user.id),
         fetchFollowUpInfoByHcpId(user.id),
+        fetchBriefExistsByHcpId(user.id),
       ]);
       if (myGen !== loadGenerationRef.current) return;
 
       setRelationshipMap(new Map(map));
       setInsightCountByHcpId(insightCounts);
       setFollowUpInfoByHcpId(followUpInfo);
+      setBriefExistsByHcpId(briefs);
 
       const defaultList = watchlists.find((w) => w.is_default) ?? watchlists[0] ?? null;
       const listId = defaultList?.id ?? null;
@@ -199,6 +226,21 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       setFollowUpInfoByHcpId(info);
     } catch (err) {
       console.warn("refreshFollowUpInfo failed", err);
+    }
+  }, [userId]);
+
+  const hasBrief = useCallback(
+    (hcpId: string): boolean => briefExistsByHcpId.has(hcpId),
+    [briefExistsByHcpId],
+  );
+
+  const refreshBriefExists = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const briefs = await fetchBriefExistsByHcpId(userId);
+      setBriefExistsByHcpId(briefs);
+    } catch (err) {
+      console.warn("refreshBriefExists failed", err);
     }
   }, [userId]);
 
@@ -276,8 +318,10 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       refreshInsightCounts,
       getFollowUpInfo,
       refreshFollowUpInfo,
+      hasBrief,
+      refreshBriefExists,
     }),
-    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo],
+    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists],
   );
 
   return (

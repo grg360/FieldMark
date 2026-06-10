@@ -285,15 +285,19 @@ export default function FollowUpsList({
 
           <button
             type="button"
+            className="fm-pill-button"
             onClick={() => void handleComposerSave()}
             disabled={composerPending || composerBody.trim().length === 0}
             style={{
               backgroundColor: "#E8A020",
               color: "#0A0A0B",
-              padding: "6px 12px",
-              borderRadius: 4,
-              fontSize: 12,
-              fontWeight: 500,
+              padding: "3px 8px",
+              borderRadius: 3,
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              lineHeight: 1.2,
               border: "none",
               cursor: composerPending || composerBody.trim().length === 0 ? "default" : "pointer",
               fontFamily: "system-ui, -apple-system, sans-serif",

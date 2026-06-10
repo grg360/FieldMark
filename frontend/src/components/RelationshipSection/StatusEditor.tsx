@@ -72,6 +72,7 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
     <div ref={menuRef} style={{ position: "relative", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <button
         type="button"
+        className="fm-pill-button"
         onClick={() => setMenuOpen((open) => !open)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -79,10 +80,13 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
         aria-label={`Change relationship status. Current: ${statusLabel(currentStatus)}`}
         aria-expanded={menuOpen}
         style={{
-          padding: "5px 10px",
-          borderRadius: 4,
-          fontSize: 11,
-          fontWeight: 500,
+          padding: "3px 8px",
+          borderRadius: 3,
+          fontSize: 10,
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          lineHeight: 1.2,
           cursor: pending ? "default" : "pointer",
           fontFamily: "system-ui, -apple-system, sans-serif",
           backgroundColor: currentColors.bg,

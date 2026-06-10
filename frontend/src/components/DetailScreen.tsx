@@ -876,10 +876,12 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
   const allValidated =
     validation.dataMatch && validation.engagement && validation.credibility && validation.momentum;
 
-  const hcpId = hcp.hcp_id ?? hcp.id ?? "";
-  const { isSaved, toggleSave } = useRelationships();
+  const hcpId = String(hcp.hcp_id ?? hcp.id ?? "");
+  const navigate = useNavigate();
+  const { isSaved, toggleSave, hasBrief } = useRelationships();
   const [savePending, setSavePending] = useState(false);
   const saved = hcpId ? isSaved(String(hcpId)) : false;
+  const briefExists = hcpId ? hasBrief(hcpId) : false;
   const fieldIntelCount = mockFieldIntelContributorCount(String(hcpId));
   const doctorLabel = hcp.name.match(/^dr\.?\s/i) ? hcp.name : `Dr. ${hcp.name}`;
 
@@ -1156,13 +1158,47 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <div
-              className="fm-detail-heading"
-              style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", flex: 1, minWidth: 0 }}
-            >
-              {hcp.name}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                className="fm-detail-heading"
+                style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}
+              >
+                {hcp.name}
+              </div>
+              <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
+                <DetailSubline hcp={hcp} />
+              </div>
             </div>
+            {hcpId ? (
+              <button
+                type="button"
+                className="fm-pill-button"
+                onClick={() => navigate(`/hcp/${hcpId}/brief`)}
+                aria-label="View AI-generated brief for this HCP"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  backgroundColor: "#1E1E22",
+                  color: "#E8E6DF",
+                  border: "1px solid #2A2A30",
+                  borderRadius: 3,
+                  padding: "3px 8px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  lineHeight: 1.2,
+                  cursor: "pointer",
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: 12, lineHeight: 1, color: "#E8A020" }}>{String.fromCodePoint(0x2728)}</span>
+                {briefExists ? "Open Brief" : "Brief"}
+              </button>
+            ) : null}
             {hcpId ? (
               <button
                 type="button"
@@ -1194,9 +1230,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 )}
               </button>
             ) : null}
-          </div>
-          <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
-            <DetailSubline hcp={hcp} />
           </div>
         </div>
 

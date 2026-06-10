@@ -306,6 +306,10 @@ button {
     min-height: 44px;
   }
 
+  .fm-pill-button {
+    min-height: 0 !important;
+  }
+
   .fm-hcp-add-btn {
     min-height: 0 !important;
   }
