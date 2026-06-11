@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { ExternalPartnerInstitution } from "../lib/api";
+import { institutionToSlug } from "../lib/institutionUtils";
 
 interface Props {
   partners: ExternalPartnerInstitution[];
@@ -89,10 +90,29 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
                 </div>
               ) : null}
             </div>
-            <div style={{ display: "flex", gap: 4, alignItems: "baseline", flexShrink: 0, marginLeft: 12 }}>
+            <button
+              type="button"
+              className="fm-pill-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/institution/${institutionToSlug(sourceInstitutionName)}/publications?partner=${encodeURIComponent(p.institution_name)}&institution=${encodeURIComponent(sourceInstitutionName)}`);
+              }}
+              style={{
+                display: "flex",
+                gap: 4,
+                alignItems: "baseline",
+                flexShrink: 0,
+                marginLeft: 12,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                fontFamily: "inherit",
+              }}
+            >
               <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{p.total_shared_publications}</span>
               <span style={{ fontSize: 12, color: "#9B9892" }}>co-pubs</span>
-            </div>
+            </button>
           </div>
         ))}
       </div>

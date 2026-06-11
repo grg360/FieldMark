@@ -1,11 +1,15 @@
+import { useNavigate } from "react-router-dom";
 import type { InstitutionCollaboration } from "../lib/api";
+import { institutionToSlug } from "../lib/institutionUtils";
 
 interface Props {
   collaborations: InstitutionCollaboration[];
   onHcpClick: (hcpId: string) => void;
+  institutionName: string;
 }
 
-export default function InstitutionCollaborationsPanel({ collaborations, onHcpClick }: Props) {
+export default function InstitutionCollaborationsPanel({ collaborations, onHcpClick, institutionName }: Props) {
+  const navigate = useNavigate();
   if (collaborations.length === 0) {
     return null;
   }
@@ -77,10 +81,28 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
                 {c.hcp2_name}
               </a>
             </div>
-            <div style={{ display: "flex", gap: 4, alignItems: "baseline", flexShrink: 0 }}>
+            <button
+              type="button"
+              className="fm-pill-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/institution/${institutionToSlug(institutionName)}/publications?internal_pair=${c.hcp1_id},${c.hcp2_id}&institution=${encodeURIComponent(institutionName)}&partner_name1=${encodeURIComponent(c.hcp1_name)}&partner_name2=${encodeURIComponent(c.hcp2_name)}`);
+              }}
+              style={{
+                display: "flex",
+                gap: 4,
+                alignItems: "baseline",
+                flexShrink: 0,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                fontFamily: "inherit",
+              }}
+            >
               <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{c.shared_publications}</span>
               <span style={{ fontSize: 12, color: "#9B9892" }}>papers</span>
-            </div>
+            </button>
           </div>
         ))}
       </div>

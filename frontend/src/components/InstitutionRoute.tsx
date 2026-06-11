@@ -292,7 +292,11 @@ export default function InstitutionRoute() {
             />
           </div>
         ) : null}
-        <InstitutionCollaborationsPanel collaborations={collabs} onHcpClick={handleHcpClick} />
+        <InstitutionCollaborationsPanel
+          collaborations={collabs}
+          onHcpClick={handleHcpClick}
+          institutionName={summary?.institution_name ?? ""}
+        />
       </div>
 
       {summary ? (

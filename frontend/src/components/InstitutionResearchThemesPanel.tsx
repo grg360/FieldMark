@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { InstitutionResearchTheme } from "../lib/institutionThemes";
+import { institutionToSlug } from "../lib/institutionUtils";
 
 interface Props {
   themes: InstitutionResearchTheme[];
@@ -42,9 +43,7 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
                 key={theme.theme_name}
                 type="button"
                 onClick={() => {
-                  if (theme.top_contributor) {
-                    navigate(`/hcp/${theme.top_contributor.hcp_id}`);
-                  }
+                  navigate(`/institution/${institutionToSlug(institutionName)}/publications?theme=${encodeURIComponent(theme.theme_name)}&institution=${encodeURIComponent(institutionName)}`);
                 }}
                 style={{
                   display: "block",
@@ -54,13 +53,13 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
                   backgroundColor: "#15131A",
                   borderRadius: 4,
                   textAlign: "left",
-                  cursor: theme.top_contributor ? "pointer" : "default",
+                  cursor: "pointer",
                   fontFamily: "inherit",
                   color: "inherit",
                   transition: "background-color 120ms",
                 }}
                 onMouseEnter={(e) => {
-                  if (theme.top_contributor) e.currentTarget.style.backgroundColor = "#1A1820";
+                  e.currentTarget.style.backgroundColor = "#1A1820";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "#15131A";
