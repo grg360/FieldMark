@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Priority } from "./relationships";
+import { updateNextAction, type Priority } from "./relationships";
 
 // Therapeutic area UUID lookup. Keys are strings stored in msl_profiles.therapeutic_areas.
 // Migrate to a UUID column on msl_profiles when team features ship.
@@ -808,4 +808,305 @@ export async function getTerritoryCoverageStats(userId: string): Promise<Territo
       territory_label: null,
     };
   }
+}
+
+export type FollowUpSource = "brief" | "manual" | "all";
+
+export type FollowUpFilterStatus = "open" | "completed";
+
+export type FollowUpFilterPriority = "all" | "high" | "normal" | "low";
+
+export interface FollowUpRow {
+  id: string;
+  relationship_id: string;
+  body: string;
+  due_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  priority: Priority;
+  created_from: string | null;
+  hcp: HcpRef;
+  overdue: boolean;
+  days_overdue: number | null;
+}
+
+export interface FollowUpStats {
+  open_total: number;
+  overdue: number;
+  due_this_week: number;
+  future: number;
+  no_due_date: number;
+  completed_this_month: number;
+  completion_rate_30d: number;
+  median_close_days_30d: number | null;
+}
+
+export interface FollowUpQueryParams {
+  status?: FollowUpFilterStatus;
+  priority?: FollowUpFilterPriority;
+  source?: FollowUpSource;
+}
+
+export async function getFollowUpsForUser(
+  userId: string,
+  params: FollowUpQueryParams = {},
+): Promise<FollowUpRow[]> {
+  const { status = "open", priority = "all", source = "all" } = params;
+
+  try {
+    let query = supabase
+      .from("msl_hcp_next_actions")
+      .select(`
+          id,
+          relationship_id,
+          body,
+          due_at,
+          completed_at,
+          created_at,
+          priority,
+          created_from,
+          msl_hcp_relationships!inner(
+            hcp_id,
+            user_id,
+            hcps_v2!inner(first_name, last_name, institution_canonical, institution_normalized)
+          )
+        `)
+      .eq("user_id", userId)
+      .is("deleted_at", null);
+
+    if (status === "open") {
+      query = query.is("completed_at", null);
+    } else {
+      query = query.not("completed_at", "is", null);
+    }
+
+    if (priority !== "all") {
+      query = query.eq("priority", priority);
+    }
+
+    if (source === "brief") {
+      query = query.eq("created_from", "brief");
+    } else if (source === "manual") {
+      query = query.or("created_from.is.null,created_from.neq.brief");
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.warn("getFollowUpsForUser: supabase error", error);
+      throw error;
+    }
+
+    const now = Date.now();
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+    const rows: FollowUpRow[] = (data ?? []).map((raw) => {
+      const r = raw as {
+        id: string;
+        relationship_id: string;
+        body: string;
+        due_at: string | null;
+        completed_at: string | null;
+        created_at: string;
+        priority: Priority;
+        created_from: string | null;
+        msl_hcp_relationships: unknown;
+      };
+
+      const rel = Array.isArray(r.msl_hcp_relationships) ? r.msl_hcp_relationships[0] : r.msl_hcp_relationships;
+      const relObj = rel as {
+        hcp_id?: string;
+        hcps_v2?: unknown;
+      };
+      const hcpRow = Array.isArray(relObj?.hcps_v2) ? relObj.hcps_v2[0] : relObj?.hcps_v2;
+      const hcpData = hcpRow as {
+        first_name: string | null;
+        last_name: string | null;
+        institution_canonical: string | null;
+        institution_normalized: string | null;
+      } | undefined;
+
+      const name = hcpData
+        ? `${hcpData.first_name ?? ""} ${hcpData.last_name ?? ""}`.trim() || "Unknown"
+        : "Unknown";
+      const institution = hcpData?.institution_canonical ?? hcpData?.institution_normalized ?? null;
+
+      const dueTs = r.due_at ? new Date(r.due_at).getTime() : null;
+      const overdue = dueTs !== null && r.completed_at === null && dueTs < now;
+      const days_overdue = overdue && dueTs !== null ? Math.floor((now - dueTs) / MS_PER_DAY) : null;
+
+      return {
+        id: r.id,
+        relationship_id: r.relationship_id,
+        body: r.body,
+        due_at: r.due_at,
+        completed_at: r.completed_at,
+        created_at: r.created_at,
+        priority: r.priority,
+        created_from: r.created_from,
+        hcp: {
+          hcp_id: relObj?.hcp_id ?? "",
+          name,
+          institution,
+        },
+        overdue,
+        days_overdue,
+      };
+    });
+
+    const PRIORITY_RANK_LOCAL: Record<Priority, number> = { high: 0, normal: 1, low: 2 };
+    rows.sort((a, b) => {
+      if (a.overdue && !b.overdue) return -1;
+      if (!a.overdue && b.overdue) return 1;
+
+      const aDue = a.due_at ? new Date(a.due_at).getTime() : Infinity;
+      const bDue = b.due_at ? new Date(b.due_at).getTime() : Infinity;
+      if (aDue !== bDue) return aDue - bDue;
+
+      const aPrio = PRIORITY_RANK_LOCAL[a.priority] ?? 1;
+      const bPrio = PRIORITY_RANK_LOCAL[b.priority] ?? 1;
+      return aPrio - bPrio;
+    });
+
+    return rows;
+  } catch (err) {
+    console.warn("getFollowUpsForUser: error", err);
+    throw err;
+  }
+}
+
+export async function getFollowUpStats(userId: string): Promise<FollowUpStats> {
+  try {
+    const empty: FollowUpStats = {
+      open_total: 0,
+      overdue: 0,
+      due_this_week: 0,
+      future: 0,
+      no_due_date: 0,
+      completed_this_month: 0,
+      completion_rate_30d: 0,
+      median_close_days_30d: null,
+    };
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const startOfMonth = (() => {
+      const d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+    })();
+
+    const { data, error } = await supabase
+      .from("msl_hcp_next_actions")
+      .select("id, due_at, completed_at, created_at")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .or(`completed_at.is.null,completed_at.gte.${thirtyDaysAgo}`);
+
+    if (error) {
+      console.warn("getFollowUpStats: supabase error", error);
+      return empty;
+    }
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      due_at: string | null;
+      completed_at: string | null;
+      created_at: string;
+    }>;
+
+    const now = Date.now();
+    const weekFromNow = now + 7 * 24 * 60 * 60 * 1000;
+    const startOfMonthTs = new Date(startOfMonth).getTime();
+    const thirtyDaysAgoTs = new Date(thirtyDaysAgo).getTime();
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+    let openTotal = 0;
+    let overdue = 0;
+    let dueThisWeek = 0;
+    let future = 0;
+    let noDueDate = 0;
+    let completedThisMonth = 0;
+    let completedLast30Days = 0;
+    let createdLast30Days = 0;
+    const closeDaysSamples: number[] = [];
+
+    for (const r of rows) {
+      const createdTs = new Date(r.created_at).getTime();
+      const completedTs = r.completed_at ? new Date(r.completed_at).getTime() : null;
+      const dueTs = r.due_at ? new Date(r.due_at).getTime() : null;
+
+      if (completedTs === null) {
+        openTotal += 1;
+        if (dueTs === null) noDueDate += 1;
+        else if (dueTs < now) overdue += 1;
+        else if (dueTs < weekFromNow) dueThisWeek += 1;
+        else future += 1;
+      }
+
+      if (completedTs !== null && completedTs >= startOfMonthTs) {
+        completedThisMonth += 1;
+      }
+
+      if (createdTs >= thirtyDaysAgoTs) {
+        createdLast30Days += 1;
+        if (completedTs !== null) completedLast30Days += 1;
+      }
+
+      if (completedTs !== null && completedTs >= thirtyDaysAgoTs) {
+        const closeDays = (completedTs - createdTs) / MS_PER_DAY;
+        if (closeDays >= 0) closeDaysSamples.push(closeDays);
+      }
+    }
+
+    const completionRate30d = createdLast30Days > 0
+      ? Math.round((completedLast30Days / createdLast30Days) * 100)
+      : 0;
+
+    let medianCloseDays: number | null = null;
+    if (closeDaysSamples.length > 0) {
+      closeDaysSamples.sort((a, b) => a - b);
+      const mid = Math.floor(closeDaysSamples.length / 2);
+      medianCloseDays = closeDaysSamples.length % 2 === 0
+        ? Math.round((closeDaysSamples[mid - 1] + closeDaysSamples[mid]) / 2 * 10) / 10
+        : Math.round(closeDaysSamples[mid] * 10) / 10;
+    }
+
+    return {
+      open_total: openTotal,
+      overdue,
+      due_this_week: dueThisWeek,
+      future,
+      no_due_date: noDueDate,
+      completed_this_month: completedThisMonth,
+      completion_rate_30d: completionRate30d,
+      median_close_days_30d: medianCloseDays,
+    };
+  } catch (err) {
+    console.warn("getFollowUpStats: error", err);
+    return {
+      open_total: 0,
+      overdue: 0,
+      due_this_week: 0,
+      future: 0,
+      no_due_date: 0,
+      completed_this_month: 0,
+      completion_rate_30d: 0,
+      median_close_days_30d: null,
+    };
+  }
+}
+
+export async function markFollowUpComplete(userId: string, followUpId: string): Promise<void> {
+  await updateNextAction(userId, followUpId, {
+    completedAt: new Date().toISOString(),
+  });
+}
+
+export async function snoozeFollowUp(
+  userId: string,
+  followUpId: string,
+  newDueAt: string,
+): Promise<void> {
+  await updateNextAction(userId, followUpId, {
+    dueAt: newDueAt,
+  });
 }

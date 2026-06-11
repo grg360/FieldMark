@@ -354,6 +354,7 @@ export async function createNextAction(
       body: string;
       due_at?: string | null;
       priority?: Priority;
+      created_from?: string | null;
     } = {
       relationship_id: relationship.id,
       user_id: userId,
@@ -365,6 +366,9 @@ export async function createNextAction(
     }
     if (params.priority !== undefined) {
       insertPayload.priority = params.priority;
+    }
+    if (params.createdFrom !== undefined) {
+      insertPayload.created_from = params.createdFrom;
     }
 
     const { data, error } = await supabase
