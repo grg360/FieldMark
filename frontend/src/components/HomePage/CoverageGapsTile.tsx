@@ -1,6 +1,9 @@
-import { useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import type { CoverageGapHcp, TerritoryCoverageStats } from "../../lib/home";
+import { getCurrentUser } from "../../lib/authHelpers";
+import { getHcpOverview } from "../../lib/aiOverviews";
+import { getTrackedHcpsInTerritory, type CoverageGapHcp, type TerritoryCoverageStats, type TrackedHcpChip } from "../../lib/home";
+import { useIsDesktop } from "../../lib/useIsDesktop";
 
 interface Props {
   gaps: CoverageGapHcp[];
@@ -18,9 +21,60 @@ const tileStyle = {
 
 export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop(600);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set());
   const [errorByHcp, setErrorByHcp] = useState<Record<string, string>>({});
+  const [overviewsByHcpId, setOverviewsByHcpId] = useState<Record<string, { body: string; loading: boolean; error: boolean }>>({});
+  const [userId, setUserId] = useState<string | null>(null);
+  const [trackedChips, setTrackedChips] = useState<TrackedHcpChip[]>([]);
+  const [trackedLoading, setTrackedLoading] = useState(false);
+
+  useEffect(() => {
+    void getCurrentUser().then((user) => setUserId(user?.id ?? null));
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    setTrackedLoading(true);
+    getTrackedHcpsInTerritory(userId)
+      .then((chips) => setTrackedChips(chips))
+      .catch((err) => console.warn("CoverageGapsTile: tracked chips error", err))
+      .finally(() => setTrackedLoading(false));
+  }, [userId]);
+
+  useEffect(() => {
+    if (!gaps || gaps.length === 0) return;
+
+    setOverviewsByHcpId((prev) => {
+      const next = { ...prev };
+      for (const gap of gaps) {
+        if (!next[gap.hcp_id]) {
+          next[gap.hcp_id] = { body: "", loading: true, error: false };
+        }
+      }
+      return next;
+    });
+
+    for (const gap of gaps) {
+      getHcpOverview(gap.hcp_id, "NSCLC")
+        .then((overview) => {
+          setOverviewsByHcpId((prev) => ({
+            ...prev,
+            [gap.hcp_id]: overview
+              ? { body: overview.body, loading: false, error: false }
+              : { body: "", loading: false, error: true },
+          }));
+        })
+        .catch((err) => {
+          console.warn("CoverageGapsTile: overview fetch error", err);
+          setOverviewsByHcpId((prev) => ({
+            ...prev,
+            [gap.hcp_id]: { body: "", loading: false, error: true },
+          }));
+        });
+    }
+  }, [gaps]);
 
   const hasStats = stats && stats.total_rising_stars_in_territory > 0;
 
@@ -52,6 +106,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
 
   return (
     <div style={tileStyle}>
+      <style>{`@keyframes fmShimmer { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
       <div
         style={{
           fontSize: 11,
@@ -96,6 +151,66 @@ export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
         </div>
       ) : (
         <>
+          {trackedChips.length > 0 ? (
+            <div style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#6B6A65",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                Tracking ({trackedChips.length})
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {trackedChips.map((chip) => {
+                  const cohortColor = chip.cohort === "rising_star" ? "#9B6DFF"
+                    : chip.cohort === "established" ? "#E8A020"
+                    : chip.cohort === "community" ? "#4A90E2"
+                    : "#6B6A65";
+                  const cohortBg = chip.cohort === "rising_star" ? "rgba(155,109,255,0.15)"
+                    : chip.cohort === "established" ? "rgba(232,160,32,0.15)"
+                    : chip.cohort === "community" ? "rgba(74,144,226,0.15)"
+                    : "rgba(107,106,101,0.15)";
+                  return (
+                    <button
+                      key={chip.hcp_id}
+                      type="button"
+                      onClick={() => navigate(`/hcp/${chip.hcp_id}`)}
+                      className="fm-pill-button"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "4px 8px",
+                        backgroundColor: cohortBg,
+                        color: cohortColor,
+                        border: `1px solid ${cohortColor}`,
+                        borderRadius: 3,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        fontFamily: "system-ui, -apple-system, sans-serif",
+                        whiteSpace: "nowrap",
+                        transition: "opacity 120ms",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                    >
+                      <span>{chip.name}</span>
+                      {chip.cohort_rank !== null ? (
+                        <span style={{ fontSize: 10, opacity: 0.85 }}>#{chip.cohort_rank}</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           <div
             style={{
               fontSize: 10,
@@ -129,8 +244,9 @@ export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
                   }}
                   style={{
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    flexDirection: isDesktop ? "row" : "column",
+                    alignItems: isDesktop ? "center" : "stretch",
+                    justifyContent: isDesktop ? "space-between" : "flex-start",
                     gap: 12,
                     padding: "10px 0",
                     cursor: "pointer",
@@ -167,9 +283,73 @@ export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
                         </>
                       ) : null}
                     </div>
+
+                    {(() => {
+                      const overview = overviewsByHcpId[gap.hcp_id];
+                      if (!overview) return null;
+
+                      if (overview.loading) {
+                        return (
+                          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <span style={{ fontSize: 11, lineHeight: 1, color: "#9B6DFF" }}>{String.fromCodePoint(0x2728)}</span>
+                              <span style={{ fontSize: 10, color: "#9B6DFF", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                AI Synthesis
+                              </span>
+                            </div>
+                            <div style={{ height: 12, background: "linear-gradient(90deg, #1E1E22 0%, #2A2A30 50%, #1E1E22 100%)", borderRadius: 3, width: "85%", animation: "fmShimmer 1.5s infinite" }} />
+                            <div style={{ height: 12, background: "linear-gradient(90deg, #1E1E22 0%, #2A2A30 50%, #1E1E22 100%)", borderRadius: 3, width: "70%", animation: "fmShimmer 1.5s infinite" }} />
+                          </div>
+                        );
+                      }
+
+                      if (overview.error || !overview.body) return null;
+
+                      return (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                backgroundColor: "rgba(155,109,255,0.18)",
+                                color: "#9B6DFF",
+                                padding: "3px 8px",
+                                borderRadius: 3,
+                                fontSize: 10,
+                                fontWeight: 600,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              <span style={{ fontSize: 11, lineHeight: 1 }}>{String.fromCodePoint(0x2728)}</span>
+                              AI Synthesis
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#9B9892",
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {overview.body}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexShrink: 0,
+                      ...(isDesktop ? {} : { marginTop: 12, alignSelf: "flex-end" }),
+                    }}
+                  >
                     <span
                       style={{
                         backgroundColor: "rgba(155,109,255,0.18)",

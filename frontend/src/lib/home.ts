@@ -80,6 +80,13 @@ export interface CoverageGapHcp {
   archetype: string | null;
 }
 
+export interface TrackedHcpChip {
+  hcp_id: string;
+  name: string;
+  cohort: "rising_star" | "established" | "community" | null;
+  cohort_rank: number | null;
+}
+
 export interface TerritoryCoverageStats {
   total_rising_stars_in_territory: number;
   tracked_count: number;
@@ -1109,4 +1116,106 @@ export async function snoozeFollowUp(
   await updateNextAction(userId, followUpId, {
     dueAt: newDueAt,
   });
+}
+
+export async function getTrackedHcpsInTerritory(userId: string): Promise<TrackedHcpChip[]> {
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from("msl_profiles")
+      .select("territory_states")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (profileError || !profile?.territory_states || profile.territory_states.length === 0) {
+      return [];
+    }
+
+    const territoryStates = profile.territory_states as string[];
+
+    const { data: rels, error: relsError } = await supabase
+      .from("msl_hcp_relationships")
+      .select("hcp_id")
+      .eq("user_id", userId);
+
+    if (relsError || !rels || rels.length === 0) {
+      return [];
+    }
+
+    const hcpIds = rels.map((r) => (r as { hcp_id: string }).hcp_id);
+
+    const CHUNK_SIZE = 100;
+    type HcpRow = {
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      nppes_practice_state: string | null;
+      cohort_classification: string | null;
+    };
+    const allHcps: HcpRow[] = [];
+    for (let i = 0; i < hcpIds.length; i += CHUNK_SIZE) {
+      const chunk = hcpIds.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabase
+        .from("hcps_v2")
+        .select("id, first_name, last_name, nppes_practice_state, cohort_classification")
+        .in("id", chunk)
+        .in("nppes_practice_state", territoryStates);
+      if (error) {
+        console.warn("getTrackedHcpsInTerritory: hcp chunk error", error);
+        continue;
+      }
+      for (const row of (data ?? []) as HcpRow[]) {
+        allHcps.push(row);
+      }
+    }
+
+    if (allHcps.length === 0) return [];
+
+    const hcpIdsInTerritory = allHcps.map((h) => h.id);
+    type RankRow = { hcp_id: string; rank_us: number | null };
+    const ranksByHcpId = new Map<string, number | null>();
+
+    for (let i = 0; i < hcpIdsInTerritory.length; i += CHUNK_SIZE) {
+      const chunk = hcpIdsInTerritory.slice(i, i + CHUNK_SIZE);
+      const { data } = await supabase
+        .from("hcp_rising_star_ranks_v3")
+        .select("hcp_id, rank_us")
+        .in("hcp_id", chunk);
+      for (const row of (data ?? []) as RankRow[]) {
+        ranksByHcpId.set(row.hcp_id, row.rank_us);
+      }
+    }
+
+    const chips: TrackedHcpChip[] = allHcps.map((h) => {
+      const cohortLower = (h.cohort_classification ?? "").toLowerCase();
+      let cohort: TrackedHcpChip["cohort"] = null;
+      if (cohortLower === "rising_star" || cohortLower === "dark_horse") cohort = "rising_star";
+      else if (cohortLower === "established") cohort = "established";
+      else if (cohortLower === "community" || cohortLower === "workhorse") cohort = "community";
+
+      return {
+        hcp_id: h.id,
+        name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
+        cohort,
+        cohort_rank: cohort === "rising_star" ? (ranksByHcpId.get(h.id) ?? null) : null,
+      };
+    });
+
+    const cohortPriority: Record<string, number> = { rising_star: 0, established: 1, community: 2 };
+    chips.sort((a, b) => {
+      const aPriority = a.cohort ? cohortPriority[a.cohort] ?? 3 : 3;
+      const bPriority = b.cohort ? cohortPriority[b.cohort] ?? 3 : 3;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      if (a.cohort === "rising_star" && b.cohort === "rising_star") {
+        if (a.cohort_rank !== null && b.cohort_rank !== null) return a.cohort_rank - b.cohort_rank;
+        if (a.cohort_rank !== null) return -1;
+        if (b.cohort_rank !== null) return 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return chips;
+  } catch (err) {
+    console.warn("getTrackedHcpsInTerritory: error", err);
+    return [];
+  }
 }
