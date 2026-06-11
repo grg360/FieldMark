@@ -114,6 +114,16 @@ export default function UserMenu() {
             type="button"
             onClick={() => {
               setOpen(false);
+              navigate("/institutions/nsclc");
+            }}
+            style={menuItemStyle}
+          >
+            Institutions
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
               navigate("/me/watchlists");
             }}
             style={menuItemStyle}

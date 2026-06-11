@@ -746,17 +746,41 @@ export async function getTerritoryCoverageStats(userId: string): Promise<Territo
       return empty;
     }
 
-    const { data: rankings, error: rankError } = await supabase
-      .from("hcp_rising_star_ranks_v3")
-      .select("hcp_id")
-      .in("therapeutic_area_id", context.taUuids);
+    const PAGE_SIZE = 1000;
+    let allRankings: { hcp_id: string }[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    if (rankError) {
-      console.warn("getTerritoryCoverageStats: rankings error", rankError);
-      return empty;
+    while (hasMore) {
+      const { data: pageData, error: pageError } = await supabase
+        .from("hcp_rising_star_ranks_v3")
+        .select("hcp_id")
+        .in("therapeutic_area_id", context.taUuids)
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (pageError) {
+        console.warn("getTerritoryCoverageStats: rankings page error", pageError);
+        return empty;
+      }
+
+      const page = (pageData ?? []) as { hcp_id: string }[];
+      allRankings = allRankings.concat(page);
+
+      if (page.length < PAGE_SIZE) {
+        hasMore = false;
+      } else {
+        offset += PAGE_SIZE;
+      }
+
+      if (offset > 50000) {
+        console.warn("getTerritoryCoverageStats: rankings exceeded 50000 rows, stopping pagination");
+        hasMore = false;
+      }
     }
 
-    const rankedHcpIds = (rankings ?? []).map((r) => (r as { hcp_id: string }).hcp_id);
+    const rankings = allRankings;
+
+    const rankedHcpIds = rankings.map((r) => r.hcp_id);
     if (rankedHcpIds.length === 0) return empty;
 
     const CHUNK_SIZE = 100;
@@ -1171,17 +1195,17 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
     if (allHcps.length === 0) return [];
 
     const hcpIdsInTerritory = allHcps.map((h) => h.id);
-    type RankRow = { hcp_id: string; rank_us: number | null };
+    type RankRow = { hcp_id: string; us_rank: number | null };
     const ranksByHcpId = new Map<string, number | null>();
 
     for (let i = 0; i < hcpIdsInTerritory.length; i += CHUNK_SIZE) {
       const chunk = hcpIdsInTerritory.slice(i, i + CHUNK_SIZE);
       const { data } = await supabase
         .from("hcp_rising_star_ranks_v3")
-        .select("hcp_id, rank_us")
+        .select("hcp_id, us_rank")
         .in("hcp_id", chunk);
       for (const row of (data ?? []) as RankRow[]) {
-        ranksByHcpId.set(row.hcp_id, row.rank_us);
+        ranksByHcpId.set(row.hcp_id, row.us_rank);
       }
     }
 

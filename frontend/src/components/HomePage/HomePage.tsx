@@ -35,6 +35,7 @@ import RecentActivityTile from "./RecentActivityTile";
 import RecentBriefsTile from "./RecentBriefsTile";
 import RecentInsightsTile from "./RecentInsightsTile";
 import TeamIntelligenceTile from "./TeamIntelligenceTile";
+import YourInstitutionsTile from "./YourInstitutionsTile";
 
 export default function HomePage() {
   const isDesktop = useIsDesktop();
@@ -162,6 +163,8 @@ export default function HomePage() {
             <HomeHero firstName={userFirstName} summary={summary} territory={territoryProfile} />
 
             <NextActionsTile actions={nextActions} />
+
+            {userId ? <YourInstitutionsTile userId={userId} /> : null}
 
             <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} onTrack={handleTrackHcp} />
 

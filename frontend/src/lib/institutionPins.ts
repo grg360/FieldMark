@@ -1,3 +1,4 @@
+import type { InstitutionIndexEntry } from "./api";
 import { supabase } from "./supabase";
 
 export interface PinnedInstitution {
@@ -77,5 +78,30 @@ export async function isInstitutionPinned(userId: string, institutionName: strin
   } catch (err) {
     console.warn("isInstitutionPinned: error", err);
     return false;
+  }
+}
+
+export async function getInstitutionsByNames(
+  names: string[],
+  therapeuticArea: string = "NSCLC",
+): Promise<Map<string, InstitutionIndexEntry>> {
+  const result = new Map<string, InstitutionIndexEntry>();
+  if (names.length === 0) return result;
+
+  try {
+    const { getInstitutionsIndex } = await import("./api");
+    const fullIndex = await getInstitutionsIndex(therapeuticArea.toLowerCase());
+
+    const nameSet = new Set(names);
+    for (const entry of fullIndex) {
+      if (nameSet.has(entry.institution_name)) {
+        result.set(entry.institution_name, entry);
+      }
+    }
+
+    return result;
+  } catch (err) {
+    console.warn("getInstitutionsByNames: error", err);
+    return result;
   }
 }
