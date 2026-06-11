@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Pin, PinOff } from "lucide-react";
 import { getInstitutionsIndex, type InstitutionIndexEntry } from "../lib/api";
-import GlobalFooter from "./GlobalFooter";
+import { getCurrentUser } from "../lib/authHelpers";
+import { getPinnedInstitutionsForUser, pinInstitution, unpinInstitution } from "../lib/institutionPins";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { institutionToSlug } from "../lib/institutionUtils";
+import AppLayout from "./AppLayout";
 
 export default function InstitutionsIndexRoute() {
   const { ta } = useParams<{ ta: string }>();
@@ -11,8 +16,10 @@ export default function InstitutionsIndexRoute() {
   const [entries, setEntries] = useState<InstitutionIndexEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortColumn, setSortColumn] = useState<string>("rising_star_count");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<"rising_star_count" | "investigator_count" | "established_count" | "talent_density_pct" | "yield_ratio" | "institution_name">("rising_star_count");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [pinnedSet, setPinnedSet] = useState<Set<string>>(new Set());
+  const [pinPending, setPinPending] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -31,288 +38,239 @@ export default function InstitutionsIndexRoute() {
     };
   }, [taSlug]);
 
-  function handleSort(column: string) {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortColumn(column);
-      setSortDirection(
-        column === "institution_name" || column === "top_rising_star_rank" ? "asc" : "desc",
-      );
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const user = await getCurrentUser();
+      if (!user || cancelled) return;
+      setUserId(user.id);
+      const pins = await getPinnedInstitutionsForUser(user.id);
+      if (cancelled) return;
+      setPinnedSet(new Set(pins.map((p) => p.institution_name)));
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleTogglePin(institutionName: string) {
+    if (!userId) return;
+    if (pinPending.has(institutionName)) return;
+
+    setPinPending((prev) => new Set(prev).add(institutionName));
+    const wasPinned = pinnedSet.has(institutionName);
+
+    setPinnedSet((prev) => {
+      const next = new Set(prev);
+      if (wasPinned) next.delete(institutionName);
+      else next.add(institutionName);
+      return next;
+    });
+
+    try {
+      if (wasPinned) {
+        await unpinInstitution(userId, institutionName);
+      } else {
+        await pinInstitution(userId, institutionName);
+      }
+    } catch (err) {
+      console.warn("handleTogglePin error", err);
+      setPinnedSet((prev) => {
+        const next = new Set(prev);
+        if (wasPinned) next.add(institutionName);
+        else next.delete(institutionName);
+        return next;
+      });
+    } finally {
+      setPinPending((prev) => {
+        const next = new Set(prev);
+        next.delete(institutionName);
+        return next;
+      });
     }
   }
 
-  function sortedEntries(): InstitutionIndexEntry[] {
+  function filteredSorted(): InstitutionIndexEntry[] {
     const filtered = searchQuery.trim()
-      ? entries.filter((e) =>
-          e.institution_name.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
+      ? entries.filter((e) => e.institution_name.toLowerCase().includes(searchQuery.toLowerCase()))
       : entries;
 
     return [...filtered].sort((a, b) => {
-      let aVal: string | number;
-      let bVal: string | number;
-
-      switch (sortColumn) {
-        case "institution_name":
-          aVal = a.institution_name;
-          bVal = b.institution_name;
-          break;
-        case "investigator_count":
-          aVal = a.investigator_count;
-          bVal = b.investigator_count;
-          break;
-        case "rising_star_count":
-          aVal = a.rising_star_count;
-          bVal = b.rising_star_count;
-          break;
-        case "established_count":
-          aVal = a.established_count;
-          bVal = b.established_count;
-          break;
-        case "talent_density_pct":
-          aVal = a.talent_density_pct ?? -1;
-          bVal = b.talent_density_pct ?? -1;
-          break;
-        case "yield_ratio":
-          aVal = a.yield_ratio ?? -1;
-          bVal = b.yield_ratio ?? -1;
-          break;
-        case "external_partner_count":
-          aVal = a.external_partner_count;
-          bVal = b.external_partner_count;
-          break;
-        case "top_rising_star_rank":
-          aVal = a.top_rising_star_rank ?? 99999;
-          bVal = b.top_rising_star_rank ?? 99999;
-          break;
-        default:
-          aVal = 0;
-          bVal = 0;
+      if (sortBy === "institution_name") {
+        return a.institution_name.localeCompare(b.institution_name);
       }
-
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return sortDirection === "asc"
-        ? Number(aVal) - Number(bVal)
-        : Number(bVal) - Number(aVal);
+      const aVal = (a[sortBy] as number | null) ?? -Infinity;
+      const bVal = (b[sortBy] as number | null) ?? -Infinity;
+      return (bVal as number) - (aVal as number);
     });
   }
 
-  function SortableHeader({
-    column,
-    label,
-    align,
-  }: {
-    column: string;
-    label: string;
-    align: "left" | "right";
-  }) {
-    const isActive = sortColumn === column;
-    const arrow = isActive ? (sortDirection === "asc" ? " \u2191" : " \u2193") : "";
-
-    return (
-      <th
-        onClick={() => handleSort(column)}
-        style={{
-          padding: "10px 12px",
-          textAlign: align,
-          fontSize: 11,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: isActive ? "#E8E6DF" : "#6B6A65",
-          fontWeight: 500,
-          cursor: "pointer",
-          userSelect: "none",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {label}
-        {arrow}
-      </th>
-    );
-  }
-
-  const displayEntries = sortedEntries();
+  const isDesktop = useIsDesktop();
+  const sorted = filteredSorted();
+  const breadcrumbs = [
+    { label: "Home", path: "/me" },
+    { label: "Institutions" },
+  ];
 
   return (
-    <div
-      className="fm-screen"
-      style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100dvh",
-        maxWidth: 960,
-        margin: "0 auto",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        overflowX: "hidden",
-      }}
-    >
-      <div style={{ padding: "16px 16px 16px", borderBottom: "1px solid #1E1E22" }}>
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#6B6A65",
-            cursor: "pointer",
-            padding: 0,
-            fontSize: 13,
-          }}
-        >
-          {"\u2190"} Home
-        </button>
-        <h1 style={{ fontSize: 22, color: "#E8E6DF", margin: "8px 0 4px", fontWeight: 600 }}>
+    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1100}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
           {taSlug.toUpperCase()} Institutions
         </h1>
-        <div style={{ fontSize: 13, color: "#6B6A65", marginBottom: 12 }}>
-          {entries.length} institutions with NSCLC investigators
+        <div style={{ fontSize: 13, color: "#9B9892", marginTop: 6 }}>
+          {entries.length} institutions with {taSlug.toUpperCase()} investigators
         </div>
+      </div>
 
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         <input
           type="text"
-          placeholder="Search institutions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search institutions..."
           style={{
-            width: "100%",
-            padding: "8px 12px",
+            flex: 1,
+            minWidth: 200,
+            padding: "10px 14px",
             backgroundColor: "#0D0D10",
             border: "1px solid #1E1E22",
-            borderRadius: 4,
+            borderRadius: 6,
             color: "#E8E6DF",
             fontSize: 13,
+            fontFamily: "inherit",
             outline: "none",
           }}
         />
-      </div>
-
-      <div style={{ padding: "16px", overflowX: "auto" }}>
-        {loading ? (
-          <div style={{ color: "#6B6A65", fontSize: 13 }}>Loading institutions...</div>
-        ) : displayEntries.length === 0 ? (
-          <div style={{ color: "#6B6A65", fontSize: 13 }}>
-            No institutions match your search.
-          </div>
-        ) : (
-          <table
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "#9B9892" }}>Sort by</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
             style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 13,
+              padding: "8px 10px",
+              backgroundColor: "#0D0D10",
+              border: "1px solid #1E1E22",
+              borderRadius: 6,
               color: "#E8E6DF",
+              fontSize: 12,
+              fontFamily: "inherit",
+              cursor: "pointer",
             }}
           >
-            <thead>
-              <tr style={{ borderBottom: "1px solid #1E1E22" }}>
-                <SortableHeader column="institution_name" label="Institution" align="left" />
-                <SortableHeader column="investigator_count" label="Published NSCLC Investigators" align="right" />
-                <SortableHeader column="rising_star_count" label="Rising Stars" align="right" />
-                <SortableHeader column="established_count" label="Established" align="right" />
-                <SortableHeader column="talent_density_pct" label="Talent Density" align="right" />
-                <SortableHeader column="yield_ratio" label="Yield" align="right" />
-                <SortableHeader column="external_partner_count" label="External Partners" align="right" />
-                <SortableHeader column="top_rising_star_rank" label="Top Investigator" align="left" />
-              </tr>
-            </thead>
-            <tbody>
-              {displayEntries.map((entry) => (
-                <tr
-                  key={entry.slug}
-                  onClick={() => navigate(`/institution/${entry.slug}`)}
-                  style={{
-                    cursor: "pointer",
-                    borderBottom: "1px solid #15131A",
-                    transition: "background-color 120ms",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#0F0F12";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <td style={{ padding: "10px 12px", color: "#E8E6DF" }}>
-                    {entry.institution_name}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      color: "#9B9892",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {entry.investigator_count.toLocaleString()}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      color: "#9B6DFF",
-                      fontWeight: 600,
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {entry.rising_star_count}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      color: "#E8A020",
-                      fontWeight: 600,
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {entry.established_count}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      color: "#3FB8AF",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {entry.talent_density_pct != null
-                      ? `${entry.talent_density_pct.toFixed(1)}%`
-                      : "\u2014"}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      color: "#E8A04E",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {entry.yield_ratio != null ? entry.yield_ratio.toFixed(2) : "\u2014"}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      color: "#9B9892",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {entry.external_partner_count}
-                  </td>
-                  <td style={{ padding: "10px 12px", color: "#9B9892", fontSize: 12 }}>
-                    {entry.top_rising_star_name
-                      ? `${entry.top_rising_star_name} (#${entry.top_rising_star_rank} US)`
-                      : "\u2014"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+            <option value="rising_star_count">Rising Stars</option>
+            <option value="established_count">Established</option>
+            <option value="investigator_count">Total Investigators</option>
+            <option value="talent_density_pct">Talent Density</option>
+            <option value="yield_ratio">Yield Ratio</option>
+            <option value="institution_name">Name (A-Z)</option>
+          </select>
+        </div>
       </div>
 
-      <GlobalFooter />
-    </div>
+      {loading ? (
+        <div style={{ fontSize: 14, color: "#6B6A65", padding: "48px 0", textAlign: "center" }}>
+          Loading...
+        </div>
+      ) : sorted.length === 0 ? (
+        <div style={{ fontSize: 14, color: "#9B9892", padding: "48px 0", textAlign: "center" }}>
+          No institutions match your search.
+        </div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
+          gap: 12,
+        }}>
+          {sorted.map((entry) => {
+            const isPinned = pinnedSet.has(entry.institution_name);
+            const isToggling = pinPending.has(entry.institution_name);
+            const states = entry.states_present.slice(0, 3).join(", ");
+            const moreStates = entry.states_present.length > 3 ? `, +${entry.states_present.length - 3}` : "";
+
+            return (
+              <div
+                key={entry.slug}
+                onClick={() => navigate(`/institution/${entry.slug}`)}
+                style={{
+                  backgroundColor: "#15131A",
+                  borderTop: "1px solid #1E1E22",
+                  borderRight: "1px solid #1E1E22",
+                  borderBottom: "1px solid #1E1E22",
+                  borderLeft: isPinned ? "3px solid #E8A020" : "1px solid #1E1E22",
+                  borderRadius: 8,
+                  padding: "14px 16px",
+                  paddingLeft: isPinned ? 14 : 16,
+                  cursor: "pointer",
+                  transition: "background-color 120ms",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#1A1820";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#15131A";
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#E8E6DF", marginBottom: 2 }}>
+                      {entry.institution_name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6B6A65" }}>
+                      {states}{moreStates}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="fm-pill-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleTogglePin(entry.institution_name);
+                    }}
+                    disabled={isToggling}
+                    aria-label={isPinned ? "Unpin institution" : "Pin institution"}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 4,
+                      cursor: isToggling ? "default" : "pointer",
+                      color: isPinned ? "#E8A020" : "#6B6A65",
+                      flexShrink: 0,
+                      opacity: isToggling ? 0.5 : 1,
+                    }}
+                  >
+                    {isPinned ? <Pin size={16} fill="currentColor" /> : <Pin size={16} />}
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap", alignItems: "baseline" }}>
+                  <div>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "#E8E6DF" }}>{entry.investigator_count.toLocaleString()}</span>
+                    <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>investigators</span>
+                  </div>
+                  {entry.rising_star_count > 0 ? (
+                    <div>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#9B6DFF" }}>{entry.rising_star_count}</span>
+                      <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>rising</span>
+                    </div>
+                  ) : null}
+                  {entry.established_count > 0 ? (
+                    <div>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{entry.established_count}</span>
+                      <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>established</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                {entry.top_rising_star_name && entry.top_rising_star_rank !== null ? (
+                  <div style={{ fontSize: 12, color: "#9B9892", marginTop: 8 }}>
+                    Top: <span style={{ color: "#E8E6DF" }}>{entry.top_rising_star_name}</span>
+                    <span style={{ color: "#9B6DFF", fontWeight: 600, marginLeft: 6 }}>#{entry.top_rising_star_rank}</span>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </AppLayout>
   );
 }
