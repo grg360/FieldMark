@@ -321,6 +321,13 @@ button {
     -webkit-text-size-adjust: none;
   }
 
+  .fm-card-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 0 16px !important;
+  }
+
   .fm-detail-body {
     display: flex !important;
     flex-direction: column !important;

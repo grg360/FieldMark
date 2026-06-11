@@ -104,6 +104,16 @@ export default function UserMenu() {
             type="button"
             onClick={() => {
               setOpen(false);
+              navigate("/");
+            }}
+            style={menuItemStyle}
+          >
+            HCP Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
               navigate("/me/watchlists");
             }}
             style={menuItemStyle}
