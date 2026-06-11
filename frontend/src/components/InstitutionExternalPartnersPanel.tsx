@@ -84,23 +84,14 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
                   {" \u2194 "}
                   <span style={{ color: "#9B9892" }}>{p.top_connection.partner_name}</span>
                   {" ("}
-                  <span style={{ fontFamily: "monospace" }}>
-                    {p.top_connection.shared_publications} papers
-                  </span>
+                  {p.top_connection.shared_publications} papers
                   {")"}
                 </div>
               ) : null}
             </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "#9B9892",
-                fontFamily: "monospace",
-                flexShrink: 0,
-                marginLeft: 12,
-              }}
-            >
-              {p.total_shared_publications} co-pubs
+            <div style={{ display: "flex", gap: 4, alignItems: "baseline", flexShrink: 0, marginLeft: 12 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{p.total_shared_publications}</span>
+              <span style={{ fontSize: 12, color: "#9B9892" }}>co-pubs</span>
             </div>
           </div>
         ))}

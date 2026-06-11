@@ -12,11 +12,13 @@ import {
   type InstitutionSummary,
   type LeaderboardEntry,
 } from "../lib/api";
+import { getInstitutionResearchThemes, type InstitutionResearchTheme } from "../lib/institutionThemes";
 import { slugToInstitution } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import GlobalFooter from "./GlobalFooter";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
 import InstitutionExternalPartnersPanel from "./InstitutionExternalPartnersPanel";
+import InstitutionResearchThemesPanel from "./InstitutionResearchThemesPanel";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
 
 function toLeaderboardEntries(entries: InstitutionLeaderboardEntry[]): LeaderboardEntry[] {
@@ -61,6 +63,7 @@ export default function InstitutionRoute() {
   const [boards, setBoards] = useState<InstitutionLeaderboards | null>(null);
   const [collabs, setCollabs] = useState<InstitutionCollaboration[]>([]);
   const [externalPartners, setExternalPartners] = useState<ExternalPartnerInstitution[]>([]);
+  const [researchThemes, setResearchThemes] = useState<InstitutionResearchTheme[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -81,11 +84,12 @@ export default function InstitutionRoute() {
         return;
       }
 
-      const [summaryRes, boardsRes, collabsRes, partnersRes] = await Promise.all([
+      const [summaryRes, boardsRes, collabsRes, partnersRes, themesRes] = await Promise.all([
         getInstitutionSummary(institutionName, "nsclc"),
         getInstitutionLeaderboards(institutionName, "nsclc", 5),
         getInstitutionCollaborations(institutionName, 8),
         getInstitutionExternalPartners(institutionName, 8),
+        getInstitutionResearchThemes(institutionName, "NSCLC", 20),
       ]);
 
       if (cancelled) return;
@@ -94,6 +98,7 @@ export default function InstitutionRoute() {
       setBoards(boardsRes);
       setCollabs(collabsRes);
       setExternalPartners(partnersRes);
+      setResearchThemes(themesRes);
       setLoading(false);
     })();
 
@@ -279,6 +284,14 @@ export default function InstitutionRoute() {
       </div>
 
       <div style={{ padding: "0 16px 16px" }}>
+        {summary && researchThemes.length > 0 ? (
+          <div style={{ marginBottom: 24 }}>
+            <InstitutionResearchThemesPanel
+              themes={researchThemes}
+              institutionName={summary.institution_name}
+            />
+          </div>
+        ) : null}
         <InstitutionCollaborationsPanel collaborations={collabs} onHcpClick={handleHcpClick} />
       </div>
 

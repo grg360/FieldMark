@@ -41,9 +41,17 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              padding: "8px 12px",
+              padding: "12px 16px",
               backgroundColor: "#15131A",
               borderRadius: 4,
+              cursor: "default",
+              transition: "background-color 120ms",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#1A1820";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#15131A";
             }}
           >
             <div style={{ fontSize: 13, color: "#E8E6DF" }}>
@@ -69,8 +77,9 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
                 {c.hcp2_name}
               </a>
             </div>
-            <div style={{ fontSize: 13, color: "#9B9892", fontFamily: "monospace" }}>
-              {c.shared_publications} papers
+            <div style={{ display: "flex", gap: 4, alignItems: "baseline", flexShrink: 0 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{c.shared_publications}</span>
+              <span style={{ fontSize: 12, color: "#9B9892" }}>papers</span>
             </div>
           </div>
         ))}
