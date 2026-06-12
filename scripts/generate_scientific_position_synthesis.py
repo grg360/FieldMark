@@ -102,6 +102,7 @@ Return valid JSON only with this exact shape:
       "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the position the investigator takes on this theme.",
       "evidence_count": 0,
+      "supporting_paper_count": 0,
       "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1", "category2"]
@@ -112,6 +113,7 @@ Return valid JSON only with this exact shape:
       "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the concern or unmet need.",
       "evidence_count": 0,
+      "supporting_paper_count": 0,
       "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1"]
@@ -136,6 +138,7 @@ RULES
 - primary_position_categories must use base category names only (efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology). Do not concatenate polarity prefixes.
 - representative_position_ids must come from the actual positions provided. Do not invent UUIDs.
 - evidence_count is the number of distinct positions supporting this theme.
+- supporting_paper_count is the number of DISTINCT source publications backing the theme. Compute this by counting unique publication_ids across the supporting positions. Each position is tagged with its publication_id implicitly via the [position_id] in the input - papers that produce multiple positions count once. Example: if a theme is supported by 7 positions drawn from 4 distinct papers, supporting_paper_count is 4.
 - weight in research_focus sums to approximately 1.0 across all entries.
 - Use grounded language: "the investigator's published record advances", "the investigator has repeatedly raised", not "believes" or "advocates for" without evidence.
 - If a theme appears in only one paper, do not include it - look for recurring viewpoints.
@@ -152,6 +155,7 @@ Return valid JSON only with this exact shape:
       "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the position the investigator takes on this theme.",
       "evidence_count": 0,
+      "supporting_paper_count": 0,
       "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1", "category2"]
@@ -162,6 +166,7 @@ Return valid JSON only with this exact shape:
       "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the concern or unmet need.",
       "evidence_count": 0,
+      "supporting_paper_count": 0,
       "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1"]
@@ -186,6 +191,7 @@ RULES
 - primary_position_categories must use base category names only (efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology). Do not concatenate polarity prefixes.
 - representative_position_ids must come from the actual positions provided. Do not invent UUIDs.
 - evidence_count is the number of distinct positions supporting this theme.
+- supporting_paper_count is the number of DISTINCT source publications backing the theme. Compute this by counting unique publication_ids across the supporting positions. Each position is tagged with its publication_id implicitly via the [position_id] in the input - papers that produce multiple positions count once. Example: if a theme is supported by 7 positions drawn from 4 distinct papers, supporting_paper_count is 4.
 - weight in research_focus sums to approximately 1.0 across all entries.
 - Use grounded language: "the investigator's published record advances", "the investigator has repeatedly raised", not "believes" or "advocates for" without evidence.
 - Be more conservative in claiming "strongly advocates" - prefer "current focus" framing in the summary text.
@@ -203,6 +209,7 @@ Return valid JSON only with this exact shape:
       "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the position the investigator takes on this theme.",
       "evidence_count": 0,
+      "supporting_paper_count": 0,
       "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1", "category2"]
@@ -213,6 +220,7 @@ Return valid JSON only with this exact shape:
       "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the concern or unmet need.",
       "evidence_count": 0,
+      "supporting_paper_count": 0,
       "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1"]
@@ -237,6 +245,7 @@ RULES
 - primary_position_categories must use base category names only (efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology). Do not concatenate polarity prefixes.
 - representative_position_ids must come from the actual positions provided. Do not invent UUIDs.
 - evidence_count is the number of distinct positions supporting this theme.
+- supporting_paper_count is the number of DISTINCT source publications backing the theme. Compute this by counting unique publication_ids across the supporting positions. Each position is tagged with its publication_id implicitly via the [position_id] in the input - papers that produce multiple positions count once. Example: if a theme is supported by 7 positions drawn from 4 distinct papers, supporting_paper_count is 4.
 - weight in research_focus sums to approximately 1.0 across all entries.
 - Use grounded language: "the investigator's published record advances", "the investigator has repeatedly raised", not "believes" or "advocates for" without evidence.
 - The strongly_advocates and frequently_raises arrays should reflect positions taken in the specific paper(s), not aggregated trends.
@@ -397,6 +406,7 @@ def build_positions_block(positions: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for pos in positions:
         position_id = pos.get("position_id", "unknown")
+        publication_id = pos.get("publication_id", "unknown")
         pub_year = pos.get("pub_year") if pos.get("pub_year") is not None else "n/a"
         citations = pos.get("citation_count") if pos.get("citation_count") is not None else "n/a"
         author_role = pos.get("author_role") or "n/a"
@@ -407,7 +417,7 @@ def build_positions_block(positions: list[dict[str, Any]]) -> str:
         position_text = (pos.get("position_text") or "").strip()
 
         lines.append(
-            f"- [{position_id}] ({pub_year}, citations={citations}, "
+            f"- [{position_id}] pub={publication_id} ({pub_year}, citations={citations}, "
             f"{author_role}, {position_type}/{position_category})"
         )
         lines.append(f"  drug: {drug_name} | biomarker: {biomarker}")
