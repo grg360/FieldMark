@@ -97,25 +97,27 @@ Return valid JSON only with this exact shape:
   "headline": "One-sentence summary an MSL could read before a meeting.",
   "strongly_advocates": [
     {{
-      "theme": "Short theme name (max 8 words)",
+      "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the position the investigator takes on this theme.",
       "evidence_count": 0,
+      "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1", "category2"]
     }}
   ],
   "frequently_raises": [
     {{
-      "theme": "Short theme name (max 8 words)",
+      "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the concern or unmet need.",
       "evidence_count": 0,
+      "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1"]
     }}
   ],
   "research_focus": [
     {{
-      "theme": "Short focus area name (max 6 words)",
+      "theme": "2-4 word focus area name",
       "weight": 0.0,
       "primary_position_categories": ["category1"]
     }}
@@ -127,6 +129,9 @@ Return valid JSON only with this exact shape:
 
 RULES
 - Include 2-5 themes per bucket. Quality over quantity.
+- Theme names must be 2-4 words describing scientific concepts or strategies. Never use individual drug names as themes. Keep elaboration in the summary field.
+- Each theme in strongly_advocates and frequently_raises must include a confidence score (0.50-0.98) calibrated to evidence strength, recency, citation impact, and senior/first authorship proportion.
+- primary_position_categories must use base category names only (efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology). Do not concatenate polarity prefixes.
 - representative_position_ids must come from the actual positions provided. Do not invent UUIDs.
 - evidence_count is the number of distinct positions supporting this theme.
 - weight in research_focus sums to approximately 1.0 across all entries.
@@ -142,25 +147,27 @@ Return valid JSON only with this exact shape:
   "headline": "One-sentence summary an MSL could read before a meeting.",
   "strongly_advocates": [
     {{
-      "theme": "Short theme name (max 8 words)",
+      "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the position the investigator takes on this theme.",
       "evidence_count": 0,
+      "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1", "category2"]
     }}
   ],
   "frequently_raises": [
     {{
-      "theme": "Short theme name (max 8 words)",
+      "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the concern or unmet need.",
       "evidence_count": 0,
+      "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1"]
     }}
   ],
   "research_focus": [
     {{
-      "theme": "Short focus area name (max 6 words)",
+      "theme": "2-4 word focus area name",
       "weight": 0.0,
       "primary_position_categories": ["category1"]
     }}
@@ -172,6 +179,9 @@ Return valid JSON only with this exact shape:
 
 RULES
 - Include 2-5 themes per bucket. Quality over quantity.
+- Theme names must be 2-4 words describing scientific concepts or strategies. Never use individual drug names as themes. Keep elaboration in the summary field.
+- Each theme in strongly_advocates and frequently_raises must include a confidence score (0.50-0.98) calibrated to evidence strength, recency, citation impact, and senior/first authorship proportion.
+- primary_position_categories must use base category names only (efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology). Do not concatenate polarity prefixes.
 - representative_position_ids must come from the actual positions provided. Do not invent UUIDs.
 - evidence_count is the number of distinct positions supporting this theme.
 - weight in research_focus sums to approximately 1.0 across all entries.
@@ -188,25 +198,27 @@ Return valid JSON only with this exact shape:
   "headline": "One-sentence summary an MSL could read before a meeting.",
   "strongly_advocates": [
     {{
-      "theme": "Short theme name (max 8 words)",
+      "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the position the investigator takes on this theme.",
       "evidence_count": 0,
+      "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1", "category2"]
     }}
   ],
   "frequently_raises": [
     {{
-      "theme": "Short theme name (max 8 words)",
+      "theme": "2-4 word scientific concept name",
       "summary": "One sentence explaining the concern or unmet need.",
       "evidence_count": 0,
+      "confidence": 0.0,
       "representative_position_ids": ["uuid1", "uuid2"],
       "primary_position_categories": ["category1"]
     }}
   ],
   "research_focus": [
     {{
-      "theme": "Short focus area name (max 6 words)",
+      "theme": "2-4 word focus area name",
       "weight": 0.0,
       "primary_position_categories": ["category1"]
     }}
@@ -218,6 +230,9 @@ Return valid JSON only with this exact shape:
 
 RULES
 - Include 2-5 themes per bucket. Quality over quantity.
+- Theme names must be 2-4 words describing scientific concepts or strategies. Never use individual drug names as themes. Keep elaboration in the summary field.
+- Each theme in strongly_advocates and frequently_raises must include a confidence score (0.50-0.98) calibrated to evidence strength, recency, citation impact, and senior/first authorship proportion.
+- primary_position_categories must use base category names only (efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology). Do not concatenate polarity prefixes.
 - representative_position_ids must come from the actual positions provided. Do not invent UUIDs.
 - evidence_count is the number of distinct positions supporting this theme.
 - weight in research_focus sums to approximately 1.0 across all entries.
@@ -245,6 +260,22 @@ Three buckets:
 3. RESEARCH FOCUS: the dominant categories of scientific work (efficacy, biomarker, resistance, etc.) the investigator is engaged with, weighted by position volume
 
 For each theme, link back to specific position IDs as evidence.
+
+THEME NAMING RULES
+- Theme names must be 2-4 words. Scannable, not sentences.
+- Theme names must describe scientific concepts, strategies, or treatment philosophies - NOT individual drug names.
+  - Good: "Perioperative Immunotherapy", "Resistance Reversal Strategies", "Precision IO Selection", "Radioimmunotherapy Combinations"
+  - Bad: "Durvalumab Efficacy", "Pembrolizumab Sequencing", "Nivolumab Plus SABR Improves EFS"
+- Keep the long explanation in the summary field, not in the theme name.
+- primary_position_categories must use ONLY base category names from the enum: efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology. Do NOT concatenate polarity prefixes (no "positive_position/efficacy").
+
+CONFIDENCE SCORING
+- Each theme in strongly_advocates and frequently_raises must include a confidence score from 0.0 to 1.0.
+- Calibrate confidence based on: number of supporting positions, recency of positions, citation impact of source papers, and proportion of positions where the HCP is senior or first author.
+- A theme supported by 5+ recent senior-authored positions across multiple high-citation papers: 0.90-0.98
+- A theme supported by 3-4 positions with mixed recency/citation: 0.70-0.89
+- A theme supported by 2 positions or with weak source signal: 0.50-0.69
+- Do not exceed 0.98. Do not go below 0.50 (anything weaker should not be included as a theme at all).
 """
     + JSON_OUTPUT_AND_RULES_DEEP
 )
@@ -260,6 +291,11 @@ POSITIONS:
 
 TASK
 Synthesize this investigator's current scientific focus. Output structure is identical to deep-corpus synthesis but framed as focus rather than developed worldview. Be more conservative in claiming "strongly advocates" - prefer "current focus" framing in the summary text. Themes still require multi-paper recurrence where possible.
+
+THEME NAMING RULES
+- Theme names must be 2-4 words. Scannable, not sentences.
+- Theme names must describe scientific concepts, strategies, or treatment philosophies - NOT individual drug names.
+- primary_position_categories must use ONLY base category names: efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology.
 """
     + JSON_OUTPUT_AND_RULES_FOCUSED
 )
@@ -275,6 +311,11 @@ POSITIONS:
 
 TASK
 Anchor the synthesis on the specific paper(s). Use "Recent Senior-Authored Work" framing. Do not aggregate across papers as if they form a pattern when the sample is too small. The strongly_advocates and frequently_raises arrays should reflect positions taken in the specific paper(s), not aggregated trends. research_focus still applies.
+
+THEME NAMING RULES
+- Theme names must be 2-4 words. Scannable, not sentences.
+- Theme names must describe scientific concepts, strategies, or treatment philosophies - NOT individual drug names.
+- primary_position_categories must use ONLY base category names: efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology.
 """
     + JSON_OUTPUT_AND_RULES_SIGNAL
 )
