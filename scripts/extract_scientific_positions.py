@@ -42,6 +42,20 @@ VALID_POSITION_TYPES = frozenset(
     }
 )
 
+VALID_POSITION_CATEGORIES = frozenset(
+    {
+        "efficacy",
+        "patient_selection",
+        "biomarker",
+        "safety",
+        "resistance",
+        "sequencing",
+        "access",
+        "diagnostics",
+        "methodology",
+    }
+)
+
 RISING_STAR_HCPS_SQL = """
 SELECT hcp_id, 'rising_star' AS cohort, us_rank AS rank_position
 FROM hcp_rising_star_ranks_v3
@@ -105,6 +119,7 @@ INSERT INTO hcp_scientific_positions_v1 (
   therapeutic_area_id,
   author_role,
   position_type,
+  position_category,
   drug_name,
   drug_class,
   biomarker,
@@ -112,9 +127,11 @@ INSERT INTO hcp_scientific_positions_v1 (
   position_text,
   evidence_excerpt,
   confidence,
-  model_name
+  model_name,
+  pub_year,
+  citation_count
 )
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
 PROMPT_TEMPLATE = """You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
@@ -129,13 +146,30 @@ Passage (abstract):
 {abstract}
 
 TASK
-Extract up to 10 scientific positions. Each must be directly supported by the passage. Do not infer beyond the text. Do not treat drug mentions as positive positions without explicit benefit evidence.
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
 
-POSITION TYPES
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
 - positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
 - cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
 - unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
 - hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
 
 OUTPUT
 Return valid JSON only with this exact shape:
@@ -143,12 +177,13 @@ Return valid JSON only with this exact shape:
   "positions": [
     {{
       "position_type": "positive_position",
+      "position_category": "efficacy",
       "drug_name": "drug name or null",
       "drug_class": "class or null",
       "biomarker": "biomarker or null",
       "disease_context": "specific subtype/setting or null",
       "position_text": "one-sentence paraphrase of the position",
-      "evidence_excerpt": "exact excerpt from passage, max 30 words",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
       "confidence": 0.0
     }}
   ]
@@ -331,6 +366,8 @@ def write_positions(
     hcp_id: str,
     pub_id: str,
     author_role: str,
+    pub_year: int | None,
+    citation_count: int | None,
     positions: list[dict[str, Any]],
 ) -> int:
     written = 0
@@ -352,6 +389,10 @@ def write_positions(
             if confidence is None:
                 continue
 
+            raw_category = normalize_optional_text(pos.get("position_category"))
+            if raw_category is not None and raw_category not in VALID_POSITION_CATEGORIES:
+                raw_category = None
+
             cur.execute(
                 INSERT_POSITION_SQL,
                 (
@@ -360,6 +401,7 @@ def write_positions(
                     NSCLC_TA_ID,
                     author_role,
                     position_type,
+                    raw_category,
                     normalize_optional_text(pos.get("drug_name")),
                     normalize_optional_text(pos.get("drug_class")),
                     normalize_optional_text(pos.get("biomarker")),
@@ -368,6 +410,8 @@ def write_positions(
                     evidence_excerpt,
                     confidence,
                     MODEL_NAME,
+                    pub_year,
+                    citation_count,
                 ),
             )
             written += 1
@@ -455,7 +499,15 @@ def main() -> int:
                     continue
 
                 try:
-                    written = write_positions(conn, hcp_id, pub_id, author_role, positions)
+                    written = write_positions(
+                        conn,
+                        hcp_id,
+                        pub_id,
+                        author_role,
+                        paper.get("pub_year"),
+                        paper.get("citation_count"),
+                        positions,
+                    )
                     hcp_positions += written
                     stats["positions_extracted"] += written
                 except Exception as exc:
