@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { NextActionWithHcp } from "../../lib/home";
+import HomeTile from "./HomeTile";
 
 interface Props {
   overdueFollowUps: NextActionWithHcp[];
@@ -7,14 +8,6 @@ interface Props {
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-const tileStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
-};
 
 function formatDueDateShort(iso: string): string {
   const date = new Date(iso);
@@ -30,7 +23,7 @@ export default function OverdueFollowUpsTile({ overdueFollowUps, totalCount }: P
   const navigate = useNavigate();
 
   return (
-    <div style={tileStyle}>
+    <HomeTile>
       <div
         style={{
           fontSize: 11,
@@ -98,6 +91,6 @@ export default function OverdueFollowUpsTile({ overdueFollowUps, totalCount }: P
           ))}
         </div>
       )}
-    </div>
+    </HomeTile>
   );
 }

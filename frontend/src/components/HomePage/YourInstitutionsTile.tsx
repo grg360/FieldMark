@@ -4,6 +4,7 @@ import { Pin } from "lucide-react";
 import type { InstitutionIndexEntry } from "../../lib/api";
 import { getInstitutionsByNames, getPinnedInstitutionsForUser, type PinnedInstitution } from "../../lib/institutionPins";
 import { institutionToSlug } from "../../lib/institutionUtils";
+import HomeTile from "./HomeTile";
 
 interface Props {
   userId: string;
@@ -55,12 +56,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
   };
 
   return (
-    <div style={{
-      backgroundColor: "#0D0D10",
-      border: "1px solid #1E1E22",
-      borderRadius: 6,
-      padding: 16,
-    }}>
+    <HomeTile>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
         <div style={titleStyle}>Your Institutions</div>
         <button
@@ -167,6 +163,6 @@ export default function YourInstitutionsTile({ userId }: Props) {
           ) : null}
         </div>
       )}
-    </div>
+    </HomeTile>
   );
 }

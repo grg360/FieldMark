@@ -1,16 +1,9 @@
 import type { OpenFollowUpStats } from "../../lib/home";
+import HomeTile from "./HomeTile";
 
 interface Props {
   stats: OpenFollowUpStats | null;
 }
-
-const tileStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
-};
 
 function BucketRow({
   count,
@@ -31,15 +24,15 @@ function BucketRow({
         fontSize: 14,
       }}
     >
-      <span style={{ fontSize: 20, fontWeight: 600, color: countColor }}>{count}</span>
       <span style={{ color: "#9B9892" }}>{label}</span>
+      <span style={{ fontSize: 20, fontWeight: 600, color: countColor }}>{count}</span>
     </div>
   );
 }
 
 export default function OpenFollowUpsTile({ stats }: Props) {
   return (
-    <div style={tileStyle}>
+    <HomeTile>
       <div
         style={{
           fontSize: 11,
@@ -69,6 +62,6 @@ export default function OpenFollowUpsTile({ stats }: Props) {
           ) : null}
         </div>
       )}
-    </div>
+    </HomeTile>
   );
 }

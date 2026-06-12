@@ -1,24 +1,17 @@
 import { useState } from "react";
 import InviteModal from "./InviteModal";
+import HomeTile from "./HomeTile";
 
 interface Props {
   userId: string;
 }
-
-const tileStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
-};
 
 export default function TeamIntelligenceTile({ userId }: Props) {
   const [showModal, setShowModal] = useState(false);
 
   return (
     <>
-      <div style={tileStyle}>
+      <HomeTile>
         <div
           style={{
             display: "flex",
@@ -85,7 +78,7 @@ export default function TeamIntelligenceTile({ userId }: Props) {
           Get notified
           <span>{String.fromCharCode(0x2192)}</span>
         </button>
-      </div>
+      </HomeTile>
 
       {showModal ? (
         <InviteModal userId={userId} onClose={() => setShowModal(false)} />

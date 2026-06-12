@@ -4,20 +4,13 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getHcpOverview } from "../../lib/aiOverviews";
 import { getTrackedHcpsInTerritory, type CoverageGapHcp, type TerritoryCoverageStats, type TrackedHcpChip } from "../../lib/home";
 import { useIsDesktop } from "../../lib/useIsDesktop";
+import HomeTile from "./HomeTile";
 
 interface Props {
   gaps: CoverageGapHcp[];
   stats: TerritoryCoverageStats | null;
   onTrack: (hcpId: string) => Promise<void>;
 }
-
-const tileStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
-};
 
 export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
   const navigate = useNavigate();
@@ -105,7 +98,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
   }
 
   return (
-    <div style={tileStyle}>
+    <HomeTile>
       <style>{`@keyframes fmShimmer { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
       <div
         style={{
@@ -407,6 +400,6 @@ export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
           </div>
         </>
       )}
-    </div>
+    </HomeTile>
   );
 }

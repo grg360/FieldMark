@@ -167,7 +167,7 @@ export default function HomePage() {
 
             <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} onTrack={handleTrackHcp} />
 
-            <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 32 }}>
               <OverdueFollowUpsTile
                 overdueFollowUps={overdueFollowUps}
                 totalCount={summary.overdue_followups}
@@ -175,7 +175,7 @@ export default function HomePage() {
               <OpenFollowUpsTile stats={followUpStats} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 32 }}>
               <RecentInsightsTile insights={recentInsights} />
               <RecentBriefsTile briefs={recentBriefs} />
             </div>

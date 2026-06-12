@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ActivityEvent, ActivityEventType } from "../../lib/home";
 import { formatRelative } from "../FieldInsights/dateFormat";
+import HomeTile from "./HomeTile";
 
 interface Props {
   activity: ActivityEvent[];
@@ -13,14 +14,6 @@ interface CollapsedEntry {
   count: number;
   label: string;
 }
-
-const tileStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
-};
 
 function eventIcon(type: ActivityEventType): ReactNode {
   switch (type) {
@@ -154,7 +147,7 @@ export default function RecentActivityTile({ activity }: Props) {
   const groups = groupByDate(activity);
 
   return (
-    <div style={tileStyle}>
+    <HomeTile>
       <div
         style={{
           fontSize: 11,
@@ -233,6 +226,6 @@ export default function RecentActivityTile({ activity }: Props) {
           })}
         </div>
       )}
-    </div>
+    </HomeTile>
   );
 }

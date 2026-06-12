@@ -2,18 +2,11 @@ import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import type { InsightWithHcp } from "../../lib/home";
 import { formatRelative } from "../FieldInsights/dateFormat";
+import HomeTile from "./HomeTile";
 
 interface Props {
   insights: InsightWithHcp[];
 }
-
-const tileStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
-};
 
 function interactionChipStyle(type: string): CSSProperties | null {
   switch (type) {
@@ -52,7 +45,7 @@ export default function RecentInsightsTile({ insights }: Props) {
   const navigate = useNavigate();
 
   return (
-    <div style={tileStyle}>
+    <HomeTile>
       <div
         style={{
           fontSize: 11,
@@ -128,6 +121,6 @@ export default function RecentInsightsTile({ insights }: Props) {
           })}
         </div>
       )}
-    </div>
+    </HomeTile>
   );
 }

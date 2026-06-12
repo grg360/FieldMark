@@ -1,24 +1,17 @@
 import { useNavigate } from "react-router-dom";
 import type { BriefRef } from "../../lib/home";
 import { formatRelative } from "../FieldInsights/dateFormat";
+import HomeTile from "./HomeTile";
 
 interface Props {
   briefs: BriefRef[];
 }
 
-const tileStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
-};
-
 export default function RecentBriefsTile({ briefs }: Props) {
   const navigate = useNavigate();
 
   return (
-    <div style={tileStyle}>
+    <HomeTile>
       <div
         style={{
           fontSize: 11,
@@ -74,6 +67,6 @@ export default function RecentBriefsTile({ briefs }: Props) {
           ))}
         </div>
       )}
-    </div>
+    </HomeTile>
   );
 }
