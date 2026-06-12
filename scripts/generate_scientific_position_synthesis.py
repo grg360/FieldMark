@@ -270,11 +270,16 @@ THEME NAMING RULES
 - primary_position_categories must use ONLY base category names from the enum: efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology. Do NOT concatenate polarity prefixes (no "positive_position/efficacy").
 
 CONFIDENCE SCORING
-- Each theme in strongly_advocates and frequently_raises must include a confidence score from 0.0 to 1.0.
-- Calibrate confidence based on: number of supporting positions, recency of positions, citation impact of source papers, and proportion of positions where the HCP is senior or first author.
-- A theme supported by 5+ recent senior-authored positions across multiple high-citation papers: 0.90-0.98
-- A theme supported by 3-4 positions with mixed recency/citation: 0.70-0.89
-- A theme supported by 2 positions or with weak source signal: 0.50-0.69
+- Each theme in strongly_advocates and frequently_raises must include a confidence score from 0.50 to 0.98.
+- Calibrate confidence based on: number of supporting positions, recency, citation impact, senior/first authorship proportion, AND the theme's prominence relative to the rest of the corpus.
+- Use the full scale. Most strong themes should land 0.80-0.90. Reserve 0.95+ for career-defining themes where the investigator is widely recognized as a primary voice.
+- Rubric:
+  - 0.95-0.98 = career-defining theme (investigator is a primary voice in the field; theme dominates the corpus)
+  - 0.90-0.94 = dominant recurring theme (clearly central to investigator's work; multiple high-citation papers)
+  - 0.80-0.89 = strong recurring theme (consistent across multiple papers but one of several focuses)
+  - 0.70-0.79 = meaningful secondary theme (recurring but not central)
+  - 0.50-0.69 = supporting theme (appears across a few papers, weaker signal)
+- If most themes for one investigator land in 0.90+, you are over-calibrating. Spread the scores across the rubric.
 - Do not exceed 0.98. Do not go below 0.50 (anything weaker should not be included as a theme at all).
 """
     + JSON_OUTPUT_AND_RULES_DEEP
