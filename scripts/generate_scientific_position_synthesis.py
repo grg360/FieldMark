@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import re
@@ -38,6 +39,7 @@ ANTHROPIC_MAX_TOKENS = 4000
 CORPUS_DEPTH_DEEP_THRESHOLD = 5
 CORPUS_DEPTH_FOCUSED_THRESHOLD = 3
 DRY_RUN_HCP_LIMIT = 1
+CONCURRENCY_LIMIT = 8
 
 GET_HCPS_WITH_POSITIONS_SQL = (
     "SELECT DISTINCT hcp_id FROM hcp_scientific_positions_v1 "
@@ -495,6 +497,15 @@ def call_anthropic_for_synthesis(
     return parsed, prompt_tokens, completion_tokens
 
 
+async def call_anthropic_for_synthesis_async(
+    client: anthropic.Anthropic,
+    prompt: str,
+    semaphore: asyncio.Semaphore,
+) -> tuple[dict[str, Any], int, int]:
+    async with semaphore:
+        return await asyncio.to_thread(call_anthropic_for_synthesis, client, prompt)
+
+
 def write_synthesis(
     conn: psycopg2.extensions.connection,
     hcp_id: str,
@@ -516,6 +527,124 @@ def write_synthesis(
                 completion_tokens,
             ),
         )
+
+
+async def run_all_hcps(
+    conn: psycopg2.extensions.connection,
+    client: anthropic.Anthropic,
+    target_hcp_ids: list[str],
+    args: argparse.Namespace,
+    stats: dict[str, Any],
+) -> None:
+    total_hcps = len(target_hcp_ids)
+    semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+    db_lock = asyncio.Lock()
+    done_counter = 0
+
+    async def process_hcp(idx: int, hcp_id: str) -> None:
+        nonlocal done_counter
+
+        try:
+            try:
+                async with db_lock:
+                    positions = get_positions_for_hcp(conn, hcp_id)
+            except Exception as exc:
+                async with db_lock:
+                    stats["db_errors"] += 1
+                print(
+                    f"[ERROR] Failed to load positions for HCP {hcp_id}: {exc}",
+                    file=sys.stderr,
+                )
+                return
+
+            if not positions:
+                print(f"[SKIP] HCP {hcp_id}: no positions found")
+                return
+
+            paper_count = count_distinct_papers(positions)
+            position_count = len(positions)
+            corpus_depth = determine_corpus_depth(paper_count)
+
+            async with db_lock:
+                stats["depth_counts"][corpus_depth] += 1
+
+            prompt = build_synthesis_prompt(
+                positions,
+                paper_count,
+                position_count,
+                corpus_depth,
+            )
+
+            try:
+                synthesis_dict, prompt_tokens, completion_tokens = (
+                    await call_anthropic_for_synthesis_async(client, prompt, semaphore)
+                )
+            except Exception as exc:
+                async with db_lock:
+                    stats["api_errors"] += 1
+                print(
+                    f"[ERROR] Anthropic API failed for HCP {hcp_id}: {exc}",
+                    file=sys.stderr,
+                )
+                return
+
+            if args.dry_run:
+                print(f"\n=== DRY RUN: HCP {hcp_id} ===")
+                print("--- PROMPT ---")
+                print(prompt)
+                print("--- PARSED JSON ---")
+                print(json.dumps(synthesis_dict, indent=2, ensure_ascii=True))
+                async with db_lock:
+                    stats["hcps_processed"] += 1
+                    done_counter += 1
+                    n = done_counter
+                print(
+                    f"[done {n}/{total_hcps}] {hcp_id}: "
+                    f"{paper_count} papers, {position_count} positions, "
+                    f"depth={corpus_depth}, dry-run only"
+                )
+                return
+
+            try:
+                async with db_lock:
+                    write_synthesis(
+                        conn,
+                        hcp_id,
+                        synthesis_dict,
+                        prompt_tokens,
+                        completion_tokens,
+                    )
+                    conn.commit()
+                    stats["syntheses_written"] += 1
+                    stats["hcps_processed"] += 1
+                    done_counter += 1
+                    n = done_counter
+            except Exception as exc:
+                async with db_lock:
+                    stats["db_errors"] += 1
+                    conn.rollback()
+                print(
+                    f"[ERROR] DB write failed for HCP {hcp_id}: {exc}",
+                    file=sys.stderr,
+                )
+                return
+
+            print(
+                f"[done {n}/{total_hcps}] {hcp_id}: "
+                f"{paper_count} papers, {position_count} positions, "
+                f"depth={corpus_depth}, synthesis written"
+            )
+        except Exception as exc:
+            print(
+                f"[ERROR] Unexpected error for HCP {hcp_id}: {exc}",
+                file=sys.stderr,
+            )
+
+    tasks = [
+        process_hcp(idx, hcp_id)
+        for idx, hcp_id in enumerate(target_hcp_ids, start=1)
+    ]
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def main() -> int:
@@ -552,84 +681,9 @@ def main() -> int:
             print("No HCPs to process.")
             return 0
 
-        for idx, hcp_id in enumerate(target_hcp_ids, start=1):
-            try:
-                positions = get_positions_for_hcp(conn, hcp_id)
-            except Exception as exc:
-                stats["db_errors"] += 1
-                print(
-                    f"[ERROR] Failed to load positions for HCP {hcp_id}: {exc}",
-                    file=sys.stderr,
-                )
-                continue
-
-            if not positions:
-                print(f"[SKIP] HCP {hcp_id}: no positions found")
-                continue
-
-            paper_count = count_distinct_papers(positions)
-            position_count = len(positions)
-            corpus_depth = determine_corpus_depth(paper_count)
-            stats["depth_counts"][corpus_depth] += 1
-
-            try:
-                prompt = build_synthesis_prompt(
-                    positions,
-                    paper_count,
-                    position_count,
-                    corpus_depth,
-                )
-                synthesis_dict, prompt_tokens, completion_tokens = call_anthropic_for_synthesis(
-                    client,
-                    prompt,
-                )
-            except Exception as exc:
-                stats["api_errors"] += 1
-                print(
-                    f"[ERROR] Anthropic API failed for HCP {hcp_id}: {exc}",
-                    file=sys.stderr,
-                )
-                continue
-
-            if args.dry_run:
-                print(f"\n=== DRY RUN: HCP {hcp_id} ===")
-                print("--- PROMPT ---")
-                print(prompt)
-                print("--- PARSED JSON ---")
-                print(json.dumps(synthesis_dict, indent=2, ensure_ascii=True))
-                stats["hcps_processed"] += 1
-                print(
-                    f"[HCP {idx}/{total_hcps}] {hcp_id}: "
-                    f"{paper_count} papers, {position_count} positions, "
-                    f"depth={corpus_depth}, dry-run only"
-                )
-                continue
-
-            try:
-                write_synthesis(
-                    conn,
-                    hcp_id,
-                    synthesis_dict,
-                    prompt_tokens,
-                    completion_tokens,
-                )
-                conn.commit()
-                stats["syntheses_written"] += 1
-            except Exception as exc:
-                stats["db_errors"] += 1
-                print(
-                    f"[ERROR] DB write failed for HCP {hcp_id}: {exc}",
-                    file=sys.stderr,
-                )
-                conn.rollback()
-                continue
-
-            stats["hcps_processed"] += 1
-            print(
-                f"[HCP {idx}/{total_hcps}] {hcp_id}: "
-                f"{paper_count} papers, {position_count} positions, "
-                f"depth={corpus_depth}, synthesis written"
-            )
+        asyncio.run(
+            run_all_hcps(conn, client, target_hcp_ids, args, stats),
+        )
 
         print("\n=== Summary ===")
         print(f"HCPs processed: {stats['hcps_processed']}")
