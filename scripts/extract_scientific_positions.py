@@ -194,18 +194,8 @@ def get_required_env(name: str) -> str:
 
 
 def get_db_connection() -> psycopg2.extensions.connection:
-    host = get_required_env("SUPABASE_DB_HOST")
-    user = get_required_env("SUPABASE_DB_USER")
-    password = get_required_env("SUPABASE_DB_PASSWORD")
-    port = int(os.getenv("SUPABASE_DB_PORT", "5432"))
-    dbname = os.getenv("SUPABASE_DB_NAME", "postgres")
-    return psycopg2.connect(
-        host=host,
-        port=port,
-        dbname=dbname,
-        user=user,
-        password=password,
-    )
+    database_url = get_required_env("DATABASE_URL")
+    return psycopg2.connect(database_url)
 
 
 def get_target_hcps(
