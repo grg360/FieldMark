@@ -3391,10 +3391,19 @@ export async function getInstitutionSummary(
   const taId = await resolveLandscapeTaId(taSlug);
   if (!taId) return null;
 
-  const { data: hcps } = await supabase
-    .from("hcps_v2")
-    .select("id, first_name, last_name, country")
-    .eq("institution_canonical", institutionName);
+  const { data: hcps } = await fetchAllPaginated<{
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    country: string | null;
+  }>(
+    async (offset, pageSize) =>
+      await supabase
+        .from("hcps_v2")
+        .select("id, first_name, last_name, country")
+        .eq("institution_canonical", institutionName)
+        .range(offset, offset + pageSize - 1),
+  );
   if (!hcps) return null;
 
   const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
@@ -3528,10 +3537,18 @@ export async function getInstitutionLeaderboards(
   const taId = await resolveLandscapeTaId(taSlug);
   if (!taId) return empty;
 
-  const { data: hcps } = await supabase
-    .from("hcps_v2")
-    .select("id, first_name, last_name")
-    .eq("institution_canonical", institutionName);
+  const { data: hcps } = await fetchAllPaginated<{
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+  }>(
+    async (offset, pageSize) =>
+      await supabase
+        .from("hcps_v2")
+        .select("id, first_name, last_name")
+        .eq("institution_canonical", institutionName)
+        .range(offset, offset + pageSize - 1),
+  );
   if (!hcps || hcps.length === 0) return empty;
 
   const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
@@ -3708,10 +3725,18 @@ export async function getInstitutionCollaborations(
   institutionName: string,
   limit: number = 8,
 ): Promise<InstitutionCollaboration[]> {
-  const { data: hcps } = await supabase
-    .from("hcps_v2")
-    .select("id, first_name, last_name")
-    .eq("institution_canonical", institutionName);
+  const { data: hcps } = await fetchAllPaginated<{
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+  }>(
+    async (offset, pageSize) =>
+      await supabase
+        .from("hcps_v2")
+        .select("id, first_name, last_name")
+        .eq("institution_canonical", institutionName)
+        .range(offset, offset + pageSize - 1),
+  );
   if (!hcps || hcps.length === 0) return [];
 
   const hcpIdSet = new Set((hcps as InstitutionHcpRow[]).map((h) => String(h.id)));
@@ -3787,10 +3812,14 @@ export async function getInstitutionExternalPartners(
   sourceInstitutionName: string,
   limit: number = 8,
 ): Promise<ExternalPartnerInstitution[]> {
-  const { data: sourceHcps } = await supabase
-    .from("hcps_v2")
-    .select("id")
-    .eq("institution_canonical", sourceInstitutionName);
+  const { data: sourceHcps } = await fetchAllPaginated<{ id: string }>(
+    async (offset, pageSize) =>
+      await supabase
+        .from("hcps_v2")
+        .select("id")
+        .eq("institution_canonical", sourceInstitutionName)
+        .range(offset, offset + pageSize - 1),
+  );
   if (!sourceHcps || sourceHcps.length === 0) return [];
 
   const sourceHcpIds = (sourceHcps as InstitutionHcpRow[]).map((h) => String(h.id));
