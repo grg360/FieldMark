@@ -1,0 +1,1577 @@
+﻿Loaded 3 target HCPs (cohort=both, limit=3)
+
+=== DRY RUN: HCP 659e0892-0795-4976-9938-8e43e4ea473b paper 4147b7bc-af47-441f-96eb-4ea17c322eed ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Impact and Diagnostic Gaps of Comprehensive Genomic Profiling in Real-World Clinical Practice.
+Year: 2020
+Journal: Cancers
+Author role on this paper: first_author
+Passage (abstract):
+PURPOSE: next-generation sequencing based comprehensive genomic profiling (CGP) is becoming common practice. Although numerous studies have shown its feasibility to identify actionable genomic alterations in most patients, its clinical impact as part of routine management across all cancers in the community remains unknown. METHODS: we conducted a retrospective study of all patients that underwent CGP as part of routine cancer management from January 2013 to June 2017 at an academic community-based NCI-designated cancer center. CGP was done in addition to established first tier reflex molecular testing as per national guidelines (e.g., RESULTS: 349 tests were sent for CGP from 333 patients and 95% had at least one actionable genomic alteration reported. According to the reported results, 23.2% had a Food and Drug Administration (FDA) approved therapy available, 61.3% had an off-label therapy available and 77.9% were potentially eligible for a clinical trial. Treatment recommendations were also reviewed within the OncoKB database and 47% of them were not clinically validated therapies. The CGP results led to treatment change in only 35 patients (10%), most commonly in NSCLC. Nineteen of these patients (54% of those treated and 5% of total) had documented clinical benefit with targeted therapy. CONCLUSION: we demonstrate that routine use of CGP in the community across all cancer types detects potentially actionable genomic alterations in a majority of patients, however has modest clinical impact enriched in the NSCLC subset.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "cautionary_position",
+      "position_category": "diagnostics",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": null,
+      "disease_context": "all cancer types, community oncology",
+      "position_text": "Despite high rates of actionable alteration detection, CGP has modest real-world clinical impact, suggesting a significant gap between genomic identification and therapeutic application in routine community practice.",
+      "evidence_excerpt": "routine use of CGP in the community across all cancer types detects potentially actionable genomic alterations in a majority of patients, however has modest clinical impact",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "patient_selection",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": null,
+      "disease_context": "NSCLC vs. other cancers",
+      "position_text": "The clinical benefit of CGP-guided treatment is disproportionately concentrated in NSCLC, suggesting that routine CGP across all cancer types may require better patient selection criteria to maximize actionable clinical impact.",
+      "evidence_excerpt": "CGP results led to treatment change in only 35 patients (10%), most commonly in NSCLC. Nineteen of these patients (54% of those treated and 5% of total) had documented clinical benefit",
+      "confidence": 0.92
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": "actionable genomic alterations",
+      "disease_context": "all cancer types",
+      "position_text": "The high proportion of CGP-identified alterations lacking clinical validation suggests that reported actionability may be overstated, and clinical interpretation tools like OncoKB are essential to distinguish truly validated targets from unproven ones.",
+      "evidence_excerpt": "Treatment recommendations were also reviewed within the OncoKB database and 47% of them were not clinically validated therapies.",
+      "confidence": 0.9
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "access",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": null,
+      "disease_context": "community oncology, all cancer types",
+      "position_text": "The gap between genomic actionability and actual treatment change indicates a systemic unmet need to improve clinical translation of CGP results in real-world community oncology settings.",
+      "evidence_excerpt": "95% had at least one actionable genomic alteration reported... CGP results led to treatment change in only 35 patients (10%)",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "sequencing",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": null,
+      "disease_context": "all cancer types, routine management",
+      "position_text": "The high rate of off-label therapy eligibility relative to FDA-approved options suggests that CGP results frequently outpace the available regulatory and clinical infrastructure, raising concerns about the clinical utility of broad CGP deployment outside of select cancer types.",
+      "evidence_excerpt": "23.2% had a Food and Drug Administration (FDA) approved therapy available, 61.3% had an off-label therapy available and 77.9% were potentially eligible for a clinical trial",
+      "confidence": 0.82
+    }
+  ]
+}
+
+=== DRY RUN: HCP 659e0892-0795-4976-9938-8e43e4ea473b paper 1362e993-965e-419a-be8b-8fcfb090e8e1 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Patient with mediastinal carcinoma of unknown primary with RET fusion achieves durable response with RET inhibition.
+Year: 2024
+Journal: Anti-cancer drugs
+Author role on this paper: senior_author
+Passage (abstract):
+Selective RET inhibitors have shown promise in thyroid cancer (TC) and nonsmall cell lung cancer (NSCLC) harboring RET fusions on next-generation sequencing (NGS), although rarity of the rearrangement has led to limited data for certain tumor types, such as carcinoma of unknown primary. We present a 65-year-old female with no history of malignancy, smoking or radiation exposure, who was found to have an anterior mediastinum malignancy of unknown primary, with metastases to supraclavicular lymph nodes. Core biopsy of the mediastinum revealed poorly differentiated carcinoma, while a biopsy of the thyroid revealed atypia of indeterminate significance (Bethesda III). PD-L1 immunohistochemistry was positive (90%), and liquid NGS revealed mutations in TP53 and the TERT promoter (c.-124C>T), as well as a CCDC6-RET fusion. This genetic profile resembled an anaplastic TC vs. NSCLC primary, although thymic primary and poorly differentiated TC remained on the differential. The patient was initiated on selpercatinib, which was held after 3 weeks due to thrombocytopenia and hypertension. At a reduced dosage, patient developed transaminitis, and selpercatinib was switched to pralsetinib. Brain MRI showed a nonenhancing temporal lobe signal abnormality, which on biopsy proved to be glioblastoma (GBM) with TERT promoter c.-124C>T mutation and FGFR3-TACC3 fusion by NGS. Pralsetinib was held during adjuvant chemoradiation for the GBM, and again for 4 weeks due to pneumonitis that resolved with steroids, and pralsetinib was restarted at a reduced dose. The patient has since demonstrated a stable reduction of the mediastinal mass for >15 months with RET inhibition therapy, despite several treatment interruptions.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "pralsetinib",
+      "drug_class": "selective RET inhibitor",
+      "biomarker": "CCDC6-RET fusion",
+      "disease_context": "carcinoma of unknown primary, mediastinal malignancy",
+      "position_text": "Selective RET inhibition can achieve durable disease control in RET fusion-positive carcinoma of unknown primary, even with multiple treatment interruptions, suggesting the benefit extends beyond established tumor types like TC and NSCLC.",
+      "evidence_excerpt": "patient has since demonstrated a stable reduction of the mediastinal mass for >15 months with RET inhibition therapy, despite several treatment interruptions.",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "patient_selection",
+      "drug_name": null,
+      "drug_class": "selective RET inhibitors",
+      "biomarker": "RET fusion",
+      "disease_context": "carcinoma of unknown primary",
+      "position_text": "The rarity of RET fusions in carcinoma of unknown primary has left a critical evidence gap, and rare tumor types should not be excluded from RET inhibitor consideration when molecular eligibility is established.",
+      "evidence_excerpt": "rarity of the rearrangement has led to limited data for certain tumor types, such as carcinoma of unknown primary.",
+      "confidence": 0.9
+    },
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "diagnostics",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": "CCDC6-RET fusion, TP53, TERT promoter c.-124C>T, PD-L1",
+      "disease_context": "mediastinal malignancy of unknown primary, anaplastic thyroid cancer vs. NSCLC differential",
+      "position_text": "Liquid NGS-derived molecular profiles, including co-occurring mutations and fusion partners, may help narrow the differential diagnosis in carcinoma of unknown primary when tissue-based primary identification is inconclusive.",
+      "evidence_excerpt": "liquid NGS revealed mutations in TP53 and the TERT promoter (c.-124C>T), as well as a CCDC6-RET fusion. This genetic profile resembled an anaplastic TC vs. NSCLC primary.",
+      "confidence": 0.87
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "safety",
+      "drug_name": "selpercatinib",
+      "drug_class": "selective RET inhibitor",
+      "biomarker": null,
+      "disease_context": "RET fusion-positive mediastinal carcinoma of unknown primary",
+      "position_text": "Selpercatinib may require dose modification or switching to an alternative RET inhibitor due to overlapping toxicities such as thrombocytopenia, hypertension, and transaminitis, which can compromise treatment continuity.",
+      "evidence_excerpt": "selpercatinib, which was held after 3 weeks due to thrombocytopenia and hypertension. At a reduced dosage, patient developed transaminitis, and selpercatinib was switched to pralsetinib.",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "diagnostics",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": "TERT promoter c.-124C>T, FGFR3-TACC3 fusion",
+      "disease_context": "concurrent glioblastoma in patient with RET fusion-positive mediastinal malignancy",
+      "position_text": "Shared molecular alterations across distinct tumor histologies in the same patient highlight the diagnostic complexity of interpreting NGS findings and the risk of misattributing variants to a single malignancy without thorough histopathologic correlation.",
+      "evidence_excerpt": "Brain MRI showed a nonenhancing temporal lobe signal abnormality, which on biopsy proved to be glioblastoma (GBM) with TERT promoter c.-124C>T mutation and FGFR3-TACC3 fusion by NGS.",
+      "confidence": 0.82
+    }
+  ]
+}
+[HCP 1/3] processing 659e0892-0795-4976-9938-8e43e4ea473b (rising_star, rank 1): 2 papers, 10 positions extracted
+
+=== DRY RUN: HCP 9b75e4f1-2a84-4eaa-b1f3-56f6ed0b2ec7 paper f01d2c90-ca3b-415a-87e4-0f02ed039a56 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Randomized open-label controlled study of cancer vaccine OSE2101 versus chemotherapy in HLA-A2-positive patients with advanced non-small-cell lung cancer with resistance to immunotherapy: ATALANTE-1.
+Year: 2023
+Journal: Annals of oncology : official journal of the European Society for Medical Oncology
+Author role on this paper: senior_author
+Passage (abstract):
+BACKGROUND: Patients with advanced non-small-cell lung cancer (NSCLC) treated with immune checkpoint blockers (ICBs) ultimately progress either rapidly (primary resistance) or after durable benefit (secondary resistance). The cancer vaccine OSE2101 may invigorate antitumor-specific immune responses after ICB failure. The objective of ATALANTE-1 was to evaluate its efficacy and safety in these patients. PATIENTS AND METHODS: ATALANTE-1 was a two-step open-label study to evaluate the efficacy and safety of OSE2101 compared to standard-of-care (SoC) chemotherapy (CT). Patients with human leukocyte antigen (HLA)-A2-positive advanced NSCLC without actionable alterations, failing sequential or concurrent CT and ICB were randomized (2 : 1) to OSE2101 or SoC (docetaxel or pemetrexed). Primary endpoint was overall survival (OS). Interim OS futility analysis was planned as per Fleming design. In April 2020 at the time of interim analysis, a decision was taken to prematurely stop the accrual due to coronavirus disease 2019 (COVID-19). Final analysis was carried out in all patients and in the subgroup of patients with ICB secondary resistance defined as failure after ICB monotherapy second line ΓëÑ12 weeks. RESULTS: Two hundred and nineteen patients were randomized (139 OSE2101, 80 SoC); 118 had secondary resistance to sequential ICB. Overall, median OS non-significantly favored OSE2101 over SoC {hazard ratio (HR) [95% confidence interval (CI)] 0.86 [0.62-1.19], P┬á= 0.36}. In the secondary resistance subgroup, OSE2101 significantly improved median OS versus SoC [11.1 versus 7.5 months; HR (95% CI) 0.59 (0.38-0.91), P┬á= 0.017], and significantly improved post-progression survival (HR 0.46, P┬á= 0.004), time to Eastern Cooperative Oncology Group (ECOG) performance status deterioration (HR 0.43, P┬á= 0.006) and Quality of Life Questionnaire Core 30 (QLQ-C30) global health status compared to SoC (P┬á= 0.045). Six-month disease control rates and progression-free survival were similar between groups. Grade ΓëÑ3 adverse effects occurred in 11.4% of patients with OSE2101 and 35.1% in SoC (P┬á= 0.002). CONCLUSIONS: In HLA-A2-positive patients with advanced NSCLC and secondary resistance to immunotherapy, OSE2101 increased survival with better safety compared to CT. Further evaluation in this population is warranted.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "OSE2101",
+      "drug_class": "cancer vaccine",
+      "biomarker": "HLA-A2",
+      "disease_context": "HLA-A2-positive advanced NSCLC with secondary resistance to ICB",
+      "position_text": "OSE2101 significantly improves overall survival and quality-of-life outcomes versus chemotherapy in HLA-A2-positive advanced NSCLC patients with secondary resistance to immunotherapy, supporting its therapeutic value in this specific population.",
+      "evidence_excerpt": "In the secondary resistance subgroup, OSE2101 significantly improved median OS versus SoC [11.1 versus 7.5 months; HR (95% CI) 0.59 (0.38-0.91), P = 0.017]",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "safety",
+      "drug_name": "OSE2101",
+      "drug_class": "cancer vaccine",
+      "biomarker": null,
+      "disease_context": "HLA-A2-positive advanced NSCLC failing ICB and chemotherapy",
+      "position_text": "OSE2101 offers a substantially more favorable safety profile compared to standard-of-care chemotherapy, with markedly lower rates of grade \u22653 adverse events, reinforcing its tolerability advantage.",
+      "evidence_excerpt": "Grade \u22653 adverse effects occurred in 11.4% of patients with OSE2101 and 35.1% in SoC (P = 0.002).",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "patient_selection",
+      "drug_name": "OSE2101",
+      "drug_class": "cancer vaccine",
+      "biomarker": "HLA-A2",
+      "disease_context": "advanced NSCLC with secondary resistance to ICB",
+      "position_text": "The survival benefit confined to the secondary resistance subgroup suggests that precise patient selection\u2014specifically those with HLA-A2 positivity and secondary ICB resistance\u2014is critical to realizing the clinical value of OSE2101, representing an unmet need for refined stratification strategies.",
+      "evidence_excerpt": "Overall, median OS non-significantly favored OSE2101 over SoC...In the secondary resistance subgroup, OSE2101 significantly improved median OS versus SoC",
+      "confidence": 0.9
+    },
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "resistance",
+      "drug_name": "OSE2101",
+      "drug_class": "cancer vaccine",
+      "biomarker": null,
+      "disease_context": "advanced NSCLC after ICB failure",
+      "position_text": "The author advances the hypothesis that OSE2101 can reinvigorate antitumor-specific immune responses in patients who have developed resistance to immune checkpoint blockade, particularly secondary resistance, offering a biologically rationale immunotherapy strategy post-ICB failure.",
+      "evidence_excerpt": "The cancer vaccine OSE2101 may invigorate antitumor-specific immune responses after ICB failure.",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "sequencing",
+      "drug_name": "OSE2101",
+      "drug_class": "cancer vaccine",
+      "biomarker": "HLA-A2",
+      "disease_context": "HLA-A2-positive advanced NSCLC with secondary ICB resistance",
+      "position_text": "Further prospective evaluation of OSE2101 in HLA-A2-positive patients with secondary ICB resistance is warranted, highlighting an unmet need for effective and better-tolerated treatment options in this post-immunotherapy sequencing context.",
+      "evidence_excerpt": "In HLA-A2-positive patients with advanced NSCLC and secondary resistance to immunotherapy, OSE2101 increased survival with better safety compared to CT. Further evaluation in this population is warranted.",
+      "confidence": 0.92
+    }
+  ]
+}
+
+=== DRY RUN: HCP 9b75e4f1-2a84-4eaa-b1f3-56f6ed0b2ec7 paper 0f834af9-0464-42ad-96e8-542f3048938f ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Beyond Checkpoint Inhibitors: Enhancing Antitumor Immune Response in Lung Cancer.
+Year: 2022
+Journal: American Society of Clinical Oncology educational book. American Society of Clinical Oncology. Annual Meeting
+Author role on this paper: first_author
+Passage (abstract):
+The introduction of immune checkpoint inhibitors has dramatically changed the treatment landscape and improved survival for many patients with thoracic malignancies. Although some patients may experience prolonged survival benefit with immune checkpoint inhibitors, a majority do not experience disease control or benefit, supporting the need for research and development of improved approaches for facilitating immune recognition. Additionally, many patients will experience toxicity with the current approaches to immunotherapy, supporting the need for developing treatment strategies with less risk of adverse events. An extensive array of different strategies are currently under investigation, including novel combinations of checkpoint inhibitors or immunotherapies; novel agents beyond checkpoint inhibitors (e.g., bispecific antibodies, vaccine strategies, cytokine therapies); and different approaches for use of radiation to augment systemic immunotherapy agents. With each strategy, researchers are evaluating the potential for augmenting antitumor responses and ensuring more sustained antitumor effects. This article highlights areas of active research, reviewing the rationale for different investigative strategies, as well as currently available clinical data.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": null,
+      "disease_context": "thoracic malignancies / NSCLC",
+      "position_text": "Because a majority of patients do not experience disease control with immune checkpoint inhibitors, there is a critical unmet need for improved approaches to facilitate immune recognition beyond current checkpoint inhibitor strategies.",
+      "evidence_excerpt": "a majority do not experience disease control or benefit, supporting the need for research and development of improved approaches for facilitating immune recognition.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "safety",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": null,
+      "disease_context": "thoracic malignancies / NSCLC",
+      "position_text": "Toxicity associated with current immunotherapy approaches represents a meaningful clinical concern, supporting the need to develop alternative treatment strategies with improved safety profiles.",
+      "evidence_excerpt": "many patients will experience toxicity with the current approaches to immunotherapy, supporting the need for developing treatment strategies with less risk of adverse events.",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": null,
+      "disease_context": "thoracic malignancies / NSCLC",
+      "position_text": "Immune checkpoint inhibitors have meaningfully improved survival for a subset of patients with thoracic malignancies, establishing immunotherapy as a foundational pillar of treatment.",
+      "evidence_excerpt": "The introduction of immune checkpoint inhibitors has dramatically changed the treatment landscape and improved survival for many patients with thoracic malignancies.",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "bispecific antibodies, vaccines, cytokine therapies, radiation-immunotherapy combinations",
+      "biomarker": null,
+      "disease_context": "thoracic malignancies / NSCLC",
+      "position_text": "Novel therapeutic strategies beyond checkpoint inhibitors\u2014including bispecific antibodies, vaccine approaches, cytokine therapies, and radiation augmentation\u2014are needed to achieve more sustained and durable antitumor responses.",
+      "evidence_excerpt": "novel agents beyond checkpoint inhibitors (e.g., bispecific antibodies, vaccine strategies, cytokine therapies); and different approaches for use of radiation to augment systemic immunotherapy agents.",
+      "confidence": 0.91
+    },
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "combination immunotherapies",
+      "biomarker": null,
+      "disease_context": "thoracic malignancies / NSCLC",
+      "position_text": "Combining checkpoint inhibitors with novel immunotherapy modalities or radiation may augment antitumor responses and sustain long-term immune-mediated tumor control beyond what single-agent checkpoint inhibition achieves.",
+      "evidence_excerpt": "researchers are evaluating the potential for augmenting antitumor responses and ensuring more sustained antitumor effects.",
+      "confidence": 0.87
+    }
+  ]
+}
+
+=== DRY RUN: HCP 9b75e4f1-2a84-4eaa-b1f3-56f6ed0b2ec7 paper c6b3ff92-a95c-4d69-a73f-472d11a2cc14 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Amivantamab-Chemotherapy in Non-Small Cell Lung Cancer with EGFR Exon 20 Insertions: Impact of Treatment Crossover and Other Endpoints from the Phase III PAPILLON Study.
+Year: 2025
+Journal: Targeted oncology
+Author role on this paper: first_author
+Passage (abstract):
+BACKGROUND: In the PAPILLON study, first-line amivantamab-chemotherapy in epidermal growth factor receptor (EGFR) exon 20 insertion-mutated non-small cell lung cancer demonstrated significantly prolonged progression-free survival and favorable overall survival over chemotherapy; a consistent benefit was also observed across some secondary endpoints. However, the complete clinical benefit of first-line amivantamab-chemotherapy is not fully understood, nor is the survival advantage in the presence of per-protocol crossover from chemotherapy to amivantamab after progression. OBJECTIVE: We aimed to assess time to treatment discontinuation (TTD) and time to subsequent therapy (TTST), at the time of primary analysis for progression-free survival, and the effect of the crossover design on overall survival at the time of interim analysis. METHODS: In the phase III PAPILLON study, 308 participants were randomized (amivantamab-chemotherapy, n = 153; chemotherapy, n = 155). Intravenous amivantamab was administered every 3 weeks. Chemotherapy was administered as carboplatin for four cycles and pemetrexed until disease progression. TTD and TTST were evaluated using Kaplan-Meier and Cox proportional hazards models. Crossover-adjusted survival estimates were generated using three established statistical methods. RESULTS: At a median follow-up of 14.9 months, median TTD was 13.2 versus 7.5 months for amivantamab-chemotherapy versus chemotherapy (hazard ratio [HR] 0.38 [95% confidence interval 0.28-0.51]; nominal p < 0.0001). Median TTST was 17.7 versus 9.9 months (HR 0.35 [95% confidence interval 0.25-0.49]; nominal p < 0.0001). A total of 65/155 participants crossed over from chemotherapy to amivantamab after progression. The crossover-adjusted overall survival continued to demonstrate a favorable survival benefit for amivantamab-chemotherapy versus chemotherapy with HRs of 0.52-0.60, which is more pronounced than the planned interim intention-to-treat overall survival (HR of 0.67; 95% confidence interval 0.42-1.09). CONCLUSIONS: In PAPILLON, TTD and TTST were substantially longer for amivantamab-chemotherapy versus chemotherapy at primary analysis (cut-off on 3 May 2023). Crossover-adjusted analyses of the planned interim overall survival demonstrated a greater benefit for amivantamab-chemotherapy versus chemotherapy, further supporting amivantamab-chemotherapy as the first-line standard of care in EGFR exon 20 insertion-mutated non-small cell lung cancer. CLINICAL TRIAL REGISTRATION: ClinicalTrials.gov Identifier: NCT04538664.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "amivantamab",
+      "drug_class": "EGFR/MET bispecific antibody",
+      "biomarker": "EGFR exon 20 insertion",
+      "disease_context": "first-line EGFR exon 20 insertion-mutated NSCLC",
+      "position_text": "The substantially longer TTD and TTST with amivantamab-chemotherapy versus chemotherapy support its durable clinical benefit beyond progression-free survival, reinforcing its role as the first-line standard of care.",
+      "evidence_excerpt": "TTD and TTST were substantially longer for amivantamab-chemotherapy versus chemotherapy at primary analysis, further supporting amivantamab-chemotherapy as the first-line standard of care.",
+      "confidence": 0.97
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "methodology",
+      "drug_name": "amivantamab",
+      "drug_class": "EGFR/MET bispecific antibody",
+      "biomarker": "EGFR exon 20 insertion",
+      "disease_context": "first-line EGFR exon 20 insertion-mutated NSCLC",
+      "position_text": "Per-protocol crossover from chemotherapy to amivantamab after progression dilutes the observed intention-to-treat overall survival benefit, meaning standard ITT analysis underestimates the true survival advantage of first-line amivantamab-chemotherapy.",
+      "evidence_excerpt": "The crossover-adjusted overall survival continued to demonstrate a favorable survival benefit with HRs of 0.52-0.60, which is more pronounced than the planned interim intention-to-treat overall survival (HR of 0.67).",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "amivantamab",
+      "drug_class": "EGFR/MET bispecific antibody",
+      "biomarker": "EGFR exon 20 insertion",
+      "disease_context": "first-line EGFR exon 20 insertion-mutated NSCLC",
+      "position_text": "Crossover-adjusted overall survival analyses provide a more accurate reflection of the true survival benefit of amivantamab-chemotherapy and should be considered alongside ITT analyses when evaluating overall survival in trials with permitted crossover.",
+      "evidence_excerpt": "Crossover-adjusted analyses of the planned interim overall survival demonstrated a greater benefit for amivantamab-chemotherapy versus chemotherapy, further supporting amivantamab-chemotherapy as the first-line standard of care.",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "efficacy",
+      "drug_name": "amivantamab",
+      "drug_class": "EGFR/MET bispecific antibody",
+      "biomarker": "EGFR exon 20 insertion",
+      "disease_context": "first-line EGFR exon 20 insertion-mutated NSCLC",
+      "position_text": "The complete clinical benefit of first-line amivantamab-chemotherapy is not yet fully understood, highlighting the need for continued follow-up and evaluation of additional endpoints beyond progression-free survival.",
+      "evidence_excerpt": "The complete clinical benefit of first-line amivantamab-chemotherapy is not fully understood, nor is the survival advantage in the presence of per-protocol crossover from chemotherapy to amivantamab after progression.",
+      "confidence": 0.91
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "sequencing",
+      "drug_name": "amivantamab",
+      "drug_class": "EGFR/MET bispecific antibody",
+      "biomarker": "EGFR exon 20 insertion",
+      "disease_context": "first-line EGFR exon 20 insertion-mutated NSCLC",
+      "position_text": "Amivantamab-chemotherapy should be established as the first-line standard of care for EGFR exon 20 insertion-mutated NSCLC, with the totality of evidence across PFS, OS, TTD, TTST, and crossover-adjusted analyses collectively supporting this sequencing recommendation.",
+      "evidence_excerpt": "A consistent benefit was also observed across some secondary endpoints...further supporting amivantamab-chemotherapy as the first-line standard of care in EGFR exon 20 insertion-mutated non-small cell lung cancer.",
+      "confidence": 0.96
+    }
+  ]
+}
+
+=== DRY RUN: HCP 9b75e4f1-2a84-4eaa-b1f3-56f6ed0b2ec7 paper 73747029-825c-46f7-8927-34313bc6f506 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Integrin beta-6: Its emerging role as a therapeutic target in solid tumors.
+Year: 2026
+Journal: Cancer treatment reviews
+Author role on this paper: first_author
+Passage (abstract):
+Integrins, a family of heterodimeric transmembrane receptors, mediate bidirectional intercellular communication as well as cellular communication with the extracellular matrix. Integrin beta-6 (IB6), which is formed via exclusive dimerization of the ╬▓6 subunit with the ╬▒v subunit, is expressed at low levels in healthy epithelial tissues and upregulated during the epithelial remodeling associated with development and wound healing. The role of IB6 in these processes is thought to be exploited during tumorigenesis enabling migration, invasion, proliferation, and survival. In fact, IB6 expression has been reported in numerous solid tumors, particularly at the invasive edge, and IB6 represents a promising anticancer therapeutic target. Over the last two decades, there have been several distinct strategies targeting IB6 investigated in preclinical studies. While many of the early preclinical strategies were discontinued after disappointing results in initial clinical studies, using IB6 as a target for antibody-drug conjugates has shown promise in early trials. Sigvotatug vedotin, an IB6-directed antibody-drug conjugate linked to a monomethyl auristatin E payload showed promising efficacy in a phase 1 study in patients with advanced solid tumors, particularly non-small cell lung cancer, and is being investigated in two phase 3 studies. Additionally, several other IB6-directed antibody-drug conjugates have demonstrated antitumor activity in preclinical studies and are entering the clinical stage of development. Results from these studies will enable greater understanding of IB6 as an anticancer therapeutic target, as well as IB6 expression as a potential biomarker.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "Sigvotatug vedotin",
+      "drug_class": "Antibody-drug conjugate",
+      "biomarker": "Integrin beta-6 (IB6)",
+      "disease_context": "Advanced solid tumors, particularly NSCLC",
+      "position_text": "Sigvotatug vedotin, an IB6-directed ADC, has demonstrated promising efficacy in early trials and represents the most clinically advanced strategy for targeting IB6 in solid tumors.",
+      "evidence_excerpt": "Sigvotatug vedotin...showed promising efficacy in a phase 1 study in patients with advanced solid tumors, particularly non-small cell lung cancer, and is being investigated in two phase 3 studies.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "Antibody-drug conjugate",
+      "biomarker": "Integrin beta-6 (IB6)",
+      "disease_context": "Solid tumors",
+      "position_text": "Targeting IB6 with antibody-drug conjugates represents the most promising therapeutic strategy after earlier IB6-directed approaches failed to translate clinically.",
+      "evidence_excerpt": "While many of the early preclinical strategies were discontinued after disappointing results in initial clinical studies, using IB6 as a target for antibody-drug conjugates has shown promise in early trials.",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": "Integrin beta-6 (IB6)",
+      "disease_context": "Solid tumors",
+      "position_text": "IB6's upregulation at the invasive edge of solid tumors and its role in enabling migration, invasion, proliferation, and survival suggest it is a mechanistically compelling anticancer therapeutic target.",
+      "evidence_excerpt": "IB6 expression has been reported in numerous solid tumors, particularly at the invasive edge, and IB6 represents a promising anticancer therapeutic target.",
+      "confidence": 0.91
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": "Antibody-drug conjugate",
+      "biomarker": "Integrin beta-6 (IB6)",
+      "disease_context": "Solid tumors",
+      "position_text": "The clinical development of IB6-directed therapies will be critical to establishing IB6 expression as a validated biomarker for patient selection in solid tumors.",
+      "evidence_excerpt": "Results from these studies will enable greater understanding of IB6 as an anticancer therapeutic target, as well as IB6 expression as a potential biomarker.",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": "Integrin beta-6 (IB6)",
+      "disease_context": "Solid tumors",
+      "position_text": "Prior non-ADC IB6-targeting strategies were largely unsuccessful in the clinic, highlighting the historical difficulty of translating IB6-directed preclinical findings into effective treatments.",
+      "evidence_excerpt": "Many of the early preclinical strategies were discontinued after disappointing results in initial clinical studies.",
+      "confidence": 0.87
+    }
+  ]
+}
+[HCP 2/3] processing 9b75e4f1-2a84-4eaa-b1f3-56f6ed0b2ec7 (rising_star, rank 2): 4 papers, 20 positions extracted
+
+=== DRY RUN: HCP bd43319c-2cdc-4f10-867e-60886fd4d835 paper 3aa66aed-9272-4d2d-a8a6-eecd5e5fb236 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Squamous cell lung cancer: Current landscape and future therapeutic options.
+Year: 2022
+Journal: Cancer cell
+Author role on this paper: first_author
+Passage (abstract):
+Squamous cell lung cancers (lung squamous cell carcinomas [LUSCs]) are associated with high mortality and a lack of therapies specific to this disease. Although recurrent molecular aberrations are present in LUSCs, efforts to develop targeted therapies against receptor tyrosine kinases, signaling transduction, and cell cycle checkpoints in LUSCs were met with significant challenges. The present therapeutic landscape focuses on epigenetic therapies to modulate the expression of lineage-dependent survival pathways and undruggable oncogenes. Another important therapeutic approach is to exploit metabolic vulnerabilities unique to LUSCs. These novel therapies may synergize with immune checkpoint inhibitors in the right therapeutic context. For example, the recognition that alterations in KEAP1-NFE2L2 in LUSCs affected antitumor immune responses created unique opportunities for targeted, metabolic, and immune combinations. This article provides a perspective on how lessons learned from the past influence the current therapeutic landscape and opportunities for future drug development for LUSCs.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "targeted therapies",
+      "biomarker": null,
+      "disease_context": "squamous cell lung carcinoma (LUSC)",
+      "position_text": "LUSC remains an area of high unmet need due to high mortality and the lack of disease-specific therapies, despite the presence of recurrent molecular aberrations.",
+      "evidence_excerpt": "Squamous cell lung cancers are associated with high mortality and a lack of therapies specific to this disease.",
+      "confidence": 0.97
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "resistance",
+      "drug_name": null,
+      "drug_class": "targeted therapies against RTKs, signal transduction, cell cycle checkpoints",
+      "biomarker": null,
+      "disease_context": "squamous cell lung carcinoma (LUSC)",
+      "position_text": "Efforts to develop targeted therapies against receptor tyrosine kinases, signaling transduction, and cell cycle checkpoints in LUSC have faced significant challenges, suggesting these approaches alone are insufficient.",
+      "evidence_excerpt": "Efforts to develop targeted therapies against receptor tyrosine kinases, signaling transduction, and cell cycle checkpoints in LUSCs were met with significant challenges.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "epigenetic therapies",
+      "biomarker": null,
+      "disease_context": "squamous cell lung carcinoma (LUSC)",
+      "position_text": "Epigenetic therapies represent a promising current therapeutic approach in LUSC by modulating the expression of lineage-dependent survival pathways and undruggable oncogenes.",
+      "evidence_excerpt": "The present therapeutic landscape focuses on epigenetic therapies to modulate the expression of lineage-dependent survival pathways and undruggable oncogenes.",
+      "confidence": 0.92
+    },
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "metabolic therapies, immune checkpoint inhibitors",
+      "biomarker": null,
+      "disease_context": "squamous cell lung carcinoma (LUSC)",
+      "position_text": "Novel therapies exploiting metabolic vulnerabilities unique to LUSC may synergize with immune checkpoint inhibitors in the appropriate therapeutic context, suggesting combination strategies as a future direction.",
+      "evidence_excerpt": "Another important therapeutic approach is to exploit metabolic vulnerabilities unique to LUSCs. These novel therapies may synergize with immune checkpoint inhibitors in the right therapeutic context.",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": "targeted, metabolic, and immune combination therapies",
+      "biomarker": "KEAP1-NFE2L2",
+      "disease_context": "squamous cell lung carcinoma (LUSC)",
+      "position_text": "KEAP1-NFE2L2 alterations in LUSC, by affecting antitumor immune responses, may represent a biomarker-defined opportunity for targeted, metabolic, and immune combination strategies.",
+      "evidence_excerpt": "The recognition that alterations in KEAP1-NFE2L2 in LUSCs affected antitumor immune responses created unique opportunities for targeted, metabolic, and immune combinations.",
+      "confidence": 0.94
+    }
+  ]
+}
+
+=== DRY RUN: HCP bd43319c-2cdc-4f10-867e-60886fd4d835 paper 4a6a930f-8aca-4212-838b-d564f44fb3ed ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Subtypes of EGFR- and HER2-Mutant Metastatic NSCLC Influence Response to Immune Checkpoint Inhibitors.
+Year: 2021
+Journal: Clinical lung cancer
+Author role on this paper: first_author
+Passage (abstract):
+INTRODUCTION: The efficacy of immune checkpoint inhibitors (ICIs) is low among EGFR-mutated non-small-cell lung cancer (NSCLC), although prolonged responses have occasionally been reported. We investigated the association between mutation subtypes and ICI outcomes among HER2- and EGFR-mutated NSCLC. PATIENTS AND METHODS: This retrospective single-center study analyzed patients with EGFR- and HER2-mutated advanced NSCLC who received at least 1 cycle of ICI between 2013 and 2019. Patient characteristics, mutation subtype, and ICI outcomes. RESULTS: Among 48 patients with advanced NSCLC, 14 (29%) had HER2 mutations and 34 (71%) had EGFR mutations. EGFR mutations included 16 (47%) exon 19 deletion, 7 (21%) L858R, 5 (15%) uncommon, and 6 (18%) exon 20 insertion. Compared to EGFR-sensitizing mutations (ESMs), HER2 and EGFR exon 20 mutations were associated with a trend toward better response (respectively, ESM, HER2, and EGFR exon 20: 11%, 29%, and 50%; P┬á= .07) and significantly better disease control rates (respectively, 18%, 57%, and 67%; P┬á= .008). Compared to ESM, HER2 mutations (adjusted hazard ratio, 0.35; P┬á= .02) and EGFR exon 20 mutations (adjusted hazard ratio, 0.37; P┬á= .10 trend) were also associated with improved PFS. Programmed death ligand 1 (PD-L1) expression remained an independent predictor of PFS (adjusted hazard ratio, 0.42; 95% confidence interval, 0.23-0.76; P┬á= .004). The 6-month PFS rates were 29% (HER2), 33% (EGFR exon 20), and 4% (ESM). ICIs were generally well tolerated in this population. Importantly, no immune-related toxicity was observed in 10 patients who received a tyrosine kinase inhibitor (TKI) as the immediate next line treatment after ICI. CONCLUSION: HER2 and EGFR exon 20 mutations derive greater benefit from ICIs with comparable PFS to wild-type historical second/third-line unselected cohorts. ICIs remain a treatment option for this genomic subgroup, given the absence of approved targeted therapies for these rare mutations.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "HER2 mutation, EGFR exon 20 insertion",
+      "disease_context": "HER2- and EGFR exon 20-mutant metastatic NSCLC",
+      "position_text": "HER2 and EGFR exon 20 mutations are associated with greater ICI benefit compared to EGFR-sensitizing mutations, with PFS rates comparable to wild-type historical second/third-line cohorts.",
+      "evidence_excerpt": "HER2 and EGFR exon 20 mutations derive greater benefit from ICIs with comparable PFS to wild-type historical second/third-line unselected cohorts.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "patient_selection",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "HER2 mutation, EGFR exon 20 insertion",
+      "disease_context": "HER2- and EGFR exon 20-mutant metastatic NSCLC",
+      "position_text": "ICIs should remain a treatment option for patients with HER2 or EGFR exon 20 mutations, particularly given the absence of approved targeted therapies for these rare genomic subgroups.",
+      "evidence_excerpt": "ICIs remain a treatment option for this genomic subgroup, given the absence of approved targeted therapies for these rare mutations.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "patient_selection",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "EGFR-sensitizing mutations",
+      "disease_context": "EGFR-sensitizing mutation metastatic NSCLC",
+      "position_text": "Patients with EGFR-sensitizing mutations (exon 19 deletion, L858R) derive limited benefit from ICIs and should not be broadly grouped with other EGFR/HER2 mutation subtypes when evaluating ICI candidacy.",
+      "evidence_excerpt": "Compared to EGFR-sensitizing mutations (ESMs), HER2 and EGFR exon 20 mutations were associated with a trend toward better response and significantly better disease control rates.",
+      "confidence": 0.9
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "PD-L1 expression",
+      "disease_context": "EGFR- and HER2-mutant metastatic NSCLC",
+      "position_text": "PD-L1 expression remains an independent predictor of ICI benefit even within EGFR- and HER2-mutant NSCLC subtypes, supporting its continued use as a patient-selection biomarker in this population.",
+      "evidence_excerpt": "Programmed death ligand 1 (PD-L1) expression remained an independent predictor of PFS (adjusted hazard ratio, 0.42; 95% confidence interval, 0.23-0.76; P = .004).",
+      "confidence": 0.92
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "sequencing",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors, tyrosine kinase inhibitors",
+      "biomarker": null,
+      "disease_context": "EGFR- and HER2-mutant metastatic NSCLC",
+      "position_text": "Sequential ICI followed by TKI therapy appears safe, as no immune-related toxicity was observed when TKI was administered immediately after ICI in this population.",
+      "evidence_excerpt": "No immune-related toxicity was observed in 10 patients who received a tyrosine kinase inhibitor (TKI) as the immediate next line treatment after ICI.",
+      "confidence": 0.88
+    }
+  ]
+}
+
+=== DRY RUN: HCP bd43319c-2cdc-4f10-867e-60886fd4d835 paper 61db651c-8f9b-4edb-9a0a-fa87e9479842 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: PD-L1 assessment in cytology samples predicts treatment response to checkpoint inhibitors in NSCLC.
+Year: 2022
+Journal: Lung cancer (Amsterdam, Netherlands)
+Author role on this paper: first_author
+Passage (abstract):
+BACKGROUND: Testing for tumor programmed death ligand-1 (PD-L1) expression was initially developed with histology specimens in non-small cell lung cancer (NSCLC). However, cytology specimens are widely used for primary diagnosis and biomarker studies in clinical practice. Limited clinical data exist on the predictiveness of cytology-derived PD-L1 scores for response to immune checkpoint inhibitor (ICI) therapy. METHODS: We reviewed all NSCLC specimens clinically tested at the University Health Network (UHN) for PD-L1 with 22C3pharmDx, from 01/2013 to 04/2021. Treatment outcomes in patients treated with single agent ICI therapy were reviewed and compared according to cytology- and histology-derived PD-L1 scores. RESULTS: We identified 494 and 1942 unique patients with cytology- and histology-derived tumor proportion scores, respectively, during the study period. Informative testing rates were 95┬á% vs 98┬á% for cytology and histology, respectively. Clinical data were available for 152 patients treated with single agent ICI: 61 cytology and 91 histology. Overall response rates (ORR) were similar for cytology and histology (36┬á% vs 34┬á%; p┬á=┬á0.23), as well as median progression free survival (PFS) (4.9 vs 4.2┬ámonths; p┬á=┬á0.99) and overall survival (23.4 vs 19.7┬ámonths; p┬á=┬á0.99). The results remained similar even after adjusting for PD-L1 expression levels and line of ICI treatment (PFS HR 1.15; 95┬á%CI 0.78-1.70; p┬á=┬á0.47). CONCLUSIONS: Treatment outcomes to single agent ICI based on cytology-derived PD-L1 scores were comparable to histology controls. Our results support PD-L1 biomarker testing on both cytology and histology specimens.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "diagnostics",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitor",
+      "biomarker": "PD-L1",
+      "disease_context": "NSCLC",
+      "position_text": "Cytology-derived PD-L1 scores are valid for guiding ICI treatment decisions, supporting their routine clinical use alongside histology specimens.",
+      "evidence_excerpt": "Treatment outcomes to single agent ICI based on cytology-derived PD-L1 scores were comparable to histology controls. Our results support PD-L1 biomarker testing on both cytology and histology specimens.",
+      "confidence": 0.97
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitor",
+      "biomarker": "PD-L1",
+      "disease_context": "NSCLC",
+      "position_text": "There is an unmet need for clinical validation of cytology-derived PD-L1 scores as predictive biomarkers for ICI response, given their widespread use in primary diagnosis but limited supporting outcome data.",
+      "evidence_excerpt": "Limited clinical data exist on the predictiveness of cytology-derived PD-L1 scores for response to immune checkpoint inhibitor (ICI) therapy.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "patient_selection",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitor",
+      "biomarker": "PD-L1",
+      "disease_context": "NSCLC",
+      "position_text": "Patients whose PD-L1 status is assessed from cytology specimens should not be excluded from ICI treatment consideration, as their outcomes are comparable to those selected via histology-derived scores.",
+      "evidence_excerpt": "Overall response rates were similar for cytology and histology (36 % vs 34 %; p = 0.23), as well as median progression free survival and overall survival.",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "diagnostics",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": "PD-L1",
+      "disease_context": "NSCLC",
+      "position_text": "Cytology specimens yield adequately informative PD-L1 testing rates, suggesting technical feasibility of cytology-based PD-L1 assessment is not a meaningful barrier to clinical use.",
+      "evidence_excerpt": "Informative testing rates were 95 % vs 98 % for cytology and histology, respectively.",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitor",
+      "biomarker": "PD-L1",
+      "disease_context": "NSCLC",
+      "position_text": "The historical focus on histology-based PD-L1 testing may have created an evidence gap that undervalues cytology specimens, despite their widespread use in real-world NSCLC diagnosis and biomarker assessment.",
+      "evidence_excerpt": "Testing for tumor programmed death ligand-1 (PD-L1) expression was initially developed with histology specimens in non-small cell lung cancer (NSCLC). However, cytology specimens are widely used for primary diagnosis and biomarker studies in clinical practice.",
+      "confidence": 0.85
+    }
+  ]
+}
+
+=== DRY RUN: HCP bd43319c-2cdc-4f10-867e-60886fd4d835 paper efd98fa2-ba89-44be-9a77-6c0861ea1083 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Concurrent Chemoradiation With or Without Durvalumab in Elderly Patients With Unresectable Stage III NSCLC: Safety and Efficacy.
+Year: 2021
+Journal: JTO clinical and research reports
+Author role on this paper: first_author
+Passage (abstract):
+INTRODUCTION: The addition of durvalumab after chemoradiation therapy (CRT) in unresectable stage III NSCLC significantly improves survival. The benefit of this approach in elderly patients is controversial given the toxicity associated with CRT and, thus, may be underutilized. We sought to investigate the outcomes of elderly patients treated with CRT without or without durvalumab at our center. METHODS: We reviewed all stage III patients with NSCLC treated with CRT between 2018 and 2020. Patients were analyzed on the basis of age: less than 70 years and 70 years and older. The end points evaluated were treatment patterns, toxicity, progression-free survival, and overall survival. RESULTS: The baseline characteristics including Eastern Cooperative Oncology Group performance status and comorbidities were similar among the 115 patients (44 elderly, 71 young). Completion rates of CRT (100%, 97%) and chemotherapy dose intensity (97%, 97%) were high in elderly and young patients, respectively. There was a trend toward increased hospitalizations in elderly patients because of infections (27% versus 13%, CONCLUSIONS: Well-selected elderly patients can be treated safely with CRT followed by durvalumab with similar survival benefits compared with their younger counterparts. We would advocate for the referral of all elderly patients for oncologic assessment to avoid undertreatment.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "durvalumab",
+      "drug_class": "PD-L1 inhibitor",
+      "biomarker": null,
+      "disease_context": "unresectable stage III NSCLC, elderly patients",
+      "position_text": "Well-selected elderly patients treated with CRT followed by durvalumab can achieve similar survival benefits compared with younger patients, supporting the regimen's use in this population.",
+      "evidence_excerpt": "Well-selected elderly patients can be treated safely with CRT followed by durvalumab with similar survival benefits compared with their younger counterparts.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "access",
+      "drug_name": "durvalumab",
+      "drug_class": "PD-L1 inhibitor",
+      "biomarker": null,
+      "disease_context": "unresectable stage III NSCLC, elderly patients",
+      "position_text": "Elderly patients with unresectable stage III NSCLC may be systematically undertreated and should be referred for oncologic assessment to ensure equitable access to standard-of-care therapy.",
+      "evidence_excerpt": "We would advocate for the referral of all elderly patients for oncologic assessment to avoid undertreatment.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "safety",
+      "drug_name": null,
+      "drug_class": null,
+      "biomarker": null,
+      "disease_context": "unresectable stage III NSCLC, elderly patients",
+      "position_text": "Elderly patients undergoing CRT may face a higher risk of infection-related hospitalizations, warranting closer monitoring despite overall comparable treatment tolerability.",
+      "evidence_excerpt": "There was a trend toward increased hospitalizations in elderly patients because of infections (27% versus 13%",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "patient_selection",
+      "drug_name": "durvalumab",
+      "drug_class": "PD-L1 inhibitor",
+      "biomarker": null,
+      "disease_context": "unresectable stage III NSCLC, elderly patients",
+      "position_text": "Age alone should not preclude patients from receiving CRT plus durvalumab, as well-selected elderly patients with good performance status can complete treatment at rates comparable to younger patients.",
+      "evidence_excerpt": "Completion rates of CRT (100%, 97%) and chemotherapy dose intensity (97%, 97%) were high in elderly and young patients, respectively.",
+      "confidence": 0.92
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "efficacy",
+      "drug_name": "durvalumab",
+      "drug_class": "PD-L1 inhibitor",
+      "biomarker": null,
+      "disease_context": "unresectable stage III NSCLC, elderly patients",
+      "position_text": "The benefit of CRT followed by durvalumab in elderly patients remains controversial due to toxicity concerns, suggesting the regimen may be underutilized in this population despite potential survival benefit.",
+      "evidence_excerpt": "The benefit of this approach in elderly patients is controversial given the toxicity associated with CRT and, thus, may be underutilized.",
+      "confidence": 0.9
+    }
+  ]
+}
+
+=== DRY RUN: HCP bd43319c-2cdc-4f10-867e-60886fd4d835 paper 3f070c77-e614-4130-b709-a0d3bbe83cf8 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: Durability of CNS disease control in NSCLC patients with brain metastases treated with immune checkpoint inhibitors plus cranial radiotherapy.
+Year: 2021
+Journal: Lung cancer (Amsterdam, Netherlands)
+Author role on this paper: first_author
+Passage (abstract):
+BACKGROUND: Immune checkpoint inhibitors (ICIs) have excellent systemic activity and are standard first line treatment in EGFR/ALK wild type metastatic non-small cell lung cancer (NSCLC). However, their role in patients with brain metastases, which affects over 20% of patients and cause significant morbidity, is less clear. METHODS: We reviewed patients with EGFR/ALK wild-type mNSCLC with CNS metastases. Serial MRIs were reviewed to determine the time to intracranial progression (iPFS). Multivariate regression was performed to adjust for the disease-specific graded prognostic score (ds-GPA). RESULTS: We identified 36 ICI- and 33 chemotherapy-treated patients with baseline CNS metastases and available serial MRIs (average frequency:3.5 months). Baseline radiation was given except for 2 chemotherapy-treated patients with asymptomatic solitary metastasis. The CNS burden of disease was higher in the ICI-treated group (ICI:22% vs. chemotherapy:0% had >10 lesions; p = 0.02), but the utilization of WBRT was not (ICI:31% vs. chemotherapy:45%; p = 0.09). At the time of progression, CNS involvement was identified in 30 % of ICI-treated patients compared to 64 % of chemotherapy controls (p = 0.02). ICI-treated patients had superior iPFS (13.5 vs 8.4 months) that remained significant in multivariate analysis (HR 1.9; 95%CI 1.1--3.4). Superior CNS outcomes in ICI-treated patients were driven by the PD-L1 high subgroup where the 12-month cumulative incidence rate of CNS progression was 19% in ICI-treated PD-L1 ΓëÑ 50%, 50% in ICI-treated PD-L1 < 50% and 58% in chemotherapy-treated patients (p = 0.03). CONCLUSIONS: Remarkable CNS disease control is seen with baseline RT plus ICIs in patients with PD-L1 ΓëÑ 50%. Strategies for delaying WBRT should be investigated in this subgroup of patients.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "PD-L1 \u2265 50%",
+      "disease_context": "EGFR/ALK wild-type mNSCLC with brain metastases",
+      "position_text": "Combining baseline cranial radiotherapy with ICIs produces remarkable CNS disease control, particularly in PD-L1 \u2265 50% patients, suggesting this combination represents a highly effective intracranial treatment strategy for this subgroup.",
+      "evidence_excerpt": "Remarkable CNS disease control is seen with baseline RT plus ICIs in patients with PD-L1 \u2265 50%.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "sequencing",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "PD-L1 \u2265 50%",
+      "disease_context": "EGFR/ALK wild-type mNSCLC with brain metastases",
+      "position_text": "Given superior CNS control with ICI plus focal RT in PD-L1 \u2265 50% patients, strategies to delay or avoid whole brain radiotherapy should be prospectively investigated in this subgroup to preserve neurocognitive function.",
+      "evidence_excerpt": "Strategies for delaying WBRT should be investigated in this subgroup of patients.",
+      "confidence": 0.95
+    },
+    {
+      "position_type": "positive_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "PD-L1 \u2265 50%",
+      "disease_context": "EGFR/ALK wild-type mNSCLC with brain metastases",
+      "position_text": "PD-L1 expression level is a key determinant of intracranial benefit from ICIs, with PD-L1 \u2265 50% driving the superior CNS progression-free outcomes observed in ICI-treated patients.",
+      "evidence_excerpt": "Superior CNS outcomes in ICI-treated patients were driven by the PD-L1 high subgroup where the 12-month cumulative incidence rate of CNS progression was 19% in ICI-treated PD-L1 \u2265 50%.",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "patient_selection",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "PD-L1 < 50%",
+      "disease_context": "EGFR/ALK wild-type mNSCLC with brain metastases",
+      "position_text": "ICI-treated patients with PD-L1 < 50% have CNS progression rates comparable to chemotherapy-treated patients, suggesting that low PD-L1 expressors with brain metastases may not derive meaningful intracranial benefit from ICIs.",
+      "evidence_excerpt": "12-month cumulative incidence rate of CNS progression was 19% in ICI-treated PD-L1 \u2265 50%, 50% in ICI-treated PD-L1 < 50% and 58% in chemotherapy-treated patients.",
+      "confidence": 0.88
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "efficacy",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": null,
+      "disease_context": "EGFR/ALK wild-type mNSCLC with brain metastases",
+      "position_text": "Despite excellent systemic activity, the intracranial role of ICIs in NSCLC patients with brain metastases remains insufficiently defined, representing an important evidence gap given the high prevalence and morbidity of CNS involvement.",
+      "evidence_excerpt": "Their role in patients with brain metastases, which affects over 20% of patients and cause significant morbidity, is less clear.",
+      "confidence": 0.9
+    }
+  ]
+}
+
+=== DRY RUN: HCP bd43319c-2cdc-4f10-867e-60886fd4d835 paper e2a8051a-959f-43d7-b186-d7981b6fdb41 ===
+--- PROMPT ---
+You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
+
+CONTEXT
+Therapeutic area: NSCLC
+Title: A retrospective analysis exploring the association of pretreatment neutrophil-to-lymphocyte ratio and immune checkpoint inhibitor outcomes in patients with advanced NSCLC and liver metastases.
+Year: 2025
+Journal: Therapeutic advances in medical oncology
+Author role on this paper: senior_author
+Passage (abstract):
+BACKGROUND: Liver metastases (LM) in advanced non-small-cell lung cancer (NSCLC) are associated with poor clinical outcomes. The tolerogenic immune microenvironment in the liver may contribute to inferior response to immune checkpoint inhibitors (ICIs). We hypothesized that the presence of LM may be associated with an expanded peripheral myeloid population, using the neutrophil-to-lymphocyte ratio (NLR) as a surrogate in patients treated with ICIs. OBJECTIVES: We evaluated the impact of LM and NLR on clinical outcomes in patients with advanced NSCLC treated with ICIs. DESIGN: This was a retrospective analysis conducted at a single cancer center. METHODS: We reviewed the records of 324 patients with advanced NSCLC treated with programmed death ligand-1 (PD-L1) inhibitors as monotherapy or in combination with cytotoxic T-lymphocyte antigen-4 (CTLA-4) inhibitors. Clinical outcomes, including progression-free survival (PFS) and overall survival (OS), were evaluated among patients with and without LM in NLR-High (NLRΓÇëΓ⌐╛ΓÇë5) and NLR-Low (NLRΓÇë<ΓÇë5) subgroups. RESULTS: Patients with LM had significantly higher median NLR compared to patients without LM (median 7.3 vs 4.5, CONCLUSION: Patients with LM who are NLR-High had the poorest clinical outcomes to ICI, and this appeared to be irrespective of PD-L1 status. Ongoing translational work will provide further insight into tumor myeloid subpopulations that may correlate with treatment resistance.
+
+TASK
+Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
+Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
+
+Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
+
+The evidence_excerpt must come from the abstract body, not the title or metadata.
+
+POSITION TYPES (polarity)
+- positive_position: efficacy, safety, favorable outcome, or favorable positioning claim
+- cautionary_position: toxicity, resistance, lack of benefit, uncertainty, evidence gaps
+- unmet_need_position: explicit or implied need (better sequencing, resistance strategies, selection, access)
+- hypothesis_position: a mechanistic or clinical hypothesis the author is advancing
+
+POSITION CATEGORIES (subject matter, pick the single best fit)
+- efficacy: treatment effect, response, survival, outcomes
+- patient_selection: who should receive treatment, stratification, eligibility
+- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- safety: toxicity, adverse events, tolerability
+- resistance: acquired or primary resistance mechanisms and patterns
+- sequencing: order or line of therapy, treatment pathway
+- access: availability, cost, real-world utilization, disparities
+- diagnostics: testing methodology, specimen type, assay validity
+- methodology: trial design, statistical approach, study methodology
+
+OUTPUT
+Return valid JSON only with this exact shape:
+{
+  "positions": [
+    {
+      "position_type": "positive_position",
+      "position_category": "efficacy",
+      "drug_name": "drug name or null",
+      "drug_class": "class or null",
+      "biomarker": "biomarker or null",
+      "disease_context": "specific subtype/setting or null",
+      "position_text": "one-sentence paraphrase of the position",
+      "evidence_excerpt": "exact excerpt from abstract body, max 30 words",
+      "confidence": 0.0
+    }
+  ]
+}
+
+RULES
+- Conservative language. Use "suggests", "associated with", "may" when the passage does.
+- Positions must be grounded in this passage.
+- If the passage contains no extractable positions, return {"positions": []}.
+- Return JSON only. No preamble. No markdown fences.
+
+--- PARSED JSON ---
+{
+  "positions": [
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "resistance",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "NLR",
+      "disease_context": "advanced NSCLC with liver metastases",
+      "position_text": "The author hypothesizes that liver metastases may drive an expanded peripheral myeloid population, reflected by elevated NLR, which contributes to ICI resistance in advanced NSCLC.",
+      "evidence_excerpt": "the presence of LM may be associated with an expanded peripheral myeloid population, using the neutrophil-to-lymphocyte ratio (NLR) as a surrogate in patients treated with ICIs",
+      "confidence": 0.92
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "patient_selection",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "NLR",
+      "disease_context": "advanced NSCLC with liver metastases",
+      "position_text": "Patients with liver metastases who are NLR-High represent a particularly poor-prognosis subgroup for ICI therapy, suggesting this combined stratification should inform patient selection.",
+      "evidence_excerpt": "Patients with LM who are NLR-High had the poorest clinical outcomes to ICI, and this appeared to be irrespective of PD-L1 status",
+      "confidence": 0.93
+    },
+    {
+      "position_type": "cautionary_position",
+      "position_category": "biomarker",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "PD-L1",
+      "disease_context": "advanced NSCLC with liver metastases and high NLR",
+      "position_text": "PD-L1 status may be insufficient as a sole predictive biomarker in NSCLC patients with liver metastases and elevated NLR, as poor ICI outcomes in this subgroup appeared independent of PD-L1 expression.",
+      "evidence_excerpt": "Patients with LM who are NLR-High had the poorest clinical outcomes to ICI, and this appeared to be irrespective of PD-L1 status",
+      "confidence": 0.9
+    },
+    {
+      "position_type": "hypothesis_position",
+      "position_category": "resistance",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": null,
+      "disease_context": "advanced NSCLC with liver metastases",
+      "position_text": "The tolerogenic immune microenvironment of the liver may mechanistically underlie inferior ICI responses in NSCLC patients with liver metastases, warranting further translational investigation.",
+      "evidence_excerpt": "The tolerogenic immune microenvironment in the liver may contribute to inferior response to immune checkpoint inhibitors (ICIs)",
+      "confidence": 0.89
+    },
+    {
+      "position_type": "unmet_need_position",
+      "position_category": "resistance",
+      "drug_name": null,
+      "drug_class": "immune checkpoint inhibitors",
+      "biomarker": "tumor myeloid subpopulations",
+      "disease_context": "advanced NSCLC with liver metastases",
+      "position_text": "There is an unmet need to characterize tumor myeloid subpopulations that correlate with ICI treatment resistance, particularly in NSCLC patients with liver metastases and high NLR.",
+      "evidence_excerpt": "Ongoing translational work will provide further insight into tumor myeloid subpopulations that may correlate with treatment resistance",
+      "confidence": 0.88
+    }
+  ]
+}
+[HCP 3/3] processing bd43319c-2cdc-4f10-867e-60886fd4d835 (rising_star, rank 3): 6 papers, 30 positions extracted
+
+=== Summary ===
+Total HCPs processed: 3
+Total papers processed: 12
+Total positions extracted: 0
+Total positions by type:
+  cautionary_position: 17
+  hypothesis_position: 8
+  positive_position: 20
+  unmet_need_position: 15
+API errors: 0
+
+Dry run complete - no database writes.
