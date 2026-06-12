@@ -236,3 +236,65 @@ export async function getPublicationsByPartner(
     return [];
   }
 }
+
+export async function getPublicationsForHcp(
+  hcpId: string,
+  therapeuticArea: string = "NSCLC",
+  limit: number = 50,
+): Promise<PublicationListRow[]> {
+  try {
+    const taLookup: Record<string, string> = {
+      NSCLC: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
+    };
+    const taId = taLookup[therapeuticArea] ?? therapeuticArea;
+
+    const { data: positions, error: posError } = await supabase
+      .from("hcp_scientific_positions_v1")
+      .select("publication_id")
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId);
+
+    if (posError) {
+      console.warn("getPublicationsForHcp: positions query error", posError);
+      return [];
+    }
+
+    const publicationIds = Array.from(
+      new Set((positions ?? []).map((p: { publication_id: string }) => p.publication_id))
+    );
+
+    if (publicationIds.length === 0) return [];
+
+    const CHUNK_SIZE = 100;
+    const allRows: PublicationListRow[] = [];
+
+    for (let i = 0; i < publicationIds.length; i += CHUNK_SIZE) {
+      const chunk = publicationIds.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabase
+        .from("publications_v2")
+        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi")
+        .in("id", chunk);
+
+      if (error) {
+        console.warn("getPublicationsForHcp: publications query error", error);
+        return [];
+      }
+
+      for (const row of (data ?? []) as PublicationDbRow[]) {
+        allRows.push(mapPublicationRow(row));
+      }
+    }
+
+    const sorted = allRows.sort((a, b) => {
+      const aCites = a.citation_count ?? -1;
+      const bCites = b.citation_count ?? -1;
+      if (bCites !== aCites) return bCites - aCites;
+      return (b.pub_year ?? 0) - (a.pub_year ?? 0);
+    });
+
+    return sorted.slice(0, limit);
+  } catch (err) {
+    console.warn("getPublicationsForHcp: error", err);
+    return [];
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import EvidenceDrawer from "./EvidenceDrawer";
 import {
   getScientificNarrativeForHcp,
@@ -228,6 +229,7 @@ export default function ScientificNarrativeSection({
   hcpId,
   therapeuticArea = "NSCLC",
 }: ScientificNarrativeSectionProps) {
+  const navigate = useNavigate();
   const [narrative, setNarrative] = useState<ScientificNarrative | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -388,8 +390,27 @@ export default function ScientificNarrativeSection({
         </div>
       ) : null}
 
-      <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 24 }}>
-        {narrative.paper_count} papers {bullet} {narrative.position_count} positions
+      <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 24, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => navigate(`/hcp/${hcpId}/publications`)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            color: "#9B6DFF",
+            textDecoration: "none",
+            borderBottom: "1px dotted #9B6DFF",
+            paddingBottom: 1,
+            cursor: "pointer",
+            fontSize: 12,
+            fontFamily: "inherit",
+          }}
+        >
+          {narrative.paper_count} papers
+        </button>
+        <span>{bullet}</span>
+        <span>{narrative.position_count} positions</span>
       </div>
 
       <EvidenceDrawer

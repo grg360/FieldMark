@@ -49,6 +49,7 @@ import HomePage from "./components/HomePage/HomePage";
 import WatchlistsPage from "./components/WatchlistsPage/WatchlistsPage";
 import FollowUpsPage from "./components/FollowUpsPage/FollowUpsPage";
 import PublicationsListPage from "./components/PublicationsListPage/PublicationsListPage";
+import HcpPublicationsPage from "./components/PublicationsListPage/HcpPublicationsPage";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialTrackEmpty from "./components/SocialTrackEmpty";
@@ -1282,6 +1283,7 @@ export default function App() {
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />
           <Route path="/institution/:slug/publications" element={<PublicationsListPage />} />
+          <Route path="/hcp/:id/publications" element={<HcpPublicationsPage />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
           <Route path="/hcp/:hcpId/brief" element={<BriefPage />} />
           <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />
