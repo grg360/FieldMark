@@ -27,7 +27,6 @@ import {
 import AppLayout from "../AppLayout";
 import CoverageGapsTile from "./CoverageGapsTile";
 import HomeHero from "./HomeHero";
-import HomeNavigationRow from "./HomeNavigationRow";
 import NextActionsTile from "./NextActionsTile";
 import OpenFollowUpsTile from "./OpenFollowUpsTile";
 import OverdueFollowUpsTile from "./OverdueFollowUpsTile";
@@ -159,7 +158,7 @@ export default function HomePage() {
             Loading your workspace...
           </div>
         ) : summary && userId ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 16, marginBottom: 32 }}>
             <HomeHero firstName={userFirstName} summary={summary} territory={territoryProfile} />
 
             <NextActionsTile actions={nextActions} />
@@ -184,8 +183,6 @@ export default function HomePage() {
             <TeamIntelligenceTile userId={userId} />
 
             <RecentActivityTile activity={recentActivity} />
-
-            <HomeNavigationRow />
           </div>
         ) : null}
     </AppLayout>

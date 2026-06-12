@@ -45,7 +45,8 @@ export default function AppLayout({ breadcrumbs, children, maxWidth = 960 }: Pro
               gap: 6,
               fontSize: 12,
               color: "#9B9892",
-              marginBottom: 12,
+              marginTop: 16,
+              marginBottom: 16,
               flexWrap: "wrap",
             }}
           >

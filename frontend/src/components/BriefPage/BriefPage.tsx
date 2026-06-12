@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { generateBrief, type Brief } from "../../lib/briefs";
+import AppLayout from "../AppLayout";
 import BriefHeader from "./BriefHeader";
 import MeetingReadinessBanner from "./MeetingReadinessBanner";
 import CollapsibleSection from "./CollapsibleSection";
-import GlobalFooter from "../GlobalFooter";
 import RelationshipSnapshot from "./RelationshipSnapshot";
 import ScientificSnapshot from "./ScientificSnapshot";
 import NetworkAndInstitution from "./NetworkAndInstitution";
@@ -48,43 +48,19 @@ export default function BriefPage() {
     void loadBrief(hcpId);
   }
 
+  const breadcrumbs = brief?.content.hcp
+    ? [
+        { label: "Home", path: "/me" },
+        { label: brief.content.hcp.name, path: hcpId ? `/hcp/${hcpId}` : undefined },
+        { label: "Brief" },
+      ]
+    : [
+        { label: "Home", path: "/me" },
+        { label: "Brief" },
+      ];
+
   return (
-    <div
-      style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100vh",
-        padding: 0,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: isDesktop ? 1200 : 720,
-          margin: "0 auto",
-          padding: 16,
-          width: "100%",
-          boxSizing: "border-box",
-        }}
-      >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <button
-          type="button"
-          onClick={() => navigate(hcpId ? `/hcp/${hcpId}` : "/")}
-          aria-label="Back to HCP detail"
-          style={{
-            background: "none",
-            border: "none",
-            color: "#9B9892",
-            fontSize: 18,
-            cursor: "pointer",
-            padding: 4,
-            lineHeight: 1,
-          }}
-        >
-          {String.fromCharCode(0x2190)}
-        </button>
-        <span style={{ fontSize: 15, fontWeight: 500, color: "#E8E6DF" }}>Brief</span>
-      </div>
+    <AppLayout breadcrumbs={breadcrumbs}>
 
       {loading ? (
         <div
@@ -145,7 +121,7 @@ export default function BriefPage() {
           />
 
           {isDesktop ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 32, marginTop: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, marginTop: 24 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
                 {brief.has_relationship ? (
                   <MeetingReadinessBanner
@@ -235,9 +211,6 @@ export default function BriefPage() {
         );
       })() : null}
 
-      <GlobalFooter />
-
-      </div>
-    </div>
+    </AppLayout>
   );
 }
