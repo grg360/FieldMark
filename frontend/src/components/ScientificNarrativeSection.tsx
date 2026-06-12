@@ -123,9 +123,28 @@ function ThemeCard({
         </div>
         <ConfidenceBars confidence={theme.confidence} />
       </div>
-      <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5 }}>
+      <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, marginBottom: 10 }}>
         {theme.summary}
       </div>
+      {theme.supporting_paper_count != null && theme.supporting_paper_count > 0 ? (
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11,
+            fontWeight: 500,
+            color: "#9B6DFF",
+            backgroundColor: "rgba(155, 109, 255, 0.10)",
+            border: "1px solid rgba(155, 109, 255, 0.25)",
+            borderRadius: 999,
+            padding: "3px 10px",
+            letterSpacing: 0.2,
+          }}
+        >
+          Supported by {theme.supporting_paper_count} {theme.supporting_paper_count === 1 ? "publication" : "publications"}
+        </div>
+      ) : null}
     </button>
   );
 }

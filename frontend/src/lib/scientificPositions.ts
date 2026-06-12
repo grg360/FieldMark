@@ -26,6 +26,7 @@ export interface AdvocacyTheme {
   theme: string;
   summary: string;
   evidence_count: number;
+  supporting_paper_count: number | null;
   confidence: number;
   representative_position_ids: string[];
   primary_position_categories: string[];
@@ -101,6 +102,9 @@ type PositionRow = {
 function isAdvocacyTheme(value: unknown): value is AdvocacyTheme {
   if (!value || typeof value !== "object") return false;
   const row = value as AdvocacyTheme;
+  const hasValidPaperCount = row.supporting_paper_count === undefined
+    || row.supporting_paper_count === null
+    || typeof row.supporting_paper_count === "number";
   return (
     typeof row.theme === "string"
     && typeof row.summary === "string"
@@ -108,6 +112,7 @@ function isAdvocacyTheme(value: unknown): value is AdvocacyTheme {
     && typeof row.confidence === "number"
     && Array.isArray(row.representative_position_ids)
     && Array.isArray(row.primary_position_categories)
+    && hasValidPaperCount
   );
 }
 
@@ -140,7 +145,16 @@ function parseScientificNarrative(body: string, hcpId: string): ScientificNarrat
       return null;
     }
 
-    return row;
+    const normalize = (theme: AdvocacyTheme): AdvocacyTheme => ({
+      ...theme,
+      supporting_paper_count: theme.supporting_paper_count ?? null,
+    });
+
+    return {
+      ...row,
+      strongly_advocates: row.strongly_advocates.map(normalize),
+      frequently_raises: row.frequently_raises.map(normalize),
+    };
   } catch (err) {
     console.warn(`getScientificNarrativeForHcp: parse failed for ${hcpId}`, err);
     return null;
