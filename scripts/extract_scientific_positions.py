@@ -19,6 +19,11 @@ import sys
 from collections import Counter
 from typing import Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import anthropic
 import psycopg2
 from dotenv import load_dotenv
