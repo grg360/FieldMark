@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 
 NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
-THERAPEUTIC_AREA = "NSCLC"
+NSCLC_TA_NAME = "NSCLC"
 MODEL_NAME = "claude-sonnet-4-6"
 SYNTHESIS_TYPE = "scientific_positions"
 ANTHROPIC_MAX_TOKENS = 4000
@@ -463,7 +463,7 @@ def write_synthesis(
             (
                 hcp_id,
                 SYNTHESIS_TYPE,
-                THERAPEUTIC_AREA,
+                NSCLC_TA_NAME,
                 body,
                 MODEL_NAME,
                 prompt_tokens,
