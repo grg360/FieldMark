@@ -132,7 +132,7 @@ export default function EvidenceDrawer({
             justifyContent: "space-between",
             alignItems: "flex-start",
             gap: 16,
-            padding: "20px 20px 12px",
+            padding: "24px 24px 20px",
             borderBottom: "1px solid #1E1E22",
           }}
         >
@@ -172,7 +172,7 @@ export default function EvidenceDrawer({
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 24px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px 28px" }}>
           {loading ? (
             <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0", textAlign: "center" }}>
               Loading evidence...
@@ -186,8 +186,8 @@ export default function EvidenceDrawer({
               <div
                 key={paper.publication_id}
                 style={{
-                  paddingBottom: 16,
-                  marginBottom: 16,
+                  paddingBottom: 20,
+                  marginBottom: 20,
                   borderBottom: paperIdx < papers.length - 1 ? "1px solid #1E1E22" : "none",
                 }}
               >
@@ -195,8 +195,42 @@ export default function EvidenceDrawer({
                   {formatPaperHeader(paper)}
                 </div>
                 {paper.pub_title ? (
-                  <div style={{ fontSize: 13, color: "#6B6A65", marginBottom: 12, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 13, color: "#6B6A65", marginBottom: 8, lineHeight: 1.4 }}>
                     {paper.pub_title}
+                  </div>
+                ) : null}
+                {(paper.doi || paper.pubmed_id) ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12, fontSize: 12 }}>
+                    {paper.doi ? (
+                      <a
+                        href={`https://doi.org/${paper.doi}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: "#9B6DFF",
+                          textDecoration: "none",
+                          borderBottom: "1px dotted #9B6DFF",
+                          paddingBottom: 1,
+                        }}
+                      >
+                        DOI: {paper.doi}
+                      </a>
+                    ) : null}
+                    {paper.pubmed_id ? (
+                      <a
+                        href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pubmed_id}/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: "#9B6DFF",
+                          textDecoration: "none",
+                          borderBottom: "1px dotted #9B6DFF",
+                          paddingBottom: 1,
+                        }}
+                      >
+                        PMID: {paper.pubmed_id}
+                      </a>
+                    ) : null}
                   </div>
                 ) : null}
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

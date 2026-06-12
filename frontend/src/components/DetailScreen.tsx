@@ -10,6 +10,7 @@ import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWe
 import { taLabelToApiSlug } from "../lib/routeSlugs";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import ResearchThemesSection from "./ResearchThemesSection";
+import ScientificNarrativeSection from "./ScientificNarrativeSection";
 import type { ResearchTheme } from "../types/researchTheme";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
 import { buildSubline, titleCaseCity } from "../lib/subline";
@@ -1621,6 +1622,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             )}
           </div>
         )}
+
+        <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea="NSCLC" />
 
         <div className="fm-detail-section fm-section-research-themes">
           <ResearchThemesSection themes={researchThemes} loading={themesLoading} />

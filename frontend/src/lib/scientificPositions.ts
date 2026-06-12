@@ -62,6 +62,8 @@ export interface EvidencePosition {
   citation_count: number | null;
   pub_title: string | null;
   journal: string | null;
+  doi: string | null;
+  pubmed_id: string | null;
 }
 
 export interface EvidencePaper {
@@ -71,6 +73,8 @@ export interface EvidencePaper {
   citation_count: number | null;
   journal: string | null;
   author_role: AuthorRole;
+  doi: string | null;
+  pubmed_id: string | null;
   positions: EvidencePosition[];
 }
 
@@ -91,7 +95,7 @@ type PositionRow = {
   confidence: number;
   pub_year: number | null;
   citation_count: number | null;
-  publications_v2: { title: string | null; journal: string | null } | null;
+  publications_v2: { title: string | null; journal: string | null; doi: string | null; pubmed_id: string | null } | null;
 };
 
 function isAdvocacyTheme(value: unknown): value is AdvocacyTheme {
@@ -160,6 +164,8 @@ function mapPositionRow(row: PositionRow): EvidencePosition {
     citation_count: row.citation_count,
     pub_title: pub?.title ?? null,
     journal: pub?.journal ?? null,
+    doi: pub?.doi ?? null,
+    pubmed_id: pub?.pubmed_id ?? null,
   };
 }
 
@@ -224,7 +230,9 @@ export async function getEvidenceForTheme(positionIds: string[]): Promise<Eviden
           citation_count,
           publications_v2 (
             title,
-            journal
+            journal,
+            doi,
+            pubmed_id
           )
         `)
         .in("id", chunk);
@@ -260,6 +268,8 @@ export async function getEvidenceForTheme(positionIds: string[]): Promise<Eviden
         citation_count: first.citation_count,
         journal: first.journal,
         author_role: first.author_role,
+        doi: first.doi,
+        pubmed_id: first.pubmed_id,
         positions: sortedPositions,
       });
     }

@@ -58,15 +58,18 @@ function filledBarCount(confidence: number): number {
 function ConfidenceBars({ confidence }: { confidence: number }) {
   const filled = filledBarCount(confidence);
   return (
-    <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+    <div
+      style={{ display: "flex", gap: 3, alignItems: "center" }}
+      title={`Confidence: ${filled} of 5`}
+    >
       {Array.from({ length: 5 }, (_, i) => (
         <div
           key={i}
           style={{
-            width: 4,
-            height: 12,
-            borderRadius: 1,
-            backgroundColor: i < filled ? "#E8E6DF" : "#3A3A3E",
+            width: 5,
+            height: 14,
+            borderRadius: 1.5,
+            backgroundColor: i < filled ? "#9B6DFF" : "#2A2A2E",
           }}
         />
       ))}
@@ -89,19 +92,21 @@ function ThemeCard({
         display: "block",
         width: "100%",
         textAlign: "left",
-        padding: "14px 16px",
+        padding: "18px 20px",
         backgroundColor: "#0D0D10",
         border: "1px solid #1E1E22",
-        borderRadius: 8,
+        borderRadius: 10,
         cursor: "pointer",
         fontFamily: "inherit",
-        transition: "background-color 120ms",
+        transition: "background-color 120ms, border-color 120ms",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = "#15131A";
+        e.currentTarget.style.borderColor = "#2A2A2E";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.backgroundColor = "#0D0D10";
+        e.currentTarget.style.borderColor = "#1E1E22";
       }}
     >
       <div
@@ -137,11 +142,11 @@ function AdvocacySubsection({
   if (themes.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginBottom: 12 }}>
+    <div style={{ marginBottom: 36 }}>
+      <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginBottom: 14, letterSpacing: 0.2 }}>
         {label}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {themes.map((theme) => (
           <ThemeCard
             key={`${label}-${theme.theme}`}
@@ -251,7 +256,7 @@ export default function ScientificNarrativeSection({
 
   if (loading) {
     return (
-      <section style={{ marginBottom: 32 }}>
+      <section style={{ marginBottom: 32, padding: "20px 24px 0" }}>
         <LoadingSkeleton />
       </section>
     );
@@ -266,7 +271,7 @@ export default function ScientificNarrativeSection({
   const bullet = String.fromCharCode(8226);
 
   return (
-    <section style={{ marginBottom: 32, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <section style={{ marginBottom: 32, padding: "20px 24px 0", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div
         style={{
           display: "flex",
@@ -298,9 +303,9 @@ export default function ScientificNarrativeSection({
           fontSize: 14,
           color: "#9B9892",
           fontStyle: "italic",
-          marginTop: 8,
-          marginBottom: 24,
-          lineHeight: 1.5,
+          marginTop: 12,
+          marginBottom: 20,
+          lineHeight: 1.6,
         }}
       >
         {narrative.headline}
