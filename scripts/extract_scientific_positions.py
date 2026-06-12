@@ -153,6 +153,12 @@ Passage (abstract):
 TASK
 Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
 
+Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
+
+A finding states what happened. A position states what it means or what should be done about it. Examples:
+- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
+- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+
 Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
 
 Do not create multiple positions from the same evidence excerpt. If one observation could fit multiple position types, choose the single best type.
