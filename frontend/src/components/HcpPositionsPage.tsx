@@ -1,0 +1,294 @@
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  getAllPositionsForHcp,
+  type EvidencePosition,
+  type PositionType,
+  type PositionCategory,
+} from "../lib/scientificPositions";
+import { supabase } from "../lib/supabase";
+
+const POLARITY_OPTIONS: { value: PositionType | "all"; label: string; color: string }[] = [
+  { value: "all", label: "All", color: "#9B9892" },
+  { value: "positive_position", label: "Positive", color: "#3FB8AF" },
+  { value: "cautionary_position", label: "Cautionary", color: "#E8A04E" },
+  { value: "unmet_need_position", label: "Unmet Need", color: "#9B6DFF" },
+  { value: "hypothesis_position", label: "Hypothesis", color: "#7B9EBD" },
+];
+
+const CATEGORY_OPTIONS: { value: PositionCategory | "all"; label: string }[] = [
+  { value: "all", label: "All categories" },
+  { value: "efficacy", label: "Efficacy" },
+  { value: "patient_selection", label: "Patient Selection" },
+  { value: "biomarker", label: "Biomarker" },
+  { value: "safety", label: "Safety" },
+  { value: "resistance", label: "Resistance" },
+  { value: "sequencing", label: "Sequencing" },
+  { value: "access", label: "Access" },
+  { value: "diagnostics", label: "Diagnostics" },
+  { value: "methodology", label: "Methodology" },
+];
+
+function polarityColor(type: PositionType): string {
+  const match = POLARITY_OPTIONS.find((opt) => opt.value === type);
+  return match?.color ?? "#9B9892";
+}
+
+function polarityLabel(type: PositionType): string {
+  const match = POLARITY_OPTIONS.find((opt) => opt.value === type);
+  return match?.label ?? type;
+}
+
+export default function HcpPositionsPage() {
+  const { id: hcpId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [positions, setPositions] = useState<EvidencePosition[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hcpName, setHcpName] = useState<string>("");
+  const [polarity, setPolarity] = useState<PositionType | "all">("all");
+  const [category, setCategory] = useState<PositionCategory | "all">("all");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!hcpId) return;
+    setLoading(true);
+
+    Promise.all([
+      getAllPositionsForHcp(hcpId, "NSCLC"),
+      fetchHcpName(hcpId),
+    ])
+      .then(([data, name]) => {
+        if (cancelled) return;
+        setPositions(data);
+        setHcpName(name);
+      })
+      .catch((err) => {
+        console.warn("HcpPositionsPage: load error", err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hcpId]);
+
+  const filtered = useMemo(() => {
+    return positions.filter((p) => {
+      if (polarity !== "all" && p.position_type !== polarity) return false;
+      if (category !== "all" && p.position_category !== category) return false;
+      return true;
+    });
+  }, [positions, polarity, category]);
+
+  const counts = useMemo(() => {
+    const byPolarity: Record<string, number> = { all: positions.length };
+    for (const opt of POLARITY_OPTIONS) {
+      if (opt.value === "all") continue;
+      byPolarity[opt.value] = positions.filter((p) => p.position_type === opt.value).length;
+    }
+    return byPolarity;
+  }, [positions]);
+
+  function goBack() {
+    if (hcpId) navigate(`/hcp/${hcpId}`);
+    else navigate(-1);
+  }
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <button
+        type="button"
+        onClick={goBack}
+        style={{
+          background: "none",
+          border: "none",
+          color: "#9B6DFF",
+          fontSize: 13,
+          cursor: "pointer",
+          padding: 0,
+          marginBottom: 16,
+        }}
+      >
+        {String.fromCharCode(0x2190)} Back to profile
+      </button>
+
+      <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0, marginBottom: 6 }}>
+        All Scientific Positions
+      </h1>
+      <div style={{ fontSize: 13, color: "#9B9892", marginBottom: 24 }}>
+        {hcpName
+          ? `All extracted scientific positions for ${hcpName} (NSCLC)`
+          : "All extracted scientific positions for this investigator (NSCLC)"}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        {POLARITY_OPTIONS.map((opt) => {
+          const active = polarity === opt.value;
+          const count = counts[opt.value] ?? 0;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setPolarity(opt.value)}
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                padding: "5px 12px",
+                borderRadius: 999,
+                cursor: "pointer",
+                backgroundColor: active ? `${opt.color}26` : "transparent",
+                color: active ? opt.color : "#9B9892",
+                border: `1px solid ${active ? opt.color : "#1E1E22"}`,
+              }}
+            >
+              {opt.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value as PositionCategory | "all")}
+          style={{
+            fontSize: 13,
+            padding: "6px 10px",
+            backgroundColor: "#0D0D10",
+            color: "#E8E6DF",
+            border: "1px solid #1E1E22",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+        >
+          {CATEGORY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {loading ? (
+        <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0" }}>Loading positions...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0" }}>
+          No positions match the current filters.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {filtered.map((pos) => (
+            <PositionRow key={pos.position_id} pos={pos} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PositionRow({ pos }: { pos: EvidencePosition }) {
+  const color = polarityColor(pos.position_type);
+  const label = polarityLabel(pos.position_type);
+  const bullet = String.fromCharCode(8226);
+
+  return (
+    <div
+      style={{
+        padding: "16px 18px",
+        backgroundColor: "#0D0D10",
+        border: "1px solid #1E1E22",
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 8,
+      }}
+    >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            padding: "2px 8px",
+            borderRadius: 999,
+            backgroundColor: `${color}26`,
+            color,
+          }}
+        >
+          {label}
+        </span>
+        {pos.position_category ? (
+          <span style={{ fontSize: 11, color: "#9B9892" }}>{pos.position_category}</span>
+        ) : null}
+        {pos.drug_name ? (
+          <span style={{ fontSize: 11, color: "#9B9892" }}>
+            {bullet} {pos.drug_name}
+          </span>
+        ) : null}
+        {pos.biomarker ? (
+          <span style={{ fontSize: 11, color: "#9B9892" }}>
+            {bullet} {pos.biomarker}
+          </span>
+        ) : null}
+      </div>
+
+      <div style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.5, marginBottom: 8 }}>
+        {pos.position_text}
+      </div>
+
+      <div
+        style={{
+          fontSize: 12,
+          color: "#6B6A65",
+          fontStyle: "italic",
+          marginLeft: 10,
+          marginBottom: 10,
+          lineHeight: 1.5,
+        }}
+      >
+        &quot;{pos.evidence_excerpt}&quot;
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 11, color: "#6B6A65" }}>
+        {pos.pub_year ? <span>{pos.pub_year}</span> : null}
+        {pos.journal ? <span>{bullet} {pos.journal}</span> : null}
+        {pos.citation_count != null ? <span>{bullet} {pos.citation_count} citations</span> : null}
+        {pos.doi ? (
+          <a
+            href={`https://doi.org/${pos.doi}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#9B6DFF", textDecoration: "none" }}
+          >
+            {bullet} DOI
+          </a>
+        ) : null}
+        {pos.pubmed_id ? (
+          <a
+            href={`https://pubmed.ncbi.nlm.nih.gov/${pos.pubmed_id}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#9B6DFF", textDecoration: "none" }}
+          >
+            {bullet} PubMed
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+async function fetchHcpName(hcpId: string): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from("hcps_v2")
+      .select("first_name, last_name")
+      .eq("id", hcpId)
+      .maybeSingle();
+    if (error || !data) return "";
+    const first = (data as { first_name?: string }).first_name ?? "";
+    const last = (data as { last_name?: string }).last_name ?? "";
+    return `${first} ${last}`.trim();
+  } catch {
+    return "";
+  }
+}

@@ -394,14 +394,18 @@ export default function ScientificNarrativeSection({
         <button
           type="button"
           onClick={() => navigate(`/hcp/${hcpId}/publications`)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textDecoration = "underline";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textDecoration = "none";
+          }}
           style={{
             background: "none",
             border: "none",
             padding: 0,
             color: "#9B6DFF",
             textDecoration: "none",
-            borderBottom: "1px dotted #9B6DFF",
-            paddingBottom: 1,
             cursor: "pointer",
             fontSize: 12,
             fontFamily: "inherit",
@@ -410,7 +414,28 @@ export default function ScientificNarrativeSection({
           {narrative.paper_count} papers
         </button>
         <span>{bullet}</span>
-        <span>{narrative.position_count} positions</span>
+        <button
+          type="button"
+          onClick={() => navigate(`/hcp/${hcpId}/positions`)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textDecoration = "underline";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textDecoration = "none";
+          }}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            color: "#9B6DFF",
+            textDecoration: "none",
+            cursor: "pointer",
+            fontSize: 12,
+            fontFamily: "inherit",
+          }}
+        >
+          {narrative.position_count} positions
+        </button>
       </div>
 
       <EvidenceDrawer

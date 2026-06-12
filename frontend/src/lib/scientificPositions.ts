@@ -294,3 +294,53 @@ export async function getEvidenceForTheme(positionIds: string[]): Promise<Eviden
     return [];
   }
 }
+
+export async function getAllPositionsForHcp(
+  hcpId: string,
+  therapeuticArea: string = "NSCLC",
+): Promise<EvidencePosition[]> {
+  const taLookup: Record<string, string> = {
+    NSCLC: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
+  };
+  const taId = taLookup[therapeuticArea] ?? therapeuticArea;
+
+  try {
+    const { data, error } = await supabase
+      .from("hcp_scientific_positions_v1")
+      .select(`
+        id,
+        publication_id,
+        author_role,
+        position_type,
+        position_category,
+        drug_name,
+        biomarker,
+        position_text,
+        evidence_excerpt,
+        confidence,
+        pub_year,
+        citation_count,
+        publications_v2 (
+          title,
+          journal,
+          doi,
+          pubmed_id
+        )
+      `)
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .order("citation_count", { ascending: false, nullsFirst: false })
+      .order("confidence", { ascending: false });
+
+    if (error) {
+      console.warn("getAllPositionsForHcp: query error", error);
+      return [];
+    }
+
+    const rows = (data ?? []) as PositionRow[];
+    return rows.map(mapPositionRow);
+  } catch (err) {
+    console.warn("getAllPositionsForHcp: error", err);
+    return [];
+  }
+}
