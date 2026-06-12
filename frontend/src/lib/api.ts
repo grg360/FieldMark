@@ -826,6 +826,27 @@ function resolveTAId(therapeuticArea: string | undefined): string | undefined {
   return TA_ID_MAP[slug];
 }
 
+const PAGINATION_PAGE_SIZE = 1000;
+
+async function fetchAllPaginated<T>(
+  buildQuery: (offset: number, pageSize: number) => Promise<{ data: T[] | null; error: any }>,
+  pageSize: number = PAGINATION_PAGE_SIZE,
+): Promise<{ data: T[]; error: any }> {
+  const allRows: T[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await buildQuery(offset, pageSize);
+    if (error) return { data: allRows, error };
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return { data: allRows, error: null };
+}
+
 /** TA-specific narrative first, then most recent narrative for this HCP. */
 export async function getHCPNarrative(
   hcpId: string,
@@ -3709,11 +3730,19 @@ export async function getInstitutionCollaborations(
   }> = [];
 
   for (const chunk of chunkInstitutionHcpIds(hcpIds)) {
-    const { data: collabs, error } = await supabase
-      .from("hcp_top_collaborators_v2")
-      .select("hcp_id, collaborator_hcp_id, shared_publications")
-      .in("hcp_id", chunk)
-      .order("shared_publications", { ascending: false });
+    const { data: collabs, error } = await fetchAllPaginated<{
+      hcp_id: string;
+      collaborator_hcp_id: string;
+      shared_publications: number;
+    }>(
+      async (offset, pageSize) =>
+        await supabase
+          .from("hcp_top_collaborators_v2")
+          .select("hcp_id, collaborator_hcp_id, shared_publications")
+          .in("hcp_id", chunk)
+          .order("shared_publications", { ascending: false })
+          .range(offset, offset + pageSize - 1),
+    );
 
     if (error) {
       console.error("[getInstitutionCollaborations] chunk error:", error);
@@ -3787,10 +3816,18 @@ export async function getInstitutionExternalPartners(
   }> = [];
 
   for (const chunk of chunkInstitutionHcpIds(sourceHcpIds)) {
-    const { data: collabs } = await supabase
-      .from("hcp_top_collaborators_v2")
-      .select("hcp_id, collaborator_hcp_id, shared_publications")
-      .in("hcp_id", chunk);
+    const { data: collabs } = await fetchAllPaginated<{
+      hcp_id: string;
+      collaborator_hcp_id: string;
+      shared_publications: number;
+    }>(
+      async (offset, pageSize) =>
+        await supabase
+          .from("hcp_top_collaborators_v2")
+          .select("hcp_id, collaborator_hcp_id, shared_publications")
+          .in("hcp_id", chunk)
+          .range(offset, offset + pageSize - 1),
+    );
     if (collabs) allCollabRows.push(...collabs);
   }
 
@@ -3931,17 +3968,25 @@ async function getInstitutionsIndexUncached(
   if (!taId) return [];
 
   const [{ data: rsRows }, { data: estRows }] = await Promise.all([
-    supabase
-      .from("hcp_rising_star_ranks_v3")
-      .select("hcp_id, us_rank")
-      .eq("therapeutic_area_id", taId)
-      .not("us_rank", "is", null),
-    supabase
-      .from("hcp_established_ranks_v3")
-      .select("hcp_id")
-      .eq("therapeutic_area_id", taId)
-      .eq("scope_type", "region")
-      .eq("scope_value", "US"),
+    ( async () => fetchAllPaginated<{ hcp_id: string; us_rank: number }>(
+      async (offset, pageSize) =>
+        await supabase
+          .from("hcp_rising_star_ranks_v3")
+          .select("hcp_id, us_rank")
+          .eq("therapeutic_area_id", taId)
+          .not("us_rank", "is", null)
+          .range(offset, offset + pageSize - 1),
+    ) )(),
+    ( async () => fetchAllPaginated<{ hcp_id: string }>(
+      async (offset, pageSize) =>
+        await supabase
+          .from("hcp_established_ranks_v3")
+          .select("hcp_id")
+          .eq("therapeutic_area_id", taId)
+          .eq("scope_type", "region")
+          .eq("scope_value", "US")
+          .range(offset, offset + pageSize - 1),
+    ) )(),
   ]);
 
   const rsRankMap = new Map<string, number>();
@@ -4019,10 +4064,18 @@ async function getInstitutionsIndexUncached(
   }> = [];
 
   for (const chunk of chunkInstitutionHcpIds(cohortHcpIds)) {
-    const { data: collabs } = await supabase
-      .from("hcp_top_collaborators_v2")
-      .select("hcp_id, collaborator_hcp_id, shared_publications")
-      .in("hcp_id", chunk);
+    const { data: collabs } = await fetchAllPaginated<{
+      hcp_id: string;
+      collaborator_hcp_id: string;
+      shared_publications: number;
+    }>(
+      async (offset, pageSize) =>
+        await supabase
+          .from("hcp_top_collaborators_v2")
+          .select("hcp_id, collaborator_hcp_id, shared_publications")
+          .in("hcp_id", chunk)
+          .range(offset, offset + pageSize - 1),
+    );
     if (collabs) allCollabs.push(...collabs);
   }
 
@@ -4163,18 +4216,26 @@ export async function getTopInstitutionsInTerritory(
   const taId = await resolveLandscapeTaId(taSlug);
   if (!taId) return [];
 
-  const { data: rsRows } = await supabase
-    .from("hcp_rising_star_ranks_v3")
-    .select("hcp_id, us_rank")
-    .eq("therapeutic_area_id", taId)
-    .not("us_rank", "is", null);
+  const { data: rsRows } = await fetchAllPaginated<{ hcp_id: string; us_rank: number }>(
+    async (offset, pageSize) =>
+      await supabase
+        .from("hcp_rising_star_ranks_v3")
+        .select("hcp_id, us_rank")
+        .eq("therapeutic_area_id", taId)
+        .not("us_rank", "is", null)
+        .range(offset, offset + pageSize - 1),
+  );
 
-  const { data: estRows } = await supabase
-    .from("hcp_established_ranks_v3")
-    .select("hcp_id")
-    .eq("therapeutic_area_id", taId)
-    .eq("scope_type", "region")
-    .eq("scope_value", "US");
+  const { data: estRows } = await fetchAllPaginated<{ hcp_id: string }>(
+    async (offset, pageSize) =>
+      await supabase
+        .from("hcp_established_ranks_v3")
+        .select("hcp_id")
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", "region")
+        .eq("scope_value", "US")
+        .range(offset, offset + pageSize - 1),
+  );
 
   const rsRankMap = new Map<string, number>();
   (rsRows ?? []).forEach((r) => {
