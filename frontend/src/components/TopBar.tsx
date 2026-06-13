@@ -55,7 +55,7 @@ export default function TopBar({
         type="button"
         onClick={() => {
           onLogoPress?.();
-          navigate("/");
+          navigate("/me");
         }}
         onMouseEnter={() => setLogoHover(true)}
         onMouseLeave={() => setLogoHover(false)}

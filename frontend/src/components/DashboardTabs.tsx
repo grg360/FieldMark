@@ -47,14 +47,10 @@ export default function DashboardTabs() {
       aria-label="Select dashboard"
       style={{
         display: "flex",
-        gap: 0,
+        justifyContent: "center",
+        flexWrap: "wrap",
+        gap: 8,
         margin: "8px 16px 8px",
-        padding: 2,
-        backgroundColor: "#0D0D10",
-        border: "1px solid #1E1E22",
-        borderRadius: 4,
-        overflowX: "auto",
-        scrollbarWidth: "none",
       }}
     >
       {DASHBOARDS.map((t) => {
@@ -63,9 +59,9 @@ export default function DashboardTabs() {
         const isFieldIntel = t.value === "field-intelligence";
         const isTelescope = t.value === "telescope";
 
-        let activeBg = "transparent";
+        let activeBg = "#0D0D10";
         let activeFg = "#6B6A65";
-        let activeBorder = "none";
+        let activeBorder = "1px solid #1E1E22";
 
         if (active) {
           if (isSocial || isTelescope) {
@@ -79,6 +75,7 @@ export default function DashboardTabs() {
           } else {
             activeBg = "#E8A020";
             activeFg = "#0A0A0B";
+            activeBorder = "1px solid #E8A020";
           }
         }
 
@@ -89,19 +86,18 @@ export default function DashboardTabs() {
             aria-selected={active}
             onClick={() => handleDashboardClick(t.value)}
             style={{
-              flex: "1 0 auto",
-              minWidth: 0,
-              padding: "8px 6px",
+              flex: "0 0 auto",
+              padding: "8px 14px",
               minHeight: 36,
               backgroundColor: activeBg,
               border: activeBorder,
-              borderRadius: 3,
+              borderRadius: 6,
               color: activeFg,
               fontWeight: active ? 600 : 400,
               fontSize: 12,
               fontFamily: "system-ui, sans-serif",
               cursor: "pointer",
-              transition: "background-color 120ms, color 120ms",
+              transition: "background-color 120ms, color 120ms, border-color 120ms",
               whiteSpace: "nowrap",
             }}
           >

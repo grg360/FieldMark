@@ -889,6 +889,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
   const addToWatchlistButtonRef = useRef<HTMLButtonElement>(null);
   const saved = hcpId ? isSaved(String(hcpId)) : false;
   const relationship = hcpId ? (relationshipMap.get(hcpId) ?? null) : null;
+  console.log('[DetailScreen bookmark debug]', { hcpId, userId, relationship, mapSize: relationshipMap.size, mapKeys: Array.from(relationshipMap.keys()).slice(0, 5) });
   const briefExists = hcpId ? hasBrief(hcpId) : false;
   const fieldIntelCount = mockFieldIntelContributorCount(String(hcpId));
   const doctorLabel = hcp.name.match(/^dr\.?\s/i) ? hcp.name : `Dr. ${hcp.name}`;

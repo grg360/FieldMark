@@ -103,6 +103,7 @@ interface RelationshipsContextValue {
   refreshFollowUpInfo: () => Promise<void>;
   hasBrief: (hcpId: string) => boolean;
   refreshBriefExists: () => Promise<void>;
+  refreshAll: () => Promise<void>;
 }
 
 const RelationshipsContext = createContext<RelationshipsContextValue | undefined>(undefined);
@@ -320,8 +321,9 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       refreshFollowUpInfo,
       hasBrief,
       refreshBriefExists,
+      refreshAll: loadUserData,
     }),
-    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists],
+    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists, loadUserData],
   );
 
   return (

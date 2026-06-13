@@ -1,0 +1,117 @@
+# FieldMark Demo Experience Plan
+
+## Tooltips
+
+### Known bugs (fix before re-writing copy)
+- ScoreModal "FieldMark Score" tooltip collides with modal body, z-index/positioning issue
+- (add others as you find them)
+
+### Pages needing tooltips
+- HCP Detail page
+  - Cohort score number (what does 99.4 mean?)
+  - Rank numbers (#10 US, #61 GLOBAL — what scope?)
+  - Confidence bars on Scientific Narrative themes
+  - Corpus depth badges (Deep / Focused / Emerging Signal)
+  - "Supported by N publications" badge
+- Watchlists page
+  - Status pills (Active, Paused, Not Engaged)
+  - Cohort chips (Rising Star #N, Established, Community)
+  - Insights count column
+  - Follow-ups column triangle indicator
+- Follow-Ups page
+  - Priority pills (High, Low)
+  - "From Brief" source chip
+  - Bucket labels (Overdue, This Week, Future, No Due Date)
+- Brief page
+  - "PRE-MEETING BRIEF" vs "FIELDMARK PROFILE" header difference
+  - AI Synthesis purple pill
+  - Strategic Opportunities cards
+- Institutions index
+  - Investigator count, Rising Star count, Established count columns
+  - Pinned vs unpinned state
+- Home page
+  - "X of Y Rising Stars tracked" coverage stat
+  - Each tile's purpose (Coverage Gaps, Territory Opportunities, etc.)
+
+## Methodology Overview Page
+
+### Audience
+- MSL who has never seen the platform
+- Reads in 2 minutes max
+- Should leave the page MORE trusting, not less
+
+### Sections to cover
+- How Rising Star scoring works (60/40 Scientific/Network, Pharma informational)
+- How Established cohort differs (same 60/40, different framework for "who matters today")
+- What the three signals actually measure
+- What we DO use (PubMed, ClinicalTrials.gov, OpenAlex, NPPES, CMS Open Payments)
+- What we DO NOT use (commercial data, prescribing data, proprietary sources)
+- How Scientific Positions extraction works (senior/first-authored only)
+- What confidence numbers mean (and don't mean)
+- Limitations honestly stated
+
+### Principles
+- Show our work
+- Acknowledge tradeoffs
+- No marketing voice — analyst voice
+- Plain language, no jargon-without-definition
+
+## Feature Descriptions
+
+### What needs descriptions
+- Scientific Narrative (this is the moat — needs the most careful copy)
+- Coverage Gaps
+- Watchlists
+- Briefs
+- Follow-Ups
+- Field Intelligence (when ready)
+
+### Format
+- One sentence what it does
+- One sentence why an MSL cares
+- One example of the question it answers
+
+## First-Login Wizard
+
+### Goals for first 60 seconds
+- User understands FieldMark is a research intelligence platform, not a CRM
+- User sees one HCP profile that demonstrates the depth
+- User finishes with one watchlist and one tracked HCP
+
+### Screen sequence (draft)
+1. Welcome + role confirmation (MSL? Medical Director? Other?)
+2. Territory setup (states + therapeutic area)
+3. Suggested HCPs to start tracking (3-5 from your territory)
+4. Show one HCP profile with annotation overlays explaining sections
+5. Land on /me with the first watchlist created
+
+### Open questions
+- How do we handle users who skip the wizard?
+- What if their territory has no Rising Stars?
+- Do we re-trigger any of this on their second visit?
+
+## Demo Experience (live demo with mentors)
+
+### Flow
+- Start at /me (show personalized workspace)
+- Click into one tracked HCP (Heymach for thoracic MSL, swap by mentor)
+- Show Scientific Narrative section
+- Click a theme → drawer with paper-grouped evidence
+- Click DOI → land on actual paper
+- Back to profile, show cohort score breakdown
+- Generate brief on the fly
+- Cross-reference to coverage gaps in territory
+
+### What I want each mentor to walk away saying
+- "I haven't seen this anywhere else"
+- "I could trust this in a regulated environment"
+- "The provenance chain is the whole game"
+
+## Open Strategic Questions
+
+- AI architecture unification (5 surfaces → how many?)
+- Hepatology / Rare Disease / Immunology corpus extension
+- Drug-level intelligence pipeline
+- NIH RePORTER integration
+- Founding 100 pricing model
+- Trademark / NDA / employment agreement legal items

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentUser } from "../../lib/authHelpers";
-import { getOrCreateRelationship } from "../../lib/relationships";
+import { useRelationships } from "../../contexts/RelationshipsContext";
+import { addHcpToDefaultOrCreate } from "../../lib/relationships";
 import { supabase } from "../../lib/supabase";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import {
@@ -39,6 +40,7 @@ import YourInstitutionsTile from "./YourInstitutionsTile";
 export default function HomePage() {
   const isDesktop = useIsDesktop();
   const [userId, setUserId] = useState<string | null>(null);
+  const { refreshAll } = useRelationships();
   const [summary, setSummary] = useState<HomeSummaryCounts | null>(null);
   const [nextActions, setNextActions] = useState<NextActionWithHcp[]>([]);
   const [overdueFollowUps, setOverdueFollowUps] = useState<NextActionWithHcp[]>([]);
@@ -123,7 +125,8 @@ export default function HomePage() {
 
   const handleTrackHcp = useCallback(async (hcpId: string) => {
     if (!userId) throw new Error("No user");
-    await getOrCreateRelationship(userId, hcpId, "coverage_gaps");
+    await addHcpToDefaultOrCreate(userId, hcpId, "coverage_gaps");
+    await refreshAll();
     const [newGaps, newStats] = await Promise.all([
       getCoverageGapsForUser(userId, 5),
       getTerritoryCoverageStats(userId),
@@ -132,7 +135,7 @@ export default function HomePage() {
     setTerritoryStats(newStats);
     const newSummary = await getHomeSummaryCounts(userId);
     setSummary(newSummary);
-  }, [userId]);
+  }, [userId, refreshAll]);
 
   const gridColumns = isDesktop ? "1fr 1fr" : "1fr";
 

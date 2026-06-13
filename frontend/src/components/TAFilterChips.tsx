@@ -45,11 +45,10 @@ export default function TAFilterChips({ selected, onSelect }: TAFilterChipsProps
     <div
       style={{
         display: "flex",
+        justifyContent: "center",
+        flexWrap: "wrap",
         gap: 8,
-        overflowX: "auto",
         padding: "12px 16px 12px",
-        scrollbarWidth: "none",
-        msOverflowStyle: "none",
       }}
     >
       {TA_CHIPS.map((chip) => {
