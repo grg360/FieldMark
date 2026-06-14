@@ -302,7 +302,7 @@ export default function ScientificNarrativeSection({
         }}
       >
         <h2 style={{ fontSize: 20, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
-          Scientific Narrative
+          Belief Profile
         </h2>
         <span
           style={{
