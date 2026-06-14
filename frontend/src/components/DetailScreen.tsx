@@ -31,6 +31,7 @@ import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldInt
 import FieldInsights from "./FieldInsights/FieldInsights";
 import RelationshipSection from "./RelationshipSection/RelationshipSection";
 import UserMenu from "./UserMenu";
+import AppLayout from "./AppLayout";
 type DetailHCP = HCP & {
   derivedState?: string | null;
   engagement_angle?: string | null;
@@ -1111,48 +1112,14 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     </div>
   );
 
+  const breadcrumbs = [
+    { label: "Home", path: "/me" },
+    { label: hcp.name },
+  ];
+
   return (
-    <div
-      className="fm-screen"
-      style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100dvh",
-        maxHeight: "100dvh",
-        maxWidth: 480,
-        margin: "0 auto",
-        overflowY: "auto",
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
+    <AppLayout breadcrumbs={breadcrumbs}>
       <style>{`@keyframes fm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-      {/* Nav bar */}
-      <div
-        className="fm-nav"
-        style={{
-          height: 48,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 16px",
-        }}
-      >
-        <button
-          onClick={onBack}
-          style={{
-            background: "none",
-            border: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-            padding: 4,
-          }}
-        >
-          <BackArrow />
-          <span style={{ fontSize: 15, color: "#6B6A65" }}>{backLinkLabel(hcp.cohort_classification)}</span>
-        </button>
-        <UserMenu />
-      </div>
 
       <div
         className="fm-detail-body"
@@ -1947,8 +1914,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         </div>{/* end fm-detail-right */}
       </div>{/* end fm-detail-body */}
 
-      <GlobalFooter onToast={showFiToast} />
-
       {contextualizeOpen && (
         <ContextualizeHCPForm
           hcpName={doctorLabel}
@@ -2033,7 +1998,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           onClose={() => setAddToWatchlistAnchor(null)}
         />
       ) : null}
-    </div>
+    </AppLayout>
   );
 }
 

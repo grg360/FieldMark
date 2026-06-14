@@ -67,12 +67,23 @@ export default function UserMenu() {
             backgroundColor: "#0F0F12",
             border: "1px solid #1E1E22",
             borderRadius: 6,
-            minWidth: 180,
+            minWidth: 220,
             boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
             overflow: "hidden",
             zIndex: 100,
           }}
         >
+          <style>{`
+            .fm-menu-item {
+              transition: background-color 120ms;
+            }
+            .fm-menu-item:hover {
+              background-color: #1E1C26 !important;
+            }
+            .fm-menu-signout:hover {
+              background-color: rgba(232, 112, 78, 0.08) !important;
+            }
+          `}</style>
           {profile?.first_name ? (
             <div
               style={{
@@ -90,12 +101,14 @@ export default function UserMenu() {
               ) : null}
             </div>
           ) : null}
+          <div style={sectionLabelStyle}>WORKSPACE</div>
           <button
             type="button"
             onClick={() => {
               setOpen(false);
               navigate("/me");
             }}
+            className="fm-menu-item"
             style={menuItemStyle}
           >
             Home
@@ -104,28 +117,9 @@ export default function UserMenu() {
             type="button"
             onClick={() => {
               setOpen(false);
-              navigate("/");
-            }}
-            style={menuItemStyle}
-          >
-            HCP Dashboard
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              navigate("/institutions/nsclc");
-            }}
-            style={menuItemStyle}
-          >
-            Institutions
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
               navigate("/me/watchlists");
             }}
+            className="fm-menu-item"
             style={menuItemStyle}
           >
             Watchlists
@@ -136,14 +130,96 @@ export default function UserMenu() {
               setOpen(false);
               navigate("/me/follow-ups");
             }}
+            className="fm-menu-item"
             style={menuItemStyle}
           >
             Follow-Ups
           </button>
-          <div style={{ height: 1, backgroundColor: "#1E1E22", margin: "4px 0" }} />
+          <div style={sectionDividerStyle} />
+          <div style={sectionLabelStyle}>DISCOVER</div>
+          <div style={subsectionLabelStyle}>HCP Dashboards</div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/oncology/established/nsclc");
+            }}
+            className="fm-menu-item fm-menu-subitem"
+            style={subMenuItemStyle}
+          >
+            Established
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/oncology/rising-stars/nsclc");
+            }}
+            className="fm-menu-item fm-menu-subitem"
+            style={subMenuItemStyle}
+          >
+            Rising Stars
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/oncology/community/nsclc");
+            }}
+            className="fm-menu-item fm-menu-subitem"
+            style={subMenuItemStyle}
+          >
+            Community
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/institutions/nsclc");
+            }}
+            className="fm-menu-item"
+            style={menuItemStyle}
+          >
+            Institutions
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/oncology/telescope/all");
+            }}
+            className="fm-menu-item"
+            style={menuItemStyle}
+          >
+            Telescope
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/oncology/social/all");
+            }}
+            className="fm-menu-item"
+            style={menuItemStyle}
+          >
+            Social
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/oncology/field-intelligence");
+            }}
+            className="fm-menu-item"
+            style={menuItemStyle}
+          >
+            Field Intelligence
+          </button>
+          <div style={sectionDividerStyle} />
           <button
             type="button"
             onClick={() => signOut()}
+            className="fm-menu-item fm-menu-signout"
             style={{ ...menuItemStyle, color: "#E8704E" }}
           >
             Sign Out
@@ -156,7 +232,7 @@ export default function UserMenu() {
 
 const menuItemStyle: CSSProperties = {
   width: "100%",
-  padding: "10px 12px",
+  padding: "6px 12px",
   backgroundColor: "transparent",
   border: "none",
   color: "#E8E6DF",
@@ -164,4 +240,40 @@ const menuItemStyle: CSSProperties = {
   textAlign: "left",
   cursor: "pointer",
   fontFamily: "system-ui, sans-serif",
+};
+
+const subMenuItemStyle: CSSProperties = {
+  width: "100%",
+  padding: "5px 12px 5px 24px",
+  backgroundColor: "transparent",
+  border: "none",
+  color: "#C8C5BE",
+  fontSize: 12,
+  textAlign: "left",
+  cursor: "pointer",
+  fontFamily: "system-ui, sans-serif",
+};
+
+const sectionLabelStyle: CSSProperties = {
+  padding: "8px 12px 2px",
+  fontSize: 10,
+  fontWeight: 600,
+  color: "#6B6A65",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  fontFamily: "system-ui, sans-serif",
+};
+
+const subsectionLabelStyle: CSSProperties = {
+  padding: "6px 12px 2px",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "#E8E6DF",
+  fontFamily: "system-ui, sans-serif",
+};
+
+const sectionDividerStyle: CSSProperties = {
+  height: 1,
+  backgroundColor: "#1E1E22",
+  margin: "4px 0",
 };
