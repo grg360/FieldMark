@@ -10,9 +10,10 @@ interface Props {
   gaps: CoverageGapHcp[];
   stats: TerritoryCoverageStats | null;
   onTrack: (hcpId: string) => Promise<void>;
+  refreshTrigger?: number;
 }
 
-export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
+export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger = 0 }: Props) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop(600);
   const [trackingId, setTrackingId] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack }: Props) {
       .then((chips) => setTrackedChips(chips))
       .catch((err) => console.warn("CoverageGapsTile: tracked chips error", err))
       .finally(() => setTrackedLoading(false));
-  }, [userId]);
+  }, [userId, refreshTrigger]);
 
   useEffect(() => {
     if (!gaps || gaps.length === 0) return;

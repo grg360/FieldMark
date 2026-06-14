@@ -41,6 +41,7 @@ export default function HomePage() {
   const isDesktop = useIsDesktop();
   const [userId, setUserId] = useState<string | null>(null);
   const { refreshAll } = useRelationships();
+  const [trackRefreshCounter, setTrackRefreshCounter] = useState(0);
   const [summary, setSummary] = useState<HomeSummaryCounts | null>(null);
   const [nextActions, setNextActions] = useState<NextActionWithHcp[]>([]);
   const [overdueFollowUps, setOverdueFollowUps] = useState<NextActionWithHcp[]>([]);
@@ -135,6 +136,7 @@ export default function HomePage() {
     setTerritoryStats(newStats);
     const newSummary = await getHomeSummaryCounts(userId);
     setSummary(newSummary);
+    setTrackRefreshCounter((c) => c + 1);
   }, [userId, refreshAll]);
 
   const gridColumns = isDesktop ? "1fr 1fr" : "1fr";
@@ -168,7 +170,7 @@ export default function HomePage() {
 
             {userId ? <YourInstitutionsTile userId={userId} /> : null}
 
-            <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} onTrack={handleTrackHcp} />
+            <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} onTrack={handleTrackHcp} refreshTrigger={trackRefreshCounter} />
 
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 32 }}>
               <OverdueFollowUpsTile
