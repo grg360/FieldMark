@@ -5,6 +5,7 @@ import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/
 export default function UserMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [hcpDrawerOpen, setHcpDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<MslProfile | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -22,6 +23,7 @@ export default function UserMenu() {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setHcpDrawerOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -137,40 +139,73 @@ export default function UserMenu() {
           </button>
           <div style={sectionDividerStyle} />
           <div style={sectionLabelStyle}>DISCOVER</div>
-          <div style={subsectionLabelStyle}>HCP Dashboards</div>
           <button
             type="button"
-            onClick={() => {
-              setOpen(false);
-              navigate("/oncology/established/nsclc");
+            onClick={() => setHcpDrawerOpen((v) => !v)}
+            className="fm-menu-item"
+            style={{
+              ...menuItemStyle,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
-            className="fm-menu-item fm-menu-subitem"
-            style={subMenuItemStyle}
+            aria-expanded={hcpDrawerOpen}
           >
-            Established
+            <span>HCP Dashboards</span>
+            <span
+              style={{
+                fontSize: 10,
+                color: "#6B6A65",
+                display: "inline-block",
+                transform: hcpDrawerOpen ? "rotate(90deg)" : "rotate(0deg)",
+                transition: "transform 0.15s ease",
+                marginLeft: 8,
+              }}
+              aria-hidden="true"
+            >
+              {String.fromCharCode(0x25B8)}
+            </span>
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              navigate("/oncology/rising-stars/nsclc");
-            }}
-            className="fm-menu-item fm-menu-subitem"
-            style={subMenuItemStyle}
-          >
-            Rising Stars
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              navigate("/oncology/community/nsclc");
-            }}
-            className="fm-menu-item fm-menu-subitem"
-            style={subMenuItemStyle}
-          >
-            Community
-          </button>
+          {hcpDrawerOpen ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setHcpDrawerOpen(false);
+                  navigate("/oncology/established/nsclc");
+                }}
+                className="fm-menu-item"
+                style={subMenuItemStyle}
+              >
+                Established
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setHcpDrawerOpen(false);
+                  navigate("/oncology/rising-stars/nsclc");
+                }}
+                className="fm-menu-item"
+                style={subMenuItemStyle}
+              >
+                Rising Stars
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setHcpDrawerOpen(false);
+                  navigate("/oncology/community/nsclc");
+                }}
+                className="fm-menu-item"
+                style={subMenuItemStyle}
+              >
+                Community
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -214,6 +249,17 @@ export default function UserMenu() {
             style={menuItemStyle}
           >
             Field Intelligence
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/methodology");
+            }}
+            className="fm-menu-item"
+            style={menuItemStyle}
+          >
+            Methodology
           </button>
           <div style={sectionDividerStyle} />
           <button
