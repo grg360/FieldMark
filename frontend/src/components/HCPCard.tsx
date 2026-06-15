@@ -879,10 +879,10 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
             <div style={{ fontSize: 12, fontWeight: 500, color: "#E8E6DF" }}>FieldMark Score</div>
             <div style={{ fontSize: 11, color: "#9B9892", marginTop: 4, lineHeight: 1.5 }}>
               {scoreTooltipKey === "FIELDMARK_SCORE_RISING"
-                ? "Composite of Scientific Influence (60%, publication leadership) and Network Influence (40%, co-authorship graph centrality). Pharma engagement shown for context but does not contribute to ranking. Normalized 0-100 within the Rising Star cohort."
+                ? "Composite of Momentum (70%, change in scientific output and network position over the last 5 years) and Visibility (30%, current publication and collaboration footprint). Normalized 0-100 within the Rising Star cohort."
                 : scoreTooltipKey === "FIELDMARK_SCORE_ESTABLISHED"
-                ? "Composite of Scientific Influence (60%, publication leadership) and Network Influence (40%, co-authorship graph centrality). Pharma engagement shown for context but does not contribute to ranking. Normalized 0-100 within the Established cohort."
-                : "Composite of pharma engagement, engagement breadth across companies, Medicare patient volume, and career stage. Normalized 0-100 within the Community cohort."}
+                ? "Composite of Scientific Influence (50%, publication leadership), Network Influence (35%, co-authorship graph centrality), and Pharma Engagement (15%, Open Payments record). Normalized 0-100 within the Established cohort."
+                : "Composite of patient volume (40%), pharma engagement (30%), group practice signal (15%), career years (10%), and publication signal (5%). Normalized 0-100 within the Community cohort."}
             </div>
           </div>
         )}
