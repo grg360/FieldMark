@@ -46,6 +46,7 @@ import InstitutionRoute from "./components/InstitutionRoute";
 import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
 import BriefPage from "./components/BriefPage/BriefPage";
 import HomePage from "./components/HomePage/HomePage";
+import MethodologyPage from "./pages/MethodologyPage";
 import WatchlistsPage from "./components/WatchlistsPage/WatchlistsPage";
 import FollowUpsPage from "./components/FollowUpsPage/FollowUpsPage";
 import PublicationsListPage from "./components/PublicationsListPage/PublicationsListPage";
@@ -1277,6 +1278,7 @@ export default function App() {
           <Route path="/landing" element={<LandingRoute />} />
           <Route path="/welcome" element={<WelcomeWizard />} />
           <Route path="/me" element={<HomePage />} />
+          <Route path="/methodology" element={<MethodologyPage />} />
           <Route path="/me/watchlists" element={<WatchlistsPage />} />
           <Route path="/me/watchlists/:watchlistId" element={<WatchlistsPage />} />
           <Route path="/me/follow-ups" element={<FollowUpsPage />} />
