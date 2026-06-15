@@ -33,13 +33,13 @@ function risingStarArchetypeColor(archetype: string | null | undefined): string 
 
 const RISING_STAR_TILE_TOOLTIPS: Record<string, string> = {
   "SCIENTIFIC MOMENTUM":
-    "Growth in publication output, citation volume, and senior-authorship across 2016-2020 vs 2021-2025.",
+    "Change in publication output between 2016-2020 and 2021-2025: senior-author paper count, citation volume, and senior-author share.",
   "NETWORK MOMENTUM":
-    "Growth in collaboration network centrality across 2016-2020 vs 2021-2025.",
+    "Change in co-authorship network centrality between 2016-2020 and 2021-2025: eigenvector, degree, and betweenness.",
   "SCIENTIFIC VISIBILITY":
-    "Current publication footprint and citation impact within the Rising Star cohort.",
+    "Current publication footprint in the recent 5-year window: total publications and citation rate.",
   "NETWORK VISIBILITY":
-    "Current position in the co-authorship network for this therapeutic area.",
+    "Current co-authorship centrality for this therapeutic area in the recent 5-year window.",
 };
 
 function RisingStarSignalTile({
