@@ -87,28 +87,6 @@ export default function TopBar({
         />
       ) : null}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {isDesktop && onScoringExplainedPress ? (
-          <button
-            type="button"
-            onClick={onScoringExplainedPress}
-            title="Scoring methodology"
-            aria-label="Scoring methodology"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px 2px",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#6B6A65",
-              fontFamily: "system-ui, sans-serif",
-              whiteSpace: "nowrap",
-              minHeight: 0,
-            }}
-          >
-            How scoring works
-          </button>
-        ) : null}
         {!isDesktop ? (
           <button
             onClick={handleSearchToggle}
