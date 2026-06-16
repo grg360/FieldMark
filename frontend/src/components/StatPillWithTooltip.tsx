@@ -18,18 +18,6 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
     title: "H-Index",
     body: "Hirsch index — a measure of how often a researcher's work is cited. Higher values indicate sustained scientific influence rather than publication volume alone.",
   },
-  "FIELDMARK_SCORE_RISING": {
-    title: "FieldMark Score",
-    body: "Composite signal of publication velocity, citation trajectory, and clinical trial activity within the therapeutic area, with career-stage adjustment. Normalized 0–100 within the rising star cohort.",
-  },
-  "FIELDMARK_SCORE_ESTABLISHED": {
-    title: "FieldMark Score",
-    body: "Composite signal of publication volume, recent productivity, lead authorship density, clinical trial activity, career length, and pharma engagement breadth. Normalized 0–100 within the established cohort.",
-  },
-  "FIELDMARK_SCORE_COMMUNITY": {
-    title: "FieldMark Score",
-    body: "Composite signal of pharma engagement, engagement breadth across companies, Medicare patient volume, and career stage. Normalized 0–100 within the community cohort.",
-  },
   "TRIAL SCORE": {
     title: "Trial Score",
     body: "Normalized score (0-100) reflecting this HCP's clinical trial involvement, weighted by role (PI, sub-investigator, study chair) and trial phase. Scores are calibrated within cohort. Note: ClinicalTrials.gov coverage of site-level investigators is limited, so some major trialists may show lower scores than their actual involvement warrants.",
@@ -37,38 +25,6 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
   "PUB YEARS": {
     title: "Publication Years",
     body: "The number of years since this HCP's first published paper, used as a proxy for research career stage when CV data is unavailable.",
-  },
-  "Publication velocity": {
-    title: "Publication velocity",
-    body: "Publication score (0-100) measuring this HCP's recent publication output, normalized within their therapeutic area and career stage cohort. Higher scores indicate more prolific publishing relative to peers.",
-  },
-  "Publication Velocity": {
-    title: "Publication Velocity",
-    body: "Publication score (0-100) measuring this HCP's recent publication output, normalized within their therapeutic area and career stage cohort. Higher scores indicate more prolific publishing relative to peers.",
-  },
-  "Citation trajectory": {
-    title: "Citation trajectory",
-    body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
-  },
-  "Citation Trajectory": {
-    title: "Citation Trajectory",
-    body: "Citation trajectory shows how fast citations to this HCP's published work are accelerating, normalized against the field average for their specialty and career stage. Higher values indicate faster-growing scientific influence.",
-  },
-  "Trial activity": {
-    title: "Trial Score",
-    body: "Normalized score (0-100) reflecting this HCP's clinical trial involvement, weighted by role (PI, sub-investigator, study chair) and trial phase. Scores are calibrated within cohort. Note: ClinicalTrials.gov coverage of site-level investigators is limited, so some major trialists may show lower scores than their actual involvement warrants.",
-  },
-  "Trial Activity": {
-    title: "Trial Score",
-    body: "Normalized score (0-100) reflecting this HCP's clinical trial involvement, weighted by role (PI, sub-investigator, study chair) and trial phase. Scores are calibrated within cohort. Note: ClinicalTrials.gov coverage of site-level investigators is limited, so some major trialists may show lower scores than their actual involvement warrants.",
-  },
-  "Career age multiplier": {
-    title: "Career age multiplier",
-    body: "Boosts scores for researchers earlier in their career. A rising star 4 years post-training outranks an equivalent researcher 20 years in — same output from a younger career is a stronger signal.",
-  },
-  "Career Age Multiplier": {
-    title: "Career Age Multiplier",
-    body: "Boosts scores for researchers earlier in their career. A rising star 4 years post-training outranks an equivalent researcher 20 years in — same output from a younger career is a stronger signal.",
   },
   "Pharma Engagement": {
     title: "Pharma Engagement",
