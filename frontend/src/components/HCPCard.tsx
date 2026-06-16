@@ -9,7 +9,6 @@ import { supabase } from "../lib/supabase";
 import { buildSubline } from "../lib/subline";
 import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
-import ScoreModal from "./ScoreModal";
 
 function risingStarArchetypeShortLabel(archetype: string | null | undefined): string {
   switch (archetype) {
@@ -485,7 +484,6 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
   const status = relationship?.status;
   const showStatus = status && status !== "not_engaged";
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-  const [scoreModalOpen, setScoreModalOpen] = useState(false);
   const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
   const [bookmarkHovered, setBookmarkHovered] = useState(false);
   const touchDevice =
@@ -560,7 +558,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
   function handleScoreBadgeClick(e: React.MouseEvent | React.TouchEvent) {
     e.stopPropagation();
     e.preventDefault();
-    setScoreModalOpen(true);
+    onCardPress(hcp);
   }
 
   const cohortScoreLabel =
@@ -1174,15 +1172,6 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           </div>
         ) : null}
       </div>
-
-      {scoreModalOpen && (
-        <ScoreModal
-          hcpName={hcp.name}
-          ta={hcp.specialty}
-          score={hcp.score}
-          onClose={() => setScoreModalOpen(false)}
-        />
-      )}
     </>
   );
 }
