@@ -704,11 +704,12 @@ export async function createNote(userId: string, params: CreateNoteParams): Prom
   }
 
   try {
-    const relationship = await getOrCreateRelationship(
+    const result = await addHcpToDefaultOrCreate(
       userId,
       params.hcpId,
-      params.createdFrom ?? null,
+      params.createdFrom ?? "hcp_detail_insight",
     );
+    const relationship = result.relationship;
 
     const insertPayload: {
       relationship_id: string;
