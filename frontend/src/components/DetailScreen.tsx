@@ -1422,34 +1422,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 data={scoreBreakdown}
                 loading={scoreBreakdownLoading}
               />
-            ) : (
-              <>
-                <ScoreRow
-                  label="Publication Velocity"
-                  value={formatResearchScoreValue(pubVelNumeric)}
-                  percent={cappedScorePercent(pubVelNumeric)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-                <ScoreRow
-                  label="Citation Trajectory"
-                  value={citTrajDisplay}
-                  percent={citTrajScorePercent(hcp.citTraj)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-                <ScoreRow
-                  label="Trial Activity"
-                  value={formatResearchScoreValue(hcp.trialScore)}
-                  percent={cappedScorePercent(hcp.trialScore)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-              </>
-            )}
+            ) : null}
           </div>
         </div>
 
