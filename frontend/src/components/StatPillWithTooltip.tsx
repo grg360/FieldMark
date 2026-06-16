@@ -128,15 +128,15 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
   },
   SCIENTIFIC: {
     title: "Scientific Influence",
-    body: "Publication leadership ranking (0-100 percentile). Based on senior-author papers, citation impact, guideline authorship, and recent publication activity.",
+    body: "Publication leadership ranking (0-100 percentile). Based on senior-author papers, citation impact, guideline authorship, and recent publication activity. 50% of the FieldMark Score for Established HCPs.",
   },
   NETWORK: {
     title: "Network Influence",
-    body: "Position within the NSCLC collaboration network (0-100 percentile). Combines degree centrality, eigenvector centrality, and betweenness centrality from the 10-year co-authorship graph.",
+    body: "Position within the co-authorship network for this therapeutic area (0-100 percentile). Combines degree centrality, eigenvector centrality, and betweenness centrality from a 10-year window. 35% of the FieldMark Score for Established HCPs.",
   },
   PHARMA: {
     title: "Pharma Engagement",
-    body: "Industry engagement breadth (0-100 percentile). Based on Open Payments data: total payments (3yr), distinct companies, distinct drugs, and transaction frequency. Displayed for reference; does not drive ranking.",
+    body: "Industry engagement breadth (0-100 percentile). Based on CMS Open Payments data: payment volume, distinct companies, drugs covered, and contract activity. 15% of the FieldMark Score for Established HCPs.",
   },
 };
 
