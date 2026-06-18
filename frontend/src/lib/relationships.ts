@@ -342,11 +342,12 @@ export async function createNextAction(
   }
 
   try {
-    const relationship = await getOrCreateRelationship(
+    const result = await addHcpToDefaultOrCreate(
       userId,
       params.hcpId,
-      params.createdFrom ?? null,
+      params.createdFrom ?? "hcp_detail_followup",
     );
+    const relationship = result.relationship;
 
     const insertPayload: {
       relationship_id: string;
