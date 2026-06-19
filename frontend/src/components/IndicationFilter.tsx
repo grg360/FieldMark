@@ -120,19 +120,6 @@ export default function IndicationFilter({
         msOverflowStyle: "none",
       }}
     >
-      <span
-        style={{
-          fontSize: 10,
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          color: "#3A3A3F",
-          flexShrink: 0,
-          alignSelf: "center",
-          marginRight: 2,
-        }}
-      >
-        indication
-      </span>
       {indications.map((info) => {
         const isSelected = info.label === selected;
         if (!info.active) {

@@ -8,8 +8,8 @@ import {
 
 const DASHBOARDS: { value: Track; label: string }[] = [
   { value: "established", label: "Established" },
-  { value: "community", label: "Community" },
   { value: "rising-stars", label: "Rising Stars" },
+  { value: "community", label: "Community" },
   { value: "social", label: "Social" },
   { value: "telescope", label: "Telescope" },
   { value: "field-intelligence", label: "Field Intelligence" },
@@ -47,10 +47,13 @@ export default function DashboardTabs() {
       aria-label="Select dashboard"
       style={{
         display: "flex",
+        alignItems: "center",
         justifyContent: "center",
-        flexWrap: "wrap",
+        overflowX: "auto",
+        padding: "8px 16px 12px",
         gap: 8,
-        margin: "8px 16px 8px",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
       }}
     >
       {DASHBOARDS.map((t) => {

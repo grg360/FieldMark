@@ -629,7 +629,7 @@ function FeedLayout({
         style={{
           backgroundColor: "#0A0A0B",
           minHeight: "100dvh",
-          maxWidth: 480,
+          maxWidth: 720,
           margin: "0 auto",
           fontFamily: "system-ui, -apple-system, sans-serif",
           overflowX: "hidden",
@@ -648,8 +648,6 @@ function FeedLayout({
 
       <TAFilterChips selected={selectedTA} />
 
-      <DashboardTabs />
-
       <IndicationFilter
         therapeuticArea={selectedTA}
         selected={selectedIndication}
@@ -657,6 +655,8 @@ function FeedLayout({
           setIndicationCount(count);
         }}
       />
+
+      <DashboardTabs />
 
       <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
         {formatUpdatedLabel()}
@@ -687,36 +687,6 @@ function FeedLayout({
         </span>
         {isCohortFeedTrack(track) && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              className="fm-section-header-right"
-              style={{
-                fontSize: 15,
-                color: "#6B6A65",
-                fontFamily: "monospace",
-              }}
-            >
-              {(() => {
-                if (feedEmptyReason === "community-non-us") {
-                  return "0 identified";
-                }
-                if (feedTotal > 0 && hcpList.length < feedTotal) {
-                  return `${hcpList.length.toLocaleString()} of ${feedTotal.toLocaleString()} identified`;
-                }
-                const cohortCount =
-                  track === "rising-stars"
-                    ? taCounts?.rising_stars ?? null
-                    : track === "community"
-                      ? feedEmptyReason
-                        ? 0
-                        : taCounts?.community_pool ?? null
-                      : track === "established"
-                        ? (feedTotal > 0 ? feedTotal : taCounts?.established ?? null)
-                        : null;
-                const resolved = cohortCount ?? (feedTotal > 0 ? feedTotal : indicationCount);
-                if (resolved == null) return "— identified";
-                return `${resolved.toLocaleString()} identified`;
-              })()}
-            </span>
             <FilterButton
               onClick={() => setFilterDrawerOpen(true)}
               taSlug={taLabelToApiSlug(selectedTA)}
@@ -1107,7 +1077,7 @@ function HCPDetailRoute() {
         style={{
           backgroundColor: "#0A0A0B",
           minHeight: "100dvh",
-          maxWidth: 480,
+          maxWidth: 720,
           margin: "0 auto",
           color: "#6B6A65",
           padding: 24,
@@ -1125,7 +1095,7 @@ function HCPDetailRoute() {
         style={{
           backgroundColor: "#0A0A0B",
           minHeight: "100dvh",
-          maxWidth: 480,
+          maxWidth: 720,
           margin: "0 auto",
           padding: 24,
           fontFamily: "system-ui, sans-serif",
@@ -1208,7 +1178,7 @@ function FIThreadRoute() {
       style={{
         backgroundColor: "#0A0A0B",
         minHeight: "100dvh",
-        maxWidth: 480,
+        maxWidth: 720,
         margin: "0 auto",
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
