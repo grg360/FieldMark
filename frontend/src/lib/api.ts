@@ -3958,7 +3958,6 @@ export interface InstitutionIndexEntry {
   established_count: number;
   talent_density_pct: number | null;
   yield_ratio: number | null;
-  external_partner_count: number;
   top_rising_star_name: string | null;
   top_rising_star_rank: number | null;
   states_present: string[];
@@ -4079,71 +4078,6 @@ async function getInstitutionsIndexUncached(
     }
   }
 
-  const hcpToInstitution = new Map<string, string>();
-  for (const h of cohortHcps) {
-    if (h.institution_canonical) {
-      hcpToInstitution.set(String(h.id), h.institution_canonical);
-    }
-  }
-
-  const allCollabs: Array<{
-    hcp_id: string;
-    collaborator_hcp_id: string;
-    shared_publications: number;
-  }> = [];
-
-  for (const chunk of chunkInstitutionHcpIds(cohortHcpIds)) {
-    const { data: collabs } = await fetchAllPaginated<{
-      hcp_id: string;
-      collaborator_hcp_id: string;
-      shared_publications: number;
-    }>(
-      async (offset, pageSize) =>
-        await supabase
-          .from("hcp_top_collaborators_v2")
-          .select("hcp_id, collaborator_hcp_id, shared_publications")
-          .in("hcp_id", chunk)
-          .range(offset, offset + pageSize - 1),
-    );
-    if (collabs) allCollabs.push(...collabs);
-  }
-
-  const collabHcpIds = Array.from(
-    new Set(
-      allCollabs
-        .map((c) => String(c.collaborator_hcp_id))
-        .filter((id) => !hcpToInstitution.has(id)),
-    ),
-  );
-
-  for (const chunk of chunkInstitutionHcpIds(collabHcpIds)) {
-    const { data: hcps } = await supabase
-      .from("hcps_v2")
-      .select("id, institution_canonical")
-      .in("id", chunk);
-    (hcps ?? []).forEach((h) => {
-      if (h.institution_canonical) {
-        hcpToInstitution.set(String(h.id), h.institution_canonical);
-      }
-    });
-  }
-
-  const externalPartnersMap = new Map<string, Set<string>>();
-  for (const c of allCollabs) {
-    const sourceInst = hcpToInstitution.get(String(c.hcp_id));
-    const partnerInst = hcpToInstitution.get(String(c.collaborator_hcp_id));
-    if (!sourceInst || !partnerInst) continue;
-    if (sourceInst === partnerInst) continue;
-    if (Number(c.shared_publications) < 5) continue;
-
-    let partners = externalPartnersMap.get(sourceInst);
-    if (!partners) {
-      partners = new Set();
-      externalPartnersMap.set(sourceInst, partners);
-    }
-    partners.add(partnerInst);
-  }
-
   type InstitutionIndexAggregate = {
     institution: string;
     rs_count: number;
@@ -4212,7 +4146,6 @@ async function getInstitutionsIndexUncached(
       established_count: agg.est_count,
       talent_density_pct: talentDensity,
       yield_ratio: yieldRatio,
-      external_partner_count: externalPartnersMap.get(agg.institution)?.size ?? 0,
       top_rising_star_name: agg.best_rs_name,
       top_rising_star_rank: agg.best_rs_rank === Infinity ? null : agg.best_rs_rank,
       states_present: Array.from(agg.states),
