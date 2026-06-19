@@ -332,7 +332,7 @@ type FeedOverlay = "landscape" | "city-feed" | null;
 
 function LandingRoute() {
   const navigate = useNavigate();
-  return <LinkedInAuthScreen onAuth={() => navigate("/")} />;
+  return <LinkedInAuthScreen onAuth={() => navigate("/me")} />;
 }
 
 function FeedLayout({
