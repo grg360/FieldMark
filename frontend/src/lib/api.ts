@@ -4051,31 +4051,27 @@ async function getInstitutionsIndexUncached(
 
   const institutionNames = Array.from(cohortInstitutions);
   const totalInvestigatorCounts = new Map<string, number>();
-  const INST_CHUNK = 50;
-  const PAGE_SIZE = 1000;
 
-  for (let i = 0; i < institutionNames.length; i += INST_CHUNK) {
-    const instChunk = institutionNames.slice(i, i + INST_CHUNK);
-    let offset = 0;
-
-    while (true) {
-      const { data: hcpsAtInst } = await supabase
-        .from("hcps_v2")
-        .select("institution_canonical, id")
-        .in("institution_canonical", instChunk)
-        .range(offset, offset + PAGE_SIZE - 1);
-
-      if (!hcpsAtInst || hcpsAtInst.length === 0) break;
-
-      hcpsAtInst.forEach((h) => {
-        const inst = h.institution_canonical;
-        if (!inst) return;
-        totalInvestigatorCounts.set(inst, (totalInvestigatorCounts.get(inst) ?? 0) + 1);
-      });
-
-      if (hcpsAtInst.length < PAGE_SIZE) break;
-      offset += PAGE_SIZE;
-    }
+  if (institutionNames.length > 0) {
+    const { data: countRows } = await fetchAllPaginated<{
+      institution_canonical: string;
+      investigator_count: number;
+    }>(
+      async (offset, pageSize) =>
+        await supabase
+          .from("institution_investigator_counts")
+          .select("institution_canonical, investigator_count")
+          .in("institution_canonical", institutionNames)
+          .range(offset, offset + pageSize - 1),
+    );
+    (countRows ?? []).forEach((row) => {
+      if (row.institution_canonical && row.investigator_count != null) {
+        totalInvestigatorCounts.set(
+          row.institution_canonical,
+          Number(row.investigator_count),
+        );
+      }
+    });
   }
 
   type InstitutionIndexAggregate = {
