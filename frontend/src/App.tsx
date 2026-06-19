@@ -60,7 +60,6 @@ import IndicationFilter from "./components/IndicationFilter";
 import FieldIntelligence from "./components/FieldIntelligence";
 import SurfaceHCPForm from "./components/SurfaceHCPForm";
 import GlobalFooter from "./components/GlobalFooter";
-import WelcomeBanner from "./components/WelcomeBanner";
 import InstitutionsInTerritoryPanel from "./components/InstitutionsInTerritoryPanel";
 import { FiToast } from "./components/FieldIntelligenceShared";
 import ScoringExplainedModal, {
@@ -865,7 +864,6 @@ function FeedLayout({
         )
       ) : isCohortFeedTrack(track) ? (
         <>
-        {route.indicationDataActive ? <WelcomeBanner /> : null}
         {route.indicationDataActive ? <InstitutionsInTerritoryPanel taSlug="nsclc" /> : null}
         <ActiveFilterPills taSlug={taLabelToApiSlug(selectedTA)} />
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
