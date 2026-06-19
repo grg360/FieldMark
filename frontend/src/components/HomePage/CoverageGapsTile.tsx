@@ -159,7 +159,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
               >
                 Tracking ({trackedChips.length})
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
                 {trackedChips.map((chip) => {
                   const cohortColor = chip.cohort === "rising_star" ? "#9B6DFF"
                     : chip.cohort === "established" ? "#E8A020"
