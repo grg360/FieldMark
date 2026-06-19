@@ -249,7 +249,7 @@ export default function InstitutionsIndexRoute() {
                   {entry.rising_star_count > 0 ? (
                     <div>
                       <span style={{ fontSize: 16, fontWeight: 700, color: "#9B6DFF" }}>{entry.rising_star_count}</span>
-                      <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>rising</span>
+                          <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>Rising Stars</span>
                     </div>
                   ) : null}
                   {entry.established_count > 0 ? (

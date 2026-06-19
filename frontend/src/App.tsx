@@ -742,7 +742,7 @@ function FeedLayout({
                 marginLeft: 8,
               }}
             >
-              {states.length > 0 ? `In territory (${states.length} states)` : "All US"}
+              {states.length > 0 ? `Territory (${states.length} states)` : "All US"}
             </button>
             <button
               onClick={() => {
@@ -767,39 +767,7 @@ function FeedLayout({
                 <rect x="8" y="0" width="2" height="10" fill="#6B6A65" />
               </svg>
               <span style={{ fontSize: 11, color: "#6B6A65" }}>
-                {selectedIndication !== "All" ? `${selectedIndication} landscape` : "Landscape"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const indSlug = indicationLabelToSlug(selectedTA, selectedIndication);
-                navigate(`/institutions/${indSlug === "all" ? "nsclc" : indSlug}`);
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                backgroundColor: "#0D0D10",
-                border: "1px solid #1E1E22",
-                borderRadius: 3,
-                padding: "3px 8px",
-                cursor: "pointer",
-                fontFamily: "system-ui, -apple-system, sans-serif",
-                marginLeft: 8,
-              }}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <rect x="1" y="0" width="8" height="10" stroke="#6B6A65" strokeWidth="1" fill="none" />
-                <rect x="3" y="3" width="1" height="1" fill="#6B6A65" />
-                <rect x="6" y="3" width="1" height="1" fill="#6B6A65" />
-                <rect x="3" y="5" width="1" height="1" fill="#6B6A65" />
-                <rect x="6" y="5" width="1" height="1" fill="#6B6A65" />
-                <rect x="3" y="7" width="1" height="1" fill="#6B6A65" />
-                <rect x="6" y="7" width="1" height="1" fill="#6B6A65" />
-              </svg>
-              <span style={{ fontSize: 11, color: "#6B6A65" }}>
-                Institutions
+                {selectedIndication !== "All" ? `${selectedIndication} Landscape` : "Landscape"}
               </span>
             </button>
           </div>
