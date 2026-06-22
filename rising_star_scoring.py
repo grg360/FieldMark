@@ -82,6 +82,7 @@ def fetch_input_signals(conn, ta_id: str) -> list[dict]:
               AND nc.window_type = 'recent_2021_2025'
             JOIN hcps_v2 h ON h.id = sm.hcp_id
             WHERE sm.therapeutic_area_id = %s
+              AND h.cohort_classification = 'rising_star'
             """,
             (ta_id,),
         )

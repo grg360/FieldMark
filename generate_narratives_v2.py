@@ -87,16 +87,7 @@ COHORT_SCORE_CONFIG: Dict[str, Dict[str, Any]] = {
         "rank_table": "hcp_rising_star_ranks_v3",
     },
     "established": {
-        "score_table": "hcp_established_scores_v2",
-        "rank_table": "hcp_established_ranks_v2",
-        "score_fields": {
-            "pub_volume": "pub_volume_score",
-            "recent_productivity": "recent_productivity_score",
-            "lead_density": "lead_density_score",
-            "trial": "trial_score",
-            "career_length": "career_length_score",
-            "pharma_breadth": "pharma_breadth_score",
-        },
+        "rank_table": "hcp_established_ranks_v3",
     },
     "community": {
         "score_table": "hcp_community_scores_v2",
@@ -182,6 +173,7 @@ class HCPContext:
     percentile_data: Dict[str, int] = field(default_factory=dict)
     therapeutic_area_slug: str = ""
     rising_star_v3: Optional[Dict[str, Any]] = None
+    established_v3: Optional[Dict[str, Any]] = None
 
 
 def get_required_env(name: str) -> str:
@@ -432,6 +424,93 @@ def fetch_rising_star_v3_context_rows(
     return rows_by_pair
 
 
+def fetch_established_v3_context_rows(
+    hcp_ids: Set[str],
+    visible_ta_ids: List[str],
+) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """Load Established v3 rank rows for both global and US scopes.
+
+    Returns dict keyed by (hcp_id, ta_id) with both scope rows under
+    'global' and 'us' keys plus shared percentiles.
+    """
+    if not hcp_ids or not visible_ta_ids:
+        return {}
+
+    ids_list = list(hcp_ids)
+    ta_list = list(visible_ta_ids)
+    rows_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    batch_size = 500
+
+    sql = """
+        SELECT
+            hcp_id,
+            therapeutic_area_id,
+            scope_type,
+            scope_value,
+            rank,
+            cohort_score,
+            scientific_influence_pctile,
+            network_influence_pctile,
+            pharma_engagement_pctile,
+            computed_at
+        FROM hcp_established_ranks_v3
+        WHERE therapeutic_area_id = ANY(%s::uuid[])
+          AND hcp_id = ANY(%s::uuid[])
+          AND (
+                (scope_type = 'global')
+             OR (scope_type = 'region' AND scope_value = 'US')
+          )
+    """
+
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(ids_list), batch_size):
+                batch_ids = ids_list[i : i + batch_size]
+                cur.execute(sql, (ta_list, batch_ids))
+                for row in cur.fetchall():
+                    (
+                        hcp_id,
+                        ta_id,
+                        scope_type,
+                        scope_value,
+                        rank_val,
+                        cohort_score,
+                        sci_pctile,
+                        net_pctile,
+                        pharma_pctile,
+                        computed_at,
+                    ) = row
+                    key = (str(hcp_id), str(ta_id))
+                    entry = rows_by_pair.setdefault(
+                        key,
+                        {
+                            "scientific_influence_pctile": None,
+                            "network_influence_pctile": None,
+                            "pharma_engagement_pctile": None,
+                            "cohort_score": None,
+                            "global_rank": None,
+                            "us_rank": None,
+                            "computed_at": None,
+                        },
+                    )
+                    if entry["scientific_influence_pctile"] is None and sci_pctile is not None:
+                        entry["scientific_influence_pctile"] = float(sci_pctile)
+                    if entry["network_influence_pctile"] is None and net_pctile is not None:
+                        entry["network_influence_pctile"] = float(net_pctile)
+                    if entry["pharma_engagement_pctile"] is None and pharma_pctile is not None:
+                        entry["pharma_engagement_pctile"] = float(pharma_pctile)
+                    if entry["cohort_score"] is None and cohort_score is not None:
+                        entry["cohort_score"] = float(cohort_score)
+                    if entry["computed_at"] is None and computed_at is not None:
+                        entry["computed_at"] = computed_at
+                    if scope_type == "global":
+                        entry["global_rank"] = int(rank_val) if rank_val is not None else None
+                    elif scope_type == "region" and scope_value == "US":
+                        entry["us_rank"] = int(rank_val) if rank_val is not None else None
+
+    return rows_by_pair
+
+
 def fetch_established_top_hcp_ids(
     supabase: Client, top_n: int, visible_ta_ids: List[str]
 ) -> Set[str]:
@@ -445,7 +524,7 @@ def fetch_established_top_hcp_ids(
         )
     except Exception as exc:
         print(
-            f"[load] hcp_established_ranks_v2 unavailable ({exc}); "
+            f"[load] hcp_established_ranks_v3 unavailable ({exc}); "
             "falling back to hcp_scores_v2 tier=established"
         )
         selected: Set[str] = set()
