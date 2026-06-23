@@ -8,6 +8,12 @@ import {
   type InsightStrength,
   type Note,
 } from "../../lib/relationships";
+import {
+  INSIGHT_CATEGORIES,
+  CATEGORY_LABELS,
+  CATEGORY_COLORS,
+  type InsightCategory,
+} from "../../lib/insightCategories";
 import { formatOccurredAt } from "./dateFormat";
 
 const INTERACTION_TYPES: InteractionType[] = [
@@ -18,6 +24,8 @@ const INTERACTION_TYPES: InteractionType[] = [
   "conference",
   "publication_review",
   "internal",
+  "advisory_board",
+  "tumor_board",
   "other",
 ];
 
@@ -25,6 +33,8 @@ const INSIGHT_STRENGTHS: InsightStrength[] = ["routine", "notable", "strategic"]
 
 function interactionTypeLabel(type: InteractionType): string {
   if (type === "publication_review") return "PUBLICATION REVIEW";
+  if (type === "advisory_board") return "ADVISORY BOARD";
+  if (type === "tumor_board") return "TUMOR BOARD";
   return type.toUpperCase();
 }
 
@@ -44,6 +54,10 @@ function interactionChipStyle(type: InteractionType): CSSProperties {
       return { backgroundColor: "#3FB8AF", color: "#0A0A0B" };
     case "internal":
       return { border: "1px solid #6B6A65", color: "#6B6A65", backgroundColor: "transparent" };
+    case "advisory_board":
+      return { backgroundColor: "#D0AF6E", color: "#0A0A0B" };
+    case "tumor_board":
+      return { backgroundColor: "#E8704E", color: "#FFFFFF" };
     default:
       return { backgroundColor: "#2A2A30", color: "#9B9892" };
   }
@@ -114,8 +128,18 @@ export default function InsightComposer({
 }: Props) {
   const [expanded, setExpanded] = useState(Boolean(editingNote) || forceExpanded || !isInline);
   const [body, setBody] = useState(editingNote?.body ?? "");
+  const [whyItMatters, setWhyItMatters] = useState(editingNote?.why_it_matters ?? "");
+  const [insightCategory, setInsightCategory] = useState<InsightCategory | null>(
+    (editingNote?.insight_category as InsightCategory | null) ?? null,
+  );
+  const [insightCategoryOtherLabel, setInsightCategoryOtherLabel] = useState(
+    editingNote?.insight_category_other_label ?? "",
+  );
   const [interactionType, setInteractionType] = useState<InteractionType>(
     editingNote?.interaction_type ?? "general",
+  );
+  const [interactionTypeOtherLabel, setInteractionTypeOtherLabel] = useState(
+    editingNote?.interaction_type_other_label ?? "",
   );
   const [insightStrength, setInsightStrength] = useState<InsightStrength>(
     editingNote?.insight_strength ?? "routine",
@@ -180,7 +204,11 @@ export default function InsightComposer({
       return;
     }
     setBody("");
+    setWhyItMatters("");
+    setInsightCategory(null);
+    setInsightCategoryOtherLabel("");
     setInteractionType("general");
+    setInteractionTypeOtherLabel("");
     setInsightStrength("routine");
     setDateValue(toDateInputValue(new Date().toISOString()));
     setShowDatePicker(false);
@@ -188,9 +216,28 @@ export default function InsightComposer({
     onCancel?.();
   }
 
+  function getValidationState(): { saveEnabled: boolean; buttonLabel: string } {
+    const trimmedBody = body.trim();
+    if (trimmedBody.length === 0) {
+      return { saveEnabled: false, buttonLabel: "Add an insight..." };
+    }
+    if (insightCategory === null) {
+      return { saveEnabled: false, buttonLabel: "Select a category" };
+    }
+    if (insightCategory === "other" && insightCategoryOtherLabel.trim().length === 0) {
+      return { saveEnabled: false, buttonLabel: "Specify category..." };
+    }
+    return { saveEnabled: true, buttonLabel: saving ? "Saving..." : "Save" };
+  }
+
   async function handleSave() {
+    const validation = getValidationState();
+    if (!validation.saveEnabled || saving) return;
+
     const trimmed = body.trim();
-    if (!trimmed || saving) return;
+    const trimmedWhy = whyItMatters.trim();
+    const trimmedCategoryOther = insightCategoryOtherLabel.trim();
+    const trimmedInteractionOther = interactionTypeOtherLabel.trim();
 
     setSaving(true);
     const occurredAt = dateInputToOccurredAt(dateValue, isToday);
@@ -202,6 +249,10 @@ export default function InsightComposer({
           interactionType,
           insightStrength,
           occurredAt,
+          insightCategory: insightCategory,
+          insightCategoryOtherLabel: insightCategory === "other" ? trimmedCategoryOther : null,
+          whyItMatters: trimmedWhy.length > 0 ? trimmedWhy : null,
+          interactionTypeOtherLabel: interactionType === "other" && trimmedInteractionOther.length > 0 ? trimmedInteractionOther : null,
         });
       } else {
         await createNote(userId, {
@@ -211,11 +262,19 @@ export default function InsightComposer({
           insightStrength,
           occurredAt,
           createdFrom: "hcp_detail_insight",
+          insightCategory: insightCategory,
+          insightCategoryOtherLabel: insightCategory === "other" ? trimmedCategoryOther : null,
+          whyItMatters: trimmedWhy.length > 0 ? trimmedWhy : null,
+          interactionTypeOtherLabel: interactionType === "other" && trimmedInteractionOther.length > 0 ? trimmedInteractionOther : null,
         });
       }
 
       setBody("");
+      setWhyItMatters("");
+      setInsightCategory(null);
+      setInsightCategoryOtherLabel("");
       setInteractionType("general");
+      setInteractionTypeOtherLabel("");
       setInsightStrength("routine");
       setDateValue(toDateInputValue(new Date().toISOString()));
       setShowDatePicker(false);
@@ -311,7 +370,87 @@ export default function InsightComposer({
         }}
       />
 
-      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 12 }}>
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 11, color: "#E8E6DF", fontWeight: 600, marginBottom: 4 }}>
+          Why it matters
+        </div>
+        <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8, lineHeight: 1.4 }}>
+          What's the strategic implication of this insight? This is what your manager will see in their weekly brief.
+        </div>
+        <textarea
+          className="fm-insight-composer-textarea"
+          value={whyItMatters}
+          onChange={(e) => setWhyItMatters(e.target.value)}
+          placeholder="Optional but recommended..."
+          aria-label="Why it matters"
+          style={{
+            width: "100%",
+            minHeight: 60,
+            borderRadius: 4,
+            backgroundColor: "#0D0D10",
+            border: "1px solid rgba(29, 158, 117, 0.30)",
+            color: "#E8E6DF",
+            fontSize: 13,
+            padding: 12,
+            lineHeight: 1.5,
+            resize: "vertical",
+            outline: "none",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
+        Category <span style={{ color: "#E8704E" }}>*</span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {INSIGHT_CATEGORIES.map((category) => {
+          const selected = insightCategory === category;
+          const colors = CATEGORY_COLORS[category];
+          return (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setInsightCategory(category)}
+              style={{
+                ...pillBase,
+                backgroundColor: selected ? colors.bg : "#1E1E22",
+                color: selected ? colors.fg : "#6B6A65",
+                border: selected ? `1px solid ${colors.border}` : "none",
+                fontWeight: selected ? 600 : 400,
+              }}
+            >
+              {CATEGORY_LABELS[category].toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+      {insightCategory === "other" ? (
+        <input
+          type="text"
+          value={insightCategoryOtherLabel}
+          onChange={(e) => setInsightCategoryOtherLabel(e.target.value)}
+          placeholder="Specify category..."
+          aria-label="Specify other category"
+          maxLength={40}
+          style={{
+            width: "100%",
+            height: 36,
+            marginTop: 8,
+            borderRadius: 4,
+            backgroundColor: "#0D0D10",
+            border: "1px solid #1E1E22",
+            color: "#E8E6DF",
+            fontSize: 13,
+            padding: "0 12px",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            outline: "none",
+          }}
+        />
+      ) : null}
+
+      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
         Type
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -333,8 +472,31 @@ export default function InsightComposer({
           );
         })}
       </div>
+      {interactionType === "other" ? (
+        <input
+          type="text"
+          value={interactionTypeOtherLabel}
+          onChange={(e) => setInteractionTypeOtherLabel(e.target.value)}
+          placeholder="Specify interaction type..."
+          aria-label="Specify other interaction type"
+          maxLength={40}
+          style={{
+            width: "100%",
+            height: 36,
+            marginTop: 8,
+            borderRadius: 4,
+            backgroundColor: "#0D0D10",
+            border: "1px solid #1E1E22",
+            color: "#E8E6DF",
+            fontSize: 13,
+            padding: "0 12px",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            outline: "none",
+          }}
+        />
+      ) : null}
 
-      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 12 }}>
+      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
         Strength
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -430,24 +592,29 @@ export default function InsightComposer({
         >
           Cancel
         </button>
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={body.trim().length === 0 || saving}
-          style={{
-            backgroundColor: "#E8A020",
-            color: "#0A0A0B",
-            padding: "6px 14px",
-            fontWeight: 500,
-            fontSize: 13,
-            borderRadius: 4,
-            border: "none",
-            cursor: body.trim().length === 0 || saving ? "default" : "pointer",
-            opacity: body.trim().length === 0 ? 0.5 : 1,
-          }}
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
+        {(() => {
+          const validation = getValidationState();
+          return (
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={!validation.saveEnabled || saving}
+              style={{
+                backgroundColor: "#E8A020",
+                color: "#0A0A0B",
+                padding: "6px 14px",
+                fontWeight: 500,
+                fontSize: 13,
+                borderRadius: 4,
+                border: "none",
+                cursor: validation.saveEnabled && !saving ? "pointer" : "default",
+                opacity: validation.saveEnabled ? 1 : 0.5,
+              }}
+            >
+              {validation.buttonLabel}
+            </button>
+          );
+        })()}
       </div>
     </div>
   );

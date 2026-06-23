@@ -2,6 +2,66 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFieldInsightsForCurrentUser, formatHcpDisplayName, formatInsightDate, type FieldInsight } from "../lib/fieldInsights";
 import { CATEGORY_LABELS, getCategoryColors, type InsightCategory, type InsightStrength } from "../lib/insightCategories";
+import AppLayout from "./AppLayout";
+
+function buildEmailBody(insights: FieldInsight[]): string {
+  if (insights.length === 0) {
+    return "No field insights captured yet.";
+  }
+  const lines: string[] = [];
+  lines.push("FIELD INSIGHTS - WEEKLY DIGEST");
+  lines.push("");
+  lines.push(`${insights.length} insight${insights.length === 1 ? "" : "s"} captured.`);
+  lines.push("");
+  lines.push("-----");
+  lines.push("");
+  for (const ins of insights) {
+    const hcpName = formatHcpDisplayName(ins.hcp_first_name, ins.hcp_last_name);
+    const categoryLabel = ins.insight_category
+      ? CATEGORY_LABELS[ins.insight_category as InsightCategory] ?? ins.insight_category
+      : "Uncategorized";
+    const dateStr = formatInsightDate(ins.occurred_at);
+    lines.push(`${hcpName} - ${categoryLabel} - ${dateStr}`);
+    lines.push("");
+    lines.push(ins.body);
+    if (ins.why_it_matters) {
+      lines.push("");
+      lines.push(`Why it matters: ${ins.why_it_matters}`);
+    }
+    lines.push("");
+    lines.push("-----");
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+function ShareIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M14 3h7v7"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 14L21 3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 type InsightTab = "by_hcp" | "by_category" | "by_date";
 
@@ -22,6 +82,7 @@ const MOCK_INSIGHTS: FieldInsight[] = [
     hcp_first_name: "John V.",
     hcp_last_name: "Heymach",
     body: "Raised concerns regarding biomarker testing implementation outside major academic centers. Specifically questioned whether community oncology practices are equipped to operationalize comprehensive genomic profiling within the AEGEAN perioperative window.",
+    why_it_matters: "Could be a leading indicator that perioperative IO uptake will lag in community settings unless testing workflow is addressed directly. Worth flagging to brand strategy.",
     interaction_type: "advisory_board",
     visibility: "team",
     occurred_at: "2026-06-12T15:30:00+00:00",
@@ -36,6 +97,7 @@ const MOCK_INSIGHTS: FieldInsight[] = [
     hcp_first_name: "John V.",
     hcp_last_name: "Heymach",
     body: "Requested additional data supporting sequencing decisions following progression on perioperative immunotherapy. Indicated current evidence base is thin for second-line targeted therapy selection in patients who progress through neoadjuvant IO.",
+    why_it_matters: "This is the second top-tier KOL this quarter raising the same evidence gap. May warrant a real-world data study or investigator-initiated research opportunity.",
     interaction_type: "one_on_one",
     visibility: "team",
     occurred_at: "2026-06-02T14:00:00+00:00",
@@ -50,6 +112,7 @@ const MOCK_INSIGHTS: FieldInsight[] = [
     hcp_first_name: "John V.",
     hcp_last_name: "Heymach",
     body: "Highlighted MATTERHORN durability data as particularly compelling in treatment discussions with referring physicians. Noted long-term response duration data is reshaping how he frames adjuvant decisions in EGFR-wildtype patients.",
+    why_it_matters: "Durability messaging is landing with senior KOLs. Consider amplifying this narrative thread in upcoming HCP-facing communications.",
     interaction_type: "congress",
     visibility: "team",
     occurred_at: "2026-05-18T10:15:00+00:00",
@@ -64,6 +127,7 @@ const MOCK_INSIGHTS: FieldInsight[] = [
     hcp_first_name: "Suresh S.",
     hcp_last_name: "Ramalingam",
     body: "Discussed competitor durvalumab positioning in Stage III consolidation. Indicated colleagues in community settings are increasingly comparing PACIFIC data with newer combination strategies and questioning whether durvalumab monotherapy remains the optimal backbone.",
+    why_it_matters: "Community sentiment may be shifting before formal guidelines update. Strategic positioning around combination data may need to move forward in the planning cycle.",
     interaction_type: "one_on_one",
     visibility: "team",
     occurred_at: "2026-06-08T11:45:00+00:00",
@@ -78,6 +142,7 @@ const MOCK_INSIGHTS: FieldInsight[] = [
     hcp_first_name: "Suresh S.",
     hcp_last_name: "Ramalingam",
     body: "Voiced skepticism about PD-L1 expression as a reliable selection marker for IO combinations. Argued that integrated biomarker panels combining PD-L1 with TMB and inflammatory gene signatures will replace single-marker selection within 3-5 years.",
+    why_it_matters: "Signal that biomarker strategy may need to evolve toward composite panels. Could affect companion diagnostic discussions and trial design assumptions.",
     interaction_type: "advisory_board",
     visibility: "team",
     occurred_at: "2026-05-24T16:00:00+00:00",
@@ -92,6 +157,7 @@ const MOCK_INSIGHTS: FieldInsight[] = [
     hcp_first_name: "Alexander I.",
     hcp_last_name: "Spira",
     body: "Flagged emerging community practice pattern of using KRAS G12C inhibitors earlier in sequencing than guidelines recommend. Suggested real-world data may need to catch up to community adoption before optimal sequencing can be defined.",
+    why_it_matters: "Practice ahead of evidence is both a risk and an opportunity. Real-world data partnership with high-volume community practices could become a meaningful evidence-generation move.",
     interaction_type: "tumor_board",
     visibility: "team",
     occurred_at: "2026-05-30T13:20:00+00:00",
@@ -106,6 +172,7 @@ const MOCK_INSIGHTS: FieldInsight[] = [
     hcp_first_name: "Aditi P.",
     hcp_last_name: "Singh",
     body: "Raised reimbursement barrier for comprehensive genomic profiling in Medicare Advantage patients. Reports several referring oncologists have been declining CGP based on prior authorization friction, leading to under-identification of actionable mutations.",
+    why_it_matters: "If CGP isn't happening, downstream targeted therapy decisions cannot be made correctly. May warrant payor engagement strategy or patient assistance program awareness push.",
     interaction_type: "one_on_one",
     visibility: "team",
     occurred_at: "2026-06-15T09:30:00+00:00",
@@ -168,50 +235,20 @@ export default function FieldInsightsScreen() {
 
   const isEmpty = !loading && insights.length === 0;
 
-  return (
-    <div
-      className="fm-screen"
-      style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100dvh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        color: "#E8E6DF",
-      }}
-    >
-      <div
-        className="fm-nav"
-        style={{
-          height: 48,
-          borderBottom: "1px solid #1E1E22",
-          display: "flex",
-          alignItems: "center",
-          padding: "0 16px",
-          position: "sticky",
-          top: 0,
-          backgroundColor: "#0A0A0B",
-          zIndex: 10,
-        }}
-      >
-        <button
-          onClick={() => navigate("/me")}
-          style={{
-            background: "none",
-            border: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-            padding: 4,
-            fontFamily: "inherit",
-          }}
-          aria-label="Back to Home"
-        >
-          <BackArrow />
-          <span style={{ fontSize: 13, color: "#6B6A65" }}>Home</span>
-        </button>
-      </div>
+  const handleShare = () => {
+    const subject = encodeURIComponent("Field Insights - Weekly Digest");
+    const body = encodeURIComponent(buildEmailBody(insights));
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 24px 16px" }}>
+  const breadcrumbs = [
+    { label: "Home", path: "/me" },
+    { label: "Field Insights" },
+  ];
+
+  return (
+    <AppLayout breadcrumbs={breadcrumbs}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{ marginBottom: 4 }}>
           <span
             style={{
@@ -225,21 +262,50 @@ export default function FieldInsightsScreen() {
             Insight Gen
           </span>
         </div>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#E8E6DF", margin: "0 0 8px", lineHeight: 1.2 }}>
-          Field Insights
-        </h1>
-        <p style={{ fontSize: 14, color: "#9B9892", margin: 0, maxWidth: 640, lineHeight: 1.5 }}>
-          Structured field intelligence from your HCP interactions. Each insight ties published beliefs to current
-          beliefs across your territory. Share this view with your manager to surface emerging themes and patterns.
-        </p>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#E8E6DF", margin: "0 0 8px", lineHeight: 1.2 }}>
+              Field Insights
+            </h1>
+            <p style={{ fontSize: 14, color: "#9B9892", margin: 0, maxWidth: 640, lineHeight: 1.5 }}>
+              Structured field intelligence from your HCP interactions. Each insight ties published beliefs to current
+              beliefs across your territory. Share this view with your manager to surface emerging themes and patterns.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={insights.length === 0}
+            aria-label="Share field insights via email"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: IG_ACCENT_BG,
+              border: `1px solid ${IG_ACCENT_BORDER}`,
+              color: IG_ACCENT,
+              padding: "8px 12px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              cursor: insights.length === 0 ? "default" : "pointer",
+              opacity: insights.length === 0 ? 0.5 : 1,
+              fontFamily: "inherit",
+              flexShrink: 0,
+              marginTop: 4,
+            }}
+          >
+            <ShareIcon />
+            Share
+          </button>
+        </div>
       </div>
 
       <div
         style={{
-          maxWidth: 960,
-          margin: "0 auto",
-          padding: "0 24px",
           borderBottom: "1px solid #1E1E22",
+          marginBottom: 24,
         }}
       >
         <div style={{ display: "flex", gap: 4 }}>
@@ -264,7 +330,7 @@ export default function FieldInsightsScreen() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 24px 64px" }}>
+      <div>
         {loading ? (
           <LoadingState />
         ) : isEmpty ? (
@@ -273,7 +339,7 @@ export default function FieldInsightsScreen() {
           <TabContent tab={activeTab} insights={insights} navigate={navigate} />
         )}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 
@@ -482,9 +548,37 @@ function InsightCard({
         </div>
       </div>
 
-      <div style={{ fontSize: 14, color: "#C8C5BE", lineHeight: 1.55, marginBottom: 12 }}>
+      <div style={{ fontSize: 14, color: "#C8C5BE", lineHeight: 1.55, marginBottom: insight.why_it_matters ? 12 : 12 }}>
         {insight.body}
       </div>
+
+      {insight.why_it_matters ? (
+        <div
+          style={{
+            backgroundColor: "rgba(29, 158, 117, 0.06)",
+            border: "1px solid rgba(29, 158, 117, 0.20)",
+            borderRadius: 8,
+            padding: "10px 12px",
+            marginBottom: 12,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: IG_ACCENT,
+              marginBottom: 6,
+            }}
+          >
+            Why it matters
+          </div>
+          <div style={{ fontSize: 13, color: "#C8C5BE", lineHeight: 1.5 }}>
+            {insight.why_it_matters}
+          </div>
+        </div>
+      ) : null}
 
       <div
         style={{

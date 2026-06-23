@@ -625,6 +625,8 @@ export type InteractionType =
   | "conference"
   | "publication_review"
   | "internal"
+  | "advisory_board"
+  | "tumor_board"
   | "other";
 
 export type NoteVisibility = "private" | "team" | "community";
@@ -680,6 +682,10 @@ export interface Note {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  insight_category: string | null;
+  insight_category_other_label: string | null;
+  why_it_matters: string | null;
+  interaction_type_other_label: string | null;
 }
 
 export interface CreateNoteParams {
@@ -689,6 +695,10 @@ export interface CreateNoteParams {
   insightStrength?: InsightStrength;
   occurredAt?: string;
   createdFrom?: string | null;
+  insightCategory?: string | null;
+  insightCategoryOtherLabel?: string | null;
+  whyItMatters?: string | null;
+  interactionTypeOtherLabel?: string | null;
 }
 
 export interface UpdateNoteParams {
@@ -696,6 +706,10 @@ export interface UpdateNoteParams {
   interactionType?: InteractionType;
   insightStrength?: InsightStrength;
   occurredAt?: string;
+  insightCategory?: string | null;
+  insightCategoryOtherLabel?: string | null;
+  whyItMatters?: string | null;
+  interactionTypeOtherLabel?: string | null;
 }
 
 export async function createNote(userId: string, params: CreateNoteParams): Promise<Note> {
@@ -719,6 +733,10 @@ export async function createNote(userId: string, params: CreateNoteParams): Prom
       interaction_type?: InteractionType;
       insight_strength?: InsightStrength;
       occurred_at?: string;
+      insight_category?: string | null;
+      insight_category_other_label?: string | null;
+      why_it_matters?: string | null;
+      interaction_type_other_label?: string | null;
     } = {
       relationship_id: relationship.id,
       user_id: userId,
@@ -733,6 +751,18 @@ export async function createNote(userId: string, params: CreateNoteParams): Prom
     }
     if (params.occurredAt) {
       insertPayload.occurred_at = params.occurredAt;
+    }
+    if (params.insightCategory !== undefined) {
+      insertPayload.insight_category = params.insightCategory;
+    }
+    if (params.insightCategoryOtherLabel !== undefined) {
+      insertPayload.insight_category_other_label = params.insightCategoryOtherLabel;
+    }
+    if (params.whyItMatters !== undefined) {
+      insertPayload.why_it_matters = params.whyItMatters;
+    }
+    if (params.interactionTypeOtherLabel !== undefined) {
+      insertPayload.interaction_type_other_label = params.interactionTypeOtherLabel;
     }
 
     const { data, error } = await supabase
@@ -828,6 +858,10 @@ export async function updateNote(
       interaction_type?: InteractionType;
       insight_strength?: InsightStrength;
       occurred_at?: string;
+      insight_category?: string | null;
+      insight_category_other_label?: string | null;
+      why_it_matters?: string | null;
+      interaction_type_other_label?: string | null;
     } = {};
 
     if (updates.body !== undefined) {
@@ -838,6 +872,18 @@ export async function updateNote(
     }
     if (updates.insightStrength !== undefined) {
       updatePayload.insight_strength = updates.insightStrength;
+    }
+    if (updates.insightCategory !== undefined) {
+      updatePayload.insight_category = updates.insightCategory;
+    }
+    if (updates.insightCategoryOtherLabel !== undefined) {
+      updatePayload.insight_category_other_label = updates.insightCategoryOtherLabel;
+    }
+    if (updates.whyItMatters !== undefined) {
+      updatePayload.why_it_matters = updates.whyItMatters;
+    }
+    if (updates.interactionTypeOtherLabel !== undefined) {
+      updatePayload.interaction_type_other_label = updates.interactionTypeOtherLabel;
     }
     if (updates.occurredAt !== undefined) {
       updatePayload.occurred_at = updates.occurredAt;

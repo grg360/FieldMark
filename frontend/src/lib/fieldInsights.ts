@@ -7,6 +7,7 @@ export interface FieldInsight {
   hcp_first_name: string;
   hcp_last_name: string;
   body: string;
+  why_it_matters: string | null;
   interaction_type: string | null;
   visibility: string | null;
   occurred_at: string;
@@ -19,6 +20,7 @@ export interface FieldInsight {
 type RawNoteRow = {
   id: string;
   body: string;
+  why_it_matters: string | null;
   interaction_type: string | null;
   visibility: string | null;
   occurred_at: string;
@@ -32,10 +34,6 @@ type RawNoteRow = {
       first_name: string | null;
       last_name: string | null;
     } | null;
-  } | null;
-  msl_profiles: {
-    first_name: string | null;
-    last_name: string | null;
   } | null;
 };
 
@@ -57,11 +55,20 @@ export async function getFieldInsightsForCurrentUser(): Promise<FieldInsight[]> 
     }
     const currentUserId = userData.user.id;
 
+    const { data: profileData } = await supabase
+      .from("msl_profiles")
+      .select("first_name, last_name")
+      .eq("user_id", currentUserId)
+      .maybeSingle();
+
+    const authorInitials = safeInitials(profileData?.first_name, profileData?.last_name);
+
     const { data, error } = await supabase
       .from("msl_hcp_notes")
       .select(`
         id,
         body,
+        why_it_matters,
         interaction_type,
         visibility,
         occurred_at,
@@ -75,10 +82,6 @@ export async function getFieldInsightsForCurrentUser(): Promise<FieldInsight[]> 
             first_name,
             last_name
           )
-        ),
-        msl_profiles!msl_hcp_notes_user_id_fkey (
-          first_name,
-          last_name
         )
       `)
       .eq("user_id", currentUserId)
@@ -102,13 +105,14 @@ export async function getFieldInsightsForCurrentUser(): Promise<FieldInsight[]> 
           hcp_first_name: (hcp.first_name ?? "").trim(),
           hcp_last_name: (hcp.last_name ?? "").trim(),
           body: row.body,
+          why_it_matters: row.why_it_matters,
           interaction_type: row.interaction_type,
           visibility: row.visibility,
           occurred_at: row.occurred_at,
           insight_strength: (row.insight_strength as InsightStrength | null) ?? null,
           insight_category: (row.insight_category as InsightCategory | null) ?? null,
           author_user_id: row.user_id,
-          author_initials: safeInitials(row.msl_profiles?.first_name, row.msl_profiles?.last_name),
+          author_initials: authorInitials,
         };
       })
       .filter((row): row is FieldInsight => row !== null);
