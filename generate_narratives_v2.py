@@ -147,7 +147,7 @@ COMMUNITY_DEFAULT_TOP_N = 500
 API_SLEEP_SECONDS = 0.5
 PROGRESS_EVERY = 25
 MAX_TOKENS_RESPONSE = 600
-TEMPERATURE = 0.4
+TEMPERATURE = 0.1
 
 
 @dataclass
@@ -331,37 +331,29 @@ def fetch_rising_star_top_hcp_ids_v3(
     top_n: int,
     visible_ta_ids: List[str],
 ) -> Set[str]:
-    """Top N rising-star HCP ids per (TA x visible scope) from hcp_rising_star_ranks_v3."""
+    """Rising Star cohort selection: US-scope only, top N per TA from hcp_rising_star_ranks_v3.
+
+    Matches the platform's US-default product model. Global/international HCPs are
+    intentionally excluded from narrative generation.
+    """
     selected: Set[str] = set()
-    for scope_type, scope_value in VISIBLE_SCOPES:
-        for ta_id in visible_ta_ids:
-            query = (
+    for ta_id in visible_ta_ids:
+        try:
+            response = (
                 supabase.table("hcp_rising_star_ranks_v3")
                 .select("hcp_id")
                 .eq("therapeutic_area_id", ta_id)
+                .not_.is_("us_rank", "null")
+                .order("us_rank", desc=False)
+                .range(0, top_n - 1)
+                .execute()
             )
-            if scope_type == "global" and scope_value is None:
-                query = query.order("rank", desc=False).range(0, top_n - 1)
-            elif scope_type == "country" and scope_value == "US":
-                query = (
-                    query.not_.is_("us_rank", "null")
-                    .order("us_rank", desc=False)
-                    .range(0, top_n - 1)
-                )
-            elif scope_type == "region" and scope_value == "EU5":
-                query = (
-                    query.in_("country", EU5_COUNTRIES)
-                    .order("rising_star_percentile", desc=True)
-                    .range(0, top_n - 1)
-                )
-            else:
-                continue
-            response = query.execute()
-            rows = response.data or []
-            for row in rows:
+            for row in response.data or []:
                 hcp_id = row.get("hcp_id")
                 if hcp_id:
                     selected.add(str(hcp_id))
+        except Exception as exc:
+            print(f"[load] hcp_rising_star_ranks_v3 query failed for TA {ta_id}: {exc}")
     return selected
 
 
@@ -468,18 +460,16 @@ def fetch_established_v3_context_rows(
                 batch_ids = ids_list[i : i + batch_size]
                 cur.execute(sql, (ta_list, batch_ids))
                 for row in cur.fetchall():
-                    (
-                        hcp_id,
-                        ta_id,
-                        scope_type,
-                        scope_value,
-                        rank_val,
-                        cohort_score,
-                        sci_pctile,
-                        net_pctile,
-                        pharma_pctile,
-                        computed_at,
-                    ) = row
+                    hcp_id = row["hcp_id"]
+                    ta_id = row["therapeutic_area_id"]
+                    scope_type = row["scope_type"]
+                    scope_value = row["scope_value"]
+                    rank_val = row["rank"]
+                    cohort_score = row["cohort_score"]
+                    sci_pctile = row["scientific_influence_pctile"]
+                    net_pctile = row["network_influence_pctile"]
+                    pharma_pctile = row["pharma_engagement_pctile"]
+                    computed_at = row["computed_at"]
                     key = (str(hcp_id), str(ta_id))
                     entry = rows_by_pair.setdefault(
                         key,
@@ -514,27 +504,21 @@ def fetch_established_v3_context_rows(
 def fetch_established_top_hcp_ids(
     supabase: Client, top_n: int, visible_ta_ids: List[str]
 ) -> Set[str]:
-    """Established cohort selection from rank view, with scores-table fallback."""
-    try:
-        return fetch_top_n_hcp_ids_from_rank_view(
-            supabase,
-            COHORT_SCORE_CONFIG["established"]["rank_table"],
-            top_n,
-            visible_ta_ids,
-        )
-    except Exception as exc:
-        print(
-            f"[load] hcp_established_ranks_v3 unavailable ({exc}); "
-            "falling back to hcp_scores_v2 tier=established"
-        )
-        selected: Set[str] = set()
-        for ta_id in visible_ta_ids:
+    """Established cohort selection: US-scope only, top N per TA from hcp_established_ranks_v3.
+
+    Matches the platform's US-default product model. Global/international HCPs are
+    intentionally excluded from narrative generation.
+    """
+    selected: Set[str] = set()
+    for ta_id in visible_ta_ids:
+        try:
             response = (
-                supabase.table("hcp_scores_v2")
-                .select("hcp_id")
+                supabase.table("hcp_established_ranks_v3")
+                .select("hcp_id,rank")
                 .eq("therapeutic_area_id", ta_id)
-                .eq("tier", "established")
-                .order("normalized_score", desc=True)
+                .eq("scope_type", "region")
+                .eq("scope_value", "US")
+                .order("rank", desc=False)
                 .range(0, top_n - 1)
                 .execute()
             )
@@ -542,7 +526,9 @@ def fetch_established_top_hcp_ids(
                 hcp_id = row.get("hcp_id")
                 if hcp_id:
                     selected.add(str(hcp_id))
-        return selected
+        except Exception as exc:
+            print(f"[load] hcp_established_ranks_v3 query failed for TA {ta_id}: {exc}")
+    return selected
 
 
 def fetch_hcps_by_ids(
@@ -624,13 +610,16 @@ def load_hcp_contexts(
         rising_star_v3_by_pair = fetch_rising_star_v3_context_rows(rising_ids, visible_ta_ids)
         print(f"Loaded {len(rising_star_v3_by_pair)} Rising Star v3 HCP x TA signal rows")
 
+    established_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
     if "established" in target_cohorts:
-        print(f"Selecting established top-{established_top_n} per (TA x visible scope) from rank table...")
+        print(f"Selecting established top-{established_top_n} per (TA x visible scope) from hcp_established_ranks_v3...")
         established_ids = fetch_established_top_hcp_ids(supabase, established_top_n, visible_ta_ids)
         print(f"Established rank selection: {len(established_ids)} unique HCPs")
         for hcp_id in established_ids:
             cohort_by_hcp[hcp_id] = "established"
         hcps.extend(fetch_hcps_by_ids(supabase, established_ids, target_version))
+        established_v3_by_pair = fetch_established_v3_context_rows(established_ids, visible_ta_ids)
+        print(f"Loaded {len(established_v3_by_pair)} Established v3 HCP x TA rank rows")
 
     if "community" in target_cohorts:
         print("Loading community HCPs by cohort_classification...")
@@ -731,6 +720,8 @@ def load_hcp_contexts(
         if cohort not in COHORT_SCORE_CONFIG:
             continue
         cohort_config = COHORT_SCORE_CONFIG[cohort]
+        if "score_table" not in cohort_config:
+            continue
         cohort_hcp_ids = hcp_ids_by_cohort.get(cohort) or set()
         if not cohort_hcp_ids:
             continue
@@ -780,7 +771,11 @@ def load_hcp_contexts(
     print("Computing per-TA percentile distributions...")
     ta_distributions_by_cohort: Dict[str, Dict[str, Dict[str, List[float]]]] = {}
     for cohort, cohort_scores in scores_by_cohort.items():
+        if cohort == "established":
+            continue
         config = COHORT_SCORE_CONFIG[cohort]
+        if "score_fields" not in config:
+            continue
         ta_distributions_by_cohort[cohort] = {}
         for (_hcp_id, ta_id), score_row in cohort_scores.items():
             if ta_id not in ta_distributions_by_cohort[cohort]:
@@ -794,7 +789,11 @@ def load_hcp_contexts(
 
     contexts: List[HCPContext] = []
     for cohort, cohort_scores in scores_by_cohort.items():
+        if cohort == "established":
+            continue
         config = COHORT_SCORE_CONFIG[cohort]
+        if "score_fields" not in config:
+            continue
         for (hcp_id, ta_id), score_row in cohort_scores.items():
             if (hcp_id, ta_id) not in ta_membership:
                 continue
@@ -880,6 +879,38 @@ def load_hcp_contexts(
             )
             contexts.append(ctx)
 
+    if "established" in target_cohorts:
+        for (hcp_id, ta_id), v3_row in established_v3_by_pair.items():
+            if (hcp_id, ta_id) not in ta_membership:
+                continue
+            hcp = hcp_map.get(hcp_id)
+            if not hcp:
+                continue
+            ops = ops_by_hcp.get(hcp_id, {})
+            ctx = HCPContext(
+                hcp_id=hcp_id,
+                therapeutic_area_id=ta_id,
+                therapeutic_area_name=ta_name_map.get(ta_id, ta_id),
+                first_name=hcp.get("first_name"),
+                last_name=hcp.get("last_name"),
+                institution=hcp.get("institution"),
+                country=hcp.get("country"),
+                cohort_classification="established",
+                cohort_score=safe_float(v3_row.get("cohort_score")),
+                composite_score=safe_float(v3_row.get("cohort_score")),
+                pub_velocity_pct=None,
+                citation_trajectory_pct=None,
+                trial_investigator_pct=None,
+                first_pub_year=safe_int(hcp.get("first_pub_year")),
+                total_career_pubs=safe_int(hcp.get("total_career_pubs")),
+                pharma_engagement_lifetime=safe_float(ops.get("total_payments_lifetime")),
+                pharma_companies_distinct=safe_int(ops.get("distinct_companies_lifetime")),
+                percentile_data={},
+                therapeutic_area_slug=ta_slug_map.get(ta_id, ""),
+                established_v3=v3_row,
+            )
+            contexts.append(ctx)
+
     print(f"Built {len(contexts)} HCP×TA contexts for narrative generation")
     return contexts, ta_name_map
 
@@ -924,6 +955,26 @@ def freshness_filter(
             if ctx.cohort_classification == "rising_star":
                 score_resp = (
                     supabase.table("hcp_rising_star_ranks_v3")
+                    .select("computed_at")
+                    .eq("hcp_id", ctx.hcp_id)
+                    .eq("therapeutic_area_id", ctx.therapeutic_area_id)
+                    .limit(1)
+                    .execute()
+                )
+                score_rows = score_resp.data or []
+                if not score_rows:
+                    kept.append(ctx)
+                    continue
+                scored_at = score_rows[0].get("computed_at")
+                if scored_at and str(generated_at) > str(scored_at):
+                    skipped += 1
+                    continue
+                kept.append(ctx)
+                continue
+
+            if ctx.cohort_classification == "established":
+                score_resp = (
+                    supabase.table("hcp_established_ranks_v3")
                     .select("computed_at")
                     .eq("hcp_id", ctx.hcp_id)
                     .eq("therapeutic_area_id", ctx.therapeutic_area_id)
@@ -999,33 +1050,58 @@ def format_hcp_facts_rising(ctx: HCPContext) -> str:
 
 
 def format_hcp_facts_established(ctx: HCPContext) -> str:
-    """Build prompt fact list for an Established-cohort HCP. Reads from ctx.percentile_data dict."""
+    """Build prompt fact list for an Established-cohort HCP. Reads ctx.established_v3 (v3 ranks)."""
+    v3 = ctx.established_v3 or {}
     lines = [
         f"HCP: {ctx.first_name or ''} {ctx.last_name or ''}".strip(),
         f"Institution: {ctx.institution or 'Unknown'}",
         f"Country: {ctx.country or 'Unknown'}",
         f"Therapeutic Area: {ctx.therapeutic_area_name}",
-        f"Cohort: Established (top-100 visible board within TA × scope)",
-        f"Cohort Score: {ctx.cohort_score if ctx.cohort_score is not None else 'Unknown'}",
+        f"Cohort: Established (recognized expert tier within TA)",
     ]
+
+    cohort_score = v3.get("cohort_score")
+    if cohort_score is not None:
+        lines.append(f"Cohort Score: {cohort_score:.1f} (50/35/15 weighted)")
+
+    global_rank = v3.get("global_rank")
+    us_rank = v3.get("us_rank")
+    rank_parts = []
+    if global_rank is not None:
+        rank_parts.append(f"global rank {global_rank}")
+    if us_rank is not None:
+        rank_parts.append(f"US rank {us_rank}")
+    if rank_parts:
+        lines.append("Standing: " + "; ".join(rank_parts) + " within the Established TA cohort")
+
     if ctx.first_pub_year is not None:
         career_years = datetime.now(timezone.utc).year - ctx.first_pub_year
         lines.append(f"Career Length: ~{career_years} years (first publication {ctx.first_pub_year})")
     if ctx.total_career_pubs is not None:
         lines.append(f"Total Career Publications: {ctx.total_career_pubs}")
-    pd = ctx.percentile_data or {}
-    if "pub_volume" in pd:
-        lines.append(f"Publication Volume: {pd['pub_volume']}th percentile within TA")
-    if "recent_productivity" in pd:
-        lines.append(f"Recent Productivity (last 5 yrs): {pd['recent_productivity']}th percentile within TA")
-    if "lead_density" in pd:
-        lines.append(f"First/Last Author Density: {pd['lead_density']}th percentile within TA")
-    if "trial" in pd:
-        lines.append(f"Clinical Trial Activity: {pd['trial']}th percentile within TA")
-    if "career_length" in pd:
-        lines.append(f"Career Stage Maturity: {pd['career_length']}th percentile within TA")
-    if "pharma_breadth" in pd:
-        lines.append(f"Pharma Engagement Breadth: {pd['pharma_breadth']}th percentile within TA")
+
+    sci = v3.get("scientific_influence_pctile")
+    net = v3.get("network_influence_pctile")
+    pharma = v3.get("pharma_engagement_pctile")
+
+    if sci is not None:
+        lines.append(
+            f"Scientific Influence: {sci:.0f}th percentile within Established cohort "
+            "(publication leadership and citation impact)"
+        )
+    if net is not None:
+        lines.append(
+            f"Network Influence: {net:.0f}th percentile within Established cohort "
+            "(co-authorship graph centrality)"
+        )
+    if pharma is not None:
+        lines.append(
+            f"Pharma Engagement: {pharma:.0f}th percentile within Established cohort "
+            "(industry collaboration breadth)"
+        )
+    else:
+        lines.append("Pharma Engagement: no Open Payments data on file for this HCP")
+
     if ctx.pharma_engagement_lifetime is not None:
         lines.append(f"Lifetime Pharma Engagement: ${ctx.pharma_engagement_lifetime:,.0f}")
     if ctx.pharma_companies_distinct is not None:
@@ -1176,14 +1252,16 @@ Output ONLY the JSON object. No code fences. No commentary.
 
 
 def build_prompt_established(ctx: HCPContext) -> str:
-    """Prompt for Established cohort — recognized expert framing."""
+    """Prompt for Established cohort - recognized expert framing using v3 methodology."""
     facts = format_hcp_facts(ctx, "established")
     prompt = (
-        "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about a recognized scientific expert. "
-        "This HCP has been algorithmically selected as a top-100 Established expert within their therapeutic area — a researcher with sustained influence, depth of publication record, and consistent presence in their field. "
-        "They are by definition a high-priority name on a curated MSL surfacing board. "
-        "The percentile data below is computed within the established cohort in their TA, so percentiles here reflect their standing among peer experts, not against all HCPs broadly. "
-        "Frame as a recognized voice whose perspective adds value to scientific dialogue.\n\n"
+        "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about a recognized scientific expert in their therapeutic area.\n\n"
+        "Methodology context (do not restate verbatim, but use to interpret the data):\n"
+        "- This HCP sits within the Established cohort of their TA - the recognized-expert tier (separate from Rising Stars and Community).\n"
+        "- Their cohort score is a weighted blend: 50 percent Scientific Influence (publication leadership and citation impact within the cohort), 35 percent Network Influence (co-authorship graph centrality), 15 percent Pharma Engagement (industry collaboration breadth).\n"
+        "- All percentiles below are computed within the Established cohort in this TA, so a 70th percentile here means top 30 percent among recognized experts, not among all HCPs.\n"
+        "- If Pharma Engagement percentile is absent from the facts, that HCP has no Open Payments data on file - treat this as missing data, not low engagement; the cohort score reweights the remaining signals proportionally.\n"
+        "- If Pharma Engagement percentile is present but low (including 0th percentile), this means the HCP has Open Payments data on file but their documented industry collaboration breadth is low relative to other recognized experts. Low pharma engagement among Established experts is COMMON, NORMAL, and NOT a concern. Many leading academic researchers have modest Open Payments footprints. Do not interpret low pharma engagement as evidence of institutional restrictions, limited receptivity, or any other adverse signal.\n\n"
         "Return ONLY valid JSON with exactly these five fields:\n"
         "{\n"
         '  "narrative": "string (exactly 3 sentences)",\n'
@@ -1193,13 +1271,14 @@ def build_prompt_established(ctx: HCPContext) -> str:
         '  "caution_flags": "string or null"\n'
         "}\n\n"
         "Constraints:\n"
-        "- narrative: exactly 3 sentences. Frame as a recognized expert with sustained influence. Reference depth of career (years active, total publications) and current standing (percentile context within established peers, lead authorship density if available, clinical trial leadership if any). Avoid hagiography — be concrete and specific.\n"
+        "- narrative: exactly 3 sentences. Frame as a recognized expert with sustained influence. Anchor in concrete percentiles from the data (Scientific Influence, Network Influence, and Pharma Engagement when available), career length, and total publications. When Scientific Influence is high, you may speak to publication leadership and citation impact at the level of abstraction the methodology supports. Avoid hagiography; be specific and data-anchored. Do not invent numbers not present in the facts.\n"
         "- why_now: exactly 1 sentence. Why this expert matters in the current scientific landscape, not just historical contribution.\n"
-        "- engagement_angle: exactly 2 sentences. Suggest scientific topics where this expert's perspective adds value. Established experts often have strong opinions on methodology, study design, or therapeutic positioning — lean into that.\n"
-        "- signal_strength: exactly 1 sentence. Honest confidence statement.\n"
-        "- caution_flags: 1 sentence OR the JSON literal null. Use null in most cases — being established means signal is consolidated, not weak. Only populate caution_flags when there is a SPECIFIC, ACTIONABLE concern: very high pharma engagement breadth (engaged with 20+ companies suggesting saturation), significant lifetime engagement concentrated with a single direct competitor, institutional restrictions on industry engagement, or evidence of recent productivity decline despite established status. Do NOT use this field to hedge or restate percentile data — those belong in signal_strength.\n"
+        "- engagement_angle: exactly 2 sentences. Suggest scientific topics where this expert's perspective adds value. Established experts often have strong opinions on methodology, study design, or therapeutic positioning - lean into that.\n"
+        "- signal_strength: exactly 1 sentence. Honest confidence statement. If Pharma Engagement data is missing, say so here.\n"
+        "- caution_flags: 1 sentence OR the JSON literal null. Default to null. Only populate when there is a SPECIFIC, ACTIONABLE concern AT THE HIGH END: very high pharma engagement breadth (20+ distinct companies suggesting saturation), lifetime engagement heavily concentrated with a single direct competitor where the MSL's product directly competes, or documented evidence (not inference) of a specific institutional restriction on industry engagement. Do NOT flag low or 0th-percentile Pharma Engagement - that is normal and is not a concern. Do NOT infer institutional policies from low pharma scores. Do NOT use this field to hedge, speculate, or restate percentile data - those belong in signal_strength.\n"
         "- No markdown. No text outside JSON.\n"
-        "- Do not name specific drug brands or NCT trial numbers.\n\n"
+        "- Do not name specific drug brands or NCT trial numbers.\n"
+        "- Ensure proper spacing between all words. Do not concatenate words together (e.g., write 'and 19th' not 'and19th', 'study design' not 'studydesign').\n\n"
         "HCP context:\n"
         f"{facts}\n"
     )
@@ -1283,7 +1362,35 @@ def parse_json_object(text: str) -> Dict:
         raise RuntimeError(f"Failed parsing Claude JSON output: {exc}") from exc
     if not isinstance(parsed, dict):
         raise RuntimeError("Claude JSON output is not an object.")
-    return parsed
+    return clean_narrative_payload(parsed)
+
+
+def clean_narrative_spacing(text: str) -> str:
+    """Fix observed spacing glitches in model output.
+
+    Conservative: only fixes patterns that cannot collide with legitimate
+    acronyms or biomedical terms (PD-L1, KRAS G12C, NSCLC, etc.).
+    """
+    if not text or not isinstance(text, str):
+        return text
+    import re as _re
+    text = _re.sub(r"([,.;:])([A-Za-z])", r"\1 \2", text)
+    text = text.replace("ScientificInfluence", "Scientific Influence")
+    text = text.replace("NetworkInfluence", "Network Influence")
+    text = text.replace("PharmaEngagement", "Pharma Engagement")
+    text = text.replace("OpenPayments", "Open Payments")
+    return text
+
+
+def clean_narrative_payload(payload: Dict[str, Optional[str]]) -> Dict[str, Optional[str]]:
+    """Apply spacing cleanup to all string fields in a narrative payload."""
+    cleaned: Dict[str, Optional[str]] = {}
+    for key, value in payload.items():
+        if isinstance(value, str):
+            cleaned[key] = clean_narrative_spacing(value)
+        else:
+            cleaned[key] = value
+    return cleaned
 
 
 def generate_narrative(ctx: HCPContext, anthropic_api_key: str) -> Dict[str, Optional[str]]:

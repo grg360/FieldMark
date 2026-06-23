@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import EvidenceDrawer from "./EvidenceDrawer";
+import BeliefClaimReactionPanel, { type ClaimSection } from "./BeliefClaimReactionPanel";
 import {
   getScientificNarrativeForHcp,
   type AdvocacyTheme,
   type CorpusDepth,
+  type ResearchFocusItem,
   type ScientificNarrative,
 } from "../lib/scientificPositions";
+import {
+  buildAdvocacyClaimKey,
+  buildResearchFocusClaimKey,
+} from "../lib/beliefClaimKey";
 
 interface ScientificNarrativeSectionProps {
   hcpId: string;
@@ -80,34 +86,51 @@ function ConfidenceBars({ confidence }: { confidence: number }) {
 
 function ThemeCard({
   theme,
-  onClick,
+  expanded,
+  onCardClick,
+  onViewSources,
 }: {
   theme: AdvocacyTheme;
-  onClick: () => void;
+  expanded: boolean;
+  onCardClick: () => void;
+  onViewSources: () => void;
 }) {
+  const borderColor = expanded ? "#9B6DFF" : "#1E1E22";
+  const bgColor = expanded ? "#15131A" : "#0D0D10";
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onCardClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onCardClick();
+        }
+      }}
       style={{
         display: "block",
         width: "100%",
         textAlign: "left",
         padding: "18px 20px",
-        backgroundColor: "#0D0D10",
-        border: "1px solid #1E1E22",
+        backgroundColor: bgColor,
+        border: `1px solid ${borderColor}`,
         borderRadius: 10,
         cursor: "pointer",
         fontFamily: "inherit",
         transition: "background-color 120ms, border-color 120ms",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "#15131A";
-        e.currentTarget.style.borderColor = "#2A2A2E";
+        if (!expanded) {
+          e.currentTarget.style.backgroundColor = "#15131A";
+          e.currentTarget.style.borderColor = "#2A2A2E";
+        }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "#0D0D10";
-        e.currentTarget.style.borderColor = "#1E1E22";
+        if (!expanded) {
+          e.currentTarget.style.backgroundColor = "#0D0D10";
+          e.currentTarget.style.borderColor = "#1E1E22";
+        }
       }}
     >
       <div
@@ -127,37 +150,79 @@ function ThemeCard({
       <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, marginBottom: 10 }}>
         {theme.summary}
       </div>
-      {theme.supporting_paper_count != null && theme.supporting_paper_count > 0 ? (
-        <div
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {theme.supporting_paper_count != null && theme.supporting_paper_count > 0 ? (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              fontWeight: 500,
+              color: "#9B6DFF",
+              backgroundColor: "rgba(155, 109, 255, 0.10)",
+              border: "1px solid rgba(155, 109, 255, 0.25)",
+              borderRadius: 999,
+              padding: "3px 10px",
+              letterSpacing: 0.2,
+            }}
+          >
+            Supported by {theme.supporting_paper_count} {theme.supporting_paper_count === 1 ? "publication" : "publications"}
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewSources();
+          }}
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
             fontSize: 11,
             fontWeight: 500,
-            color: "#9B6DFF",
-            backgroundColor: "rgba(155, 109, 255, 0.10)",
-            border: "1px solid rgba(155, 109, 255, 0.25)",
+            color: "rgba(232, 230, 223, 0.6)",
+            background: "transparent",
+            border: "1px solid rgba(232, 230, 223, 0.15)",
             borderRadius: 999,
             padding: "3px 10px",
-            letterSpacing: 0.2,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "#E8E6DF";
+            e.currentTarget.style.borderColor = "rgba(232, 230, 223, 0.4)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "rgba(232, 230, 223, 0.6)";
+            e.currentTarget.style.borderColor = "rgba(232, 230, 223, 0.15)";
           }}
         >
-          Supported by {theme.supporting_paper_count} {theme.supporting_paper_count === 1 ? "publication" : "publications"}
-        </div>
-      ) : null}
-    </button>
+          View sources
+        </button>
+      </div>
+    </div>
   );
 }
 
 function AdvocacySubsection({
   label,
+  section,
   themes,
-  onThemeClick,
+  expandedKey,
+  claimKeys,
+  hcpId,
+  therapeuticAreaSlug,
+  onCardToggle,
+  onViewSources,
 }: {
   label: string;
+  section: ClaimSection;
   themes: AdvocacyTheme[];
-  onThemeClick: (theme: AdvocacyTheme) => void;
+  expandedKey: string | null;
+  claimKeys: Map<string, string>;
+  hcpId: string;
+  therapeuticAreaSlug: string;
+  onCardToggle: (claimKey: string) => void;
+  onViewSources: (theme: AdvocacyTheme) => void;
 }) {
   if (themes.length === 0) return null;
 
@@ -167,13 +232,34 @@ function AdvocacySubsection({
         {label}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {themes.map((theme) => (
-          <ThemeCard
-            key={`${label}-${theme.theme}`}
-            theme={theme}
-            onClick={() => onThemeClick(theme)}
-          />
-        ))}
+        {themes.map((theme) => {
+          const cacheKey = `${section}-${theme.theme}`;
+          const claimKey = claimKeys.get(cacheKey);
+          const expanded = claimKey != null && claimKey === expandedKey;
+          return (
+            <div key={cacheKey}>
+              <ThemeCard
+                theme={theme}
+                expanded={expanded}
+                onCardClick={() => {
+                  if (claimKey) onCardToggle(claimKey);
+                }}
+                onViewSources={() => onViewSources(theme)}
+              />
+              {claimKey ? (
+                <BeliefClaimReactionPanel
+                  hcpId={hcpId}
+                  claimKey={claimKey}
+                  claimSection={section}
+                  claimTitle={theme.theme}
+                  therapeuticAreaSlug={therapeuticAreaSlug}
+                  expanded={expanded}
+                  onClose={() => onCardToggle(claimKey)}
+                />
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -235,6 +321,10 @@ export default function ScientificNarrativeSection({
   const [error, setError] = useState<Error | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTheme, setDrawerTheme] = useState<DrawerTheme | null>(null);
+  const [expandedClaimKey, setExpandedClaimKey] = useState<string | null>(null);
+  const [claimKeys, setClaimKeys] = useState<Map<string, string>>(new Map());
+
+  const therapeuticAreaSlug = useMemo(() => therapeuticArea.toLowerCase(), [therapeuticArea]);
 
   useEffect(() => {
     let cancelled = false;
@@ -260,6 +350,41 @@ export default function ScientificNarrativeSection({
       cancelled = true;
     };
   }, [hcpId, therapeuticArea]);
+
+  useEffect(() => {
+    if (!narrative) {
+      setClaimKeys(new Map());
+      return;
+    }
+    let cancelled = false;
+    const next = new Map<string, string>();
+
+    async function buildKeys() {
+      if (!narrative) return;
+      const advocacyEntries: Array<{ cacheKey: string; theme: AdvocacyTheme }> = [
+        ...narrative.strongly_advocates.map((t) => ({ cacheKey: `strongly_advocates-${t.theme}`, theme: t })),
+        ...narrative.frequently_raises.map((t) => ({ cacheKey: `frequently_raises-${t.theme}`, theme: t })),
+      ];
+      for (const entry of advocacyEntries) {
+        const key = await buildAdvocacyClaimKey(hcpId, entry.theme);
+        next.set(entry.cacheKey, key);
+      }
+      for (const item of narrative.research_focus) {
+        const key = await buildResearchFocusClaimKey(hcpId, item);
+        next.set(`research_focus-${item.theme}`, key);
+      }
+      if (!cancelled) setClaimKeys(next);
+    }
+
+    buildKeys();
+    return () => {
+      cancelled = true;
+    };
+  }, [narrative, hcpId]);
+
+  function handleCardToggle(claimKey: string) {
+    setExpandedClaimKey((prev) => (prev === claimKey ? null : claimKey));
+  }
 
   function openDrawer(theme: AdvocacyTheme) {
     setDrawerTheme({
@@ -292,7 +417,7 @@ export default function ScientificNarrativeSection({
   const bullet = String.fromCharCode(8226);
 
   return (
-    <section style={{ marginBottom: 32, padding: "20px 24px 0", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <section style={{ marginBottom: 0, padding: "20px 24px 0", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div
         style={{
           display: "flex",
@@ -334,14 +459,26 @@ export default function ScientificNarrativeSection({
 
       <AdvocacySubsection
         label="Strongly Advocates"
+        section="strongly_advocates"
         themes={narrative.strongly_advocates}
-        onThemeClick={openDrawer}
+        expandedKey={expandedClaimKey}
+        claimKeys={claimKeys}
+        hcpId={hcpId}
+        therapeuticAreaSlug={therapeuticAreaSlug}
+        onCardToggle={handleCardToggle}
+        onViewSources={openDrawer}
       />
 
       <AdvocacySubsection
         label="Frequently Raises"
+        section="frequently_raises"
         themes={narrative.frequently_raises}
-        onThemeClick={openDrawer}
+        expandedKey={expandedClaimKey}
+        claimKeys={claimKeys}
+        hcpId={hcpId}
+        therapeuticAreaSlug={therapeuticAreaSlug}
+        onCardToggle={handleCardToggle}
+        onViewSources={openDrawer}
       />
 
       {narrative.research_focus.length > 0 ? (
@@ -349,48 +486,79 @@ export default function ScientificNarrativeSection({
           <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginBottom: 12 }}>
             Research Focus
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {narrative.research_focus.map((item) => {
-              const widthPct = maxWeight > 0 ? (item.weight / maxWeight) * 100 : 0;
-              return (
-                <div
-                  key={item.theme}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#15131A",
-                    border: "1px solid #1E1E22",
-                    borderRadius: 999,
-                    minWidth: 120,
-                  }}
-                >
-                  <div style={{ fontSize: 13, color: "#E8E6DF", marginBottom: 6 }}>
-                    {item.theme}
-                  </div>
-                  <div
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {narrative.research_focus.map((item) => {
+                const widthPct = maxWeight > 0 ? (item.weight / maxWeight) * 100 : 0;
+                const cacheKey = `research_focus-${item.theme}`;
+                const claimKey = claimKeys.get(cacheKey);
+                const expanded = claimKey != null && claimKey === expandedClaimKey;
+                return (
+                  <button
+                    key={item.theme}
+                    type="button"
+                    onClick={() => {
+                      if (claimKey) handleCardToggle(claimKey);
+                    }}
                     style={{
-                      height: 3,
-                      borderRadius: 2,
-                      backgroundColor: "#1E1E22",
-                      overflow: "hidden",
+                      padding: "6px 12px",
+                      backgroundColor: expanded ? "#1F1A2E" : "#15131A",
+                      border: expanded ? "1px solid #9B6DFF" : "1px solid #1E1E22",
+                      borderRadius: 999,
+                      minWidth: 120,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      textAlign: "left",
                     }}
                   >
+                    <div style={{ fontSize: 13, color: "#E8E6DF", marginBottom: 6 }}>
+                      {item.theme}
+                    </div>
                     <div
                       style={{
-                        width: `${widthPct}%`,
-                        height: "100%",
-                        backgroundColor: "#9B6DFF",
+                        height: 3,
                         borderRadius: 2,
+                        backgroundColor: "#1E1E22",
+                        overflow: "hidden",
                       }}
-                    />
-                  </div>
-                </div>
+                    >
+                      <div
+                        style={{
+                          width: `${widthPct}%`,
+                          height: "100%",
+                          backgroundColor: "#9B6DFF",
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {narrative.research_focus.map((item) => {
+              const cacheKey = `research_focus-${item.theme}`;
+              const claimKey = claimKeys.get(cacheKey);
+              if (!claimKey) return null;
+              const expanded = claimKey === expandedClaimKey;
+              if (!expanded) return null;
+              return (
+                <BeliefClaimReactionPanel
+                  key={`panel-${cacheKey}`}
+                  hcpId={hcpId}
+                  claimKey={claimKey}
+                  claimSection="research_focus"
+                  claimTitle={item.theme}
+                  therapeuticAreaSlug={therapeuticAreaSlug}
+                  expanded={expanded}
+                  onClose={() => handleCardToggle(claimKey)}
+                />
               );
             })}
           </div>
         </div>
       ) : null}
 
-      <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 24, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 12, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         <button
           type="button"
           onClick={() => navigate(`/hcp/${hcpId}/publications`)}

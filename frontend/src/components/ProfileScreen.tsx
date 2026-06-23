@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
   getCurrentUser,
@@ -7,10 +8,6 @@ import {
   clearMslProfileCache,
   type MslProfile,
 } from "../lib/authHelpers";
-
-interface ProfileScreenProps {
-  onBack: () => void;
-}
 
 const BackArrow = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -34,7 +31,7 @@ const LinkedInIcon = () => (
 const INDICATIONS: Record<string, string[]> = {
   "Rare Disease": ["All", "Fabry disease", "Huntington's", "Sickle cell", "Gaucher", "PKU", "Pompe"],
   Oncology: ["All", "NSCLC", "CAR-T", "DLBCL", "Melanoma", "CLL", "AML"],
-  Immunology: ["All", "Lupus", "Crohn's", "Myasthenia gravis", "Sjögren's", "CIDP"],
+  Immunology: ["All", "Lupus", "Crohn's", "Myasthenia gravis", "Sjogren's", "CIDP"],
   Hepatology: ["All", "PBC", "NASH", "PSC", "AIH", "HCC"],
 };
 
@@ -135,7 +132,8 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   );
 }
 
-export default function ProfileScreen({ onBack }: ProfileScreenProps) {
+export default function ProfileScreen() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -213,6 +211,7 @@ export default function ProfileScreen({ onBack }: ProfileScreenProps) {
     const taSlug = TA_NAME_TO_SLUG[selectedTA] ?? "oncology";
     const indSlug = INDICATION_NAME_TO_SLUG[selectedIndication] ?? "all";
     const regionSlug = REGION_NAME_TO_SLUG[selectedRegion] ?? "northeast";
+    const territoryLabel = selectedRegion;
 
     const { error: updateErr } = await supabase
       .from("msl_profiles")
@@ -221,6 +220,8 @@ export default function ProfileScreen({ onBack }: ProfileScreenProps) {
         default_indication_slug: indSlug,
         region: regionSlug,
         states_covered: statesCovered,
+        territory_states: statesCovered,
+        territory_label: territoryLabel,
         notify_new_rising_stars: notifications.newStars,
         notify_score_changes: notifications.scoreChanges,
         notify_field_notes: notifications.fieldNotes,
@@ -275,11 +276,11 @@ export default function ProfileScreen({ onBack }: ProfileScreenProps) {
         }}
       >
         <button
-          onClick={onBack}
+          onClick={() => navigate("/me")}
           style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: 4 }}
         >
           <BackArrow />
-          <span style={{ fontSize: 13, color: "#6B6A65" }}>Feed</span>
+          <span style={{ fontSize: 13, color: "#6B6A65" }}>Home</span>
         </button>
         <div style={{ display: "flex", alignItems: "center" }}>
           {error ? (
@@ -293,7 +294,7 @@ export default function ProfileScreen({ onBack }: ProfileScreenProps) {
             disabled={saving}
             style={{ background: "none", border: "none", cursor: saving ? "default" : "pointer", padding: 4, fontSize: 13, color: "#1D9E75", fontWeight: 500 }}
           >
-            {saving ? "Saving..." : saved ? "Saved ✓" : "Save"}
+            {saving ? "Saving..." : saved ? "Saved" : "Save"}
           </button>
         </div>
       </div>
@@ -470,7 +471,7 @@ export default function ProfileScreen({ onBack }: ProfileScreenProps) {
               >
                 {statesCovered.length > 0 ? statesCovered.join(", ") : "No states assigned"}
               </div>
-              <div style={{ fontSize: 11, color: "#3A3A3F", marginTop: 8 }}>Set by your MSL manager. Contact your admin to update territory boundaries.</div>
+              <div style={{ fontSize: 11, color: "#3A3A3F", marginTop: 8 }}>Changes here propagate to Coverage Gaps and territory-scoped surfaces.</div>
             </div>
 
             <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1E1E22" }}>

@@ -137,6 +137,17 @@ export default function UserMenu() {
           >
             Follow-Ups
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/me/insights");
+            }}
+            className="fm-menu-item"
+            style={menuItemStyle}
+          >
+            Field Insights
+          </button>
           <div style={sectionDividerStyle} />
           <div style={sectionLabelStyle}>DISCOVER</div>
           <button
@@ -260,6 +271,19 @@ export default function UserMenu() {
             style={menuItemStyle}
           >
             Methodology
+          </button>
+          <div style={sectionDividerStyle} />
+          <div style={sectionLabelStyle}>ACCOUNT</div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/me/settings");
+            }}
+            className="fm-menu-item"
+            style={menuItemStyle}
+          >
+            Settings
           </button>
           <div style={sectionDividerStyle} />
           <button

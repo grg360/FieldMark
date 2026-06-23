@@ -9,7 +9,6 @@ import { institutionToSlug } from "../lib/institutionUtils";
 import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWebSignals, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown, type WebSignal } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import ResearchThemesSection from "./ResearchThemesSection";
 import ScientificNarrativeSection from "./ScientificNarrativeSection";
 import type { ResearchTheme } from "../types/researchTheme";
 import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
@@ -1565,10 +1564,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         )}
 
         <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea="NSCLC" />
-
-        <div className="fm-detail-section fm-section-research-themes">
-          <ResearchThemesSection themes={researchThemes} loading={themesLoading} />
-        </div>
 
         {!isRisingStarCohort &&
           renderFieldIntelligenceSection(
