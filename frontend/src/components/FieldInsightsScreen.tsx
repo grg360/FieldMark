@@ -580,6 +580,40 @@ function InsightCard({
         </div>
       ) : null}
 
+      {insight.belief_claim_title ? (
+        <button
+          type="button"
+          onClick={() => navigate(`/hcp/${insight.hcp_id}#belief-profile`)}
+          aria-label={`View linked Belief Profile: ${insight.belief_claim_title}`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "rgba(155, 109, 255, 0.08)",
+            border: "1px solid rgba(155, 109, 255, 0.30)",
+            color: "#B89BFF",
+            padding: "6px 10px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            marginBottom: 12,
+            transition: "background-color 120ms ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.14)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.08)";
+          }}
+        >
+          <span style={{ color: "#9B9892", fontWeight: 400 }}>Linked Belief Profile:</span>
+          <span>{insight.belief_claim_title}</span>
+          <span aria-hidden style={{ color: "#9B9892", marginLeft: 2 }}>{String.fromCharCode(0x2192)}</span>
+        </button>
+      ) : null}
+
       <div
         style={{
           display: "flex",

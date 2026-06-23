@@ -678,6 +678,25 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
   const [webSignalsLoading, setWebSignalsLoading] = useState(false);
 
   useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash) return;
+    const targetId = hash.slice(1);
+    let attemptsRemaining = 10;
+    const attemptScroll = () => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      attemptsRemaining -= 1;
+      if (attemptsRemaining > 0) {
+        window.setTimeout(attemptScroll, 150);
+      }
+    };
+    attemptScroll();
+  }, [hcp.id]);
+
+  useEffect(() => {
     const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
     if (!hcpId) {
       setNarrativeLoading(false);
@@ -1563,7 +1582,9 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           </div>
         )}
 
-        <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea="NSCLC" />
+        <div id="belief-profile" style={{ scrollMarginTop: 80 }}>
+          <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea="NSCLC" />
+        </div>
 
         {!isRisingStarCohort &&
           renderFieldIntelligenceSection(

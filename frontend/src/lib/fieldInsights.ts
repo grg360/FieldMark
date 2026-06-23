@@ -15,6 +15,8 @@ export interface FieldInsight {
   insight_category: InsightCategory | null;
   author_user_id: string;
   author_initials: string;
+  belief_claim_key: string | null;
+  belief_claim_title: string | null;
 }
 
 type RawNoteRow = {
@@ -26,6 +28,8 @@ type RawNoteRow = {
   occurred_at: string;
   insight_strength: string | null;
   insight_category: string | null;
+  belief_claim_key: string | null;
+  belief_claim_title: string | null;
   user_id: string;
   msl_hcp_relationships: {
     hcp_id: string;
@@ -74,6 +78,8 @@ export async function getFieldInsightsForCurrentUser(): Promise<FieldInsight[]> 
         occurred_at,
         insight_strength,
         insight_category,
+        belief_claim_key,
+        belief_claim_title,
         user_id,
         msl_hcp_relationships (
           hcp_id,
@@ -106,6 +112,8 @@ export async function getFieldInsightsForCurrentUser(): Promise<FieldInsight[]> 
           hcp_last_name: (hcp.last_name ?? "").trim(),
           body: row.body,
           why_it_matters: row.why_it_matters,
+          belief_claim_key: row.belief_claim_key,
+          belief_claim_title: row.belief_claim_title,
           interaction_type: row.interaction_type,
           visibility: row.visibility,
           occurred_at: row.occurred_at,
