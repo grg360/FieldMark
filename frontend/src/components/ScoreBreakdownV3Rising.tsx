@@ -1,6 +1,7 @@
 import React from "react";
 import type { RisingStarScoreBreakdown } from "../lib/api";
 import { RIGHT_RAIL_HEADER_STYLE } from "./rightRailStyles";
+import ScoreKpiTile from "./ScoreKpiTile";
 
 interface ScoreBreakdownV3RisingProps {
   data: RisingStarScoreBreakdown | null;
@@ -42,73 +43,6 @@ function showArchetypeBadge(archetype: string): boolean {
     archetype === "Balanced Rising Star" ||
     archetype === "Scientific Accelerator" ||
     archetype === "Network Accelerator"
-  );
-}
-
-function KpiTile({
-  label,
-  value,
-  barColor,
-}: {
-  label: string;
-  value: number;
-  barColor: string;
-}) {
-  const pct = Math.min(100, Math.max(0, Number(value) || 0));
-  return (
-    <div
-      style={{
-        backgroundColor: "#0F0F0F",
-        border: "1px solid #2A2A2A",
-        borderRadius: 4,
-        padding: 12,
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        minHeight: 88,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 10,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 24,
-          color: "#E8E6DF",
-          fontWeight: 600,
-          fontFeatureSettings: '"tnum"',
-          lineHeight: 1,
-        }}
-      >
-        {Math.round(pct)}
-      </div>
-      <div
-        style={{
-          height: 4,
-          backgroundColor: "#1A1A1A",
-          borderRadius: 2,
-          overflow: "hidden",
-          marginTop: "auto",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${pct}%`,
-            backgroundColor: barColor,
-            borderRadius: 2,
-          }}
-        />
-      </div>
-    </div>
   );
 }
 
@@ -231,22 +165,22 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
           marginBottom: 14,
         }}
       >
-        <KpiTile
+        <ScoreKpiTile
           label="Scientific Momentum"
           value={data.scientific_momentum_percentile}
           barColor={SIGNAL_SCIENTIFIC}
         />
-        <KpiTile
+        <ScoreKpiTile
           label="Network Momentum"
           value={data.network_momentum_percentile}
           barColor={SIGNAL_NETWORK}
         />
-        <KpiTile
+        <ScoreKpiTile
           label="Scientific Visibility"
           value={data.scientific_visibility_percentile}
           barColor={SIGNAL_SCIENTIFIC}
         />
-        <KpiTile
+        <ScoreKpiTile
           label="Network Visibility"
           value={data.network_visibility_percentile}
           barColor={SIGNAL_NETWORK}
