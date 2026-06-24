@@ -1,5 +1,6 @@
 import React from "react";
 import { getTopCompaniesForHcp, type TopCompanyEntry, type CompanyStatus } from "../lib/api";
+import { RIGHT_RAIL_HEADER_STYLE, RIGHT_RAIL_SECTION_STYLE } from "./rightRailStyles";
 
 interface TopPharmaCompaniesProps {
   hcpId: string;
@@ -91,16 +92,8 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
 
   if (loading) {
     return (
-      <div style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}>
-        <div
-          style={{
-            fontSize: 15,
-            color: "#E8E6DF",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 12,
-          }}
-        >
+      <div style={RIGHT_RAIL_SECTION_STYLE}>
+        <div style={RIGHT_RAIL_HEADER_STYLE}>
           Top Pharma Companies
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -127,19 +120,8 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
   const maxAmount = entries[0]?.total_amount_usd ?? 1;
 
   return (
-    <div
-      ref={containerRef}
-      style={{ padding: "0 0 16px", borderBottom: "1px solid #1E1E22", marginBottom: 16 }}
-    >
-      <div
-        style={{
-          fontSize: 15,
-          color: "#E8E6DF",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          marginBottom: 12,
-        }}
-      >
+    <div ref={containerRef} style={RIGHT_RAIL_SECTION_STYLE}>
+      <div style={RIGHT_RAIL_HEADER_STYLE}>
         Top Pharma Companies
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

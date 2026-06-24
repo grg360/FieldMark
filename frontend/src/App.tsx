@@ -53,6 +53,7 @@ import WatchlistsPage from "./components/WatchlistsPage/WatchlistsPage";
 import FollowUpsPage from "./components/FollowUpsPage/FollowUpsPage";
 import PublicationsListPage from "./components/PublicationsListPage/PublicationsListPage";
 import HcpPublicationsPage from "./components/PublicationsListPage/HcpPublicationsPage";
+import HcpPairPublicationsPage from "./components/PublicationsListPage/HcpPairPublicationsPage";
 import HcpPositionsPage from "./components/HcpPositionsPage";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
@@ -1227,6 +1228,7 @@ export default function App() {
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />
           <Route path="/institution/:slug/publications" element={<PublicationsListPage />} />
           <Route path="/hcp/:id/publications" element={<HcpPublicationsPage />} />
+          <Route path="/hcp/:id/publications-with/:partnerId" element={<HcpPairPublicationsPage />} />
           <Route path="/hcp/:id/positions" element={<HcpPositionsPage />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
           <Route path="/hcp/:hcpId/brief" element={<BriefPage />} />

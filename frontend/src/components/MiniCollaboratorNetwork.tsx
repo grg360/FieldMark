@@ -5,10 +5,12 @@ import type { TopCollaborator } from "../lib/api";
 
 interface MiniCollaboratorNetworkProps {
   hcpName: string;
+  hcpId?: string;
   collaborators: TopCollaborator[];
 }
 
 export default function MiniCollaboratorNetwork({
+  hcpId,
   collaborators,
 }: MiniCollaboratorNetworkProps) {
   const navigate = useNavigate();
@@ -99,10 +101,19 @@ export default function MiniCollaboratorNetwork({
           <div
             style={{
               fontSize: 11,
-              color: "#9B9892",
+              color: hcpId ? "#9B6DFF" : "#9B9892",
               flexShrink: 0,
               marginLeft: 8,
               fontFeatureSettings: '"tnum"',
+              cursor: hcpId ? "pointer" : "default",
+              textDecoration: hcpId ? "underline" : "none",
+              textUnderlineOffset: 2,
+              textDecorationColor: "#9B6DFF55",
+            }}
+            onClick={(e) => {
+              if (!hcpId) return;
+              e.stopPropagation();
+              navigate(`/hcp/${hcpId}/publications-with/${c.hcp_id}`);
             }}
           >
             {c.shared_publications} co-authored papers

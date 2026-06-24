@@ -33,6 +33,15 @@ Verified working tonight after settle-delay fix, but the 800ms wait may feel slo
 ### Larry's tracking_status backfill
 The seed script creates relationships with status `targeted`. Once Larry actually clicks Track in the UI, the status changes via platform code. Pre-seeded relationships have status semantics that may differ from naturally-created relationships. Worth confirming demo viewers see expected status badges.
 
+### TOP COLLABORATORS section missing on HCP detail page
+Heymach detail page does not render the TOP COLLABORATORS section. Network tab confirms `hcp_top_collaborators_v2` returns 200 OK with data (5 rows for Heymach), so it's not a data/RLS issue. Likely a conditional render bug in MiniCollaboratorNetwork or DetailScreen's right rail. Worth investigating before demo - this was meant to be a visible value-add on Established HCP profiles.
+
+### TOP PHARMA COMPANIES card padding inconsistent
+The collapsed company row and the expanded detail panel below it have different left/right padding, making the visual hierarchy feel broken. Pre-existing UI bug. Affects all Established HCP detail pages.
+
+### Cohort feed filter: Northeast territory keeps re-applying after clearing
+On the Established (and likely other cohort) feeds, clearing the Northeast territory filter doesn't stick. After refresh, the filter re-applies automatically. Filter state is probably being re-derived from msl_profiles on each load rather than respecting the user's explicit clear action. Worth adding persistence to the cleared state, possibly via localStorage or session-level state.
+
 ---
 
 ## Medium priority (post-demo polish)

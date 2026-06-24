@@ -1697,6 +1697,23 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             <DrugConstellation hcpId={String(hcp.hcp_id ?? hcp.id ?? "")} />
           </div>
 
+          {isEstablishedCohort &&
+            scoreBreakdown?.top_collaborators &&
+            scoreBreakdown.top_collaborators.length > 0 && (
+              <div
+                className="fm-detail-section fm-section-top-collaborators"
+                style={RIGHT_RAIL_SECTION_STYLE}
+              >
+                <div style={RIGHT_RAIL_HEADER_STYLE}>
+                  Top Collaborators
+                </div>
+                <MiniCollaboratorNetwork
+                  hcpName={hcp.name ?? ""}
+                  hcpId={String(hcp.hcp_id ?? hcp.id ?? "")}
+                  collaborators={scoreBreakdown.top_collaborators}
+                />
+              </div>
+            )}
           {isRisingStarCohort &&
             risingStarBreakdown?.top_collaborators &&
             risingStarBreakdown.top_collaborators.length > 0 && (
@@ -1709,6 +1726,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 </div>
                 <MiniCollaboratorNetwork
                   hcpName={hcp.name ?? ""}
+                  hcpId={String(hcp.hcp_id ?? hcp.id ?? "")}
                   collaborators={risingStarBreakdown.top_collaborators}
                 />
                 {risingStarBreakdown?.network_momentum_percentile != null &&
@@ -1856,6 +1874,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
               {risingStarBreakdown.external_collaborators.length > 0 ? (
                 <MiniCollaboratorNetwork
                   hcpName={hcp.name ?? ""}
+                  hcpId={String(hcp.hcp_id ?? hcp.id ?? "")}
                   collaborators={risingStarBreakdown.external_collaborators}
                 />
               ) : (
