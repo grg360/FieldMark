@@ -681,19 +681,33 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     const hash = window.location.hash;
     if (!hash) return;
     const targetId = hash.slice(1);
-    let attemptsRemaining = 10;
-    const attemptScroll = () => {
+    let elementFoundAt: number | null = null;
+    let attemptsRemaining = 30;
+
+    const waitForSettle = () => {
       const el = document.getElementById(targetId);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (!el) {
+        attemptsRemaining -= 1;
+        if (attemptsRemaining > 0) {
+          window.setTimeout(waitForSettle, 100);
+        }
         return;
       }
-      attemptsRemaining -= 1;
-      if (attemptsRemaining > 0) {
-        window.setTimeout(attemptScroll, 150);
+      if (elementFoundAt === null) {
+        elementFoundAt = Date.now();
       }
+      const elapsedSinceFound = Date.now() - elementFoundAt;
+      if (elapsedSinceFound < 800) {
+        attemptsRemaining -= 1;
+        if (attemptsRemaining > 0) {
+          window.setTimeout(waitForSettle, 100);
+        }
+        return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     };
-    attemptScroll();
+
+    waitForSettle();
   }, [hcp.id]);
 
   useEffect(() => {
