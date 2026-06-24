@@ -601,7 +601,9 @@ async function getUserTerritoryContext(userId: string): Promise<{
 
   const states = Array.isArray(data.territory_states) ? data.territory_states : [];
   const taLabels: string[] = Array.isArray(data.therapeutic_areas) ? data.therapeutic_areas : [];
-  const taUuids = taLabels.map((label) => TA_SLUG_TO_UUID[label]).filter((uuid): uuid is string => Boolean(uuid));
+  const taUuids = taLabels
+    .map((label) => TA_SLUG_TO_UUID[label.toUpperCase()])
+    .filter((uuid): uuid is string => Boolean(uuid));
 
   return {
     states,

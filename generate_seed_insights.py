@@ -57,8 +57,8 @@ USER_HCP_ROSTERS: dict[str, list[str]] = {
         "b7a02d2d-c149-4a52-8a49-f915232bb711",  # Hussein (Comm, FL)
         "14309c59-5c74-4374-990d-6d42c9042b3d",  # Stephen Divers (Comm, AR)
     ],
-    # Larry (placeholder; populated once account exists)
-    "PLACEHOLDER_LARRY_UUID": [
+    # Larry Liberti
+    "49e84a2b-5f4e-45f1-8e85-92e5ee7f28ee": [
         "2302d82f-c44a-498e-b0ab-6ca39a3f8964",  # Heymach
         "659e0892-0795-4976-9938-8e43e4ea473b",  # Singh
         "b7a02d2d-c149-4a52-8a49-f915232bb711",  # Hussein
@@ -394,12 +394,14 @@ def insert_insight(
 
     # Resolve claim linkage
     claim_key = None
+    claim_title = None
     linked_title = insight.get("linked_claim_title")
     if linked_title and candidate_claims:
         for c in candidate_claims:
             if c["title"] and c["title"].strip().lower() == linked_title.strip().lower():
                 if c["position_ids"]:
                     claim_key = build_advocacy_claim_key(hcp_id, c["position_ids"])
+                    claim_title = c["title"].strip()
                 break
 
     occurred = random_occurred_at()
@@ -411,14 +413,14 @@ def insert_insight(
                 relationship_id, user_id, body, interaction_type,
                 interaction_type_other_label, insight_strength,
                 insight_category, insight_category_other_label,
-                why_it_matters, belief_claim_key, occurred_at
+                why_it_matters, belief_claim_key, belief_claim_title, occurred_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
             RETURNING id
             """,
             (relationship_id, user_id, body, itype, itype_other,
-             strength, category, cat_other, why, claim_key, occurred),
+             strength, category, cat_other, why, claim_key, claim_title, occurred),
         )
         row = cur.fetchone()
         return row["id"] if row else None
