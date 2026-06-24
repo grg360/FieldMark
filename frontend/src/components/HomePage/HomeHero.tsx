@@ -73,7 +73,7 @@ export default function HomeHero({ firstName, summary, territory }: Props) {
         <button
           type="button"
           className="fm-pill-button"
-          onClick={() => navigate("/follow-ups")}
+          onClick={() => navigate("/me/follow-ups")}
           style={pillStyle}
         >
           View Follow-Ups
