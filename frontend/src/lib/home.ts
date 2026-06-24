@@ -1181,8 +1181,7 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       const { data, error } = await supabase
         .from("hcps_v2")
         .select("id, first_name, last_name, nppes_practice_state, cohort_classification")
-        .in("id", chunk)
-        .in("nppes_practice_state", territoryStates);
+        .in("id", chunk);
       if (error) {
         console.warn("getTrackedHcpsInTerritory: hcp chunk error", error);
         continue;
