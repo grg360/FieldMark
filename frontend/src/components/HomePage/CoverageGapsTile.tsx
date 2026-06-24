@@ -111,31 +111,8 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
           marginBottom: 12,
         }}
       >
-        Territory Opportunities
+        Your HCP Portfolio
       </div>
-
-      {hasStats ? (() => {
-        const opportunitiesRemaining = stats.total_rising_stars_in_territory - stats.tracked_count;
-        return (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.5 }}>
-              <span style={{ fontWeight: 600 }}>{stats.tracked_count}</span> of{" "}
-              <span style={{ fontWeight: 600 }}>{stats.total_rising_stars_in_territory}</span> Rising Stars tracked
-            </div>
-            <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, marginTop: 2 }}>
-              {opportunitiesRemaining} {opportunitiesRemaining === 1 ? "opportunity" : "opportunities"} remaining
-            </div>
-            <div style={{ fontSize: 11, color: "#9B6DFF", fontWeight: 600, marginTop: 6 }}>
-              Coverage: {stats.coverage_percentage}%
-            </div>
-            {stats.territory_label ? (
-              <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 4 }}>
-                {stats.territory_label}
-              </div>
-            ) : null}
-          </div>
-        );
-      })() : null}
 
       {gaps.length === 0 ? (
         <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5 }}>
@@ -205,6 +182,36 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
             </div>
           ) : null}
 
+          {hasStats ? (() => {
+            const opportunitiesRemaining = stats.total_rising_stars_in_territory - stats.tracked_count;
+            return (
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#6B6A65",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    fontWeight: 600,
+                    marginBottom: 8,
+                  }}
+                >
+                  Territory View
+                </div>
+                <div style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 600 }}>{stats.tracked_count}</span> of{" "}
+                  <span style={{ fontWeight: 600 }}>{stats.total_rising_stars_in_territory}</span> Rising Stars tracked
+                </div>
+                <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, marginTop: 2 }}>
+                  {opportunitiesRemaining} {opportunitiesRemaining === 1 ? "opportunity" : "opportunities"} remaining
+                </div>
+                <div style={{ fontSize: 11, color: "#9B6DFF", fontWeight: 600, marginTop: 6 }}>
+                  Coverage: {stats.coverage_percentage}%
+                </div>
+              </div>
+            );
+          })() : null}
+
           <div
             style={{
               fontSize: 10,
@@ -215,7 +222,9 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
               marginBottom: 8,
             }}
           >
-            Not yet tracking:
+            {stats?.territory_label
+              ? `Untracked HCPs in the ${stats.territory_label}:`
+              : "Untracked HCPs in your territory:"}
           </div>
 
           <div>
