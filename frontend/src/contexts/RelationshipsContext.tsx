@@ -195,8 +195,8 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
   }, [loadUserData, resetState]);
 
   const isSaved = useCallback(
-    (hcpId: string) => savedHcpIds.has(hcpId),
-    [savedHcpIds],
+    (hcpId: string) => relationshipMap.has(hcpId),
+    [relationshipMap],
   );
 
   const getInsightCount = useCallback(
