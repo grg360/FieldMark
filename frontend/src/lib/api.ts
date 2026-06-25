@@ -610,6 +610,8 @@ export interface TopCollaborator {
 
 export interface EstablishedScoreBreakdown {
   cohort_score: number;
+  us_rank: number | null;
+  global_rank: number | null;
   scientific: ScientificInfluenceData | null;
   network: NetworkInfluenceData | null;
   industry: IndustryEngagementData | null;
@@ -632,6 +634,16 @@ export interface RisingStarScoreBreakdown {
   external_collaborators: TopCollaborator[];
   early_collaborator_count?: number | null;
   recent_collaborator_count?: number | null;
+}
+
+export interface CommunityScoreBreakdown {
+  hcp_id: string;
+  composite_score: number;
+  rank: number | null;
+  patient_volume_3yr: number | null;
+  lifetime_payments: number | null;
+  distinct_companies: number | null;
+  distinct_drugs: number | null;
 }
 
 export interface WebSignal {
@@ -1917,6 +1929,7 @@ export async function getEstablishedScoreBreakdown(
 
   const [
     ranksV3,
+    globalRankRow,
     scientific,
     network,
     pharma,
@@ -1924,11 +1937,18 @@ export async function getEstablishedScoreBreakdown(
   ] = await Promise.all([
     supabase
       .from("hcp_established_ranks_v3")
-      .select("cohort_score")
+      .select("cohort_score, rank")
       .eq("hcp_id", hcpId)
       .eq("therapeutic_area_id", taId)
       .eq("scope_type", "region")
       .eq("scope_value", "US")
+      .maybeSingle(),
+    supabase
+      .from("hcp_established_ranks_v3")
+      .select("rank")
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", "global")
       .maybeSingle(),
     supabase
       .from("hcp_publication_leadership_v2")
@@ -2023,6 +2043,8 @@ export async function getEstablishedScoreBreakdown(
 
   const result: EstablishedScoreBreakdown = {
     cohort_score: ranksV3.data?.cohort_score ? Number(ranksV3.data.cohort_score) : 0,
+    us_rank: ranksV3.data?.rank != null ? Number(ranksV3.data.rank) : null,
+    global_rank: globalRankRow.data?.rank != null ? Number(globalRankRow.data.rank) : null,
     scientific: scientific.data
       ? {
           percentile: Number(scientific.data.percentile_rank),
@@ -2055,6 +2077,62 @@ export async function getEstablishedScoreBreakdown(
 
   console.log("[getEstablishedScoreBreakdown] returning:", result);
   return result;
+}
+
+export async function getCommunityScoreBreakdown(
+  hcpId: string,
+  taSlug: string,
+): Promise<CommunityScoreBreakdown | null> {
+  if (!hcpId || !taSlug) return null;
+
+  const { data: taRow } = await supabase
+    .from("therapeutic_areas")
+    .select("id")
+    .eq("slug", taSlug)
+    .single();
+
+  if (!taRow?.id) return null;
+  const taId = taRow.id;
+
+  const [ranksRow, opRow, medRow, drugCountResp] = await Promise.all([
+    supabase
+      .from("hcp_community_ranks_v2")
+      .select("composite_score, rank")
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .eq("scope_type", "global")
+      .maybeSingle(),
+    supabase
+      .from("hcp_open_payments_summary_v2")
+      .select("total_payments_lifetime, distinct_companies_lifetime")
+      .eq("hcp_id", hcpId)
+      .maybeSingle(),
+    supabase
+      .from("hcp_medicare_summary_v2")
+      .select("total_beneficiaries_3yr")
+      .eq("hcp_id", hcpId)
+      .maybeSingle(),
+    supabase
+      .from("hcp_open_payments_by_drug_v2")
+      .select("drug_name", { count: "exact", head: true })
+      .eq("hcp_id", hcpId)
+      .not("drug_name", "is", null),
+  ]);
+
+  if (!ranksRow.data) return null;
+
+  return {
+    hcp_id: hcpId,
+    composite_score: Number(ranksRow.data.composite_score ?? 0),
+    rank: ranksRow.data.rank != null ? Number(ranksRow.data.rank) : null,
+    patient_volume_3yr: medRow.data?.total_beneficiaries_3yr ?? null,
+    lifetime_payments:
+      opRow.data?.total_payments_lifetime != null
+        ? Number(opRow.data.total_payments_lifetime)
+        : null,
+    distinct_companies: opRow.data?.distinct_companies_lifetime ?? null,
+    distinct_drugs: drugCountResp.count ?? null,
+  };
 }
 
 export interface HCPSearchResult {

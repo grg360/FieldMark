@@ -6,7 +6,7 @@ import { useRelationships } from "../contexts/RelationshipsContext";
 import { getCurrentUser } from "../lib/authHelpers";
 import AddToWatchlistPopover from "./AddToWatchlistPopover";
 import { institutionToSlug } from "../lib/institutionUtils";
-import { fetchHcpThemes, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWebSignals, getPublicationTimeline, getRisingStarScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown, type WebSignal } from "../lib/api";
+import { fetchHcpThemes, getCommunityScoreBreakdown, getEstablishedScoreBreakdown, getHCPNarrative, getHcpWebSignals, getPublicationTimeline, getRisingStarScoreBreakdown, type CommunityScoreBreakdown, type EstablishedScoreBreakdown, type PublicationTimelinePoint, type RisingStarScoreBreakdown, type WebSignal } from "../lib/api";
 import { taLabelToApiSlug } from "../lib/routeSlugs";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import ScientificNarrativeSection from "./ScientificNarrativeSection";
@@ -21,6 +21,7 @@ import TopPharmaCompanies from "./TopPharmaCompanies";
 import DrugConstellation from "./DrugConstellation";
 import ScoreBreakdownV3 from "./ScoreBreakdownV3";
 import ScoreBreakdownV3Rising from "./ScoreBreakdownV3Rising";
+import ScoreBreakdownV3Community from "./ScoreBreakdownV3Community";
 import MiniCollaboratorNetwork from "./MiniCollaboratorNetwork";
 import GlobalFooter from "./GlobalFooter";
 import ContactAccessCard from "./ContactAccessCard";
@@ -674,6 +675,8 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
   const [scoreBreakdownLoading, setScoreBreakdownLoading] = useState(false);
   const [risingStarBreakdown, setRisingStarBreakdown] = useState<RisingStarScoreBreakdown | null>(null);
   const [risingStarBreakdownLoading, setRisingStarBreakdownLoading] = useState(false);
+  const [communityBreakdown, setCommunityBreakdown] = useState<CommunityScoreBreakdown | null>(null);
+  const [communityBreakdownLoading, setCommunityBreakdownLoading] = useState(false);
   const [webSignals, setWebSignals] = useState<WebSignal[]>([]);
   const [webSignalsLoading, setWebSignalsLoading] = useState(false);
 
@@ -808,6 +811,29 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         if (!cancelled) setRisingStarBreakdownLoading(false);
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [hcp.hcp_id, hcp.id, hcp.cohort_classification, taSlug]);
+
+  useEffect(() => {
+    const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
+    if (!hcpId || !taSlug) return;
+    if (hcp.cohort_classification !== "community" && hcp.cohort_classification !== "workhorse") return;
+    let cancelled = false;
+    setCommunityBreakdownLoading(true);
+    getCommunityScoreBreakdown(hcpId, taSlug)
+      .then((data) => {
+        if (cancelled) return;
+        setCommunityBreakdown(data);
+      })
+      .catch((err) => {
+        console.error("[DetailScreen] getCommunityScoreBreakdown failed:", err);
+        if (!cancelled) setCommunityBreakdown(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCommunityBreakdownLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -1401,49 +1427,12 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             borderBottom: "1px solid #1E1E22",
           }}
         >
-          {!isEstablishedCohort && !isRisingStarCohort && (
-            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-              Score breakdown
-            </div>
-          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {isCommunityCohort ? (
-              <>
-                <ScoreRow
-                  label="Pharma Engagement"
-                  value={formatEngagementDollar(hcp.openPaymentsLifetime ?? null)}
-                  percent={cappedPercent(hcp.openPaymentsLifetime, COMMUNITY_MAX_ENGAGEMENT)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-                <ScoreRow
-                  label="Pharma Companies"
-                  value={formatIntDisplay(hcp.distinctCompanies ?? null)}
-                  percent={cappedPercent(hcp.distinctCompanies, COMMUNITY_MAX_COMPANIES)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-                {hcp.medicareVolume != null && (
-                  <ScoreRow
-                    label="Patient Volume"
-                    value={formatIntDisplay(hcp.medicareVolume)}
-                    percent={cappedPercent(hcp.medicareVolume, COMMUNITY_MAX_PATIENTS)}
-                    barColor={cohortBarColor}
-                    activeTooltip={activeTooltip}
-                    onTooltipChange={setActiveTooltip}
-                  />
-                )}
-                <ScoreRow
-                  label="Years in Practice"
-                  value={formatIntDisplay(hcp.careerYears ?? null)}
-                  percent={cappedPercent(hcp.careerYears, COMMUNITY_MAX_YEARS)}
-                  barColor={cohortBarColor}
-                  activeTooltip={activeTooltip}
-                  onTooltipChange={setActiveTooltip}
-                />
-              </>
+              <ScoreBreakdownV3Community
+                data={communityBreakdown}
+                loading={communityBreakdownLoading}
+              />
             ) : isRisingStarCohort ? (
               <ScoreBreakdownV3Rising
                 data={risingStarBreakdown}
@@ -1600,7 +1589,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea="NSCLC" />
         </div>
 
-        {!isRisingStarCohort &&
+        {false &&
           renderFieldIntelligenceSection(
             {
               padding: "16px 16px 12px",
@@ -1894,8 +1883,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             </div>
           )}
 
-          {isRisingStarCohort &&
-            renderFieldIntelligenceSection(RIGHT_RAIL_SECTION_STYLE, RIGHT_RAIL_HEADER_STYLE)}
+          {renderFieldIntelligenceSection(RIGHT_RAIL_SECTION_STYLE, RIGHT_RAIL_HEADER_STYLE)}
 
         {/* Field notes */}
         <div className="fm-detail-section fm-section-field-notes" style={RIGHT_RAIL_SECTION_STYLE}>

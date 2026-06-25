@@ -122,26 +122,41 @@ export default function ScoreBreakdownV3({ data, loading }: ScoreBreakdownV3Prop
     </div>
   );
 
+  const rankSubtext =
+    data.us_rank != null && data.global_rank != null
+      ? `Rank ${data.us_rank} US \u00B7 Rank ${data.global_rank} Global`
+      : data.us_rank != null
+        ? `Rank ${data.us_rank} US`
+        : data.global_rank != null
+          ? `Rank ${data.global_rank} Global`
+          : "";
+
   return (
     <div style={{ padding: 0, borderBottom: "1px solid #1E1E22" }}>
       <div style={{ marginBottom: 16 }}>
         <InfoTooltip content="Composite ranking of Scientific Influence (60%) and Network Influence (40%), normalized within US Established cohort. Pharma Engagement is informational and does not drive ranking.">
-          <div style={sectionHeaderStyle}>Cohort Score</div>
+          <div style={sectionHeaderStyle}>Established Score</div>
         </InfoTooltip>
-        <div
-          style={{
-            fontSize: 32,
-            color: "#E8A020",
-            fontWeight: 700,
-            fontFeatureSettings: '"tnum"',
-          }}
-        >
-          {cohortScoreDisplay}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+          <span
+            style={{
+              fontSize: 36,
+              color: "#E8A020",
+              fontWeight: 700,
+              fontFeatureSettings: '"tnum"',
+              lineHeight: 1,
+            }}
+          >
+            {cohortScoreDisplay}
+          </span>
+          <span style={{ fontSize: 16, color: "#6B6A65", fontWeight: 500 }}>/ 100</span>
         </div>
+        {rankSubtext && (
+          <div style={{ fontSize: 11, color: "#9B9892", marginTop: 8 }}>{rankSubtext}</div>
+        )}
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={sectionHeaderStyle}>Why They Matter</div>
 
         <div style={scoreRowStyle}>
           <InfoTooltip content="Publication leadership percentile. Based on senior-author papers, citation impact, guideline authorship, and recent activity.">
