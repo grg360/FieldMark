@@ -2,7 +2,35 @@
 
 Running list of bugs, polish items, and product issues surfaced during Larry/John demo prep. Append as discovered.
 
-Last updated: 2026-06-23
+Last updated: 2026-06-25
+
+---
+
+## Resolved
+
+### TOP COLLABORATORS section missing on HCP detail page (2026-06-24)
+Was gated to `isRisingStarCohort` only despite the data existing for Established. Added parallel Established branch in DetailScreen.tsx. Renders correctly across all cohorts.
+
+### TOP PHARMA COMPANIES card padding inconsistent (2026-06-24)
+Was using bespoke padding wrapper instead of shared `RIGHT_RAIL_SECTION_STYLE`. Aligned to shared style; also resolved the gap above DRUG ENGAGEMENT.
+
+### View Follow-Ups button route (2026-06-24)
+HomeHero button navigated to `/follow-ups` (unregistered) instead of `/me/follow-ups`. One-line fix.
+
+### Publication NULL titles - 1543 rows (2026-06-24)
+PubMed efetch backfill via `backfill_publication_titles.py`. All 1,543 NULL titles now populated. Heymach's Wistuba-coauthored Cancer Discovery paper among the fixes.
+
+### Bookmark icon not filling for seeded accounts (2026-06-25)
+Bookmark icon read from `savedHcpIds` (watchlist items) while portfolio chips read from `relationshipMap`. Seeded accounts had no watchlist items so bookmark stayed empty despite the HCP being tracked. Changed `isSaved` to read from `relationshipMap`. Bookmark now reflects portfolio state correctly.
+
+### Cohort score visual continuity across Established/Rising Star/Community (2026-06-25)
+Three cohorts had three different score header treatments and three different section names ("Cohort Score" / "Rising Star Score" / "Score Breakdown"). Now unified: each cohort renders the same header structure (cohort-prefixed score heading, "N / 100" framing, rank subtext), with cohort-appropriate content below. Extracted ScoreKpiTile shared primitive. Built ScoreBreakdownV3Community.tsx.
+
+### Field Intelligence section column inconsistency (2026-06-25)
+Established + Community rendered FIELD INTELLIGENCE in left column while Rising Star rendered it in right column. Now consolidated to right column under FIELD NOTES across all cohorts.
+
+### Cohort feed filter: Northeast territory re-applies (2026-06-24)
+Could not reproduce after 5-7 minutes of attempts. Likely heisenbug tied to specific timing or stale state. Watch for recurrence with detailed repro steps.
 
 ---
 
@@ -32,15 +60,6 @@ Verified working tonight after settle-delay fix, but the 800ms wait may feel slo
 
 ### Larry's tracking_status backfill
 The seed script creates relationships with status `targeted`. Once Larry actually clicks Track in the UI, the status changes via platform code. Pre-seeded relationships have status semantics that may differ from naturally-created relationships. Worth confirming demo viewers see expected status badges.
-
-### TOP COLLABORATORS section missing on HCP detail page
-Heymach detail page does not render the TOP COLLABORATORS section. Network tab confirms `hcp_top_collaborators_v2` returns 200 OK with data (5 rows for Heymach), so it's not a data/RLS issue. Likely a conditional render bug in MiniCollaboratorNetwork or DetailScreen's right rail. Worth investigating before demo - this was meant to be a visible value-add on Established HCP profiles.
-
-### TOP PHARMA COMPANIES card padding inconsistent
-The collapsed company row and the expanded detail panel below it have different left/right padding, making the visual hierarchy feel broken. Pre-existing UI bug. Affects all Established HCP detail pages.
-
-### Cohort feed filter: Northeast territory keeps re-applying after clearing
-On the Established (and likely other cohort) feeds, clearing the Northeast territory filter doesn't stick. After refresh, the filter re-applies automatically. Filter state is probably being re-derived from msl_profiles on each load rather than respecting the user's explicit clear action. Worth adding persistence to the cleared state, possibly via localStorage or session-level state.
 
 ---
 
@@ -79,6 +98,38 @@ Renders on Heymach but not other Established HCPs on mobile. Likely taSlug propa
 
 ### Therapeutic_areas case sensitivity (now fixed but worth noting)
 WelcomeWizard wrote `["nsclc"]` (lowercase) while Garrett's profile had `["NSCLC"]` (uppercase). Fixed in home.ts by normalizing to uppercase at lookup. Worth a code-wide audit for similar case-sensitive comparisons against profile data.
+
+---
+
+## Architecture cleanup (post-demo)
+
+### savedHcpIds is now dead state in RelationshipsContext
+After the bookmark fix on 2026-06-25, `isSaved` reads from `relationshipMap` rather than `savedHcpIds`. The `savedHcpIds` Set is still populated on load and updated by `toggleSave`, but no UI reads from it. Memory cost negligible but it's clutter and a footgun for future contributors. Delete in a cleanup pass: remove the state, remove the watchlist-items load on mount, remove the setter calls in `toggleSave`.
+
+### toggleSave semantic mismatch
+Clicking the bookmark icon currently calls `toggleSave`, which adds a watchlist item and (as a side effect) creates a relationship. The relationship creation is what makes the bookmark visually fill after the fix. But the function is still named and shaped around "save to watchlist," not "toggle relationship." Real architectural decision needed: should the bookmark click toggle relationship directly, or is the watchlist add a legitimate paired side effect? Affects naming, the watchlists table's role in the product, and how users mentally model "tracking" vs "saving."
+
+### Dead Field Intelligence branch in DetailScreen.tsx
+The left-column FIELD INTELLIGENCE render is now gated on `false &&` rather than deleted, to keep the surgical edit small. Delete the entire dead block in a cleanup pass.
+
+### Stale Dagogo-Jack UUID in generate_seed_insights.py
+Garrett's hardcoded roster references `51760cb9-3694-4e5c-a7e5-937c477c495f` as Dagogo-Jack (RS), but her actual UUID is `688b09af-ef70-4fef-bcab-fc4614fac3e7` and she is classified community in current data. The 51760... UUID may not exist in `hcps_v2` at all. Re-running seed for Garrett would either no-op or write to a stale entity. Worth resolving when next touching that script.
+
+### DetailScreen re-render storm
+Console showed 50+ instances of the bookmark debug log firing on page load before auth resolved. Probably means the component re-renders on every state change in RelationshipsContext. Real performance issue worth profiling. Not visible to users today but compounds as more state lands in the context.
+
+---
+
+## Community cohort coverage (Phase 2)
+
+### Community narratives only generated for top 200
+The top 200 NSCLC Community HCPs (by rank) have AI-generated "Why This Practitioner" narratives. The other ~4,300 NSCLC Community HCPs with Open Payments data still show "Narrative generating, check back soon" placeholder. Production-grade coverage requires a full background run (~$10-15 estimated based on the $1.12 cost for 200). Schedule as a low-attention background job post-launch validation.
+
+### Community p95 reference values hardcoded in component
+`ScoreBreakdownV3Community.tsx` hardcodes the four p95 reference values (P95_PATIENTS=12421, P95_LIFETIME_PAYMENTS=99871, P95_COMPANIES=52, P95_DRUGS=11) used for bar scaling. Computed once on 2026-06-25 from NSCLC Community NSCLC cohort. Becomes stale as data evolves. Real fix: cache layer or daily re-compute writing to a `cohort_signal_references_v1` table. Frontend reads from cache rather than holding constants.
+
+### Community page layout
+With Community now having a real intelligence layer (narrative + score header + tiles), the existing page sections that are publication-based (Belief Profile, Top Collaborators, Research Themes) render mostly empty for Community HCPs. Sections should be conditionally hidden for Community cohort. Replaced by Community-appropriate sections: a richer DRUG ENGAGEMENT visual, PATIENT VOLUME breakdown, and PRACTICE PROFILE pulling NPPES + Medicare data. ~90-120 min refactor in DetailScreen.tsx.
 
 ---
 

@@ -67,6 +67,24 @@ USER_HCP_ROSTERS: dict[str, list[str]] = {
         "5f36754d-c175-4f9e-94e4-00a1fab76f04",  # Tejas Patil (RS, CO)
         "530f4f8d-1b61-42cc-82ac-7d68ca390669",  # Kurt Tauer (Comm, TN)
     ],
+    # Alex Carter (demo account, National)
+    "e334b3b7-5dbb-4851-9fab-9b6034118763": [
+        "2302d82f-c44a-498e-b0ab-6ca39a3f8964",  # Heymach (Est, TX)
+        "cbb24fad-0ab0-4a3f-aa48-39af1a7ca25a",  # Janne (Est, MA)
+        "71b51a2d-0f56-434f-abf4-f6755c796eaf",  # Ramalingam (Est, GA)
+        "b217c02b-9402-497e-9fba-f8cc69bb382b",  # Spira (Est, VA)
+        "77dae038-df3f-4d00-98f0-66d63917e6a3",  # Wakelee (Est, CA)
+        "659e0892-0795-4976-9938-8e43e4ea473b",  # Singh (RS, PA)
+        "7efaec17-c95c-4cd2-ae25-834170adcdae",  # Schoenfeld (RS, NY)
+        "5f36754d-c175-4f9e-94e4-00a1fab76f04",  # Patil (RS, CO)
+        "6648e326-c5e9-4fe3-a778-29decba1b669",  # Reuben (RS, TX)
+        "b5ee1d52-6181-41a3-a91e-79aa92878327",  # Presley (RS, OH)
+        "b7a02d2d-c149-4a52-8a49-f915232bb711",  # Hussein (Comm, FL)
+        "14309c59-5c74-4374-990d-6d42c9042b3d",  # Divers (Comm, AR)
+        "f44f55c9-d27e-4d75-81e8-29d59eeb5ab6",  # Waples (Comm, AL)
+        "876f42be-8fab-47b7-a191-d91d584462f5",  # Sumrall (Comm, GA)
+        "d50695b9-fa38-4e45-932e-f40a71207a1d",  # Challagalla (Comm, TX)
+    ],
     # John (placeholder; populated once account exists)
     "PLACEHOLDER_JOHN_UUID": [
         "2302d82f-c44a-498e-b0ab-6ca39a3f8964",  # Heymach

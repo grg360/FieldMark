@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
 import { softDeleteNote, type InteractionType, type InsightStrength, type Note } from "../../lib/relationships";
 import { formatOccurredAt, formatRelative } from "./dateFormat";
 import InsightComposer from "./InsightComposer";
@@ -55,6 +56,7 @@ interface Props {
 }
 
 export default function InsightCard({ note, userId, hcpId, firstName, onMutate }: Props) {
+  const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -238,6 +240,47 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate }
         <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
           {note.body}
         </div>
+
+        {note.belief_claim_title ? (
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("belief-profile");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+              } else {
+                navigate(`/hcp/${hcpId}#belief-profile`);
+              }
+            }}
+            aria-label={`View linked Belief Profile: ${note.belief_claim_title}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "rgba(155, 109, 255, 0.08)",
+              border: "1px solid rgba(155, 109, 255, 0.30)",
+              color: "#B89BFF",
+              padding: "6px 10px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              marginTop: 10,
+              transition: "background-color 120ms ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.14)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.08)";
+            }}
+          >
+            <span style={{ color: "#9B9892", fontWeight: 400 }}>Linked Belief Profile:</span>
+            <span>{note.belief_claim_title}</span>
+            <span aria-hidden style={{ color: "#9B9892", marginLeft: 2 }}>{String.fromCharCode(0x2192)}</span>
+          </button>
+        ) : null}
 
         {showFooter ? (
           <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 8 }}>

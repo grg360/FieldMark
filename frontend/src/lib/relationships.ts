@@ -686,6 +686,8 @@ export interface Note {
   insight_category_other_label: string | null;
   why_it_matters: string | null;
   interaction_type_other_label: string | null;
+  belief_claim_key: string | null;
+  belief_claim_title: string | null;
 }
 
 export interface CreateNoteParams {
