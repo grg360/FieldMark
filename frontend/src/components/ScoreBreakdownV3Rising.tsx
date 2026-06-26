@@ -169,21 +169,25 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
           label="Scientific Momentum"
           value={data.scientific_momentum_percentile}
           barColor={SIGNAL_SCIENTIFIC}
+          tooltip="Change in publication output between 2016-2020 and 2021-2025: senior-author paper count, citation volume, and senior-author share."
         />
         <ScoreKpiTile
           label="Network Momentum"
           value={data.network_momentum_percentile}
           barColor={SIGNAL_NETWORK}
+          tooltip="Change in co-authorship network centrality between 2016-2020 and 2021-2025: eigenvector, degree, and betweenness."
         />
         <ScoreKpiTile
           label="Scientific Visibility"
           value={data.scientific_visibility_percentile}
           barColor={SIGNAL_SCIENTIFIC}
+          tooltip="Current publication footprint in the recent 5-year window: total publications and citation rate."
         />
         <ScoreKpiTile
           label="Network Visibility"
           value={data.network_visibility_percentile}
           barColor={SIGNAL_NETWORK}
+          tooltip="Current co-authorship centrality for this therapeutic area in the recent 5-year window."
         />
       </div>
 

@@ -112,24 +112,28 @@ export default function ScoreBreakdownV3Community({
           label="Patient Volume"
           value={formatPatients(data.patient_volume_3yr)}
           barColor={COMMUNITY_ACCENT}
+          tooltip="Total Medicare beneficiaries treated over the past 3 years. Proxy for clinical practice scale."
           barPercent={scaleBar(data.patient_volume_3yr, P95_PATIENTS)}
         />
         <ScoreKpiTile
           label="Pharma Engagement"
           value={formatPayments(data.lifetime_payments)}
           barColor={COMMUNITY_ACCENT}
+          tooltip="Lifetime payments received from pharmaceutical manufacturers per CMS Open Payments. Includes consulting, advisory, speaking, and education-related payments."
           barPercent={scaleBar(data.lifetime_payments, P95_LIFETIME_PAYMENTS)}
         />
         <ScoreKpiTile
           label="Pharma Reach"
           value={formatCount(data.distinct_companies)}
           barColor={COMMUNITY_ACCENT}
+          tooltip="Number of distinct pharmaceutical manufacturers with payment relationships. Higher reach indicates broader engagement across the industry."
           barPercent={scaleBar(data.distinct_companies, P95_COMPANIES)}
         />
         <ScoreKpiTile
           label="Drug Breadth"
           value={formatCount(data.distinct_drugs)}
           barColor={COMMUNITY_ACCENT}
+          tooltip="Number of distinct agents represented in this practitioner's pharma engagement history. Indicates breadth of therapeutic exposure."
           barPercent={scaleBar(data.distinct_drugs, P95_DRUGS)}
         />
       </div>

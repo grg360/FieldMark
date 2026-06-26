@@ -1,4 +1,5 @@
 import React from "react";
+import InfoTooltip from "./InfoTooltip";
 
 interface ScoreKpiTileProps {
   label: string;
@@ -8,6 +9,8 @@ interface ScoreKpiTileProps {
   barColor: string;
   /** Bar fill percentage 0-100. Defaults to the numeric value of `value` if `value` is a number. */
   barPercent?: number;
+  /** Optional tooltip content explaining the metric. Renders an InfoTooltip wrapping the label. */
+  tooltip?: string;
 }
 
 export default function ScoreKpiTile({
@@ -15,6 +18,7 @@ export default function ScoreKpiTile({
   value,
   barColor,
   barPercent,
+  tooltip,
 }: ScoreKpiTileProps) {
   let displayValue: string;
   let inferredBarPercent: number;
@@ -42,17 +46,33 @@ export default function ScoreKpiTile({
         minHeight: 88,
       }}
     >
-      <div
-        style={{
-          fontSize: 10,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-        }}
-      >
-        {label}
-      </div>
+      {tooltip ? (
+        <InfoTooltip content={tooltip} style={{ display: "block", width: "100%" }}>
+          <div
+            style={{
+              fontSize: 10,
+              color: "#6B6A65",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              fontWeight: 500,
+            }}
+          >
+            {label}
+          </div>
+        </InfoTooltip>
+      ) : (
+        <div
+          style={{
+            fontSize: 10,
+            color: "#6B6A65",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            fontWeight: 500,
+          }}
+        >
+          {label}
+        </div>
+      )}
       <div
         style={{
           fontSize: 24,
