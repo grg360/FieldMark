@@ -42,6 +42,9 @@ Could not reproduce after 5-7 minutes of attempts. Likely heisenbug tied to spec
 
 ## High priority (should fix before demo or address in email framing)
 
+### Co-authored paper counts on Network Influence collaborator list not clickable
+On the ESTABLISHED SCORE / Network Influence section, each top collaborator row shows their co-authored paper count (e.g., "97 co-authored papers" for Jianjun Zhang). These counts should link to a filtered publication list showing those specific co-authored papers, matching the pattern we shipped recently for the publication-level click-through. Currently the count is display-only. Same UX pattern as the Heymach publication count link added 2026-06-24. Real fix: wrap the count span in a button or Link, navigate to publications view filtered by `hcp_id IN (heymach, zhang)` or equivalent intersection query. Backend likely supports this already via existing publication queries.
+
 ### Territory Opportunities tile - Rising Star-only framing
 The tile header says "1 of 66 Rising Stars tracked" even though the tracking chip row shows all tracked HCPs across Established, Rising Star, and Community cohorts. Misrepresents the user's actual portfolio. Two problems:
 - Count line is filtered to Rising Stars only, ignoring tracked Established and Community HCPs
