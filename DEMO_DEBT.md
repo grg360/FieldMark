@@ -42,6 +42,9 @@ Could not reproduce after 5-7 minutes of attempts. Likely heisenbug tied to spec
 
 ## High priority (should fix before demo or address in email framing)
 
+### Rising Voices scatter chart dots too small for reliable hover
+The dots on the Rising Voices engagement-per-follower scatter chart are visually small and require precision cursor placement to trigger hover. Demo dry runs failed twice trying to land on a single dot mid-narration. Standard fix: render an invisible larger hit-target circle (2-3x visual radius) over each dot to expand the interaction zone without changing the visual. Pattern is well-documented in d3/recharts. Real demo blocker for any walkthrough that wants to highlight a specific Rising Voice investigator on the chart.
+
 ### Co-authored paper counts on Network Influence collaborator list not clickable
 On the ESTABLISHED SCORE / Network Influence section, each top collaborator row shows their co-authored paper count (e.g., "97 co-authored papers" for Jianjun Zhang). These counts should link to a filtered publication list showing those specific co-authored papers, matching the pattern we shipped recently for the publication-level click-through. Currently the count is display-only. Same UX pattern as the Heymach publication count link added 2026-06-24. Real fix: wrap the count span in a button or Link, navigate to publications view filtered by `hcp_id IN (heymach, zhang)` or equivalent intersection query. Backend likely supports this already via existing publication queries.
 

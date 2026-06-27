@@ -90,6 +90,7 @@ import {
   taSlugToLabel,
 } from "./lib/routeSlugs";
 import type { CohortFeedResult, HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
+import DemoPage from "./pages/DemoPage";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
@@ -1211,6 +1212,11 @@ function FieldIntelligenceFeedRoute() {
 export default function App() {
   return (
     <TrackProvider>
+      <Routes>
+      <Route path="/demo" element={<DemoPage />} />
+      <Route
+        path="*"
+        element={
       <AuthWrapper>
         <RelationshipsProvider>
           <Routes>
@@ -1249,6 +1255,9 @@ export default function App() {
           </Routes>
         </RelationshipsProvider>
       </AuthWrapper>
+        }
+      />
+      </Routes>
     </TrackProvider>
   );
 }
