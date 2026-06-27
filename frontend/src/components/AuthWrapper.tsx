@@ -23,7 +23,7 @@ export default function AuthWrapper({ children }: Props) {
 
       if (!active) return;
 
-      if (location.pathname === "/landing") {
+      if (location.pathname === "/landing" || location.pathname === "/demo") {
         setChecking(false);
         return;
       }
