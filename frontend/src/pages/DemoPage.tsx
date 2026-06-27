@@ -159,7 +159,7 @@ export default function DemoPage() {
         <div>
           <div style={wordmarkStyle}>Bessel Analytics</div>
           <h1 style={headlineStyle}>We see the nebula. Not just the star.</h1>
-          <p style={subheadStyle}>A walkthrough of FieldMark for non-small cell lung cancer.</p>
+          <p style={subheadStyle}>A walkthrough of FieldMark for Non-Small Cell Lung Cancer.</p>
         </div>
 
         <div style={videoFrameStyle}>
@@ -176,12 +176,11 @@ export default function DemoPage() {
         </div>
 
         <p style={paragraphStyle}>
-          FieldMark is a B2B platform for medical science liaisons working in pharmaceutical
-          field medical. This 13-minute walkthrough demonstrates the platform for non-small
-          cell lung cancer - our launch indication. The architecture is therapeutic-area-agnostic,
-          with new indications replicable in seven to ten days. Built solo by Garrett Reeves,
-          with substrate drawn from PubMed, ClinicalTrials.gov, OpenAlex, NPPES, Open Payments,
-          Medicare, Twitter, and Bluesky.
+          FieldMark is an HCP intelligence platform for MSL and Medical Affairs teams. This
+          walkthrough demonstrates the platform for Non-Small Cell Lung Cancer - our launch
+          indication. The architecture is therapeutic-area agnostic with new indications
+          replicable in 7-10 days. The data stack includes PubMed, ClinicalTrials.gov,
+          OpenAlex, NPPES, Open Payments, Medicare, Twitter, and Bluesky.
         </p>
 
         <div style={statsRowStyle}>
