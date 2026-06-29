@@ -13,10 +13,16 @@ const pageStyle: CSSProperties = {
 
 const containerStyle: CSSProperties = {
   width: "100%",
-  maxWidth: 1000,
+  maxWidth: 1280,
   display: "flex",
   flexDirection: "column",
+  alignItems: "center",
   gap: 32,
+};
+
+const textBlockStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: 1000,
 };
 
 const wordmarkStyle: CSSProperties = {
@@ -54,6 +60,7 @@ const videoFrameStyle: CSSProperties = {
   border: "1px solid #2A2A2A",
   boxShadow: "0 20px 60px rgba(0, 0, 0, 0.6), 0 0 80px rgba(232, 160, 32, 0.06)",
   backgroundColor: "#0F0F0F",
+  width: "100%",
 };
 
 const videoAspectStyle: CSSProperties = {
@@ -156,7 +163,7 @@ export default function DemoPage() {
   return (
     <div style={pageStyle}>
       <div style={containerStyle}>
-        <div>
+        <div style={textBlockStyle}>
           <div style={wordmarkStyle}>Bessel Analytics</div>
           <h1 style={headlineStyle}>We see the nebula. Not just the star.</h1>
           <p style={subheadStyle}>A walkthrough of FieldMark for Non-Small Cell Lung Cancer.</p>
@@ -175,15 +182,17 @@ export default function DemoPage() {
           </div>
         </div>
 
-        <p style={paragraphStyle}>
-          FieldMark is an HCP intelligence platform for MSL and Medical Affairs teams. This
-          walkthrough demonstrates the platform for Non-Small Cell Lung Cancer - our launch
-          indication. The architecture is therapeutic-area agnostic with new indications
-          replicable in 7-10 days. The data stack includes PubMed, ClinicalTrials.gov,
-          OpenAlex, NPPES, Open Payments, Medicare, Twitter, and Bluesky.
-        </p>
+        <div style={textBlockStyle}>
+          <p style={paragraphStyle}>
+            FieldMark is an HCP intelligence platform for MSL and Medical Affairs teams. This
+            walkthrough demonstrates the platform for Non-Small Cell Lung Cancer - our launch
+            indication. The architecture is therapeutic-area agnostic with new indications
+            replicable in 7-10 days. The data stack includes PubMed, ClinicalTrials.gov,
+            OpenAlex, NIH RePORTER, NPPES, Open Payments, Medicare, Twitter, and Bluesky.
+          </p>
+        </div>
 
-        <div style={statsRowStyle}>
+        <div style={{ ...textBlockStyle, ...statsRowStyle }}>
           {stats.map((s) => (
             <div key={s.label} style={statStyle}>
               <span style={statValueStyle}>{s.value}</span>
@@ -192,7 +201,7 @@ export default function DemoPage() {
           ))}
         </div>
 
-        <div style={ctaWrapStyle}>
+        <div style={{ ...textBlockStyle, ...ctaWrapStyle }}>
           <a
             href="mailto:fieldmark@besselanalytics.com?subject=FieldMark%20access%20request"
             style={ctaButtonStyle}
