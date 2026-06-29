@@ -84,6 +84,7 @@ const paragraphStyle: CSSProperties = {
   maxWidth: 720,
   margin: "0 auto",
   textAlign: "center",
+  textWrap: "pretty",
 };
 
 const statsRowStyle: CSSProperties = {
