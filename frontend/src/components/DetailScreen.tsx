@@ -1588,21 +1588,6 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         <div id="belief-profile" style={{ scrollMarginTop: 80 }}>
           <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea="NSCLC" />
         </div>
-
-        {false &&
-          renderFieldIntelligenceSection(
-            {
-              padding: "16px 16px 12px",
-              borderBottom: "1px solid #1E1E22",
-            },
-            {
-              fontSize: 15,
-              color: "#E8E6DF",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              marginBottom: 12,
-            },
-          )}
         </div>{/* end fm-detail-left */}
 
         {/* RIGHT COLUMN: Metric pills + Field notes */}

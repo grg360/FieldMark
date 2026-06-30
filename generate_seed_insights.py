@@ -53,7 +53,7 @@ USER_HCP_ROSTERS: dict[str, list[str]] = {
         "71b51a2d-0f56-434f-abf4-f6755c796eaf",  # Ramalingam (Est)
         "659e0892-0795-4976-9938-8e43e4ea473b",  # Singh (RS)
         "7efaec17-c95c-4cd2-ae25-834170adcdae",  # Schoenfeld (RS)
-        "51760cb9-3694-4e5c-a7e5-937c477c495f",  # Dagogo-Jack (RS)
+        "688b09af-ef70-4fef-bcab-fc4614fac3e7",  # Dagogo-Jack (Community)
         "b7a02d2d-c149-4a52-8a49-f915232bb711",  # Hussein (Comm, FL)
         "14309c59-5c74-4374-990d-6d42c9042b3d",  # Stephen Divers (Comm, AR)
     ],

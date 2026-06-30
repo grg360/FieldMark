@@ -45,6 +45,9 @@ Logged during demo dry run as missing functionality. Verified after that MiniCol
 
 ## High priority (should fix before demo or address in email framing)
 
+### Duplicate Dagogo-Jack records due to hyphen character mismatch
+Two records exist in hcps_v2 for Ibiayi Dagogo-Jack: 688b09af-ef70-4fef-bcab-fc4614fac3e7 (ASCII hyphen U+002D, community classification, current) and 51760cb9-3694-4e5c-a7e5-937c477c495f (Unicode hyphen U+2010, rising_star classification, stale). Same person, different hyphen normalization. The import or merge pipeline did not normalize Unicode hyphens to ASCII before deduplication. Real fix: (1) audit hcps_v2 for any other Unicode-hyphen variants causing duplicates, (2) merge the Unicode-hyphen record into the ASCII one, repointing any FK references in msl_hcp_relationships, msl_hcp_notes, publication_authors_v2, etc., (3) add hyphen normalization to the import pipeline going forward. Estimated 60-90 min once the FK reference audit is complete.
+
 ### FIELD INSIGHTS and WHY THIS EXPERT text styling inconsistent
 On HCP detail pages, the FIELD INSIGHTS section body text renders bright and clean (color #E8E6DF, sharp weight) while the WHY THIS EXPERT narrative text below renders dull and dark by comparison (likely lower-contrast color, possibly different font-weight). The visual hierarchy reads as if the narrative is less important than the insights, but architecturally both are primary content surfaces. Fix should align WHY THIS EXPERT text styling to match FIELD INSIGHTS - same color (#E8E6DF), same weight, same line-height. Likely a one-line change in ScientificNarrativeSection.tsx or wherever the narrative renders.
 
@@ -112,8 +115,8 @@ WelcomeWizard wrote `["nsclc"]` (lowercase) while Garrett's profile had `["NSCLC
 
 ## Architecture cleanup (post-demo)
 
-### savedHcpIds is now dead state in RelationshipsContext
-After the bookmark fix on 2026-06-25, `isSaved` reads from `relationshipMap` rather than `savedHcpIds`. The `savedHcpIds` Set is still populated on load and updated by `toggleSave`, but no UI reads from it. Memory cost negligible but it's clutter and a footgun for future contributors. Delete in a cleanup pass: remove the state, remove the watchlist-items load on mount, remove the setter calls in `toggleSave`.
+### savedHcpIds investigated - not dead state, actively used by toggleSave decision logic
+2026-06-26: Investigation revealed that while no UI reads from savedHcpIds for visual purposes (isSaved now reads from relationshipMap after the 2026-06-25 bookmark fix), savedHcpIds IS actively used inside toggleSave at line 252: const wasSaved = savedHcpIds.has(hcpId) determines whether to add or remove the HCP from the user's default watchlist. Removing savedHcpIds would break that decision logic. The actual architectural issue: the codebase has two separate concepts ("am I tracking this HCP" via relationshipMap, and "is this HCP in my default watchlist" via savedHcpIds) that toggleSave couples together but doesn't fully unify. This is the same problem as the toggleSave semantic mismatch item below - they should be addressed together as a single architectural decision about whether watchlists are first-class concepts or derived from relationships.
 
 ### toggleSave semantic mismatch
 Clicking the bookmark icon currently calls `toggleSave`, which adds a watchlist item and (as a side effect) creates a relationship. The relationship creation is what makes the bookmark visually fill after the fix. But the function is still named and shaped around "save to watchlist," not "toggle relationship." Real architectural decision needed: should the bookmark click toggle relationship directly, or is the watchlist add a legitimate paired side effect? Affects naming, the watchlists table's role in the product, and how users mentally model "tracking" vs "saving."
