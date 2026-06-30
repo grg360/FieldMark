@@ -214,7 +214,7 @@ export default function DemoPage() {
       </div>
 
       <div style={footerStyle}>
-        Bessel Analytics, LLC
+        Bessel Analytics
       </div>
     </div>
   );
