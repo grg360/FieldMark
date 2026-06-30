@@ -237,7 +237,11 @@ function AdvocacySubsection({
           const claimKey = claimKeys.get(cacheKey);
           const expanded = claimKey != null && claimKey === expandedKey;
           return (
-            <div key={cacheKey}>
+            <div
+              key={cacheKey}
+              id={claimKey ? `claim-${claimKey}` : undefined}
+              style={{ scrollMarginTop: 80 }}
+            >
               <ThemeCard
                 theme={theme}
                 expanded={expanded}

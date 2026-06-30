@@ -245,12 +245,19 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate }
           <button
             type="button"
             onClick={() => {
-              const el = document.getElementById("belief-profile");
-              if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "start" });
-              } else {
-                navigate(`/hcp/${hcpId}#belief-profile`);
+              const claimEl = note.belief_claim_key
+                ? document.getElementById(`claim-${note.belief_claim_key}`)
+                : null;
+              if (claimEl) {
+                claimEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                return;
               }
+              const sectionEl = document.getElementById("belief-profile");
+              if (sectionEl) {
+                sectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                return;
+              }
+              navigate(`/hcp/${hcpId}#belief-profile`);
             }}
             aria-label={`View linked Belief Profile: ${note.belief_claim_title}`}
             style={{
