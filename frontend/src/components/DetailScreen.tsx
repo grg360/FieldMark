@@ -1343,7 +1343,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                   borderLeft: `3px solid ${cohortBarColor}`,
                   paddingLeft: 12,
                   fontSize: 14,
-                  color: "#B8B4AC",
+                  color: "#E8E6DF",
                   lineHeight: 1.6,
                 }}
               >
