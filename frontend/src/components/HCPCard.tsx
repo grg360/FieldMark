@@ -924,7 +924,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
         )}
 
         {/* Why_now insight band — 3-line clamp; full narrative on card click → detail */}
-        {hcp.why_now && cohort !== "community" && cohort !== "workhorse" ? (
+        {(hcp.why_now || hcp.narrative) ? (
           <div
             style={{
               marginTop: 14,
@@ -944,7 +944,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
               overflow: "hidden",
               textOverflow: "ellipsis",
             }}>
-              {hcp.why_now}
+              {hcp.why_now ?? hcp.narrative}
             </span>
           </div>
         ) : null}
