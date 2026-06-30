@@ -13,13 +13,13 @@ export function formatVolumeK(n: number | null | undefined): string {
 }
 
 export function formatIntDisplay(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return "0";
   return Math.round(n).toLocaleString();
 }
 
 /** Lifetime engagement dollars with K/M suffixes. */
 export function formatEngagementDollar(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n) || n <= 0) return "—";
+  if (n == null || !Number.isFinite(n) || n <= 0) return "$0";
   const v = Math.round(n);
   if (v < 1000) return `$${v.toLocaleString()}`;
   if (v < 1000000) return `$${(v / 1000).toFixed(1)}K`;

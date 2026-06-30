@@ -64,7 +64,7 @@ def fetch_top_community_hcps(conn, limit: int) -> List[Dict]:
                 r.composite_score
             FROM hcp_community_ranks_v2 r
             JOIN hcps_v2 h ON h.id = r.hcp_id
-            JOIN hcp_open_payments_summary_v2 op ON op.hcp_id = h.id
+            LEFT JOIN hcp_open_payments_summary_v2 op ON op.hcp_id = h.id
             WHERE r.therapeutic_area_id = %s
               AND r.scope_type = 'global'
               AND h.cohort_classification = 'community'
@@ -84,6 +84,44 @@ def fetch_top_community_hcps(conn, limit: int) -> List[Dict]:
             "specialty": row[5],
             "rank": row[6],
             "composite_score": float(row[7]) if row[7] is not None else None,
+        }
+        for row in rows
+    ]
+
+
+def fetch_single_community_hcp(conn, hcp_id: str) -> List[Dict]:
+    """Fetch a single HCP by ID with the same shape as fetch_top_community_hcps."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 
+                h.id,
+                h.first_name,
+                h.last_name,
+                h.nppes_practice_state,
+                h.institution_canonical,
+                h.npi_specialty,
+                r.rank
+            FROM hcps_v2 h
+            LEFT JOIN hcp_community_ranks_v2 r 
+              ON r.hcp_id = h.id 
+              AND r.therapeutic_area_id = %s
+              AND r.scope_type = 'global'
+            WHERE h.id = %s
+              AND h.cohort_classification = 'community'
+            """,
+            (NSCLC_TA_ID, hcp_id),
+        )
+        rows = cur.fetchall()
+    return [
+        {
+            "hcp_id": str(row[0]),
+            "first_name": row[1] or "",
+            "last_name": row[2] or "",
+            "state": row[3],
+            "institution": row[4],
+            "specialty": row[5],
+            "rank": row[6],
         }
         for row in rows
     ]
@@ -236,7 +274,7 @@ def build_prompt(hcp: Dict, op_summary: Dict, top_companies: List[Dict], drugs: 
     lines.append(f"Institution: {institution}")
     lines.append(f"Specialty: {specialty}")
     if hcp.get("rank") is not None:
-        lines.append(f"Community cohort rank in NSCLC: #{hcp['rank']}")
+        lines.append(f"US national rank in NSCLC Community cohort: #{hcp['rank']}")
     lines.append("")
 
     lines.append("PRACTICE SCALE:")
@@ -317,6 +355,7 @@ REQUIREMENTS:
 - Avoid generic phrases like "active community oncologist" or "broad therapeutic engagement"
 - Do not start with "Dr." or the HCP's name - start with a specific observation about the data
 - If the data is sparse (low payment totals, few drugs, limited Medicare detail), do NOT close with vague gestures like "understand who else is influencing decisions" or "find out where decisions are made." Instead, anchor on what IS known: practice scale, geography, the small handful of pharma touchpoints that exist, and what those concretely suggest for first contact.
+- SPECIAL CASE - zero pharma engagement: If "Distinct pharma companies engaged (lifetime)" is 0 AND "Total payments received (lifetime)" is 0, this HCP has no Open Payments record at all. Frame this as strategically meaningful: a high-volume community practitioner that pharma has not yet reached. Lead with the practice scale (patient volume, geography, setting) and explicitly name the absence of engagement as an opportunity signal. Suggest what an MSL should bring to a first conversation when there is no engagement history to anchor against - educational materials, peer-published data, comparative effectiveness research. Do not invent engagement data that does not exist. Do not speculate about WHY the HCP has no engagement (could be anti-pharma, could be untapped, could be selective - the data cannot distinguish). Treat the absence as a fact and a strategic prompt, not a deficiency.
 
 Output ONLY the narrative text. No preamble, no JSON wrapping, no quotation marks around the output."""
 
@@ -369,6 +408,7 @@ def main():
     parser.add_argument("--limit", type=int, default=50, help="Max number of HCPs to process (ranked, top first)")
     parser.add_argument("--dry-run", action="store_true", help="Generate but don't write to DB")
     parser.add_argument("--force", action="store_true", help="Regenerate even if community narrative already exists")
+    parser.add_argument("--hcp-id", type=str, default=None, help="Process only this single HCP ID, ignoring --limit and rank ordering")
     args = parser.parse_args()
 
     print("Connecting to database...")
@@ -378,8 +418,15 @@ def main():
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     try:
-        hcps = fetch_top_community_hcps(conn, args.limit)
-        print(f"Fetched {len(hcps)} top Community NSCLC HCPs with Open Payments data")
+        if args.hcp_id:
+            hcps = fetch_single_community_hcp(conn, args.hcp_id)
+            if not hcps:
+                print(f"ERROR: HCP {args.hcp_id} not found or not in NSCLC Community cohort")
+                return
+            print(f"Single-HCP mode: processing {args.hcp_id}")
+        else:
+            hcps = fetch_top_community_hcps(conn, args.limit)
+            print(f"Fetched {len(hcps)} top Community NSCLC HCPs")
         if args.dry_run:
             print("DRY RUN: will generate but not write to DB")
         if args.force:
@@ -403,9 +450,16 @@ def main():
 
             op_summary = fetch_open_payments_summary(conn, hcp["hcp_id"])
             if not op_summary:
-                print(f"[{idx}/{len(hcps)}] {name}: no Open Payments summary, skipping")
-                total_skipped += 1
-                continue
+                # No Open Payments record - frame as untapped opportunity rather than skip
+                op_summary = {
+                    "companies_lifetime": 0,
+                    "lifetime_usd": 0,
+                    "payments_3yr_usd": 0,
+                    "yoy_trend_pct": None,
+                    "speaker_bureau_3yr": 0,
+                    "consulting_3yr": 0,
+                }
+                print(f"[{idx}/{len(hcps)}] {name}: no Open Payments record - generating opportunity narrative")
 
             top_companies = fetch_top_companies(conn, hcp["hcp_id"], limit=5)
             drugs = fetch_drug_engagement(conn, hcp["hcp_id"], limit=10)
