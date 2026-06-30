@@ -289,18 +289,31 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
                 name="Voices"
                 data={points}
                 onClick={(p: any) => setPinnedPoint(p.payload)}
-              >
-                {points.map((p, idx) => (
-                  <Cell
-                    key={`cell-${idx}`}
-                    fill={getDotColor(p)}
-                    fillOpacity={0.85}
-                    stroke="#111113"
-                    strokeWidth={1}
-                    style={{ cursor: "pointer" }}
-                  />
-                ))}
-              </Scatter>
+                shape={(props: any) => {
+                  const { cx, cy, payload } = props;
+                  const color = getDotColor(payload);
+                  return (
+                    <g style={{ cursor: "pointer" }}>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={14}
+                        fill="transparent"
+                      />
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={5}
+                        fill={color}
+                        fillOpacity={0.85}
+                        stroke="#111113"
+                        strokeWidth={1}
+                        pointerEvents="none"
+                      />
+                    </g>
+                  );
+                }}
+              />
             </ScatterChart>
           </ResponsiveContainer>
         </div>
