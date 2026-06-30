@@ -298,7 +298,7 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={14}
+                        r={8}
                         fill="transparent"
                       />
                       <circle
