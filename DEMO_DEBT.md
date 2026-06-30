@@ -45,6 +45,9 @@ Logged during demo dry run as missing functionality. Verified after that MiniCol
 
 ## High priority (should fix before demo or address in email framing)
 
+### FIELD INSIGHTS and WHY THIS EXPERT text styling inconsistent
+On HCP detail pages, the FIELD INSIGHTS section body text renders bright and clean (color #E8E6DF, sharp weight) while the WHY THIS EXPERT narrative text below renders dull and dark by comparison (likely lower-contrast color, possibly different font-weight). The visual hierarchy reads as if the narrative is less important than the insights, but architecturally both are primary content surfaces. Fix should align WHY THIS EXPERT text styling to match FIELD INSIGHTS - same color (#E8E6DF), same weight, same line-height. Likely a one-line change in ScientificNarrativeSection.tsx or wherever the narrative renders.
+
 ### Rising Voices scatter chart dots too small for reliable hover
 The dots on the Rising Voices engagement-per-follower scatter chart are visually small and require precision cursor placement to trigger hover. Demo dry runs failed twice trying to land on a single dot mid-narration. Standard fix: render an invisible larger hit-target circle (2-3x visual radius) over each dot to expand the interaction zone without changing the visual. Pattern is well-documented in d3/recharts. Real demo blocker for any walkthrough that wants to highlight a specific Rising Voice investigator on the chart.
 

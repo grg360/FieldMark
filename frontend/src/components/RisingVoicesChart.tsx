@@ -289,6 +289,7 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
                 name="Voices"
                 data={points}
                 onClick={(p: any) => setPinnedPoint(p.payload)}
+                isAnimationActive={false}
                 shape={(props: any) => {
                   const { cx, cy, payload } = props;
                   const color = getDotColor(payload);
