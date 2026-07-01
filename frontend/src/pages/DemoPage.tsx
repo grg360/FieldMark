@@ -173,7 +173,7 @@ export default function DemoPage() {
         <div style={videoFrameStyle}>
           <div style={videoAspectStyle}>
             <iframe
-              src="https://customer-vnv0tydawqbi5840.cloudflarestream.com/8b692ac5cbc1adedda02689772e03ce3/iframe?poster=https%3A%2F%2Fcustomer-vnv0tydawqbi5840.cloudflarestream.com%2F8b692ac5cbc1adedda02689772e03ce3%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+              src="https://customer-vnv0tydawqbi5840.cloudflarestream.com/71551adadac81f3593c5f0558894199d/iframe?poster=https%3A%2F%2Fcustomer-vnv0tydawqbi5840.cloudflarestream.com%2F71551adadac81f3593c5f0558894199d%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
               loading="lazy"
               style={iframeStyle}
               allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
