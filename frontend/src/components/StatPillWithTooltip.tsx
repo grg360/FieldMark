@@ -76,7 +76,7 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
   },
   PUBS: {
     title: "Career publications",
-    body: "Total career publications attributed to this HCP (OpenAlex / career enrichment). Used as a volume signal for established researchers.",
+    body: "Career NSCLC publications attributed to this HCP (as author or co-author).",
   },
   CITATIONS: {
     title: "Citations",
