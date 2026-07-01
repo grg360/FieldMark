@@ -6,7 +6,15 @@
   "ta_level": "specialty",
   "pubmed": {
     "global_query": "(\n  (\"primary biliary cholangitis\"[Title/Abstract]\n   OR \"primary biliary cirrhosis\"[Title/Abstract]\n   OR \"biliary cholangitis\"[Title/Abstract]\n   OR \"cholestatic liver disease\"[Title/Abstract]\n   OR \"linerixibat\"[Title/Abstract]\n   OR \"IBAT inhibitor\"[Title/Abstract]\n   OR \"ileal bile acid transporter\"[Title/Abstract]\n   OR \"obeticholic acid\"[Title/Abstract]\n   OR \"NASH\"[Title/Abstract]\n   OR \"MAFLD\"[Title/Abstract]\n   OR \"non-alcoholic steatohepatitis\"[Title/Abstract])\n)",
-    "us_query": "(\n  (\"primary biliary cholangitis\"[Title/Abstract]\n   OR \"primary biliary cirrhosis\"[Title/Abstract]\n   OR \"biliary cholangitis\"[Title/Abstract]\n   OR \"cholestatic liver disease\"[Title/Abstract]\n   OR \"linerixibat\"[Title/Abstract]\n   OR \"IBAT inhibitor\"[Title/Abstract]\n   OR \"ileal bile acid transporter\"[Title/Abstract]\n   OR \"obeticholic acid\"[Title/Abstract]\n   OR \"NASH\"[Title/Abstract]\n   OR \"MAFLD\"[Title/Abstract]\n   OR \"non-alcoholic steatohepatitis\"[Title/Abstract])\n  AND\n  (\"United States\"[Affiliation] OR \"USA\"[Affiliation])\n)"
+    "us_query": "(\n  (\"primary biliary cholangitis\"[Title/Abstract]\n   OR \"primary biliary cirrhosis\"[Title/Abstract]\n   OR \"biliary cholangitis\"[Title/Abstract]\n   OR \"cholestatic liver disease\"[Title/Abstract]\n   OR \"linerixibat\"[Title/Abstract]\n   OR \"IBAT inhibitor\"[Title/Abstract]\n   OR \"ileal bile acid transporter\"[Title/Abstract]\n   OR \"obeticholic acid\"[Title/Abstract]\n   OR \"NASH\"[Title/Abstract]\n   OR \"MAFLD\"[Title/Abstract]\n   OR \"non-alcoholic steatohepatitis\"[Title/Abstract])\n  AND\n  (\"United States\"[Affiliation] OR \"USA\"[Affiliation])\n)",
+    "years_back": null,
+    "max_results": null,
+    "retrieval": {
+      "recall": "high",
+      "source": "PubMed",
+      "include_reviews": true,
+      "include_letters": false
+    }
   },
   "nppes": {
     "taxonomies": [],

@@ -6,7 +6,15 @@
   "ta_level": "cross_ta",
   "pubmed": {
     "global_query": "(\n(\"rare disease\"[Title/Abstract] OR \"orphan disease\"[Title/Abstract] OR \"rare genetic disorder\"[Title/Abstract] OR \"inborn error of metabolism\"[Title/Abstract] OR \"spinal muscular atrophy\"[Title/Abstract] OR \"Duchenne muscular dystrophy\"[Title/Abstract] OR \"phenylketonuria\"[Title/Abstract] OR \"lysosomal storage\"[Title/Abstract] OR \"hereditary angioedema\"[Title/Abstract] OR \"Fabry disease\"[Title/Abstract] OR \"Gaucher disease\"[Title/Abstract] OR \"cystic fibrosis\"[Title/Abstract] OR \"hemophilia\"[Title/Abstract] OR \"sickle cell disease\"[Title/Abstract] OR \"thalassemia\"[Title/Abstract] OR \"Wilson disease\"[Title/Abstract] OR \"Huntington disease\"[Title/Abstract])\n)",
-    "us_query": "(\"rare disease\"[Title/Abstract] OR \"orphan disease\"[Title/Abstract] OR \"rare genetic disorder\"[Title/Abstract] OR \"inborn error of metabolism\"[Title/Abstract] OR \"spinal muscular atrophy\"[Title/Abstract] OR \"Duchenne muscular dystrophy\"[Title/Abstract] OR \"phenylketonuria\"[Title/Abstract] OR \"lysosomal storage\"[Title/Abstract] OR \"hereditary angioedema\"[Title/Abstract] OR \"Fabry disease\"[Title/Abstract] OR \"Gaucher disease\"[Title/Abstract] OR \"cystic fibrosis\"[Title/Abstract] OR \"hemophilia\"[Title/Abstract] OR \"sickle cell disease\"[Title/Abstract] OR \"thalassemia\"[Title/Abstract] OR \"Wilson disease\"[Title/Abstract] OR \"Huntington disease\"[Title/Abstract]) AND (\"United States\"[Affiliation] OR \"USA\"[Affiliation])"
+    "us_query": "(\"rare disease\"[Title/Abstract] OR \"orphan disease\"[Title/Abstract] OR \"rare genetic disorder\"[Title/Abstract] OR \"inborn error of metabolism\"[Title/Abstract] OR \"spinal muscular atrophy\"[Title/Abstract] OR \"Duchenne muscular dystrophy\"[Title/Abstract] OR \"phenylketonuria\"[Title/Abstract] OR \"lysosomal storage\"[Title/Abstract] OR \"hereditary angioedema\"[Title/Abstract] OR \"Fabry disease\"[Title/Abstract] OR \"Gaucher disease\"[Title/Abstract] OR \"cystic fibrosis\"[Title/Abstract] OR \"hemophilia\"[Title/Abstract] OR \"sickle cell disease\"[Title/Abstract] OR \"thalassemia\"[Title/Abstract] OR \"Wilson disease\"[Title/Abstract] OR \"Huntington disease\"[Title/Abstract]) AND (\"United States\"[Affiliation] OR \"USA\"[Affiliation])",
+    "years_back": null,
+    "max_results": null,
+    "retrieval": {
+      "recall": "high",
+      "source": "PubMed",
+      "include_reviews": true,
+      "include_letters": false
+    }
   },
   "nppes": {
     "taxonomies": [],

@@ -14,10 +14,12 @@ Required environment variables:
 Optional environment variables:
 - PUBMED_EMAIL (recommended by NCBI)
 - PUBMED_TOOL (default: fieldmark_pubmed_pipeline)
-- PUBMED_DAYS_BACK (default: 365)
-- PUBMED_MAX_RESULTS (default: 500, per therapeutic area query)
+- PUBMED_MAX_RESULTS (optional; used only when TA config omits pubmed.max_results)
 - PUBMED_RETMAX_PER_CALL (default: 100)
 - PUBMED_API_BASE (default: https://eutils.ncbi.nlm.nih.gov/entrez/eutils)
+
+Per-TA pubmed config (config/therapeutic_areas/*.json) is authoritative for years_back,
+max_results, and retrieval metadata. years_back is in years; null means no date filter.
 """
 
 from __future__ import annotations
@@ -28,8 +30,9 @@ import os
 import re
 import time
 from dataclasses import dataclass
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, TypeVar
 
 from dotenv import load_dotenv
 
@@ -107,7 +110,7 @@ def build_http_session() -> requests.Session:
         connect=5,
         backoff_factor=0.8,
         status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=("GET",),
+        allowed_methods=("GET", "POST"),
     )
     adapter = HTTPAdapter(max_retries=retries)
     session.mount("https://", adapter)
@@ -122,6 +125,63 @@ def safe_get(url: str, params: Dict[str, str], session: requests.Session, timeou
         return response
     except requests.RequestException as exc:
         raise RuntimeError(f"HTTP request failed for {url}: {exc}") from exc
+
+
+def safe_post(url: str, data: Dict[str, str], session: requests.Session, timeout: int = 40) -> Response:
+    try:
+        response = session.post(url, data=data, timeout=timeout)
+        response.raise_for_status()
+        return response
+    except requests.RequestException as exc:
+        raise RuntimeError(f"HTTP request failed for {url}: {exc}") from exc
+
+
+SUPABASE_TRANSIENT_MARKERS = (
+    "520",
+    "521",
+    "522",
+    "523",
+    "524",
+    "500",
+    "502",
+    "503",
+    "504",
+    "APIError",
+    "Cloudflare",
+)
+
+T = TypeVar("T")
+
+
+def _is_transient_supabase_error(exc: Exception) -> bool:
+    msg = str(exc)
+    if "401" in msg or "403" in msg:
+        return False
+    if "400" in msg:
+        return False
+    return any(marker in msg for marker in SUPABASE_TRANSIENT_MARKERS)
+
+
+def supabase_execute(fn: Callable[[], T]) -> T:
+    """Run a Supabase PostgREST call with exponential backoff on transient failures."""
+    max_attempts = 5
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            last_exc = exc
+            if not _is_transient_supabase_error(exc) or attempt >= max_attempts:
+                raise
+            wait_seconds = 2**attempt
+            summary = str(exc).split("\n")[0][:200]
+            print(
+                f"Supabase transient error (attempt {attempt}/{max_attempts}): "
+                f"{summary}. Retrying in {wait_seconds}s..."
+            )
+            time.sleep(wait_seconds)
+    assert last_exc is not None
+    raise last_exc
 
 
 def parse_xml(content: bytes, source_name: str) -> ET.Element:
@@ -240,69 +300,314 @@ def build_dedupe_key(first_name: Optional[str], last_name: Optional[str], instit
     return f"{normalize_token(first_name)}|{normalize_token(last_name)}|{normalize_token(institution)}"
 
 
+def resolve_years_back(pubmed_cfg: Dict[str, Any]) -> Optional[int]:
+    """Return years_back from TA config; missing key or null means no date filter."""
+    if "years_back" not in pubmed_cfg:
+        return None
+    value = pubmed_cfg["years_back"]
+    return int(value) if value is not None else None
+
+
+def years_back_to_days(years_back: Optional[int]) -> Optional[int]:
+    if years_back is None:
+        return None
+    return years_back * 365
+
+
+def resolve_max_results(pubmed_cfg: Dict[str, Any]) -> Optional[int]:
+    """Resolve max_results: TA config (if key present) -> env (if key absent) -> None."""
+    if "max_results" in pubmed_cfg:
+        value = pubmed_cfg["max_results"]
+        return int(value) if value is not None else None
+    env_val = os.getenv("PUBMED_MAX_RESULTS")
+    if env_val not in (None, ""):
+        return int(env_val)
+    return None
+
+
+def pubmed_esearch_count(
+    session: requests.Session,
+    base_url: str,
+    query: str,
+    days_back: Optional[int],
+    email: Optional[str],
+    tool_name: str,
+) -> int:
+    """Return total PMID count for a query (esearch Count element)."""
+    esearch_url = f"{base_url}/esearch.fcgi"
+    api_key = os.getenv("PUBMED_API_KEY")
+    params: Dict[str, str] = {
+        "db": "pubmed",
+        "term": query,
+        "retmode": "xml",
+        "retmax": "0",
+        "sort": "pub_date",
+        "tool": tool_name,
+    }
+    if days_back is not None:
+        params["datetype"] = "pdat"
+        params["reldate"] = str(days_back)
+    if email:
+        params["email"] = email
+    if api_key:
+        params["api_key"] = api_key
+
+    response = safe_post(esearch_url, data=params, session=session)
+    root = parse_xml(response.content, "esearch_count")
+    if root.findtext("ERROR"):
+        raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
+    count_text = root.findtext("Count")
+    return int(count_text) if count_text and count_text.isdigit() else 0
+
+
+PUBMED_HISTORY_MAX_PMIDS = 9999
+
+
+def iter_year_date_ranges(days_back: int) -> List[Tuple[str, str]]:
+    """Split a relative day window into calendar-year chunks (newest first)."""
+    end = date.today()
+    start = end - timedelta(days=days_back)
+    ranges: List[Tuple[str, str]] = []
+    for year in range(end.year, start.year - 1, -1):
+        year_start = max(start, date(year, 1, 1))
+        year_end = min(end, date(year, 12, 31))
+        if year_start > year_end:
+            continue
+        ranges.append((year_start.strftime("%Y/%m/%d"), year_end.strftime("%Y/%m/%d")))
+    return ranges
+
+
+def iter_decade_date_ranges() -> List[Tuple[str, str]]:
+    """Split full PubMed history into decade chunks (newest first)."""
+    end = date.today()
+    ranges: List[Tuple[str, str]] = []
+    year = end.year
+    while year >= 1960:
+        decade_end = date(year, 12, 31)
+        decade_start = date(max(year - 9, 1960), 1, 1)
+        ranges.append((decade_start.strftime("%Y/%m/%d"), decade_end.strftime("%Y/%m/%d")))
+        year -= 10
+    return ranges
+
+
+def pubmed_esearch_init_history(
+    session: requests.Session,
+    esearch_url: str,
+    query: str,
+    email: Optional[str],
+    tool_name: str,
+    days_back: Optional[int] = None,
+    mindate: Optional[str] = None,
+    maxdate: Optional[str] = None,
+) -> Tuple[str, str, int]:
+    """Run one ESearch with usehistory=y; return WebEnv, QueryKey, Count."""
+    api_key = os.getenv("PUBMED_API_KEY")
+    init_params: Dict[str, str] = {
+        "db": "pubmed",
+        "term": query,
+        "retmode": "xml",
+        "retmax": "0",
+        "usehistory": "y",
+        "sort": "pub_date",
+        "tool": tool_name,
+    }
+    if mindate and maxdate:
+        init_params["datetype"] = "pdat"
+        init_params["mindate"] = mindate
+        init_params["maxdate"] = maxdate
+    elif days_back is not None:
+        init_params["datetype"] = "pdat"
+        init_params["reldate"] = str(days_back)
+    if email:
+        init_params["email"] = email
+    if api_key:
+        init_params["api_key"] = api_key
+
+    response = safe_post(esearch_url, data=init_params, session=session)
+    root = parse_xml(response.content, "esearch_init")
+    if root.findtext("ERROR"):
+        raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
+
+    webenv = text_or_none(root.find("WebEnv"))
+    query_key = text_or_none(root.find("QueryKey"))
+    if not webenv or not query_key:
+        raise RuntimeError("PubMed ESearch did not return WebEnv/QueryKey for history session.")
+
+    count_text = root.findtext("Count")
+    total_count = int(count_text) if count_text and count_text.isdigit() else 0
+    return webenv, query_key, total_count
+
+
+def pubmed_efetch_history_pmids(
+    session: requests.Session,
+    efetch_url: str,
+    webenv: str,
+    query_key: str,
+    session_target: int,
+    per_call: int,
+    email: Optional[str],
+    tool_name: str,
+    sleep_seconds: float,
+    total_retrieved: int,
+    overall_target: int,
+    last_progress_logged: int,
+    max_total: Optional[int] = None,
+) -> Tuple[List[str], int, int]:
+    """EFetch PMIDs from one history session (max 9,999 per NCBI limit)."""
+    api_key = os.getenv("PUBMED_API_KEY")
+    capped_target = min(session_target, PUBMED_HISTORY_MAX_PMIDS)
+    ids: List[str] = []
+    retstart = 0
+    stop_at = max_total if max_total is not None else overall_target
+
+    while retstart < capped_target:
+        if total_retrieved >= stop_at:
+            break
+        batch_size = min(per_call, capped_target - retstart)
+        if max_total is not None:
+            batch_size = min(batch_size, stop_at - total_retrieved)
+            if batch_size <= 0:
+                break
+        fetch_params: Dict[str, str] = {
+            "db": "pubmed",
+            "rettype": "uilist",
+            "retmode": "text",
+            "WebEnv": webenv,
+            "query_key": query_key,
+            "retstart": str(retstart),
+            "retmax": str(batch_size),
+            "tool": tool_name,
+        }
+        if email:
+            fetch_params["email"] = email
+        if api_key:
+            fetch_params["api_key"] = api_key
+
+        response = safe_post(efetch_url, data=fetch_params, session=session)
+        batch_ids = [line.strip() for line in response.text.splitlines() if line.strip()]
+        if not batch_ids:
+            break
+        ids.extend(batch_ids)
+        retstart += len(batch_ids)
+        total_retrieved += len(batch_ids)
+
+        if total_retrieved - last_progress_logged >= 5000 or total_retrieved >= overall_target:
+            print(
+                f"Retrieved {total_retrieved:,} / {overall_target:,} PMIDs from PubMed history..."
+            )
+            last_progress_logged = total_retrieved
+
+        time.sleep(sleep_seconds)
+
+    return ids, total_retrieved, last_progress_logged
+
+
 def pubmed_esearch(
     session: requests.Session,
     base_url: str,
     query: str,
-    days_back: int,
-    max_results: int,
+    days_back: Optional[int],
+    max_results: Optional[int],
     per_call: int,
     email: Optional[str],
     tool_name: str,
 ) -> List[str]:
     esearch_url = f"{base_url}/esearch.fcgi"
+    efetch_url = f"{base_url}/efetch.fcgi"
     api_key = os.getenv("PUBMED_API_KEY")
     sleep_seconds = 0.11 if api_key else 0.34
-    webenv: Optional[str] = None
-    query_key: Optional[str] = None
+
+    webenv, query_key, total_count = pubmed_esearch_init_history(
+        session=session,
+        esearch_url=esearch_url,
+        query=query,
+        email=email,
+        tool_name=tool_name,
+        days_back=days_back,
+    )
+    if total_count == 0:
+        return []
+
+    if max_results is not None:
+        overall_target = min(total_count, max_results)
+    else:
+        overall_target = total_count
+
     ids: List[str] = []
-    retstart = 0
+    total_retrieved = 0
+    last_progress_logged = 0
 
-    while retstart < max_results:
-        batch_size = min(per_call, max_results - retstart)
-        params = {
-            "db": "pubmed",
-            "term": query,
-            "retmode": "xml",
-            "retmax": str(batch_size),
-            "retstart": str(retstart),
-            "sort": "pub_date",
-            "datetype": "pdat",
-            "reldate": str(days_back),
-            "usehistory": "y",
-            "tool": tool_name,
-        }
-        if email:
-            params["email"] = email
-        if api_key:
-            params["api_key"] = api_key
-        if webenv and query_key:
-            params["WebEnv"] = webenv
-            params["query_key"] = query_key
-
-        response = safe_get(esearch_url, params=params, session=session)
-        root = parse_xml(response.content, "esearch")
-        if root.findtext("ERROR"):
-            raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
-
-        if not webenv:
-            webenv = text_or_none(root.find("WebEnv"))
-            query_key = text_or_none(root.find("QueryKey"))
-
-        batch_ids = [elem.text for elem in root.findall("./IdList/Id") if elem.text]
-        if not batch_ids:
-            break
+    if overall_target <= PUBMED_HISTORY_MAX_PMIDS:
+        batch_ids, total_retrieved, last_progress_logged = pubmed_efetch_history_pmids(
+            session=session,
+            efetch_url=efetch_url,
+            webenv=webenv,
+            query_key=query_key,
+            session_target=overall_target,
+            per_call=per_call,
+            email=email,
+            tool_name=tool_name,
+            sleep_seconds=sleep_seconds,
+            total_retrieved=total_retrieved,
+            overall_target=overall_target,
+            last_progress_logged=last_progress_logged,
+        )
         ids.extend(batch_ids)
-        retstart += len(batch_ids)
-        time.sleep(sleep_seconds)
+    else:
+        if days_back is not None:
+            date_ranges = iter_year_date_ranges(days_back)
+        else:
+            date_ranges = iter_decade_date_ranges()
 
-    # Preserve order while removing any duplicated PMIDs.
-    seen: Set[str] = set()
-    unique_ids: List[str] = []
-    for pmid in ids:
-        if pmid not in seen:
-            seen.add(pmid)
-            unique_ids.append(pmid)
+        seen: Set[str] = set()
+        unique_ids = ids  # reuse list, populate with unique PMIDs in order
+        for mindate, maxdate in date_ranges:
+            if len(unique_ids) >= overall_target:
+                break
+            chunk_webenv, chunk_query_key, chunk_count = pubmed_esearch_init_history(
+                session=session,
+                esearch_url=esearch_url,
+                query=query,
+                email=email,
+                tool_name=tool_name,
+                mindate=mindate,
+                maxdate=maxdate,
+            )
+            if chunk_count == 0:
+                continue
+            session_target = min(chunk_count, PUBMED_HISTORY_MAX_PMIDS)
+            batch_ids, total_retrieved, last_progress_logged = pubmed_efetch_history_pmids(
+                session=session,
+                efetch_url=efetch_url,
+                webenv=chunk_webenv,
+                query_key=chunk_query_key,
+                session_target=session_target,
+                per_call=per_call,
+                email=email,
+                tool_name=tool_name,
+                sleep_seconds=sleep_seconds,
+                total_retrieved=len(unique_ids),
+                overall_target=overall_target,
+                last_progress_logged=last_progress_logged,
+                max_total=overall_target,
+            )
+            for pmid in batch_ids:
+                if pmid not in seen:
+                    seen.add(pmid)
+                    unique_ids.append(pmid)
+                    if len(unique_ids) >= overall_target:
+                        break
+
+    # Preserve order while removing any duplicated PMIDs (single-session path only).
+    if overall_target <= PUBMED_HISTORY_MAX_PMIDS:
+        seen: Set[str] = set()
+        unique_ids: List[str] = []
+        for pmid in ids:
+            if pmid not in seen:
+                seen.add(pmid)
+                unique_ids.append(pmid)
+    if max_results is not None:
+        return unique_ids[:max_results]
     return unique_ids
 
 
@@ -419,7 +724,7 @@ def pubmed_esearch_all(
         if api_key:
             params["api_key"] = api_key
 
-        response = safe_get(esearch_url, params=params, session=session)
+        response = safe_post(esearch_url, data=params, session=session)
         root = parse_xml(response.content, "esearch_all")
         if root.findtext("ERROR"):
             raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
@@ -637,11 +942,13 @@ def _fetch_hcp_ids_for_batch(supabase: Client, batch: Sequence[HCPRecord]) -> Di
 
     or_filter = ",".join(_postgrest_and_clause_for_hcp(h) for h in batch)
     try:
-        response = (
-            supabase.table("hcps")
-            .select("id,first_name,last_name,institution")
-            .or_(or_filter)
-            .execute()
+        response = supabase_execute(
+            lambda: (
+                supabase.table("hcps")
+                .select("id,first_name,last_name,institution")
+                .or_(or_filter)
+                .execute()
+            )
         )
     except Exception as exc:
         raise RuntimeError(f"Failed batch select for HCP ids: {exc}") from exc
@@ -673,11 +980,13 @@ def upsert_hcps(supabase: Client, hcps: Sequence[HCPRecord]) -> Dict[str, str]:
         rows = [_hcp_row_dict(h) for h in batch]
 
         try:
-            supabase.table("hcps").upsert(
-                rows,
-                on_conflict="first_name,last_name,institution",
-                returning="representation",
-            ).execute()
+            supabase_execute(
+                lambda: supabase.table("hcps").upsert(
+                    rows,
+                    on_conflict="first_name,last_name,institution",
+                    returning="representation",
+                ).execute()
+            )
         except Exception as exc:
             raise RuntimeError(f"Failed batch upsert HCPs (batch starting at {i}): {exc}") from exc
 
@@ -700,7 +1009,7 @@ def upsert_hcps(supabase: Client, hcps: Sequence[HCPRecord]) -> Dict[str, str]:
                     q = q.is_("institution", "null")
                 else:
                     q = q.eq("institution", hcp.institution)
-                query = q.limit(1).execute()
+                query = supabase_execute(lambda: q.limit(1).execute())
                 qrows = query.data or []
                 if qrows:
                     id_map[hcp.dedupe_key] = qrows[0]["id"]
@@ -750,10 +1059,12 @@ def upsert_publications(
         batch = publication_rows[i : i + batch_size]
         try:
             # Upsert assumes unique constraint on (hcp_id, pubmed_id).
-            supabase.table("publications").upsert(
-                batch,
-                on_conflict="hcp_id,pubmed_id",
-            ).execute()
+            supabase_execute(
+                lambda: supabase.table("publications").upsert(
+                    batch,
+                    on_conflict="hcp_id,pubmed_id",
+                ).execute()
+            )
         except Exception as exc:
             raise RuntimeError(f"Failed to upsert publication records batch starting at {i}: {exc}") from exc
 
@@ -769,15 +1080,11 @@ def fetch_hcps_with_low_publication_counts(
     max_publications: int = 2,
 ) -> List[Dict[str, object]]:
     try:
-        hcps_response = (
-            supabase.table("hcps")
-            .select("id,first_name,last_name")
-            .execute()
+        hcps_response = supabase_execute(
+            lambda: supabase.table("hcps").select("id,first_name,last_name").execute()
         )
-        pubs_response = (
-            supabase.table("publications")
-            .select("hcp_id,pubmed_id")
-            .execute()
+        pubs_response = supabase_execute(
+            lambda: supabase.table("publications").select("hcp_id,pubmed_id").execute()
         )
     except Exception as exc:
         raise RuntimeError(f"Failed to load HCP/publication counts for second pass: {exc}") from exc
@@ -857,10 +1164,12 @@ def run_author_enrichment_second_pass(
             rows = extract_publication_rows_for_hcp(articles, hcp_id, first_name, last_name)
             if not rows:
                 continue
-            supabase.table("publications").upsert(
-                rows,
-                on_conflict="hcp_id,pubmed_id",
-            ).execute()
+            supabase_execute(
+                lambda: supabase.table("publications").upsert(
+                    rows,
+                    on_conflict="hcp_id,pubmed_id",
+                ).execute()
+            )
             total_upserted += len(rows)
         except Exception as exc:
             print(f"Second pass warning: failed upsert for HCP {hcp_id}: {exc}")
@@ -871,12 +1180,14 @@ def run_author_enrichment_second_pass(
 
 def get_therapeutic_area_id_by_slug(supabase: Client, slug: str) -> str:
     try:
-        response = (
-            supabase.table("therapeutic_areas")
-            .select("id")
-            .eq("slug", slug)
-            .limit(1)
-            .execute()
+        response = supabase_execute(
+            lambda: (
+                supabase.table("therapeutic_areas")
+                .select("id")
+                .eq("slug", slug)
+                .limit(1)
+                .execute()
+            )
         )
     except Exception as exc:
         raise RuntimeError(f"Failed to query therapeutic area slug '{slug}': {exc}") from exc
@@ -909,10 +1220,12 @@ def upsert_hcp_therapeutic_area_links(
     ]
 
     try:
-        supabase.table("hcp_therapeutic_areas").upsert(
-            rows,
-            on_conflict="hcp_id,therapeutic_area_id",
-        ).execute()
+        supabase_execute(
+            lambda: supabase.table("hcp_therapeutic_areas").upsert(
+                rows,
+                on_conflict="hcp_id,therapeutic_area_id",
+            ).execute()
+        )
     except Exception as exc:
         raise RuntimeError(f"Failed to upsert hcp_therapeutic_areas links: {exc}") from exc
 
@@ -923,12 +1236,8 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> None:
     base_url = os.getenv("PUBMED_API_BASE", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils")
     tool_name = os.getenv("PUBMED_TOOL", "fieldmark_pubmed_pipeline")
     email = os.getenv("PUBMED_EMAIL")
-    days_back = int(os.getenv("PUBMED_DAYS_BACK", "1460"))
-    max_results = int(os.getenv("PUBMED_MAX_RESULTS", "2000"))
     per_call = int(os.getenv("PUBMED_RETMAX_PER_CALL", "100"))
     dry_run = bool(args and args.dry_run)
-    if args and args.limit:
-        max_results = min(max_results, args.limit)
 
     ta_slugs_to_run = (
         [slug.strip() for slug in args.ta.split(",") if slug.strip()]
@@ -947,12 +1256,54 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> None:
 
     for ta_slug in ta_slugs_to_run:
         cfg = load_ta_config(ta_slug)
-        query_text = cfg["pubmed"]["us_query"]
-        query_label = f"{cfg['name']} US"
+        pubmed_cfg = cfg.get("pubmed") or {}
+        print("Ingestion mode: global (geographic filtering deferred to enrichment)")
+        query_text = pubmed_cfg["global_query"]
+        query_label = f"{cfg['name']}"
         print(f"\n--- Processing query: {query_label} ({ta_slug}) ---")
 
         therapeutic_area_id = cfg["ta_uuid"]
         print(f"Using therapeutic_area_id={therapeutic_area_id} from config")
+
+        retrieval_cfg = pubmed_cfg.get("retrieval") or {}
+        recall = retrieval_cfg.get("recall", "unknown")
+        source = retrieval_cfg.get("source", "unknown")
+        print(f"Retrieval strategy: recall={recall}, source={source}")
+
+        years_back = resolve_years_back(pubmed_cfg)
+        days_back = years_back_to_days(years_back)
+        if years_back is not None:
+            print(
+                f"Using years_back={years_back} "
+                f"(publication date filter, {days_back} days)"
+            )
+        else:
+            print("No time filter (full PubMed history)")
+
+        config_max_results = resolve_max_results(pubmed_cfg)
+        max_results = config_max_results
+        if args and args.limit:
+            max_results = min(max_results, args.limit) if max_results is not None else args.limit
+
+        if config_max_results is None:
+            print(
+                "[WARN] Unlimited fetch mode: no max_results cap; "
+                "paginating until PubMed returns no more IDs."
+            )
+        else:
+            print(f"Using max_results={config_max_results}")
+        if args and args.limit:
+            print(f"Applying CLI --limit={args.limit} (effective fetch cap: {max_results})")
+
+        total_available = pubmed_esearch_count(
+            session=session,
+            base_url=base_url,
+            query=query_text,
+            days_back=days_back,
+            email=email,
+            tool_name=tool_name,
+        )
+        print(f"PubMed reports {total_available:,} total matching PMIDs for this query/window.")
 
         print("Searching PubMed...")
         pmids = pubmed_esearch(

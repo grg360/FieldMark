@@ -501,6 +501,64 @@ def fetch_established_v3_context_rows(
     return rows_by_pair
 
 
+def fetch_established_leadership_rows(
+    hcp_ids: Set[str],
+    visible_ta_ids: List[str],
+) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """Load TA-scoped publication leadership rows for Established narrative context."""
+    if not hcp_ids or not visible_ta_ids:
+        return {}
+
+    ids_list = list(hcp_ids)
+    ta_list = list(visible_ta_ids)
+    rows_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    batch_size = 500
+
+    sql = """
+        SELECT
+            hcp_id,
+            therapeutic_area_id,
+            first_pub_count,
+            senior_pub_count,
+            senior_pub_recent_5yr,
+            guideline_pub_count,
+            percentile_rank
+        FROM hcp_publication_leadership_v2
+        WHERE therapeutic_area_id = ANY(%s::uuid[])
+          AND hcp_id = ANY(%s::uuid[])
+    """
+
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(ids_list), batch_size):
+                batch_ids = ids_list[i : i + batch_size]
+                cur.execute(sql, (ta_list, batch_ids))
+                for row in cur.fetchall():
+                    hcp_id = str(row["hcp_id"])
+                    ta_id = str(row["therapeutic_area_id"])
+                    rows_by_pair[(hcp_id, ta_id)] = dict(row)
+    return rows_by_pair
+
+
+def merge_established_leadership_rows(
+    established_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]],
+    leadership_by_pair: Dict[Tuple[str, str], Dict[str, Any]],
+) -> None:
+    """Merge hcp_publication_leadership_v2 fields into Established v3 context dicts."""
+    for key, lead in leadership_by_pair.items():
+        if key not in established_v3_by_pair:
+            continue
+        entry = established_v3_by_pair[key]
+        first_pub = safe_int(lead.get("first_pub_count")) or 0
+        senior_pub = safe_int(lead.get("senior_pub_count")) or 0
+        entry["first_pub_count"] = first_pub
+        entry["senior_pub_count"] = senior_pub
+        entry["senior_pub_recent_5yr"] = safe_int(lead.get("senior_pub_recent_5yr"))
+        entry["guideline_pub_count"] = safe_int(lead.get("guideline_pub_count"))
+        entry["leadership_percentile_rank"] = safe_float(lead.get("percentile_rank"))
+        entry["lead_pub_total"] = first_pub + senior_pub
+
+
 def fetch_established_top_hcp_ids(
     supabase: Client, top_n: int, visible_ta_ids: List[str]
 ) -> Set[str]:
@@ -579,12 +637,16 @@ def load_hcp_contexts(
     rising_top_n: int,
     established_top_n: int,
     target_version: str = "v1",
+    single_hcp_id: Optional[str] = None,
 ) -> Tuple[List[HCPContext], Dict[str, str]]:
     """
     Load HCP context for narrative generation, filtered by cohort.
 
     For rising_star and established: top N per (TA x visible scope) from rank views.
     For community: top N by cohort_score (default 500).
+
+    When single_hcp_id is set, skip top-N selection and load only that HCP using the
+    cohort's existing data-fetch paths.
     """
     visible_ta_ids = load_visible_ta_ids(supabase)
     if not visible_ta_ids:
@@ -594,8 +656,42 @@ def load_hcp_contexts(
     hcps: List[Dict] = []
     cohort_by_hcp: Dict[str, str] = {}
     rising_star_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    established_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
-    if "rising_star" in target_cohorts:
+    if single_hcp_id:
+        print(f"Single-HCP mode: loading hcp_id={single_hcp_id} (skipping cohort top-N selection)")
+        hcp_rows = fetch_hcps_by_ids(supabase, {single_hcp_id}, target_version)
+        if not hcp_rows:
+            print(f"[WARNING] HCP {single_hcp_id} not found.")
+            return [], {}
+        hcp = hcp_rows[0]
+        cohort = hcp.get("cohort_classification")
+        if not cohort or cohort not in target_cohorts:
+            print(
+                f"[WARNING] HCP {single_hcp_id} cohort_classification={cohort!r} "
+                f"does not match target cohorts {target_cohorts}."
+            )
+            return [], {}
+        cohort_by_hcp[single_hcp_id] = cohort
+        hcps = hcp_rows
+        if cohort == "rising_star":
+            rising_star_v3_by_pair = fetch_rising_star_v3_context_rows(
+                {single_hcp_id}, visible_ta_ids
+            )
+            print(f"Loaded {len(rising_star_v3_by_pair)} Rising Star v3 HCP x TA signal rows")
+        elif cohort == "established":
+            established_v3_by_pair = fetch_established_v3_context_rows(
+                {single_hcp_id}, visible_ta_ids
+            )
+            leadership_by_pair = fetch_established_leadership_rows(
+                {single_hcp_id}, visible_ta_ids
+            )
+            merge_established_leadership_rows(established_v3_by_pair, leadership_by_pair)
+            print(f"Loaded {len(established_v3_by_pair)} Established v3 HCP x TA rank rows")
+            print(f"Merged {len(leadership_by_pair)} Established HCP x TA leadership rows")
+        else:
+            print(f"Loaded community HCP {single_hcp_id}")
+    elif "rising_star" in target_cohorts:
         print(
             f"Selecting rising_star top-{rising_top_n} per (TA x visible scope) "
             "from hcp_rising_star_ranks_v3..."
@@ -610,8 +706,7 @@ def load_hcp_contexts(
         rising_star_v3_by_pair = fetch_rising_star_v3_context_rows(rising_ids, visible_ta_ids)
         print(f"Loaded {len(rising_star_v3_by_pair)} Rising Star v3 HCP x TA signal rows")
 
-    established_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
-    if "established" in target_cohorts:
+    if not single_hcp_id and "established" in target_cohorts:
         print(f"Selecting established top-{established_top_n} per (TA x visible scope) from hcp_established_ranks_v3...")
         established_ids = fetch_established_top_hcp_ids(supabase, established_top_n, visible_ta_ids)
         print(f"Established rank selection: {len(established_ids)} unique HCPs")
@@ -619,9 +714,12 @@ def load_hcp_contexts(
             cohort_by_hcp[hcp_id] = "established"
         hcps.extend(fetch_hcps_by_ids(supabase, established_ids, target_version))
         established_v3_by_pair = fetch_established_v3_context_rows(established_ids, visible_ta_ids)
+        leadership_by_pair = fetch_established_leadership_rows(established_ids, visible_ta_ids)
+        merge_established_leadership_rows(established_v3_by_pair, leadership_by_pair)
         print(f"Loaded {len(established_v3_by_pair)} Established v3 HCP x TA rank rows")
+        print(f"Merged {len(leadership_by_pair)} Established HCP x TA leadership rows")
 
-    if "community" in target_cohorts:
+    if not single_hcp_id and "community" in target_cohorts:
         print("Loading community HCPs by cohort_classification...")
         hcps_table = get_table_name("hcps", target_version)
         if target_version == "v2":
@@ -902,7 +1000,7 @@ def load_hcp_contexts(
                 citation_trajectory_pct=None,
                 trial_investigator_pct=None,
                 first_pub_year=safe_int(hcp.get("first_pub_year")),
-                total_career_pubs=safe_int(hcp.get("total_career_pubs")),
+                total_career_pubs=None,
                 pharma_engagement_lifetime=safe_float(ops.get("total_payments_lifetime")),
                 pharma_companies_distinct=safe_int(ops.get("distinct_companies_lifetime")),
                 percentile_data={},
@@ -1060,10 +1158,6 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
         f"Cohort: Established (recognized expert tier within TA)",
     ]
 
-    cohort_score = v3.get("cohort_score")
-    if cohort_score is not None:
-        lines.append(f"Cohort Score: {cohort_score:.1f} (50/35/15 weighted)")
-
     global_rank = v3.get("global_rank")
     us_rank = v3.get("us_rank")
     rank_parts = []
@@ -1074,11 +1168,32 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
     if rank_parts:
         lines.append("Standing: " + "; ".join(rank_parts) + " within the Established TA cohort")
 
+    senior_pub_count = v3.get("senior_pub_count")
+    senior_recent = v3.get("senior_pub_recent_5yr")
+    leadership_pct = v3.get("leadership_percentile_rank")
+    guideline_count = v3.get("guideline_pub_count")
+    ta_label = ctx.therapeutic_area_name
+
+    if senior_pub_count is not None:
+        lines.append(
+            f"Senior-Author Publications ({ta_label}): {senior_pub_count} lifetime "
+            "(TA-scoped senior-author count)"
+        )
+    if senior_recent is not None:
+        lines.append(
+            f"Senior-Author Publications, last 5 years ({ta_label}): {senior_recent}"
+        )
+    if leadership_pct is not None:
+        lines.append(
+            f"Publication Leadership Percentile ({ta_label} Established cohort): "
+            f"{leadership_pct:.0f}th percentile"
+        )
+    if guideline_count is not None and guideline_count > 0:
+        lines.append(f"Guideline Publications ({ta_label}): {guideline_count}")
+
     if ctx.first_pub_year is not None:
         career_years = datetime.now(timezone.utc).year - ctx.first_pub_year
         lines.append(f"Career Length: ~{career_years} years (first publication {ctx.first_pub_year})")
-    if ctx.total_career_pubs is not None:
-        lines.append(f"Total Career Publications: {ctx.total_career_pubs}")
 
     sci = v3.get("scientific_influence_pctile")
     net = v3.get("network_influence_pctile")
@@ -1258,10 +1373,11 @@ def build_prompt_established(ctx: HCPContext) -> str:
         "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about a recognized scientific expert in their therapeutic area.\n\n"
         "Methodology context (do not restate verbatim, but use to interpret the data):\n"
         "- This HCP sits within the Established cohort of their TA - the recognized-expert tier (separate from Rising Stars and Community).\n"
-        "- Their cohort score is a weighted blend: 50 percent Scientific Influence (publication leadership and citation impact within the cohort), 35 percent Network Influence (co-authorship graph centrality), 15 percent Pharma Engagement (industry collaboration breadth).\n"
+        "- Standing within the Established cohort reflects a weighted blend of signals: 50 percent Scientific Influence (publication leadership and citation impact within the cohort), 35 percent Network Influence (co-authorship graph centrality), 15 percent Pharma Engagement (industry collaboration breadth).\n"
         "- All percentiles below are computed within the Established cohort in this TA, so a 70th percentile here means top 30 percent among recognized experts, not among all HCPs.\n"
-        "- If Pharma Engagement percentile is absent from the facts, that HCP has no Open Payments data on file - treat this as missing data, not low engagement; the cohort score reweights the remaining signals proportionally.\n"
-        "- If Pharma Engagement percentile is present but low (including 0th percentile), this means the HCP has Open Payments data on file but their documented industry collaboration breadth is low relative to other recognized experts. Low pharma engagement among Established experts is COMMON, NORMAL, and NOT a concern. Many leading academic researchers have modest Open Payments footprints. Do not interpret low pharma engagement as evidence of institutional restrictions, limited receptivity, or any other adverse signal.\n\n"
+        "- If Pharma Engagement percentile is absent from the facts, that HCP has no Open Payments data on file - treat this as missing data, not low engagement; ranking reweights the remaining signals proportionally.\n"
+        "- Pharma Engagement phrasing (all five JSON fields): If pharma_engagement_pctile is absent from the facts, treat as missing Open Payments data. If pharma_engagement_pctile is exactly 0.0, do NOT cite it as '0th percentile', 'no documented industry collaboration', or any phrasing that implies a confirmed low engagement finding; instead omit Pharma Engagement from that field or note that 'pharma engagement data is not available for this profile'. If pharma_engagement_pctile is greater than 0.0 but below 5.0, cite as 'at the low end of documented industry collaboration within the Established cohort' (do not use a numeric percentile). If between 5.0 and 99.5, cite as 'Nth percentile' as usual. If >= 99.5, use ceiling phrasing per the rule below. Low documented pharma engagement among Established experts is COMMON and NOT a concern when cited appropriately; do not interpret it as institutional restrictions or limited receptivity.\n"
+        "- Percentile phrasing (all five JSON fields): When citing Scientific Influence, Network Influence, or Publication Leadership percentiles from the facts in narrative, why_now, engagement_angle, signal_strength, or caution_flags: if the value is >= 99.5, do NOT write '99th percentile', '100th percentile', or other numeric ceiling phrasing. Instead describe as 'at the top of the Established [TA] cohort' or 'at the ceiling of the cohort'. Percentiles below 99.5 may be cited as 'Nth percentile' as usual. Pharma Engagement follows the Pharma Engagement phrasing rule above.\n\n"
         "Return ONLY valid JSON with exactly these five fields:\n"
         "{\n"
         '  "narrative": "string (exactly 3 sentences)",\n'
@@ -1271,11 +1387,12 @@ def build_prompt_established(ctx: HCPContext) -> str:
         '  "caution_flags": "string or null"\n'
         "}\n\n"
         "Constraints:\n"
-        "- narrative: exactly 3 sentences. Frame as a recognized expert with sustained influence. Anchor in concrete percentiles from the data (Scientific Influence, Network Influence, and Pharma Engagement when available), career length, and total publications. When Scientific Influence is high, you may speak to publication leadership and citation impact at the level of abstraction the methodology supports. Avoid hagiography; be specific and data-anchored. Do not invent numbers not present in the facts.\n"
+        "- narrative: exactly 3 sentences. Frame as a recognized expert with sustained influence. Lead with TA-scoped rank (US and/or global) from the facts. State TA-scoped senior-author publication counts using senior_pub_count and senior_pub_recent_5yr (e.g. '54 NSCLC publications as senior author, including 35 in the last 5 years'). NEVER use the phrase 'leadership publications'. Reference Scientific Influence percentile as driven by publication leadership and citation impact. Reference Network Influence when available. Reference Pharma Engagement only per the Pharma Engagement phrasing rules above. If guideline_pub_count is present and greater than 0, you may reference contributor to N TA guideline publications. Career length may appear alone without any publication count. NEVER cite cohort_score, composite score, or any weighted score figure. NEVER cite total_career_pubs, lifetime works, works_count, or any career-total publication figure. NEVER produce an 'X publications over Y years' construction. Avoid hagiography; be specific and data-anchored. Do not invent numbers not present in the facts.\n"
         "- why_now: exactly 1 sentence. Why this expert matters in the current scientific landscape, not just historical contribution.\n"
         "- engagement_angle: exactly 2 sentences. Suggest scientific topics where this expert's perspective adds value. Established experts often have strong opinions on methodology, study design, or therapeutic positioning - lean into that.\n"
-        "- signal_strength: exactly 1 sentence. Honest confidence statement. If Pharma Engagement data is missing, say so here.\n"
-        "- caution_flags: 1 sentence OR the JSON literal null. Default to null. Only populate when there is a SPECIFIC, ACTIONABLE concern AT THE HIGH END: very high pharma engagement breadth (20+ distinct companies suggesting saturation), lifetime engagement heavily concentrated with a single direct competitor where the MSL's product directly competes, or documented evidence (not inference) of a specific institutional restriction on industry engagement. Do NOT flag low or 0th-percentile Pharma Engagement - that is normal and is not a concern. Do NOT infer institutional policies from low pharma scores. Do NOT use this field to hedge, speculate, or restate percentile data - those belong in signal_strength.\n"
+        "- signal_strength: exactly 1 sentence. Honest confidence statement. If Pharma Engagement is absent or exactly 0.0 per the phrasing rules, note that pharma engagement data is not available for this profile rather than citing a low percentile.\n"
+        "- caution_flags: 1 sentence OR the JSON literal null. Default to null. Only populate when there is a SPECIFIC, ACTIONABLE concern AT THE HIGH END: very high pharma engagement breadth (20+ distinct companies suggesting saturation), lifetime engagement heavily concentrated with a single direct competitor where the MSL's product directly competes, or documented evidence (not inference) of a specific institutional restriction on industry engagement. Do NOT flag absent or zero Pharma Engagement percentile as a concern. Do NOT infer institutional policies from low pharma scores. Do NOT use this field to hedge, speculate, or restate percentile data - those belong in signal_strength.\n"
+        "- Never cite cohort_score, composite score, or weighted score figures in any JSON field; use rank and percentiles only.\n"
         "- No markdown. No text outside JSON.\n"
         "- Do not name specific drug brands or NCT trial numbers.\n"
         "- Ensure proper spacing between all words. Do not concatenate words together (e.g., write 'and 19th' not 'and19th', 'study design' not 'studydesign').\n\n"
@@ -1514,21 +1631,49 @@ def run_pipeline(
     dry_run: bool,
     force: bool,
     target_version: str = "v1",
+    single_hcp_id: Optional[str] = None,
 ) -> None:
     load_dotenv()
     supabase = init_supabase()
-    if "rising_star" in target_cohorts and not os.getenv("DATABASE_URL"):
+    needs_postgres = (
+        "rising_star" in target_cohorts or "established" in target_cohorts
+    )
+    if needs_postgres and not os.getenv("DATABASE_URL"):
         raise EnvironmentError(
-            "DATABASE_URL is required for rising_star cohort (v3 signal joins via Postgres)."
+            "DATABASE_URL is required for rising_star and established cohorts "
+            "(v3 signal joins via Postgres)."
         )
 
-    print(f"Target cohorts: {target_cohorts}")
-    if "rising_star" in target_cohorts:
-        print(f"Rising star downselect: top {rising_top_n} per (TA x visible scope) from ranks")
-    if "established" in target_cohorts:
-        print(f"Established downselect: top {established_top_n} per (TA x visible scope) from ranks")
-    if "community" in target_cohorts:
-        print(f"Community downselect: top {community_top_n} by cohort_score")
+    if single_hcp_id:
+        if len(target_cohorts) != 1:
+            raise ValueError(
+                "--hcp-id requires exactly one --cohort value (not 'all')."
+            )
+        expected_cohort = target_cohorts[0]
+        hcp_rows = fetch_hcps_by_ids(supabase, {single_hcp_id}, target_version)
+        if not hcp_rows:
+            raise ValueError(f"HCP not found: {single_hcp_id}")
+        actual_cohort = hcp_rows[0].get("cohort_classification")
+        if actual_cohort != expected_cohort:
+            raise ValueError(
+                f"HCP {single_hcp_id} cohort_classification is '{actual_cohort}', "
+                f"not '{expected_cohort}'. Use --cohort {actual_cohort} to regenerate."
+            )
+        hcp_name = (
+            f"{hcp_rows[0].get('first_name') or ''} {hcp_rows[0].get('last_name') or ''}"
+        ).strip()
+        print(f"Single-HCP mode: {hcp_name or single_hcp_id} ({single_hcp_id})")
+        print(f"Cohort cross-check passed: {expected_cohort}")
+    else:
+        print(f"Target cohorts: {target_cohorts}")
+        if "rising_star" in target_cohorts:
+            print(f"Rising star downselect: top {rising_top_n} per (TA x visible scope) from ranks")
+        if "established" in target_cohorts:
+            print(
+                f"Established downselect: top {established_top_n} per (TA x visible scope) from ranks"
+            )
+        if "community" in target_cohorts:
+            print(f"Community downselect: top {community_top_n} by cohort_score")
     print()
 
     contexts, ta_name_map = load_hcp_contexts(
@@ -1538,15 +1683,19 @@ def run_pipeline(
         rising_top_n,
         established_top_n,
         target_version=target_version,
+        single_hcp_id=single_hcp_id,
     )
     if not contexts:
         print("No HCPs found for target cohorts. Exiting.")
         return
 
     if not force:
-        contexts = freshness_filter(
-            contexts, supabase, ta_name_map, target_version=target_version
-        )
+        if not (dry_run and single_hcp_id):
+            contexts = freshness_filter(
+                contexts, supabase, ta_name_map, target_version=target_version
+            )
+        elif dry_run and single_hcp_id:
+            print("[DRY RUN] Skipping freshness filter for single-HCP preview.")
         if not contexts:
             print("All contexts filtered by freshness. Exiting.")
             return
@@ -1557,8 +1706,8 @@ def run_pipeline(
             cohort_breakdown.get(ctx.cohort_classification, 0) + 1
         )
 
-    # Cost estimate (+1 sample call in dry-run)
-    num_calls = len(contexts) + (1 if dry_run else 0)
+    # Cost estimate (+1 sample call in dry-run for cohort mode only)
+    num_calls = len(contexts) + (1 if dry_run and not single_hcp_id else 0)
     estimated_cost = estimate_cost(num_calls)
     cohort_labels = {
         "rising_star": "Rising star",
@@ -1575,25 +1724,40 @@ def run_pipeline(
         total_suffix = " (+1 sample in dry-run)" if dry_run else ""
         print(f"Total: ${estimated_cost:.2f}{total_suffix}")
     else:
-        print(f"Total narrative calls: {len(contexts)}" + (" (+1 sample in dry-run)" if dry_run else ""))
+        print(f"Total narrative calls: {len(contexts)}" + (" (+1 sample in dry-run)" if dry_run and not single_hcp_id else ""))
         print(f"Estimated input tokens: {num_calls * EST_INPUT_TOKENS_PER_CALL:,}")
         print(f"Estimated output tokens: {num_calls * EST_OUTPUT_TOKENS_PER_CALL:,}")
         print(f"Estimated cost: ${estimated_cost:.2f}")
     print()
 
     if dry_run:
-        print("[DRY RUN] Generating one sample narrative, then exiting without DB writes.")
-        if contexts:
-            anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
-            sample_ctx = contexts[0]
-            print(f"\n=== Sample narrative (hcp_id={sample_ctx.hcp_id}, TA={sample_ctx.therapeutic_area_name}) ===")
-            try:
-                output = generate_narrative(sample_ctx, anthropic_api_key)
-                print(json.dumps(output, indent=2))
-            except Exception as exc:
-                print(f"[DRY RUN] Sample generation failed: {exc}")
+        anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
+        if single_hcp_id:
+            print("[DRY RUN] Generating narrative(s) for single HCP, no DB writes.")
+            if not contexts:
+                print("[DRY RUN] No contexts available for this HCP.")
+                return
+            for ctx in contexts:
+                print(
+                    f"\n=== Narrative (hcp_id={ctx.hcp_id}, TA={ctx.therapeutic_area_name}) ==="
+                )
+                try:
+                    output = generate_narrative(ctx, anthropic_api_key)
+                    print(json.dumps(output, indent=2))
+                except Exception as exc:
+                    print(f"[DRY RUN] Generation failed: {exc}")
         else:
-            print("[DRY RUN] No contexts available for sample narrative.")
+            print("[DRY RUN] Generating one sample narrative, then exiting without DB writes.")
+            if contexts:
+                sample_ctx = contexts[0]
+                print(f"\n=== Sample narrative (hcp_id={sample_ctx.hcp_id}, TA={sample_ctx.therapeutic_area_name}) ===")
+                try:
+                    output = generate_narrative(sample_ctx, anthropic_api_key)
+                    print(json.dumps(output, indent=2))
+                except Exception as exc:
+                    print(f"[DRY RUN] Sample generation failed: {exc}")
+            else:
+                print("[DRY RUN] No contexts available for sample narrative.")
         return
 
     print(f"Narratives to generate by cohort:")
@@ -1601,16 +1765,17 @@ def run_pipeline(
         print(f"  {cohort}: {count}")
     print()
 
-    # Confirm before consuming budget
-    if len(target_cohorts) > 1:
-        confirm = input("Proceed with generation? Type 'yes' to continue: ")
-    else:
-        confirm = input(
-            f"Proceed with generation? Estimated cost ${estimated_cost:.2f}. Type 'yes' to continue: "
-        )
-    if confirm.strip().lower() != "yes":
-        print("Cancelled by user.")
-        return
+    # Confirm before consuming budget (skip for single-HCP targeted regen)
+    if not single_hcp_id:
+        if len(target_cohorts) > 1:
+            confirm = input("Proceed with generation? Type 'yes' to continue: ")
+        else:
+            confirm = input(
+                f"Proceed with generation? Estimated cost ${estimated_cost:.2f}. Type 'yes' to continue: "
+            )
+        if confirm.strip().lower() != "yes":
+            print("Cancelled by user.")
+            return
 
     anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
     success = 0
@@ -1686,7 +1851,21 @@ def main() -> int:
         default="v1",
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
     )
+    parser.add_argument(
+        "--hcp-id",
+        type=str,
+        default=None,
+        help="Regenerate narrative for a single HCP by UUID (skips cohort top-N selection)",
+    )
     args = parser.parse_args()
+
+    if args.hcp_id and args.cohort == "all":
+        print(
+            "[ERROR] --hcp-id requires a specific --cohort value "
+            "(rising_star, established, or community), not 'all'.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.cohort == "all":
         target_cohorts = ["rising_star", "established", "community"]
@@ -1702,6 +1881,7 @@ def main() -> int:
             dry_run=args.dry_run,
             force=args.force,
             target_version=args.target_version,
+            single_hcp_id=args.hcp_id,
         )
         return 0
     except Exception as exc:
