@@ -1,0 +1,16 @@
+{
+  "slug": "hepatology",
+  "name": "Hepatology",
+  "ta_uuid": "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e",
+  "parent_uuid": null,
+  "ta_level": "specialty",
+  "pubmed": {
+    "global_query": "(\n  (\"primary biliary cholangitis\"[Title/Abstract]\n   OR \"primary biliary cirrhosis\"[Title/Abstract]\n   OR \"biliary cholangitis\"[Title/Abstract]\n   OR \"cholestatic liver disease\"[Title/Abstract]\n   OR \"linerixibat\"[Title/Abstract]\n   OR \"IBAT inhibitor\"[Title/Abstract]\n   OR \"ileal bile acid transporter\"[Title/Abstract]\n   OR \"obeticholic acid\"[Title/Abstract]\n   OR \"NASH\"[Title/Abstract]\n   OR \"MAFLD\"[Title/Abstract]\n   OR \"non-alcoholic steatohepatitis\"[Title/Abstract])\n)",
+    "us_query": "(\n  (\"primary biliary cholangitis\"[Title/Abstract]\n   OR \"primary biliary cirrhosis\"[Title/Abstract]\n   OR \"biliary cholangitis\"[Title/Abstract]\n   OR \"cholestatic liver disease\"[Title/Abstract]\n   OR \"linerixibat\"[Title/Abstract]\n   OR \"IBAT inhibitor\"[Title/Abstract]\n   OR \"ileal bile acid transporter\"[Title/Abstract]\n   OR \"obeticholic acid\"[Title/Abstract]\n   OR \"NASH\"[Title/Abstract]\n   OR \"MAFLD\"[Title/Abstract]\n   OR \"non-alcoholic steatohepatitis\"[Title/Abstract])\n  AND\n  (\"United States\"[Affiliation] OR \"USA\"[Affiliation])\n)"
+  },
+  "nppes": {
+    "taxonomies": [],
+    "description": "Deferred - not currently in active ingestion"
+  }
+}
+

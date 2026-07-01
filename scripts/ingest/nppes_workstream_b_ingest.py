@@ -9,15 +9,22 @@ Run manually after applying schema SQL migrations.
 from __future__ import annotations
 
 import os
+import sys
 import uuid
 from collections import Counter
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import pandas as pd
 from dotenv import load_dotenv
 from supabase import Client, create_client
 from tqdm import tqdm
+
+_SCRIPTS_INGEST = Path(__file__).resolve().parent
+if str(_SCRIPTS_INGEST) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_INGEST))
+from pubmed_pipeline import list_ta_configs, load_ta_config
 
 
 def get_table_name(base_name: str, target_version: str) -> str:
@@ -27,25 +34,6 @@ def get_table_name(base_name: str, target_version: str) -> str:
 
 
 PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
-
-NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
-HEPATOLOGY_TA_ID = "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e"  # v1 ingestion defers hepatology taxonomy matching
-RARE_DISEASE_TA_ID = "833e7b38-d01b-409e-82c0-71eb29e138a0"
-
-NSCLC_TAXONOMIES = ["207RX0202X"]  # Internal Medicine - Medical Oncology
-
-RARE_DISEASE_TAXONOMIES = [
-    "2080N0001X",
-    "2080P0207X",
-    "207RA0401X",
-    "207RM1200X",
-]
-
-HEPATOLOGY_TAXONOMIES = [
-    "207RI0008X",  # Internal Medicine - Hepatology
-    "207RT0003X",  # Internal Medicine - Transplant Hepatology
-    "207RG0100X",  # Internal Medicine - Gastroenterology (broad; refined by --npi-filter)
-]
 
 BATCH_HCPS = 500
 BATCH_TA = 500
@@ -297,10 +285,30 @@ def main() -> None:
     for col in REQUIRED_COLUMNS:
         df[col] = df[col].astype(str)
 
-    mask_nsclc = taxonomy_match_mask(df, set(NSCLC_TAXONOMIES))
-    mask_rare = taxonomy_match_mask(df, set(RARE_DISEASE_TAXONOMIES))
-    mask_hepa = taxonomy_match_mask(df, set(HEPATOLOGY_TAXONOMIES))
-    mask_union = mask_nsclc | mask_rare | mask_hepa
+    ta_masks: Dict[str, Dict[str, Any]] = {}
+    for slug in list_ta_configs():
+        cfg = load_ta_config(slug)
+        nppes_cfg = cfg.get("nppes") or {}
+        taxonomies = nppes_cfg.get("taxonomies") or []
+        if not taxonomies:
+            continue
+        ta_masks[slug] = {
+            "ta_uuid": cfg["ta_uuid"],
+            "mask": taxonomy_match_mask(df, set(taxonomies)),
+            "name": cfg["name"],
+        }
+
+    if not ta_masks:
+        raise RuntimeError("No TA configs with nppes.taxonomies found in config/therapeutic_areas/")
+
+    mask_union = None
+    for slug, entry in ta_masks.items():
+        mask_union = entry["mask"] if mask_union is None else (mask_union | entry["mask"])
+
+    ta_names = [entry["name"] for entry in ta_masks.values()]
+    print(f"Loaded NPPES taxonomy filters for: {', '.join(ta_names)}")
+    for slug, entry in sorted(ta_masks.items()):
+        print(f"  {entry['name']} ({slug}): {int(entry['mask'].sum()):,} matching rows")
 
     # If --npi-filter provided, intersect with the NPI list from CSV
     if npi_filter_path:
@@ -319,12 +327,12 @@ def main() -> None:
         print(f"Applied --npi-filter intersection")
 
     filtered = df.loc[mask_union].copy()
-    filtered["_match_nsclc"] = mask_nsclc.loc[filtered.index]
-    filtered["_match_rare"] = mask_rare.loc[filtered.index]
-    filtered["_match_hepa"] = mask_hepa.loc[filtered.index]
+    for slug, entry in ta_masks.items():
+        filtered[f"_match_{slug}"] = entry["mask"].loc[filtered.index]
 
     total_matching_rows = len(filtered)
-    print(f"NPPES rows matching NSCLC ∪ Rare Disease taxonomies: {total_matching_rows:,}")
+    ta_label_union = " | ".join(entry["name"] for entry in ta_masks.values())
+    print(f"NPPES rows matching {ta_label_union} taxonomies: {total_matching_rows:,}")
 
     agg_rows: List[Tuple[str, pd.Series, List[str]]] = []
     for npi_raw, grp in tqdm(
@@ -335,16 +343,10 @@ def main() -> None:
         npi_norm = normalize_npi_digits(npi_raw)
         if not npi_norm:
             continue
-        match_nsclc = bool(grp["_match_nsclc"].any())
-        match_rare = bool(grp["_match_rare"].any())
-        match_hepa = bool(grp["_match_hepa"].any())
         ta_ids: List[str] = []
-        if match_nsclc:
-            ta_ids.append(NSCLC_TA_ID)
-        if match_rare:
-            ta_ids.append(RARE_DISEASE_TA_ID)
-        if match_hepa:
-            ta_ids.append(HEPATOLOGY_TA_ID)
+        for slug, entry in ta_masks.items():
+            if bool(grp[f"_match_{slug}"].any()):
+                ta_ids.append(entry["ta_uuid"])
         row0 = grp.sort_index().iloc[0]
         agg_rows.append((npi_norm, row0, ta_ids))
 
@@ -423,11 +425,7 @@ def main() -> None:
     print(f"Total new hcps rows inserted (acknowledged): {inserted_hcps:,}")
     print(f"Total hcp_therapeutic_areas rows inserted: {inserted_ta_rows:,}")
     print("\nTherapeutic-area association counts (planned, one row per TA per new HCP):")
-    ta_labels = {
-        NSCLC_TA_ID: "NSCLC",
-        RARE_DISEASE_TA_ID: "RARE_DISEASE",
-        HEPATOLOGY_TA_ID: "HEPATOLOGY",
-    }
+    ta_labels = {entry["ta_uuid"]: entry["name"] for entry in ta_masks.values()}
     for tid, cnt in sorted(ta_dist.items(), key=lambda kv: (-kv[1], kv[0])):
         print(f"  {ta_labels.get(tid, tid)}: {cnt:,}")
     print("\nTop 10 source states (planned ingest list before DB failures):")

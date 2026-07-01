@@ -22,13 +22,18 @@ Optional environment variables:
 
 from __future__ import annotations
 
+import argparse
+import json
 import os
-from dotenv import load_dotenv
-load_dotenv()
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+from dotenv import load_dotenv
+
+load_dotenv()
 from xml.etree import ElementTree as ET
 
 import requests
@@ -39,124 +44,26 @@ from tqdm import tqdm
 from urllib3.util.retry import Retry
 
 
-# Domain-targeted query for rare disease + relevant therapy/oncology areas.
-PUBMED_QUERY = """
-(
-("rare disease"[Title/Abstract] OR "orphan disease"[Title/Abstract] OR "rare genetic disorder"[Title/Abstract] OR "inborn error of metabolism"[Title/Abstract] OR "spinal muscular atrophy"[Title/Abstract] OR "Duchenne muscular dystrophy"[Title/Abstract] OR "phenylketonuria"[Title/Abstract] OR "lysosomal storage"[Title/Abstract] OR "hereditary angioedema"[Title/Abstract] OR "Fabry disease"[Title/Abstract] OR "Gaucher disease"[Title/Abstract] OR "cystic fibrosis"[Title/Abstract] OR "hemophilia"[Title/Abstract] OR "sickle cell disease"[Title/Abstract] OR "thalassemia"[Title/Abstract] OR "Wilson disease"[Title/Abstract] OR "Huntington disease"[Title/Abstract])
-)
-""".strip()
+def load_ta_config(ta_slug: str) -> dict:
+    """Load per-TA configuration from config/therapeutic_areas/<slug>.json.
 
-PUBMED_QUERY_HEPATOLOGY = """
-(
-  ("primary biliary cholangitis"[Title/Abstract]
-   OR "primary biliary cirrhosis"[Title/Abstract]
-   OR "biliary cholangitis"[Title/Abstract]
-   OR "cholestatic liver disease"[Title/Abstract]
-   OR "linerixibat"[Title/Abstract]
-   OR "IBAT inhibitor"[Title/Abstract]
-   OR "ileal bile acid transporter"[Title/Abstract]
-   OR "obeticholic acid"[Title/Abstract]
-   OR "NASH"[Title/Abstract]
-   OR "MAFLD"[Title/Abstract]
-   OR "non-alcoholic steatohepatitis"[Title/Abstract])
-)
-""".strip()
+    Returns the parsed dict. Raises FileNotFoundError if the TA config is missing.
+    """
+    config_dir = Path(__file__).resolve().parent.parent.parent / "config" / "therapeutic_areas"
+    config_path = config_dir / f"{ta_slug}.json"
+    if not config_path.exists():
+        raise FileNotFoundError(f"No TA config found for slug '{ta_slug}' at {config_path}")
+    with open(config_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-PUBMED_QUERY_NSCLC = """
-(
-  ("non-small cell lung cancer"[Title/Abstract]
-   OR "NSCLC"[Title/Abstract]
-   OR "lung adenocarcinoma"[Title/Abstract]
-   OR "lung squamous cell carcinoma"[Title/Abstract]
-   OR "large cell lung carcinoma"[Title/Abstract]
-   OR "PD-L1"[Title/Abstract]
-   OR "PD-1 inhibitor"[Title/Abstract]
-   OR "pembrolizumab"[Title/Abstract]
-   OR "atezolizumab"[Title/Abstract]
-   OR "durvalumab"[Title/Abstract]
-   OR "nivolumab"[Title/Abstract]
-   OR "checkpoint inhibitor lung"[Title/Abstract]
-   OR "EGFR mutation"[Title/Abstract]
-   OR "osimertinib"[Title/Abstract]
-   OR "erlotinib"[Title/Abstract]
-   OR "gefitinib"[Title/Abstract]
-   OR "afatinib"[Title/Abstract]
-   OR "EGFR exon 20"[Title/Abstract]
-   OR "ALK inhibitor"[Title/Abstract]
-   OR "alectinib"[Title/Abstract]
-   OR "lorlatinib"[Title/Abstract]
-   OR "crizotinib"[Title/Abstract]
-   OR "ROS1 fusion"[Title/Abstract]
-   OR "RET fusion lung"[Title/Abstract]
-   OR "KRAS G12C"[Title/Abstract]
-   OR "sotorasib"[Title/Abstract]
-   OR "adagrasib"[Title/Abstract]
-   OR "HER2 lung"[Title/Abstract]
-   OR "MET exon 14"[Title/Abstract]
-   OR "TROP-2 lung"[Title/Abstract]
-   OR "antibody drug conjugate lung"[Title/Abstract])
-)
-""".strip()
 
-PUBMED_QUERY_HEPATOLOGY_US = """
-(
-  ("primary biliary cholangitis"[Title/Abstract]
-   OR "primary biliary cirrhosis"[Title/Abstract]
-   OR "biliary cholangitis"[Title/Abstract]
-   OR "cholestatic liver disease"[Title/Abstract]
-   OR "linerixibat"[Title/Abstract]
-   OR "IBAT inhibitor"[Title/Abstract]
-   OR "ileal bile acid transporter"[Title/Abstract]
-   OR "obeticholic acid"[Title/Abstract]
-   OR "NASH"[Title/Abstract]
-   OR "MAFLD"[Title/Abstract]
-   OR "non-alcoholic steatohepatitis"[Title/Abstract])
-  AND
-  ("United States"[Affiliation] OR "USA"[Affiliation])
-)
-""".strip()
+def list_ta_configs() -> list[str]:
+    """Return a list of all TA slugs with config files present."""
+    config_dir = Path(__file__).resolve().parent.parent.parent / "config" / "therapeutic_areas"
+    if not config_dir.exists():
+        return []
+    return sorted([p.stem for p in config_dir.glob("*.json")])
 
-PUBMED_QUERY_NSCLC_US = """
-(
-  ("non-small cell lung cancer"[Title/Abstract]
-   OR "NSCLC"[Title/Abstract]
-   OR "lung adenocarcinoma"[Title/Abstract]
-   OR "lung squamous cell carcinoma"[Title/Abstract]
-   OR "large cell lung carcinoma"[Title/Abstract]
-   OR "PD-L1"[Title/Abstract]
-   OR "PD-1 inhibitor"[Title/Abstract]
-   OR "pembrolizumab"[Title/Abstract]
-   OR "atezolizumab"[Title/Abstract]
-   OR "durvalumab"[Title/Abstract]
-   OR "nivolumab"[Title/Abstract]
-   OR "checkpoint inhibitor lung"[Title/Abstract]
-   OR "EGFR mutation"[Title/Abstract]
-   OR "osimertinib"[Title/Abstract]
-   OR "erlotinib"[Title/Abstract]
-   OR "gefitinib"[Title/Abstract]
-   OR "afatinib"[Title/Abstract]
-   OR "EGFR exon 20"[Title/Abstract]
-   OR "ALK inhibitor"[Title/Abstract]
-   OR "alectinib"[Title/Abstract]
-   OR "lorlatinib"[Title/Abstract]
-   OR "crizotinib"[Title/Abstract]
-   OR "ROS1 fusion"[Title/Abstract]
-   OR "RET fusion lung"[Title/Abstract]
-   OR "KRAS G12C"[Title/Abstract]
-   OR "sotorasib"[Title/Abstract]
-   OR "adagrasib"[Title/Abstract]
-   OR "HER2 lung"[Title/Abstract]
-   OR "MET exon 14"[Title/Abstract]
-   OR "TROP-2 lung"[Title/Abstract]
-   OR "antibody drug conjugate lung"[Title/Abstract])
-  AND
-  ("United States"[Affiliation] OR "USA"[Affiliation])
-)
-""".strip()
-
-PUBMED_QUERY_RARE_DISEASE_US = """
-("rare disease"[Title/Abstract] OR "orphan disease"[Title/Abstract] OR "rare genetic disorder"[Title/Abstract] OR "inborn error of metabolism"[Title/Abstract] OR "spinal muscular atrophy"[Title/Abstract] OR "Duchenne muscular dystrophy"[Title/Abstract] OR "phenylketonuria"[Title/Abstract] OR "lysosomal storage"[Title/Abstract] OR "hereditary angioedema"[Title/Abstract] OR "Fabry disease"[Title/Abstract] OR "Gaucher disease"[Title/Abstract] OR "cystic fibrosis"[Title/Abstract] OR "hemophilia"[Title/Abstract] OR "sickle cell disease"[Title/Abstract] OR "thalassemia"[Title/Abstract] OR "Wilson disease"[Title/Abstract] OR "Huntington disease"[Title/Abstract]) AND ("United States"[Affiliation] OR "USA"[Affiliation])
-""".strip()
 
 @dataclass
 class HCPRecord:
@@ -1012,27 +919,40 @@ def upsert_hcp_therapeutic_area_links(
     return len(rows)
 
 
-def run_pipeline() -> None:
+def run_pipeline(args: Optional[argparse.Namespace] = None) -> None:
     base_url = os.getenv("PUBMED_API_BASE", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils")
     tool_name = os.getenv("PUBMED_TOOL", "fieldmark_pubmed_pipeline")
     email = os.getenv("PUBMED_EMAIL")
     days_back = int(os.getenv("PUBMED_DAYS_BACK", "1460"))
     max_results = int(os.getenv("PUBMED_MAX_RESULTS", "2000"))
     per_call = int(os.getenv("PUBMED_RETMAX_PER_CALL", "100"))
+    dry_run = bool(args and args.dry_run)
+    if args and args.limit:
+        max_results = min(max_results, args.limit)
+
+    ta_slugs_to_run = (
+        [slug.strip() for slug in args.ta.split(",") if slug.strip()]
+        if args and args.ta
+        else list_ta_configs()
+    )
+    if not ta_slugs_to_run:
+        raise RuntimeError("No TA configs found in config/therapeutic_areas/")
 
     session = build_http_session()
-    supabase = init_supabase()
+    supabase: Optional[Client] = None
+    if not dry_run:
+        supabase = init_supabase()
+    elif dry_run:
+        print("[DRY RUN] No Supabase writes will be performed.")
 
-    query_plan = [
-    ("hepatology", PUBMED_QUERY_HEPATOLOGY_US, "Hepatology US"),
-    ("nsclc", PUBMED_QUERY_NSCLC_US, "NSCLC US"),
-    ]
-
-    for ta_slug, query_text, query_label in query_plan:
+    for ta_slug in ta_slugs_to_run:
+        cfg = load_ta_config(ta_slug)
+        query_text = cfg["pubmed"]["us_query"]
+        query_label = f"{cfg['name']} US"
         print(f"\n--- Processing query: {query_label} ({ta_slug}) ---")
 
-        therapeutic_area_id = get_therapeutic_area_id_by_slug(supabase, ta_slug)
-        print(f"Resolved therapeutic_area_id={therapeutic_area_id}")
+        therapeutic_area_id = cfg["ta_uuid"]
+        print(f"Using therapeutic_area_id={therapeutic_area_id} from config")
 
         print("Searching PubMed...")
         pmids = pubmed_esearch(
@@ -1064,7 +984,19 @@ def run_pipeline() -> None:
 
         hcps_by_key, publication_records = extract_records(articles)
         unique_hcps = list(hcps_by_key.values())
-        print(f"Extracted {len(unique_hcps)} unique HCP profiles and {len(publication_records)} author-publication links.")
+        print(
+            f"Extracted {len(unique_hcps)} unique HCP profiles and "
+            f"{len(publication_records)} author-publication links."
+        )
+
+        if dry_run:
+            print("Sample publication titles:")
+            for article in articles[:5]:
+                title = text_or_none(article.find("./MedlineCitation/Article/ArticleTitle"))
+                print(f"  - {title or '(no title)'}")
+            continue
+
+        assert supabase is not None
 
         print("Upserting HCPs into Supabase...")
         hcp_id_map = upsert_hcps(supabase, unique_hcps)
@@ -1082,6 +1014,11 @@ def run_pipeline() -> None:
         )
         print(f"Upserted {link_count} hcp_therapeutic_areas rows for {query_label}.")
 
+    if dry_run:
+        print("Dry run completed.")
+        return
+
+    assert supabase is not None
     print("Starting second pass author enrichment...")
     second_pass_count = run_author_enrichment_second_pass(
         supabase=supabase,
@@ -1095,9 +1032,32 @@ def run_pipeline() -> None:
     print("Pipeline run completed.")
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="PubMed -> Supabase pipeline for FieldMark")
+    parser.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        help="Single TA slug or comma-separated list (default: all configs in config/therapeutic_areas/)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch PubMed results and print samples without writing to Supabase",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Cap PMIDs per TA (testing)",
+    )
+    args = parser.parse_args()
+    run_pipeline(args)
+
+
 if __name__ == "__main__":
     try:
-        run_pipeline()
+        main()
     except Exception as error:
         print(f"[ERROR] Pipeline failed: {error}")
         raise
