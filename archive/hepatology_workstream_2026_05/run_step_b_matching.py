@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import random
 import sys
 import time
 from datetime import datetime
@@ -43,6 +44,17 @@ def get_table_name(base_name: str, target_version: str) -> str:
 
 KEYSET_BATCH_SIZE = 500
 PROGRESS_EVERY = 500
+
+# hcps_v2 columns differ from v1. There is no openalex_author_id (linkage
+# lives in hcp_openalex_authors_v2) and no nppes_organization_name/institution/
+# city/state; the closest analogs are institution_normalized and
+# nppes_practice_state, aliased to the legacy keys the matcher expects.
+# nppes_organization_name and openalex_author_id are intentionally absent, so
+# h.get(...) yields None (trusted-ROR org lookup and Category 1 seed no-op).
+HCP_SELECT_COLUMNS_V2 = (
+    "id,first_name,last_name,npi_number,country,"
+    "institution:institution_normalized,state:nppes_practice_state"
+)
 
 HIGH_CONF_STATUSES = frozenset(
     {
@@ -178,7 +190,7 @@ def match_method_for_status(status: str) -> str:
 
 def table_exists(supabase: Client, table_name: str) -> bool:
     try:
-        supabase.table(table_name).select("id").limit(1).execute()
+        supabase.table(table_name).select("*").limit(1).execute()
         return True
     except Exception:
         return False
@@ -239,6 +251,38 @@ def fetch_hcp_keyset_batch(
     target_version: str = "v1",
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     hcps_table = get_table_name("hcps", target_version)
+
+    if target_version == "v2":
+        # v2 candidates = HCPs in hcps_v2 with no row yet in
+        # hcp_openalex_authors_v2 (anti-join on hcp_id). We keyset-paginate
+        # hcps_v2, then drop rows that already have a join-table match.
+        q = (
+            supabase.table(hcps_table)
+            .select(HCP_SELECT_COLUMNS_V2)
+            .order("id")
+            .limit(batch_size)
+        )
+        if last_id is not None:
+            q = q.gt("id", last_id)
+        rows = q.execute().data or []
+        # Cursor is derived from the full fetched batch (before filtering) so
+        # pagination keeps advancing even when every row is already matched.
+        next_cursor = str(rows[-1]["id"]) if rows else None
+        if rows:
+            hcp_oa_table = get_table_name("hcp_openalex_authors", target_version)
+            ids = [str(r["id"]) for r in rows]
+            existing = (
+                supabase.table(hcp_oa_table)
+                .select("hcp_id")
+                .in_("hcp_id", ids)
+                .execute()
+                .data
+                or []
+            )
+            already_matched = {str(r["hcp_id"]) for r in existing}
+            rows = [r for r in rows if str(r["id"]) not in already_matched]
+        return rows, next_cursor
+
     q = (
         supabase.table(hcps_table)
         .select(stepb.HCP_SELECT_COLUMNS)
@@ -250,6 +294,48 @@ def fetch_hcp_keyset_batch(
     rows = q.execute().data or []
     next_cursor = str(rows[-1]["id"]) if rows else None
     return rows, next_cursor
+
+
+def fetch_hcps_by_ids(
+    supabase: Client, ids: Sequence[str], target_version: str = "v1"
+) -> List[Dict[str, Any]]:
+    if target_version == "v1":
+        return stepb.fetch_hcps_by_ids(supabase, ids)
+
+    if not ids:
+        return []
+
+    hcps_table = get_table_name("hcps", target_version)
+    out: List[Dict[str, Any]] = []
+    for i in range(0, len(ids), 500):
+        chunk = list(ids[i : i + 500])
+        out.extend(
+            supabase.table(hcps_table)
+            .select(stepb.HCP_SELECT_COLUMNS)
+            .in_("id", chunk)
+            .execute()
+            .data
+            or []
+        )
+    return out
+
+
+def select_candidate_hcp_ids(supabase: Client, target_version: str = "v1") -> List[str]:
+    hcps_table = get_table_name("hcps", target_version)
+    rows = supabase.table(hcps_table).select("id").execute().data or []
+    return [str(r["id"]) for r in rows if r.get("id")]
+
+
+def load_hcps_random_sample(
+    supabase: Client, n: int, target_version: str = "v1"
+) -> List[Dict[str, Any]]:
+    if target_version == "v1":
+        return stepb.load_hcps_random_sample(supabase, n)
+
+    ids = select_candidate_hcp_ids(supabase, target_version)
+    rng = random.Random(42)
+    rng.shuffle(ids)
+    return fetch_hcps_by_ids(supabase, ids[:n], target_version)
 
 
 def build_join_rows(
@@ -580,7 +666,7 @@ def run() -> None:
 
     if args.canonicals_only:
         ids = list(canonical_ids)
-        hcps = stepb.fetch_hcps_by_ids(supabase, ids)
+        hcps = fetch_hcps_by_ids(supabase, ids, target_version)
         hcps.sort(key=lambda x: str(x.get("id")))
         print(f"Canonical-only mode: {len(hcps)} HCP row(s)\n")
         for i, h in enumerate(tqdm(hcps, desc="matching HCPs", unit="hcp"), start=1):
@@ -590,7 +676,7 @@ def run() -> None:
                 flush_joins()
                 flush_hcp_updates()
     elif args.random_sample is not None:
-        hcps = stepb.load_hcps_random_sample(supabase, args.random_sample)
+        hcps = load_hcps_random_sample(supabase, args.random_sample, target_version)
         print(f"Random sample: {len(hcps)} HCP row(s)\n")
         for i, h in enumerate(tqdm(hcps, desc="matching HCPs", unit="hcp"), start=1):
             if not handle_one_hcp(h):

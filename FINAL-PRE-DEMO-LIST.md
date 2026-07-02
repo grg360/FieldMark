@@ -42,6 +42,12 @@ Updated Wed Jun 18, 2026 ~11pm (laptop vacation session).
 - Fix: Frontend conditional, single file (likely DetailScreen.tsx)
 - Time: 10-15 min
 
+### Flag Organizations in Social Feature
+- Problem: Social feature surfaces organizational accounts (OncoAlert, likely ESMO/ASCO/etc.) mixed in with individual HCPs/experts. They produce relevant content but conflate "voice" with "person."
+- Fix: Add an org-vs-individual flag to social data (likely a column on the underlying handle/account table or a derived classification). Render org accounts with a distinct visual treatment (different badge, "ORG" label, or muted styling) so MSLs can tell at a glance.
+- Open Questions: Where does the org classification live - database column on the existing handle table, or a separate orgs lookup table? Are there other org accounts beyond the obvious ones (OncoAlert, ESMO, ASCO) that need cataloging? Manual list to start, or automated detection?
+- Time: 30-60 min if scoping stays small; longer if it becomes a real classification project
+
 ---
 
 ## Desktop Session Required (Python Pipeline Work)
