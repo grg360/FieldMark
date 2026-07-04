@@ -20,12 +20,30 @@ WEIGHTED_RELEVANT_THRESHOLD = 5.0
 FRACTION_THRESHOLD = 0.30
 OUTPUT_LOG_PATH = "ta_tagging_rebuild_log.json"
 
-CANONICALS = [
-    {"label": "Loomba", "hcp_id": "8a5ed89d-df8a-4b7c-a5f7-37f602b63577", "expected_ta": "Hepatology"},
-    {"label": "Sanyal", "hcp_id": "be751618-9371-4ce1-8760-c579599fd30e", "expected_ta": "Hepatology"},
-    {"label": "Chalasani", "hcp_id": "22388b63-dc82-44d7-abaa-24ab8f4ab8eb", "expected_ta": "Hepatology"},
-    {"label": "Kowdley", "hcp_id": "272ff3bc-0464-499b-9ab2-1ceae503e415", "expected_ta": "Hepatology"},
-]
+CANONICALS_BY_TA: Dict[str, List[Dict[str, Any]]] = {
+    "hepatology": [
+        {"label": "Loomba", "hcp_id": "8a5ed89d-df8a-4b7c-a5f7-37f602b63577", "expected_ta": "Hepatology"},
+        {"label": "Sanyal", "hcp_id": "be751618-9371-4ce1-8760-c579599fd30e", "expected_ta": "Hepatology"},
+        {"label": "Chalasani", "hcp_id": "22388b63-dc82-44d7-abaa-24ab8f4ab8eb", "expected_ta": "Hepatology"},
+        {"label": "Kowdley", "hcp_id": "272ff3bc-0464-499b-9ab2-1ceae503e415", "expected_ta": "Hepatology"},
+    ],
+    "atopic-dermatitis": [
+        {"label": "Silverberg", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Jonathan Silverberg"},
+        {"label": "Simpson", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Eric Simpson"},
+        {"label": "Eichenfield", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Lawrence Eichenfield"},
+        {"label": "Guttman-Yassky", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Emma Guttman-Yassky"},
+        {"label": "Flohr", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Carsten Flohr"},
+        {"label": "Bieber", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Thomas Bieber"},
+        {"label": "Irvine", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Alan Irvine"},
+        {"label": "Wollenberg", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Andreas Wollenberg"},
+        {"label": "Lio", "hcp_id": None, "expected_ta": "Atopic Dermatitis", "lookup_name": "Peter Lio"},
+    ],
+}
+
+# Backward compat: default CANONICALS is the full merged list (used when no --ta)
+CANONICALS: List[Dict[str, Any]] = []
+for _clist in CANONICALS_BY_TA.values():
+    CANONICALS.extend(_clist)
 
 logger = logging.getLogger("ta_tagging_rebuild")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -52,10 +70,69 @@ def recency_multiplier(pub_year: Optional[int]) -> float:
     return 0.5
 
 
-def fetch_curated_concepts(client: Client) -> Dict[str, Set[str]]:
-    """Return {ta_id: set(openalex_concept_ids)}."""
-    print("Loading curated_ta_concepts...")
-    rows = client.table("curated_ta_concepts").select("therapeutic_area_id,openalex_concept_id").execute().data or []
+def resolve_ta_slug(client: Client, slug: str) -> Tuple[str, str]:
+    """Resolve a TA slug to (therapeutic_area_id, ta_name). Raises if not found."""
+    rows = (
+        client.table("therapeutic_areas")
+        .select("id,name,slug")
+        .eq("slug", slug)
+        .execute()
+        .data or []
+    )
+    if not rows:
+        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
+    ta_id = str(rows[0]["id"])
+    ta_name = str(rows[0]["name"])
+    return ta_id, ta_name
+
+
+def resolve_canonical_hcp_ids(client: Client, canonicals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """For canonicals with hcp_id=None, attempt to resolve via last_name lookup in hcps_v2."""
+    resolved = []
+    for c in canonicals:
+        entry = dict(c)
+        if entry.get("hcp_id") is None and entry.get("lookup_name"):
+            parts = entry["lookup_name"].rsplit(" ", 1)
+            last_name = parts[-1] if parts else entry["lookup_name"]
+            rows = (
+                client.table("hcps_v2")
+                .select("id,first_name,last_name")
+                .eq("last_name", last_name)
+                .execute()
+                .data or []
+            )
+            if len(rows) == 1:
+                entry["hcp_id"] = str(rows[0]["id"])
+            elif len(rows) > 1:
+                first_name = parts[0].lower() if len(parts) > 1 else ""
+                matches = [r for r in rows if (r.get("first_name") or "").lower().startswith(first_name[:3])]
+                if len(matches) == 1:
+                    entry["hcp_id"] = str(matches[0]["id"])
+                else:
+                    logger.warning(f"  Could not uniquely resolve canonical '{entry['lookup_name']}' ({len(rows)} matches)")
+            else:
+                logger.warning(f"  Canonical '{entry['lookup_name']}' not found in hcps_v2")
+        resolved.append(entry)
+    return resolved
+
+
+def fetch_curated_concepts(client: Client, scoped_ta_id: Optional[str] = None) -> Dict[str, Set[str]]:
+    """Return {ta_id: set(openalex_concept_ids)}.
+
+    When scoped_ta_id is provided, only that TA's concepts are loaded.
+    """
+    if scoped_ta_id:
+        print(f"Loading curated_ta_concepts for TA {scoped_ta_id} only...")
+        rows = (
+            client.table("curated_ta_concepts")
+            .select("therapeutic_area_id,openalex_concept_id")
+            .eq("therapeutic_area_id", scoped_ta_id)
+            .execute()
+            .data or []
+        )
+    else:
+        print("Loading curated_ta_concepts (all TAs)...")
+        rows = client.table("curated_ta_concepts").select("therapeutic_area_id,openalex_concept_id").execute().data or []
     by_ta: Dict[str, Set[str]] = defaultdict(set)
     for r in rows:
         ta_id = str(r.get("therapeutic_area_id") or "")
@@ -351,47 +428,78 @@ def compute_canonical_check(
     hcp_ta_aggregates: Dict[Tuple[str, str], Dict[str, float]],
     hcp_total_pubs: Dict[str, int],
     ta_names: Dict[str, str],
+    canonicals: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
+    check_list = canonicals if canonicals is not None else CANONICALS
+    if not check_list:
+        return []
     ta_id_by_name = {v: k for k, v in ta_names.items()}
     row_lookup = {(r["hcp_id"], r["therapeutic_area_id"]): r for r in rows}
     out = []
-    for c in CANONICALS:
+    for c in check_list:
+        hcp_id = c.get("hcp_id")
+        if not hcp_id:
+            print(f"Canonical {c['label']}: [SKIPPED — hcp_id not resolved]")
+            out.append({"label": c["label"], "hcp_id": None, "expected_ta": c["expected_ta"], "tagged": False, "note": "hcp_id not resolved"})
+            continue
         ta_id = ta_id_by_name.get(c["expected_ta"])
         entry = {
             "label": c["label"],
-            "hcp_id": c["hcp_id"],
+            "hcp_id": hcp_id,
             "expected_ta": c["expected_ta"],
             "tagged": False,
             "weighted_relevant": None,
             "relevant_count": None,
-            "total_pubs": hcp_total_pubs.get(c["hcp_id"]),
+            "total_pubs": hcp_total_pubs.get(hcp_id),
             "fraction": None,
         }
         if ta_id:
-            agg = hcp_ta_aggregates.get((c["hcp_id"], ta_id))
+            agg = hcp_ta_aggregates.get((hcp_id, ta_id))
             if agg:
                 entry["weighted_relevant"] = agg["weighted_relevant"]
                 entry["relevant_count"] = int(agg["relevant_count"])
-                total = hcp_total_pubs.get(c["hcp_id"], 0)
+                total = hcp_total_pubs.get(hcp_id, 0)
                 entry["fraction"] = (entry["relevant_count"] / total) if total > 0 else None
-            entry["tagged"] = (c["hcp_id"], ta_id) in row_lookup
+            entry["tagged"] = (hcp_id, ta_id) in row_lookup
         out.append(entry)
         print(f"Canonical {c['label']}: {json.dumps(entry, default=str)}")
     return out
 
 
-def run(execute: bool) -> None:
+def run(execute: bool, ta_slug: Optional[str] = None) -> None:
     load_dotenv()
     client = sb()
     started = time.time()
     mode = "execute" if execute else "dry_run"
     errors: List[str] = []
 
+    # Resolve TA scope
+    scoped_ta_id: Optional[str] = None
+    scoped_ta_name: Optional[str] = None
+    if ta_slug:
+        scoped_ta_id, scoped_ta_name = resolve_ta_slug(client, ta_slug)
+        print(f"\n{'='*60}")
+        print(f"  TA-SCOPED RUN: {scoped_ta_name} (slug={ta_slug})")
+        print(f"  therapeutic_area_id: {scoped_ta_id}")
+        print(f"  Only this TA's concepts will be loaded.")
+        print(f"  Only this TA's hcp_therapeutic_areas_v2 rows will be written.")
+        print(f"{'='*60}\n")
+    else:
+        print("\n[INFO] Running for ALL therapeutic areas (no --ta flag).\n")
+
     # Phase 1: reference data
-    curated = fetch_curated_concepts(client)
+    curated = fetch_curated_concepts(client, scoped_ta_id=scoped_ta_id)
     ta_names = fetch_ta_names(client)
     if not curated:
         raise RuntimeError("curated_ta_concepts is empty - cannot proceed")
+
+    # Safety assertion: when scoped, curated must contain ONLY the target TA
+    if scoped_ta_id:
+        unexpected_tas = set(curated.keys()) - {scoped_ta_id}
+        if unexpected_tas:
+            raise RuntimeError(
+                f"SAFETY VIOLATION: curated concepts contain non-scoped TAs: {unexpected_tas}. Aborting."
+            )
 
     # Phase 2: per-pub TA scores
     pub_ta_scores = compute_pub_ta_scores(client, curated)
@@ -402,21 +510,41 @@ def run(execute: bool) -> None:
     # Phase 4: apply gate
     rows = apply_gate_and_emit(hcp_ta_aggregates, hcp_total_pubs)
 
+    # Safety assertion: when scoped, all emitted rows must be for the scoped TA
+    if scoped_ta_id:
+        bad_rows = [r for r in rows if r["therapeutic_area_id"] != scoped_ta_id]
+        if bad_rows:
+            raise RuntimeError(
+                f"SAFETY VIOLATION: {len(bad_rows)} rows have therapeutic_area_id != {scoped_ta_id}. Aborting."
+            )
+
+    # Select canonicals based on TA scope
+    if ta_slug and ta_slug in CANONICALS_BY_TA:
+        active_canonicals = resolve_canonical_hcp_ids(client, CANONICALS_BY_TA[ta_slug])
+    elif ta_slug:
+        active_canonicals = []
+        print(f"\n[INFO] No canonicals defined for TA slug '{ta_slug}'; skipping canonical check.")
+    else:
+        active_canonicals = CANONICALS
+
     # Stats
     level_1 = compute_level_1_stats(rows, hcp_ta_aggregates, ta_names)
     print("\n=== Level 1 stats ===")
     print(json.dumps(level_1, indent=2, default=str))
 
-    print("\n=== Level 2 canonicals ===")
-    level_2 = compute_canonical_check(rows, hcp_ta_aggregates, hcp_total_pubs, ta_names)
+    level_2: List[Dict[str, Any]] = []
+    if active_canonicals:
+        print("\n=== Level 2 canonicals ===")
+        level_2 = compute_canonical_check(rows, hcp_ta_aggregates, hcp_total_pubs, ta_names, canonicals=active_canonicals)
 
     # Phase 5: write
     rows_inserted: Optional[int] = None
     if not execute:
         print("\n[DRY-RUN] Skipping write.")
     else:
+        scope_label = f" ({scoped_ta_name})" if scoped_ta_name else ""
         confirm = input(
-            f"\nAbout to UPSERT {len(rows)} rows into hcp_therapeutic_areas_v2. "
+            f"\nAbout to UPSERT {len(rows)} rows into hcp_therapeutic_areas_v2{scope_label}. "
             f"Continue? (yes/no): "
         )
         if confirm != "yes":
@@ -435,6 +563,8 @@ def run(execute: bool) -> None:
     log_payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
+        "ta_scope": ta_slug or "all",
+        "scoped_ta_id": scoped_ta_id,
         "elapsed_seconds": elapsed,
         "level_1_stats": level_1,
         "level_2_canonicals": level_2,
@@ -450,5 +580,7 @@ def run(execute: bool) -> None:
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Rebuild hcp_therapeutic_areas_v2 from publication concepts")
     p.add_argument("--execute", action="store_true", default=False, help="Enable writes (default dry-run)")
+    p.add_argument("--ta", type=str, default=None, metavar="SLUG",
+                   help="Scope run to a single therapeutic area by slug (e.g. atopic-dermatitis)")
     args = p.parse_args()
-    run(args.execute)
+    run(args.execute, ta_slug=args.ta)
