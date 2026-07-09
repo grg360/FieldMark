@@ -23,6 +23,7 @@ Columns:
 
 from __future__ import annotations
 
+import argparse
 import os
 import time
 from collections import Counter
@@ -35,7 +36,13 @@ from supabase import Client, create_client
 
 PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
 HCP_PAGE_SIZE = 1000
+HCP_ID_CHUNK = 200
 UPSERT_BATCH_SIZE = 500
+
+# AD ta_id default; resolved from --ta slug at runtime.
+DEFAULT_TA_SLUG = "atopic-dermatitis"
+
+_ELIGIBLE_HCPS_CACHE: Dict[str, List[Dict]] = {}
 
 
 def get_required_env(name: str) -> str:
@@ -105,29 +112,113 @@ def _ensure_dataframe(result: Union[pd.DataFrame, pd.Series]) -> pd.DataFrame:
     return result
 
 
-def fetch_unmatched_hcps_page(supabase: Client, offset: int, limit: int) -> List[Dict]:
+def resolve_ta_id(supabase: Client, slug: str) -> str:
     response = (
-        supabase.table("hcps")
-        .select("id,first_name,last_name,state")
-        .eq("country", "USA")
-        .is_("npi_number", "null")
-        .order("id")
-        .range(offset, offset + limit - 1)
-        .execute()
-    )
-    return response.data or []
-
-
-def fetch_unmatched_hcps_count(supabase: Client) -> int:
-    response = (
-        supabase.table("hcps")
-        .select("id", count="estimated")
-        .eq("country", "USA")
-        .is_("npi_number", "null")
+        supabase.table("therapeutic_areas")
+        .select("id")
+        .eq("slug", slug)
         .limit(1)
         .execute()
     )
-    return int(response.count or 0)
+    rows = response.data or []
+    if not rows:
+        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
+    return str(rows[0]["id"])
+
+
+def fetch_community_hcp_ids(supabase: Client, ta_id: str) -> List[str]:
+    """Step 1: AD community cohort hcp_ids from hcp_cohort_classification_v2."""
+    ids: List[str] = []
+    offset = 0
+    while True:
+        batch = (
+            supabase.table("hcp_cohort_classification_v2")
+            .select("hcp_id")
+            .eq("therapeutic_area_id", ta_id)
+            .eq("cohort", "community")
+            .order("hcp_id")
+            .range(offset, offset + HCP_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        ids.extend(str(row["hcp_id"]) for row in batch if row.get("hcp_id"))
+        if len(batch) < HCP_PAGE_SIZE:
+            break
+        offset += HCP_PAGE_SIZE
+    return ids
+
+
+def hcp_state_from_v2(row: Dict) -> str:
+    """COALESCE(nppes_practice_state, derived_state) for NPPES state matching."""
+    return norm_state(row.get("nppes_practice_state") or row.get("derived_state"))
+
+
+def load_eligible_unmatched_hcps(supabase: Client, ta_id: str) -> List[Dict]:
+    """
+    Two-step v2 cohort load:
+      1) community hcp_ids for scoped TA from hcp_cohort_classification_v2
+      2) hcps_v2 rows: id IN cohort, npi_number IS NULL, US-identifiable via state
+    """
+    if ta_id in _ELIGIBLE_HCPS_CACHE:
+        return _ELIGIBLE_HCPS_CACHE[ta_id]
+
+    community_ids = fetch_community_hcp_ids(supabase, ta_id)
+    eligible: List[Dict] = []
+
+    for i in range(0, len(community_ids), HCP_ID_CHUNK):
+        chunk = community_ids[i : i + HCP_ID_CHUNK]
+        offset = 0
+        while True:
+            batch = (
+                supabase.table("hcps_v2")
+                .select("id,first_name,last_name,nppes_practice_state,derived_state")
+                .in_("id", chunk)
+                .is_("npi_number", "null")
+                .or_("derived_state.not.is.null,nppes_practice_state.not.is.null")
+                .order("id")
+                .range(offset, offset + HCP_PAGE_SIZE - 1)
+                .execute()
+                .data
+                or []
+            )
+            if not batch:
+                break
+            for row in batch:
+                state = hcp_state_from_v2(row)
+                if not state:
+                    continue
+                eligible.append(
+                    {
+                        "id": row["id"],
+                        "first_name": row.get("first_name"),
+                        "last_name": row.get("last_name"),
+                        "state": state,
+                    }
+                )
+            if len(batch) < HCP_PAGE_SIZE:
+                break
+            offset += HCP_PAGE_SIZE
+
+    eligible.sort(key=lambda row: str(row["id"]))
+    _ELIGIBLE_HCPS_CACHE[ta_id] = eligible
+    return eligible
+
+
+def fetch_unmatched_hcps_page(
+    supabase: Client,
+    ta_id: str,
+    offset: int,
+    limit: int,
+) -> List[Dict]:
+    eligible = load_eligible_unmatched_hcps(supabase, ta_id)
+    return eligible[offset : offset + limit]
+
+
+def fetch_unmatched_hcps_count(supabase: Client, ta_id: str) -> int:
+    return len(load_eligible_unmatched_hcps(supabase, ta_id))
 
 
 def candidate_taxonomy_codes(row: pd.Series) -> List[str]:
@@ -285,15 +376,24 @@ def bulk_upsert_proposals(supabase: Client, rows: Sequence[Dict]) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Propose NPI matches for unmatched US community HCPs")
+    parser.add_argument("--ta", default=DEFAULT_TA_SLUG, help="Therapeutic area slug")
+    parser.add_argument("--dry-run", action="store_true", help="Compute matches but skip DB writes")
+    args = parser.parse_args()
+
     load_dotenv()
     started = time.time()
     supabase = init_supabase()
+    ta_id = resolve_ta_id(supabase, args.ta)
+
+    print(f"TA={args.ta} (ta_id={ta_id})")
+    print(f"Mode: {'DRY-RUN (no writes)' if args.dry_run else 'EXECUTE (writes enabled)'}")
 
     print("Loading NPPES parquet...")
     nppes_df = load_nppes_df()
 
-    total_hcps = fetch_unmatched_hcps_count(supabase)
-    print(f"Loaded {total_hcps} unmatched US HCPs")
+    total_hcps = fetch_unmatched_hcps_count(supabase, ta_id)
+    print(f"Loaded {total_hcps} unmatched US community HCPs (v2, state-set, no NPI)")
 
     tier_counts: Counter = Counter()
     status_counts: Counter = Counter()
@@ -303,7 +403,7 @@ def main() -> None:
     now_iso = datetime.now(timezone.utc).isoformat()
 
     while True:
-        hcp_page = fetch_unmatched_hcps_page(supabase, offset, HCP_PAGE_SIZE)
+        hcp_page = fetch_unmatched_hcps_page(supabase, ta_id, offset, HCP_PAGE_SIZE)
         if not hcp_page:
             break
 
@@ -398,7 +498,8 @@ def main() -> None:
             tier_counts[tier] += 1
             status_counts[status] += 1
 
-        bulk_upsert_proposals(supabase, proposals)
+        if not args.dry_run:
+            bulk_upsert_proposals(supabase, proposals)
 
         processed += len(hcp_page)
         if processed % 1000 == 0 or processed == total_hcps:
@@ -424,6 +525,8 @@ def main() -> None:
     for status in ["matched_high", "matched_medium", "review_pending", "no_match", "ambiguous"]:
         print(f"  {status}: {status_counts.get(status, 0)}")
     print(f"Estimated v1 application count (Tier 1 + Tier 2): {tier_counts.get(1, 0) + tier_counts.get(2, 0)}")
+    if args.dry_run:
+        print("[dry-run] skipped npi_match_proposals upsert")
     print(f"Total runtime: {time.time() - started:.1f}s")
 
 

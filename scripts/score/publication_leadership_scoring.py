@@ -56,13 +56,13 @@ def resolve_ta_id(conn, slug: str) -> str:
 
 
 def fetch_established_hcp_ids(conn, ta_id: str, limit: int | None = None) -> list[str]:
-    """Distinct Established cohort HCPs ordered by best (minimum) rank."""
+    """Distinct Established cohort HCPs from hcp_cohort_classification_v2."""
     sql = """
-        SELECT er.hcp_id
-        FROM hcp_established_ranks_v2 er
-        WHERE er.therapeutic_area_id = %s
-        GROUP BY er.hcp_id
-        ORDER BY MIN(er.rank)
+        SELECT cc.hcp_id
+        FROM hcp_cohort_classification_v2 cc
+        WHERE cc.therapeutic_area_id = %s
+          AND cc.cohort = 'established'
+        ORDER BY cc.hcp_id
     """
     params: list[Any] = [ta_id]
     if limit is not None:
@@ -111,7 +111,8 @@ def fetch_signals(conn, ta_id: str, hcp_ids: list[str] | None = None) -> list[di
         FROM publication_authors_v2 pa
         JOIN ta_pubs p ON p.id = pa.publication_id
         WHERE pa.hcp_id IN (
-          SELECT DISTINCT hcp_id FROM hcp_established_ranks_v2 WHERE therapeutic_area_id = %s
+          SELECT hcp_id FROM hcp_cohort_classification_v2
+          WHERE therapeutic_area_id = %s AND cohort = 'established'
         ){hcp_filter}
         GROUP BY pa.hcp_id
     """
@@ -148,17 +149,22 @@ def compute_normalized(raw_scores: list[float]) -> list[float]:
     return [((score - score_min) / (score_max - score_min)) * 100.0 for score in raw_scores]
 
 
-def compute_percentile_ranks(raw_scores: list[float]) -> list[int]:
-    """NTILE(100)-equivalent: 100 = top, 1 = bottom."""
+def compute_percentile_ranks(raw_scores: list[float]) -> list[float]:
+    """Continuous rank-percentile: 100 = highest, 0+ = lowest, each HCP unique.
+
+    Matches network_centrality_scoring / pharma_engagement_scoring:
+      percentile = 100.0 * (1.0 - position / (n - 1))  # 0-indexed, descending
+    """
     if not raw_scores:
         return []
     n = len(raw_scores)
     indexed = sorted(enumerate(raw_scores), key=lambda item: item[1], reverse=True)
-    ranks = [0] * n
+    if n == 1:
+        return [100.0]
+    ranks = [0.0] * n
     for position, (orig_idx, _) in enumerate(indexed):
-        percentile = 100 - int(position * 100 / n)
-        percentile = max(1, min(100, percentile))
-        ranks[orig_idx] = percentile
+        percentile = 100.0 * (1.0 - position / (n - 1))
+        ranks[orig_idx] = round(percentile, 2)
     return ranks
 
 
@@ -240,7 +246,7 @@ def upsert_results(conn, ta_id: str, rows: list[dict]) -> int:
 
 @click.command()
 @click.option("--ta", default="nsclc", help="Therapeutic area slug")
-@click.option("--limit", default=None, type=int, help="Process only first N Established HCPs by rank")
+@click.option("--limit", default=None, type=int, help="Process only first N Established HCPs (by hcp_id)")
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=10, type=int, help="Print top N raw scores before writing")
 def main(ta: str, limit: int | None, dry_run: bool, debug_top: int) -> None:
@@ -278,8 +284,9 @@ def main(ta: str, limit: int | None, dry_run: bool, debug_top: int) -> None:
     )
     for i, row in enumerate(top_n, 1):
         name = " ".join(hcp_names.get(str(row["hcp_id"]), ("?", "?")))
+        name_safe = name.encode("ascii", errors="replace").decode("ascii")
         print(
-            f"{i:<5} {name[:29]:<30} {row['percentile_rank']:<6} {row['raw_score']:<8.1f} "
+            f"{i:<5} {name_safe[:29]:<30} {row['percentile_rank']:<6.2f} {row['raw_score']:<8.1f} "
             f"{row['senior_pub_count']:<4} {row['senior_pub_recent_5yr']:<5} "
             f"{row['senior_pub_total_citations']:<6} {row['guideline_pub_count']:<3} "
             f"{row['guideline_pub_senior']:<3}"

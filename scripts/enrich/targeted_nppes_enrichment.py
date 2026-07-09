@@ -26,7 +26,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from tqdm import tqdm
 
@@ -47,6 +47,8 @@ NPPES_API_URL = "https://npiregistry.cms.hhs.gov/api/?version=2.1"
 REQUEST_TIMEOUT_SECONDS = 20
 API_SLEEP_SECONDS = 0.1
 HCPS_PAGE_SIZE = 1000
+
+US_COUNTRY_CODES = ("US", "USA")
 
 US_STATES_AND_TERRITORIES = [
     "AL",
@@ -104,6 +106,112 @@ US_STATES_AND_TERRITORIES = [
 ]
 
 
+def resolve_ta_slug(supabase_client: Client, slug: str) -> Tuple[str, str]:
+    """Resolve a TA slug to (therapeutic_area_id, ta_name)."""
+    rows = (
+        supabase_client.table("therapeutic_areas")
+        .select("id,name,slug")
+        .eq("slug", slug)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
+    return str(rows[0]["id"]), str(rows[0]["name"])
+
+
+def fetch_hcp_ids_for_ta(supabase_client: Client, ta_id: str) -> Set[str]:
+    """Load hcp_ids tagged to a therapeutic area via hcp_therapeutic_areas_v2."""
+    ta_table = "hcp_therapeutic_areas_v2"
+    hcp_ids: Set[str] = set()
+    offset = 0
+    while True:
+        batch = (
+            supabase_client.table(ta_table)
+            .select("hcp_id")
+            .eq("therapeutic_area_id", ta_id)
+            .order("hcp_id")
+            .range(offset, offset + HCPS_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            hid = row.get("hcp_id")
+            if hid:
+                hcp_ids.add(str(hid))
+        if len(batch) < HCPS_PAGE_SIZE:
+            break
+        offset += HCPS_PAGE_SIZE
+    return hcp_ids
+
+
+def fetch_hcp_ids_for_ingestion_runs(
+    supabase_client: Client, ingestion_run_ids: List[str], *, target_version: str
+) -> Set[str]:
+    """Load hcp_ids whose hcps_v2.ingestion_run_id is in the given run set."""
+    hcps_table = get_table_name("hcps", target_version)
+    hcp_ids: Set[str] = set()
+    for run_id in ingestion_run_ids:
+        offset = 0
+        while True:
+            batch = (
+                supabase_client.table(hcps_table)
+                .select("id")
+                .eq("ingestion_run_id", run_id)
+                .order("id")
+                .range(offset, offset + HCPS_PAGE_SIZE - 1)
+                .execute()
+                .data
+                or []
+            )
+            if not batch:
+                break
+            for row in batch:
+                hid = row.get("id")
+                if hid:
+                    hcp_ids.add(str(hid))
+            if len(batch) < HCPS_PAGE_SIZE:
+                break
+            offset += HCPS_PAGE_SIZE
+    return hcp_ids
+
+
+def build_scoped_hcp_ids(
+    supabase_client: Client,
+    *,
+    ta_id: Optional[str],
+    ingestion_run_ids: Optional[List[str]],
+    target_version: str,
+) -> Set[str]:
+    """Build the scoped HCP id set. When both filters are given, intersect them."""
+    scoped_sets: List[Set[str]] = []
+    if ta_id:
+        ta_hcps = fetch_hcp_ids_for_ta(supabase_client, ta_id)
+        print(f"[SCOPE] TA filter: {len(ta_hcps):,} HCPs in hcp_therapeutic_areas_v2")
+        scoped_sets.append(ta_hcps)
+    if ingestion_run_ids:
+        run_hcps = fetch_hcp_ids_for_ingestion_runs(
+            supabase_client, ingestion_run_ids, target_version=target_version
+        )
+        print(
+            f"[SCOPE] ingestion_run_id filter ({len(ingestion_run_ids)} run(s)): "
+            f"{len(run_hcps):,} HCPs"
+        )
+        scoped_sets.append(run_hcps)
+
+    if not scoped_sets:
+        return set()
+
+    scoped = scoped_sets[0]
+    for extra in scoped_sets[1:]:
+        scoped &= extra
+    return scoped
+
+
 def create_supabase_client() -> Client:
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_service_key = os.environ.get("SUPABASE_KEY")
@@ -122,6 +230,7 @@ def get_candidate_hcps(
     us_only: bool = True,
     limit: Optional[int] = None,
     target_version: str = "v1",
+    scoped_hcp_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
     if target_version == "v1":
         query = (
@@ -165,33 +274,10 @@ def get_candidate_hcps(
 
         return filtered
 
+    if scoped_hcp_ids is not None and not scoped_hcp_ids:
+        return []
+
     hcps_table = get_table_name("hcps", target_version)
-    oa_table = get_table_name("hcp_openalex_authors", target_version)
-
-    oa_by_hcp: Dict[str, Any] = {}
-    offset = 0
-    while True:
-        oa_batch = (
-            supabase_client.table(oa_table)
-            .select("hcp_id,openalex_author_id")
-            .eq("is_primary", True)
-            .order("hcp_id")
-            .range(offset, offset + HCPS_PAGE_SIZE - 1)
-            .execute()
-            .data
-            or []
-        )
-        if not oa_batch:
-            break
-        for row in oa_batch:
-            hcp_id = row.get("hcp_id")
-            oa_id = row.get("openalex_author_id")
-            if hcp_id and oa_id:
-                oa_by_hcp[str(hcp_id)] = oa_id
-        if len(oa_batch) < HCPS_PAGE_SIZE:
-            break
-        offset += HCPS_PAGE_SIZE
-
     raw_hcps: List[Dict[str, Any]] = []
     offset = 0
     while True:
@@ -200,8 +286,9 @@ def get_candidate_hcps(
         q = (
             supabase_client.table(hcps_table)
             .select(
-                "id,first_name,last_name,nppes_practice_state,institution_normalized,"
-                "total_career_pubs,npi_number"
+                "id,first_name,last_name,middle_name,country,institution_normalized,"
+                "institution_canonical,total_career_pubs,npi_number,nppes_practice_state,"
+                "derived_state,ingestion_run_id"
             )
             .is_("npi_number", "null")
             .gte("total_career_pubs", min_career_pubs)
@@ -209,7 +296,7 @@ def get_candidate_hcps(
             .not_.is_("last_name", "null")
         )
         if us_only:
-            q = q.in_("nppes_practice_state", US_STATES_AND_TERRITORIES)
+            q = q.in_("country", list(US_COUNTRY_CODES))
         batch = q.order("id").range(offset, offset + HCPS_PAGE_SIZE - 1).execute().data or []
         if not batch:
             break
@@ -223,19 +310,28 @@ def get_candidate_hcps(
         if limit is not None and len(filtered_v2) >= limit:
             break
         hcp_id = str(row.get("id") or "")
-        if not hcp_id or oa_by_hcp.get(hcp_id) is None:
+        if not hcp_id:
+            continue
+        if scoped_hcp_ids is not None and hcp_id not in scoped_hcp_ids:
             continue
         first = str(row.get("first_name") or "").strip()
         last = str(row.get("last_name") or "").strip()
         if not first or not last:
             continue
+        # NPPES search state: COALESCE(nppes_practice_state, derived_state)
+        nppes_state = (
+            str(row.get("nppes_practice_state") or row.get("derived_state") or "")
+            .strip()
+            .upper()
+        )
         filtered_v2.append(
             {
                 "id": row.get("id"),
                 "first_name": first,
                 "last_name": last,
-                "derived_state": row.get("nppes_practice_state"),
-                "institution_short": row.get("institution_normalized"),
+                "derived_state": nppes_state or None,
+                "institution_short": row.get("institution_normalized")
+                or row.get("institution_canonical"),
                 "total_career_pubs": row.get("total_career_pubs"),
             }
         )
@@ -501,7 +597,14 @@ def update_hcp_with_nppes(
     nppes_data: Dict[str, Any],
     dry_run: bool = True,
     target_version: str = "v1",
+    scoped_hcp_ids: Optional[Set[str]] = None,
 ) -> bool:
+    if scoped_hcp_ids is not None and hcp_id not in scoped_hcp_ids:
+        print(
+            f"[SAFETY] Refusing update for hcp_id={hcp_id}: outside scoped HCP set."
+        )
+        return False
+
     addresses = nppes_data.get("addresses") or []
     basic = nppes_data.get("basic") or {}
 
@@ -666,14 +769,63 @@ def main() -> None:
         default="v1",
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
     )
+    parser.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Scope enrichment to HCPs tagged to this therapeutic area (e.g. atopic-dermatitis).",
+    )
+    parser.add_argument(
+        "--ingestion-run-id",
+        action="append",
+        dest="ingestion_run_ids",
+        default=None,
+        metavar="UUID",
+        help="Scope enrichment to HCPs from a specific Step C ingestion run (repeatable).",
+    )
     args = parser.parse_args()
     dry_run = args.dry_run
     sample_limit = args.sample_limit
     min_career_pubs = args.min_career_pubs
     target_version = args.target_version
+    ta_slug = args.ta
+    ingestion_run_ids = args.ingestion_run_ids
 
     supabase_client = create_supabase_client()
     build_enrichment_log_table(supabase_client, target_version=target_version)
+
+    scoped_hcp_ids: Optional[Set[str]] = None
+    scoped_ta_id: Optional[str] = None
+    scoped_ta_name: Optional[str] = None
+
+    if target_version == "v2" and not ta_slug and not ingestion_run_ids:
+        raise SystemExit(
+            "v2 mode requires scoping: pass --ta <slug> and/or --ingestion-run-id <uuid> "
+            "so frozen TAs (e.g. NSCLC) are never touched."
+        )
+
+    if ta_slug or ingestion_run_ids:
+        if ta_slug:
+            scoped_ta_id, scoped_ta_name = resolve_ta_slug(supabase_client, ta_slug)
+        scoped_hcp_ids = build_scoped_hcp_ids(
+            supabase_client,
+            ta_id=scoped_ta_id,
+            ingestion_run_ids=ingestion_run_ids,
+            target_version=target_version,
+        )
+        print(f"\n{'='*60}")
+        if scoped_ta_name:
+            print(f"  TA-SCOPED RUN: {scoped_ta_name} (slug={ta_slug})")
+            print(f"  therapeutic_area_id: {scoped_ta_id}")
+        if ingestion_run_ids:
+            print(f"  ingestion_run_id(s): {', '.join(ingestion_run_ids)}")
+        print(f"  Scoped HCP count: {len(scoped_hcp_ids):,}")
+        print(f"  Only these HCPs can be selected or updated.")
+        print(f"{'='*60}\n")
+        if not scoped_hcp_ids:
+            print("[SCOPE] No HCPs match the scope filters. Exiting.")
+            return
 
     candidates = get_candidate_hcps(
         supabase_client,
@@ -681,10 +833,23 @@ def main() -> None:
         us_only=True,
         limit=sample_limit,
         target_version=target_version,
+        scoped_hcp_ids=scoped_hcp_ids,
     )
+
+    if scoped_hcp_ids is not None:
+        out_of_scope = [
+            str(h.get("id"))
+            for h in candidates
+            if str(h.get("id")) not in scoped_hcp_ids
+        ]
+        if out_of_scope:
+            raise RuntimeError(
+                f"SAFETY VIOLATION: {len(out_of_scope)} candidate(s) outside scoped HCP set. Aborting."
+            )
+
     print(
         f"[START] Candidate HCP count: {len(candidates)} "
-        f"(sample_limit={sample_limit}, dry_run={dry_run})"
+        f"(sample_limit={sample_limit}, dry_run={dry_run}, target_version={target_version})"
     )
 
     total_processed = 0
@@ -728,6 +893,7 @@ def main() -> None:
                 nppes_data=decision.get("nppes_data") or {},
                 dry_run=dry_run,
                 target_version=target_version,
+                scoped_hcp_ids=scoped_hcp_ids,
             )
             if did_update:
                 updated += 1
@@ -739,17 +905,20 @@ def main() -> None:
                 f"candidates={json.dumps(decision.get('candidates') or [])}"
             )
             if not dry_run:
-                supabase_client.table(
-                    get_table_name("nppes_enrichment_log", target_version)
-                ).insert(
-                    {
-                        "hcp_id": hcp_id,
-                        "matched_npi": None,
-                        "match_confidence": "ambiguous",
-                        "match_reason": "Multiple plausible NPPES matches; skipped.",
-                        "candidates_considered": nppes_raw.get("results") or [],
-                    }
-                ).execute()
+                if scoped_hcp_ids is not None and hcp_id not in scoped_hcp_ids:
+                    print(f"[SAFETY] Skipping ambiguous log for out-of-scope hcp_id={hcp_id}")
+                else:
+                    supabase_client.table(
+                        get_table_name("nppes_enrichment_log", target_version)
+                    ).insert(
+                        {
+                            "hcp_id": hcp_id,
+                            "matched_npi": None,
+                            "match_confidence": "ambiguous",
+                            "match_reason": "Multiple plausible NPPES matches; skipped.",
+                            "candidates_considered": nppes_raw.get("results") or [],
+                        }
+                    ).execute()
 
         else:
             no_match += 1

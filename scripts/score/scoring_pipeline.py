@@ -113,6 +113,28 @@ class ScoreRow:
     tier: str = "unranked"
 
 
+def resolve_ta_slug(supabase: Client, slug: str) -> Tuple[str, str]:
+    rows = (
+        supabase.table("therapeutic_areas")
+        .select("id,name,slug")
+        .eq("slug", slug)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
+    return str(rows[0]["id"]), str(rows[0]["name"])
+
+
+def assert_scoped_ta_writes(score_rows: Sequence[ScoreRow], scoped_ta_id: str) -> None:
+    bad = [r for r in score_rows if str(r.therapeutic_area_id) != scoped_ta_id]
+    if bad:
+        raise RuntimeError(
+            f"SAFETY VIOLATION: {len(bad)} score row(s) have therapeutic_area_id != {scoped_ta_id}"
+        )
+
+
 def get_required_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
@@ -154,18 +176,24 @@ def fetch_all_rows(
         if not batch:
             break
         rows.extend(batch)
+        # Correct terminator: a short (or empty) page means we reached the end.
+        if len(batch) < page_size:
+            break
         offset += page_size
 
-        if offset > expected_count + page_size:
-            logger_msg = (
-                f"Pagination safety bail for table '{table}': "
-                f"offset={offset} expected_count={expected_count}"
+        # Runaway-safety cap only (count can be stale in either direction).
+        # A genuinely larger-than-counted table must not crash; a genuinely
+        # broken pagination must not loop forever.
+        if offset > expected_count * 2 + page_size:
+            print(
+                f"[WARN] Runaway-safety cap hit for table '{table}': "
+                f"offset={offset} expected_count={expected_count}; stopping load."
             )
-            raise RuntimeError(logger_msg)
+            break
 
     print(f"Loaded {len(rows)} of ~{expected_count} rows from {table}")
     if len(rows) < (expected_count * 0.95):
-        raise RuntimeError(f"Loaded only {len(rows)} of ~{expected_count} rows from {table}")
+        print(f"[WARN] Loaded only {len(rows)} of ~{expected_count} rows from {table} (count may be stale).")
     return rows
 
 
@@ -203,16 +231,20 @@ def fetch_all_hcps(supabase: Client, page_size: int = 1000, target_version: str 
                 if "career_first_pub_year_v2" in row:
                     row["first_pub_year"] = row.pop("career_first_pub_year_v2")
         rows.extend(batch)
+        if len(batch) < page_size:
+            break
         offset += page_size
 
-        if offset > expected_count + page_size:
-            raise RuntimeError(
-                f"Pagination safety bail for table 'hcps': offset={offset} expected_count={expected_count}"
+        if offset > expected_count * 2 + page_size:
+            print(
+                f"[WARN] Runaway-safety cap hit for table 'hcps': "
+                f"offset={offset} expected_count={expected_count}; stopping load."
             )
+            break
 
     print(f"Loaded {len(rows)} of ~{expected_count} rows from hcps")
     if len(rows) < (expected_count * 0.95):
-        raise RuntimeError(f"Loaded only {len(rows)} of ~{expected_count} rows from hcps")
+        print(f"[WARN] Loaded only {len(rows)} of ~{expected_count} rows from hcps (count may be stale).")
     return rows
 
 
@@ -250,16 +282,93 @@ def fetch_all_publication_authors(
         if not batch:
             break
         rows.extend(batch)
+        if len(batch) < page_size:
+            break
         offset += page_size
 
-        if offset > expected_count + page_size:
-            raise RuntimeError(
-                f"Pagination safety bail for table 'publication_authors': offset={offset} expected_count={expected_count}"
+        if offset > expected_count * 2 + page_size:
+            print(
+                f"[WARN] Runaway-safety cap hit for table 'publication_authors': "
+                f"offset={offset} expected_count={expected_count}; stopping load."
             )
+            break
 
     print(f"Loaded {len(rows)} of ~{expected_count} rows from publication_authors")
     if len(rows) < (expected_count * 0.95):
-        raise RuntimeError(f"Loaded only {len(rows)} of ~{expected_count} rows from publication_authors")
+        print(f"[WARN] Loaded only {len(rows)} of ~{expected_count} rows from publication_authors (count may be stale).")
+    return rows
+
+
+def _fetch_in_chunks(
+    supabase: Client,
+    table: str,
+    columns: str,
+    filter_column: str,
+    ids: Iterable[str],
+    order_columns: Sequence[str],
+    chunk_size: int = 200,
+    page_size: int = 1000,
+) -> List[Dict]:
+    """Load rows where filter_column IN ids, chunked to keep URLs short.
+
+    Each chunk is paginated by (order_columns, range) until a short/empty page,
+    so a filter value with many matching rows (e.g. a prolific HCP) is complete.
+    """
+    out: List[Dict] = []
+    id_list = sorted({str(i) for i in ids if i})
+    for start in range(0, len(id_list), chunk_size):
+        chunk = id_list[start : start + chunk_size]
+        offset = 0
+        while True:
+            q = supabase.table(table).select(columns).in_(filter_column, chunk)
+            for oc in order_columns:
+                q = q.order(oc)
+            batch = q.range(offset, offset + page_size - 1).execute().data or []
+            if not batch:
+                break
+            out.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += page_size
+    return out
+
+
+def fetch_hcp_tas_for_ta(supabase: Client, hcp_tas_table: str, ta_id: str, page_size: int = 1000) -> List[Dict]:
+    """Load hcp_therapeutic_areas rows for a single therapeutic_area_id (scoped)."""
+    rows: List[Dict] = []
+    offset = 0
+    while True:
+        batch = (
+            supabase.table(hcp_tas_table)
+            .select("hcp_id,therapeutic_area_id")
+            .eq("therapeutic_area_id", ta_id)
+            .order("hcp_id")
+            .range(offset, offset + page_size - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return rows
+
+
+def fetch_hcps_by_ids(supabase: Client, ids: Iterable[str], target_version: str = "v1") -> List[Dict]:
+    """Load hcps rows for a specific id set (scoped). Mirrors fetch_all_hcps columns/rename."""
+    hcps_table = get_table_name("hcps", target_version)
+    if target_version == "v2":
+        select_cols = "id,first_name,last_name,country,total_career_pubs,career_first_pub_year_v2"
+    else:
+        select_cols = "id,first_name,last_name,country,total_career_pubs,first_pub_year"
+    rows = _fetch_in_chunks(supabase, hcps_table, select_cols, "id", ids, ["id"])
+    if target_version == "v2":
+        for row in rows:
+            if "career_first_pub_year_v2" in row:
+                row["first_pub_year"] = row.pop("career_first_pub_year_v2")
     return rows
 
 
@@ -1038,9 +1147,13 @@ def upsert_scores(
     score_rows: Sequence[ScoreRow],
     target_version: str = "v1",
     scoring_run_id: Optional[str] = None,
+    scoped_ta_id: Optional[str] = None,
 ) -> int:
     if not score_rows:
         return 0
+
+    if scoped_ta_id:
+        assert_scoped_ta_writes(score_rows, scoped_ta_id)
 
     scores_table = get_table_name("hcp_scores", target_version)
     if target_version == "v2":
@@ -1171,9 +1284,18 @@ def print_top_rising_stars(
             )
 
 
-def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
+def run_pipeline(
+    dry_run: bool = False,
+    target_version: str = "v1",
+    ta_slug: Optional[str] = None,
+) -> None:
     load_dotenv()
     supabase = init_supabase()
+
+    scoped_ta_id: Optional[str] = None
+    scoped_ta_name: Optional[str] = None
+    if ta_slug:
+        scoped_ta_id, scoped_ta_name = resolve_ta_slug(supabase, ta_slug)
 
     scoring_run_id: Optional[str] = None
     if target_version == "v2":
@@ -1181,53 +1303,107 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
         print(f"Scoring run ID (v2): {scoring_run_id}")
 
     print("Loading Supabase data...")
-    hcps = fetch_all_hcps(supabase, target_version=target_version)
-    print(f"Loaded {len(hcps)} HCPs (all countries).")
-    publications = fetch_all_rows(
-        supabase,
-        get_table_name("publications", target_version),
-        "id,pub_year,citation_count,citation_counts_by_year,openalex_concepts",
-        target_version=target_version,
-    )
-    publication_authors = fetch_all_publication_authors(supabase, target_version=target_version)
-    clinical_trials = fetch_all_rows(
-        supabase,
-        get_table_name("clinical_trials", target_version),
-        "id,nct_id,phase,start_date,completion_date",
-        target_version=target_version,
-    )
-    trial_investigators = fetch_all_rows(
-        supabase,
-        get_table_name("trial_investigators", target_version),
-        "hcp_id,trial_id,role",
-        target_version=target_version,
-    )
-    author_metrics = fetch_all_rows(
-        supabase,
-        "hcp_author_metrics_v2",
-        "hcp_id,counts_by_year,snapshot_date",
-        target_version=target_version,
-        order_column="hcp_id",
-    ) if target_version == "v2" else []
-    if target_version == "v2":
-        hcp_tas = fetch_all_rows(
-            supabase,
-            get_table_name("hcp_therapeutic_areas", target_version),
-            "hcp_id,therapeutic_area_id",
-            target_version=target_version,
-            order_column="hcp_id",
+    pub_authors_table = get_table_name("publication_authors", target_version)
+    trial_inv_table = get_table_name("trial_investigators", target_version)
+    publications_table = get_table_name("publications", target_version)
+    clinical_trials_table = get_table_name("clinical_trials", target_version)
+    hcp_tas_table = get_table_name("hcp_therapeutic_areas", target_version)
+    pub_cols = "id,pub_year,citation_count,citation_counts_by_year,openalex_concepts"
+    trial_cols = "id,nct_id,phase,start_date,completion_date"
+
+    if scoped_ta_id:
+        # PART A: TA-scoped loads. Links are loaded first; publications and
+        # clinical_trials parents are derived from the link id-sets.
+        #   FK verified from sql/rebuild/phase1_addendum_3 & _6:
+        #     publication_authors_v2.publication_id -> publications_v2.id
+        #     trial_investigators_v2.trial_id       -> clinical_trials_v2.id
+        hcp_tas = fetch_hcp_tas_for_ta(supabase, hcp_tas_table, scoped_ta_id)
+        ta_hcp_ids = {str(r["hcp_id"]) for r in hcp_tas if r.get("hcp_id")}
+
+        hcps = fetch_hcps_by_ids(supabase, ta_hcp_ids, target_version=target_version)
+
+        publication_authors = _fetch_in_chunks(
+            supabase, pub_authors_table, "publication_id,hcp_id",
+            "hcp_id", ta_hcp_ids, ["publication_id", "hcp_id"],
+        )
+        trial_investigators = _fetch_in_chunks(
+            supabase, trial_inv_table, "hcp_id,trial_id,role",
+            "hcp_id", ta_hcp_ids, ["id"] if target_version == "v2" else ["hcp_id"],
+        )
+
+        pub_id_set = {str(r["publication_id"]) for r in publication_authors if r.get("publication_id")}
+        trial_id_set = {str(r["trial_id"]) for r in trial_investigators if r.get("trial_id")}
+
+        publications = _fetch_in_chunks(
+            supabase, publications_table, pub_cols, "id", pub_id_set, ["id"],
+        )
+        clinical_trials = _fetch_in_chunks(
+            supabase, clinical_trials_table, trial_cols, "id", trial_id_set, ["id"],
+        )
+
+        if target_version == "v2":
+            author_metrics = _fetch_in_chunks(
+                supabase, "hcp_author_metrics_v2", "hcp_id,counts_by_year,snapshot_date",
+                "hcp_id", ta_hcp_ids, ["hcp_id", "snapshot_date"],
+            )
+        else:
+            author_metrics = []
+
+        therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
+
+        print(
+            f"TA-scoped load: {len(hcps)} HCPs, {len(publications)} publications, "
+            f"{len(clinical_trials)} trials, {len(publication_authors)} pub-author links, "
+            f"{len(trial_investigators)} trial-investigator links, {len(hcp_tas)} hcp-TA pairs."
         )
     else:
-        hcp_tas = fetch_all_rows(
-            supabase,
-            get_table_name("hcp_therapeutic_areas", target_version),
-            "hcp_id,therapeutic_area_id",
-            target_version=target_version,
+        hcps = fetch_all_hcps(supabase, target_version=target_version)
+        print(f"Loaded {len(hcps)} HCPs (all countries).")
+        publications = fetch_all_rows(
+            supabase, publications_table, pub_cols, target_version=target_version,
         )
-    therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
+        publication_authors = fetch_all_publication_authors(supabase, target_version=target_version)
+        clinical_trials = fetch_all_rows(
+            supabase, clinical_trials_table, trial_cols, target_version=target_version,
+        )
+        trial_investigators = fetch_all_rows(
+            supabase, trial_inv_table, "hcp_id,trial_id,role", target_version=target_version,
+        )
+        author_metrics = fetch_all_rows(
+            supabase,
+            "hcp_author_metrics_v2",
+            "hcp_id,counts_by_year,snapshot_date",
+            target_version=target_version,
+            order_column="hcp_id",
+        ) if target_version == "v2" else []
+        if target_version == "v2":
+            hcp_tas = fetch_all_rows(
+                supabase, hcp_tas_table, "hcp_id,therapeutic_area_id",
+                target_version=target_version, order_column="hcp_id",
+            )
+        else:
+            hcp_tas = fetch_all_rows(
+                supabase, hcp_tas_table, "hcp_id,therapeutic_area_id",
+                target_version=target_version,
+            )
+        therapeutic_areas = fetch_all_rows(supabase, "therapeutic_areas", "id,name")
+
+    if scoped_ta_id:
+        hcp_tas = [
+            r for r in hcp_tas
+            if str(r.get("therapeutic_area_id") or "") == scoped_ta_id
+        ]
+        scoped_hcp_ids = {str(r["hcp_id"]) for r in hcp_tas if r.get("hcp_id")}
+        hcps = [h for h in hcps if str(h.get("id")) in scoped_hcp_ids]
+        print(
+            f"\nTA-SCOPED scoring run: {scoped_ta_name} (ta_id={scoped_ta_id}). "
+            f"{len(hcp_tas)} HCP-TA pairs will be scored/written.\n"
+        )
 
     print("Loading curated_ta_concepts and computing per-pub TA relevance...")
     curated_by_ta = fetch_curated_concepts_by_ta(supabase)
+    if scoped_ta_id:
+        curated_by_ta = {scoped_ta_id: curated_by_ta.get(scoped_ta_id, set())}
     pub_tas = compute_pub_ta_relevance(publications, curated_by_ta)
     print(f"  Curated concepts loaded for {len(curated_by_ta)} TAs")
     print(f"  {len(pub_tas)} publications have TA relevance")
@@ -1254,10 +1430,15 @@ def run_pipeline(dry_run: bool = False, target_version: str = "v1") -> None:
 
     if dry_run:
         print("[DRY RUN] Skipping hcp_scores upsert. Scores computed but not persisted.")
+        print(f"[DRY RUN] Computed {len(scores)} score rows for scoped cohort.")
     else:
         print("Upserting hcp_scores...")
         upserted = upsert_scores(
-            supabase, scores, target_version=target_version, scoring_run_id=scoring_run_id
+            supabase,
+            scores,
+            target_version=target_version,
+            scoring_run_id=scoring_run_id,
+            scoped_ta_id=scoped_ta_id,
         )
         print(f"Upserted {upserted} hcp_scores records.")
 
@@ -1288,10 +1469,17 @@ if __name__ == "__main__":
         default="v1",
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
     )
+    parser.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Scope scoring/writes to one therapeutic area (e.g. atopic-dermatitis).",
+    )
     args = parser.parse_args()
 
     try:
-        run_pipeline(dry_run=args.dry_run, target_version=args.target_version)
+        run_pipeline(dry_run=args.dry_run, target_version=args.target_version, ta_slug=args.ta)
     except Exception as error:
         print(f"[ERROR] Scoring pipeline failed: {error}")
         raise

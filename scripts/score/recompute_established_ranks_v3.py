@@ -1,7 +1,8 @@
 """
 recompute_established_ranks_v3.py — Established cohort composite ranking (v3).
 
-Reorders HCPs already qualified as Established (hcp_established_ranks_v2) using:
+Reorders HCPs qualified as Established via hcp_cohort_classification_v2
+(cohort='established') using:
 
   cohort_score =
     0.50 * scientific_influence_pctile
@@ -10,6 +11,12 @@ Reorders HCPs already qualified as Established (hcp_established_ranks_v2) using:
 
 Missing signal data is treated as percentile 0 (penalizing). We may revisit
 later (e.g., impute median or weight only available signals).
+
+Scope rows (same intent as the old hcp_established_ranks_v2 materialization):
+  - every Established HCP gets a global scope row (scope_type='global',
+    scope_value=NULL)
+  - HCPs with a non-null country also get a region scope row
+    (scope_type='region', scope_value=<country code>)
 
 Usage:
     python recompute_established_ranks_v3.py --ta nsclc
@@ -49,23 +56,59 @@ def resolve_ta_id(conn, slug: str):
 
 
 def fetch_established_cohort(conn, ta_id):
-    """Returns [(hcp_id, scope_type, scope_value, first_name, last_name, institution)]"""
+    """
+    Established cohort from hcp_cohort_classification_v2, expanded into the
+    same (hcp, scope) rows the old hcp_established_ranks_v2 carried:
+      - one global row per HCP
+      - one region:<country> row when hcps_v2.country is non-null
+
+    Returns list of dicts with keys:
+      hcp_id, scope_type, scope_value, first_name, last_name, institution_normalized
+    """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             """
             SELECT
-              er.hcp_id::text AS hcp_id,
-              er.scope_type,
-              er.scope_value,
-              er.first_name,
-              er.last_name,
-              er.institution_normalized
-            FROM hcp_established_ranks_v2 er
-            WHERE er.therapeutic_area_id = %s
+              cc.hcp_id::text AS hcp_id,
+              h.first_name,
+              h.last_name,
+              h.institution_normalized,
+              NULLIF(BTRIM(h.country), '') AS country
+            FROM hcp_cohort_classification_v2 cc
+            JOIN hcps_v2 h ON h.id = cc.hcp_id
+            WHERE cc.therapeutic_area_id = %s
+              AND cc.cohort = 'established'
+            ORDER BY cc.hcp_id
             """,
             (ta_id,),
         )
-        return cur.fetchall()
+        base_rows = cur.fetchall()
+
+    expanded = []
+    for row in base_rows:
+        expanded.append(
+            {
+                "hcp_id": row["hcp_id"],
+                "scope_type": "global",
+                "scope_value": None,
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "institution_normalized": row["institution_normalized"],
+            }
+        )
+        country = row.get("country")
+        if country:
+            expanded.append(
+                {
+                    "hcp_id": row["hcp_id"],
+                    "scope_type": "region",
+                    "scope_value": country,
+                    "first_name": row["first_name"],
+                    "last_name": row["last_name"],
+                    "institution_normalized": row["institution_normalized"],
+                }
+            )
+    return expanded
 
 
 def fetch_scientific_scores(conn, ta_id):
@@ -207,7 +250,8 @@ def main(
     print(f"Weights: Scientific={w_scientific}, Network={w_network}, Pharma={w_pharma}")
 
     cohort = fetch_established_cohort(conn, ta_id)
-    print(f"Found {len(cohort)} (hcp, scope) rows in Established cohort")
+    distinct_hcps = len({r["hcp_id"] for r in cohort})
+    print(f"Found {distinct_hcps} Established HCPs -> {len(cohort)} (hcp, scope) rows")
 
     if not cohort:
         print("No cohort data. Exiting.")
@@ -223,7 +267,7 @@ def main(
     pharma_scores = fetch_pharma_scores(conn, ta_id)
     print(f"  Pharma scores: {len(pharma_scores)} HCPs")
 
-    by_scope: dict[tuple[str, str], list] = {}
+    by_scope: dict[tuple[str, str | None], list] = {}
     for row in cohort:
         key = (row["scope_type"], row["scope_value"])
         by_scope.setdefault(key, []).append(row)
@@ -231,7 +275,8 @@ def main(
     print(f"Found {len(by_scope)} scopes")
 
     all_results = []
-    debug_scope_results = None
+    debug_us_results = None
+    debug_global_results = None
 
     for (scope_type, scope_value), members in by_scope.items():
         scope_net_raw = {m["hcp_id"]: net_raw.get(m["hcp_id"], 0) for m in members}
@@ -279,23 +324,32 @@ def main(
         all_results.extend(scope_results)
 
         if scope_type == "region" and scope_value == "US":
-            debug_scope_results = scope_results
+            debug_us_results = scope_results
+        if scope_type == "global":
+            debug_global_results = scope_results
 
-    if debug_scope_results:
-        print(f"\n=== Top {debug_top} US Established (new composite) ===")
+    def _print_top(label: str, scope_results: list) -> None:
+        print(f"\n=== Top {debug_top} {label} Established (new composite) ===")
         print(
             f"{'NewRk':<6} {'Name':<28} {'Inst':<28} {'Score':<7} "
             f"{'Sci':<6} {'Net':<6} {'Pha':<6}"
         )
-        for r in debug_scope_results[:debug_top]:
+        for r in scope_results[:debug_top]:
             name = f"{r['first_name']} {r['last_name']}"
+            name_safe = name.encode("ascii", errors="replace").decode("ascii")
             inst = r.get("institution_normalized") or ""
+            inst_safe = str(inst).encode("ascii", errors="replace").decode("ascii")
             print(
-                f"{r['rank']:<6} {name[:27]:<28} {inst[:27]:<28} "
+                f"{r['rank']:<6} {name_safe[:27]:<28} {inst_safe[:27]:<28} "
                 f"{r['cohort_score']:<7.2f} "
                 f"{r['scientific_pctile']:<6.1f} {r['network_pctile']:<6.1f} "
                 f"{r['pharma_pctile']:<6.1f}"
             )
+
+    if debug_global_results:
+        _print_top("global", debug_global_results)
+    if debug_us_results:
+        _print_top("US", debug_us_results)
 
     if dry_run:
         print(f"\n[dry-run] would have written {len(all_results)} rows")

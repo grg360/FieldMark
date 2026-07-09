@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 
 URL = "https://clinicaltrials.gov/api/v2/studies"
-CKPT = "trials_pipeline_checkpoint.json"
+CKPT_DEFAULT = "trials_pipeline_checkpoint.json"
 ROLES = {"PRINCIPAL_INVESTIGATOR", "SUB_INVESTIGATOR", "STUDY_CHAIR", "STUDY_DIRECTOR"}
 
 STATE_ABBREV_TO_NAME = {
@@ -216,46 +216,86 @@ def compute_affiliation_confidence(hcp: Dict, official: Dict, trial_locations: L
     return score
 
 
-def load_ckpt() -> Set[str]:
-    if not os.path.exists(CKPT):
+def get_ckpt_path(ta_slug: Optional[str]) -> str:
+    if ta_slug:
+        return f"trials_pipeline_checkpoint_{ta_slug}.json"
+    return CKPT_DEFAULT
+
+
+def resolve_ta_slug(c: Client, slug: str) -> Tuple[str, str]:
+    rows = (
+        c.table("therapeutic_areas")
+        .select("id,name,slug")
+        .eq("slug", slug)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
+    return str(rows[0]["id"]), str(rows[0]["name"])
+
+
+def fetch_hcp_ids_for_ta(c: Client, ta_id: str, target_version: str) -> Set[str]:
+    ta_table = get_table_name("hcp_therapeutic_areas", target_version)
+    hcp_ids: Set[str] = set()
+    offset = 0
+    while True:
+        batch = (
+            c.table(ta_table)
+            .select("hcp_id")
+            .eq("therapeutic_area_id", ta_id)
+            .order("hcp_id")
+            .range(offset, offset + 999)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            hid = row.get("hcp_id")
+            if hid:
+                hcp_ids.add(str(hid))
+        if len(batch) < 1000:
+            break
+        offset += 1000
+    return hcp_ids
+
+
+def load_ckpt(ckpt_path: str) -> Set[str]:
+    if not os.path.exists(ckpt_path):
         return set()
     try:
-        with open(CKPT, "r", encoding="utf-8") as f:
+        with open(ckpt_path, "r", encoding="utf-8") as f:
             return set((json.load(f).get("processed_hcp_ids") or []))
     except Exception:
         return set()
 
 
-def save_ckpt(ids: Set[str]) -> None:
-    with open(CKPT, "w", encoding="utf-8") as f:
+def save_ckpt(ckpt_path: str, ids: Set[str]) -> None:
+    with open(ckpt_path, "w", encoding="utf-8") as f:
         json.dump({"processed_hcp_ids": sorted(ids), "saved_at": datetime.now(UTC).isoformat()}, f, indent=2)
 
 
 def get_hcps(c: Client, target_version: str = "v1") -> List[Dict]:
-    """Load HCPs with non-null state (includes Step C OpenAlex HCPs; NPI not required)."""
+    """Load HCPs for trials pipeline (v2: all rows; v1: non-null state only)."""
     hcps_table = get_table_name("hcps", target_version)
     if target_version == "v2":
         select_cols = (
             "id,first_name,last_name,institution_normalized,institution_raw,"
-            "nppes_practice_city,nppes_practice_state,npi_number"
+            "nppes_practice_city,nppes_practice_state,derived_state,country,npi_number"
         )
-        state_col = "nppes_practice_state"
     else:
         select_cols = "id,first_name,last_name,institution_short,institution_full,city,state,npi_number"
         state_col = "state"
     rows: List[Dict] = []
     o = 0
     while True:
-        b = (
-            c.table(hcps_table)
-            .select(select_cols)
-            .not_.is_(state_col, "null")
-            .order("id")
-            .range(o, o + 999)
-            .execute()
-            .data
-            or []
-        )
+        q = c.table(hcps_table).select(select_cols).order("id").range(o, o + 999)
+        if target_version != "v2":
+            q = q.not_.is_(state_col, "null")
+        b = q.execute().data or []
         if not b:
             break
         if target_version == "v2":
@@ -266,8 +306,9 @@ def get_hcps(c: Client, target_version: str = "v1") -> List[Dict]:
                     row["institution_full"] = row.pop("institution_raw")
                 if "nppes_practice_city" in row:
                     row["city"] = row.pop("nppes_practice_city")
-                if "nppes_practice_state" in row:
-                    row["state"] = row.pop("nppes_practice_state")
+                nppes_state = row.pop("nppes_practice_state", None)
+                derived_state = row.pop("derived_state", None)
+                row["state"] = nppes_state or derived_state
         rows.extend(b)
         if len(b) < 1000:
             break
@@ -593,23 +634,38 @@ def insert_links(c: Client, links: List[Dict], m: Dict[str, str], target_version
                     serialized[k] = str(v) if not isinstance(v, (str, int, float, bool)) else v
             batch_serializable.append(serialized)
         try:
-            if target_version == "v2":
-                investigators_table = get_table_name("trial_investigators", target_version)
-                response = c.table(investigators_table).upsert(
-                    batch_serializable,
-                    on_conflict="trial_id,investigator_raw_first_name,investigator_raw_last_name,role,source",
-                ).execute()
-                if not response.data:
-                    raise RuntimeError(
-                        f"Investigator upsert returned empty data ({len(batch_serializable)} rows) - "
-                        f"writes may have been silently dropped"
-                    )
-            else:
-                c.rpc("upsert_trial_investigators_preserving_match", {"rows_data": batch_serializable}).execute()
+            rpc_name = (
+                "upsert_trial_investigators_v2_preserving_match"
+                if target_version == "v2"
+                else "upsert_trial_investigators_preserving_match"
+            )
+            c.rpc(rpc_name, {"rows_data": batch_serializable}).execute()
         except Exception as e:
             logger.error(f"[rpc] upsert failed for batch {i}: {e}")
             raise
     return len(rows)
+
+
+def count_would_insert_links(links: List[Dict], nct_ids: Set[str]) -> int:
+    """Count deduplicated investigator links that would be written (dry-run only)."""
+    dedup_map: Dict[Tuple[Any, ...], Dict] = {}
+    for l in links:
+        nct = str(l.get("nct_id") or "")
+        if nct not in nct_ids:
+            continue
+        key = (
+            nct,
+            l.get("investigator_raw_first_name"),
+            l.get("investigator_raw_last_name"),
+            l.get("role"),
+            l.get("source"),
+        )
+        existing = dedup_map.get(key)
+        if existing is None:
+            dedup_map[key] = l
+        elif existing.get("hcp_id") is None and l.get("hcp_id") is not None:
+            dedup_map[key] = l
+    return len(dedup_map)
 
 
 def eta(done: int, total: int, start: float) -> str:
@@ -625,28 +681,46 @@ def run(
     limit: Optional[int],
     reset_checkpoint: bool = False,
     target_version: str = "v1",
+    ta_slug: Optional[str] = None,
+    dry_run: bool = False,
 ) -> None:
     load_dotenv()
     c = sb()
     s = requests.Session()
     s.headers.update({"User-Agent": "FieldMark/1.0"})
 
+    ckpt_path = get_ckpt_path(ta_slug)
+    scoped_ta_id: Optional[str] = None
+    scoped_ta_name: Optional[str] = None
+    scoped_hcp_ids: Optional[Set[str]] = None
+    if ta_slug:
+        scoped_ta_id, scoped_ta_name = resolve_ta_slug(c, ta_slug)
+        scoped_hcp_ids = fetch_hcp_ids_for_ta(c, scoped_ta_id, target_version)
+
     # HTTP/2 stream ID exhaustion mitigation
     # Track Supabase operations and recycle the client before hitting the ~20K limit
     op_counter = 0
     RECYCLE_THRESHOLD = 15000
 
-    if reset_checkpoint and os.path.exists(CKPT):
-        os.remove(CKPT)
-        print("Checkpoint deleted; will re-process all HCPs from scratch.")
+    if reset_checkpoint and os.path.exists(ckpt_path):
+        os.remove(ckpt_path)
+        print(f"Checkpoint deleted ({ckpt_path}); will re-process all HCPs from scratch.")
     hcps = get_hcps(c, target_version)
-    seen = load_ckpt()
+    if scoped_hcp_ids is not None:
+        hcps = [h for h in hcps if str(h.get("id")) in scoped_hcp_ids]
+        print(
+            f"\nTA-SCOPED trials run: {scoped_ta_name} (ta_id={scoped_ta_id}). "
+            f"Only {len(hcps)} HCPs will be processed.\n"
+        )
+    seen = load_ckpt(ckpt_path)
     todo = [h for h in hcps if str(h.get("id")) not in seen]
     if test:
         todo = stratified_test_sample(todo, limit or 50)
     elif limit:
         todo = todo[:limit]
     print(f"Loaded HCPs: {len(hcps)} | Pending after checkpoint: {len(todo)}")
+    if dry_run:
+        print("[DRY RUN] No database writes or checkpoint updates will be performed.")
     if test:
         print(f"TEST MODE: limit={limit or 50} (stratified 10 short/non-null + 10 short/null city/non-null + 30 random)")
     st = S(start=time.time())
@@ -688,10 +762,14 @@ def run(
         if not trials or not links:
             st.skipped += 1
             continue
-        m = upsert_trials(c, trials, target_version)
-        op_counter += len(trials) * 2  # estimate: 1 upsert + 1 select per trial batch
-        ins = insert_links(c, links, m, target_version)
-        op_counter += max(len(links) // 500, 1) * 2  # estimate: 1 fetch + 1 upsert per 500-row batch
+        if not dry_run:
+            m = upsert_trials(c, trials, target_version)
+            op_counter += len(trials) * 2  # estimate: 1 upsert + 1 select per trial batch
+            ins = insert_links(c, links, m, target_version)
+            op_counter += max(len(links) // 500, 1) * 2  # estimate: 1 fetch + 1 upsert per 500-row batch
+        else:
+            nct_ids = {str(t["nct_id"]) for t in trials if t.get("nct_id")}
+            ins = count_would_insert_links(links, nct_ids)
         st.linked_hcps += 1
         st.trials += len(trials)
         st.links += ins
@@ -704,10 +782,11 @@ def run(
                 f"[{i}/{len(todo)}] HCPs processed | Trials added: {st.trials} | "
                 f"Investigators added: {st.links} | Skipped: {st.skipped} | ETA: {eta(i, len(todo), st.start)}"
             )
-        if i % 500 == 0:
-            save_ckpt(seen)
+        if i % 500 == 0 and not dry_run:
+            save_ckpt(ckpt_path, seen)
             print(f"Checkpoint saved at {i} HCPs.")
-    save_ckpt(seen)
+    if not dry_run:
+        save_ckpt(ckpt_path, seen)
     print("\n=== Trials Pipeline Summary ===")
     print(f"Total HCPs processed: {st.processed}")
     print(f"Total HCPs with at least one verified trial link: {st.linked_hcps}")
@@ -725,6 +804,9 @@ def run(
     print("Sample matched links (up to 5):")
     for sm in sample_matches[:5]:
         print(json.dumps(sm))
+    if dry_run:
+        print(f"[DRY RUN] Would write {st.trials} trials and {st.links} investigator links.")
+        print("[DRY RUN] No database writes performed.")
 
 
 if __name__ == "__main__":
@@ -736,11 +818,19 @@ if __name__ == "__main__":
         action="store_true",
         help="Delete checkpoint file before starting (forces full re-processing of all HCPs)",
     )
+    p.add_argument("--dry-run", action="store_true", default=False)
     p.add_argument(
         "--target-version",
         choices=["v1", "v2"],
         default="v1",
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
     )
+    p.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Scope to HCPs in one therapeutic area (e.g. atopic-dermatitis).",
+    )
     a = p.parse_args()
-    run(a.test, a.limit, a.reset_checkpoint, a.target_version)
+    run(a.test, a.limit, a.reset_checkpoint, a.target_version, ta_slug=a.ta, dry_run=a.dry_run)

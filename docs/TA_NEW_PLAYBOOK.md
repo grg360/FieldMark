@@ -116,6 +116,134 @@ other TAs' data is NOT permitted during a freeze — and is not needed.
 
 ---
 
+## 0c. AUTHOR IDENTITY RESOLUTION — fragmentation, dedup, and the false-merge invariant (FOUNDATIONAL, added July 7)
+
+The AD build (TA #2) surfaced a problem NSCLC/Hep did not: **author identity fragmentation.** A single
+real person is split across multiple `hcps_v2` records because their name was ingested inconsistently.
+This is UPSTREAM of scoring and, left unfixed, silently corrupts cohort classification and KOL ranking.
+It is worse for international TAs (AD is ~82% non-US) and comparatively mild for US/ASCII-name TAs.
+
+### What fragmentation looks like (the symptom chain)
+A KOL-poor established cohort → real KOLs showing single-digit linked pubs → the same person under 2+
+records with different OpenAlex author IDs. Worked example: **Emma Guttman-Yassky** was split across a
+37-work record and a 764-work record because her surname used two different hyphen characters (ASCII
+hyphen U+002D vs Unicode hyphen U+2010) that render identically but don't byte-match. Her real profile
+existed in the data — just disconnected from the record the classifier surfaced.
+
+### Root causes (all name-normalization failures)
+- **Unicode hyphen variants** (U+2010/2011/2012/2013/2014/2212/00AD vs ASCII '-'): Guttman-Yassky,
+  Paz-Ares, Calzavara-Pinton, Neuschwander-Tetri, Dagogo-Jack, Abou-Alfa, El-Serag.
+- **Diacritics** (Niccolò/Niccolo, Åke/Ake, Giménez/Gimenez, Gürakar/Gurakar).
+- **Initials vs full given name** (Ghassan K. vs Ghassan; Juan A. vs Juan).
+- **Duplicate OpenAlex author entities** (OpenAlex itself sometimes has the same person twice with
+  identical works_count — Ferrucci 261/261, Katoh 494/494).
+
+### THE INVARIANT — false_split > false_merge (both experts, adopted as code, not philosophy)
+A false SPLIT under-credits a KOL (fewer pubs/centrality/authority) — recoverable, honest uncertainty.
+A false MERGE fuses two real physicians into one record — corrupts pub counts, coauthor graph,
+institution history, Open Payments, scoring — IRREVERSIBLE and often undetectable. **In KOL
+intelligence, always prefer to under-credit than to invent a superhuman.** When in doubt, do NOT merge.
+Concrete failure mode this guards against: three different "Wei Li"s fused into one monster profile that
+ranks #2 destroys trust; leaving Wei Li fragmented at #42/#57/#88 merely hurts recall.
+
+### THE COMMITTED RULE — ambiguity, not geography; corroboration required
+High-**ambiguity** names are NOT auto-merged, regardless of origin. This is about name frequency, NOT
+country — "John Smith / David Brown" are as unmergeable as "Wei Wang / Jun Li." Both experts and the
+NSCLC precedent (2,476 un-merged "Wang" records, ships clean) confirm: **leave common-name records
+separate.** They're mostly distinct people; a corroborating signal can't reliably distinguish
+same-person-fragmented from two-different-people, so don't try.
+
+**Auto-merge (high-confidence band) requires ALL of:**
+1. Identical normalized full name — `name_key(first)` AND `name_key(last)` both match. NEVER surname
+   alone (Alexander Leung ≠ Donald Leung ≠ Ting Leung — same surname, different people).
+2. Low ambiguity — rare surname (block frequency ≤ ~10 as the current proxy; global rarity is the
+   better long-term signal — see below).
+3. ≥1 STRONG corroborating signal: `shared_openalex_id` (identical author id) OR `shared_coauthors`
+   (≥1 common co-author) OR `same_institution` (both non-empty, equal). **Weak signals that do NOT
+   qualify:** `both_have_openalex` (~everyone who publishes has one) and `pub_domain_overlap` (within
+   one TA, everyone shares the domain). These are near-universal and mean nothing on their own.
+
+No corroboration → do NOT merge (record as low-evidence for a future review queue). Record a
+`merge_reason` on every merge (which signals fired) — these become training data for the eventual
+scoring resolver, and give you "why were these merged?" explainability.
+
+### name_key normalization (the fix that makes detection possible)
+`name_key(value)` = Unicode NFKC → fold all hyphen variants to '-' → strip diacritics (NFKD, drop
+combining marks `category == 'Mn'`) → lowercase → collapse whitespace. Apply to BOTH the blocking key
+AND the pair match. Without this, variant-hyphen/diacritic names land in different blocks and are never
+even compared. `scripts/dedup/dedup_detect.py` has this now.
+
+### The dedup subsystem — TWO detection paths
+`scripts/dedup/dedup_detect.py` (read-only, writes candidate CSV) + `dedup_merge.py` (executes).
+- **Stub absorption** (original): a substantive publication record + a thin NPI-only stub of the same
+  person. This is what NSCLC/Hep needed; it does NOT catch fragment-vs-fragment.
+- **Fragment pairing** (added July 7): two SUBSTANTIVE records of the same person. This is the AD case.
+  Requires the corroboration gate above. Emits `candidate_type` = stub|fragment and `merge_reason`.
+
+### Merger correctness requirements (learned the hard way)
+- **Survivor = highest OpenAlex `works_count`** (from `hcp_author_metrics_v2`), NOT `total_career_pubs`
+  and NOT `is_primary`. Critical because de-inflating `total_career_pubs` from linked-pub counts
+  INVERTS the signal for fragments (Guttman-Yassky's real 764-work record had only 2 LINKED pubs → a
+  naive pub-count survivor would keep the 37-work fragment and destroy the real profile). Log
+  `[SURVIVOR SWAP]` when the CSV primary loses.
+- **Transitive clusters** — a person split 3+ ways (Werfel: 513/365/74/48) must fold ALL into the ONE
+  highest-works survivor via union-find components, not pairwise (pairwise can merge two non-survivors
+  or double-merge). Track already-merged ids; assert survivor/merged-away overlap == 0.
+- **Re-point ALL FKs to `hcps_v2.id`.** There are ~39 of them. The merger initially handled only 22 →
+  merges failed on the missing ones (and would have orphaned score/rank rows —
+  `hcp_established_ranks_v3`, `hcp_score_ranks_v2`, `hcp_network_centrality_v2`,
+  `hcp_publication_leadership_v2`, `hcp_pharma_engagement_v2`, `hcp_author_metrics_v2`, and
+  `hcp_top_collaborators_v2` which references hcps_v2 via BOTH `hcp_id` AND `collaborator_hcp_id`).
+  Before running the merger for a new TA, AUDIT all FKs to hcps_v2.id (`pg_constraint`, contype='f')
+  and confirm every one is in the re-point list. Each conflict-delete must target the table's ACTUAL
+  pk/unique constraint.
+
+### SEQUENCE — dedup BEFORE de-inflation (order matters)
+De-inflating `total_career_pubs` from the join table BEFORE dedup harms fragmented KOLs (sets their
+count to a fragment's sliver). Correct order: **dedup/merge identities FIRST → THEN re-derive
+`total_career_pubs` and `career_first_pub_year_v2` on the merged identities → THEN classify.** Any
+career-metric derivation must run downstream of identity resolution.
+
+### The SEPARATE problem dedup does NOT fix: publication under-linkage
+Merging fixes IDENTITY (one record, pointing at the rich OpenAlex author profile). It does NOT fix a
+thin publication corpus. Guttman-Yassky post-merge still showed ~8 LINKED pubs vs. her OpenAlex
+works_count of 764 — because her actual publications were never ingested/linked into
+`publication_authors_v2`. If establishment/ranking reads `total_career_pubs` (linked) rather than
+OpenAlex `works_count` (rich), a merged KOL can still look thin. Decide per build: use OpenAlex
+works_count as an establishment signal, or complete publication linkage. Keep these two problems
+(identity vs. corpus linkage) mentally separate.
+
+### The future (committed next-leg, NOT built yet)
+Both experts recommend treating identity resolution as its OWN subsystem: **blocking → evidence scoring
+(ORCID +100 / OpenAlex-author +100 / same institution / shared coauthors / career continuity / GLOBAL
+surname rarity — not TA-cohort frequency, which drifts as you ingest more TAs) → decision bands
+(high→auto-merge, medium→review queue, low→leave split).** Add an `identity_status` field per HCP
+(resolved / high_confidence / ambiguous / fragmented / reviewed) so uncertainty has somewhere to live.
+Today's rule-based high-confidence merge is deliberately the strict high-confidence subset of that
+future system — not a throwaway. Note: ORCID/OpenAlex clustering improves over time, so some impossible
+merges today become trivial later — another reason not to force them now.
+
+---
+
+## 0d. TA-ANCHORED ESTABLISHMENT — "established in a TA" requires real TA output (added July 8)
+
+Establishment must NOT be decided on a global career alone. The AD build found the established cohort polluted
+by cross-TA passengers — hepatologists with 30-year liver careers and ZERO AD publications, qualifying via a
+global `career_age > 10` rule. They are not AD KOLs and must not appear in AD's established cohort.
+
+**The rule:** `established = (ta_pubs >= TA_ESTABLISHED_MIN_PUBS) AND (existing career-based rule)`.
+  - `ta_pubs` = the HCP's TA-specific publication count (COUNT from publication_authors_v2 JOIN
+    publication_therapeutic_areas_v2, scoped to the TA). Requires corpus linkage to be complete first (§0c).
+  - `TA_ESTABLISHED_MIN_PUBS = 5` (tunable; verify no real KOL sits below it — for AD the lowest real KOL had 8).
+  - Career rule (unchanged): total_career_pubs>=500 OR (>=200 AND first_pub_year<2020) OR career_age>10.
+  - HCPs meeting the career rule but with ta_pubs < threshold route to COMMUNITY (present in the TA, but not a
+    KOL) — not deleted. Record `ta_pubs` in cohort_reason for auditability.
+
+**Effect on AD:** established dropped from 9,449 (59%, polluted) to 2,547 (16%, a credible KOL tier). Every
+hepatologist -> community; every real AD KOL retained. This should be STANDARD for every TA.
+
+---
+
 ## 1. The canonical pipeline order (v2)
 
 HCP identity is resolved **OpenAlex-first**, AFTER publication ingestion. Publication ingestion does
@@ -142,9 +270,16 @@ NOT create HCP rows. This is the single most important architectural rule in v2.
 9.  run_step_f_rebuild_publication_authors.py
         → rebuilds publication_authors_v2 linking pubs to the new HCPs.
 10. NPPES / Open Payments / Medicare aggregators (--target-version v2)
-11. scoring_pipeline.py + established_scoring.py + community_scoring.py
-12. generate_narratives_v2.py --target-version v2   (⚠️ --target-version v2 REQUIRED — default writes v1)
-13. Frontend cutover / TA enablement (is_visible_in_ui).
+10b. IDENTITY RESOLUTION (dedup) — REQUIRED, esp. for international TAs. See §0c.
+        dedup_detect.py (read-only → candidate CSV) → review high-confidence fragment set →
+        dedup_merge.py --dry-run → --execute. Merge BEFORE deriving career metrics.
+11. career-metric re-derivation ON MERGED identities: total_career_pubs (join-table COUNT, --ta) +
+        career_first_pub_year_v2 (sustained-onset method). MUST run after 10b, not before.
+11b. cohort_classification_v2.py --ta <slug> --execute → hcp_cohort_classification_v2 (career-based:
+        established / rising_eligible / too_young / community). CLASSIFY before cohort-scoring.
+12. scoring_pipeline.py (rising) + publication_leadership/network/pharma (established) + community
+13. generate_narratives_v2.py --target-version v2   (⚠️ --target-version v2 REQUIRED — default writes v1)
+14. Frontend cutover / TA enablement (is_visible_in_ui).
 ```
 
 Runtime notes: inventory ~30 min; Step C ~1–2 h; career enrichment ~6 h. Plan a long window.
@@ -381,3 +516,135 @@ you need to SEE results (`run_sql.py --file` reports SELECTs poorly — returns 
 
 **Tool-split rule:** terminal `run_sql.py` for writes/long ops; dashboard for read-only SELECTs needing
 visible results. `SET statement_timeout` only applies on the direct (terminal) connection.
+
+---
+
+## MULTI-TA SCRIPT STANDARD (added July 6 — the contract every pipeline script must meet)
+
+Discovered during AD (TA #2): NONE of the original scripts were built for multi-TA. Each has needed the
+same retrofit. This is the STANDARD every TA-pipeline script must meet before it is safe to run for a
+new TA. When a script fails this, fix it TO STANDARD (permanent), do not one-off patch it.
+
+**The contract:**
+1. **TA scoping.** A `--ta <slug>` flag (and/or `--ingestion-run-id`) that scopes the ENTIRE operation
+   to one TA. Must REFUSE to run unscoped (v2). No hardcoded TARGET_TA_IDS lists.
+2. **Frozen-TA safety.** Must be PROVABLY incapable of writing/updating/deleting rows for any TA outside
+   scope. Pattern: filter-at-source + candidate filter + write guard + post-load assertion. Trace the
+   data flow and confirm no out-of-scope write path exists. (NSCLC is frozen under advisor review.)
+3. **v2 schema correctness.** Reference only columns that exist on the v2 tables. Common landmines:
+   `derived_state`/`openalex_author_id` do NOT exist on hcps_v2; OpenAlex link is via
+   hcp_openalex_authors_v2; TA membership is via hcp_therapeutic_areas_v2 (no ta_id on hcps_v2).
+4. **--target-version v2** routing (get_table_name pattern).
+5. **--dry-run default or available**, writes nothing in dry mode.
+6. **Idempotency.** Re-runnable safely (ON CONFLICT DO NOTHING/UPDATE, or IS NULL / enriched_at scoping).
+7. **.env from project root** (load_dotenv() root-search, not script-dir).
+8. **ASCII-only Python; PowerShell files UTF-8 no BOM.**
+
+**Retrofit ledger (which scripts meet the standard):**
+  - create_hcps_v2.py (Step C) ......................... ✓ (rewritten)
+  - rebuild_publication_authors_v2.py (Step F) ......... ✓ (rewritten)
+  - ta_tagging_rebuild_v2.py ........................... ✓ (--ta added)
+  - targeted_nppes_enrichment.py ...................... ✓ (retrofitted; .env-path minor pending)
+  - recompute_established_ranks_v3.py ................. ✓ (already had --ta; verify NSCLC-safe on use)
+  - scoring_pipeline.py (rising cohort) ............... ✓ (July 7: --ta scoping + write-scope assert +
+        LOAD-scoping to TA hcp_ids + pagination-guard fix [empty-batch terminator, not offset-vs-count bail])
+  - cohort_classification_v2.py (NEW, July 7) ........ ✓ (career-based cohort assignment -> the per-TA
+        table hcp_cohort_classification_v2; --ta/--dry-run/--execute + write-scope assert)
+  - dedup_detect.py .................................. ✓ (July 7: Unicode name_key + fragment path +
+        rarity gate + STRONG-corroboration requirement + merge_reason; read-only)
+  - dedup_merge.py ................................... ✓ (July 7: works_count survivor + union-find
+        transitive clusters + already-merged tracking + all 39 hcps_v2 FKs re-pointed)
+  - publication_leadership_scoring.py ................. ✓ (verified July 7: fully TA-scoped via ta_pubs CTE;
+        BUT reads established set from hcp_established_ranks_v2 — needs wiring to hcp_cohort_classification_v2)
+  - network_centrality_scoring.py .................... ✗ PENDING
+  - pharma_engagement_scoring.py ..................... ✗ PENDING
+  - open_payments_aggregator.py / open_payments_filter.py ✗ PENDING
+  - [state-derivation script — see below] ............ ✗ TO BUILD/PORT from v1
+
+This ledger IS the agent-team's "what's ready" map. Keep it current as scripts are retrofitted.
+
+---
+
+## PIPELINE ADDITIONS (July 6 — steps discovered during AD, missing from original §1 order)
+
+Two steps belong in the canonical pipeline between tagging and scoring, both learned the hard way on AD:
+
+### STATE DERIVATION (before NPPES) — NEW required step for publication-derived HCPs
+Publication-derived HCPs have country but no US state (state normally comes FROM NPPES -> chicken/egg).
+NPPES name->NPI matching needs a state to disambiguate. So BEFORE NPPES:
+  - Derive `derived_state` (or feed state to matcher) from institution via `staging_us_institution_to_state`
+    (institution_normalized -> state).
+  - **The mapping is TA-dependent** (seeded from oncology/hep). Each new clinical domain brings clinical
+    institutions it lacks -> EXTEND the mapping with the new TA's clinical centers first. (AD needed
+    GWU->DC, National Jewish->CO, Rochester, Children's Colorado, etc.)
+  - Industry/NIH institutions correctly stay unmapped (they're not clinical; see debt #15).
+  - (v1 hcps had derived_state/institution_state columns; v2 hcps_v2 does not — port this step to v2.)
+
+### INDUSTRY/NIH HCP HANDLING (during/before NPPES)
+Industry/basic-science HCPs (pharma cos, NIH, Rockefeller, etc.): KEEP in population + cohort-classify
+(they have real scientific/network signal), but do NOT NPPES-match (not clinicians; pharma legitimately
+null). Exclude from NPPES scope. (Reconstructed from NSCLC behavior — see debt #15.)
+
+### ESTABLISHED SCORING SUB-PIPELINE (rewritten July 8 after the AD build — supersedes the old 50/35/15 model)
+
+**Pipeline order (Rising/Community are parallel chains, still TBD):**
+  0. IDENTITY RESOLUTION (dedup) must be complete first — see §0c. Scoring on fragmented identities is wrong.
+  1. cohort_classification_v2.py --ta <slug> -> hcp_cohort_classification_v2 (TA-ANCHORED establishment; §0d)
+  2. Derive authorship position (is_first/is_senior) from OpenAlex authorships JSON into publication_authors_v2
+     (REQUIRED — the scorer's senior/first signals are dead without it; see §0c). Also complete corpus linkage.
+  3. publication_leadership_scoring.py --ta <slug> -> hcp_publication_leadership_v2 (SCIENTIFIC AUTHORITY)
+  4. network_centrality_scoring.py --ta <slug> -> hcp_network_centrality_v2 '10yr' (NETWORK INFLUENCE)
+  5. pharma_engagement_scoring.py --ta <slug> -> hcp_pharma_engagement_v2 (COMMERCIAL ENGAGEMENT — displayed)
+  6. recompute_established_ranks_v3.py --ta <slug> --w-scientific 0.75 --w-network 0.25 --w-pharma 0.0
+     -> hcp_established_ranks_v3 (composite -> frontend). Each scorer reads the established set from
+     hcp_cohort_classification_v2 WHERE cohort='established' (NOT the old hcp_established_ranks_v2).
+
+### SCORING DOCTRINE (the load-bearing decisions from the AD build — advisor-validated)
+
+**TWO AXES, not one score. Concepts are TA-INDEPENDENT.**
+  - SCIENTIFIC/CLINICAL AUTHORITY (the rank): publications, authorship position, citations, guideline/consensus
+    authorship, network. Answers "who CHANGED the field?" — stable, slow-moving.
+  - COMMERCIAL ENGAGEMENT (displayed, NOT ranked): Open Payments, companies, drugs, advisory. Answers "who is
+    engaged with industry?" — different axis. NEVER fold commercial into the KOL rank.
+  The concepts stay constant across every TA. This is why the model generalizes without per-TA weight hacks.
+
+**Nimbleness lives at the DATA-AVAILABILITY layer, not the concept layer** (see debt §29ae). Don't hand-tune
+  weights per TA. Instead: assess per-TA which signals have trustworthy coverage; RANK on signals whose data
+  supports the whole cohort fairly; DISPLAY (don't rank on) signals with structural coverage gaps.
+  - Pharma: US-only (Open Payments). For an intl-heavy TA (AD is 73% intl, ~11% pharma coverage) -> weight 0,
+    display only. For a US-centric TA it MAY be defensible to weight — assess coverage first.
+  - Trial leadership: strong concept BUT gated on investigator->HCP match quality. ct.gov gives clean roles
+    (PI/chair/director) but matching fails on prominent KOLs (no ORCID/OpenAlex bridge id). DEFERRED until a
+    real investigator-resolution effort. Do not add it to the rank on the current match quality.
+  - Prestige signals (guideline/consensus/editorial/review) are IN PubMed (publication_types), internationally
+    uniform, and ALREADY the highest-weighted signals in the scientific score (guideline-senior = 15x a normal
+    senior pub). Lean on these, not on registry-dependent signals.
+
+**Composite weights: 0.75 scientific / 0.25 network** (advisor). Rationale: authority is stable (persists if
+  someone stops collaborating); network is contextual (rewards collaboration structure — inflates for
+  consortium-heavy cultures, e.g. European multicenter groups). Authority deserves the heavier weight. Do NOT
+  tune the network algorithm; only its relative weight needed recalibration. The composite reweights per-HCP:
+  a missing signal is dropped and remaining weights renormalize (sum-of-present-weights) — NOT scored 0.
+
+**VALIDATE, don't tune** (the key discipline): the acceptance test is "does the ranking naturally RECOVER the
+  known KOLs?" — hand the top-20 to a domain Head of Medical Affairs; do they nod? If it recovers the reference
+  names, STOP tuning (further tweaking overfits to one TA). AD reference list: Silverberg, Simpson,
+  Guttman-Yassky, Wollenberg, Weidinger, Flohr, Eichenfield, Bieber. Build a reference KOL list per TA.
+
+**CALIBRATION GOTCHA (cost us hours — check this):** percentile columns must be DOUBLE PRECISION / NUMERIC,
+  never INTEGER. An integer percentile_rank column silently rounds continuous percentiles, tying the entire
+  top ~1% at 100, which collapses scientific discrimination and lets network dominate the composite at the top.
+  Also use the CONTINUOUS percentile formula 100*(1-pos/(n-1)), not integer-floored 100-int(pos*100/n). All
+  three component scorers must use the same continuous form. Bake double-precision into the table DDL.
+
+**Display normalization:** show percentile ("99th percentile") or a robust rank-preserving transform, NOT
+  min-max (min-max lets one outlier — e.g. Silverberg — rescale everyone; every future superstar shifts all
+  displayed scores). Ranking already uses percentile; this is a display-layer fix (still TODO).
+
+## MULTI-TA STANDARD — ADDENDUM (July 6): --dry-run is MANDATORY; never write on first run
+Learned the hard way: trials_pipeline.py had no --dry-run, and a "--limit 5 test" WROTE 30 trials + 1,723
+investigator records before its matching behavior was validated. RULE: every pipeline/enrichment/scoring
+script MUST have a --dry-run that computes and prints but writes NOTHING. Any script lacking one gets a
+--dry-run ADDED (Cursor) BEFORE its first execution against a TA. First run of any script is ALWAYS
+--dry-run. Validate against a known KOL (e.g. Silverberg for AD) in the dry-run before executing.
+Add to the 8-point contract as point 9.

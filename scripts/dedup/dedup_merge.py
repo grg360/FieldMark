@@ -11,14 +11,19 @@ import argparse
 import csv
 from collections import Counter
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
 CSV_PATH_DEFAULT = "dedup_candidates_phase1.csv"
 
-ALLOWED_ACTIONS = {"merge_high_confidence", "merge_review"}
+ALLOWED_ACTIONS = {
+    "merge_high_confidence",
+    "merge_review",
+    "merge_fragment_high_confidence",
+}
+TIER_CHOICES = sorted(ALLOWED_ACTIONS)
 
 MERGE_KEYWORD_HINTS = ("department", "division", "center", "centre", "program", "unit", "clinic")
 
@@ -49,6 +54,7 @@ class CandidateCluster:
     stub_hcp_id: str
     primary_first_name: str
     stub_first_name: str
+    merge_reason: str = ""
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     mode.add_argument("--execute", action="store_true", help="Perform merge writes/deletes.")
     parser.add_argument(
         "--tier",
-        choices=["merge_high_confidence", "merge_review"],
+        choices=TIER_CHOICES,
         default=None,
         help="Limit to one recommended_action tier.",
     )
@@ -89,13 +95,174 @@ def load_candidates(path: str, tier: Optional[str], cluster: Optional[int]) -> L
                     stub_hcp_id=str(r.get("stub_hcp_id") or ""),
                     primary_first_name=str(r.get("primary_first_name") or ""),
                     stub_first_name=str(r.get("stub_first_name") or ""),
+                    merge_reason=str(r.get("merge_reason") or ""),
                 )
             )
     return out
 
 
+class UnionFind:
+    """Minimal union-find for grouping candidate pair edges into components."""
+
+    def __init__(self) -> None:
+        self.parent: Dict[str, str] = {}
+
+    def find(self, x: str) -> str:
+        self.parent.setdefault(x, x)
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]
+        # Path compression.
+        while self.parent[x] != root:
+            self.parent[x], x = root, self.parent[x]
+        return root
+
+    def union(self, a: str, b: str) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[ra] = rb
+
+
+def build_components(candidates: Sequence[CandidateCluster]) -> List[List[str]]:
+    """Group candidate pair edges into connected components of hcp_ids."""
+    uf = UnionFind()
+    for c in candidates:
+        if c.primary_hcp_id and c.stub_hcp_id:
+            uf.union(c.primary_hcp_id, c.stub_hcp_id)
+    groups: Dict[str, List[str]] = {}
+    seen: Set[str] = set()
+    for c in candidates:
+        for hid in (c.primary_hcp_id, c.stub_hcp_id):
+            if hid and hid not in seen:
+                seen.add(hid)
+                groups.setdefault(uf.find(hid), []).append(hid)
+    return [sorted(members) for members in groups.values() if len(members) >= 2]
+
+
+def reasons_by_hcp(candidates: Sequence[CandidateCluster]) -> Dict[str, str]:
+    """Map each hcp_id to a representative merge_reason from an incident pair."""
+    out: Dict[str, str] = {}
+    for c in candidates:
+        if c.merge_reason:
+            out.setdefault(c.primary_hcp_id, c.merge_reason)
+            out.setdefault(c.stub_hcp_id, c.merge_reason)
+    return out
+
+
 def ns(v: Any) -> str:
     return " ".join(str(v or "").strip().split())
+
+
+def fetch_works_counts(cur, hcp_ids: Sequence[str]) -> Dict[str, int]:
+    """Max OpenAlex works_count per hcp_id from hcp_author_metrics_v2 (ok snapshots only)."""
+    if not hcp_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT hcp_id, COALESCE(MAX(works_count), 0) AS works_count
+        FROM hcp_author_metrics_v2
+        WHERE hcp_id = ANY(%s::uuid[])
+          AND (fetch_status IS NULL OR fetch_status = 'ok')
+        GROUP BY hcp_id
+        """,
+        (list(hcp_ids),),
+    )
+    return {str(r["hcp_id"]): int(r["works_count"] or 0) for r in cur.fetchall()}
+
+
+def fetch_is_primary_flags(cur, hcp_ids: Sequence[str]) -> Dict[str, bool]:
+    if not hcp_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT hcp_id, BOOL_OR(COALESCE(is_primary, FALSE)) AS is_primary
+        FROM hcp_openalex_authors_v2
+        WHERE hcp_id = ANY(%s::uuid[])
+        GROUP BY hcp_id
+        """,
+        (list(hcp_ids),),
+    )
+    return {str(r["hcp_id"]): bool(r["is_primary"]) for r in cur.fetchall()}
+
+
+def fetch_npi_flags(cur, hcp_ids: Sequence[str]) -> Dict[str, bool]:
+    """has-NPI flag per hcp_id from hcps_v2 (for survivor tiebreak)."""
+    if not hcp_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT id, (npi_number IS NOT NULL AND btrim(npi_number) <> '') AS has_npi
+        FROM hcps_v2
+        WHERE id = ANY(%s::uuid[])
+        """,
+        (list(hcp_ids),),
+    )
+    return {str(r["id"]): bool(r["has_npi"]) for r in cur.fetchall()}
+
+
+def survivor_sort_key(
+    hid: str,
+    works_by_hcp: Dict[str, int],
+    npi_by_hcp: Dict[str, bool],
+    is_primary_by_hcp: Dict[str, bool],
+) -> Tuple[int, int, int, str]:
+    """
+    Survivor precedence (lower tuple wins under min()):
+      1) higher OpenAlex works_count
+      2) has NPI
+      3) is_primary OpenAlex link
+      4) lower id (stable deterministic fallback)
+    """
+    return (
+        -int(works_by_hcp.get(hid, 0)),
+        -int(bool(npi_by_hcp.get(hid))),
+        -int(bool(is_primary_by_hcp.get(hid))),
+        hid,
+    )
+
+
+def choose_survivor_many(
+    ids: Sequence[str],
+    *,
+    works_by_hcp: Dict[str, int],
+    npi_by_hcp: Dict[str, bool],
+    is_primary_by_hcp: Dict[str, bool],
+) -> str:
+    """Highest-works_count survivor across N component members (same precedence)."""
+    return min(
+        ids,
+        key=lambda hid: survivor_sort_key(hid, works_by_hcp, npi_by_hcp, is_primary_by_hcp),
+    )
+
+
+def choose_survivor(
+    a_id: str,
+    b_id: str,
+    *,
+    works_by_hcp: Dict[str, int],
+    npi_by_hcp: Dict[str, bool],
+    is_primary_by_hcp: Dict[str, bool],
+) -> Tuple[str, str]:
+    """
+    Pick survivor between two duplicate candidates.
+    Precedence:
+      1) higher OpenAlex works_count
+      2) has NPI
+      3) is_primary OpenAlex link
+      4) lower id (stable deterministic fallback)
+    Returns (survivor_id, merge_away_id).
+    """
+    survivor_id = min(
+        [a_id, b_id],
+        key=lambda hid: (
+            -int(works_by_hcp.get(hid, 0)),
+            -int(bool(npi_by_hcp.get(hid))),
+            -int(bool(is_primary_by_hcp.get(hid))),
+            hid,
+        ),
+    )
+    merge_id = b_id if survivor_id == a_id else a_id
+    return survivor_id, merge_id
 
 
 def is_more_specific_institution(primary_inst: str, stub_inst: str) -> bool:
@@ -216,10 +383,25 @@ def move_trial_proposals(cur, primary_id: str, stub_id: str) -> Dict[str, int]:
     return {"updated": int(cur.rowcount or 0), "deleted_conflicts": deleted}
 
 
-def merge_cluster(cur, cluster: CandidateCluster, dry_run: bool) -> Dict[str, Dict[str, int]]:
-    primary_id = cluster.primary_hcp_id
-    stub_id = cluster.stub_hcp_id
+def merge_record_into_survivor(
+    cur,
+    survivor_id: str,
+    stub_id: str,
+    dry_run: bool,
+) -> Dict[str, Dict[str, int]]:
+    """
+    Merge a single stub record INTO a fixed survivor (no survivor re-selection).
+    Survivor choice is made once per component by the caller; this only re-points
+    FKs, merges fields/NPI, and deletes the stub.
+    """
+    if survivor_id == stub_id:
+        raise RuntimeError(f"refusing to merge a record into itself: {survivor_id}")
 
+    primary_id = survivor_id
+    primary, stub = fetch_hcp_pair(cur, survivor_id, stub_id)
+
+    # Simple hcp_id re-points: no unique key on hcp_id, so a plain UPDATE cannot
+    # create a duplicate-key conflict.
     tables_simple = [
         ("publication_authors_v2", "hcp_id"),
         ("trial_investigators_v2", "hcp_id"),
@@ -229,8 +411,13 @@ def merge_cluster(cur, cluster: CandidateCluster, dry_run: bool) -> Dict[str, Di
         ("hcp_openalex_authors_v2", "hcp_id"),
         ("dol_matches_v2", "hcp_id"),
         ("nppes_enrichment_log_v2", "hcp_id"),
+        ("hcp_research_themes_v2", "hcp_id"),
+        ("hcp_scientific_positions_v1", "hcp_id"),
     ]
 
+    # Conflict-safe re-points: (hcp_id, *key_cols) is a unique/primary key, so a
+    # merged-away row that would collide with an existing survivor row is deleted
+    # first, then the remainder are re-pointed.
     tables_conflict = [
         ("hcp_open_payments_summary_v2", "hcp_id", []),
         ("hcp_open_payments_by_ta_v2", "hcp_id", ["therapeutic_area_id"]),
@@ -243,11 +430,24 @@ def merge_cluster(cur, cluster: CandidateCluster, dry_run: bool) -> Dict[str, Di
         ("hcp_community_scores_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_therapeutic_areas_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_institutions_v2", "hcp_id", ["reference_institution_id"]),
+        # --- Added after FK audit (all remaining FKs -> hcps_v2.id) ---
+        ("dol_canonical_overrides", "hcp_id", ["social_user_id"]),
+        ("hcp_ai_overviews", "hcp_id", ["synthesis_type", "therapeutic_area"]),
+        ("hcp_author_metrics_v2", "hcp_id", ["snapshot_date"]),
+        ("hcp_established_ranks_v3", "hcp_id", ["therapeutic_area_id", "scope_type", "scope_value"]),
+        ("hcp_industry_classification_v1", "hcp_id", []),
+        ("hcp_leadership_evidence", "hcp_id", ["role_type", "organization", "source_url"]),
+        ("hcp_network_centrality_v2", "hcp_id", ["therapeutic_area_id", "window_type"]),
+        ("hcp_pharma_engagement_v2", "hcp_id", ["therapeutic_area_id"]),
+        ("hcp_publication_leadership_v2", "hcp_id", ["therapeutic_area_id"]),
+        ("hcp_score_ranks_v2", "hcp_id", ["therapeutic_area_id", "cohort", "scope_type", "scope_value"]),
+        ("msl_hcp_relationships", "hcp_id", ["user_id"]),
+        ("npi_match_proposals_v2", "hcp_id", ["npi"]),
+        ("nih_grant_investigators", "hcp_id", ["core_project_num", "role"]),
     ]
 
     moved: Dict[str, Dict[str, int]] = {}
 
-    primary, stub = fetch_hcp_pair(cur, primary_id, stub_id)
     # Save stub fields first for safe merge sequencing.
     stub_npi = ns(stub.get("npi_number"))
     primary_npi = ns(primary.get("npi_number"))
@@ -296,6 +496,59 @@ def merge_cluster(cur, cluster: CandidateCluster, dry_run: bool) -> Dict[str, Di
         else:
             moved[table] = move_hcp_fk_with_conflict_delete(cur, table, key_cols, primary_id, stub_id, hcp_col)
 
+    # hcp_top_collaborators_v2 has TWO FKs to hcps_v2.id: hcp_id (part of the
+    # unique key) and collaborator_hcp_id (not in the unique key). Re-point both,
+    # then drop any self-collaborator rows created by the merge.
+    if dry_run:
+        moved["hcp_top_collaborators_v2(hcp_id)"] = {
+            "updated": count_rows_for_hcp(cur, "hcp_top_collaborators_v2", "hcp_id", stub_id),
+            "deleted_conflicts": 0,
+        }
+        moved["hcp_top_collaborators_v2(collaborator_hcp_id)"] = {
+            "updated": count_rows_for_hcp(cur, "hcp_top_collaborators_v2", "collaborator_hcp_id", stub_id),
+            "deleted_conflicts": 0,
+        }
+    else:
+        moved["hcp_top_collaborators_v2(hcp_id)"] = move_hcp_fk_with_conflict_delete(
+            cur,
+            "hcp_top_collaborators_v2",
+            ["therapeutic_area_id", "window_type", "rank"],
+            primary_id,
+            stub_id,
+            "hcp_id",
+        )
+        collab_updated = move_simple_hcp_fk(
+            cur, "hcp_top_collaborators_v2", primary_id, stub_id, "collaborator_hcp_id"
+        )
+        cur.execute(
+            "DELETE FROM hcp_top_collaborators_v2 WHERE hcp_id = collaborator_hcp_id AND hcp_id = %s",
+            (primary_id,),
+        )
+        self_deleted = int(cur.rowcount or 0)
+        moved["hcp_top_collaborators_v2(collaborator_hcp_id)"] = {
+            "updated": collab_updated,
+            "deleted_conflicts": self_deleted,
+        }
+
+    # nih_merge_candidates has two hcp FKs (hcp_id_a, hcp_id_b), no unique key on
+    # either -> plain re-point of both columns.
+    if dry_run:
+        moved["nih_merge_candidates"] = {
+            "updated": (
+                count_rows_for_hcp(cur, "nih_merge_candidates", "hcp_id_a", stub_id)
+                + count_rows_for_hcp(cur, "nih_merge_candidates", "hcp_id_b", stub_id)
+            ),
+            "deleted_conflicts": 0,
+        }
+    else:
+        moved["nih_merge_candidates"] = {
+            "updated": (
+                move_simple_hcp_fk(cur, "nih_merge_candidates", primary_id, stub_id, "hcp_id_a")
+                + move_simple_hcp_fk(cur, "nih_merge_candidates", primary_id, stub_id, "hcp_id_b")
+            ),
+            "deleted_conflicts": 0,
+        }
+
     if dry_run:
         moved["trial_investigator_match_proposals_v2"] = {
             "updated": count_rows_for_hcp(cur, "trial_investigator_match_proposals_v2", "proposed_hcp_id", stub_id),
@@ -338,51 +591,97 @@ def main() -> None:
     successes = 0
     failed = 0
     stubs_deleted = 0
-    failure_reasons: List[Tuple[int, str]] = []
+    failure_reasons: List[Tuple[str, str]] = []
+
+    # Group all selected pairs into connected components (transitive-safe).
+    components = build_components(candidates)
+    reason_by_hcp = reasons_by_hcp(candidates)
+    print(f"Connected components (>=2 records): {len(components):,}")
+
+    all_hcp_ids: Set[str] = set()
+    for comp in components:
+        all_hcp_ids.update(comp)
+
+    # Global guard: no id may be a survivor in one component and merged-away in
+    # another. Components are disjoint by construction, but track defensively.
+    global_survivors: Set[str] = set()
+    global_merged_away: Set[str] = set()
 
     with psycopg.connect(db_url, row_factory=dict_row, autocommit=False) as conn:
-        for c in candidates:
-            print(
-                f"\ncluster={c.cluster_id} last_name={c.last_name} "
-                f"primary={c.primary_first_name}({c.primary_hcp_id}) "
-                f"stub={c.stub_first_name}({c.stub_hcp_id}) tier={c.recommended_action}"
+        with conn.cursor() as preload_cur:
+            works_by_hcp = fetch_works_counts(preload_cur, sorted(all_hcp_ids))
+            is_primary_by_hcp = fetch_is_primary_flags(preload_cur, sorted(all_hcp_ids))
+            npi_by_hcp = fetch_npi_flags(preload_cur, sorted(all_hcp_ids))
+        print(f"Loaded OpenAlex works_count for {len(works_by_hcp):,} / {len(all_hcp_ids):,} component HCP ids")
+
+        for idx, members in enumerate(sorted(components, key=lambda m: -len(m)), start=1):
+            survivor_id = choose_survivor_many(
+                members,
+                works_by_hcp=works_by_hcp,
+                npi_by_hcp=npi_by_hcp,
+                is_primary_by_hcp=is_primary_by_hcp,
             )
-            try:
-                if dry_run:
-                    with conn.transaction():
-                        with conn.cursor() as cur:
-                            moved = merge_cluster(cur, c, dry_run=True)
-                else:
-                    with conn.transaction():
-                        with conn.cursor() as cur:
-                            moved = merge_cluster(cur, c, dry_run=False)
+            merge_away = [m for m in members if m != survivor_id]
 
-                for table, stats in moved.items():
+            print(
+                f"\ncomponent={idx} size={len(members)} "
+                f"survivor={survivor_id} (works={works_by_hcp.get(survivor_id, 0)}) "
+                f"merge_away={len(merge_away)}"
+            )
+            for m in merge_away:
+                print(
+                    f"    <- {m} (works={works_by_hcp.get(m, 0)}, "
+                    f"reason={reason_by_hcp.get(m, '')})"
+                )
+
+            global_survivors.add(survivor_id)
+
+            for stub_id in merge_away:
+                # Already-merged tracking: never process an id twice; never merge
+                # the survivor away.
+                if stub_id in global_merged_away:
+                    print(f"    [SKIP] {stub_id} already merged away")
+                    continue
+                if stub_id == survivor_id:
+                    continue
+                try:
+                    with conn.transaction():
+                        with conn.cursor() as cur:
+                            moved = merge_record_into_survivor(
+                                cur, survivor_id, stub_id, dry_run=dry_run
+                            )
                     prefix = "Would UPDATE" if dry_run else "Moved"
-                    print(
-                        f"  {prefix} {stats['updated']} rows in {table}"
-                        + (
-                            f" (deleted_conflicts={stats['deleted_conflicts']})"
-                            if stats.get("deleted_conflicts")
-                            else ""
+                    for table, stats in moved.items():
+                        print(
+                            f"      {prefix} {stats['updated']} rows in {table}"
+                            + (
+                                f" (deleted_conflicts={stats['deleted_conflicts']})"
+                                if stats.get("deleted_conflicts")
+                                else ""
+                            )
                         )
-                    )
-                successes += 1
-                stubs_deleted += moved.get("hcps_v2_stub_delete", {}).get("updated", 0)
-            except Exception as exc:
-                failed += 1
-                failure_reasons.append((c.cluster_id, repr(exc)))
-                print(f"  [FAILED] cluster={c.cluster_id}: {exc}")
-                continue
+                    global_merged_away.add(stub_id)
+                    successes += 1
+                    stubs_deleted += moved.get("hcps_v2_stub_delete", {}).get("updated", 0)
+                except Exception as exc:
+                    failed += 1
+                    failure_reasons.append((stub_id, repr(exc)))
+                    print(f"      [FAILED] merge {stub_id} -> {survivor_id}: {exc}")
+                    continue
 
+    overlap = global_survivors & global_merged_away
     print("\n=== Final Summary ===")
-    print(f"Successful merges count: {successes}")
-    print(f"Failed merges count: {failed}")
+    print(f"Components processed: {len(components):,}")
+    print(f"Successful record merges: {successes}")
+    print(f"Failed record merges: {failed}")
     print(f"Stubs deleted count: {stubs_deleted if not dry_run else 0}")
+    print(f"Survivor/merged-away overlap (must be 0): {len(overlap)}")
+    if overlap:
+        print(f"  OVERLAP IDS: {sorted(overlap)}")
     if failure_reasons:
         print("Failed reasons:")
-        for cid, reason in failure_reasons:
-            print(f"  cluster {cid}: {reason}")
+        for hid, reason in failure_reasons:
+            print(f"  {hid}: {reason}")
 
 
 if __name__ == "__main__":

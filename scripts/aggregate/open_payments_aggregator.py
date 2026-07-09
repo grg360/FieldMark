@@ -69,6 +69,12 @@ CANONICALS = [
         "npi": "1053999599",
         "expected_ta": "NSCLC",
     },
+    {
+        "label": "Silverberg",
+        "hcp_id": "f5a0351e-2af3-4169-acf2-019aab06673a",
+        "npi": "1831325521",
+        "expected_ta": "Atopic Dermatitis",
+    },
 ]
 
 
@@ -80,6 +86,13 @@ def parse_args() -> argparse.Namespace:
         choices=["v1", "v2"],
         default="v1",
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
+    parser.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Scope computation/writes to one therapeutic area (e.g. atopic-dermatitis).",
     )
     return parser.parse_args()
 
@@ -137,7 +150,49 @@ def fetch_ta_drug_keywords(client: Client) -> List[Dict[str, Any]]:
 
 
 def fetch_therapeutic_areas(client: Client) -> List[Dict[str, Any]]:
-    return client.table("therapeutic_areas").select("id,name").execute().data or []
+    return client.table("therapeutic_areas").select("id,name,slug").execute().data or []
+
+
+def resolve_ta_slug(client: Client, slug: str) -> Tuple[str, str]:
+    rows = (
+        client.table("therapeutic_areas")
+        .select("id,name,slug")
+        .eq("slug", slug)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
+    return str(rows[0]["id"]), str(rows[0]["name"])
+
+
+def assert_ta_write_scope(
+    *,
+    scoped_ta_id: str,
+    scoped_hcp_ids: set,
+    summary_rows: List[Dict[str, Any]],
+    by_ta_rows: List[Dict[str, Any]],
+    top_companies_rows: List[Dict[str, Any]],
+    by_drug_rows: List[Dict[str, Any]],
+) -> None:
+    bad_by_ta = [
+        r for r in by_ta_rows if str(r.get("therapeutic_area_id")) != scoped_ta_id
+    ]
+    if bad_by_ta:
+        raise RuntimeError(
+            f"SAFETY VIOLATION: {len(bad_by_ta)} by_ta row(s) have therapeutic_area_id != {scoped_ta_id}"
+        )
+    for label, rows in (
+        ("summary", summary_rows),
+        ("top_companies", top_companies_rows),
+        ("by_drug", by_drug_rows),
+    ):
+        bad = [r for r in rows if str(r.get("hcp_id")) not in scoped_hcp_ids]
+        if bad:
+            raise RuntimeError(
+                f"SAFETY VIOLATION: {len(bad)} {label} row(s) have hcp_id outside scoped TA HCP set"
+            )
 
 
 def sql_literal(value: str) -> str:
@@ -173,11 +228,23 @@ if __name__ == "__main__":
     args = parse_args()
     execute = bool(args.execute)
     target_version: str = args.target_version
+    ta_slug: Optional[str] = args.ta
     mode = "execute" if execute else "dry_run"
     errors: List[str] = []
 
     load_dotenv()
     client = init_supabase()
+
+    scoped_ta_id: Optional[str] = None
+    scoped_ta_name: Optional[str] = None
+    scoped_hcp_ids: Optional[set] = None
+    if ta_slug:
+        scoped_ta_id, scoped_ta_name = resolve_ta_slug(client, ta_slug)
+        print(f"\n{'=' * 60}")
+        print(f"TA-SCOPED RUN: {scoped_ta_name} (ta_id={scoped_ta_id})")
+        print("Only HCPs in this TA will be computed/written.")
+        print(f"{'=' * 60}\n")
+
     con = duckdb.connect()
     con.execute("SET memory_limit = '4GB'")
 
@@ -215,6 +282,42 @@ if __name__ == "__main__":
             "id,hcp_id,therapeutic_area_id",
             target_version=target_version,
         )
+
+    if scoped_ta_id:
+        hcp_ta_rows = [
+            r
+            for r in hcp_ta_rows
+            if str(r.get("therapeutic_area_id") or "") == scoped_ta_id
+        ]
+        scoped_hcp_ids = {
+            str(r.get("hcp_id"))
+            for r in hcp_ta_rows
+            if r.get("hcp_id")
+        }
+        print(f"[SCOPE] hcp_ta_rows filtered to TA: {len(hcp_ta_rows):,} rows, {len(scoped_hcp_ids):,} HCPs")
+        hcps_npi_rows = [
+            r for r in hcps_npi_rows if str(r.get("id")) in scoped_hcp_ids
+        ]
+        npi_set = {
+            str(r.get("npi_number")).strip()
+            for r in hcps_npi_rows
+            if str(r.get("npi_number") or "").strip()
+        }
+        npi_to_hcp = {
+            str(r["npi_number"]).strip(): str(r["id"])
+            for r in hcps_npi_rows
+            if r.get("npi_number")
+        }
+        ta_drug_keywords = [
+            r
+            for r in ta_drug_keywords
+            if str(r.get("therapeutic_area_id") or "") == scoped_ta_id
+        ]
+        print(
+            f"[SCOPE] NPI cohort scoped to TA HCPs: {len(npi_set):,} NPIs; "
+            f"drug keywords for TA: {len(ta_drug_keywords):,}"
+        )
+
     hcp_to_tas: Dict[str, set] = {}
     for r in hcp_ta_rows:
         h = str(r.get("hcp_id") or "")
@@ -524,6 +627,17 @@ if __name__ == "__main__":
 
     print(f"Computed {len(summary_rows)} summary rows, {len(by_ta_rows)} by_ta rows, {len(top_companies_rows)} top_companies rows, {len(by_drug_rows)} by_drug rows")
 
+    if scoped_ta_id and scoped_hcp_ids is not None:
+        assert_ta_write_scope(
+            scoped_ta_id=scoped_ta_id,
+            scoped_hcp_ids=scoped_hcp_ids,
+            summary_rows=summary_rows,
+            by_ta_rows=by_ta_rows,
+            top_companies_rows=top_companies_rows,
+            by_drug_rows=by_drug_rows,
+        )
+        print("[SCOPE] Pre-write assertion passed: all rows are within target TA scope.")
+
     # Phase 8 - Level 1 stats
     hcp_with_summary = len(summary_rows)
     hcp_with_by_ta = len({r["hcp_id"] for r in by_ta_rows})
@@ -613,7 +727,12 @@ if __name__ == "__main__":
 
     # Phase 8 - Level 3 unmatched per TA
     level_3_unmatched: Dict[str, List[Dict[str, Any]]] = {}
-    for ta_id, ta_name in ta_name_by_id.items():
+    unmatched_ta_items: Sequence[Tuple[str, str]]
+    if scoped_ta_id and scoped_ta_name:
+        unmatched_ta_items = [(scoped_ta_id, scoped_ta_name)]
+    else:
+        unmatched_ta_items = list(ta_name_by_id.items())
+    for ta_id, ta_name in unmatched_ta_items:
         unmatched_query = f"""
         SELECT
           fp.drug_name,
@@ -825,6 +944,8 @@ if __name__ == "__main__":
     log_payload: Dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
+        "ta_scope": ta_slug or "all",
+        "scoped_ta_id": scoped_ta_id,
         "elapsed_seconds": elapsed_seconds,
         "cohort_size": len(npi_set),
         "filtered_payment_rows": int(filtered_payment_rows),

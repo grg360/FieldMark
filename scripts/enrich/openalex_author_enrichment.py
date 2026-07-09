@@ -34,7 +34,7 @@ from collections import deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -252,14 +252,94 @@ def compute_data_quality_flags(parsed: Dict[str, Any]) -> Optional[Dict[str, Any
 # Supabase operations
 # ============================================================
 
-def load_link_rows(client: Client, limit: Optional[int], offset: int) -> List[LinkRow]:
+def resolve_ta_slug(client: Client, slug: str) -> Tuple[str, str]:
+    rows = (
+        client.table("therapeutic_areas")
+        .select("id,name,slug")
+        .eq("slug", slug)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
+    return str(rows[0]["id"]), str(rows[0]["name"])
+
+
+def fetch_hcp_ids_for_ta(client: Client, ta_id: str) -> Set[str]:
+    hcp_ids: Set[str] = set()
+    page_size = 1000
+    offset = 0
+    while True:
+        batch = (
+            client.table("hcp_therapeutic_areas_v2")
+            .select("hcp_id")
+            .eq("therapeutic_area_id", ta_id)
+            .order("hcp_id")
+            .range(offset, offset + page_size - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            hid = row.get("hcp_id")
+            if hid:
+                hcp_ids.add(str(hid))
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return hcp_ids
+
+
+def _append_link_rows(rows: List[Dict[str, Any]], out: List[LinkRow]) -> None:
+    for r in rows:
+        hcp_join = r.get("hcps_v2")
+        if isinstance(hcp_join, list):
+            hcp_join = hcp_join[0] if hcp_join else None
+        total_career_pubs = hcp_join.get("total_career_pubs") if hcp_join else None
+        out.append(LinkRow(
+            hcp_id=r["hcp_id"],
+            openalex_author_id=r["openalex_author_id"],
+            total_career_pubs=total_career_pubs,
+        ))
+
+
+def load_link_rows(
+    client: Client,
+    limit: Optional[int],
+    offset: int,
+    scoped_hcp_ids: Optional[Set[str]] = None,
+) -> List[LinkRow]:
     """
     Load (hcp_id, openalex_author_id, total_career_pubs) tuples.
     total_career_pubs is from hcps_v2 and used downstream for disambiguation
     conflation detection.
     """
+    if scoped_hcp_ids is not None:
+        out: List[LinkRow] = []
+        hcp_list = sorted(scoped_hcp_ids)
+        chunk_size = 200
+        for i in range(0, len(hcp_list), chunk_size):
+            chunk = hcp_list[i : i + chunk_size]
+            resp = (
+                client.table("hcp_openalex_authors_v2")
+                .select("hcp_id, openalex_author_id, hcps_v2!inner(total_career_pubs)")
+                .eq("is_primary", True)
+                .in_("hcp_id", chunk)
+                .order("hcp_id")
+                .execute()
+            )
+            _append_link_rows(resp.data or [], out)
+        if offset:
+            out = out[offset:]
+        if limit is not None:
+            out = out[:limit]
+        return out
+
     page_size = 1000
-    out: List[LinkRow] = []
+    out = []
     fetched = 0
     cur = offset
 
@@ -299,11 +379,8 @@ def load_link_rows(client: Client, limit: Optional[int], offset: int) -> List[Li
     return out
 
 
-def load_done_today(client: Client, today: str) -> set:
-    """
-    For --resume: return the set of hcp_ids that already have a row in
-    hcp_author_metrics_v2 for today's snapshot_date.
-    """
+def load_done_for_snapshot(client: Client, snapshot_date: str) -> set:
+    """Return hcp_ids that already have a row for the given snapshot_date."""
     out: set = set()
     page_size = 1000
     cur = 0
@@ -312,7 +389,7 @@ def load_done_today(client: Client, today: str) -> set:
         q = (
             client.table("hcp_author_metrics_v2")
             .select("hcp_id")
-            .eq("snapshot_date", today)
+            .eq("snapshot_date", snapshot_date)
             .range(cur, end)
         )
         resp = q.execute()
@@ -325,6 +402,14 @@ def load_done_today(client: Client, today: str) -> set:
             break
         cur += page_size
     return out
+
+
+def load_done_today(client: Client, today: str) -> set:
+    """
+    For --resume: return the set of hcp_ids that already have a row in
+    hcp_author_metrics_v2 for today's snapshot_date.
+    """
+    return load_done_for_snapshot(client, today)
 
 
 def upsert_batch(client: Client, rows: List[MetricsRow], dry_run: bool) -> None:
@@ -399,10 +484,43 @@ def run(args: argparse.Namespace) -> int:
 
     print(f"[openalex_enrich] enrichment_run_id={enrichment_run_id}")
     print(f"[openalex_enrich] snapshot_date={today}")
-    print(f"[openalex_enrich] dry_run={args.dry_run} resume={args.resume} limit={args.limit} offset={args.offset}")
+    print(
+        f"[openalex_enrich] dry_run={args.dry_run} resume={args.resume} "
+        f"missing_only={args.missing_only} limit={args.limit} offset={args.offset}"
+    )
+
+    scoped_ta_id: Optional[str] = None
+    scoped_ta_name: Optional[str] = None
+    scoped_hcp_ids: Optional[Set[str]] = None
+    if args.ta:
+        scoped_ta_id, scoped_ta_name = resolve_ta_slug(client, args.ta)
+        scoped_hcp_ids = fetch_hcp_ids_for_ta(client, scoped_ta_id)
+        print(
+            f"[openalex_enrich] TA scope: {scoped_ta_name} "
+            f"({len(scoped_hcp_ids)} HCPs in hcp_therapeutic_areas_v2)"
+        )
 
     print("[openalex_enrich] loading link rows from hcp_openalex_authors_v2 ...")
-    links = load_link_rows(client, args.limit, args.offset)
+    links = load_link_rows(client, args.limit, args.offset, scoped_hcp_ids=scoped_hcp_ids)
+
+    if args.missing_only:
+        print(
+            f"[openalex_enrich] loading HCPs already snapshotted for {today} (--missing-only) ..."
+        )
+        done_snapshot = load_done_for_snapshot(client, today)
+        before = len(links)
+        links = [link for link in links if link.hcp_id not in done_snapshot]
+        print(
+            f"[openalex_enrich] --missing-only: {before} candidates -> {len(links)} "
+            f"({before - len(links)} already have snapshot_date={today})"
+        )
+
+    if args.ta:
+        print(
+            f"TA-SCOPED author-metrics run: {scoped_ta_name} (ta_id={scoped_ta_id}). "
+            f"{len(links)} candidate HCPs (missing_only={args.missing_only})."
+        )
+
     print(f"[openalex_enrich] loaded {len(links)} link rows")
 
     done_today: set = set()
@@ -585,6 +703,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Supabase upsert batch size.")
     p.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
                    help="Number of concurrent fetch workers (default 1, safe ceiling 8).")
+    p.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Scope to HCPs in one therapeutic area (e.g. atopic-dermatitis).",
+    )
+    p.add_argument(
+        "--missing-only",
+        action="store_true",
+        help="Only fetch HCPs without an hcp_author_metrics_v2 row for the target snapshot_date.",
+    )
     return p.parse_args()
 
 
