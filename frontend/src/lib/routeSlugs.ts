@@ -172,6 +172,12 @@ export function getIndicationCount(taLabel: string, indicationLabel: string): nu
   return match?.count ?? null;
 }
 
+export function getIndicationTaId(taLabel: string, indicationLabel: string): string | undefined {
+  const options = INDICATIONS_BY_TA[taLabel] ?? [];
+  const match = options.find((o) => o.label === indicationLabel);
+  return match?.taId;
+}
+
 export function resolveIndicationForTa(
   taLabel: string,
   indicationSlug: string | undefined,

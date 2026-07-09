@@ -9,6 +9,7 @@ export interface IndicationOption {
   label: string;
   active: boolean;
   count?: number;
+  taId?: string;
 }
 
 export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
@@ -47,8 +48,8 @@ export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
     { label: "Cystic Fibrosis", active: false },
   ],
   Immunology: [
-    { label: "All", active: true, count: 1204 },
-    { label: "Atopic Dermatitis", active: false },
+    { label: "All", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
+    { label: "Atopic Dermatitis", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
     { label: "Psoriasis", active: false },
     { label: "Rheumatoid Arthritis", active: false },
     { label: "Crohn's Disease", active: false },

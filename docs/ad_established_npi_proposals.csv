@@ -1,0 +1,68 @@
+﻿rank,hcp_name,institution,country,proposed_npi,matched_nppes_name,state,city,taxonomy,nppes_candidate_count,review_flag,decision
+17,Peter Lio,Northwestern University,US,1497787923,PETER LIO,IL,CHICAGO,Dermatology,2,,written
+36,Katrina Abuabara,"University of California, San Francisco",US,1558689216,KATRINA ABUABARA,PA,PHILADELPHIA,Dermatology,1,,written
+44,Donald Leung,National Jewish Health,US,1215012950,DONALD LEUNG,CO,DENVER,Allergy & Immunology,1,,dup-excluded (dedup pending)
+70,Vivian Shi,University of Arizona,US,1720333990,VIVIAN SHI,WA,SEATTLE,Dermatology,3,,written
+84,Lisa Beck,University of Rochester Medical Center,US,1780649681,LISA BECK,NY,ROCHESTER,Dermatology,2,,written
+107,Martin Steinhoff,Cornell University,US,1730321167,MARTIN STEINHOFF,CA,SAN FRANCISCO,Dermatology,1,,written
+180,Anna Nowak‐Węgrzyn,University of Warmia and Mazury in Olsztyn,,1477522621,ANNA NOWAK-WEGRZYN,NY,NEW YORK,"Pediatrics, Pediatric Allergy/Immunology",1,,written
+213,Kari Nadeau,Stanford University,US,1871652644,KARI NADEAU,MA,BOSTON,"Internal Medicine, Allergy & Immunology",1,,written
+226,Mercedes González,University of Miami,US,1750563243,MERCEDES GONZALEZ,FL,MIAMI,Dermatology,4,,written
+254,Leslie Castelo‐Soccio,Children's Hospital of Philadelphia,US,1992865976,LESLIE CASTELO-SOCCIO,DC,WASHINGTON,Dermatology,1,,written
+273,Leon Kircik,Icahn School of Medicine at Mount Sinai,US,1760576599,LEON KIRCIK,KY,LOUSIVILLE,Dermatology,1,,written
+346,Carla Davis,Baylor College of Medicine,US,1679653018,CARLA DAVIS,DC,WASHINGTON,"Pediatrics, Pediatric Allergy/Immunology",14,REVIEW (common name),dropped
+485,Talal Chatila,Boston Children's Hospital,US,1952321846,TALAL CHATILA,CA,LOS ANGELES,"Pediatrics, Pediatric Allergy/Immunology",1,,written
+501,Mahboobeh Mahdavinia,Rush University Medical Center,US,1659514131,MAHBOOBEH MAHDAVINIA,TX,HOUSTON,"Internal Medicine, Allergy & Immunology",1,,written
+508,April Armstrong,University of Southern California,US,1356477087,APRIL ARMSTRONG,CA,LOS ANGELES,Dermatology,2,,dup-excluded (dedup pending)
+510,David Berk,Atara Biotherapeutics (United States),US,1205045192,DAVID BERK,MO,SAINT LOUIS,Dermatology,5,REVIEW (industry),dropped
+557,Jonathan Bernstein,University of Cincinnati,US,1093713638,JONATHAN BERNSTEIN,OH,CINCINNATI,Allergy & Immunology,3,,written
+607,Henry Lim,Henry Ford Hospital,US,1710065842,HENRY LIM,MI,DETROIT,"Dermatology, Clinical & Laboratory Dermatological Immunology",5,,written
+633,Jane Grant‐Kels,UConn Health,US,1750386462,JANE GRANT-KELS,CT,FARMINGTON,Dermatology,1,,written
+644,Maryam Asgari,Harvard University,US,1962580050,MARYAM ASGARI,CO,AURORA,"Dermatology, MOHS-Micrographic Surgery",1,,written
+686,Mark Kaplan,Indiana University School of Medicine,US,1861591661,MARK KAPLAN,IL,GURNEE,Allergy & Immunology,18,REVIEW (common name),dropped
+739,Moise L. Levy,Dell Children's Medical Center of Central Texas,US,1013097419,MOISE LEVY,TX,AUSTIN,"Dermatology, Pediatric Dermatology",1,,written
+740,Dana Wallace,Nova Southeastern University,US,1437192531,DANA WALLACE,FL,FT LAUDERDALE,Allergy & Immunology,15,REVIEW (common name),dropped
+759,Pamela Frischmeyer‐Guerrerio,National Institute of Allergy and Infectious Diseases,US,1184762106,PAMELA FRISCHMEYER-GUERRERIO,MD,BALTIMORE,"Pediatrics, Pediatric Allergy/Immunology",1,,written
+830,Zoe Draelos,Dermatology Consulting Services,,1518940170,ZOE DRAELOS,NC,HIGH POINT,Dermatology,1,,written
+842,David Bernstein,University of Cincinnati Medical Center,US,1558369843,DAVID BERNSTEIN,OH,CINCINNATI,Allergy & Immunology,2,,written
+904,David Rubenstein,Roivant Sciences (United States),,1447360151,DAVID RUBENSTEIN,NC,CHAPEL HILL,Dermatology,5,,written
+966,Daniel Kaplan,University of Pittsburgh,US,1407847890,DANIEL KAPLAN,PA,PITTSBURGH,Dermatology,2,,written
+1066,Mio Nakamura,"University of California, San Francisco",US,1740607894,MIO NAKAMURA,MI,ANN ARBOR,Dermatology,1,,written
+1217,Markus Boos,Seattle Children's Hospital,US,1225359680,MARKUS BOOS,PA,PHILADELPHIA,"Dermatology, Pediatric Dermatology",1,,written
+1256,James Marks,Pennsylvania State University,US,1366406746,JAMES MARKS,PA,HERSHEY,Dermatology,3,,written
+1262,Anthony Fransway,Clinical Physiology Associates,,1710948476,ANTHONY FRANSWAY,FL,FORT MYERS,"Dermatology, Procedural Dermatology",1,,written
+1281,Robert Wood,Johns Hopkins University,US,1508894221,ROBERT WOOD,MD,BALTIMORE,"Pediatrics, Pediatric Allergy/Immunology",2,,written
+1283,Kelly Cordoro,"University of California, San Francisco",US,1477622090,KELLY CORDORO,VA,CHARLOTTESVILLE,Dermatology,1,,written
+1422,Jenna Borok,University of California San Diego,US,1558858449,JENNA BOROK,IL,CHICAGO,Dermatology,1,,written
+1486,Robert Schwartz,"Rutgers, The State University of New Jersey",US,1548354566,ROBERT SCHWARTZ,NJ,NEWARK,Dermatology,4,,written
+1487,Abigail Cline,Wake Forest University,US,1639606536,ABIGAIL CLINE,NY,BRONX,Dermatology,3,,written
+1582,Jerry Bagel,Windsor Dermatology,,1992772156,JERRY BAGEL,NJ,EAST WINDSOR,Dermatology,1,,written
+1647,Lisa Zhou,Icahn School of Medicine at Mount Sinai,US,1548823206,LISA ZHOU,NJ,MORRISTOWN,"Dermatology, Dermatopathology",3,,written
+1655,Matthew Turner,Richard L. Roudebush VA Medical Center,US,1033308275,MATTHEW TURNER,IN,INDIANAPOLIS,Dermatology,20,REVIEW (common name),written
+1679,Maria Garzón,Columbia University,US,1487754784,MARIA GARZON,NY,NEW YORK,"Dermatology, Pediatric Dermatology",1,,written
+1715,Jeffrey Travers,Wright State University,US,1770599979,JEFFREY TRAVERS,OH,DAYTON,Dermatology,2,,written
+1764,Joan Guitart,Northwestern University,US,1225074727,JOAN GUITART,IL,CHICAGO,"Dermatology, Dermatopathology",2,,written
+1777,Stephen Tyring,Center for Clinical Studies,,1245227263,STEPHEN TYRING,TX,WEBSTER,Dermatology,1,,written
+1781,Rachael Clark,Brigham and Women's Hospital,US,1053378315,RACHAEL CLARK,MA,BROOKLINE,Dermatology,3,,written
+1812,Rachel Miller,Icahn School of Medicine at Mount Sinai,US,1235297243,RACHEL MILLER,NY,NEW YORK,"Allergy & Immunology, Allergy",10,REVIEW (common name),written
+1875,Angela Moore,Baylor University Medical Center,US,1235142266,ANGELA MOORE,TX,ARLINGTON,"Dermatology, Dermatopathology",6,,written
+1897,Neal Bhatia,Therapeutics Clinical Research,,1255349288,NEAL BHATIA,CA,SAN DIEGO,Dermatology,3,REVIEW (industry),written
+1996,John Browning,The University of Texas at San Antonio Health Science Center,US,1124181615,JOHN BROWNING,TX,SAN ANTONIO,Dermatology,11,REVIEW (common name),written
+2014,Jason Meyer,San Francisco VA Medical Center,US,1275915316,JASON MEYER,TN,NASHVILLE,Dermatology,20,REVIEW (common name),dropped
+2040,María Rueda,Eli Lilly (United States),US,1457300725,MARIA RUEDA,TN,SEYMOUR,Dermatology,4,REVIEW (industry),dropped
+2042,Lucia Seminario‐Vidal,Eli Lilly (United States),US,1588912869,LUCIA SEMINARIO VIDAL,FL,TAMPA,Dermatology,1,REVIEW (industry),written
+2073,Naiem Issa,University of Miami,US,1386170769,NAIEM ISSA,VA,VIENNA,Dermatology,1,,written
+2095,Thy Huynh,Northwestern University,US,1043745243,THY HUYNH,MS,JACKSON,Dermatology,5,,written
+2134,Rodrigo Valdés‐Rodríguez,Temple University,US,1518311778,RODRIGO VALDES-RODRIGUEZ,TX,SAN ANTONIO,Dermatology,1,,written
+2144,Kelly Stone,National Institutes of Health,US,1417957879,KELLY STONE,DC,WASHINGTON,"Pediatrics, Pediatric Allergy/Immunology",20,REVIEW (common name),dropped
+2151,James Taylor,Cleveland Clinic,US,1154387892,JAMES TAYLOR,OH,CLEVELAND,Dermatology,14,REVIEW (common name),written
+2159,Mary‐Margaret Chren,Vanderbilt University Medical Center,US,1265462956,MARY-MARGARET CHREN,TN,NASHVILLE,Dermatology,1,,written
+2206,Calvin Sung,"University of California, Riverside",US,1518426766,CALVIN SUNG,CA,MONTEREY PARK,Dermatology,2,,written
+2310,Jill Waibel,Miami Dermatology and Laser Institute,,1154347847,JILL WAIBEL,FL,MIAMI,Dermatology,1,,written
+2319,Emily Cole,Emory University,US,1194105981,EMILY COLE,MO,SAINT LOUIS,Dermatology,20,REVIEW (common name),dropped
+2339,Supriya Immaneni,Northwestern University,US,1497129399,SUPRIYA IMMANENI,GA,MACON,"Dermatology, MOHS-Micrographic Surgery",1,,written
+2346,Clifton Hall,National Jewish Health,US,1780904300,CLIFTON HALL,NV,LAS VEGAS,Dermatology,6,,written
+2383,Jennifer Chen,Stanford University,US,1184851297,JENNIFER CHEN,CA,STANFORD,Dermatology,20,REVIEW (common name),written
+2384,Wayne Shreffler,Massachusetts General Hospital,US,1174592448,WAYNE SHREFFLER,NY,NEW YORK,"Pediatrics, Pediatric Allergy/Immunology",1,,written
+2422,Adnan Ahmed,Northwestern University,US,1245817378,ADNAN AHMED,MD,HUNT VALLEY,Dermatology,2,,written
+2534,Margit Juhász,"University of California, Irvine",US,1225488208,MARGIT JUHASZ,WA,BURIEN,"Dermatology, MOHS-Micrographic Surgery",1,,written

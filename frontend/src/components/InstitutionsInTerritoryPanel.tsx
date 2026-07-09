@@ -5,9 +5,10 @@ import { getTopInstitutionsInTerritory, type TerritoryInstitution } from "../lib
 
 interface Props {
   taSlug: string;
+  taId?: string;
 }
 
-export default function InstitutionsInTerritoryPanel({ taSlug }: Props) {
+export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
   const navigate = useNavigate();
   const { states } = useFilterContext();
   const [institutions, setInstitutions] = useState<TerritoryInstitution[]>([]);
@@ -17,7 +18,7 @@ export default function InstitutionsInTerritoryPanel({ taSlug }: Props) {
     let active = true;
     (async () => {
       setLoading(true);
-      const top = await getTopInstitutionsInTerritory(taSlug, states, 8);
+      const top = await getTopInstitutionsInTerritory(taSlug, states, 8, taId);
       if (!active) return;
       setInstitutions(top);
       setLoading(false);
@@ -25,7 +26,7 @@ export default function InstitutionsInTerritoryPanel({ taSlug }: Props) {
     return () => {
       active = false;
     };
-  }, [taSlug, states.join(",")]);
+  }, [taSlug, taId, states.join(",")]);
 
   if (loading || institutions.length === 0) return null;
 

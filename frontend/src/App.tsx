@@ -70,6 +70,7 @@ import ScoringExplainedModal, {
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
 import {
+  apiSlugForTaId,
   getCommunity,
   getEstablished,
   getHCPDetail,
@@ -84,6 +85,7 @@ import { useFilterContext, statesFromTerritory } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
 import {
   buildHcpDetailPath,
+  getIndicationTaId,
   indicationLabelToSlug,
   resolveFeedRoute,
   taLabelToApiSlug,
@@ -356,6 +358,7 @@ function FeedLayout({
   });
   const selectedTA = route.taLabel;
   const selectedIndication = route.indicationLabel;
+  const indicationTaId = getIndicationTaId(selectedTA, selectedIndication);
   const [indicationCount, setIndicationCount] = useState<number | null>(
     route.indicationCount ?? HOME_INDICATION_COUNT,
   );
@@ -451,7 +454,7 @@ function FeedLayout({
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states, themeIds };
+      const filters = { therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
@@ -492,7 +495,7 @@ function FeedLayout({
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states, themeIds };
+      const filters = { therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
@@ -520,7 +523,7 @@ function FeedLayout({
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, track, region, regions, states, themeIds, route.indicationDataActive]);
+  }, [selectedTA, track, region, regions, states, themeIds, route.indicationDataActive, indicationTaId]);
 
   async function loadMore() {
     if (!isCohortFeedTrack(track)) return;
@@ -568,7 +571,7 @@ function FeedLayout({
 
   function handleCardPress(hcp: AppHCP) {
     const hcpId = hcp.hcp_id ?? hcp.id;
-    if (hcpId) navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
+    if (hcpId) navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA, taId: indicationTaId } });
   }
 
   function handleAddPress(hcp: AppHCP) {
@@ -583,7 +586,7 @@ function FeedLayout({
   function handleAddNoteFromTray() {
     setTrayOpen(false);
     const hcpId = activeHCP?.hcp_id ?? activeHCP?.id;
-    if (hcpId) navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
+    if (hcpId) navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA, taId: indicationTaId } });
   }
 
   async function handleSearchSelect(hcpId: string, _taId: string) {
@@ -838,7 +841,7 @@ function FeedLayout({
         )
       ) : isCohortFeedTrack(track) ? (
         <>
-        {route.indicationDataActive ? <InstitutionsInTerritoryPanel taSlug="nsclc" /> : null}
+        {route.indicationDataActive ? <InstitutionsInTerritoryPanel taSlug={taLabelToApiSlug(selectedTA)} taId={indicationTaId} /> : null}
         <ActiveFilterPills taSlug={taLabelToApiSlug(selectedTA)} />
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
           {showInactiveIndicationEmpty ? (
@@ -1027,7 +1030,9 @@ function HCPDetailRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const { region } = useFilterContext();
-  const selectedTA = (location.state as { taLabel?: string } | null)?.taLabel ?? "Oncology";
+  const navState = location.state as { taLabel?: string; taId?: string } | null;
+  const selectedTA = navState?.taLabel ?? "Oncology";
+  const detailTaId = navState?.taId;
   const [subScreen, setSubScreen] = useState<HcpDetailSubScreen>("detail");
   const [hcp, setHcp] = useState<AppHCP>(EMPTY_HCP);
   const [loading, setLoading] = useState(true);
@@ -1048,8 +1053,9 @@ function HCPDetailRoute() {
 
     void (async () => {
       const { data, error } = await getHCPDetail(hcpId, {
-        therapeuticArea: "nsclc",
+        therapeuticArea: taLabelToApiSlug(selectedTA),
         region,
+        taId: detailTaId,
       });
       if (cancelled) return;
       if (error || !data) {
@@ -1064,7 +1070,7 @@ function HCPDetailRoute() {
     return () => {
       cancelled = true;
     };
-  }, [hcpId, region]);
+  }, [hcpId, region, detailTaId]);
 
   function handleBack() {
     if (window.history.length > 1) {
@@ -1146,7 +1152,7 @@ function HCPDetailRoute() {
           setBibYear(year);
           setSubScreen("bibliography");
         }}
-        taSlug={taLabelToApiSlug(selectedTA)}
+        taSlug={detailTaId ? (apiSlugForTaId(detailTaId) ?? taLabelToApiSlug(selectedTA)) : taLabelToApiSlug(selectedTA)}
       />
       <ActionTray
         open={trayOpen}

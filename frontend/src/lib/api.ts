@@ -660,7 +660,16 @@ const TA_ID_MAP: Record<string, string> = {
   nsclc: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
   oncology: "095bc902-c3dc-48a3-8167-52ee55795d60",
   immunology: "4cf07827-ff1c-451e-832e-0e0a14ea9c86",
+  "atopic-dermatitis": "9e4139d2-e062-4a58-8728-cdabb2d7dca1",
 };
+
+const SLUG_BY_TA_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(TA_ID_MAP).map(([slug, id]) => [id, slug]),
+);
+
+export function apiSlugForTaId(taId: string): string | undefined {
+  return SLUG_BY_TA_ID[taId];
+}
 
 const INDUSTRY_PATTERNS = [
   "pfizer", "merck", "novartis", "roche", "genentech", "astrazeneca",
@@ -943,7 +952,7 @@ export async function getRisingStars(
         : filtersOrSlug;
 
     const taSlug = filters.therapeuticArea.toLowerCase().trim();
-    const taId = TA_ID_MAP[taSlug];
+    const taId = filters.taId ?? TA_ID_MAP[taSlug];
 
     if (!taId) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
@@ -985,7 +994,7 @@ export async function getEstablished(
         : filtersOrSlug;
 
     const taSlug = filters.therapeuticArea.toLowerCase().trim();
-    const taId = TA_ID_MAP[taSlug];
+    const taId = filters.taId ?? TA_ID_MAP[taSlug];
 
     if (!taId) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
@@ -1027,7 +1036,7 @@ export async function getCommunity(
         : filtersOrSlug;
 
     const taSlug = filters.therapeuticArea.toLowerCase().trim();
-    const taId = TA_ID_MAP[taSlug];
+    const taId = filters.taId ?? TA_ID_MAP[taSlug];
 
     if (!taId) {
       return { data: { rows: dedupeHCPs<RisingStar>([]), total: 0 }, error: null };
@@ -1489,7 +1498,7 @@ export async function getHCPDetail(
       return { data: null, error: "Therapeutic area is required for HCP detail." };
     }
     const taSlug = filters.therapeuticArea.toLowerCase().trim();
-    const taId = TA_ID_MAP[taSlug];
+    const taId = filters.taId ?? TA_ID_MAP[taSlug];
     if (!taId) {
       return { data: null, error: `Unknown therapeutic area: ${taSlug}` };
     }
@@ -1702,8 +1711,22 @@ export async function getHCPDetail(
       } | null;
     }).data ?? null;
 
+    // When an explicit indication ta_id is supplied, cohort membership is
+    // TA-scoped and lives in the ranks tables — not the global hcps_v2 column
+    // (which is null for HCPs classified only within a sub-indication TA like AD).
+    let cohortClassification = hcpData.cohort_classification ?? null;
+    if (filters.taId) {
+      const { data: estRows } = await supabase
+        .from("hcp_established_ranks_v3")
+        .select("hcp_id")
+        .eq("hcp_id", hcpId)
+        .eq("therapeutic_area_id", taId)
+        .limit(1);
+      if (estRows && estRows.length > 0) cohortClassification = "established";
+    }
+
     const response: HCPDetailResponse = {
-      hcp: hcpData,
+      hcp: { ...hcpData, cohort_classification: cohortClassification },
       score: (scoreResult as { data?: unknown }).data ?? null,
       rank: (rankResult as { data?: unknown }).data ?? null,
       narrative: narrativeData,
@@ -2152,6 +2175,7 @@ const TA_DISPLAY_BY_ID: Record<string, string> = {
   "c0065b03-a25e-4e9a-bde4-4b4d0db7827d": "Oncology",
   "095bc902-c3dc-48a3-8167-52ee55795d60": "Oncology",
   "4cf07827-ff1c-451e-832e-0e0a14ea9c86": "Immunology",
+  "9e4139d2-e062-4a58-8728-cdabb2d7dca1": "Atopic Dermatitis",
 };
 
 const SEARCH_COHORT_ORDER: Record<string, number> = {
@@ -4248,8 +4272,9 @@ export async function getTopInstitutionsInTerritory(
   taSlug: string,
   states: string[],
   limit: number = 8,
+  taIdOverride?: string,
 ): Promise<TerritoryInstitution[]> {
-  const taId = await resolveLandscapeTaId(taSlug);
+  const taId = taIdOverride ?? (await resolveLandscapeTaId(taSlug));
   if (!taId) return [];
 
   const { data: rsRows } = await fetchAllPaginated<{ hcp_id: string; us_rank: number }>(

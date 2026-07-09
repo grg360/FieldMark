@@ -1586,7 +1586,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
         )}
 
         <div id="belief-profile" style={{ scrollMarginTop: 80 }}>
-          <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea="NSCLC" />
+          <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea={taSlug === "nsclc" ? "NSCLC" : taSlug} />
         </div>
         </div>{/* end fm-detail-left */}
 

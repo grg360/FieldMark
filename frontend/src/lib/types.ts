@@ -199,6 +199,8 @@ export interface FilterState {
   scope?: "global" | "regional"; // When 'global', returns unfiltered counts. Defaults to 'regional'.
   states?: string[];     // US state codes ["NY", "NJ", ...], applied only when region includes "US"
   themeIds?: string[];   // uuid array of canonical_id values; empty = no theme filter
+  taId?: string;         // Optional explicit ta_id from indication config. When set, the
+                         // cohort fetchers use it directly; undefined => TA_ID_MAP[slug] fallback.
   // Future filters land here. Adding them does NOT require api.ts changes
   // until the resolver/query layer is taught to consume them.
 }
