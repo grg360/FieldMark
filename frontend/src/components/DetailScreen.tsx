@@ -39,15 +39,6 @@ type DetailHCP = HCP & {
   signal_strength?: string | null;
 };
 
-function signalStrengthColor(strength: string | null | undefined): string {
-  switch ((strength ?? "").toLowerCase()) {
-    case "high":     return "#3FB8AF";
-    case "moderate": return "#E8A04E";
-    case "early":    return "#6B6A65";
-    default:         return "#6B6A65";
-  }
-}
-
 function identificationAddressContent(hcp: DetailHCP): {
   content: React.ReactNode;
   label: string;
@@ -724,7 +715,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     setNarrativeLoading(true);
 
     void (async () => {
-      const { data, error } = await getHCPNarrative(hcpId, hcp.specialty);
+      const { data, error } = await getHCPNarrative(hcpId, taSlug);
       if (cancelled) return;
       if (!error) {
         setNarrative(data);
@@ -735,7 +726,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
     return () => {
       cancelled = true;
     };
-  }, [hcp.hcp_id, hcp.id, hcp.specialty]);
+  }, [hcp.hcp_id, hcp.id, taSlug]);
 
   useEffect(() => {
     const hcpId = hcp.hcp_id || (hcp.id != null ? String(hcp.id) : "");
@@ -1353,9 +1344,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           )}
         </div>
 
-        {hcp.cohort_classification === "rising_star" && (
-          hcp.why_now || hcp.engagement_angle || hcp.caution_flags
-        ) && (
+        {(hcp.signal_strength || hcp.why_now || hcp.engagement_angle || hcp.caution_flags) && (
           <div
             className="fm-detail-section fm-section-signal-summary"
             style={{
@@ -1363,26 +1352,21 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
               borderBottom: "1px solid #1E1E22",
             }}
           >
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Signal Summary
-              </div>
-              {hcp.signal_strength && (
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  padding: "4px 8px",
-                  borderRadius: 4,
-                  backgroundColor: signalStrengthColor(hcp.signal_strength),
-                  color: "#FFFFFF",
-                  flexShrink: 0,
-                }}>
-                  Signal: {hcp.signal_strength}
-                </span>
-              )}
+            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+              Signal Summary
             </div>
+
+            <div style={{ borderLeft: `3px solid ${cohortBarColor}`, paddingLeft: 12 }}>
+            {hcp.signal_strength && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Signal
+                </div>
+                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                  {hcp.signal_strength}
+                </div>
+              </div>
+            )}
 
             {hcp.why_now && (
               <div style={{ marginBottom: 16 }}>
@@ -1416,6 +1400,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 </div>
               </div>
             )}
+            </div>
           </div>
         )}
 

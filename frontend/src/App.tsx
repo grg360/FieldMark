@@ -228,6 +228,7 @@ function detailResponseToRisingStar(detail: HCPDetailResponse): RisingStar {
     country: String(hcp.country ?? ""),
     therapeutic_area: detail.therapeuticArea,
     narrative: detail.narrative?.narrative_text ?? null,
+    why_now: detail.narrative?.why_now ?? null,
     engagement_angle: detail.narrative?.engagement_angle ?? null,
     caution_flags: detail.narrative?.caution_flags ?? null,
     signal_strength: detail.narrative?.signal_strength ?? null,

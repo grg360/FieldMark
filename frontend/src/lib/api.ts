@@ -1503,6 +1503,12 @@ export async function getHCPDetail(
       return { data: null, error: `Unknown therapeutic area: ${taSlug}` };
     }
 
+    // Narratives are keyed by the TA's own slug (e.g. 'atopic-dermatitis'),
+    // not the display/api label the caller passes (AD is surfaced under the
+    // 'immunology' label). Resolve the narrative slug from the resolved taId
+    // so sub-indication TAs read their own narratives.
+    const narrativeTaSlug = apiSlugForTaId(taId) ?? taSlug;
+
     // 2) Fetch core HCP profile (TA-independent fields only).
     const { data: hcpData, error: hcpError } = await supabase
       .from("hcps_v2")
@@ -1579,7 +1585,7 @@ export async function getHCPDetail(
       .from("hcp_narratives_v2")
       .select("narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug")
       .eq("hcp_id", hcpId)
-      .eq("therapeutic_area_slug", taSlug)
+      .eq("therapeutic_area_slug", narrativeTaSlug)
       .maybeSingle();
 
     const medicarePromise = supabase
