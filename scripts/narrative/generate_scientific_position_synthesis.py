@@ -33,6 +33,7 @@ from psycopg2.extras import RealDictCursor
 
 NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
 NSCLC_TA_NAME = "NSCLC"
+AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
 MODEL_NAME = "claude-sonnet-4-6"
 SYNTHESIS_TYPE = "scientific_positions"
 ANTHROPIC_MAX_TOKENS = 4000
@@ -40,6 +41,36 @@ CORPUS_DEPTH_DEEP_THRESHOLD = 5
 CORPUS_DEPTH_FOCUSED_THRESHOLD = 3
 DRY_RUN_HCP_LIMIT = 1
 CONCURRENCY_LIMIT = 8
+
+# Per-TA config. The nsclc entry reproduces the original prompt text and written
+# tag ("NSCLC") verbatim so its behavior is byte-for-byte identical; non-NSCLC
+# TAs use TA-neutral theme exemplars and write their own slug tag.
+TA_CONFIGS: dict[str, dict[str, str]] = {
+    "nsclc": {
+        "ta_id": NSCLC_TA_ID,
+        "tag": NSCLC_TA_NAME,  # written to hcp_ai_overviews.therapeutic_area
+        "label": "NSCLC",  # prompt framing
+        "theme_naming_examples": (
+            '  - Good: "Perioperative Immunotherapy", "Resistance Reversal '
+            'Strategies", "Precision IO Selection", "Radioimmunotherapy Combinations"\n'
+            '  - Bad: "Durvalumab Efficacy", "Pembrolizumab Sequencing", '
+            '"Nivolumab Plus SABR Improves EFS"'
+        ),
+    },
+    "atopic-dermatitis": {
+        "ta_id": AD_TA_ID,
+        "tag": "atopic-dermatitis",  # slug, matches the frontend read
+        "label": "atopic dermatitis",
+        "theme_naming_examples": (
+            '  - Good: name the scientific concept or strategy, e.g. '
+            '"Combination Maintenance Strategy", "Early Treatment Escalation", '
+            '"Biomarker-Guided Selection", "Long-Term Disease Control"\n'
+            '  - Bad: name a drug or a single endpoint result, e.g. '
+            '"Drug X Efficacy", "Agent Y Sequencing", "Compound Z Improves Endpoint"'
+        ),
+    },
+}
+DEFAULT_TA = "nsclc"
 
 GET_HCPS_WITH_POSITIONS_SQL = (
     "SELECT DISTINCT hcp_id FROM hcp_scientific_positions_v1 "
@@ -254,10 +285,10 @@ RULES
 """
 
 PROMPT_TEMPLATE_DEEP = (
-    """You are a medical affairs analyst synthesizing an investigator's scientific positioning from their published work in NSCLC.
+    """You are a medical affairs analyst synthesizing an investigator's scientific positioning from their published work in {ta_label}.
 
 INVESTIGATOR CORPUS
-This investigator has {paper_count} senior or first-authored NSCLC publications and {position_count} extracted scientific positions. The corpus is large enough to characterize a developed scientific worldview.
+This investigator has {paper_count} senior or first-authored {ta_label} publications and {position_count} extracted scientific positions. The corpus is large enough to characterize a developed scientific worldview.
 
 POSITIONS (sorted by citation impact, most recent first):
 {positions_block}
@@ -275,8 +306,7 @@ For each theme, link back to specific position IDs as evidence.
 THEME NAMING RULES
 - Theme names must be 2-4 words. Scannable, not sentences.
 - Theme names must describe scientific concepts, strategies, or treatment philosophies - NOT individual drug names.
-  - Good: "Perioperative Immunotherapy", "Resistance Reversal Strategies", "Precision IO Selection", "Radioimmunotherapy Combinations"
-  - Bad: "Durvalumab Efficacy", "Pembrolizumab Sequencing", "Nivolumab Plus SABR Improves EFS"
+{theme_naming_examples}
 - Keep the long explanation in the summary field, not in the theme name.
 - primary_position_categories must use ONLY base category names from the enum: efficacy, patient_selection, biomarker, safety, resistance, sequencing, access, diagnostics, methodology. Do NOT concatenate polarity prefixes (no "positive_position/efficacy").
 
@@ -297,10 +327,10 @@ CONFIDENCE SCORING
 )
 
 PROMPT_TEMPLATE_FOCUSED = (
-    """You are a medical affairs analyst synthesizing an investigator's scientific positioning from their published work in NSCLC.
+    """You are a medical affairs analyst synthesizing an investigator's scientific positioning from their published work in {ta_label}.
 
 INVESTIGATOR CORPUS
-This investigator has {paper_count} senior or first-authored NSCLC publications and {position_count} extracted scientific positions. The corpus is focused but not exhaustive - characterize the current scientific focus without overclaiming a fully developed worldview.
+This investigator has {paper_count} senior or first-authored {ta_label} publications and {position_count} extracted scientific positions. The corpus is focused but not exhaustive - characterize the current scientific focus without overclaiming a fully developed worldview.
 
 POSITIONS:
 {positions_block}
@@ -317,10 +347,10 @@ THEME NAMING RULES
 )
 
 PROMPT_TEMPLATE_SIGNAL = (
-    """You are a medical affairs analyst characterizing an investigator's recent senior/first-authored work in NSCLC.
+    """You are a medical affairs analyst characterizing an investigator's recent senior/first-authored work in {ta_label}.
 
 INVESTIGATOR CORPUS
-This investigator has only {paper_count} senior or first-authored NSCLC publications, with {position_count} extracted positions. Do not claim a developed worldview. Characterize the specific work and the positions advanced within it.
+This investigator has only {paper_count} senior or first-authored {ta_label} publications, with {position_count} extracted positions. Do not claim a developed worldview. Characterize the specific work and the positions advanced within it.
 
 POSITIONS:
 {positions_block}
@@ -360,6 +390,12 @@ def parse_args() -> argparse.Namespace:
         metavar="UUID",
         help="Process only this specific HCP (overrides limit).",
     )
+    parser.add_argument(
+        "--ta",
+        choices=tuple(TA_CONFIGS.keys()),
+        default=DEFAULT_TA,
+        help="Therapeutic area to process (default: nsclc).",
+    )
     return parser.parse_args()
 
 
@@ -379,12 +415,13 @@ def get_target_hcp_ids(
     conn: psycopg2.extensions.connection,
     hcp_id_filter: str | None = None,
     limit: int | None = None,
+    ta_id: str | None = None,
 ) -> list[str]:
     if hcp_id_filter:
         return [hcp_id_filter]
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(GET_HCPS_WITH_POSITIONS_SQL, (NSCLC_TA_ID,))
+        cur.execute(GET_HCPS_WITH_POSITIONS_SQL, (ta_id,))
         rows = cur.fetchall()
 
     hcp_ids = [str(row["hcp_id"]) for row in rows]
@@ -396,9 +433,10 @@ def get_target_hcp_ids(
 def get_positions_for_hcp(
     conn: psycopg2.extensions.connection,
     hcp_id: str,
+    ta_id: str,
 ) -> list[dict[str, Any]]:
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(GET_POSITIONS_FOR_HCP_SQL, (hcp_id, NSCLC_TA_ID))
+        cur.execute(GET_POSITIONS_FOR_HCP_SQL, (hcp_id, ta_id))
         return [dict(row) for row in cur.fetchall()]
 
 
@@ -445,12 +483,15 @@ def build_synthesis_prompt(
     paper_count: int,
     position_count: int,
     corpus_depth: str,
+    ta: dict[str, str],
 ) -> str:
     positions_block = build_positions_block(positions)
     format_kwargs = {
         "paper_count": paper_count,
         "position_count": position_count,
         "positions_block": positions_block,
+        "ta_label": ta["label"],
+        "theme_naming_examples": ta["theme_naming_examples"],
     }
 
     if corpus_depth == "deep":
@@ -522,6 +563,7 @@ def write_synthesis(
     synthesis_dict: dict[str, Any],
     prompt_tokens: int,
     completion_tokens: int,
+    ta: dict[str, str],
 ) -> None:
     body = json.dumps(synthesis_dict, ensure_ascii=True)
     with conn.cursor() as cur:
@@ -530,7 +572,7 @@ def write_synthesis(
             (
                 hcp_id,
                 SYNTHESIS_TYPE,
-                NSCLC_TA_NAME,
+                ta["tag"],
                 body,
                 MODEL_NAME,
                 prompt_tokens,
@@ -545,6 +587,7 @@ async def run_all_hcps(
     target_hcp_ids: list[str],
     args: argparse.Namespace,
     stats: dict[str, Any],
+    ta: dict[str, str],
 ) -> None:
     total_hcps = len(target_hcp_ids)
     semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
@@ -557,7 +600,7 @@ async def run_all_hcps(
         try:
             try:
                 async with db_lock:
-                    positions = get_positions_for_hcp(conn, hcp_id)
+                    positions = get_positions_for_hcp(conn, hcp_id, ta["ta_id"])
             except Exception as exc:
                 async with db_lock:
                     stats["db_errors"] += 1
@@ -583,6 +626,7 @@ async def run_all_hcps(
                 paper_count,
                 position_count,
                 corpus_depth,
+                ta,
             )
 
             try:
@@ -623,6 +667,7 @@ async def run_all_hcps(
                         synthesis_dict,
                         prompt_tokens,
                         completion_tokens,
+                        ta,
                     )
                     conn.commit()
                     stats["syntheses_written"] += 1
@@ -660,6 +705,7 @@ async def run_all_hcps(
 def main() -> int:
     load_dotenv()
     args = parse_args()
+    ta = TA_CONFIGS[args.ta]
 
     if args.hcp_id:
         effective_limit = None
@@ -683,16 +729,16 @@ def main() -> int:
     }
 
     try:
-        target_hcp_ids = get_target_hcp_ids(conn, args.hcp_id, effective_limit)
+        target_hcp_ids = get_target_hcp_ids(conn, args.hcp_id, effective_limit, ta["ta_id"])
         total_hcps = len(target_hcp_ids)
-        print(f"Loaded {total_hcps} target HCPs")
+        print(f"Loaded {total_hcps} target HCPs (ta={args.ta})")
 
         if total_hcps == 0:
             print("No HCPs to process.")
             return 0
 
         asyncio.run(
-            run_all_hcps(conn, client, target_hcp_ids, args, stats),
+            run_all_hcps(conn, client, target_hcp_ids, args, stats, ta),
         )
 
         print("\n=== Summary ===")

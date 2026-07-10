@@ -30,6 +30,7 @@ from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 
 NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
+AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
 MODEL_NAME = "claude-sonnet-4-6"
 MIN_ABSTRACT_LENGTH = 800
 MIN_YEAR = 2020
@@ -37,6 +38,38 @@ PAPERS_PER_HCP = 10
 MAX_POSITIONS_PER_PAPER = 10
 ANTHROPIC_MAX_TOKENS = 2000
 DRY_RUN_HCP_LIMIT = 3
+
+# Per-TA config. The nsclc entry reproduces the original prompt text verbatim so
+# its rendered prompt is byte-for-byte identical; non-NSCLC TAs use TA-neutral
+# teaching exemplars so extraction is not biased toward NSCLC drugs/biomarkers.
+TA_CONFIGS: dict[str, dict[str, str]] = {
+    "nsclc": {
+        "ta_id": NSCLC_TA_ID,
+        "label": "NSCLC",
+        "finding_position_example": (
+            '- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."\n'
+            '- Position (extract): "The durable TTD and TTST advantage supports '
+            'amivantamab-chemotherapy as the first-line standard of care."'
+        ),
+        "biomarker_examples": "PD-L1, mutation status, ctDNA, molecular markers",
+    },
+    "atopic-dermatitis": {
+        "ta_id": AD_TA_ID,
+        "label": "atopic dermatitis",
+        "finding_position_example": (
+            '- Finding (avoid): "The active arm achieved a higher response rate '
+            'than the comparator at the primary endpoint."\n'
+            '- Position (extract): "The magnitude and durability of the response '
+            'support this approach as a preferred option for the target patient '
+            'population."'
+        ),
+        "biomarker_examples": (
+            "disease-relevant molecular or serologic markers, expression or "
+            "mutation status, biomarker levels"
+        ),
+    },
+}
+DEFAULT_TA = "nsclc"
 
 VALID_POSITION_TYPES = frozenset(
     {
@@ -117,6 +150,11 @@ WHERE rn <= %s
 ORDER BY rn
 """
 
+DELETE_POSITIONS_FOR_HCP_TA_SQL = (
+    "DELETE FROM hcp_scientific_positions_v1 "
+    "WHERE hcp_id = %s AND therapeutic_area_id = %s"
+)
+
 INSERT_POSITION_SQL = """
 INSERT INTO hcp_scientific_positions_v1 (
   publication_id,
@@ -142,7 +180,7 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 PROMPT_TEMPLATE = """You are a medical affairs scientific positioning analyst. Read the publication passage below and extract scientific positions the author is advancing through this work. A position is a claim, hypothesis, concern, or unmet need the author is advocating, asserting, or flagging.
 
 CONTEXT
-Therapeutic area: NSCLC
+Therapeutic area: {ta_label}
 Title: {title}
 Year: {pub_year}
 Journal: {journal}
@@ -156,8 +194,7 @@ Extract up to 5 distinct, high-value scientific positions. A position should hel
 Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
 
 A finding states what happened. A position states what it means or what should be done about it. Examples:
-- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."
-- Position (extract): "The durable TTD and TTST advantage supports amivantamab-chemotherapy as the first-line standard of care."
+{finding_position_example}
 
 Do not exhaustively list every endpoint. Consolidate related endpoint findings into one position when they support the same scientific point.
 
@@ -174,7 +211,7 @@ POSITION TYPES (polarity)
 POSITION CATEGORIES (subject matter, pick the single best fit)
 - efficacy: treatment effect, response, survival, outcomes
 - patient_selection: who should receive treatment, stratification, eligibility
-- biomarker: PD-L1, mutation status, ctDNA, molecular markers
+- biomarker: {biomarker_examples}
 - safety: toxicity, adverse events, tolerability
 - resistance: acquired or primary resistance mechanisms and patterns
 - sequencing: order or line of therapy, treatment pathway
@@ -229,6 +266,12 @@ def parse_args() -> argparse.Namespace:
         default="both",
         help="Which cohort(s) to process (default: both).",
     )
+    parser.add_argument(
+        "--ta",
+        choices=tuple(TA_CONFIGS.keys()),
+        default=DEFAULT_TA,
+        help="Therapeutic area to process (default: nsclc).",
+    )
     return parser.parse_args()
 
 
@@ -248,13 +291,14 @@ def get_target_hcps(
     conn: psycopg2.extensions.connection,
     cohort: str,
     limit: int,
+    ta_id: str,
 ) -> list[dict[str, Any]]:
     hcps: list[dict[str, Any]] = []
     seen: set[str] = set()
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         if cohort in ("rising_star", "both"):
-            cur.execute(RISING_STAR_HCPS_SQL, (NSCLC_TA_ID,))
+            cur.execute(RISING_STAR_HCPS_SQL, (ta_id,))
             for row in cur.fetchall():
                 hcp_id = str(row["hcp_id"])
                 if hcp_id not in seen:
@@ -262,7 +306,7 @@ def get_target_hcps(
                     hcps.append(dict(row))
 
         if cohort in ("established", "both"):
-            cur.execute(ESTABLISHED_HCPS_SQL, (NSCLC_TA_ID,))
+            cur.execute(ESTABLISHED_HCPS_SQL, (ta_id,))
             for row in cur.fetchall():
                 hcp_id = str(row["hcp_id"])
                 if hcp_id not in seen:
@@ -286,6 +330,7 @@ def get_top_papers_for_hcp(
 
 def build_extraction_prompt(
     paper: dict[str, Any],
+    ta: dict[str, str],
     hcp_name_hint: str | None = None,
 ) -> str:
     title = (paper.get("title") or "").strip()
@@ -299,6 +344,9 @@ def build_extraction_prompt(
         journal=journal,
         author_role=author_role,
         abstract=abstract,
+        ta_label=ta["label"],
+        finding_position_example=ta["finding_position_example"],
+        biomarker_examples=ta["biomarker_examples"],
     )
     if hcp_name_hint:
         prompt = f"HCP context: {hcp_name_hint}\n\n{prompt}"
@@ -380,6 +428,7 @@ def write_positions(
     pub_year: int | None,
     citation_count: int | None,
     positions: list[dict[str, Any]],
+    ta_id: str,
 ) -> int:
     written = 0
     with conn.cursor() as cur:
@@ -409,7 +458,7 @@ def write_positions(
                 (
                     pub_id,
                     hcp_id,
-                    NSCLC_TA_ID,
+                    ta_id,
                     author_role,
                     position_type,
                     raw_category,
@@ -432,6 +481,8 @@ def write_positions(
 def main() -> int:
     load_dotenv()
     args = parse_args()
+    ta = TA_CONFIGS[args.ta]
+    ta_id = ta["ta_id"]
 
     effective_limit = args.limit
     if args.dry_run:
@@ -452,9 +503,12 @@ def main() -> int:
     }
 
     try:
-        target_hcps = get_target_hcps(conn, args.cohort, effective_limit)
+        target_hcps = get_target_hcps(conn, args.cohort, effective_limit, ta_id)
         total_hcps = len(target_hcps)
-        print(f"Loaded {total_hcps} target HCPs (cohort={args.cohort}, limit={effective_limit})")
+        print(
+            f"Loaded {total_hcps} target HCPs "
+            f"(ta={args.ta}, cohort={args.cohort}, limit={effective_limit})"
+        )
 
         if total_hcps == 0:
             print("No HCPs to process.")
@@ -477,13 +531,28 @@ def main() -> int:
                 )
                 continue
 
+            # Idempotency: clear this HCP's existing positions for the TA before
+            # re-inserting, so re-runs replace rather than duplicate. Same
+            # transaction as the inserts below (committed per HCP).
+            if not args.dry_run:
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(DELETE_POSITIONS_FOR_HCP_TA_SQL, (hcp_id, ta_id))
+                except Exception as exc:
+                    print(
+                        f"[ERROR] Failed to clear existing positions for HCP {hcp_id}: {exc}",
+                        file=sys.stderr,
+                    )
+                    conn.rollback()
+                    continue
+
             for paper in papers:
                 pub_id = str(paper["pub_id"])
                 author_role = paper.get("author_role") or "first_author"
                 stats["papers_processed"] += 1
 
                 try:
-                    prompt = build_extraction_prompt(paper)
+                    prompt = build_extraction_prompt(paper, ta)
                     if args.dry_run:
                         print(f"\n=== DRY RUN: HCP {hcp_id} paper {pub_id} ===")
                         print("--- PROMPT ---")
@@ -518,6 +587,7 @@ def main() -> int:
                         paper.get("pub_year"),
                         paper.get("citation_count"),
                         positions,
+                        ta_id,
                     )
                     hcp_positions += written
                     stats["positions_extracted"] += written
