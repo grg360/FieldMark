@@ -530,7 +530,7 @@ function FeedLayout({
     if (!isCohortFeedTrack(track)) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = taLabelToApiSlug(selectedTA);
-    const filters = { therapeuticArea: taSlug, region, states, themeIds };
+    const filters = { therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId };
     setLoadingMore(true);
     try {
       let data;

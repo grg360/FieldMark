@@ -235,7 +235,7 @@ async function enrichAndMapCohortRows(
       if (!hcp) return false;
       const inst = String(hcp.institution_normalized ?? hcp.institution_raw ?? "").toLowerCase();
       if (!inst) return true;
-      return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
+      return !INDUSTRY_REGEX.test(inst);
     }
     const inst = String(
       rr.institution_normalized ??
@@ -245,7 +245,7 @@ async function enrichAndMapCohortRows(
         "",
     ).toLowerCase();
     if (!inst) return true;
-    return !INDUSTRY_PATTERNS.some((pattern) => inst.includes(pattern));
+    return !INDUSTRY_REGEX.test(inst);
   });
 
   const narrativeIds = filteredRankRows.map((r: any) => String(r.hcp_id));
@@ -681,6 +681,12 @@ const INDUSTRY_PATTERNS = [
   "arvinas", "seagen", "incyte", "jazz pharm", "bluebird bio",
   "iqvia", "parexel", "syneos", "icon plc", "charles river",
 ];
+
+// Word-boundary matcher so a pharma token can't match inside a longer word —
+// e.g. "roche" must not match "University of Rochester". inst is pre-lowercased.
+const INDUSTRY_REGEX = new RegExp(
+  `\\b(${INDUSTRY_PATTERNS.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`,
+);
 
 function deriveProfileUrl(platform: "twitter" | "bluesky", handle: string): string {
   const normalizedHandle = handle.trim().replace(/^@/, "");
