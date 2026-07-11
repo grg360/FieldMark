@@ -39,13 +39,14 @@ export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
     background: "rgba(216, 90, 48, 0.10)",
     border: "1px solid rgba(216, 90, 48, 0.40)",
     color: "#F0997B",
-    padding: "4px 8px 4px 10px",
+    padding: "2px 6px 2px 8px",
     borderRadius: 3,
-    fontSize: 11,
+    fontSize: 10,
+    lineHeight: 1,
     fontFamily: "system-ui, sans-serif",
     display: "inline-flex",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   };
 
   const removeBtnStyle: CSSProperties = {
@@ -54,7 +55,7 @@ export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
     padding: 0,
     margin: 0,
     cursor: "pointer",
-    fontSize: 11,
+    fontSize: 10,
     color: "#6B6A65",
     lineHeight: 1,
   };
@@ -73,7 +74,7 @@ export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
       style={{
         display: "flex",
         flexWrap: "wrap",
-        gap: 6,
+        gap: 4,
         margin: "8px 16px 12px",
       }}
     >
