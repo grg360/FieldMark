@@ -2,7 +2,16 @@
 
 **Status:** FOUNDATIONAL — CANONICAL. This document supersedes all prior TA-expansion guidance.
 **Created:** July 3, 2026 (during the Atopic Dermatitis / TA #2 build)
-**Companion:** `TA_BUILD_DEBT.md` (what the platform still owes to make this fully turnkey)
+**Last updated:** July 10, 2026 — added **PART II (Frontend Repoint & Enrichment)**: sections 7–10 cover
+everything AFTER scoring — making a built TA render correctly (§7), the enrichment/synthesis layer (§8),
+the parity-matrix definition-of-done (§9), and Part II operating discipline (§10). Part I (below, §0–§6)
+is the BACKEND build (ingest → dedup → score); Part II is getting it into the product at parity.
+**Companion:** `TA_BUILD_DEBT.md` (chronological work log / what the platform still owes) and
+`<TA>_PARITY_CHECKLIST.md` (per-TA definition-of-done matrix).
+
+**The core Part II mental model:** there is always a FROZEN REFERENCE TA (NSCLC for the AD build) that
+already works end-to-end. Every Part II step = "make the new TA do what the reference TA does, WITHOUT
+changing the reference TA byte-for-byte." The reference TA is both template and regression oracle.
 
 ---
 
@@ -267,8 +276,18 @@ NOT create HCP rows. This is the single most important architectural rule in v2.
         → ONLY for Workstream B (NPPES community) HCPs needing linkage, AFTER Step C.
 8.  reconcile_step_c_duplicates_diagnostic.py → reconcile_step_c_duplicates_apply.py
         → merges duplicate HCPs Step C's clustering missed (multi-shard authors).
-9.  run_step_f_rebuild_publication_authors.py
-        → rebuilds publication_authors_v2 linking pubs to the new HCPs.
+9.  rebuild_publication_authors_v2.py (Step F) — links pubs to HCPs.
+        ⚠️ CANONICAL INVOCATION: scope to ALL HCPs tagged to the TA, NOT just newly-created ones.
+        Export all TA hcp_ids (SELECT hcp_id FROM hcp_therapeutic_areas_v2 WHERE therapeutic_area_id=<TA>)
+        to a file, then run with --hcp-ids-file <file> --execute.
+        DO NOT use --only-new-hcps: it links only HCPs created in this run, leaving PRE-EXISTING cross-TA
+        HCPs (who also work in the new TA) UNDER-LINKED. This silently buried ~34% of AD's established cohort
+        (864 KOLs with big careers but <20 linked pubs, e.g. Guttman-Yassky at 6 links) — see debt §29o-29q.
+        Frozen-safe by construction: the script provably writes links only for scoped HCPs, only to pubs their
+        own OpenAlex IDs appear on — it cannot touch another TA's links.
+9b. Derive authorship position (is_first_author/is_senior_author) into publication_authors_v2 from the OpenAlex
+        authorships JSON (author_position first/middle/last). REQUIRED — the scientific scorer's senior/first
+        signals are all-zero (dead) without this. See debt §29m. Run right after Step F.
 10. NPPES / Open Payments / Medicare aggregators (--target-version v2)
 10b. IDENTITY RESOLUTION (dedup) — REQUIRED, esp. for international TAs. See §0c.
         dedup_detect.py (read-only → candidate CSV) → review high-confidence fragment set →
@@ -648,3 +667,232 @@ script MUST have a --dry-run that computes and prints but writes NOTHING. Any sc
 --dry-run ADDED (Cursor) BEFORE its first execution against a TA. First run of any script is ALWAYS
 --dry-run. Validate against a known KOL (e.g. Silverberg for AD) in the dry-run before executing.
 Add to the 8-point contract as point 9.
+
+---
+
+# PART II — FRONTEND REPOINT & ENRICHMENT (added July 10, after the AD Established frontend+enrichment build)
+
+Part I above gets a TA *built* in the database (ingested, deduped, scored → `hcp_established_ranks_v3`).
+Part II gets it to *appear correctly in the product* (frontend repoint) and *look as complete as the
+frozen reference TA* (enrichment layer). These are the two halves nobody documented before AD #2.
+
+**Mental model for Part II:** there is always a FROZEN REFERENCE TA (for AD it was NSCLC) that already
+works end-to-end. Every step in Part II is "make the new TA do what the reference TA already does,
+WITHOUT changing the reference TA's behavior byte-for-byte." The reference TA is both your template
+and your regression oracle.
+
+---
+
+## 7. FRONTEND REPOINT — making a built TA appear correctly
+
+### 7a. The foundational insight: cohort data flows through RPCs, not table names
+The frontend does NOT query tables by name. Cohort feeds flow through Postgres RPCs
+(`get_established_filtered`, `get_rising_star_filtered`, `get_community_filtered`) that take a `p_ta_id`.
+So a "repoint" is mostly a **data-function / parameter-threading** job, not a table-rename job. Trace the
+actual data flow before assuming anything — the wiring is rarely what the UI suggests.
+
+### 7b. TA-as-indication-under-a-parent (the IA pattern)
+A new TA is usually surfaced as an **indication under a parent TA chip**, mirroring the reference:
+NSCLC is an indication under **Oncology**; AD is an indication under **Immunology**. Match the reference's
+information architecture — mentors/users read the parent→indication hierarchy as "real platform," and a
+flat top-level chip for every sub-indication looks wrong.
+
+### 7c. THE FAÇADE DISCOVERY — the parent hierarchy may be cosmetic
+When we traced Oncology→NSCLC we found the "hierarchy" is a FAÇADE at the data layer: the **TA LABEL
+carries the ta_id** (`taLabelToApiSlug("Oncology") === "nsclc"`, hardcoded), and the indication chips are
+**cosmetic — they never enter the cohort query**. Selecting "All" vs "NSCLC" under Oncology yields the
+same ta_id. ALWAYS trace how the reference TA's label/indication actually resolves to its ta_id before
+copying it — you may be copying a shortcut.
+
+### 7d. Option A (façade mirror) vs Option B (real per-indication ta_id) — PREFER B
+- **Option A** — reproduce the façade: map the parent label straight to the new ta_id. Fast (~1 line),
+  but reproduces the flaw: activating a *second* indication under that parent would show the first
+  indication's data. A latent demo footgun the moment you display multiple indications.
+- **Option B** — REAL per-indication resolution: add an optional `taId` to the indication config, thread
+  it into `filters`, and have cohort fetchers use `filters.taId ?? TA_ID_MAP[taSlug]`. Makes the
+  indication genuinely select the ta_id. This is the architecturally correct multi-indication foundation
+  (and FieldMark's whole thesis is many-TAs-many-indications).
+- **DECISION (AD):** did Option B. The `?? currentBehavior` fallback is the safety mechanism (see 7e).
+  Do B unless there's a strong reason not to — "the right fix now" beats "the fast fix + debt."
+
+### 7e. THE BACKWARD-COMPAT GUARDRAIL (the load-bearing pattern for ALL of Part II)
+Every shared-code change uses an ADDITIVE fallback so existing TAs are byte-for-byte unchanged:
+
+    const taId = filters.taId ?? TA_ID_MAP[taSlug];   // new TA passes taId; others hit the untouched path
+
+- An entity WITHOUT the new field resolves EXACTLY as today → reference TA unaffected.
+- Only the new TA takes the new branch.
+- VERIFY the invariant explicitly every time (e.g. confirm `taLabelToApiSlug("Oncology")` still returns
+  "nsclc" so NSCLC is preserved). Assert it; don't assume it.
+
+### 7f. THE TA-SCOPING BUG PATTERN (recurring — expect ~3–4 per TA)
+The single most common frontend bug class: **the data exists and is correct, but a component renders it
+wrong (or empty) because of a HARDCODED reference-TA assumption in the READ path.** Each is the same shape:
+a query/prop hardcodes the reference TA's id/slug/name, so the new TA reads the wrong (empty) scope.
+
+Three caught during AD (all identical in shape, different location):
+  1. **Established score block** — detail page derived cohort from a global `hcps_v2` column that's NULL
+     for indication-scoped HCPs → showed "Unclassified." Fix: when a taId is passed, derive cohort from
+     presence in `hcp_established_ranks_v3` for that ta_id.
+  2. **Narrative slug** — generator writes `therapeutic_area_slug="atopic-dermatitis"`; frontend read
+     resolved the PARENT label ("immunology") → no match → blank. Fix: narrative reads resolve the
+     indication slug via `apiSlugForTaId(taId)`. (There were TWO read sites — `getHCPDetail` AND
+     `getHCPNarrative` via `hcp.specialty` — find them ALL.)
+  3. **Belief Profile tag** — `DetailScreen:1587` passes `therapeuticArea={taSlug==="nsclc"?"NSCLC":taSlug}`
+     → reference reads a DISPLAY NAME, new TA reads a SLUG. The generator's written tag must match whatever
+     the frontend reads for that TA.
+
+**LESSON:** the frontend read format is often INCONSISTENT across TAs (reference reads a display name via a
+special-case ternary; others read a slug). When you add a TA, audit every place the reference TA is
+hardcoded and confirm the new TA's read matches its written value. A `grep` for the reference TA's
+id/slug/name across the frontend surfaces the whole set. (Debt: reconcile the ternary to one canonical
+format — deferred because it touches the reference TA's render path.)
+
+### 7g. VERIFY-IN-BROWSER-LOGGED-IN is the only real confirmation
+Typecheck/build passing ≠ it renders. RLS means anon sees nothing — you MUST log in and click through.
+The regression oracle: the reference TA must look IDENTICAL to before (e.g. NSCLC's #1 unchanged), the new
+TA must render its correct roster, and any shared side-panel must look sane. Headless agents (Claude Code)
+CANNOT do this — the founder's browser check is the gate on every "renders correctly" claim.
+
+### 7h. Repoint gotchas checklist
+- Count badges (`getTACounts`) often read DIFFERENT tables than the feed (`_scores_v2` vs `_ranks_v3`) — a
+  new TA can have a working feed but "0" count badges. Backend data gap, not a frontend bug.
+- Un-hardcoding a shared panel (e.g. InstitutionsInTerritoryPanel) may FIX a latent bug for OTHER TAs
+  (they were showing the reference TA's data) — a real behavior change to flag, usually an improvement.
+- Territory/practice-state filtering reads `hcps_v2.nppes_practice_state` directly (a column predicate),
+  NOT region-scope rank rows. Populating practice-state is the whole territory fix (see §8f).
+
+---
+
+## 8. ENRICHMENT LAYER — making the new TA's profiles as complete as the reference
+
+Scoring (Part I) populates the AUTHORITY layer (ranks + component percentiles). The ENRICHMENT/SYNTHESIS
+layer is separate and, for a new TA, usually UNBUILT — every enrichment step was run only for the
+reference TA. Each enrichment is "run the reference TA's step for the new ta_id," but with gotchas.
+
+### 8a. The enrichment inventory (per-HCP layers to populate)
+For each, the frozen reference TA has it; a new TA starts at 0:
+  - **Narratives** (`hcp_narratives_v2`) — Why This Expert + why_now + engagement_angle + signal_strength +
+    caution_flags. Cheapest (~$1/200, minutes).
+  - **Belief Profile / Scientific Positions** (`hcp_scientific_positions_v1` → `hcp_ai_overviews`,
+    `synthesis_type='scientific_positions'`) — the DIFFERENTIATED MOAT (authority-weighted position
+    aggregation). TWO-stage, per-paper extraction, ~$15–25/top-100.
+  - **Top Collaborators** (`hcp_top_collaborators_v2`) — collaborator-pairing step.
+  - **Research Themes** (`hcp_research_themes_v2`) — theme-extraction step.
+These are PUBLICATION-DERIVED → apply to Established + Rising, NOT Community (non-publishing; Community gets
+an OPERATIONAL narrative from Open Payments + NPPES, a different generator, built with the Community
+Workspace).
+
+### 8b. TRACE-BEFORE-GENERATE (the discipline that prevents wasted runs)
+Before running ANY enrichment for a new TA, have the agent READ THE ACTUAL SCRIPT and report:
+  1. What tables/columns it reads; how it selects HCPs (does it work for the new TA's cohort?).
+  2. **THE TAG/SLUG it WRITES vs what the frontend READS** — the #1 silent-failure mode. If write ≠ read,
+     it generates INVISIBLE output. Confirm they match BEFORE spending.
+  3. Model, token, cap settings → a GROUNDED cost (not a read-the-code ballpark).
+  4. Idempotency (does a re-run duplicate?).
+  5. Every reference-TA hardcode (constants, SQL, AND prompt text).
+This single read saved AD from: a slug-mismatch invisible narrative run, a tag-mismatch invisible belief
+run, and a 4× cost misestimate. Always trace first.
+
+### 8c. COST-GROUNDING (don't trust ballpark estimates)
+Estimates from reading code are guesses; the actual cap/token settings are facts. A per-paper extractor
+looks expensive ("1 call/paper × all papers") until you read the PAPER CAP (~10/HCP) and learn abstracts
+are PRE-STORED (no live fetch). AD Belief Profile: ballpark said $20–60; grounded reality ~$15. If a founder
+remembers it costing less, TRUST THAT — search past chats for the original build's actual numbers before
+re-estimating.
+
+### 8d. THE PER-TA REGISTRY PATTERN (how to parameterize a reference-hardcoded pipeline)
+Don't swap constants inline. Build a registry keyed by `--ta`:
+
+    TA_CONFIGS = {
+      "nsclc":            { ta_id, tag, label, ...exemplars },  # reference: VERBATIM original strings
+      "atopic-dermatitis":{ ta_id, tag, label, ...exemplars },  # new TA
+    }
+
+- The reference entry reproduces the ORIGINAL strings verbatim → reference renders byte-for-byte identical.
+- New TA entry carries its own ta_id, tag (must match frontend read), label, and prompt exemplars.
+- Add a `--ta` flag (default = reference). Thread `ta_id` through selection → prompt → write.
+- PROVE reference byte-identity: a zero-API prompt-render harness that diffs before/after prompt text
+  (empty diff = proven, stronger than a live dry-run, costs nothing).
+- This generalizes to any-TA and is the reusable pattern for all future enrichment parameterization.
+
+### 8e. PROMPT DE-CONTAMINATION — TA-NEUTRAL exemplars (do NOT ask the founder to author clinical claims)
+Reference-TA prompts contain TWO classes of hardcoding:
+  - HARD (ta_id, tag, SQL) — mechanical to parameterize.
+  - SOFT (the reference TA's NAME + its DRUG/ENDPOINT EXEMPLARS baked into the prompt) — a QUALITY risk:
+    left unchanged, they tell the model the new TA's investigators work in the reference disease and seed
+    theme-naming with the wrong drugs → biased extraction + mislabeled experts.
+**The fix is TA-NEUTRAL/STRUCTURAL exemplars** that teach the SHAPE of the output (a claim + endpoint +
+polarity) WITHOUT naming specific drugs or asserting clinical statements. The founder is NOT a scientist and
+must not author clinical claims. The real clinical content comes from the model extracting the REAL
+abstracts. Neutral exemplars + real abstracts = accurate, un-biased extraction. (AD validated this: neutral
+exemplars produced specific, correct AD positions — pediatric underdiagnosis, severity-tool caution — with
+zero reference-TA leakage.) The domain advisor refines with TA-specific exemplars LATER (ship-now-refine-later,
+matching how the reference TA itself was built).
+
+### 8f. IDEMPOTENCY (re-runs must not duplicate)
+Enrichment gets re-run (test-5 then full, refreshes, new TAs). A non-idempotent write duplicates.
+  - Plain INSERT with no ON CONFLICT → re-run appends duplicates. FIX: delete-existing-rows-for-(HCP,TA)
+    before insert, INSIDE the per-HCP transaction (partial-run safe; only reprocessed HCPs are cleared).
+  - The NULLS-DISTINCT constraint trap: a standard UNIQUE treats NULLs as distinct, so rows with a NULL
+    scope column (e.g. global-scope) ESCAPE an existing upsert and duplicate on re-run. FIX: swap to
+    `UNIQUE NULLS NOT DISTINCT (...)` (PG15+) so NULL rows conflict and the upsert fires. (This was the AD
+    ranks_v3 dedup: 2,546 duplicate global rows from a re-run, fixed by the constraint swap; recurrence
+    structurally prevented, no script change needed.)
+
+### 8g. Signal fields must actually RENDER (audit generate-vs-render)
+A generator may write fields the UI never shows. AD found 4 of 5 narrative fields (why_now,
+engagement_angle, signal_strength, caution_flags) were generated but RENDERED NOWHERE for Established
+(a Signal Summary section was gated to `rising_star` only, and why_now was dropped in a mapping). Un-gating
+surfaced the MOST MSL-actionable content platform-wide. LESSON: after enrichment, AUDIT that every generated
+field has a render site; "are we surfacing everything we compute?" is a recurring audit question. (Watch
+field FORMAT vs component: a full-sentence value in a fixed badge component overflows — render prose fields
+as wrapping text blocks, guard each sub-block on its own field so empty fields hide cleanly.)
+
+### 8h. Enrichment run ordering & dependencies
+- LOCATION before NARRATIVES: narratives reference practice location → resolve NPPES practice-state first,
+  or narratives omit/misstate geography and need regeneration. (Data-dependency ordering.)
+- DEDUP before ENRICHMENT: enrichment selects "top-N by rank" from the ranks table — clean duplicates first
+  or selection is corrupted (fewer distinct HCPs, double-generation).
+- Stage-1 before Stage-2 (Belief Profile): Stage 2 selects only HCPs that already have Stage-1 positions.
+- Narratives anchor on INSTITUTION (reliable), not stale NPPES city — verify location claims are corroborated.
+
+---
+
+## 9. DEFINITION OF DONE — the parity matrix
+
+The acceptance test for a new TA is a **live-DB parity matrix vs the frozen reference TA**, per cohort:
+rows = enrichment layers, columns = {Reference Established, New Established, Reference Rising, New Rising}.
+Each cell = coverage (distinct cohort HCPs with a row / cohort population) + remaining work.
+
+Reading the matrix (critical — %s are NOT apples-to-apples):
+  - FULL-COHORT layers (classification, pub-leadership, network, author-metrics) should approach 100% for a
+    properly-built TA. (AD Established hit 98–99% — CLEANER than NSCLC's 57%, because AD used the TA-anchored
+    cohort vs NSCLC's looser legacy denominator. A new TA does NOT need to "catch up" to the reference's %.)
+  - OVERLAY layers (narratives, belief profiles, themes, web signals) are TOP-KOL BY DESIGN → low cohort %
+    is EXPECTED even when "done"; judge by top-N depth, not cohort %.
+  - US clinical/commercial (Medicare, Open Payments) are coverage-capped by the US fraction; an intl-heavy TA
+    showing low coverage is STRUCTURAL, not a defect (→ display-only, weight 0).
+Save the matrix as `docs/<TA>_PARITY_CHECKLIST.md` — it IS the definition-of-done.
+
+---
+
+## 10. PART II OPERATING DISCIPLINE (additions to §4)
+
+- **VERIFY STATE BEFORE ACTING — including agents' in-flight work.** Before starting a run, confirm nothing
+  else (esp. a background agent job) is already doing it — two processes writing the same table race and
+  corrupt. The founder caught this; ask the agent for status before parallel work on a shared resource.
+- **LONG RUNS GO IN THE FOUNDER'S TERMINAL**, not an agent background job. Agent background jobs redirect to
+  a file and BLOCK-BUFFER → no live progress/ETA/failure-count until done (blind for 1–2 hrs). Direct
+  terminal runs stream live progress and allow Ctrl-C. (Use `python -u` / PYTHONUNBUFFERED=1 if an agent
+  must run one.) Agent = code work + short verifiable runs; multi-minute/hour GENERATION = founder's terminal.
+- **SEARCH PAST CHATS FOR DESIGN INTENT** before re-deriving how a feature works or what it cost. The original
+  build conversations hold the real cost numbers, the exemplar provenance, and the design rationale. (Saved
+  AD from re-authoring exemplars the founder never wrote, and from a 4× cost misestimate.)
+- **AGENT + STRATEGY SPLIT that works:** the coding agent (Claude Code) traces/parameterizes/reviews/fixes in
+  the codebase; the strategy thread holds architecture, decisions, and this running doc; the founder does
+  domain validation (does the output read TRUE to the field?) and the browser gate. Read the actual
+  script/schema before acting — the agent's estimates and the strategy thread's inferences are both guesses
+  until grounded in the code/DB.
+- **COMMIT + PUSH at every verified milestone** (multi-machine safety; branch commits don't deploy).
+

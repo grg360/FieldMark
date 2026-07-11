@@ -4935,3 +4935,1833 @@ built (19,351 derms + payments). Community reconceived: workspace design LOCKED 
 Field Intelligence as the daily HEARTBEAT (the moat, the original thesis). Architecture: TWO INTELLIGENCES
 (scientific-global publication-first; operational-local NPPES-first) + the coming THIRD (the change-layer).
 Sequencing doctrine + two-spine + keying principle captured for TA #3. Tomorrow: frontend. ===
+
+### 30by. FRONTEND AUDIT (Claude Code, live-verified). Lift: Established Small, Rising Medium, Community Large/separate. + RLS LAUNCH BLOCKER found.
+Claude Code audit of frontend/src (~177 files, data layer in lib/api.ts ~4300 lines), verified against live
+Postgres + PostgREST. Stack: Vite+React18+TS, react-router-dom v7, supabase-js v2, recharts, force-graph.
+KEY ARCHITECTURE FINDINGS:
+  - Cohort UI is WELL-PARAMETERIZED: one FeedLayout component (App.tsx:342-1021) branches on `track` string;
+    shared .map over <HCPCard>; one shared HCPCard.tsx (1178 lines) branches on hcp.cohort_classification. Adding
+    AD = config + data-layer, NOT new components (for Established).
+  - Cohort data flows through POSTGRES RPCs, not table names: fetchCohortViaRpc (api.ts:495-557) calls get_
+    established_filtered / get_rising_star_filtered / get_community_filtered, passing p_ta_id. So "repointing" is
+    mostly a DB-FUNCTION job. .from("hcp_*_ranks_v3") are only enrichment lookups.
+  - TA selection FULLY HARDCODED across >=5 maps (TAFilterChips.tsx, routeSlugs.ts, api.ts TA_ID_MAP:657). AD's
+    ta_id 9e4139d2 ABSENT (only immunology parent 4cf07827 present). Immunology hard-DISABLED (TAFilterChips:29).
+    AD exists only as a disabled INDICATION under Immunology - and INDICATION DOESN'T SCOPE COHORT QUERIES (keyed
+    on TA only). => AD must be its OWN TOP-LEVEL TA CHIP (mirroring how "Oncology" chip is really NSCLC).
+LIVE DATA VERIFIED: hcp_established_ranks_v3 AD=7,462 (glob 5,131/region 447); hcp_rising_composite_v1 AD=5,719;
+hcp_scientific_emergence_v1 AD=3,052; community_practitioners 19,351; community_practitioner_payments present.
+hcp_narratives_v2 AD=0 (NOT generated - cards show "narrative generating" until backend gen runs).
+*** RLS LAUNCH BLOCKER (opposite of the worry - Established is FINE): the 4 NEW AD tables shipped with RLS
+DISABLED - readable by anyone with the committed anon key (in the JS bundle), no login. WORST: community_
+practitioner_payments = Sunshine Act payment detail on 19,351 named physicians+NPIs, WIDE OPEN. Claude Code
+drafted migrations/2026_07_09_ad_tables_rls_lockdown.sql (enables RLS + authenticated-only read on all 4, revokes
+anon grant; pipelines use DATABASE_URL/service_role so unaffected). RUN FIRST, independent of frontend timing. ***
+  (Established is NOT blocked: RLS ON, admits authenticated, inherits production NSCLC's exact working posture.)
+LIFT (revised, per audit):
+  - ESTABLISHED = SMALL: ~6 files additive config (api.ts TA_ID_MAP + TA_DISPLAY_BY_ID + resolveTASlug;
+    routeSlugs.ts both maps + taLabelToApiSlug; TAFilterChips add chip + remove Immunology disable; Indication
+    Filter add AD indication; un-hardcode App.tsx:1051 therapeuticArea:"nsclc" + InstitutionsInTerritoryPanel
+    taSlug="nsclc":841). NO HCPCard change, NO new RPC - rides existing generic get_established_filtered which
+    already reads v3 (= AD's target table). Fastest path to a live 2nd TA (minus narratives).
+  - RISING = MEDIUM: new RPC over hcp_rising_composite_v1 + hcp_scientific_emergence_v1; collapse two 2x2 grids ->
+    two tiles (HCPCard.tsx:952-986 + ScoreBreakdownV3Rising.tsx:160-205) + 1 DetailScreen subtext; re-map ~6 field
+    sites (types.ts:102-108, hcpData.ts:68-74, App.tsx:320-326). network_influence_pctile = SAME field Established
+    uses (type already carries it). DECISION NEEDED: `archetype` is orthogonal to new axes + new model doesn't emit
+    it - does it survive? Old 2x2 read scientific/network _momentum/_visibility_percentile (4 fields) -> new = 2
+    axes (emergence_pctile, network_influence_pctile).
+  - COMMUNITY = LARGE / SEPARATE PROJECT: operational tables are DIFFERENT SHAPE (npi-keyed, no therapeutic_area_
+    id, no rank/composite, many not linked to hcps_v2) -> legacy getCommunity->HCPCard->/hcp/:id flow WON'T WORK.
+    It's the CommunityWorkspace redesign (§30bt/bu), NOT a repoint. Own project.
+OTHER: no shared TA config (identity duped across >=5 maps - a central TA_REGISTRY would de-risk AD + future TAs;
+backend already moved to JSON-per-TA, frontend hasn't). Dead code in HCPCard (console.log McKean 513-524; unused
+renderScoreChip 569-700). NSCLC strings in StatPillWithTooltip. anon key committed inline in bundle.
+RECOMMENDED ORDER (audit): 1) RUN RLS LOCKDOWN (now, independent). 2) Ship AD Established (§5 config diff, Small).
+3) Rising (new RPC + 2-tile rework, Medium). 4) Community (own project, CommunityWorkspace redesign).
+
+### 30bz. RLS LOCKDOWN RUN + VERIFIED. Launch blocker CLEARED. Anon locked out of all 4 new AD tables.
+Ran the 4-table migration (ENABLE RLS + authenticated-read policy + REVOKE SELECT FROM anon + NOTIFY pgrst).
+VERIFIED:
+  - Service role: SELECT count(*) community_practitioner_payments = 14,165 (data intact, pipelines unaffected -
+    they use DATABASE_URL/service_role, bypass RLS).
+  - Anon PostgREST probe: HTTP 401, PostgREST error 42501 "permission denied for table community_practitioner_
+    payments". = anon BLOCKED at the grant level (REVOKE fired). Hole closed. (Got hard 401/permission-denied
+    rather than []/*/0 because REVOKE-grant is stricter than RLS-policy-empty and fires first - the MORE secure
+    outcome.)
+=> The data-exposure launch blocker is CLEARED. Sunshine Act payment data on 19,351 named physicians now locked
+to service_role (pipelines) + authenticated users only. All 4 new AD tables (rising_composite, scientific_
+emergence, community_practitioners, community_practitioner_payments) now match the RLS posture of the working
+tables (hcps_v2, established_v3, narratives).
+NEXT: ship AD Established (§5 config diff, Small) - the fast path to a live 2nd TA.
+
+### 30ca. AD Established frontend diff REVIEWED + approved (Claude Code, plan mode). Replace variant. 5 files/11 edits, NSCLC-safe.
+Claude Code traced real wiring, produced clean additive diff, caught 2 things the audit missed. Reviewed + approved.
+NSCLC PRESERVATION VERIFIED: taLabelToApiSlug("Oncology")==="nsclc" confirmed stays true -> both un-hardcodings
+preserve NSCLC byte-for-byte. All NSCLC/Onc/Hep map entries untouched; AD added ALONGSIDE. 
+IMMUNOLOGY INDICATION: confirmed leave inert (flipping to true would route to wrong ta_id 4cf07827 parent, not AD
+9e4139d2 -> misleading duplicate). Indication never reaches cohort query (filter has no indication field). Left
+untouched per "only add" guardrail.
+THE 5-FILE DIFF (11 edits): api.ts (TA_ID_MAP + TA_DISPLAY_BY_ID + resolveTASlug slugByLabel); routeSlugs.ts
+(TA_SLUG_TO_LABEL + TA_LABEL_TO_SLUG + taLabelToApiSlug case + new ATOPIC_DERMATITIS indication map wired into
+both by-TA maps); TAFilterChips.tsx (REPLACE disabled Immunology chip -> AD, remove isImmunology branches);
+IndicationFilter.tsx (add AD "All" indication, Immunology untouched); App.tsx (InstitutionsInTerritoryPanel
+taSlug + getHCPDetail therapeuticArea both -> taLabelToApiSlug(selectedTA)). NO HCPCard/DetailScreen/RPC touched.
+DECISION: REPLACE variant (Immunology chip -> AD) - removes dead disabled UI, doesn't enable Immunology, other 3
+chips untouched. (vs keep-disabled-Immunology-as-5th + AD-6th = clutter.)
+2 THINGS AUDIT MISSED (both flag-not-fix, correctly out of scope):
+  1. COUNT BADGES read 0 for AD: getTACounts (api.ts:1086) reads hcp_established_scores_v2 / hcp_community_scores_
+     v2 / hcp_score_ranks_v2 - AD=0 in all 3 (pipeline populated ranks_v3 but NOT _scores_v2 count tables). Feed
+     UNAFFECTED (uses ranks_v3 via RPC, 7,462 AD rows). Only the separate TASelectionScreen shows 0/"—" AD counts.
+     BACKEND DATA GAP (future: populate _scores_v2 for AD), not a frontend fix.
+  2. HEPATOLOGY SIDE EFFECT: un-hardcoding InstitutionsInTerritoryPanel FIXES a latent bug (Hep was showing NSCLC
+     institutions). Now Hep->hepatology, Rare->rare-disease. NSCLC still ->nsclc (unchanged). Behavior change
+     beyond AD = arguably a fix; let stand but verify Hep institutions panel looks sane when testing.
+NEXT: Claude Code applies edits -> runs typecheck + lint + build -> then LOCAL test: AD chip renders Established
+(logged in), NSCLC IDENTICAL to before, Hep institutions sane. On branch ad-frontend-established (isolated, not
+deployed until merged to foundation-rebuild). AD cards show "Narrative generating" (AD narratives=0, expected).
+
+### 30cb. *** AD ESTABLISHED IS LIVE IN THE FRONTEND. Verified in-browser, logged in. Rankings domain-correct. ***
+Preview server + authenticated login: the "Atopic Dermatitis" chip renders real Established data. Full chain
+resolved (chip -> /atopic-dermatitis/established/all -> AD ta_id -> get_established_filtered -> rows). 
+RANKINGS VALIDATED IN-PRODUCT (domain-correct who's-who of AD):
+  #1 Silverberg (100, GWU - the AD KOL benchmark, exactly right) · #2 Guttman-Yassky (Mount Sinai) · #3 Simpson
+  (OHSU) · #4 Eichenfield (UCSD, PEDS AD) · #5 Lio · #6 Paller (peds AD) · #7 Boguniewicz · #8 Yosipovitch (itch)
+  · #9 Abuabara · #10 Leung · #11 Ong · #12 Feldman · #13 Sidbury (Seattle Children's) · #14 Greenhawt (Children's
+  Colorado) · #15 Shi · #16 Siegfried (Cardinal Glennon). = accurate AD field, incl correct pediatric-AD skew.
+CARD ANATOMY renders perfectly: score, #US/#Global rank, Scientific/Network/Pharma chips, institution, flag, gold
+Established border. Pharma-as-display working (Silverberg 95, Guttman-Yassky 0, Eichenfield 95 - real Open Payments
+variation, not ranked). Cards render clean despite AD narratives=0 (detail view would show "narrative generating").
+Top Institutions strip populated (Mount Sinai 4 Est, Northwestern, U Miami, U Mississippi).
+=> FieldMark's SECOND therapeutic area is live in the frontend. The scientific-backend work (2 days) is now VISIBLE
++ validated end-to-end in the real product. On branch ad-frontend-established, builds clean, NSCLC byte-for-byte
+preserved. Ready to commit + (later) merge to foundation-rebuild.
+NEXT: commit the branch -> optionally verify NSCLC + Hep unchanged in same session -> then Rising (Medium: new RPC
++ 2x2->2-tile) as the next cohort. Merge to foundation-rebuild when satisfied (that's the deploy trigger).
+
+### 30cc. GAP FOUND: AD Established has almost NO practice-location data (8 of 5,131 have nppes_practice_state) + NO region-scope rows. Territory filtering is hollow.
+Investigating why NE territory showed "4 Est" at Mount Sinai, found the real issue:
+  - Check B: of 5,131 AD Established HCPs (global scope), only 8 have nppes_practice_state populated. 99.8% NULL.
+    Established is PUBLICATION-DERIVED and was essentially NEVER NPI/practice-location resolved (that data came
+    from the NPPES spine, which we built only for COMMUNITY yesterday). So territory/state filtering on Established
+    filters against ~all-null data. The "5 in NE" = 5 of the only 8 HCPs cohort-wide that have ANY state.
+  - Check A: 0 region-scope rows for AD Established in the 9 NE states (scope_type='region'). AD Established only
+    got GLOBAL scope computed, not regional breakdowns. (Contrast: audit reported AD region-US 447 rows exist -
+    so 'region-US' national scope exists but NOT per-STATE region rows the territory filter needs. RECONCILE.)
+  - 4-vs-5 (cards vs query): the 4 visible cards are all Mount Sinai (Guttman-Yassky, Kim, Estrada, Gottlieb =
+    the "4 Est" institution count). The 5th NE-state HCP is elsewhere/below fold, OR app territory logic != my SQL.
+    Moot vs the bigger point: the territory view is running on ~8 data points, cosmetically "working" but hollow.
+=> BACKEND DATA GAP, not a frontend bug. The AD frontend repoint is correct; the territory FEATURE is starved of
+data because Established HCPs lack practice-location. TWO sub-gaps: (a) NPI/practice-state resolution for the
+Established (publication-derived) population - was never done; (b) per-state region-scope rank rows for AD.
+IMPORTANT SCOPE NOTE: this is the SAME structural theme as the Community discovery - publication-derived HCPs lack
+operational/location data. Established KOLs CAN often be NPI-matched (they're real US clinicians w/ NPIs, unlike
+the pure researchers), so this is resolvable via an NPI-resolution pass on the Established cohort - but it's a
+BACKEND job, separate from today's frontend work. Territory filtering for Established will stay hollow until then.
+For NSCLC it presumably works because NSCLC Established got practice-location/region data at some point (verify).
+DECISION: today's frontend goal (AD Established RENDERS) is DONE + correct. Territory filtering being data-starved
+is a pre-existing backend gap surfaced (not caused) by testing AD. Log it, don't fix now. The NATIONAL/global AD
+Established view (Silverberg #1 etc, §30cb) is fully correct - that's the shippable win. Territory scoping is a
+separate backend completeness task.
+NEXT: confirm national view still good -> commit branch. Backlog: NPI-resolve Established population + per-state
+region rows (backend, future). Verify how NSCLC territory gets its location data (the template).
+
+### 30cd. RESTRUCTURE: AD = indication under IMMUNOLOGY (not top-level chip). Trace revealed Oncology->NSCLC is a FAÇADE.
+Garrett corrected the IA: mentors will see this - chip bar must read ONCOLOGY·HEPATOLOGY·IMMUNOLOGY·RARE DISEASE
+(NOT "Atopic Dermatitis" as top-level), with AD as an indication UNDER Immunology, mirroring NSCLC under Oncology.
+CLAUDE CODE TRACE (airtight): the Oncology->NSCLC "hierarchy" is a FAÇADE. The TA LABEL carries the ta_id, NOT the
+indication. taLabelToApiSlug("Oncology")="nsclc" (hardcoded switch) -> TA_ID_MAP["nsclc"] -> ta_id. The selected
+INDICATION never enters `filters` - it only gates the "coming soon" state + section header + telescope + landscape
+link. Selecting "All" vs "NSCLC" under Oncology = SAME ta_id. Indication chips are COSMETIC.
+=> To mirror: taLabelToApiSlug("Immunology") -> "atopic-dermatitis" -> TA_ID_MAP -> 9e4139d2. Immunology behaves
+like Oncology; AD is its cosmetic first indication. Pivotal = ONE line (the Immunology case in taLabelToApiSlug).
+Rest of the plan = REVERTING the top-level-AD-chip edits (§30ca) + flipping Immunology's AD indication active:true
++ restoring "Immunology" to TA_CHIPS (enabled now). App.tsx un-hardcodings KEPT. api.ts TA_ID_MAP + TA_DISPLAY_BY_
+ID entries KEPT (targets of the mapping).
+*** OPTION A vs B (the real decision): 
+  A = faithful mirror (TA-label->ta_id, indication cosmetic). Fast (~1 pivotal line + reverts). BUT reproduces
+    Oncology's FLAW: indication is fake -> if a 2nd immunology indication (Psoriasis/RA/etc, all VISIBLE in the
+    list) is ever activated, it'd silently show AD's data. Latent demo footgun. SAFE TODAY because AD is the ONLY
+    active immunology indication (siblings active:false, unclickable).
+  B = real per-indication ta_id (thread taId through filters + getEstablished/Community/RisingStars signatures).
+    Invasive today but makes indication GENUINE - each resolves to its own ta_id. The architecturally correct
+    multi-indication foundation (= FieldMark's core thesis).
+DECISION: ship OPTION A NOW (correct VISUAL structure for mentors today, safe because AD is sole active immunology
+indication) + LOG OPTION B as REQUIRED before activating ANY sibling indication (Psoriasis etc). The footgun only
+fires when a 2nd indication is activated - which won't happen yet. Don't default to A permanently - B is the real
+fix for multi-indication. ***
+COSMETIC CALLS: (1) land on "Atopic Dermatitis" indication (not "All") - reads intentional for demo. (2) FIX the
+stale count: Immunology "All" shows 1204 placeholder; real AD Established ~7,462 - set both All + AD indication to
+7462 (same data). Don't show a stale number to mentors.
+FLAG (note, not fix): search/TopBar scopes Immunology to parent ta_id 4cf07827 (separate getTAIdForLabel path),
+consistent w/ Oncology using oncology-parent. Out of scope for Established.
+NEXT: approve Option A + 2 cosmetic calls -> Claude Code applies (plan mode) -> verify Immunology->AD renders +
+NSCLC unchanged -> commit. Backlog: OPTION B (real per-indication ta_id) before any 2nd immunology indication;
+also the §30cc territory/practice-location gap (separate backend).
+
+### 30ce. DECISION REVERSED (Garrett pushed): do OPTION B now (real per-indication ta_id), not A-then-B.
+Garrett: "why not just do the right fix now?" - correct. Reasons to do B now:
+  - The mentor demo's whole point is multi-indication scaling; Option B makes the indication REAL, not cosmetic.
+    A mentor clicking Psoriasis should get a real answer, not decorative behavior.
+  - Have to do B eventually anyway; marginal cost NOW (Claude Code warmed, files traced, review in place) << total
+    cost of A-now + B-later + context-switch tax.
+  - Kills the footgun permanently vs leaving a "fix before activating siblings" landmine in backlog (exactly how
+    latent bugs ship to a demo).
+  - It's the architecturally honest version of FieldMark's "many TAs, many indications" thesis - structural not
+    presentational.
+Counterarguments (speed; B touches filters shape + getEstablished/getCommunity/getRisingStars signatures) are
+weak: not time-boxed today, and "more surface" is well-bounded mechanical work Claude Code handles well w/ plan
+mode + typecheck.
+OPTION B DESIGN: add a `taId` to each indication config; thread into `filters`; the cohort fetchers use the
+indication's taId when present. CRITICAL GUARDRAIL: must be ADDITIVE/BACKWARD-COMPATIBLE - an indication WITHOUT
+an explicit taId falls back to the current TA-label->ta_id behavior, so NSCLC/Oncology/Hepatology/Rare Disease
+behave BYTE-FOR-BYTE identical. Only Immunology's AD indication carries an explicit taId (9e4139d2) initially.
+This touches the 3 shared cohort fetchers (affects all TAs' code paths) -> the backward-compat fallback is the
+safety mechanism. Plan mode + typecheck + verify NSCLC unchanged.
+NET RESULT: Immunology top-level TA (enabled) with AD as a REAL indication resolving to 9e4139d2; siblings can
+later each carry their own taId (genuine multi-indication). Solves §30cd's footgun structurally.
+NEXT: Claude Code plans Option B (plan mode, show full trace + diff) -> review (esp. the backward-compat fallback
+for existing TAs) -> apply -> typecheck/build -> verify Immunology->AD renders + NSCLC/Hep byte-for-byte -> commit.
+
+### 30cf. OPTION B plan REVIEWED. Guardrail airtight. DECISIONS: (a) "All"=recommended (AD taId), (b) thread taId into DETAIL page NOW (don't defer).
+Claude Code Option B plan reviewed. Core change = one line x3 in the cohort fetchers: `const taId = filters.taId
+?? TA_ID_MAP[taSlug]`. `??` = use indication's explicit taId if present, else EXACT current logic. Backward-compat
+PROVEN: every existing TA has no indication taId -> undefined -> untouched TA_ID_MAP[taSlug]. Oncology/NSCLC ->
+c0065b03 byte-for-byte. Effect dep indicationTaId constant-undefined for existing TAs -> zero extra fetches. SAFE.
+New helper getIndicationTaId(taLabel, indicationLabel) reads taId off the indication config. FilterState/Indication
+Option get optional taId field (additive). Reverts the top-level-AD-chip edits; restores Immunology as enabled chip.
+DECISION (a) "All" fork = RECOMMENDED: Immunology parent ta_id 4cf07827 has 0 established rows (only AD 9e4139d2
+has 7,462). So "All" must ALSO carry AD's taId (both All+AD -> 9e4139d2, count 7462, AD listed first = landing) -
+else All renders empty + 7462 count is a lie. Mirrors Oncology (All ~= NSCLC). Reversible when real cross-
+indication data exists.
+DECISION (b) THREAD taId INTO DETAIL PAGE NOW (not deferred): Flag #2 - as feed-only-scoped, clicking an AD card
+opens a detail page scoped to Immunology PARENT ta_id 4cf07827 (no data) -> EMPTY scores/narrative. For a MENTOR
+DEMO that's a worse moment than no list (looks broken: Silverberg's card -> empty profile). So include the detail-
+page taId threading now: thread indication taId into card-nav `state` -> consume in HCPDetailRoute. More surface
+but the drill-down MUST work for the demo. (My earlier "feed only" constraint no longer applies - doing it right
+means detail is AD-aware too.)
+REMAINING FLAGS (accept/defer): #3 feed narratives use taSlug=immunology -> 0 for AD -> "narrative generating"
+placeholder (expected, AD narratives=0). #4 getTACounts untouched -> AD count badges 0/"—" on TASelectionScreen
+(cosmetic, known §30ca/cc). #2-side-panels: DOLHeroPanel/InstitutionsInTerritoryPanel/ActiveFilterPills also
+parent-scoped - decide if those matter for demo (institutions panel already shows AD via the un-hardcoding? verify)
+- lower priority than the detail page itself.
+NEXT: approve Option B + (a) recommended + (b) include detail threading. Claude Code applies (plan mode) -> type
+check/build -> verify: Immunology->AD feed renders, AD CARD CLICK -> populated detail (Silverberg profile), NSCLC/
+Hep byte-for-byte unchanged, greyed immunology siblings show. Then commit.
+BACKLOG (still): §30cc territory/practice-location gap (Established has 8/5131 practice states); getTACounts
+_scores_v2 population for AD; side-panel parent-scoping if it matters.
+
+### 30cg. BUG: AD detail page still parent-scoped - Silverberg (#1 in feed) shows "Unclassified" on his profile. Decision-(b) threading didn't fully land.
+Compared Silverberg (AD, Image1) vs Heymach (NSCLC, Image2) detail pages. Silverberg MISSING all cohort/TA-scoped
+components that Heymach has:
+  - NO "Established Score" block (Heymach: 99/100, Rank 8 US/51 Global, Sci/Net/Pharma bars). Silverberg shows grey
+    "Unclassified - in our database but hasn't met cohort criteria."
+  - NO "Why This Expert" narrative (expected - AD narratives=0), NO Belief Profile, NO Top Collaborators.
+  - BUT DOES show all hcp_id-keyed data: Identification/NPI, Top Pharma Companies, Drug Engagement, Engagement Mix,
+    Publication Timeline. (These work regardless of ta_id.)
+SMOKING GUN: Silverberg is #1 AD Established in the FEED (just verified §30cb) but his DETAIL page says
+"Unclassified." => the detail page is querying his cohort/score under the WRONG ta_id (Immunology PARENT 4cf07827,
+0 rows) -> finds no cohort record -> falls back to "unclassified + raw data" view. This is EXACTLY flag #2 from the
+Option B plan ("detail page scoped to Immunology parent -> empty scores/narrative").
+=> Decision (b) - thread indication taId into the DETAIL page - did NOT fully land. Feed is AD-aware (ranks #1);
+detail route is still parent-scoped. Either the taId wasn't threaded into the card-nav state, or it's threaded but
+NOT CONSUMED where HCPDetailRoute does the cohort/score/established lookup.
+DIAGNOSIS FOR CLAUDE CODE: the signature (hcp_id data present, ta-scoped cohort/score/narrative absent + "Unclassi
+fied") = the detail page's ESTABLISHED/cohort query is using taLabelToApiSlug(selectedTA)="immunology"->parent
+4cf07827 instead of the indication taId 9e4139d2. Need: the indication taId must reach the detail page's cohort/
+score lookup (getEstablished-equivalent for the single HCP, or however the profile resolves cohort membership +
+score + rank). Verify: does getHCPDetail / HCPDetailRoute accept + use a taId? The card-nav `state` must carry it
+AND the detail data-fetch must consume it for the cohort/score/narrative queries (not just the hcp_id lookups).
+NOT a data gap (his AD Established record EXISTS - he's #1 in feed). Purely the detail path resolving wrong ta_id.
+NEXT: hand back to Claude Code with this diagnosis - fix the detail-page cohort/score resolution to use the
+indication taId. Re-verify: Silverberg detail shows Established Score ~100, Rank #1 US, Sci/Net/Pharma bars (like
+Heymach). NSCLC detail (Heymach) must stay unchanged.
+
+### 30ch. SEQUENCING: NPPES practice-state resolution MUST precede narrative generation (narratives reference location).
+Garrett caught a data-dependency: AD Established narratives reference LOCATION (institution city, regional
+influence, "based in..."). Generating narratives BEFORE the §30cc NPPES/practice-state resolution -> narratives
+omit or misstate location -> would need full regeneration (multi-hour job, wasted). So RESOLVE LOCATION FIRST.
+CORRECTED ORDER:
+  1. Detail-page taId fix (§30cg) - running in Claude Code now.
+  2. NPPES practice-state resolution for AD Established (§30cc) - populate nppes_practice_state (8/5131 -> most)
+     + likely per-state region-scope rank rows. Backend, NPI-resolution pass (Established KOLs mostly HAVE NPIs,
+     unlike the Community researchers - resolvable). ALSO fixes the frontend territory filter ("more cards appear
+     accurately" - Garrett's next goal). VERIFY FIRST: how does NSCLC Established get its practice-location? = the
+     working template to replicate.
+  3. THEN narrative generation (~2,585 AD Established) - narratives now reference ACCURATE location. Multi-hour
+     background job -> run while doing other foreground work. Writes hcp_narratives_v2 w/ AD ta_id. Test-run 5
+     HCPs first (confirm writes correctly) before full run.
+This is a data-DEPENDENCY ordering (narratives depend on location) - exactly what §30bd sequencing doctrine is for.
+Good catch: generate out of order and you pay twice.
+NEXT: finish detail fix -> NPPES practice-state resolution (verify NSCLC template first) -> narrative test-run ->
+full narrative background run.
+
+### 30ci. Detail-page bug = TWO breaks (not one). Fix reviewed + approved. + FLAG: duplicate global rows in hcp_established_ranks_v3.
+Claude Code trace found the taId DID reach the detail route (earlier getHCPDetail fix worked), but TWO independent
+downstream breaks the fix didn't touch:
+  BREAK 1 (cohort gate): getHCPDetail returns cohort_classification from a single GLOBAL column on hcps_v2 - NULL
+    for Silverberg (he's classified within AD sub-indication, not globally). DetailScreen gates the Established
+    block on cohort_classification==="established" -> NULL -> never renders -> "Unclassified" banner. FIX: when
+    taId passed, derive cohort from PRESENCE in hcp_established_ranks_v3 for that ta_id (= exactly how the feed
+    defines the cohort). Guarded by if(filters.taId) -> NSCLC unaffected.
+  BREAK 2 (breakdown slug): DetailScreen gets taSlug="immunology" -> getEstablishedScoreBreakdown resolves parent
+    4cf07827 -> 0 rows. FIX: add reverse taId->slug lookup (apiSlugForTaId via SLUG_BY_TA_ID) so detail passes
+    "atopic-dermatitis"->9e4139d2 where Silverberg's rows live (rank 1, score 100, sci100/net100/pharma94.89 -
+    verified). Falls back to taLabelToApiSlug when detailTaId undefined -> NSCLC unchanged.
+Both guarded/backward-compat: NSCLC/Hep/Rare (no taId) -> both fixes inert -> Heymach byte-for-byte. APPROVED.
+*** FLAG (backend data-quality, note for cleanup): hcp_established_ranks_v3 has DUPLICATE global rows for
+Silverberg (2 rows, scores 99.95 / 99.9525). getEstablishedScoreBreakdown global-rank query uses .maybeSingle()
+-> ERRORS on 2 rows -> global_rank shows null (US/region rank #1 still fine). Doesn't block the fix. Echoes the
+§30bd "dedup before scoring" lesson. TODO backend: (1) count how many AD Established HCPs have dup global rows -
+may not be just Silverberg; (2) dedup pass on ranks_v3. (The detail fix uses .limit(1) to tolerate the dupes.) ***
+NEXT: apply Parts 1+2 -> typecheck/build -> verify Silverberg detail shows Established Score 100 / Rank #1 US /
+Sci-Net-Pharma bars (like Heymach) + NSCLC unchanged. Then: count dup global rows (quick diagnostic). Then the
+NPPES practice-state resolution (§30cc/ch).
+
+### 30cj. DETAIL-PAGE FIX VERIFIED in-browser. AD drill-down works end-to-end. Committing.
+All 3 checks passed in-browser (logged in): Silverberg profile now shows Established block (Score 100, Rank #1 US,
+Sci/Net/Pharma bars) - "Unclassified" banner gone. Other AD cards (Guttman-Yassky/Eichenfield) same. NSCLC
+(Heymach) byte-for-byte unchanged. => AD-under-Immunology is COMPLETE + demo-ready: chip -> feed (Silverberg #1) ->
+card click -> populated AD detail profile. Full path works.
+(Global rank may still null for HCPs with dup global rows - the task_c0e748c8 dedup issue - US/region rank fine.
+Separate, filed.)
+STATE OF AD FRONTEND: Established cohort fully live under Immunology TA (feed + detail), Option B real per-
+indication ta_id wiring, backward-compat (NSCLC/Hep unchanged), greyed immunology siblings, count 7462. On branch
+ad-frontend-established. Committing.
+REMAINING FOR AD FRONTEND (not blocking Established demo): Rising cohort (Medium - new RPC + 2x2->2-tile);
+Community (Large - CommunityWorkspace redesign). Narratives (0, "generating" placeholder). Territory/practice-
+location (§30cc, next).
+NEXT: (1) dup-count diagnostic (Silverberg-only or systemic?). (2) NPPES practice-state resolution (§30cc/ch) -
+verify NSCLC template first. (3) THEN narratives (background, multi-hour, after location resolved).
+
+### 30ck. Two diagnostics: (1) dup global rows are SYSTEMIC (not Silverberg-only); (2) NSCLC Established practice-state = only 20% - the State fix = replicate NSCLC's NPI-resolution for AD.
+DIAGNOSTIC 1 - DUP GLOBAL ROWS SYSTEMIC: query capped ~100, EVERY row has exactly 2 global rows. Widespread double-
+insert across AD Established, not a one-off. Almost certainly recompute_established_ranks_v3.py RE-RUN without
+truncate/dedup (cf §30cb "+38 from backfill drift via re-run"). task_c0e748c8 cleanup = real: dedup + UNIQUE
+constraint (therapeutic_area_id, scope_type, scope_value, hcp_id) to prevent recurrence. Echoes §30bd dedup lesson.
+Not blocking demo (.limit(1) tolerates, US rank shows; global rank nulls via .maybeSingle()).
+DIAGNOSTIC 2 - THE STATE FIX REFRAMED: NSCLC Established = 11,390 HCPs but only 2,227 have nppes_practice_state =
+~20%. So even the WORKING TA has practice-state for only 1/5 of Established. NSCLC territory filtering runs on 20%
+coverage.
+=> AD (8/5,131 = 0.2%) isn't uniquely broken - it just never got ANY NPI-resolution pass. NSCLC got one (2,227
+populated). The FIX = run that same NPI-resolution/practice-state enrichment for AD's ta_id. AD Established KOLs
+mostly have NPIs (real US clinicians) -> resolvable. Target: AD 0.2% -> ~20%+ like NSCLC. That fixes the demo
+territory view ("more cards appear accurately").
+CAVEAT: 20% is itself low - NSCLC's territory view also isn't complete. "Fix AD to match NSCLC" = ~20% for AD
+(helps demo, not full). Deeper fix (higher NPI-resolution coverage across ALL Established) = bigger backend project,
+later.
+NEXT: FIND the script/mechanism that populated NSCLC's 2,227 practice-states (the enrichment pass). Candidates:
+scripts/enrich/nppes_matcher.py, targeted_nppes_enrichment.py (both in repo). Determine how it selects/writes ->
+run for AD ta_id 9e4139d2. Verify AD practice-state coverage jumps. THEN territory filter shows more AD cards.
+(Also: per-state region-scope rank rows - §30cc noted AD has 0; does NSCLC have them? territory filter may need
+them too. CHECK.)
+
+### 30cl. State-fix trace: NSCLC's practice-states came from a SUPERSEDED all-cohort script (nppes_enrichment.py); no v2 script covers Established. Fix = populate nppes_practice_state. + FAST PATH via community_practitioners.
+TRACE (Claude Code): NSCLC Established's 2,227 practice-states came from archive/superseded/nppes_enrichment.py -
+a general ALL-COHORT NPPES backfill from the NSCLC-build era. v2 rebuild REPLACED it with COMMUNITY-ONLY scripts
+(community_nppes_backfill, nppes_matcher, workstream_b). So NO active v2 script covers the ESTABLISHED cohort ->
+AD Established sits at ~8 (only pubmed_pipeline/dedup_merge stragglers). AD didn't fail a step - the whole-cohort
+enrichment stopped existing in v2; NSCLC just retains legacy fills.
+FRONTEND (great news): territory filter reads nppes_practice_state DIRECTLY - column predicate on hcps_v2 join in
+get_established_filtered (`h.nppes_practice_state = ANY(p_states)`). NO per-state region rows needed (no TA has
+them; AD already has its 447 region/US rows). => populating hcps_v2.nppes_practice_state is the ENTIRE fix. Zero
+ranks_v3 / frontend changes.
+PLAN (Claude Code): Step0 verify coverage (how many AD Established have npi / already have state). Step1 NPI
+coverage for the gap (targeted_nppes_enrichment.py --ta atopic-dermatitis w/ LOWERED --min-career-pubs; default
+500 tuned for NSCLC, AD authors have fewer pubs). Step2 practice-state backfill (reuse community_nppes_backfill's
+parse_nppes_result+apply_writes, cohort-agnostic fill-only keep_or_new, w/ a NEW --established-ta target selector
+from hcp_established_ranks_v3 for 9e4139d2). Step3 none. Guardrails: keep_or_new fill-only (won't touch NSCLC's
+2,227), AD-ta-scoped, dry-run first, API throttled.
+*** FAST PATH (Claude Code flagged, I'm elevating it): many AD Established derms ALREADY EXIST in community_
+practitioners (19,351 NPPES derms w/ NPI+practice_state from yesterday). A JOIN AD-Established -> community_
+practitioners (by NPI, or name) could backfill practice-state with ZERO API calls. Silverberg/Guttman-Yassky/
+Eichenfield are academic derms who are ALSO practicing clinicians -> plausibly in the 19,351 (cf the 342 matched_
+hcp_id overlaps). For AD specifically, the OPERATIONAL SPINE built yesterday feeds the SCIENTIFIC cohort's location
+data. Elegant + free + instant. ***
+REORDERED PLAN: Step0 coverage (npi? state?). Step0.5 (NEW, fast path): how many AD Established get practice-state
+from community_practitioners join (free, no API)? If it covers most -> may skip the NPPES API pass entirely.
+Step1/2 (API) only for the residual the community join doesn't cover.
+NEXT: run Step0 + Step0.5 coverage SQL (read-only) -> see how much the free community-join covers -> decide API
+pass scope.
+
+### 30cm. Coverage reality: AD Established has only 171/2,585 NPIs (7%). Bottleneck = NPI, not state. Fast path = 90 free via community join. Full = risky name-match.
+Step0: 2,585 AD Established HCPs, only 171 have NPI (~7%), 6 have practice-state. Step0.5: 90 matchable to
+community_practitioners by NPI (free state backfill). 
+=> BOTTLENECK IS NPI COVERAGE, not practice-state. 93% of AD Established have NO NPI -> can't get state from
+anywhere (NPPES keyed on NPI) until NPI-resolved. SAME structural truth as yesterday: publication-derived HCPs
+mostly lack NPIs. Practice-state coverage gated on NPI coverage = 7%.
+PATHS:
+  A (free): community join UPDATE -> ~90 HCPs get state. $0, instant, trivial, zero-risk. Coverage 6 -> ~96.
+    The 90 are the KOLs who are ALSO practicing derms (in the 19,351) = highest-value, most-likely-demoed.
+  B (full): NPI-resolve the other ~2,414 via NPPES NAME+STATE match (targeted_nppes_enrichment, lowered pub
+    threshold) THEN backfill state. Up to ~2,414 but: reintroduces the FUZZY-MATCH accuracy risk that ate hours
+    yesterday (89% no-match, mismatch risk on researchers/PhDs/intl). Slow (throttled API). Real work + real risk.
+RECOMMENDATION: A NOW (demo), B later as a careful scheduled backend project (w/ yesterday's fuzzy-match
+skepticism + validation). Rationale: the 90 free matches = highest-value KOLs (the ones a mentor clicks); UPDATE
+is instant/zero-risk; materially improves territory view TODAY. Full 2,414 name-match = real accuracy risk, needs
+validation not a rushed pre-demo pass. FOR NARRATIVES: the 90 demoed KOLs getting accurate location is what
+matters most; the long tail of 2,414 lower-ranked researchers matters less for demo narratives.
+NEXT: Option A - the free community-join UPDATE for the 90 (AD-scoped, fill-only, dry-run/verify first). Then
+proceed to narratives for AD Established (the 90 will have location; rest won't - acceptable, they're lower-ranked/
+non-demoed). Backlog: Option B full NPI-resolution of Established (careful, validated, later).
+
+### 30cn. State fast-path DONE: AD Established practice-state 6 -> 96 via free community_practitioners NPI join. Verified names/locations correct.
+Ran the fill-only, AD-scoped UPDATE (hcps_v2.nppes_practice_state/city from community_practitioners by NPI). ~90
+rows written. Verified 6 -> 96 AD Established HCPs now have practice-state. Sanity-checked top 25 pre-write: all
+correct (Silverberg->DC/GWU, Simpson->OR/OHSU, Eichenfield->CA/UCSD, Feldman->NC/Wake, Bunick->CT/Yale, Margolis->
+PA/Penn, Wan->MD/Hopkins etc). Clean NPI join, no mismatches. Guardrails held: fill-only (nppes_practice_state IS
+NULL -> can't overwrite NSCLC's 2,227), AD-ta-scoped. Dup global rows appeared in the join (each name x2) but
+UPDATE idempotent on hcps_v2 (one row per h.id) - harmless; dedup still pending (task_c0e748c8).
+=> The 96 = the highest-value AD KOLs (also practicing derms). Territory view now shows meaningfully more NE cards
+(Nanette Silverberg/Alexis/Brunner NY, Margolis PA, Bunick CT, Wan MD). Free, instant, zero API. The operational
+spine (yesterday's 19,351 derms) fed the scientific cohort's location - the two-intelligence architecture paying
+off concretely.
+REMAINING (backlog, not demo-blocking): Option B - NPI-resolve the other ~2,414 AD Established (7% NPI coverage) via
+careful validated name-match (fuzzy-match risk per yesterday). Deferred. The 96 cover the demoed KOLs; long tail
+is lower-ranked researchers.
+NEXT: verify territory view in browser (more NE cards) -> THEN narratives for AD Established (now the demoed KOLs
+have accurate location for the narrative text). Narrative gen = multi-hour background job (test 5 first).
+
+### 30co. STRATEGIC FINDING: AD Established is an INTERNATIONAL academic cohort - 78% of no-NPI HCPs are non-US. US-territory filtering has a hard ceiling AD doesn't share with NSCLC. Dry-run (no writes).
+Ran the NPI-resolution DRY-RUN on the 2,414 no-NPI AD Established (faithful to production matcher). KEY FINDINGS:
+  - *** 1,884 of 2,414 (78%) are EXPLICITLY NON-US *** (DE/JP/KR/IT/GB...). AD "global" Established is dominated by
+    European/Asian academic derm KOLs w/ NO US NPI. US-resolvable universe = only ~530 (vs NSCLC's 2,227 US-heavy).
+    HARD CEILING on US-territory filtering for AD that NSCLC didn't have. NOT a matcher bug - the NATURE of AD
+    (globally-distributed specialty). "It worked for NSCLC" DOESN'T transfer: AD != NSCLC (international field).
+  - Matcher yield on the 530 US: 25 HIGH-confidence / 81 ambiguous (held) / 424 no-match. Running "for real" = 25
+    rows written. Barely > the 96 already free.
+  - THRESHOLD: --min-career-pubs 500 must be REMOVED (0 AD no-NPI HCPs have >=500 pubs; max 301, avg 14. Established
+    membership IS the quality filter).
+  - *** CRITICAL FAILURE MODE (why dry-run first was right): the TOP US KOLs FAIL. Guttman-Yassky (#2 Mount Sinai)
+    -> NO MATCH. Abuabara (#36 UCSF) -> NO MATCH. Cause: HYPHENATED/COMPOUND/ACCENTED surnames break exact-last-
+    name match (Guttman-Yassky, Yamamoto-Hanada, Akdis). Conservative matcher misses exactly the highest-value
+    people while correctly skipping intl. Blind run = 25 mid-tier writes + Guttman-Yassky STILL blank. ***
+  - Only 1 of 25 high matches has state cross-check (these HCPs lack a state to corroborate = the chicken-egg the
+    task tries to break). Parallel community_practitioners pass independently yielded 16 high (complementary).
+CONFIDENCE GATE (agreed): WRITE only `high` (single NPPES verified name+derm-taxonomy). NEVER write ambiguous/
+no_match (wrong location on a KOL profile worse than blank). Manual eyeball the high set before writing (few, no
+state corroboration).
+DECISION: do Claude Code's rec (a) - add SURNAME-NORMALIZATION pass (split hyphens, try components, strip accents)
++ re-run dry-run. Recovers the demo-critical misses (Guttman-Yassky, Abuabara). THEN review the improved high set,
+manual-eyeball, write only high.
+STRATEGIC IMPLICATION (bigger than the fix): AD territory filtering is inherently limited - it's an international
+cohort. The US-practicing-derm population for AD lives in COMMUNITY (19,351), not Established. Established territory
+view will always be sparse for AD (mostly intl KOLs). This is correct + worth articulating to mentors: "Established
+= global scientific leaders (many intl); Community = US practicing derms (territory-rich)." Reinforces the two-
+intelligence split.
+NEXT: surname-normalization re-run (dry-run) -> review improved high set -> manual eyeball -> write high only ->
+backfill their state. Then narratives.
+
+### 30cp. NPI dry-run v2b: taxonomy ALLOW-LIST is the key - 67 clean high-confidence (was 25). Ambiguous 101->2. Reviewing 67 via CSV before write.
+Progression: v1 (exact name+exclusion) 25 high / 81 amb / 424 no-match -> v2a (+surname normalization) 62/101/367
+-> v2b (+taxonomy ALLOW-LIST derm/allergy/immunology) 67 HIGH / 2 amb / 461 no-match. The allow-list simultaneously
+REMOVED ~20 false positives (vet, dentists, counselors, NP, SLP) AND RESCUED real matches from ambiguous (only-one-
+same-name-candidate-is-a-derm -> unambiguous high). Ambiguous collapsed 101->2. The 67 are uniformly Dermatology/
+Allergy&Immunology/Peds-Allergy-Immunology - "reads like a real AD clinical roster."
+TOP-KOL RECOVERY: Abuabara (#36 -> NPI ...216, Derm Philadelphia) + Lio (#17 -> Derm Chicago, taxonomy
+disambiguated a common name) NOW RESOLVE (were no-match in v1). Residual misses: Guttman-Yassky, Sidbury = NPPES
+last_name search quirk on HYPHENATED compound surnames (won't return even verbatim) -> MANUAL ENTRY for the
+trivially-few top KOLs.
+FINAL GATE (agreed): write only single-NPPES-result w/ exact-first-token + whole-surname compressed-equality
+(accent/hyphen/space-insensitive) + taxonomy in {derm, allergy, immunology} = the 67. MANUAL EYEBALL the ~10
+common-name entries first (James Taylor/Jennifer Chen/Emily Cole/Robert Wood/Kelly Stone - taxonomy-plausible +
+exact-name but no state corroboration -> coincidental same-name derm POSSIBLE). HAND-ENTER Guttman-Yassky/Sidbury/
+top-40 hyphenated misses. NEVER write the 2 ambiguous or 461 no-match. Precision-over-recall accepted (drops genuine
+AD clinician w/ non-allergy taxonomy - blank beats wrong).
+=> Export 67 to CSV (rank/name/institution/proposed NPI/NPPES name/state/city/taxonomy, ~10 common-name FLAGGED)
+for review BEFORE any DB write. Same eyeball discipline as the community-join 25. Confirm ~57 unambiguous look
+right + scrutinize the ~10 flagged individually (keep clear, drop uncertain).
+RESULT WHEN WRITTEN: ~67 more AD Established get NPI -> unlocks their practice-state backfill (96 -> ~160+ w/ state).
+Plus manual top-KOL entries. Still capped by the 78%-international ceiling (§30co) - this maxes the US-resolvable set.
+NEXT: review CSV -> write approved high set -> manual KOL entries -> state backfill -> THEN narratives.
+
+### 30cq. NPI CSV review: add INDUSTRY-affiliation flag (Claude Code caught David Berk/Atara -> clinical NPI false-positive risk). Review flagged + location-mismatch scan.
+CSV ad_established_npi_proposals_dryrun.csv (67 rows) exported, NO writes. Columns incl nppes_candidate_count +
+review_flag. 11 rows flagged REVIEW(common name) (>=8 candidates). 
+CLAUDE CODE CAUGHT a 2nd failure mode the flag missed: INDUSTRY/NON-CLINICAL affiliations. #510 David Berk (inst
+"Atara Biotherapeutics") matched a clinical Dermatology NPI (cand=5, unflagged). Industry scientists often have NO
+clinical NPI -> same-name match to a clinician = false positive by construction. Orthogonal to candidate-count.
+=> Adding 2nd review_flag reason: industry/biotech institution (Atara + '...therapeutics/biosciences/pharma/inc').
+REVIEW STRUCTURE: unflagged (~55) = scan-and-trust tier (exact name + single/taxonomy-disambiguated derm, real
+institution = same safety class as community-join 25). Flagged (~11 common-name + industry) = judgment. Decision
+rule per flagged: does NPPES practice location CORROBORATE the HCP's known institution? corroborated -> keep; high-
+candidate + no corroboration -> drop (blank beats wrong); industry + clinical NPI -> drop unless strongly
+corroborated.
+WATCH (even unflagged): institution-vs-NPPES-location MISMATCH. E.g. Abuabara inst=UCSF(SF) but NPPES NPI=
+Philadelphia (cand=1, unflagged) - could be legit (stale NPPES / prior practice) or wrong match. Scan the trust
+tier once for inst-vs-location mismatches too.
+Guttman-Yassky + Sidbury still absent (hyphenated-surname NPPES quirk) -> hand-enter.
+WRITE PLAN (on approval, dry-run-first): (1) set hcps_v2.npi_number for approved HCPs. (2) practice-state backfill
+(community_nppes_backfill fill-only logic) over just those NPIs. Nothing to DB until approved.
+NEXT: regenerate CSV w/ industry flag -> Claude Code pastes flagged rows inline + confirms unflagged are exact-
+single-derm -> review flagged individually + scan trust tier for location mismatch -> approve write set -> write.
+
+### 30cr. NPI flagged-row review: DECISION PRINCIPLE = location-match trumps candidate-count. Keep 7, drop 8 of the 15 flagged. + 52 unflagged clean.
+Reviewed 15 flagged rows. PRINCIPLE: does NPPES practice location corroborate the HCP's known institution? location
+match = the disambiguator (only 1 of N same-name candidates is in that city) -> trumps high candidate count.
+KEEP (7) - location corroborates institution OR unique/real-derm:
+  - Matthew Turner: Roudebush VA Indianapolis = NPPES Indianapolis IN. keep.
+  - Rachel Miller: Mt Sinai NY = NPPES New York NY. keep.
+  - John Browning: UT San Antonio = NPPES San Antonio TX. keep.
+  - James Taylor: Cleveland Clinic = NPPES Cleveland OH (common name but location pins it). keep.
+  - Jennifer Chen: Stanford = NPPES Stanford CA (common name but location pins it). keep.
+  - Seminario-Vidal: Lilly keyword-flagged but cand=1 unique, real derm (CC noted). keep.
+  - Bhatia: "Therapeutics Clinical Research" = his own site, cand=3, real derm (CC noted). keep.
+DROP (8) - location MISMATCH or industry-staff/clinician collision (blank beats wrong):
+  - Carla Davis: Baylor Houston vs NPPES DC. mismatch. drop.
+  - David Berk: Atara Biotherapeutics (industry) vs NPPES St Louis. collision. drop.
+  - Mark Kaplan: Indiana vs NPPES Gurnee IL, 18 cand. mismatch. drop.
+  - Jason Meyer: SF VA vs NPPES Nashville TN. mismatch. drop.
+  - Maria Rueda: Eli Lilly (industry) vs NPPES Seymour TN. collision. drop.
+  - Emily Cole: Emory Atlanta vs NPPES St Louis MO. mismatch. drop.
+  - Dana Wallace: Nova FL = NPPES Ft Lauderdale FL (state matches) BUT 15 cand, no city confirm. drop (cautious).
+  - Kelly Stone: NIH vs NPPES DC (loose), 20 cand, common. drop (cautious).
+52 unflagged CONFIRMED clean (exact-name single-derm-taxonomy, <8 cand, non-industry). => WRITE SET = 52 unflagged
++ 7 kept flagged = 59. Plus hand-enter Guttman-Yassky + Sidbury (hyphenated misses).
+ALSO scan unflagged for the Abuabara-type location mismatch (inst UCSF/SF vs NPPES Philadelphia, cand=1 so unflagged)
+- CC's confirmation didn't call additional ones; accept unflagged but note Abuabara's mismatch (could be stale NPPES/
+prior practice - keep but flag for the narrative to not over-specify her city).
+NEXT: tell Claude Code the write set (52 unflagged + 7 named keeps, drop the 8) -> dry-run-first write of npi_number
+-> practice-state backfill over those NPIs -> hand-enter Guttman-Yassky/Sidbury -> verify state coverage jump ->
+THEN narratives.
+
+### 30cs. NPI write dry-run: 57 to write (2 excluded = duplicate-HCP-record KOLs). GO for execute. 96 -> ~153 coverage.
+Dry-run: all 59 approved resolved to unique hcp_ids, all npi_number NULL + no practice_state -> clean fill-only
+write of 57. Includes the 7 kept-flagged + top KOLs (Abuabara, Lio, Steinhoff, Beck, Nadeau, Chatila). Guardrails
+confirmed: fill-only (WHERE npi_number IS NULL / practice_state IS NULL), scoped to 57 AD-Established hcp_ids,
+dup-NPI conflicts excluded, service-role. GO given.
+2 EXCLUDED (Donald Leung 1215012950, April Armstrong 1356477087): NPI already on ANOTHER hcps_v2 row -> these KOLs
+have DUPLICATE HCP RECORDS (pub-side no-NPI row in AD Established + separate NPI-bearing row). Unique constraint
+correctly blocked. = DEDUP candidates (like Janne/Reddy merges), not matcher errors. Merging carries NPI+state over.
+=> THIRD duplicate-data symptom today (dup global rank rows §30ck, now dup HCP rows). Broader AD dedup pass owed.
+Create dedup task chip (Leung+Armstrong + scan for more) - AFTER the 57-write, not blocking.
+NEXT: execute 57-write (96->~153) -> create dedup chip -> hand-enter Guttman-Yassky/Sidbury NPIs (manual NPPES
+lookup) -> verify coverage -> THEN narratives. Abuabara noted: NPPES says Philadelphia vs inst UCSF - keep NPI but
+narrative shouldn't over-specify her current city.
+
+### 30ct. NPI/state write DONE + verified: 96->153 practice-state, 171->228 NPI. State work complete (at US ceiling). 3 dup symptoms = 1 root cause.
+Executed + independently verified: AD Established global with npi_number 171->228 (+57), with nppes_practice_state
+96->153 (+57). Spot-check correct (Abuabara NPI ...216 PA/Philadelphia; Lio ...923 IL/Chicago). Fill-only, scoped,
+2 dup-NPI conflicts skipped.
+DEDUP PATTERN (key insight): task_f93e84de (merge dup AD Established HCP records: Leung+Armstrong + broader scan) +
+task_c0e748c8 (dup hcp_established_ranks_v3 global rows) = THREE dup symptoms today likely sharing ONE root cause:
+the AD pipeline's upsert/dedup logic producing dupes across hcps_v2 AND ranks_v3. Fix at SOURCE (one root-cause
+pass on the AD upsert) then clean existing dupes. Echoes §30bd dedup-before-scoring. Backlog.
+HOUSEKEEPING: move review CSV -> docs/; preserve the write/matcher script -> scripts/enrich/ (REUSABLE: taxonomy-
+allow-list + surname-normalization matcher is valuable for AD long-tail + future TAs; don't lose to scratchpad).
+STATE WORK COMPLETE: 153 practice-states = the US-resolvable ceiling for AD Established (78% intl, §30co). Wrong
+matches excluded, demoed KOLs covered w/ verified locations. Remaining: hand-enter Guttman-Yassky + Sidbury (manual
+NPPES lookup -> 153->155); the international majority is correctly unresolvable.
+NEXT: (1) hand-enter the 2 KOL NPIs. (2) housekeeping (CSV->docs, script->scripts/enrich). (3) NARRATIVES - test 5
+first (confirm writes hcp_narratives_v2 w/ AD ta_id + reads well + uses location where present), then full/scoped
+run. Abuabara caveat: NPPES=Philadelphia vs inst UCSF -> narrative shouldn't over-specify her current city.
+
+### 30cu. AD profile-components diagnosis: 1 scoping bug to fix NOW (hardcoded NSCLC), rest = the ENRICHMENT/SYNTHESIS LAYER never run for AD.
+Claude Code traced every AD detail-page component. THE PATTERN: AD's build populated the SCORING layer (ranks_v3 +
+3 percentile tables) but NOT the downstream ENRICHMENT/SYNTHESIS layer. Narratives, AI scientific-position overviews
+(Belief Profile), top-collaborator pairing, research-theme extraction = all NSCLC-only (pipeline steps never run for
+AD). Apart from the Established score block (lone true scoping bug, fixed §30ci), every missing AD component = a
+DATA-GEN GAP.
+RENDERS CORRECTLY FOR AD: Identity/Identification (NPI/state now populated for the 57), Top Pharma, Drug Constella
+tion, Publication Timeline (all hcp_id-keyed, TA-agnostic), Established Score block (fixed).
+MISSING (component / source table / cause):
+  - Belief Profile (ScientificNarrativeSection <- hcp_ai_overviews synthesis_type=scientific_positions): 0 AD rows
+    = DATA GAP + a LATENT HARDCODE BUG (DetailScreen.tsx:1589 <ScientificNarrativeSection therapeuticArea="NSCLC"/>
+    hardcoded; getScientificNarrativeForHcp filters hcp_ai_overviews.therapeutic_area="NSCLC"). Same class as the
+    score-block fix. => generate data AND fix hardcode.
+  - Top Collaborators (hcp_top_collaborators_v2): 0 AD rows = pure DATA GAP. (network_centrality_v2 DID run for AD -
+    19,925 rows, why Network bar shows - but the collaborator-PAIRING step didn't. different pipeline stage.)
+  - Why This Expert (hcp_narratives_v2): 0 AD = pure DATA GAP (narrative gen, build-doc step 12, pending). Minor:
+    getHCPNarrative header falls to slug from hcp.specialty -> "immunology" not "atopic-dermatitis" (latent slug
+    mismatch, moot while AD narratives=0, fallback tries any-slug).
+  - Research Themes (hcp_research_themes_v2): 0 AD = pure DATA GAP (theme-extraction never run over AD corpus; hcp_
+    id-keyed, no TA filter, NO scoping bug).
+*** FIX NOW (fold into commit): the hardcoded therapeuticArea="NSCLC" at DetailScreen.tsx:1589 - DEMO LANDMINE:
+masked now by AD data gap, but the moment AD hcp_ai_overviews is generated (or an AD HCP shares an hcp_id-keyed
+overview) it SILENTLY SHOWS NSCLC BELIEF DATA ON AD PROFILES. Same fix as score block: replace "NSCLC" literal with
+resolved AD slug (taLabelToApiSlug/detail taId). Cheap, removes live footgun. ***
+BACKLOG = "RUN THE AD ENRICHMENT/SYNTHESIS LAYER" (each = existing NSCLC pipeline step pointed at AD ta_id):
+  1. narrative gen -> hcp_narratives_v2. 2. AI scientific-positions synthesis -> hcp_ai_overviews (Belief Profile).
+  3. top-collaborator pairing -> hcp_top_collaborators_v2. 4. research-theme extraction -> hcp_research_themes_v2.
+  Coherent batch, not 4 ad-hoc runs. (Narratives first, after location - §30ch. Also fix the getHCPNarrative slug
+  mismatch when running narratives.)
+NEXT: fix the :1589 hardcode NOW (fold into commit) -> then the enrichment-layer batch as backend jobs (narratives
+lead). The scoring layer is done; the synthesis layer is the remaining AD backend work.
+
+### 30cv. Enrichment scope: Top 200 each of Established/Rising/Community. FLAG: enrichment layer is PUBLICATION-DERIVED - fits Established+Rising, probably NOT Community.
+Garrett scoped the enrichment batch to Top 200 Established + Top 200 Rising + Top 200 Community (not full corpus).
+Good: covers demoable, fast, cohort-aware.
+DEPENDENCY CHECK per cohort:
+  - ESTABLISHED top 200: clean, ready (hcp_established_ranks_v3 live+ranked). Run enrichment now.
+  - RISING top 200: data exists (hcp_rising_composite_v1, 5,719) but frontend NOT repointed yet (pending Medium
+    task). Enrichment doesn't depend on frontend -> generate now so it's READY when frontend catches up. Smart to
+    pre-enrich. (Rising profiles just not VISIBLE until repoint.)
+  - COMMUNITY top 200: TWO issues. (a) "top 200 by WHAT"? Community has NO single score (deliberately multi-
+    dimensional §30bs). Needs a rank definition (AD-drug $? a dimension?). (b) MORE FUNDAMENTAL: the enrichment
+    layer (narratives, belief profiles, top-collaborators, research-themes) is ALL PUBLICATION-DERIVED - needs a
+    scientific corpus. Community practitioners are mostly NON-PUBLISHING (the whole point of the operational spine).
+    A community derm w/ no pubs CAN'T have a "Why This Expert" narrative or co-author network. => enrichment layer
+    is STRUCTURALLY INAPPLICABLE to most of Community.
+=> Community's "profile" is a DIFFERENT artifact: the operational card (Commercial/Scientific/Practice dimensions,
+"why she's here" line, cross-cohort badge) - NOT an AI publication-narrative. Enriching Community w/ the pub-derived
+layer would produce empty/nonsensical results for non-publishing derms.
+PROPOSED: run the enrichment batch for Top 200 ESTABLISHED + Top 200 RISING now (both publication-derived, layer
+applies). DEFER Community - its "profile completeness" = the Community Workspace build (wiring the dimensions/card
+to real data), a DIFFERENT task, not this enrichment layer. The ~342 matched_hcp_id community derms who ARE also
+in the scientific corpus could get scientific enrichment via their hcps_v2 row, but that's an edge case.
+NEED GARRETT'S READ: agree to enrich Established+Rising now, handle Community via the Workspace build (not pub-
+enrichment)? Or is there a Community-specific enrichment intent I'm missing?
+
+### 30cw. Community narrative: Garrett wants top-by-patient-volume -> narrative. REALITY: no volume data (claims unaffordable). Proxy = AD engagement. Narrative = OPERATIONAL (not publication).
+Garrett: sort Community by PATIENT VOLUME, top 200 get a narrative. Two problems:
+  PROBLEM 1 - NO PATIENT VOLUME DATA. Volume/prescribing = commercial claims (IQVIA/Komodo) = the data Garrett said
+  can't afford (the whole reason Community is Open-Payments-based §30bo). No volume field exists anywhere. => "sort
+  by volume" -> "sort by best PROXY". Best available proxy = AD-DRUG OPEN PAYMENTS engagement (deep Dupixent/Rinvoq
+  $ = demonstrably active in AD treatment). Name it HONESTLY (engagement, not volume - §30bo rule).
+  PROBLEM 2 - NARRATIVE SOURCE. Community derms DON'T PUBLISH -> the Established/Rising PUBLICATION-narrative
+  generator has nothing to draw from. BUT can generate an OPERATIONAL engagement narrative from Open Payments +
+  NPPES: "High Dupixent+Rinvoq engagement 3yr, no prior company relationship, pediatric AD focus, Boston, sole
+  practitioner." Genuinely useful, AI-written, sourced from operational data not pubs. = a DIFFERENT generator
+  (same idea, different inputs).
+WHAT GARRETT IS ACTUALLY PROPOSING (made precise):
+  1. Rank Community by AD-drug engagement (honest volume proxy).
+  2. Top 200.
+  3. Generate OPERATIONAL engagement narrative for those 200 (from OP + practice data) -> becomes the "why she's
+     here" briefing text on the Community card (the locked CommunityWorkspaceV3 design already has this slot).
+= a NEW Community-specific enrichment. Good idea - makes top Community derms feel as complete as Established, w/
+operationally-grounded text. Distinct from the pub-enrichment batch (which stays Established+Rising).
+DECISION NEEDED: (a) confirm engagement-as-volume-proxy (honestly labeled), and (b) is the operational Community
+narrative a NOW build or does it wait for the Community Workspace build (since the narrative slot lives in that UI)?
+Leaning: the Community operational narrative naturally belongs WITH the Workspace build (the card that displays it
+isn't built yet) - so enrich Established+Rising now (pub-narratives), and fold the Community operational narrative
+into the Workspace build. But if Garrett wants the 200 narratives generated now as a backend asset ready for the
+UI, that's fine too (data can precede UI, like pre-enriching Rising).
+
+### 30cx. Dedup task_c0e748c8 -> do BEFORE enrichment (enrichment selects top-200 from this table). Investigate read-only first.
+WHY BEFORE ENRICHMENT: narratives/belief/collaborators select "top 200" by rank from hcp_established_ranks_v3 -
+the dup table. Enriching against 2-rows-per-HCP risks: only 100 distinct HCPs selected, double-generation, or rank
+weirdness. Clean dupes FIRST -> enrichment selects a correct clean top 200. Prerequisite, not detour.
+SAFE SEQUENCE (destructive DB op on a table the live frontend reads - full care):
+  1. QUANTIFY (read-only): GROUP BY (ta_id,hcp_id,scope_type,scope_value) HAVING count>1. CRITICAL: AD-only or also
+     NSCLC (c0065b03)? If AD-only -> scope dedup to AD, NSCLC untouched (safe). If NSCLC too -> extreme care (frozen
+     production TA). Strong hypothesis: AD-only (from AD recompute re-run §30ck). VERIFY before touching.
+  2. INSPECT dupe pairs: confirm genuine dupes (Silverberg 99.95 vs 99.9525 = re-run drift, near-identical). Keep-
+     rule: highest cohort_score (more-complete/corrected computation).
+  3. Claude Code PROPOSES dedup + UNIQUE-constraint SQL -> review (DELETE correctly scoped? keeps exactly 1 row/key?
+     constraint matches (hcp_id, ta_id, scope_type, scope_value)?).
+  4. RUN (service-role, RLS-migration-level care) -> verify 1 row/HCP, Silverberg global rank renders.
+THE REAL FIX = UNIQUE (hcp_id, therapeutic_area_id, scope_type, scope_value): prevents recurrence - next accidental
+recompute re-run CAN'T double-insert (conflicts/errors loud instead of silently duping). §30bd dedup lesson made
+structural. Also consider changing recompute_established_ranks_v3.py to upsert (ON CONFLICT DO UPDATE) or truncate-
+first.
+NOTE: this is 1 of the 3 dup symptoms (§30ct) - task_f93e84de (dup HCP records Leung/Armstrong) is the 2nd; may
+share root cause (AD pipeline upsert). This task fixes the ranks_v3 symptom + adds the guard.
+NEXT: run the quantify query (step 1, read-only) -> is it AD-only? how widespread? -> inspect pairs -> review
+proposed SQL -> run -> THEN proceed to enrichment (narrative script location + test-5).
+
+### 30cy. Narrative generator analysis: SLUG MISMATCH (must fix frontend read first) + RISING INCOMPATIBLE (script change needed). Established-only now.
+Script: scripts/narrative/generate_narratives_v2.py (Sonnet-based, cohort-templated). Writes narrative/why_now/
+engagement_angle/signal_strength/caution_flags per HCPxTA. Flags: --cohort (established/rising/community/all),
+--established-top (def 100), --rising-top (100), --community-top (500), --dry-run, --force, --target-version (MUST
+pass v2), --hcp-id. NO --ta flag - scopes via load_visible_ta_ids() (therapeutic_area_ingestion_config WHERE
+is_visible_in_ui AND is_active); generates for every visible TA's top-N; --force-off + freshness skips NSCLC.
+*** CRITICAL - SLUG MISMATCH (would silently waste the run): generator WRITES therapeutic_area_slug="atopic-
+dermatitis" (= therapeutic_areas.slug for AD ta_id). But frontend READS "immunology" (AD modeled as Immunology TA:
+getHCPDetail narrative query taLabelToApiSlug("Immunology")="immunology"; getHCPNarrative uses hcp.specialty=
+"immunology"). write != read -> narratives generate but DON'T RENDER (getHCPDetail is TA-strict, no fallback).
+FIX FIRST (recommended, same pattern as score-block/DetailScreen:1589): make frontend narrative READS resolve the
+AD slug (atopic-dermatitis via apiSlugForTaId/taId). NOT the quick-wrong option (write "immunology" -> collides w/
+future Immunology indications). One more small frontend fix, THEN write-slug matches everywhere. ***
+*** RISING INCOMPATIBLE: generator's Rising path reads hcp_rising_star_ranks_v3 + OLD MOMENTUM tables (scientific_
+momentum_v1/network_momentum_v1). AD Rising lives in hcp_rising_composite_v1/hcp_scientific_emergence_v1 (new 2-axis
+model). Running Rising now -> selects 0 AD HCPs, can't read Emergence context. AD RISING NARRATIVES NEED SCRIPT
+CHANGES, not just a run. Defer - pairs naturally with the Rising FRONTEND repoint (same new-table migration). ***
+OTHER BLOCKERS (flag-handled): must pass --target-version v2 (v1 = wrong table); --hcp-id single-mode FAILS for AD
+(cross-checks hcps_v2.cohort_classification=="established" which is NULL for AD -> ValueError) -> use TOP-N path
+only (overrides cohort from rank selection); confirm AD is_visible_in_ui=true in therapeutic_area_ingestion_config
+or top-N selects nothing.
+ESTABLISHED SELECTION WORKS FOR AD: fetch_established_top_hcp_ids top-N by rank from ranks_v3 (scope_type='region',
+scope_value='US'), sets cohort_classification="established" from rank selection (doesn't rely on null global col).
+REORDERED PLAN: (1) dedup ranks_v3 first (in progress). (2) FIX frontend narrative read slug (AD->atopic-dermatitis,
+same pattern as prior fixes). (3) Established narrative test: --cohort established --established-top 5 --target-
+version v2 --dry-run (note: iterates all visible TAs, NSCLC freshness-skipped). (4) verify renders + reads well ->
+(5) full Established top 200. RISING narratives deferred (needs script update to new tables, pairs w/ Rising frontend
+repoint). Community deferred (operational narrative w/ Workspace build, §30cw).
+
+### 30cz. Dedup investigation: AD-ONLY (NSCLC clean), 2,546 exact global pairs from a partial recompute re-run. Discriminator = computed_at. Draft dry-run.
+BLAST RADIUS: AD-only (ta 9e4139d2). NSCLC c0065b03 + all other TAs = ZERO dups. 2,546 duplicate groups, all exact
+pairs, 2,546 excess rows, 2,546 HCPs. ENTIRELY scope_type='global' (region scopes clean).
+ROOT CAUSE (visible in data): two AD recompute runs 2026-07-08 - 15:46:57 (PARTIAL, 2,546 global-only) + 18:16:34
+(COMPLETE, 4,916 = 2,585 global + 2,331 region). Writer INSERTs w/o upsert/delete-first -> the 2,546 global HCPs in
+BOTH runs = the dups. (Matches §30cb "+38 from re-run" note.) Later run's region rows + ~39 extra global HCPs
+unaffected.
+GENUINE DUPES confirmed: same hcp_id/TA/global, identical scientific_influence_pctile, marginal re-sort drift only
+(rank/score/network) - two generations of same logical row, differ only by id + computed_at.
+CLEAN DISCRIMINATOR: computed_at. Keep 18:16:34 (complete/consistent), drop 15:46:57 (leftover partial). Every pair
+has exactly one row per timestamp -> separates cleanly. BETTER than "keep highest score" (based on WHICH RUN was
+authoritative, not arbitrary tiebreak).
+FIX (dry-run first): DELETE the 2,546 rows WHERE computed_at='2026-07-08 15:46:57' AND scope_type='global' AND ta=
+AD (exactly 2,546). Verify AD global 5,131 -> 2,585 distinct. Add UNIQUE (therapeutic_area_id, hcp_id, scope_type,
+scope_value). 
+CONSTRAINT SIDE EFFECT: recompute_established_ranks_v3.py plain INSERT will ERROR on future re-run (conflict) instead
+of silently duping = DESIRED short-term (fail loud). LONG-TERM: move script to upsert (ON CONFLICT DO UPDATE) or
+delete-first so re-runs are clean. (Same root-cause class as task_f93e84de dup HCP records - the AD pipeline's non-
+idempotent writes.)
+NEXT: review the dry-run (DELETE targets exactly 2,546? pre/post 5,131->2,585? constraint DDL?) -> approve -> run ->
+verify Silverberg global rank renders (was null via .maybeSingle() on 2 rows) -> THEN slug fix -> narrative test-5.
+
+### 30da. Dedup ROOT CAUSE found (better than expected): NULLS-DISTINCT constraint let global(NULL scope_value) rows escape the existing upsert. Fix = NULLS NOT DISTINCT constraint swap. Migration-file.
+CORRECTION to §30cz: recompute script ALREADY upserts (INSERT ... ON CONFLICT (hcp_id,ta_id,scope_type,scope_value)
+DO UPDATE, line 200-215). The bug is subtler: the EXISTING unique constraint (hcp_established_ranks_v3_hcp_id_
+therapeutic_area_id_scope_t_key) is STANDARD (NULLS DISTINCT). Global rows have scope_value=NULL; Postgres treats
+NULLs as DISTINCT -> two global NULL rows NEVER conflict -> ON CONFLICT never fires -> duplicate on re-run. Region
+rows (non-null) conflict + upsert cleanly. => explains global-ONLY + AD-only (AD got re-run Jul-8 15:46+18:16;
+NSCLC frozen after single run so never hit the NULL-escape).
+FIX (better than "add constraint"): SWAP the standard unique for NULLS NOT DISTINCT (PG15+; on 17.6). Then NULL
+global rows CONFLICT -> existing upsert fires -> future re-runs UPDATE IN PLACE not duplicate. NO script change
+needed (upsert was always correct; constraint just needs to recognize NULL-scope conflicts). Genuinely FIXES
+recurrence, not just guards.
+REVIEW CHECKS PASS: DELETE targets exactly 2,546 (0 orphans, every deleted row has an 18:16 twin); pre/post 5,131
+-> 2,585 distinct (one row each); constraint DDL drops standard unique, adds NULLS NOT DISTINCT (hcp_id, ta_id,
+scope_type, scope_value). Atomic txn: DELETE first (dupes must be gone before stricter constraint creates), then
+constraint swap, one BEGIN/COMMIT.
+CAUTION CONFIRMED SAFE: the swapped constraint is TABLE-WIDE (all TAs, not just AD). Changes uniqueness semantics
+for NSCLC etc too - but that's DESIRED (would've prevented NSCLC dupes too) and constraint CREATION succeeds because
+quantify confirmed zero dups outside AD. Safe.
+RUN MECHANISM: write to migrations/ file (like RLS lockdown §30bz), run in Supabase SQL editor - version-controlled,
+final eyes before executing on production table. (Not direct-run.)
+POST-FIX VALIDATION (Claude Code suggested): run recompute_established_ranks_v3.py --ta atopic-dermatitis twice
+(--dry-run first) + re-check dup query returns 0 - confirms re-runs no longer duplicate.
+NEXT: write migration file -> review -> run in SQL editor -> verify DELETE 2546 + 2,585 distinct + Silverberg global
+rank renders -> THEN slug fix -> narrative test-5. (This also structurally explains task_f93e84de's dup HCP records
+may be a DIFFERENT root cause - that's hcps_v2 not ranks_v3 - keep separate.)
+
+### 30db. DEDUP DONE + VERIFIED. AD ranks_v3 global 5,131->2,585 distinct (one row/HCP). Constraint swapped to NULLS NOT DISTINCT. Recurrence structurally prevented.
+Ran migrations/2026_07_10_dedupe_ad_established_ranks_v3_global.sql in Supabase SQL editor. "Success. No rows
+returned" (normal - DELETE/DDL don't return rows; editor swallows the DELETE count). VERIFIED via 3 read queries:
+  1. AD global: 2585 rows / 2585 distinct (was 5,131) = exactly one global row per HCP. DELETE applied.
+  2. Constraint: hcp_established_ranks_v3_hcp_ta_scope_uq present (old ..._scope_t_key gone). Swap applied.
+  3. Dup-check (>1 global row per hcp): 0 rows. No dupes remain.
+=> RECURRENCE STRUCTURALLY PREVENTED: NULLS NOT DISTINCT means next recompute --ta atopic-dermatitis re-run -> global
+NULL-scope rows CONFLICT -> existing upsert fires -> updates in place, no duplication. Bug can't recur. No script
+change needed.
+PAYOFF: Silverberg global rank should now RENDER (was null via .maybeSingle() on his 2 rows; one row now). VERIFY
+in app.
+Migration file untracked -> commit to ad-frontend-established alongside AD work + close task_c0e748c8 (superseded).
+STATUS: today's dedup prerequisite DONE. ranks_v3 clean -> enrichment can now select a correct top-200. 
+NEXT: (1) verify Silverberg global rank in app. (2) commit migration + close chip. (3) SLUG FIX (frontend narrative
+reads resolve AD->atopic-dermatitis, §30cy). (4) narrative test-5 (Established, dry-run then real). (5) full
+Established top 200. [Context: Code ~72% - natural point for a FRESH Code session for narrative work; state safe in
+this doc + chips.]
+(task_f93e84de dup HCP records = separate, hcps_v2 not ranks_v3, likely different root cause - still pending.)
+
+### 30dc. Narrative slug fix REVIEWED + approved. Two read sites, both backward-compat. (Fresh Code session.)
+Fresh Code session traced the slug mismatch to TWO narrative read sites (both found - my worry addressed):
+  FIX 1 (getHCPDetail, api.ts:1582): narrativePromise filtered therapeutic_area_slug=taSlug="immunology" -> no
+    match -> hcp.narrative=null. Fix: derive narrativeTaSlug = apiSlugForTaId(taId) ?? taSlug -> AD reads "atopic-
+    dermatitis". Same pattern as score-block fix.
+  FIX 2 (DetailScreen.tsx:727): getHCPNarrative called with hcp.specialty="immunology" -> missed AND fell back to
+    HCP's most-recent narrative across ANY TA (could show unrelated TA's narrative = worse-than-blank). Fix: pass
+    the already-correct taSlug prop (App resolves via apiSlugForTaId(detailTaId)??taLabelToApiSlug) instead of
+    hcp.specialty. Update effect deps [.., taSlug].
+BACKWARD-COMPAT VERIFIED: Fix1 apiSlugForTaId(taId)??taSlug -> NSCLC/Hep/Rare resolve same as today (additive).
+Fix2 getHCPNarrative runs resolveTASlug() on arg; passing taSlug ("nsclc" etc) = same slug the old hcp.specialty
+path produced -> only ADDS "atopic-dermatitis" resolution; NSCLC narratives read exactly as before. response.
+therapeuticArea (displayed specialty label) untouched. Only AD fixed.
+These are the ONLY 2 narrative reads (API layer + component layer) -> whichever the UI renders is AD-scoped.
+APPROVED. NEXT: apply both -> typecheck/build -> narrative test-5 (Established, --cohort established --established-
+top 5 --target-version v2 --dry-run then real) -> verify a narrative RENDERS on Silverberg profile (real test of
+this fix) + reads well -> full Established top 200.
+
+### 30dd. Narrative dry-run: CLEAN + high quality. Blast radius = AD-only (freshness-skipped the 5 non-AD). Sample (Lio) reads excellently. Proceed to real 5.
+Dry-run output: loaded 3 visible TAs (Hep/NSCLC/AD), selected 10 unique HCPs (top-5 per TA w/ rows). KEY: "[fresh
+ness] Skipped 5 contexts with narratives newer than latest score" -> 5 already had narratives (NSCLC/Hep), skipped;
+5 remain = the AD ones. Net writes = ~5 AD. Hep didn't surprise (its top-5 already have narratives or skipped). Cost
+$0.03 for 5.
+SAMPLE (Peter Lio, AD) = HIGH QUALITY:
+  - Accurate/specific: global rank 19, US rank 5, "59 AD pubs senior-author, 40 in last 5yr, 10 guideline pubs",
+    Network 98th pctile. Real grounded numbers, not fluff.
+  - Domain-appropriate: novel targeted mechanisms, patient-stratification, treatment sequencing, guideline
+    incorporation. Reads like AD medical-affairs fluency. MSL-useful.
+  - HONEST pharma gap: "pharma engagement data is not available for this profile" (Lio = Pharma 0, correctly stated
+    not invented). Holds the §30bo honesty discipline.
+  - All 5 fields populated well (narrative/why_now/engagement_angle/signal_strength/caution_flags). caution_flags
+    null (appropriate for clean top-tier).
+  - LEANS ON INSTITUTION ("Peter Lio at Northwestern") + publication metrics, NOT a specific practice city -> the
+    stale-NPPES-location risk (Abuabara Philadelphia vs UCSF) did NOT materialize. Generator anchors on institution
+    + scholarly record = reliable data. Location caveat likely a non-issue for narratives.
+=> PROCEED to real 5-HCP run (drop --dry-run). Then verify a narrative RENDERS on Silverberg profile (real test of
+the slug fix §30dc) + reads well. Then full Established top 200.
+NEXT: real 5 -> verify render -> full top 200 (background). Cost check: 5 = $0.03, so 200 ~ $1.20 - trivial. Could
+even do more than 200 given cost. (Rising deferred - script reads old momentum tables §30cy.)
+
+### 30de. DESIGN DEBT: generate_narratives_v2.py TA-scoping is not future-proof (implicit via config-visibility + freshness-skip, no --ta flag). Fix later, fine for today.
+Garrett flagged: the narrative script isn't future-proofed. Correct - real design debt:
+  1. TA scoping is IMPLICIT + GLOBAL, not explicit. No --ta flag. Generates for whatever's is_visible_in_ui in
+     config; relies on FRESHNESS-SKIP to avoid redoing. "Only does AD" is true ONLY because NSCLC/Hep have fresh
+     narratives - an emergent side effect of data state, not an intention.
+  2. Freshness-skip is load-bearing but invisible. Add a 4th TA / recompute NSCLC scores (making its narratives
+     "stale") / use --force -> script silently does far more than intended. No explicit guardrail.
+  3. No way to target ONE TA. Can't regenerate just AD (e.g. after prompt tweak) without --force-everything or
+     fighting freshness.
+  4. is_visible_in_ui OVERLOADED: controls BOTH frontend visibility AND narrative-script enrollment (should be
+     independent). Marking a TA user-visible shouldn't auto-enroll it in narrative gen.
+  5. Recompute coupling: freshness compares narrative age to "latest score" -> any score recompute silently re-
+     enrolls that TA for regeneration next run (unexpected cost/scope balloon).
+=> scoping is a COINCIDENCE OF DATA STATE, not an expressible intention. Works today for AD by luck of freshness
+state; will surprise later.
+TODAY: FINE - the dry-run EMPIRICALLY PROVED current state = AD-only (net 5). Verified behavior, didn't trust
+design. Complete the run safely.
+FIX (task chip, later - NOT a blocker): add --ta <slug> flag to explicitly scope generation to one/list of TAs,
+INDEPENDENT of is_visible_in_ui. Lets you say --ta atopic-dermatitis and know exactly what runs regardless of
+freshness/visibility. Decouples "visible to users" from "process for narratives". Makes runs intentional +
+reproducible. (Same reproducibility principle as the established_npi_resolver --ta design.)
+NEXT: finish today's run (verified safe) -> verify render on AD profile -> full top 200. File the --ta future-proof
+chip for later.
+
+### 30df. NARRATIVE RENDERS - slug fix WORKS end-to-end (Guttman-Yassky "Why This Expert" shows real text). The "two narratives" = two FIELDS by design (card=why_now teaser, detail=narrative), consistent w/ NSCLC.
+Verified in-browser: Guttman-Yassky detail "WHY THIS EXPERT" renders real accurate narrative (2nd US/4th global,
+126 senior-author pubs, 67 in last 5yr, 15 guideline pubs, ~23yr). => SLUG FIX §30dc WORKS end-to-end: generator
+writes atopic-dermatitis -> frontend reads atopic-dermatitis -> displays. All the last hour's work validated.
+GARRETT SPOTTED "two different narratives" (card vs detail): NOT a bug - two FIELDS surfaced in two places by
+design:
+  - CARD shows why_now field ("As the AD treatment landscape expands with multiple mechanism-differentiated
+    biologics...") - the forward-looking hook, truncated as teaser.
+  - DETAIL "Why This Expert" shows narrative field (biographical/credentials summary).
+  Generator writes 5 fields (narrative/why_now/engagement_angle/signal_strength/caution_flags); UI surfaces
+  different fields on card vs detail. CONSISTENT WITH NSCLC (Garrett noticed NSCLC does same) = evidence it's
+  INTENDED, not an AD break. NSCLC is the working reference; AD now behaves identically = correct.
+MINOR UX NOTES (decisions, not bugs): (1) card why_now teaser can't be expanded on the card (must click to detail)
+- fine (card=summary, detail=depth), or make expandable if desired. (2) worth confirming card=why_now / detail=
+narrative consistently (two distinct fields) vs any same-field-truncation confusion - from images they're clearly
+distinct fields, likely fine.
+=> AD Established narratives WORK. Ready for full run.
+NEXT: full Established run (--established-top 200, ~$1.20, ~40min at 1min/5 - could even do all 2,585 ~$15/~4-5hr).
+Then AD Established profiles are COMPLETE (score+narrative). [Remaining enrichment: belief profiles/ai_overviews,
+top-collaborators, research-themes - separate gen steps. Rising narratives - deferred (old tables). Community -
+Workspace build.]
+
+### 30dg. UX ISSUE (real, worth fixing): card teaser = why_now (truncated, DEAD-ENDS - appears nowhere else, can't expand). Likely defect: why_now displayed ONLY on card. Decide design.
+Garrett dug into the "two narratives": the CARD surfaces why_now (truncated, ellipsis) but that text appears
+NOWHERE ELSE and can't be expanded. He'd assumed card = preview of the detail "Why This Expert" (narrative field) -
+intuitive assumption. Reality: card=why_now, detail=narrative = two different fields. User reads compelling card
+half-sentence -> clicks in -> gets DIFFERENT text. Genuine UX seam. (Consistent w/ NSCLC = intended mapping, but
+questionable design.)
+NOT a bug (consistent field-mapping) but arguably WRONG design. Options:
+  A. Card teaser previews the DETAIL narrative (what Garrett expected): card shows truncated `narrative` (same field
+     as detail Why This Expert) -> clicking expands the SAME thought. Most intuitive. ~1-line (card pulls narrative
+     not why_now).
+  B. Keep card=why_now (a forward-looking "why engage NOW" hook is arguably the BEST card surface - most MSL-
+     actionable), but FIX THE DEAD-END: display full why_now on the DETAIL page too (its own "Why Now" section near
+     "Why This Expert"). The ACTUAL DEFECT = why_now is currently displayed ONLY on the card, truncated, no full
+     version anywhere. Generator writes why_now (paid for) but it only appears as a truncated teaser.
+  C. Leave it (consistent w/ NSCLC, works). But Garrett noticed twice + it bothers him -> worth fixing.
+LEAN: Option B. why_now (engagement hook) IS a good card surface (most actionable "why now"); narrative (bio/creds)
+is right for detail Why This Expert. The defect is why_now has no full-text home -> add a "Why Now" section to the
+detail page so the card teaser expands into something real. Keeps both distinct useful fields, gives the hook a
+payoff. Generator already writes why_now - just not displayed on detail.
+(Applies to NSCLC too = product-wide UX fix, not AD-specific. Verify: is why_now displayed ANYWHERE on the detail
+page currently? If not -> that's the confirmation.)
+NEXT: while narrative top-200 runs, have Claude Code check where why_now is displayed (card only? detail too?) ->
+confirm the dead-end -> decide A vs B -> apply. Then continue enrichment (belief profiles etc).
+
+### 30dh. Field->UI trace: 4 of 5 narrative fields dead-end or invisible for ESTABLISHED. Two root causes. Fix = un-gate Signal Summary + add why_now to detail mapping.
+Claude Code mapped all 5 generator fields -> 2 render surfaces (HCPCard, DetailScreen):
+  - narrative_text: card FALLBACK (why_now ?? narrative); detail PRIMARY "Why This Expert" (renderNarrative,
+    DetailScreen:1350). RENDERS for AD. ✓
+  - why_now: card PRIMARY teaser (3-line clamp, HCPCard:947). Detail "Why Now" block EXISTS (DetailScreen:1387) but
+    NEVER POPULATES - (a) gated to cohort==="rising_star" (:1356) so Established/Community never see it, AND (b)
+    detailResponseToRisingStar mapping (App.tsx:230) OMITS why_now (maps narrative/engagement_angle/caution_flags/
+    signal_strength but not why_now) -> hcp.why_now=null on detail -> guard never fires. DEAD-END everywhere.
+  - engagement_angle: detail "Signal Summary -> Engagement Angle" (:1398) but RISING_STAR ONLY.
+  - caution_flags: detail "Signal Summary -> Caution" (:1409) RISING_STAR ONLY.
+  - signal_strength: detail "Signal:" badge (:1382) RISING_STAR ONLY.
+=> FOR AD ESTABLISHED (+ NSCLC Established + Community): why_now = truncated card dead-end (no full text anywhere);
+engagement_angle/caution_flags/signal_strength = GENERATED (paid for) but RENDERED NOWHERE (Signal Summary is
+rising-star-gated). 4 of 5 fields dead-ended or invisible for Established.
+THE BURIED FIELDS ARE THE MOST MSL-ACTIONABLE: engagement_angle ("how to approach" - Lio's was excellent: study-
+design rigor/comparative-effectiveness/evidence-thresholds) = arguably MOST useful field, INVISIBLE. why_now
+(timeliness hook) teased-not-shown. caution_flags (risk signals) invisible.
+TWO ROOT CAUSES: (a) why_now omitted from detail mapping (App.tsx:230). (b) Signal Summary gated rising_star-only
+(DetailScreen:1356) - should show for established/community too.
+FIX (product-wide, benefits NSCLC too): (1) add why_now to the detail response mapping. (2) un-gate Signal Summary
+(engagement_angle/why_now/signal_strength/caution_flags) for established+community, not just rising_star. Then the
+card teaser has a home AND the buried actionable fields surface. Verify each field renders sensibly per-cohort
+(e.g. established caution_flags often null = fine, hide if empty).
+NEXT: draft the fix (un-gate Signal Summary + add why_now mapping) - makes AD Established profiles genuinely
+complete (narrative + why_now + engagement_angle + signal + caution all visible). Then continue enrichment (belief
+profiles etc). [Narrative top-200 run completing in background meanwhile.]
+
+### 30di. Signal Summary fix APPROVED. 2 small diffs, empty-field-hiding already clean, backward-compat. Nuance: why_now was blank for ALL cohorts (fix helps rising stars too).
+Reviewed both diffs:
+  FIX 1 (App.tsx:230): add `why_now: detail.narrative?.why_now ?? null` to detailResponseToRisingStar mapping. Data
+    was already selected by getHCPDetail + in response type, just dropped in this mapping. Flows through
+    mapRisingStarToHCP (already maps item.why_now) -> hcp.why_now. One line.
+  FIX 2 (DetailScreen:1356): remove ONLY the cohort==="rising_star" gate; keep OR (why_now||engagement_angle||
+    caution_flags) as trigger. Lines 1359-1420 untouched.
+CONCERN (a) EMPTY-FIELD HIDING: already clean, no change needed. Each sub-block independently guarded ({hcp.caution_
+flags && ...} etc) -> null caution_flags renders nothing (no empty label). Section-level OR guard -> "Signal
+Summary" heading never appears with zero body. signal_strength deliberately NOT in section trigger (lone badge w/o
+body would render near-empty section; keeps rising-star behavior identical).
+CONCERN (b) BACKWARD-COMPAT: rising-star section trigger now (why_now||engagement_angle||caution_flags) = IDENTICAL
+to what they already evaluated (they always passed cohort check, OR was the real gate). TA-agnostic/cohort-driven.
+NSCLC rising unchanged; NSCLC established/community GAIN Signal Summary when they have data (additive, never removes).
+NUANCE (Code caught, my assumption was off): rising stars saw engagement_angle/caution_flags/signal_strength but NOT
+why_now - it was dropped in the SAME mapping omission for ALL cohorts. So "Why Now" block was blank for EVERYONE.
+Fix 1 also populates it on rising-star detail (previously dead). ACCEPT - no reason to hide a correct field;
+scoping it out would preserve a bug.
+NET: rising_star gains populated Why Now; established gains full Signal Summary; community gains it (data-dependent).
+No HCPCard change. APPROVED.
+NEXT: apply both -> typecheck (expect 70 baseline, 0 new) + build -> verify on an AD Established profile: Why This
+Expert + Why Now + Engagement Angle + Signal (+ Caution if present) all render. Then continue enrichment. [Narrative
+top-200 run finishing in background.]
+
+### 30dj. Signal Summary fix APPLIED + verified (typecheck 70 baseline / build green). The "new" error was pre-existing :1589 ternary shifted to :1587 (Fix 2 collapsed 3->1 line, -2 lines). AD profiles now show full briefing.
+Both edits in: App.tsx:231 (why_now added to detailResponseToRisingStar), DetailScreen.tsx:1356 (Signal Summary
+cohort gate removed -> renders on why_now||engagement_angle||caution_flags any cohort). Typecheck 70=baseline, 0 net
+new. Build green 6.72s. The apparent "new" TS2322 at :1587 = the pre-existing ScientificNarrativeSection ternary
+error from :1589, shifted up 2 lines by the gate collapse (net -2 lines). NOT new - good catch by Code.
+=> AD Established profiles now render FULL BRIEFING: Why This Expert (narrative) + Signal Summary (Why Now +
+Engagement Angle + Signal badge; Caution hidden when null). Rising-star Why Now block (previously blank for all
+cohorts) now populates too (the accepted additive nuance).
+VERIFY IN BROWSER: (1) does Engagement Angle read well for an Established KOL (debut on Established - was rising-
+star-scoped; confirm tone fits senior figure)? (2) does Why Now show the full text the card teased (dead-end
+resolved)?
+STATE: AD Established profile completeness now = score block + narrative + full Signal Summary. Remaining enrichment:
+Belief Profile (hcp_ai_overviews - TAG "atopic-dermatitis" to match DetailScreen:1589 fix), Top Collaborators (hcp_
+top_collaborators_v2 - pairing step), Research Themes (hcp_research_themes_v2 - extraction). Each = run NSCLC step
+for AD.
+NEXT: verify profile briefing -> narrative run finishing (~193 writing) -> then Belief Profile step (check the tag
+BEFORE generating, like we did narratives). [This session's UX-audit win: surfaced 4 buried fields product-wide.]
+
+### 30dk. Signal Summary WORKS (content excellent) but SIGNAL BADGE OVERFLOWS: signal_strength is a full SENTENCE stuffed in a BADGE component -> horizontal overflow across screen.
+Verified Guttman-Yassky profile: Signal Summary renders. CONTENT EXCELLENT:
+  - Why Now: full text renders (dead-end RESOLVED) - "AD landscape expands with multiple mechanistic classes...".
+  - Engagement Angle: PERFECT Established-KOL tone - "immunopathologic mechanisms distinguishing AD endotypes...
+    therapeutic sequencing/patient stratification... study design standards, endpoint selection, head-to-head
+    evidence." Senior-figure register, MSL-actionable. The previously-invisible field = most valuable on page.
+  - "No reported industry engagement / Greenfield for first-mover MSL relationships" = beautiful honest Pharma-0
+    reframing (opportunity not blank).
+BUG (Garrett caught): the SIGNAL badge OVERFLOWS horizontally across the whole screen (spans both columns, over
+Field Intelligence panel). Text: "SIGNAL: SCIENTIFIC AND NETWORK INFLUENCE SIGNALS ARE BOTH AT THE C...G VERY HIGH
+CONFIDENCE IN". ROOT CAUSE: signal_strength was designed as a SHORT badge label (e.g. "Signal: Strong") but the
+GENERATOR writes it as a FULL SENTENCE (cf Lio sample: "Scientific and Network Influence signals are exceptionally
+strong and mutually reinforcing... high confidence..."). Paragraph-in-a-badge -> overflow. Format mismatch:
+generator output (long-form) vs UI component (short badge). Was masked while rising-star-only IF their signal_
+strength was short; un-gating surfaced it on Established where AD generator produces long-form.
+FIX OPTIONS: (a) frontend - render signal_strength as a normal text block/sentence (not a fixed-width badge) w/
+proper wrapping + overflow handling; treat it like the other Signal Summary prose fields (Why Now/Engagement Angle
+render fine as wrapped text). SIMPLEST + consistent. OR (b) generator - constrain signal_strength to a short label
+(e.g. High/Moderate/Emerging) - but that loses the richer sentence + requires regen. LEAN (a): make the badge a
+wrapping text block like the sibling fields. Also the "SIGNAL:" badge styling (uppercase pill) may need to become a
+labeled prose line.
+NEXT: fix the signal_strength rendering (option a - wrapping text block, not overflow badge). Verify on Guttman-
+Yassky. [Narrative run finishing. Rest of Signal Summary content validated - excellent.]
+
+### 30dl. NARRATIVE RUN COMPLETE: 198 AD Established narratives generated (2 failures ~1%, transient), 34 min, $1.10.
+Full top-200 AD Established narrative run done: 198 generated / 2 failed / $1.10 / 34.1 min. ~all demoable AD
+Established now narrated (Why This Expert + Why Now + Engagement Angle + Signal + Caution-where-present). 2 failures
+= ~1% transient (not systemic). OPTIONAL: re-run same command -> freshness-skips the 198, retries only the 2 (cheap)
+- or just note + move on (198/200 fine for demo). Low priority.
+STATE: AD Established profile completeness = score block + narrative + full Signal Summary content. Only remaining
+visual bug: signal_strength badge OVERFLOW (§30dk, fix in progress - render as wrapping prose not fixed badge).
+Then AD Established narrative/signal layer = DONE.
+REMAINING AD ENRICHMENT (each = run NSCLC step for AD ta_id): Belief Profile (hcp_ai_overviews, TAG atopic-
+dermatitis), Top Collaborators (hcp_top_collaborators_v2), Research Themes (hcp_research_themes_v2). Then AD
+Established fully matches NSCLC depth. (Rising narratives deferred - old-tables script change; Community operational
+narrative - Workspace build.)
+NEXT: (1) apply signal_strength overflow fix -> verify Guttman-Yassky clean. (2) then Belief Profile enrichment
+(check atopic-dermatitis tag BEFORE generating). (3) Top Collaborators. (4) Research Themes. [Consider fresh Code
+session for the belief/collaborators/themes batch - context climbing; state in doc + chips.]
+
+### 30dm. signal_strength overflow fix APPROVED: root cause = flexShrink:0 span in space-between flex row. Fix = render as wrapping prose div like sibling fields.
+Root cause confirmed: signal_strength was a <span> with flexShrink:0 inside a justifyContent:space-between flex row
+-> span doesn't wrap + flexShrink:0 forbids shrinking -> full-sentence value forced row wider than column -> spill.
+FIX: remove the flex row + badge span; render signal_strength as a plain block <div> (fontSize 14, lineHeight 1.5,
+no flex/flexShrink/nowrap/fixed-width) - structurally identical to Why Now/Engagement Angle blocks that already wrap.
+Text wraps at column content-box width. Why Now/Engagement Angle untouched (outside replaced region, own guards).
+Also removes the dead signalStrengthColor helper (only matched high/moderate/early; full sentences fell to default
+-> dead for this data; removal avoids TS6133 unused-fn error).
+Section-guard: added signal_strength to section-level guard (why_now||engagement_angle||caution_flags||signal_
+strength). Accepted - signal_strength always co-occurs w/ the others in real output so renders identically; only
+closes a lone-field edge case. Harmless.
+APPROVED. Apply -> typecheck (70 baseline, 0 new - the removed helper offsets nothing since it was unused) + build
+-> verify Guttman-Yassky Signal Summary renders clean (signal_strength wraps in column, no horizontal bleed).
+=> After this: AD Established narrative/signal layer DONE (score + narrative + full Signal Summary, no overflow).
+NEXT: verify -> then Belief Profile / Top Collaborators / Research Themes enrichment (consider fresh Code session -
+context climbing). Commit accumulated work at a checkpoint.
+
+### 30dn. signal_strength overflow FIXED + verified (renders clean, wraps in column). Content excellent. Minor polish: add yellow left-border accent to Signal Summary to match Why This Expert.
+Verified Guttman-Yassky: Signal Summary renders CLEAN - Signal/Why Now/Engagement Angle all wrap as prose sub-blocks
+in the left column, no horizontal bleed. Overflow bug RESOLVED. Content excellent (Engagement Angle: "immunopatho
+logic distinctions between AD subtypes... trial design, endpoint selection, therapeutic sequencing" = perfect
+Established-KOL register).
+POLISH (Garrett caught): "Why This Expert" has a yellow/gold LEFT-BORDER ACCENT bar; "Signal Summary" does NOT.
+They're PEER narrative sections -> should match visually (currently look like different tiers). FIX: add the same
+left-border accent to Signal Summary, REUSING the exact Why-This-Expert accent styling (same gold color/width/
+padding offset, not a new near-match yellow). Cosmetic, quick.
+=> After this polish: AD Established narrative/signal layer visually DONE + consistent.
+NEXT: apply accent polish -> then COMMIT accumulated work (dedup migration, narrative slug fix, Signal Summary
+un-gate, overflow fix, accent) + push. Then decide: Belief Profile/Collaborators/Themes enrichment (fresh session)
+vs bank the day. Lots done this session - commit is the priority before switching/stopping.
+
+### 30do. Starting BELIEF PROFILE enrichment (hcp_ai_overviews, scientific-positions synthesis -> ScientificNarrativeSection). TAG MATCH is the key risk (trickier than narratives).
+Moving to Belief Profile enrichment for AD top Established. Trace-before-generate (no writes) - the TAG is the whole
+ballgame + trickier than narratives:
+THE TAG COMPLICATION: our morning fix DetailScreen.tsx:1587 passes therapeuticArea={taSlug==="nsclc"?"NSCLC":taSlug}.
+So frontend READS:
+  - NSCLC -> "NSCLC" (uppercase DISPLAY NAME)
+  - AD -> "atopic-dermatitis" (SLUG - falls through ternary else to taSlug)
+= an INCONSISTENCY in the frontend read (NSCLC=display-name, AD=slug). So the generator must write DIFFERENT-format
+tags per TA to match: NSCLC rows tagged "NSCLC", AD rows must be tagged "atopic-dermatitis" (NOT "Atopic Dermatitis"
+display name). If the NSCLC generator writes the display name, the AD equivalent would write "Atopic Dermatitis" ->
+MISMATCH with the frontend's "atopic-dermatitis" read -> belief profile generates but DOESN'T RENDER (same class as
+the narrative slug issue).
+TRACE MUST ANSWER: (1) script name/flags/scoping. (2) EXACTLY what it writes to hcp_ai_overviews.therapeutic_area
+for a TA - display name or slug? (3) does it select AD Established given the null-cohort-column issue? (4) 5-HCP
+test invocation. (5) does the write value == frontend read ("atopic-dermatitis" for AD)? Flag any mismatch.
+POSSIBLE OUTCOME: may need EITHER the generator to write "atopic-dermatitis" for AD, OR reconcile the frontend read
+(make DetailScreen:1587 consistent - e.g. always slug, and tag NSCLC rows by slug too - but that risks NSCLC render).
+Decide after trace. Same trace-before-generate discipline that saved the narrative run.
+NEXT: trace the belief-profile generator -> confirm tag match -> (fix tag/read if needed) -> 5-HCP test -> verify
+renders on Guttman-Yassky belief profile -> full top-200. [After committing the narrative/signal work first.]
+
+### 30dp. Belief Profile trace: BIGGER than narratives. TWO-stage NSCLC-hardcoded pipeline. Tag mismatch confirmed. Needs TA-parameterization of BOTH stages. ~$25-70 for top-100.
+Trace (no writes): Belief Profile = hcp_ai_overviews synthesis_type='scientific_positions' -> ScientificNarrative
+Section. Generator = scripts/narrative/generate_scientific_position_synthesis.py. But it's a TWO-STAGE pipeline,
+both NSCLC-hardcoded:
+  STAGE 1 (extract_scientific_positions.py): reads each HCP's papers, extracts per-paper positions -> hcp_scientific
+    _positions_v1 (tagged by therapeutic_area_id). HEAVY stage: 1 call PER PAPER. Selects top Established from
+    hcp_established_ranks_v3 (scope_type='region', scope_value='US', rank<=100) - the SAME ranks table we deduped
+    this morning, NOT the null cohort column -> works for AD once parameterized. ✓
+  STAGE 2 (synthesis): reads positions_v1 for the TA, synthesizes -> hcp_ai_overviews. Selects ONLY HCPs w/ positions
+    in _v1 for that TA. AD has NONE yet (Stage 1 NSCLC-only) -> STAGE 1 MUST RUN FOR AD FIRST or Stage 2 = 0 AD.
+=> NOT "run NSCLC script for AD" like narratives. TWO AD-adapted stages in sequence.
+TAG MISMATCH CONFIRMED (the check paid off): generator writes hardcoded NSCLC_TA_NAME="NSCLC" (uppercase display
+name, no TA param). Frontend reads "atopic-dermatitis" for AD (:1587 ternary). As-is: NSCLC rows tagged "NSCLC"
+(render), ZERO AD output. Even naively writing display name "Atopic Dermatitis" would still mismatch the slug the
+frontend sends. Same failure mode as narratives.
+BOTH STAGES NSCLC-HARDCODED in multiple places: NSCLC_TA_ID in selection SQL + positions query + Stage2 written tag
++ PROMPT TEXT ("in NSCLC" baked in templates -> would MISLABEL AD investigators). Needs real TA-parameterization,
+not a flag flip. But scripts are CLEAN/reusable (async, dry-run, idempotent) -> "modest adaptation (parameterize ~3
+constants + prompt + tag), not a rewrite" - comparable to narrative work.
+FIX PATH: parameterize NSCLC_TA_ID -> AD ta_id; write tag as "atopic-dermatitis" (slug, per frontend read);
+genericize prompt text (remove "in NSCLC"). Recommendation from Code: (a) write "atopic-dermatitis" to ship AD now,
+(b) log the frontend read inconsistency (:1587 ternary NSCLC=display-name/AD=slug) as debt to reconcile later.
+COST: Stage 1 HEAVY (1 call/paper, ~$0.20-0.60/HCP -> top-100 ~$20-60). Stage 2 cheap (~$5-10/100). Full ~$25-70
+(vs narratives $1.10). Affordable but a real spend + Stage 1 slower. 
+FIRST: verify whether ANY AD rows already exist in hcp_scientific_positions_v1 (Code had no DB access) - confirm
+before costing a full Stage-1 run.
+NEXT: (1) DB check - AD rows in hcp_scientific_positions_v1? (2) draft TA-parameterization of both stages (Code
+offered, no writes). (3) 5-HCP test (Stage1 then Stage2, tag=atopic-dermatitis) -> verify Belief Profile RENDERS on
+Guttman-Yassky. (4) full top-100. Log the :1587/:1574 ternary inconsistency as debt.
+
+### 30dq. AD positions = 0 confirmed (Stage 1 must run fresh). COST estimate suspect - Garrett's instinct: NSCLC didn't cost this much. Read the actual paper-cap before costing.
+DB check: hcp_scientific_positions_v1 for AD = 0 positions / 0 HCPs. Stage 1 runs fresh for AD, confirmed.
+COST FLAG: Garrett doesn't remember NSCLC Belief Profile costing $20-60. Trust that instinct - Code's estimate was
+a ballpark from READING code (per-paper x papers/HCP x 100), not measured. Reasons real cost likely LOWER:
+  1. NSCLC Stage 1 may have been done incrementally over prior sessions -> never a single visible bill.
+  2. The per-paper estimate hinges on the PAPER CAP per HCP (TOP_PAPERS_SQL). If capped at top ~10-20 papers/HCP
+     (not ALL papers), it's 100 HCPs x ~15 papers = ~1,500 modest calls = single-to-low-double-digit $, not $60.
+     Code flagged its own estimate "rough - depends on per-HCP paper cap." That cap is the whole ballgame.
+  3. Idempotent upsert -> re-runs cheap (but first run is the cost).
+=> DON'T cost/run until we READ the actual cap. Check: (1) paper cap per HCP in TOP_PAPERS_SQL (top N or all?), (2)
+model + max_tokens per call, (3) full vs truncated abstracts. Then a GROUNDED estimate for AD top-100. Also: any
+record of what NSCLC Stage 1 actually cost / how many calls?
+HUNCH (aligned w/ Garrett's memory): extraction scripts almost always cap papers/HCP (don't need all 300 of
+Silverberg's papers - top ~15-20 recent/cited capture his positions). Likely much less than $20-60.
+NEXT: read the paper cap -> grounded cost -> then parameterize both stages (backward-compat NSCLC) -> test-5 ->
+decide scope -> run. [Still: log the :1587 ternary frontend-read inconsistency as debt.]
+
+### 30dr. COST RECONCILED via past-chat search: Garrett's memory correct. Belief Profile reads PRE-STORED abstracts, ~$25 (not $20-60). Paper cap ~10/HCP confirmed.
+Garrett recalled the enrichment was based on abstracts ALREADY in the DB for the TA. CONFIRMED via past chats
+(July 7 NSCLC pilot that established this pipeline):
+  - Corpus = 1,296 abstracts total (822+474) ALREADY INGESTED (not re-fetched live).
+  - Extraction ~$0.015/abstract on ~1,600-char abstracts -> ~$20 for extraction.
+  - Synthesis = 189 calls (1 per HCP w/ papers) -> ~$5.
+  - TOTAL ~$25 one-time for full Top-100 x Top-100 NSCLC pilot. Runtime 30-45 min.
+  - PAPER CAP: pilot design "extract all 10 [papers/HCP], let synthesis weight them"; citation skew noted (top 3-4
+    papers carry messaging weight). So ~10 papers/HCP cap confirmed.
+=> Garrett RIGHT: enrichment reads PRE-STORED abstracts; extraction is 1 call/abstract at ~$0.015; capped ~10/HCP.
+Code's $20-60 estimate was TOO HIGH - it reasoned "1 call/paper up to N" without knowing (a) abstracts are pre-
+stored (no live fetch) and (b) the ~10/HCP cap. GROUNDED cost from Garrett's own pilot: ~$25 for full top-100, NOT
+$20-60. Cost is NOT a constraint (was never meant to be).
+ALSO recovered design context: Belief Profile = the "scientific positions / publication messaging" layer. Per-paper
+STRENGTH weights statements (authority-weighted aggregation = the differentiated moat, needs the HCP graph).
+Cohort asymmetry productized in synthesis prompt (Established="established positioning" 8+ papers / "focused" 3-7;
+Rising="emerging voice" 5+ / "early footprint" 1-4; 0 papers = don't render). AD scientific advisor is load-bearing
+for the paper-strength rubric + statement typology.
+=> This changes the Stage-1 concern: Code said "Stage 1 must run for AD, extracts positions per paper" - but if AD
+abstracts are already ingested (they should be - AD corpus was built), Stage 1 reads THOSE, ~$0.015 each, capped
+~10/HCP. NOT a heavy live-fetch. Confirm AD abstracts are in the DB (they should be from the AD ingestion) -> then
+Stage 1 for AD top-100 ~$20, Stage 2 ~$5.
+NEXT: confirm AD abstracts present in DB (publication_authors_v2 / abstracts table for AD). Then the cost is ~$25
+as Garrett remembered. Proceed w/ parameterization + test-5 (cost non-issue). Verify the ~10-paper cap in the
+actual Stage-1 SQL.
+
+### 30ds. AD corpus confirmed: 19,047 AD pubs w/ abstracts (publications_v2.abstract, source_therapeutic_area_id). Ample. Cost hinges ENTIRELY on the paper cap.
+Schema: abstracts in publications_v2.abstract; TA link = publications_v2.source_therapeutic_area_id (or publication_
+therapeutic_areas_v2 join). AD = 19,047 pubs with abstracts. Ample corpus (Stage 1 has plenty to extract from).
+(Note: publications_v2_ad_contaminated_backup exists - Stage 1 must read publications_v2 CLEAN, not the backup.)
+COST REALITY - the cap is everything: 19,047 is the AVAILABLE corpus. If Stage 1 extracted ALL -> ~$285. But it
+CAPS at top ~10 papers/HCP for top-100 HCPs -> ~1,000 abstracts (w/ dedup maybe fewer) x $0.015 = ~$15 extraction +
+~$5 synthesis = ~$20 total. Matches Garrett's ~$25 memory. THE CAP is what keeps it $20 not $285 -> confirming the
+actual cap value in Stage-1 SQL is critical (difference between $20 and $285 run).
+=> DON'T run Stage 1 unbounded over 19,047. The top-N-papers-per-top-N-HCPs scoping is the cost control. Verify the
+exact cap (TOP_PAPERS_SQL) + HCP selection (top-100 from deduped ranks_v3) before running.
+NEXT: Code reads Stage-1 SQL -> exact paper cap + HCP-count + grounded cost (should be ~$20). Parameterize both
+stages (backward-compat NSCLC; AD tag "atopic-dermatitis"; genericize prompt, PRESERVE cohort-asymmetric framing).
+Test-5 -> verify Belief Profile RENDERS on Guttman-Yassky -> full top-100 (~$20-25). AD advisor load-bearing for
+paper-strength rubric/typology (recovered §30dr) - NSCLC-validated pipeline is a reasonable start.
+
+### 30dt. Belief Profile toolkit FULLY READ. Cost ~$15 (Garrett right). TWO key findings beyond cost: Stage 1 NOT idempotent; SOFT prompt contamination (NSCLC drug exemplars) = quality risk needing AD-specific rework (advisor load-bearing).
+Full read of both scripts (self-contained, all prompts inline). PIPELINE: publications_v2.abstract -> [Stage 1
+extract, 1 call/paper] -> hcp_scientific_positions_v1 (atomic positions) -> [Stage 2 synthesize, 1 call/HCP] ->
+hcp_ai_overviews -> ScientificNarrativeSection (Belief Profile).
+STAGE 1: HCP selection get_target_hcps (2 ranks queries deduped, --limit default 200, --cohort). ESTABLISHED_HCPS_
+SQL reads hcp_established_ranks_v3 (region/US, rank<=100) - immune to null-cohort issue. PAPERS: TOP_PAPERS_SQL
+reads publications_v2 (CLEAN, p.abstract) JOIN publication_authors_v2. Filters: pub_year>=2020, abstract>=800 chars,
+senior OR first author, cap rn<=PAPERS_PER_HCP=10. Extraction prompt asks "up to 5 distinct positions" (claim author
+ADVANCES, not bare findings). Typology: position_type (positive/cautionary/unmet_need/hypothesis) x position_
+category (efficacy/patient_selection/biomarker/safety/resistance/sequencing/access/diagnostics/methodology). Drug
+normalization: NONE (free-text). confidence 0-1. Validation before write. 
+*** STAGE 1 NOT IDEMPOTENT: plain INSERT no ON CONFLICT -> re-run APPENDS duplicate positions. Clean re-run needs
+DELETE existing TA rows first. (Matters: test-5 then full run would duplicate the 5.) ***
+STAGE 2: selects HCPs purely position-driven (whoever Stage 1 populated), no cohort/rank filter. Aggregates ->
+3-bucket (strongly_advocates/frequently_raises/research_focus) + corpus_depth (Deep>=5/Focused>=3/Signal). Weighting
+PROMPT-DIRECTED not computed (hands model citation+author_role, instructs weight by recency/citations/authorship,
+confidence rubric 0.50-0.98). Output body JSON -> hcp_ai_overviews. IDEMPOTENT (ON CONFLICT (hcp_id, synthesis_type,
+therapeutic_area) DO UPDATE). Writes therapeutic_area = NSCLC_TA_NAME = "NSCLC" (line 534) -> AD needs "atopic-
+dermatitis" (slug, per frontend read).
+COST GROUNDED: model claude-sonnet-4-6 (older id - candidate upgrade, separate decision). Stage 1: <=100 HCP x <=10
+papers, 800-char/2020/senior-first filter leaves ~6-8 papers/HCP -> ~650-800 calls, ~$0.012-0.015/call -> ~$8-12,
+SLOW (sequential, ~25-45 min). Stage 2: <=100 calls ~$0.04-0.05 -> ~$4-6, fast (concurrency 8). AD top-100
+Established ~$12-18 (~$15). Both cohorts (200 HCP) ~$25-40. PAPERS_PER_HCP=10 = primary cost lever. GARRETT'S ~$25
+MEMORY CONFIRMED (Code's original $20-60 corrected).
+*** TWO CLASSES OF NSCLC HARDCODING: (a) HARD constants/SQL (ta_id, tag) - mechanical to parameterize. (b) SOFT
+PROMPT CONTAMINATION - "NSCLC" word + NSCLC DRUG EXEMPLARS (durvalumab/pembrolizumab/SABR/EFS/amivantamab/TTD) baked
+in BOTH extraction + synthesis prompts. Left unchanged -> tells model AD investigators work in NSCLC + seeds theme-
+naming w/ lung-cancer drugs -> BIASES extraction + MISLABELS AD experts. This is a QUALITY item, not cosmetic. AD
+needs AD exemplars (dupilumab/upadacitinib/EASI-75/IGA/itch) - AD ADVISOR LOAD-BEARING here (recovered §30dr). ***
+FULL HARDCODE SURFACE mapped (Stage 1: lines 3,32,145,159,213,257,265,412; Stage 2: lines 34,35,257/300/320,260/303/
+323,278-279,387,401,534).
+PARAMETERIZATION DECISIONS (when we draft): (1) TA constants + tag format ("atopic-dermatitis"). (2) prompt de-
+contamination (AD-neutral or AD-specific exemplars - advisor input ideal). (3) --ta flag vs config lookup. (4)
+Stage-1 idempotency (add ON CONFLICT / delete-first, else re-runs dup). (5) model upgrade? (separate).
+NEXT: decide parameterization approach. KEY QUESTION for Garrett: prompt de-contamination - go AD-neutral now (strip
+NSCLC exemplars, generic) to ship, and refine w/ advisor later? Or wait for advisor input on AD exemplars/typology
+before running? Cost non-issue ($15) so no rush from that angle.
+
+### 30du. NSCLC precedent recovered: B (AD-specific exemplars) IS the robust approach = Garrett writes AD position examples (as he did for NSCLC). Typology is TA-agnostic (his design); only EXAMPLES are TA-specific. Ship founder-authored now, advisor validates later.
+Past-chat search on how NSCLC was done:
+  FACT 1: the NSCLC prompt exemplars came from GARRETT, not invented by Claude. He wrote (July 7): Positive="Perio
+    perative durvalumab improves EFS and pCR"; Cautionary="EGFR-mutant disease remains a challenge despite check
+    point advances"; Unmet Need="STK11/LKB1 tumors require novel combinatorial approaches." These seed the model
+    with the SHAPE of a position (drug + endpoint + polarity). NSCLC-specific -> mislead for AD.
+  FACT 2: the TYPOLOGY is TA-AGNOSTIC and Garrett designed it. He renamed layer -> "Scientific Positions"; framework
+    = positions/hypotheses/beliefs/concerns/evidence stances w/ polarity (positive/cautionary/unmet-need). General
+    ontology; only the EXAMPLES are NSCLC.
+  FACT 3: NSCLC pilot SHIPPED with Garrett's own exemplars; advisor was for STRESS-TESTING/refinement later, not a
+    prerequisite to run. Precedent = FOUNDER-AUTHORED exemplars now, advisor validates later.
+=> "B is most robust" CONFIRMED + clarified: B = Garrett writes AD position examples (as he did for NSCLC), swapped
+into the prompt in place of the NSCLC exemplars. Robustness = his domain expertise seeding AD exemplars. NOT
+guessing - doing for AD what he already did for NSCLC. Doesn't need advisor to START (didn't for NSCLC).
+AD EXEMPLARS Garrett would provide (his field): Positive e.g. "Dupilumab achieves durable EASI-75 in moderate-severe
+AD"; Cautionary e.g. "JAK inhibitor safety signals warrant careful patient selection" (upadacitinib/abrocitinib
+boxed warnings); Unmet Need e.g. "H2H biologic comparisons + long-term remission data remain limited." (Garrett to
+finalize the actual exemplars.)
+=> APPROACH: B. Parameterize hard constants (ta_id, tag="atopic-dermatitis") + REPLACE NSCLC position exemplars w/
+Garrett-authored AD exemplars in BOTH prompts + de-NSCLC the framing text + make Stage 1 idempotent (ON CONFLICT or
+delete-first). Backward-compat NSCLC. Then test-5 -> verify renders + reads AD-accurate -> full top-100 (~$15).
+NEXT: Garrett provides the AD position exemplars (positive/cautionary/unmet-need, + any category examples) -> Code
+parameterizes both scripts w/ them -> review diffs -> test-5.
+
+### 30dv. CORRECTION (Garrett): the NSCLC prompt exemplars were NOT founder-authored. Garrett is not a scientist. The EXTRACTED positions are abstract-derived (correct); the prompt EXEMPLARS are teaching-examples (likely Claude/Cursor-written when pipeline built). De-contamination should NOT require Garrett to author clinical claims.
+CORRECTION to §30du: Garrett clarified he did NOT create the NSCLC position exemplars and is not a scientist -
+thought positions were derived from abstracts. HE'S RIGHT, and I conflated two things:
+  1. EXTRACTED POSITIONS (the output) ARE abstract-derived: Stage 1 reads each real abstract, extracts THAT paper's
+     actual positions. Heymach's positions came from Heymach's papers. Correct - this is the moat.
+  2. PROMPT EXEMPLARS (in the instructions) are a DIFFERENT thing: 2-3 illustrative examples baked into the prompt
+     template to show the model the SHAPE of a position. NOT extracted - teaching examples. The "durvalumab/EFS"
+     text Code found. Likely written by Claude/Cursor when the pipeline was built (NSCLC examples b/c NSCLC was the
+     TA), NOT founder-authored. In the July 7 chat Garrett described positions CONCEPTUALLY while designing the
+     feature - not authoring production prompt exemplars.
+=> REVISED APPROACH: Garrett does NOT need to author AD clinical claims (he's not a scientist; shouldn't assert
+statements he can't stand behind). De-contamination options:
+  (a) TA-NEUTRAL/STRUCTURAL exemplars: replace NSCLC drug examples with generic structural ones showing the SHAPE
+     (drug + endpoint + polarity) WITHOUT naming specific drugs/claims. Model derives real AD content from real AD
+     abstracts. SAFEST - no founder clinical authorship, no NSCLC bias. LEAN THIS.
+  (b) AD exemplars from the ADVISOR (not Garrett) - if we want AD-specific teaching examples, they come from the
+     load-bearing AD advisor, later. 
+  (c) AD exemplars pulled FROM the AD abstracts themselves (a few real extracted AD positions as examples) - but
+     circular (need to run first).
+DECISION: go (a) TA-neutral/structural exemplars now - de-NSCLC the prompt without requiring Garrett to invent
+clinical claims. Extraction quality comes from the real abstracts + the (TA-agnostic) typology. Advisor can refine
+with AD-specific exemplars later (the NSCLC precedent: ship now, advisor refines). Cost/quality both fine.
+NEXT: parameterize both scripts - hard constants (ta_id, tag "atopic-dermatitis") + REPLACE NSCLC exemplars w/ TA-
+NEUTRAL structural ones (not founder-authored AD claims) + de-NSCLC framing + Stage 1 idempotency + backward-compat
+NSCLC. Test-5 -> verify AD positions extract sensibly from real abstracts + Belief Profile renders. Then full top-100.
+
+### 30dw. Belief Profile parameterization REVIEWED - excellent. Per-TA registry (TA_CONFIGS), TA-neutral exemplars, tag=atopic-dermatitis, Stage-1 idempotency, NSCLC byte-for-byte. Approve -> test-5.
+Code parameterized both scripts via a per-TA REGISTRY (TA_CONFIGS keyed by --ta, default nsclc) - better than
+constant-swapping, works for any TA. Review:
+  1. REGISTRY: nsclc entry reproduces original strings VERBATIM (byte-for-byte identical render); atopic-dermatitis
+     entry has own ta_id (9e4139d2), tag, exemplars. Backward-compat by construction. ✓
+  2. EXEMPLARS TA-NEUTRAL (per §30dv correction): AD finding_position_example = "active arm achieved higher response
+     rate than comparator at primary endpoint" -> "magnitude and durability support this approach as preferred
+     option for target patient population." NO drug names, NO specific clinical claims - teaches the SHAPE only.
+     biomarker_examples = "disease-relevant molecular or serologic markers" (not PD-L1/ctDNA). Garrett authors
+     nothing clinical; model extracts real positions from real AD abstracts. ✓
+  3. TAG: Stage 2 AD entry writes tag="atopic-dermatitis" (comment "slug, matches frontend read"). ✓ THE key item.
+  4. STAGE-1 IDEMPOTENCY: DELETE_POSITIONS_FOR_HCP_TA_SQL clears HCP's existing positions before re-insert, INSIDE
+     the per-HCP transaction (committed per HCP). Fresh run = no-op delete; re-run REPLACES not duplicates. Nuance
+     (Code flagged honestly): changes NSCLC RE-RUN behavior (replaces vs duplicate-appends) = CORRECTING a latent
+     bug, not altering clean-run results. ✓
+  5. BACKWARD-COMPAT 3 ways: nsclc entry original ta_id/tag; default --ta nsclc; every prompt placeholder renders
+     NSCLC's exact original text. Typology (position_type x position_category) + corpus-depth framing (deep/focused/
+     signal) untouched (TA-agnostic). ✓
+  6. Stage-2 theme-naming exemplars neutralized (AD "Good" = generic strategy names "Combination Maintenance
+     Strategy"/"Biomarker-Guided Selection"; "Bad" = anti-pattern naming a drug, no NSCLC drugs). ✓
+  7. --ta flag added to both (choices from TA_CONFIGS.keys(), default nsclc). ta_id threaded through selection/
+     prompt/write in both stages.
+Code offered: could later move registry to config/therapeutic_areas/*.json to generalize (kept inline per "AD is
+additive"). Good future note, not now.
+=> APPROVE. Apply -> test-5: Stage1 --ta atopic-dermatitis --cohort established --limit 5 --dry-run then real
+(idempotent), sanity-check rows in hcp_scientific_positions_v1 for AD -> Stage2 --ta atopic-dermatitis --limit 5
+--dry-run then real, confirm hcp_ai_overviews rows synthesis_type='scientific_positions' + therapeutic_area='atopic-
+dermatitis' -> VERIFY Belief Profile RENDERS on Guttman-Yassky + reads AD-sensible. NSCLC regression: one --ta nsclc
+--dry-run per script, diff prompt vs pre-change to prove byte-identity. Then full top-100 (~$15).
+NEXT: apply + test-5. Watch: do the neutral exemplars produce good AD position extraction from real abstracts (the
+quality test)?
+
+### 30dx. DEMO VIDEO to re-record (Garrett) - but AFTER enrichment complete, not now. Signal Summary + full enrichment stack = the demo-worthy profile.
+Garrett realized the un-gated Signal Summary (Why Now + Engagement Angle) is a major surface the current demo/intro
+video doesn't show -> wants to possibly re-record. RECOMMENDATION: log it, re-record AFTER the AD enrichment batch
+is complete, NOT now. Reasons:
+  1. The LIVE app already has Signal Summary (mentor live click-throughs reflect it); only the RECORDED video is
+     stale. Urgency depends on what the video is for (async first-touch vs live walkthrough).
+  2. Re-recording now = capturing an INCOMPLETE profile (Belief Profile/Collaborators/Themes not yet populated for
+     AD). Would want to re-record AGAIN once enrichment lands. Record ONCE at the end.
+  3. The demo-worthy profile = the COMPLETE stack: score + narrative + full Signal Summary + Belief Profile + Top
+     Collaborators + Research Themes (as rich as NSCLC). Recording before enrichment done undersells it.
+DECISION: re-record demo/intro video ONCE, after AD enrichment batch complete (Signal Summary + Belief Profile +
+Collaborators + Themes all populated + rendering). Definite to-do, not now. (Also: does the video use NSCLC or AD?
+If NSCLC, the Signal Summary improvement already applies there too - could record either TA's complete profile.)
+NEXT: continue Belief Profile enrichment (test-5 running). Demo re-record queued for after the enrichment batch.
+
+### 30dy. Belief Profile test-5: applied + AD extraction quality EXCELLENT (the neutral-exemplar bet paid off) + NSCLC byte-identity PROVEN. Stage 1 running.
+Diffs applied to both scripts (compile clean). Results:
+  *** AD EXTRACTION QUALITY EXCELLENT - the key uncertainty resolved: real AD-specific positions grounded in
+  abstracts - "pediatric AD underdiagnosis, severity-tool caution (PtGA vs POEM), rural access gaps" - correct
+  typology (unmet_need_position/diagnostics, cautionary_position/diagnostics, positive_position/patient_selection)
+  + ZERO NSCLC contamination. The TA-NEUTRAL exemplars worked: model extracted real, specific, clinically-sensible
+  AD positions from real abstracts; Garrett authored nothing clinical; AD-accurate b/c grounded in papers. The
+  neutral-exemplar approach VALIDATED. ***
+  NSCLC BYTE-IDENTITY PROVEN: Code wrote a zero-API prompt-render harness, diffed before/after - all 4 NSCLC prompts
+  (Stage1 extraction + Stage2 deep/focused/signal) render byte-for-byte identical (empty diff, exit 0). Stronger
+  than a live dry-run, cost nothing. NSCLC provably untouched.
+  De-contamination confirmed: "atopic dermatitis" framing, zero NSCLC/amivantamab/TTD/PD-L1 leak (grep -c = 0).
+  AD selection works (hcp_established_ranks_v3, null-cohort dodged). Stage 1 idempotent write to hcp_scientific_
+  positions_v1.
+PRACTICAL: run is sequential + output block-buffered (Python->file) -> ~12-15 min for 5 HCPs, progress hidden until
+done. Code waiting for completion (not polling buffered file). Background job bswnb91sk.
+NEXT: Stage 1 finishes -> Code shows a couple ACTUALLY-WRITTEN positions (from DB) -> Stage 2 (dry-run then real,
+tag atopic-dermatitis) -> VERIFY Belief Profile renders on Guttman-Yassky + reads true to her known AD positions
+(Garrett gut-check) -> full top-100 (~$15). NOTE FOR FULL RUN: sequential Stage 1 is SLOW (~19 papers/5min) -> top-
+100 Stage 1 could be ~1-2 hrs. Background it.
+
+### 30dz. Belief Profile test-5 COMPLETE + confirmed. 249 positions (healthy polarity spread), 5 profiles all depth=deep, genuine AD themes, tag=atopic-dermatitis on all 5. Verify render on Guttman-Yassky.
+Stage 1 (extract): 5 HCPs, 50 papers, 249 positions, 0 errors. Polarity spread 119 positive / 58 unmet-need / 41
+cautionary / 31 hypothesis - HEALTHY realistic mix (not all-positive = genuine positions, not cheerleading). AD-
+specific, correctly typed (severity-tool discordance, underdiagnosis, methodology cautions), zero NSCLC leak.
+Stage 2 (synthesize): 5 Belief Profiles, all depth=deep, 0 errors. Themes = genuine AD concepts: "Beyond-Severity
+Burden Assessment", "Skin Barrier Therapeutic Targeting", "Psychodermatology Adjunctive Benefit" - thematically
+named (not drug-named, anti-pattern guard held), calibrated confidence + real evidence links. The differentiated
+"what does this investigator advocate" output, working for AD.
+TAG correct on all 5: therapeutic_area='atopic-dermatitis' (matches getScientificNarrativeForHcp / DetailScreen
+taSlug for AD). Top-5 = real AD KOL roster (Silverberg, Guttman-Yassky, Simpson, Eichenfield, Lio). Guttman-Yassky
+(rank 2) has a profile -> verification target.
+=> VERIFY (Garrett): Guttman-Yassky Belief Profile - (1) section renders (Deep Corpus badge, confidence meter,
+strongly-advocates/frequently-raises/research-focus buckets)? (2) reads TRUE to her (AD immunopathology/endotyping
+figure - founder gut-check, "is this actually her")?
+TWO HOUSEKEEPING (Code): (1) Guttman-Yassky's stored name uses Unicode hyphen U+2010 not ASCII - detail render by
+hcp_id unaffected, but name SEARCH w/ normal hyphen might miss. Separate data-hygiene item, log it. (2) scripts
+applied but NOT committed - commit after Garrett confirms render ("Belief Profiles: parameterize scientific-positions
+pipeline by --ta; AD support + idempotent Stage 1").
+NEXT: verify render + gut-check -> commit the 2 scripts -> full top-100 run (Stage 1 sequential ~1-2hr, BACKGROUND
+it; Stage 2 fast after). Then Top Collaborators + Research Themes remain.
+
+### 30ea. OPERATIONAL RULE (Garrett): run LONG enrichment jobs directly in Garrett's terminal, NOT as Code background jobs. Live progress vs buffered blackout.
+Garrett: future long runs should be in the terminal so we see progress/duration/ETA. CORRECT - a real limitation
+surfaced today:
+  - Code background job (output redirected to file) = BLOCK-BUFFERED -> progress doesn't flush until stage finishes.
+    Code flew blind ("still on first HCP after 90s, output won't appear until done"). No live progress/ETA/rate for
+    a 1-2hr job = bad (can't tell healthy vs stalled vs erroring until done).
+  - Garrett running directly in his terminal (the narrative run) = STREAMED LIVE: "Progress: 125/200 | success=123
+    failed=2 | rate=0.1/sec | ETA=12.9 min". Full visibility, watch failures, know completion, can Ctrl-C.
+RULE: LONG enrichment/generation runs (narratives, Belief Profile Stage 1, future TA pipelines) -> Garrett runs
+them DIRECTLY in his terminal (python scripts/...) for live progress + ETA + failure count + abort control. Code is
+for the CODE (parameterize, trace, review, fix) + short/verifiable runs; the multi-min/multi-hr GENERATION runs go
+in Garrett's terminal. (If Code must run one, use unbuffered: python -u, or PYTHONUNBUFFERED=1, so output streams -
+but Garrett's terminal is the better default for visibility.)
+=> APPLIES NOW: the full Belief Profile top-100 run - Garrett runs it in his terminal (python scripts/narrative/
+extract_scientific_positions.py --ta atopic-dermatitis --cohort established, then generate_scientific_position_
+synthesis.py --ta atopic-dermatitis) to watch Stage 1's ~1-2hr progress live, rather than Code backgrounding it.
+NEXT: Garrett runs full Belief Profile in terminal (live progress). Parity analysis (read-only) can run in Code in
+parallel.
+
+### 30eb. Verified: Code WAS already running full Belief Profile Stage 1 (job bkivbkcyk, 15:58:29, ~9/100 HCPs, 409 positions, healthy). Garrett right to check first (would've been 2 racing processes). DECISION: A - leave it running.
+Garrett asked "are we sure Code isn't already doing this?" - GOOD catch. Code verified (checked process + DB twice):
+YES it's running the full top-100 Stage 1 (bkivbkcyk, started 15:58:29, no --limit, actively writing hcp_scientific
+_positions_v1). Live proof: AD positions 249/5HCPs (test-5) -> 409/9HCPs, rank order, idempotent-replacing test-5 +
+extending. Stage 2 queued (auto-launch when Stage 1 done). test-5 job (bswnb91sk) separate/complete.
+=> Starting a 2nd Stage 1 in Garrett's terminal would RACE: two processes delete+insert same HCPs -> lost/half-
+written HCPs + double spend. Confirmed don't.
+DECISION: A - leave Code's run going. Rationale: already 9% done + healthy (killing = throw away progress + re-spend);
+visibility benefit smaller for THIS run (Code gives stage-boundary notifications + manual progress reads); the
+terminal-visibility RULE (§30ea) applies to NEXT runs, not retroactively worth a kill+restart. Stage 2 is fast
+(doesn't need terminal); Collaborators/Themes/future TAs = where the terminal rule kicks in.
+LESSON REINFORCED: verify state before acting (Garrett caught me prescribing a terminal run without confirming Code
+wasn't already running it - the exact assume-don't-verify failure we avoid). Also: I lacked visibility into Code's
+in-flight jobs - always ask Code for status before starting parallel work on the same resource.
+NEXT: A (Code finishes Stage 1 -> auto Stage 2, notifies at boundaries). Parity analysis (read-only, §30 revised
+4-column prompt both cohorts) runs in Code in PARALLEL - won't touch the running job. Then verify Guttman-Yassky
+Belief Profile renders (may already be visible from test-5).
+
+### 30ec. PARITY MATRIX (live-DB measured) = AD definition-of-done. AD Established near-done (cleaner than NSCLC on core layers); AD Rising ENTIRELY UNBUILT (one blocker: rising scoring chain never ran).
+Code built a live-DB parity matrix (4 cols: NSCLC Est, AD Est, NSCLC Rising, AD Rising). KEY FINDINGS:
+HEADLINE: AD Established essentially DONE + CLEANER than NSCLC on core authority layers (98-99% vs NSCLC 57-58%) -
+because AD used the TA-anchored 2,586-KOL cohort vs NSCLC's looser 11,390 LEGACY set. NOT apples-to-apples; AD does
+NOT need to "catch up" to NSCLC's lower %. AD data quality arguably BETTER on foundational layers.
+AD ESTABLISHED remaining (the near-done column):
+  1. Belief Profiles - FINISHING NOW (job bkivbkcyk, Stage 1 ~12 HCPs in, 559 positions; Stage 2 auto-follows). ⏳
+  2. Top Collaborators - 0, GAP. Needs collaborator-extraction run for AD (feeds detail-page collaborator panel).
+     NET-NEW RUN.
+  3. Research Themes - 0, GAP. Needs theme generator for AD. NET-NEW RUN.
+  4. Narratives - 198 (intended top-KOL slice; NSCLC-parity IS a slice not 100% -> effectively done).
+  5. Web signals / Medicare / Open Payments - structurally sparse (AD ~82% intl, US-gated), DISPLAY-ONLY, NOT
+     blockers (per scoring doctrine: pharma weight-0/display-only).
+  => AD Established = Belief Profiles (finishing) + Collaborators + Themes. TWO net-new runs. That's it.
+AD RISING - entirely UNBUILT (biggest chunk): 0 HCPs scored. 3,234 rising_eligible candidates EXIST but the RISING
+SCORING CHAIN NEVER RAN for AD. ENTIRE Rising column blocked on that ONE step. Fix: run scoring_pipeline.py (rising)
+-> hcp_rising_star_ranks_v3 -> network_momentum -> unblocks column; then same overlays (narratives/Belief Profiles/
+themes) as Established. = ONE coherent workstream (one blocker + downstream cascade), not scattered gaps.
+HOW TO READ %: full-cohort layers (classification/pub-leadership/network/author-metrics) should approach 100% (AD
+Est does 98-99%); overlay layers (Belief/narratives/themes/web-signals) are top-KOL BY DESIGN -> low % expected even
+when "done", judge by top-N depth not cohort %; US clinical/commercial (Medicare/OpenPayments) coverage-capped by
+US fraction (AD ~82% intl -> low = structural not defect); NSCLC's own gaps (58% pub-leadership, legacy classif) =
+its larger un-anchored denominator, NOT a bar AD must match.
+NOTE the Rising data-model wrinkle (from §30cy): the OLD rising chain (scoring_pipeline rising -> hcp_rising_star_
+ranks_v3 + network_momentum) is what parity measures - but AD Rising was ALSO discussed as living in the NEW model
+(hcp_rising_composite_v1/scientific_emergence_v1) w/ a frontend repoint pending. RECONCILE: which rising model is
+canonical for AD? The scoring chain to run + the frontend repoint must target the SAME model. Clarify before running
+AD Rising.
+Code offered to save the matrix as docs/AD_PARITY_CHECKLIST.md - YES, track it in repo.
+NEXT: let Belief Profile finish (Stage 1 -> Stage 2). Then AD Established: Collaborators run + Themes run = DONE.
+AD Rising = separate coherent workstream (scoring chain + overlays + frontend repoint; reconcile old vs new model
+first). Decide: continue vs bank (huge day).
+
+### 30ed. Parity checklist saved to docs/AD_PARITY_CHECKLIST.md (108 lines, 4-col matrix + punch-list + reading guide, dated 2026-07-10, Belief Profiles mid-generation at snapshot). Committing ("docs: AD enrichment parity checklist vs NSCLC"). Running docs published for Garrett to save locally.
+End-of-day-session checkpoint before Garrett's evening break. Belief Profile Stage 1 (bkivbkcyk) still running
+healthy: 559 positions / ~12 HCPs in; Stage 2 auto-follows. Parity checklist committed + pushed. Running docs
+(TA_BUILD_DEBT.md through here) published to outputs for local save.
+STATE AT BREAK: AD Established near-complete (Belief Profiles finishing in background; Collaborators + Themes = 2
+net-new runs remain). AD Rising entirely unbuilt (one blocker: rising scoring chain; reconcile old vs new rising
+model first). All committed + pushed on ad-frontend-established (not deployed). Demo re-record queued for post-
+enrichment.
+PICKUP WHEN BACK: (1) verify Belief Profile finished (Stage1+Stage2) -> Guttman-Yassky Belief Profile renders +
+reads true (founder gut-check). (2) AD Est: Top Collaborators run + Research Themes run. (3) AD Rising workstream
+(resolve model question first). (4) demo re-record. (5) merge to foundation-rebuild to go live (after enrichment).
+
+### 30ee. BELIEF PROFILE FULL RUN COMPLETE (both stages, 0 errors). 87/87 profiles, tagged atopic-dermatitis. 30.8 positions/HCP matches NSCLC baseline 35.1 (Gate 14 holds at scale). Idempotency held (test-5 replaced not duped).
+Full AD Established Belief Profile build done + clean (ran during the Umbra session):
+  STAGE 1: 100 HCPs (ranks 1-100) -> 2,676 positions across 87 DISTINCT HCPs, 0 API errors. 13 HCPs had no
+    papers clearing the >=800-char/2020+/senior-or-first filter (expected - thinner lower-ranked KOLs; data-
+    coverage fact not a failure). Polarity: 874 positive / 649 unmet-need / 596 hypothesis / 557 cautionary.
+  STAGE 2: 87/87 Belief Profiles written, 0 errors, tagged atopic-dermatitis, zero empty bodies. Corpus-depth:
+    56 deep / 14 focused / 17 signal_moment (RIGHT shape - top ranks rich corpora=deep, thinner=conservative
+    signal framing; validates the cohort-asymmetric framing we preserved).
+  IDEMPOTENCY HELD AT SCALE: test-5 HCPs cleanly REPLACED not duplicated (first real at-scale test of delete-
+    before-reinsert - PASSED).
+GATE 14 CHECK (vs tonight's NSCLC baseline 35.1 positions/HCP): AD full = 2,676/87 = 30.8/HCP = in the NSCLC band
+(test-5's ~50 was the top-5 densest KOLs, as predicted). Polarity shape matches NSCLC (positive largest). Gate 14
+HOLDS on the full run, not just test-5. Cost ~$15 as grounded.
+Pipeline scripts already committed (d91e8e4). AD_PARITY_CHECKLIST.md updated (Belief Profiles row hourglass->done 87)
+but UNTRACKED - commit pending ("docs: AD enrichment parity checklist vs NSCLC + Belief Profiles complete").
+=> AD ESTABLISHED enrichment status: authority layers 98-99%, ranks deduped, narratives 198, Signal Summary
+un-gated, BELIEF PROFILES DONE (87). Remaining: Top Collaborators (0) + Research Themes (0) = 2 net-new runs
+(Themes has the tag-match risk - Gate 15 - therapeutic_area TEXT must = frontend read).
+NEXT: (1) VERIFY Guttman-Yassky Belief Profile renders + reads TRUE (founder gut-check - the last validation on the
+moat layer). (2) commit the parity checklist. (3) then Collaborators + Themes (trace-before-generate the themes tag).
+
+### 30ef. REGRESSION on server restart: Guttman-Yassky shows "Unclassified" + WHOLE profile collapsed (no Why This Expert, no Signal Summary, no Belief Profile, no score block). This afternoon she rendered FULLY (§30dj/dk). Likely: dev server restarted on WRONG BRANCH (pre-fix code).
+After localhost server was closed + restarted, Guttman-Yassky detail page shows "Unclassified - this HCP is in our
+database but hasn't met cohort criteria. Available data shown below." = the OLD pre-fix behavior. NONE of today's
+enrichment renders (no narrative, no Signal Summary, no Belief Profile, no Established score block). Only Engagement
+Mix + Publication Timeline show.
+This is a REGRESSION not a missing-data issue: she rendered FULLY this afternoon (§30dj score block classified,
+§30dk full Signal Summary) + Belief Profile written to DB tonight (§30ee, 87/87 tagged atopic-dermatitis, DB-verified).
+Data is intact in DB. The FRONTEND reverted to pre-fix behavior.
+"Unclassified - hasn't met cohort criteria" is EXACTLY the pre-fix symptom (§30-series score-block bug): detail page
+derived cohort from global hcps_v2 column (NULL for indication-scoped HCPs). The FIX made it derive from presence in
+hcp_established_ranks_v3. Seeing pre-fix behavior => running pre-fix CODE.
+MOST LIKELY ROOT CAUSE: dev server restart landed on the WRONG BRANCH (not ad-frontend-established which has today's
+fixes - maybe foundation-rebuild/main/other). Without the score-block cohort-derivation fix, she reverts to
+Unclassified, and narrative/signal/belief sections all gate off cohort -> total collapse.
+CHECK: `git branch --show-current` + `git status`. If not ad-frontend-established -> `git checkout ad-frontend-
+established` -> restart dev server -> she should render fully again (data's all in DB). If ON the right branch ->
+deeper investigation (did a rebuild/HMR break, is the RPC returning her cohort, etc).
+NEXT: confirm branch. Fix = checkout correct branch + restart. Then re-verify Guttman-Yassky renders full profile
+incl Belief Profile + reads true.
+
+### 30eg. Guttman-Yassky IS in ranks_v3 (global rank 1 + US rank 1) but frontend says "Unclassified" = CONTRADICTION. Also she moved 2->1 since this afternoon = ranks table CHANGED. Not stale build (branch confirmed). Investigate what recomputed ranks + why read path misses her.
+git branch confirmed ad-frontend-established (code fixes present, committed). So NOT a wrong-branch issue.
+DB check: Guttman-Yassky (f5a0351e) IS in hcp_established_ranks_v3 for AD - global rank 1, US rank 1. Only 2 rows
+(not duplicated - dedup held). BUT: she was rank 2 this afternoon (behind Silverberg), now rank 1. => THE RANKS
+TABLE CHANGED since this afternoon. Something recomputed established ranks tonight.
+THE CONTRADICTION: data says established-rank-1 (both scopes), UI says "Unclassified - hasn't met cohort criteria."
+Can't both be right on correct code. Points to: frontend read path not finding her rank despite it being there.
+CANDIDATES:
+  1. A rank recompute fired tonight (recompute_established_ranks_v3?) - Belief Profile READS ranks (to select top-
+     100) it doesn't WRITE them, so something ELSE ran. Check: did Code trigger a recompute? "1 commit ahead of
+     origin" - what's that commit?
+  2. Detail page reads cohort from pre-fix path (global hcps_v2 column) not hcp_established_ranks_v3 -> fix not in
+     running code despite being on branch (stale build still possible - hard-refresh not yet confirmed).
+  3. .maybeSingle() on global scope: original dedup bug (§30cx) was dup global rows -> maybeSingle returns null ->
+     rank renders null. She's NOT duplicated now (only 2 rows), so this specific bug isn't recurring - but if the
+     read expects a specific scope_value shape and the recompute changed it, could miss.
+KEY DIAGNOSTIC: computed_at on her rank rows. If tonight -> something recomputed (investigate what). If this
+afternoon -> ranks stable, problem is purely frontend (stale build/cache -> hard-refresh).
+NEXT: (1) check computed_at + whether the recompute was intended. (2) hard-refresh browser (Ctrl+Shift+R) - still
+not confirmed done. (3) if she's rank 1 in DB but Unclassified in UI after hard-refresh -> the read path is the bug
+(is the score-block fix actually reading ranks_v3? verify the running code). Investigate before assuming.
+
+### 30eh. Ranks are July-8 stable (computed_at 2026-07-08 18:16:34) - NO recompute tonight; Claude misremembered her as "rank 2 this afternoon" (she's been global+US rank 1 since the 8th). Hard-refresh did NOT fix. => running frontend not executing the score-block fix despite branch being correct.
+computed_at = 2026-07-08 18:16:34 (both rows). So ranks STABLE since Jul 8, nothing recomputed tonight. Claude's
+"she was rank 2 this afternoon" memory was WRONG - she's been rank 1 global+US since the 8th. No mystery recompute;
+that thread CLOSED. Data has been correct+stable throughout (rank 1, one row/scope).
+Hard-refresh did NOT fix the Unclassified render. So RULED OUT: wrong branch (confirmed ad-frontend-established),
+changed/bad data (stable, rank 1), browser cache (hard-refresh no-op).
+REMAINING EXPLANATION: the RUNNING dev server isn't executing the score-block fix - she's rank 1 in ranks_v3 but the
+detail page can't classify her. Fix is COMMITTED on branch but running server not reflecting it. Causes to check in
+order:
+  1. STALE DEV SERVER PROCESS (most likely): Vite started BEFORE the fix commit / before checkout -> serving old
+     bundles. A browser refresh won't help (server serves stale code). FIX: fully KILL the Vite process (Ctrl+C,
+     confirm dead) + `npm run dev` fresh + hard-refresh.
+  2. Fix not actually in the running file: have Code confirm the score-block cohort-derivation fix (derive cohort
+     from presence in hcp_established_ranks_v3 when taId passed, not the global hcps_v2 column) is present + trace:
+     for an AD HCP IN ranks_v3 but NULL in global hcps_v2 cohort col, does the read classify established or
+     unclassified?
+  3. EDGE CASE - her global row scope_value=NULL: if the read filters on scope or .single()/.maybeSingle() mishandles
+     the null-scope global row, it misses her rank even though present (same SHAPE as the original dedup bug §30cx;
+     she's not duplicated now but the null-scope read could still mishandle).
+LEAN: kill-and-restart dev server (1) first - "branch right, files right, UI old" = classic stale server process.
+NEXT: fully stop Vite -> npm run dev fresh -> hard-refresh. If classified -> stale process was it. If STILL
+unclassified on clean restart -> read-path edge case (2/3), have Code trace why the fix isn't firing for her null-
+scope-global row.
+
+### 30ei. RESOLVED: stale Vite dev-server process was serving old bundles. Full kill + `npm run dev` restart brought the score-block fix back into running code -> Guttman-Yassky renders fully incl Belief Profile. Data was correct throughout.
+The Unclassified regression (§30ef-eh) = a STALE VITE PROCESS (started before the fix commit) serving old compiled
+bundles. Browser hard-refresh couldn't fix it (server-side stale, not browser cache). Full kill + npm run dev fresh
+-> Guttman-Yassky renders fully again (score block classified + Signal Summary + BELIEF PROFILE). Data/branch/ranks
+were correct the entire time.
+LESSON (operational): after committing frontend fixes, a browser refresh is NOT enough - the Vite DEV SERVER must be
+restarted to pick up committed changes if it was running from before. "Branch right + files right + UI shows old
+behavior + hard-refresh no-op" = stale dev-server process -> kill Vite, npm run dev fresh. (Add to Part II verify-in-
+browser discipline: ensure the dev server was started AFTER the code under test.)
+ALSO logged: Claude misremembered her as "rank 2 this afternoon" - she's been global+US rank 1 since Jul 8 (computed_
+at proved it). Verify timestamps, don't trust recollection of ranks.
+=> BELIEF PROFILE fully validated end-to-end: 87/87 built, tagged, RENDERING on Guttman-Yassky. Remaining: founder
+gut-check (does it read TRUE to her?) + commit parity checklist + Collaborators + Themes.
+NEXT: (1) the founder domain-truth read of Guttman-Yassky's Belief Profile - is it genuinely HER? (2) commit AD_
+PARITY_CHECKLIST.md. (3) Collaborators + Themes runs (trace themes tag first).
+
+### 30ej. Belief Profile FOUNDER GUT-CHECK PASSED (Guttman-Yassky reads legitimate). Deep Corpus, 10 papers/50 positions. Specific to HER real work (single-cell, tape-strip, CCL17/TARC, IL-13/JAK1). Advocacy-vs-caution split working. Advisor read still ideal for the definitive domain-truth nod.
+Guttman-Yassky Belief Profile renders + Garrett's gut-check = "looks legitimate." Analysis of WHY it holds:
+  - SPECIFIC TO HER real work (not generic AD): "single-cell and tape-strip approaches", "CCL17/TARC", "tape strip
+    RNA sequencing as scalable alternative to skin biopsy", "IL-13 and JAK1 inhibition" - maps to her genuine
+    signature (molecular endotyping, minimally-invasive profiling, translational mechanism->trial bridge). Generic
+    would say "advocates biologics"; this cites her METHODS = real abstract extraction.
+  - POLARITY SPLIT doing real work: Strongly Advocates = positive positions (JAK1 efficacy, biomarker frameworks);
+    Frequently Raises = her CAUTIONS/unmet-needs (dose-dependent tolerability, biomarker validation gaps, long-term
+    evidence gaps >16wk for JAK inhibitors). Captures a serious scientist advancing a therapy AND flagging limits =
+    not cheerleading. Sophisticated field-accurate concerns.
+  - Deep Corpus badge (correct for her stature), 50 positions/10 papers = 5/paper (at cap, thorough).
+  - Every position "Supported by N publications" + View sources = the MOAT working (grounded in her actual papers,
+    traceable). No publication-count competitor can replicate.
+FOUNDER GUT-CHECK: PASSED (smell test). CAVEAT (per Umbra constitution Art V - domain-truth validation stays human/
+expert): Garrett is not the AD domain expert; the DEFINITIVE nod on the moat layer should come from the AD ADVISOR
+before customer-facing. Nothing looks wrong; the advisor read is the deeper validation (catch overstatement/missing
+themes neither Garrett nor Claude would). Not blocking; queue advisor review of Belief Profiles.
+=> BELIEF PROFILE COMPLETE + validated (founder-level). Moat layer built for AD Established.
+NEXT: (1) commit AD_PARITY_CHECKLIST.md. (2) queue advisor review of AD Belief Profiles (definitive domain-truth).
+(3) Top Collaborators + Research Themes runs (trace themes tag first - Gate 15).
+
+### 30ek. CONCERN (Garrett): platform surfaces only 19 US Established AD HCPs. Diagnose kind-of-problem BEFORE fixing. Likely: nppes_practice_state bottleneck (US filter needs practice-state; only ~31% NPPES match) stacking on AD's 82%-intl skew - NOT a small roster.
+Garrett's concern: only 19 US Established AD HCPs surface - too low for a workable MSL roster. Take seriously but
+DIAGNOSE which problem (data vs frontend-surface - just spent an hour where data was fine but UI showed nothing).
+DIAGNOSTIC 1 - real US Established count in ranks:
+  SELECT COUNT(DISTINCT hcp_id) FROM hcp_established_ranks_v3 WHERE therapeutic_area_id='9e4139d2...' AND scope_type=
+  'region' AND scope_value='US';
+  -> if ~19: constraint upstream (classification/practice-state). If hundreds: "19" is frontend/filter artifact.
+PRIOR (from this week): AD ~82% intl (why pharma display-only, NPI ~31%, US clinical structurally sparse). Small US
+count PARTLY reflects genuinely intl-heavy AD leadership. BUT 19 feels too low even for 82%-intl -> suspect a 2nd
+stacking factor:
+  THE nppes_practice_state BOTTLENECK: territory/US filtering reads hcps_v2.nppes_practice_state DIRECTLY (Part II
+  §7h). NPPES matching only succeeded ~31% of US clinical HCPs (Gate 6). So "US Established" in the FRONTEND may be
+  gated on "has practice_state" not "is US+established" -> if only a fraction of AD US Established KOLs got an NPI/
+  practice-state match, surfaced count COLLAPSES though many more are genuinely US-based established. LIKELY CULPRIT:
+  not 19 US Established HCPs, but 19 with the practice-state field the US filter requires.
+DIAGNOSTIC 2 - US-by-country vs has-practice-state:
+  SELECT COUNT(*) FILTER (WHERE h.country='US') AS est_country_us, COUNT(*) FILTER (WHERE h.nppes_practice_state IS
+  NOT NULL) AS est_with_practice_state FROM hcp_established_ranks_v3 r JOIN hcps_v2 h ON h.id=r.hcp_id WHERE r.
+  therapeutic_area_id='9e4139d2...' AND r.scope_type='global';
+  -> if est_country_us >> est_with_practice_state (e.g. 150 vs 19): bottleneck = NPPES practice-state population, NOT
+  roster. FIX = practice-state backfill (known tractable gap: state-derivation step §PLAYBOOK, NPPES match rate),
+  NOT re-scoring/re-ingesting.
+NEXT: run both diagnostics. Determine: (a) real US Established roster size, (b) whether practice-state is the gate.
+Then decide fix (practice-state backfill vs deeper). Don't assume 19 is the true roster.
+
+### 30el. "19 US Established" was a FILTER/DISPLAY ARTIFACT - real US Established roster = 447. Practice-state gap real: 447 US-by-country but only 153 have nppes_practice_state (294 invisible to STATE-based territory filters). Dashboard now shows full roster (post Vite restart).
+Diagnostics: US Established (region rank) = 447 distinct HCPs. US-by-country = 447; with nppes_practice_state = 153.
+=> "19" was NEVER the roster. Real US Established AD = 447. Dashboard screenshot (post Vite restart) shows a FULL
+roster (Guttman-Yassky, Simpson, Eichenfield, Lio, Paller, Yosipovitch, Abuabara, Feldman, Shi, Sidbury, Margolis,
+Alexis, Kim, Steinhoff, Silverberg J+N, Brunner, Hebert, Bunick, Estrada... 24+ visible, more scrolling). Healthy.
+TWO SEPARATE THINGS:
+  1. THE 447-vs-153 PRACTICE-STATE GAP (real, tractable): all 447 in ranks, but only 153 have nppes_practice_state.
+     A STATE-based territory filter can only place 153; the other 294 are US-by-country w/ no state -> invisible to
+     state-specific territory views. This is the NPPES ~31% match rate (Gate 6) manifesting. 294 US Established AD
+     HCPs invisible to state territory filtering.
+  2. "WHERE DID 19 COME FROM?" - neither 447 nor 153. Candidates: (a) count under a SPECIFIC STATE selected in the
+     territory filter (19 = one state's roster); (b) a COUNT BADGE reading a different table than the feed
+     (getTACounts reads _scores_v2 vs feed _ranks_v3 - can disagree, Part II §7h); (c) STALE VITE bundle pre-restart
+     (same bug that hid Guttman-Yassky §30ei) - now fixed. LIKELY (a) or (c) given dashboard now shows full roster.
+DECISIONS:
+  A. PRACTICE-STATE BACKFILL (fixes the 294): populate nppes_practice_state for more US Established via the state-
+     derivation step (institution->state mapping, PLAYBOOK) + better NPPES matching. Known bounded task. Gets more
+     of the 447 into state territory views.
+  B. FILTER FALLBACK (faster, product decision): should the US/territory filter require practice-state at all? For
+     intl-heavy AD, gating on an NPPES CLINICAL match drops US-based ACADEMICS/researchers who are legit US+
+     established but lack/didn't-match an NPPES record. Fall back to country='US' when practice_state null -> surface
+     the real US roster now, before backfill. Smaller frontend change.
+NEXT: (1) pin down what "19" actually was (select a state? count badge? stale?) - probably resolved by the restart.
+(2) decide practice-state backfill (A) and/or filter-fallback (B) for the 294 without state. Neither is urgent -
+447 roster is healthy + surfacing.
+
+### 30em. CORRECTION: the dashboard DOES render exactly 19 cards (Claude miscounted "24+"). So 19 is REAL + reproducible POST-restart, NOT a stale ghost. Hard contradiction: DB 447 US Established, feed renders 19. Find where 447->19 collapses. Likely a FEED LIMIT/PAGINATION (the 19 are the TOP-19 by rank) or the "Territory (US-intel)" filter.
+Garrett corrected: image has exactly 19 HCP cards (Claude's "24+" was a sloppy miscount - apologized). So "19" is
+REAL, reproducible AFTER the Vite restart - not a stale-bundle artifact. Retract §30el's "full roster surfacing"
+conclusion.
+HARD CONTRADICTION: hcp_established_ranks_v3 = 447 US Established AD; frontend feed renders 19. 428 dropped between
+ranks table and rendered feed.
+KEY CLUE: the 19 shown are the TOP-19 BY RANK (Guttman-Yassky #1, Simpson, Eichenfield, Lio, Paller, Yosipovitch,
+Abuabara, Feldman, Shi, Sidbury, Margolis, Alexis, Kim, Steinhoff, Silverberg, Brunner, N.Silverberg, Hebert,
+Bunick, Estrada - top ranks in order, then STOPS). Top-N-then-stops STRONGLY suggests a LIMIT/PAGINATION cutoff, NOT
+a data filter (a filter would scatter, not truncate the top). Also NOT simply practice-state (that'd show 153 not 19).
+Screenshot: "Territory (US-intel)" filter toggled ON.
+FUNNEL to diagnose: 447 US Established -> 153 with practice-state -> 19 rendered. What cuts 153->19 (or 447->19)?
+Candidates: (a) FEED LIMIT/page-size resolving to 19 (most likely given top-19-by-rank); (b) "Territory (US-intel)"
+filter intersecting to a narrow set; (c) practice-state AND something else.
+DIAGNOSTICS: (1) confirm 447 (done). (2) confirm 153 w/ state (done). (3) distribution of the 153 by state (ORDER BY
+n DESC) - if scattered summing to 153, 19 is a FRONTEND cap not a state count. 
+CODE TRACE (parallel): the get_established_filtered (or the Immunology->AD Established feed) RPC - what's its LIMIT/
+page-size? does "Territory (US-intel)" cap it at 19? why 447->19: pagination vs practice-state vs territory filter?
+Show the feed query + limit/filter params.
+NEXT: run state-distribution SQL + Code feed-trace IN PARALLEL. Pin whether it's a feed limit (likely) or a filter.
+The top-19-by-rank pattern = probably a limit/page-size bug or a hardcoded cap.
+
+### 30en. DIAGNOSIS: the 447->19 collapse is a FEED LIMIT/PAGINATION cap, NOT a filter. State distribution scatters across ~29 states (CA 24/NY 20/TX 10...) summing to 145 - NO single state has 19. So 19 != a state count + != practice-state (145). The feed renders top-19-by-rank then stops = a limit.
+State distribution of the 145 US Established w/ practice-state: CA 24, NY 20, TX 10, MD 9, IL 8, PA 8, FL 7, OH 6,
+MA 6, CT 5, ... 29 states, sum 145. NO state = 19. (Note: with_state now 145 not 153 - minor drift, immaterial here.)
+=> CONCLUSION: "19" is the FRONTEND FEED CAPPING at ~19 (top-19 by rank then stops). NOT a state count, NOT the
+practice-state filter (145), NOT a scattered data filter (would not truncate the top cleanly). It's a LIMIT/
+PAGINATION on the feed. The 447 roster is real + correctly ranked; the feed just doesn't render past ~19.
+WHY 19 SPECIFICALLY (odd for a hardcoded limit - expect 20/25/50): (a) LIMIT 20 with an off-by-one or 1 row dropped
+for a null field -> 19; (b) page-size 20, first page minus 1; (c) "Territory (US-intel)" filter intersecting the
+feed requiring some field that ~19 of top-20 have; (d) literal hardcoded cap. Code trace will pin it.
+practice-state 145/153 = RED HERRING for this bug (matters for state-territory PLACEMENT, not the feed cap).
+CODE TRACE (fire this): the AD Established US feed RPC / query for Immunology->AD w/ Territory(US-intel) on - find
+the LIMIT / page-size / any cap; why does it render ~19 of 447? Is it LIMIT 20 (off-by-one), pagination page-size,
+or the territory filter requiring a field? Show the query + limit/filter/pagination params + whether pagination/
+"load more" exists.
+NEXT: Code trace to find the exact cap. Likely a one-line fix (raise/remove limit, fix pagination, or fix the
+territory-filter intersection). 447 roster is healthy - purely a feed-rendering cap. THIS is the real "only 19"
+bug + it's tractable.
+
+### 30eo. REFRAME (Garrett caught it): feed shows Guttman-Yassky in #1 CARD position but she's US rank #2 - the true US #1 (Silverberg) is MISSING from the feed. So it's a FILTER DROPPING SPECIFIC HCPs, not just a count limit. The dropped #1 is the key.
+Garrett: the cards show Guttman-Yassky at the top but she's US rank #2 (Silverberg is US #1 per Gate 10: Silverberg,
+Guttman-Yassky, Simpson, Eichenfield...). If the #1 (Silverberg) is absent/not-at-top, the feed is DROPPING specific
+HCPs, not merely capping count. This reframes "19": maybe not top-19-by-limit but "the 19 who PASS SOME FILTER, in
+rank order" - and the filter drops the #1.
+WHAT DROPS SILVERBERG SPECIFICALLY? He HAS an NPI (1831325521, GWU/DC, verified Gate 6) - but did his nppes_practice_
+state populate? Candidates for the dropping field: (a) nppes_practice_state NULL (feed requires state -> drops the
+~302 without it, AND if Silverberg's state didn't populate he drops despite having an NPI); (b) some display field
+(headshot/score component/column) the feed requires; (c) territory filter requiring US-intel data.
+UNIFYING HYPOTHESIS: the feed requires nppes_practice_state (or similar), showing only top-ranked HCPs who HAVE it.
+447 US Established -> ~145 with practice-state -> the top ~19 of those by rank render. Silverberg (#1, possibly null
+state) drops -> Guttman-Yassky (#2, NY ✓) becomes first card. This ties count + missing-#1 together: it's a PRACTICE-
+STATE (or similar field) REQUIREMENT in the feed, not a limit.
+DIAGNOSTIC (run): top-25 US Established by rank WITH practice_state + country:
+  SELECT r.hcp_id, h.full_name, r.rank, h.nppes_practice_state, h.country FROM hcp_established_ranks_v3 r JOIN
+  hcps_v2 h ON h.id=r.hcp_id WHERE r.therapeutic_area_id='9e4139d2...' AND r.scope_type='region' AND scope_value=
+  'US' ORDER BY r.rank LIMIT 25;
+  -> compare to the 19 cards. HCPs in query but NOT on dashboard = the dropped ones. If they share a null field
+  (practice_state?) = THE FILTER. If Silverberg #1 has null practice_state + is missing -> confirmed: feed requires
+  practice-state, drops #1.
+=> This is likely the SAME root as the "19": a field-requirement filter, not a limit. Code's feed trace + this SQL
+converge. If confirmed, the fix (Option B from §30el) = feed should NOT require practice-state (fall back to country=
+US), which simultaneously restores the #1 AND expands 19->fuller roster.
+NEXT: run the top-25 SQL, compare to dashboard, confirm the dropped field. Pair w/ Code's feed trace.
+
+### 30ep. ROOT CAUSE FOUND (Code, empirical): TWO stacking bugs = 447->19. Practice-state was a RED HERRING (confirmed). Bug A: count RPC reads wrong table (v2 not v3) -> AD count=0 -> Load-More gated off -> feed frozen at page-1 (20). Bug B: industry filter substring "roche" eats "University of Rochester" (rank 18) -> 20-1=19.
+Code traced the feed empirically (ran count+rows RPCs vs DB). "19" = page-size 20 frozen by Bug A, minus 1 Rochester
+false-positive (Bug B). NOT a limit, NOT practice-state (red herring - confirmed), NOT the territory filter.
+BUG A (the real cap): two RPCs point at DIFFERENT tables. get_established_filtered (ROWS) reads hcp_established_ranks
+_v3 ✓ (447 AD rows). get_established_filtered_count (TOTAL) still reads hcp_established_ranks_v2 ✗ (0 AD rows). The
+migration 2026_05_28_get_established_filtered_v3.sql repointed the ROWS fn to v3 but NEVER the COUNT fn (body still
+FROM hcp_established_ranks_v2 er, verified via pg_get_functiondef). AD built into v3 ONLY -> count returns 0. NSCLC
+has v2 rows so its count works -> why this never surfaced until AD. Downstream: getEstablished->fetchCohortViaRpc
+sets feedTotal=data.total=0. Load-More gated by hcpList.length < feedTotal (App.tsx:911) -> 19<0 = false -> NO
+pagination -> feed frozen on page 1 (20 rows).
+BUG B (the -1): rows RPC returns 20 (ranks 1-20). Client-side INDUSTRY_PATTERNS filter (api.ts:232) drops any
+institution containing a pharma substring - list includes bare token "roche" (api.ts:675). Matches "University of
+Rochester Medical Center" (rank 18) -> KOL wrongly filtered as industry. 20-1=19. Over-filters EVERY page (Code
+flagged 76/447 as "industry" - unknown share are Rochester-style false positives).
+=> "19" = 20 (page-1, frozen by A) - 1 (Rochester false-pos, B). Garrett's missing-#1 catch = Bug B dropping ranked
+HCPs via substring false-positive (proved it was a filter not a clean limit - he was right).
+PRACTICE-STATE RED HERRING confirmed: "US-intel"=national territory -> states=[] -> p_states=ARRAY[]::text[] -> the
+RPC's (cardinality(p_states)=0 OR ...) short-circuits TRUE -> NO practice_state filter applied. The 19 are global
+top-by-rank (1-20), not a state subset. practice-state (145/447) only bites if a REGIONAL territory is selected (and
+even then count RPC still returns 0 - same v2 bug).
+THE FIXES: Bug A (the real one): repoint BOTH get_established_filtered_count overloads to hcp_established_ranks_v3
+(one-word table swap mirroring the rows fn) -> restores total=447 + Load-More. CHECK community/rising count RPCs for
+the same missed-repoint. Bug B: make industry match token/word-boundary aware (or drop bare "roche") so it stops
+eating "Rochester" (+ watch similar substrings).
+NEXT: (1) fix Bug A (count RPC v2->v3 repoint migration) - restores 447 + pagination. (2) fix Bug B (industry
+substring word-boundary) - stops dropping Rochester + audit the other 76 flagged industry for false positives. (3)
+verify feed shows full 447 in correct rank order w/ Silverberg #1. (4) CHECK rising/community count RPCs for the same
+v2/v3 miss.
+
+### 30eq. Both fixes AUDITED + APPROVED. Bug A = Established-count-only (Rising/Community count RPCs verified consistent - NOT affected). NSCLC safe (2885 v2==v3 identical). Bug B blast radius = only 1 false-pos (Rochester, 4 HCPs); other 72 real pharma. Apply both.
+Code audited (empirical) + proposed diffs:
+BUG A AUDIT: rows/count table consistency per cohort: Established rows=v3/count=v2 = MISMATCH (the bug); Rising v3/v3
+= ok; Community v2/v2 = ok. => Established-count-ONLY. My "check rising/community" worry resolved correctly (Code
+verified, didn't assume - they're internally consistent). NSCLC SAFETY VERIFIED: established US count 2885 in BOTH
+v2 and v3 (identical) -> repoint v2->v3 leaves NSCLC unchanged (2885), fixes AD (0->447), and makes NSCLC's count
+consistent (was silently reading a different same-numbered table). AD Rising/Community rank tables empty (0 rows) ->
+feeds empty for real data reason, count RPCs correctly return 0 (consistent w/ parity checklist, not a bug).
+BUG B BLAST RADIUS: 76 flagged HCPs span 9 institutions; only ONE false-positive: "roche" in "University of
+Rochester Medical Center" (4 HCPs). Other 8 patterns (pfizer 17/regeneron 15/sanofi 12/abbvie 11/eli lilly 11/
+incyte 3/iqvia 2/astrazeneca 1) all REAL pharma/CRO, word-boundary-safe. Word-boundary fix frees exactly 4 Rochester
+HCPs, keeps all 72 genuine drops. Low risk, precisely scoped. (NOT the product-wide issue I feared - only "roche"
+leaked.)
+DIFFS: Bug A - both count overloads: hcp_established_ranks_v2 er -> _v3 er, same signatures, CREATE OR REPLACE (no
+DROP), standalone/no-txn/no-- comments, NOTIFY pgrst included. Bug B - word-boundary regex BUILT FROM the existing
+INDUSTRY_PATTERNS list (list stays source of truth, no churn), .some(includes)->.test() at both call sites (api.ts
+:238 rising + :248 established/community). \b...\b escaped -> "roche" won't match "Rochester".
+APPROVED both. Order: Bug A (migration via direct DB connection) then Bug B (frontend edit + typecheck/build).
+VERIFY: Bug A - AD count RPC 0->447, NSCLC 2885 unchanged, frontend "Load 20 More" appears (19<447 now true). Bug B
+- typecheck 70 baseline/build green, Rochester's 4 no longer flagged, rank-18 Rochester KOL renders, feed 19->20 on
+page 1. THEN full verify: feed shows 447 across pages, correct rank order, SILVERBERG #1.
+NEXT: apply both -> verify 447 + Silverberg #1 + Load More paginates. This was the real "only 19" bug (Garrett's
+concern fully vindicated: wrong count AND wrong #1).
+
+### 30er. Bugs A+B fixed (Load More appeared, Rochester KOL back = +1) BUT unmasked a THIRD bug: "Load 20 More" added only 1 card (not 20), and Silverberg (#1) STILL missing. => the ROWS RPC only returns ~21 rows total, not 447. Count(447) and rows(~21) now disagree the OTHER way. A filter on the ROWS query cuts 447->~21, dropping Silverberg.
+After applying A+B + server restart: Bug A worked (Load More button appeared - count now 447 un-froze it). Bug B
+worked (Rochester KOL back = +1 card). BUT:
+  1. Guttman-Yassky STILL #1, Silverberg (true US #1) STILL missing -> dropped by something OTHER than the Rochester
+     substring bug (separate cause).
+  2. "Load 20 More" added only 1 card (page 1 had 20 -> now 21), NOT 20. => the ROWS RPC page 2 returned ~1 row then
+     dried up. The rows query is returning ~21 TOTAL, not 447.
+=> THIRD BUG: count RPC (repointed to v3) correctly returns 447, but the ROWS RPC only delivers ~21 rows. They now
+disagree the OTHER way (count 447 / rows ~21). A FILTER on the ROWS query cuts 447->~21 and drops Silverberg (#1).
+The rows RPC applies a restriction the count RPC doesn't (they were already proven to differ - read different tables
+pre-fix; may differ in MORE than the table - joins/filters/where-clauses).
+NOT practice-state (US-intel=national -> p_states=[] -> no practice-state filter per Code §30ep). So what does the
+ROWS query require that count doesn't? Candidates: (a) an INNER JOIN in rows that filters (e.g. joins a table only
+~21 AD HCPs have a row in - a score component? a display table? headshot/enrichment?); (b) a WHERE clause in rows
+absent from count; (c) rows joins hcps_v2 or another table on a condition that excludes most.
+DIAGNOSTIC: dump BOTH get_established_filtered (rows) and get_established_filtered_count definitions and DIFF their
+FROM/JOIN/WHERE - the rows fn has an extra restriction. Also: run the rows RPC directly for AD US with p_limit=500
+p_offset=0 - how many rows? (should be 447; bug if ~21). And check what Silverberg's hcp_id has/lacks that the ~21
+shown have (the joined/filtered field).
+NEXT: Code dumps + diffs the two RPC bodies (rows vs count) to find the extra filter/join in ROWS. Run rows RPC
+directly (limit 500) to confirm it returns ~21 not 447. Find what the ~21 share that the other ~426 (incl Silverberg)
+lack. THAT field/join is bug #3. (Count fix was necessary but revealed the rows query was ALSO restricted.)
+
+### 30es. Bug #3 ROOT CAUSE: loadMore (App.tsx:533) OMITS taId from its filters object -> getEstablished falls back to TA_ID_MAP['immunology'] = PARENT Immunology ta_id (0 Established rows) -> Load More fetches empty page. Rows RPC is INNOCENT (returns 447, Silverberg #1). Silverberg NOT dropped - browser is running a STALE BUNDLE.
+Code diagnosed empirically. THE ROWS RPC IS FINE: ran directly limit 500 -> 447 rows, Silverberg rank 1 PRESENT,
+top roster correct (#1 Silverberg/GWU, #2 Guttman-Yassky, #3 Simpson). am join is LEFT non-filtering; no INNER join,
+no extra WHERE. My "rows has extra filter" hypothesis WRONG (Code checked, didn't assume).
+REAL BUG #3: loadMore queries the WRONG TA. Initial load (App.tsx:499) filters={...taId, indicationTaId} (has taId).
+loadMore (App.tsx:533) filters={therapeuticArea, region, states, themeIds} - taId MISSING. getEstablished does
+taId=filters.taId ?? TA_ID_MAP[taSlug]; taSlug=taLabelToApiSlug('Immunology')='immunology' -> loadMore falls back
+to the PARENT Immunology ta_id (4cf07827) which has 0 Established rows (AD is UNDER immunology but the immunology
+ta_id itself has no HCPs). So Load More fetches an EMPTY page. "~21" = 20 (correct AD page 1) + ~0 (broken page 2).
+= a direct TA-SCOPING BUG (PLAYBOOK §7f parent-vs-indication ta_id), hiding in loadMore instead of initial fetch.
+Initial load was fixed to pass indication ta_id; loadMore was MISSED (the "find them ALL" lesson - like narrative
+slug's 2 read sites).
+SILVERBERG MYSTERY RESOLVED: he is NOT dropped. Live RPC shows him #1. Garrett sees Guttman-Yassky #1 -> BROWSER
+RUNNING STALE BUNDLE (same stale-Vite issue as §30ei tonight). Live query = Silverberg #1; rendered page = Guttman-
+Yassky #1 -> browser not running current code. (Rochester false-pos = Lisa Beck rank 18, NOT Silverberg - he was
+never filtered.)
+FIX #3 (one line): loadMore filters object add taId: indicationTaId (already in scope; initial load uses it).
+Makes Load More query AD (447) not Immunology (0).
+ALSO: grep other getEstablished/getCommunity/getRisingStars call sites (+ other loadMore/pagination paths) for the
+same taId omission - this parent-fallback could lurk in community/rising load-more too.
+NEXT: (1) apply fix #3 (loadMore taId). (2) HARD server restart + hard refresh (stale bundle is why Silverberg looks
+missing - he's #1 in the data). (3) verify: Silverberg #1, Load More adds 20 (real page 2), pages through 447. (4)
+grep other pagination call sites for taId omission. (5) commit A+B+C together.
+
+### 30et. All 3 feed fixes COMMITTED (0dcc0d1). Audit: taId omission was loadMore-ONLY; its filters object is SHARED across established/community/rising branches -> the one fix covers all 3 cohorts' pagination. Verify in browser after CLEAN restart (B+C ship in the bundle - stale bundle = why Silverberg looked missing).
+Committed 0dcc0d1 "fix(feed): AD Established feed shows all 447, not 19" (3 files +62/-3):
+  A - count RPC repoint (both overloads -> ranks_v3): applied live to DB + committed as migration. AD 0->447, NSCLC
+    2885 unchanged.
+  B - INDUSTRY_REGEX word-boundary (\b, both call sites): frees Rochester (Lisa Beck rank 18), keeps real pharma.
+  C - loadMore taId: indicationTaId added: Load More now queries AD (447) not parent Immunology (0).
+AUDIT: the taId omission was loadMore-ONLY. Its filters object is SHARED across established/community/rising
+branches -> the single loadMore fix covers community + rising load-more too (no sibling bug lurking - resolved the
+§30es concern). Two initial-load sites (fetchHCPs:458, fetchData:499) already had taId. No feed callers outside
+App.tsx. Typecheck 70 baseline, build clean.
+CRITICAL FOR VERIFY: Bug A is live in DB; B+C ship in the FRONTEND BUNDLE -> only take effect on a clean rebuild.
+Stale bundle = why Silverberg looked "missing" (data has him rank 1). MUST kill Vite + restart + hard refresh.
+DEPLOY NOTE: B+C are on ad-frontend-established. If the deploy tracks foundation-rebuild, must merge/deploy ad-
+frontend-established (or point deploy at it) to see B+C live at app.besselanalytics.com. Nothing pushed yet.
+NEXT: (1) CLEAN restart (kill Vite, npm run dev, hard refresh). (2) verify: Silverberg #1, Load More adds real 20
+(cards 21-40, AD not Immunology), pages through 447, Lisa Beck rank 18 present. (3) push ad-frontend-established.
+(4) then back to enrichment (Collaborators + Themes) / the practice-state territory decision (separate, §30el).
+
+### 30eu. After all 3 fixes + restart: HCPs load + paginate, but Silverberg STILL not #1 in the rendered feed - though the rows RPC returns him rank 1 (Code proved directly §30es). Contradiction persists. Split: is he PRESENT-but-not-first (client-side sort bug) or ABSENT (a filter still dropping him)?
+Count/pagination fixed (HCPs loading). But Silverberg STILL not at top of rendered feed. Rows RPC returns him rank
+1 (proven §30es). So DB/query fine, rendered order wrong. Possibilities:
+  1. STALE BUNDLE AGAIN (bitten 3x tonight): confirm FULL Vite kill + hard-refresh (Ctrl+Shift+R). If any cached
+     bundle -> old order.
+  2. FRONTEND RE-SORTS client-side: RPC returns rank order (Silverberg 1) but UI re-sorts before render - by
+     displayed score (both Silverberg & Guttman-Yassky show 100 -> rounded tie -> secondary sort by name/hcp_id/
+     insertion puts Guttman-Yassky first). Would explain RPC-says-1 but UI-shows-2.
+  3. Need to know WHO is #1 now: still Guttman-Yassky (nothing changed -> stale bundle) or someone ELSE (order
+     shifted but not to Silverberg)?
+KEY DISCRIMINATOR: is Silverberg PRESENT-but-not-first (scroll - at position 3/5?) or ABSENT entirely?
+  - PRESENT not first -> client-side SORT/ordering bug (RPC gives him #1, UI re-sorts him down). Possibility 2.
+  - ABSENT entirely -> a filter still drops HIM specifically -> filter hunt for one person.
+DIAGNOSTIC: (a) confirm clean restart done. (b) is Silverberg visible anywhere in feed? (c) if present-not-first ->
+Code: does the frontend re-sort the RPC rows client-side before render (by score/name/other)? the RPC returns rank
+order; does the UI preserve it? Check the cohort feed render/sort path. (d) both Silverberg + Guttman-Yassky show
+100 - is the displayed score rounded, causing a tie the UI breaks by a non-rank secondary key?
+NEXT: get who's #1 now + is Silverberg present/absent. Then either (stale bundle -> real clean restart) or (client
+sort bug -> Code check the render ordering vs RPC rank order).
+
+### 30ev. CONFIRMED not stale bundle (clean restart + cache-disabled, Silverberg STILL absent). He's dropped by something REAL + specific between RPC-return (he's rank 1) and render. Trace his row end-to-end. Prime suspects: industry regex edge on "George Washington University", client-side dedup collision, or a null-field card-render guard.
+Full clean restart (confirmed no stray node, hard-refresh cache-disabled) - Silverberg STILL not in rendered feed.
+DEFINITIVELY not a stale bundle. Rows RPC returns him rank 1 (proven §30es). So something client-side between RPC
+response and rendered cards drops HIS specific row.
+SUSPECTS:
+  1. INDUSTRY_REGEX edge: his institution = "George Washington University" (from Code's §es output). Does the new
+     word-boundary regex match a token in it? (Pattern list: pfizer/regeneron/sanofi/abbvie/eli lilly/roche/incyte/
+     iqvia/astrazeneca/parexel/syneos/icon plc/charles river - nothing obviously matches "George Washington
+     University" but this feed keeps surprising; the \b fix could have an edge). CHECK definitively.
+  2. CLIENT-SIDE DEDUP (hcp-dedupe.ts): keys on name+institution - could a key collision drop/collapse his row?
+  3. NULL-FIELD CARD-RENDER GUARD: does his row lack a field a card component requires -> card skipped?
+TRACE (Code): (a) run his actual institution string through INDUSTRY_REGEX -> true/false. (b) check dedup for a
+collision on his row. (c) check card-render guards for a required field he's null on. (d) get his hcp_id + institution
+from DB, trace that specific row through fetch->filter->dedup->render, find WHERE it disappears.
+NOTE: Guttman-Yassky is rendering as #1 (she's rank 2). So the feed shows rank 2 as top = rank 1 (Silverberg) dropped,
+everyone shifts up. Same shape as the Rochester drop but Silverberg-specific + survived the word-boundary fix -> if
+industry filter, it's a DIFFERENT match than "roche"/Rochester.
+NEXT: Code traces Silverberg's row to the exact drop point. Most likely (1) industry regex or (2) dedup. Fix, then
+verify Silverberg #1.
+
+### 30ew. FOUND IT (Garrett, via the FILTERS panel not the feed): DC is MISSING/unselected in the US States filter. All 50 states lit, DC greyed. Silverberg is at George Washington University, practice_state="DC" -> filtered out because DC isn't in the selected-states set. That's why the #1 US KOL drops.
+Garrett inspected the Filters panel (not the feed) and spotted: US States shows all 50 selected/highlighted (red)
+but DC is GREYED/unselected. Silverberg = George Washington University, Washington DC, nppes_practice_state="DC".
+=> DC not in the states filter set -> Silverberg (+ any DC HCP) filtered out. He's the highest-ranked DC practitioner
+-> the visible casualty (US #1 missing).
+EXPLAINS EVERYTHING cleanly: not count RPC, not industry regex, not loadMore, not dedup - a FILTER-COMPLETENESS bug:
+DC omitted from the US States list. The RPC returns him (Code queried WITHOUT the DC-excluding state filter, or at
+national default) but the RENDERED feed applies the states filter which excludes DC. Survived all prior fixes because
+it's an entirely separate cause.
+ROOT: the US States filter list omits DC (shows "US STATES (50)" - 50 states, no DC). DC is a territory/district, not
+a state - a classic "50 states" list that forgets DC (+ likely also PR, other territories). The default "all US" /
+national selection is built from this 50-item list -> DC-based HCPs excluded by construction.
+FIX: add DC to the US States filter list (and the default-selected set), and audit for other missing US
+jurisdictions (PR, territories) if any AD HCPs have them. Also: confirm the "national/US-intel" default actually
+selects ALL including DC (Code earlier said national -> p_states=[] = no filter; but the rendered behavior filters
+DC out, so the UI default may pass the 50-state array, NOT []). Reconcile: does national pass [] (no filter) or the
+50-state list (which omits DC)?
+IMPACT: any DC HCP invisible in territory-filtered views. Silverberg (US #1 AD KOL, GWU/DC) = the headline casualty.
+Demo-critical (wrong #1). Likely affects NSCLC + all TAs (DC omission is TA-independent).
+NEXT: (1) add DC to the states filter list + default set. (2) reconcile national-default behavior ([] vs 50-list).
+(3) verify Silverberg #1 in DC-inclusive feed. (4) audit for PR/other territories. This is the REAL reason Silverberg
+was missing - all night's other fixes were also real bugs but THIS is the #1-missing cause.
+
+### 30ex. TWO problems, second is structural: (1) DC omitted (3 AD HCPs incl Silverberg). (2) 302 of 447 US Established AD HCPs have NULL practice_state -> excluded whenever ANY state filter active = 68% of US roster invisible under territory filtering. Garrett: "AD needs to filter differently than NSCLC." CORRECT - this is a product-design fork.
+Code confirmed: Silverberg practice_state="DC"; 3 AD Established in DC. AND 302/447 US Established AD have NULL
+practice_state.
+PROBLEM 1 (small): DC omitted from states list -> 3 DC HCPs (incl Silverberg #1) dropped. Fix: add DC.
+PROBLEM 2 (STRUCTURAL, the real issue): 302/447 (68%) US Established AD have NULL practice_state -> excluded whenever
+a state filter is active. Two-thirds of the US roster invisible under territory filtering.
+WHY AD != NSCLC (Garrett's insight, correct): NSCLC US-centric, high NPI/practice-state coverage (US clinicians
+match NPPES cleanly). AD 82% intl + US KOLs heavily ACADEMIC (Guttman-Yassky/Mt Sinai, Silverberg/GWU) whose NPPES
+clinical records often don't populate practice_state -> structural 302/447-null gap NSCLC doesn't have. A state-
+filter territory model that works for NSCLC silently hides 2/3 of AD's US roster. => PRODUCT-DESIGN FORK, not just a
+bug.
+OPTIONS for "territory" when most KOLs lack practice_state:
+  A (LEAN): NULL practice_state INCLUDED in national/all-US view. "All US" = everyone country='US' regardless of
+    practice_state (no state filter). Specific-state selection filters to that state (only the ~145 placeable).
+    National = full 447; state view = the subset we can place. Silverberg shows (DC + national). Cleanest.
+  B: backfill practice_state from institution (state-derivation GWU->DC, Mt Sinai->NY) - reduces 302, complementary,
+    won't get all (ambiguous/intl institutions), more work.
+  C: coverage-honest territory UX ("N in [state] + M unspecified") - more UX work.
+KEY RECONCILIATION: Code earlier said national -> p_states=[] -> NO state filter. If that's intended, the 302 nulls +
+DC SHOULD show in national. The BUG = the default isn't passing [], it's passing the explicit all-50-states array
+(which omits DC AND excludes the 302 nulls). LIKELY FIX = make the default "all US" view pass [] (no state filter),
+not an all-states-selected array -> surfaces all 447 in default view; state filtering = opt-in narrowing.
+LEAN: Option A via the []-default fix + add DC to the list (for when DC is explicitly selectable). Backfill (B) later
+for precise state placement.
+NEXT: read the states-list + "select all"/default definition. Determine: does default pass [] or the 50-array? Fix
+so default = all 447 (no state filter) + DC in the list. Verify Silverberg #1 + all 447 in national view. This is
+the AD-differs-from-NSCLC territory-model decision.
+
+### 30ey. ===== END-OF-DAY CLOSEOUT (2026-07-10 night) =====
+TWO-DAY ARC COMPLETE. Banking here. Tomorrow's pickup is the territory-model fix (fully diagnosed, §30ex).
+
+WHAT SHIPPED TODAY (committed):
+  - AD Belief Profiles: 87/87 built + validated (§30ee, founder gut-check passed §30ej). The MOAT layer for AD Est.
+  - Feed fixes A/B/C committed 0dcc0d1 (§30et): count RPC v2->v3 repoint (447 not 0), industry regex word-boundary
+    (frees Rochester), loadMore taId (pagination queries AD not parent Immunology).
+  - Docs current: TA_BUILD_DEBT (this, thru §ey), TA_GATE_BASELINES (Gates 1-16, all NSCLC baselines backfilled),
+    TA_NEW_PLAYBOOK (Part II added: frontend repoint + enrichment). AD_PARITY_CHECKLIST saved.
+  - UMBRA founding docs authored: Governance & Organizational Trust (constitution) + Implementation Doctrine
+    (companion). In /mnt/user-data/outputs.
+
+TOMORROW - FIRST THING (the one open bug, fully diagnosed):
+  TERRITORY-MODEL FIX for AD (§30ex). Silverberg (US #1) still not rendering because:
+    (1) DC omitted from the US States filter list (3 AD HCPs incl Silverberg practice in DC).
+    (2) STRUCTURAL: 302/447 US Established AD have NULL practice_state -> excluded under any state filter (68% of US
+        roster hidden). AD academic/intl -> low practice-state coverage, unlike NSCLC.
+  FIX (decide from what Code finds): make the default "all US / national" view pass p_states=[] (NO state filter) ->
+    shows all 447 incl nulls + DC; specific-state selection = opt-in narrowing to the ~145 placeable. Add DC to the
+    states list. LEAN Option A. First: Code must report whether the default currently passes [] or the 50-state
+    array (determines 1-line fix vs territory-model change). VERIFY NSCLC state filtering doesn't regress.
+  VERIFY: Silverberg #1 in national view, all 447 visible, Load More paginates, DC selectable.
+
+THEN (AD Established remaining to parity):
+  - Top Collaborators run + Research Themes run (2 net-new; THEMES has tag-match risk - Gate 15 - therapeutic_area
+    TEXT must match frontend read, trace first).
+  - Backfill practice_state from institution (Option B, complementary to the territory fix) - later.
+
+THEN (bigger workstreams):
+  - AD Rising: entirely unbuilt, one blocker (rising scoring chain never ran). RECONCILE old (rising_star_ranks_v3/
+    momentum) vs new (rising_composite_v1/scientific_emergence_v1) model FIRST.
+  - Advisor review of AD Belief Profiles (definitive domain-truth nod, per Umbra Art V).
+  - Demo re-record (after enrichment complete).
+  - Merge ad-frontend-established -> foundation-rebuild to deploy (after enrichment; RLS migration already run).
+  - UMBRA: begin Capability 1 (State Substrate) toward the constitution - first test = can it hold canonical vs
+    historical (e.g. Belief Profile costs $15 not $60).
+
+CLOSEOUT CHECKLIST:
+  [ ] commit + push docs (TA_BUILD_DEBT, GATE_BASELINES, NEW_PLAYBOOK, AD_PARITY_CHECKLIST)
+  [ ] push ad-frontend-established (feed fixes 0dcc0d1)
+  [ ] save UMBRA docs locally (Governance + Implementation Doctrine)
+  [ ] confirm no orphaned Code background jobs
+===== END CLOSEOUT =====

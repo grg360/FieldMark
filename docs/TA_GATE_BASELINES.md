@@ -1,8 +1,20 @@
 # TA_GATE_BASELINES.md — "What Good Looks Like" per pipeline gate
 
+**Last updated:** July 10, 2026 — added **Gates 11–16** (frontend repoint + enrichment): cohort re-class
+post-dedup (11), frontend rendering (12), narratives (13), Belief Profile/the moat gate (14), collaborators
+& themes (15), and the parity-matrix definition-of-done (16). Gates 1–10 are the backend build + scoring
+(current through July 10, incl. night-session NSCLC-baseline backfill for Gates 10/13/14/15). All queryable NSCLC
+baselines are now MEASURED; the only non-backfilled gate is Gate 12 (in-browser regression — needs no numeric baseline).
+Companion: `TA_NEW_PLAYBOOK.md` (Part I §0–6 backend, Part II §7–10 frontend/enrichment).
+
 Purpose: at each pipeline gate, a concrete acceptance standard anchored to the NSCLC build (a trusted,
 demo-quality TA), so a new TA's output can be judged against a real reference instead of subjective
 "looks right." This is also the ruleset the QA Scientist agent will enforce.
+
+**Note on the July 10 gates:** the AD values in Gates 11–16 were validated in-browser/in-DB this session
+and stand as legitimate gates on their own (Type B / domain-truth), independent of an NSCLC comparison.
+NSCLC baselines drawn from the July 10 parity matrix are real (measured today); genuinely-unmeasured NSCLC
+baselines are marked **TBD (query)** in the STILL-TO-MEASURE section rather than fabricated.
 
 ## How to read this doc
 - **Type A (NSCLC-anchored numeric):** we queried NSCLC's realized value from the DB; new-TA value is
@@ -195,3 +207,159 @@ residual) — a merged KOL with thin linked pubs may still rank low if scoring r
   root cause was NOT weights but a saturated scientific axis (integer percentile column + integer-floored
   formula tied the top at 100). Fix the calibration and the weighting fixes itself (advisor). Check percentile
   column types (double precision) and use the continuous percentile formula.
+- **NSCLC score-distribution baseline (MEASURED July 10):** global composite min 0 / max 100 / avg 42.9 /
+  median 38.2 / p90 82.9 / p99 98.7. Healthy spread, NOT top-compressed (the integer-tying gotcha is ABSENT
+  in the reference). A new TA's global distribution should match this SHAPE — if the top is compressed
+  (many tied at ~100), suspect the percentile-column-type / integer-floor calibration bug. Cross-check AD's
+  distribution against this when convenient.
+
+---
+
+# GATES 11–16 — FRONTEND REPOINT & ENRICHMENT (added July 10)
+
+These cover everything AFTER the composite ranking (Gate 10): getting the built TA to render correctly
+and populating the enrichment layer to reference-TA parity. Companion: `TA_NEW_PLAYBOOK.md` Part II (§7–10).
+Many AD values here were validated in-browser/in-DB this session and are legitimate gates on their own
+(Type B), independent of an NSCLC comparison. NSCLC baselines that come from the July 10 parity matrix are
+real (measured today); ones we never queried are marked **TBD (query)** with the SQL to run.
+
+## GATE 11 — Cohort re-classification post-dedup   [Type A]  (resolves the Gate 8 PENDING item)
+- **Metric:** re-run cohort classification AFTER dedup + a clean ranks table; established cohort no longer
+  polluted by cross-TA passengers; the ranks table has exactly one row per (hcp, ta, scope).
+- **AD result (EXECUTED July 10):** ranks_v3 deduped — global 5,131 → 2,585 distinct (one row/HCP), 0 dupes;
+  constraint swapped to `UNIQUE NULLS NOT DISTINCT` (recurrence structurally prevented). AD-only issue;
+  NSCLC clean (0 dupes). Silverberg global rank renders (was null via `.maybeSingle()` on 2 rows). PASS.
+- **The invariant this gate enforces:** no duplicate (hcp_id, ta_id, scope_type, scope_value) rows. The
+  NULLS-DISTINCT trap: standard UNIQUE lets NULL-scope (global) rows escape the upsert and duplicate on
+  re-run. Check: `GROUP BY hcp_id,ta_id,scope_type,scope_value HAVING count(*)>1` returns 0.
+- **NSCLC baseline:** 0 duplicate rows (never re-run; clean). AD matched after the fix.
+
+## GATE 12 — Frontend repoint / rendering   [Type B in-browser, decisive]
+- **Metric:** logged-in, the new TA renders its correct roster (feed AND detail), the FROZEN reference TA
+  looks byte-for-byte identical (regression), and shared side-panels are sane. Typecheck/build passing is
+  necessary but NOT sufficient — RLS means you MUST log in and click through (see PLAYBOOK §7g).
+- **Standard:** (a) new-TA chip → correct cohort feed (domain-correct top-N); (b) card click → POPULATED
+  detail (not "Unclassified"); (c) reference TA's #1 and cards UNCHANGED; (d) the TA-scoping bug pattern
+  audited — grep the reference TA's id/slug/name across the frontend, confirm every new-TA read matches its
+  written value (expect ~3–4 hardcode bugs per TA; see PLAYBOOK §7f).
+- **AD result (EXECUTED July 10):** Immunology→AD chip renders domain-correct Established roster (Silverberg
+  #1, Guttman-Yassky #2, Simpson #3, Eichenfield #4 peds…); NSCLC byte-for-byte unchanged (verified
+  `taLabelToApiSlug("Oncology")==="nsclc"`); card→detail populated (score block, ranks, bars). Option B
+  (real per-indication ta_id) implemented with `?? currentBehavior` guardrail. THREE scoping bugs found +
+  fixed (score-block null-cohort derive; narrative slug ×2 read sites; belief-profile tag). PASS.
+- **Reusable:** the reference-TA hardcode audit is a REQUIRED step, not opportunistic. A `grep` for the
+  reference id/slug/name IS the checklist.
+
+## GATE 13 — Narratives enrichment   [Type A + Type B]  (top-KOL overlay — judge by depth, not cohort %)
+- **Metric (A):** narratives written for the intended top-N of the cohort; low cohort % is EXPECTED (overlay
+  layer, top-KOL by design). **Metric (B):** a canonical KOL's narrative RENDERS on the detail page and
+  reads true to the field; the write-slug MATCHES the frontend read-slug (else invisible).
+- **Standard:** trace-before-generate (confirm tag/slug match + cost BEFORE running, PLAYBOOK §8b); narrative
+  anchors on INSTITUTION not stale NPPES city; all 5 generated fields (narrative/why_now/engagement_angle/
+  signal_strength/caution_flags) have a RENDER site (audit generate-vs-render, PLAYBOOK §8g).
+- **AD result (EXECUTED July 10):** 198 Established narratives (top-200, 2 transient failures), $1.10, 34 min.
+  Guttman-Yassky "Why This Expert" + full Signal Summary render + read true. Slug fix landed (writes
+  atopic-dermatitis, frontend reads atopic-dermatitis). Signal Summary un-gated (4 fields were generated-but-
+  buried for Established platform-wide — now surface). PASS.
+- **NSCLC baseline (MEASURED July 10):** 3,213 narratives; field-completeness narrative_text 100%,
+  why_now / engagement_angle / signal_strength ~94% (3,012 ea), caution_flags 26% (843). **Standard:**
+  why_now/engagement_angle/signal_strength should populate ~universally; caution_flags LEGITIMATELY sparse
+  (~quarter) — most HCPs warrant no caution, null is correct (validates hide-when-null UI). (Parity matrix
+  also showed 1,356 as the rendered narrative slice — parity is a SLICE not 100% cohort; don't chase raw count.)
+- **Slug-match invariant:** generator write value == frontend read value for the TA. The #1 silent-failure
+  mode (PLAYBOOK §8b). Verify by RENDER, not by row count.
+
+## GATE 14 — Belief Profile / Scientific Positions   [Type B domain-truth, the MOAT gate]
+- **Metric (B):** a canonical KOL's Belief Profile renders and reads TRUE to their known scientific positions
+  (founder/advisor gut-check — "is this actually them?"); themes are genuine TA concepts, NOT drug names, NOT
+  reference-TA leakage; healthy polarity spread (not all-positive = real positions, not cheerleading).
+- **Metric (A):** positions extracted per HCP (cap ~10 papers), profiles written with correct tag; depth
+  classification (deep ≥5 / focused ≥3 / signal) sane.
+- **Standard:** per-TA registry (TA_CONFIGS) with reference entry VERBATIM (prove byte-identity via prompt-
+  render diff); TA-NEUTRAL exemplars (founder authors NO clinical claims; model extracts real abstracts);
+  Stage-1 idempotent (delete-before-reinsert); tag == frontend read.
+- **AD result (test-5 EXECUTED July 10; full top-100 running):** test-5 = 249 positions from 50 papers
+  (polarity 119 pos / 58 unmet-need / 41 cautionary / 31 hypothesis — healthy mix), 5 profiles all depth=deep,
+  genuine AD themes ("Beyond-Severity Burden Assessment", "Skin Barrier Therapeutic Targeting",
+  "Psychodermatology Adjunctive Benefit"), tag=atopic-dermatitis on all 5, zero NSCLC contamination. NSCLC
+  byte-identity PROVEN (prompt-render diff empty). Extraction quality validated as AD-accurate + specific.
+  PASS (test-5); full top-100 pending completion. Cost ~$15 (grounded; NOT the $20-60 ballpark).
+- **NSCLC baseline (MEASURED July 10):** 6,354 positions / 181 HCPs = **35.1 positions/HCP**; polarity
+  2,160 positive / 1,560 unmet-need / 1,602 cautionary / 1,032 hypothesis (~34%/25%/25%/16%). ~104 Belief-
+  Profile HCPs synthesized (parity matrix). **Standard for a new TA:** positions/HCP in the ~35 band (top-KOL
+  slice runs higher, ~50); polarity SHAPE = positive largest, hypothesis smallest (a healthy realistic mix,
+  not all-positive). AD test-5 matched the shape (48/23/16/13). PASS criterion is shape-match + domain truth,
+  not exact count.
+- **The differentiated-moat note:** this is authority-weighted position aggregation — the layer no
+  publication-count competitor can replicate. Its gate is DOMAIN TRUTH (does it read true to the KOL), not a
+  coverage %. Neutral-exemplars + real-abstracts is the quality mechanism (validated: AD produced correct AD
+  positions with zero founder clinical authorship).
+
+## GATE 15 — Top Collaborators & Research Themes   [Type A + Type B]  (net-new runs per TA)
+- **Metric:** collaborator-pairing run populates `hcp_top_collaborators_v2` (detail collaborator panel);
+  theme-extraction run populates `hcp_research_themes_v2`; canonical KOL shows plausible co-authors / themes.
+- **AD result:** **NOT YET RUN (0 rows both).** Two net-new runs remain for AD Established parity.
+  network_centrality_v2 DID run (19,925+ AD rows) — that's the graph; the collaborator-PAIRING step is
+  separate and pending.
+- **NSCLC baseline (MEASURED July 10 night):**
+  - **Top Collaborators** = 434,929 rows / 93,923 HCPs = **4.6 collaborators/HCP**. NOTE: this is a NEAR-FULL-
+    COHORT layer (populated for ~94K HCPs, not a top-KOL overlay) — matches the parity matrix's 57% coverage.
+    Keyed by `therapeutic_area_id` (uuid) + has a `window_type` column (per time-window, like network 10yr —
+    check which window the frontend reads before the AD run). Target for AD: ~4.6/HCP across the cohort.
+  - **Research Themes** = 10,640 rows / 1,064 HCPs = **exactly 10.0/HCP** (CAPPED at top-10 themes per HCP).
+    Keyed by `therapeutic_area` = **TEXT** storing the DISPLAY NAME `'NSCLC'` (NOT a uuid, NOT a slug). Target
+    for AD: top-10 themes/HCP for the run's HCP set.
+- **SCHEMA GOTCHA (tag-match risk — trace before the AD run):** the two tables key the TA DIFFERENTLY —
+  collaborators by `therapeutic_area_id` (uuid), themes by `therapeutic_area` (TEXT display name). When AD themes
+  run, the written `therapeutic_area` value MUST match what the frontend reads for AD (per belief-profile
+  precedent the frontend reads the slug `atopic-dermatitis` — confirm the themes read path before generating, or
+  themes generate invisibly). Same class as the narrative-slug / belief-tag bugs (PLAYBOOK §7f, §8b).
+- **Standard:** same trace-before-generate + tag-match + backward-compat discipline as Gates 13–14.
+- **PENDING for AD** — run both (collaborator-pairing + theme-extraction), confirm tag-match FIRST, then re-check.
+
+## GATE 16 — Definition of Done: the parity matrix   [Type A, the acceptance gate]
+- **Metric:** a live-DB parity matrix vs the frozen reference TA, per cohort (Established + Rising): rows =
+  enrichment layers, columns = {Ref Est, New Est, Ref Rising, New Rising}, each cell = coverage + remaining.
+  Saved as `docs/<TA>_PARITY_CHECKLIST.md`. See PLAYBOOK §9.
+- **Reading rule (critical — %s NOT apples-to-apples):** full-cohort layers should approach 100% for a
+  properly-built TA (AD Est 98–99%, CLEANER than NSCLC's 57% legacy denominator — new TA needn't "catch up");
+  overlay layers (narratives/belief/themes) are top-KOL by design (judge depth not %); US clinical/commercial
+  coverage-capped by US fraction (intl-heavy TA low = structural, display-only).
+- **AD result (EXECUTED July 10):** matrix built + saved (`AD_PARITY_CHECKLIST.md`). AD Established
+  ESSENTIALLY DONE (Belief Profile finishing + Collaborators + Themes = 2 net-new runs remain). AD Rising
+  ENTIRELY UNBUILT — one blocker (rising scoring chain never ran; 3,234 eligible waiting), whole column
+  cascades from it. PARTIAL PASS (Established near-complete; Rising is a separate coherent workstream).
+- **Rising model reconciliation (flag):** the parity matrix measured the OLD rising model (hcp_rising_star_
+  ranks_v3 + network_momentum); AD Rising was also discussed as the NEW model (hcp_rising_composite_v1 /
+  scientific_emergence_v1) with a frontend repoint pending. RESOLVE which is canonical before running AD
+  Rising — the scoring chain and the frontend repoint must target the SAME model.
+
+---
+
+## STILL-TO-MEASURE — NSCLC diagnostics we never ran (backfill these baselines)
+The Gate 11–16 AD values are validated and stand as gates on their own. These NSCLC baselines would
+STRENGTHEN the Type-A comparisons but were never queried (most Gate 13–16 NSCLC numbers above come from the
+July 10 parity matrix, which IS real; the ones below are genuinely unmeasured). Run in the founder's terminal
+(per PLAYBOOK §10), NSCLC ta_id = c0065b03-a25e-4e9a-bde4-4b4d0db7827d:
+
+1. ~~Gate 14 NSCLC position-extraction depth~~ **MEASURED July 10 (night):** NSCLC = 6,354 positions / 181 HCPs
+   / **35.1 per HCP**; polarity 2,160 positive / 1,560 unmet-need / 1,602 cautionary / 1,032 hypothesis
+   (~34%/25%/25%/16%). AD test-5 (~50/HCP for top-5 KOLs, 119/58/41/31 = 48%/23%/16%/13%) = SAME SHAPE
+   (positive largest, hypothesis smallest), slightly positive-skewed on the top KOLs; full AD top-100 avg should
+   settle toward ~35. Gate 14 VALIDATED — AD positions structurally comparable to NSCLC. (Baseline now filled in
+   Gate 14 above.)
+2. ~~Gate 13 NSCLC narrative field-completeness~~ **MEASURED July 10 (night):** NSCLC = 3,213 narratives; 
+   narrative_text 3,213 (100%), why_now / engagement_angle / signal_strength 3,012 each (~94%), caution_flags
+   843 (26%). => caution_flags is LEGITIMATELY SPARSE by design (most HCPs warrant no caution → null is correct,
+   validates the 'hide caution when null' UI + AD's frequent-null caution_flags is correct). Target for AD:
+   ~universal why_now/engagement_angle/signal_strength, ~quarter caution_flags. (Baseline now filled in Gate 13.)
+3. ~~Gate 15 NSCLC collaborator/theme depth~~ **MEASURED July 10 (night):** collaborators 434,929 / 93,923 HCPs
+   = 4.6/HCP (near-full-cohort, keyed therapeutic_area_id uuid, has window_type); themes 10,640 / 1,064 HCPs =
+   10.0/HCP (capped top-10, keyed therapeutic_area TEXT='NSCLC' display name). Baselines now filled in Gate 15.
+   The therapeutic_area='NSCLC' text key is a TAG-MATCH risk for the AD themes run (see Gate 15 schema gotcha).
+4. **Gate 12 NSCLC has no numeric baseline (it's a Type-B in-browser gate)** — nothing to query; the standard
+   IS "reference TA renders identically," which is self-referential. No backfill needed.
+5. ~~Gate 10 score-distribution SHAPE~~ **MEASURED July 10 (night):** NSCLC global composite = min 0, max 100,
+   avg 42.9, median 38.2, p90 82.9, p99 98.7. Healthy spread, NOT top-compressed (the integer-percentile-tying
+   calibration gotcha is absent). AD's global distribution should match this shape — cross-check AD when convenient.
+
