@@ -55,44 +55,11 @@ function resolveRpcScopeParams(filters: FilterState): RpcScopeParams {
   }
 
   const scopeIncludesUs = scopeValues.includes("US");
+  // National mode (the default) sends no state filter, so all US HCPs surface —
+  // including the ~68% with a null nppes_practice_state and DC-based HCPs. A
+  // specific-state selection (national=false) narrows to those states.
   const states =
-    filters.states && filters.states.length > 0 && scopeIncludesUs
-      ? filters.states.map((s) => s.toUpperCase())
-      : [];
-
-  return { scopeType, scopeValues, states, scopeLabel, scopeIncludesUs };
-}
-
-function resolveRisingStarRpcScopeParams(filters: FilterState): RpcScopeParams {
-  const scope = resolveFilterScope(filters);
-  const scopeLabel = scopeDisplayLabel(scope);
-  const requestedRegion = filters.region as RegionKey | undefined;
-
-  let scopeType = "region";
-  let scopeValues: string[] = [];
-
-  if (scope.scopeType === "global") {
-    scopeType = "global";
-    scopeValues = [];
-  } else if (scope.scopeType === "country") {
-    scopeValues = [scope.scopeValue!];
-  } else if (scope.scopeType === "region" && requestedRegion) {
-    const countries = countriesForRegion(requestedRegion);
-    if (countries === null) {
-      scopeType = "global";
-      scopeValues = [];
-    } else if (countries.length === 0) {
-      scopeValues = [];
-    } else {
-      scopeValues = countries;
-    }
-  } else {
-    scopeValues = [scope.scopeValue ?? "US"];
-  }
-
-  const scopeIncludesUs = scopeValues.includes("US");
-  const states =
-    filters.states && filters.states.length > 0 && scopeIncludesUs
+    !filters.national && filters.states && filters.states.length > 0 && scopeIncludesUs
       ? filters.states.map((s) => s.toUpperCase())
       : [];
 
@@ -503,10 +470,7 @@ async function fetchCohortViaRpc(
   rankTable: string,
   cohort: CohortKind,
 ): Promise<{ rows: RisingStar[]; total: number; error: string | null }> {
-  const rpcScope =
-    cohort === "rising_star"
-      ? resolveRisingStarRpcScopeParams(filters)
-      : resolveRpcScopeParams(filters);
+  const rpcScope = resolveRpcScopeParams(filters);
   const scope = resolveFilterScope(filters);
 
   if (scope.scopeType === "global" || rpcScope.scopeValues.length === 0) {

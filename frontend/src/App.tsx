@@ -347,7 +347,7 @@ function FeedLayout({
   forcedIndication,
 }: { forcedDashboard?: string; forcedIndication?: string } = {}) {
   const { track, setTrack } = useTrack();
-  const { region, regions, states, themeIds, setStates, userTerritory, hydrateFromProfile } = useFilterContext();
+  const { region, regions, states, national, themeIds, setStates, userTerritory, hydrateFromProfile } = useFilterContext();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -455,7 +455,7 @@ function FeedLayout({
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId };
+      const filters = { therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
@@ -496,7 +496,7 @@ function FeedLayout({
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId };
+      const filters = { therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));

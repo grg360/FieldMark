@@ -11,7 +11,6 @@ import { DEFAULT_REGION, REGIONS, type RegionKey } from "./regions";
 
 const STORAGE_KEY = "fieldmark.user.region";
 const REGIONS_STORAGE_KEY = "fieldmark.user.regions";
-const STATES_STORAGE_KEY = "fieldmark.user.states";
 const THEME_IDS_STORAGE_KEY = "fieldmark.user.themeIds";
 
 export const TERRITORY_STATES: Record<string, string[]> = {
@@ -33,6 +32,8 @@ interface FilterContextValue {
   setRegions: (regions: RegionKey[]) => void;
   states: string[];
   setStates: (states: string[]) => void;
+  national: boolean;
+  setNational: (national: boolean) => void;
   themeIds: string[];
   setThemeIds: (ids: string[]) => void;
   setRegion: (region: RegionKey) => void;
@@ -71,25 +72,6 @@ function readStoredRegions(): RegionKey[] {
   return [DEFAULT_REGION];
 }
 
-function readStoredStates(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = window.localStorage.getItem(STATES_STORAGE_KEY);
-    if (stored) {
-      const parsed: unknown = JSON.parse(stored);
-      if (
-        Array.isArray(parsed) &&
-        parsed.every((item) => typeof item === "string" && item.trim() !== "")
-      ) {
-        return parsed.map((item) => String(item).toUpperCase());
-      }
-    }
-  } catch {
-    // localStorage unavailable; fall through to default.
-  }
-  return [];
-}
-
 function readStoredThemeIds(): string[] {
   if (typeof window === "undefined") return [];
   try {
@@ -121,12 +103,15 @@ function normalizeRegions(regions: RegionKey[]): RegionKey[] {
 export function FilterProvider({ children }: { children: ReactNode }) {
   const [regions, setRegionsState] = useState<RegionKey[]>([DEFAULT_REGION]);
   const [states, setStatesState] = useState<string[]>([]);
+  const [national, setNationalState] = useState<boolean>(true);
   const [themeIds, setThemeIdsState] = useState<string[]>([]);
   const [userTerritory, setUserTerritoryState] = useState<string | null>(null);
 
   useEffect(() => {
     setRegionsState(readStoredRegions());
-    setStatesState(readStoredStates());
+    // States are intentionally NOT restored from localStorage: every load defaults
+    // to national mode (all US), so a stale saved selection can't silently re-hide
+    // null-practice_state HCPs. State filtering is a per-session opt-in.
     setThemeIdsState(readStoredThemeIds());
   }, []);
 
@@ -146,11 +131,13 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const setStates = useCallback((nextStates: string[]) => {
     const normalized = nextStates.map((s) => s.toUpperCase());
     setStatesState(normalized);
-    try {
-      window.localStorage.setItem(STATES_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-      // Storage failed; in-memory state still updates correctly.
-    }
+    // Empty selection = national (no state filter); a specific selection opts out of national.
+    setNationalState(normalized.length === 0);
+  }, []);
+
+  const setNational = useCallback((on: boolean) => {
+    setNationalState(on);
+    if (on) setStatesState([]);
   }, []);
 
   const setThemeIds = useCallback((nextThemeIds: string[]) => {
@@ -178,11 +165,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     if (statesCovered.length > 0) {
       const normalized = statesCovered.map((s) => s.toUpperCase());
       setStatesState(normalized);
-      try {
-        window.localStorage.setItem(STATES_STORAGE_KEY, JSON.stringify(normalized));
-      } catch {
-        // noop
-      }
+      setNationalState(false);
     }
   }, []);
 
@@ -193,6 +176,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setRegions,
       states,
       setStates,
+      national,
+      setNational,
       themeIds,
       setThemeIds,
       setRegion,
@@ -206,6 +191,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       setRegions,
       states,
       setStates,
+      national,
+      setNational,
       themeIds,
       setThemeIds,
       setRegion,

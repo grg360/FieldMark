@@ -47,7 +47,9 @@ export default function AuthWrapper({ children }: Props) {
       updateLastActive(session.user.id);
 
       if (!hydratedRef.current) {
-        hydrateFromProfile(profile.region, profile.states_covered ?? []);
+        // National is the default on load; the saved territory sets context only
+        // (for the Territory toggle), it does NOT auto-apply as a feed state filter.
+        hydrateFromProfile(profile.region, []);
         hydratedRef.current = true;
       }
 
