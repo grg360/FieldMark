@@ -1,25 +1,46 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   getPublicationsForHcp,
   type PublicationListRow,
 } from "../../lib/publicationsList";
+import { resolvePrimaryTaId, taDisplayNameForId } from "../../lib/api";
 import PublicationCard from "./PublicationCard";
 
 export default function HcpPublicationsPage() {
   const { id: hcpId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navTaId = (location.state as { taId?: string } | null)?.taId;
+  const [taId, setTaId] = useState<string | undefined>(navTaId);
   const [pubs, setPubs] = useState<PublicationListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [hcpName, setHcpName] = useState<string>("");
 
+  // Resolve the TA from nav-state, else re-derive from the HCP (refresh/deep-link).
+  useEffect(() => {
+    if (navTaId) {
+      setTaId(navTaId);
+      return;
+    }
+    if (!hcpId) return;
+    let cancelled = false;
+    void (async () => {
+      const primary = await resolvePrimaryTaId(hcpId);
+      if (!cancelled) setTaId(primary ?? undefined);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hcpId, navTaId]);
+
   useEffect(() => {
     let cancelled = false;
-    if (!hcpId) return;
+    if (!hcpId || !taId) return;
     setLoading(true);
 
     Promise.all([
-      getPublicationsForHcp(hcpId, "NSCLC", 100),
+      getPublicationsForHcp(hcpId, taId, 100),
       fetchHcpName(hcpId),
     ])
       .then(([pubsData, name]) => {
@@ -37,7 +58,7 @@ export default function HcpPublicationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [hcpId]);
+  }, [hcpId, taId]);
 
   function goBack() {
     if (hcpId) navigate(`/hcp/${hcpId}`);
@@ -66,7 +87,7 @@ export default function HcpPublicationsPage() {
         Source Publications
       </h1>
       <div style={{ fontSize: 13, color: "#9B9892", marginBottom: 24 }}>
-        {hcpName ? `Senior/first-authored NSCLC publications backing ${hcpName}'s scientific positions` : "Senior/first-authored NSCLC publications backing this investigator's scientific positions"}
+        {hcpName ? `Senior/first-authored ${taId ? `${taDisplayNameForId(taId)} ` : ""}publications backing ${hcpName}'s scientific positions` : `Senior/first-authored ${taId ? `${taDisplayNameForId(taId)} ` : ""}publications backing this investigator's scientific positions`}
       </div>
 
       {loading ? (

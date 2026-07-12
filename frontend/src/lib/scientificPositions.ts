@@ -192,7 +192,7 @@ function sortPapers(a: EvidencePaper, b: EvidencePaper): number {
 
 export async function getScientificNarrativeForHcp(
   hcpId: string,
-  therapeuticArea: string = "NSCLC",
+  therapeuticArea: string,
 ): Promise<ScientificNarrative | null> {
   try {
     const { data, error } = await supabase
@@ -297,13 +297,8 @@ export async function getEvidenceForTheme(positionIds: string[]): Promise<Eviden
 
 export async function getAllPositionsForHcp(
   hcpId: string,
-  therapeuticArea: string = "NSCLC",
+  taId: string,
 ): Promise<EvidencePosition[]> {
-  const taLookup: Record<string, string> = {
-    NSCLC: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
-  };
-  const taId = taLookup[therapeuticArea] ?? therapeuticArea;
-
   try {
     const { data, error } = await supabase
       .from("hcp_scientific_positions_v1")

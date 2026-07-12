@@ -239,15 +239,10 @@ export async function getPublicationsByPartner(
 
 export async function getPublicationsForHcp(
   hcpId: string,
-  therapeuticArea: string = "NSCLC",
+  taId: string,
   limit: number = 50,
 ): Promise<PublicationListRow[]> {
   try {
-    const taLookup: Record<string, string> = {
-      NSCLC: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
-    };
-    const taId = taLookup[therapeuticArea] ?? therapeuticArea;
-
     const { data: positions, error: posError } = await supabase
       .from("hcp_scientific_positions_v1")
       .select("publication_id")

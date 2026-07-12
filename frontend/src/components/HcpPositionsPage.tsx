@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   getAllPositionsForHcp,
   type EvidencePosition,
   type PositionType,
   type PositionCategory,
 } from "../lib/scientificPositions";
+import { resolvePrimaryTaId, taDisplayNameForId } from "../lib/api";
 import { supabase } from "../lib/supabase";
 
 const POLARITY_OPTIONS: { value: PositionType | "all"; label: string; color: string }[] = [
@@ -42,19 +43,39 @@ function polarityLabel(type: PositionType): string {
 export default function HcpPositionsPage() {
   const { id: hcpId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navTaId = (location.state as { taId?: string } | null)?.taId;
+  const [taId, setTaId] = useState<string | undefined>(navTaId);
   const [positions, setPositions] = useState<EvidencePosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [hcpName, setHcpName] = useState<string>("");
   const [polarity, setPolarity] = useState<PositionType | "all">("all");
   const [category, setCategory] = useState<PositionCategory | "all">("all");
 
+  // Resolve the TA from nav-state, else re-derive from the HCP (refresh/deep-link).
+  useEffect(() => {
+    if (navTaId) {
+      setTaId(navTaId);
+      return;
+    }
+    if (!hcpId) return;
+    let cancelled = false;
+    void (async () => {
+      const primary = await resolvePrimaryTaId(hcpId);
+      if (!cancelled) setTaId(primary ?? undefined);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hcpId, navTaId]);
+
   useEffect(() => {
     let cancelled = false;
-    if (!hcpId) return;
+    if (!hcpId || !taId) return;
     setLoading(true);
 
     Promise.all([
-      getAllPositionsForHcp(hcpId, "NSCLC"),
+      getAllPositionsForHcp(hcpId, taId),
       fetchHcpName(hcpId),
     ])
       .then(([data, name]) => {
@@ -72,7 +93,7 @@ export default function HcpPositionsPage() {
     return () => {
       cancelled = true;
     };
-  }, [hcpId]);
+  }, [hcpId, taId]);
 
   const filtered = useMemo(() => {
     return positions.filter((p) => {
@@ -119,8 +140,8 @@ export default function HcpPositionsPage() {
       </h1>
       <div style={{ fontSize: 13, color: "#9B9892", marginBottom: 24 }}>
         {hcpName
-          ? `All extracted scientific positions for ${hcpName} (NSCLC)`
-          : "All extracted scientific positions for this investigator (NSCLC)"}
+          ? `All extracted scientific positions for ${hcpName}${taId ? ` (${taDisplayNameForId(taId)})` : ""}`
+          : `All extracted scientific positions for this investigator${taId ? ` (${taDisplayNameForId(taId)})` : ""}`}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>

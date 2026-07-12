@@ -13,10 +13,11 @@ import {
   buildAdvocacyClaimKey,
   buildResearchFocusClaimKey,
 } from "../lib/beliefClaimKey";
+import { taIdForApiSlug } from "../lib/api";
 
 interface ScientificNarrativeSectionProps {
   hcpId: string;
-  therapeuticArea?: string;
+  therapeuticArea: string;
 }
 
 interface DrawerTheme {
@@ -317,7 +318,7 @@ function LoadingSkeleton() {
 
 export default function ScientificNarrativeSection({
   hcpId,
-  therapeuticArea = "NSCLC",
+  therapeuticArea,
 }: ScientificNarrativeSectionProps) {
   const navigate = useNavigate();
   const [narrative, setNarrative] = useState<ScientificNarrative | null>(null);
@@ -565,7 +566,11 @@ export default function ScientificNarrativeSection({
       <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 12, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => navigate(`/hcp/${hcpId}/publications`)}
+          onClick={() =>
+            navigate(`/hcp/${hcpId}/publications`, {
+              state: { taId: taIdForApiSlug(therapeuticAreaSlug) },
+            })
+          }
           onMouseEnter={(e) => {
             e.currentTarget.style.textDecoration = "underline";
           }}
@@ -588,7 +593,11 @@ export default function ScientificNarrativeSection({
         <span>{bullet}</span>
         <button
           type="button"
-          onClick={() => navigate(`/hcp/${hcpId}/positions`)}
+          onClick={() =>
+            navigate(`/hcp/${hcpId}/positions`, {
+              state: { taId: taIdForApiSlug(therapeuticAreaSlug) },
+            })
+          }
           onMouseEnter={(e) => {
             e.currentTarget.style.textDecoration = "underline";
           }}
