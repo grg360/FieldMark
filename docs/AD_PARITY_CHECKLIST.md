@@ -11,6 +11,10 @@ across the two KOL cohorts (Established, Rising).
 senior-or-first filter), then 87/87 Belief Profiles synthesized (56 deep / 14 focused / 17 signal_moment),
 all tagged `atopic-dermatitis`, 0 errors. The Belief Profile row below is updated to reflect this.
 
+**Update 2026-07-11:** AD Established Top Collaborators COMPLETED — `compute_top_collaborators.py --ta
+atopic-dermatitis` wrote 84,455 rows across 19,925 HCPs; Established coverage 445/447 (99.6%). Tag/scope
+(ta_id UUID + `window_type='10yr'`) matches the frontend read — renders in the Established score breakdown.
+
 **Coverage metric:** `distinct cohort HCPs with a row in the layer (TA-scoped where applicable) /
 distinct HCPs in that cohort's rank table for the TA`.
 
@@ -61,7 +65,7 @@ Coverage = cohort HCPs with a row / cohort population. **⏳ = in progress at sn
 | **— OpenAlex metrics (full-cohort target) —** | | | | |
 | Author metrics (`hcp_author_metrics_latest_v2`) | 94% | **99%** ✅ | 99% ✅ | ❌ blocked |
 | **— Collaborator network —** | | | | |
-| Top collaborators (`hcp_top_collaborators_v2`) | 57% | **❌ 0% — GAP** | 99% | ❌ blocked |
+| Top collaborators (`hcp_top_collaborators_v2`) | 57% | **✅ 99.6%** (445/447, 2026-07-11) | 99% | ❌ blocked |
 | **— Top-KOL intelligence overlays (NOT full-cohort) —** | | | | |
 | Belief Profiles — Stage 1+2 (`hcp_scientific_positions_v1` / `hcp_ai_overviews`) | ~104 HCPs | **✅ 87** (top-100; 13 no corpus) | 81 | ❌ blocked |
 | Narratives (`hcp_narratives_v2`) | 1,356 | 198 (partial) | 274 | ❌ 0 |
@@ -79,8 +83,9 @@ Coverage = cohort HCPs with a row / cohort population. **⏳ = in progress at sn
 ### AD Established (near-done)
 1. **Belief Profiles** — ✅ DONE (2026-07-10). Top-100 Established: 87 profiles (13 no extractable corpus),
    56 deep / 14 focused / 17 signal_moment. Pipeline parameterized by `--ta atopic-dermatitis` (commit `d91e8e4`).
-2. **Top Collaborators** — ❌ not built (0). NSCLC Est has 57%. Needs the collaborator-extraction run for
-   AD; feeds the detail-page collaborator panel in the Established score breakdown. *Net-new run.*
+2. **Top Collaborators** — ✅ DONE (2026-07-11). `compute_top_collaborators.py --ta atopic-dermatitis`
+   (pure SQL, already multi-TA, no code change): 84,455 rows / 19,925 HCPs; Established coverage 445/447
+   (99.6%). Writes `therapeutic_area_id` (ta_id UUID) + `window_type='10yr'` — matches the frontend read.
 3. **Research Themes** — ❌ not built (0). NSCLC Est has 222. Needs the theme generator for AD. *Net-new run.*
 4. **Narratives** — ⚠️ partial (198/2,586). Extend to the intended top-KOL slice (NSCLC-parity is a
    *slice*, not 100%).
