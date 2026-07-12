@@ -1,16 +1,20 @@
 """
-extract_research_themes.py - Extract NSCLC research themes per HCP via Claude API.
+extract_research_themes.py - Extract per-HCP research themes by TA via Claude API.
 
 Themes are derived from recent first/senior author publications and written to
-hcp_research_themes_v2.
+hcp_research_themes_v2. The TA is selected with --ta (default: nsclc); each TA
+supplies its own cohort selection, written tag, and TA-neutral prompt fragments
+via TA_CONFIGS. Delete/exists are (hcp_id, therapeutic_area)-scoped so a run for
+one TA can never touch another TA's rows for a dual-TA HCP.
 
 Required environment variables:
 - DATABASE_URL (port 5432 direct connection)
 - ANTHROPIC_API_KEY
 
 Usage:
-    python extract_research_themes.py --dry-run
-    python extract_research_themes.py
+    python extract_research_themes.py --dry-run                                   # nsclc (default)
+    python extract_research_themes.py --ta atopic-dermatitis --scope us --dry-run
+    python extract_research_themes.py --ta atopic-dermatitis --scope us
     python extract_research_themes.py --force
     python extract_research_themes.py --limit 100
 """
@@ -21,6 +25,7 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -34,7 +39,14 @@ from anthropic import APIConnectionError, APIStatusError, APITimeoutError
 from dotenv import load_dotenv
 from psycopg.rows import dict_row
 
-CHECKPOINT_PATH = "extract_research_themes_checkpoint.json"
+# On Windows the console defaults to cp1252, which crashes on Unicode-hyphen
+# (U+2010) and other non-Latin characters in HCP names during the dry-run print.
+# Force UTF-8 on stdout/stderr so sample output can't crash the run.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 8192
 MIN_REQUEST_INTERVAL_SEC = 1.0
@@ -42,24 +54,86 @@ MAX_RETRIES = 3
 DRY_RUN_HCP_LIMIT = 10
 INPUT_USD_PER_M = 3.0
 OUTPUT_USD_PER_M = 15.0
-THERAPEUTIC_AREA = "NSCLC"
 
-SYSTEM_PROMPT = (
-    "You analyze NSCLC research output to identify thematic focus areas of individual "
+# System prompt is per-TA via {domain}. For nsclc (domain="NSCLC") this renders
+# byte-identical to the original hardcoded string.
+SYSTEM_PROMPT_TEMPLATE = (
+    "You analyze {domain} research output to identify thematic focus areas of individual "
     "investigators. You return structured JSON only - no preamble, no explanation, "
     "no markdown code fences."
 )
 
-TARGET_HCPS_SQL = """
+# Selection SQL is per-TA because the cohort differs (NSCLC=Rising-US, AD=Established).
+# All variants take a single %s = ta_id and return the same column shape (the rank
+# column is aliased so downstream code never reads it by name).
+TARGET_HCPS_SQL_NSCLC_RISING_US = """
 SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.us_rank
 FROM hcps_v2 h
 JOIN hcp_rising_star_ranks_v3 r ON r.hcp_id = h.id
-JOIN therapeutic_areas ta ON ta.id = r.therapeutic_area_id
-WHERE ta.name = 'NSCLC'
+WHERE r.therapeutic_area_id = %s
   AND h.country = 'US'
   AND r.us_rank IS NOT NULL
 ORDER BY r.us_rank ASC
 """
+
+TARGET_HCPS_SQL_ESTABLISHED_US = """
+SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
+FROM hcps_v2 h
+JOIN hcp_established_ranks_v3 r ON r.hcp_id = h.id
+WHERE r.therapeutic_area_id = %s
+  AND r.scope_type = 'region' AND r.scope_value = 'US'
+ORDER BY r.rank ASC
+"""
+
+TARGET_HCPS_SQL_ESTABLISHED_GLOBAL = """
+SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
+FROM hcps_v2 h
+JOIN hcp_established_ranks_v3 r ON r.hcp_id = h.id
+WHERE r.therapeutic_area_id = %s
+  AND r.scope_type = 'global'
+ORDER BY r.rank ASC
+"""
+
+# Per-TA config. The nsclc entry reproduces the original prompt text and
+# NSCLC-Rising-US selection verbatim (byte-identical rendered prompts, identical
+# selected HCP set). Non-NSCLC TAs supply their own cohort scoping, tag, and
+# TA-neutral prompt fragments.
+#   tag              -> therapeutic_area TEXT write value + delete/exists scope
+#   domain           -> prompt framing (renders into SYSTEM_PROMPT + user prompt)
+#   generic_negative -> the "NOT generic categories like ..." example
+#   theme_examples   -> the "e.g., ..." specific-theme exemplars
+#   selection        -> {scope_slug: SQL}; the run's --scope keys into this
+#   default_scope    -> scope used when --scope is omitted
+TA_CONFIGS = {
+    "nsclc": {
+        "tag": "NSCLC",
+        "domain": "NSCLC",
+        "generic_negative": "'lung cancer'",
+        "theme_examples": (
+            "'EGFR-mutant resistance mechanisms' or "
+            "'CNS-active TKIs for brain metastases'"
+        ),
+        "selection": {"rising": TARGET_HCPS_SQL_NSCLC_RISING_US},
+        "default_scope": "rising",
+    },
+    "atopic-dermatitis": {
+        "tag": "Atopic Dermatitis",
+        "domain": "atopic dermatitis",
+        "generic_negative": "'atopic dermatitis'",
+        # TA-neutral: teaches "specific, not generic" without asserting any
+        # drug/mechanism. The model extracts real themes from the abstracts.
+        "theme_examples": (
+            "'a specific signaling-pathway focus' or "
+            "'a defined patient-selection strategy'"
+        ),
+        "selection": {
+            "us": TARGET_HCPS_SQL_ESTABLISHED_US,
+            "global": TARGET_HCPS_SQL_ESTABLISHED_GLOBAL,
+        },
+        "default_scope": "us",
+    },
+}
+DEFAULT_TA = "nsclc"
 
 PAPERS_SQL = """
 SELECT
@@ -73,9 +147,8 @@ SELECT
 FROM publications_v2 p
 JOIN publication_authors_v2 pa ON pa.publication_id = p.id
 JOIN publication_therapeutic_areas_v2 pta ON pta.publication_id = p.id
-JOIN therapeutic_areas ta ON ta.id = pta.therapeutic_area_id
 WHERE pa.hcp_id = %s
-  AND ta.name = 'NSCLC'
+  AND pta.therapeutic_area_id = %s
   AND p.pub_year >= 2021
   AND (pa.is_first_author = true OR pa.is_senior_author = true)
   AND p.title IS NOT NULL
@@ -97,13 +170,26 @@ INSERT INTO public.hcp_research_themes_v2 (
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 """
 
+# TA-scoped so an AD run can NEVER delete or be blocked by a dual-TA HCP's NSCLC
+# themes. A no-op on NSCLC's single-TA data (every NSCLC row is already tagged
+# 'NSCLC'), so NSCLC behavior is unchanged.
 DELETE_THEMES_SQL = """
-DELETE FROM public.hcp_research_themes_v2 WHERE hcp_id = %s
+DELETE FROM public.hcp_research_themes_v2 WHERE hcp_id = %s AND therapeutic_area = %s
 """
 
 COUNT_THEMES_SQL = """
-SELECT COUNT(*) AS cnt FROM public.hcp_research_themes_v2 WHERE hcp_id = %s
+SELECT COUNT(*) AS cnt FROM public.hcp_research_themes_v2 WHERE hcp_id = %s AND therapeutic_area = %s
 """
+
+
+def resolve_ta_id(conn: psycopg.Connection, slug: str) -> str:
+    """Resolve therapeutic_areas.slug -> id (psycopg3 dict_row -> row["id"])."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM therapeutic_areas WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError(f"TA slug not found in therapeutic_areas: {slug}")
+        return str(row["id"])
 
 
 def utc_now_iso() -> str:
@@ -197,16 +283,20 @@ def format_publications_block(papers: List[Dict[str, Any]]) -> str:
     return "\n---\n".join(blocks)
 
 
-def build_user_prompt(papers: List[Dict[str, Any]]) -> str:
+def build_user_prompt(
+    papers: List[Dict[str, Any]],
+    domain: str,
+    theme_examples: str,
+    generic_negative: str,
+) -> str:
     publications_block = format_publications_block(papers)
     return (
-        "Below are the recent publications (last 5 years) of an NSCLC researcher. "
+        f"Below are the recent publications (last 5 years) of an {domain} researcher. "
         "They appear as either first author (executing the work) or senior author "
         "(directing the work).\n\n"
         "Identify 10-12 distinct research themes in their work. Themes should be SPECIFIC "
-        "scientific concepts - e.g., 'EGFR-mutant resistance mechanisms' or "
-        "'CNS-active TKIs for brain metastases' - NOT generic categories like 'lung cancer' "
-        "or 'clinical trials'.\n\n"
+        f"scientific concepts - e.g., {theme_examples} - NOT generic categories like "
+        f"{generic_negative} or 'clinical trials'.\n\n"
         "For each theme, return:\n"
         "- theme_name (string, 2-6 words, specific not generic)\n"
         "- centrality ('core' if this is a central focus appearing across multiple papers, "
@@ -328,6 +418,7 @@ def assign_display_ranks(themes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def call_claude(
     client: anthropic.Anthropic,
     user_prompt: str,
+    system_prompt: str,
 ) -> Tuple[str, int, int]:
     last_error: Optional[Exception] = None
 
@@ -336,7 +427,7 @@ def call_claude(
             response = client.messages.create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
             )
             text = extract_response_text(response)
@@ -363,28 +454,28 @@ def call_claude(
     raise RuntimeError(f"Claude API failed after retries: {last_error}")
 
 
-def fetch_target_hcps(conn: psycopg.Connection) -> List[Dict[str, Any]]:
+def fetch_target_hcps(conn: psycopg.Connection, target_sql: str, ta_id: str) -> List[Dict[str, Any]]:
     with conn.cursor() as cur:
-        cur.execute(TARGET_HCPS_SQL)
+        cur.execute(target_sql, (ta_id,))
         return list(cur.fetchall())
 
 
-def fetch_papers(conn: psycopg.Connection, hcp_id: str) -> List[Dict[str, Any]]:
+def fetch_papers(conn: psycopg.Connection, hcp_id: str, ta_id: str) -> List[Dict[str, Any]]:
     with conn.cursor() as cur:
-        cur.execute(PAPERS_SQL, (hcp_id,))
+        cur.execute(PAPERS_SQL, (hcp_id, ta_id))
         return list(cur.fetchall())
 
 
-def themes_exist(conn: psycopg.Connection, hcp_id: str) -> bool:
+def themes_exist(conn: psycopg.Connection, hcp_id: str, tag: str) -> bool:
     with conn.cursor() as cur:
-        cur.execute(COUNT_THEMES_SQL, (hcp_id,))
+        cur.execute(COUNT_THEMES_SQL, (hcp_id, tag))
         row = cur.fetchone()
     return int(row["cnt"]) > 0 if row else False
 
 
-def delete_themes(conn: psycopg.Connection, hcp_id: str) -> None:
+def delete_themes(conn: psycopg.Connection, hcp_id: str, tag: str) -> None:
     with conn.cursor() as cur:
-        cur.execute(DELETE_THEMES_SQL, (hcp_id,))
+        cur.execute(DELETE_THEMES_SQL, (hcp_id, tag))
 
 
 def write_themes(
@@ -392,6 +483,7 @@ def write_themes(
     hcp_id: str,
     themes: List[Dict[str, Any]],
     extraction_run_id: str,
+    tag: str,
 ) -> int:
     rows = [
         (
@@ -401,7 +493,7 @@ def write_themes(
             t["paper_count"],
             t.get("display_rank"),
             t["example_pmids"] or None,
-            THERAPEUTIC_AREA,
+            tag,
             extraction_run_id,
         )
         for t in themes
@@ -476,7 +568,21 @@ def print_progress(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Extract NSCLC research themes per HCP via Claude API."
+        description="Extract per-HCP research themes by therapeutic area via Claude API."
+    )
+    parser.add_argument(
+        "--ta",
+        choices=tuple(TA_CONFIGS.keys()),
+        default=DEFAULT_TA,
+        help="Therapeutic-area slug (default: nsclc).",
+    )
+    parser.add_argument(
+        "--scope",
+        default=None,
+        help=(
+            "Cohort scope within the TA (e.g. AD: 'us' vs 'global'). "
+            "Defaults to the TA config's default_scope. Valid values are per-TA."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -513,17 +619,38 @@ def main() -> int:
     force = bool(args.force)
     hcp_limit = resolve_hcp_limit(dry_run, args.limit)
 
+    # Resolve the TA config + scope. Fix A: validate --scope against the per-TA
+    # selection dict (not a static choices tuple), because valid scopes differ by
+    # TA (nsclc: rising; atopic-dermatitis: us/global). ta_id needs a DB
+    # connection, so it is resolved later, inside the `with conn` block (fix B).
+    ta_slug = args.ta
+    ta_cfg = TA_CONFIGS[ta_slug]
+    scope = args.scope or ta_cfg["default_scope"]
+    if scope not in ta_cfg["selection"]:
+        valid = ", ".join(sorted(ta_cfg["selection"].keys()))
+        raise SystemExit(
+            f"Invalid --scope '{scope}' for --ta {ta_slug}. Valid scopes: {valid}"
+        )
+    target_sql = ta_cfg["selection"][scope]
+    tag = ta_cfg["tag"]
+    domain = ta_cfg["domain"]
+    theme_examples = ta_cfg["theme_examples"]
+    generic_negative = ta_cfg["generic_negative"]
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(domain=domain)
+    # Per-TA/scope checkpoint so an AD run can never resume from an NSCLC checkpoint.
+    checkpoint_path = f"extract_research_themes_{ta_slug}_{scope}_checkpoint.json"
+
     database_url = get_required_env("DATABASE_URL")
     api_key = get_required_env("ANTHROPIC_API_KEY")
     client = anthropic.Anthropic(api_key=api_key, timeout=120.0)
 
     if force:
-        delete_checkpoint(CHECKPOINT_PATH)
+        delete_checkpoint(checkpoint_path)
         extraction_run_id = str(uuid.uuid4())
         checkpoint_state: Optional[Dict[str, Any]] = None
         print("Force mode: starting fresh extraction run.", flush=True)
     else:
-        checkpoint_state = load_checkpoint(CHECKPOINT_PATH)
+        checkpoint_state = load_checkpoint(checkpoint_path)
         if checkpoint_state and checkpoint_state.get("extraction_run_id"):
             extraction_run_id = str(checkpoint_state["extraction_run_id"])
         else:
@@ -535,8 +662,12 @@ def main() -> int:
 
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         conn.autocommit = False
-        print("Loading target NSCLC HCPs...", flush=True)
-        hcps = fetch_target_hcps(conn)
+        ta_id = resolve_ta_id(conn, ta_slug)  # fix B: needs conn
+        print(
+            f"Loading target HCPs | TA: {tag} ({ta_slug}) | scope: {scope}...",
+            flush=True,
+        )
+        hcps = fetch_target_hcps(conn, target_sql, ta_id)
         total_loaded = len(hcps)
         print(f"Loaded {total_loaded} HCPs meeting publication threshold.", flush=True)
 
@@ -579,7 +710,7 @@ def main() -> int:
             hcp_start = time.monotonic()
 
             try:
-                if not force and not dry_run and themes_exist(conn, hcp_id):
+                if not force and not dry_run and themes_exist(conn, hcp_id, tag):
                     print(f"[SKIP] HCP {hcp_id}: already extracted", flush=True)
                     stats.skipped_count += 1
                     if not dry_run:
@@ -593,13 +724,13 @@ def main() -> int:
                         checkpoint_state["processed_count"] = int(
                             checkpoint_state.get("processed_count", 0)
                         ) + 1
-                        save_checkpoint(CHECKPOINT_PATH, checkpoint_state)
+                        save_checkpoint(checkpoint_path, checkpoint_state)
                     duration = time.monotonic() - hcp_start
                     stats.per_hcp_durations.append(duration)
                     print_progress(idx, total, start_time, stats)
                     continue
 
-                papers = fetch_papers(conn, hcp_id)
+                papers = fetch_papers(conn, hcp_id, ta_id)
                 if not papers:
                     print(f"[WARN] HCP {hcp_id}: no qualifying papers; skipping", flush=True)
                     stats.failed_count += 1
@@ -611,8 +742,10 @@ def main() -> int:
                 if elapsed_since_request < MIN_REQUEST_INTERVAL_SEC:
                     time.sleep(MIN_REQUEST_INTERVAL_SEC - elapsed_since_request)
 
-                user_prompt = build_user_prompt(papers)
-                raw_text, in_tok, out_tok = call_claude(client, user_prompt)
+                user_prompt = build_user_prompt(
+                    papers, domain, theme_examples, generic_negative
+                )
+                raw_text, in_tok, out_tok = call_claude(client, user_prompt, system_prompt)
                 last_request_at = time.monotonic()
                 stats.total_input_tokens += in_tok
                 stats.total_output_tokens += out_tok
@@ -649,8 +782,8 @@ def main() -> int:
                     stats.successful_count += 1
                 else:
                     if force:
-                        delete_themes(conn, hcp_id)
-                    written = write_themes(conn, hcp_id, themes, extraction_run_id)
+                        delete_themes(conn, hcp_id, tag)
+                    written = write_themes(conn, hcp_id, themes, extraction_run_id, tag)
                     stats.themes_written += written
                     stats.successful_count += 1
                     checkpoint_state = checkpoint_state or {
@@ -663,7 +796,7 @@ def main() -> int:
                     checkpoint_state["processed_count"] = int(
                         checkpoint_state.get("processed_count", 0)
                     ) + 1
-                    save_checkpoint(CHECKPOINT_PATH, checkpoint_state)
+                    save_checkpoint(checkpoint_path, checkpoint_state)
 
             except (APITimeoutError, APIConnectionError, httpx.TimeoutException) as e:
                 print(
@@ -690,8 +823,8 @@ def main() -> int:
         projected_in = 0
         projected_out = 0
         if api_calls > 0:
-            projected_in = int(stats.total_input_tokens / api_calls * 4400)
-            projected_out = int(stats.total_output_tokens / api_calls * 4400)
+            projected_in = int(stats.total_input_tokens / api_calls * total_loaded)
+            projected_out = int(stats.total_output_tokens / api_calls * total_loaded)
         projected_cost = estimate_cost(projected_in, projected_out)
         sample_n = api_calls if api_calls else DRY_RUN_HCP_LIMIT
         print(
@@ -699,7 +832,7 @@ def main() -> int:
             f"  Total input tokens: {stats.total_input_tokens:,}\n"
             f"  Total output tokens: {stats.total_output_tokens:,}\n"
             f"  Cost of dry run: ${cost:.2f}\n"
-            f"  Projected cost for full 4400 HCPs: ${projected_cost:.2f}",
+            f"  Projected cost for full {total_loaded} HCPs: ${projected_cost:.2f}",
             flush=True,
         )
 
