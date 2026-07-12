@@ -77,6 +77,7 @@ import {
   getRisingStars,
   getTACounts,
   getTAIdForLabel,
+  resolvePrimaryTaId,
 } from "./lib/api";
 import ActiveFilterPills from "./components/ActiveFilterPills";
 import FilterButton from "./components/FilterButton";
@@ -1032,8 +1033,9 @@ function HCPDetailRoute() {
   const location = useLocation();
   const { region } = useFilterContext();
   const navState = location.state as { taLabel?: string; taId?: string } | null;
-  const selectedTA = navState?.taLabel ?? "Oncology";
-  const detailTaId = navState?.taId;
+  const [resolvedTaId, setResolvedTaId] = useState<string | undefined>(navState?.taId);
+  const [taResolving, setTaResolving] = useState<boolean>(!navState?.taId);
+  const detailTaSlug = resolvedTaId ? apiSlugForTaId(resolvedTaId) : undefined;
   const [subScreen, setSubScreen] = useState<HcpDetailSubScreen>("detail");
   const [hcp, setHcp] = useState<AppHCP>(EMPTY_HCP);
   const [loading, setLoading] = useState(true);
@@ -1041,8 +1043,41 @@ function HCPDetailRoute() {
   const [bibYear, setBibYear] = useState(2024);
   const [trayOpen, setTrayOpen] = useState(false);
 
+  // Re-derive the HCP's TA when the caller carried none (refresh, bookmark,
+  // deep-link, back-nav). navState.taId always wins when present so in-app
+  // context + dual-TA intent are preserved. No silent default to NSCLC.
+  useEffect(() => {
+    if (navState?.taId) {
+      setResolvedTaId(navState.taId);
+      setTaResolving(false);
+      return;
+    }
+    if (!hcpId) {
+      setTaResolving(false);
+      return;
+    }
+    let cancelled = false;
+    setTaResolving(true);
+    void (async () => {
+      const primary = await resolvePrimaryTaId(hcpId);
+      if (cancelled) return;
+      setResolvedTaId(primary ?? undefined);
+      setTaResolving(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hcpId, navState?.taId]);
+
   useEffect(() => {
     if (!hcpId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    if (taResolving) return; // wait for TA re-derivation before fetching
+    if (!resolvedTaId || !detailTaSlug) {
+      // HCP has no TA membership → honest not-found instead of a wrong TA.
       setNotFound(true);
       setLoading(false);
       return;
@@ -1054,9 +1089,9 @@ function HCPDetailRoute() {
 
     void (async () => {
       const { data, error } = await getHCPDetail(hcpId, {
-        therapeuticArea: taLabelToApiSlug(selectedTA),
+        therapeuticArea: detailTaSlug,
         region,
-        taId: detailTaId,
+        taId: resolvedTaId,
       });
       if (cancelled) return;
       if (error || !data) {
@@ -1071,7 +1106,7 @@ function HCPDetailRoute() {
     return () => {
       cancelled = true;
     };
-  }, [hcpId, region, detailTaId]);
+  }, [hcpId, region, resolvedTaId, taResolving]);
 
   function handleBack() {
     if (window.history.length > 1) {
@@ -1153,7 +1188,7 @@ function HCPDetailRoute() {
           setBibYear(year);
           setSubScreen("bibliography");
         }}
-        taSlug={detailTaId ? (apiSlugForTaId(detailTaId) ?? taLabelToApiSlug(selectedTA)) : taLabelToApiSlug(selectedTA)}
+        taSlug={detailTaSlug as string}
       />
       <ActionTray
         open={trayOpen}

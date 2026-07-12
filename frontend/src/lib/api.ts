@@ -635,6 +635,51 @@ export function apiSlugForTaId(taId: string): string | undefined {
   return SLUG_BY_TA_ID[taId];
 }
 
+export function taIdForApiSlug(slug: string): string | undefined {
+  return TA_ID_MAP[slug.toLowerCase().trim()];
+}
+
+const TA_DISPLAY_NAME_BY_SLUG: Record<string, string> = {
+  nsclc: "NSCLC",
+  "atopic-dermatitis": "Atopic Dermatitis",
+  hepatology: "Hepatology",
+  "rare-disease": "Rare Disease",
+  immunology: "Immunology",
+  oncology: "Oncology",
+};
+
+export function taDisplayNameForId(taId: string): string {
+  const slug = apiSlugForTaId(taId);
+  return (slug && TA_DISPLAY_NAME_BY_SLUG[slug]) ?? "";
+}
+
+/**
+ * Resolve an HCP's primary therapeutic area when the caller didn't carry one
+ * (refresh, bookmark, deep-link, back-nav). Primary = the TA with the most
+ * publications for this HCP (hcp_therapeutic_areas_v2.publication_count).
+ *
+ * NOTE: publication_count, NOT hcp_scores_v2.composite_score. hcp_scores_v2 is
+ * the legacy v2 scoring table and contains no AD rows — an AD KOL has zero score
+ * rows there, so a "highest-scored" pick returns nothing for non-NSCLC HCPs.
+ * publication_count is populated for every TA membership. Deterministic tiebreak
+ * on therapeutic_area_id.
+ */
+export async function resolvePrimaryTaId(hcpId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("hcp_therapeutic_areas_v2")
+    .select("therapeutic_area_id, publication_count")
+    .eq("hcp_id", hcpId)
+    .order("publication_count", { ascending: false, nullsFirst: false })
+    .order("therapeutic_area_id", { ascending: true })
+    .limit(1);
+  if (error) {
+    console.warn("resolvePrimaryTaId: query error", error);
+    return null;
+  }
+  const row = (data ?? [])[0] as { therapeutic_area_id?: string } | undefined;
+  return row?.therapeutic_area_id ? String(row.therapeutic_area_id) : null;
+}
+
 const INDUSTRY_PATTERNS = [
   "pfizer", "merck", "novartis", "roche", "genentech", "astrazeneca",
   "glaxosmithkline", "gsk", "sanofi", "bristol myers", "bristol-myers",
