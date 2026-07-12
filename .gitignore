@@ -86,3 +86,14 @@ fieldmark_backup_premerge.dump
 Twitter API.txtno_fit_*.json
 failed_batches_*.json
 node_modules/
+
+# --- AD Rising session scratch (July 2026) ---
+*_scan.txt
+*.log
+/*.txt
+/*.png
+CommunityExplorer.jsx
+ctgov_silverberg_probe.py
+/index_and_verify.sql
+/inventory_dryrun.sql
+/unmapped_ad_institutions.sql
