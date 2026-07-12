@@ -6765,3 +6765,47 @@ CLOSEOUT CHECKLIST:
   [ ] save UMBRA docs locally (Governance + Implementation Doctrine)
   [ ] confirm no orphaned Code background jobs
 ===== END CLOSEOUT =====
+
+### 30ez. AD RISING FRONTEND = larger than a repoint (grep-confirmed). Tier 1 now; archetype + Landscape + Home/Watchlists/Briefs are logged follow-ups.
+
+RPC migration DONE (get_rising_composite_filtered / _count, mirrors get_established_filtered against
+hcp_rising_composite_v1; career_first_pub_year_v2 swap confirmed via 76% plain-vs-v2 divergence + scorer
+grep showing emergence/momentum gate on _v2). Migration is scope-row shaped, returns the real axes
+(rising_composite_score, emergence_pctile, network_influence_pctile). Safe to apply — net-new names, old
+rising RPC untouched for frozen NSCLC.
+
+FRONTEND CONSUMER TRACE (the load-bearing find): the entire rising read path speaks the OLD 2x2
+momentum/visibility vocabulary. Nothing reads the new columns. A field-grep (archetype|scope_rank|us_rank)
+exposed the true blast radius - NOT the 4 files scoped, but ~11 surfaces across 4 tiers:
+  TIER 1 (feed - do now): ScoreBreakdownV3Rising, HCPCard, api.ts rising branch (281-351), types.ts,
+    hcpData.ts. Collapse 4 tiles -> 2 (Emergence / Network Influence, copy from the 30v advisor spec).
+  TIER 2 (archetype = a subsystem, not a field): 5 archetype fns in HCPCard + an ARCHETYPE stat column +
+    pill; ScoreBreakdownV3Rising has its own archetypeColor/ShortLabel/showBadge. New model emits NO
+    archetype. DECISION LOGGED BELOW.
+  TIER 3 (Landscape/Telescope - separate workstream): LandscapeQuadrantChart + api.ts feeders (3158-3389)
+    read the 4 momentum/visibility fields + archetype + us_rank straight off hcp_rising_star_ranks_v3 (OLD
+    table). A 2-axis model has no 4-quadrant chart - rebuild-or-remove, not a repoint. Plus
+    MethodologyPage:157-195 PROSE describes the 70/30 momentum/visibility model - copy goes false on cutover.
+  TIER 4 (silent-empty risk): home.ts, watchlists.ts, briefs.ts, generate-brief Edge Fn all query us_rank +
+    archetype directly off hcp_rising_star_ranks_v3, bypassing the RPC. On AD-cutover they read a stale/absent
+    table -> silent empties. Briefs empty would show in a demo. Repoint-or-guard pass needed; bump priority.
+
+ARCHETYPE DECISION (not a regression - a retired premise): the old archetypes (Scientific/Network Accelerator,
+Balanced Rising Star) were labels for positions in the 2x2 grid. The 30v advisor pass killed the
+network-in-momentum axis AS DISHONEST. So archetype named positions in a grid whose axes no longer mean what
+they claimed. Removing it is a consequence of the advisor's own logic, not a feature loss.
+  - NOW (Tier 1): AD rising renders NO archetype badge (old subsystem stays live for NSCLC on the old table).
+    AD leads with cohort-relative emergence_pctile + the 2-tile breakdown = more info than one quadrant label.
+  - LATER (open design Q, decidable after seeing the 2-tile render): does emergence x network-influence
+    warrant its OWN archetype derivation? emergence-high/network-low ("surging on science, not yet connected")
+    vs emergence-low/network-high ("connected, not accelerating") is a REAL, honest distinction - arguably
+    better than the old one because both axes now mean what they say. Build the honest version or none.
+
+SEQUENCING (reconfirmed): commit resolvePrimaryTaId durability fix first (clean base - it's uncommitted in
+the working tree, touches App.tsx/api.ts which Tier 1 also touches; verify Silverberg survives hard-refresh
+before committing). Run NSCLC back-migration (emergence + rising_composite --ta nsclc) BEFORE repointing the
+feed, else NSCLC rising goes dark (rising_composite_v1 is AD-only today). Then Tier 1. Tiers 2-4 logged.
+
+ALSO LOGGED (Established twin): established_scoring.py:298 selects plain career_first_pub_year (corrupted col).
+Established RANKS are clean (career age not in its ranking math - projection-only), but Established CARDS may
+DISPLAY the corrupted start year. Same display bug we fixed for rising. Low priority, don't lose it.
