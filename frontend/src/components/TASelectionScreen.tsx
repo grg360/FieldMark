@@ -7,18 +7,12 @@ interface TASelectionScreenProps {
   onSkip: () => void;
 }
 
+// Hepatology and Rare Disease retired 2026-07-11 (parent tiles suppressed; no v3
+// rank data). See docs/VERSION_CONSISTENCY_AUDIT.md.
 const taOptions = [
-  {
-    name: "Rare Disease",
-    descriptor: "Ultra-orphan and orphan conditions",
-  },
   {
     name: "Oncology",
     descriptor: "Solid tumors, hematologic malignancies, immunotherapy",
-  },
-  {
-    name: "Hepatology",
-    descriptor: "Liver disease, cholestatic and metabolic conditions",
   },
   {
     name: "Immunology",

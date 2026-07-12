@@ -7,7 +7,11 @@ import {
   trackToDashboardSlug,
 } from "../lib/routeSlugs";
 
-const TA_CHIPS = ["Oncology", "Immunology", "Hepatology", "Rare Disease"];
+// Hepatology and Rare Disease parent tiles retired (2026-07-11): their cohort feeds
+// read hcp_*_ranks_v3, which has no hepatology/rare-disease rows, so the tiles
+// advertised counts (from the v2 scores tables) against empty feeds. Presentation-
+// layer suppression only — no data deleted. See docs/VERSION_CONSISTENCY_AUDIT.md.
+const TA_CHIPS = ["Oncology", "Immunology"];
 
 interface TAFilterChipsProps {
   selected: string;

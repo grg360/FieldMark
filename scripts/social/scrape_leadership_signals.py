@@ -325,11 +325,12 @@ def fetch_target_hcps(
             SELECT
               er.hcp_id,
               er.rank,
-              er.first_name,
-              er.last_name,
-              er.institution_normalized AS institution
-            FROM hcp_established_ranks_v2 er
+              h.first_name,
+              h.last_name,
+              h.institution_normalized AS institution
+            FROM hcp_established_ranks_v3 er
             JOIN therapeutic_areas ta ON ta.id = er.therapeutic_area_id
+            JOIN hcps_v2 h ON h.id = er.hcp_id
             WHERE ta.slug = %s
               AND er.scope_type = %s
               AND er.scope_value = %s

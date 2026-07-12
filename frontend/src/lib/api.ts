@@ -1236,7 +1236,9 @@ export async function getTACounts(
 
 export async function getAllTACounts(): Promise<ApiResult<Record<string, TACounts>>> {
   try {
-    const slugs = ["rare-disease", "hepatology", "nsclc", "immunology"] as const;
+    // Hepatology and Rare Disease retired 2026-07-11 (no v3 rank rows → frozen feeds);
+    // stop computing their parent-level counts. See docs/VERSION_CONSISTENCY_AUDIT.md.
+    const slugs = ["nsclc", "immunology"] as const;
     const results = await Promise.all(
       slugs.map((slug) => getTACounts({ therapeuticArea: slug, scope: "global" })),
     );
