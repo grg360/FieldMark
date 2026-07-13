@@ -75,6 +75,9 @@ export interface HCP {
   archetype?: string | null;
   us_rank?: number | null;
   scope_rank?: number | null;
+  // AD rising 2-axis composite model (rising_model === "composite").
+  emergence_pctile?: number | null;
+  rising_model?: "composite" | "legacy";
 }
 
 export const hcpData: HCP[] = [

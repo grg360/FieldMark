@@ -101,6 +101,55 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
     );
   }
 
+  // AD 2-axis composite model: headline = rising_composite_score, two tiles
+  // (Emergence / Network Influence), no archetype badge, scope-local rank.
+  if (data.model === "composite") {
+    const compositeScore = Math.round(data.rising_composite_score ?? 0);
+    const compositeColor = "#9B6DFF";
+    const compositeRankSubtext = `Rank ${data.rank} Global`;
+    return (
+      <div style={{ padding: 0 }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ ...RIGHT_RAIL_HEADER_STYLE, marginBottom: 12 }}>Rising Star Score</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span
+              style={{
+                fontSize: 36,
+                color: compositeColor,
+                fontWeight: 700,
+                fontFeatureSettings: '"tnum"',
+                lineHeight: 1,
+              }}
+            >
+              {compositeScore}
+            </span>
+            <span style={{ fontSize: 16, color: "#6B6A65", fontWeight: 500 }}>/ 100</span>
+          </div>
+          <div style={{ fontSize: 11, color: "#9B9892", marginTop: 8 }}>{compositeRankSubtext}</div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+          <ScoreKpiTile
+            label="Emergence"
+            value={data.emergence_pctile ?? 0}
+            barColor={SIGNAL_SCIENTIFIC}
+            tooltip="Who is establishing themselves scientifically? Recent (2021-2025) AD publication trajectory — output (45%), senior/first authorship (35%), citations per paper (20%) — ranked within the rising cohort."
+          />
+          <ScoreKpiTile
+            label="Network Influence"
+            value={data.network_influence_pctile ?? 0}
+            barColor={SIGNAL_NETWORK}
+            tooltip="How connected are they? Position in the AD collaboration graph."
+          />
+        </div>
+
+        <div style={{ marginTop: 14, fontSize: 11, color: "#6B6A65", lineHeight: 1.5 }}>
+          Emergence 75% · Network 25%
+        </div>
+      </div>
+    );
+  }
+
   const scoreDisplay = Math.round(data.rising_star_percentile);
   const badgeColor = archetypeColor(data.archetype);
   const rankSubtext =

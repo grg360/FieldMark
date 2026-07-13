@@ -331,6 +331,8 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     archetype: item.archetype ?? null,
     us_rank: item.us_rank ?? null,
     scope_rank: item.scope_rank ?? null,
+    emergence_pctile: item.emergence_pctile ?? null,
+    rising_model: item.rising_model,
   };
 }
 

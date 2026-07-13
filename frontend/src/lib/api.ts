@@ -278,7 +278,7 @@ async function enrichAndMapCohortRows(
     const opData = opById.get(String(rr.hcp_id));
     const metricsData = metricsById.get(String(rr.hcp_id));
 
-    if (cohort === "rising_star" || cohort === "rising_composite") {
+    if (cohort === "rising_star") {
       const risingStarPercentile = parseOptionalNumber(rr.rising_star_percentile) ?? 0;
       const scopeRank = parseOptionalNumber(rr.scope_rank) ?? parseOptionalNumber(rr.rank) ?? 0;
       const momentumComponent = parseOptionalNumber(rr.momentum_component);
@@ -350,6 +350,81 @@ async function enrichAndMapCohortRows(
           scientific_influence_pctile: momentumComponent,
           network_influence_pctile: visibilityComponent,
           pharma_engagement_pctile: null,
+          citedByCount: metricsData?.cited_by_count ?? null,
+          hIndex: metricsData?.h_index ?? null,
+          worksCount: metricsData?.works_count ?? null,
+          total_citations: metricsData?.cited_by_count ?? null,
+          h_index: metricsData?.h_index ?? null,
+          works_count: metricsData?.works_count ?? null,
+        } as RisingStar,
+      ];
+    }
+
+    if (cohort === "rising_composite") {
+      // AD 2-axis composite model. Reads the real Emergence / Network Influence
+      // axes from get_rising_composite_filtered; emits NO momentum/visibility/
+      // archetype/us_rank/scope_rank. cohort_classification stays "rising_star" so
+      // the existing rising card/detail gates still recognize it; the rising_model
+      // flag is what the card/detail branch on to render the 2-tile composite view.
+      const compositeScore = parseOptionalNumber(rr.rising_composite_score) ?? 0;
+      const emergencePctile = parseOptionalNumber(rr.emergence_pctile);
+      const networkInfluencePctile = parseOptionalNumber(rr.network_influence_pctile);
+      const scopeRank = parseOptionalNumber(rr.rank) ?? 0;
+
+      const enrichedRow = {
+        composite_score: compositeScore,
+        normalized_score: compositeScore,
+        cohort_score: compositeScore,
+        pub_velocity_score: null,
+        citation_trajectory_score: null,
+        trial_investigator_score: null,
+        career_first_pub_year: rr.career_first_pub_year ?? null,
+        total_career_pubs: rr.total_career_pubs ?? null,
+        tier: "rising_star",
+        hcps: {
+          ...hcp,
+          first_name: rr.first_name ?? hcp.first_name,
+          last_name: rr.last_name ?? hcp.last_name,
+          institution_normalized:
+            rr.institution_normalized ?? rr.institution_key ?? hcp.institution_normalized,
+          country: rr.country ?? hcp.country,
+          career_first_pub_year: rr.career_first_pub_year ?? hcp.career_first_pub_year,
+          total_career_pubs: rr.total_career_pubs ?? hcp.total_career_pubs,
+          cohort_classification: "rising_star",
+          therapeutic_area: filters.therapeuticArea,
+          hcp_medicare_summary: medicareData ? [medicareData] : null,
+          hcp_open_payments_summary: opData ? [opData] : null,
+        },
+      };
+
+      const mapped = mapRisingStarRow(enrichedRow, filters.therapeuticArea);
+      return [
+        {
+          ...mapped,
+          normalized_score: compositeScore,
+          cohort_score: compositeScore,
+          composite_score: compositeScore,
+          rising_composite_score: compositeScore,
+          emergence_pctile: emergencePctile,
+          network_influence_pctile: networkInfluencePctile,
+          rising_model: "composite",
+          pub_velocity: 0,
+          citation_trajectory: 0,
+          pubVel: "—",
+          citTraj: null,
+          trial_score: 0,
+          trialScore: 0,
+          narrative: narrativeMap.get(String(rr.hcp_id))?.narrative_text ?? null,
+          why_now: narrativeMap.get(String(rr.hcp_id))?.why_now ?? null,
+          engagement_angle: narrativeMap.get(String(rr.hcp_id))?.engagement_angle ?? null,
+          caution_flags: narrativeMap.get(String(rr.hcp_id))?.caution_flags ?? null,
+          signal_strength: narrativeMap.get(String(rr.hcp_id))?.signal_strength ?? null,
+          rank: scopeRank,
+          percentile: compositeScore,
+          scope_size: undefined,
+          scope: scopeLabel,
+          tier: "rising_star",
+          cohort_classification: "rising_star",
           citedByCount: metricsData?.cited_by_count ?? null,
           hIndex: metricsData?.h_index ?? null,
           worksCount: metricsData?.works_count ?? null,
@@ -604,6 +679,13 @@ export interface RisingStarScoreBreakdown {
   external_collaborators: TopCollaborator[];
   early_collaborator_count?: number | null;
   recent_collaborator_count?: number | null;
+  // AD 2-axis composite model. model === "composite" → render Emergence / Network
+  // Influence tiles from these fields; legacy (NSCLC) leaves model unset and uses the
+  // momentum/visibility/archetype fields above.
+  model?: "composite" | "legacy";
+  rising_composite_score?: number | null;
+  emergence_pctile?: number | null;
+  network_influence_pctile?: number | null;
 }
 
 export interface CommunityScoreBreakdown {
@@ -1780,6 +1862,143 @@ export async function getHCPDetail(
   }
 }
 
+async function getRisingCompositeScoreBreakdown(
+  hcpId: string,
+  taId: string,
+): Promise<RisingStarScoreBreakdown | null> {
+  // AD 2-axis composite detail. Reads real Emergence / Network Influence from
+  // hcp_rising_composite_v1 (global scope = the AD rising feed default). Drops the
+  // hcp_network_momentum_v1 read (0% AD coverage); keeps hcp_top_collaborators_v2.
+  const { data, error } = await supabase
+    .from("hcp_rising_composite_v1")
+    .select("hcp_id, rank, rising_composite_score, emergence_pctile, network_influence_pctile")
+    .eq("hcp_id", hcpId)
+    .eq("therapeutic_area_id", taId)
+    .eq("scope_type", "global")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[getRisingCompositeScoreBreakdown]", error);
+    return null;
+  }
+  if (!data) return null;
+  const row = data as unknown as Record<string, unknown>;
+
+  const [{ data: sourceHcp }, { data: collaboratorsRaw }] = await Promise.all([
+    supabase.from("hcps_v2").select("institution_canonical").eq("id", hcpId).maybeSingle(),
+    supabase
+      .from("hcp_top_collaborators_v2")
+      .select("rank, collaborator_hcp_id, shared_publications")
+      .eq("hcp_id", hcpId)
+      .eq("therapeutic_area_id", taId)
+      .order("rank", { ascending: true })
+      .limit(10),
+  ]);
+  const sourceInstitution = sourceHcp?.institution_canonical ?? null;
+
+  let topCollaborators: TopCollaborator[] = [];
+  let externalCollaborators: TopCollaborator[] = [];
+  if (collaboratorsRaw && collaboratorsRaw.length > 0) {
+    const collabIds = collaboratorsRaw.map((r) => r.collaborator_hcp_id);
+    const { data: collabHcps } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name, institution_canonical")
+      .in("id", collabIds);
+    const nameMap = new Map<string, { name: string; institution: string | null }>();
+    (collabHcps || []).forEach((h) => {
+      nameMap.set(String(h.id), {
+        name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim(),
+        institution: h.institution_canonical,
+      });
+    });
+
+    const [establishedRanks, risingCompositeRanks] = await Promise.all([
+      supabase
+        .from("hcp_established_ranks_v3")
+        .select("hcp_id, cohort_score")
+        .in("hcp_id", collabIds)
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", "region")
+        .eq("scope_value", "US"),
+      supabase
+        .from("hcp_rising_composite_v1")
+        .select("hcp_id, rising_composite_score")
+        .in("hcp_id", collabIds)
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", "global"),
+    ]);
+
+    const establishedScoreMap = new Map<string, number>();
+    (establishedRanks.data || []).forEach((r) => {
+      if (r.cohort_score != null) {
+        establishedScoreMap.set(String(r.hcp_id), Number(r.cohort_score));
+      }
+    });
+
+    const risingScoreMap = new Map<string, number>();
+    (risingCompositeRanks.data || []).forEach((r) => {
+      const rr = r as { hcp_id: string; rising_composite_score: number | null };
+      if (rr.rising_composite_score != null) {
+        risingScoreMap.set(String(rr.hcp_id), Number(rr.rising_composite_score));
+      }
+    });
+
+    const allCollaborators: TopCollaborator[] = collaboratorsRaw.map((r) => {
+      const id = String(r.collaborator_hcp_id);
+      const risingScore = risingScoreMap.get(id);
+      const establishedScore = establishedScoreMap.get(id);
+      let cohort_kind: "rising_star" | "established" | null = null;
+      let cohort_score: number | null = null;
+      if (risingScore != null) {
+        cohort_kind = "rising_star";
+        cohort_score = risingScore;
+      } else if (establishedScore != null) {
+        cohort_kind = "established";
+        cohort_score = establishedScore;
+      }
+      return {
+        hcp_id: id,
+        rank: Number(r.rank),
+        name: nameMap.get(id)?.name ?? "Unknown",
+        institution: nameMap.get(id)?.institution ?? null,
+        shared_publications: Number(r.shared_publications ?? 0),
+        cohort_score,
+        cohort_kind,
+      };
+    });
+
+    topCollaborators = allCollaborators.filter(
+      (c) => sourceInstitution && c.institution === sourceInstitution,
+    );
+    externalCollaborators = allCollaborators.filter(
+      (c) => !sourceInstitution || c.institution !== sourceInstitution,
+    );
+  }
+
+  const composite = Number(row.rising_composite_score ?? 0);
+  return {
+    hcp_id: String(row.hcp_id),
+    model: "composite",
+    rising_composite_score: composite,
+    emergence_pctile: row.emergence_pctile == null ? null : Number(row.emergence_pctile),
+    network_influence_pctile:
+      row.network_influence_pctile == null ? null : Number(row.network_influence_pctile),
+    rank: Number(row.rank ?? 0),
+    // Legacy fields required by the type; unused by the composite render:
+    rising_star_percentile: composite,
+    momentum_component: 0,
+    visibility_component: 0,
+    scientific_momentum_percentile: 0,
+    network_momentum_percentile: 0,
+    scientific_visibility_percentile: 0,
+    network_visibility_percentile: 0,
+    archetype: "",
+    us_rank: null,
+    top_collaborators: topCollaborators,
+    external_collaborators: externalCollaborators,
+  };
+}
+
 export async function getRisingStarScoreBreakdown(
   hcpId: string,
   taSlug: string,
@@ -1788,6 +2007,11 @@ export async function getRisingStarScoreBreakdown(
 
   const taId = TA_ID_MAP[taSlug.toLowerCase().trim()];
   if (!taId) return null;
+
+  // AD rising uses the 2-axis composite model; every other TA stays on the legacy path.
+  if (taSlug.toLowerCase().trim() === "atopic-dermatitis") {
+    return getRisingCompositeScoreBreakdown(hcpId, taId);
+  }
 
   const { data, error } = await supabase
     .from("hcp_rising_star_ranks_v3")

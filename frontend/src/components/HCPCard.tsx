@@ -39,6 +39,10 @@ const RISING_STAR_TILE_TOOLTIPS: Record<string, string> = {
     "Current publication footprint in the recent 5-year window: total publications and citation rate.",
   "NETWORK VISIBILITY":
     "Current co-authorship centrality for this therapeutic area in the recent 5-year window.",
+  EMERGENCE:
+    "Who is establishing themselves scientifically? Recent (2021-2025) AD publication trajectory — output (45%), senior/first authorship (35%), citations per paper (20%) — ranked within the rising cohort.",
+  "NETWORK INFLUENCE":
+    "How connected are they? Position in the AD collaboration graph.",
 };
 
 function RisingStarSignalTile({
@@ -756,6 +760,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
               />
             )}
             {hcp.cohort_classification === "rising_star" &&
+              hcp.rising_model !== "composite" &&
               hcp.archetype &&
               hcp.archetype !== "Emerging Leader" && (
               <span
@@ -950,7 +955,29 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
         ) : null}
 
         {/* Row 4: Stat pills (cohort_classification-driven) */}
-        {cohort === "rising_star" ? (
+        {cohort === "rising_star" && hcp.rising_model === "composite" ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              marginTop: 12,
+            }}
+          >
+            <RisingStarSignalTile
+              label="EMERGENCE"
+              value={Math.round(hcp.emergence_pctile ?? 0)}
+              barColor="#3FB8AF"
+              tooltip={RISING_STAR_TILE_TOOLTIPS["EMERGENCE"]}
+            />
+            <RisingStarSignalTile
+              label="NETWORK INFLUENCE"
+              value={Math.round(hcp.networkInfluencePctile ?? 0)}
+              barColor="#E8A04E"
+              tooltip={RISING_STAR_TILE_TOOLTIPS["NETWORK INFLUENCE"]}
+            />
+          </div>
+        ) : cohort === "rising_star" ? (
           <div
             style={{
               display: "grid",
