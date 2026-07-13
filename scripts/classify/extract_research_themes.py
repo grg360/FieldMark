@@ -94,6 +94,18 @@ WHERE r.therapeutic_area_id = %s
 ORDER BY r.rank ASC
 """
 
+# AD rising cohort, global scope (2-axis composite model). Same 5-column shape as
+# the established SQL above (id, names, institution, rank) so fetch_target_hcps and
+# the dry-run print are unchanged; rank is scope-local composite rank.
+TARGET_HCPS_SQL_RISING_COMPOSITE_GLOBAL = """
+SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
+FROM hcps_v2 h
+JOIN hcp_rising_composite_v1 r ON r.hcp_id = h.id
+WHERE r.therapeutic_area_id = %s
+  AND r.scope_type = 'global'
+ORDER BY r.rank ASC
+"""
+
 # Per-TA config. The nsclc entry reproduces the original prompt text and
 # NSCLC-Rising-US selection verbatim (byte-identical rendered prompts, identical
 # selected HCP set). Non-NSCLC TAs supply their own cohort scoping, tag, and
@@ -129,6 +141,7 @@ TA_CONFIGS = {
         "selection": {
             "us": TARGET_HCPS_SQL_ESTABLISHED_US,
             "global": TARGET_HCPS_SQL_ESTABLISHED_GLOBAL,
+            "rising-global": TARGET_HCPS_SQL_RISING_COMPOSITE_GLOBAL,
         },
         "default_scope": "us",
     },
