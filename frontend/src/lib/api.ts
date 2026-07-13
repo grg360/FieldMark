@@ -66,7 +66,7 @@ function resolveRpcScopeParams(filters: FilterState): RpcScopeParams {
   return { scopeType, scopeValues, states, scopeLabel, scopeIncludesUs };
 }
 
-type CohortKind = "rising_star" | "established" | "community";
+type CohortKind = "rising_star" | "rising_composite" | "established" | "community";
 
 async function enrichAndMapCohortRows(
   rankRows: any[],
@@ -107,7 +107,7 @@ async function enrichAndMapCohortRows(
   }
 
   const { data: globalRankRows } =
-    cohort === "rising_star"
+    cohort === "rising_star" || cohort === "rising_composite"
       ? { data: null }
       : await supabase
           .from(rankTable)
@@ -198,7 +198,7 @@ async function enrichAndMapCohortRows(
 
   const filteredRankRows = rankRows.filter((rr: any) => {
     const hcp = hcpById.get(String(rr.hcp_id));
-    if (cohort === "rising_star") {
+    if (cohort === "rising_star" || cohort === "rising_composite") {
       if (!hcp) return false;
       const inst = String(hcp.institution_normalized ?? hcp.institution_raw ?? "").toLowerCase();
       if (!inst) return true;
@@ -278,7 +278,7 @@ async function enrichAndMapCohortRows(
     const opData = opById.get(String(rr.hcp_id));
     const metricsData = metricsById.get(String(rr.hcp_id));
 
-    if (cohort === "rising_star") {
+    if (cohort === "rising_star" || cohort === "rising_composite") {
       const risingStarPercentile = parseOptionalNumber(rr.rising_star_percentile) ?? 0;
       const scopeRank = parseOptionalNumber(rr.scope_rank) ?? parseOptionalNumber(rr.rank) ?? 0;
       const momentumComponent = parseOptionalNumber(rr.momentum_component);
@@ -473,7 +473,13 @@ async function fetchCohortViaRpc(
   const rpcScope = resolveRpcScopeParams(filters);
   const scope = resolveFilterScope(filters);
 
-  if (scope.scopeType === "global" || rpcScope.scopeValues.length === 0) {
+  // The rising_composite RPC handles global natively (scope_type='global',
+  // scope_value=NULL). Every other cohort/RPC has no global rows path, so it
+  // still bails to empty for global scope.
+  if (
+    (scope.scopeType === "global" || rpcScope.scopeValues.length === 0) &&
+    cohort !== "rising_composite"
+  ) {
     return { rows: [], total: 0, error: null };
   }
 
@@ -974,16 +980,19 @@ export async function getRisingStars(
     }
 
     const offset = options.offset ?? 0;
+    // AD rising reads the new 2-axis composite model (scope-aware, global-capable);
+    // every other TA stays on the frozen rising_star RPC/table byte-for-byte.
+    const isAdRising = taId === TA_ID_MAP["atopic-dermatitis"];
     const { rows, total, error: fetchError } = await fetchCohortViaRpc(
       filters,
       taId,
       taSlug,
       limit,
       offset,
-      "get_rising_star_filtered_count",
-      "get_rising_star_filtered",
-      "hcp_rising_star_ranks_v3",
-      "rising_star",
+      isAdRising ? "get_rising_composite_filtered_count" : "get_rising_star_filtered_count",
+      isAdRising ? "get_rising_composite_filtered" : "get_rising_star_filtered",
+      isAdRising ? "hcp_rising_composite_v1" : "hcp_rising_star_ranks_v3",
+      isAdRising ? "rising_composite" : "rising_star",
     );
     if (fetchError) {
       return { data: null, error: `Rising star fetch failed: ${fetchError}` };

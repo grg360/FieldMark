@@ -456,7 +456,13 @@ function FeedLayout({
       else setLoadingHCPs(true);
       setFeedOffset(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId };
+      // AD RISING defaults to global scope (82% intl). Gated on the rising track so
+      // AD Established/Community stay region/US (their RPCs still bail on global).
+      const isAdRising = indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" && track === "rising-stars";
+      const filters = {
+        therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId,
+        ...(isAdRising ? { scope: "global" as const } : {}),
+      };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
@@ -497,7 +503,13 @@ function FeedLayout({
       setFeedOffset(0);
       setFeedTotal(0);
       const taSlug = taLabelToApiSlug(selectedTA);
-      const filters = { therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId };
+      // AD RISING defaults to global scope (82% intl). Gated on the rising track so
+      // AD Established/Community stay region/US (their RPCs still bail on global).
+      const isAdRising = indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" && track === "rising-stars";
+      const filters = {
+        therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId,
+        ...(isAdRising ? { scope: "global" as const } : {}),
+      };
       let data: CohortFeedResult | null = null;
       if (track === "established") {
         ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
@@ -531,7 +543,13 @@ function FeedLayout({
     if (!isCohortFeedTrack(track)) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = taLabelToApiSlug(selectedTA);
-    const filters = { therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId };
+    // AD RISING defaults to global scope (82% intl). Gated on the rising track so
+    // AD Established/Community stay region/US (their RPCs still bail on global).
+    const isAdRising = indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" && track === "rising-stars";
+    const filters = {
+      therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId,
+      ...(isAdRising ? { scope: "global" as const } : {}),
+    };
     setLoadingMore(true);
     try {
       let data;
