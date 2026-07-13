@@ -82,8 +82,17 @@ VISIBLE_SCOPES = [
 
 EU5_COUNTRIES = ["DE", "FR", "IT", "ES", "GB"]
 
+# AD rising uses the 2-axis composite model (hcp_rising_composite_v1); every other TA
+# stays on the frozen legacy rising model (hcp_rising_star_ranks_v3). The 3 shared rising
+# functions (selection, context, freshness-skip) branch on this id so NSCLC/hepatology/
+# rare-disease rising narratives are untouched.
+AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
+
 COHORT_SCORE_CONFIG: Dict[str, Dict[str, Any]] = {
     "rising_star": {
+        # NOTE: rank_table is UNUSED (dead) — the rising selection/context/freshness
+        # functions hardcode their table (now TA-conditional via AD_TA_ID), so this is
+        # not the repoint lever. Left for parity with the other cohort entries.
         "rank_table": "hcp_rising_star_ranks_v3",
     },
     "established": {
@@ -331,29 +340,44 @@ def fetch_rising_star_top_hcp_ids_v3(
     top_n: int,
     visible_ta_ids: List[str],
 ) -> Set[str]:
-    """Rising Star cohort selection: US-scope only, top N per TA from hcp_rising_star_ranks_v3.
+    """Rising Star cohort selection: top N per TA by rank.
 
-    Matches the platform's US-default product model. Global/international HCPs are
-    intentionally excluded from narrative generation.
+    Per-TA model split:
+      - AD: GLOBAL top-N by composite rank from hcp_rising_composite_v1 (AD is
+        global-first; the composite table stores global rows as scope_type='global',
+        scope_value=NULL).
+      - Every other TA: frozen legacy path — US-scope only, top-N by us_rank from
+        hcp_rising_star_ranks_v3 (US-default product model; intl HCPs excluded).
     """
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
         try:
-            response = (
-                supabase.table("hcp_rising_star_ranks_v3")
-                .select("hcp_id")
-                .eq("therapeutic_area_id", ta_id)
-                .not_.is_("us_rank", "null")
-                .order("us_rank", desc=False)
-                .range(0, top_n - 1)
-                .execute()
-            )
+            if str(ta_id) == AD_TA_ID:
+                response = (
+                    supabase.table("hcp_rising_composite_v1")
+                    .select("hcp_id")
+                    .eq("therapeutic_area_id", ta_id)
+                    .eq("scope_type", "global")
+                    .order("rank", desc=False)
+                    .range(0, top_n - 1)
+                    .execute()
+                )
+            else:
+                response = (
+                    supabase.table("hcp_rising_star_ranks_v3")
+                    .select("hcp_id")
+                    .eq("therapeutic_area_id", ta_id)
+                    .not_.is_("us_rank", "null")
+                    .order("us_rank", desc=False)
+                    .range(0, top_n - 1)
+                    .execute()
+                )
             for row in response.data or []:
                 hcp_id = row.get("hcp_id")
                 if hcp_id:
                     selected.add(str(hcp_id))
         except Exception as exc:
-            print(f"[load] hcp_rising_star_ranks_v3 query failed for TA {ta_id}: {exc}")
+            print(f"[load] rising selection query failed for TA {ta_id}: {exc}")
     return selected
 
 
@@ -361,16 +385,26 @@ def fetch_rising_star_v3_context_rows(
     hcp_ids: Set[str],
     visible_ta_ids: List[str],
 ) -> Dict[Tuple[str, str], Dict[str, Any]]:
-    """Load Rising Star v3 ranks joined to scientific and network momentum signals."""
+    """Load Rising Star ranks + per-model context signals.
+
+    Per-TA model split (structurally different SQL selected by ta_id):
+      - AD: hcp_rising_composite_v1 (scope_type='global') LEFT JOIN
+        hcp_scientific_emergence_v1 (recent-window emergence sub-signals). Network
+        signal = r.network_influence_pctile from the composite row; NO network_momentum
+        join (0% AD coverage).
+      - Every other TA: frozen legacy query — hcp_rising_star_ranks_v3 + scientific/
+        network momentum joins (unchanged).
+    """
     if not hcp_ids or not visible_ta_ids:
         return {}
 
     ids_list = list(hcp_ids)
-    ta_list = list(visible_ta_ids)
+    ad_ta_ids = [t for t in visible_ta_ids if str(t) == AD_TA_ID]
+    legacy_ta_ids = [t for t in visible_ta_ids if str(t) != AD_TA_ID]
     rows_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
     batch_size = 500
 
-    sql = """
+    legacy_sql = """
         SELECT
             r.hcp_id,
             r.therapeutic_area_id,
@@ -404,15 +438,44 @@ def fetch_rising_star_v3_context_rows(
           AND r.hcp_id = ANY(%s::uuid[])
     """
 
+    composite_sql = """
+        SELECT
+            r.hcp_id,
+            r.therapeutic_area_id,
+            r.rank,
+            r.rising_composite_score,
+            r.network_influence_pctile,
+            e.recent_pub_count,
+            e.recent_pub_percentile,
+            e.recent_senior_pubs,
+            e.recent_first_pubs,
+            e.recent_senior_first_pct,
+            e.recent_authorship_percentile,
+            e.recent_citations_per_pub,
+            e.recent_total_citations,
+            e.recent_citation_impact_percentile,
+            e.emergence_percentile
+        FROM hcp_rising_composite_v1 r
+        LEFT JOIN hcp_scientific_emergence_v1 e
+            ON e.hcp_id = r.hcp_id
+           AND e.therapeutic_area_id = r.therapeutic_area_id
+        WHERE r.therapeutic_area_id = ANY(%s::uuid[])
+          AND r.hcp_id = ANY(%s::uuid[])
+          AND r.scope_type = 'global'
+    """
+
     with get_db_conn() as conn:
         with conn.cursor() as cur:
-            for i in range(0, len(ids_list), batch_size):
-                batch_ids = ids_list[i : i + batch_size]
-                cur.execute(sql, (ta_list, batch_ids))
-                for row in cur.fetchall():
-                    hcp_id = str(row["hcp_id"])
-                    ta_id = str(row["therapeutic_area_id"])
-                    rows_by_pair[(hcp_id, ta_id)] = dict(row)
+            for ta_group, sql in ((legacy_ta_ids, legacy_sql), (ad_ta_ids, composite_sql)):
+                if not ta_group:
+                    continue
+                for i in range(0, len(ids_list), batch_size):
+                    batch_ids = ids_list[i : i + batch_size]
+                    cur.execute(sql, (ta_group, batch_ids))
+                    for row in cur.fetchall():
+                        hcp_id = str(row["hcp_id"])
+                        ta_id = str(row["therapeutic_area_id"])
+                        rows_by_pair[(hcp_id, ta_id)] = dict(row)
     return rows_by_pair
 
 
@@ -1051,8 +1114,13 @@ def freshness_filter(
                 continue
 
             if ctx.cohort_classification == "rising_star":
+                rising_score_table = (
+                    "hcp_rising_composite_v1"
+                    if str(ctx.therapeutic_area_id) == AD_TA_ID
+                    else "hcp_rising_star_ranks_v3"
+                )
                 score_resp = (
-                    supabase.table("hcp_rising_star_ranks_v3")
+                    supabase.table(rising_score_table)
                     .select("computed_at")
                     .eq("hcp_id", ctx.hcp_id)
                     .eq("therapeutic_area_id", ctx.therapeutic_area_id)
