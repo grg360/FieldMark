@@ -36,6 +36,7 @@ import TopBar from "./components/TopBar";
 import FieldIntelligenceThread from "./components/FieldIntelligenceThread";
 import TAFilterChips from "./components/TAFilterChips";
 import HCPCard from "./components/HCPCard";
+import CommunityExplorer from "./components/CommunityExplorer";
 import ActionTray from "./components/ActionTray";
 import DetailScreen from "./components/DetailScreen";
 import NoteEntryScreen from "./components/NoteEntryScreen";
@@ -863,6 +864,11 @@ function FeedLayout({
           </div>
         )
       ) : isCohortFeedTrack(track) ? (
+        // AD Community renders the practitioner directory (server-side RPC over
+        // community_practitioners); every other TA/cohort keeps the card feed.
+        track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" ? (
+          <CommunityExplorer taLabel={selectedIndication} />
+        ) : (
         <>
         {route.indicationDataActive ? <InstitutionsInTerritoryPanel taSlug={taLabelToApiSlug(selectedTA)} taId={indicationTaId} /> : null}
         <ActiveFilterPills taSlug={taLabelToApiSlug(selectedTA)} />
@@ -972,6 +978,7 @@ function FeedLayout({
           )}
         </div>
         </>
+        )
       ) : null}
 
       <FilterDrawer
