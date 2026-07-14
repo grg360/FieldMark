@@ -189,7 +189,7 @@ export default function InstitutionsIndexRoute() {
             return (
               <div
                 key={entry.slug}
-                onClick={() => navigate(`/institution/${entry.slug}`)}
+                onClick={() => navigate(`/institution/${entry.slug}?ta=${taSlug}`)}
                 style={{
                   backgroundColor: "#15131A",
                   borderTop: "1px solid #1E1E22",

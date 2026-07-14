@@ -3733,6 +3733,118 @@ async function fetchInstitutionRowsInChunks<T>(
   return allRows;
 }
 
+// ---------------------------------------------------------------------------
+// Institutions rising cohort is TA-conditional. NSCLC (and any TA with rows)
+// reads the FROZEN hcp_rising_star_ranks_v3 exactly as before. AD has 0 rows
+// there and instead lives in hcp_rising_composite_v1 — same scope structure as
+// hcp_established_ranks_v3 (scope_type='region'/scope_value='US' for US), with
+// `rank` (not us_rank) and `rising_composite_score` (not rising_star_percentile).
+// The helpers return rows in the OLD shape so every downstream sort/count/label
+// is unchanged. Explicit AD-taId check keeps NSCLC untouched (mirrors how the
+// cohort feeds / Telescope branch AD).
+const AD_INSTITUTIONS_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1";
+
+// Piece 3: which hcps_v2 column identifies an institution's members. AD HCPs
+// carry the institution in institution_normalized (institution_canonical is
+// ~unpopulated for AD: ~8/447 established, ~2/684 rising); NSCLC uses
+// institution_canonical (100% populated) and stays FROZEN. canonical == normalized
+// for 99.5% of HCPs that have both, so a single-column .eq is safe and avoids the
+// comma-in-.or() PostgREST parsing pitfall for names like "University of
+// California, San Francisco".
+function institutionColumnForTa(
+  taId: string | null,
+): "institution_canonical" | "institution_normalized" {
+  return taId === AD_INSTITUTIONS_TA_ID ? "institution_normalized" : "institution_canonical";
+}
+
+type InstitutionRisingRow = {
+  hcp_id: string;
+  us_rank: number | null;
+  rising_star_percentile: number | null;
+};
+
+// Chunked-by-hcpId (institution-scoped) variant — used by summary + leaderboards.
+async function fetchInstitutionRisingRowsForHcps(
+  taId: string,
+  hcpIds: string[],
+): Promise<InstitutionRisingRow[]> {
+  if (taId === AD_INSTITUTIONS_TA_ID) {
+    return fetchInstitutionRowsInChunks<InstitutionRisingRow>(hcpIds, async (chunk) => {
+      const { data, error } = await supabase
+        .from("hcp_rising_composite_v1")
+        .select("hcp_id, rank, rising_composite_score")
+        .eq("therapeutic_area_id", taId)
+        .eq("scope_type", "region")
+        .eq("scope_value", "US")
+        .in("hcp_id", chunk)
+        .not("rank", "is", null);
+      if (error) {
+        console.error("[institution rising composite] chunk error:", error);
+        return [];
+      }
+      return (data ?? []).map(
+        (r: { hcp_id: string; rank: number | null; rising_composite_score: number | null }) => ({
+          hcp_id: String(r.hcp_id),
+          us_rank: r.rank != null ? Number(r.rank) : null,
+          rising_star_percentile:
+            r.rising_composite_score != null ? Number(r.rising_composite_score) : null,
+        }),
+      );
+    });
+  }
+  return fetchInstitutionRowsInChunks<InstitutionRisingRow>(hcpIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from("hcp_rising_star_ranks_v3")
+      .select("hcp_id, us_rank, rising_star_percentile")
+      .eq("therapeutic_area_id", taId)
+      .in("hcp_id", chunk)
+      .not("us_rank", "is", null);
+    if (error) {
+      console.error("[institution rising v3] chunk error:", error);
+      return [];
+    }
+    return (data ?? []).map(
+      (r: { hcp_id: string; us_rank: number | null; rising_star_percentile: number | null }) => ({
+        hcp_id: String(r.hcp_id),
+        us_rank: r.us_rank != null ? Number(r.us_rank) : null,
+        rising_star_percentile:
+          r.rising_star_percentile != null ? Number(r.rising_star_percentile) : null,
+      }),
+    );
+  });
+}
+
+// Paginated all-TA variant (no institution pre-filter) — used by the index list
+// and the territory panel to build the TA's rising cohort set.
+async function fetchAllInstitutionRisingRanksForTa(
+  taId: string,
+): Promise<Array<{ hcp_id: string; us_rank: number }>> {
+  if (taId === AD_INSTITUTIONS_TA_ID) {
+    const { data } = await fetchAllPaginated<{ hcp_id: string; rank: number }>(
+      async (offset, pageSize) =>
+        await supabase
+          .from("hcp_rising_composite_v1")
+          .select("hcp_id, rank")
+          .eq("therapeutic_area_id", taId)
+          .eq("scope_type", "region")
+          .eq("scope_value", "US")
+          .not("rank", "is", null)
+          .range(offset, offset + pageSize - 1),
+    );
+    return (data ?? []).map((r) => ({ hcp_id: String(r.hcp_id), us_rank: Number(r.rank) }));
+  }
+  const { data } = await fetchAllPaginated<{ hcp_id: string; us_rank: number }>(
+    async (offset, pageSize) =>
+      await supabase
+        .from("hcp_rising_star_ranks_v3")
+        .select("hcp_id, us_rank")
+        .eq("therapeutic_area_id", taId)
+        .not("us_rank", "is", null)
+        .range(offset, offset + pageSize - 1),
+  );
+  return (data ?? []).map((r) => ({ hcp_id: String(r.hcp_id), us_rank: Number(r.us_rank) }));
+}
+
 function buildInstitutionLeaderboardEntries(
   rows: Array<Record<string, unknown>>,
   nameMap: Map<string, string>,
@@ -3757,6 +3869,74 @@ function buildInstitutionLeaderboardEntries(
   });
 }
 
+/**
+ * Resolve an institution's primary therapeutic area when the caller didn't
+ * carry one — the detail route /institution/:slug has NO :ta, so hard-refresh,
+ * bookmark, back-nav, and deep-links arrive with no TA context. Mirrors
+ * resolvePrimaryTaId (HCP detail): primary = the TA with the most publications
+ * across the institution's HCPs (hcp_therapeutic_areas_v2.publication_count),
+ * which is populated for every TA membership incl. AD. NEVER defaults to NSCLC
+ * — an AD-dominant institution resolves to AD. Deterministic tiebreak on
+ * therapeutic_area_id asc. Returns null only if the institution has no TA rows.
+ */
+export async function resolveInstitutionPrimaryTaId(
+  institutionName: string,
+): Promise<string | null> {
+  // TA-agnostic (we're deriving the TA), so match the institution's HCPs by
+  // canonical first (NSCLC path, unchanged), then fall back to normalized so
+  // AD-only institutions — whose members carry only institution_normalized —
+  // are still found.
+  const fetchByColumn = async (column: string) =>
+    (
+      await fetchAllPaginated<{ id: string }>(
+        async (offset, pageSize) =>
+          await supabase
+            .from("hcps_v2")
+            .select("id")
+            .eq(column, institutionName)
+            .range(offset, offset + pageSize - 1),
+      )
+    ).data ?? [];
+
+  let hcps = await fetchByColumn("institution_canonical");
+  if (hcps.length === 0) hcps = await fetchByColumn("institution_normalized");
+  const hcpIds = hcps.map((h) => String(h.id));
+  if (hcpIds.length === 0) return null;
+
+  const rows = await fetchInstitutionRowsInChunks<{
+    therapeutic_area_id: string;
+    publication_count: number | null;
+  }>(hcpIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from("hcp_therapeutic_areas_v2")
+      .select("therapeutic_area_id, publication_count")
+      .in("hcp_id", chunk);
+    if (error) {
+      console.warn("resolveInstitutionPrimaryTaId: chunk error", error);
+      return [];
+    }
+    return data ?? [];
+  });
+
+  const totals = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.therapeutic_area_id) continue;
+    const taId = String(r.therapeutic_area_id);
+    totals.set(taId, (totals.get(taId) ?? 0) + Number(r.publication_count ?? 0));
+  }
+  if (totals.size === 0) return null;
+
+  let bestTaId: string | null = null;
+  let bestTotal = -Infinity;
+  for (const [taId, total] of totals) {
+    if (total > bestTotal || (total === bestTotal && bestTaId !== null && taId < bestTaId)) {
+      bestTotal = total;
+      bestTaId = taId;
+    }
+  }
+  return bestTaId;
+}
+
 export async function getInstitutionSummary(
   institutionName: string,
   taSlug: string = "nsclc",
@@ -3774,7 +3954,7 @@ export async function getInstitutionSummary(
       await supabase
         .from("hcps_v2")
         .select("id, first_name, last_name, country")
-        .eq("institution_canonical", institutionName)
+        .eq(institutionColumnForTa(taId), institutionName)
         .range(offset, offset + pageSize - 1),
   );
   if (!hcps) return null;
@@ -3798,22 +3978,7 @@ export async function getInstitutionSummary(
   }
 
   const [rsRows, estRows] = await Promise.all([
-    fetchInstitutionRowsInChunks(
-      hcpIds,
-      async (chunk) => {
-        const { data, error } = await supabase
-          .from("hcp_rising_star_ranks_v3")
-          .select("hcp_id, us_rank, rising_star_percentile")
-          .eq("therapeutic_area_id", taId)
-          .in("hcp_id", chunk)
-          .not("us_rank", "is", null);
-        if (error) {
-          console.error("[getInstitutionSummary] rs chunk error:", error);
-          return [];
-        }
-        return data ?? [];
-      },
-    ),
+    fetchInstitutionRisingRowsForHcps(taId, hcpIds),
     fetchInstitutionRowsInChunks(
       hcpIds,
       async (chunk) => {
@@ -3919,7 +4084,7 @@ export async function getInstitutionLeaderboards(
       await supabase
         .from("hcps_v2")
         .select("id, first_name, last_name")
-        .eq("institution_canonical", institutionName)
+        .eq(institutionColumnForTa(taId), institutionName)
         .range(offset, offset + pageSize - 1),
   );
   if (!hcps || hcps.length === 0) return empty;
@@ -3938,22 +4103,7 @@ export async function getInstitutionLeaderboards(
     centralityRows,
     networkMomentumRows,
   ] = await Promise.all([
-    fetchInstitutionRowsInChunks(
-      hcpIds,
-      async (chunk) => {
-        const { data, error } = await supabase
-          .from("hcp_rising_star_ranks_v3")
-          .select("hcp_id, us_rank, rising_star_percentile")
-          .eq("therapeutic_area_id", taId)
-          .in("hcp_id", chunk)
-          .not("us_rank", "is", null);
-        if (error) {
-          console.error("[getInstitutionLeaderboards] rising stars chunk error:", error);
-          return [];
-        }
-        return data ?? [];
-      },
-    ),
+    fetchInstitutionRisingRowsForHcps(taId, hcpIds),
     fetchInstitutionRowsInChunks(
       hcpIds,
       async (chunk) => {
@@ -4097,7 +4247,11 @@ export async function getInstitutionLeaderboards(
 export async function getInstitutionCollaborations(
   institutionName: string,
   limit: number = 8,
+  taSlug: string = "nsclc",
 ): Promise<InstitutionCollaboration[]> {
+  // Co-authorship data itself is TA-agnostic; taSlug only selects which column
+  // identifies the institution's members (normalized for AD, canonical for NSCLC).
+  const institutionColumn = institutionColumnForTa(taIdForApiSlug(taSlug) ?? null);
   const { data: hcps } = await fetchAllPaginated<{
     id: string;
     first_name: string | null;
@@ -4107,7 +4261,7 @@ export async function getInstitutionCollaborations(
       await supabase
         .from("hcps_v2")
         .select("id, first_name, last_name")
-        .eq("institution_canonical", institutionName)
+        .eq(institutionColumn, institutionName)
         .range(offset, offset + pageSize - 1),
   );
   if (!hcps || hcps.length === 0) return [];
@@ -4184,13 +4338,17 @@ export async function getInstitutionCollaborations(
 export async function getInstitutionExternalPartners(
   sourceInstitutionName: string,
   limit: number = 8,
+  taSlug: string = "nsclc",
 ): Promise<ExternalPartnerInstitution[]> {
+  // Source-institution membership is TA-conditional (AD → institution_normalized,
+  // NSCLC → institution_canonical, frozen), same as the other Institutions sites.
+  const sourceColumn = institutionColumnForTa(taIdForApiSlug(taSlug) ?? null);
   const { data: sourceHcps } = await fetchAllPaginated<{ id: string }>(
     async (offset, pageSize) =>
       await supabase
         .from("hcps_v2")
         .select("id")
-        .eq("institution_canonical", sourceInstitutionName)
+        .eq(sourceColumn, sourceInstitutionName)
         .range(offset, offset + pageSize - 1),
   );
   if (!sourceHcps || sourceHcps.length === 0) return [];
@@ -4244,10 +4402,13 @@ export async function getInstitutionExternalPartners(
   for (const chunk of chunkInstitutionHcpIds(collaboratorIds)) {
     const { data: hcps } = await supabase
       .from("hcps_v2")
-      .select("id, first_name, last_name, institution_canonical")
+      .select("id, first_name, last_name, institution_canonical, institution_normalized")
       .in("id", chunk);
     (hcps ?? []).forEach((h) => {
-      institutionMap.set(String(h.id), h.institution_canonical);
+      // Name partner institutions by canonical, falling back to normalized so
+      // AD-only partner institutions (no canonical) still resolve. NSCLC is
+      // unchanged (canonical is populated, so `??` never reaches normalized).
+      institutionMap.set(String(h.id), h.institution_canonical ?? h.institution_normalized);
       nameMap.set(
         String(h.id),
         `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
@@ -4368,16 +4529,12 @@ async function getInstitutionsIndexUncached(
   const taId = await resolveLandscapeTaId(taSlug);
   if (!taId) return [];
 
-  const [{ data: rsRows }, { data: estRows }] = await Promise.all([
-    ( async () => fetchAllPaginated<{ hcp_id: string; us_rank: number }>(
-      async (offset, pageSize) =>
-        await supabase
-          .from("hcp_rising_star_ranks_v3")
-          .select("hcp_id, us_rank")
-          .eq("therapeutic_area_id", taId)
-          .not("us_rank", "is", null)
-          .range(offset, offset + pageSize - 1),
-    ) )(),
+  // AD groups by institution_normalized (canonical is ~unpopulated for AD);
+  // NSCLC stays on institution_canonical (frozen).
+  const institutionColumn = institutionColumnForTa(taId);
+
+  const [rsRows, { data: estRows }] = await Promise.all([
+    fetchAllInstitutionRisingRanksForTa(taId),
     ( async () => fetchAllPaginated<{ hcp_id: string }>(
       async (offset, pageSize) =>
         await supabase
@@ -4391,7 +4548,7 @@ async function getInstitutionsIndexUncached(
   ]);
 
   const rsRankMap = new Map<string, number>();
-  (rsRows ?? []).forEach((r) => {
+  rsRows.forEach((r) => {
     rsRankMap.set(String(r.hcp_id), Number(r.us_rank));
   });
   const rsHcpIds = new Set(rsRankMap.keys());
@@ -4403,6 +4560,7 @@ async function getInstitutionsIndexUncached(
   type CohortHcpRow = {
     id: string;
     institution_canonical: string | null;
+    institution_normalized: string | null;
     first_name: string | null;
     last_name: string | null;
     nppes_practice_state: string | null;
@@ -4412,14 +4570,15 @@ async function getInstitutionsIndexUncached(
   for (const chunk of chunkInstitutionHcpIds(cohortHcpIds)) {
     const { data: hcps } = await supabase
       .from("hcps_v2")
-      .select("id, institution_canonical, first_name, last_name, nppes_practice_state")
+      .select("id, institution_canonical, institution_normalized, first_name, last_name, nppes_practice_state")
       .in("id", chunk);
     if (hcps) cohortHcps.push(...(hcps as CohortHcpRow[]));
   }
 
   const cohortInstitutions = new Set<string>();
   for (const h of cohortHcps) {
-    if (h.institution_canonical) cohortInstitutions.add(h.institution_canonical);
+    const inst = h[institutionColumn];
+    if (inst) cohortInstitutions.add(inst);
   }
 
   const institutionNames = Array.from(cohortInstitutions);
@@ -4458,7 +4617,7 @@ async function getInstitutionsIndexUncached(
   const aggregates = new Map<string, InstitutionIndexAggregate>();
 
   for (const h of cohortHcps) {
-    const inst = h.institution_canonical;
+    const inst = h[institutionColumn];
     if (!inst) continue;
 
     let agg = aggregates.get(inst);
@@ -4494,7 +4653,12 @@ async function getInstitutionsIndexUncached(
 
   const entries: InstitutionIndexEntry[] = [];
   for (const agg of aggregates.values()) {
-    const investigatorCount = totalInvestigatorCounts.get(agg.institution) ?? 0;
+    // institution_investigator_counts is keyed by name and covers the canonical
+    // (NSCLC) set. AD-only institutions may be absent — fall back to the cohort
+    // count so the card shows a real number instead of 0. NSCLC keeps `?? 0`.
+    const investigatorCount =
+      totalInvestigatorCounts.get(agg.institution) ??
+      (institutionColumn === "institution_normalized" ? agg.rs_count + agg.est_count : 0);
     const talentDensity =
       investigatorCount >= 30 && agg.rs_count > 0
         ? (agg.rs_count / investigatorCount) * 100
@@ -4548,15 +4712,11 @@ export async function getTopInstitutionsInTerritory(
   const taId = taIdOverride ?? (await resolveLandscapeTaId(taSlug));
   if (!taId) return [];
 
-  const { data: rsRows } = await fetchAllPaginated<{ hcp_id: string; us_rank: number }>(
-    async (offset, pageSize) =>
-      await supabase
-        .from("hcp_rising_star_ranks_v3")
-        .select("hcp_id, us_rank")
-        .eq("therapeutic_area_id", taId)
-        .not("us_rank", "is", null)
-        .range(offset, offset + pageSize - 1),
-  );
+  // AD identifies institution membership via institution_normalized; NSCLC via
+  // institution_canonical (frozen).
+  const institutionColumn = institutionColumnForTa(taId);
+
+  const rsRows = await fetchAllInstitutionRisingRanksForTa(taId);
 
   const { data: estRows } = await fetchAllPaginated<{ hcp_id: string }>(
     async (offset, pageSize) =>
@@ -4570,7 +4730,7 @@ export async function getTopInstitutionsInTerritory(
   );
 
   const rsRankMap = new Map<string, number>();
-  (rsRows ?? []).forEach((r) => {
+  rsRows.forEach((r) => {
     rsRankMap.set(String(r.hcp_id), Number(r.us_rank));
   });
   const estSet = new Set<string>((estRows ?? []).map((r) => String(r.hcp_id)));
@@ -4594,7 +4754,7 @@ export async function getTopInstitutionsInTerritory(
     const chunk = allCohortIds.slice(i, i + CHUNK_SIZE);
     const { data: hcps } = await supabase
       .from("hcps_v2")
-      .select("id, first_name, last_name, institution_canonical, nppes_practice_state")
+      .select("id, first_name, last_name, institution_canonical, institution_normalized, nppes_practice_state")
       .in("id", chunk);
     (hcps ?? []).forEach((h) => {
       const state = h.nppes_practice_state
@@ -4606,7 +4766,7 @@ export async function getTopInstitutionsInTerritory(
       hcpInfo.push({
         id: String(h.id),
         name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim(),
-        institution: h.institution_canonical,
+        institution: h[institutionColumn],
         state,
       });
     });

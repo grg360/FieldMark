@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFilterContext } from "../lib/filter-context";
-import { getTopInstitutionsInTerritory, type TerritoryInstitution } from "../lib/api";
+import { apiSlugForTaId, getTopInstitutionsInTerritory, type TerritoryInstitution } from "../lib/api";
 
 interface Props {
   taSlug: string;
@@ -13,6 +13,13 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
   const { states } = useFilterContext();
   const [institutions, setInstitutions] = useState<TerritoryInstitution[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // The index route (/institutions/:ta) keys on the active INDICATION slug, not
+  // the parent-TA slug. taSlug here is the parent api slug (e.g. "immunology"),
+  // which the index reads as empty; taId is the indication (e.g. AD) — the same
+  // id used for the data fetch below — so derive the correct slug from it.
+  // (Oncology's parent slug already maps to "nsclc", so NSCLC is unaffected.)
+  const institutionsSlug = (taId ? apiSlugForTaId(taId) : undefined) ?? taSlug;
 
   useEffect(() => {
     let active = true;
@@ -49,7 +56,7 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
         </span>
         <button
           type="button"
-          onClick={() => navigate(`/institutions/${taSlug}`)}
+          onClick={() => navigate(`/institutions/${institutionsSlug}`)}
           style={{
             background: "none",
             border: "none",
@@ -83,7 +90,7 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
           <button
             key={inst.slug}
             type="button"
-            onClick={() => navigate(`/institution/${inst.slug}`)}
+            onClick={() => navigate(`/institution/${inst.slug}?ta=${institutionsSlug}`)}
             style={{
               flexShrink: 0,
               width: 220,

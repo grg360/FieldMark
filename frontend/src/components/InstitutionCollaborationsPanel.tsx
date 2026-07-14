@@ -34,7 +34,7 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
         Top Internal Collaborations
       </div>
       <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 12 }}>
-        Investigator pairs ranked by shared NSCLC publications
+        Investigator pairs ranked by shared publications
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

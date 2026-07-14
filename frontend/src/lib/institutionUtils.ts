@@ -18,12 +18,16 @@ export function institutionToSlug(name: string): string {
 }
 
 /**
- * Reverse lookup: given a slug, find the matching institution_canonical.
- * Used when resolving /institution/{slug} routes.
+ * Reverse lookup: given a slug, find the matching institution name.
+ * Used when resolving /institution/{slug} routes. Scans institution_canonical
+ * first (NSCLC path, unchanged); if no match, falls back to institution_normalized
+ * so AD-only institutions — whose members carry only institution_normalized — are
+ * still resolvable (Piece 3).
  */
-export async function slugToInstitution(
+async function findInstitutionBySlug(
   slug: string,
   supabase: SupabaseClient,
+  column: "institution_canonical" | "institution_normalized",
 ): Promise<string | null> {
   const PAGE_SIZE = 1000;
   const seen = new Set<string>();
@@ -32,14 +36,14 @@ export async function slugToInstitution(
   while (true) {
     const { data, error } = await supabase
       .from("hcps_v2")
-      .select("institution_canonical")
-      .not("institution_canonical", "is", null)
+      .select(column)
+      .not(column, "is", null)
       .range(from, from + PAGE_SIZE - 1);
 
     if (error || !data || data.length === 0) break;
 
     for (const row of data) {
-      const inst = row.institution_canonical as string;
+      const inst = (row as Record<string, unknown>)[column] as string;
       if (!inst || seen.has(inst)) continue;
       seen.add(inst);
       if (institutionToSlug(inst) === slug) {
@@ -52,4 +56,13 @@ export async function slugToInstitution(
   }
 
   return null;
+}
+
+export async function slugToInstitution(
+  slug: string,
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const canonical = await findInstitutionBySlug(slug, supabase, "institution_canonical");
+  if (canonical) return canonical;
+  return findInstitutionBySlug(slug, supabase, "institution_normalized");
 }

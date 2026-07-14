@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  apiSlugForTaId,
   getInstitutionCollaborations,
   getInstitutionExternalPartners,
   getInstitutionLeaderboards,
   getInstitutionSummary,
+  resolveInstitutionPrimaryTaId,
+  taDisplayNameForId,
+  taIdForApiSlug,
   type ExternalPartnerInstitution,
   type InstitutionCollaboration,
   type InstitutionLeaderboardEntry,
@@ -57,13 +61,23 @@ function PipelineBucket({
 
 export default function InstitutionRoute() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
+
+  // Explicit TA when the caller carried one — durable via the ?ta= URL param
+  // (survives refresh/bookmark), or nav state as a non-durable secondary.
+  const explicitTaSlug =
+    searchParams.get("ta") ??
+    (location.state as { taSlug?: string } | null)?.taSlug ??
+    null;
 
   const [summary, setSummary] = useState<InstitutionSummary | null>(null);
   const [boards, setBoards] = useState<InstitutionLeaderboards | null>(null);
   const [collabs, setCollabs] = useState<InstitutionCollaboration[]>([]);
   const [externalPartners, setExternalPartners] = useState<ExternalPartnerInstitution[]>([]);
   const [researchThemes, setResearchThemes] = useState<InstitutionResearchTheme[]>([]);
+  const [taDisplayName, setTaDisplayName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -84,12 +98,26 @@ export default function InstitutionRoute() {
         return;
       }
 
+      // Durable TA resolution. The detail route (/institution/:slug) has no :ta,
+      // so we must not depend on nav state alone (it evaporates on hard-refresh,
+      // deep-link, bookmark, back-nav → silent NSCLC fallback). Prefer an
+      // explicit TA when carried (?ta= / nav state); otherwise DERIVE the
+      // institution's dominant TA from data. Never silent-default to NSCLC.
+      let taId = (explicitTaSlug ? taIdForApiSlug(explicitTaSlug) : undefined) ?? null;
+      if (!taId) {
+        taId = await resolveInstitutionPrimaryTaId(institutionName);
+        if (cancelled) return;
+      }
+      const taSlug = (taId ? apiSlugForTaId(taId) : undefined) ?? "nsclc";
+      const displayName = (taId ? taDisplayNameForId(taId) : "") || "NSCLC";
+      setTaDisplayName(displayName);
+
       const [summaryRes, boardsRes, collabsRes, partnersRes, themesRes] = await Promise.all([
-        getInstitutionSummary(institutionName, "nsclc"),
-        getInstitutionLeaderboards(institutionName, "nsclc", 5),
-        getInstitutionCollaborations(institutionName, 8),
-        getInstitutionExternalPartners(institutionName, 8),
-        getInstitutionResearchThemes(institutionName, "NSCLC", 20),
+        getInstitutionSummary(institutionName, taSlug),
+        getInstitutionLeaderboards(institutionName, taSlug, 5),
+        getInstitutionCollaborations(institutionName, 8, taSlug),
+        getInstitutionExternalPartners(institutionName, 8, taSlug),
+        getInstitutionResearchThemes(institutionName, displayName, 20),
       ]);
 
       if (cancelled) return;
@@ -105,7 +133,7 @@ export default function InstitutionRoute() {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, explicitTaSlug]);
 
   function handleHcpClick(hcpId: string) {
     navigate(`/hcp/${String(hcpId)}`);
@@ -171,7 +199,7 @@ export default function InstitutionRoute() {
               {summary.institution_name}
             </h1>
             <div style={{ fontSize: 13, color: "#6B6A65" }}>
-              {summary.total_investigators} NSCLC investigators {"\u00b7"}{" "}
+              {summary.total_investigators} {taDisplayName} investigators {"\u00b7"}{" "}
               {summary.rising_star_count} Rising Star
               {summary.rising_star_count !== 1 ? "s" : ""} {"\u00b7"} {summary.established_count}{" "}
               Established
@@ -289,6 +317,7 @@ export default function InstitutionRoute() {
             <InstitutionResearchThemesPanel
               themes={researchThemes}
               institutionName={summary.institution_name}
+              taDisplayName={taDisplayName}
             />
           </div>
         ) : null}

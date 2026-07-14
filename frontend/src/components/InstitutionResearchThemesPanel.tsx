@@ -6,9 +6,10 @@ import { institutionToSlug } from "../lib/institutionUtils";
 interface Props {
   themes: InstitutionResearchTheme[];
   institutionName: string;
+  taDisplayName?: string;
 }
 
-export default function InstitutionResearchThemesPanel({ themes, institutionName }: Props) {
+export default function InstitutionResearchThemesPanel({ themes, institutionName, taDisplayName }: Props) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const visibleThemes = expanded ? themes : themes.slice(0, 10);
@@ -28,7 +29,7 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
         Top Research Themes
       </div>
       <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 12 }}>
-        Most-published NSCLC topics at {institutionName}
+        Most-published {taDisplayName || "NSCLC"} topics at {institutionName}
       </div>
 
       {themes.length === 0 ? (
