@@ -455,6 +455,13 @@ function FeedLayout({
       setFeedEmptyReason(null);
       return;
     }
+    // AD Community renders the CommunityExplorer directory; skip getCommunity.
+    if (track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1") {
+      setHcpList([]);
+      setFeedTotal(0);
+      setFeedEmptyReason(null);
+      return;
+    }
     try {
       if (loadingAsRefresh) setRefreshingFeed(true);
       else setLoadingHCPs(true);
@@ -495,6 +502,17 @@ function FeedLayout({
 
     async function fetchData() {
       if (!isCohortFeedTrack(track) || !route.indicationDataActive) {
+        setHcpList([]);
+        setFeedOffset(0);
+        setFeedTotal(0);
+        setFeedEmptyReason(null);
+        setLastUpdatedAt(new Date());
+        setLoadingHCPs(false);
+        return;
+      }
+      // AD Community renders the CommunityExplorer directory via its own RPC; skip
+      // the unused getCommunity round-trip on this branch.
+      if (track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1") {
         setHcpList([]);
         setFeedOffset(0);
         setFeedTotal(0);
@@ -545,6 +563,7 @@ function FeedLayout({
 
   async function loadMore() {
     if (!isCohortFeedTrack(track)) return;
+    if (track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1") return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = taLabelToApiSlug(selectedTA);
     // AD RISING defaults to global scope (82% intl). Gated on the rising track so

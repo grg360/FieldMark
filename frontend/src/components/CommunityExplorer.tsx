@@ -125,6 +125,7 @@ interface DirRow {
   is_sole_proprietor: boolean | null;
   career_stage_years: number | null;
   matched_hcp_id: string | null;
+  is_published_kol: boolean | null;
   total_payments_3yr: number | string | null;
   ad_drug_payments_3yr: number | string | null;
   top_manufacturers: PaymentEntry[] | null;
@@ -149,6 +150,14 @@ interface DermRecord {
   isKOL: boolean;
 }
 
+// NPPES stores names in ALL CAPS; render in natural case. Capitalizes the first
+// letter after start / space / apostrophe / hyphen (O'Brien, Smith-Jones).
+function nameCase(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/(^|[\s'’-])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
+}
+
 function mapRow(r: DirRow): DermRecord {
   const drugs = (r.top_drugs ?? [])
     .slice(0, 3)
@@ -156,10 +165,10 @@ function mapRow(r: DirRow): DermRecord {
     .filter((d): d is string => !!d);
   return {
     key: r.npi_number,
-    first: r.first_name ?? "",
-    last: r.last_name ?? "",
+    first: nameCase(r.first_name ?? ""),
+    last: nameCase(r.last_name ?? ""),
     cred: r.credentials ?? "MD",
-    city: r.practice_city ?? "—",
+    city: nameCase(r.practice_city ?? "—"),
     state: r.practice_state ?? "—",
     sub: SUB_LABEL[r.primary_taxonomy_label ?? ""] ?? "General Dermatology",
     setting: r.is_sole_proprietor ? "Solo Practice" : "Group Practice",
@@ -169,7 +178,7 @@ function mapRow(r: DirRow): DermRecord {
     adTotal: Number(r.ad_drug_payments_3yr ?? 0),
     topMfr: cleanManufacturer(r.top_manufacturers?.[0]?.name ?? null),
     adDrugs: drugs,
-    isKOL: r.matched_hcp_id != null,
+    isKOL: r.is_published_kol ?? r.matched_hcp_id != null,
   };
 }
 
@@ -351,21 +360,14 @@ function DermCard({ r }: { r: DermRecord }) {
             {r.first} {r.last}, <span style={S.cred}>{r.cred}</span>
           </div>
           <div style={S.loc}>
-            <MapPin size={11} color="#6b7280" style={{ marginRight: 3, verticalAlign: "-1px" }} />
-            {r.city}, {r.state} · {r.setting}
+            <MapPin size={11} color="#6b7280" style={{ flexShrink: 0 }} />
+            <span>{r.city}, {r.state}</span>
           </div>
         </div>
         <div style={{ ...S.subBadge, color: subColor, borderColor: subColor + "55", background: subColor + "14" }}>
           {SUB_ABBR[r.sub]}
         </div>
       </div>
-
-      {r.isKOL && (
-        <div style={S.kolBadge}>
-          <Award size={11} style={{ verticalAlign: "-1px", marginRight: 4 }} />
-          Also a published KOL <span style={{ color: "#e0a52e" }}>→</span>
-        </div>
-      )}
 
       {/* engagement strip */}
       <div style={S.engRow}>
@@ -384,7 +386,13 @@ function DermCard({ r }: { r: DermRecord }) {
       </div>
 
       <div style={S.cardBottom}>
-        <span style={S.tenure}>{r.tenure != null ? `${r.tenure}y since NPI` : "Tenure n/a"}</span>
+        <span style={S.tenure}>{r.tenure != null ? `${r.tenure} yrs practicing` : "Tenure n/a"}</span>
+        {r.isKOL && (
+          <span style={S.kolBadge}>
+            <Award size={10} style={{ verticalAlign: "-1px", marginRight: 3 }} />
+            Published KOL
+          </span>
+        )}
         {r.soleProprietor && <span style={S.tag}>Sole proprietor</span>}
         {r.adDrugs.length > 0 && (
           <span style={S.drugTags}>
@@ -462,10 +470,10 @@ const S: Record<string, React.CSSProperties> = {
   cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 },
   name: { fontSize: 15, fontWeight: 700, color: "#f0f2f6" },
   cred: { fontSize: 12, fontWeight: 500, color: "#8b93a7" },
-  loc: { fontSize: 12, color: "#8b93a7", marginTop: 3 },
+  loc: { fontSize: 12, color: "#8b93a7", marginTop: 3, display: "flex", alignItems: "center", gap: 4 },
   subBadge: { fontSize: 10, fontWeight: 700, letterSpacing: ".5px", padding: "3px 7px", borderRadius: 5, border: "1px solid", whiteSpace: "nowrap" },
 
-  kolBadge: { marginTop: 9, display: "inline-flex", alignItems: "center", fontSize: 11, color: "#c9b06a", background: "#e0a52e14", border: "1px solid #e0a52e33", borderRadius: 5, padding: "3px 8px", cursor: "pointer" },
+  kolBadge: { display: "inline-flex", alignItems: "center", fontSize: 10.5, color: "#5aa9bd", background: "#4b9db014", border: "1px solid #4b9db044", borderRadius: 5, padding: "2px 7px", cursor: "pointer" },
 
   engRow: { display: "flex", gap: 7, marginTop: 12 },
   engCell: { flex: 1, background: "#0a0d14", border: "1px solid #171c26", borderRadius: 7, padding: "8px 9px" },
