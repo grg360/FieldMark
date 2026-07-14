@@ -14,6 +14,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -122,6 +123,120 @@ JOIN publication_authors_v2 pa2
 GROUP BY LEAST(pa1.hcp_id, pa2.hcp_id), GREATEST(pa1.hcp_id, pa2.hcp_id);
 """
 
+# ---------------------------------------------------------------------------
+# Atopic Dermatitis (--ta ad). Same node/edge SCHEMA and same collaboration-graph
+# logic as NSCLC, but sourced from the AD rank tables (hcp_established_ranks_v3 +
+# hcp_rising_composite_v1, AD ta_id) since AD has no rows in hcp_score_ranks_v2.
+# Deliberately GLOBAL (no country='US' filter) — AD is ~82% international.
+# ---------------------------------------------------------------------------
+
+AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
+AD_NODES_PATH = Path("frontend/src/data/telescope_ad_nodes.json")
+AD_EDGES_PATH = Path("frontend/src/data/telescope_ad_edges.json")
+
+AD_NODES_SQL = """
+WITH top_established AS (
+  SELECT
+    er.hcp_id,
+    h.first_name || ' ' || h.last_name AS name,
+    h.institution_normalized,
+    er.rank,
+    er.cohort_score AS score_at_rank,
+    er.therapeutic_area_id
+  FROM hcp_established_ranks_v3 er
+  JOIN hcps_v2 h ON h.id = er.hcp_id
+  WHERE er.therapeutic_area_id = '9e4139d2-e062-4a58-8728-cdabb2d7dca1'
+    AND er.scope_type = 'global'
+  ORDER BY er.rank
+  LIMIT 50
+),
+network_hcps AS (
+  SELECT
+    te.hcp_id::text AS id,
+    te.name,
+    te.institution_normalized AS institution,
+    'established' AS cohort,
+    te.rank,
+    te.score_at_rank AS score
+  FROM top_established te
+  UNION
+  SELECT DISTINCT
+    h.id::text AS id,
+    h.first_name || ' ' || h.last_name AS name,
+    h.institution_normalized AS institution,
+    'rising' AS cohort,
+    rc.rank,
+    rc.rising_composite_score AS score
+  FROM top_established te
+  JOIN publication_authors_v2 pa_te ON pa_te.hcp_id = te.hcp_id
+  JOIN publication_authors_v2 pa_rs
+    ON pa_rs.publication_id = pa_te.publication_id
+    AND pa_rs.hcp_id != te.hcp_id
+  JOIN hcps_v2 h ON h.id = pa_rs.hcp_id
+  JOIN hcp_rising_composite_v1 rc
+    ON rc.hcp_id = h.id
+    AND rc.scope_type = 'global'
+    AND rc.therapeutic_area_id = te.therapeutic_area_id
+)
+SELECT * FROM network_hcps;
+"""
+
+AD_EDGES_SQL = """
+WITH top_established AS (
+  SELECT er.hcp_id, er.therapeutic_area_id
+  FROM hcp_established_ranks_v3 er
+  JOIN hcps_v2 h ON h.id = er.hcp_id
+  WHERE er.therapeutic_area_id = '9e4139d2-e062-4a58-8728-cdabb2d7dca1'
+    AND er.scope_type = 'global'
+  ORDER BY er.rank
+  LIMIT 50
+),
+network_hcp_ids AS (
+  SELECT hcp_id FROM top_established
+  UNION
+  SELECT DISTINCT pa_rs.hcp_id
+  FROM top_established te
+  JOIN publication_authors_v2 pa_te ON pa_te.hcp_id = te.hcp_id
+  JOIN publication_authors_v2 pa_rs
+    ON pa_rs.publication_id = pa_te.publication_id
+    AND pa_rs.hcp_id != te.hcp_id
+  JOIN hcps_v2 h ON h.id = pa_rs.hcp_id
+  JOIN hcp_rising_composite_v1 rc
+    ON rc.hcp_id = pa_rs.hcp_id
+    AND rc.scope_type = 'global'
+    AND rc.therapeutic_area_id = te.therapeutic_area_id
+)
+SELECT
+  LEAST(pa1.hcp_id, pa2.hcp_id)::text AS source,
+  GREATEST(pa1.hcp_id, pa2.hcp_id)::text AS target,
+  count(DISTINCT pa1.publication_id) AS weight
+FROM network_hcp_ids nh1
+JOIN network_hcp_ids nh2 ON nh1.hcp_id < nh2.hcp_id
+JOIN publication_authors_v2 pa1 ON pa1.hcp_id = nh1.hcp_id
+JOIN publication_authors_v2 pa2
+  ON pa2.publication_id = pa1.publication_id
+  AND pa2.hcp_id = nh2.hcp_id
+GROUP BY LEAST(pa1.hcp_id, pa2.hcp_id), GREATEST(pa1.hcp_id, pa2.hcp_id);
+"""
+
+# TA registry — --ta selects which SQL + output paths to use. NSCLC entry uses the
+# original constants verbatim, so `--ta nsclc` (the default) is byte-identical.
+TA_EXPORTS = {
+    "nsclc": {
+        "nodes_sql": NODES_SQL, "edges_sql": EDGES_SQL,
+        "nodes_path": NODES_PATH, "edges_path": EDGES_PATH,
+    },
+    "ad": {
+        "nodes_sql": AD_NODES_SQL, "edges_sql": AD_EDGES_SQL,
+        "nodes_path": AD_NODES_PATH, "edges_path": AD_EDGES_PATH,
+    },
+}
+# Accepted --ta aliases -> registry key.
+TA_ALIASES = {
+    "nsclc": "nsclc",
+    "ad": "ad", "atopic-dermatitis": "ad", "atopic_dermatitis": "ad",
+}
+
 
 def get_required_env(name: str) -> str:
     value = os.getenv(name, "").strip()
@@ -196,6 +311,25 @@ def write_json_array(path: Path, data: List[Dict[str, Any]]) -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Export Telescope collaboration network data (nodes + edges)."
+    )
+    parser.add_argument(
+        "--ta",
+        type=str,
+        default="nsclc",
+        help="Therapeutic area: 'nsclc' (default) or 'ad'/'atopic-dermatitis'.",
+    )
+    args = parser.parse_args()
+    ta_key = TA_ALIASES.get(args.ta.strip().lower())
+    if ta_key is None:
+        print(
+            f"Error: unknown --ta '{args.ta}'. Options: {sorted(set(TA_ALIASES))}",
+            file=sys.stderr,
+        )
+        return 1
+    cfg = TA_EXPORTS[ta_key]
+
     load_dotenv()
     try:
         init_supabase()
@@ -204,17 +338,17 @@ def main() -> int:
         return 1
 
     try:
-        print("Querying nodes...")
-        nodes = run_query(NODES_SQL)
+        print(f"[{ta_key}] Querying nodes...")
+        nodes = run_query(cfg["nodes_sql"])
         print(f"Got {len(nodes)} nodes ({payload_size_mb(nodes):.1f} MB)")
-        print(f"Writing to {NODES_PATH}")
-        write_json_array(NODES_PATH, nodes)
+        print(f"Writing to {cfg['nodes_path']}")
+        write_json_array(cfg["nodes_path"], nodes)
 
-        print("Querying edges...")
-        edges = run_query(EDGES_SQL)
+        print(f"[{ta_key}] Querying edges...")
+        edges = run_query(cfg["edges_sql"])
         print(f"Got {len(edges)} edges ({payload_size_mb(edges):.1f} MB)")
-        print(f"Writing to {EDGES_PATH}")
-        write_json_array(EDGES_PATH, edges)
+        print(f"Writing to {cfg['edges_path']}")
+        write_json_array(cfg["edges_path"], edges)
 
         print("Done.")
         return 0
