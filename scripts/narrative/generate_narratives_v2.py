@@ -464,6 +464,39 @@ def fetch_rising_star_v3_context_rows(
           AND r.scope_type = 'global'
     """
 
+    # AD composite path only: per-HCP AD research themes (subfocus), used to
+    # ground the engagement angle. Themes are tagged with the DISPLAY-form TA
+    # string 'Atopic Dermatitis', NOT the 'atopic-dermatitis' slug — the slug
+    # returns zero rows. Multiple extraction runs coexist in this table; scope to
+    # the single most-recent run (by extracted_at) so stale/duplicate labels from
+    # prior runs never mix in.
+    themes_sql = """
+        SELECT
+            hcp_id,
+            theme_name,
+            centrality
+        FROM hcp_research_themes_v2
+        WHERE therapeutic_area = 'Atopic Dermatitis'
+          AND extraction_run_id = (
+              SELECT extraction_run_id
+              FROM hcp_research_themes_v2
+              WHERE therapeutic_area = 'Atopic Dermatitis'
+              ORDER BY extracted_at DESC
+              LIMIT 1
+          )
+          AND hcp_id = ANY(%s::uuid[])
+        ORDER BY
+            hcp_id,
+            CASE centrality
+                WHEN 'core' THEN 0
+                WHEN 'supporting' THEN 1
+                WHEN 'peripheral' THEN 2
+                ELSE 3
+            END,
+            display_rank NULLS LAST,
+            paper_count DESC
+    """
+
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             for ta_group, sql in ((legacy_ta_ids, legacy_sql), (ad_ta_ids, composite_sql)):
@@ -476,6 +509,22 @@ def fetch_rising_star_v3_context_rows(
                         hcp_id = str(row["hcp_id"])
                         ta_id = str(row["therapeutic_area_id"])
                         rows_by_pair[(hcp_id, ta_id)] = dict(row)
+
+            # AD composite path only: attach per-HCP themes. Legacy/NSCLC rows are
+            # never touched (frozen path). Thin-corpus HCPs → themes = [] (the
+            # prompt handles an empty list). Capped at 12 per HCP, core-first.
+            if ad_ta_ids:
+                themes_by_hcp: Dict[str, List[Dict[str, Any]]] = {}
+                for i in range(0, len(ids_list), batch_size):
+                    batch_ids = ids_list[i : i + batch_size]
+                    cur.execute(themes_sql, (batch_ids,))
+                    for trow in cur.fetchall():
+                        themes_by_hcp.setdefault(str(trow["hcp_id"]), []).append(
+                            {"label": trow["theme_name"], "centrality": trow["centrality"]}
+                        )
+                for (hcp_id, ta_id), row in rows_by_pair.items():
+                    if ta_id == AD_TA_ID:
+                        row["themes"] = themes_by_hcp.get(hcp_id, [])[:12]
     return rows_by_pair
 
 
@@ -701,6 +750,7 @@ def load_hcp_contexts(
     established_top_n: int,
     target_version: str = "v1",
     single_hcp_id: Optional[str] = None,
+    ta_slug: Optional[str] = None,
 ) -> Tuple[List[HCPContext], Dict[str, str]]:
     """
     Load HCP context for narrative generation, filtered by cohort.
@@ -715,6 +765,25 @@ def load_hcp_contexts(
     if not visible_ta_ids:
         print("[WARNING] No visible TAs configured. Returning empty context list.")
         return [], {}
+
+    # Optional single-TA scoping: resolve the --ta slug to its id via
+    # therapeutic_areas.slug and restrict the run to that TA (must be among the
+    # visible TAs). Additive only — omitting --ta leaves visible_ta_ids unchanged.
+    if ta_slug:
+        slug_resp = (
+            supabase.table("therapeutic_areas")
+            .select("id,slug")
+            .eq("slug", ta_slug)
+            .execute()
+        )
+        matched_ids = {str(r["id"]) for r in (slug_resp.data or []) if r.get("id")}
+        scoped_ta_ids = [t for t in visible_ta_ids if t in matched_ids]
+        if not scoped_ta_ids:
+            raise ValueError(
+                f"--ta '{ta_slug}' not found among visible TAs: {visible_ta_ids}"
+            )
+        visible_ta_ids = scoped_ta_ids
+        print(f"--ta scoping: restricted to slug '{ta_slug}' -> {visible_ta_ids}")
 
     hcps: List[Dict] = []
     cohort_by_hcp: Dict[str, str] = {}
@@ -757,7 +826,7 @@ def load_hcp_contexts(
     elif "rising_star" in target_cohorts:
         print(
             f"Selecting rising_star top-{rising_top_n} per (TA x visible scope) "
-            "from hcp_rising_star_ranks_v3..."
+            "from the rising rank source (per-TA model: composite for AD, legacy v3 otherwise)..."
         )
         rising_ids = fetch_rising_star_top_hcp_ids_v3(
             supabase, rising_top_n, visible_ta_ids
@@ -1334,8 +1403,167 @@ def format_hcp_facts(ctx: HCPContext, cohort: str) -> str:
     raise ValueError(f"Unknown cohort {cohort!r}")
 
 
+def _format_rising_themes(themes: Optional[List[Dict[str, Any]]]) -> str:
+    """Render per-HCP AD research themes for the composite rising prompt.
+
+    Empty / missing → an explicit instruction to reason from metrics alone, so
+    the prompt assembles cleanly for thin-corpus HCPs (themes = []).
+    """
+    if not themes:
+        return ("None available — reason from the publication metrics alone; "
+                "do not invent focus areas.")
+    lines: List[str] = []
+    for theme in themes:
+        label = (theme.get("label") or "").strip()
+        if not label:
+            continue
+        centrality = (theme.get("centrality") or "unspecified").strip()
+        lines.append(f"  - [{centrality}] {label}")
+    if not lines:
+        return ("None available — reason from the publication metrics alone; "
+                "do not invent focus areas.")
+    return "\n".join(lines)
+
+
+def build_prompt_rising_star_composite(ctx: HCPContext) -> str:
+    """AD Rising Star prompt — 2-axis Emergence / Network Influence composite model.
+
+    Distinct from the frozen v3 momentum/visibility/archetype prompt used by every
+    non-AD TA. The output JSON keys are IDENTICAL to the legacy rising prompt
+    (narrative, why_now, signal_strength, caution_flags, engagement_angle) so the
+    shared parser (generate_narrative) and writer (upsert_narrative) are unchanged.
+    'signal_strength' is CONCEPTUALLY the emergence-confidence field here — the JSON
+    key stays 'signal_strength' to avoid breaking the required-field check and the
+    hcp_narratives(_v2).signal_strength column; only its meaning/label changes.
+    """
+    v3 = ctx.rising_star_v3 or {}
+    career_years = "Unknown"
+    if ctx.first_pub_year is not None:
+        career_years = str(datetime.now(timezone.utc).year - ctx.first_pub_year)
+
+    # recent_senior_first_pct is stored as a 0-1 fraction; render as a percent.
+    _sf = safe_float(v3.get("recent_senior_first_pct"))
+    senior_first_pct_disp = format_display_int(_sf * 100) if _sf is not None else "Unknown"
+    themes_block = _format_rising_themes(v3.get("themes"))
+
+    return f"""You are writing an MSL-facing intelligence brief for an EMERGING (rising)
+{ctx.therapeutic_area_name} investigator — someone whose recent body of work
+indicates they are TRANSITIONING INTO scientific leadership in {ctx.therapeutic_area_name}.
+You are NOT describing an established authority; you are flagging someone crossing
+that threshold, so a field team can engage them BEFORE their influence peaks.
+
+HCP: {ctx.first_name or ''} {ctx.last_name or ''}
+Institution: {ctx.institution or 'Unknown'}
+Career years (first publication to present): {career_years}
+
+DATA (recent window = 2021-2025):
+  Recent {ctx.therapeutic_area_name} publications: {format_display_int(v3.get('recent_pub_count'))}
+  Recent senior-author publications: {format_display_int(v3.get('recent_senior_pubs'))}
+  Recent first-author publications: {format_display_int(v3.get('recent_first_pubs'))}
+  Senior/first-author share of recent output: {senior_first_pct_disp}%
+  Citations per recent paper: {format_display_int(v3.get('recent_citations_per_pub'))}
+  Total recent citations: {format_display_int(v3.get('recent_total_citations'))}
+  Emergence percentile (within the rising cohort): {format_percentile_one_decimal(v3.get('emergence_percentile'))}
+  Network Influence percentile: {format_percentile_one_decimal(v3.get('network_influence_pctile'))}
+  Composite rising score: {format_percentile_one_decimal(v3.get('rising_composite_score'))}
+  Rank in the {ctx.therapeutic_area_name} rising cohort: {format_display_int(v3.get('rank'))}
+
+RESEARCH THEMES (this HCP's actual {ctx.therapeutic_area_name} subfocus; centrality in brackets):
+{themes_block}
+
+HOW TO REASON (follow this order; do NOT output these instructions):
+1. PRE-STEP (internal, do not output): identify the SINGLE STRONGEST piece of
+   evidence that this investigator is emerging. Build the narrative around that
+   one thing — not an even list of every statistic.
+2. EVIDENCE LOGIC — lead with CONCRETE OBSERVABLE evidence (actual recent output,
+   authorship, citation impact), THEN interpretation (what that combination
+   implies), THEN the percentile as CONFIRMATION, last. Never lead with the
+   percentile; it validates the observation, it does not replace it.
+3. REASON, DON'T RECITE — do not list numbers ("39 papers. 28 citations. 99.9
+   percentile."). Reason FROM them ("an unusually high volume of recent
+   publications combined with consistent senior authorship suggests a rapid
+   transition from contributor to scientific leader"). The insight leads; the
+   numbers support it.
+4. EMERGENCE DISCIPLINE (future tense) — this person is still climbing. Use
+   "fastest-establishing," "rapidly building scientific authority,"
+   "increasingly influential." NEVER "leading authority," "recognized authority,"
+   or "established" language — that describes the wrong cohort.
+5. EMERGENCE vs NETWORK BALANCE — weight the narrative roughly 60% on the
+   emergence / scientific story and 40% on the network / collaboration story.
+   Give network a genuine second beat (advisory-board potential, referral
+   patterns, congress presence, position in the {ctx.therapeutic_area_name}
+   research graph, how their influence spreads) — not a footnote.
+6. THEMES -> ENGAGEMENT — ground the engagement angle in this HCP's ACTUAL themes
+   above (e.g. "JAK inhibitor positioning," "IL-31/IL-33 pruritus biology,"
+   "barrier dysfunction," "pediatric AD," "comparative biologic efficacy"). Be
+   specific to THEIR subfocus, never generic. If the themes are advocacy /
+   patient-burden flavored, frame engagement accordingly — do not force a
+   bench-science frame onto a non-bench profile. If no themes are listed, reason
+   from the publication metrics alone and do not invent focus areas.
+7. INDUSTRY AFFILIATION — if the Institution above is a pharmaceutical company
+   (e.g. Regeneron, Sanofi, Pfizer, AbbVie, Eli Lilly), this is a meaningful
+   {ctx.therapeutic_area_name} signal, NOT a disqualifier — AD's emerging evidence
+   base is heavily industry-shaped. Write the narrative normally, but you MUST add
+   a caution flag naming the affiliation as context (e.g. "Regeneron-affiliated;
+   recent publication profile reflects an industry research role, characteristic
+   of the heavy industry authorship shaping AD's emerging literature"), and frame
+   engagement honestly for an industry-embedded author (scientific exchange /
+   congress presence, not KOL recruitment).
+8. PRIORITY HOOK (the close) — end on WHY ENGAGE NOW, as a priority argument, not
+   hype. Concept (vary the wording): investigators at this stage often become
+   tomorrow's established KOLs; early engagement builds the relationship before
+   their influence reaches its peak.
+
+Return STRICT JSON with EXACTLY these fields, no additional fields, no preamble,
+no markdown fences:
+
+{{
+  "narrative": "...",
+  "why_now": "...",
+  "signal_strength": "high" | "moderate" | "early",
+  "caution_flags": "..." | null,
+  "engagement_angle": "..."
+}}
+
+Field instructions:
+
+narrative: 4-6 sentences, max 130 words, MSL tone. Order: evidence ->
+interpretation -> percentile-as-confirmation. Roughly 60% emergence / 40% network.
+End on the priority hook. Do NOT use marketing words ("trajectory," "ascent,"
+"leadership in the making," "exceptional," "rockstar," "monster"). Do not invent
+numbers not present in the DATA above.
+
+why_now: one to two sentences. The rationale for engaging at THIS career moment —
+the emergence signal that makes now the right time, before their influence peaks.
+
+signal_strength: this is your EMERGENCE CONFIDENCE — exactly one of "high",
+"moderate", or "early", keyed to the strength of the emergence evidence (recent
+output + authorship + citation impact, confirmed by the composite rising score and
+emergence percentile). high = strong, convergent recent evidence; moderate = solid
+but mixed; early = promising but thin. The JSON key MUST remain "signal_strength".
+
+caution_flags: a single string listing the honest caveats (semicolon-separated if
+more than one), or null. ACTIVELY include real ones — they build trust:
+single-collaboration-network concentration, high recent volume but limited
+independent senior authorship, industry affiliation (per rule 7), a highly
+specialized / narrow focus, or a thin corpus. Return null ONLY if none genuinely
+apply. Do NOT return a JSON array.
+
+engagement_angle: one to two sentences. A specific, theme-grounded, science-forward
+next step for the MSL, tied to this HCP's actual subfocus above (or to their
+publication profile if no themes are listed). For an industry-embedded author,
+frame as scientific exchange / congress presence, not KOL recruitment.
+
+Output ONLY the JSON object. No code fences. No commentary.
+"""
+
+
 def build_prompt_rising_star(ctx: HCPContext) -> str:
     """Prompt for Rising Star cohort -- v3 momentum/visibility methodology."""
+    # AD forks to the Emergence/Network composite prompt; all other TAs use the
+    # frozen v3 momentum/visibility/archetype prompt below (byte-unchanged).
+    if str(ctx.therapeutic_area_id) == AD_TA_ID:
+        return build_prompt_rising_star_composite(ctx)
     v3 = ctx.rising_star_v3 or {}
     career_years = "Unknown"
     if ctx.first_pub_year is not None:
@@ -1700,6 +1928,7 @@ def run_pipeline(
     force: bool,
     target_version: str = "v1",
     single_hcp_id: Optional[str] = None,
+    ta_slug: Optional[str] = None,
 ) -> None:
     load_dotenv()
     supabase = init_supabase()
@@ -1752,6 +1981,7 @@ def run_pipeline(
         established_top_n,
         target_version=target_version,
         single_hcp_id=single_hcp_id,
+        ta_slug=ta_slug,
     )
     if not contexts:
         print("No HCPs found for target cohorts. Exiting.")
@@ -1925,6 +2155,12 @@ def main() -> int:
         default=None,
         help="Regenerate narrative for a single HCP by UUID (skips cohort top-N selection)",
     )
+    parser.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        help="Restrict the run to a single TA by slug; default = all visible TAs.",
+    )
     args = parser.parse_args()
 
     if args.hcp_id and args.cohort == "all":
@@ -1950,6 +2186,7 @@ def main() -> int:
             force=args.force,
             target_version=args.target_version,
             single_hcp_id=args.hcp_id,
+            ta_slug=args.ta,
         )
         return 0
     except Exception as exc:
