@@ -185,6 +185,7 @@ type HCPCardHCP = HCP & {
   network_momentum_percentile?: number | null;
   scientific_visibility_percentile?: number | null;
   network_visibility_percentile?: number | null;
+  is_industry_affiliated?: boolean;
 };
 
 function formatCardAffiliationLine(hcp: HCPCardHCP): string {
@@ -782,6 +783,30 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
                 }}
               >
                 {risingStarArchetypeShortLabel(hcp.archetype)}
+              </span>
+            )}
+            {hcp.rising_model === "composite" && hcp.is_industry_affiliated && (
+              <span
+                title="Industry-affiliated author"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  height: 22,
+                  padding: "3px 8px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  borderRadius: 4,
+                  verticalAlign: "middle",
+                  backgroundColor: "rgba(232, 160, 32, 0.12)",
+                  color: "#E8A020",
+                  border: "1px solid rgba(232, 160, 32, 0.4)",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                Industry
               </span>
             )}
           </div>

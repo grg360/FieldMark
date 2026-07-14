@@ -198,7 +198,13 @@ async function enrichAndMapCohortRows(
 
   const filteredRankRows = rankRows.filter((rr: any) => {
     const hcp = hcpById.get(String(rr.hcp_id));
-    if (cohort === "rising_star" || cohort === "rising_composite") {
+    if (cohort === "rising_composite") {
+      // AD new-model rising KEEPS industry-affiliated HCPs (badged on the card),
+      // matching the narrative-layer decision. The industry drop is intentionally
+      // NOT applied here; only the missing-hcp guard remains.
+      return !!hcp;
+    }
+    if (cohort === "rising_star") {
       if (!hcp) return false;
       const inst = String(hcp.institution_normalized ?? hcp.institution_raw ?? "").toLowerCase();
       if (!inst) return true;
@@ -370,6 +376,14 @@ async function enrichAndMapCohortRows(
       const emergencePctile = parseOptionalNumber(rr.emergence_pctile);
       const networkInfluencePctile = parseOptionalNumber(rr.network_influence_pctile);
       const scopeRank = parseOptionalNumber(rr.rank) ?? 0;
+      // Precompute the industry-affiliation flag (same institution source + regex
+      // the drop used) so the card can badge it without re-running the regex.
+      const industryInst = String(
+        hcp?.institution_normalized ?? hcp?.institution_raw ?? "",
+      ).toLowerCase();
+      const isIndustryAffiliated = industryInst
+        ? INDUSTRY_REGEX.test(industryInst)
+        : false;
 
       const enrichedRow = {
         composite_score: compositeScore,
@@ -408,6 +422,7 @@ async function enrichAndMapCohortRows(
           emergence_pctile: emergencePctile,
           network_influence_pctile: networkInfluencePctile,
           rising_model: "composite",
+          is_industry_affiliated: isIndustryAffiliated,
           pub_velocity: 0,
           citation_trajectory: 0,
           pubVel: "—",

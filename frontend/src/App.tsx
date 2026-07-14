@@ -333,6 +333,7 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     scope_rank: item.scope_rank ?? null,
     emergence_pctile: item.emergence_pctile ?? null,
     rising_model: item.rising_model,
+    is_industry_affiliated: item.is_industry_affiliated,
   };
 }
 

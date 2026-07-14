@@ -78,6 +78,7 @@ export interface HCP {
   // AD rising 2-axis composite model (rising_model === "composite").
   emergence_pctile?: number | null;
   rising_model?: "composite" | "legacy";
+  is_industry_affiliated?: boolean;
 }
 
 export const hcpData: HCP[] = [

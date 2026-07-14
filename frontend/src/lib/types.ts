@@ -113,6 +113,9 @@ export interface RisingStar extends HCP, HCPScore {
   emergence_pctile?: number | null;
   rising_composite_score?: number | null;
   rising_model?: "composite" | "legacy";
+  /** AD rising_composite only: institution matched the pharma-industry pattern
+   *  (kept, not filtered — surfaced as an "Industry" badge on the card). */
+  is_industry_affiliated?: boolean;
 }
 
 /** Result payload from cohort feed API functions (getEstablished, getCommunity, getRisingStars). */
