@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
-import nodesData from "../data/telescope_nsclc_nodes.json";
-import edgesData from "../data/telescope_nsclc_edges.json";
+import nsclcNodesData from "../data/telescope_nsclc_nodes.json";
+import nsclcEdgesData from "../data/telescope_nsclc_edges.json";
+import adNodesData from "../data/telescope_ad_nodes.json";
+import adEdgesData from "../data/telescope_ad_edges.json";
+
+// Atopic Dermatitis TA. When the active TA is AD we swap the node/edge source to
+// the AD network files; every other TA (NSCLC and default) keeps the NSCLC files
+// so that path stays byte-identical. The rendering apparatus is TA-agnostic.
+const AD_TELESCOPE_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1";
+
+type TelescopeEdge = { source: string; target: string; weight: number };
 
 type TelescopeNode = {
   id: string;
@@ -13,6 +22,82 @@ type TelescopeNode = {
   x?: number;
   y?: number;
 };
+
+// ---------------------------------------------------------------------------
+// Ambient motion + interaction tickle (tunable). The graph would otherwise
+// freeze solid once the layout settles. A small custom d3 force injects a
+// low-energy velocity nudge each tick so nodes keep breathing, and a gentle
+// spring back to a slow-following "home" keeps that motion BOUNDED — it never
+// reheats the full layout or lets nodes drift away. Clicking (or hovering) a
+// node briefly raises the energy for a small, fast-settling shiver.
+//
+// PRIMARY TUNING KNOBS — change these two numbers to dial the feel:
+//   AMBIENT_ALPHA  continuous breathing energy (higher = more constant motion)
+//   TICKLE_ALPHA   extra energy injected on click; decays away within ~1s
+const AMBIENT_ALPHA = 0;
+const TICKLE_ALPHA = 0.1;
+// Secondary shaping (rarely need changing):
+const MOTION_PX = 10; // px-per-alpha scale converting energy -> velocity nudge
+const BREATHING_SPRING = 0.03; // restoring pull to home; keeps motion bounded
+const HOME_TRACK = 0.01; // how fast "home" follows the settling/zooming layout
+const TICKLE_DECAY = 0.9; // per-tick falloff of a tickle (~1s to settle at 60fps)
+const HOVER_TICKLE_FRACTION = 0.35; // hover tickle strength relative to a click
+
+// Click-to-center: smoothly pan the clicked node to the center of the VISIBLE
+// graph area (the left region not covered by the drawer). CLICK_CENTER_MS is the
+// pan duration; DRAWER_WIDTH_PX matches TelescopeDrawer's fixed width so we can
+// shift the target left of the drawer. Pan only — no zoom.
+const CLICK_CENTER_MS = 600;
+const DRAWER_WIDTH_PX = 400;
+
+// Zoom-on-select: on selecting a node the view pans (above) AND zooms in to
+// SELECT_ZOOM to feature the node + its immediate cluster while keeping network
+// context. On deselect the view returns to OVERVIEW_ZOOM — matched to the
+// centroid-zoom-on-load level (1.3) so clearing selection returns to load state.
+const SELECT_ZOOM = 1.8;
+const OVERVIEW_ZOOM = 1.3;
+
+// Selected-node emphasis (persistent while selected). Additive over the cohort
+// color so gold/purple still read — a bright ring + soft halo + a slightly
+// larger node, plus a brief arrival pulse. Tunable.
+const SELECTED_RADIUS_MULT = 1.5; // selected node grows for prominence
+const SELECTED_RING_COLOR = "#FFFFFF"; // bright, theme-safe ring/halo tint
+const SELECTED_PULSE_MS = 700; // arrival flash duration before settling
+
+type SimNode = { x: number; y: number; vx: number; vy: number };
+
+// Custom d3 force: alpha-independent so it keeps working after the sim cools.
+// tickleRef carries the transient click/hover energy and is decayed here.
+function createBreathingForce(tickleRef: { current: number }) {
+  let nodes: SimNode[] = [];
+  const homes = new WeakMap<SimNode, { x: number; y: number }>();
+  const force = () => {
+    const energy = (AMBIENT_ALPHA + tickleRef.current) * MOTION_PX;
+    for (const n of nodes) {
+      if (typeof n.x !== "number" || typeof n.y !== "number") continue;
+      let home = homes.get(n);
+      if (!home) {
+        home = { x: n.x, y: n.y };
+        homes.set(n, home);
+      } else {
+        // Slow-follow the true equilibrium so we never fight the initial
+        // layout / centroid zoom and never accumulate net drift.
+        home.x += (n.x - home.x) * HOME_TRACK;
+        home.y += (n.y - home.y) * HOME_TRACK;
+      }
+      n.vx += (home.x - n.x) * BREATHING_SPRING;
+      n.vy += (home.y - n.y) * BREATHING_SPRING;
+      n.vx += (Math.random() - 0.5) * energy;
+      n.vy += (Math.random() - 0.5) * energy;
+    }
+    // Decay the transient tickle once per tick (not per node).
+    tickleRef.current = tickleRef.current > 0.001 ? tickleRef.current * TICKLE_DECAY : 0;
+  };
+  force.initialize = (n: SimNode[]) => {
+    nodes = n;
+  };
+  return force;
+}
 
 function getNodeColor(cohort: string, rank: number): string {
   if (cohort === "established" && rank <= 10) {
@@ -52,14 +137,29 @@ interface TelescopeProps {
     rank: number;
     score: number;
   }) => void;
+  /** Active TA id. Selects the AD network when it matches AD; NSCLC otherwise. */
+  taId?: string;
+  /** Currently selected node id (drives pan+zoom focus); null = deselected. */
+  selectedNodeId?: string | null;
 }
 
-export default function Telescope({ onNodeClick }: TelescopeProps) {
+export default function Telescope({ onNodeClick, taId, selectedNodeId }: TelescopeProps) {
+  const isAtopicDermatitis = taId === AD_TELESCOPE_TA_ID;
+  const nodesData = (isAtopicDermatitis ? adNodesData : nsclcNodesData) as TelescopeNode[];
+  const edgesData = (isAtopicDermatitis ? adEdgesData : nsclcEdgesData) as TelescopeEdge[];
+
   const reticleRef = useRef<SVGSVGElement>(null);
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   const closestNodeIdRef = useRef<string | null>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Transient energy for the interaction tickle; read + decayed by the breathing force.
+  const tickleRef = useRef(0);
+  // Previous selection, so the focus effect can tell select from deselect and
+  // skip the deselect zoom-out on initial mount (no prior selection).
+  const prevSelectedRef = useRef<string | null>(null);
+  // Timestamp of the current selection, for the brief arrival pulse in paintNode.
+  const selectAnimRef = useRef<{ id: string; start: number } | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
@@ -104,7 +204,57 @@ export default function Telescope({ onNodeClick }: TelescopeProps) {
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [nodesData]);
+
+  // Zoom-on-select. Driven by the selection state so it covers every path that
+  // changes it — clicking a graph node, clicking a drawer collaborator, and
+  // clearing the drawer — uniformly. Pure viewport control (centerAt + zoom); it
+  // never touches node positions or the sim, so it composes cleanly with the
+  // tickle/breathing force. TA-agnostic (works for NSCLC and AD).
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const prev = prevSelectedRef.current;
+    prevSelectedRef.current = selectedNodeId ?? null;
+
+    if (selectedNodeId) {
+      // Focus: pan the node to the center of the VISIBLE (left-of-drawer) area
+      // and zoom in. The drawer offset is in graph units at the TARGET zoom, so
+      // the node lands centered-in-open-space once the zoom settles. Moving from
+      // one focused node to another keeps SELECT_ZOOM (no zoom-out-then-in).
+      const node = nodesData.find((n) => n.id === selectedNodeId);
+      if (node && typeof node.x === "number" && typeof node.y === "number") {
+        const targetX = node.x + DRAWER_WIDTH_PX / 2 / SELECT_ZOOM;
+        fg.centerAt(targetX, node.y, CLICK_CENTER_MS);
+        fg.zoom(SELECT_ZOOM, CLICK_CENTER_MS);
+      }
+    } else if (prev) {
+      // Deselect: only when we were focused (prev set) — return to the overview
+      // (established centroid + load zoom level), matching the on-load view.
+      let sumX = 0;
+      let sumY = 0;
+      let count = 0;
+      for (const n of nodesData) {
+        if (n.cohort === "established" && typeof n.x === "number" && typeof n.y === "number") {
+          sumX += n.x;
+          sumY += n.y;
+          count++;
+        }
+      }
+      if (count > 0) {
+        fg.centerAt(sumX / count, sumY / count, CLICK_CENTER_MS);
+      }
+      fg.zoom(OVERVIEW_ZOOM, CLICK_CENTER_MS);
+    }
+  }, [selectedNodeId, nodesData]);
+
+  // Stamp the moment a node becomes selected so paintNode can play a one-shot
+  // arrival pulse (then settle to the persistent ring). Cleared on deselect.
+  useEffect(() => {
+    selectAnimRef.current = selectedNodeId
+      ? { id: selectedNodeId, start: performance.now() }
+      : null;
+  }, [selectedNodeId]);
 
   function hexToRgba(hex: string, alpha: number): string {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -113,12 +263,34 @@ export default function Telescope({ onNodeClick }: TelescopeProps) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  const graphData = {
-    nodes: nodesData,
-    links: edgesData
-      .filter((e) => e.weight >= 3)
-      .map((e) => ({ source: e.source, target: e.target, value: e.weight })),
-  };
+  // Memoized so the reference is stable across selection re-renders. Rebuilding
+  // graphData (and a fresh links array) every render made ForceGraph2D re-ingest
+  // the graph and reheat the force sim, drifting nodes on every click. Deps are
+  // the data source only, so the centroid-zoom-on-load effect is unaffected.
+  const graphData = useMemo(
+    () => ({
+      nodes: nodesData,
+      links: edgesData
+        .filter((e) => e.weight >= 3)
+        .map((e) => ({ source: e.source, target: e.target, value: e.weight })),
+    }),
+    [nodesData, edgesData]
+  );
+
+  // Install the ambient breathing/tickle force on the simulation. Re-runs when
+  // the data source swaps (TA change) since ForceGraph2D rebuilds its sim then.
+  // This adds motion via alpha control only — graphData stays memoized (the
+  // anti-drift fix), and cooldownTicks={Infinity} keeps the loop ticking so the
+  // force is applied continuously. TA-agnostic: identical for NSCLC and AD.
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const setForce = fg.d3Force as unknown as (name: string, force: unknown) => unknown;
+    setForce("telescopeBreathing", createBreathingForce(tickleRef));
+    return () => {
+      setForce("telescopeBreathing", null);
+    };
+  }, [graphData]);
 
   const { topTenEstablishedIds, midRangeEstablishedIds, topHundredRisingIds } = useMemo(() => {
     const established = nodesData
@@ -137,7 +309,7 @@ export default function Telescope({ onNodeClick }: TelescopeProps) {
       midRangeEstablishedIds: midRange,
       topHundredRisingIds: topHundredRising,
     };
-  }, []);
+  }, [nodesData]);
 
   const paintNode = (node: TelescopeNode, ctx: CanvasRenderingContext2D) => {
     if (node.x === undefined || node.y === undefined) {
@@ -150,9 +322,11 @@ export default function Telescope({ onNodeClick }: TelescopeProps) {
       finalRadius = 4.0;
     }
 
+    const isSelected = selectedNodeId != null && node.id === selectedNodeId;
     const magnification = closestNodeIdRef.current === node.id ? 2.0 : 1.0;
 
-    const effectiveRadius = finalRadius * magnification;
+    const effectiveRadius =
+      finalRadius * magnification * (isSelected ? SELECTED_RADIUS_MULT : 1);
     const color = getNodeColor(node.cohort, node.rank);
     let finalColor = color;
     if (node.cohort === "rising" && topHundredRisingIds.has(node.id)) {
@@ -232,6 +406,49 @@ export default function Telescope({ onNodeClick }: TelescopeProps) {
       ctx.beginPath();
       ctx.arc(node.x, node.y, effectiveRadius * 1.8, 0, 2 * Math.PI);
       ctx.stroke();
+    }
+
+    if (isSelected) {
+      // Persistent selection emphasis: a soft halo + crisp bright ring framing
+      // the node. Additive (transparent at center) so the cohort color still
+      // reads. A brief arrival pulse expands and fades on first selection.
+      const ringRadius = effectiveRadius * 2.2;
+
+      const halo = ctx.createRadialGradient(
+        node.x,
+        node.y,
+        ringRadius * 0.4,
+        node.x,
+        node.y,
+        ringRadius * 2.0
+      );
+      halo.addColorStop(0, hexToRgba(SELECTED_RING_COLOR, 0));
+      halo.addColorStop(0.5, hexToRgba(SELECTED_RING_COLOR, 0.12));
+      halo.addColorStop(1, hexToRgba(SELECTED_RING_COLOR, 0));
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, ringRadius * 2.0, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.strokeStyle = hexToRgba(SELECTED_RING_COLOR, 0.9);
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, ringRadius, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      const anim = selectAnimRef.current;
+      if (anim && anim.id === node.id) {
+        const elapsed = performance.now() - anim.start;
+        if (elapsed < SELECTED_PULSE_MS) {
+          const t = elapsed / SELECTED_PULSE_MS; // 0 -> 1
+          const pulseRadius = ringRadius + t * effectiveRadius * 5;
+          ctx.strokeStyle = hexToRgba(SELECTED_RING_COLOR, (1 - t) * 0.8);
+          ctx.lineWidth = 1.5 * (1 - t) + 0.4;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, pulseRadius, 0, 2 * Math.PI);
+          ctx.stroke();
+        }
+      }
     }
 
     const isTopTen = topTenEstablishedIds.has(node.id);
@@ -356,8 +573,13 @@ export default function Telescope({ onNodeClick }: TelescopeProps) {
       onClick={() => {
         const closestId = closestNodeIdRef.current;
         if (!closestId) return;
+        // Small, fast-settling shiver on click (does not recenter/zoom/reheat).
+        tickleRef.current = TICKLE_ALPHA;
         const node = (nodesData as TelescopeNode[]).find((n) => n.id === closestId);
         if (node) {
+          // Selecting drives the pan+zoom focus via the selectedNodeId effect
+          // above (so graph clicks and drawer-collaborator clicks behave the
+          // same); here we just report the selection up.
           onNodeClick({
             id: node.id,
             name: node.name,
@@ -396,6 +618,14 @@ export default function Telescope({ onNodeClick }: TelescopeProps) {
               }
             }
 
+            // Gentle tickle when the cursor first reaches a new node (a lighter
+            // shiver than a click). Only on entering a new target, not every move.
+            if (closestId && closestId !== closestNodeIdRef.current) {
+              tickleRef.current = Math.max(
+                tickleRef.current,
+                TICKLE_ALPHA * HOVER_TICKLE_FRACTION
+              );
+            }
             closestNodeIdRef.current = closestId;
           }
         }

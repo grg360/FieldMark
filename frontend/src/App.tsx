@@ -126,7 +126,9 @@ function isCohortFeedTrack(track: string): boolean {
 }
 
 function isTelescopeAvailable(ta: string, indication: string): boolean {
-  return ta === "Oncology" && (indication === "All" || indication === "NSCLC");
+  if (ta === "Oncology") return indication === "All" || indication === "NSCLC";
+  if (ta === "Immunology") return indication === "Atopic Dermatitis";
+  return false;
 }
 
 const EMPTY_HCP: AppHCP = {
@@ -403,6 +405,13 @@ function FeedLayout({
     setTrack(route.track);
   }, [route.track, setTrack]);
 
+  // Telescope swaps its node/edge source when the TA changes. Clear any open
+  // drawer selection on that switch so a stale researcher (e.g. an NSCLC node
+  // absent from the AD graph) can't persist across TAs. Fires both directions.
+  useEffect(() => {
+    setTelescopeSelectedHcp(null);
+  }, [indicationTaId]);
+
   useEffect(() => {
     setIndicationCount(route.indicationCount);
   }, [route.indicationCount, route.indicationLabel, route.taLabel]);
@@ -437,7 +446,9 @@ function FeedLayout({
     }
     const taLabel =
       track === "telescope" && isTelescopeAvailable(selectedTA, selectedIndication)
-        ? "Oncology (NSCLC) - Telescope"
+        ? selectedTA === "Immunology"
+          ? "Immunology (Atopic Dermatitis) - Telescope"
+          : "Oncology (NSCLC) - Telescope"
         : selectedTA;
     if (selectedIndication === "All") return taLabel;
     return `${taLabel} \u2014 ${selectedIndication}`;
@@ -820,7 +831,9 @@ function FeedLayout({
                 fontWeight: 400,
               }}
             >
-              Telescope maps the network of HCPs driving clinical and scientific progress in non-small cell lung cancer. Each star represents a US-based researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in NSCLC — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it.
+              {indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
+                ? "Telescope maps the network of HCPs driving clinical and scientific progress in atopic dermatitis. Each star represents a researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in atopic dermatitis — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it."
+                : "Telescope maps the network of HCPs driving clinical and scientific progress in non-small cell lung cancer. Each star represents a US-based researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in NSCLC — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it."}
             </div>
             <div
               style={{
@@ -833,8 +846,13 @@ function FeedLayout({
                 borderRadius: "4px",
               }}
             >
-              <Telescope onNodeClick={(node) => setTelescopeSelectedHcp(node)} />
+              <Telescope
+                taId={indicationTaId}
+                selectedNodeId={telescopeSelectedHcp?.id ?? null}
+                onNodeClick={(node) => setTelescopeSelectedHcp(node)}
+              />
               <TelescopeDrawer
+                taId={indicationTaId}
                 hcp={telescopeSelectedHcp}
                 onClose={() => setTelescopeSelectedHcp(null)}
                 onViewProfile={(hcpId) => {
@@ -873,12 +891,14 @@ function FeedLayout({
                 marginBottom: "12px",
               }}
             >
-              Telescope is currently available for Oncology (NSCLC)
+              Telescope is currently available for Oncology (NSCLC) and Immunology (Atopic Dermatitis)
             </div>
             <div style={{ fontSize: "13px", maxWidth: "480px", lineHeight: 1.5 }}>
-              {selectedTA !== "Oncology"
-                ? "Hepatology, Immunology, and Rare Disease coverage are in development. Select Oncology and the NSCLC indication to explore the collaboration network."
-                : "Select the All or NSCLC indication under Oncology to explore the NSCLC collaboration network. Other oncology indications are in development."}
+              {selectedTA === "Immunology"
+                ? "Select the Atopic Dermatitis indication under Immunology to explore its collaboration network. Other immunology indications are in development."
+                : selectedTA === "Oncology"
+                ? "Select the All or NSCLC indication under Oncology to explore the NSCLC collaboration network. Other oncology indications are in development."
+                : "Hepatology and Rare Disease coverage are in development. Select Oncology (NSCLC) or Immunology (Atopic Dermatitis) to explore a collaboration network."}
             </div>
           </div>
         )

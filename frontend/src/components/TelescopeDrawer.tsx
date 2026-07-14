@@ -1,6 +1,24 @@
 import { useMemo, type CSSProperties } from "react";
-import nodesData from "../data/telescope_nsclc_nodes.json";
-import edgesData from "../data/telescope_nsclc_edges.json";
+import { useNavigate } from "react-router-dom";
+import nsclcNodesData from "../data/telescope_nsclc_nodes.json";
+import nsclcEdgesData from "../data/telescope_nsclc_edges.json";
+import adNodesData from "../data/telescope_ad_nodes.json";
+import adEdgesData from "../data/telescope_ad_edges.json";
+
+// Mirror Telescope's TA-conditional data source: the Top Collaborators list is
+// derived from the edges array, so the drawer must read the same TA's nodes/edges
+// the graph is showing. AD when taId matches AD; NSCLC (default) otherwise.
+const AD_TELESCOPE_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1";
+
+type TelescopeDrawerNode = {
+  id: string;
+  name: string;
+  institution: string;
+  cohort: string;
+  rank: number;
+  score: number;
+};
+type TelescopeDrawerEdge = { source: string; target: string; weight: number };
 
 export interface TelescopeDrawerProps {
   hcp: {
@@ -21,6 +39,8 @@ export interface TelescopeDrawerProps {
     rank: number;
     score: number;
   }) => void;
+  /** Active TA id. Selects the AD network when it matches AD; NSCLC otherwise. */
+  taId?: string;
 }
 
 function getCohortBadge(
@@ -73,7 +93,13 @@ export default function TelescopeDrawer({
   onClose,
   onViewProfile,
   onSelectCollaborator,
+  taId,
 }: TelescopeDrawerProps) {
+  const navigate = useNavigate();
+  const isAtopicDermatitis = taId === AD_TELESCOPE_TA_ID;
+  const nodesData = (isAtopicDermatitis ? adNodesData : nsclcNodesData) as TelescopeDrawerNode[];
+  const edgesData = (isAtopicDermatitis ? adEdgesData : nsclcEdgesData) as TelescopeDrawerEdge[];
+
   const { topTenEstablishedIds, topHundredRisingIds } = useMemo(() => {
     const established = nodesData
       .filter((n: { cohort: string }) => n.cohort === "established")
@@ -86,14 +112,14 @@ export default function TelescopeDrawer({
     const topHundredRising = new Set(rising.slice(0, 100).map((n: { id: string }) => n.id));
 
     return { topTenEstablishedIds: topTen, topHundredRisingIds: topHundredRising };
-  }, []);
+  }, [nodesData]);
 
   const collaborators = useMemo(() => {
     if (!hcp) return [];
 
-    const relevantEdges = (
-      edgesData as Array<{ source: string; target: string; weight: number }>
-    ).filter((e) => e.source === hcp.id || e.target === hcp.id);
+    const relevantEdges = edgesData.filter(
+      (e) => e.source === hcp.id || e.target === hcp.id
+    );
 
     const collaboratorMap = new Map<string, number>();
     for (const edge of relevantEdges) {
@@ -106,18 +132,7 @@ export default function TelescopeDrawer({
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
 
-    const nodesById = new Map(
-      (
-        nodesData as Array<{
-          id: string;
-          name: string;
-          institution: string;
-          cohort: string;
-          rank: number;
-          score: number;
-        }>
-      ).map((n) => [n.id, n])
-    );
+    const nodesById = new Map(nodesData.map((n) => [n.id, n]));
 
     return sortedIds
       .map(([id, weight]) => {
@@ -134,7 +149,7 @@ export default function TelescopeDrawer({
         };
       })
       .filter((c): c is NonNullable<typeof c> => c !== null);
-  }, [hcp]);
+  }, [hcp, nodesData, edgesData]);
 
   if (!hcp) {
     return null;
@@ -414,11 +429,25 @@ export default function TelescopeDrawer({
                       </div>
                     </div>
                     <div
+                      role="link"
+                      title="View co-authored papers"
+                      onClick={(e) => {
+                        // Same destination the profile page's "XX co-authored
+                        // papers" link uses: the shared-publications view for the
+                        // (selected node, collaborator) pair. stopPropagation so
+                        // the row's select-node handler doesn't also fire.
+                        e.stopPropagation();
+                        navigate(`/hcp/${hcp.id}/publications-with/${collab.id}`);
+                      }}
                       style={{
                         fontSize: "11px",
-                        color: "rgba(232, 230, 223, 0.5)",
+                        color: "#9B6DFF",
                         marginLeft: "8px",
                         flexShrink: 0,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        textUnderlineOffset: 2,
+                        textDecorationColor: "#9B6DFF55",
                       }}
                     >
                       {collab.weight} papers
