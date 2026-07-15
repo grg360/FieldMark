@@ -4,6 +4,7 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getHcpOverview } from "../../lib/aiOverviews";
 import { getTrackedHcpsInTerritory, type CoverageGapHcp, type TerritoryCoverageStats, type TrackedHcpChip } from "../../lib/home";
 import { useIsDesktop } from "../../lib/useIsDesktop";
+import { useTA } from "../../lib/TAContext";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger = 0 }: Props) {
   const navigate = useNavigate();
+  const { indication } = useTA();
   const isDesktop = useIsDesktop(600);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set());
@@ -51,7 +53,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
     });
 
     for (const gap of gaps) {
-      getHcpOverview(gap.hcp_id, "NSCLC")
+      getHcpOverview(gap.hcp_id, indication.label)
         .then((overview) => {
           setOverviewsByHcpId((prev) => ({
             ...prev,
@@ -68,7 +70,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
           }));
         });
     }
-  }, [gaps]);
+  }, [gaps, indication.label]);
 
   const hasStats = stats && stats.total_rising_stars_in_territory > 0;
 
@@ -98,6 +100,13 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
     }
   }
 
+  // Empty → hide (don't render an empty shell). gaps arrives already-resolved from
+  // HomePage (which gates tiles behind its own loading), so an empty gaps here means
+  // genuinely no coverage-gap data for the current TA — e.g. AD, whose international
+  // academic cohort has no US-territory rising-star gaps. NSCLC has gaps → renders.
+  // (This is after all hooks, per the Rules of Hooks.)
+  if (gaps.length === 0) return null;
+
   return (
     <HomeTile>
       <style>{`@keyframes fmShimmer { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
@@ -114,13 +123,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
         Your HCP Portfolio
       </div>
 
-      {gaps.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5 }}>
-          {hasStats
-            ? "You're tracking every Rising Star in your territory. Outstanding."
-            : "No territory data yet."}
-        </div>
-      ) : (
+      {(
         <>
           {trackedChips.length > 0 ? (
             <div style={{ marginBottom: 16 }}>

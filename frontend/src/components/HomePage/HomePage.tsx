@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { useRelationships } from "../../contexts/RelationshipsContext";
+import { useTA } from "../../lib/TAContext";
+import { taIdForApiSlug } from "../../lib/api";
+import { taLabelToApiSlug, taSlugToLabel } from "../../lib/routeSlugs";
 import { addHcpToDefaultOrCreate } from "../../lib/relationships";
 import { supabase } from "../../lib/supabase";
 import { useIsDesktop } from "../../lib/useIsDesktop";
@@ -39,6 +42,13 @@ import YourInstitutionsTile from "./YourInstitutionsTile";
 
 export default function HomePage() {
   const isDesktop = useIsDesktop();
+  // The home dashboard has no feed URL, so its TA is anchored to the USER'S PROFILE
+  // default (resolved in load() below) rather than the volatile last-browsed ambient
+  // value — otherwise the tiles would show the wrong TA (e.g. a stale AD selection
+  // makes NSCLC's coverage gaps disappear). We seed TAContext from the profile so the
+  // tiles' own useTA() reads stay consistent.
+  const { setTA } = useTA();
+  const [homeTaId, setHomeTaId] = useState<string | undefined>(undefined);
   const [userId, setUserId] = useState<string | null>(null);
   const { refreshAll } = useRelationships();
   const [trackRefreshCounter, setTrackRefreshCounter] = useState(0);
@@ -69,8 +79,27 @@ export default function HomePage() {
 
         setUserId(user.id);
 
+        // Resolve the dashboard TA from the user's profile default FIRST, seed
+        // TAContext so the tiles' useTA() reads match, then fetch TA-scoped data
+        // with it. Single fetch → no hide-then-flash.
+        const { data: profile } = await supabase
+          .from("msl_profiles")
+          .select("first_name, default_ta_slug, default_indication_slug")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (profile?.first_name) setUserFirstName(profile.first_name);
+
+        const parentSlug = profile?.default_ta_slug ?? "oncology";
+        const indicationSlug =
+          profile?.default_indication_slug ?? taLabelToApiSlug(taSlugToLabel(parentSlug));
+        const resolvedTaId =
+          taIdForApiSlug(indicationSlug) ??
+          taIdForApiSlug(taLabelToApiSlug(taSlugToLabel(parentSlug)));
+        setHomeTaId(resolvedTaId);
+        setTA(parentSlug, indicationSlug);
+
         const [
-          profileResult,
           summaryData,
           nextActionsData,
           overdueData,
@@ -82,7 +111,6 @@ export default function HomePage() {
           territoryStatsData,
           territoryProfileData,
         ] = await Promise.all([
-          supabase.from("msl_profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
           getHomeSummaryCounts(user.id),
           getNextActionsForUser(user.id, 3),
           getOverdueFollowUpsForUser(user.id, 5),
@@ -90,16 +118,12 @@ export default function HomePage() {
           getRecentInsightsForUser(user.id, 5),
           getRecentBriefsForUser(user.id, 5),
           getRecentActivityForUser(user.id, 10),
-          getCoverageGapsForUser(user.id, 5),
-          getTerritoryCoverageStats(user.id),
+          getCoverageGapsForUser(user.id, resolvedTaId, 5),
+          getTerritoryCoverageStats(user.id, resolvedTaId),
           getTerritoryProfile(user.id),
         ]);
 
         if (cancelled) return;
-
-        if (profileResult.data?.first_name) {
-          setUserFirstName(profileResult.data.first_name);
-        }
 
         setSummary(summaryData);
         setNextActions(nextActionsData);
@@ -122,22 +146,22 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setTA]);
 
   const handleTrackHcp = useCallback(async (hcpId: string) => {
     if (!userId) throw new Error("No user");
     await addHcpToDefaultOrCreate(userId, hcpId, "coverage_gaps");
     await refreshAll();
     const [newGaps, newStats] = await Promise.all([
-      getCoverageGapsForUser(userId, 5),
-      getTerritoryCoverageStats(userId),
+      getCoverageGapsForUser(userId, homeTaId, 5),
+      getTerritoryCoverageStats(userId, homeTaId),
     ]);
     setCoverageGaps(newGaps);
     setTerritoryStats(newStats);
     const newSummary = await getHomeSummaryCounts(userId);
     setSummary(newSummary);
     setTrackRefreshCounter((c) => c + 1);
-  }, [userId, refreshAll]);
+  }, [userId, refreshAll, homeTaId]);
 
   const gridColumns = isDesktop ? "1fr 1fr" : "1fr";
 

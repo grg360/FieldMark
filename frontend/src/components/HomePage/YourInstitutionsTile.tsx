@@ -4,6 +4,7 @@ import { Pin } from "lucide-react";
 import type { InstitutionIndexEntry } from "../../lib/api";
 import { getInstitutionsByNames, getPinnedInstitutionsForUser, type PinnedInstitution } from "../../lib/institutionPins";
 import { institutionToSlug } from "../../lib/institutionUtils";
+import { useTA } from "../../lib/TAContext";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -11,6 +12,9 @@ interface Props {
 }
 
 export default function YourInstitutionsTile({ userId }: Props) {
+  // Ambient current TA — pins are global (not TA-scoped), but their displayed stats
+  // and the "Browse all" index link follow the user's current TA.
+  const { dataSlug } = useTA();
   const [pins, setPins] = useState<PinnedInstitution[]>([]);
   const [indexMap, setIndexMap] = useState<Map<string, InstitutionIndexEntry>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -29,7 +33,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
 
         if (pinsData.length > 0) {
           const names = pinsData.map((p) => p.institution_name);
-          const statsMap = await getInstitutionsByNames(names);
+          const statsMap = await getInstitutionsByNames(names, dataSlug);
           if (cancelled) return;
           setIndexMap(statsMap);
         }
@@ -40,7 +44,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
     })();
 
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, dataSlug]);
 
   const MAX_VISIBLE = 5;
   const visiblePins = pins.slice(0, MAX_VISIBLE);
@@ -55,6 +59,12 @@ export default function YourInstitutionsTile({ userId }: Props) {
     marginBottom: 8,
   };
 
+  // Empty → hide (consistency with the home-tile pattern). Only after the fetch
+  // resolves: while loading we still render the tile's loading state below, so a
+  // slow fetch doesn't hide-then-flash-in. Pins are global (not TA-scoped), so this
+  // hides only for a user with no pins at all.
+  if (!loading && pins.length === 0) return null;
+
   return (
     <HomeTile>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
@@ -62,7 +72,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
         <button
           type="button"
           className="fm-pill-button"
-          onClick={() => navigate("/institutions/nsclc")}
+          onClick={() => navigate(`/institutions/${dataSlug}`)}
           style={{
             background: "none",
             border: "none",
@@ -89,7 +99,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
           <button
             type="button"
             className="fm-pill-button"
-            onClick={() => navigate("/institutions/nsclc")}
+            onClick={() => navigate(`/institutions/${dataSlug}`)}
             style={{
               background: "none",
               border: "1px solid #1E1E22",

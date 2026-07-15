@@ -643,11 +643,16 @@ export async function getTerritoryProfile(userId: string): Promise<TerritoryProf
 
 export async function getCoverageGapsForUser(
   userId: string,
+  taId?: string,
   limit: number = 5,
 ): Promise<CoverageGapHcp[]> {
   try {
     const context = await getUserTerritoryContext(userId);
-    if (!context || context.states.length === 0 || context.taUuids.length === 0) {
+    // Ambient TA (threaded in from TAContext by the caller) scopes the fetch; fall
+    // back to the profile-derived TAs when no taId is supplied. Territory (states)
+    // still comes from the user's profile.
+    const taUuids = taId ? [taId] : (context?.taUuids ?? []);
+    if (!context || context.states.length === 0 || taUuids.length === 0) {
       return [];
     }
 
@@ -666,7 +671,7 @@ export async function getCoverageGapsForUser(
     const { data: rankings, error: rankError } = await supabase
       .from("hcp_rising_star_ranks_v3")
       .select("hcp_id, us_rank, archetype, therapeutic_area_id")
-      .in("therapeutic_area_id", context.taUuids)
+      .in("therapeutic_area_id", taUuids)
       .not("us_rank", "is", null)
       .order("us_rank", { ascending: true })
       .limit(500);
@@ -734,7 +739,10 @@ export async function getCoverageGapsForUser(
   }
 }
 
-export async function getTerritoryCoverageStats(userId: string): Promise<TerritoryCoverageStats> {
+export async function getTerritoryCoverageStats(
+  userId: string,
+  taId?: string,
+): Promise<TerritoryCoverageStats> {
   try {
     const context = await getUserTerritoryContext(userId);
     const empty: TerritoryCoverageStats = {
@@ -744,7 +752,9 @@ export async function getTerritoryCoverageStats(userId: string): Promise<Territo
       territory_label: context?.territoryLabel ?? null,
     };
 
-    if (!context || context.states.length === 0 || context.taUuids.length === 0) {
+    // Ambient TA scopes the fetch; fall back to the profile TAs when absent.
+    const taUuids = taId ? [taId] : (context?.taUuids ?? []);
+    if (!context || context.states.length === 0 || taUuids.length === 0) {
       return empty;
     }
 
@@ -757,7 +767,7 @@ export async function getTerritoryCoverageStats(userId: string): Promise<Territo
       const { data: pageData, error: pageError } = await supabase
         .from("hcp_rising_star_ranks_v3")
         .select("hcp_id")
-        .in("therapeutic_area_id", context.taUuids)
+        .in("therapeutic_area_id", taUuids)
         .range(offset, offset + PAGE_SIZE - 1);
 
       if (pageError) {
