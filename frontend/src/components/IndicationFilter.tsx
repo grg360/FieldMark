@@ -4,6 +4,7 @@ import {
   indicationLabelToSlug,
   resolveFeedRoute,
 } from "../lib/routeSlugs";
+import { useTA } from "../lib/TAContext";
 
 export interface IndicationOption {
   label: string;
@@ -84,6 +85,7 @@ export default function IndicationFilter({
   onSelect,
 }: IndicationFilterProps) {
   const navigate = useNavigate();
+  const { setTA } = useTA();
   const params = useParams();
   const location = useLocation();
   const isFieldIntelligence = location.pathname.includes("/field-intelligence");
@@ -98,6 +100,8 @@ export default function IndicationFilter({
   function handleIndicationSelect(label: string, count: number | null) {
     onSelect?.(label, count);
     const indicationSlug = indicationLabelToSlug(therapeuticArea, label);
+    // Phase 1a: track the user's indication selection in TAContext alongside routing.
+    setTA(route.taSlug, indicationSlug);
     if (isFieldIntelligence) {
       if (indicationSlug === "all") {
         navigate(`/${route.taSlug}/field-intelligence`);

@@ -85,6 +85,7 @@ import FilterButton from "./components/FilterButton";
 import FilterDrawer from "./components/FilterDrawer";
 import { useFilterContext, statesFromTerritory } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
+import { TAProvider, useTA } from "./lib/TAContext";
 import {
   buildHcpDetailPath,
   getIndicationTaId,
@@ -367,6 +368,13 @@ function FeedLayout({
   const selectedTA = route.taLabel;
   const selectedIndication = route.indicationLabel;
   const indicationTaId = getIndicationTaId(selectedTA, selectedIndication);
+
+  // Phase 1a: mirror the URL-resolved TA into TAContext (the URL stays authoritative
+  // on feed routes; the context reflects it). No consumer reads it yet.
+  const { setTA } = useTA();
+  useEffect(() => {
+    setTA(route.taSlug, route.indicationSlug);
+  }, [route.taSlug, route.indicationSlug, setTA]);
   const [indicationCount, setIndicationCount] = useState<number | null>(
     route.indicationCount ?? HOME_INDICATION_COUNT,
   );
@@ -1321,6 +1329,7 @@ function FieldIntelligenceFeedRoute() {
 export default function App() {
   return (
     <TrackProvider>
+      <TAProvider>
       <Routes>
       <Route path="/demo" element={<DemoPage />} />
       <Route
@@ -1367,6 +1376,7 @@ export default function App() {
         }
       />
       </Routes>
+      </TAProvider>
     </TrackProvider>
   );
 }

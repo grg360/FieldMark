@@ -6,6 +6,7 @@ import {
   taLabelToSlug,
   trackToDashboardSlug,
 } from "../lib/routeSlugs";
+import { useTA } from "../lib/TAContext";
 
 // Hepatology and Rare Disease parent tiles retired (2026-07-11): their cohort feeds
 // read hcp_*_ranks_v3, which has no hepatology/rare-disease rows, so the tiles
@@ -20,6 +21,7 @@ interface TAFilterChipsProps {
 
 export default function TAFilterChips({ selected, onSelect }: TAFilterChipsProps) {
   const navigate = useNavigate();
+  const { setTA } = useTA();
   const params = useParams();
   const location = useLocation();
   const route = resolveFeedRoute({
@@ -41,6 +43,9 @@ export default function TAFilterChips({ selected, onSelect }: TAFilterChipsProps
       route.dashboardSlug === "field-intelligence"
         ? trackToDashboardSlug("established")
         : route.dashboardSlug;
+    // Phase 1a: track the user's selection in TAContext alongside routing (routing
+    // stays authoritative; no consumer reads the context yet).
+    setTA(newTaSlug, indicationSlug);
     navigate(buildFeedPath(newTaSlug, dashboardSlug, indicationSlug));
   }
 
