@@ -56,8 +56,13 @@ const DEFAULT_INDICATION_SLUG = "nsclc";
  * (e.g. Immunology "All" → AD) and finally to the parent's active-data slug
  * (e.g. Oncology "All" → nsclc). `indicationTaId` is then TA_ID_MAP[dataSlug] — so it
  * is defined for NSCLC and AD alike.
+ *
+ * Exported as a PURE fn (Phase 1b.2) so callers can derive the TA SYNCHRONOUSLY from the
+ * route on the same render. The provider's value is mirrored from the URL by an effect and
+ * therefore lags it by one render; feed code that branches on the TA inside a render or an
+ * effect must not read that lagging value. Same mapping, no lag — see useTA() vs this.
  */
-function deriveTAValue(parentSlug: string, indicationSlug: string): TAValue {
+export function deriveTAValue(parentSlug: string, indicationSlug: string): TAValue {
   const parentLabel = taSlugToLabel(parentSlug);
   const indicationLabel =
     indicationSlugToLabel(parentLabel, indicationSlug) ?? indicationSlug;

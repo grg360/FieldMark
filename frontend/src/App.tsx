@@ -14,7 +14,7 @@
  * - Refresh deep URL -> same content after auth
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Link,
   Navigate,
@@ -85,7 +85,7 @@ import FilterButton from "./components/FilterButton";
 import FilterDrawer from "./components/FilterDrawer";
 import { useFilterContext, statesFromTerritory } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
-import { TAProvider, useTA } from "./lib/TAContext";
+import { TAProvider, deriveTAValue, useTA } from "./lib/TAContext";
 import {
   buildHcpDetailPath,
   getIndicationTaId,
@@ -375,6 +375,20 @@ function FeedLayout({
   useEffect(() => {
     setTA(route.taSlug, route.indicationSlug);
   }, [route.taSlug, route.indicationSlug, setTA]);
+
+  // Phase 1b.2: the feed's AD branches derive their TA from the ROUTE via TAContext's
+  // pure deriveTAValue — NOT from useTA(), whose value is mirrored by the effect above and
+  // so still holds the previous TA on the render a switch happens. Reading the lagging
+  // value here would compute isAdFeed=false for the first AD render/effect pass, and the
+  // cohort effect below (deps: selectedTA/indicationTaId) would never re-fire to correct
+  // it — AD Rising would silently keep region/US instead of its global default.
+  // Route-derived is exactly equivalent to the old `indicationTaId === <AD uuid>` compare
+  // on every route (incl. Immunology "All", which maps to AD) and is correct at render N.
+  const feedDataSlug = useMemo(
+    () => deriveTAValue(route.taSlug, route.indicationSlug).dataSlug,
+    [route.taSlug, route.indicationSlug],
+  );
+  const isAdFeed = feedDataSlug === "atopic-dermatitis";
   const [indicationCount, setIndicationCount] = useState<number | null>(
     route.indicationCount ?? HOME_INDICATION_COUNT,
   );
@@ -475,7 +489,7 @@ function FeedLayout({
       return;
     }
     // AD Community renders the CommunityExplorer directory; skip getCommunity.
-    if (track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1") {
+    if (track === "community" && isAdFeed) {
       setHcpList([]);
       setFeedTotal(0);
       setFeedEmptyReason(null);
@@ -488,7 +502,7 @@ function FeedLayout({
       const taSlug = taLabelToApiSlug(selectedTA);
       // AD RISING defaults to global scope (82% intl). Gated on the rising track so
       // AD Established/Community stay region/US (their RPCs still bail on global).
-      const isAdRising = indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" && track === "rising-stars";
+      const isAdRising = isAdFeed && track === "rising-stars";
       const filters = {
         therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId,
         ...(isAdRising ? { scope: "global" as const } : {}),
@@ -531,7 +545,7 @@ function FeedLayout({
       }
       // AD Community renders the CommunityExplorer directory via its own RPC; skip
       // the unused getCommunity round-trip on this branch.
-      if (track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1") {
+      if (track === "community" && isAdFeed) {
         setHcpList([]);
         setFeedOffset(0);
         setFeedTotal(0);
@@ -546,7 +560,7 @@ function FeedLayout({
       const taSlug = taLabelToApiSlug(selectedTA);
       // AD RISING defaults to global scope (82% intl). Gated on the rising track so
       // AD Established/Community stay region/US (their RPCs still bail on global).
-      const isAdRising = indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" && track === "rising-stars";
+      const isAdRising = isAdFeed && track === "rising-stars";
       const filters = {
         therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId,
         ...(isAdRising ? { scope: "global" as const } : {}),
@@ -578,16 +592,18 @@ function FeedLayout({
     return () => {
       cancelled = true;
     };
-  }, [selectedTA, track, region, regions, states, themeIds, route.indicationDataActive, indicationTaId]);
+    // isAdFeed is route-derived, so it flips on the SAME render as selectedTA/indicationTaId
+    // — listing it adds no extra fire, it just keeps the dep list honest about the read.
+  }, [selectedTA, track, region, regions, states, themeIds, route.indicationDataActive, indicationTaId, isAdFeed]);
 
   async function loadMore() {
     if (!isCohortFeedTrack(track)) return;
-    if (track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1") return;
+    if (track === "community" && isAdFeed) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
     const taSlug = taLabelToApiSlug(selectedTA);
     // AD RISING defaults to global scope (82% intl). Gated on the rising track so
     // AD Established/Community stay region/US (their RPCs still bail on global).
-    const isAdRising = indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" && track === "rising-stars";
+    const isAdRising = isAdFeed && track === "rising-stars";
     const filters = {
       therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId,
       ...(isAdRising ? { scope: "global" as const } : {}),
@@ -839,7 +855,7 @@ function FeedLayout({
                 fontWeight: 400,
               }}
             >
-              {indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
+              {isAdFeed
                 ? "Telescope maps the network of HCPs driving clinical and scientific progress in atopic dermatitis. Each star represents a researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in atopic dermatitis — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it."
                 : "Telescope maps the network of HCPs driving clinical and scientific progress in non-small cell lung cancer. Each star represents a US-based researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in NSCLC — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it."}
             </div>
@@ -913,7 +929,7 @@ function FeedLayout({
       ) : isCohortFeedTrack(track) ? (
         // AD Community renders the practitioner directory (server-side RPC over
         // community_practitioners); every other TA/cohort keeps the card feed.
-        track === "community" && indicationTaId === "9e4139d2-e062-4a58-8728-cdabb2d7dca1" ? (
+        track === "community" && isAdFeed ? (
           <CommunityExplorer taLabel={selectedIndication} />
         ) : (
         <>
