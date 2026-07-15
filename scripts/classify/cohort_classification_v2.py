@@ -430,7 +430,13 @@ def print_dry_run_report(
             f"first_pub_yr={fpy} | career_age={age} | reason={reason}"
         )
 
-    # Spot-check: known hepatologists must NOT be established; known AD KOLs must be.
+    # Spot-check: known hepatologists must NOT be established; the TA's own reference
+    # KOLs must be. PRINT-ONLY — these lists select which rows to display and never
+    # reach classify_hcp, so a wrong list makes the readout uninformative, not wrong.
+    # Matching is substring on norm().lower() with NO unicode folding: "janne" does NOT
+    # match "Jänne" (U+00E4) and "paz-ares" does NOT match "Paz‐Ares" (U+2010 hyphen).
+    # hepato_surnames stays valid for EVERY TA — "are hepatologists landing established
+    # here?" is the contamination check that motivated the TA-anchored gate.
     hepato_surnames = {
         "sanyal", "loomba", "wedemeyer", "sarin", "tacke",
         "bajaj", "gores", "trebicka", "trautwein",
@@ -439,6 +445,18 @@ def print_dry_run_report(
         "silverberg", "simpson", "wollenberg", "eichenfield",
         "yosipovitch", "guttman-yassky", "de bruin-weller", "bruin-weller",
     }
+    nsclc_kol_surnames = {
+        "herbst", "ramalingam", "heymach", "reck", "camidge", "wakelee",
+        "rudin", "garon", "gadgeel", "sequist", "brahmer", "hirsch",
+        "carbone", "langer", "spigel", "gandara", "oxnard", "socinski",
+        "borghaei", "scagliotti", "rosell", "peters", "soria", "shaw",
+        "jänne",  # exact: the ASCII fragment "nne" also matches Brunner/Donne etc.
+        "paz",    # Paz‐Ares: sidesteps the U+2010 hyphen ("ares" also hits Soares/Tavares)
+    }
+    kol_label, kol_surnames = {
+        "9e4139d2-e062-4a58-8728-cdabb2d7dca1": ("AD", ad_kol_surnames),
+        "c0065b03-a25e-4e9a-bde4-4b4d0db7827d": ("NSCLC", nsclc_kol_surnames),
+    }.get(str(ta_id), (ta_name, set()))
     print("\nHepatologist spillover check (must NOT be established):")
     hepato_hits = [
         r for r in classified
@@ -454,14 +472,16 @@ def print_dry_run_report(
             f"reason={r.get('cohort_reason')}"
         )
 
-    print("\nAD KOL check (should remain established):")
+    print(f"\n{kol_label} KOL check (should remain established):")
     kol_hits = [
         r for r in classified
         if any(
             s in norm(r.get("last_name")).lower()
-            for s in ad_kol_surnames
+            for s in kol_surnames
         )
     ]
+    if not kol_surnames:
+        print("  (no reference KOL list defined for this TA)")
     for r in sorted(kol_hits, key=lambda x: norm(x.get("last_name")).lower()):
         name = ascii_safe(f"{r.get('first_name', '')} {r.get('last_name', '')}")
         print(
