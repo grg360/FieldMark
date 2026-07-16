@@ -1886,22 +1886,90 @@ export async function getHCPDetail(
       } | null;
     }).data ?? null;
 
-    // When an explicit indication ta_id is supplied, cohort membership is
-    // TA-scoped and lives in the ranks tables — not the global hcps_v2 column
-    // (which is null for HCPs classified only within a sub-indication TA like AD).
-    let cohortClassification = hcpData.cohort_classification ?? null;
+    // Cohort classification AND score are per-TA — they live in the cohort rank tables
+    // keyed by therapeutic_area_id, NOT in the global hcps_v2.cohort_classification /
+    // cohort_score columns (which are null for HCPs classified only within a sub-indication
+    // TA like AD, and TA-independent for everyone else). Resolve BOTH from the entity's
+    // resolved taId across all three cohorts (an HCP is in at most one cohort per TA, so
+    // first hit by precedence wins). Rising is TA-conditional — AD reads the 2-axis
+    // composite, every other TA the legacy rising table — mirroring the feed's isAdRising
+    // split; the score column per cohort matches exactly what enrichAndMapCohortRows writes
+    // for the board, so detail agrees with the feed. No per-TA row -> null; NEVER the global
+    // hcps_v2 column (that was the leak). Only the filters.taId-set path (the real detail
+    // route, entity TA resolved) re-resolves; the legacy no-taId path is left untouched.
+    let cohortClassification: string | null = hcpData.cohort_classification ?? null;
+    let cohortScore: number | null = parseOptionalNumber(hcpData.cohort_score);
     if (filters.taId) {
-      const { data: estRows } = await supabase
-        .from("hcp_established_ranks_v3")
-        .select("hcp_id")
-        .eq("hcp_id", hcpId)
-        .eq("therapeutic_area_id", taId)
-        .limit(1);
-      if (estRows && estRows.length > 0) cohortClassification = "established";
+      const isAdRising = taId === TA_ID_MAP["atopic-dermatitis"];
+      const scopedScore = (
+        rows: Array<Record<string, unknown>> | null | undefined,
+        scoreCol: string,
+        scoped: boolean,
+      ): number | null => {
+        const list = rows ?? [];
+        if (list.length === 0) return null;
+        const row = scoped
+          ? list.find(
+              (r) =>
+                r.scope_type === scope.scopeType &&
+                (scope.scopeValue === null
+                  ? r.scope_value === null
+                  : r.scope_value === scope.scopeValue),
+            )
+          : list[0];
+        return row?.[scoreCol] == null ? null : Number(row[scoreCol]);
+      };
+
+      const [estCohort, risingCohort, communityCohort] = await Promise.all([
+        supabase
+          .from("hcp_established_ranks_v3")
+          .select("cohort_score, scope_type, scope_value")
+          .eq("hcp_id", hcpId)
+          .eq("therapeutic_area_id", taId),
+        isAdRising
+          ? supabase
+              .from("hcp_rising_composite_v1")
+              .select("rising_composite_score, scope_type, scope_value")
+              .eq("hcp_id", hcpId)
+              .eq("therapeutic_area_id", taId)
+          : supabase
+              .from("hcp_rising_star_ranks_v3")
+              .select("rising_star_percentile")
+              .eq("hcp_id", hcpId)
+              .eq("therapeutic_area_id", taId),
+        supabase
+          .from("hcp_community_ranks_v2")
+          .select("normalized_score, scope_type, scope_value")
+          .eq("hcp_id", hcpId)
+          .eq("therapeutic_area_id", taId),
+      ]);
+
+      const estData = (estCohort as { data?: Array<Record<string, unknown>> | null }).data ?? [];
+      const risingData = (risingCohort as { data?: Array<Record<string, unknown>> | null }).data ?? [];
+      const communityData = (communityCohort as { data?: Array<Record<string, unknown>> | null }).data ?? [];
+
+      if (estData.length > 0) {
+        cohortClassification = "established";
+        cohortScore = scopedScore(estData, "cohort_score", true);
+      } else if (risingData.length > 0) {
+        cohortClassification = "rising_star";
+        cohortScore = scopedScore(
+          risingData,
+          isAdRising ? "rising_composite_score" : "rising_star_percentile",
+          isAdRising,
+        );
+      } else if (communityData.length > 0) {
+        cohortClassification = "community";
+        cohortScore = scopedScore(communityData, "normalized_score", true);
+      } else {
+        // Not in any per-TA cohort for this TA -> honestly null, NOT the global column.
+        cohortClassification = null;
+        cohortScore = null;
+      }
     }
 
     const response: HCPDetailResponse = {
-      hcp: { ...hcpData, cohort_classification: cohortClassification },
+      hcp: { ...hcpData, cohort_classification: cohortClassification, cohort_score: cohortScore },
       score: (scoreResult as { data?: unknown }).data ?? null,
       rank: (rankResult as { data?: unknown }).data ?? null,
       narrative: narrativeData,
