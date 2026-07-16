@@ -11,6 +11,11 @@ export interface MslProfile {
   states_covered: string[] | null;
   default_ta_slug: string | null;
   default_indication_slug: string | null;
+  // Per-user TA entitlement (PARENT slugs, e.g. ["oncology","immunology"]).
+  // Auto-fetched by getMslProfile's select("*"). Resolve visibility through
+  // entitledTASlugs() in api.ts (fail-open when empty/null). Mirrors the
+  // states_covered text[] pattern.
+  allowed_ta_slugs: string[] | null;
   onboarded_at: string | null;
   last_active_at: string | null;
   notify_new_rising_stars?: boolean;

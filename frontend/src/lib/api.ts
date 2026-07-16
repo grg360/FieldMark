@@ -757,6 +757,101 @@ export function taDisplayNameForId(taId: string): string {
 }
 
 /**
+ * Live therapeutic areas as PARENT slugs (e.g. ["oncology","immunology"]).
+ *
+ * Authoritative source: the live_therapeutic_areas view, which is
+ * therapeutic_area_ingestion_config pre-filtered to is_visible_in_ui = true AND
+ * is_active = true (the same gate the pipeline uses) and exposing ONLY
+ * therapeutic_area_id — the config's scoring_weights / pubmed_query stay
+ * server-side (core IP; the base table is RLS-blocked to authenticated). Each
+ * live id is an indication-level TA (NSCLC, Atopic Dermatitis), mapped UP to its
+ * broad-TA parent slug (oncology, immunology) via the therapeutic_areas hierarchy
+ * (parent_ta_id). A broad-TA row (no parent) contributes its own slug. Hepatology
+ * is parked (is_visible_in_ui = false) so it is excluded. Currently →
+ * ["oncology","immunology"].
+ *
+ * This is the live-TA source of truth. It is intended to retire the hardcoded
+ * TA_CHIPS = ["Oncology","Immunology"] in TAFilterChips.tsx — that migration is a
+ * deliberate follow-up; this task only builds the resolver.
+ *
+ * NOTE: the live_therapeutic_areas view must be granted to the authenticated role
+ * for this to return rows in-browser (see the migration accompanying this change).
+ * Cached like getMslProfile: one settled promise, cleared on error.
+ */
+let liveTASlugsCache: Promise<string[]> | null = null;
+
+export function clearLiveTASlugsCache(): void {
+  liveTASlugsCache = null;
+}
+
+export async function getLiveTASlugs(): Promise<string[]> {
+  if (liveTASlugsCache) return liveTASlugsCache;
+
+  const promise = (async () => {
+    const { data: cfgRows, error: cfgErr } = await supabase
+      .from("live_therapeutic_areas")
+      .select("therapeutic_area_id");
+    if (cfgErr) throw cfgErr;
+
+    const liveIds = (cfgRows ?? [])
+      .map((r) => (r.therapeutic_area_id ? String(r.therapeutic_area_id) : ""))
+      .filter(Boolean);
+    if (liveIds.length === 0) return [];
+
+    const { data: taRows, error: taErr } = await supabase
+      .from("therapeutic_areas")
+      .select("id, slug, parent_ta_id");
+    if (taErr) throw taErr;
+
+    const byId = new Map<string, { slug: string | null; parentId: string | null }>();
+    for (const row of taRows ?? []) {
+      byId.set(String(row.id), {
+        slug: row.slug ?? null,
+        parentId: row.parent_ta_id ? String(row.parent_ta_id) : null,
+      });
+    }
+
+    const parentSlugs = new Set<string>();
+    for (const id of liveIds) {
+      const node = byId.get(id);
+      if (!node) continue;
+      const parent = node.parentId ? byId.get(node.parentId) : null;
+      const slug = parent?.slug ?? node.slug;
+      if (slug) parentSlugs.add(slug);
+    }
+    return Array.from(parentSlugs);
+  })();
+
+  liveTASlugsCache = promise;
+  promise.catch(() => {
+    liveTASlugsCache = null;
+  });
+  return promise;
+}
+
+/**
+ * Entitled TA slugs for a user = allowed_ta_slugs ∩ live TAs, as PARENT slugs.
+ *
+ * FAIL-OPEN grandfather: a missing/empty allowed_ta_slugs returns ALL live TAs,
+ * so pre-entitlement users (and anyone onboarded before registration writes the
+ * list) are never locked out. A populated list is intersected with the live set,
+ * so a parked/removed TA left in a user's list (e.g. hepatology) never surfaces.
+ *
+ * Guard-reads the array like states_covered. Returns parent slugs.
+ */
+export async function entitledTASlugs(
+  profile: { allowed_ta_slugs?: string[] | null },
+): Promise<string[]> {
+  const live = await getLiveTASlugs();
+  const allowed = Array.isArray(profile.allowed_ta_slugs)
+    ? profile.allowed_ta_slugs
+    : [];
+  if (allowed.length === 0) return live;
+  const liveSet = new Set(live);
+  return allowed.filter((slug) => liveSet.has(slug));
+}
+
+/**
  * Resolve an HCP's primary therapeutic area when the caller didn't carry one
  * (refresh, bookmark, deep-link, back-nav). Primary = the TA with the most
  * publications for this HCP (hcp_therapeutic_areas_v2.publication_count).
