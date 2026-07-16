@@ -3485,17 +3485,21 @@ async function fetchHcpNameMap(hcpIds: string[]): Promise<Map<string, { name: st
   const hcpMap = new Map<string, { name: string; institution: string | null }>();
   if (hcpIds.length === 0) return hcpMap;
 
-  const { data: hcps } = await supabase
-    .from("hcps_v2")
-    .select("id, first_name, last_name, institution_normalized")
-    .in("id", hcpIds);
+  // Chunk the id filter (like the other .in() reads in this file) so a large landscape
+  // union — up to thousands of ids — can't overflow the request URL and 400.
+  for (const chunk of chunkInstitutionHcpIds(hcpIds)) {
+    const { data: hcps } = await supabase
+      .from("hcps_v2")
+      .select("id, first_name, last_name, institution_normalized")
+      .in("id", chunk);
 
-  (hcps ?? []).forEach((h: HcpNameRow) => {
-    hcpMap.set(String(h.id), {
-      name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
-      institution: h.institution_normalized,
+    (hcps ?? []).forEach((h: HcpNameRow) => {
+      hcpMap.set(String(h.id), {
+        name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
+        institution: h.institution_normalized,
+      });
     });
-  });
+  }
 
   return hcpMap;
 }
@@ -4698,7 +4702,13 @@ async function getInstitutionsIndexUncached(
   const institutionNames = Array.from(cohortInstitutions);
   const totalInvestigatorCounts = new Map<string, number>();
 
-  if (institutionNames.length > 0) {
+  // Chunk the institution-name filter at 100 (fetchAllPaginated only bounds RESULT rows;
+  // the .in() filter URL still carries every name, so a large cohort's institution set —
+  // hundreds to 1,000+ — would overflow the request URL and 400). Each chunk is still
+  // fully paginated for its result rows.
+  const INSTITUTION_NAME_CHUNK_SIZE = 100;
+  for (let i = 0; i < institutionNames.length; i += INSTITUTION_NAME_CHUNK_SIZE) {
+    const nameChunk = institutionNames.slice(i, i + INSTITUTION_NAME_CHUNK_SIZE);
     const { data: countRows } = await fetchAllPaginated<{
       institution_canonical: string;
       investigator_count: number;
@@ -4707,7 +4717,7 @@ async function getInstitutionsIndexUncached(
         await supabase
           .from("institution_investigator_counts")
           .select("institution_canonical, investigator_count")
-          .in("institution_canonical", institutionNames)
+          .in("institution_canonical", nameChunk)
           .range(offset, offset + pageSize - 1),
     );
     (countRows ?? []).forEach((row) => {
