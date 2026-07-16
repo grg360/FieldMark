@@ -76,7 +76,6 @@ import {
   getEstablished,
   getHCPDetail,
   getRisingStars,
-  getTACounts,
   getTAIdForLabel,
   resolvePrimaryTaId,
 } from "./lib/api";
@@ -94,7 +93,7 @@ import {
   taLabelToApiSlug,
   taSlugToLabel,
 } from "./lib/routeSlugs";
-import type { CohortFeedResult, HCPDetailResponse, RisingStar, TACounts } from "./lib/types";
+import type { CohortFeedResult, HCPDetailResponse, RisingStar } from "./lib/types";
 import DemoPage from "./pages/DemoPage";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
@@ -407,7 +406,6 @@ function FeedLayout({
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const [taCounts, setTaCounts] = useState<TACounts | null>(null);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
   const [surfaceHcpOpen, setSurfaceHcpOpen] = useState(false);
@@ -626,26 +624,6 @@ function FeedLayout({
       setLoadingMore(false);
     }
   }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchCounts() {
-      const taSlug = taLabelToApiSlug(selectedTA);
-      const { data } = await getTACounts({
-        therapeuticArea: taSlug,
-        region,
-      });
-      if (cancelled) return;
-      setTaCounts(data);
-    }
-
-    fetchCounts();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedTA, region]);
 
   function handleCardPress(hcp: AppHCP) {
     const hcpId = hcp.hcp_id ?? hcp.id;

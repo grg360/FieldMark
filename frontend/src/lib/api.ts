@@ -1199,233 +1199,6 @@ export async function getCommunity(
   }
 }
 
-/**
- * Read cohort counts for a TA from hcp_score_ranks_v2.
- *
- * Accepts a FilterState. Defaults region to "US" if not provided.
- * Counts are queried from the precomputed ranks table ? one count query
- * per cohort, no joins, no row caps.
- *
- * The therapeuticArea slug must resolve via TA_ID_MAP; unknown slugs return
- * zeroed counts.
- *
- * @param filtersOrSlug - Either a FilterState object or a legacy slug string.
- *                       String form is supported for backwards compatibility
- *                       and defaults region to "US".
- */
-export async function getTACounts(
-  filtersOrSlug: FilterState | string,
-): Promise<ApiResult<TACounts>> {
-  try {
-    const filters: FilterState =
-      typeof filtersOrSlug === "string"
-        ? { therapeuticArea: filtersOrSlug }
-        : filtersOrSlug;
-
-    const taSlug = filters.therapeuticArea.toLowerCase().trim();
-    const taId = TA_ID_MAP[taSlug];
-
-    const zeroCounts: TACounts = {
-      rising_stars: 0,
-      dark_horses: 0,
-      verified_dols: 0,
-      community_pool: 0,
-      workhorses: 0,
-      established: 0,
-      total_hcps: 0,
-    };
-
-    if (!taId) {
-      return { data: zeroCounts, error: null };
-    }
-
-    const scope = resolveFilterScope(filters);
-
-    // Build the scope filter for hcp_score_ranks_v2. Note: scope_value can be
-    // null (global scope), so we use .is() for null comparisons.
-    const applyScope = (q: any): any => {
-      let query = q.eq("therapeutic_area_id", taId).eq("scope_type", scope.scopeType);
-      if (scope.scopeValue === null) {
-        query = query.is("scope_value", null);
-      } else {
-        query = query.eq("scope_value", scope.scopeValue);
-      }
-      return query;
-    };
-
-    let risingStarsQuery: any;
-    if (scope.scopeType === "global" || scope.scopeValue === null) {
-      risingStarsQuery = supabase
-        .from("hcp_rising_star_ranks_v3")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId);
-    } else if (scope.scopeValue === "US") {
-      risingStarsQuery = supabase
-        .from("hcp_rising_star_ranks_v3")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .not("us_rank", "is", null);
-    } else {
-      risingStarsQuery = supabase
-        .from("hcp_rising_star_ranks_v3")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId);
-    }
-    const risingStarCountResult = await risingStarsQuery;
-    if (risingStarCountResult.error) {
-      return { data: null, error: `Rising star selected count failed: ${risingStarCountResult.error.message}` };
-    }
-
-    let risingPoolQuery: any;
-    if (scope.scopeType === "global") {
-      // Global branch: scope_type='global' rows only to avoid per-region duplicates.
-      risingPoolQuery = supabase
-        .from("hcp_score_ranks_v2")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .eq("cohort", "rising")
-        .eq("scope_type", "global");
-    } else {
-      risingPoolQuery = supabase
-        .from("hcp_score_ranks_v2")
-        .select("hcp_id", { count: "exact", head: true })
-        .eq("therapeutic_area_id", taId)
-        .eq("cohort", "rising")
-        .eq("scope_type", scope.scopeType);
-      if (scope.scopeValue === null) {
-        risingPoolQuery = risingPoolQuery.is("scope_value", null);
-      } else {
-        risingPoolQuery = risingPoolQuery.eq("scope_value", scope.scopeValue);
-      }
-    }
-
-    const [
-      risingPoolResult,
-      establishedResult,
-      communityResult,
-    ] = await Promise.all([
-      risingPoolQuery,
-      // Established counts come from hcp_established_ranks_v3 — the per-TA-classified
-      // table the feed board reads. hcp_established_scores_v2 is established_scoring.py's
-      // (HCP x TA) cartesian output: it holds a row for EVERY globally-'established' HCP
-      // in BOTH TAs regardless of TA membership (Hepatology 11,390 == NSCLC 11,390 —
-      // identical counts are the signature), and has ZERO AD rows, so AD counted 0.
-      // v3 stores one row per (hcp, scope); scope_type='global' yields exactly one row
-      // per established HCP = the TA-wide count this call has always reported.
-      supabase
-        .from("hcp_established_ranks_v3").select("hcp_id", { count: "exact", head: true }).eq("therapeutic_area_id", taId).eq("scope_type", "global"),
-      supabase
-        .from("hcp_community_scores_v2").select("hcp_id", { count: "exact", head: true }).eq("therapeutic_area_id", taId),
-    ]);
-
-    if (risingPoolResult.error) {
-      return { data: null, error: `Rising star pool count failed: ${risingPoolResult.error.message}` };
-    }
-    if (establishedResult.error) {
-      return { data: null, error: `Established count failed: ${establishedResult.error.message}` };
-    }
-    if (communityResult.error) {
-      return { data: null, error: `Community count failed: ${communityResult.error.message}` };
-    }
-
-    const risingPool = risingPoolResult.count ?? 0;
-    const risingSelected = risingStarCountResult.count ?? 0;
-    const established = establishedResult.count ?? 0;
-    const community = communityResult.count ?? 0;
-
-    // total_hcps for this TA in this scope = sum across cohorts.
-    // (Some HCPs MAY be in more than one cohort across TAs, but within a single
-    // TA+cohort+scope the rank rows are unique by hcp_id.)
-    // total_hcps uses the candidate pool, not the threshold-selected count.
-    // This is the "how deep is the platform's coverage in this TA+scope" number.
-    const totalHcps = risingPool + established + community;
-
-    // Verified DOLs count is cohort-independent. Filter HCPs by is_verified_dol
-    // and intersect with the TA + scope. For now, we use the hcp_therapeutic_areas_v2
-    // join because verified DOL status lives on hcps_v2, not on score ranks.
-    // Future: denormalize is_verified_dol onto hcp_score_ranks_v2.
-    let verifiedDols = 0;
-    try {
-      // Find HCPs in this TA+scope from rank rows, then intersect with verified DOLs.
-      // For simplicity and correctness, fetch the hcp_ids first, then count verified.
-      // Note: this query is bounded by the cohort populations above.
-      const { data: hcpIdRows, error: hcpIdError } = await applyScope(
-        supabase.from("hcp_score_ranks_v2").select("hcp_id"),
-      ).limit(10000);
-
-      if (!hcpIdError && hcpIdRows && hcpIdRows.length > 0) {
-        const hcpIds = Array.from(new Set(hcpIdRows.map((r: any) => String(r.hcp_id))));
-        if (hcpIds.length > 0) {
-          const { count: dolCount, error: dolError } = await supabase
-            .from("hcps_v2")
-            .select("id", { count: "exact", head: true })
-            .in("id", hcpIds)
-            .eq("is_verified_dol", true);
-          if (!dolError) {
-            verifiedDols = dolCount ?? 0;
-          }
-        }
-      }
-    } catch {
-      // Verified DOL count is non-critical; failure here returns 0, not an error.
-      verifiedDols = 0;
-    }
-
-    return {
-      data: {
-        rising_stars: risingSelected,
-        rising_stars_pool: risingPool,
-        dark_horses: 0, // Deprecated; tier-based filtering removed. Field kept for type compatibility.
-        verified_dols: verifiedDols,
-        community_pool: community,
-        workhorses: 0, // Deprecated; tier-based filtering removed.
-        established: established,
-        total_hcps: totalHcps,
-      },
-      error: null,
-    };
-  } catch (err) {
-    return {
-      data: null,
-      error: err instanceof Error ? err.message : "Unknown error occurred",
-    };
-  }
-}
-
-export async function getAllTACounts(): Promise<ApiResult<Record<string, TACounts>>> {
-  try {
-    // Hepatology and Rare Disease retired 2026-07-11 (no v3 rank rows → frozen feeds);
-    // stop computing their parent-level counts. See docs/VERSION_CONSISTENCY_AUDIT.md.
-    const slugs = ["nsclc", "immunology"] as const;
-    const results = await Promise.all(
-      slugs.map((slug) => getTACounts({ therapeuticArea: slug, scope: "global" })),
-    );
-    const output: Record<string, TACounts> = {};
-    for (let i = 0; i < slugs.length; i += 1) {
-      const slug = slugs[i];
-      const res = results[i];
-      if (res.error) {
-        return { data: null, error: `Failed loading counts for ${slug}: ${res.error}` };
-      }
-      output[slug] = res.data ?? {
-        rising_stars: 0,
-        dark_horses: 0,
-        verified_dols: 0,
-        community_pool: 0,
-        workhorses: 0,
-        established: 0,
-        total_hcps: 0,
-      };
-    }
-    return { data: output, error: null };
-  } catch (err) {
-    return {
-      data: null,
-      error: err instanceof Error ? err.message : "Unknown error occurred",
-    };
-  }
-}
-
 export async function getVerifiedDOLs(
   therapeuticArea: string,
   limit: number = 20,
@@ -4057,7 +3830,7 @@ export async function resolveInstitutionPrimaryTaId(
 
 export async function getInstitutionSummary(
   institutionName: string,
-  taSlug: string = "nsclc",
+  taSlug: string,
 ): Promise<InstitutionSummary | null> {
   const taId = await resolveLandscapeTaId(taSlug);
   if (!taId) return null;
@@ -4180,7 +3953,7 @@ export async function getInstitutionSummary(
 
 export async function getInstitutionLeaderboards(
   institutionName: string,
-  taSlug: string = "nsclc",
+  taSlug: string,
   limit: number = 5,
 ): Promise<InstitutionLeaderboards> {
   const empty: InstitutionLeaderboards = {
@@ -4365,7 +4138,7 @@ export async function getInstitutionLeaderboards(
 export async function getInstitutionCollaborations(
   institutionName: string,
   limit: number = 8,
-  taSlug: string = "nsclc",
+  taSlug: string,
 ): Promise<InstitutionCollaboration[]> {
   // Co-authorship data itself is TA-agnostic; taSlug only selects which column
   // identifies the institution's members (normalized for AD, canonical for NSCLC).
@@ -4456,7 +4229,7 @@ export async function getInstitutionCollaborations(
 export async function getInstitutionExternalPartners(
   sourceInstitutionName: string,
   limit: number = 8,
-  taSlug: string = "nsclc",
+  taSlug: string,
 ): Promise<ExternalPartnerInstitution[]> {
   // Source-institution membership is TA-conditional (AD → institution_normalized,
   // NSCLC → institution_canonical, frozen), same as the other Institutions sites.
