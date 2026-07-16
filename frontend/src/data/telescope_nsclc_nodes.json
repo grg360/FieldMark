@@ -4,8 +4,8 @@
     "name": "Bal\u00e1zs Halmos",
     "institution": "Albert Einstein College of Medicine",
     "cohort": "established",
-    "rank": 152,
-    "score": 59.7942
+    "rank": 181,
+    "score": 98.505
   },
   {
     "id": "001fd93e-60d7-49f5-a526-efcc265ac7da",
@@ -22,14 +22,6 @@
     "cohort": "rising",
     "rank": 9236,
     "score": 28.5358
-  },
-  {
-    "id": "0062432e-eb48-481c-ad55-37e0306c1fdf",
-    "name": "Casey R. Ager",
-    "institution": "Columbia University",
-    "cohort": "rising",
-    "rank": 16647,
-    "score": 26.0118
   },
   {
     "id": "006cf699-586a-45d6-85c5-c8e262e23853",
@@ -120,28 +112,12 @@
     "score": 16.7971
   },
   {
-    "id": "023e84a0-6245-4632-b6b3-d57e70483441",
-    "name": "Emilie Wang",
-    "institution": "University of South Florida",
-    "cohort": "rising",
-    "rank": 991,
-    "score": 38.6107
-  },
-  {
     "id": "0241ef9f-2eaf-4220-94c0-1516dbaed13f",
     "name": "Leah Wells",
     "institution": "University of Michigan",
     "cohort": "rising",
     "rank": 19274,
     "score": 25.2432
-  },
-  {
-    "id": "025eae11-9b8f-4708-ac5c-1fc693652c62",
-    "name": "Tyler MacNeil",
-    "institution": "Yale University",
-    "cohort": "rising",
-    "rank": 2612,
-    "score": 29.9839
   },
   {
     "id": "026850cd-c8e4-4fee-8612-3fcf1bd993de",
@@ -168,14 +144,6 @@
     "score": 28.958
   },
   {
-    "id": "02946f40-94fe-41ee-a112-8fa25b86a3a2",
-    "name": "Romi Gupta",
-    "institution": "University of Alabama at Birmingham",
-    "cohort": "rising",
-    "rank": 22328,
-    "score": 22.619
-  },
-  {
     "id": "029fab71-30e1-4d8d-b764-8551f76e3f81",
     "name": "Joshua K. Ochieng",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -200,12 +168,12 @@
     "score": 28.5358
   },
   {
-    "id": "02ed5cb4-4b5c-42ab-a2b4-b39b4933900a",
-    "name": "Vladislav O. Sviderskiy",
-    "institution": "New York University",
+    "id": "02d0f28c-8f6d-4bae-b870-9b8c5d557324",
+    "name": "Yuexin Xu",
+    "institution": "Fred Hutch Cancer Center",
     "cohort": "rising",
-    "rank": 11433,
-    "score": 26.5646
+    "rank": 11762,
+    "score": 26.5242
   },
   {
     "id": "0300e43b-38f2-4fda-bf54-7fbd93d3fb9f",
@@ -288,20 +256,20 @@
     "score": 28.1014
   },
   {
-    "id": "04ef972f-6b5f-493a-af3c-9874767148b9",
-    "name": "David L. Rimm",
-    "institution": "Yale University",
-    "cohort": "established",
-    "rank": 271,
-    "score": 54.4091
-  },
-  {
     "id": "04f7af7f-a4b3-4a8b-bac8-3bd074d3c57a",
     "name": "Kevin Lu",
     "institution": "University of California San Diego",
     "cohort": "rising",
     "rank": 9105,
     "score": 28.6728
+  },
+  {
+    "id": "04f8b5f9-278d-4a23-9f70-13648e001755",
+    "name": "Junaid Raja",
+    "institution": "University of Alabama at Birmingham",
+    "cohort": "rising",
+    "rank": 11506,
+    "score": 26.5492
   },
   {
     "id": "0521f641-2501-4501-ae9c-881b892b7127",
@@ -328,20 +296,20 @@
     "score": 26.5242
   },
   {
+    "id": "0599c23c-4abd-480d-a7b9-9de9a3a1b930",
+    "name": "Alexander J. Pfeil",
+    "institution": "University of North Carolina at Chapel Hill",
+    "cohort": "rising",
+    "rank": 1640,
+    "score": 30.8527
+  },
+  {
     "id": "05a553d0-98de-4e21-b37b-1b165517576d",
     "name": "Esther Red\u00edn",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "rising",
     "rank": 9251,
     "score": 28.5358
-  },
-  {
-    "id": "060c035c-1efd-4117-8e51-df85748ad07a",
-    "name": "Hossein Borghaei",
-    "institution": "Fox Chase Cancer Center",
-    "cohort": "established",
-    "rank": 190,
-    "score": 57.6029
   },
   {
     "id": "06116ef9-7849-4c00-bd59-34ce87043534",
@@ -352,12 +320,12 @@
     "score": 0.0
   },
   {
-    "id": "06836a6f-a844-4063-bf9e-df70f14f22a1",
-    "name": "Peter Meyn",
-    "institution": "Office of Science",
+    "id": "06185ace-d11d-47e2-8d7e-c489ebad29f0",
+    "name": "Michael D. Farwell",
+    "institution": "University of Pennsylvania",
     "cohort": "rising",
-    "rank": 7553,
-    "score": 29.1792
+    "rank": 609,
+    "score": 44.4023
   },
   {
     "id": "06ab5ccd-6805-41f2-8085-9f93bb82e82b",
@@ -366,6 +334,14 @@
     "cohort": "rising",
     "rank": 6254,
     "score": 29.4047
+  },
+  {
+    "id": "06cf3eca-772a-4351-a7b1-cadca5e12568",
+    "name": "Ariel B. Bourla",
+    "institution": "Flatiron Health (United States)",
+    "cohort": "rising",
+    "rank": 16671,
+    "score": 26.0118
   },
   {
     "id": "06dae813-95dd-4c1a-b8a8-e224004f810b",
@@ -416,14 +392,6 @@
     "score": 26.5242
   },
   {
-    "id": "07936dca-7f4f-4ee8-9e1d-76b22c06d9fb",
-    "name": "Fridolin Haugg",
-    "institution": "Brigham and Women's Hospital",
-    "cohort": "rising",
-    "rank": 2668,
-    "score": 29.9839
-  },
-  {
     "id": "07a06ad9-0d67-47d9-bab9-f1b1befe705b",
     "name": "Ramin Salehi\u2010Rad",
     "institution": "University of California, Los Angeles",
@@ -464,12 +432,12 @@
     "score": 26.5242
   },
   {
-    "id": "084ca87c-0e18-44b2-9ed8-9a26840fdc88",
-    "name": "Joanna Roopkumar",
-    "institution": "Mayo Clinic in Florida",
-    "cohort": "rising",
-    "rank": 11856,
-    "score": 26.5242
+    "id": "0838caf0-7cf7-4fa8-bf2e-deb52cb120a1",
+    "name": "Xiuning Le",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "established",
+    "rank": 134,
+    "score": 98.92500000000001
   },
   {
     "id": "08b209da-a80a-4544-9e84-65358398e4fb",
@@ -488,14 +456,6 @@
     "score": 23.0645
   },
   {
-    "id": "08c57adc-52d4-4061-a9f7-c78aa4e79e9f",
-    "name": "Benjamin Kepecs",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 23933,
-    "score": 0.0
-  },
-  {
     "id": "08c9201b-d0d5-4970-a08e-638c79fac308",
     "name": "Dexter P. Mendoza",
     "institution": "Massachusetts General Hospital",
@@ -510,14 +470,6 @@
     "cohort": "rising",
     "rank": 23396,
     "score": 20.4729
-  },
-  {
-    "id": "0925331f-de93-4484-a6d1-654b63b0da3d",
-    "name": "D.R. Camidge",
-    "institution": "University of Colorado Cancer Center",
-    "cohort": "rising",
-    "rank": 7435,
-    "score": 29.3175
   },
   {
     "id": "092887c2-e8fc-4edd-89bb-e0f9ebf44c88",
@@ -552,14 +504,6 @@
     "score": 26.677
   },
   {
-    "id": "0a28e185-ff78-433f-bf95-2960c9519f27",
-    "name": "Jos\u00e9 Laborde",
-    "institution": "Moffitt Cancer Center",
-    "cohort": "rising",
-    "rank": 2701,
-    "score": 29.9839
-  },
-  {
     "id": "0a619c3c-bd8e-40b2-8e72-e404ada65f9c",
     "name": "Rebecca Caeser",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -574,14 +518,6 @@
     "cohort": "rising",
     "rank": 17798,
     "score": 25.8088
-  },
-  {
-    "id": "0ab53077-919a-4471-b240-4a633f4804d5",
-    "name": "Mohammadhadi Khorrami",
-    "institution": "Case Western Reserve University",
-    "cohort": "rising",
-    "rank": 19282,
-    "score": 25.2432
   },
   {
     "id": "0afb3370-b871-4256-874c-fdcf94bcad4b",
@@ -600,28 +536,12 @@
     "score": 17.2984
   },
   {
-    "id": "0b9f11e0-34e3-4aa6-a9a6-3d68378bdf4e",
-    "name": "Bruce E. Johnson",
-    "institution": "Dana-Farber Cancer Institute",
-    "cohort": "established",
-    "rank": 280,
-    "score": 54.1993
-  },
-  {
     "id": "0bd67242-abc0-4cb5-8ffe-391479289e7c",
     "name": "R. S. K. Vijayan",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "rising",
     "rank": 2716,
     "score": 29.9839
-  },
-  {
-    "id": "0beefb77-31e1-4824-8b7f-0c83729e2a15",
-    "name": "Jennifer Mentlick",
-    "institution": "Mayo Clinic",
-    "cohort": "rising",
-    "rank": 23960,
-    "score": 0.0
   },
   {
     "id": "0bf6cc22-f784-49d8-aae8-33a00abd27b2",
@@ -638,14 +558,6 @@
     "cohort": "rising",
     "rank": 67,
     "score": 52.8334
-  },
-  {
-    "id": "0c3418ab-839f-4e02-9ca8-31c3fa85e030",
-    "name": "Trisari Anggondowati",
-    "institution": "University of Nebraska Medical Center",
-    "cohort": "rising",
-    "rank": 2727,
-    "score": 29.9839
   },
   {
     "id": "0c3ea5a9-daf9-41fe-a431-30104de77764",
@@ -672,14 +584,6 @@
     "score": 29.9839
   },
   {
-    "id": "0cea4c4b-922b-4b89-8969-bcd92d7098d6",
-    "name": "Mohamed Rahouma",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 23450,
-    "score": 18.1338
-  },
-  {
     "id": "0cf9dbdb-c6db-4360-be9a-c045849aa23d",
     "name": "Jordan Eichholz",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -704,20 +608,20 @@
     "score": 16.8598
   },
   {
-    "id": "0d3e8d72-61b4-42bb-bd6c-d120409cefe7",
-    "name": "Marjory Charlot",
-    "institution": "University of North Carolina at Chapel Hill",
-    "cohort": "rising",
-    "rank": 20784,
-    "score": 23.0645
-  },
-  {
     "id": "0d482ce2-2ffd-4a59-bde0-e6189d6cab9c",
     "name": "Kevin Rhee",
     "institution": "Harvard University",
     "cohort": "rising",
     "rank": 20786,
     "score": 23.0645
+  },
+  {
+    "id": "0d8905ca-f572-4063-80c8-bdfb6d665138",
+    "name": "Karen L. Reckamp",
+    "institution": "Cedars-Sinai Medical Center",
+    "cohort": "established",
+    "rank": 170,
+    "score": 98.60749999999999
   },
   {
     "id": "0d9efe95-00a8-4ef3-972e-d94706136511",
@@ -736,20 +640,20 @@
     "score": 29.9839
   },
   {
-    "id": "0dab1f3f-30be-4de5-94b5-5493e3ef08de",
-    "name": "David Hsiehchen",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 10465,
-    "score": 27.667
-  },
-  {
     "id": "0db29919-9a11-4760-902d-4ae9724e5795",
     "name": "Jacob P. Zaemes",
     "institution": "Georgetown University",
     "cohort": "rising",
     "rank": 10450,
     "score": 27.6859
+  },
+  {
+    "id": "0df44928-c082-4351-99fc-c62f9ec1b8cd",
+    "name": "Daniel Dix",
+    "institution": "Guardant (United States)",
+    "cohort": "rising",
+    "rank": 11944,
+    "score": 26.5242
   },
   {
     "id": "0dfba246-02c2-4a6d-8e98-c9fe5c55bf2b",
@@ -774,14 +678,6 @@
     "cohort": "rising",
     "rank": 23114,
     "score": 21.9506
-  },
-  {
-    "id": "0e8112a8-7b62-45ad-917c-95e9e85674c1",
-    "name": "David C. Christiani",
-    "institution": "Harvard University",
-    "cohort": "established",
-    "rank": 216,
-    "score": 56.5857
   },
   {
     "id": "0e8f874e-0037-4dd9-bf6c-d1be889c0d26",
@@ -824,6 +720,14 @@
     "score": 25.7556
   },
   {
+    "id": "0f36d21f-9d8c-4af6-b0c4-277922ef6ade",
+    "name": "Anwesha Nag",
+    "institution": "Dana-Farber Cancer Institute",
+    "cohort": "rising",
+    "rank": 16706,
+    "score": 26.0118
+  },
+  {
     "id": "0f716ab3-eabf-455b-81e1-1c55cbdec4a0",
     "name": "Ana Gal\u00e1n\u2010Cobo",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -854,6 +758,14 @@
     "cohort": "rising",
     "rank": 11981,
     "score": 26.5242
+  },
+  {
+    "id": "0f9b2537-755e-458c-9992-c448ad117e13",
+    "name": "Carmen M. Anadon",
+    "institution": "Duke University",
+    "cohort": "rising",
+    "rank": 19295,
+    "score": 25.2432
   },
   {
     "id": "0f9b4317-626b-45f8-bcfe-b2809a8b5a4e",
@@ -924,24 +836,8 @@
     "name": "Stephen V. Liu",
     "institution": "Georgetown University",
     "cohort": "established",
-    "rank": 116,
-    "score": 62.9741
-  },
-  {
-    "id": "103ca10b-bd6f-47e9-8e69-9e02e515ab76",
-    "name": "Giulia Fabbri",
-    "institution": "AstraZeneca (United States)",
-    "cohort": "rising",
-    "rank": 1910,
-    "score": 30.5631
-  },
-  {
-    "id": "1072ad9c-84ca-4950-8eb6-eb3b5c1ee78d",
-    "name": "Lisa Tran",
-    "institution": "University of California, San Diego",
-    "cohort": "rising",
-    "rank": 994,
-    "score": 38.6107
+    "rank": 115,
+    "score": 99.0775
   },
   {
     "id": "107a7dd1-23bf-471d-a589-22d61f783194",
@@ -1040,14 +936,6 @@
     "score": 28.3986
   },
   {
-    "id": "1299d1f0-d79f-4277-9496-45ad12bda207",
-    "name": "Lindsay Caprio",
-    "institution": "Columbia University Irving Medical Center",
-    "cohort": "rising",
-    "rank": 10468,
-    "score": 27.667
-  },
-  {
     "id": "12c019eb-13d3-4f79-80be-d93d060d0bc7",
     "name": "Qasem Al-Tashi",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -1078,6 +966,14 @@
     "cohort": "rising",
     "rank": 17713,
     "score": 25.9294
+  },
+  {
+    "id": "1317de80-c15a-4d28-93ee-4f88edddaef0",
+    "name": "April Lo",
+    "institution": "University of Washington",
+    "cohort": "rising",
+    "rank": 9279,
+    "score": 28.5358
   },
   {
     "id": "1323fcad-5f11-4bf6-9ec2-f0499ba7ba65",
@@ -1152,6 +1048,14 @@
     "score": 27.683
   },
   {
+    "id": "13ceecda-89fb-467a-a982-c6974709b21c",
+    "name": "Shivaek Venkateswaran",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "rising",
+    "rank": 5495,
+    "score": 29.9115
+  },
+  {
     "id": "13da93e6-a899-41cf-adaf-d811a54b3614",
     "name": "Sonam Puri",
     "institution": "University of Utah",
@@ -1216,14 +1120,6 @@
     "score": 28.6138
   },
   {
-    "id": "14bc05f3-f35b-4214-901c-9eb3b586bdc1",
-    "name": "John Deng",
-    "institution": "Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 2835,
-    "score": 29.9839
-  },
-  {
     "id": "14dc6492-dde8-42a1-b099-5a6e983b37be",
     "name": "David G. McFadden",
     "institution": "The University of Texas Southwestern Medical Center",
@@ -1260,8 +1156,8 @@
     "name": "Fred R. Hirsch",
     "institution": "Mount Sinai Health System",
     "cohort": "established",
-    "rank": 186,
-    "score": 57.8477
+    "rank": 21,
+    "score": 99.77250000000001
   },
   {
     "id": "1647088d-5c6e-4386-94b3-7c20c78f88e9",
@@ -1286,14 +1182,6 @@
     "cohort": "rising",
     "rank": 9290,
     "score": 28.5358
-  },
-  {
-    "id": "16d19fcf-9a29-42a0-8ac9-f8ffb1ccba59",
-    "name": "Shaikha Al-Thani",
-    "institution": "NewYork\u2013Presbyterian Hospital",
-    "cohort": "rising",
-    "rank": 9745,
-    "score": 28.4013
   },
   {
     "id": "16e0c3e1-fc99-4fad-85a2-fedafcf31da4",
@@ -1384,14 +1272,6 @@
     "score": 26.5242
   },
   {
-    "id": "181dc9a6-caa1-4129-a89f-bcc099296fef",
-    "name": "Leanna Troncoso",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 1647,
-    "score": 30.8527
-  },
-  {
     "id": "1865527f-cb12-4066-9595-12ebc48eae50",
     "name": "Kelsey Poorman",
     "institution": "Caris Life Sciences (United States)",
@@ -1424,14 +1304,6 @@
     "score": 26.3961
   },
   {
-    "id": "194bb3b1-5c62-4301-b8cb-0add9e65fd16",
-    "name": "Biagio Ricciuti",
-    "institution": "Dana-Farber Cancer Institute",
-    "cohort": "established",
-    "rank": 237,
-    "score": 55.9297
-  },
-  {
     "id": "19a67878-fad3-45f3-8510-7b24eaf759fc",
     "name": "Trevor Rose",
     "institution": "Moffitt Cancer Center",
@@ -1454,14 +1326,6 @@
     "cohort": "rising",
     "rank": 22307,
     "score": 22.6243
-  },
-  {
-    "id": "19bedd76-f372-4e62-9b76-ca0280763dd2",
-    "name": "Tamara A. Sussman",
-    "institution": "Cleveland Clinic",
-    "cohort": "rising",
-    "rank": 16500,
-    "score": 26.0788
   },
   {
     "id": "19d19181-7b5f-4539-97a4-3afc99073a3e",
@@ -1496,12 +1360,12 @@
     "score": 25.7556
   },
   {
-    "id": "1a967150-61f4-4e7a-93c1-26c773d0f70f",
-    "name": "Thomas Boerner",
-    "institution": "Memorial Sloan Kettering Cancer Center",
+    "id": "1ae56db1-d5ad-421e-8c85-15d1a89acbff",
+    "name": "Yue Xie",
+    "institution": "Dana-Farber Cancer Institute",
     "cohort": "rising",
-    "rank": 23120,
-    "score": 21.9506
+    "rank": 266,
+    "score": 49.7668
   },
   {
     "id": "1b533c5a-831a-4190-8c1c-ab7f24810290",
@@ -1526,14 +1390,6 @@
     "cohort": "rising",
     "rank": 16758,
     "score": 26.0118
-  },
-  {
-    "id": "1c3ec15c-afce-4749-b925-06ee3c574d0a",
-    "name": "Nasser K. Altorki",
-    "institution": "Cornell University",
-    "cohort": "established",
-    "rank": 193,
-    "score": 57.518
   },
   {
     "id": "1c4160e4-a916-494d-b9e8-93648cdf75b0",
@@ -1592,20 +1448,20 @@
     "score": 26.5242
   },
   {
+    "id": "1d6a9f6c-536a-4e60-a8f3-b471c114819d",
+    "name": "Fatemehsadat Pezeshkian",
+    "institution": "Brigham and Women's Hospital",
+    "cohort": "rising",
+    "rank": 1574,
+    "score": 30.9975
+  },
+  {
     "id": "1d919567-d809-46ab-b9dd-20d29bb4574d",
     "name": "Augusto Villegas",
     "institution": "Florida Cancer Specialists & Research Institute",
     "cohort": "rising",
     "rank": 16766,
     "score": 26.0118
-  },
-  {
-    "id": "1da23c8b-90bf-4503-85d1-41d45787c39b",
-    "name": "Tomi Jun",
-    "institution": "Sema4 (United States)",
-    "cohort": "rising",
-    "rank": 20071,
-    "score": 24.4747
   },
   {
     "id": "1da3aad1-281b-41dd-b202-b6c91dbdb846",
@@ -1680,14 +1536,6 @@
     "score": 25.2432
   },
   {
-    "id": "1e5c0f7a-71e3-4fb8-80ef-effbe7cf15ff",
-    "name": "Abhilasha Sinha",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 17974,
-    "score": 25.7556
-  },
-  {
     "id": "1e5c6bae-fd08-4d61-982c-e26aa3274511",
     "name": "Garry L. Coles",
     "institution": "Stanford University",
@@ -1720,14 +1568,6 @@
     "score": 26.5242
   },
   {
-    "id": "1ed2bb6a-9699-44d5-8d47-cb55121ff57a",
-    "name": "Don L. Gibbons",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "established",
-    "rank": 196,
-    "score": 57.4267
-  },
-  {
     "id": "1f4413d6-ac27-4845-9563-bbda0e2b9a9a",
     "name": "Nishan Tchekmedyian",
     "institution": "University of South Florida",
@@ -1736,12 +1576,20 @@
     "score": 23.0654
   },
   {
+    "id": "1f693d38-e244-4df5-bef2-553a9c01a38f",
+    "name": "Z. Alexander Cao",
+    "institution": "Merck & Co., Inc., Rahway, NJ, USA (United States)",
+    "cohort": "rising",
+    "rank": 7718,
+    "score": 29.115
+  },
+  {
     "id": "1f8e627b-ac6d-4637-aaa1-de1c54fb8051",
     "name": "Sai\u2010Hong Ignatius Ou",
     "institution": "University of California, Irvine",
     "cohort": "established",
-    "rank": 133,
-    "score": 61.3888
+    "rank": 26,
+    "score": 99.75
   },
   {
     "id": "1fbd8c53-51f6-4b67-8a6d-19f9bcbdc148",
@@ -1768,22 +1616,6 @@
     "score": 26.5242
   },
   {
-    "id": "2036bbe7-5797-4af9-b9ac-2125f0de98d4",
-    "name": "Melissa L. Johnson",
-    "institution": "Sarah Cannon",
-    "cohort": "established",
-    "rank": 202,
-    "score": 57.092
-  },
-  {
-    "id": "20372a75-ba69-40d6-9109-04e277908a1d",
-    "name": "Van Hilburn",
-    "institution": "University of California, San Diego",
-    "cohort": "rising",
-    "rank": 24102,
-    "score": 0.0
-  },
-  {
     "id": "20423d7e-177e-4720-af3f-c34c77e20294",
     "name": "Andrew Song",
     "institution": "Thomas Jefferson University",
@@ -1792,28 +1624,12 @@
     "score": 24.2185
   },
   {
-    "id": "2089d2f5-a98b-4548-9ce9-3d420d919014",
-    "name": "Manli Shi",
-    "institution": "Pfizer (United States)",
-    "cohort": "rising",
-    "rank": 2455,
-    "score": 30.0388
-  },
-  {
     "id": "20a3265b-ef84-452d-ad16-b9df846be20b",
     "name": "Graeme Fenton",
     "institution": "University of Maryland, Baltimore",
     "cohort": "rising",
     "rank": 2959,
     "score": 29.9839
-  },
-  {
-    "id": "20b8aeba-e43c-48e4-95d6-2b53caedf897",
-    "name": "Saakshi Kaushik",
-    "institution": "University of Wisconsin\u2013Madison",
-    "cohort": "rising",
-    "rank": 12274,
-    "score": 26.5242
   },
   {
     "id": "20df5264-1517-457e-8f67-7b2568c07232",
@@ -1832,12 +1648,12 @@
     "score": 52.7419
   },
   {
-    "id": "211202ef-b328-498a-887f-04891ad4ea12",
-    "name": "Sharrell B. Lee",
-    "institution": "Cornell University",
+    "id": "2112e57a-0d49-474c-9eaf-e2cf31bc5f5f",
+    "name": "Shriya Kamlapurkar",
+    "institution": "Fred Hutch Cancer Center",
     "cohort": "rising",
-    "rank": 2962,
-    "score": 29.9839
+    "rank": 9141,
+    "score": 28.6133
   },
   {
     "id": "21152508-a3ea-44ef-9afc-d019b3c4536d",
@@ -1856,6 +1672,22 @@
     "score": 30.5631
   },
   {
+    "id": "21190cf2-4d9c-4d56-8333-4593abf09d73",
+    "name": "A. Justin Rucker",
+    "institution": "Duke Medical Center",
+    "cohort": "rising",
+    "rank": 2963,
+    "score": 29.9839
+  },
+  {
+    "id": "211fef7c-e73a-44f1-8f98-6b2093ca4614",
+    "name": "James W. Welsh",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "established",
+    "rank": 164,
+    "score": 98.64750000000001
+  },
+  {
     "id": "2127ac06-b76a-4e3e-bc64-72352cc16f1a",
     "name": "Shruthy Suresh",
     "institution": "Southwestern Medical Center",
@@ -1870,6 +1702,14 @@
     "cohort": "rising",
     "rank": 23513,
     "score": 17.2984
+  },
+  {
+    "id": "2155e176-e1ab-4f37-986b-b0f6254f860f",
+    "name": "Alfred A. Chan",
+    "institution": "UCLA Medical Center",
+    "cohort": "rising",
+    "rank": 8583,
+    "score": 28.9702
   },
   {
     "id": "218b3bd1-3eb9-422e-a77b-d22e07f7d892",
@@ -1902,6 +1742,14 @@
     "cohort": "rising",
     "rank": 12293,
     "score": 26.5242
+  },
+  {
+    "id": "22056b42-3f2f-4634-a835-b87801ee9ebb",
+    "name": "Boris Sepesi",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "established",
+    "rank": 129,
+    "score": 98.96000000000001
   },
   {
     "id": "220c53c2-2732-4cf0-b94a-6254a8863551",
@@ -1968,6 +1816,14 @@
     "score": 22.3962
   },
   {
+    "id": "22b3741f-0e67-45c5-8eca-7a1147cc1270",
+    "name": "Qianqian Hu",
+    "institution": "University of South Florida",
+    "cohort": "rising",
+    "rank": 19338,
+    "score": 25.2432
+  },
+  {
     "id": "22b63601-da34-4b26-bedc-d0d6896353bf",
     "name": "Khaja Khan",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -1976,28 +1832,12 @@
     "score": 29.115
   },
   {
-    "id": "22fbd5a7-042f-45d9-b612-8484584e26f6",
-    "name": "Kate Anderton",
-    "institution": "Medical University of South Carolina",
-    "cohort": "rising",
-    "rank": 2989,
-    "score": 29.9839
-  },
-  {
     "id": "2302d82f-c44a-498e-b0ab-6ca39a3f8964",
     "name": "John V. Heymach",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "established",
-    "rank": 22,
-    "score": 77.2007
-  },
-  {
-    "id": "231997dd-e590-41af-b625-0fd528042f26",
-    "name": "Fei Li",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 17991,
-    "score": 25.7556
+    "rank": 50,
+    "score": 99.5925
   },
   {
     "id": "233802d4-b0dd-4c8a-af0e-18a6ef110bdb",
@@ -2008,20 +1848,12 @@
     "score": 26.5242
   },
   {
-    "id": "2340305a-c81f-4d44-9f09-f07a63e67c56",
-    "name": "Diana Younan",
-    "institution": "Amgen (United States)",
+    "id": "234b316f-efbd-40ca-a15d-88fcf779ba45",
+    "name": "Roman O. Kowalchuk",
+    "institution": "Riverside Regional Medical Center",
     "cohort": "rising",
-    "rank": 23126,
-    "score": 21.9506
-  },
-  {
-    "id": "23532ece-7822-42cd-bc1f-83f234375e6a",
-    "name": "Rachna Malani",
-    "institution": "University of Utah",
-    "cohort": "rising",
-    "rank": 744,
-    "score": 44.2549
+    "rank": 12317,
+    "score": 26.5242
   },
   {
     "id": "236b1fec-36e7-47e6-b7fd-16078313ddbd",
@@ -2064,12 +1896,12 @@
     "score": 29.9839
   },
   {
-    "id": "23d5c6d8-eea0-4b83-baaa-ae0dbe54c34a",
-    "name": "Mara B. Antonoff",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "established",
-    "rank": 241,
-    "score": 55.5397
+    "id": "2408ab71-4841-417c-9ad3-e63a10122029",
+    "name": "Iris M. Fink-Baldauf",
+    "institution": "Cincinnati Children's Hospital Medical Center",
+    "cohort": "rising",
+    "rank": 19765,
+    "score": 24.987
   },
   {
     "id": "24097407-aabb-4dd9-9cab-5429a924df2e",
@@ -2086,6 +1918,14 @@
     "cohort": "rising",
     "rank": 870,
     "score": 42.9292
+  },
+  {
+    "id": "24d833e3-1490-436f-b082-cda6eaf07c2d",
+    "name": "Katrina D. Silos",
+    "institution": "Cedars-Sinai Medical Center",
+    "cohort": "rising",
+    "rank": 9057,
+    "score": 28.7895
   },
   {
     "id": "25101c90-bd15-44ec-8ac7-16c84c807762",
@@ -2136,14 +1976,6 @@
     "score": 25.794
   },
   {
-    "id": "26476768-0f94-41ad-9a09-7acc15484fc5",
-    "name": "Jonathan W. Goldman",
-    "institution": "University of California, Los Angeles",
-    "cohort": "established",
-    "rank": 291,
-    "score": 53.9087
-  },
-  {
     "id": "264f5287-051a-4223-81fc-574284d32f3c",
     "name": "Laura Gibson",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -2176,20 +2008,20 @@
     "score": 26.5242
   },
   {
-    "id": "26ac9948-4d6a-4389-9233-8c04bae05344",
-    "name": "Jason E. Long",
-    "institution": "Sunesis (United States)",
-    "cohort": "rising",
-    "rank": 1326,
-    "score": 31.4319
-  },
-  {
     "id": "26b306c9-af3c-4c2a-9c02-4b8107e6aea0",
     "name": "S. Duygu Sel\u00e7uklu",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "rising",
     "rank": 1327,
     "score": 31.4319
+  },
+  {
+    "id": "2717db16-62f7-46cc-b47c-5741a5818ac1",
+    "name": "Genevieve Bertolet",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 3035,
+    "score": 29.9839
   },
   {
     "id": "276482e6-fc6b-4b24-b781-d04d63f6e292",
@@ -2222,14 +2054,6 @@
     "cohort": "rising",
     "rank": 12379,
     "score": 26.5242
-  },
-  {
-    "id": "27ca6f77-087e-4fe7-a776-20a5c606811a",
-    "name": "Radhika Kainthla",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 19344,
-    "score": 25.2432
   },
   {
     "id": "2834080a-4be3-49f9-b3be-bf6939e2974c",
@@ -2304,14 +2128,6 @@
     "score": 23.0645
   },
   {
-    "id": "2999b2b6-b774-48cf-ac9e-90dfb104bc63",
-    "name": "Benjamin P. Brown",
-    "institution": "Vanderbilt University",
-    "cohort": "rising",
-    "rank": 12419,
-    "score": 26.5242
-  },
-  {
     "id": "29fe1501-790c-49be-beff-a219cdd5f1af",
     "name": "Mohana Roy",
     "institution": "Stanford University",
@@ -2326,14 +2142,6 @@
     "cohort": "rising",
     "rank": 10706,
     "score": 27.3477
-  },
-  {
-    "id": "2a74b87f-9f45-42ce-a5e1-8e98efed4699",
-    "name": "Wei Wang",
-    "institution": "New York University",
-    "cohort": "rising",
-    "rank": 12424,
-    "score": 26.5242
   },
   {
     "id": "2ab0bb27-32f9-4523-a491-2f3f8e2a5b84",
@@ -2376,6 +2184,14 @@
     "score": 28.9702
   },
   {
+    "id": "2b923208-5ae2-4953-bbf7-fd0bbfca4293",
+    "name": "Tilak Sundaresan",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "rising",
+    "rank": 770,
+    "score": 43.813
+  },
+  {
     "id": "2b9f5423-5891-4109-8ec7-dcf5cb7e89f4",
     "name": "Kelly Fitzgerald",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -2408,6 +2224,14 @@
     "score": 50.9119
   },
   {
+    "id": "2c715506-e071-42f9-a9d5-f4759b0c55ac",
+    "name": "Jordan O. Gasho",
+    "institution": "Cedars-Sinai Medical Center",
+    "cohort": "rising",
+    "rank": 9077,
+    "score": 28.7386
+  },
+  {
     "id": "2ca89ab8-efcf-4102-b41c-4a2487abcc6e",
     "name": "Qingqing Ding",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -2416,20 +2240,12 @@
     "score": 29.9839
   },
   {
-    "id": "2cc1c9d8-7bf7-4d4f-9e1f-d6c163bb83bb",
-    "name": "Jhanelle E. Gray",
-    "institution": "Moffitt Cancer Center",
-    "cohort": "established",
-    "rank": 81,
-    "score": 65.838
-  },
-  {
     "id": "2cc6cca2-203b-4d30-b8bc-2bb3eb584b8c",
     "name": "David R. Gandara",
     "institution": "UC Davis Comprehensive Cancer Center",
     "cohort": "established",
-    "rank": 272,
-    "score": 54.3396
+    "rank": 98,
+    "score": 99.2175
   },
   {
     "id": "2cc9f71e-340e-4536-8099-549d00a6eda7",
@@ -2456,12 +2272,28 @@
     "score": 26.5242
   },
   {
+    "id": "2d325649-548b-4ac3-bdeb-a8ae2ee25554",
+    "name": "Pankhuri Wanjari",
+    "institution": "University of Chicago",
+    "cohort": "rising",
+    "rank": 19352,
+    "score": 25.2432
+  },
+  {
     "id": "2d3f6037-2701-454c-96f2-6163cc7313f5",
     "name": "Jason C. Chang",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "rising",
     "rank": 23736,
     "score": 16.7136
+  },
+  {
+    "id": "2d46f072-8c6c-4516-bfbb-cd7f9ab6cf21",
+    "name": "Liangpeng Yang",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 3098,
+    "score": 29.9839
   },
   {
     "id": "2d5b759c-ae53-4c7b-887a-06eb934fe3f8",
@@ -2494,22 +2326,6 @@
     "cohort": "rising",
     "rank": 18016,
     "score": 25.7556
-  },
-  {
-    "id": "2d79e734-1084-4b1b-bd9b-4f56229c4e49",
-    "name": "Jennifer L. Schehr",
-    "institution": "University of Wisconsin\u2013Madison",
-    "cohort": "rising",
-    "rank": 22375,
-    "score": 22.619
-  },
-  {
-    "id": "2dc09fba-323a-4111-b6bd-a246b14a475e",
-    "name": "Amit Dipak Amin",
-    "institution": "Columbia University Irving Medical Center",
-    "cohort": "rising",
-    "rank": 20078,
-    "score": 24.4747
   },
   {
     "id": "2dc67394-130b-42c4-ac3e-afca48a1b207",
@@ -2584,14 +2400,6 @@
     "score": 28.2462
   },
   {
-    "id": "2e9fa23a-e5eb-428d-ba01-ecf111993fd1",
-    "name": "Alison Chafitz",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 24199,
-    "score": 0.0
-  },
-  {
     "id": "2ed6896f-9e8d-4454-ae34-77a08070ad4c",
     "name": "Brendan Knapp",
     "institution": "Washington University in St. Louis",
@@ -2616,14 +2424,6 @@
     "score": 25.7556
   },
   {
-    "id": "2f370341-ac08-454b-aa3c-d2d353410ff8",
-    "name": "Arda Durmaz",
-    "institution": "Cleveland Clinic",
-    "cohort": "rising",
-    "rank": 12513,
-    "score": 26.5242
-  },
-  {
     "id": "2f3bdbe6-c90a-4135-bef6-5b1b2baa765a",
     "name": "Luyang Yao",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -2640,12 +2440,12 @@
     "score": 26.5242
   },
   {
-    "id": "2fcc9d01-2eeb-4e05-820a-e996133fdcf8",
-    "name": "Elie G. Dib",
-    "institution": "Michigan Cancer Research Consortium",
+    "id": "2f5c649e-6ce7-47d1-a7c5-0d9c84332846",
+    "name": "Stephanie Hogue",
+    "institution": "Moffitt Cancer Center",
     "cohort": "rising",
-    "rank": 10244,
-    "score": 27.8051
+    "rank": 6422,
+    "score": 29.4047
   },
   {
     "id": "2fcf912a-3c59-497c-9c0c-7f95ddf2fee7",
@@ -2672,14 +2472,6 @@
     "score": 29.9839
   },
   {
-    "id": "301d0d1f-593f-464f-ab11-961b94a6b711",
-    "name": "Edgar Gonzalez\u2010Kozlova",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 23764,
-    "score": 16.463
-  },
-  {
     "id": "303a8d06-21a3-4564-aebb-847624a01b0e",
     "name": "Anisha Luthra",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -2688,11 +2480,19 @@
     "score": 25.7556
   },
   {
-    "id": "305bf780-bd90-4eb9-a50e-d3a24bd36237",
-    "name": "Vineela Kasireddy",
-    "institution": "Fox Chase Cancer Center",
+    "id": "30a881ad-25aa-4101-a05e-c12c20cf5fa0",
+    "name": "Sarah Phat",
+    "institution": "Massachusetts General Hospital",
     "cohort": "rising",
-    "rank": 12526,
+    "rank": 12531,
+    "score": 26.5242
+  },
+  {
+    "id": "30cfd8e7-d2ca-4235-8b69-30b895f4e8d2",
+    "name": "Alexandra Hotca",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "rising",
+    "rank": 12537,
     "score": 26.5242
   },
   {
@@ -2718,14 +2518,6 @@
     "cohort": "rising",
     "rank": 12541,
     "score": 26.5242
-  },
-  {
-    "id": "312282c8-2dba-4984-8d6f-99484f849e61",
-    "name": "Sittinon Tang",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 3145,
-    "score": 29.9839
   },
   {
     "id": "3128fb57-aaa9-40fa-bf6c-6c8a2abc0f85",
@@ -2760,14 +2552,6 @@
     "score": 25.7556
   },
   {
-    "id": "318fafdd-ab55-4c6f-96b1-363dac7e9ab3",
-    "name": "Reed Mullen",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 6435,
-    "score": 29.4047
-  },
-  {
     "id": "3191172a-f633-42f2-bf49-2a7165e3dd05",
     "name": "Shaira Therese Dingal",
     "institution": "City Of Hope National Medical Center",
@@ -2792,6 +2576,14 @@
     "score": 26.5559
   },
   {
+    "id": "320d31be-3ee2-4516-84f7-ca4c99f4af04",
+    "name": "Marc Ladanyi",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "established",
+    "rank": 188,
+    "score": 98.46
+  },
+  {
     "id": "3278da91-45d9-4cce-b1c4-5f7daa4f98af",
     "name": "Marta \u0141uksza",
     "institution": "Icahn School of Medicine at Mount Sinai",
@@ -2808,14 +2600,6 @@
     "score": 28.2462
   },
   {
-    "id": "328858cc-a665-4534-a48e-93a67349c5c2",
-    "name": "Kaustav Bera",
-    "institution": "Case Western Reserve University",
-    "cohort": "rising",
-    "rank": 18038,
-    "score": 25.7556
-  },
-  {
     "id": "329b16d0-92b3-4569-9580-b7f090db687e",
     "name": "Alessandro La Ferlita",
     "institution": "The Ohio State University Comprehensive Cancer Center \u2013 Arthur G. James Cancer Hospital and Richard J. Solove Research Institute",
@@ -2830,6 +2614,14 @@
     "cohort": "rising",
     "rank": 9724,
     "score": 28.4394
+  },
+  {
+    "id": "32c215ca-6c4c-4d7e-9264-5fba5046b072",
+    "name": "Sandrine Billet",
+    "institution": "Cedars-Sinai Medical Center",
+    "cohort": "rising",
+    "rank": 18834,
+    "score": 25.6275
   },
   {
     "id": "3300ac37-20f8-4eb1-b734-e0476908aea7",
@@ -2904,12 +2696,28 @@
     "score": 30.3816
   },
   {
+    "id": "3404fcb1-df06-4f30-ba2d-2ccb49ba2b16",
+    "name": "Leslie Servidio",
+    "institution": "AstraZeneca (United States)",
+    "cohort": "rising",
+    "rank": 1335,
+    "score": 31.4319
+  },
+  {
     "id": "34071e41-f6a3-47a8-b7f0-088a3413b789",
     "name": "Rotem Ben\u2010Shachar",
     "institution": "Tempus Labs (United States)",
     "cohort": "rising",
     "rank": 11224,
     "score": 26.7169
+  },
+  {
+    "id": "3421db44-c273-4dfd-a2b0-18eb6ab0d240",
+    "name": "Amy C. Moreno",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 7451,
+    "score": 29.3049
   },
   {
     "id": "342965f2-3601-4ffb-b3fe-79f65966b93e",
@@ -2928,14 +2736,6 @@
     "score": 32.8799
   },
   {
-    "id": "34ee4fa3-320a-4485-8c91-4305026fe57f",
-    "name": "Jui Kothari",
-    "institution": "Harvard University",
-    "cohort": "rising",
-    "rank": 24255,
-    "score": 0.0
-  },
-  {
     "id": "350f50d6-7ea2-4822-8767-0a3d1b4bedbd",
     "name": "Alexander J. Byun",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -2952,20 +2752,12 @@
     "score": 22.619
   },
   {
-    "id": "3571fdbf-e60a-4e33-b9ad-e567b91f8e23",
-    "name": "Yi\u2010Chieh Nancy Du",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 21014,
-    "score": 23.0645
-  },
-  {
     "id": "35753596-6fa1-4b6c-8c00-1e66c620bb2d",
     "name": "Ignacio I. Wistuba",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "established",
-    "rank": 246,
-    "score": 55.4247
+    "rank": 99,
+    "score": 99.215
   },
   {
     "id": "35ddd28d-7cd9-4785-a619-eb1b76b05054",
@@ -3064,20 +2856,20 @@
     "score": 21.9533
   },
   {
-    "id": "3730606b-ba87-4c66-a52b-144568b53bfb",
-    "name": "Priya Brunsdon",
-    "institution": "AbbVie (United States)",
-    "cohort": "rising",
-    "rank": 24273,
-    "score": 0.0
-  },
-  {
     "id": "377142d3-3954-4d68-a850-aaac3cd0720e",
     "name": "Marie-Ana\u00efs Locquet",
     "institution": "Dana-Farber Cancer Institute",
     "cohort": "rising",
     "rank": 10145,
     "score": 28.0547
+  },
+  {
+    "id": "378df115-7bb4-468a-9f9b-0ef3ad8dc36c",
+    "name": "Erin M. Coyne",
+    "institution": "Johns Hopkins University",
+    "cohort": "rising",
+    "rank": 1285,
+    "score": 31.4514
   },
   {
     "id": "37a124d0-6425-40e3-9e95-a920e306c32f",
@@ -3128,14 +2920,6 @@
     "score": 24.6239
   },
   {
-    "id": "37f62bfc-855e-479f-89cb-12c188682fa7",
-    "name": "Corey J. Langer",
-    "institution": "University of Pennsylvania",
-    "cohort": "established",
-    "rank": 86,
-    "score": 65.2346
-  },
-  {
     "id": "387de857-b285-43ec-9a74-13cc0350dcd7",
     "name": "Jane J. Liu",
     "institution": "Illinois CancerCare",
@@ -3156,8 +2940,8 @@
     "name": "David R. Spigel",
     "institution": "Sarah Cannon",
     "cohort": "established",
-    "rank": 85,
-    "score": 65.5892
+    "rank": 114,
+    "score": 99.09
   },
   {
     "id": "38f18bdc-679a-4776-9f62-297f9c9301a2",
@@ -3166,6 +2950,14 @@
     "cohort": "rising",
     "rank": 22387,
     "score": 22.619
+  },
+  {
+    "id": "39333a03-707a-470d-9c29-10f04025acd9",
+    "name": "Margherita Paschini",
+    "institution": "Boston Children's Hospital",
+    "cohort": "rising",
+    "rank": 9334,
+    "score": 28.5358
   },
   {
     "id": "395e57fc-a94b-4877-b07c-f0090e4d53ec",
@@ -3198,6 +2990,14 @@
     "cohort": "rising",
     "rank": 3239,
     "score": 29.9839
+  },
+  {
+    "id": "39a3fbe7-450a-4434-aae0-c3a3afb5fb33",
+    "name": "Mengyu Xie",
+    "institution": "University of South Florida",
+    "cohort": "rising",
+    "rank": 12666,
+    "score": 26.5242
   },
   {
     "id": "39d9474c-c11b-48f5-8c13-fd5522b20374",
@@ -3272,14 +3072,6 @@
     "score": 26.5242
   },
   {
-    "id": "3b31b808-6769-42ca-acce-9a51692b6889",
-    "name": "Kate Brown",
-    "institution": "Center for Cancer Research",
-    "cohort": "rising",
-    "rank": 1337,
-    "score": 31.4319
-  },
-  {
     "id": "3b343f73-967e-430e-a099-e236e42ac650",
     "name": "Neel Belani",
     "institution": "Fox Chase Cancer Center",
@@ -3294,14 +3086,6 @@
     "cohort": "rising",
     "rank": 1539,
     "score": 31.1273
-  },
-  {
-    "id": "3b7261da-9389-4b9d-bf8f-9361fa71683a",
-    "name": "Lyudmila Bazhenova",
-    "institution": "University of California San Diego",
-    "cohort": "established",
-    "rank": 139,
-    "score": 60.8543
   },
   {
     "id": "3be13ab2-bb51-4d41-a89c-037e095b1e73",
@@ -3396,8 +3180,8 @@
     "name": "Ravi Salgia",
     "institution": "City Of Hope National Medical Center",
     "cohort": "established",
-    "rank": 63,
-    "score": 68.3029
+    "rank": 160,
+    "score": 98.70499999999998
   },
   {
     "id": "3d0e8036-fb41-4e55-b9c6-0b17f28fa4c1",
@@ -3464,6 +3248,14 @@
     "score": 47.1821
   },
   {
+    "id": "3e522454-9057-4237-bfb0-8dcb49af2a65",
+    "name": "Deepa Rangachari",
+    "institution": "Beth Israel Deaconess Medical Center",
+    "cohort": "rising",
+    "rank": 18383,
+    "score": 25.7556
+  },
+  {
     "id": "3e5d3166-1ecc-4b42-8c89-134f8089f632",
     "name": "William Schwartzman",
     "institution": "Southwestern Medical Center",
@@ -3480,14 +3272,6 @@
     "score": 0.0
   },
   {
-    "id": "3e9af03b-9f4d-424f-b953-6832ab65a63b",
-    "name": "Ilies Bouabdallah",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "rising",
-    "rank": 765,
-    "score": 43.8195
-  },
-  {
     "id": "3eec3e14-feda-40aa-8abb-8ae9f885cccb",
     "name": "Krista Y. Chen",
     "institution": "Johns Hopkins University",
@@ -3502,6 +3286,14 @@
     "cohort": "rising",
     "rank": 7812,
     "score": 29.115
+  },
+  {
+    "id": "3ff32eda-d2d2-4425-a797-c242cd7a169a",
+    "name": "Chante Graham",
+    "institution": "National Cancer Institute",
+    "cohort": "rising",
+    "rank": 3321,
+    "score": 29.9839
   },
   {
     "id": "40012bb5-9e0c-4960-90a3-46e4e2af4fa8",
@@ -3547,14 +3339,6 @@
     "id": "41b28cc9-b187-46a9-8fbd-c51e317cab4b",
     "name": "Ticiana Leal",
     "institution": "Emory University",
-    "cohort": "established",
-    "rank": 174,
-    "score": 58.7672
-  },
-  {
-    "id": "41b28cc9-b187-46a9-8fbd-c51e317cab4b",
-    "name": "Ticiana Leal",
-    "institution": "Emory University",
     "cohort": "rising",
     "rank": 1135,
     "score": 33.6578
@@ -3566,22 +3350,6 @@
     "cohort": "rising",
     "rank": 18090,
     "score": 25.7556
-  },
-  {
-    "id": "420557b6-c48f-44d5-9e8c-b434b863e487",
-    "name": "Jessica M. Saltarski",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 12800,
-    "score": 26.5242
-  },
-  {
-    "id": "4249dabd-d7a1-4020-b08b-b7d6e75d1a96",
-    "name": "Marley Boyd",
-    "institution": "McKesson (United States)",
-    "cohort": "rising",
-    "rank": 21100,
-    "score": 23.0645
   },
   {
     "id": "4249f86d-7293-41d2-a28b-695cabe62da6",
@@ -3712,12 +3480,12 @@
     "score": 26.5242
   },
   {
-    "id": "443adec1-b986-48b6-a63b-ccacf7f2bd7f",
-    "name": "Andrew Nguyen",
-    "institution": "Cornell University",
+    "id": "445bde24-c259-4038-a0a5-e2f706801259",
+    "name": "Jonathan Serrano",
+    "institution": "NYU Langone Health",
     "cohort": "rising",
-    "rank": 12844,
-    "score": 26.5242
+    "rank": 21109,
+    "score": 23.0645
   },
   {
     "id": "44609927-1244-46d3-9b34-1bdd614c3f5c",
@@ -3768,12 +3536,12 @@
     "score": 26.5242
   },
   {
-    "id": "462a4ca3-7ac8-44c4-ab71-0bc48b115c23",
-    "name": "Jeremy Mason",
-    "institution": "University of Southern California",
+    "id": "45e74b82-b264-4cf3-ad0f-71d9ebd0dc54",
+    "name": "Pooja Middha",
+    "institution": "University of California, San Francisco",
     "cohort": "rising",
-    "rank": 22972,
-    "score": 22.2848
+    "rank": 19399,
+    "score": 25.2432
   },
   {
     "id": "465d9da8-de8c-47d1-ba4a-bfa80c433b0a",
@@ -3832,14 +3600,6 @@
     "score": 29.1353
   },
   {
-    "id": "474a8293-056c-4df8-8500-7e217179fd98",
-    "name": "Patrick Leo",
-    "institution": "Case Western Reserve University",
-    "cohort": "rising",
-    "rank": 12896,
-    "score": 26.5242
-  },
-  {
     "id": "47ca066a-3898-44fd-a788-cd666f33fe8b",
     "name": "Michael J. Jelinek",
     "institution": "Rush University Medical Center",
@@ -3862,6 +3622,14 @@
     "cohort": "rising",
     "rank": 22407,
     "score": 22.619
+  },
+  {
+    "id": "482f9b0b-b18d-41f7-a4b8-24f04f61a6a2",
+    "name": "Weiye Deng",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 647,
+    "score": 44.4023
   },
   {
     "id": "4857cb54-484e-486f-87be-3ce03d9d63a3",
@@ -3888,12 +3656,12 @@
     "score": 26.0118
   },
   {
-    "id": "490fa9a7-1302-4d31-bb0a-3f99857cb694",
-    "name": "Liron Yoffe",
-    "institution": "Cornell University",
+    "id": "4881edc1-750a-43f6-a81a-80a2a8352b13",
+    "name": "Paloma del C. Monroig-Bosque",
+    "institution": "Methodist Hospital",
     "cohort": "rising",
-    "rank": 8368,
-    "score": 29.1083
+    "rank": 12912,
+    "score": 26.5242
   },
   {
     "id": "49a0026f-3fca-4f68-8a01-d959ce6de79a",
@@ -3944,14 +3712,6 @@
     "score": 29.9839
   },
   {
-    "id": "4a404763-b362-498a-b89c-c287feb4874d",
-    "name": "Chhavi Jain",
-    "institution": "Cleveland Clinic Lerner College of Medicine",
-    "cohort": "rising",
-    "rank": 3436,
-    "score": 29.9839
-  },
-  {
     "id": "4a4e7f96-cb0e-41ce-bd21-8010707bb2a7",
     "name": "Ojasvi Chaudhary",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -3966,14 +3726,6 @@
     "cohort": "rising",
     "rank": 1834,
     "score": 30.771
-  },
-  {
-    "id": "4aa91c59-91ca-4791-b3fe-b177a8b33bbf",
-    "name": "Michal Slyper",
-    "institution": "Broad Institute",
-    "cohort": "rising",
-    "rank": 19405,
-    "score": 25.2432
   },
   {
     "id": "4adae83a-4a72-429d-b8bb-e463affc99d0",
@@ -4016,14 +3768,6 @@
     "score": 26.5242
   },
   {
-    "id": "4b6985fc-eaf2-498f-b16c-6e77daad33e6",
-    "name": "Tulika Ranjan",
-    "institution": "Baptist Hospital of Miami",
-    "cohort": "rising",
-    "rank": 11162,
-    "score": 26.7804
-  },
-  {
     "id": "4b6c9ed3-ed3b-4c34-8f7e-ee2b7b4959a0",
     "name": "Tyiesha Brown",
     "institution": "UCSF Helen Diller Family Comprehensive Cancer Center",
@@ -4048,14 +3792,6 @@
     "score": 29.8391
   },
   {
-    "id": "4c364ea3-1889-47da-800f-0f82b533d94f",
-    "name": "Darren S. Bryan",
-    "institution": "University of Chicago",
-    "cohort": "rising",
-    "rank": 20566,
-    "score": 23.0974
-  },
-  {
     "id": "4c8fbee0-e32a-492b-a946-c0b0c87788e7",
     "name": "Jieun Son",
     "institution": "Harvard University",
@@ -4070,14 +3806,6 @@
     "cohort": "rising",
     "rank": 12973,
     "score": 26.5242
-  },
-  {
-    "id": "4d0e19ca-4d12-4f5a-af1d-3d2f16498d7b",
-    "name": "Melinda D. Willard",
-    "institution": "Eli Lilly (United States)",
-    "cohort": "rising",
-    "rank": 23433,
-    "score": 19.0229
   },
   {
     "id": "4d37d2e8-20df-465a-bf29-698208a3452f",
@@ -4208,14 +3936,6 @@
     "score": 30.2735
   },
   {
-    "id": "4edfa980-71ad-48ce-aff6-d3a9bdaf62c7",
-    "name": "Suzanne Cole",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 401,
-    "score": 47.6051
-  },
-  {
     "id": "4ef6cdb1-494a-445b-8c4c-5c2f821aa4c1",
     "name": "Atish Mohanty",
     "institution": "City Of Hope National Medical Center",
@@ -4248,12 +3968,12 @@
     "score": 28.3692
   },
   {
-    "id": "4fdd4035-c2ba-4cdb-bc6b-6da180c9e04d",
-    "name": "William Zhao",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 9156,
-    "score": 28.5953
+    "id": "4fecdce0-bd3b-4d1b-b74f-9033da28d449",
+    "name": "Mari Mino\u2013Kenudson",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "established",
+    "rank": 167,
+    "score": 98.6325
   },
   {
     "id": "500d3e3b-efea-47ba-b465-89b662d2f533",
@@ -4270,6 +3990,14 @@
     "cohort": "rising",
     "rank": 7860,
     "score": 29.115
+  },
+  {
+    "id": "50b53fe8-ead0-480d-acc3-5e5d0083d2d8",
+    "name": "Eduardo C\u00e1rdenas",
+    "institution": "University of California, San Francisco",
+    "cohort": "rising",
+    "rank": 9068,
+    "score": 28.7664
   },
   {
     "id": "50dd856b-719e-4c5b-b7fc-b8d05cf0680c",
@@ -4294,22 +4022,6 @@
     "cohort": "rising",
     "rank": 962,
     "score": 39.6792
-  },
-  {
-    "id": "51452c33-e495-420f-88c0-92a6792d94b9",
-    "name": "Amyn A. Habib",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 21170,
-    "score": 23.0645
-  },
-  {
-    "id": "5154225d-7146-4767-a593-c41eafe37c74",
-    "name": "Paula Toro",
-    "institution": "Cleveland Clinic",
-    "cohort": "rising",
-    "rank": 3504,
-    "score": 29.9839
   },
   {
     "id": "51628f87-21c6-4f9d-a9d3-be678e0a35f8",
@@ -4344,20 +4056,20 @@
     "score": 29.115
   },
   {
+    "id": "51feb936-fa03-47ce-8600-e3caa123bd95",
+    "name": "Rohan Katipally",
+    "institution": "University of Chicago",
+    "cohort": "rising",
+    "rank": 3511,
+    "score": 29.9839
+  },
+  {
     "id": "5242665f-b9b7-441f-ae3c-9e56b99dd9ba",
     "name": "Nicholas Rohs",
     "institution": "Icahn School of Medicine at Mount Sinai",
     "cohort": "rising",
     "rank": 284,
     "score": 49.5278
-  },
-  {
-    "id": "525c8e2e-eed3-4880-af4a-d1da247c6407",
-    "name": "Yupei Lin",
-    "institution": "Baylor College of Medicine",
-    "cohort": "rising",
-    "rank": 20105,
-    "score": 24.4747
   },
   {
     "id": "525fb349-d9fa-4589-a42f-ab7bd780a719",
@@ -4374,6 +4086,14 @@
     "cohort": "rising",
     "rank": 3521,
     "score": 29.9839
+  },
+  {
+    "id": "52da4436-e151-430d-86b4-0a1a8458dfb3",
+    "name": "Nahum Puebla\u2010Osorio",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 16207,
+    "score": 26.3961
   },
   {
     "id": "52f360f7-dffc-4df3-8c8e-3415d2c3a1b1",
@@ -4440,14 +4160,6 @@
     "score": 28.5358
   },
   {
-    "id": "538ceb01-3023-41fd-89f8-00e4fdcb2ad8",
-    "name": "Christopher H. Grant",
-    "institution": "University of California, Irvine Medical Center",
-    "cohort": "rising",
-    "rank": 9195,
-    "score": 28.5722
-  },
-  {
     "id": "53d77f19-2713-4f90-aef1-956937fab01f",
     "name": "Jaclyn Neely",
     "institution": "Bristol-Myers Squibb (United States)",
@@ -4480,6 +4192,14 @@
     "score": 26.5242
   },
   {
+    "id": "544c6bab-ce69-4250-9807-e2582693a278",
+    "name": "Jonathan W. Riess",
+    "institution": "UC Davis Comprehensive Cancer Center",
+    "cohort": "established",
+    "rank": 179,
+    "score": 98.51500000000001
+  },
+  {
     "id": "5459ece3-2857-4324-9a39-7703e95c00c5",
     "name": "Kara M. Soroko",
     "institution": "Dana-Farber Cancer Institute",
@@ -4494,14 +4214,6 @@
     "cohort": "rising",
     "rank": 21191,
     "score": 23.0645
-  },
-  {
-    "id": "548b0cac-0ad9-4be2-92d4-0582e22feac9",
-    "name": "Kalyani Narra",
-    "institution": "Texas Christian University",
-    "cohort": "rising",
-    "rank": 652,
-    "score": 44.4023
   },
   {
     "id": "54addc4f-d6cb-4902-be96-da5e6eccaaa7",
@@ -4536,6 +4248,14 @@
     "score": 29.9839
   },
   {
+    "id": "54f354e4-c80a-4ee6-a2ab-414b21fc6bd0",
+    "name": "Bhavani S. Gannavarapu",
+    "institution": "The University of Texas Southwestern Medical Center",
+    "cohort": "rising",
+    "rank": 19416,
+    "score": 25.2432
+  },
+  {
     "id": "55212f2f-50e9-4674-a292-ac12e5cf8995",
     "name": "Kathryn E. Beckermann",
     "institution": "Vanderbilt University Medical Center",
@@ -4550,14 +4270,6 @@
     "cohort": "rising",
     "rank": 2487,
     "score": 30.0249
-  },
-  {
-    "id": "553b42e3-f431-4f28-a22a-b2528385041b",
-    "name": "Alexander C. Huang",
-    "institution": "University of Pennsylvania",
-    "cohort": "rising",
-    "rank": 22422,
-    "score": 22.619
   },
   {
     "id": "5572d909-1fd4-4f0f-8475-bb2f499798fc",
@@ -4600,6 +4312,14 @@
     "score": 29.115
   },
   {
+    "id": "5610e628-bc76-43a0-ac78-f94f48321602",
+    "name": "Zoe Quandt",
+    "institution": "University of California, San Francisco",
+    "cohort": "rising",
+    "rank": 19417,
+    "score": 25.2432
+  },
+  {
     "id": "56408924-bfc1-47f4-b5da-a04adc8a3ce5",
     "name": "Zoey Chopra",
     "institution": "University of Michigan",
@@ -4614,14 +4334,6 @@
     "cohort": "rising",
     "rank": 6002,
     "score": 29.6167
-  },
-  {
-    "id": "5649ab5e-0dea-4941-8052-6ac999183b13",
-    "name": "Ruli Gao",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "rising",
-    "rank": 22977,
-    "score": 22.2848
   },
   {
     "id": "5658e39c-77cb-4ac2-94c3-7b4621a384c4",
@@ -4712,14 +4424,6 @@
     "score": 28.5358
   },
   {
-    "id": "572bedd1-8109-4a48-8725-be82a5b604f5",
-    "name": "Vikram R. Shaw",
-    "institution": "Baylor College of Medicine",
-    "cohort": "rising",
-    "rank": 2333,
-    "score": 30.1173
-  },
-  {
     "id": "57346118-383c-458d-a229-adc3e8e0c551",
     "name": "Elaine Shum",
     "institution": "NYU Langone Health",
@@ -4758,14 +4462,6 @@
     "cohort": "rising",
     "rank": 161,
     "score": 50.672
-  },
-  {
-    "id": "57ab08ef-e3a2-4212-af5c-5f48f801071a",
-    "name": "Pratyusha Vadagam",
-    "institution": "Johnson & Johnson (United States)",
-    "cohort": "rising",
-    "rank": 1101,
-    "score": 36.0189
   },
   {
     "id": "57ba842f-c73e-4710-abc5-a8d7cc4039c6",
@@ -4840,14 +4536,6 @@
     "score": 28.5358
   },
   {
-    "id": "59119432-3231-4d41-981d-94fff24571db",
-    "name": "Jin Qi",
-    "institution": "Moffitt Cancer Center",
-    "cohort": "rising",
-    "rank": 13196,
-    "score": 26.5242
-  },
-  {
     "id": "59166cb0-de5a-4b4e-975b-cd98bfb46052",
     "name": "Kyle Concannon",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -4902,14 +4590,6 @@
     "cohort": "rising",
     "rank": 13215,
     "score": 26.5242
-  },
-  {
-    "id": "5a1d2f0f-1d72-4b6b-95bf-afc48b0b95a4",
-    "name": "Nicholas Giustini",
-    "institution": "Moores Cancer Center",
-    "cohort": "rising",
-    "rank": 9395,
-    "score": 28.5358
   },
   {
     "id": "5a1e558b-4aad-4f46-8ee9-81ae2d78957f",
@@ -4976,12 +4656,12 @@
     "score": 29.9839
   },
   {
-    "id": "5b563c9a-1bc2-4b9d-9599-1a13c1af9a67",
-    "name": "Kenneth Bernstein",
-    "institution": "NYU Langone Health",
+    "id": "5b0e7e3d-4e13-4034-8100-713c3512f195",
+    "name": "Rafael Ribeiro Barcelos",
+    "institution": "Brigham and Women's Hospital",
     "cohort": "rising",
-    "rank": 10771,
-    "score": 27.2928
+    "rank": 7535,
+    "score": 29.1962
   },
   {
     "id": "5b612c9c-e34a-4288-93b3-f6395e7d5039",
@@ -5056,20 +4736,20 @@
     "score": 29.6581
   },
   {
+    "id": "5c7f014c-b940-4ba2-acca-f6018756271e",
+    "name": "Jamie M. Jacobs",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "rising",
+    "rank": 938,
+    "score": 40.2594
+  },
+  {
     "id": "5c9ec7d2-d3d3-47d5-8ecd-e376f47641fb",
     "name": "Adam S. Fisch",
     "institution": "Brigham and Women's Hospital",
     "cohort": "rising",
     "rank": 2111,
     "score": 30.3011
-  },
-  {
-    "id": "5ca24f2e-add1-44f5-a167-d93f2e4eb348",
-    "name": "Max M. Quinn",
-    "institution": "Dana-Farber Cancer Institute",
-    "cohort": "rising",
-    "rank": 13255,
-    "score": 26.5242
   },
   {
     "id": "5ca54cf5-59b2-4d77-a0b7-6bf1e3e8bc03",
@@ -5128,14 +4808,6 @@
     "score": 29.9839
   },
   {
-    "id": "5d4e773f-e493-4bca-a4b7-ba289a1d6811",
-    "name": "Xiaoyao Yang",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 13268,
-    "score": 26.5242
-  },
-  {
     "id": "5d787f12-2cc0-4adc-816c-94e273e43e9d",
     "name": "Robert Samstein",
     "institution": "Icahn School of Medicine at Mount Sinai",
@@ -5176,6 +4848,14 @@
     "score": 25.6916
   },
   {
+    "id": "5e023f30-379f-4bb8-9185-0636d5809b79",
+    "name": "Timothy L. Lochmann",
+    "institution": "Virginia Cancer Institute",
+    "cohort": "rising",
+    "rank": 13281,
+    "score": 26.5242
+  },
+  {
     "id": "5e179f04-b1f7-48ac-9bb6-8dd43597bea3",
     "name": "Jacob S. Witt",
     "institution": "University of Wisconsin\u2013Madison",
@@ -5198,14 +4878,6 @@
     "cohort": "rising",
     "rank": 6094,
     "score": 29.4799
-  },
-  {
-    "id": "5eaec12b-5f05-4e68-a029-bfc611e19a87",
-    "name": "Anirudh Murthy",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 3656,
-    "score": 29.9839
   },
   {
     "id": "5eb689e2-09e1-4773-989e-1f1c81063348",
@@ -5288,12 +4960,12 @@
     "score": 26.5242
   },
   {
-    "id": "60ee328c-37df-48b0-82e8-a665f6a99c21",
-    "name": "Ruiwen Ding",
-    "institution": "University of California, Los Angeles",
+    "id": "6092c9ea-6485-4873-8025-fd2c91e02e05",
+    "name": "Ashley O\u2019Connor",
+    "institution": "Johns Hopkins University",
     "cohort": "rising",
-    "rank": 3679,
-    "score": 29.9839
+    "rank": 20659,
+    "score": 23.0698
   },
   {
     "id": "60f57572-dd43-4c71-92a5-f4af9ad8ef81",
@@ -5310,6 +4982,14 @@
     "cohort": "rising",
     "rank": 7919,
     "score": 29.115
+  },
+  {
+    "id": "614ae945-7aa9-475b-b42f-9b56be70bb77",
+    "name": "David M. Faleck",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "rising",
+    "rank": 17062,
+    "score": 26.0118
   },
   {
     "id": "61599c26-f6be-49a6-a0c0-a2be83f661fe",
@@ -5368,6 +5048,14 @@
     "score": 28.9702
   },
   {
+    "id": "621f6f4f-9f9e-452f-bd91-eca4d8c6b8b0",
+    "name": "Kamila Naxerova",
+    "institution": "Harvard University",
+    "cohort": "rising",
+    "rank": 17065,
+    "score": 26.0118
+  },
+  {
     "id": "6268ba2b-23c7-4768-9f0b-c20c2bf81eb2",
     "name": "Jitesh B. Shewale",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -5376,12 +5064,12 @@
     "score": 23.0663
   },
   {
-    "id": "62c57a9c-dd8b-4b26-81e2-751d3f637b55",
-    "name": "Nestor Villamizar",
-    "institution": "University of Miami",
+    "id": "62ba522f-2de6-45d3-baef-e870be88954b",
+    "name": "Sarah M. Shin",
+    "institution": "Johns Hopkins University",
     "cohort": "rising",
-    "rank": 22782,
-    "score": 22.3962
+    "rank": 1586,
+    "score": 30.9896
   },
   {
     "id": "634b3684-8ab5-4b7b-b5ba-3bd892152e5b",
@@ -5390,14 +5078,6 @@
     "cohort": "rising",
     "rank": 21276,
     "score": 23.0645
-  },
-  {
-    "id": "637a1393-d9f0-444e-a9bf-0404856bfe38",
-    "name": "Elizabeth Marchlewicz",
-    "institution": "IBM (United States)",
-    "cohort": "rising",
-    "rank": 3716,
-    "score": 29.9839
   },
   {
     "id": "63d3b780-6895-49d2-a8be-e489c30065d8",
@@ -5496,6 +5176,14 @@
     "score": 16.0592
   },
   {
+    "id": "65e1acce-e5af-4607-bcd3-627a32141089",
+    "name": "Lecia V. Sequist",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "established",
+    "rank": 155,
+    "score": 98.745
+  },
+  {
     "id": "65f0130c-ab0d-49e4-8c86-5b65201645ee",
     "name": "Kerem \u00d6zcan",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -5509,6 +5197,14 @@
     "institution": "Yale University",
     "cohort": "rising",
     "rank": 13405,
+    "score": 26.5242
+  },
+  {
+    "id": "66697f2e-3759-4c49-b2e1-7a440068b994",
+    "name": "David L. Schwartz",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 13411,
     "score": 26.5242
   },
   {
@@ -5558,6 +5254,14 @@
     "cohort": "rising",
     "rank": 59,
     "score": 53.4517
+  },
+  {
+    "id": "67bbfeac-5c81-4d74-934b-a20ef0a6bf85",
+    "name": "Chonnipa Nantavithya",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 17096,
+    "score": 26.0118
   },
   {
     "id": "67bc3b39-a3e6-44c3-a5bf-72b67a1147b4",
@@ -5630,14 +5334,6 @@
     "cohort": "rising",
     "rank": 3772,
     "score": 29.9839
-  },
-  {
-    "id": "689e2d2a-60ec-4f71-a45f-2ea2df824b70",
-    "name": "Joshua S. Mincer",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "rising",
-    "rank": 8719,
-    "score": 28.9702
   },
   {
     "id": "68eb1336-0d66-4c72-bfa4-ae9a8bd3e32c",
@@ -5744,6 +5440,14 @@
     "score": 28.1654
   },
   {
+    "id": "6a35d11a-c825-4aa8-9576-8e7213b3e9b7",
+    "name": "Kisha Mitchell-Richards",
+    "institution": "Greenwich Hospital",
+    "cohort": "rising",
+    "rank": 21322,
+    "score": 23.0645
+  },
+  {
     "id": "6a41081f-ee3d-47e2-859b-6defebe33634",
     "name": "Talal El Zarif",
     "institution": "Yale University",
@@ -5768,19 +5472,19 @@
     "score": 29.9839
   },
   {
-    "id": "6a51ac7f-197b-4547-b75c-f65a98d56a73",
-    "name": "Alejandro Bribriesco",
-    "institution": "Cleveland Clinic",
-    "cohort": "rising",
-    "rank": 16228,
-    "score": 26.3961
-  },
-  {
     "id": "6a6e8a0e-0f55-45d7-8a99-2c4fe4431024",
     "name": "Weilong Yao",
     "institution": "Emory University",
     "cohort": "rising",
     "rank": 13465,
+    "score": 26.5242
+  },
+  {
+    "id": "6abedf17-d30d-4830-a409-93ac7dfe5f9f",
+    "name": "Fabian M. Troschel",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "rising",
+    "rank": 13471,
     "score": 26.5242
   },
   {
@@ -5798,14 +5502,6 @@
     "cohort": "rising",
     "rank": 23546,
     "score": 17.2984
-  },
-  {
-    "id": "6b1437da-2e3c-4f3f-9f1c-2b2033b5753b",
-    "name": "Mujmmail Ahmed",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 24650,
-    "score": 0.0
   },
   {
     "id": "6b3ed20f-7e77-473d-a450-9cf284a6c5e0",
@@ -5840,6 +5536,14 @@
     "score": 17.2984
   },
   {
+    "id": "6b750691-38c1-4508-8675-f1d9157e29b3",
+    "name": "Feng Meng",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 3814,
+    "score": 29.9839
+  },
+  {
     "id": "6b755d48-48e7-4384-9641-2f09b307d3bb",
     "name": "Nikita Patel",
     "institution": "Emory University",
@@ -5856,14 +5560,6 @@
     "score": 29.9839
   },
   {
-    "id": "6b8764d2-abd2-4eb4-ac5c-bf3df8f8fe4a",
-    "name": "Nikhil Shukla",
-    "institution": "Indiana University Health",
-    "cohort": "rising",
-    "rank": 6700,
-    "score": 29.4047
-  },
-  {
     "id": "6bc344da-dfc4-4eb4-8c6f-a3615a31830d",
     "name": "Marlese A. Pisegna",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -5872,12 +5568,20 @@
     "score": 25.8379
   },
   {
-    "id": "6bef654d-07e2-4d7d-8eb2-52e3fe5988ac",
-    "name": "Gina N. Grantham",
-    "institution": "American Society of Clinical Oncology",
+    "id": "6bdacd53-6ee0-4547-8881-9d3fce463823",
+    "name": "Claire K. Mulvey",
+    "institution": "University of California, San Francisco",
     "cohort": "rising",
-    "rank": 3820,
-    "score": 29.9839
+    "rank": 18931,
+    "score": 25.6275
+  },
+  {
+    "id": "6bf8ffe8-505b-46cf-b978-00ff1595cb1b",
+    "name": "Christopher W. Schultz",
+    "institution": "National Cancer Institute",
+    "cohort": "rising",
+    "rank": 23704,
+    "score": 16.7971
   },
   {
     "id": "6c2196cf-30d3-46df-971b-822a428a46e2",
@@ -5888,12 +5592,12 @@
     "score": 44.2549
   },
   {
-    "id": "6c2ac8ce-b1c0-4ba8-b846-c15130d57875",
-    "name": "Kamrine E. Poels",
-    "institution": "Harvard University",
-    "cohort": "rising",
-    "rank": 13490,
-    "score": 26.5242
+    "id": "6c88f982-7251-4c5b-9a1f-a14cc1ba1196",
+    "name": "Joe Y. Chang",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "established",
+    "rank": 63,
+    "score": 99.495
   },
   {
     "id": "6c9cbd6e-60d0-41dc-806c-c08b31de92f3",
@@ -5934,14 +5638,6 @@
     "cohort": "rising",
     "rank": 21336,
     "score": 23.0645
-  },
-  {
-    "id": "6d4e75e3-718d-4932-b0d6-906470f493b2",
-    "name": "Mehdi Alilou",
-    "institution": "Case Western Reserve University",
-    "cohort": "rising",
-    "rank": 13520,
-    "score": 26.5242
   },
   {
     "id": "6d65ee4d-465d-4470-8330-76470a81b1fb",
@@ -6040,14 +5736,6 @@
     "score": 25.2432
   },
   {
-    "id": "6f43a8eb-f422-4e1d-a582-c854b82f9fec",
-    "name": "Idalid Franco",
-    "institution": "Brigham and Women's Hospital",
-    "cohort": "rising",
-    "rank": 22447,
-    "score": 22.619
-  },
-  {
     "id": "6f634734-c4e8-41d7-9351-099b60d816d3",
     "name": "Nofisat Ismaila",
     "institution": "American Society of Clinical Oncology",
@@ -6062,6 +5750,22 @@
     "cohort": "rising",
     "rank": 18226,
     "score": 25.7556
+  },
+  {
+    "id": "6fc4c6e9-79b8-4c30-b526-452690209d3a",
+    "name": "Claudia S. Kettlun Leyton",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 5711,
+    "score": 29.8391
+  },
+  {
+    "id": "7007ee61-8fab-4308-a8e6-f965a6fa3722",
+    "name": "Alexander A. Merleev",
+    "institution": "University of California, Davis",
+    "cohort": "rising",
+    "rank": 13569,
+    "score": 26.5242
   },
   {
     "id": "702f434d-93b8-4427-9253-84ad451ea43f",
@@ -6088,14 +5792,6 @@
     "score": 28.3175
   },
   {
-    "id": "70b64fb0-3f32-4ef1-bd85-ee5b90650731",
-    "name": "Bryce Damman",
-    "institution": "Mayo Clinic",
-    "cohort": "rising",
-    "rank": 2166,
-    "score": 30.2735
-  },
-  {
     "id": "70d3071c-e490-4be9-8383-7d379aced2fe",
     "name": "Khalil Choucair",
     "institution": "Wayne State University",
@@ -6110,14 +5806,6 @@
     "cohort": "rising",
     "rank": 23705,
     "score": 16.7971
-  },
-  {
-    "id": "7109af77-2773-45fe-9d43-b6d1987478ab",
-    "name": "James Luke Godwin",
-    "institution": "Fox Chase Cancer Center",
-    "cohort": "rising",
-    "rank": 13594,
-    "score": 26.5242
   },
   {
     "id": "7128a4b7-c16a-4ca5-8ec2-62f57027a95c",
@@ -6144,44 +5832,12 @@
     "score": 26.5242
   },
   {
-    "id": "71864929-422b-4fcf-abb9-5e225f594b6e",
-    "name": "Jennifer M. Suga",
-    "institution": "Kaiser Permanente Vallejo Medical Center",
-    "cohort": "rising",
-    "rank": 19821,
-    "score": 24.987
-  },
-  {
-    "id": "71a7a495-9c17-4e9e-a08d-ef1abfed670e",
-    "name": "Dexter Waters",
-    "institution": "Johnson & Johnson (United States)",
-    "cohort": "rising",
-    "rank": 10093,
-    "score": 28.1014
-  },
-  {
-    "id": "71abb337-c930-4c64-bc95-c9d27da9c0c3",
-    "name": "Helena A. Yu",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "established",
-    "rank": 82,
-    "score": 65.8199
-  },
-  {
     "id": "71b51a2d-0f56-434f-abf4-f6755c796eaf",
     "name": "Suresh S. Ramalingam",
     "institution": "Emory University",
     "cohort": "established",
-    "rank": 117,
-    "score": 62.9408
-  },
-  {
-    "id": "71b76351-1d46-4491-bdb8-7f72c694953c",
-    "name": "Joanne Cheng",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "rising",
-    "rank": 3882,
-    "score": 29.9839
+    "rank": 19,
+    "score": 99.7925
   },
   {
     "id": "71c43b4b-62c2-4a6f-bfbe-95d5f7b4fedf",
@@ -6190,6 +5846,14 @@
     "cohort": "rising",
     "rank": 10517,
     "score": 27.667
+  },
+  {
+    "id": "71d509c0-95e1-4a8e-b737-71552d31dce1",
+    "name": "Giuseppe Giaccone",
+    "institution": "Georgetown University",
+    "cohort": "rising",
+    "rank": 16069,
+    "score": 26.5086
   },
   {
     "id": "7216a7d6-a583-466d-8974-157592667767",
@@ -6222,6 +5886,14 @@
     "cohort": "rising",
     "rank": 19474,
     "score": 25.2432
+  },
+  {
+    "id": "7282753f-02c2-40b8-84d0-78e7e54608f9",
+    "name": "Deep Upadhyay",
+    "institution": "National Cancer Institute",
+    "cohort": "rising",
+    "rank": 3898,
+    "score": 29.9839
   },
   {
     "id": "72a8f83e-31b0-4c1e-99cd-7eb6a14c892e",
@@ -6304,14 +5976,6 @@
     "score": 22.3962
   },
   {
-    "id": "736598e4-7be0-476e-b269-95263219283a",
-    "name": "Blythe Adamson",
-    "institution": "Flatiron Health (United States)",
-    "cohort": "rising",
-    "rank": 13641,
-    "score": 26.5242
-  },
-  {
     "id": "739c12b6-0867-48fa-8677-3179828897ca",
     "name": "Utsav Joshi",
     "institution": "Moffitt Cancer Center",
@@ -6328,12 +5992,20 @@
     "score": 23.0645
   },
   {
-    "id": "73c17b24-5cbc-49c2-a825-86e41ce518b4",
-    "name": "Sheenu Chandwani",
-    "institution": "Merck & Co., Inc., Rahway, NJ, USA (United States)",
+    "id": "73cf9196-ee04-44d4-8824-814c9b8a2a97",
+    "name": "William Tyler Turchan",
+    "institution": "University of Chicago",
     "cohort": "rising",
-    "rank": 11643,
-    "score": 26.5329
+    "rank": 13647,
+    "score": 26.5242
+  },
+  {
+    "id": "73dc9bd3-bb5f-448f-b7ef-453657413f6c",
+    "name": "Michael Dohopolski",
+    "institution": "Southwestern Medical Center",
+    "cohort": "rising",
+    "rank": 13648,
+    "score": 26.5242
   },
   {
     "id": "740a0ce0-0026-4624-a06b-ea699cf9247b",
@@ -6360,14 +6032,6 @@
     "score": 29.4047
   },
   {
-    "id": "7497bda5-264e-4438-b832-1fc4f7788e80",
-    "name": "Raed Sulaiman",
-    "institution": "Avera Health",
-    "cohort": "rising",
-    "rank": 13656,
-    "score": 26.5242
-  },
-  {
     "id": "74a32e0a-c24b-4471-abcd-7943e794acaa",
     "name": "Melissa Gilbert\u2010Ross",
     "institution": "Emory University",
@@ -6382,14 +6046,6 @@
     "cohort": "rising",
     "rank": 24723,
     "score": 0.0
-  },
-  {
-    "id": "74e621ad-8ac7-4210-ab99-1990c46fe5be",
-    "name": "Steven Montalvo",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 10521,
-    "score": 27.667
   },
   {
     "id": "74fb67dc-7a8e-4aaf-92e2-38f883d520bb",
@@ -6520,6 +6176,14 @@
     "score": 30.8527
   },
   {
+    "id": "766e355b-3898-4eb8-9f70-d9ecd4736b06",
+    "name": "Alice T. Shaw",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "established",
+    "rank": 91,
+    "score": 99.2525
+  },
+  {
     "id": "7686935f-0c3a-488d-890a-872c954313ca",
     "name": "Malini Patel",
     "institution": "Rutgers, The State University of New Jersey",
@@ -6544,14 +6208,6 @@
     "score": 26.3252
   },
   {
-    "id": "76a8a94e-30fb-4928-980e-509e2e239c8a",
-    "name": "Ran Tao",
-    "institution": "Johnson & Johnson (United States)",
-    "cohort": "rising",
-    "rank": 23324,
-    "score": 21.2823
-  },
-  {
     "id": "76b6c458-e1a4-491c-afa4-ac370584c161",
     "name": "Sheeba J. Sujit",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -6560,28 +6216,12 @@
     "score": 27.2287
   },
   {
-    "id": "76bd3e74-a6ca-40f9-96b7-b66236a1681b",
-    "name": "Dunrui Wang",
-    "institution": "National Institutes of Health",
-    "cohort": "rising",
-    "rank": 21385,
-    "score": 23.0645
-  },
-  {
     "id": "772033c1-a205-498a-a53a-53437567ae95",
     "name": "Michelle Afkhami",
     "institution": "City of Hope",
     "cohort": "rising",
     "rank": 22994,
     "score": 22.2848
-  },
-  {
-    "id": "773c4c53-907a-4fbb-9afd-107bc5c325ad",
-    "name": "Marisa Sewell",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "rising",
-    "rank": 6014,
-    "score": 29.5828
   },
   {
     "id": "773dddf4-620e-42c1-94ad-827400711bca",
@@ -6652,8 +6292,8 @@
     "name": "Heather A. Wakelee",
     "institution": "Stanford University",
     "cohort": "established",
-    "rank": 137,
-    "score": 61.0982
+    "rank": 79,
+    "score": 99.385
   },
   {
     "id": "77df3cf7-272f-4171-900a-218e4550e876",
@@ -6670,14 +6310,6 @@
     "cohort": "rising",
     "rank": 23841,
     "score": 14.8966
-  },
-  {
-    "id": "78982afb-24f9-44be-bf6f-30083c8d23c1",
-    "name": "Cheryl Aylesworth",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 3956,
-    "score": 29.9839
   },
   {
     "id": "78bf44b2-8ee6-4f80-984b-a674f215c612",
@@ -6712,6 +6344,14 @@
     "score": 26.5242
   },
   {
+    "id": "78eec780-a66c-46a9-a802-5b7ec4c29db9",
+    "name": "Maureen Aliru",
+    "institution": "The University of Texas Southwestern Medical Center",
+    "cohort": "rising",
+    "rank": 1013,
+    "score": 38.6107
+  },
+  {
     "id": "78f85320-386a-44c1-871f-4ba81be18877",
     "name": "Miguel L\u00f3pez de Rodas",
     "institution": "Yale Cancer Center",
@@ -6720,20 +6360,12 @@
     "score": 28.9702
   },
   {
-    "id": "7930676f-6809-41b6-ae08-421618285e12",
-    "name": "Anjile An",
-    "institution": "Cornell University",
+    "id": "790c9ac6-71a2-4e89-a49c-b99457dd6ee3",
+    "name": "Golzar Hemmati",
+    "institution": "University of California, San Francisco",
     "cohort": "rising",
-    "rank": 313,
-    "score": 49.1947
-  },
-  {
-    "id": "7948d3ee-11c6-4a4c-bbfa-ee1a398f12e5",
-    "name": "Azam Ghafoor",
-    "institution": "National Cancer Institute",
-    "cohort": "rising",
-    "rank": 299,
-    "score": 49.4386
+    "rank": 3961,
+    "score": 29.9839
   },
   {
     "id": "798e461b-37df-4d9b-ab8c-c7b591e0f349",
@@ -6782,14 +6414,6 @@
     "cohort": "rising",
     "rank": 10782,
     "score": 27.2928
-  },
-  {
-    "id": "7a6c18f3-d549-419a-8c81-02e588116eba",
-    "name": "Manasee V. Shah",
-    "institution": "GlaxoSmithKline (United States)",
-    "cohort": "rising",
-    "rank": 20216,
-    "score": 24.2185
   },
   {
     "id": "7a87a8d1-d352-4144-85b2-36bc4409d6a0",
@@ -6864,14 +6488,6 @@
     "score": 26.9315
   },
   {
-    "id": "7bb652d9-4655-478c-b761-bf14de9ff8de",
-    "name": "Karl Klingler",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 107,
-    "score": 51.7651
-  },
-  {
     "id": "7c0f9fe6-1556-4aa2-a4b5-de4b8fe79bb0",
     "name": "Fuduan Peng",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -6896,20 +6512,20 @@
     "score": 22.9531
   },
   {
+    "id": "7c36873e-8a40-4d7c-aae8-97e0d2c7e199",
+    "name": "Justin T. Stowell",
+    "institution": "WinnMed",
+    "cohort": "rising",
+    "rank": 13776,
+    "score": 26.5242
+  },
+  {
     "id": "7c45eeb5-c702-4d89-820d-58eae67eefca",
     "name": "Vidushi Durani",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "rising",
     "rank": 2501,
     "score": 30.0208
-  },
-  {
-    "id": "7c4854f5-182b-449b-99e9-22e43b8c58e3",
-    "name": "Nancy Diao",
-    "institution": "Harvard University",
-    "cohort": "rising",
-    "rank": 21414,
-    "score": 23.0645
   },
   {
     "id": "7c661704-8c62-41d5-920b-bc71211e3126",
@@ -7012,8 +6628,8 @@
     "name": "Justin F. Gainor",
     "institution": "Massachusetts General Hospital",
     "cohort": "established",
-    "rank": 105,
-    "score": 63.3176
+    "rank": 125,
+    "score": 99.0275
   },
   {
     "id": "7de9cd70-fa3a-49ab-9eda-9beaab992ea4",
@@ -7048,6 +6664,14 @@
     "score": 26.5298
   },
   {
+    "id": "7e49a1ad-8621-45f0-bec6-2302c37b3756",
+    "name": "David G. Coffey",
+    "institution": "Fred Hutch Cancer Center",
+    "cohort": "rising",
+    "rank": 21425,
+    "score": 23.0645
+  },
+  {
     "id": "7e5fd4ae-e273-4536-b58d-6592a448d449",
     "name": "Angel Ray Baroz",
     "institution": "City Of Hope National Medical Center",
@@ -7080,14 +6704,6 @@
     "score": 26.5242
   },
   {
-    "id": "7ebc289c-e44c-45fe-95dc-ffd4c0fee48e",
-    "name": "Cynthia R. Cherry",
-    "institution": "East Carolina University",
-    "cohort": "rising",
-    "rank": 21427,
-    "score": 23.0645
-  },
-  {
     "id": "7ed3d6d6-afff-4879-9638-528969bd9e12",
     "name": "Hyunsil Park",
     "institution": "The University of Texas Southwestern Medical Center",
@@ -7102,6 +6718,14 @@
     "cohort": "rising",
     "rank": 13829,
     "score": 26.5242
+  },
+  {
+    "id": "7ee0653e-bd78-4b3d-9792-05e793e593b6",
+    "name": "Ximeng Liu",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 8007,
+    "score": 29.115
   },
   {
     "id": "7efaec17-c95c-4cd2-ae25-834170adcdae",
@@ -7136,12 +6760,12 @@
     "score": 16.9642
   },
   {
-    "id": "7f1efd94-2e32-45df-b823-ed4709033f47",
-    "name": "Sarah Warren",
-    "institution": "Nanostring Technologies (United States)",
-    "cohort": "rising",
-    "rank": 23559,
-    "score": 17.2984
+    "id": "7f353e79-b83a-42ff-bb42-887a2584ec50",
+    "name": "Scott Gettinger",
+    "institution": "Yale Cancer Center",
+    "cohort": "established",
+    "rank": 152,
+    "score": 98.765
   },
   {
     "id": "7f5a7db3-3053-4155-9c1d-3cef45a7466c",
@@ -7158,22 +6782,6 @@
     "cohort": "rising",
     "rank": 10139,
     "score": 28.0629
-  },
-  {
-    "id": "7f8fdda5-96c6-49aa-9feb-02ed5ca8c324",
-    "name": "Pok Fai Wong",
-    "institution": "Yale University",
-    "cohort": "rising",
-    "rank": 18277,
-    "score": 25.7556
-  },
-  {
-    "id": "7f9066a8-5839-4319-9613-a61aa05f5c4c",
-    "name": "Fiona Sherman",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 5728,
-    "score": 29.8391
   },
   {
     "id": "7fa70a98-e566-4abc-99db-e82ef1bf3948",
@@ -7272,12 +6880,28 @@
     "score": 45.7922
   },
   {
+    "id": "8114e17c-741d-4143-8af1-607cc2912af6",
+    "name": "Andreas Rimner",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "established",
+    "rank": 112,
+    "score": 99.11
+  },
+  {
     "id": "8119dc3c-692a-44fe-888d-ae2b1c6eec93",
     "name": "Tia Cheunkarndee",
     "institution": "Stanford University",
     "cohort": "rising",
     "rank": 2381,
     "score": 30.0804
+  },
+  {
+    "id": "811ed502-4ce2-43af-a632-774834d83bd0",
+    "name": "Nikita Kotlov",
+    "institution": "Addgene",
+    "cohort": "rising",
+    "rank": 13869,
+    "score": 26.5242
   },
   {
     "id": "8132f32f-30b1-4e2d-b711-fa1faabb8aeb",
@@ -7294,14 +6918,6 @@
     "cohort": "rising",
     "rank": 13873,
     "score": 26.5242
-  },
-  {
-    "id": "81c6ea36-7f82-410b-9dba-defab69d90b3",
-    "name": "Cameron Durfee",
-    "institution": "The University of Texas at San Antonio Health Science Center",
-    "cohort": "rising",
-    "rank": 6800,
-    "score": 29.4047
   },
   {
     "id": "81defb3e-3b98-4452-8eb3-e6842154fbb5",
@@ -7332,8 +6948,8 @@
     "name": "D. Ross Camidge",
     "institution": "University of Colorado Cancer Center",
     "cohort": "established",
-    "rank": 149,
-    "score": 59.9626
+    "rank": 58,
+    "score": 99.50999999999999
   },
   {
     "id": "82315793-6227-48b3-83a8-701d4ee66028",
@@ -7358,6 +6974,14 @@
     "cohort": "rising",
     "rank": 21457,
     "score": 23.0645
+  },
+  {
+    "id": "8279d48f-426b-43e3-bf01-29554a66b1a7",
+    "name": "Martin Blohmer",
+    "institution": "Harvard University",
+    "cohort": "rising",
+    "rank": 5996,
+    "score": 29.6259
   },
   {
     "id": "82966362-929f-4799-b5bb-07317cc64272",
@@ -7392,6 +7016,14 @@
     "score": 25.6275
   },
   {
+    "id": "82dd3d48-11d1-4c34-b0e8-e893a7d93f64",
+    "name": "Vonetta M. Williams",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "rising",
+    "rank": 18968,
+    "score": 25.6275
+  },
+  {
     "id": "8300b9bd-2fc5-436e-af99-05bff4ffd8ac",
     "name": "Afsheen N. Iqbal",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -7412,8 +7044,8 @@
     "name": "Ramaswamy Govindan",
     "institution": "Washington University in St. Louis",
     "cohort": "established",
-    "rank": 177,
-    "score": 58.5541
+    "rank": 107,
+    "score": 99.17500000000001
   },
   {
     "id": "834d7ac8-9943-4dd1-95f1-7d569ebb9e11",
@@ -7464,6 +7096,14 @@
     "score": 32.3933
   },
   {
+    "id": "84a50c3e-3167-4bae-be84-386793c23f40",
+    "name": "Anandaroop Mukhopadhyay",
+    "institution": "Huntsman Cancer Institute",
+    "cohort": "rising",
+    "rank": 10311,
+    "score": 27.8051
+  },
+  {
     "id": "84b7ada9-ef9b-4f72-a012-a8e561651a84",
     "name": "So Yeon Kim",
     "institution": "Yale University",
@@ -7472,12 +7112,28 @@
     "score": 25.6622
   },
   {
+    "id": "84d55c81-bb2d-40d0-bd82-752bf50493ca",
+    "name": "Chinh Phan",
+    "institution": "VA Northern California Health Care System",
+    "cohort": "rising",
+    "rank": 210,
+    "score": 50.1939
+  },
+  {
     "id": "850444e4-16e4-4f4c-baa5-a5b4c8a44ac8",
     "name": "A. Weissferdt",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "rising",
     "rank": 13930,
     "score": 26.5242
+  },
+  {
+    "id": "8523c687-b84d-4f41-90da-3dde8cd88a50",
+    "name": "Konstantinos V. Floros",
+    "institution": "Virginia Cancer Institute",
+    "cohort": "rising",
+    "rank": 21482,
+    "score": 23.0645
   },
   {
     "id": "853786d8-8c52-4318-9d7c-094b34c39493",
@@ -7494,14 +7150,6 @@
     "cohort": "rising",
     "rank": 11430,
     "score": 26.5666
-  },
-  {
-    "id": "85920899-201a-4ef2-a3f3-2135605fad9a",
-    "name": "Yichen Guo",
-    "institution": "Harvard University",
-    "cohort": "rising",
-    "rank": 11685,
-    "score": 26.5288
   },
   {
     "id": "85aada03-42d4-4adb-8329-cb5edd84bf19",
@@ -7540,8 +7188,8 @@
     "name": "Shirish M. Gadgeel",
     "institution": "Henry Ford Health System",
     "cohort": "established",
-    "rank": 91,
-    "score": 64.4639
+    "rank": 118,
+    "score": 99.06
   },
   {
     "id": "8679eec2-576d-42b4-bef1-c16ac777d4a9",
@@ -7558,14 +7206,6 @@
     "cohort": "rising",
     "rank": 21496,
     "score": 23.0645
-  },
-  {
-    "id": "86d7452b-0e8d-42b9-95fe-41de227c2d30",
-    "name": "Lindsay K. Larson",
-    "institution": "University of Minnesota",
-    "cohort": "rising",
-    "rank": 6827,
-    "score": 29.4047
   },
   {
     "id": "86dbfe23-92aa-4ec0-923e-e695f0b3eb9e",
@@ -7694,14 +7334,6 @@
     "cohort": "rising",
     "rank": 9111,
     "score": 28.6601
-  },
-  {
-    "id": "8913864d-6666-4c36-aedd-64915ef8fb67",
-    "name": "Yonghua Li",
-    "institution": "New York University",
-    "cohort": "rising",
-    "rank": 1069,
-    "score": 37.8421
   },
   {
     "id": "89326b70-1b56-4f64-b6b1-225db987f5de",
@@ -7848,6 +7480,14 @@
     "score": 26.5242
   },
   {
+    "id": "8baa4f42-6e9d-4bd8-83db-d5b02598a372",
+    "name": "Eleanor Russell\u2010Goldman",
+    "institution": "Brigham and Women's Hospital",
+    "cohort": "rising",
+    "rank": 14049,
+    "score": 26.5242
+  },
+  {
     "id": "8bb95d8d-436e-4549-9e0f-42135b4cfb94",
     "name": "Harshit Shah",
     "institution": "Revolution Medicines (United States)",
@@ -7878,22 +7518,6 @@
     "cohort": "rising",
     "rank": 6851,
     "score": 29.4047
-  },
-  {
-    "id": "8cabfdcd-cb9b-4fcf-bc3f-cda720fc2b92",
-    "name": "Yongfeng He",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 4194,
-    "score": 29.9839
-  },
-  {
-    "id": "8cc1d504-c021-4669-be54-1b9de9334247",
-    "name": "Chuanpeng Dong",
-    "institution": "Indiana University \u2013 Purdue University Indianapolis",
-    "cohort": "rising",
-    "rank": 20269,
-    "score": 24.1784
   },
   {
     "id": "8cc3b4af-bc83-4a59-ba9d-111da6b8e7ed",
@@ -8048,20 +7672,20 @@
     "score": 26.2626
   },
   {
+    "id": "8dcd81f1-14bb-42d3-a836-34e10dddcfa2",
+    "name": "Yonathan Lissanu",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 5565,
+    "score": 29.8432
+  },
+  {
     "id": "8df09489-4893-441c-8b92-de719a3b4cc0",
     "name": "Minal Mehta",
     "institution": "Takeda (United States)",
     "cohort": "rising",
     "rank": 6075,
     "score": 29.4942
-  },
-  {
-    "id": "8e49c1fd-d7a4-4f4b-a62f-44391600d432",
-    "name": "Maen Abdelrahim",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 16436,
-    "score": 26.2341
   },
   {
     "id": "8e51c507-59a6-4339-8daf-85c48467f7c1",
@@ -8104,20 +7728,20 @@
     "score": 26.5242
   },
   {
-    "id": "8ff0ea54-61da-41da-bb72-cd647076007b",
-    "name": "Deepti Srinivasan",
-    "institution": "Massachusetts General Hospital",
-    "cohort": "rising",
-    "rank": 10715,
-    "score": 27.3245
-  },
-  {
     "id": "900f5260-ef8f-4546-9e2c-b213d8a83138",
     "name": "Moses S. Raj",
     "institution": "Allegheny Health Network",
     "cohort": "rising",
     "rank": 21542,
     "score": 23.0645
+  },
+  {
+    "id": "90188354-9e4a-4fd0-aa05-7a9b3c9aba11",
+    "name": "Scott Antonia",
+    "institution": "Moffitt Cancer Center",
+    "cohort": "established",
+    "rank": 128,
+    "score": 98.9975
   },
   {
     "id": "903a177f-ce9b-4eda-b489-fc8db2fa902f",
@@ -8152,6 +7776,14 @@
     "score": 26.5242
   },
   {
+    "id": "90e73992-91eb-435c-98ac-9f4213f7f21b",
+    "name": "Adam J. Hockenberry",
+    "institution": "Tempus Labs (United States)",
+    "cohort": "rising",
+    "rank": 22484,
+    "score": 22.619
+  },
+  {
     "id": "90ea1f13-6665-4333-af15-dce0835ba33a",
     "name": "Liliana Villafania",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -8166,6 +7798,14 @@
     "cohort": "rising",
     "rank": 17243,
     "score": 26.0118
+  },
+  {
+    "id": "9171398c-4f10-4cb8-8c65-45dacc381313",
+    "name": "Alessandra Vaccaro",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 4244,
+    "score": 29.9839
   },
   {
     "id": "919b3aae-3499-4e2d-939b-3c870098b1d7",
@@ -8188,8 +7828,8 @@
     "name": "Alexander Drilon",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "established",
-    "rank": 226,
-    "score": 56.2857
+    "rank": 108,
+    "score": 99.16250000000001
   },
   {
     "id": "91c37ad7-1152-468d-8b2f-7955fb00e4ba",
@@ -8214,14 +7854,6 @@
     "cohort": "rising",
     "rank": 14176,
     "score": 26.5242
-  },
-  {
-    "id": "91f9b4dc-e252-4f13-9cf9-f0ad6282313d",
-    "name": "Eduard Gasal",
-    "institution": "Center for Global Development",
-    "cohort": "rising",
-    "rank": 1019,
-    "score": 38.6107
   },
   {
     "id": "92470266-4f8d-4597-88ee-92719792b3fe",
@@ -8296,14 +7928,6 @@
     "score": 25.3061
   },
   {
-    "id": "94197535-0d04-4fd3-93ee-ff999bc706ce",
-    "name": "Priyanka Sahu",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 9483,
-    "score": 28.5358
-  },
-  {
     "id": "946fdf77-d114-447d-b78c-f74113fd6bee",
     "name": "Amanda Herrmann",
     "institution": "University of Southern California",
@@ -8324,8 +7948,16 @@
     "name": "Patrick M. Forde",
     "institution": "Bloomberg (United States)",
     "cohort": "established",
-    "rank": 225,
-    "score": 56.2975
+    "rank": 117,
+    "score": 99.06750000000001
+  },
+  {
+    "id": "95390e63-302f-4a9f-b962-cfe355642804",
+    "name": "Todd A. Pezzi",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 21564,
+    "score": 23.0645
   },
   {
     "id": "956f7300-a7ce-4763-b86c-68a2567219cf",
@@ -8376,6 +8008,14 @@
     "score": 31.7215
   },
   {
+    "id": "968b4b01-1d7a-4842-a521-4549ef4a3c56",
+    "name": "Hiroto Kikuchi",
+    "institution": "Harvard University",
+    "cohort": "rising",
+    "rank": 18335,
+    "score": 25.7556
+  },
+  {
     "id": "969ebfc2-efb7-468a-b239-2f97cfd4d716",
     "name": "Parthib Das",
     "institution": "The Ohio State University",
@@ -8416,12 +8056,12 @@
     "score": 26.5329
   },
   {
-    "id": "97049176-bb18-498c-9f27-2f3ff0fb18c2",
-    "name": "Aaron M. Goodman",
-    "institution": "University of California San Diego",
-    "cohort": "rising",
-    "rank": 21578,
-    "score": 23.0645
+    "id": "9705f91e-c9ae-4f1b-8b00-b909661caa73",
+    "name": "Tina Cascone",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "established",
+    "rank": 142,
+    "score": 98.83249999999998
   },
   {
     "id": "976de8fe-d144-4fce-9254-49e378d446b7",
@@ -8430,14 +8070,6 @@
     "cohort": "rising",
     "rank": 7462,
     "score": 29.2903
-  },
-  {
-    "id": "97704097-7296-407a-8808-550c71c38891",
-    "name": "Nefeli Georgoulia",
-    "institution": "AstraZeneca (United States)",
-    "cohort": "rising",
-    "rank": 7422,
-    "score": 29.3317
   },
   {
     "id": "97c9473b-1658-46b0-aca4-16a9db48a76d",
@@ -8544,12 +8176,36 @@
     "score": 29.9839
   },
   {
+    "id": "9aa410a5-9fad-4f1b-be19-590007694ff0",
+    "name": "John M. Varlotto",
+    "institution": "University of Massachusetts Chan Medical School",
+    "cohort": "rising",
+    "rank": 9503,
+    "score": 28.5358
+  },
+  {
+    "id": "9abb7d9b-b863-4fcb-a657-82cd2bfb2f4b",
+    "name": "Christine F. Brainson",
+    "institution": "University of Kentucky",
+    "cohort": "rising",
+    "rank": 23378,
+    "score": 20.9482
+  },
+  {
     "id": "9aef1162-2cdc-40ca-bee4-152a9c616304",
     "name": "Greg Jones",
     "institution": "Research Triangle Park Foundation",
     "cohort": "rising",
     "rank": 17282,
     "score": 26.0118
+  },
+  {
+    "id": "9af196f6-9db1-4123-afd0-10ea2e8da588",
+    "name": "Santiago Olaechea",
+    "institution": "Southwestern Medical Center",
+    "cohort": "rising",
+    "rank": 9491,
+    "score": 28.5358
   },
   {
     "id": "9af262d2-b067-4283-aef4-ab79fb36b6af",
@@ -8632,20 +8288,20 @@
     "score": 30.6185
   },
   {
+    "id": "9bd26885-b0ba-4f8b-bc39-81b98229a7b2",
+    "name": "Julianna Bronk",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 417,
+    "score": 47.5295
+  },
+  {
     "id": "9beef6fb-7613-429b-b872-7b24f72dca8b",
     "name": "Richard Lee",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "rising",
     "rank": 7,
     "score": 71.7105
-  },
-  {
-    "id": "9bf00637-9467-4310-a305-05fd40054b79",
-    "name": "Bob T. Li",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "established",
-    "rank": 277,
-    "score": 54.2575
   },
   {
     "id": "9bf3db74-d734-4ac4-a821-cbc2939bdb3c",
@@ -8728,20 +8384,20 @@
     "score": 25.2432
   },
   {
+    "id": "9d3b3ad4-c56a-4e9d-83db-ad64831880a0",
+    "name": "Matthew D. Hellmann",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "established",
+    "rank": 80,
+    "score": 99.38499999999999
+  },
+  {
     "id": "9d5914e0-faf5-4324-bd1a-92837840e200",
     "name": "Samuel A. Kareff",
     "institution": "University of Miami",
     "cohort": "rising",
     "rank": 10889,
     "score": 27.2234
-  },
-  {
-    "id": "9da68635-962c-4402-a137-00a06a811c78",
-    "name": "Hiranmayi Ravichandran",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 19010,
-    "score": 25.6275
   },
   {
     "id": "9dda31f1-0e2d-4b4c-8368-3bb3d1c07748",
@@ -8760,20 +8416,20 @@
     "score": 29.9839
   },
   {
+    "id": "9e596313-a0cf-4bb3-b756-e923987d782e",
+    "name": "Linda Sciuto",
+    "institution": "National Cancer Institute",
+    "cohort": "rising",
+    "rank": 4384,
+    "score": 29.9839
+  },
+  {
     "id": "9e68d596-bab8-462a-9237-6e95fea020e2",
     "name": "Michael Peoples",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "rising",
     "rank": 14360,
     "score": 26.5242
-  },
-  {
-    "id": "9ec10cbc-b170-403f-99d9-8e3d29afbc3d",
-    "name": "Sunny Lai",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 11673,
-    "score": 26.5298
   },
   {
     "id": "9f080dba-db23-496a-bdf2-c6e7f285ca24",
@@ -8784,20 +8440,12 @@
     "score": 30.2735
   },
   {
-    "id": "9f0cf4a3-edc1-46f3-9403-3ed2e510d514",
-    "name": "Jeffrey A. SoRelle",
-    "institution": "The University of Texas Southwestern Medical Center",
+    "id": "9f21387a-c7bc-45a3-8a68-1698ab383fc4",
+    "name": "Jean Lopategui",
+    "institution": "Cedars-Sinai Medical Center",
     "cohort": "rising",
-    "rank": 418,
-    "score": 47.5295
-  },
-  {
-    "id": "9f6db2b9-843f-4ad8-9134-21170ec786fa",
-    "name": "Mary Gwin",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 10545,
-    "score": 27.667
+    "rank": 8098,
+    "score": 29.115
   },
   {
     "id": "9f782e3d-2d06-4042-b2f1-f34f7e92ae90",
@@ -8824,22 +8472,6 @@
     "score": 26.5242
   },
   {
-    "id": "9fb1748d-2e79-4468-a99f-5bcbbb0e75de",
-    "name": "Aparna Padhye",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "rising",
-    "rank": 4405,
-    "score": 29.9839
-  },
-  {
-    "id": "9fbea9a9-c256-4b9b-a310-b54dc77907df",
-    "name": "David E. Gerber",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "established",
-    "rank": 147,
-    "score": 60.0706
-  },
-  {
     "id": "9fed75c0-7137-4e43-9814-7688cd489e3a",
     "name": "James Conway",
     "institution": "AstraZeneca (United States)",
@@ -8856,36 +8488,12 @@
     "score": 29.4047
   },
   {
-    "id": "9ffb8e37-b31c-4499-953d-136e090e1c52",
-    "name": "Vipul Baxi",
-    "institution": "Bristol-Myers Squibb (United States)",
-    "cohort": "rising",
-    "rank": 18368,
-    "score": 25.7556
-  },
-  {
-    "id": "a0357042-c601-48fd-afc4-5865efc7c2b6",
-    "name": "Kari Teigen",
-    "institution": "John Peter Smith Hospital",
-    "cohort": "rising",
-    "rank": 4410,
-    "score": 29.9839
-  },
-  {
     "id": "a056bf9e-d674-46bc-9d85-80cd7d226b9a",
     "name": "Khaled Sanber",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "rising",
     "rank": 6135,
     "score": 29.4519
-  },
-  {
-    "id": "a05f4c3a-78a2-4c1e-950d-cb64aa4df7e8",
-    "name": "Alessia Pedoto",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "rising",
-    "rank": 854,
-    "score": 43.3711
   },
   {
     "id": "a0719dce-3560-413d-8bf3-b85269db5616",
@@ -8920,14 +8528,6 @@
     "score": 25.7556
   },
   {
-    "id": "a0a71553-ef83-4d1c-a958-4866d0f140c0",
-    "name": "Xiangxue Wang",
-    "institution": "Case Western Reserve University",
-    "cohort": "rising",
-    "rank": 21628,
-    "score": 23.0645
-  },
-  {
     "id": "a0ae20e8-6c31-4ec6-9c43-cfba91d515b0",
     "name": "Asaf Maoz",
     "institution": "Dana-Farber Cancer Institute",
@@ -8940,8 +8540,8 @@
     "name": "Charu Aggarwal",
     "institution": "University of Pennsylvania",
     "cohort": "established",
-    "rank": 61,
-    "score": 69.2944
+    "rank": 166,
+    "score": 98.64249999999998
   },
   {
     "id": "a150b398-6728-464c-b8a7-407df883f8d0",
@@ -9040,12 +8640,12 @@
     "score": 29.115
   },
   {
-    "id": "a32129ac-30f4-406f-991b-15057935a6a4",
-    "name": "Vidya Sankar Viswanathan",
-    "institution": "Emory University",
+    "id": "a32ab029-f185-4378-9bed-c1e49328641a",
+    "name": "Brendan T. Heiden",
+    "institution": "Washington University in St. Louis",
     "cohort": "rising",
-    "rank": 9506,
-    "score": 28.5358
+    "rank": 9091,
+    "score": 28.7096
   },
   {
     "id": "a32cc450-7247-49b4-a64a-057a15a8b46c",
@@ -9054,6 +8654,14 @@
     "cohort": "rising",
     "rank": 18376,
     "score": 25.7556
+  },
+  {
+    "id": "a370cbf9-6758-4878-bd4c-cc2c82ff3724",
+    "name": "Bomiao Hu",
+    "institution": "Yale University",
+    "cohort": "rising",
+    "rank": 6939,
+    "score": 29.4047
   },
   {
     "id": "a3c3ac11-7199-488b-a41a-992c7774b713",
@@ -9168,6 +8776,14 @@
     "score": 22.3962
   },
   {
+    "id": "a62e53fc-3208-4897-b5b2-9cae2203a374",
+    "name": "Elizabeth B. Gottlin",
+    "institution": "Duke Medical Center",
+    "cohort": "rising",
+    "rank": 2084,
+    "score": 30.3334
+  },
+  {
     "id": "a62fe70e-5d71-43b5-91cf-6fbaf0255441",
     "name": "Samantha Armstrong",
     "institution": "Georgetown University",
@@ -9192,12 +8808,28 @@
     "score": 23.0645
   },
   {
+    "id": "a65f83a6-f33c-4a2f-a16f-4721d9b99f0d",
+    "name": "William D. Travis",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "established",
+    "rank": 122,
+    "score": 99.055
+  },
+  {
     "id": "a6aadc92-b3ea-4e26-8297-d34b7b2805a3",
     "name": "Yingqian A. Zhan",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "rising",
     "rank": 6964,
     "score": 29.4047
+  },
+  {
+    "id": "a6eab1f3-b254-4a05-814c-811f08bf91c8",
+    "name": "Hitendra S. Solanki",
+    "institution": "Moffitt Cancer Center",
+    "cohort": "rising",
+    "rank": 20365,
+    "score": 23.7435
   },
   {
     "id": "a6f5a9f5-98a5-4547-b09e-e4382abb78cd",
@@ -9208,20 +8840,12 @@
     "score": 23.0645
   },
   {
-    "id": "a7240037-a8c7-4e02-91c4-6276096498f5",
-    "name": "Abigail Gregory",
-    "institution": "American Society of Clinical Oncology",
+    "id": "a72a8fec-7c72-4a7f-bb91-dc74a7a7568a",
+    "name": "Edward Christopher Dee",
+    "institution": "Harvard University",
     "cohort": "rising",
-    "rank": 2468,
-    "score": 30.0341
-  },
-  {
-    "id": "a72aa4a9-b1e3-4af5-957e-9911d9ab52d5",
-    "name": "Tri Le",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 954,
-    "score": 39.8193
+    "rank": 23712,
+    "score": 16.7971
   },
   {
     "id": "a75690f7-609d-4ac6-a964-95b911b6eef6",
@@ -9236,8 +8860,8 @@
     "name": "Christian Rolfo",
     "institution": "University of Maryland, Baltimore",
     "cohort": "established",
-    "rank": 171,
-    "score": 58.9168
+    "rank": 86,
+    "score": 99.3225
   },
   {
     "id": "a7624e25-ecd1-4b7c-810e-1b561824a700",
@@ -9312,6 +8936,14 @@
     "score": 26.5242
   },
   {
+    "id": "a83e7bb3-e07a-4734-b683-6b03a6463378",
+    "name": "Ethan Hsu",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 6973,
+    "score": 29.4047
+  },
+  {
     "id": "a888fbb4-ccb3-4d02-b0e7-b981fa3ca2a2",
     "name": "Luana Guimar\u00e3es de Sousa",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -9384,20 +9016,20 @@
     "score": 24.4747
   },
   {
+    "id": "a9ed1587-2e1f-4f5f-95fe-6c5a48ee3795",
+    "name": "Daniel R. Gomez",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "established",
+    "rank": 130,
+    "score": 98.95750000000001
+  },
+  {
     "id": "aa25edcf-8984-42fe-bdf6-79f4086ca3a7",
     "name": "Ken Culver",
     "institution": "Positive Impact",
     "cohort": "rising",
     "rank": 1426,
     "score": 31.4319
-  },
-  {
-    "id": "aa36cea2-e72a-4d42-beec-8e1df66c264b",
-    "name": "Igor Bychkov",
-    "institution": "Northwestern University",
-    "cohort": "rising",
-    "rank": 17343,
-    "score": 26.0118
   },
   {
     "id": "aa447ed5-efc4-4546-a057-0c175bed18a3",
@@ -9461,6 +9093,14 @@
     "institution": "Children's Medical Center",
     "cohort": "rising",
     "rank": 17348,
+    "score": 26.0118
+  },
+  {
+    "id": "ab1c0d11-325f-4cfa-88d2-d0e0230eacfb",
+    "name": "Astero Klampatsa",
+    "institution": "University of Pennsylvania",
+    "cohort": "rising",
+    "rank": 17349,
     "score": 26.0118
   },
   {
@@ -9528,14 +9168,6 @@
     "score": 23.0645
   },
   {
-    "id": "ac7864ea-e433-4f3e-9147-af8159d71bd0",
-    "name": "Meghan McCarthy",
-    "institution": "Massachusetts General Hospital",
-    "cohort": "rising",
-    "rank": 19564,
-    "score": 25.2432
-  },
-  {
     "id": "ac9914e3-48d2-4832-afec-9f07b0132b7a",
     "name": "Fawzi Benzaghou",
     "institution": "Ipsen (United States)",
@@ -9568,6 +9200,14 @@
     "score": 26.3961
   },
   {
+    "id": "ad6ec722-8b35-4e0f-a259-783f7da7e1f9",
+    "name": "Praphulla Bhawsar",
+    "institution": "National Institutes of Health",
+    "cohort": "rising",
+    "rank": 1875,
+    "score": 30.6688
+  },
+  {
     "id": "ad7076b6-b19b-4404-92c4-078d3676a79d",
     "name": "Taylor A. Black",
     "institution": "University of Pennsylvania",
@@ -9582,14 +9222,6 @@
     "cohort": "rising",
     "rank": 7000,
     "score": 29.4047
-  },
-  {
-    "id": "adaa12da-0cd6-4539-9071-ea12839e36f9",
-    "name": "Pranjal Vaidya",
-    "institution": "Case Western Reserve University",
-    "cohort": "rising",
-    "rank": 18416,
-    "score": 25.7556
   },
   {
     "id": "adabbd76-2c00-4b85-9c7f-713523c4c859",
@@ -9760,14 +9392,6 @@
     "score": 23.0645
   },
   {
-    "id": "b0ae6522-51d8-448e-be9d-62225619e305",
-    "name": "Meri Rogava",
-    "institution": "Columbia University",
-    "cohort": "rising",
-    "rank": 19571,
-    "score": 25.2432
-  },
-  {
     "id": "b0c13cd8-6aa8-41c8-bec3-60d6f647da9f",
     "name": "Alissa J. Cooper",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -9776,12 +9400,28 @@
     "score": 29.4047
   },
   {
+    "id": "b0f8ae14-d361-426c-9b91-6b3e2c38505f",
+    "name": "Tiffany A. Voss",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 5800,
+    "score": 29.8391
+  },
+  {
     "id": "b11d7e2b-dfe4-4613-b861-42dd8eef113a",
     "name": "Jonathan Villena\u2010Vargas",
     "institution": "Cornell University",
     "cohort": "rising",
     "rank": 16109,
     "score": 26.4362
+  },
+  {
+    "id": "b14b26b1-8f52-4878-979b-99925b6aef09",
+    "name": "Fatemeh Masrorpour",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 7014,
+    "score": 29.4047
   },
   {
     "id": "b1638856-a2ba-4c23-b874-74e2e94bd090",
@@ -9840,22 +9480,6 @@
     "score": 29.9839
   },
   {
-    "id": "b1df8399-b8a0-483b-b550-b19a23a1ca63",
-    "name": "Vamsidhar Velcheti",
-    "institution": "NYU Langone Health",
-    "cohort": "established",
-    "rank": 200,
-    "score": 57.1987
-  },
-  {
-    "id": "b217c02b-9402-497e-9fba-f8cc69bb382b",
-    "name": "Alexander I. Spira",
-    "institution": "Virginia Cancer Specialists",
-    "cohort": "established",
-    "rank": 29,
-    "score": 75.9684
-  },
-  {
     "id": "b228275f-6a5c-487e-af91-652cbccd6f0e",
     "name": "Enakshi Saha",
     "institution": "Harvard University",
@@ -9896,22 +9520,6 @@
     "score": 26.0118
   },
   {
-    "id": "b2d68709-e8db-4f4a-b898-ddb8cd031edc",
-    "name": "Zamaan Hooda",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "rising",
-    "rank": 2321,
-    "score": 30.1329
-  },
-  {
-    "id": "b31b03c7-94bb-44cc-b25e-1041afc81a96",
-    "name": "Hai Hu",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 18431,
-    "score": 25.7556
-  },
-  {
     "id": "b31d7025-b838-4304-aa34-1bc2e564aad1",
     "name": "Caressa Hui",
     "institution": "Stanford University",
@@ -9934,6 +9542,14 @@
     "cohort": "rising",
     "rank": 25184,
     "score": 0.0
+  },
+  {
+    "id": "b36dd62b-bc07-44c9-a485-11b006fa35b0",
+    "name": "Cliff Molife",
+    "institution": "Eli Lilly (United States)",
+    "cohort": "rising",
+    "rank": 14730,
+    "score": 26.5242
   },
   {
     "id": "b3a740bf-9c47-44e0-b58f-29dc0a0c322d",
@@ -10080,20 +9696,20 @@
     "score": 26.0118
   },
   {
+    "id": "b627095c-7969-4b31-ab2a-bb30a73d1c59",
+    "name": "Thomas S. Riad",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 2284,
+    "score": 30.1805
+  },
+  {
     "id": "b644b564-bee5-4840-a936-bce580571eed",
     "name": "Lauren \u010cech",
     "institution": "University of California, San Francisco",
     "cohort": "rising",
     "rank": 5809,
     "score": 29.8391
-  },
-  {
-    "id": "b6892d0d-b0bf-4009-a670-17bc4dd1ea41",
-    "name": "Mikaela Bradley",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "rising",
-    "rank": 14787,
-    "score": 26.5242
   },
   {
     "id": "b6926857-bbee-4e55-b217-b03b0548eef7",
@@ -10112,28 +9728,12 @@
     "score": 26.5242
   },
   {
-    "id": "b6e228cf-be8c-4f24-a4e4-564dda3b19d8",
-    "name": "Ji\u2010Youn Han",
-    "institution": "National Cancer Center",
-    "cohort": "rising",
-    "rank": 159,
-    "score": 50.7327
-  },
-  {
     "id": "b70106b2-d0d6-43b3-8f40-5f6fb97f6057",
     "name": "Yuming Guo",
     "institution": "City Of Hope National Medical Center",
     "cohort": "rising",
     "rank": 21762,
     "score": 23.0645
-  },
-  {
-    "id": "b7286c48-5b4a-437e-87a4-5f9844fb8860",
-    "name": "Sipeng Shen",
-    "institution": "Harvard University",
-    "cohort": "rising",
-    "rank": 14800,
-    "score": 26.5242
   },
   {
     "id": "b7728ae6-54e7-4022-87b6-ecf91ff88b7e",
@@ -10328,6 +9928,14 @@
     "score": 29.4047
   },
   {
+    "id": "bb2a16d9-99f5-43e5-a041-d73cb8a0cace",
+    "name": "Karen Kelly",
+    "institution": "UC Davis Comprehensive Cancer Center",
+    "cohort": "established",
+    "rank": 187,
+    "score": 98.48000000000002
+  },
+  {
     "id": "bb555537-b001-4a70-8e04-1f949dadd5a7",
     "name": "Rachel A. Orbuch",
     "institution": "University of Wisconsin\u2013Madison",
@@ -10344,6 +9952,14 @@
     "score": 26.5242
   },
   {
+    "id": "bb5c9bb5-63c8-4da7-960c-1d79312a32e2",
+    "name": "Matthew Ebia",
+    "institution": "Cedars-Sinai Medical Center",
+    "cohort": "rising",
+    "rank": 9112,
+    "score": 28.6601
+  },
+  {
     "id": "bbcce4af-55bf-495f-be6d-e63390c0bffa",
     "name": "Yingyu Wang",
     "institution": "City of Hope",
@@ -10358,14 +9974,6 @@
     "cohort": "rising",
     "rank": 21784,
     "score": 23.0645
-  },
-  {
-    "id": "bc073bfc-c53c-410c-a27e-1266222b9542",
-    "name": "Theodore Chin",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 7063,
-    "score": 29.4047
   },
   {
     "id": "bc160c1a-b2ec-43e1-90e2-a358017bfcce",
@@ -10448,12 +10056,20 @@
     "score": 22.5532
   },
   {
-    "id": "bdc79a45-4915-42ce-9c38-70f10a9bdd15",
-    "name": "Yi Ban",
-    "institution": "Cornell University",
+    "id": "bd576307-e929-4d99-a860-82d96a38c4f5",
+    "name": "Pooja Karukonda",
+    "institution": "University of Pittsburgh",
     "cohort": "rising",
-    "rank": 18462,
-    "score": 25.7556
+    "rank": 700,
+    "score": 44.4023
+  },
+  {
+    "id": "bd7839e2-e5ae-42a9-851e-75dc486d8a42",
+    "name": "Stephanie Tuminello",
+    "institution": "Icahn School of Medicine at Mount Sinai",
+    "cohort": "rising",
+    "rank": 22247,
+    "score": 22.9375
   },
   {
     "id": "bdd61f2d-3c5a-4b5b-922d-996de3d71cf9",
@@ -10480,14 +10096,6 @@
     "score": 26.5242
   },
   {
-    "id": "be542347-a844-4f51-9178-8dbf634789d0",
-    "name": "Matthew N. Mills",
-    "institution": "Moffitt Cancer Center",
-    "cohort": "rising",
-    "rank": 22224,
-    "score": 22.9531
-  },
-  {
     "id": "be60b680-7901-42a3-81ec-f94d481ed8e0",
     "name": "Ardaman Shergill",
     "institution": "University of Chicago",
@@ -10502,14 +10110,6 @@
     "cohort": "rising",
     "rank": 5900,
     "score": 29.7605
-  },
-  {
-    "id": "bed24065-55c7-407e-8e67-41d77e3ab502",
-    "name": "David Bertsch",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 221,
-    "score": 50.1939
   },
   {
     "id": "bee9c59c-5065-4b08-ae88-10774f71a816",
@@ -10528,14 +10128,6 @@
     "score": 25.7556
   },
   {
-    "id": "bf159341-4051-4a43-98c2-305b40729205",
-    "name": "Roman Zeleznik",
-    "institution": "Brigham and Women's Hospital",
-    "cohort": "rising",
-    "rank": 14942,
-    "score": 26.5242
-  },
-  {
     "id": "bf28961d-549e-4edb-ab09-af21fd9b6a4f",
     "name": "Sonal Paul",
     "institution": "NewYork\u2013Presbyterian Brooklyn Methodist Hospital",
@@ -10550,14 +10142,6 @@
     "cohort": "rising",
     "rank": 9576,
     "score": 28.5358
-  },
-  {
-    "id": "c00f4793-a69a-4b74-8bab-ba4d2ee29757",
-    "name": "Marina C. Martinez",
-    "institution": "University of Pennsylvania",
-    "cohort": "rising",
-    "rank": 11339,
-    "score": 26.6034
   },
   {
     "id": "c0176b36-08a0-43e9-9326-40e288c77f0c",
@@ -10598,6 +10182,14 @@
     "cohort": "rising",
     "rank": 14962,
     "score": 26.5242
+  },
+  {
+    "id": "c0b90b6d-0d76-48a3-a294-6d2335168fd3",
+    "name": "Ivan Valiev",
+    "institution": "Addgene",
+    "cohort": "rising",
+    "rank": 1983,
+    "score": 30.5631
   },
   {
     "id": "c0bdac76-f3a4-4a13-96ea-47078ca4e032",
@@ -10656,6 +10248,14 @@
     "score": 26.0118
   },
   {
+    "id": "c1b13e96-6a3b-4ac7-b35e-811ea719f6b3",
+    "name": "Manan Krishnamurthy",
+    "institution": "National Cancer Institute",
+    "cohort": "rising",
+    "rank": 4788,
+    "score": 29.9839
+  },
+  {
     "id": "c1c1ca76-9c1f-4a6d-b1a3-c29e86014404",
     "name": "Victoria Ebiana",
     "institution": "Merck & Co., Inc., Rahway, NJ, USA (United States)",
@@ -10680,6 +10280,14 @@
     "score": 26.5242
   },
   {
+    "id": "c1e88442-d21e-4146-8b3a-a44f84676cbd",
+    "name": "Ray Lin",
+    "institution": "Amgen (United States)",
+    "cohort": "rising",
+    "rank": 4794,
+    "score": 29.9839
+  },
+  {
     "id": "c2087cc8-d3c8-4808-8771-3056b0aebea7",
     "name": "Hamzah Abu\u2010Sbeih",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -10700,8 +10308,8 @@
     "name": "Joel W. Neal",
     "institution": "Stanford University",
     "cohort": "established",
-    "rank": 57,
-    "score": 70.0485
+    "rank": 88,
+    "score": 99.2825
   },
   {
     "id": "c23add56-e304-42b9-a6e4-090c90bd2039",
@@ -10718,22 +10326,6 @@
     "cohort": "rising",
     "rank": 8195,
     "score": 29.115
-  },
-  {
-    "id": "c25f750e-a665-42db-8659-ed09bc930ade",
-    "name": "Chinmay Haridas",
-    "institution": "Massachusetts General Hospital",
-    "cohort": "rising",
-    "rank": 7099,
-    "score": 29.4047
-  },
-  {
-    "id": "c27a35d8-0586-4e9b-a8de-cf732cda7df3",
-    "name": "Zachary Walsh",
-    "institution": "Columbia University",
-    "cohort": "rising",
-    "rank": 351,
-    "score": 48.8256
   },
   {
     "id": "c292d836-8812-4b1d-8c77-ecdb992ab0b1",
@@ -10780,8 +10372,16 @@
     "name": "David P. Carbone",
     "institution": "The Ohio State University",
     "cohort": "established",
-    "rank": 71,
-    "score": 66.9353
+    "rank": 151,
+    "score": 98.775
+  },
+  {
+    "id": "c355e1e4-5a1a-4f4b-9568-2aa262160542",
+    "name": "Greg J. Haro",
+    "institution": "University of California, San Francisco",
+    "cohort": "rising",
+    "rank": 15007,
+    "score": 26.5242
   },
   {
     "id": "c365a4d0-be40-47ac-9dba-f53fd4a18dbe",
@@ -10824,20 +10424,12 @@
     "score": 26.5242
   },
   {
-    "id": "c3e9596b-002b-45bb-bc9c-7230995b1495",
-    "name": "James Haberberger",
-    "institution": "Foundation Medicine (United States)",
+    "id": "c406f294-86e0-43b5-93f9-aa06aaccc531",
+    "name": "Julianne Barlow",
+    "institution": "Brigham and Women's Hospital",
     "cohort": "rising",
-    "rank": 4815,
-    "score": 29.9839
-  },
-  {
-    "id": "c41073c5-a27e-4127-9d00-d6bbd1415e41",
-    "name": "Kayla Guidry",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 4818,
-    "score": 29.9839
+    "rank": 7108,
+    "score": 29.4047
   },
   {
     "id": "c41dc1b5-7520-4b4b-adbd-33434fa9590c",
@@ -10880,14 +10472,6 @@
     "score": 24.1784
   },
   {
-    "id": "c46a21cf-9dd2-44b3-b41d-a67478eb0414",
-    "name": "Christopher A. Lemmon",
-    "institution": "Cleveland Clinic",
-    "cohort": "rising",
-    "rank": 15029,
-    "score": 26.5242
-  },
-  {
     "id": "c46da3b3-70ca-4796-a236-bc695e28b0cc",
     "name": "L. Villaruz",
     "institution": "University of Pittsburgh",
@@ -10910,14 +10494,6 @@
     "cohort": "rising",
     "rank": 21836,
     "score": 23.0645
-  },
-  {
-    "id": "c4e7da2c-af74-47bb-a32c-a26c33c56cb2",
-    "name": "Bassam Ghabach",
-    "institution": "Texas Christian University",
-    "cohort": "rising",
-    "rank": 11006,
-    "score": 27.0366
   },
   {
     "id": "c4f65345-0993-4160-a3e5-2d2a6c895458",
@@ -10960,20 +10536,20 @@
     "score": 26.0118
   },
   {
+    "id": "c5de93d3-d25a-4471-aa02-a82d43466658",
+    "name": "D. Saravia",
+    "institution": "University of Miami",
+    "cohort": "rising",
+    "rank": 15046,
+    "score": 26.5242
+  },
+  {
     "id": "c6285f11-3947-4ecd-9cd0-a6cc11bc9d3d",
     "name": "Jinesh Gheeya",
     "institution": "The Ohio State University",
     "cohort": "rising",
     "rank": 112,
     "score": 51.7651
-  },
-  {
-    "id": "c628cfbf-969f-42af-837c-978e594a660d",
-    "name": "Manshi Li",
-    "institution": "Cleveland Clinic",
-    "cohort": "rising",
-    "rank": 15049,
-    "score": 26.5242
   },
   {
     "id": "c62b0915-0c39-4475-885a-7fff30cb8386",
@@ -10992,28 +10568,12 @@
     "score": 30.9538
   },
   {
-    "id": "c66d0f4c-924d-461f-8609-98fcbfae9542",
-    "name": "Maida Hafiz",
-    "institution": "East Carolina University",
-    "cohort": "rising",
-    "rank": 15053,
-    "score": 26.5242
-  },
-  {
     "id": "c739dc31-6765-413e-aa6b-ced7fc82623d",
     "name": "Elizabeth Weihe",
     "institution": "University of California San Diego",
     "cohort": "rising",
     "rank": 11593,
     "score": 26.538
-  },
-  {
-    "id": "c78e38db-ddbc-4263-b6dd-2be860303a12",
-    "name": "James J. Choi",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "rising",
-    "rank": 4862,
-    "score": 29.9839
   },
   {
     "id": "c79737a6-7ebd-4862-829a-65f1a3408f4e",
@@ -11040,6 +10600,14 @@
     "score": 29.4047
   },
   {
+    "id": "c8420987-4e01-4780-a56c-5fb56394a102",
+    "name": "Drew F. K. Williamson",
+    "institution": "Brigham and Women's Hospital",
+    "cohort": "rising",
+    "rank": 18501,
+    "score": 25.7556
+  },
+  {
     "id": "c8590cbf-15eb-4f2b-a05b-a745da43c9f5",
     "name": "Lorin A. Ferris",
     "institution": "Massachusetts General Hospital",
@@ -11062,14 +10630,6 @@
     "cohort": "rising",
     "rank": 899,
     "score": 42.2366
-  },
-  {
-    "id": "c8e90743-adf9-4b66-84cd-8923925a6e6a",
-    "name": "Benjamin J. Resio",
-    "institution": "Yale University",
-    "cohort": "rising",
-    "rank": 16390,
-    "score": 26.3396
   },
   {
     "id": "c8f5d51c-d37e-4122-b9b4-873ccaf1aebe",
@@ -11096,28 +10656,12 @@
     "score": 30.0434
   },
   {
-    "id": "c933c660-6e2d-44b7-b2d1-fe74dd711b07",
-    "name": "Emily K. Law",
-    "institution": "University of Minnesota",
+    "id": "c96fcb44-90ce-4504-8a29-b1bfaa052464",
+    "name": "Andriana Nikolova",
+    "institution": "Cedars-Sinai Medical Center",
     "cohort": "rising",
-    "rank": 17475,
-    "score": 26.0118
-  },
-  {
-    "id": "c98a209e-5ae9-4ab6-b7e2-6161f0c0fd3f",
-    "name": "Vivek Podder",
-    "institution": "Baptist Hospital of Miami",
-    "cohort": "rising",
-    "rank": 11194,
-    "score": 26.7804
-  },
-  {
-    "id": "c9913c7c-31ac-4a09-92b2-22a38004c05e",
-    "name": "Jeffrey Gagan",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 15101,
-    "score": 26.5242
+    "rank": 876,
+    "score": 42.9292
   },
   {
     "id": "c9a44be0-60b5-4d10-b3a6-3cc91caf2f6e",
@@ -11148,8 +10692,8 @@
     "name": "Julie R. Brahmer",
     "institution": "Bloomberg (United States)",
     "cohort": "established",
-    "rank": 268,
-    "score": 54.5638
+    "rank": 66,
+    "score": 99.47999999999999
   },
   {
     "id": "c9d6201c-fa17-4ddc-aea7-796642e25d46",
@@ -11192,14 +10736,6 @@
     "score": 22.4011
   },
   {
-    "id": "cae177da-4eee-4cc2-a0b0-053931792f94",
-    "name": "David R. Jones",
-    "institution": "Memorial Sloan Kettering Cancer Center",
-    "cohort": "established",
-    "rank": 203,
-    "score": 57.0718
-  },
-  {
     "id": "cae43b5d-1ebf-452a-8b1e-55a7119e5f8c",
     "name": "Clare Keddy",
     "institution": "Oregon Health & Science University",
@@ -11236,8 +10772,8 @@
     "name": "Pasi A. J\u00e4nne",
     "institution": "Dana-Farber Cancer Institute",
     "cohort": "established",
-    "rank": 84,
-    "score": 65.5927
+    "rank": 32,
+    "score": 99.7125
   },
   {
     "id": "cbd0e3fa-718a-4f96-8557-79f325fce833",
@@ -11248,12 +10784,12 @@
     "score": 25.7556
   },
   {
-    "id": "cbfd0722-a0e9-4b0a-9adb-6fc9892e4162",
-    "name": "Alberto Vides",
-    "institution": "Memorial Sloan Kettering Cancer Center",
+    "id": "cc19f828-cfc5-48b3-b0fb-a0ed70d776d3",
+    "name": "Brian W. Gilmore",
+    "institution": "University of North Texas",
     "cohort": "rising",
-    "rank": 4927,
-    "score": 29.9839
+    "rank": 25373,
+    "score": 0.0
   },
   {
     "id": "cc1c8ffb-432e-49e8-b1fe-eb58510760e3",
@@ -11288,6 +10824,14 @@
     "score": 29.9839
   },
   {
+    "id": "cc51d83b-df62-4d71-9438-8e0dfae46a66",
+    "name": "Alina I. Marusina",
+    "institution": "University of California, Davis",
+    "cohort": "rising",
+    "rank": 15149,
+    "score": 26.5242
+  },
+  {
     "id": "cc74eedf-02ac-4d71-a1dc-4b29c0cc7978",
     "name": "Stan Krulewicz",
     "institution": "Pfizer (United States)",
@@ -11302,6 +10846,14 @@
     "cohort": "rising",
     "rank": 22546,
     "score": 22.619
+  },
+  {
+    "id": "ccd10299-1566-4526-a27f-26899f297bd0",
+    "name": "Maen Abdelrahim",
+    "institution": "Houston Methodist",
+    "cohort": "rising",
+    "rank": 16436,
+    "score": 26.2341
   },
   {
     "id": "cce050ab-c74a-4929-b7e4-42a272e2da5c",
@@ -11336,12 +10888,28 @@
     "score": 28.9702
   },
   {
+    "id": "cde9b36d-084a-485f-997e-3a0ae9da2804",
+    "name": "Meng Wang",
+    "institution": "Massachusetts General Hospital",
+    "cohort": "rising",
+    "rank": 17491,
+    "score": 26.0118
+  },
+  {
     "id": "ce17e520-93d9-4cf9-bfa8-bdeb2031eba5",
     "name": "Polina Khrizman",
     "institution": "Cooper University Hospital",
     "cohort": "rising",
     "rank": 19615,
     "score": 25.2432
+  },
+  {
+    "id": "ce4808a0-0dfc-452f-95fc-c609a34c189d",
+    "name": "Alexei Hernandez",
+    "institution": "Johns Hopkins University",
+    "cohort": "rising",
+    "rank": 1499,
+    "score": 31.3374
   },
   {
     "id": "ce80d299-3e32-49fd-9be9-4bf89e6b5e8e",
@@ -11358,14 +10926,6 @@
     "cohort": "rising",
     "rank": 10008,
     "score": 28.2441
-  },
-  {
-    "id": "ce9b9d9b-98bb-4b80-8a9d-149b1064bfc3",
-    "name": "Ivan Gorlov",
-    "institution": "Baylor College of Medicine",
-    "cohort": "rising",
-    "rank": 1989,
-    "score": 30.5631
   },
   {
     "id": "cea0eb0e-0ff1-4673-90fd-7b16a0910299",
@@ -11388,8 +10948,8 @@
     "name": "Edward B. Garon",
     "institution": "University of California, Los Angeles",
     "cohort": "established",
-    "rank": 140,
-    "score": 60.7908
+    "rank": 78,
+    "score": 99.395
   },
   {
     "id": "cef5b7b4-e0be-4bad-bc2e-03e4f39f0a57",
@@ -11400,12 +10960,12 @@
     "score": 26.5242
   },
   {
-    "id": "ceff4d38-f7d5-40d9-92ce-4718e554297c",
-    "name": "Minita Shah",
-    "institution": "New York Genome Center",
+    "id": "cf1c8bb7-110c-4344-bc62-aad6c70fda68",
+    "name": "Won Jin Ho",
+    "institution": "Johns Hopkins University",
     "cohort": "rising",
-    "rank": 21898,
-    "score": 23.0645
+    "rank": 23468,
+    "score": 17.7996
   },
   {
     "id": "cf5f8169-bc21-4b65-8deb-0901dbf7176e",
@@ -11430,14 +10990,6 @@
     "cohort": "rising",
     "rank": 21905,
     "score": 23.0645
-  },
-  {
-    "id": "d0087106-74b0-4a03-8eae-8faecebf1d33",
-    "name": "Nicholas R. Mayne",
-    "institution": "Duke University",
-    "cohort": "rising",
-    "rank": 22550,
-    "score": 22.619
   },
   {
     "id": "d017cb93-bbad-42a1-be8e-e521477266fd",
@@ -11478,14 +11030,6 @@
     "cohort": "rising",
     "rank": 15223,
     "score": 26.5242
-  },
-  {
-    "id": "d12b9c25-7dfa-4fd1-8e6e-72d419225ca3",
-    "name": "James Sayre",
-    "institution": "Oklahoma State University Center for Health Sciences",
-    "cohort": "rising",
-    "rank": 7179,
-    "score": 29.4047
   },
   {
     "id": "d14e09ec-e8e2-4699-9417-227330401752",
@@ -11552,14 +11096,6 @@
     "score": 30.7803
   },
   {
-    "id": "d22eac57-6a25-4aa5-b66e-99e34ef35c7f",
-    "name": "Nicholas Venturini",
-    "institution": "Tisch Hospital",
-    "cohort": "rising",
-    "rank": 7183,
-    "score": 29.4047
-  },
-  {
     "id": "d2b69143-a12e-4d10-9a02-c304e5874ea0",
     "name": "Ruoying Yu",
     "institution": "Genesee Community College",
@@ -11572,8 +11108,8 @@
     "name": "Gregory J. Riely",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "established",
-    "rank": 220,
-    "score": 56.4267
+    "rank": 18,
+    "score": 99.8
   },
   {
     "id": "d2bf664e-3d36-4195-9858-36ad92ca7573",
@@ -11590,14 +11126,6 @@
     "cohort": "rising",
     "rank": 15268,
     "score": 26.5242
-  },
-  {
-    "id": "d350b7f7-96a5-4a0e-a04f-9760e0447012",
-    "name": "Carley Mitchell",
-    "institution": "University Hospitals of Cleveland",
-    "cohort": "rising",
-    "rank": 9618,
-    "score": 28.5358
   },
   {
     "id": "d36bc0e1-2bd2-40bc-a272-490a8bbf1e87",
@@ -11656,14 +11184,6 @@
     "score": 29.9839
   },
   {
-    "id": "d505fd5c-738a-4fcc-9309-fb43ef5c458c",
-    "name": "Julie A. Barta",
-    "institution": "Thomas Jefferson University",
-    "cohort": "rising",
-    "rank": 707,
-    "score": 44.4023
-  },
-  {
     "id": "d5151472-b210-4347-9fc6-a0b946e16eac",
     "name": "Michelle DeVeaux",
     "institution": "Yale University",
@@ -11696,6 +11216,14 @@
     "score": 24.1784
   },
   {
+    "id": "d543291f-a7ca-43cf-b100-9d8f98605d2d",
+    "name": "John Davelaar",
+    "institution": "Cedars-Sinai Medical Center",
+    "cohort": "rising",
+    "rank": 8255,
+    "score": 29.115
+  },
+  {
     "id": "d5ac0ac8-d96c-4857-afc2-4c184e65bfa3",
     "name": "Emma Labrot",
     "institution": "Novartis (United States)",
@@ -11712,28 +11240,12 @@
     "score": 16.7971
   },
   {
-    "id": "d5e19900-3edc-49f7-9524-8fce35307fac",
-    "name": "Niha Beig",
-    "institution": "Case Western Reserve University",
-    "cohort": "rising",
-    "rank": 21936,
-    "score": 23.0645
-  },
-  {
     "id": "d5f3a803-2cd4-42e5-b036-8a52a16fe9a8",
     "name": "Alexander Graur",
     "institution": "Massachusetts General Hospital",
     "cohort": "rising",
     "rank": 5026,
     "score": 29.9839
-  },
-  {
-    "id": "d5f77988-1487-43c1-ada9-21416be6663e",
-    "name": "Giuseppe Giaccone",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 16069,
-    "score": 26.5086
   },
   {
     "id": "d5fa389c-2e81-4b9c-b220-10466bea6892",
@@ -11748,8 +11260,8 @@
     "name": "Roy S. Herbst",
     "institution": "Yale Cancer Center",
     "cohort": "established",
-    "rank": 92,
-    "score": 64.3894
+    "rank": 39,
+    "score": 99.6625
   },
   {
     "id": "d63e5ff2-7607-4d2b-9a8a-cd8876c64f0c",
@@ -11792,14 +11304,6 @@
     "score": 27.5788
   },
   {
-    "id": "d6d5c17c-44d0-4832-a674-947db1b1aadc",
-    "name": "Muhammad Zubair Afzal",
-    "institution": "Dartmouth\u2013Hitchcock Medical Center",
-    "cohort": "rising",
-    "rank": 5038,
-    "score": 29.9839
-  },
-  {
     "id": "d6d8bd82-b580-4cdb-9f4e-9ff91c467443",
     "name": "Frank Rojas Alvarez",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -11824,6 +11328,14 @@
     "score": 17.2984
   },
   {
+    "id": "d7a7117c-7a41-4ef8-9011-a9899c6f7c2b",
+    "name": "L. Anne Gilmore",
+    "institution": "Southwestern Medical Center",
+    "cohort": "rising",
+    "rank": 23200,
+    "score": 21.9506
+  },
+  {
     "id": "d7c7423f-20d0-4b4b-a867-dd4b7410fa43",
     "name": "Jeff Lewis",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -11846,6 +11358,14 @@
     "cohort": "rising",
     "rank": 171,
     "score": 50.3899
+  },
+  {
+    "id": "d8075eb6-f934-4e6f-97a4-386b583f93f5",
+    "name": "Chuntao Wu",
+    "institution": "Daiichi Sankyo (United States)",
+    "cohort": "rising",
+    "rank": 16113,
+    "score": 26.4324
   },
   {
     "id": "d81439e9-c031-430d-8aa2-7af6e8264a30",
@@ -11902,22 +11422,6 @@
     "cohort": "rising",
     "rank": 5053,
     "score": 29.9839
-  },
-  {
-    "id": "d8da5f3b-1abf-44e3-89b1-837335e7f133",
-    "name": "Patricia Ho",
-    "institution": "Columbia University",
-    "cohort": "rising",
-    "rank": 19637,
-    "score": 25.2432
-  },
-  {
-    "id": "d91df6ef-abff-4c15-bbe1-64e77779090b",
-    "name": "Marianna V. Papageorge",
-    "institution": "Boston University",
-    "cohort": "rising",
-    "rank": 15370,
-    "score": 26.5242
   },
   {
     "id": "d91ea03c-0c0d-4641-8cf7-c2ecc4f235ca",
@@ -11990,14 +11494,6 @@
     "cohort": "rising",
     "rank": 18557,
     "score": 25.7556
-  },
-  {
-    "id": "da229847-b7a4-4b59-8ba9-07fbf4417405",
-    "name": "Amanda L. Treece",
-    "institution": "Children's Hospital Colorado",
-    "cohort": "rising",
-    "rank": 20644,
-    "score": 23.0721
   },
   {
     "id": "da407111-6ead-4e67-9e48-2562dcd3af55",
@@ -12080,14 +11576,6 @@
     "score": 29.9839
   },
   {
-    "id": "dafd4669-5330-4bdd-9dc6-b2c93bc4f22a",
-    "name": "Danwen Qian",
-    "institution": "Duke University",
-    "cohort": "rising",
-    "rank": 11227,
-    "score": 26.7123
-  },
-  {
     "id": "db288813-a031-489e-8648-51954a98a4ba",
     "name": "Jessica Flynn",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -12104,19 +11592,19 @@
     "score": 26.0118
   },
   {
+    "id": "db49fa02-62c7-4dd0-9f53-f491a1e6632b",
+    "name": "Omid Savari",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "rising",
+    "rank": 25494,
+    "score": 0.0
+  },
+  {
     "id": "db570120-1fe6-460d-a850-8081cf7ac951",
     "name": "Sandip H. Patel",
     "institution": "The Ohio State University",
     "cohort": "rising",
     "rank": 15410,
-    "score": 26.5242
-  },
-  {
-    "id": "db82041c-fa22-493c-9a4d-8460e7c175c2",
-    "name": "Ilke Tunali",
-    "institution": "Moffitt Cancer Center",
-    "cohort": "rising",
-    "rank": 15412,
     "score": 26.5242
   },
   {
@@ -12136,12 +11624,20 @@
     "score": 29.9839
   },
   {
+    "id": "dc171a9c-6a0c-40e6-b66a-2d53c21f1927",
+    "name": "Rosalind Dick-Godfrey",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "rising",
+    "rank": 15421,
+    "score": 26.5242
+  },
+  {
     "id": "dc351cdd-ea83-42ff-a8be-95336e9fe1fa",
     "name": "Charles M. Rudin",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "established",
-    "rank": 135,
-    "score": 61.2054
+    "rank": 143,
+    "score": 98.8175
   },
   {
     "id": "dc4b2ca0-369b-4b92-8ddf-03ebc91c2d39",
@@ -12184,14 +11680,6 @@
     "score": 30.5631
   },
   {
-    "id": "dd45415f-630a-4e38-812b-90f0ecbea389",
-    "name": "Iuliia Topchu",
-    "institution": "Northwestern University",
-    "cohort": "rising",
-    "rank": 7233,
-    "score": 29.4047
-  },
-  {
     "id": "dd494a3c-4365-4c20-8280-af8ed781f3cf",
     "name": "Jiarui Zhang",
     "institution": "Boston University",
@@ -12214,6 +11702,14 @@
     "cohort": "rising",
     "rank": 21968,
     "score": 23.0645
+  },
+  {
+    "id": "ddaef84b-7775-4019-82d4-a1936d498286",
+    "name": "Chike O. Abana",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 5106,
+    "score": 29.9839
   },
   {
     "id": "ddb70112-576a-48f0-a7e3-fc31c8f3734c",
@@ -12296,6 +11792,14 @@
     "score": 26.461
   },
   {
+    "id": "df11ea02-9485-47c1-bc78-635269098879",
+    "name": "Matthew A. Gubens",
+    "institution": "University of California, San Francisco",
+    "cohort": "established",
+    "rank": 159,
+    "score": 98.715
+  },
+  {
     "id": "df602992-3829-4159-bbea-71956dd83c28",
     "name": "Alexandra L. Potter",
     "institution": "Massachusetts General Hospital",
@@ -12310,6 +11814,14 @@
     "cohort": "rising",
     "rank": 8287,
     "score": 29.115
+  },
+  {
+    "id": "dfeca7d8-10a0-4bcc-aa3f-0af40964b980",
+    "name": "Daniel Morgensztern",
+    "institution": "Washington University in St. Louis",
+    "cohort": "established",
+    "rank": 137,
+    "score": 98.8875
   },
   {
     "id": "e008152e-f0d9-4c68-9a69-e4e40558bd3c",
@@ -12336,20 +11848,12 @@
     "score": 43.813
   },
   {
-    "id": "e142cf99-6f32-4aa4-a4b3-670d5b945195",
-    "name": "Andrea T. Shafer",
-    "institution": "Harvard University",
+    "id": "e1dcce59-14f1-483e-8fc2-2f9365578d35",
+    "name": "Howard J. Lee",
+    "institution": "University of California, San Francisco",
     "cohort": "rising",
-    "rank": 18575,
-    "score": 25.7556
-  },
-  {
-    "id": "e2179ca0-baca-4c5b-bd65-fdd72f44fe17",
-    "name": "Iris Lin",
-    "institution": "Johnson & Johnson (United States)",
-    "cohort": "rising",
-    "rank": 5151,
-    "score": 29.9839
+    "rank": 19254,
+    "score": 25.2509
   },
   {
     "id": "e22c5353-9126-45b8-9ea0-c6e50369bf8a",
@@ -12430,30 +11934,6 @@
     "cohort": "rising",
     "rank": 15525,
     "score": 26.5242
-  },
-  {
-    "id": "e331165c-8643-49c2-8304-b7e10b6cd8ee",
-    "name": "Pam K. Mangat",
-    "institution": "American Society of Clinical Oncology",
-    "cohort": "rising",
-    "rank": 15530,
-    "score": 26.5242
-  },
-  {
-    "id": "e3ca166f-5192-444d-9591-efee1f7eaa85",
-    "name": "Yvonne Gloria-McCutchen",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 19654,
-    "score": 25.2432
-  },
-  {
-    "id": "e3ceb7f0-3e0b-4e55-a8e6-b235e51d04ee",
-    "name": "Chenyang Li",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "rising",
-    "rank": 8938,
-    "score": 28.9702
   },
   {
     "id": "e4269098-1646-4bba-b1dd-5e6a411e57e2",
@@ -12568,36 +12048,12 @@
     "score": 30.0902
   },
   {
-    "id": "e60b0561-311a-4d3b-ac79-5d22f51d256b",
-    "name": "Sawsan Rashdan",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 556,
-    "score": 44.958
-  },
-  {
     "id": "e6179a6b-e02b-48a7-8a10-7747694ea6df",
     "name": "Brie Kezlarian",
     "institution": "Memorial Sloan Kettering Cancer Center",
     "cohort": "rising",
     "rank": 15585,
     "score": 26.5242
-  },
-  {
-    "id": "e64699de-b7d8-4ef6-aa46-3b94bd3bacf9",
-    "name": "Colin A. Longhurst",
-    "institution": "University of Wisconsin\u2013Madison",
-    "cohort": "rising",
-    "rank": 7266,
-    "score": 29.4047
-  },
-  {
-    "id": "e6587b84-2f1f-4bae-83f1-a79eeb344327",
-    "name": "I. Diaz Perez",
-    "institution": "AstraZeneca (United States)",
-    "cohort": "rising",
-    "rank": 9987,
-    "score": 28.2462
   },
   {
     "id": "e6860950-c5ee-49dc-8bc3-515dca62aae7",
@@ -12622,14 +12078,6 @@
     "cohort": "rising",
     "rank": 22581,
     "score": 22.619
-  },
-  {
-    "id": "e6e57561-f489-446d-b1bf-60319e8e8f09",
-    "name": "Kristen Labbe",
-    "institution": "NYU Langone Health",
-    "cohort": "rising",
-    "rank": 15601,
-    "score": 26.5242
   },
   {
     "id": "e6fabf77-43c2-4c16-8420-61344e0cefac",
@@ -12696,6 +12144,14 @@
     "score": 27.8051
   },
   {
+    "id": "e7c485b0-fcab-4805-8a6e-d262e1cc1346",
+    "name": "Leo Y. Luo",
+    "institution": "Memorial Sloan Kettering Cancer Center",
+    "cohort": "rising",
+    "rank": 16123,
+    "score": 26.4027
+  },
+  {
     "id": "e7d68622-e8c1-43e9-892f-171952f03f13",
     "name": "Carlos Adame",
     "institution": "University of California, Los Angeles",
@@ -12728,12 +12184,20 @@
     "score": 26.0118
   },
   {
-    "id": "e8f3b873-9e2d-486f-a831-ae23d92ec0b2",
-    "name": "Brian Y. Soong",
-    "institution": "Icahn School of Medicine at Mount Sinai",
+    "id": "e8ed547d-848f-494f-b3d7-4e49e76bfbd3",
+    "name": "Coral X. Giovacchini",
+    "institution": "Duke Medical Center",
     "cohort": "rising",
-    "rank": 8948,
-    "score": 28.9702
+    "rank": 15633,
+    "score": 26.5242
+  },
+  {
+    "id": "e8f9bc43-6f00-4d04-a3c5-ca814e17f306",
+    "name": "Joe Dan Dunn",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 5217,
+    "score": 29.9839
   },
   {
     "id": "e8fe8198-2223-4965-a0d5-58453ad44119",
@@ -12760,12 +12224,12 @@
     "score": 46.6761
   },
   {
-    "id": "e92bf721-be05-4c5a-91fe-281996744ae1",
-    "name": "Vaia Florou",
-    "institution": "University of Miami",
+    "id": "e9307765-ac13-4d07-9907-b41f9044eb41",
+    "name": "Mark Wasley",
+    "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "rising",
-    "rank": 259,
-    "score": 49.962
+    "rank": 5221,
+    "score": 29.9839
   },
   {
     "id": "e9571f73-4700-4103-8a5c-8731c6616493",
@@ -12774,14 +12238,6 @@
     "cohort": "rising",
     "rank": 19933,
     "score": 24.923
-  },
-  {
-    "id": "e96d5314-0c22-4593-b6b9-287de25995e3",
-    "name": "Nelson M. LaMarche",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 1766,
-    "score": 30.8527
   },
   {
     "id": "e9a21fae-df95-40aa-93c2-9945573e2824",
@@ -12832,28 +12288,12 @@
     "score": 29.4047
   },
   {
-    "id": "ea24e99a-9a50-4c46-a3aa-682ac6580e51",
-    "name": "Shakti Ramsamooj",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 5230,
-    "score": 29.9839
-  },
-  {
     "id": "ea25ab30-d641-4b46-81e3-cb5c374f8e12",
     "name": "Chukwuemeka Ikpeazu",
     "institution": "University of Miami",
     "cohort": "rising",
     "rank": 356,
     "score": 48.6209
-  },
-  {
-    "id": "ea384aaa-e3c1-4334-b6cf-1f45a0b66fa6",
-    "name": "Amrit S. Gonugunta",
-    "institution": "Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 5232,
-    "score": 29.9839
   },
   {
     "id": "ea390398-7338-4449-a5da-b91de0ed33f2",
@@ -12918,6 +12358,14 @@
     "cohort": "rising",
     "rank": 10818,
     "score": 27.2928
+  },
+  {
+    "id": "eb060506-3585-4490-8f45-9673b3edeb46",
+    "name": "Lynette M. Sholl",
+    "institution": "Brigham and Women's Hospital",
+    "cohort": "established",
+    "rank": 71,
+    "score": 99.42500000000001
   },
   {
     "id": "eb4c8935-1c84-4748-8b96-d8439d6de2ed",
@@ -13088,12 +12536,28 @@
     "score": 32.8597
   },
   {
+    "id": "ed89cb27-b9b9-4061-bd0c-41971faf6e49",
+    "name": "Ailing Huang",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 5859,
+    "score": 29.8391
+  },
+  {
     "id": "ed90a73b-9e73-4a74-9090-2f6ccc1f9fc4",
     "name": "Penny Fang",
     "institution": "The University of Texas MD Anderson Cancer Center",
     "cohort": "rising",
     "rank": 22051,
     "score": 23.0645
+  },
+  {
+    "id": "ee06e9ce-9da6-4de8-a5aa-ff05619f9f3b",
+    "name": "Raymond Liu",
+    "institution": "Kaiser Permanente",
+    "cohort": "rising",
+    "rank": 23724,
+    "score": 16.7971
   },
   {
     "id": "ee448879-e728-49e6-ac94-e061ff254713",
@@ -13160,6 +12624,14 @@
     "score": 26.5242
   },
   {
+    "id": "ef6ed0b2-1354-4ce8-857c-8da2c76d7596",
+    "name": "Natalie Danziger",
+    "institution": "Foundation Medicine (United States)",
+    "cohort": "rising",
+    "rank": 15745,
+    "score": 26.5242
+  },
+  {
     "id": "f0228604-214c-4331-a06f-3ac6850950bb",
     "name": "Chaitanya Bandlamudi",
     "institution": "Memorial Sloan Kettering Cancer Center",
@@ -13176,28 +12648,12 @@
     "score": 26.5242
   },
   {
-    "id": "f048c4a3-4616-486f-b8cd-285071e06733",
-    "name": "Daniel Nicastri",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 15760,
-    "score": 26.5242
-  },
-  {
     "id": "f053f66d-3dc3-4e3f-967d-21a44e076d80",
     "name": "Matthew Lee",
     "institution": "Albert Einstein College of Medicine",
     "cohort": "rising",
     "rank": 18615,
     "score": 25.7556
-  },
-  {
-    "id": "f05ae855-9505-489a-a869-a4ff5bb3c368",
-    "name": "Jianjun Zhang",
-    "institution": "The University of Texas MD Anderson Cancer Center",
-    "cohort": "established",
-    "rank": 144,
-    "score": 60.526
   },
   {
     "id": "f061a284-4573-405e-82cd-438bb79aed18",
@@ -13256,14 +12712,6 @@
     "score": 17.7996
   },
   {
-    "id": "f0ddd7cb-0997-437e-83e7-84f38ea567e1",
-    "name": "Jessica Le B\u00e9richel",
-    "institution": "Icahn School of Medicine at Mount Sinai",
-    "cohort": "rising",
-    "rank": 7323,
-    "score": 29.4047
-  },
-  {
     "id": "f0ec97af-5139-4d6b-9f1c-1f1f71fa05e8",
     "name": "Ryan Fan",
     "institution": "University of Pennsylvania",
@@ -13280,14 +12728,6 @@
     "score": 23.0747
   },
   {
-    "id": "f1222adc-2d1b-4b01-8870-eeaa671b7a31",
-    "name": "Ioana Baiu",
-    "institution": "The Ohio State University Wexner Medical Center",
-    "cohort": "rising",
-    "rank": 9032,
-    "score": 28.8299
-  },
-  {
     "id": "f1412696-a797-43c0-86c9-9d013de2805f",
     "name": "Varuna Nangia",
     "institution": "Massachusetts General Hospital",
@@ -13300,8 +12740,8 @@
     "name": "Charles B. Simone",
     "institution": "University of Maryland, Baltimore",
     "cohort": "established",
-    "rank": 183,
-    "score": 57.9702
+    "rank": 76,
+    "score": 99.4025
   },
   {
     "id": "f1b305fb-75b8-4c18-aab5-d3604fb0d117",
@@ -13310,14 +12750,6 @@
     "cohort": "rising",
     "rank": 11205,
     "score": 26.7804
-  },
-  {
-    "id": "f1f166cb-6118-4801-ac4d-7229bc74b088",
-    "name": "Hortense Le",
-    "institution": "New York University",
-    "cohort": "rising",
-    "rank": 7457,
-    "score": 29.2994
   },
   {
     "id": "f223feee-4fbf-4592-97cc-6364c2c9fcd2",
@@ -13516,16 +12948,8 @@
     "name": "Mark M. Awad",
     "institution": "Dana-Farber Cancer Institute",
     "cohort": "established",
-    "rank": 130,
-    "score": 61.9016
-  },
-  {
-    "id": "f5831736-e9b5-4f03-ab4e-b66683cfe3ba",
-    "name": "Carmine Frumiento",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 5345,
-    "score": 29.9839
+    "rank": 65,
+    "score": 99.49
   },
   {
     "id": "f59502c8-0bb1-4f31-b5db-50a79da2fb52",
@@ -13672,14 +13096,6 @@
     "score": 24.4747
   },
   {
-    "id": "f6e3bcf3-b67c-4d4d-87f1-02edcf3fe732",
-    "name": "Johannes C. Melms",
-    "institution": "Columbia University Irving Medical Center",
-    "cohort": "rising",
-    "rank": 19687,
-    "score": 25.2432
-  },
-  {
     "id": "f6fe8a1f-ced9-4178-a9c7-0ecabdd70064",
     "name": "Kang Qin",
     "institution": "The University of Texas MD Anderson Cancer Center",
@@ -13784,6 +13200,14 @@
     "score": 42.6373
   },
   {
+    "id": "f8d095a7-511d-4884-bcbe-4f180783081b",
+    "name": "Meng Li",
+    "institution": "The University of Texas MD Anderson Cancer Center",
+    "cohort": "rising",
+    "rank": 15911,
+    "score": 26.5242
+  },
+  {
     "id": "f8e5ed07-0ac1-4a40-b53b-d9e981ae0f6f",
     "name": "Etai Jacob",
     "institution": "AstraZeneca (United States)",
@@ -13816,14 +13240,6 @@
     "score": 25.2448
   },
   {
-    "id": "f9a19ae4-1d56-4fd5-a5d4-af8b2255a493",
-    "name": "Vinita Popat",
-    "institution": "The University of Texas Southwestern Medical Center",
-    "cohort": "rising",
-    "rank": 5397,
-    "score": 29.9839
-  },
-  {
     "id": "f9baf2f4-2a93-4b66-8035-8734fe08d0f8",
     "name": "Sahith Rajalingam",
     "institution": "New York University",
@@ -13846,6 +13262,14 @@
     "cohort": "rising",
     "rank": 911,
     "score": 42.0453
+  },
+  {
+    "id": "fa3b5bb6-6ab0-492d-b116-8095415b9fde",
+    "name": "Brandon Shih",
+    "institution": "University of California, San Francisco",
+    "cohort": "rising",
+    "rank": 16615,
+    "score": 26.0236
   },
   {
     "id": "fa4304a2-7166-4ec8-bc63-cbd9f7287251",
@@ -13872,20 +13296,12 @@
     "score": 23.0645
   },
   {
-    "id": "faa10626-81a6-4c7b-be72-02cda7bdd43c",
-    "name": "Ahmed Hosny",
-    "institution": "Brigham and Women's Hospital",
+    "id": "faedd02c-6d4b-4569-98b7-3165261117f4",
+    "name": "Bina Desai",
+    "institution": "University of South Florida",
     "cohort": "rising",
-    "rank": 22107,
-    "score": 23.0645
-  },
-  {
-    "id": "fab006f3-2ff0-4f13-a9b6-a087022dd030",
-    "name": "Paul M. Diderichsen",
-    "institution": "Certara (United States)",
-    "cohort": "rising",
-    "rank": 5406,
-    "score": 29.9839
+    "rank": 18700,
+    "score": 25.6916
   },
   {
     "id": "faef2b85-a41f-46a6-be58-c541e4060fad",
@@ -13968,12 +13384,20 @@
     "score": 0.0
   },
   {
-    "id": "fcaf485c-1512-4818-8336-b154755e398d",
-    "name": "Jessica Hudson",
-    "institution": "Loma Linda University Medical Center",
+    "id": "fc9d638d-de32-4736-b2a7-9ddbc1749e60",
+    "name": "Gina Choe",
+    "institution": "Oregon Health & Science University",
     "cohort": "rising",
-    "rank": 18647,
-    "score": 25.7556
+    "rank": 22116,
+    "score": 23.0645
+  },
+  {
+    "id": "fcac53e4-6684-4f02-9663-1624dc2db154",
+    "name": "Tin\u2010Yun Tang",
+    "institution": "University Hospitals of Cleveland",
+    "cohort": "rising",
+    "rank": 1479,
+    "score": 31.4319
   },
   {
     "id": "fced8469-afac-4b0b-9194-dfe776dc53eb",
@@ -13981,14 +13405,6 @@
     "institution": "Emory University",
     "cohort": "rising",
     "rank": 15985,
-    "score": 26.5242
-  },
-  {
-    "id": "fcf673b5-9168-4c2d-98b9-1beef08852aa",
-    "name": "Petr Makhov",
-    "institution": "Fox Chase Cancer Center",
-    "cohort": "rising",
-    "rank": 15987,
     "score": 26.5242
   },
   {
@@ -14032,14 +13448,6 @@
     "score": 26.5242
   },
   {
-    "id": "fd6be9d1-d860-4465-9ddf-05d2fb9a8c90",
-    "name": "Ngoc-Quynh Chu",
-    "institution": "Massachusetts General Hospital",
-    "cohort": "rising",
-    "rank": 18648,
-    "score": 25.7556
-  },
-  {
     "id": "fd71ca63-4a3d-44f8-afda-487027175c29",
     "name": "Dylan Scholes",
     "institution": "Penn Center for AIDS Research",
@@ -14056,28 +13464,12 @@
     "score": 29.8391
   },
   {
-    "id": "fdc301af-1806-42c3-81f8-8dd3e969bf5a",
-    "name": "Michelle C. Salazar",
-    "institution": "Yale University",
-    "cohort": "rising",
-    "rank": 22911,
-    "score": 22.3962
-  },
-  {
     "id": "fdd5a7f5-6175-4890-85d8-f0b688b84d9d",
     "name": "Adrian D. Vickers",
     "institution": "RTI Health Solutions",
     "cohort": "rising",
     "rank": 17850,
     "score": 25.7715
-  },
-  {
-    "id": "fde3b7bb-de92-4754-9e20-f8a9159e5cc7",
-    "name": "\u00c5sa Segerstolpe",
-    "institution": "Broad Institute",
-    "cohort": "rising",
-    "rank": 9709,
-    "score": 28.5358
   },
   {
     "id": "fe0f9401-d334-4a93-be81-85d1bc26d138",
@@ -14110,22 +13502,6 @@
     "cohort": "rising",
     "rank": 22126,
     "score": 23.0645
-  },
-  {
-    "id": "fe949c40-8339-4219-a789-b6420450969c",
-    "name": "Nicole Gianino",
-    "institution": "Yale University",
-    "cohort": "rising",
-    "rank": 8362,
-    "score": 29.115
-  },
-  {
-    "id": "fe9576c4-7f54-4747-aada-f5a105b37316",
-    "name": "Nathan Mynard",
-    "institution": "Cornell University",
-    "cohort": "rising",
-    "rank": 5449,
-    "score": 29.9839
   },
   {
     "id": "febfb8e8-16ea-4137-9310-d77c38cb8466",
@@ -14192,6 +13568,14 @@
     "score": 26.5467
   },
   {
+    "id": "ff97e7af-5b63-463b-b4ce-fd9d903b0287",
+    "name": "Hilary Dietz",
+    "institution": "Duke University",
+    "cohort": "rising",
+    "rank": 16041,
+    "score": 26.5242
+  },
+  {
     "id": "ff98dc41-7bae-4c8a-b6ec-d70f45ac218f",
     "name": "Nikhil Sebastian",
     "institution": "Emory University",
@@ -14206,5 +13590,13 @@
     "cohort": "rising",
     "rank": 16629,
     "score": 26.019
+  },
+  {
+    "id": "ffdd03f6-2dc3-4c9e-a5e9-0fa0566115a3",
+    "name": "Celina Ngiam",
+    "institution": "Genesys (United States)",
+    "cohort": "rising",
+    "rank": 1229,
+    "score": 32.0111
   }
 ]

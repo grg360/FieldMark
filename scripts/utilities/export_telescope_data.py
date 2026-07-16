@@ -30,6 +30,14 @@ NODES_PATH = Path("frontend/src/data/telescope_nsclc_nodes.json")
 EDGES_PATH = Path("frontend/src/data/telescope_nsclc_edges.json")
 STATEMENT_TIMEOUT_MS = 300_000  # 5 minutes
 
+# The ESTABLISHED seed reads hcp_established_ranks_v3 — the per-TA-classified table.
+# It previously read hcp_score_ranks_v2, whose established slice is the output of
+# established_scoring.py's (HCP x TA) cartesian product: every globally-'established'
+# HCP got a row for BOTH TAs regardless of TA membership (Hepatology 11,389 ==
+# NSCLC 11,389 — identical counts are the signature), so the seed was ~61% non-NSCLC.
+# Only the established slice is affected; the rising join below stays on
+# hcp_score_ranks_v2, whose rising/community slices are properly TA-scoped.
+# v3 has no `cohort` column (it is established-only) and names the score `cohort_score`.
 NODES_SQL = """
 WITH top_established AS (
   SELECT
@@ -37,13 +45,12 @@ WITH top_established AS (
     h.first_name || ' ' || h.last_name AS name,
     h.institution_normalized,
     hsr.rank,
-    hsr.score_at_rank,
+    hsr.cohort_score AS score_at_rank,
     hsr.therapeutic_area_id
-  FROM hcp_score_ranks_v2 hsr
+  FROM hcp_established_ranks_v3 hsr
   JOIN hcps_v2 h ON h.id = hsr.hcp_id
   JOIN therapeutic_areas ta ON ta.id = hsr.therapeutic_area_id
-  WHERE hsr.cohort = 'established'
-    AND hsr.scope_type = 'global'
+  WHERE hsr.scope_type = 'global'
     AND h.country = 'US'
     AND ta.name = 'NSCLC'
   ORDER BY hsr.rank
@@ -81,14 +88,15 @@ network_hcps AS (
 SELECT * FROM network_hcps;
 """
 
+# Same established-seed repoint as NODES_SQL — the two seeds MUST stay identical or
+# the edge set would be computed over a different graph than the nodes.
 EDGES_SQL = """
 WITH top_established AS (
   SELECT hsr.hcp_id, hsr.therapeutic_area_id
-  FROM hcp_score_ranks_v2 hsr
+  FROM hcp_established_ranks_v3 hsr
   JOIN hcps_v2 h ON h.id = hsr.hcp_id
   JOIN therapeutic_areas ta ON ta.id = hsr.therapeutic_area_id
-  WHERE hsr.cohort = 'established'
-    AND hsr.scope_type = 'global'
+  WHERE hsr.scope_type = 'global'
     AND h.country = 'US'
     AND ta.name = 'NSCLC'
   ORDER BY hsr.rank
