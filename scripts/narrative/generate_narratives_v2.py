@@ -701,6 +701,42 @@ def fetch_established_top_hcp_ids(
     return selected
 
 
+def fetch_community_top_hcp_ids(
+    supabase: Client, top_n: int, visible_ta_ids: List[str]
+) -> Set[str]:
+    """Community cohort selection: US-scope, top N per TA from hcp_community_ranks_v2.
+
+    Exact mirror of fetch_established_top_hcp_ids (per-TA, scope_type='region'/'US',
+    ordered by rank) — hcp_community_ranks_v2 carries the same global + US-region scope
+    rows per HCP, so scoping to US yields one row per HCP (without it, top-N *rows* would
+    collapse to ~N/2 unique HCPs). Replaces the old selector that read
+    hcps_v2.cohort_classification/cohort_score — a TA-independent legacy column that pulled
+    the global top-N across ALL TAs (Hepatology/Rare-Disease dominating an --ta nsclc run).
+    NOTE: AD has zero rows here — AD community lives in community_practitioners (the
+    directory), not this table — so an AD run correctly selects no community narratives.
+    """
+    selected: Set[str] = set()
+    for ta_id in visible_ta_ids:
+        try:
+            response = (
+                supabase.table("hcp_community_ranks_v2")
+                .select("hcp_id,rank")
+                .eq("therapeutic_area_id", ta_id)
+                .eq("scope_type", "region")
+                .eq("scope_value", "US")
+                .order("rank", desc=False)
+                .range(0, top_n - 1)
+                .execute()
+            )
+            for row in response.data or []:
+                hcp_id = row.get("hcp_id")
+                if hcp_id:
+                    selected.add(str(hcp_id))
+        except Exception as exc:
+            print(f"[load] hcp_community_ranks_v2 query failed for TA {ta_id}: {exc}")
+    return selected
+
+
 def fetch_hcps_by_ids(
     supabase: Client,
     hcp_ids: Set[str],
@@ -852,53 +888,12 @@ def load_hcp_contexts(
         print(f"Merged {len(leadership_by_pair)} Established HCP x TA leadership rows")
 
     if not single_hcp_id and "community" in target_cohorts:
-        print("Loading community HCPs by cohort_classification...")
-        hcps_table = get_table_name("hcps", target_version)
-        if target_version == "v2":
-            hcp_select_cols = (
-                "id,first_name,last_name,institution_normalized,country,"
-                "cohort_classification,cohort_score,total_career_pubs,career_first_pub_year_v2"
-            )
-        else:
-            hcp_select_cols = (
-                "id,first_name,last_name,institution,country,cohort_classification,"
-                "cohort_score,total_career_pubs,first_pub_year"
-            )
-        community_hcps: List[Dict] = []
-        page_size = 1000
-        offset = 0
-        while True:
-            response = (
-                supabase.table(hcps_table)
-                .select(hcp_select_cols)
-                .eq("cohort_classification", "community")
-                .range(offset, offset + page_size - 1)
-                .execute()
-            )
-            batch = response.data or []
-            if not batch:
-                break
-            if target_version == "v2":
-                for row in batch:
-                    if "institution_normalized" in row:
-                        row["institution"] = row.pop("institution_normalized")
-                    if "career_first_pub_year_v2" in row:
-                        row["first_pub_year"] = row.pop("career_first_pub_year_v2")
-            community_hcps.extend(batch)
-            if len(batch) < page_size:
-                break
-            offset += page_size
-        community_hcps.sort(
-            key=lambda h: h.get("cohort_score") if h.get("cohort_score") is not None else -1.0,
-            reverse=True,
-        )
-        community_keep = community_hcps[:community_top_n]
-        print(f"After community top-{community_top_n} downselect: {len(community_keep)} HCPs")
-        for row in community_keep:
-            hcp_id = row.get("id")
-            if hcp_id:
-                cohort_by_hcp[str(hcp_id)] = "community"
-        hcps.extend(community_keep)
+        print(f"Selecting community top-{community_top_n} per (TA x visible scope) from hcp_community_ranks_v2...")
+        community_ids = fetch_community_top_hcp_ids(supabase, community_top_n, visible_ta_ids)
+        print(f"Community rank selection: {len(community_ids)} unique HCPs")
+        for hcp_id in community_ids:
+            cohort_by_hcp[hcp_id] = "community"
+        hcps.extend(fetch_hcps_by_ids(supabase, community_ids, target_version))
 
     # Dedupe by HCP id (same HCP may appear in multiple cohort selections)
     seen_ids: Set[str] = set()
@@ -979,22 +974,23 @@ def load_hcp_contexts(
 
     ops_table = get_table_name("hcp_open_payments_summary", target_version)
     print("Loading hcp_open_payments_summary...")
-    ops_raw = (
-        supabase.table(ops_table)
-        .select("hcp_id,total_payments_lifetime,distinct_companies_lifetime")
-        .in_("hcp_id", list(hcp_ids) if len(hcp_ids) < 1000 else None)
-        .execute()
-        if len(hcp_ids) < 1000
-        else None
-    )
-    if ops_raw is None:
-        # Fallback: fetch all
+    # Batched .in_() like fetch_hcps_by_ids: a single .in_() with the whole cohort
+    # overflows the request URL (hundreds of UUIDs > the gateway's char limit) and
+    # 400s. The old len<1000 guard checked id COUNT, not URL length — the wrong axis.
+    ops_ids_list = list(hcp_ids)
+    ops_batch_size = 500
+    ops_by_hcp: Dict[str, Dict] = {}
+    for i in range(0, len(ops_ids_list), ops_batch_size):
+        batch_ids = ops_ids_list[i : i + ops_batch_size]
         ops_raw = (
             supabase.table(ops_table)
             .select("hcp_id,total_payments_lifetime,distinct_companies_lifetime")
+            .in_("hcp_id", batch_ids)
             .execute()
         )
-    ops_by_hcp = {row["hcp_id"]: row for row in (ops_raw.data or []) if row.get("hcp_id")}
+        for row in (ops_raw.data or []):
+            if row.get("hcp_id"):
+                ops_by_hcp[row["hcp_id"]] = row
 
     hcp_map = {row["id"]: row for row in hcps if row.get("id")}
 
@@ -1970,7 +1966,7 @@ def run_pipeline(
                 f"Established downselect: top {established_top_n} per (TA x visible scope) from ranks"
             )
         if "community" in target_cohorts:
-            print(f"Community downselect: top {community_top_n} by cohort_score")
+            print(f"Community downselect: top {community_top_n} per (TA x visible scope) from hcp_community_ranks_v2")
     print()
 
     contexts, ta_name_map = load_hcp_contexts(
