@@ -1305,8 +1305,15 @@ export async function getTACounts(
       communityResult,
     ] = await Promise.all([
       risingPoolQuery,
+      // Established counts come from hcp_established_ranks_v3 — the per-TA-classified
+      // table the feed board reads. hcp_established_scores_v2 is established_scoring.py's
+      // (HCP x TA) cartesian output: it holds a row for EVERY globally-'established' HCP
+      // in BOTH TAs regardless of TA membership (Hepatology 11,390 == NSCLC 11,390 —
+      // identical counts are the signature), and has ZERO AD rows, so AD counted 0.
+      // v3 stores one row per (hcp, scope); scope_type='global' yields exactly one row
+      // per established HCP = the TA-wide count this call has always reported.
       supabase
-        .from("hcp_established_scores_v2").select("hcp_id", { count: "exact", head: true }).eq("therapeutic_area_id", taId),
+        .from("hcp_established_ranks_v3").select("hcp_id", { count: "exact", head: true }).eq("therapeutic_area_id", taId).eq("scope_type", "global"),
       supabase
         .from("hcp_community_scores_v2").select("hcp_id", { count: "exact", head: true }).eq("therapeutic_area_id", taId),
     ]);
@@ -1687,19 +1694,58 @@ export async function getHCPDetail(
       .eq("therapeutic_area_id", taId)
       .maybeSingle();
 
-    const rankPromise = (() => {
-      let q = supabase
-        .from("hcp_score_ranks_v2")
-        .select("rank, percentile, scope_size, score_at_rank, cohort, scope_type, scope_value")
-        .eq("hcp_id", hcpId)
-        .eq("therapeutic_area_id", taId)
-        .eq("scope_type", scope.scopeType);
-      if (scope.scopeValue === null) {
-        q = q.is("scope_value", null);
-      } else {
-        q = q.eq("scope_value", scope.scopeValue);
+    // ESTABLISHED ranks read hcp_established_ranks_v3 — the same table the feed board
+    // reads — so an HCP's detail rank matches their board rank. They previously came
+    // from hcp_score_ranks_v2, whose established slice is established_scoring.py's
+    // (HCP x TA) cartesian output and disagrees with the feed; it also has no row at
+    // all for 14,303 of the current NSCLC cohort, so those detail pages showed no rank.
+    // RISING/COMMUNITY are NOT repointed: their v2 slices are properly TA-scoped
+    // (counts differ per TA, unlike established). v3 is established-only, so a
+    // non-established HCP simply finds no row and falls through to v2 — this read
+    // serves all three cohorts, so the fallback is what keeps them working.
+    // taId is the caller's RESOLVED entity TA (never hardcoded), so both reads stay
+    // scoped to the TA the detail page resolved. Scope matches the feed's.
+    // v3 has no percentile/scope_size, but neither survives mapRisingStarToHCP —
+    // only `rank` reaches the UI — so the narrower row shape is not a loss.
+    const rankPromise = (async () => {
+      const withScopeValue = <T extends { is: any; eq: any }>(q: T) =>
+        scope.scopeValue === null
+          ? q.is("scope_value", null)
+          : q.eq("scope_value", scope.scopeValue);
+
+      const establishedRank = await withScopeValue(
+        supabase
+          .from("hcp_established_ranks_v3")
+          .select("rank, cohort_score, scope_type, scope_value")
+          .eq("hcp_id", hcpId)
+          .eq("therapeutic_area_id", taId)
+          .eq("scope_type", scope.scopeType),
+      ).maybeSingle();
+
+      if (establishedRank.data) {
+        const row = establishedRank.data as Record<string, unknown>;
+        return {
+          data: {
+            rank: row.rank,
+            percentile: null,
+            scope_size: null,
+            score_at_rank: row.cohort_score,
+            cohort: "established",
+            scope_type: row.scope_type,
+            scope_value: row.scope_value,
+          },
+          error: null,
+        };
       }
-      return q.maybeSingle();
+
+      return withScopeValue(
+        supabase
+          .from("hcp_score_ranks_v2")
+          .select("rank, percentile, scope_size, score_at_rank, cohort, scope_type, scope_value")
+          .eq("hcp_id", hcpId)
+          .eq("therapeutic_area_id", taId)
+          .eq("scope_type", scope.scopeType),
+      ).maybeSingle();
     })();
 
     // Narrative is TA-strict: NO fallback to other TAs. If the HCP has no
