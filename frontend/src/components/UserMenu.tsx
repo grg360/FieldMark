@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/authHelpers";
+import { useIsAdmin } from "../lib/useIsAdmin";
 
 export default function UserMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [hcpDrawerOpen, setHcpDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<MslProfile | null>(null);
+  const { isAdmin } = useIsAdmin();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -285,6 +287,19 @@ export default function UserMenu() {
           >
             Settings
           </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                navigate("/admin");
+              }}
+              className="fm-menu-item"
+              style={menuItemStyle}
+            >
+              Admin
+            </button>
+          ) : null}
           <div style={sectionDividerStyle} />
           <button
             type="button"

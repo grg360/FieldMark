@@ -51,6 +51,7 @@ import HomePage from "./components/HomePage/HomePage";
 import ProfileScreen from "./components/ProfileScreen";
 import FieldInsightsScreen from "./components/FieldInsightsScreen";
 import MethodologyPage from "./pages/MethodologyPage";
+import AdminPage from "./components/AdminPage/AdminPage";
 import WatchlistsPage from "./components/WatchlistsPage/WatchlistsPage";
 import FollowUpsPage from "./components/FollowUpsPage/FollowUpsPage";
 import PublicationsListPage from "./components/PublicationsListPage/PublicationsListPage";
@@ -1339,6 +1340,7 @@ export default function App() {
           <Route path="/welcome" element={<WelcomeWizard />} />
           <Route path="/me" element={<HomePage />} />
           <Route path="/me/settings" element={<ProfileScreen />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="/me/insights" element={<FieldInsightsScreen />} />
           <Route path="/methodology" element={<MethodologyPage />} />
           <Route path="/me/watchlists" element={<WatchlistsPage />} />
