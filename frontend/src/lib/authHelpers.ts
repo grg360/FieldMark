@@ -20,6 +20,10 @@ export interface MslProfile {
   allowed_ta_slugs: string[] | null;
   onboarded_at: string | null;
   last_active_at: string | null;
+  // Admin-set suspension timestamp (null = active). Server-controlled: the
+  // column-lock trigger blocks a client from editing it, so a suspended user
+  // cannot self-reactivate. AuthWrapper bounces any session where this is set.
+  deactivated_at: string | null;
   notify_new_rising_stars?: boolean;
   notify_score_changes?: boolean;
   notify_field_notes?: boolean;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { mintInvite, type InviteRow } from "../../lib/admin";
+import { mintInvite, setInviteActive, type InviteRow } from "../../lib/admin";
 import {
   EmptyNote,
   ErrorNote,
@@ -21,6 +21,59 @@ interface Props {
   loading: boolean;
   error: string | null;
   onMinted: () => void;
+  onChanged: () => void;
+}
+
+/** is_active status + reversible revoke/reactivate control, own busy/error. */
+function InviteStatusCell({ row, onChanged }: { row: InviteRow; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function run() {
+    if (row.is_active) {
+      const ok = window.confirm(
+        `Revoke this invite? The link stops working immediately (reversible).`,
+      );
+      if (!ok) return;
+    }
+    setBusy(true);
+    setErr(null);
+    const { error } = await setInviteActive(row.code, !row.is_active);
+    setBusy(false);
+    if (error) {
+      setErr(error);
+      return;
+    }
+    onChanged();
+  }
+
+  return (
+    <Td>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, color: row.is_active ? PALETTE.green : PALETTE.dim }}>
+          {row.is_active ? "active" : "revoked"}
+        </span>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void run()}
+          style={{
+            ...buttonStyle(row.is_active ? "ghost" : "primary"),
+            padding: "3px 10px",
+            fontSize: 11,
+            opacity: busy ? 0.6 : 1,
+            color: row.is_active ? PALETTE.red : PALETTE.accent,
+            borderColor: row.is_active ? PALETTE.red : PALETTE.accent,
+          }}
+        >
+          {busy ? "..." : row.is_active ? "Revoke" : "Reactivate"}
+        </button>
+        {err ? (
+          <span style={{ fontSize: 10, color: PALETTE.red, fontFamily: MONO, maxWidth: 160 }}>{err}</span>
+        ) : null}
+      </div>
+    </Td>
+  );
 }
 
 function CodeCell({ code }: { code: string }) {
@@ -54,7 +107,7 @@ function CodeCell({ code }: { code: string }) {
   );
 }
 
-export default function AdminInvites({ rows, loading, error, onMinted }: Props) {
+export default function AdminInvites({ rows, loading, error, onMinted, onChanged }: Props) {
   const [quota, setQuota] = useState("10");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -188,7 +241,7 @@ export default function AdminInvites({ rows, loading, error, onMinted }: Props) 
         ) : rows.length === 0 ? (
           <EmptyNote>No invites yet.</EmptyNote>
         ) : (
-          <Table columns={["Code", "Inviter", "Uses left", "Redeemed", "Active", "Note", "Created"]}>
+          <Table columns={["Code", "Inviter", "Uses left", "Redeemed", "Status", "Note", "Created"]}>
             {rows.map((r) => (
               <tr key={r.code}>
                 <Td>
@@ -199,9 +252,7 @@ export default function AdminInvites({ rows, loading, error, onMinted }: Props) 
                 <Td mono style={{ color: r.redemption_count > 0 ? PALETTE.accent : undefined }}>
                   {r.redemption_count}
                 </Td>
-                <Td mono style={{ color: r.is_active ? PALETTE.green : PALETTE.dim }}>
-                  {r.is_active ? "yes" : "no"}
-                </Td>
+                <InviteStatusCell row={r} onChanged={onChanged} />
                 <Td dim>{orDash(r.note)}</Td>
                 <Td dim mono>
                   {formatTimestamp(r.created_at)}

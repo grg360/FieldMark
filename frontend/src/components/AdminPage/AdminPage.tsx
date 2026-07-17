@@ -50,6 +50,11 @@ export default function AdminPage() {
     setInvites({ data: data ?? [], loading: false, error });
   }, []);
 
+  const loadUsers = useCallback(async () => {
+    const { data, error } = await listUsers();
+    setUsers({ data: data ?? [], loading: false, error });
+  }, []);
+
   const loadAll = useCallback(async () => {
     setRefreshing(true);
     const [c, i, r, u] = await Promise.all([
@@ -121,11 +126,17 @@ export default function AdminPage() {
         loading={invites.loading}
         error={invites.error}
         onMinted={() => void loadInvites()}
+        onChanged={() => void loadInvites()}
       />
 
       <AdminReferrals rows={referrals.data} loading={referrals.loading} error={referrals.error} />
 
-      <AdminUsers rows={users.data} loading={users.loading} error={users.error} />
+      <AdminUsers
+        rows={users.data}
+        loading={users.loading}
+        error={users.error}
+        onChanged={() => void loadUsers()}
+      />
     </AppLayout>
   );
 }

@@ -54,6 +54,7 @@ export interface AdminUserRow {
   invited_by: string | null;
   invited_by_name: string | null;
   is_admin: boolean;
+  deactivated_at: string | null;
   created_at: string | null;
 }
 
@@ -127,4 +128,35 @@ export async function referralGraph(): Promise<AdminResult<ReferralEdge[]>> {
 export async function listUsers(): Promise<AdminResult<AdminUserRow[]>> {
   const { data, error } = await supabase.rpc("list_users");
   return toResult<AdminUserRow[]>(data ?? [], error);
+}
+
+/**
+ * Deactivate (active=false) or reactivate (active=true) a user. Reversible.
+ * The server rejects an admin deactivating their own account. Returns the row's
+ * resulting { user_id, deactivated_at } so the caller renders server truth.
+ */
+export async function setUserActive(
+  userId: string,
+  active: boolean,
+): Promise<AdminResult<{ user_id: string; deactivated_at: string | null }>> {
+  const { data, error } = await supabase.rpc("set_user_active", {
+    p_user: userId,
+    p_active: active,
+  });
+  return toResult<{ user_id: string; deactivated_at: string | null }>(data, error);
+}
+
+/**
+ * Revoke (active=false) or reactivate (active=true) an invite. Reversible. A
+ * revoked invite stops redeeming immediately (redeem_invite filters is_active).
+ */
+export async function setInviteActive(
+  code: string,
+  active: boolean,
+): Promise<AdminResult<{ code: string; is_active: boolean }>> {
+  const { data, error } = await supabase.rpc("set_invite_active", {
+    p_code: code,
+    p_active: active,
+  });
+  return toResult<{ code: string; is_active: boolean }>(data, error);
 }

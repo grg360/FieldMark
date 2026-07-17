@@ -12,6 +12,7 @@ export default function AuthWrapper({ children }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const [checking, setChecking] = useState(true);
+  const [suspended, setSuspended] = useState(false);
   const { hydrateFromProfile } = useFilterContext();
   const hydratedRef = useRef(false);
 
@@ -43,6 +44,23 @@ export default function AuthWrapper({ children }: Props) {
         navigate("/welcome");
         return;
       }
+
+      // Admin suspension gate — checked on EVERY AuthWrapper pass (the effect
+      // re-runs on each navigation), with a LIVE uncached read so a mid-session
+      // deactivation bounces on the next navigation, not only on full reload
+      // (getMslProfile is memoized and would serve a stale active profile).
+      const { data: statusRow } = await supabase
+        .from("msl_profiles")
+        .select("deactivated_at")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (!active) return;
+      if (statusRow?.deactivated_at) {
+        setSuspended(true);
+        setChecking(false);
+        return;
+      }
+      setSuspended(false);
 
       updateLastActive(session.user.id);
 
@@ -93,6 +111,51 @@ export default function AuthWrapper({ children }: Props) {
         }}
       >
         Loading...
+      </div>
+    );
+  }
+
+  if (suspended) {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#0A0A0B",
+          color: "#E8E6DF",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          padding: 24,
+          textAlign: "center",
+        }}
+      >
+        <div style={{ maxWidth: 420 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
+            Your access has been suspended
+          </div>
+          <p style={{ fontSize: 14, color: "#9B9892", lineHeight: 1.6, margin: "0 0 24px" }}>
+            This account is no longer active. If you think this is a mistake, contact your FieldMark
+            administrator.
+          </p>
+          <button
+            type="button"
+            onClick={() => void supabase.auth.signOut()}
+            style={{
+              backgroundColor: "#0D0D10",
+              border: "1px solid #1E1E22",
+              color: "#9B9892",
+              borderRadius: 4,
+              padding: "8px 20px",
+              fontSize: 13,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     );
   }
