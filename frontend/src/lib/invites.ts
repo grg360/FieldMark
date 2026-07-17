@@ -6,6 +6,52 @@ export interface RedeemResult {
   invite_code: string;
 }
 
+export interface MyInvite {
+  code: string;
+  uses_remaining: number;
+  is_active: boolean;
+  note: string | null;
+  created_at: string;
+}
+
+/**
+ * sessionStorage key that carries the invite code minted for a brand-new user
+ * (returned by redeem_invite() at signup, which SignupScreen would otherwise
+ * discard). Its PRESENCE is the one-time "just signed up" signal the /me welcome
+ * share banner keys off; it is cleared once that banner is dismissed.
+ */
+export const FRESH_INVITE_KEY = "fieldmark_fresh_invite_code";
+
+/** The full shareable link a user pastes into Slack/text/email. */
+export function inviteUrl(code: string): string {
+  return `${window.location.origin}/join/${code}`;
+}
+
+/**
+ * The caller's OWN invite rows. Relies on the Stage 1 `invites_select_own` RLS
+ * policy (inviter_id = auth.uid()) plus the SELECT grant added by
+ * 2026_07_17_invite_link_sharing_grant_select_own.sql — so a plain SELECT
+ * returns only the caller's own invite(s), no RPC needed. Never throws; a
+ * failure (e.g. the grant not yet applied → 42501) resolves to []. Newest first.
+ */
+export async function getMyInvites(): Promise<MyInvite[]> {
+  const { data, error } = await supabase
+    .from("invites")
+    .select("code, uses_remaining, is_active, note, created_at")
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.warn("getMyInvites: select error", error);
+    return [];
+  }
+  return (data ?? []) as MyInvite[];
+}
+
+/** The user's primary shareable invite: newest still-active one, else newest. */
+export function primaryInvite(invites: MyInvite[]): MyInvite | null {
+  if (invites.length === 0) return null;
+  return invites.find((i) => i.is_active && i.uses_remaining > 0) ?? invites[0];
+}
+
 /**
  * Read-only validity pre-check for an invite code (calls the check_invite RPC).
  * Returns true only if the code exists, is active, and has uses remaining.

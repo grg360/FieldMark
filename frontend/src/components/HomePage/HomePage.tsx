@@ -31,6 +31,7 @@ import {
 import AppLayout from "../AppLayout";
 import CoverageGapsTile from "./CoverageGapsTile";
 import HomeHero from "./HomeHero";
+import InviteColleaguesTile from "./InviteColleaguesTile";
 import NextActionsTile from "./NextActionsTile";
 import OpenFollowUpsTile from "./OpenFollowUpsTile";
 import OverdueFollowUpsTile from "./OverdueFollowUpsTile";
@@ -38,6 +39,7 @@ import RecentActivityTile from "./RecentActivityTile";
 import RecentBriefsTile from "./RecentBriefsTile";
 import RecentInsightsTile from "./RecentInsightsTile";
 import TeamIntelligenceTile from "./TeamIntelligenceTile";
+import WelcomeShareBanner from "./WelcomeShareBanner";
 import YourInstitutionsTile from "./YourInstitutionsTile";
 
 export default function HomePage() {
@@ -188,9 +190,13 @@ export default function HomePage() {
           </div>
         ) : summary && userId ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 16, marginBottom: 32 }}>
+            <WelcomeShareBanner />
+
             <HomeHero firstName={userFirstName} summary={summary} territory={territoryProfile} />
 
             <NextActionsTile actions={nextActions} />
+
+            <InviteColleaguesTile />
 
             {userId ? <YourInstitutionsTile userId={userId} /> : null}
 

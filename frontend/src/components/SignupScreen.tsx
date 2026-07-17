@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { checkInvite, redeemInvite } from "../lib/invites";
+import { checkInvite, redeemInvite, FRESH_INVITE_KEY } from "../lib/invites";
 
 const PENDING_INVITE_KEY = "fm_pending_invite";
 
@@ -48,6 +48,12 @@ export default function SignupScreen() {
     const { data, error: redeemErr } = await redeemInvite(c);
     if (!redeemErr && data?.ok) {
       sessionStorage.removeItem(PENDING_INVITE_KEY);
+      // Capture the invite code redeem_invite() just minted for this new user, so
+      // the /me welcome banner can offer it as their share link. Presence of this
+      // key is also the one-time "just signed up" signal.
+      if (data.invite_code) {
+        sessionStorage.setItem(FRESH_INVITE_KEY, data.invite_code);
+      }
       navigate("/welcome");
       return;
     }
