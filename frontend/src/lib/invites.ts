@@ -53,6 +53,34 @@ export function primaryInvite(invites: MyInvite[]): MyInvite | null {
 }
 
 /**
+ * Email the caller's OWN invite to a colleague via the send-invite-email Edge
+ * Function. The client supplies only the recipient (+ optional note) — the server
+ * picks the caller's code (never trust the client for whose invite). Never throws;
+ * returns the server's error message on failure so the UI can show it.
+ */
+export async function sendInviteEmail(
+  recipientEmail: string,
+  note?: string | null,
+): Promise<{ ok: boolean; error: string | null }> {
+  const { data, error } = await supabase.functions.invoke("send-invite-email", {
+    body: { recipientEmail, note: note?.trim() || undefined },
+  });
+  if (error) {
+    // Edge errors (4xx/5xx) surface the JSON { error } body via context when available.
+    let message = error.message;
+    try {
+      const parsed = await (error as { context?: Response }).context?.json?.();
+      if (parsed?.error) message = parsed.error as string;
+    } catch {
+      // keep the generic message
+    }
+    return { ok: false, error: message };
+  }
+  if (data && (data as { ok?: boolean }).ok) return { ok: true, error: null };
+  return { ok: false, error: (data as { error?: string })?.error ?? "Send failed" };
+}
+
+/**
  * Read-only validity pre-check for an invite code (calls the check_invite RPC).
  * Returns true only if the code exists, is active, and has uses remaining.
  * Safe to call pre-auth (anon). Never throws; a failure resolves to false.

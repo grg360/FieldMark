@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getMyInvites, primaryInvite, type MyInvite } from "../../lib/invites";
 import HomeTile from "./HomeTile";
+import InviteEmailForm from "./InviteEmailForm";
 import InviteShareCard from "./InviteShareCard";
 
 /**
@@ -47,6 +48,22 @@ export default function InviteColleaguesTile() {
         Share your personal link. Anyone you invite gets FieldMark access — and their own invites to pass on.
       </p>
       <InviteShareCard code={invite.code} usesRemaining={invite.uses_remaining} />
+
+      <div
+        style={{
+          borderTop: "1px solid #1E1E22",
+          margin: "16px 0 12px",
+          paddingTop: 12,
+          fontSize: 11,
+          color: "#6B6A65",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          fontWeight: 500,
+        }}
+      >
+        Or email an invite
+      </div>
+      <InviteEmailForm />
     </HomeTile>
   );
 }
