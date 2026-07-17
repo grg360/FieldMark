@@ -180,7 +180,7 @@ export default function SignupScreen() {
             <div style={{ textAlign: "center", fontSize: 12, color: "#6B6A65", marginBottom: 24 }}>Create your account to continue.</div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <input type="email" placeholder="Work email" value={email} autoComplete="email"
+              <input type="email" placeholder="Email" value={email} autoComplete="email"
                 onChange={(e) => setEmail(e.target.value)} onKeyDown={handleKeyDown} style={input} />
               <input type="password" placeholder="Create a password" value={password} autoComplete="new-password"
                 onChange={(e) => setPassword(e.target.value)} onKeyDown={handleKeyDown} style={input} />

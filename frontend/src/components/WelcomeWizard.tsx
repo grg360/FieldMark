@@ -31,6 +31,7 @@ export default function WelcomeWizard() {
   const [region, setRegion] = useState("");
   const [statesCovered, setStatesCovered] = useState<string[]>([]);
   const [jobFunction, setJobFunction] = useState("");
+  const [jobFunctionOther, setJobFunctionOther] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -70,6 +71,10 @@ export default function WelcomeWizard() {
     if (step === 3) {
       if (!jobFunction) {
         setError("Please select your function.");
+        return;
+      }
+      if (jobFunction === "other" && !jobFunctionOther.trim()) {
+        setError("Please tell us your function.");
         return;
       }
     }
@@ -112,7 +117,7 @@ export default function WelcomeWizard() {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         company: company.trim(),
-        job_function: jobFunction,
+        job_function: jobFunction === "other" ? jobFunctionOther.trim() : jobFunction,
         region,
         states_covered: statesCovered,
         onboarded_at: new Date().toISOString(),
@@ -126,7 +131,7 @@ export default function WelcomeWizard() {
       return;
     }
 
-    navigate("/");
+    navigate("/me");
   }
 
   return (
@@ -261,6 +266,16 @@ export default function WelcomeWizard() {
                 </button>
               ))}
             </div>
+            {jobFunction === "other" ? (
+              <input
+                type="text"
+                placeholder="Tell us your function (e.g., Market Access)"
+                value={jobFunctionOther}
+                onChange={(e) => setJobFunctionOther(e.target.value)}
+                autoFocus
+                style={{ ...inputStyle, marginTop: 8, marginBottom: 0 }}
+              />
+            ) : null}
           </>
         )}
 

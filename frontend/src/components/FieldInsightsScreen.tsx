@@ -75,114 +75,6 @@ const IG_ACCENT = "#1D9E75";
 const IG_ACCENT_BG = "rgba(29, 158, 117, 0.10)";
 const IG_ACCENT_BORDER = "rgba(29, 158, 117, 0.30)";
 
-const MOCK_INSIGHTS: FieldInsight[] = [
-  {
-    id: "mock-1",
-    hcp_id: "2302d82f-c44a-498e-b0ab-6ca39a3f8964",
-    hcp_first_name: "John V.",
-    hcp_last_name: "Heymach",
-    body: "Raised concerns regarding biomarker testing implementation outside major academic centers. Specifically questioned whether community oncology practices are equipped to operationalize comprehensive genomic profiling within the AEGEAN perioperative window.",
-    why_it_matters: "Could be a leading indicator that perioperative IO uptake will lag in community settings unless testing workflow is addressed directly. Worth flagging to brand strategy.",
-    interaction_type: "advisory_board",
-    visibility: "team",
-    occurred_at: "2026-06-12T15:30:00+00:00",
-    insight_strength: "high" as InsightStrength,
-    insight_category: "message_challenge" as InsightCategory,
-    author_user_id: "f0a8352f-3846-4a85-b96d-f91d8b3109f4",
-    author_initials: "GR",
-  },
-  {
-    id: "mock-2",
-    hcp_id: "2302d82f-c44a-498e-b0ab-6ca39a3f8964",
-    hcp_first_name: "John V.",
-    hcp_last_name: "Heymach",
-    body: "Requested additional data supporting sequencing decisions following progression on perioperative immunotherapy. Indicated current evidence base is thin for second-line targeted therapy selection in patients who progress through neoadjuvant IO.",
-    why_it_matters: "This is the second top-tier KOL this quarter raising the same evidence gap. May warrant a real-world data study or investigator-initiated research opportunity.",
-    interaction_type: "one_on_one",
-    visibility: "team",
-    occurred_at: "2026-06-02T14:00:00+00:00",
-    insight_strength: "high" as InsightStrength,
-    insight_category: "evidence_gap" as InsightCategory,
-    author_user_id: "f0a8352f-3846-4a85-b96d-f91d8b3109f4",
-    author_initials: "GR",
-  },
-  {
-    id: "mock-3",
-    hcp_id: "2302d82f-c44a-498e-b0ab-6ca39a3f8964",
-    hcp_first_name: "John V.",
-    hcp_last_name: "Heymach",
-    body: "Highlighted MATTERHORN durability data as particularly compelling in treatment discussions with referring physicians. Noted long-term response duration data is reshaping how he frames adjuvant decisions in EGFR-wildtype patients.",
-    why_it_matters: "Durability messaging is landing with senior KOLs. Consider amplifying this narrative thread in upcoming HCP-facing communications.",
-    interaction_type: "congress",
-    visibility: "team",
-    occurred_at: "2026-05-18T10:15:00+00:00",
-    insight_strength: "medium" as InsightStrength,
-    insight_category: "message_reinforcement" as InsightCategory,
-    author_user_id: "f0a8352f-3846-4a85-b96d-f91d8b3109f4",
-    author_initials: "GR",
-  },
-  {
-    id: "mock-4",
-    hcp_id: "71b51a2d-0f56-434f-abf4-f6755c796eaf",
-    hcp_first_name: "Suresh S.",
-    hcp_last_name: "Ramalingam",
-    body: "Discussed competitor durvalumab positioning in Stage III consolidation. Indicated colleagues in community settings are increasingly comparing PACIFIC data with newer combination strategies and questioning whether durvalumab monotherapy remains the optimal backbone.",
-    why_it_matters: "Community sentiment may be shifting before formal guidelines update. Strategic positioning around combination data may need to move forward in the planning cycle.",
-    interaction_type: "one_on_one",
-    visibility: "team",
-    occurred_at: "2026-06-08T11:45:00+00:00",
-    insight_strength: "high" as InsightStrength,
-    insight_category: "competitor_signal" as InsightCategory,
-    author_user_id: "f0a8352f-3846-4a85-b96d-f91d8b3109f4",
-    author_initials: "GR",
-  },
-  {
-    id: "mock-5",
-    hcp_id: "71b51a2d-0f56-434f-abf4-f6755c796eaf",
-    hcp_first_name: "Suresh S.",
-    hcp_last_name: "Ramalingam",
-    body: "Voiced skepticism about PD-L1 expression as a reliable selection marker for IO combinations. Argued that integrated biomarker panels combining PD-L1 with TMB and inflammatory gene signatures will replace single-marker selection within 3-5 years.",
-    why_it_matters: "Signal that biomarker strategy may need to evolve toward composite panels. Could affect companion diagnostic discussions and trial design assumptions.",
-    interaction_type: "advisory_board",
-    visibility: "team",
-    occurred_at: "2026-05-24T16:00:00+00:00",
-    insight_strength: "medium" as InsightStrength,
-    insight_category: "clinical_practice_trend" as InsightCategory,
-    author_user_id: "f0a8352f-3846-4a85-b96d-f91d8b3109f4",
-    author_initials: "GR",
-  },
-  {
-    id: "mock-6",
-    hcp_id: "b217c02b-9402-497e-9fba-f8cc69bb382b",
-    hcp_first_name: "Alexander I.",
-    hcp_last_name: "Spira",
-    body: "Flagged emerging community practice pattern of using KRAS G12C inhibitors earlier in sequencing than guidelines recommend. Suggested real-world data may need to catch up to community adoption before optimal sequencing can be defined.",
-    why_it_matters: "Practice ahead of evidence is both a risk and an opportunity. Real-world data partnership with high-volume community practices could become a meaningful evidence-generation move.",
-    interaction_type: "tumor_board",
-    visibility: "team",
-    occurred_at: "2026-05-30T13:20:00+00:00",
-    insight_strength: "high" as InsightStrength,
-    insight_category: "clinical_practice_trend" as InsightCategory,
-    author_user_id: "f0a8352f-3846-4a85-b96d-f91d8b3109f4",
-    author_initials: "GR",
-  },
-  {
-    id: "mock-7",
-    hcp_id: "5c4b1a8e-0000-0000-0000-000000000007",
-    hcp_first_name: "Aditi P.",
-    hcp_last_name: "Singh",
-    body: "Raised reimbursement barrier for comprehensive genomic profiling in Medicare Advantage patients. Reports several referring oncologists have been declining CGP based on prior authorization friction, leading to under-identification of actionable mutations.",
-    why_it_matters: "If CGP isn't happening, downstream targeted therapy decisions cannot be made correctly. May warrant payor engagement strategy or patient assistance program awareness push.",
-    interaction_type: "one_on_one",
-    visibility: "team",
-    occurred_at: "2026-06-15T09:30:00+00:00",
-    insight_strength: "medium" as InsightStrength,
-    insight_category: "access_reimbursement" as InsightCategory,
-    author_user_id: "f0a8352f-3846-4a85-b96d-f91d8b3109f4",
-    author_initials: "GR",
-  },
-];
-
 const STRENGTH_LABELS: Record<InsightStrength, string> = {
   high: "High signal",
   medium: "Medium signal",
@@ -215,15 +107,11 @@ export default function FieldInsightsScreen() {
     getFieldInsightsForCurrentUser()
       .then((data) => {
         if (cancelled) return;
-        if (data.length === 0) {
-          setInsights(MOCK_INSIGHTS);
-        } else {
-          setInsights(data);
-        }
+        setInsights(data);
       })
       .catch((err) => {
         console.warn("FieldInsightsScreen: load error", err);
-        if (!cancelled) setInsights(MOCK_INSIGHTS);
+        if (!cancelled) setInsights([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
