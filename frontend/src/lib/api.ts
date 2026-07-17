@@ -2509,9 +2509,23 @@ export async function searchHCPs(
     return { inCurrentTA: [], inOtherTAs: [] };
   }
 
-  const searchPattern = `%${sanitized.replace(/%/g, "\\%")}%`;
+  // Tokenize on whitespace/commas so a full-name query matches ACROSS both name
+  // fields. Each token must appear in first_name OR last_name, AND'd across tokens
+  // (chained .or() groups combine with AND in PostgREST). This makes "John Heymach",
+  // "Heymach John", "Heymach", and "John" all match {first_name:"John V.",
+  // last_name:"Heymach"} — word order and a stored middle initial don't matter
+  // because tokens are independent substrings. Previously the whole query was
+  // matched per-field, so "John Heymach" matched neither field and returned 0.
+  const tokens = sanitized
+    .split(/[\s,]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
+    .slice(0, 6);
+  if (tokens.length === 0) {
+    return { inCurrentTA: [], inOtherTAs: [] };
+  }
 
-  const { data, error } = await supabase
+  let queryBuilder = supabase
     .from("hcps_v2")
     .select(
       `
@@ -2526,8 +2540,20 @@ export async function searchHCPs(
         therapeutic_areas ( name )
       )
     `,
-    )
-    .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern}`)
+    );
+
+  for (const token of tokens) {
+    const pattern = `%${token.replace(/[%_]/g, "\\$&")}%`;
+    queryBuilder = queryBuilder.or(`first_name.ilike.${pattern},last_name.ilike.${pattern}`);
+  }
+
+  // Order by cohort_score DESC so the highest-value matches survive the 50-row cap.
+  // Previously an unordered .limit(50) returned an arbitrary subset — for a common
+  // token like "John" (~1,660 matches) it silently dropped ranked KOLs (e.g. a
+  // US-#7 with cohort_score 100). last_name is a deterministic tiebreaker.
+  const { data, error } = await queryBuilder
+    .order("cohort_score", { ascending: false, nullsFirst: false })
+    .order("last_name", { ascending: true })
     .limit(50);
 
   if (error || !data) {

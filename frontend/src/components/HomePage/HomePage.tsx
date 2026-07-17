@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useTA } from "../../lib/TAContext";
 import { taIdForApiSlug } from "../../lib/api";
-import { taLabelToApiSlug, taSlugToLabel } from "../../lib/routeSlugs";
+import { buildHcpDetailPath, taLabelToApiSlug, taSlugToLabel } from "../../lib/routeSlugs";
 import { addHcpToDefaultOrCreate } from "../../lib/relationships";
 import { supabase } from "../../lib/supabase";
 import { useIsDesktop } from "../../lib/useIsDesktop";
@@ -44,6 +45,7 @@ import WelcomeShareBanner from "./WelcomeShareBanner";
 import YourInstitutionsTile from "./YourInstitutionsTile";
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   // The home dashboard has no feed URL, so its TA is anchored to the USER'S PROFILE
   // default (resolved in load() below) rather than the volatile last-browsed ambient
@@ -52,6 +54,7 @@ export default function HomePage() {
   // tiles' own useTA() reads stay consistent.
   const { setTA } = useTA();
   const [homeTaId, setHomeTaId] = useState<string | undefined>(undefined);
+  const [homeTaLabel, setHomeTaLabel] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null);
   const { refreshAll } = useRelationships();
   const [trackRefreshCounter, setTrackRefreshCounter] = useState(0);
@@ -100,6 +103,7 @@ export default function HomePage() {
           taIdForApiSlug(indicationSlug) ??
           taIdForApiSlug(taLabelToApiSlug(taSlugToLabel(parentSlug)));
         setHomeTaId(resolvedTaId);
+        setHomeTaLabel(taSlugToLabel(parentSlug));
         setTA(parentSlug, indicationSlug);
 
         const [
@@ -151,6 +155,16 @@ export default function HomePage() {
     };
   }, [setTA]);
 
+  // KOL search from the /me TopBar. Mirrors the feed's handleSearchSelect: go to
+  // the HCP detail page, passing the user's default-TA label as the display hint
+  // (the detail route re-resolves the HCP's primary TA when no taId is given).
+  const handleSearchSelect = useCallback(
+    (hcpId: string) => {
+      navigate(buildHcpDetailPath(hcpId), { state: { taLabel: homeTaLabel } });
+    },
+    [navigate, homeTaLabel],
+  );
+
   const handleTrackHcp = useCallback(async (hcpId: string) => {
     if (!userId) throw new Error("No user");
     await addHcpToDefaultOrCreate(userId, hcpId, "coverage_gaps");
@@ -169,7 +183,7 @@ export default function HomePage() {
   const gridColumns = isDesktop ? "1fr 1fr" : "1fr";
 
   return (
-    <AppLayout>
+    <AppLayout currentTaId={homeTaId} onSearchSelect={handleSearchSelect}>
         {loading ? (
           <div
             style={{

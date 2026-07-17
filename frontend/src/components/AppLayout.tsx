@@ -12,9 +12,19 @@ interface Props {
   breadcrumbs?: BreadcrumbItem[];
   children: ReactNode;
   maxWidth?: number;
+  // Opt-in KOL search: when BOTH are provided, TopBar renders the SearchBar.
+  // Pages that omit them (settings, watchlists, institutions) are unchanged.
+  currentTaId?: string;
+  onSearchSelect?: (hcpId: string, taId: string) => void;
 }
 
-export default function AppLayout({ breadcrumbs, children, maxWidth = 960 }: Props) {
+export default function AppLayout({
+  breadcrumbs,
+  children,
+  maxWidth = 960,
+  currentTaId,
+  onSearchSelect,
+}: Props) {
   const navigate = useNavigate();
 
   return (
@@ -34,7 +44,11 @@ export default function AppLayout({ breadcrumbs, children, maxWidth = 960 }: Pro
           boxSizing: "border-box",
         }}
       >
-        <TopBar onLogoPress={() => navigate("/me")} />
+        <TopBar
+          onLogoPress={() => navigate("/me")}
+          currentTaId={currentTaId}
+          onSearchSelect={onSearchSelect}
+        />
 
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <nav
