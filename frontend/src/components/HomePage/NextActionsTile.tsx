@@ -109,9 +109,9 @@ export default function NextActionsTile({ actions }: Props) {
 
       {actions.length === 0 ? (
         <div>
-          <div style={{ fontSize: 14, color: "#E8E6DF" }}>You&apos;re all caught up.</div>
+          <div style={{ fontSize: 14, color: "#E8E6DF" }}>No actions scheduled yet.</div>
           <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 4 }}>
-            No overdue or scheduled follow-ups.
+            Track HCPs and add follow-ups, and your next actions will appear here.
           </div>
         </div>
       ) : (

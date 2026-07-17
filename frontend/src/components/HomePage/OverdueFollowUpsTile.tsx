@@ -43,7 +43,7 @@ export default function OverdueFollowUpsTile({ overdueFollowUps, totalCount }: P
       {overdueFollowUps.length === 0 ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#3FB8AF", fontSize: 14 }}>{String.fromCharCode(0x2713)}</span>
-          <span style={{ fontSize: 14, color: "#E8E6DF" }}>You&apos;re all caught up.</span>
+          <span style={{ fontSize: 14, color: "#E8E6DF" }}>Nothing overdue.</span>
         </div>
       ) : (
         <div>

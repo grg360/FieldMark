@@ -38,6 +38,7 @@ import OverdueFollowUpsTile from "./OverdueFollowUpsTile";
 import RecentActivityTile from "./RecentActivityTile";
 import RecentBriefsTile from "./RecentBriefsTile";
 import RecentInsightsTile from "./RecentInsightsTile";
+import StartHereCard from "./StartHereCard";
 import TeamIntelligenceTile from "./TeamIntelligenceTile";
 import WelcomeShareBanner from "./WelcomeShareBanner";
 import YourInstitutionsTile from "./YourInstitutionsTile";
@@ -192,6 +193,14 @@ export default function HomePage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 16, marginBottom: 32 }}>
             <WelcomeShareBanner />
 
+            <StartHereCard
+              isColdStart={
+                summary.watched_hcps === 0 &&
+                summary.open_followups === 0 &&
+                summary.overdue_followups === 0
+              }
+            />
+
             <HomeHero firstName={userFirstName} summary={summary} territory={territoryProfile} />
 
             <NextActionsTile actions={nextActions} />
@@ -200,7 +209,9 @@ export default function HomePage() {
 
             {userId ? <YourInstitutionsTile userId={userId} /> : null}
 
-            <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} onTrack={handleTrackHcp} refreshTrigger={trackRefreshCounter} />
+            <div id="coverage-gaps">
+              <CoverageGapsTile gaps={coverageGaps} stats={territoryStats} onTrack={handleTrackHcp} refreshTrigger={trackRefreshCounter} />
+            </div>
 
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: 32 }}>
               <OverdueFollowUpsTile

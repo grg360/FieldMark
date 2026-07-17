@@ -7,6 +7,43 @@ const TA_SLUG_TO_UUID: Record<string, string> = {
   NSCLC: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
 };
 
+// Cached TA hierarchy (id, slug, parent_ta_id) — a tiny table. Used only by the
+// first-run fallback below to resolve parent slugs to their indication TA ids.
+let taHierarchyCache: Promise<Array<{ id: string; slug: string; parent_ta_id: string | null }>> | null = null;
+
+async function getTaHierarchy(): Promise<Array<{ id: string; slug: string; parent_ta_id: string | null }>> {
+  if (!taHierarchyCache) {
+    taHierarchyCache = (async () => {
+      const { data, error } = await supabase
+        .from("therapeutic_areas")
+        .select("id, slug, parent_ta_id");
+      if (error) {
+        taHierarchyCache = null;
+        return [];
+      }
+      return (data ?? []) as Array<{ id: string; slug: string; parent_ta_id: string | null }>;
+    })();
+  }
+  return taHierarchyCache;
+}
+
+// Resolve entitlement parent slugs (allowed_ta_slugs, e.g. ["oncology"]) to the
+// TA ids the rank/cohort tables are keyed by — the parent's OWN id AND its
+// children's (rising-star ranks live on indication-level TAs like NSCLC, whose
+// parent is oncology). First-run fallback only.
+async function taUuidsForParentSlugs(slugs: string[]): Promise<string[]> {
+  if (slugs.length === 0) return [];
+  const rows = await getTaHierarchy();
+  const wanted = new Set(slugs.map((s) => s.toLowerCase()));
+  const parentIds = new Set(rows.filter((r) => wanted.has(r.slug)).map((r) => r.id));
+  const ids = new Set<string>();
+  for (const r of rows) {
+    if (wanted.has(r.slug)) ids.add(r.id); // the entitled TA itself
+    if (r.parent_ta_id && parentIds.has(r.parent_ta_id)) ids.add(r.id); // its indications
+  }
+  return [...ids];
+}
+
 export interface HcpRef {
   hcp_id: string;
   name: string;
@@ -589,7 +626,7 @@ async function getUserTerritoryContext(userId: string): Promise<{
 } | null> {
   const { data, error } = await supabase
     .from("msl_profiles")
-    .select("territory_label, territory_states, therapeutic_areas")
+    .select("territory_label, territory_states, therapeutic_areas, states_covered, allowed_ta_slugs")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -599,11 +636,28 @@ async function getUserTerritoryContext(userId: string): Promise<{
   }
   if (!data) return null;
 
-  const states = Array.isArray(data.territory_states) ? data.territory_states : [];
+  // FIRST-RUN FALLBACK. The WelcomeWizard writes states_covered + allowed_ta_slugs
+  // but NOT the canonical territory_states / therapeutic_areas (only ProfileScreen
+  // sets those). Without this, every fresh signup has empty territory here, so
+  // getCoverageGapsForUser bails at the states/taUuids guard and the Coverage Gaps
+  // onboarding tile is silently empty. Fall back ONLY when the canonical column is
+  // absent — a user who has set territory_states/therapeutic_areas is unaffected.
+  const canonicalStates = Array.isArray(data.territory_states) ? data.territory_states : [];
+  const states =
+    canonicalStates.length > 0
+      ? canonicalStates
+      : Array.isArray(data.states_covered)
+        ? data.states_covered
+        : [];
+
   const taLabels: string[] = Array.isArray(data.therapeutic_areas) ? data.therapeutic_areas : [];
-  const taUuids = taLabels
+  let taUuids = taLabels
     .map((label) => TA_SLUG_TO_UUID[label.toUpperCase()])
     .filter((uuid): uuid is string => Boolean(uuid));
+  if (taUuids.length === 0) {
+    const allowed = Array.isArray(data.allowed_ta_slugs) ? data.allowed_ta_slugs : [];
+    taUuids = await taUuidsForParentSlugs(allowed);
+  }
 
   return {
     states,
