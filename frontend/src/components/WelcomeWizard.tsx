@@ -12,6 +12,13 @@ const US_REGIONS = [
   { value: "national", label: "National", states: [] },
 ];
 
+const FUNCTION_OPTIONS = [
+  { value: "medical_affairs", label: "Medical Affairs" },
+  { value: "clinical_development", label: "Clinical Development" },
+  { value: "commercial", label: "Commercial" },
+  { value: "other", label: "Other" },
+];
+
 export default function WelcomeWizard() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -23,12 +30,25 @@ export default function WelcomeWizard() {
   const [company, setCompany] = useState("");
   const [region, setRegion] = useState("");
   const [statesCovered, setStatesCovered] = useState<string[]>([]);
+  const [jobFunction, setJobFunction] = useState("");
 
   useEffect(() => {
     (async () => {
       const user = await getCurrentUser();
       if (!user) {
         navigate("/landing");
+        return;
+      }
+      // Prefill name from an OAuth provider's metadata (e.g. LinkedIn) when present.
+      const meta = (user.user_metadata ?? {}) as Record<string, string | undefined>;
+      const given = meta.given_name ?? meta.first_name;
+      const family = meta.family_name ?? meta.last_name;
+      if (given) setFirstName((v) => v || given);
+      if (family) setLastName((v) => v || family);
+      if (!given && !family && meta.name) {
+        const parts = meta.name.trim().split(/\s+/);
+        setFirstName((v) => v || parts[0] || "");
+        setLastName((v) => v || parts.slice(1).join(" "));
       }
     })();
   }, [navigate]);
@@ -44,6 +64,12 @@ export default function WelcomeWizard() {
     if (step === 2) {
       if (!company.trim()) {
         setError("Company required.");
+        return;
+      }
+    }
+    if (step === 3) {
+      if (!jobFunction) {
+        setError("Please select your function.");
         return;
       }
     }
@@ -77,21 +103,25 @@ export default function WelcomeWizard() {
       return;
     }
 
-    const { error: insertErr } = await supabase
+    // redeem_invite() pre-created this row with server-set allowed_ta_slugs and
+    // invited_by (both column-locked). UPDATE only user-editable fields — never
+    // include allowed_ta_slugs / invited_by or the lock trigger will reject the write.
+    const { error: updateErr } = await supabase
       .from("msl_profiles")
-      .insert({
-        user_id: user.id,
+      .update({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         company: company.trim(),
+        job_function: jobFunction,
         region,
         states_covered: statesCovered,
         onboarded_at: new Date().toISOString(),
         last_active_at: new Date().toISOString(),
-      });
+      })
+      .eq("user_id", user.id);
 
-    if (insertErr) {
-      setError(insertErr.message);
+    if (updateErr) {
+      setError(updateErr.message);
       setLoading(false);
       return;
     }
@@ -144,7 +174,7 @@ export default function WelcomeWizard() {
           gap: 8,
         }}
       >
-        {[1, 2, 3].map((s) => (
+        {[1, 2, 3, 4].map((s) => (
           <div
             key={s}
             style={{
@@ -204,6 +234,37 @@ export default function WelcomeWizard() {
         )}
 
         {step === 3 && (
+          <>
+            <div style={{ fontSize: 18, color: "#E8E6DF", marginBottom: 8 }}>
+              What's your function?
+            </div>
+            <div style={{ fontSize: 12, color: "#6B6A65", marginBottom: 20 }}>
+              Helps us tailor FieldMark to how you work.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {FUNCTION_OPTIONS.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setJobFunction(f.value)}
+                  style={{
+                    ...regionButtonStyle,
+                    height: 48,
+                    textAlign: "left",
+                    paddingLeft: 14,
+                    borderColor: jobFunction === f.value ? "#E8A020" : "#1E1E22",
+                    backgroundColor: jobFunction === f.value ? "rgba(232,160,32,0.1)" : "#0F0F12",
+                    color: jobFunction === f.value ? "#E8A020" : "#E8E6DF",
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {step === 4 && (
           <>
             <div style={{ fontSize: 18, color: "#E8E6DF", marginBottom: 8 }}>
               What's your territory?
@@ -285,7 +346,7 @@ export default function WelcomeWizard() {
             Back
           </button>
         ) : null}
-        {step < 3 ? (
+        {step < 4 ? (
           <button type="button" onClick={handleNext} style={primaryBtnStyle}>
             Continue
           </button>

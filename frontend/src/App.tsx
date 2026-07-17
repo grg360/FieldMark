@@ -29,6 +29,7 @@ import Telescope from "./components/Telescope";
 import TelescopeDrawer from "./components/TelescopeDrawer";
 import TelescopeLegend from "./components/TelescopeLegend";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
+import SignupScreen from "./components/SignupScreen";
 import AuthWrapper from "./components/AuthWrapper";
 import { RelationshipsProvider } from "./contexts/RelationshipsContext";
 import WelcomeWizard from "./components/WelcomeWizard";
@@ -1326,6 +1327,8 @@ export default function App() {
       <TAProvider>
       <Routes>
       <Route path="/demo" element={<DemoPage />} />
+      <Route path="/join/:code" element={<SignupScreen />} />
+      <Route path="/join" element={<SignupScreen />} />
       <Route
         path="*"
         element={

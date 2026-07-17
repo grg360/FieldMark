@@ -7,6 +7,8 @@ export interface MslProfile {
   last_name: string | null;
   company: string | null;
   role: string | null;
+  job_function: string | null;
+  invited_by: string | null;
   region: string | null;
   states_covered: string[] | null;
   default_ta_slug: string | null;
