@@ -100,14 +100,32 @@ const SUB_ABBR: Record<string, string> = {
   "Dermatological Immunology": "IMMUN",
 };
 
-const SUB_COLOR: Record<string, string> = {
-  "General Dermatology": "#8b93a7",
-  "Pediatric Dermatology": "#e0a52e", // gold — the AD-critical one
-  "MOHS Surgery": "#6f9dc4",
-  "Dermatopathology": "#9d7fc4",
-  "Procedural": "#6fb0a0",
-  "Dermatological Immunology": "#c47f9d",
-};
+// Local app-palette constant. FieldMark has no shared design-token module yet
+// (only data-specific palettes like themeHeatPalette / insightCategories), so the
+// app's convention is inline hex repeated per component (HCPCard, AppLayout,
+// ScoreKpiTile, StatPillWithTooltip…). This mirrors those exact values so the
+// Community directory matches the Rising/Established surfaces and is themed from
+// one place. Extracting a shared lib/uiTokens.ts is deliberate future work — see
+// the design-token debt note — not smuggled in via this one screen.
+const C = {
+  bg: "#0A0A0B", // app root background
+  card: "#111113", // card surface (HCPCard container)
+  tile: "#0F0F0F", // inner stat-tile surface (ScoreKpiTile)
+  tileBorder: "#2A2A2A", // inner stat-tile border (ScoreKpiTile)
+  border: "#1E1E22", // standard divider/border
+  text: "#E8E6DF", // primary text
+  muted: "#9B9892", // secondary text
+  dim: "#6B6A65", // labels / tertiary text
+  faint: "#3A3A3F", // faintest
+  accent: "#E8A020", // brand amber — values + active states
+  accentBg: "rgba(232,160,32,0.10)",
+  accentBorder: "rgba(232,160,32,0.40)",
+  teal: "#4ECDC4", // secondary signal (KOL badge), from the app cohort palette
+  tealBg: "rgba(78,205,196,0.08)",
+  tealBorder: "rgba(78,205,196,0.30)",
+  mono: "monospace",
+  sans: "system-ui, -apple-system, sans-serif",
+} as const;
 
 interface PaymentEntry {
   name?: string;
@@ -267,7 +285,7 @@ export default function CommunityExplorer({ taLabel = "Atopic Dermatitis" }: { t
       {/* search row */}
       <div style={S.searchRow}>
         <div style={S.searchWrap}>
-          <Search size={15} color="#6b7280" style={{ position: "absolute", left: 12, top: 11 }} />
+          <Search size={15} color={C.dim} style={{ position: "absolute", left: 12, top: 11 }} />
           <input
             style={S.search}
             placeholder="Search dermatologists by name or city…"
@@ -275,7 +293,7 @@ export default function CommunityExplorer({ taLabel = "Atopic Dermatitis" }: { t
             onChange={(e) => setQuery(e.target.value)}
           />
           {query && (
-            <X size={15} color="#6b7280" style={{ position: "absolute", right: 12, top: 11, cursor: "pointer" }} onClick={() => setQuery("")} />
+            <X size={15} color={C.dim} style={{ position: "absolute", right: 12, top: 11, cursor: "pointer" }} onClick={() => setQuery("")} />
           )}
         </div>
       </div>
@@ -302,7 +320,7 @@ export default function CommunityExplorer({ taLabel = "Atopic Dermatitis" }: { t
             style={{ ...S.toggle, ...(adOnly ? S.toggleOn : {}) }}
             onClick={() => setAdOnly((v) => !v)}
           >
-            <span style={{ ...S.dot, background: adOnly ? "#e0a52e" : "#3a4152" }} />
+            <span style={{ ...S.dot, background: adOnly ? C.accent : C.faint }} />
             AD-drug engagement
           </button>
           <div style={{ flex: 1 }} />
@@ -351,7 +369,6 @@ export default function CommunityExplorer({ taLabel = "Atopic Dermatitis" }: { t
 }
 
 function DermCard({ r }: { r: DermRecord }) {
-  const subColor = SUB_COLOR[r.sub] || "#8b93a7";
   return (
     <div style={S.card}>
       <div style={S.cardTop}>
@@ -360,13 +377,11 @@ function DermCard({ r }: { r: DermRecord }) {
             {r.first} {r.last}, <span style={S.cred}>{r.cred}</span>
           </div>
           <div style={S.loc}>
-            <MapPin size={11} color="#6b7280" style={{ flexShrink: 0 }} />
+            <MapPin size={11} color={C.dim} style={{ flexShrink: 0 }} />
             <span>{r.city}, {r.state}</span>
           </div>
         </div>
-        <div style={{ ...S.subBadge, color: subColor, borderColor: subColor + "55", background: subColor + "14" }}>
-          {SUB_ABBR[r.sub]}
-        </div>
+        <div style={S.subBadge}>{SUB_ABBR[r.sub]}</div>
       </div>
 
       {/* engagement strip */}
@@ -375,9 +390,9 @@ function DermCard({ r }: { r: DermRecord }) {
           <div style={S.engLabel}>OPEN PAYMENTS (3YR)</div>
           <div style={S.engVal}>{money(r.total)}</div>
         </div>
-        <div style={{ ...S.engCell, ...S.engAd }}>
+        <div style={S.engCell}>
           <div style={S.engLabel}>AD-DRUG $</div>
-          <div style={{ ...S.engVal, color: r.adTotal > 0 ? "#e0a52e" : "#4b5262" }}>{money(r.adTotal)}</div>
+          <div style={{ ...S.engVal, color: r.adTotal > 0 ? C.accent : C.dim }}>{money(r.adTotal)}</div>
         </div>
         <div style={S.engCell}>
           <div style={S.engLabel}>TOP MFR</div>
@@ -432,63 +447,62 @@ function Dropdown({ label, value, setValue, options }: { label: string; value: s
 }
 
 const S: Record<string, React.CSSProperties> = {
-  root: { background: "#0a0d14", color: "#e6e9ef", fontFamily: "'Inter', system-ui, sans-serif", padding: "0 0 40px" },
+  root: { background: C.bg, color: C.text, fontFamily: C.sans, padding: "0 0 40px" },
 
   searchRow: { display: "flex", justifyContent: "center", padding: "14px 22px 0" },
   searchWrap: { position: "relative", flex: 1, maxWidth: 520 },
-  search: { width: "100%", background: "#11151e", border: "1px solid #222835", borderRadius: 8, padding: "9px 34px", color: "#e6e9ef", fontSize: 13.5, outline: "none", boxSizing: "border-box" },
+  search: { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: "9px 34px", color: C.text, fontSize: 13.5, outline: "none", boxSizing: "border-box", fontFamily: C.sans },
 
   headerLine: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: "22px 24px 12px", maxWidth: 1180, margin: "0 auto" },
-  h1: { fontSize: 20, fontWeight: 700 },
-  subtitle: { color: "#6b7280", fontSize: 12.5, marginTop: 4 },
-  filterBtn: { display: "flex", alignItems: "center", gap: 6, background: "#11151e", border: "1px solid #222835", color: "#c4cad6", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, cursor: "pointer" },
+  h1: { fontSize: 20, fontWeight: 600, color: C.text },
+  subtitle: { color: C.dim, fontSize: 12.5, marginTop: 4 },
+  filterBtn: { display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${C.border}`, color: C.dim, borderRadius: 3, padding: "7px 12px", fontSize: 11.5, cursor: "pointer", fontFamily: C.sans },
 
   filterBar: { display: "flex", alignItems: "center", gap: 10, padding: "6px 24px 14px", maxWidth: 1180, margin: "0 auto", flexWrap: "wrap" },
-  dd: { background: "#11151e", border: "1px solid #222835", color: "#c4cad6", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, cursor: "pointer" },
-  ddActive: { borderColor: "#e0a52e77", color: "#e6e9ef" },
-  ddLabel: { color: "#6b7280", marginRight: 3 },
-  ddMenu: { position: "absolute", top: "110%", left: 0, background: "#11151e", border: "1px solid #2a3140", borderRadius: 8, padding: 5, zIndex: 20, minWidth: 170, maxHeight: 280, overflowY: "auto", boxShadow: "0 10px 30px rgba(0,0,0,.5)" },
-  ddItem: { padding: "7px 10px", fontSize: 12.5, color: "#c4cad6", borderRadius: 6, cursor: "pointer" },
-  ddItemActive: { background: "#1c2230", color: "#e0a52e" },
+  dd: { background: C.card, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 3, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontFamily: C.sans },
+  ddActive: { borderColor: C.accent, color: C.text },
+  ddLabel: { color: C.dim, marginRight: 3 },
+  ddMenu: { position: "absolute", top: "110%", left: 0, background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: 5, zIndex: 20, minWidth: 170, maxHeight: 280, overflowY: "auto", boxShadow: "0 10px 30px rgba(0,0,0,.5)" },
+  ddItem: { padding: "7px 10px", fontSize: 12, color: C.muted, borderRadius: 3, cursor: "pointer" },
+  ddItemActive: { background: C.accentBg, color: C.accent },
 
-  toggle: { display: "flex", alignItems: "center", gap: 7, background: "#11151e", border: "1px solid #222835", color: "#8b93a7", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, cursor: "pointer" },
-  toggleOn: { borderColor: "#e0a52e77", color: "#e6e9ef" },
+  toggle: { display: "flex", alignItems: "center", gap: 7, background: C.card, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 3, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontFamily: C.sans },
+  toggleOn: { borderColor: C.accent, color: C.text },
   dot: { width: 8, height: 8, borderRadius: "50%" },
 
   sortWrap: { display: "flex", alignItems: "center", gap: 10 },
-  sortLabel: { color: "#4b5262", fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".5px" },
-  sortActive: { color: "#e0a52e", fontSize: 12.5, cursor: "pointer", fontWeight: 600 },
-  sortDim: { color: "#6b7280", fontSize: 12.5, cursor: "pointer" },
+  sortLabel: { color: C.dim, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" },
+  sortActive: { color: C.accent, fontSize: 12, cursor: "pointer", fontWeight: 600 },
+  sortDim: { color: C.muted, fontSize: 12, cursor: "pointer" },
 
-  countLine: { padding: "2px 24px 14px", maxWidth: 1180, margin: "0 auto", fontSize: 13, color: "#8b93a7" },
-  countStrong: { color: "#e6e9ef", fontWeight: 700 },
-  countDim: { color: "#6b7280" },
+  countLine: { padding: "2px 24px 14px", maxWidth: 1180, margin: "0 auto", fontSize: 13, color: C.muted },
+  countStrong: { color: C.text, fontWeight: 600 },
+  countDim: { color: C.dim },
 
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12, padding: "0 24px", maxWidth: 1180, margin: "0 auto" },
 
-  card: { background: "#0e121b", border: "1px solid #1a202c", borderRadius: 10, padding: "14px 15px" },
+  card: { background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: "14px 15px" },
   cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 },
-  name: { fontSize: 15, fontWeight: 700, color: "#f0f2f6" },
-  cred: { fontSize: 12, fontWeight: 500, color: "#8b93a7" },
-  loc: { fontSize: 12, color: "#8b93a7", marginTop: 3, display: "flex", alignItems: "center", gap: 4 },
-  subBadge: { fontSize: 10, fontWeight: 700, letterSpacing: ".5px", padding: "3px 7px", borderRadius: 5, border: "1px solid", whiteSpace: "nowrap" },
+  name: { fontSize: 15, fontWeight: 600, color: C.text },
+  cred: { fontSize: 12, fontWeight: 500, color: C.muted },
+  loc: { fontSize: 12, color: C.muted, marginTop: 3, display: "flex", alignItems: "center", gap: 4 },
+  subBadge: { fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", padding: "3px 7px", borderRadius: 3, border: `1px solid ${C.border}`, background: C.tile, color: C.muted, whiteSpace: "nowrap" },
 
-  kolBadge: { display: "inline-flex", alignItems: "center", fontSize: 10.5, color: "#5aa9bd", background: "#4b9db014", border: "1px solid #4b9db044", borderRadius: 5, padding: "2px 7px", cursor: "pointer" },
+  kolBadge: { display: "inline-flex", alignItems: "center", fontSize: 10.5, color: C.teal, background: C.tealBg, border: `1px solid ${C.tealBorder}`, borderRadius: 3, padding: "2px 7px" },
 
   engRow: { display: "flex", gap: 7, marginTop: 12 },
-  engCell: { flex: 1, background: "#0a0d14", border: "1px solid #171c26", borderRadius: 7, padding: "8px 9px" },
-  engAd: { borderColor: "#e0a52e22" },
-  engLabel: { fontSize: 9, color: "#5b6373", letterSpacing: ".6px", fontWeight: 600 },
-  engVal: { fontSize: 15, fontWeight: 700, marginTop: 2, color: "#e6e9ef" },
-  engValSm: { fontSize: 12, fontWeight: 600, marginTop: 3, color: "#c4cad6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  engCell: { flex: 1, background: C.tile, border: `1px solid ${C.tileBorder}`, borderRadius: 4, padding: "8px 9px" },
+  engLabel: { fontSize: 10, color: C.dim, letterSpacing: "0.06em", fontWeight: 500, textTransform: "uppercase" },
+  engVal: { fontSize: 15, fontWeight: 600, marginTop: 3, color: C.text, fontFamily: C.mono },
+  engValSm: { fontSize: 12, fontWeight: 500, marginTop: 4, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
 
   cardBottom: { display: "flex", alignItems: "center", gap: 8, marginTop: 11, flexWrap: "wrap" },
-  tenure: { fontSize: 11, color: "#6b7280" },
-  tag: { fontSize: 10.5, color: "#8b93a7", border: "1px solid #222835", borderRadius: 5, padding: "2px 7px" },
+  tenure: { fontSize: 11, color: C.dim },
+  tag: { fontSize: 10.5, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 3, padding: "2px 7px" },
   drugTags: { display: "flex", gap: 5, marginLeft: "auto", flexWrap: "wrap" },
-  drugTag: { fontSize: 10, color: "#c9b06a", background: "#e0a52e0f", border: "1px solid #e0a52e2a", borderRadius: 4, padding: "2px 6px" },
+  drugTag: { fontSize: 10, color: C.accent, background: C.accentBg, border: `1px solid ${C.accentBorder}`, borderRadius: 3, padding: "2px 6px", fontFamily: C.mono },
 
-  moreLine: { textAlign: "center", color: "#6b7280", fontSize: 12.5, padding: "20px 0", maxWidth: 1180, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 14 },
-  loadMoreBtn: { background: "#11151e", border: "1px solid #e0a52e55", color: "#e0a52e", borderRadius: 8, padding: "8px 18px", fontSize: 12.5, cursor: "pointer" },
-  empty: { textAlign: "center", color: "#6b7280", fontSize: 13.5, padding: "50px 0" },
+  moreLine: { textAlign: "center", color: C.dim, fontSize: 12.5, padding: "20px 0", maxWidth: 1180, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 14 },
+  loadMoreBtn: { background: C.card, border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 3, padding: "8px 18px", fontSize: 12.5, cursor: "pointer", fontFamily: C.sans },
+  empty: { textAlign: "center", color: C.dim, fontSize: 13.5, padding: "50px 0" },
 };
