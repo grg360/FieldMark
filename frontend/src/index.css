@@ -20,6 +20,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/*
+ * Global placeholder color. Tailwind Preflight (@tailwind base) defaults
+ * ::placeholder to gray-400 (#9ca3af), a cool blue-grey that reads off-palette
+ * on the dark UI. Override to the app's warm neutral — #9B9892 — the same
+ * placeholder color the InsightComposer / FollowUpsList fields already set, so
+ * every field is consistent. Selector matches Preflight's specificity and comes
+ * later in the cascade, so it wins. opacity:1 + -webkit-text-fill-color keep it
+ * correct on Firefox and Safari/iOS.
+ */
+input::placeholder,
+textarea::placeholder {
+  color: #9B9892;
+  opacity: 1;
+  -webkit-text-fill-color: #9B9892;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
