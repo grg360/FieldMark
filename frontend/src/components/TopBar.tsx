@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchBar from "./SearchBar";
 import UserMenu from "./UserMenu";
+import InviteColleaguesButton from "./InviteColleaguesButton";
 import { useMediaQuery } from "../lib/useMediaQuery";
 
 interface TopBarProps {
@@ -100,6 +101,7 @@ export default function TopBar({
             </svg>
           </button>
         ) : null}
+        <InviteColleaguesButton />
         <UserMenu />
       </div>
     </div>

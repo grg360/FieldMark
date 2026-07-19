@@ -32,7 +32,6 @@ import {
 import AppLayout from "../AppLayout";
 import CoverageGapsTile from "./CoverageGapsTile";
 import HomeHero from "./HomeHero";
-import InviteColleaguesTile from "./InviteColleaguesTile";
 import NextActionsTile from "./NextActionsTile";
 import OpenFollowUpsTile from "./OpenFollowUpsTile";
 import OverdueFollowUpsTile from "./OverdueFollowUpsTile";
@@ -218,8 +217,6 @@ export default function HomePage() {
             <HomeHero firstName={userFirstName} summary={summary} territory={territoryProfile} />
 
             <NextActionsTile actions={nextActions} />
-
-            <InviteColleaguesTile />
 
             {userId ? <YourInstitutionsTile userId={userId} /> : null}
 
