@@ -983,3 +983,189 @@ BIGGER PICTURE / STILL OPEN BEYOND REGEN:
 - Identity fragments (Camidge/Hirsch) — matcher relaxation + domain review, not dedup re-run.
 - 1-decimal score display (§30gc). Drop backup tables when satisfied. Merge/deploy strategy for the growing
   unshipped delta (now ~27 commits).
+
+### 30gh. DATA-COMPLETENESS AUDIT complete → docs/DATA_COMPLETENESS_AUDIT.md. The dread quantified: BOUNDED.
+Ran the data-completeness audit (read-only, concurrent with the narrative billed run — extra Supabase compute, no
+contention). Deliverable docs/DATA_COMPLETENESS_AUDIT.md. THE NUMBER (the thing the nervousness was about): 13
+TA-scoping issues remain, 10 new (+1 unconfirmed). *** The family is BOUNDED — the pattern did NOT sprawl. ***
+
+PATTERN CLOSING (not expanding): Python pipeline layer is FULLY CLEAN — 0 remaining unchunked large .in() (the
+narrative open-payments fix was the last), 0 remaining readers of contaminated hcp_established_scores_v2, every
+hcp_score_ranks_v2 read is therapeutic_area_id-filtered. Known-7 held up: 4 fixed this session, 3 remain (est-scorer
+script un-retired, AD institution_canonical + rising_star_ranks_v3 workarounds — both mitigated).
+
+CATEGORY B by-TA matrix (the load-bearing finding) — visible+active TAs are AD/Hepatology/NSCLC (Rare Disease absent
+from config → its lopsided tables are DEAD DATA, not bugs — bounds the search). Matrix showed the new big one:
+*** HEPATOLOGY IS A HALF-MIGRATED VISIBLE TA: 2,344 narratives + 40,800 community_ranks + legacy data, but ZERO rows
+in EVERY new per-TA table (established_ranks_v3, publication_leadership_v2, cohort_classification_v2, research_themes,
+scientific_positions). "Retired" at frontend 2026-07-11 BUT therapeutic_area_ingestion_config still has
+is_visible_in_ui=true → a billed all-TA run would still generate Hep content. Config-vs-frontend inconsistency. The
+single biggest completeness gap — but it's a TA being RETIRED, so fix is likely "make config match retirement," not
+"finish migrating Hep." ***
+
+WORST-FIRST (new findings):
+1. getHCPDetail per-TA cohort gap (api.ts:1653/1654) — ONLY new VISIBLE-WRONG. Passes global hcps_v2.cohort_score
+   through untouched, only upgrades ESTABLISHED to v3 → live AD detail pages show null/global score + unresolved
+   rising/community classification. Fix mirrors the v3-probe already in that function. *** FIX FIRST (user-visible). ***
+2. AD trials never tagged — trial_ta_mapping.py hardcodes HEP/NSCLC → clinical_trials_ta_v2 has 0 AD rows (Hep 4,313,
+   NSCLC 2,463). AD trial signals absent downstream.
+3. Hepatology half-migrated config (above).
+4. Two more unchunked .in() in api.ts (institutions 4642, landscape 3423); institution fns default taSlug="nsclc";
+   3 CLI whitelists that hard-reject new TAs (established_scoring.py TARGET_TA_IDS, trial_ta_mapping.py, CLI lists).
+
+DEAD CODE (audit cross-checked, cleared — NOT real issues): generate_community_narratives.py NSCLC-hardcoding (no
+live caller, superseded by generate_narratives_v2.py); getAllTACounts/getTACounts "visible-wrong home UI" (TASelection
+Screen unimported, never rendered — matches §30gf).
+
+TRIAGE READ: of 13 — 1 user-visible (getHCPDetail, one-function fix), a few latent-real (Hep config, AD trials, 2
+unchunked .in()), some hardening (CLI whitelists), 2 dead. NOTHING says "rebuild everything." Extremely manageable
+punch-list. This is the OUTPUT that ends the "how deep does this go" nervousness: it doesn't go deep — it's bounded,
+enumerated, mostly minor, most fixable with patterns already applied 5×.
+
+### 30gi. [FORWARD-LOOKING / STRATEGIC] Scheduled re-ingest — after the desk is clean.
+Discovered while parking Hepatology: ingest has been is_active=true on TAs but NOT actually re-run in the 10 weeks
+since the project started. So "is_active=true" is currently on-but-idle — nominally active, not producing consumed
+output. Garrett's insight: the clean end-state is to make ingest a DELIBERATE, SCHEDULED (cron'd) process — re-ingest
+NSCLC (and AD) on a known cadence so the corpus stays genuinely current, rather than a flag that's on-but-idle.
+
+SEQUENCING (why NOT now): a re-ingest CASCADES — new pubs → new HCPs → new memberships → potentially new established/
+rising members → which need re-scoring, re-classifying, re-narrating, re-telescoping. I.e. re-ingest pours new data
+through the exact pipelines just stabilized. Doing it mid-cleanup = chasing a moving target through pipelines still
+being fixed. CORRECT ORDER: get pipelines clean + trustworthy FIRST (finish the data-completeness punch-list, retire
+the cartesian scorer, etc.), THEN turn on scheduled ingest so fresh data flows through KNOWN-GOOD machinery. "Clean
+desk, then cron."
+
+WHEN READY, this needs its own design: (a) cron cadence (weekly? monthly?); (b) the full downstream cascade a fresh
+ingest triggers (re-run classification → scoring → ranks → narratives → themes → positions → telescope, per changed
+cohort) — automate it or gate it; (c) the local automation box already spec'd (Ryzen mini-PC, Ubuntu, Docker,
+Tailscale, Claude Code headless, ntfy/Pushover gates) is the intended home for this; (d) idempotency + the "verify
+the frozen thing" discipline must hold across automated runs. This is arguably the capstone: continuous fresh data
+through trustworthy pipelines with human-in-the-loop gates. NOT NOW — a clean-desk milestone.
+
+### 30gj. CLEANLINESS SWEEP (day) — 3 of 4 data-completeness items closed; Hep fully parked; active-status honest.
+Working the data-completeness audit (§30gh) punch-list toward "cleanest platform." Committed/done this session:
+- getHCPDetail per-TA cohort resolution (§ earlier, committed) — the only user-visible audit item. AD/rising/community
+  detail now show real per-TA scores, null-when-absent (never global). Entity-TA boundary intact.
+- Two unchunked .in() in api.ts (landscape name map, institution investigator counts) → chunked at 100 (the file's
+  chunkInstitutionHcpIds convention). Committed 9bcab4b. CLOSES the unchunked-.in() category (pipeline already clean).
+  Verified-DOL chain .in()s left unchunked — dead getTACounts path, flagged if revived.
+- 4 institution fns (getInstitutionSummary/Leaderboards/Collaborations/ExternalPartners) defaulted taSlug="nsclc" →
+  made REQUIRED (dead default, never hit — sole caller passes explicitly — but a latent trap). TS now enforces it.
+  Committed. Left in scope-boundary: InstitutionRoute.tsx:111 caller-side `?? "nsclc"` last-resort (fires only when
+  an institution has NO derivable TA at all) — flagged for separate honest-empty-vs-nsclc review.
+
+*** HEPATOLOGY FULLY PARKED (the biggest cleanliness win) — DB config change, verified, reversible: ***
+therapeutic_area_ingestion_config for Hep (ta_id 9b31947b): is_visible_in_ui True→False AND is_active True→False
+(1 row). Rationale: Hep is half-built (0 rows in all new per-TA tables) AND its legacy data is cartesian-CONTAMINATED
+(established_scores_v2 ~40% non-Hep members, same TARGET_TA_IDS=[HEP,NSCLC] disease as NSCLC's 61%), AND we haven't
+re-ingested in 10 weeks so keeping it active bought nothing. is_visible_in_ui is OVERLOADED (TA_BUILD_DEBT.md:5707):
+controls BOTH frontend visibility (already retired in code 2026-07-11 via hardcoded getAllTACounts) AND
+generate_narratives_v2.py enrollment — so =false closes the real leak (a bare narrative run would've generated ~500
+Hep community narratives, billed). is_active=false stops ingest_publications.py PubMed pulls. Data BYTE-IDENTICAL
+after (narratives 2,344, community_ranks 40,800, est_scores 11,390, score_ranks 254,343 all unchanged — flags touch
+no data tables). FULLY REVERSIBLE: flip both back + re-ingest fresh when building Hep properly (which requires the
+same full rebuild NSCLC got — do NOT build on the contaminated legacy tables).
+
+ALL-TA ACTIVE-STATUS AUDIT (from the same check): config now has only 3 TAs — AD (active/visible), NSCLC
+(active/visible), Hep (parked). Rare Disease not in config at all (its lopsided tables are dead data). So the config
+is now HONEST: active = the 2 live TAs, parked = the half-built one. AD + NSCLC remain is_active=true (correct — they're
+live), but note per §30gi: is_active is eligibility-for-ingest, and ingest hasn't RUN in 10 weeks, so it's on-but-idle
+until scheduled ingest is designed (clean-desk-then-cron).
+
+REMAINING data-completeness item (4th of 4): dead-code deletion — generate_community_narratives.py NSCLC-hardcoding
+(confirmed dead, safe delete) + the TASelectionScreen/getAllTACounts/getTACounts/taCounts-state path (dead + wasteful
+10k fetch/nav, BUT check switcher-relevance first per §30gf before deleting — it's a TA-selection component and the
+TopBar switcher is upcoming). Plus documented-not-today: AD trials (trial_ta_mapping.py hardcodes HEP/NSCLC → 0 AD
+trial rows), 3 CLI whitelists that hard-reject new TAs (tie to future TA builds), InstitutionRoute:111 fallback,
+verified-DOL chunking. NOTHING here is urgent; the platform's 2 live TAs are correct + clean.
+
+### 30gk. MULTI-TA SWITCHER — entitlement model READ SIDE (foundation). Design decisions locked.
+Starting the TopBar TA-switcher (the payoff of the multi-TA workstream). Constraint from Garrett: NOT all users have
+multi-TA access → switcher must be ENTITLEMENT-AWARE, and entitlement must exist first (audit Q3: it's UNMODELED
+today — access gated by data-existence, not identity). Product model (Garrett): existing users → ALL TA access
+(grandfather); new users → TA access set at registration (rule TBD, separate WRITE-side step later). Building the
+READ side first (unblocks switcher, independent of registration rule).
+
+TRACE FINDINGS (key ones):
+- NEAR-MISS: msl_profiles ALREADY has a therapeutic_areas text[] column — but it's a DIFFERENT thing (TA display
+  LABELS ['NSCLC'], territory/COVERAGE context, read only by Home). Do NOT reuse for entitlement. allowed_ta_slugs
+  is a NEW separate column. (So the user now has 3 distinct TA concepts: states_covered, therapeutic_areas=coverage,
+  allowed_ta_slugs=entitlement. Watch naming clarity.)
+- states_covered is the pattern to mirror: text[], DEFAULT ARRAY[]::text[], guarded-read, plain-array-write.
+- Profile load choke point: getMslProfile(userId) — cached, select("*"), so adding the column auto-fetches; just
+  add to MslProfile TS interface. Switcher hangs off this existing cached load — NO new profile query. RLS-scoped
+  (users read only their own row).
+- Authoritative LIVE-TA source: therapeutic_area_ingestion_config WHERE is_visible_in_ui=true AND is_active=true
+  (same as pipeline's load_visible_ta_ids). Returns NSCLC + AD (Hep parked earlier §30gj — the honest config is now
+  load-bearing for the switcher). Bonus: a cached getLiveTASlugs() retires the hardcoded TA_CHIPS drift.
+- HAZARD (audit Q4 again): parent-vs-indication namespace split — config lists DATA slugs (nsclc, atopic-dermatitis),
+  but default_ta_slug + switcher chips use PARENT slugs (oncology, immunology). therapeutic_areas lookup carries
+  parent_ta_id/ta_level to reconcile.
+- Backfill scope trivial: 4 rows, 0 null, 0 profile-less users.
+
+DECISIONS LOCKED (Garrett confirmed):
+1. STORE PARENT SLUGS (oncology, immunology) in allowed_ta_slugs — matches default_ta_slug + switcher-chip
+   conventions. Resolver maps config's data slugs → parents to intersect.
+2. FAIL-OPEN on empty/null: null/empty allowed_ta_slugs → treat as ALL LIVE TAs (grandfather), NOT "none" — the
+   non-breaking property (nobody locked out before registration populates it).
+3. Backfill existing 4 users → ['oncology','immunology'] (all live parents = the "all current TAs" grandfather).
+
+BUILD (read side only — NO switcher UI yet):
+1. Migration: ALTER TABLE msl_profiles ADD COLUMN allowed_ta_slugs text[] DEFAULT ARRAY[]::text[]; backfill 4 rows
+   to ['oncology','immunology'].
+2. Resolver in api.ts (next to TA_ID_MAP): cached getLiveTASlugs() (config → parent slugs) + entitledTASlugs(profile)
+   = (allowed_ta_slugs null/empty ? liveTASlugs() : allowed_ta_slugs ∩ liveTASlugs()).
+3. Add allowed_ta_slugs to MslProfile interface (auto-fetched via select("*")).
+4. Testable immediately: Garrett's account grandfathers to all live TAs → can test the multi-TA switcher path later.
+WRITE side (registration sets allowed_ta_slugs) = separate later step, rule TBD.
+
+### 30gl. *** SELF-SERVE INVITE-GATED SIGNUP — BUILT & VERIFIED END-TO-END. #1 launch blocker CLEARED. ***
+Strategic pivot this session: FieldMark → PUBLIC, self-serve, "users first" (NOT enterprise B2B sales cycle).
+Option 1 (public product + signup GATE between open internet and named-physician data). Gate = INVITE SYSTEM (peer-
+vouching in the tight MSL/pharma-professional community IS the professional gate AND the viral growth engine). LinkedIn
+OAuth evaluated + REJECTED as gate (Aug-2023 API overhaul: returns only name/email, no title/company/industry, explicitly
+"does not verify identity") — kept as optional login only. Audience broadened: target medical affairs, WELCOME clinical
+dev + commercial (Garrett: med/commercial firewall has cooled, esp. biotech) — capture job_function as segmentation signal,
+don't gate on it.
+
+BUILT (3 stages, all committed, all on ad-frontend-established):
+- Entitlement READ side (§30gk, committed): allowed_ta_slugs on msl_profiles + live_therapeutic_areas VIEW (IP-safe:
+  scoring_weights/pubmed_query never browser-reachable, proven 0-rows via anon path) + fail-open resolver.
+- Stage 1 (bc6e600): server-side security foundation. redeem_invite() atomic SECURITY DEFINER RPC (kill-switch check →
+  atomic quota decrement WHERE uses_remaining>0 → server-set allowed_ta_slugs from live_ta_parent_slugs() → invited_by
+  attribution → referral log → mint invitee's own quota-10 invite). admin_users (identity OFF msl_profiles, no self-
+  promote), app_config kill-switch, invites/invite_redemptions tables, entitlement column-lock trigger, dropped client
+  INSERT policy. *** VERIFIED ON REAL AUTHENTICATED PATH (anon key + JWT, not service-role): self-edit entitlement
+  BLOCKED (P0001 trigger), self-INSERT profile BLOCKED (42501 RLS), flip kill-switch BLOCKED (42501), normal edits work.
+  Under public launch "anyone can sign up" = every writable field is an attack surface; all sealed. ***
+- Stage 2 (3ed69f8): user-facing flow. SignupScreen (/join/:code, OUTSIDE AuthWrapper): check_invite validation →
+  email/password signup → redeem_invite → 4-step WelcomeWizard (name/company/job_function/territory). job_function column
+  + check_invite() anon-callable pre-check. WelcomeWizard INSERT→UPDATE (payload EXCLUDES locked allowed_ta_slugs/
+  invited_by — verified). Fixed a dev-only StrictMode double-mount hang (ranRef guard collided with StrictMode's mount→
+  cleanup→mount: Mount1 cleanup disarmed its async, guard blocked Mount2 → setPhase never called → infinite "validating"
+  spinner. Fix: drop ranRef, rely on active/cancelled flag = StrictMode-safe pattern. Dev-only; prod build ran once).
+  Email confirmation turned OFF (invite is the gate; removes friction + fragile round-trip + the email rate-limit wall).
+
+END-TO-END VERIFIED via real UI click-through (incognito, fresh email): invite validated → account created → redeem
+fired → allowed_ta_slugs server-set {oncology,immunology} → invited_by attributed (68117362...) → quota 10→9 → wizard
+saved (company=Genentech, job_function=medical_affairs) → landed in app. THE WHOLE CHAIN WORKS. (Lesson echo: build was
+green + typecheck clean + server path proven, and STILL a dev hang — only the click-through caught it. Green-at-top ≠
+correct-underneath, same as the contaminated-tail lesson.)
+
+UX POLISH (batched, non-blocking): (1) "Work email" → "Email" (invite is the gate; some users won't use corporate email);
+(2) company field: don't guess/pre-fill employer; (3) job_function "Other" → reveal free-text, capture write-in (welcoming
+beyond MSLs → capture what they actually are); (4) deterministic ORDER BY in live_ta_parent_slugs if display order matters.
+
+REMAINING LAUNCH PATH: (1) Admin page / Stage 3 — mint/manage invites, referral graph, kill-switch toggle, deactivate
+(replaces hand-SQL; NOTE: admin reads app_config/admin_users which are client-locked → needs admin-gated RPCs/Edge Fn;
+seed-cohort invite codes must be HIGH-ENTROPY like the auto-minted ones, not memorable). (2) 3 more TAs → launch-5 (proven
+manual pipeline; watch each for novel weirdness). (3) One-hour healthcare-data/physician-privacy legal consult before
+launch (esp. re: commercial use of payment/influence data). (4) Cold-user onboarding + the UX polish above.
+
+OPEN DESIGN (surfaced, not resolved): MULTI-INDICATION-PER-PARENT. Entitlement is FINE (parent-level → a user with
+'oncology' auto-gets new oncology indications, no per-user change). But the SWITCHER hierarchy (parent-level vs indication-
+level, how to show Oncology→{NSCLC, prostate, ...}) is NOT designed — today there's 1 indication/parent so it's never been
+exercised. Resolve BEFORE building the switcher UI. Trace prompt drafted, deferred.
+
+INFRA NOTE: 34+ unpushed commits on ad-frontend-established (local-only). Push to remote for BACKUP soon (2+ weeks of work
+on one machine). Not merge/deploy yet (foundation-rebuild auto-deploys) — just back it up.
