@@ -390,10 +390,11 @@ button {
 
   .fm-section-engagement-mix { order: 9; }
 
+  /* TopPharmaCompanies already self-pads (RIGHT_RAIL_SECTION_STYLE = 12px 16px 8px),
+     so adding wrapper padding here double-indented the header on mobile (32px vs
+     siblings' 16px). Padding intentionally omitted; order only. */
   .fm-section-top-pharma {
     order: 10;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
   }
 
   .fm-section-drug-constellation { order: 11; }
@@ -409,6 +410,50 @@ button {
     padding-left: 16px !important;
     padding-right: 16px !important;
   }
+
+  /* ── Established cohort: cohort-scoped mobile section order ──
+     Overrides the shared order values above for established HCPs ONLY (via the
+     fm-cohort-established class on .fm-detail-body); Rising/Community keep the
+     shared order untouched. Higher specificity (two classes) than the base rules,
+     so these win. The reset-to-99 is a safety net for any section not listed. */
+  .fm-cohort-established .fm-detail-section { order: 99; }
+  .fm-cohort-established .fm-section-identification { order: 1; }
+  .fm-cohort-established .fm-section-relationship { order: 2; }
+  .fm-cohort-established .fm-section-insights { order: 3; }
+  .fm-cohort-established .fm-section-score-breakdown { order: 4; }
+  .fm-cohort-established .fm-section-narrative { order: 5; }
+  .fm-cohort-established .fm-section-signal-summary { order: 6; }
+  .fm-cohort-established .fm-section-top-collaborators { order: 7; }
+  .fm-cohort-established .fm-section-engagement-mix { order: 8; }
+  .fm-cohort-established .fm-section-top-pharma { order: 9; }
+  .fm-cohort-established .fm-section-drug-constellation { order: 10; }
+  .fm-cohort-established .fm-section-publication-timeline { order: 11; }
+  .fm-cohort-established .fm-section-belief-profile { order: 12; }
+  .fm-cohort-established .fm-section-field-intelligence { order: 13; }
+  .fm-cohort-established .fm-section-field-notes { order: 14; }
+
+  /* ── Rising Star cohort: cohort-scoped mobile section order ──
+     Mirrors Established, with two differences: Contact & Access takes the
+     Identification slot (#1; Rising renders Contact & Access, not Identification),
+     and External Collaborators follows Top Collaborators (#8). Network Trajectory
+     stays nested inside Top Collaborators and moves with it. Community keeps the
+     shared order untouched. */
+  .fm-cohort-rising_star .fm-detail-section { order: 99; }
+  .fm-cohort-rising_star .fm-section-contact-access { order: 1; }
+  .fm-cohort-rising_star .fm-section-relationship { order: 2; }
+  .fm-cohort-rising_star .fm-section-insights { order: 3; }
+  .fm-cohort-rising_star .fm-section-score-breakdown { order: 4; }
+  .fm-cohort-rising_star .fm-section-narrative { order: 5; }
+  .fm-cohort-rising_star .fm-section-signal-summary { order: 6; }
+  .fm-cohort-rising_star .fm-section-top-collaborators { order: 7; }
+  .fm-cohort-rising_star .fm-section-external-collaborators { order: 8; }
+  .fm-cohort-rising_star .fm-section-engagement-mix { order: 9; }
+  .fm-cohort-rising_star .fm-section-top-pharma { order: 10; }
+  .fm-cohort-rising_star .fm-section-drug-constellation { order: 11; }
+  .fm-cohort-rising_star .fm-section-publication-timeline { order: 12; }
+  .fm-cohort-rising_star .fm-section-belief-profile { order: 13; }
+  .fm-cohort-rising_star .fm-section-field-intelligence { order: 14; }
+  .fm-cohort-rising_star .fm-section-field-notes { order: 15; }
 
   .fm-feed-section-header {
     flex-direction: column !important;

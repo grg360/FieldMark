@@ -1171,7 +1171,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
       <style>{`@keyframes fm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       <div
-        className="fm-detail-body"
+        className={`fm-detail-body fm-cohort-${(hcp.cohort_classification ?? "").trim() || "unclassified"}`}
         style={{
           border: "1px solid #1E1E22",
           borderRadius: 6,
@@ -1299,9 +1299,14 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           </div>
         </div>
 
-        <RelationshipSection hcp={hcp} />
+        {/* fm-section-* wrapper: mobile ordering hook only (desktop block flow unchanged) */}
+        <div className="fm-section-relationship">
+          <RelationshipSection hcp={hcp} />
+        </div>
 
-        <FieldInsights hcp={hcp} />
+        <div className="fm-section-insights">
+          <FieldInsights hcp={hcp} />
+        </div>
 
         {/* Narrative / unclassified notice */}
         <div
@@ -1570,7 +1575,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           </div>
         )}
 
-        <div id="belief-profile" style={{ scrollMarginTop: 80 }}>
+        <div id="belief-profile" className="fm-section-belief-profile" style={{ scrollMarginTop: 80 }}>
           <ScientificNarrativeSection hcpId={hcp.id} therapeuticArea={taSlug === "nsclc" ? "NSCLC" : taSlug} />
         </div>
         </div>{/* end fm-detail-left */}
