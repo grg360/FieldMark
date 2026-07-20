@@ -350,7 +350,12 @@ def move_hcp_fk_with_conflict_delete(
         cur.execute(f"UPDATE {table} SET {hcp_col}=%s WHERE {hcp_col}=%s", (primary_id, stub_id))
         return {"updated": int(cur.rowcount or 0), "deleted_conflicts": deleted}
 
-    on_clause = " AND ".join([f"p.{c} = s.{c}" for c in key_cols])
+    # Use IS NOT DISTINCT FROM (not =) so NULL key values compare equal, matching
+    # unique-index NULL semantics. A plain "=" makes NULL = NULL evaluate to NULL,
+    # so the DELETE skips colliding rows whose key contains NULL and the following
+    # UPDATE then trips the unique constraint (observed on hcp_score_ranks_v2,
+    # whose scope_value is NULL for national-scope rows).
+    on_clause = " AND ".join([f"p.{c} IS NOT DISTINCT FROM s.{c}" for c in key_cols])
     cur.execute(
         f"DELETE FROM {table} s USING {table} p WHERE s.{hcp_col}=%s AND p.{hcp_col}=%s AND {on_clause}",
         (stub_id, primary_id),
@@ -403,13 +408,7 @@ def merge_record_into_survivor(
     # Simple hcp_id re-points: no unique key on hcp_id, so a plain UPDATE cannot
     # create a duplicate-key conflict.
     tables_simple = [
-        ("publication_authors_v2", "hcp_id"),
         ("trial_investigators_v2", "hcp_id"),
-        ("hcp_narratives_v2", "hcp_id"),
-        ("hcp_affiliation_profile_v2", "hcp_id"),
-        ("hcp_nppes_detail_v2", "hcp_id"),
-        ("hcp_openalex_authors_v2", "hcp_id"),
-        ("dol_matches_v2", "hcp_id"),
         ("nppes_enrichment_log_v2", "hcp_id"),
         ("hcp_research_themes_v2", "hcp_id"),
         ("hcp_scientific_positions_v1", "hcp_id"),
@@ -444,6 +443,14 @@ def merge_record_into_survivor(
         ("msl_hcp_relationships", "hcp_id", ["user_id"]),
         ("npi_match_proposals_v2", "hcp_id", ["npi"]),
         ("nih_grant_investigators", "hcp_id", ["core_project_num", "role"]),
+        # --- Moved from tables_simple: composite-key uniques on the hcp_id FK
+        #     column caused UniqueViolation on plain re-point (crash on merge). ---
+        ("publication_authors_v2", "hcp_id", ["publication_id"]),
+        ("hcp_narratives_v2", "hcp_id", ["therapeutic_area_slug"]),
+        ("hcp_openalex_authors_v2", "hcp_id", ["openalex_author_id"]),
+        ("dol_matches_v2", "hcp_id", ["social_user_id"]),
+        ("hcp_affiliation_profile_v2", "hcp_id", []),  # hcp_id-alone unique
+        ("hcp_nppes_detail_v2", "hcp_id", []),  # hcp_id-alone unique
     ]
 
     moved: Dict[str, Dict[str, int]] = {}
