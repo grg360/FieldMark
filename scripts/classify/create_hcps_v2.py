@@ -232,6 +232,42 @@ def compute_identity_hash(orcid: str, normalized_name: str, institution_key: str
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def compute_record_identity_hash(
+    *,
+    orcid: Optional[str],
+    display_name: Optional[str],
+    institution_ror: Optional[str],
+    institution_normalized: Optional[str],
+    primary_openalex_author_id: Optional[str],
+) -> str:
+    """THE single source of truth for a canonical person's identity_hash.
+
+    Called at insert time (derive_cluster_metadata) AND by backfill_identity_hash.py, so
+    the engine and the backfill can NEVER diverge — a backfilled hash is guaranteed to
+    equal what the engine will recompute on reingest. Do not inline this logic anywhere.
+
+    Inputs are the person's resolved fields; all normalization is applied HERE so callers
+    may pass either already-normalized (engine) or raw stored (backfill) values — every
+    normalizer used is idempotent, so double-normalization is safe:
+      * orcid                        -> normalize_orcid; if present, hash is ORCID-only.
+      * display_name                 -> name_pair_from_display (lowercase/strip/collapse).
+      * institution_ror              -> normalize_ror (preferred institution key).
+      * institution_normalized       -> normalize_org_name + normalize_token_field (fallback
+                                        key when there is no ROR).
+      * primary_openalex_author_id   -> nameonly-singleton anchor: when there is neither
+                                        ORCID nor any institution key, the hash is anchored
+                                        on this shard's OpenAlex id so two distinct same-name
+                                        singletons cannot collide on sha256(name|"").
+    """
+    orc = normalize_orcid(orcid)
+    nf, nl = name_pair_from_display(display_name)
+    normalized_name = f"{nf} {nl}".strip()
+    inst_key = normalize_ror(institution_ror) or normalize_token_field(normalize_org_name(institution_normalized))
+    if not orc and not inst_key:
+        inst_key = f"oa:{normalize_openalex_author_id(primary_openalex_author_id)}"
+    return compute_identity_hash(orc, normalized_name, inst_key)
+
+
 # ============================================================
 # Clustering
 # ============================================================
@@ -466,18 +502,15 @@ def derive_cluster_metadata(
         identity_method = MATCH_METHOD_NAME_ONLY
         identity_confidence_score = CONFIDENCE_NAME_ONLY_SINGLETON
 
-    # identity_hash
-    nf, nl = name_pair_from_display(preferred_display_name or primary.get("display_name"))
-    normalized_name = f"{nf} {nl}".strip()
-    inst_key = institution_ror or normalize_token_field(institution_normalized or "")
-    if not orcid and not inst_key:
-        # Name-only singleton (no ORCID, no institution corroboration; see
-        # cluster_key_for_row). identity_hash is UNIQUE NOT NULL, so two distinct
-        # same-name singletons must not collide on sha256(name|"") -> anchor the hash on
-        # this shard's own OpenAlex id. Deterministic per shard, so re-runs reproduce the
-        # same hash (idempotent) while keeping each singleton distinct.
-        inst_key = f"oa:{normalize_openalex_author_id(primary.get('openalex_author_id'))}"
-    identity_hash = compute_identity_hash(orcid, normalized_name, inst_key)
+    # identity_hash — via the shared source-of-truth function (also used by
+    # backfill_identity_hash.py). Nameonly-singleton anchoring lives inside it.
+    identity_hash = compute_record_identity_hash(
+        orcid=orcid,
+        display_name=preferred_display_name or primary.get("display_name"),
+        institution_ror=institution_ror,
+        institution_normalized=institution_normalized,
+        primary_openalex_author_id=primary.get("openalex_author_id"),
+    )
 
     return ClusterMetadata(
         hcp_id=hcp_id,
