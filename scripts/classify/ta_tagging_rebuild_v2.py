@@ -893,6 +893,7 @@ def run(
     candidate_hcp_ids_file: Optional[str] = None,
     ingestion_run_id: Optional[str] = None,
     decisions_csv: Optional[str] = None,
+    assume_yes: bool = False,
 ) -> None:
     load_dotenv()
     # 1-element box so retry/reconnect helpers can swap in a fresh client on a dropped conn.
@@ -1014,10 +1015,24 @@ def run(
         print("\n[DRY-RUN] Skipping write.")
     else:
         scope_label = f" ({scoped_ta_name})" if scoped_ta_name else ""
-        confirm = input(
-            f"\nAbout to UPSERT {len(rows)} rows into hcp_therapeutic_areas_v2{scope_label}. "
-            f"Continue? (yes/no): "
-        )
+        # Confirmation gate. --yes bypasses it (unattended/orchestrated runs). If --yes was NOT given
+        # and stdin is not a TTY (cron/subprocess), REFUSE rather than call input() -- input() on a
+        # non-interactive stdin either blocks forever (an inherited pipe: the observed 3am hang) or
+        # raises EOFError. Fail fast with a clear message so the orchestrator advances instead.
+        if assume_yes:
+            print(f"\n[--yes] Proceeding to UPSERT {len(rows)} rows into "
+                  f"hcp_therapeutic_areas_v2{scope_label} without interactive confirmation.")
+            confirm = "yes"
+        elif not sys.stdin.isatty():
+            raise SystemExit(
+                "Refusing to --execute without confirmation: stdin is not a TTY and --yes was not "
+                "passed. Re-run with --yes for unattended/orchestrated execution."
+            )
+        else:
+            confirm = input(
+                f"\nAbout to UPSERT {len(rows)} rows into hcp_therapeutic_areas_v2{scope_label}. "
+                f"Continue? (yes/no): "
+            )
         if confirm != "yes":
             print("Execution cancelled.")
             errors.append("execute_cancelled_by_user")
@@ -1069,6 +1084,10 @@ if __name__ == "__main__":
                    help="Where to write the machine-diffable tag-decision CSV (default "
                         "ta_tagging_decisions_full.csv / _scoped.csv). Used for the both-modes "
                         "validation diff.")
+    p.add_argument("--yes", "-y", action="store_true", default=False,
+                   help="Skip the interactive pre-write confirmation (REQUIRED for unattended/"
+                        "orchestrated/cron --execute runs -- without it the write step blocks on "
+                        "input() forever with no TTY to answer).")
     args = p.parse_args()
     run(
         args.execute,
@@ -1076,4 +1095,17 @@ if __name__ == "__main__":
         candidate_hcp_ids_file=args.candidate_hcp_ids_file,
         ingestion_run_id=args.ingestion_run_id,
         decisions_csv=args.decisions_csv,
+        assume_yes=args.yes,
     )
+    # GUARANTEED CLEAN EXIT (belt-and-suspenders for the unattended 3am orchestrator). run() has
+    # finished and every DB write is committed per-request (PostgREST), the log file is written and
+    # closed, and we flush stdout/stderr here -- so nothing is lost. os._exit(0) then terminates
+    # IMMEDIATELY, without waiting to join any non-daemon thread or run atexit handlers. sys.exit(0)
+    # is NOT sufficient: it raises SystemExit, which unwinds into normal interpreter shutdown and
+    # STILL blocks on any lingering non-daemon thread. If a client-stack resource (httpx pool /
+    # realtime / a future library thread) ever failed to release, this ensures the stage still returns
+    # control to the orchestrator instead of hanging after committed work. (Errors still surface as a
+    # non-zero exit: run() raises on failure, so this line is only reached on a clean completion.)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)

@@ -12,7 +12,7 @@
 --   authorships (never OpenAlex-enriched — e.g. too-new-for-OpenAlex) are ABSENT from the flat, so a
 --   flat-derived COUNT can be LOWER than an author's true corpus count. The original build_inventory_
 --   ad.sql used `corpus_pub_count = EXCLUDED.corpus_pub_count`, which therefore LOWERED established
---   KOLs' counts on every cycle — the documented "buried 34% of the established cohort / 933-KOL
+--   KOLs' counts on every cycle — the documented "buried 34%% of the established cohort / 933-KOL
 --   degradation" bug. GREATEST() makes the upsert NEVER lower a count. first_seen_pub_year /
 --   last_seen_pub_year use LEAST / GREATEST for the same never-lose-information reason.
 --
@@ -23,10 +23,14 @@
 --   the Step B/C linkage that create_hcps established (never overwrite it here).
 -- ============================================================================================
 --
--- Param:   %(ta_id)s  — the therapeutic_areas.id UUID, passed as a BOUND parameter
+-- Param:   %%(ta_id)s  — the therapeutic_areas.id UUID, passed as a BOUND parameter
 --          (run_sql.py --param ta_id=<uuid>), never string-interpolated.
 -- Runtime: this is a heavy aggregate over the full author_pub_flat — the caller raises
 --          statement_timeout (run_sql.py --statement-timeout 30min); single statement (parametrized).
+-- EDITING:  this file is run with BOUND params, so psycopg scans the WHOLE text (comments included)
+--           for percent signs. Any LITERAL percent — even inside a comment — must be written DOUBLED,
+--           or psycopg raises an "incomplete placeholder" error. The only real bind token is the
+--           ta_id placeholder in the WHERE clause below; keep that single, and double everything else.
 
 INSERT INTO openalex_author_inventory (
   openalex_author_id, display_name, last_known_institution, last_known_institution_ror,

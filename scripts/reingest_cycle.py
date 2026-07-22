@@ -27,10 +27,12 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
   1 ingest            pubmed_pipeline.py --ta <slug> --primary-pmids-out <primary_pmids.txt>
                       (capture PUB_RUN_ID; quiet-week gate: empty primary_pmids -> skip cycle, exit 0)
      [OpenAlex sub-sequence -- create_hcps' prerequisites; runs ONLY on a non-quiet week, AFTER the gate]
-     1b openalex_pipeline.py --target-version v2 --skip-career-enrichment
-        -> publications_v2.authorships. GATE-A: ALL pubs with a DOI and openalex_enriched_at IS NULL --
-        that is primary + 2nd-pass author-history + any un-enriched backlog, NOT just the ~primary batch
-        (pubmed_pipeline inserts every pub with enriched_at=NULL). BILLED (OpenAlex API). See §billing note.
+     1b openalex_pipeline.py --target-version v2 --skip-career-enrichment  (env SKIP_DOI_ENRICHMENT=0)
+        -> publications_v2.authorships. Runs the DOI-enrichment phase (forced on via SKIP_DOI_ENRICHMENT=0;
+        this env sets it truthy, which would otherwise skip the phase -> silent no-op). GATE-A: ALL pubs
+        with a DOI and openalex_enriched_at IS NULL -- primary + 2nd-pass author-history + any un-enriched
+        backlog, NOT just the ~primary batch (pubmed_pipeline inserts every pub with enriched_at=NULL).
+        BILLED (OpenAlex API). See §billing note.
      1c run_sql.py --file build_author_flat.sql  (full O(corpus) rebuild of author_pub_flat)  GATE-D: after 1b.
      1d run_sql.py --file sql/reingest/inventory_upsert_incremental.sql --param ta_id=<TA_ID>
         --statement-timeout 30min  (openalex_author_inventory upsert, HAVING count>=3, GREATEST no-clobber) GATE-B.
@@ -213,7 +215,11 @@ def cmd_ingest(
 
 def cmd_openalex_enrich_pubs() -> List[str]:
     # 1b: pub-level OpenAlex enrichment -> publications_v2.authorships. v2 tables; skip the HCP career
-    # phase (that's stage 8). GATE-A is built into the script: it enriches pubs with a DOI where
+    # phase (that's stage 8; v2 auto-skips it anyway). The DOI-ENRICHMENT phase (the one that writes
+    # authorships + sets openalex_enriched_at) is what we need -- it is forced ON via the
+    # SKIP_DOI_ENRICHMENT=0 env override at the run_stage call site (this env sets that var truthy,
+    # which would otherwise skip the phase and make 1b a no-op). There is no CLI flag to force it on.
+    # GATE-A is built into the script: it enriches pubs with a DOI where
     # openalex_enriched_at IS NULL. BILLING NOTE: that is the primary batch PLUS the second-pass
     # author-history pubs PLUS any un-enriched backlog -- NOT scoped to the ~primary batch. This is
     # intentional (the 2nd-pass pubs were ingested for career depth and must be flattened+inventoried
@@ -247,7 +253,12 @@ def cmd_compute_affected(hcp_run_id: str, batch_pubs_path: str, affected_path: s
 
 
 def cmd_ta_tagging(slug: str, affected_path: str) -> List[str]:
-    return py("ta_tagging") + ["--ta", slug, "--candidate-hcp-ids-file", affected_path, "--execute"]
+    # --yes: ta_tagging's --execute path prompts input() for confirmation; unattended (3am cron) there
+    # is no TTY to answer it, so without --yes the stage blocks forever after its read phase. (Also
+    # hardened at the subprocess level: run_stage gives every child stdin=DEVNULL -- see run_stage.)
+    return py("ta_tagging") + [
+        "--ta", slug, "--candidate-hcp-ids-file", affected_path, "--execute", "--yes",
+    ]
 
 
 def cmd_step_f(ta_hcp_ids_path: str) -> List[str]:
@@ -294,7 +305,10 @@ def cmd_rising_score(slug: str) -> List[str]:
 # Subprocess runner (streams live output, optionally captures a stdout pattern), fail-fast.
 # ---------------------------------------------------------------------------
 
-def run_stage(stage_no: int, name: str, cmd: List[str], capture_pattern: Optional[str] = None) -> Optional[str]:
+def run_stage(
+    stage_no: int, name: str, cmd: List[str],
+    capture_pattern: Optional[str] = None, extra_env: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
     print(f"\n{'='*72}\n[stage {stage_no}] {name}\n  $ {_display(cmd)}\n{'='*72}", flush=True)
     t0 = time.time()
     captured: Optional[str] = None
@@ -302,8 +316,16 @@ def run_stage(stage_no: int, name: str, cmd: List[str], capture_pattern: Optiona
     # byte (accented author names on Windows' cp1252 default) becomes a replacement char
     # instead of crashing the reader; PYTHONIOENCODING makes the children emit utf-8 too.
     child_env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    # Per-stage env overrides. NOTE: these must be values the child's load_dotenv(override=False)
+    # will NOT clobber -- since the key is already present in the child env, .env is ignored for it.
+    if extra_env:
+        child_env.update(extra_env)
+    # stdin=DEVNULL: this orchestrator is unattended (3am cron). No stage should ever expect
+    # interactive input; with DEVNULL a stray input() gets EOF and raises (fail-fast) instead of
+    # blocking forever on an inherited pipe/TTY -- the exact ta_tagging hang after its committed reads.
     proc = subprocess.Popen(
-        cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        cmd, cwd=str(REPO_ROOT), stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", errors="replace", bufsize=1, env=child_env,
     )
     assert proc.stdout is not None
@@ -590,7 +612,13 @@ def run_cycle(
             # is exactly what was missing -> the "0 new HCPs every run" + empty-Group-B defect.
             # ----------------------------------------------------------------------------------
             # 1b: pub-level OpenAlex enrichment (BILLED). GATE-A: only enriched_at IS NULL pubs.
-            run_stage(1, "openalex_enrich_pubs(1b)", cmd_openalex_enrich_pubs())
+            # SKIP_DOI_ENRICHMENT=0 FORCES the DOI-enrichment phase ON: openalex_pipeline gates that
+            # phase on `args.skip_doi_enrichment OR env_flag_true("SKIP_DOI_ENRICHMENT")`, and this
+            # env has that var set truthy -> without the override, 1b skips the very phase that writes
+            # publications_v2.authorships and is a silent no-op. The child's load_dotenv(override=False)
+            # keeps our "0" (the key is already present in the child env), so .env cannot re-enable it.
+            run_stage(1, "openalex_enrich_pubs(1b)", cmd_openalex_enrich_pubs(),
+                      extra_env={"SKIP_DOI_ENRICHMENT": "0"})
             note(1, "openalex_enrich_pubs(1b)", "OK")
 
             # 1c: rebuild author_pub_flat from the now-enriched authorships (GATE-D: after 1b).
