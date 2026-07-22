@@ -88,6 +88,12 @@ SCRIPTS: Dict[str, str] = {
 # --tier restricts dedup_merge to this one recommended_action.
 DEDUP_MERGE_EXTRA_ARGS: List[str] = ["--tier", "merge_fragment_high_confidence"]
 
+# Stage 1 MUST always be date-windowed. An un-windowed pubmed_pipeline run (config years_back=null)
+# enters "full PubMed history / unlimited fetch" mode and pulls the entire corpus back to 1947 --
+# always wrong for an incremental cycle. So when no --days/--mindate/--maxdate is given we default
+# to a 7-day window; there is deliberately no code path that ingests without a window.
+DEFAULT_INGEST_DAYS = 7
+
 # Ordered stages for --resume-from and the plan.
 STAGE_ORDER: List[Tuple[int, str]] = [
     (1, "ingest"),
@@ -141,12 +147,16 @@ def _display(cmd: List[str]) -> str:
 def build_ingest_date_args(
     days: Optional[int], mindate: Optional[str], maxdate: Optional[str]
 ) -> List[str]:
-    """Stage-1 date-window pass-through for pubmed_pipeline (--days OR --mindate/--maxdate)."""
+    """Stage-1 date-window pass-through for pubmed_pipeline (--days OR --mindate/--maxdate).
+
+    NEVER returns an empty window: if none is given it falls back to DEFAULT_INGEST_DAYS, so the
+    orchestrator can never invoke pubmed_pipeline un-windowed (which would pull the full corpus).
+    """
     if days is not None:
         return ["--days", str(days)]
     if mindate and maxdate:
         return ["--mindate", mindate, "--maxdate", maxdate]
-    return []
+    return ["--days", str(DEFAULT_INGEST_DAYS)]
 
 
 def cmd_ingest(
@@ -590,6 +600,11 @@ def main() -> int:
     execute = args.execute and not args.dry_run  # dry-run is the safe default
     resume_from = resolve_resume(args.resume_from)
     date_args = build_ingest_date_args(args.days, args.mindate, args.maxdate)
+    if args.days is None and not (args.mindate and args.maxdate):
+        print(f"[reingest_cycle] No date window given; DEFAULTING stage 1 to --days "
+              f"{DEFAULT_INGEST_DAYS} (un-windowed ingest would pull the full PubMed corpus back "
+              f"to 1947 -- never correct for an incremental cycle). Pass --days N or "
+              f"--mindate/--maxdate to override.")
 
     if not execute:
         print_plan(slug, date.today().isoformat(), work_dir_for(slug), args.ingest_limit, date_args)
