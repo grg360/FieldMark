@@ -1783,6 +1783,15 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
     reset_checkpoint = bool(args and args.reset_checkpoint)
     resume = bool(args and args.resume)
 
+    # AUTHORITATIVE batch identity: when requested, accumulate the PRIMARY windowed-query pmids
+    # (the esearch result set) across the TA loop and emit them at the end. This is the orchestrator's
+    # source of truth for "this cycle's batch", replacing the unreliable insert-only run_id reverse-
+    # derivation (which under-captures re-ingested papers that kept an older run_id). It is PRIMARY-ONLY:
+    # the second pass (author-history enrichment) fetches its own pmids inside
+    # run_author_enrichment_second_pass and never touches `pmids`, so enrichment pmids cannot leak in.
+    primary_pmids_out = getattr(args, "primary_pmids_out", None) if args else None
+    primary_pmids_accum: List[str] = []
+
     ta_slugs_to_run = (
         [slug.strip() for slug in args.ta.split(",") if slug.strip()]
         if args and args.ta
@@ -1912,6 +1921,12 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
                     "pmids": pmids,
                 }
                 save_checkpoint(checkpoint, ta_slug)
+
+        # Capture the PRIMARY windowed pmids for this TA into the batch-identity accumulator BEFORE
+        # any early-continue, so a genuinely empty window still contributes (nothing) and the file is
+        # written even when 0 primary papers matched.
+        if primary_pmids_out is not None:
+            primary_pmids_accum.extend(str(p) for p in pmids)
 
         if not pmids:
             print(f"No PubMed results found for {query_label}.")
@@ -2152,6 +2167,17 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
                 f"for {query_label}."
             )
 
+    # Emit the authoritative PRIMARY pmid set (batch identity for the orchestrator). Written even
+    # when empty (0 primary papers -> empty file), so the caller can distinguish "quiet window,
+    # nothing new" from "flag not passed". De-duplicated, order-preserving.
+    if primary_pmids_out is not None:
+        seen: Set[str] = set()
+        deduped = [p for p in primary_pmids_accum if not (p in seen or seen.add(p))]
+        Path(primary_pmids_out).write_text(
+            "\n".join(deduped) + ("\n" if deduped else ""), encoding="utf-8"
+        )
+        print(f"[pubmed_pipeline] wrote {len(deduped)} primary pmid(s) -> {primary_pmids_out}")
+
     if dry_run:
         print("Dry run completed.")
         return ingestion_run_id
@@ -2203,6 +2229,16 @@ def main() -> None:
         metavar="YYYY/MM/DD",
         help="Explicit date-window end (publication date). Must be given with --mindate. "
              "Mutually exclusive with --days.",
+    )
+    parser.add_argument(
+        "--primary-pmids-out",
+        type=str,
+        default=None,
+        metavar="FILE",
+        help="Write the PRIMARY windowed-query pmids (the esearch result set, one per line) to FILE. "
+             "This is the authoritative batch identity for the orchestrator -- primary papers only, "
+             "NOT second-pass author-history/enrichment pmids. Written even if empty (0 primary "
+             "papers -> empty file).",
     )
     parser.add_argument(
         "--reset-checkpoint",

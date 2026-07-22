@@ -6,18 +6,37 @@ It chains the existing stage scripts via subprocess, fail-fast, threading the cy
 The only direct DB access is three tiny read-only SELECT-to-file glue queries (ta_id, the TA's
 hcp-ids, and the batch's pub-ids) - because run_sql.py prints a formatted table, not bare uuids.
 
+BATCH IDENTITY (authoritative): stage 1 emits primary_pmids.txt via --primary-pmids-out -- the
+PRIMARY windowed-query pmids (esearch result), enrichment/author-history pmids EXCLUDED. batch_pubs
+is resolved from that (pubmed_id = ANY(primary_pmids)), NOT from the run_id stamp. The insert-only
+run_id stamp is created-by and under-captures re-ingested papers that kept an older run_id (caused
+"batch pub-ids: 0" -> stage 3 crash); the pmid set is complete regardless of provenance.
+
+QUIET WEEK: if primary_pmids.txt is EMPTY (0 new primary papers this window), the whole cycle is
+skipped cleanly after stage 1 -- completion marker SUCCESS/skipped, exit 0 (no affected-set fan-out,
+no rescore). A MISSING file (stage 1 failed to emit it) is a hard error, not a quiet week.
+
 TWO RUN IDS (both captured, used where noted):
   * PUB_RUN_ID  - minted+printed by pubmed_pipeline.py (stage 1) as "[pubmed_pipeline]
-                  ingestion_run_id=...". Stamps publications_v2.ingestion_run_id. Used in stage 6
-                  to find the batch's new pubs.
+                  ingestion_run_id=...". Stamps publications_v2.ingestion_run_id (created-by; NO
+                  LONGER the batch definition -- see BATCH IDENTITY above).
   * HCP_RUN_ID  - minted by create_hcps_v2.py (stage 2), read from its --summary-out JSON
                   ("ingestion_run_id"). The canonical HCP run id. Used in stages 3, 7, 8c.
 
 STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
-  1 ingest            pubmed_pipeline.py --ta <slug>                (capture PUB_RUN_ID)
+  1 ingest            pubmed_pipeline.py --ta <slug> --primary-pmids-out <primary_pmids.txt>
+                      (capture PUB_RUN_ID; quiet-week gate: empty primary_pmids -> skip cycle, exit 0)
+     [OpenAlex sub-sequence -- create_hcps' prerequisites; runs ONLY on a non-quiet week, AFTER the gate]
+     1b openalex_pipeline.py --target-version v2 --skip-career-enrichment
+        -> publications_v2.authorships. GATE-A: ALL pubs with a DOI and openalex_enriched_at IS NULL --
+        that is primary + 2nd-pass author-history + any un-enriched backlog, NOT just the ~primary batch
+        (pubmed_pipeline inserts every pub with enriched_at=NULL). BILLED (OpenAlex API). See §billing note.
+     1c run_sql.py --file build_author_flat.sql  (full O(corpus) rebuild of author_pub_flat)  GATE-D: after 1b.
+     1d run_sql.py --file sql/reingest/inventory_upsert_incremental.sql --param ta_id=<TA_ID>
+        --statement-timeout 30min  (openalex_author_inventory upsert, HAVING count>=3, GREATEST no-clobber) GATE-B.
   2 create_hcps       create_hcps_v2.py --ta <slug> --incremental --summary-out <run_summary.json>
-                      (read HCP_RUN_ID)
-    [gen batch_pubs]  SELECT id FROM publications_v2 WHERE ingestion_run_id=<PUB_RUN_ID> -> batch_pubs.txt
+                      (read HCP_RUN_ID; requires author_pub_flat + openalex_author_inventory, now populated by 1b-1d)
+    [gen batch_pubs]  SELECT id FROM publications_v2 WHERE pubmed_id = ANY(primary_pmids.txt) -> batch_pubs.txt
   3 affected          compute_affected_hcps.py --run-id <HCP_RUN_ID> --pub-ids-file batch_pubs.txt --out affected.txt
   4 ta_tagging        ta_tagging_rebuild_v2.py --ta <slug> --candidate-hcp-ids-file affected.txt --execute
     [gen ta_hcp_ids]  SELECT hcp_id FROM hcp_therapeutic_areas_v2 WHERE therapeutic_area_id=<TA_ID> -> ta_hcp_ids.txt
@@ -64,6 +83,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent  # scripts/reingest_cycle.py 
 
 SCRIPTS: Dict[str, str] = {
     "pubmed": "scripts/ingest/pubmed_pipeline.py",
+    "openalex_pipeline": "scripts/enrich/openalex_pipeline.py",   # 1b: pub-level authorships enrichment
+    "run_sql": "scripts/utilities/run_sql.py",                    # 1c/1d: execute the flatten + inventory SQL
     "create_hcps": "scripts/classify/create_hcps_v2.py",
     "compute_affected": "scripts/utilities/compute_affected_hcps.py",
     "ta_tagging": "scripts/classify/ta_tagging_rebuild_v2.py",
@@ -77,6 +98,21 @@ SCRIPTS: Dict[str, str] = {
     "cohort": "scripts/classify/cohort_classification_v2.py",
     "rising_score": "scripts/score/rising_score.py",
 }
+
+# 1c FLATTEN: full rebuild of author_pub_flat from publications_v2.authorships (TA-agnostic, unbilled
+# SQL). GATE-D is satisfied by ORDER -- it runs AFTER 1b, so it flattens the freshly-enriched pubs.
+# PERF: this is a FULL-CORPUS rebuild (DROP + CREATE TABLE AS over all publications_v2.authorships),
+# i.e. O(corpus), not scoped to the batch. Accepted as-is (matches the playbook, and it's unbilled
+# SQL). If weekly runtime becomes a problem, the candidate optimization is an APPEND-ONLY flatten:
+# delete + re-insert only the batch pubs' author rows instead of rebuilding the whole table.
+BUILD_AUTHOR_FLAT_SQL = REPO_ROOT / "build_author_flat.sql"
+
+# 1d INVENTORY UPSERT: refresh openalex_author_inventory for THIS TA's authors from author_pub_flat.
+# The SQL lives in a committed file (ta_id as a BOUND param, GATE-B GREATEST fix documented in its
+# header) so the correctness property is visible in the SQL layer, not buried here. The on-disk
+# build_inventory_ad.sql is deliberately NOT used (AD-hardcoded + EXCLUDED-clobber = the GATE-B bug).
+INVENTORY_UPSERT_SQL_FILE = REPO_ROOT / "sql" / "reingest" / "inventory_upsert_incremental.sql"
+INVENTORY_STATEMENT_TIMEOUT = "30min"  # heavy aggregate over the full author_pub_flat
 
 # dedup_merge write policy for the UNATTENDED 3am job -- EARN-PROMOTION policy: only the PROVEN
 # tier auto-merges; every other tier stays in the candidate CSV, logged, for manual review, and is
@@ -160,13 +196,43 @@ def build_ingest_date_args(
 
 
 def cmd_ingest(
-    slug: str, ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None
+    slug: str, ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
+    primary_pmids_out: Optional[str] = None,
 ) -> List[str]:
     cmd = py("pubmed") + ["--ta", slug]
     if ingest_limit is not None:
         cmd += ["--limit", str(ingest_limit)]
     if date_args:
         cmd += date_args
+    if primary_pmids_out is not None:
+        cmd += ["--primary-pmids-out", primary_pmids_out]
+    return cmd
+
+
+# --- OpenAlex sub-sequence (1b/1c/1d): the prerequisites create_hcps/ta_tagging/Step F depend on. ---
+
+def cmd_openalex_enrich_pubs() -> List[str]:
+    # 1b: pub-level OpenAlex enrichment -> publications_v2.authorships. v2 tables; skip the HCP career
+    # phase (that's stage 8). GATE-A is built into the script: it enriches pubs with a DOI where
+    # openalex_enriched_at IS NULL. BILLING NOTE: that is the primary batch PLUS the second-pass
+    # author-history pubs PLUS any un-enriched backlog -- NOT scoped to the ~primary batch. This is
+    # intentional (the 2nd-pass pubs were ingested for career depth and must be flattened+inventoried
+    # to count toward thin HCPs' corpus_pub_count). Steady-state volume ~= new pubs/week; the FIRST
+    # run clears the whole backlog (potentially large). To scope tighter, openalex_pipeline would need
+    # a --pmids/--pub-ids filter (it has none today) -- a deliberate follow-up, not silently assumed.
+    return py("openalex_pipeline") + ["--target-version", "v2", "--skip-career-enrichment"]
+
+
+def cmd_run_sql_file(
+    sql_path: str,
+    params: Optional[Dict[str, str]] = None,
+    statement_timeout: Optional[str] = None,
+) -> List[str]:
+    cmd = py("run_sql") + ["--file", sql_path]
+    for key, value in (params or {}).items():
+        cmd += ["--param", f"{key}={value}"]
+    if statement_timeout is not None:
+        cmd += ["--statement-timeout", statement_timeout]
     return cmd
 
 
@@ -284,10 +350,35 @@ def _write_ids_file(sql: str, params: Tuple, path: Path, label: str) -> int:
     return len(ids)
 
 
-def gen_batch_pubs_file(pub_run_id: str, path: Path) -> int:
+def read_pmids_file(path: Path) -> List[str]:
+    """One pmid per line; blanks ignored. Missing file -> empty list."""
+    if not path.exists():
+        return []
+    out: List[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if s:
+            out.append(s)
+    return out
+
+
+def gen_batch_pubs_file(primary_pmids_path: Path, batch_pubs_path: Path) -> int:
+    """Resolve THIS cycle's batch pub uuids from the authoritative PRIMARY pmid set.
+
+    Batch identity comes from stage 1's --primary-pmids-out file (the esearch windowed result),
+    NOT from publications_v2.ingestion_run_id. The run_id stamp is insert-only (created-by), so it
+    under-captures re-ingested papers that kept an older run_id -> "batch pub-ids: 0". Resolving
+    pmid -> id via `WHERE pubmed_id = ANY(...)` is complete regardless of created-by provenance.
+    Caller handles the empty case (0 primary pmids = quiet week) BEFORE this is reached.
+    """
+    pmids = read_pmids_file(primary_pmids_path)
+    if not pmids:
+        batch_pubs_path.write_text("", encoding="utf-8")
+        print(f"  [gen] batch pub-ids: 0 (no primary pmids) -> {batch_pubs_path}")
+        return 0
     return _write_ids_file(
-        "SELECT id FROM publications_v2 WHERE ingestion_run_id = %s", (pub_run_id,),
-        path, "batch pub-ids",
+        "SELECT id FROM publications_v2 WHERE pubmed_id = ANY(%s)", (pmids,),
+        batch_pubs_path, "batch pub-ids",
     )
 
 
@@ -340,11 +431,12 @@ def print_plan(
     B = str(work / "batch_pubs.txt")
     T = str(work / "ta_hcp_ids.txt")
     S = str(work / "run_summary.json")
+    P = str(work / "primary_pmids.txt")
     HCP = "<HCP_RUN_ID>"
     PUB = "<PUB_RUN_ID>"
     TAID = "<TA_ID>"
 
-    ingest_label = "1  ingest (capture PUB_RUN_ID from stdout)"
+    ingest_label = "1  ingest (capture PUB_RUN_ID from stdout; emit PRIMARY pmids -> primary_pmids.txt)"
     window_note = " ".join(date_args) if date_args else "full corpus"
     ingest_label += f"  [window: {window_note}]"
     if ingest_limit is not None:
@@ -353,9 +445,18 @@ def print_plan(
         ingest_label += "  [unbounded]"
 
     plan: List[Tuple[str, List[str]]] = [
-        (ingest_label, cmd_ingest(slug, ingest_limit, date_args)),
-        ("2  create_hcps (mints HCP_RUN_ID -> run_summary.json)", cmd_create_hcps(slug, S)),
-        ("   [gen] batch_pubs.txt = publications_v2 WHERE ingestion_run_id=" + PUB, []),
+        (ingest_label, cmd_ingest(slug, ingest_limit, date_args, P)),
+        ("   [quiet-week gate] if primary_pmids.txt is EMPTY -> skip whole cycle (incl. all billed OpenAlex), mark SUCCESS/skipped, exit 0", []),
+        ("1b openalex enrich pubs -> publications_v2.authorships  [GATE-A: ALL enriched_at IS NULL DOI pubs "
+         "= primary + 2nd-pass author-history + any backlog; BILLED, NOT just the ~primary batch]",
+         cmd_openalex_enrich_pubs()),
+        ("1c flatten author_pub_flat (full O(corpus) rebuild from authorships)  [GATE-D: runs AFTER 1b; unbilled SQL]",
+         cmd_run_sql_file(str(BUILD_AUTHOR_FLAT_SQL))),
+        ("1d inventory upsert -> openalex_author_inventory (HAVING count>=3, GREATEST no-clobber "
+         "[GATE-B]; committed SQL, ta_id bound param; unbilled)",
+         cmd_run_sql_file(str(INVENTORY_UPSERT_SQL_FILE), {"ta_id": TAID}, INVENTORY_STATEMENT_TIMEOUT)),
+        ("2  create_hcps (mints HCP_RUN_ID -> run_summary.json)  [now has author_pub_flat + inventory]", cmd_create_hcps(slug, S)),
+        ("   [gen] batch_pubs.txt = publications_v2 WHERE pubmed_id = ANY(primary_pmids.txt)", []),
         ("3  affected", cmd_compute_affected(HCP, B, A)),
         ("4  ta_tagging", cmd_ta_tagging(slug, A)),
         ("   [gen] ta_hcp_ids.txt = hcp_therapeutic_areas_v2 WHERE therapeutic_area_id=" + TAID, []),
@@ -376,7 +477,7 @@ def print_plan(
     print(f"  TA:            {slug}")
     print(f"  ta_id:         {TAID}  (resolved at execute time)")
     print(f"  HCP_RUN_ID:    {HCP}   (minted by stage 2)")
-    print(f"  PUB_RUN_ID:    {PUB}   (minted by stage 1, from stdout)")
+    print(f"  PUB_RUN_ID:    {PUB}   (minted by stage 1; created-by stamp, NO LONGER the batch definition)")
     print(f"  snapshot_date: {snapshot}  (passed identically to 8b and 8c)")
     print(f"  work dir:      {work}")
     print(f"  Mode:          DRY-RUN (plan only)")
@@ -409,6 +510,7 @@ def run_cycle(
     batch_pubs = work / "batch_pubs.txt"
     ta_hcp_ids = work / "ta_hcp_ids.txt"
     run_summary = work / "run_summary.json"
+    primary_pmids = work / "primary_pmids.txt"  # authoritative batch identity, emitted by stage 1
     snapshot = date.today().isoformat()
     started_at = datetime.now(timezone.utc).isoformat()
     t0 = time.time()
@@ -443,12 +545,63 @@ def run_cycle(
     try:
         # 1 INGEST
         if running(1):
-            pub_run_id = run_stage(1, "ingest", cmd_ingest(slug, ingest_limit, date_args),
-                                   capture_pattern=r"\[pubmed_pipeline\]\s+ingestion_run_id=(\S+)")
+            pub_run_id = run_stage(
+                1, "ingest",
+                cmd_ingest(slug, ingest_limit, date_args, str(primary_pmids)),
+                capture_pattern=r"\[pubmed_pipeline\]\s+ingestion_run_id=(\S+)",
+            )
             if not pub_run_id:
                 raise StageFailure(1, "ingest", 1)  # could not capture PUB_RUN_ID
             save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id, "hcp_run_id": hcp_run_id})
             note(1, "ingest", "OK")
+
+            # QUIET-WEEK GATE: stage 1 emits primary_pmids.txt (the authoritative batch = the esearch
+            # windowed result). A MISSING file is a misconfiguration (stage 1 must emit it); an EMPTY
+            # file is a genuinely quiet week -- 0 new primary papers, nothing to process. On a quiet
+            # week, skip the whole cycle cleanly: no affected-set fan-out, no rescore (nothing changed).
+            # Mark the completion marker SUCCESS/skipped and exit 0 -- NOT fail-fast, NOT whole-TA
+            # reprocessing (which is what an empty batch_pubs previously degenerated into).
+            if not primary_pmids.exists():
+                raise SystemExit(
+                    f"stage 1 did not emit {primary_pmids} (expected --primary-pmids-out). "
+                    f"Cannot determine batch identity; aborting."
+                )
+            primary_count = len(read_pmids_file(primary_pmids))
+            print(f"  primary papers this window: {primary_count:,}")
+            if primary_count == 0:
+                note(1, "quiet_week", "SKIPPED")
+                write_completion_marker(work, {
+                    "ta": slug, "ta_id": ta_id, "hcp_run_id": hcp_run_id, "pub_run_id": pub_run_id,
+                    "snapshot_date": snapshot, "started_at": started_at,
+                    "ended_at": datetime.now(timezone.utc).isoformat(),
+                    "stages": stage_status, "result": "SUCCESS", "skipped": "quiet_week",
+                    "note": "quiet week: 0 new primary papers, nothing to do", "failed_stage": None,
+                })
+                print(f"\n{'='*72}\n  QUIET WEEK  ta={slug}: 0 new primary papers this window; "
+                      f"nothing to do.\n  Cycle skipped cleanly (SUCCESS). "
+                      f"({time.time()-t0:.0f}s)\n{'='*72}")
+                return 0
+
+            # ----------------------------------------------------------------------------------
+            # OpenAlex sub-sequence (1b/1c/1d) -- grouped under stage 1 (like 7a/7b, 8a-8d). Runs
+            # ONLY on a non-quiet week (after the gate's return 0 above), so a quiet week never
+            # incurs the billed OpenAlex calls. These populate create_hcps' prerequisites
+            # (publications_v2.authorships -> author_pub_flat -> openalex_author_inventory), which
+            # is exactly what was missing -> the "0 new HCPs every run" + empty-Group-B defect.
+            # ----------------------------------------------------------------------------------
+            # 1b: pub-level OpenAlex enrichment (BILLED). GATE-A: only enriched_at IS NULL pubs.
+            run_stage(1, "openalex_enrich_pubs(1b)", cmd_openalex_enrich_pubs())
+            note(1, "openalex_enrich_pubs(1b)", "OK")
+
+            # 1c: rebuild author_pub_flat from the now-enriched authorships (GATE-D: after 1b).
+            run_stage(1, "flatten_author_pub_flat(1c)", cmd_run_sql_file(str(BUILD_AUTHOR_FLAT_SQL)))
+            note(1, "flatten_author_pub_flat(1c)", "OK")
+
+            # 1d: inventory upsert for this TA's authors (GATE-B: GREATEST no-clobber, in the committed
+            # SQL). ta_id is a BOUND param; run_sql raises statement_timeout for the heavy aggregate.
+            run_stage(1, "inventory_upsert(1d)", cmd_run_sql_file(
+                str(INVENTORY_UPSERT_SQL_FILE), {"ta_id": ta_id}, INVENTORY_STATEMENT_TIMEOUT))
+            note(1, "inventory_upsert(1d)", "OK")
 
         # 2 CREATE HCPS (mint HCP_RUN_ID)
         if running(2):
@@ -463,12 +616,16 @@ def run_cycle(
             save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id, "hcp_run_id": hcp_run_id})
             note(2, "create_hcps", "OK")
 
-        # [gen batch_pubs] needed by stages 3 and 6
+        # [gen batch_pubs] needed by stages 3 and 6 -- resolved from the PRIMARY pmid set
+        # (authoritative batch identity: pubmed_id = ANY(primary_pmids.txt)), NOT the created-by
+        # run_id stamp, which under-captures re-ingested papers that kept an older run_id.
         if running(3) or running(6):
-            if not pub_run_id:
-                raise SystemExit("PUB_RUN_ID unknown (resume without run_state). Re-run from top.")
+            if not primary_pmids.exists():
+                raise SystemExit(
+                    f"{primary_pmids} missing (stage 1 emits it). Re-run from top."
+                )
             if running(3) or not batch_pubs.exists():
-                gen_batch_pubs_file(pub_run_id, batch_pubs)
+                gen_batch_pubs_file(primary_pmids, batch_pubs)
 
         # 3 AFFECTED
         if running(3):
