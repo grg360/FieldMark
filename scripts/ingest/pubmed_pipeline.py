@@ -1609,12 +1609,21 @@ def run_author_enrichment_second_pass(
                 )
                 for row in rows
             ]
+            # therapeutic_area_id=None AND ingestion_run_id=None ON PURPOSE: these are the author's
+            # FULL publication history (back-catalog on unrelated topics), ingested only for
+            # career-depth enrichment. They are neither this TA's papers (so no publication_
+            # therapeutic_areas_v2 link / source_therapeutic_area_id backfill -- both guarded by
+            # `if therapeutic_area_id`) NOR this run's batch (so no ingestion_run_id stamp). Only the
+            # PRIMARY windowed-query papers carry the run_id, so "WHERE ingestion_run_id=X" returns
+            # just the primary batch (the orchestrator's batch_pubs.txt), not the ~10K enrichment
+            # substrate. The pubs + author-links are still written (career depth preserved); if an
+            # enrichment pub later matches a real query, created-by semantics stamp it properly then.
             pub_count, author_count = upsert_publications(
                 supabase=supabase,
                 publication_records=publication_records,
                 hcp_id_map={},
-                therapeutic_area_id=therapeutic_area_id,
-                ingestion_run_id=ingestion_run_id,
+                therapeutic_area_id=None,
+                ingestion_run_id=None,
             )
             total_upserted += author_count or pub_count
         except Exception as exc:
