@@ -5,7 +5,6 @@ CHANGES IN v1.4 (2026-05-18):
 - Added per-TA normalization step: composite_score is normalized 0-100 within
   each therapeutic area separately. Result written to normalized_score.
 - Added tier assignment based on normalized_score thresholds:
-    normalized >= 95 AND (pub_vel > 0 OR trial > 0) -> dark_horse
     normalized >= 85                                 -> rising_star
     normalized >= 30                                 -> emerging
     otherwise                                        -> unranked
@@ -78,7 +77,6 @@ RECENT_PUBLICATION_YEAR_CUTOFF = 2022
 # corpus has a different score distribution shape, requiring a lower threshold to
 # produce a usable rising star cohort. Empirical: ≥65 produces ~74 US Hep + ~325
 # US NSCLC rising stars.
-TIER_DARK_HORSE_THRESHOLD = 80.0
 TIER_RISING_STAR_THRESHOLD = 65.0
 TIER_EMERGING_THRESHOLD = 30.0
 CONCEPT_SCORE_THRESHOLD = 0.4
@@ -817,7 +815,6 @@ def assign_tier(normalized: float, composite: float, pub_vel: float, trial: floa
     """
     Assign tier based on per-TA normalized_score thresholds.
 
-    - dark_horse: normalized >= 95 AND has signal evidence (pub_vel or trial > 0)
     - rising_star: normalized >= 85
     - emerging: normalized >= 30
     - unranked: below 30, or composite is 0 (failed ranking threshold)
@@ -825,8 +822,6 @@ def assign_tier(normalized: float, composite: float, pub_vel: float, trial: floa
     # HCPs that failed the ranking publication threshold have composite_score=0
     if composite == 0.0:
         return "unranked"
-    if normalized >= TIER_DARK_HORSE_THRESHOLD and (pub_vel > 0 or trial > 0):
-        return "dark_horse"
     if normalized >= TIER_RISING_STAR_THRESHOLD:
         return "rising_star"
     if normalized >= TIER_EMERGING_THRESHOLD:
