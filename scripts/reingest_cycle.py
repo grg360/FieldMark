@@ -138,8 +138,26 @@ def _display(cmd: List[str]) -> str:
 # real execution (resolved values)) -- so plan and execution can never diverge.
 # ---------------------------------------------------------------------------
 
-def cmd_ingest(slug: str) -> List[str]:
-    return py("pubmed") + ["--ta", slug]
+def build_ingest_date_args(
+    days: Optional[int], mindate: Optional[str], maxdate: Optional[str]
+) -> List[str]:
+    """Stage-1 date-window pass-through for pubmed_pipeline (--days OR --mindate/--maxdate)."""
+    if days is not None:
+        return ["--days", str(days)]
+    if mindate and maxdate:
+        return ["--mindate", mindate, "--maxdate", maxdate]
+    return []
+
+
+def cmd_ingest(
+    slug: str, ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None
+) -> List[str]:
+    cmd = py("pubmed") + ["--ta", slug]
+    if ingest_limit is not None:
+        cmd += ["--limit", str(ingest_limit)]
+    if date_args:
+        cmd += date_args
+    return cmd
 
 
 def cmd_create_hcps(slug: str, summary_path: str) -> List[str]:
@@ -204,9 +222,13 @@ def run_stage(stage_no: int, name: str, cmd: List[str], capture_pattern: Optiona
     print(f"\n{'='*72}\n[stage {stage_no}] {name}\n  $ {_display(cmd)}\n{'='*72}", flush=True)
     t0 = time.time()
     captured: Optional[str] = None
+    # Force UTF-8 both ways: decode child output as utf-8 with errors="replace" so a stray
+    # byte (accented author names on Windows' cp1252 default) becomes a replacement char
+    # instead of crashing the reader; PYTHONIOENCODING makes the children emit utf-8 too.
+    child_env = dict(os.environ, PYTHONIOENCODING="utf-8")
     proc = subprocess.Popen(
         cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1,
+        text=True, encoding="utf-8", errors="replace", bufsize=1, env=child_env,
     )
     assert proc.stdout is not None
     pat = re.compile(capture_pattern) if capture_pattern else None
@@ -300,7 +322,10 @@ def write_completion_marker(work: Path, marker: Dict) -> None:
 # Plan (dry-run)
 # ---------------------------------------------------------------------------
 
-def print_plan(slug: str, snapshot: str, work: Path) -> None:
+def print_plan(
+    slug: str, snapshot: str, work: Path,
+    ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
+) -> None:
     A = str(work / "affected.txt")
     B = str(work / "batch_pubs.txt")
     T = str(work / "ta_hcp_ids.txt")
@@ -309,8 +334,16 @@ def print_plan(slug: str, snapshot: str, work: Path) -> None:
     PUB = "<PUB_RUN_ID>"
     TAID = "<TA_ID>"
 
+    ingest_label = "1  ingest (capture PUB_RUN_ID from stdout)"
+    window_note = " ".join(date_args) if date_args else "full corpus"
+    ingest_label += f"  [window: {window_note}]"
+    if ingest_limit is not None:
+        ingest_label += f"  [--limit {ingest_limit}]"
+    else:
+        ingest_label += "  [unbounded]"
+
     plan: List[Tuple[str, List[str]]] = [
-        ("1  ingest (capture PUB_RUN_ID from stdout)", cmd_ingest(slug)),
+        (ingest_label, cmd_ingest(slug, ingest_limit, date_args)),
         ("2  create_hcps (mints HCP_RUN_ID -> run_summary.json)", cmd_create_hcps(slug, S)),
         ("   [gen] batch_pubs.txt = publications_v2 WHERE ingestion_run_id=" + PUB, []),
         ("3  affected", cmd_compute_affected(HCP, B, A)),
@@ -357,7 +390,10 @@ def print_plan(slug: str, snapshot: str, work: Path) -> None:
 # Execute
 # ---------------------------------------------------------------------------
 
-def run_cycle(slug: str, resume_from: Optional[int]) -> int:
+def run_cycle(
+    slug: str, resume_from: Optional[int],
+    ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
+) -> int:
     work = work_dir_for(slug)
     affected = work / "affected.txt"
     batch_pubs = work / "batch_pubs.txt"
@@ -397,7 +433,7 @@ def run_cycle(slug: str, resume_from: Optional[int]) -> int:
     try:
         # 1 INGEST
         if running(1):
-            pub_run_id = run_stage(1, "ingest", cmd_ingest(slug),
+            pub_run_id = run_stage(1, "ingest", cmd_ingest(slug, ingest_limit, date_args),
                                    capture_pattern=r"\[pubmed_pipeline\]\s+ingestion_run_id=(\S+)")
             if not pub_run_id:
                 raise StageFailure(1, "ingest", 1)  # could not capture PUB_RUN_ID
@@ -511,11 +547,26 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ta", required=True, metavar="SLUG", help="Therapeutic area slug (e.g. nsclc).")
     p.add_argument("--dry-run", action="store_true", help="Print the full plan; execute nothing (default).")
     p.add_argument("--execute", action="store_true", help="Run the cycle for real.")
+    p.add_argument("--ingest-limit", type=int, default=None, metavar="N",
+                   help="Cap stage 1 (pubmed_pipeline) to N via --limit N. Omit to run unbounded.")
+    p.add_argument("--days", type=int, default=None, metavar="N",
+                   help="Date-window stage 1 to the last N days (pubmed_pipeline --days N), e.g. "
+                        "--days 7 for the weekly cron. Mutually exclusive with --mindate/--maxdate.")
+    p.add_argument("--mindate", default=None, metavar="YYYY/MM/DD",
+                   help="Explicit stage-1 window start (with --maxdate). Mutually exclusive with --days.")
+    p.add_argument("--maxdate", default=None, metavar="YYYY/MM/DD",
+                   help="Explicit stage-1 window end (with --mindate). Mutually exclusive with --days.")
     p.add_argument("--resume-from", metavar="STAGE", default=None,
                    help="Skip to a stage (number 1-9 or name: "
                         + ", ".join(name for _, name in STAGE_ORDER)
                         + "), reusing the last run's ids/files from the work dir.")
-    return p.parse_args()
+    args = p.parse_args()
+    # --days and --mindate/--maxdate are mutually exclusive; an explicit range needs both bounds.
+    if args.days is not None and (args.mindate or args.maxdate):
+        p.error("--days is mutually exclusive with --mindate/--maxdate.")
+    if bool(args.mindate) != bool(args.maxdate):
+        p.error("--mindate and --maxdate must be given together.")
+    return args
 
 
 def resolve_resume(value: Optional[str]) -> Optional[int]:
@@ -538,11 +589,12 @@ def main() -> int:
     slug = args.ta
     execute = args.execute and not args.dry_run  # dry-run is the safe default
     resume_from = resolve_resume(args.resume_from)
+    date_args = build_ingest_date_args(args.days, args.mindate, args.maxdate)
 
     if not execute:
-        print_plan(slug, date.today().isoformat(), work_dir_for(slug))
+        print_plan(slug, date.today().isoformat(), work_dir_for(slug), args.ingest_limit, date_args)
         return 0
-    return run_cycle(slug, resume_from)
+    return run_cycle(slug, resume_from, args.ingest_limit, date_args)
 
 
 if __name__ == "__main__":

@@ -475,6 +475,8 @@ def pubmed_esearch_count(
     days_back: Optional[int],
     email: Optional[str],
     tool_name: str,
+    mindate: Optional[str] = None,
+    maxdate: Optional[str] = None,
 ) -> int:
     """Return total PMID count for a query (esearch Count element)."""
     esearch_url = f"{base_url}/esearch.fcgi"
@@ -487,7 +489,11 @@ def pubmed_esearch_count(
         "sort": "pub_date",
         "tool": tool_name,
     }
-    if days_back is not None:
+    if mindate and maxdate:
+        params["datetype"] = "pdat"
+        params["mindate"] = mindate
+        params["maxdate"] = maxdate
+    elif days_back is not None:
         params["datetype"] = "pdat"
         params["reldate"] = str(days_back)
     if email:
@@ -654,6 +660,8 @@ def pubmed_esearch(
     per_call: int,
     email: Optional[str],
     tool_name: str,
+    mindate: Optional[str] = None,
+    maxdate: Optional[str] = None,
 ) -> List[str]:
     esearch_url = f"{base_url}/esearch.fcgi"
     efetch_url = f"{base_url}/efetch.fcgi"
@@ -667,6 +675,8 @@ def pubmed_esearch(
         email=email,
         tool_name=tool_name,
         days_back=days_back,
+        mindate=mindate,
+        maxdate=maxdate,
     )
     if total_count == 0:
         return []
@@ -697,6 +707,15 @@ def pubmed_esearch(
         )
         ids.extend(batch_ids)
     else:
+        if mindate and maxdate:
+            # The >9999 chunker splits by year (days_back) or decade (full corpus); it has no
+            # chunker for an arbitrary explicit range, so decade-chunking would silently ignore
+            # the window. Fail loudly instead of over-fetching the whole corpus.
+            raise RuntimeError(
+                f"Explicit --mindate/--maxdate window returned {total_count:,} PMIDs (> "
+                f"{PUBMED_HISTORY_MAX_PMIDS}); this path cannot page an arbitrary range. "
+                f"Use --days N for large windows, or narrow the range."
+            )
         if days_back is not None:
             date_ranges = iter_year_date_ranges(days_back)
         else:
@@ -1811,6 +1830,26 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         else:
             print("No time filter (full PubMed history)")
 
+        # CLI date-window override (mutually exclusive: --days vs --mindate/--maxdate; validated
+        # in main()). When given, it overrides the config window AND forces fresh PMID retrieval:
+        # a date-windowed run must query that window, not resume the full-corpus offset checkpoint,
+        # nor poison it with the windowed PMID set (see checkpoint read/write guards below).
+        cli_days = getattr(args, "days", None) if args else None
+        cli_mindate = getattr(args, "mindate", None) if args else None
+        cli_maxdate = getattr(args, "maxdate", None) if args else None
+        window_mindate: Optional[str] = None
+        window_maxdate: Optional[str] = None
+        date_window_override = cli_days is not None or bool(cli_mindate and cli_maxdate)
+        if cli_days is not None:
+            days_back = cli_days
+            print(f"CLI date window: --days {cli_days} (relative; overrides config, fresh query, "
+                  f"checkpoint offset ignored)")
+        elif cli_mindate and cli_maxdate:
+            days_back = None  # explicit range supersedes the relative window
+            window_mindate, window_maxdate = cli_mindate, cli_maxdate
+            print(f"CLI date window: --mindate {cli_mindate} --maxdate {cli_maxdate} (explicit range; "
+                  f"overrides config, fresh query, checkpoint offset ignored)")
+
         config_max_results = resolve_max_results(pubmed_cfg)
         max_results = config_max_results
         if args and args.limit:
@@ -1827,7 +1866,7 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
             print(f"Applying CLI --limit={args.limit} (effective fetch cap: {max_results})")
 
         pmid_phase = checkpoint["phases"]["pmid_retrieval"] if checkpoint else None
-        if checkpoint and pmid_phase.get("complete") and pmid_phase.get("pmids"):
+        if checkpoint and not date_window_override and pmid_phase.get("complete") and pmid_phase.get("pmids"):
             pmids = [str(p) for p in pmid_phase["pmids"]]
             print(f"Checkpoint: skipping PMID retrieval ({len(pmids):,} PMIDs loaded from checkpoint)")
         else:
@@ -1838,6 +1877,8 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
                 days_back=days_back,
                 email=email,
                 tool_name=tool_name,
+                mindate=window_mindate,
+                maxdate=window_maxdate,
             )
             print(f"PubMed reports {total_available:,} total matching PMIDs for this query/window.")
 
@@ -1851,8 +1892,12 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
                 per_call=per_call,
                 email=email,
                 tool_name=tool_name,
+                mindate=window_mindate,
+                maxdate=window_maxdate,
             )
-            if checkpoint is not None:
+            # Do NOT persist the windowed PMID set into the shared checkpoint: it is a partial
+            # (date-bounded) view and would poison a later full-corpus run's pmid_retrieval cache.
+            if checkpoint is not None and not date_window_override:
                 checkpoint["phases"]["pmid_retrieval"] = {
                     "complete": True,
                     "pmids": pmids,
@@ -2126,6 +2171,31 @@ def main() -> None:
         help="Cap PMIDs per TA (testing)",
     )
     parser.add_argument(
+        "--days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Date-window the run to the last N days (publication date). Overrides the config window "
+             "and forces a fresh query (ignores the checkpoint offset). Mutually exclusive with "
+             "--mindate/--maxdate.",
+    )
+    parser.add_argument(
+        "--mindate",
+        type=str,
+        default=None,
+        metavar="YYYY/MM/DD",
+        help="Explicit date-window start (publication date). Must be given with --maxdate. "
+             "Mutually exclusive with --days.",
+    )
+    parser.add_argument(
+        "--maxdate",
+        type=str,
+        default=None,
+        metavar="YYYY/MM/DD",
+        help="Explicit date-window end (publication date). Must be given with --mindate. "
+             "Mutually exclusive with --days.",
+    )
+    parser.add_argument(
         "--reset-checkpoint",
         action="store_true",
         help="Delete the per-TA checkpoint file before starting (forces a fresh run).",
@@ -2136,6 +2206,13 @@ def main() -> None:
         help="Resume from pubmed_checkpoint_<ta>.json; errors if the checkpoint file is missing.",
     )
     args = parser.parse_args()
+
+    # --days and --mindate/--maxdate are mutually exclusive; an explicit range needs both bounds.
+    if args.days is not None and (args.mindate or args.maxdate):
+        parser.error("--days is mutually exclusive with --mindate/--maxdate.")
+    if bool(args.mindate) != bool(args.maxdate):
+        parser.error("--mindate and --maxdate must be given together.")
+
     run_pipeline(args)
 
 
