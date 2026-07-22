@@ -306,6 +306,17 @@ def _append_link_rows(rows: List[Dict[str, Any]], out: List[LinkRow]) -> None:
         ))
 
 
+def load_hcp_ids_from_file(path: str) -> Set[str]:
+    """Load hcp_ids (one uuid per line; blank lines and '#' comments ignored)."""
+    out: Set[str] = set()
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            s = line.strip()
+            if s and not s.startswith("#"):
+                out.add(s)
+    return out
+
+
 def load_link_rows(
     client: Client,
     limit: Optional[int],
@@ -492,13 +503,31 @@ def run(args: argparse.Namespace) -> int:
     scoped_ta_id: Optional[str] = None
     scoped_ta_name: Optional[str] = None
     scoped_hcp_ids: Optional[Set[str]] = None
+    file_hcp_ids: Optional[Set[str]] = None
+    if args.hcp_ids_file:
+        file_hcp_ids = load_hcp_ids_from_file(args.hcp_ids_file)
+        print(
+            f"[openalex_enrich] --hcp-ids-file: {len(file_hcp_ids)} hcp_id(s) from {args.hcp_ids_file}"
+        )
     if args.ta:
         scoped_ta_id, scoped_ta_name = resolve_ta_slug(client, args.ta)
-        scoped_hcp_ids = fetch_hcp_ids_for_ta(client, scoped_ta_id)
+        ta_hcp_ids = fetch_hcp_ids_for_ta(client, scoped_ta_id)
         print(
             f"[openalex_enrich] TA scope: {scoped_ta_name} "
-            f"({len(scoped_hcp_ids)} HCPs in hcp_therapeutic_areas_v2)"
+            f"({len(ta_hcp_ids)} HCPs in hcp_therapeutic_areas_v2)"
         )
+        if file_hcp_ids is not None:
+            # Both scopes: enrich only HCPs in the TA AND in the file.
+            scoped_hcp_ids = ta_hcp_ids & file_hcp_ids
+            print(
+                f"[openalex_enrich] INTERSECT --ta & --hcp-ids-file: "
+                f"{len(scoped_hcp_ids)} HCP(s) in both"
+            )
+        else:
+            scoped_hcp_ids = ta_hcp_ids
+    elif file_hcp_ids is not None:
+        # File only: exactly these HCPs.
+        scoped_hcp_ids = file_hcp_ids
 
     print("[openalex_enrich] loading link rows from hcp_openalex_authors_v2 ...")
     links = load_link_rows(client, args.limit, args.offset, scoped_hcp_ids=scoped_hcp_ids)
@@ -709,6 +738,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         metavar="SLUG",
         help="Scope to HCPs in one therapeutic area (e.g. atopic-dermatitis).",
+    )
+    p.add_argument(
+        "--hcp-ids-file",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Scope to these hcp_ids (one uuid per line). Combined with --ta => INTERSECT "
+             "(HCPs in both the TA and the file); alone => exactly these ids. For incremental cycles.",
     )
     p.add_argument(
         "--missing-only",

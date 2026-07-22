@@ -32,6 +32,7 @@ import json
 import os
 import re
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -1237,7 +1238,12 @@ def _resolve_hcp_id(record: PublicationRecord, hcp_id_map: Dict[str, str]) -> Op
 
 
 def _publication_v2_row(record: PublicationRecord, therapeutic_area_id: Optional[str]) -> Dict[str, object]:
-    """Fixed key set for every publication upsert row (explicit nulls for shape consistency)."""
+    """Fixed key set for every publication upsert row (explicit nulls for shape consistency).
+
+    NOTE: ingestion_run_id is intentionally NOT in this payload. Including it would make the
+    on_conflict="pubmed_id" upsert overwrite it on every re-ingest (last-wrote semantics). It is
+    INSERT-ONLY: stamped in upsert_publications on rows where it is still NULL (created-by).
+    """
     return {
         "pubmed_id": record.pubmed_id,
         "doi": record.doi,
@@ -1256,7 +1262,8 @@ def _publication_v2_row(record: PublicationRecord, therapeutic_area_id: Optional
         "openalex_enriched_at": None,
         "source_therapeutic_area_id": therapeutic_area_id,
         "source": PUBMED_SOURCE,
-        "ingestion_run_id": None,
+        # ingestion_run_id deliberately omitted -> excluded from the ON CONFLICT UPDATE set,
+        # so a re-ingest never overwrites a pre-existing value. Stamped insert-only below.
     }
 
 
@@ -1369,6 +1376,7 @@ def upsert_publications(
     therapeutic_area_id: Optional[str],
     start_batch: int = 0,
     on_batch_complete: Optional[Callable[[int, int], None]] = None,
+    ingestion_run_id: Optional[str] = None,
 ) -> Tuple[int, int]:
     pubs_by_pmid: Dict[str, Dict[str, object]] = {}
     author_links_by_pmid: Dict[str, List[Tuple[PublicationRecord, str]]] = defaultdict(list)
@@ -1414,6 +1422,22 @@ def upsert_publications(
             )
         except Exception as exc:
             raise RuntimeError(f"Failed to upsert publications_v2 batch starting at {i}: {exc}") from exc
+
+        # INSERT-ONLY stamp of ingestion_run_id (created-by semantics). The column was excluded
+        # from the upsert payload, so pre-existing rows are untouched above; here we set it ONLY
+        # where it is still NULL -- i.e. the rows this run just inserted. Rows created by an
+        # earlier run keep their original ingestion_run_id (never overwritten).
+        if ingestion_run_id and batch_pmids:
+            try:
+                supabase_execute(
+                    lambda pmids=batch_pmids: supabase.table(PUBLICATIONS_TABLE)
+                    .update({"ingestion_run_id": ingestion_run_id})
+                    .in_("pubmed_id", pmids)
+                    .is_("ingestion_run_id", "null")
+                    .execute()
+                )
+            except Exception as exc:
+                print(f"  [warn] ingestion_run_id insert-only stamp failed for batch at {i}: {exc}")
 
         pmid_to_id = {
             str(row["pubmed_id"]): row["id"]
@@ -1500,6 +1524,7 @@ def run_author_enrichment_second_pass(
     tool_name: str,
     per_call: int,
     therapeutic_area_id: str,
+    ingestion_run_id: Optional[str] = None,
 ) -> int:
     """
     For HCPs with sparse publication history, fetch career-spanning author publications.
@@ -1570,6 +1595,7 @@ def run_author_enrichment_second_pass(
                 publication_records=publication_records,
                 hcp_id_map={},
                 therapeutic_area_id=therapeutic_area_id,
+                ingestion_run_id=ingestion_run_id,
             )
             total_upserted += author_count or pub_count
         except Exception as exc:
@@ -1714,7 +1740,13 @@ def upsert_publication_therapeutic_area_links(
     return upserted
 
 
-def run_pipeline(args: Optional[argparse.Namespace] = None) -> None:
+def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
+    # One id per ingest run, stamped onto every publications_v2 row written by this run so the
+    # batch is identifiable. Printed in a parseable form (and returned) for an orchestrator to
+    # capture and pass to downstream stages as --ingestion-run-id.
+    ingestion_run_id = str(uuid.uuid4())
+    print(f"[pubmed_pipeline] ingestion_run_id={ingestion_run_id}")
+
     base_url = os.getenv("PUBMED_API_BASE", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils")
     tool_name = os.getenv("PUBMED_TOOL", "fieldmark_pubmed_pipeline")
     email = os.getenv("PUBMED_EMAIL")
@@ -1955,6 +1987,7 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> None:
                 therapeutic_area_id=therapeutic_area_id,
                 start_batch=pub_start_batch,
                 on_batch_complete=on_publication_batch,
+                ingestion_run_id=ingestion_run_id,
             )
             checkpoint["phases"]["publication_upsert"]["complete_batches"] = pub_total_batches
             checkpoint["phases"]["author_link_upsert"]["complete_batches"] = pub_total_batches
@@ -2058,6 +2091,7 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> None:
                 tool_name=tool_name,
                 per_call=per_call,
                 therapeutic_area_id=therapeutic_area_id,
+                ingestion_run_id=ingestion_run_id,
             )
             print(
                 f"Second pass upserted {second_pass_count} publication_authors_v2 rows "
@@ -2066,9 +2100,10 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> None:
 
     if dry_run:
         print("Dry run completed.")
-        return
+        return ingestion_run_id
 
     print("Pipeline run completed.")
+    return ingestion_run_id
 
 
 def main() -> None:

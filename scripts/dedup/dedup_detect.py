@@ -1,12 +1,25 @@
 """
-FieldMark — Phase 1 duplicate detection (read-only, no DB writes).
+FieldMark - Phase 1 duplicate detection (read-only, no DB writes).
 
 Identifies strict duplicate HCP candidate pairs in hcps_v2 and writes
 dedup_candidates_phase1.csv.
 
 Usage:
-  python dedup_detect.py
+  python dedup_detect.py                                  # whole-corpus (default)
   python dedup_detect.py --limit-clusters 50
+  python dedup_detect.py --ingestion-run-id <uuid>        # scope to one Step C batch
+  python dedup_detect.py --candidate-hcp-ids-file ids.txt # scope to a specific id set
+
+Scoped mode (incremental): after an incremental Step C run only the new/changed HCPs can
+introduce new duplicates, so a whole-corpus rescan is wasteful. Duplicates are PAIRS and a
+new HCP may duplicate an EXISTING one (a returning KOL under a new OpenAlex fragment), so
+scoping is relational, not a naive filter:
+  1. Seed set = the provided new/changed hcp_ids.
+  2. Neighborhood = every EXISTING HCP sharing a surname block with any seed (each seed is
+     compared against its full name-block neighborhood in the existing corpus).
+  3. Emit pairs where >=1 member is in the seed set (existing-vs-existing is out of scope).
+Scoring (corroboration gate, candidate_type, merge_reason) is UNCHANGED - only the candidate
+set examined changes. Result is identical to a whole-corpus run for every seed-involving pair.
 """
 
 from __future__ import annotations
@@ -105,6 +118,58 @@ def init_supabase() -> Client:
     return create_client(get_required_env("SUPABASE_URL"), get_required_env("SUPABASE_KEY"))
 
 
+def read_ids_file(path: str) -> Set[str]:
+    """One hcp_id (uuid) per line; blank lines and '#' comments ignored."""
+    out: Set[str] = set()
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            s = line.strip()
+            if s and not s.startswith("#"):
+                out.add(s)
+    return out
+
+
+def fetch_ids_by_ingestion_run(client: Client, ingestion_run_id: str) -> Set[str]:
+    """hcps_v2 ids created by a given ingestion run (e.g. an incremental Step C batch)."""
+    out: Set[str] = set()
+    last_id: Optional[str] = None
+    while True:
+        q = (
+            client.table("hcps_v2")
+            .select("id")
+            .eq("ingestion_run_id", ingestion_run_id)
+            .order("id")
+            .limit(READ_PAGE_SIZE)
+        )
+        if last_id is not None:
+            q = q.gt("id", last_id)
+        batch = q.execute().data or []
+        if not batch:
+            break
+        for r in batch:
+            rid = r.get("id")
+            if rid:
+                out.add(str(rid))
+        last_id = str(batch[-1]["id"])
+        if len(batch) < READ_PAGE_SIZE:
+            break
+    return out
+
+
+def load_seed_ids(
+    client: Client,
+    candidate_hcp_ids_file: Optional[str],
+    ingestion_run_id: Optional[str],
+) -> Set[str]:
+    """Union of the two scope sources. Empty set => whole-corpus mode (backward compatible)."""
+    seeds: Set[str] = set()
+    if candidate_hcp_ids_file:
+        seeds |= read_ids_file(candidate_hcp_ids_file)
+    if ingestion_run_id:
+        seeds |= fetch_ids_by_ingestion_run(client, ingestion_run_id)
+    return seeds
+
+
 def norm(value: Any) -> str:
     return " ".join(str(value or "").strip().split())
 
@@ -186,8 +251,23 @@ def fetch_all_hcps(client: Client) -> List[Dict[str, Any]]:
     return rows
 
 
-def fetch_pub_author_counts(client: Client) -> Dict[str, int]:
+def fetch_pub_author_counts(client: Client, scope_ids: Optional[Set[str]] = None) -> Dict[str, int]:
+    """Per-hcp publication_authors_v2 row count. scope_ids restricts to those hcp_ids via a
+    chunked .in_(hcp_id) read (the big scaling win - publication_authors_v2 is millions of
+    rows); None does the full-corpus keyset scan. The per-hcp count is identical either way
+    because it depends only on that hcp's own rows."""
     counts: Dict[str, int] = defaultdict(int)
+    if scope_ids is not None:
+        rows = fetch_rows_in(
+            client, "publication_authors_v2", "publication_id,hcp_id",
+            "hcp_id", sorted(scope_ids), order_col="publication_id",
+        )
+        for row in rows:
+            hcp_id = row.get("hcp_id")
+            if hcp_id:
+                counts[str(hcp_id)] += 1
+        return dict(counts)
+
     last_pub_id: Optional[str] = None
     while True:
         q = (
@@ -211,24 +291,17 @@ def fetch_pub_author_counts(client: Client) -> Dict[str, int]:
     return dict(counts)
 
 
-def fetch_works_counts(client: Client) -> Dict[str, int]:
-    """Latest snapshot_date works_count per hcp_id from hcp_author_metrics_v2."""
+def fetch_works_counts(client: Client, scope_ids: Optional[Set[str]] = None) -> Dict[str, int]:
+    """Latest snapshot_date works_count per hcp_id from hcp_author_metrics_v2.
+
+    scope_ids restricts to those hcp_ids via a chunked .in_(hcp_id) read; None does the full
+    keyset scan. Both paths feed the SAME latest-snapshot fold, so the per-hcp value is
+    identical (it depends only on that hcp's own metric rows)."""
     works_by_hcp: Dict[str, int] = {}
     latest_snap: Dict[str, str] = {}
-    last_hcp_id: Optional[str] = None
-    while True:
-        q = (
-            client.table("hcp_author_metrics_v2")
-            .select("hcp_id,snapshot_date,works_count,fetch_status")
-            .order("hcp_id")
-            .limit(READ_PAGE_SIZE)
-        )
-        if last_hcp_id is not None:
-            q = q.gt("hcp_id", last_hcp_id)
-        batch = q.execute().data or []
-        if not batch:
-            break
-        for row in batch:
+
+    def fold(rows: Iterable[Dict[str, Any]]) -> None:
+        for row in rows:
             status = str(row.get("fetch_status") or "").strip().lower()
             if status and status not in ("ok", ""):
                 continue
@@ -243,15 +316,53 @@ def fetch_works_counts(client: Client) -> Dict[str, int]:
                 works_by_hcp[hid] = wc
             elif snap == prev_snap:
                 works_by_hcp[hid] = max(works_by_hcp.get(hid, 0), wc)
+
+    if scope_ids is not None:
+        fold(fetch_rows_in(
+            client, "hcp_author_metrics_v2", "hcp_id,snapshot_date,works_count,fetch_status",
+            "hcp_id", sorted(scope_ids), order_col="hcp_id",
+        ))
+        return works_by_hcp
+
+    last_hcp_id: Optional[str] = None
+    while True:
+        q = (
+            client.table("hcp_author_metrics_v2")
+            .select("hcp_id,snapshot_date,works_count,fetch_status")
+            .order("hcp_id")
+            .limit(READ_PAGE_SIZE)
+        )
+        if last_hcp_id is not None:
+            q = q.gt("hcp_id", last_hcp_id)
+        batch = q.execute().data or []
+        if not batch:
+            break
+        fold(batch)
         last_hcp_id = str(batch[-1]["hcp_id"])
         if len(batch) < READ_PAGE_SIZE:
             break
     return works_by_hcp
 
 
-def fetch_openalex_author_ids(client: Client) -> Dict[str, Set[str]]:
-    """OpenAlex author ids linked to each hcp_id."""
+def fetch_openalex_author_ids(client: Client, scope_ids: Optional[Set[str]] = None) -> Dict[str, Set[str]]:
+    """OpenAlex author ids linked to each hcp_id. scope_ids restricts via chunked
+    .in_(hcp_id); None scans full. Per-hcp id set is identical either way."""
     by_hcp: Dict[str, Set[str]] = defaultdict(set)
+
+    def fold(rows: Iterable[Dict[str, Any]]) -> None:
+        for row in rows:
+            hid = str(row.get("hcp_id") or "")
+            oa = norm(row.get("openalex_author_id"))
+            if hid and oa:
+                by_hcp[hid].add(oa)
+
+    if scope_ids is not None:
+        fold(fetch_rows_in(
+            client, "hcp_openalex_authors_v2", "hcp_id,openalex_author_id",
+            "hcp_id", sorted(scope_ids), order_col="hcp_id",
+        ))
+        return dict(by_hcp)
+
     last_hcp_id: Optional[str] = None
     while True:
         q = (
@@ -265,11 +376,7 @@ def fetch_openalex_author_ids(client: Client) -> Dict[str, Set[str]]:
         batch = q.execute().data or []
         if not batch:
             break
-        for row in batch:
-            hid = str(row.get("hcp_id") or "")
-            oa = norm(row.get("openalex_author_id"))
-            if hid and oa:
-                by_hcp[hid].add(oa)
+        fold(batch)
         last_hcp_id = str(batch[-1]["hcp_id"])
         if len(batch) < READ_PAGE_SIZE:
             break
@@ -579,8 +686,14 @@ def detect_stub_candidates(
     pub_author_counts: Dict[str, int],
     *,
     limit_clusters: Optional[int] = None,
+    seed_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
-    """Existing primary-vs-stub absorption path (unchanged guards and actions)."""
+    """Existing primary-vs-stub absorption path (unchanged guards and actions).
+
+    seed_ids (scoped mode): emit only pairs with >=1 member in the seed set. A pair of two
+    already-existing HCPs is out of scope (covered by the last full run). The block group is
+    still the FULL name block (existing + seed) so a seed can pair with an existing HCP.
+    """
     candidates: List[Dict[str, Any]] = []
     cluster_id = 0
 
@@ -593,6 +706,8 @@ def detect_stub_candidates(
             continue
 
         for a, b in itertools.combinations(group, 2):
+            if seed_ids is not None and str(a["id"]) not in seed_ids and str(b["id"]) not in seed_ids:
+                continue
             if not strict_name_match(a, b):
                 continue
 
@@ -629,11 +744,17 @@ def collect_fragment_pairs(
     last_name_freq: Counter[str],
     pub_author_counts: Dict[str, int],
     works_by_hcp: Dict[str, int],
+    *,
+    seed_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Phase 1: gather rare-surname fragment pairs that pass the mandatory
     first+last name_key match. Corroboration/action is decided later.
     Only surnames with block-frequency <= RARE_SURNAME_STRICT_MAX enter here.
+
+    seed_ids (scoped mode): emit only pairs with >=1 member in the seed set (new-vs-existing
+    and new-vs-new); existing-vs-existing pairs are out of scope. The sub-group is still the
+    FULL name+first block so a seed can pair with an existing fragment.
     """
     pairs: List[Dict[str, Any]] = []
 
@@ -660,6 +781,8 @@ def collect_fragment_pairs(
             if len(sub_group) < 2:
                 continue
             for a, b in itertools.combinations(sub_group, 2):
+                if seed_ids is not None and str(a["id"]) not in seed_ids and str(b["id"]) not in seed_ids:
+                    continue
                 # Mandatory first+last name_key match on the ACTUAL emitted pair.
                 if not strict_name_match(a, b):
                     continue
@@ -786,27 +909,47 @@ def main() -> None:
         default=None,
         help="Optional cap on emitted candidate clusters for quick tests.",
     )
+    parser.add_argument(
+        "--candidate-hcp-ids-file",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Scope detection to these new/changed hcp_ids (one uuid per line). Restricts to "
+             "pairs where >=1 member is in this set, expanded across each seed's full surname "
+             "block in the EXISTING corpus (catches new-vs-existing duplicates). Omit for "
+             "whole-corpus mode (default).",
+    )
+    parser.add_argument(
+        "--ingestion-run-id",
+        type=str,
+        default=None,
+        metavar="UUID",
+        help="Scope to hcps_v2 rows with this ingestion_run_id (e.g. an incremental Step C "
+             "batch). Unioned with --candidate-hcp-ids-file if both given.",
+    )
     args = parser.parse_args()
 
     load_dotenv()
     client = init_supabase()
 
+    # --- Scope resolution -------------------------------------------------------------
+    seed_ids = load_seed_ids(client, args.candidate_hcp_ids_file, args.ingestion_run_id)
+    scoped = bool(seed_ids)
+    if scoped:
+        print(f"SCOPED mode: {len(seed_ids):,} seed hcp_id(s) "
+              f"(file={args.candidate_hcp_ids_file or '-'}, ingestion_run={args.ingestion_run_id or '-'})")
+    else:
+        print("WHOLE-CORPUS mode (no scope flag).")
+
+    # hcps_v2 is always loaded in full: the blocking key normalizes hyphens/diacritics in
+    # Python, so the existing-corpus name-block neighborhood of a seed cannot be recovered by
+    # a SQL surname filter without risking missed variant-surname duplicates. hcps_v2 is the
+    # small entity table; the expensive publication/metrics reads below ARE scoped.
     print("Loading hcps_v2...")
     hcps = fetch_all_hcps(client)
     print(f"Loaded {len(hcps):,} HCP rows")
 
-    print("Loading publication_authors_v2 counts...")
-    pub_author_counts = fetch_pub_author_counts(client)
-    print(f"Loaded publication-author counts for {len(pub_author_counts):,} HCP ids")
-
-    print("Loading hcp_author_metrics_v2 works_count (latest snapshot)...")
-    works_by_hcp = fetch_works_counts(client)
-    print(f"Loaded OpenAlex works_count for {len(works_by_hcp):,} HCP ids")
-
-    print("Loading hcp_openalex_authors_v2 for corroboration...")
-    openalex_by_hcp = fetch_openalex_author_ids(client)
-    print(f"Loaded OpenAlex author links for {len(openalex_by_hcp):,} HCP ids")
-
+    # Corpus-wide blocking + surname frequency (rarity gates depend on TRUE corpus frequency).
     last_name_freq: Counter[str] = Counter()
     by_block: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for h in hcps:
@@ -816,21 +959,57 @@ def main() -> None:
         last_name_freq[bk] += 1
         by_block[bk].append(h)
 
+    # In scoped mode, restrict detection to the name blocks that contain >=1 seed, and scope
+    # the expensive reads to that neighborhood (every existing HCP sharing a block with a seed).
+    if scoped:
+        seed_blocks = {block_key(h.get("last_name")) for h in hcps
+                       if str(h["id"]) in seed_ids and block_key(h.get("last_name"))}
+        detect_by_block: Dict[str, List[Dict[str, Any]]] = {
+            bk: g for bk, g in by_block.items() if bk in seed_blocks
+        }
+        neighborhood_ids: Optional[Set[str]] = {
+            str(h["id"]) for g in detect_by_block.values() for h in g
+        }
+        seeds_present = sum(1 for h in hcps if str(h["id"]) in seed_ids)
+        print(f"  Seed name blocks: {len(seed_blocks):,}; comparison neighborhood "
+              f"(existing + seed HCPs in those blocks): {len(neighborhood_ids):,}; "
+              f"seeds present in hcps_v2: {seeds_present:,}/{len(seed_ids):,}")
+    else:
+        detect_by_block = by_block
+        neighborhood_ids = None
+
+    seed_filter: Optional[Set[str]] = seed_ids if scoped else None
+
+    scope_label = "neighborhood-scoped" if scoped else "full-corpus"
+    print(f"Loading publication_authors_v2 counts ({scope_label})...")
+    pub_author_counts = fetch_pub_author_counts(client, scope_ids=neighborhood_ids)
+    print(f"Loaded publication-author counts for {len(pub_author_counts):,} HCP ids")
+
+    print(f"Loading hcp_author_metrics_v2 works_count ({scope_label})...")
+    works_by_hcp = fetch_works_counts(client, scope_ids=neighborhood_ids)
+    print(f"Loaded OpenAlex works_count for {len(works_by_hcp):,} HCP ids")
+
+    print(f"Loading hcp_openalex_authors_v2 for corroboration ({scope_label})...")
+    openalex_by_hcp = fetch_openalex_author_ids(client, scope_ids=neighborhood_ids)
+    print(f"Loaded OpenAlex author links for {len(openalex_by_hcp):,} HCP ids")
+
     print("\nRunning stub-absorption detection path...")
     stub_candidates = detect_stub_candidates(
-        by_block,
+        detect_by_block,
         last_name_freq,
         pub_author_counts,
         limit_clusters=args.limit_clusters,
+        seed_ids=seed_filter,
     )
     print(f"  Stub candidates: {len(stub_candidates):,}")
 
     print("Running fragment-pairing detection path (rare surnames freq<=%d)..." % RARE_SURNAME_STRICT_MAX)
     fragment_pairs = collect_fragment_pairs(
-        by_block,
+        detect_by_block,
         last_name_freq,
         pub_author_counts,
         works_by_hcp,
+        seed_ids=seed_filter,
     )
     print(f"  Rare-surname fragment pairs (pre-corroboration): {len(fragment_pairs):,}")
 

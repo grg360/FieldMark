@@ -1,21 +1,37 @@
 """
-FieldMark — Rebuild publication_authors_v2 (scoped, additive-only mode).
+FieldMark - Rebuild publication_authors_v2 (Step F; scoped, additive-only).
 
 Links HCPs to their publications via OpenAlex author IDs, using the author_pub_flat
-staging table. Disambiguates misattributed clusters (one openalex_author_id → multiple HCPs)
-via ROR, institution name, then country — preserving the original Step F anti-conflation logic.
+staging table. Disambiguates misattributed clusters (one openalex_author_id -> multiple HCPs)
+via ROR, institution name, then country - preserving the original Step F anti-conflation logic.
 
-DEFAULT: --only-new-hcps mode scopes the ENTIRE operation to HCPs linked today.
-SAFETY: In scoped mode, this script NEVER deletes, NEVER wipes, and is provably incapable
-of writing a publication_authors_v2 row for any hcp_id outside the scoped set.
+TWO SCOPING PHILOSOPHIES - they differ in WHAT THEY WRITE, and one is a known footgun:
+
+  * --only-new-hcps / --hcp-ids-file / --since  (winner-scoped writes)
+      Load full clusters for disambiguation, but only WRITE a link when the winning HCP is
+      itself inside the scoped set. Provably cannot write outside the scope.
+      *** R3 FOOTGUN: with a SMALL scope (--only-new-hcps), a pub whose shared OA ID
+      legitimately belongs to an out-of-scope (e.g. established) HCP has its true-winner link
+      DROPPED. In a rebuild that under-links established HCPs, dropping their pub counts below
+      cohort thresholds -- this buried 34% of AD's established cohort. Use small winner-scoped
+      writes only when you are certain every legitimate winner is inside the scope.
+
+  * --candidate-hcp-ids-file  (start-scoped writes -- the incremental-safe mode)
+      Scope bounds only which OA IDs we START from (the affected HCPs'); we read author_pub_flat
+      for those OA IDs, load full clusters, and WRITE whichever HCP legitimately wins each pub -
+      even a non-affected HCP if they are the true author. This NEVER drops a true-winner link,
+      so it cannot reproduce the R3 failure. This is the mode for an incremental cycle: pass the
+      compute_affected_hcps.py output (affected.txt = new HCPs + pre-existing authors of batch
+      pubs).
+
+Additive only: ON CONFLICT DO NOTHING; NEVER deletes, NEVER wipes.
 
 Requires: SUPABASE_URL, SUPABASE_KEY in env or .env.
 
 Examples:
   python scripts/classify/rebuild_publication_authors_v2.py --only-new-hcps --dry-run
-  python scripts/classify/rebuild_publication_authors_v2.py --only-new-hcps --limit 100
-  python scripts/classify/rebuild_publication_authors_v2.py --only-new-hcps --execute
-  python scripts/classify/rebuild_publication_authors_v2.py --hcp-ids-file new_hcp_ids.txt --execute
+  python scripts/classify/rebuild_publication_authors_v2.py --hcp-ids-file nsclc_all_hcp_ids.txt --execute
+  python scripts/classify/rebuild_publication_authors_v2.py --candidate-hcp-ids-file affected.txt --execute
 """
 
 from __future__ import annotations
@@ -56,7 +72,7 @@ ORPHAN_MULTI_COUNTRY = "multiple_hcps_match_country_no_other_disambiguator"
 
 
 # ---------------------------------------------------------------------------
-# Normalization helpers (from preview_step_b_matching — inlined to avoid archive import)
+# Normalization helpers (from preview_step_b_matching - inlined to avoid archive import)
 # ---------------------------------------------------------------------------
 
 def normalize_ror(raw: Any) -> str:
@@ -342,7 +358,7 @@ def build_linkage_index(
     # Fetch metadata for all HCPs in the linkage
     hcp_meta = fetch_hcps_metadata(client, all_hcp_ids_in_links)
 
-    # Build the oa_id → cluster map
+    # Build the oa_id -> cluster map
     by_oa: Dict[str, Dict[str, HcpClusterMember]] = {}
     for r in all_links:
         oa = str(r.get("openalex_author_id") or "")
@@ -438,7 +454,7 @@ def fetch_pub_links_from_flat(
 
 
 # ---------------------------------------------------------------------------
-# Resolve pub_id (author_pub_flat.pub_id) → publications_v2.id
+# Resolve pub_id (author_pub_flat.pub_id) -> publications_v2.id
 #
 # author_pub_flat.pub_id IS publications_v2.id (UUID) from the build SQL:
 #   SELECT ... p.id AS pub_id ... FROM publications_v2 p
@@ -515,12 +531,17 @@ def run(
     *,
     dry_run: bool,
     limit: Optional[int],
+    write_all_winners: bool = False,
 ) -> None:
     t0 = time.perf_counter()
 
+    write_mode = ("START-scoped (write ALL legitimate winners; R3-safe)"
+                  if write_all_winners else
+                  "WINNER-scoped (write only in-scope winners; R3 footgun on small scopes)")
     print(f"\n{'='*70}")
-    print("  REBUILD PUBLICATION_AUTHORS_V2 — SCOPED ADDITIVE MODE")
-    print(f"  Scoped HCPs: {len(scoped_hcp_ids):,}")
+    print("  REBUILD PUBLICATION_AUTHORS_V2 - STEP F, ADDITIVE MODE")
+    print(f"  Scoped HCPs (OA-ID start set): {len(scoped_hcp_ids):,}")
+    print(f"  Write policy: {write_mode}")
     print(f"  Mode: {'DRY-RUN' if dry_run else 'EXECUTE (writes enabled)'}")
     if limit:
         print(f"  Limit: {limit:,} output rows")
@@ -528,14 +549,14 @@ def run(
     print(f"{'='*70}\n")
 
     if not scoped_hcp_ids:
-        print("No scoped HCPs — nothing to do.")
+        print("No scoped HCPs - nothing to do.")
         return
 
     # Step 1: Build linkage index
     by_oa, scoped_oa_ids = build_linkage_index(client, scoped_hcp_ids)
 
     if not scoped_oa_ids:
-        print("No OA IDs found for scoped HCPs — nothing to do.")
+        print("No OA IDs found for scoped HCPs - nothing to do.")
         return
 
     # Step 2: Fetch author-pub links from author_pub_flat
@@ -545,14 +566,15 @@ def run(
         print("No publications found in author_pub_flat for scoped OA IDs.")
         return
 
-    # Step 3: Process flat rows → build publication_authors_v2 rows
+    # Step 3: Process flat rows -> build publication_authors_v2 rows
     print(f"\nProcessing {len(flat_rows):,} author-publication links...")
     method_counts: Counter = Counter()
     orphan_reasons: Counter = Counter()
     output_rows: List[Dict[str, Any]] = []
-    # Dedup: (pub_id, hcp_id) → best row (prefer METHOD_UNIQUE > disambiguated)
+    # Dedup: (pub_id, hcp_id) -> best row (prefer METHOD_UNIQUE > disambiguated)
     seen_pairs: Dict[Tuple[str, str], Dict[str, Any]] = {}
     skipped_non_scoped = 0
+    wrote_outside_scope: Set[str] = set()  # true winners outside the scope (start-scoped mode)
 
     for idx, flat in enumerate(flat_rows):
         oa_id = str(flat.get("author_id") or "")
@@ -586,10 +608,18 @@ def run(
                     orphan_reasons[orphan_reason] += 1
                 continue
 
-        # SAFETY: Only emit if winner is in the scoped HCP set
-        if winner.hcp_id not in scoped_hcp_ids:
+        # WRITE POLICY.
+        # winner-scoped modes: only emit if the winner is inside the scoped set. This is the
+        #   R3 footgun on small scopes -- a true winner outside the scope has its link DROPPED.
+        # start-scoped mode (--candidate-hcp-ids-file): write whichever HCP legitimately wins,
+        #   even outside the affected set. The scope only bounded which OA IDs we started from,
+        #   never which HCP can win a link -- so no true-winner link is ever dropped.
+        if not write_all_winners and winner.hcp_id not in scoped_hcp_ids:
             skipped_non_scoped += 1
             continue
+        if write_all_winners and winner.hcp_id not in scoped_hcp_ids:
+            # A true winner OUTSIDE the affected set -- exactly the link the R3 footgun dropped.
+            wrote_outside_scope.add(winner.hcp_id)
 
         method_counts[method] += 1
         pair_key = (pub_id, winner.hcp_id)
@@ -625,7 +655,13 @@ def run(
     print(f"{'='*70}")
     print(f"  Flat rows processed: {len(flat_rows):,}")
     print(f"  Unique (pub, hcp) pairs to write: {len(output_rows):,}")
-    print(f"  Skipped (winner not in scoped set): {skipped_non_scoped:,}")
+    if write_all_winners:
+        n_out = sum(1 for r in output_rows if r["hcp_id"] in wrote_outside_scope)
+        print(f"  True-winner links written OUTSIDE the affected set: {n_out:,} "
+              f"({len(wrote_outside_scope):,} distinct HCPs) - these are exactly the links the "
+              f"R3 winner-scoped filter would have DROPPED.")
+    else:
+        print(f"  Skipped (winner not in scoped set - DROPPED, R3 risk): {skipped_non_scoped:,}")
     print(f"  Orphaned (disambiguation failed): {orphan_total:,}")
     for reason in (ORPHAN_NO_SIGNALS, ORPHAN_ROR_NO_MATCH, ORPHAN_INST_NO_MATCH,
                    ORPHAN_COUNTRY_NO_MATCH, ORPHAN_MULTI_COUNTRY):
@@ -677,6 +713,16 @@ def parse_args() -> argparse.Namespace:
         metavar="YYYY-MM-DD",
         help="Scope to HCPs linked at or after this date (hcp_openalex_authors_v2.linked_at >= date).",
     )
+    scope.add_argument(
+        "--candidate-hcp-ids-file",
+        type=str,
+        metavar="PATH",
+        help="INCREMENTAL-SAFE (start-scoped) mode. Scope only bounds which OA IDs we start "
+             "from (these affected HCPs'); disambiguation still loads full clusters, and links "
+             "are written for whichever HCP legitimately wins each pub - even outside the "
+             "affected set. Never drops a true-winner link (avoids the R3 footgun). Pass "
+             "compute_affected_hcps.py output (affected.txt).",
+    )
 
     p.add_argument("--execute", action="store_true", default=False,
                    help="Enable writes (default is dry-run)")
@@ -694,7 +740,9 @@ def main() -> None:
     load_dotenv()
     client = init_client()
 
-    # Resolve scoped HCP set
+    # Resolve scoped HCP set. write_all_winners distinguishes start-scoped (R3-safe) from the
+    # winner-scoped modes.
+    write_all_winners = False
     if args.only_new_hcps:
         today_str = date.today().isoformat()
         scoped_hcp_ids = load_new_hcp_ids_by_linked_at(client, today_str)
@@ -702,15 +750,18 @@ def main() -> None:
         scoped_hcp_ids = load_hcp_ids_from_file(args.hcp_ids_file)
     elif args.since:
         scoped_hcp_ids = load_new_hcp_ids_by_linked_at(client, args.since)
+    elif args.candidate_hcp_ids_file:
+        scoped_hcp_ids = load_hcp_ids_from_file(args.candidate_hcp_ids_file)
+        write_all_winners = True
     else:
-        print("ERROR: Must specify --only-new-hcps, --hcp-ids-file, or --since.", file=sys.stderr)
+        print("ERROR: Must specify a scope flag.", file=sys.stderr)
         raise SystemExit(1)
 
     if not scoped_hcp_ids:
         print("No HCPs found matching scope criteria. Exiting.")
         raise SystemExit(0)
 
-    run(client, scoped_hcp_ids, dry_run=dry_run, limit=args.limit)
+    run(client, scoped_hcp_ids, dry_run=dry_run, limit=args.limit, write_all_winners=write_all_winners)
 
 
 if __name__ == "__main__":
