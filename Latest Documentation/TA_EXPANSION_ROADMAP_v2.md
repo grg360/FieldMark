@@ -265,14 +265,20 @@ This is research-heavy work, not engineering. Produces `scripts/config/therapeut
 
 ### Phase 2: Substrate ingestion (1-2 days human + 1-2 days compute)
 
-Run the refactored scripts in the documented Phase sequence (PubMed → NPPES B → NPI Discovery → NPPES backfill → OpenAlex → Publication attribution → Classification):
+Run the scripts in the current v2 sequence. NOTE: `pubmed_pipeline.py` persists **publications only** —
+HCP identity is resolved OpenAlex-first, AFTER ingestion, by `create_hcps_v2.py`. So OpenAlex enrichment
+must run BEFORE HCP creation (PubMed pubs → OpenAlex enrich → build_author_flat → inventory →
+create_hcps_v2 → tag → …). See `docs/TA_BUILD_GUIDE.md` for the authoritative chain; prefer the
+`reingest_cycle.py` orchestrator, which runs it end-to-end.
 
 ```powershell
-python scripts/ingest/pubmed_pipeline.py --ta atopic-dermatitis
-python scripts/ingest/nppes_workstream_b_ingest.py --ta atopic-dermatitis
-python scripts/enrich/targeted_nppes_enrichment.py --ta atopic-dermatitis
-python scripts/enrich/openalex_pipeline.py --ta atopic-dermatitis
-# ... and so on
+# publications only (no HCPs):
+python scripts/ingest/pubmed_pipeline.py --ta atopic-dermatitis --reset-checkpoint
+# OpenAlex-first HCP creation chain:
+python scripts/enrich/openalex_pipeline.py --target-version v2 --skip-career-enrichment
+python scripts/utilities/run_sql.py --file build_author_flat.sql
+python scripts/classify/create_hcps_v2.py --ta atopic-dermatitis --incremental
+# ... then tag (ta_tagging_rebuild_v2), Step F, dedup, career, cohort, score
 ```
 
 **Verification at each phase:** Spot-check 5-10 canonical AD HCPs are appearing in each table at expected ranks. If Guttman-Yassky doesn't appear in the top 20 Established AD HCPs after scoring, something is wrong upstream.

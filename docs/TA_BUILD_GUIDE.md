@@ -152,6 +152,14 @@ Two ways to run, depending on how much the orchestrator has been generalized for
 ### Path A — the orchestrator (preferred if your TA is wired into it)
 `reingest_cycle.py` runs the whole chain (ingest → OpenAlex enrich → flatten → inventory → create HCPs →
 affected → tag → Step F → authorship → dedup → career → cohort → score). **Always `--dry-run` first.**
+
+> Stage 1 of the orchestrator is `pubmed_pipeline.py`, which — like `ingest_publications.py` in Path B —
+> now persists **publications only** (`publications_v2` + `publication_therapeutic_areas_v2` +
+> `source_therapeutic_area_id` + raw `pubmed_authorships`). It does NOT create `hcps_v2` or write
+> `hcp_therapeutic_areas_v2`. HCP identity is minted later by `create_hcps_v2.py` (stage 2) from the
+> OpenAlex inventory; TA tags come from `ta_tagging_rebuild_v2.py` (stage 4). The orchestrator always
+> passes `--reset-checkpoint` so stage 1 re-writes every cycle (resuming a stale checkpoint dropped the
+> batch — the old name-based-HCP loss).
 ```powershell
 # DRY RUN FIRST — prints the full plan, writes nothing:
 python scripts/reingest_cycle.py --ta <slug> --dry-run

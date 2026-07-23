@@ -135,6 +135,7 @@ The frontend has hardcoded NSCLC references in ~74 files (246 total references) 
 ### NPI linkage gaps
 
 - Some US-practicing HCPs have publication-keyed `hcps_v2` rows without NPIs, and separate NPPES-keyed stub rows holding their NPI + Open Payments data. For NSCLC we manually merged Jänne and Reddy. AD will likely have similar patterns — build a diagnostic query to identify these early rather than discover them per profile.
+  - **NOTE (v2 refactor):** these publication-keyed HCP rows are *legacy*. `pubmed_pipeline.py` no longer creates HCPs from PubMed names — HCP identity is now minted OpenAlex-first by `create_hcps_v2.py`, so this specific pub-stub-vs-NPPES-stub split will not be newly produced going forward. Existing legacy rows may still need the merge; new ingests won't add to them.
 - Query pattern for finding merge candidates: `WHERE h.nppes_practice_state IS NOT NULL AND h.npi_number IS NULL` in top-100 cohort.
 
 ### Session discipline

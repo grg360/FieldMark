@@ -1,13 +1,20 @@
 """
 PubMed -> Supabase pipeline for FieldMark.
 
+PUBLICATIONS-ONLY. This script persists publications, NOT HCP identities. Author identity is
+resolved downstream from OpenAlex evidence (create_hcps_v2.py is the sole identity authority at
+stage 2; rebuild_publication_authors_v2.py -- Step F -- builds publication_authors_v2 at stage 5).
+Minting HCPs from PubMed names here was the root of the checkpoint-resume publication loss: the
+PubMed name-md5 identity_hash no longer matched hcps_v2 (create_hcps_v2 backfills an OpenAlex-derived
+hash; dedup_merge deletes the PubMed stubs), so the id_map collapsed and the attribution gate silently
+dropped the batch. That path is removed.
+
 This script:
-1) Queries PubMed for recent rare-disease related publications.
-2) Extracts publication and author affiliation metadata.
-3) Deduplicates authors into unique HCP profiles.
-4) Stores HCPs and linked publication rows in Supabase v2 tables
-   (hcps_v2, publications_v2, publication_authors_v2, hcp_therapeutic_areas_v2,
-   publication_therapeutic_areas_v2).
+1) Queries PubMed for TA-relevant publications (per-TA config query + date window).
+2) Extracts publication metadata (incl. raw pubmed_authorships JSON for later OpenAlex linkage).
+3) Persists publications_v2 UNCONDITIONALLY, keyed by pubmed_id, plus their
+   publication_therapeutic_areas_v2 links and source_therapeutic_area_id.
+   It does NOT write hcps_v2, publication_authors_v2, or hcp_therapeutic_areas_v2.
 
 Required environment variables:
 - SUPABASE_URL
@@ -27,16 +34,13 @@ max_results, and retrieval metadata. years_back is in years; null means no date 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
 import time
 import uuid
-from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from collections import defaultdict
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, TypeVar
 
 from dotenv import load_dotenv
@@ -73,38 +77,6 @@ def list_ta_configs() -> list[str]:
     if not config_dir.exists():
         return []
     return sorted([p.stem for p in config_dir.glob("*.json")])
-
-
-@dataclass
-class HCPRecord:
-    first_name: Optional[str]
-    last_name: Optional[str]
-    credentials: Optional[str]
-    institution: Optional[str]
-    institution_full: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
-    zip_code: Optional[str]
-    country: Optional[str]
-    specialty: Optional[str]
-    subspecialty: Optional[str]
-    dedupe_key: str
-
-
-@dataclass
-class PublicationRecord:
-    pubmed_id: str
-    title: Optional[str]
-    journal: Optional[str]
-    pub_year: Optional[int]
-    citation_count: Optional[int]
-    doi: Optional[str]
-    hcp_dedupe_key: str
-    author_position: Optional[int] = None
-    total_authors: Optional[int] = None
-    is_first_author: Optional[bool] = None
-    is_senior_author: Optional[bool] = None
-    hcp_id: Optional[str] = None
 
 
 def get_required_env(name: str) -> str:
@@ -197,7 +169,6 @@ def supabase_execute(fn: Callable[[], T]) -> T:
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-HCP_UPSERT_BATCH_SIZE = 100
 PUBLICATION_UPSERT_BATCH_SIZE = 200
 TA_LINK_UPSERT_BATCH_SIZE = 200
 CHECKPOINT_EVERY_N_BATCHES = 10
@@ -222,11 +193,7 @@ def fresh_checkpoint(ta_slug: str) -> Dict[str, Any]:
             "pmid_retrieval": {"complete": False, "pmids": []},
             "efetch": {"complete": False, "publications_fetched_count": 0},
             "publication_upsert": {"complete_batches": 0, "total_batches": 0},
-            "hcp_extract": {"complete": False, "unique_hcps_count": 0},
-            "hcp_upsert": {"complete_batches": 0, "total_batches": 0},
-            "author_link_upsert": {"complete_batches": 0, "total_batches": 0},
             "publication_ta_link_upsert": {"complete_batches": 0, "total_batches": 0},
-            "ta_link_upsert": {"complete_batches": 0, "total_batches": 0},
         },
         "updated_at": None,
     }
@@ -275,37 +242,6 @@ def save_checkpoint(checkpoint: Dict[str, Any], ta_slug: str) -> None:
         path.write_text(json.dumps(checkpoint, indent=2), encoding="utf-8")
     except OSError as exc:
         print(f"[WARN] Could not write checkpoint file {path.name}: {exc}")
-
-
-def is_hcp_upsert_complete(checkpoint: Dict[str, Any], total_batches: Optional[int] = None) -> bool:
-    phase = checkpoint["phases"]["hcp_upsert"]
-    total = total_batches if total_batches is not None else (phase.get("total_batches") or 0)
-    complete = phase.get("complete_batches", 0) or 0
-    if total <= 0:
-        return False
-    # Stale checkpoint from a prior batch-size / HCP-count scale (e.g. complete_batches=5730
-    # at size 15 vs total_batches=1916 at size 100) must not be treated as complete.
-    if complete > total:
-        return False
-    return complete >= total
-
-
-def resolve_hcp_upsert_start_batch(checkpoint: Dict[str, Any], total_batches: int) -> int:
-    """Return the first batch index to upsert; clamp stale checkpoint batch counters."""
-    phase = checkpoint["phases"]["hcp_upsert"]
-    complete = phase.get("complete_batches", 0) or 0
-    if total_batches <= 0:
-        return 0
-    if complete > total_batches:
-        print(
-            f"[WARN] Checkpoint hcp_upsert.complete_batches ({complete}) exceeds "
-            f"current total_batches ({total_batches}) — likely a batch-size or scale change. "
-            f"Resetting HCP upsert start to batch 0."
-        )
-        return 0
-    if complete >= total_batches:
-        return total_batches
-    return complete
 
 
 def is_batch_phase_complete(checkpoint: Dict[str, Any], phase_name: str) -> bool:
@@ -428,19 +364,6 @@ def parse_affiliation(affiliation: Optional[str]) -> Tuple[Optional[str], Option
 
 def build_dedupe_key(first_name: Optional[str], last_name: Optional[str], institution: Optional[str]) -> str:
     return f"{normalize_token(first_name)}|{normalize_token(last_name)}|{normalize_token(institution)}"
-
-
-def compute_identity_hash(
-    first_name: Optional[str],
-    last_name: Optional[str],
-    institution: Optional[str],
-) -> str:
-    """Match hcps_v2.identity_hash: md5(coalesce(fn,'') || '|' || coalesce(ln,'') || '|' || coalesce(inst,''))."""
-    fn = first_name if first_name is not None else ""
-    ln = last_name if last_name is not None else ""
-    inst = institution if institution is not None else ""
-    payload = f"{fn}|{ln}|{inst}"
-    return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
 
 def resolve_years_back(pubmed_cfg: Dict[str, Any]) -> Optional[int]:
@@ -832,237 +755,87 @@ def parse_doi(article: ET.Element) -> Optional[str]:
     return None
 
 
-def build_author_query(first_name: Optional[str], last_name: Optional[str]) -> Optional[str]:
-    if not last_name:
+def parse_pub_date(article: ET.Element) -> Optional[str]:
+    """YYYY-MM-DD from the PubDate node, or None if no year. Ported from ingest_publications.py
+    so this pipeline populates publications_v2.pub_date (the Pulse theme time-series depends on it;
+    writing None here left 16,971 corpus-wide NULLs). Missing month/day default to 01."""
+    y = parse_pub_year(article)
+    if not y:
         return None
-    normalized_last = normalize_space(last_name)
-    normalized_first = normalize_space(first_name) if first_name else None
-    if not normalized_last:
-        return None
-    if normalized_first:
-        first_initial = normalized_first[0]
-        return f"\"{normalized_last} {first_initial}\"[Author]"
-    return f"\"{normalized_last}\"[Author]"
+    m = text_or_none(article.find("./MedlineCitation/Article/Journal/JournalIssue/PubDate/Month"))
+    d = text_or_none(article.find("./MedlineCitation/Article/Journal/JournalIssue/PubDate/Day"))
+    month_map = {
+        "Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04", "May": "05", "Jun": "06",
+        "Jul": "07", "Aug": "08", "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12",
+    }
+    if m and not m.isdigit():
+        m = month_map.get(m[:3], "01")
+    elif not m:
+        m = "01"
+    if not d or not d.isdigit():
+        d = "01"
+    return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
 
 
-def normalize_space(value: Optional[str]) -> Optional[str]:
-    if value is None:
-        return None
-    cleaned = re.sub(r"\s+", " ", value).strip()
-    return cleaned or None
-
-
-def pubmed_esearch_all(
-    session: requests.Session,
-    base_url: str,
-    query: str,
-    per_call: int,
-    email: Optional[str],
-    tool_name: str,
-) -> List[str]:
-    """
-    Fetch all PMIDs for a query with pagination.
-    """
-    esearch_url = f"{base_url}/esearch.fcgi"
-    api_key = os.getenv("PUBMED_API_KEY")
-    sleep_seconds = 0.11 if api_key else 0.34
-    max_results = 500
-    ids: List[str] = []
-    retstart = 0
-
-    while len(ids) < max_results:
-        batch_size = min(per_call, max_results - len(ids))
-        params = {
-            "db": "pubmed",
-            "term": query,
-            "retmode": "xml",
-            "retmax": str(batch_size),
-            "retstart": str(retstart),
-            "sort": "pub_date",
-            "tool": tool_name,
-        }
-        if email:
-            params["email"] = email
-        if api_key:
-            params["api_key"] = api_key
-
-        response = safe_post(esearch_url, data=params, session=session)
-        root = parse_xml(response.content, "esearch_all")
-        if root.findtext("ERROR"):
-            raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
-
-        batch_ids = [elem.text for elem in root.findall("./IdList/Id") if elem.text]
-        if not batch_ids:
-            break
-
-        ids.extend(batch_ids)
-        retstart += len(batch_ids)
-        if len(ids) >= max_results:
-            break
-        time.sleep(sleep_seconds)
-
-    seen: Set[str] = set()
-    unique_ids: List[str] = []
-    for pmid in ids:
-        if pmid not in seen:
-            seen.add(pmid)
-            unique_ids.append(pmid)
-    return unique_ids[:max_results]
-
-
-def is_author_match(
-    article_author_first: Optional[str],
-    article_author_last: Optional[str],
-    target_first: Optional[str],
-    target_last: Optional[str],
-) -> bool:
-    if not article_author_last or not target_last:
-        return False
-
-    article_last_norm = normalize_token(article_author_last)
-    target_last_norm = normalize_token(target_last)
-    if article_last_norm != target_last_norm:
-        return False
-
-    # If we do not have first name on the HCP record, last-name-only fallback.
-    if not target_first:
-        return True
-
-    article_first_norm = normalize_token(article_author_first)
-    target_first_norm = normalize_token(target_first)
-    if not article_first_norm:
-        return False
-
-    return article_first_norm.startswith(target_first_norm[:1]) or target_first_norm.startswith(article_first_norm[:1])
-
-
-def extract_publication_rows_for_hcp(
-    articles: Sequence[ET.Element],
-    hcp_id: str,
-    first_name: Optional[str],
-    last_name: Optional[str],
-) -> List[Dict[str, object]]:
-    rows: List[Dict[str, object]] = []
-    seen_pubmed_ids: Set[str] = set()
-
-    for article in articles:
-        pmid = text_or_none(article.find("./MedlineCitation/PMID"))
-        if not pmid or pmid in seen_pubmed_ids:
+def parse_authorships(article: ET.Element) -> List[Dict[str, Any]]:
+    """Extract author info AS-IS from PubMed (names, affiliations, ORCID, collective entries) for
+    later OpenAlex-driven resolution. Stored raw as publications_v2.pubmed_authorships (JSONB).
+    Does NOT mint HCP identities. Ported from ingest_publications.py."""
+    out: List[Dict[str, Any]] = []
+    for idx, author in enumerate(article.findall("./MedlineCitation/Article/AuthorList/Author")):
+        if author.find("CollectiveName") is not None:
+            collective = text_or_none(author.find("CollectiveName"))
+            if collective:
+                out.append({
+                    "position": idx + 1,
+                    "is_collective": True,
+                    "collective_name": collective,
+                })
             continue
 
-        title = text_or_none(article.find("./MedlineCitation/Article/ArticleTitle"))
-        journal = text_or_none(article.find("./MedlineCitation/Article/Journal/Title"))
-        pub_year = parse_pub_year(article)
-        doi = parse_doi(article)
+        affiliations: List[str] = []
+        for aff in author.findall("./AffiliationInfo/Affiliation"):
+            t = (aff.text or "").strip()
+            if t:
+                affiliations.append(t)
 
-        author_nodes = article.findall("./MedlineCitation/Article/AuthorList/Author")
-        matched = False
-        for author in author_nodes:
-            if author.find("CollectiveName") is not None:
-                continue
-            article_first = clean_person_name(text_or_none(author.find("ForeName")) or text_or_none(author.find("Initials")))
-            article_last = clean_person_name(text_or_none(author.find("LastName")))
-            if is_author_match(article_first, article_last, first_name, last_name):
-                matched = True
+        orcid: Optional[str] = None
+        for ident in author.findall("./Identifier"):
+            if ident.attrib.get("Source", "").lower() == "orcid" and ident.text:
+                orcid = ident.text.strip()
                 break
 
-        if not matched:
-            continue
-
-        seen_pubmed_ids.add(pmid)
-        rows.append(
-            {
-                "hcp_id": hcp_id,
-                "pubmed_id": pmid,
-                "title": title,
-                "journal": journal,
-                "pub_year": pub_year,
-                "citation_count": None,
-                "doi": doi,
-            }
-        )
-
-    return rows
+        out.append({
+            "position": idx + 1,
+            "is_collective": False,
+            "last_name": text_or_none(author.find("LastName")),
+            "fore_name": text_or_none(author.find("ForeName")),
+            "initials": text_or_none(author.find("Initials")),
+            "suffix": text_or_none(author.find("Suffix")),
+            "affiliations": affiliations,
+            "orcid": orcid,
+        })
+    return out
 
 
-def extract_records(articles: Sequence[ET.Element]) -> Tuple[Dict[str, HCPRecord], List[PublicationRecord]]:
-    hcps_by_key: Dict[str, HCPRecord] = {}
-    publication_records: List[PublicationRecord] = []
+def extract_publication_rows(
+    articles: Sequence[ET.Element], therapeutic_area_id: Optional[str]
+) -> List[Dict[str, object]]:
+    """One publications_v2 row per unique pubmed_id, built directly from the article XML.
 
-    for article in tqdm(articles, desc="ingesting publications", unit="pub"):
+    UNCONDITIONAL PERSISTENCE: the only article skipped is one with no PMID (the row is keyed by
+    pubmed_id, so a PMID-less record cannot be persisted). Articles with no AuthorList or only a
+    collective author ARE persisted -- they are real TA-matched publications (consortium papers,
+    editorials, errata); their author data is preserved raw in pubmed_authorships for later OpenAlex
+    linkage. HCP identities are NOT minted here (create_hcps_v2 owns identity; Step F builds
+    publication_authors_v2)."""
+    rows_by_pmid: Dict[str, Dict[str, object]] = {}
+    for article in tqdm(articles, desc="building publication rows", unit="pub"):
         pmid = text_or_none(article.find("./MedlineCitation/PMID"))
-        if not pmid:
+        if not pmid or pmid in rows_by_pmid:
             continue
-
-        title = text_or_none(article.find("./MedlineCitation/Article/ArticleTitle"))
-        journal = text_or_none(article.find("./MedlineCitation/Article/Journal/Title"))
-        pub_year = parse_pub_year(article)
-        doi = parse_doi(article)
-
-        author_nodes = article.findall("./MedlineCitation/Article/AuthorList/Author")
-        if not author_nodes:
-            continue
-
-        valid_authors: List[Tuple[ET.Element, Optional[str], Optional[str], Optional[str], Optional[str]]] = []
-        for author in author_nodes:
-            if author.find("CollectiveName") is not None:
-                continue
-
-            first_name = clean_person_name(
-                text_or_none(author.find("ForeName")) or text_or_none(author.find("Initials"))
-            )
-            last_name = clean_person_name(text_or_none(author.find("LastName")))
-            credentials = infer_credentials(text_or_none(author.find("Suffix")))
-            aff_info_nodes = author.findall("./AffiliationInfo/Affiliation")
-            affiliation = text_or_none(aff_info_nodes[0]) if aff_info_nodes else None
-
-            if not first_name and not last_name:
-                continue
-
-            valid_authors.append((author, first_name, last_name, credentials, affiliation))
-
-        if not valid_authors:
-            continue
-
-        total_authors = len(valid_authors)
-        for position, (_author, first_name, last_name, credentials, affiliation) in enumerate(valid_authors):
-            institution, city, state, zip_code, country = parse_affiliation(affiliation)
-
-            dedupe_key = build_dedupe_key(first_name, last_name, institution)
-            if dedupe_key not in hcps_by_key:
-                hcps_by_key[dedupe_key] = HCPRecord(
-                    first_name=first_name,
-                    last_name=last_name,
-                    credentials=credentials,
-                    institution=institution,
-                    institution_full=affiliation,
-                    city=city,
-                    state=state,
-                    zip_code=zip_code,
-                    country=country,
-                    specialty=None,
-                    subspecialty=None,
-                    dedupe_key=dedupe_key,
-                )
-
-            author_position = position + 1
-            publication_records.append(
-                PublicationRecord(
-                    pubmed_id=pmid,
-                    title=title,
-                    journal=journal,
-                    pub_year=pub_year,
-                    citation_count=None,  # Not available directly in E-utilities efetch response.
-                    doi=doi,
-                    hcp_dedupe_key=dedupe_key,
-                    author_position=author_position,
-                    total_authors=total_authors,
-                    is_first_author=position == 0,
-                    is_senior_author=position == total_authors - 1 and total_authors > 1,
-                )
-            )
-
-    return hcps_by_key, publication_records
+        rows_by_pmid[pmid] = _publication_v2_row(article, pmid, therapeutic_area_id)
+    return list(rows_by_pmid.values())
 
 
 def init_supabase() -> Client:
@@ -1074,209 +847,33 @@ def init_supabase() -> Client:
     return create_client(supabase_url, supabase_key, options)
 
 
-def _hcp_v2_row_dict(hcp: HCPRecord) -> Dict[str, object]:
-    """Fixed key set for every HCP upsert row (explicit nulls for shape consistency)."""
-    institution_raw = hcp.institution_full or hcp.institution
-    return {
-        "identity_hash": compute_identity_hash(hcp.first_name, hcp.last_name, hcp.institution),
-        "first_name": hcp.first_name,
-        "last_name": hcp.last_name or "Unknown",
-        "credentials": hcp.credentials,
-        "institution_raw": institution_raw,
-        "institution_normalized": hcp.institution,
-        "country": hcp.country,
-        "nppes_practice_city": hcp.city,
-        "nppes_practice_state": hcp.state,
-    }
+def _publication_v2_row(
+    article: ET.Element, pmid: str, therapeutic_area_id: Optional[str]
+) -> Dict[str, object]:
+    """Fixed key set for one publications_v2 row, built directly from the article XML.
 
-
-HCP_ID_LOOKUP_CHUNK_SIZE = 100
-
-
-def _fetch_hcp_ids_for_batch(supabase: Client, batch: Sequence[HCPRecord]) -> Dict[str, str]:
-    """Resolve dedupe_key -> id for a batch via identity_hash IN lookup."""
-    if not batch:
-        return {}
-
-    hash_to_dedupe_key: Dict[str, str] = {}
-    for hcp in batch:
-        identity_hash = compute_identity_hash(hcp.first_name, hcp.last_name, hcp.institution)
-        hash_to_dedupe_key[identity_hash] = hcp.dedupe_key
-
-    id_map: Dict[str, str] = {}
-    for start in range(0, len(batch), HCP_ID_LOOKUP_CHUNK_SIZE):
-        chunk = batch[start : start + HCP_ID_LOOKUP_CHUNK_SIZE]
-        identity_hashes = [
-            compute_identity_hash(h.first_name, h.last_name, h.institution) for h in chunk
-        ]
-        try:
-            response = supabase_execute(
-                lambda hashes=identity_hashes: (
-                    supabase.table(HCPS_TABLE)
-                    .select("id,identity_hash")
-                    .in_("identity_hash", hashes)
-                    .execute()
-                )
-            )
-        except Exception:
-            print("[DIAG] PostgREST batch select failed in _fetch_hcp_ids_for_batch")
-            print("[DIAG] lookup_method: identity_hash in_ filter")
-            print(f"[DIAG] identity_hashes: {identity_hashes}")
-            for diag_hcp in chunk:
-                print(
-                    "[DIAG] HCP record: "
-                    f"dedupe_key={diag_hcp.dedupe_key} "
-                    f"first_name={diag_hcp.first_name} "
-                    f"last_name={diag_hcp.last_name} "
-                    f"institution={diag_hcp.institution}"
-                )
-                print(
-                    "[DIAG] repr: "
-                    f"first_name={repr(diag_hcp.first_name)} "
-                    f"last_name={repr(diag_hcp.last_name)} "
-                    f"institution={repr(diag_hcp.institution)}"
-                )
-            raise
-
-        for row in response.data or []:
-            rid = row.get("id")
-            identity_hash = row.get("identity_hash")
-            if not rid or not identity_hash:
-                continue
-            dedupe_key = hash_to_dedupe_key.get(identity_hash)
-            if dedupe_key and dedupe_key not in id_map:
-                id_map[dedupe_key] = rid
-    return id_map
-
-
-def upsert_hcps(
-    supabase: Client,
-    hcps: Sequence[HCPRecord],
-    start_batch: int = 0,
-    on_batch_complete: Optional[Callable[[int, int], None]] = None,
-) -> Dict[str, str]:
-    if not hcps:
-        return {}
-
-    batch_size = HCP_UPSERT_BATCH_SIZE
-    id_map: Dict[str, str] = {}
-    total_batches = (len(hcps) + batch_size - 1) // batch_size
-    batches_upserted = 0
-    rows_upserted = 0
-    batches_lookup_only = 0
-
-    if start_batch > 0:
-        if start_batch >= total_batches:
-            print(
-                f"HCP upsert: all {total_batches} batches already complete; "
-                f"rebuilding ID map via lookup only..."
-            )
-        else:
-            print(
-                f"Resuming HCP upsert from batch {start_batch + 1}/{total_batches} "
-                f"(rebuilding ID map for {start_batch} prior batches)..."
-            )
-
-    for batch_idx in tqdm(range(total_batches), desc="upserting HCPs", unit="batch"):
-        i = batch_idx * batch_size
-        batch = list(hcps[i : i + batch_size])
-
-        if batch_idx < start_batch:
-            batches_lookup_only += 1
-            batch_ids = _fetch_hcp_ids_for_batch(supabase, batch)
-            for hcp in batch:
-                rid = batch_ids.get(hcp.dedupe_key)
-                if rid:
-                    id_map[hcp.dedupe_key] = rid
-            continue
-
-        rows = [_hcp_v2_row_dict(h) for h in batch]
-
-        try:
-            response = supabase_execute(
-                lambda upsert_rows=rows: supabase.table(HCPS_TABLE).upsert(
-                    upsert_rows,
-                    on_conflict="identity_hash",
-                    returning="representation",
-                ).execute()
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed batch upsert HCPs (batch starting at {i}): {exc}") from exc
-
-        returned_rows = response.data or []
-        if len(returned_rows) < len(rows):
-            print(
-                f"[WARN] HCP upsert batch {batch_idx + 1}/{total_batches}: "
-                f"sent {len(rows)} rows, PostgREST returned {len(returned_rows)}."
-            )
-        batches_upserted += 1
-        rows_upserted += len(rows)
-
-        batch_ids = _fetch_hcp_ids_for_batch(supabase, batch)
-        for hcp in batch:
-            rid = batch_ids.get(hcp.dedupe_key)
-            if rid:
-                id_map[hcp.dedupe_key] = rid
-
-        missing = [h for h in batch if h.dedupe_key not in id_map]
-        for hcp in missing:
-            try:
-                identity_hash = compute_identity_hash(
-                    hcp.first_name, hcp.last_name, hcp.institution
-                )
-                query = supabase_execute(
-                    lambda ih=identity_hash: (
-                        supabase.table(HCPS_TABLE)
-                        .select("id")
-                        .eq("identity_hash", ih)
-                        .limit(1)
-                        .execute()
-                    )
-                )
-                qrows = query.data or []
-                if qrows:
-                    id_map[hcp.dedupe_key] = qrows[0]["id"]
-            except Exception as exc:
-                raise RuntimeError(f"Failed to fetch HCP id for key {hcp.dedupe_key}: {exc}") from exc
-
-        if on_batch_complete:
-            on_batch_complete(batch_idx + 1, total_batches)
-
-    print(
-        f"HCP upsert summary: {batches_upserted} write batches ({rows_upserted:,} rows), "
-        f"{batches_lookup_only} lookup-only batches skipped, "
-        f"{len(id_map):,} dedupe keys mapped to IDs."
-    )
-    return id_map
-
-
-def _resolve_hcp_id(record: PublicationRecord, hcp_id_map: Dict[str, str]) -> Optional[str]:
-    if record.hcp_id:
-        return record.hcp_id
-    return hcp_id_map.get(record.hcp_dedupe_key)
-
-
-def _publication_v2_row(record: PublicationRecord, therapeutic_area_id: Optional[str]) -> Dict[str, object]:
-    """Fixed key set for every publication upsert row (explicit nulls for shape consistency).
+    pub_date and pubmed_authorships ARE populated here (parse_pub_date / parse_authorships) -- the
+    former feeds the Pulse theme time-series, the latter preserves author data raw for later
+    OpenAlex linkage without minting HCP identities.
 
     NOTE: ingestion_run_id is intentionally NOT in this payload. Including it would make the
     on_conflict="pubmed_id" upsert overwrite it on every re-ingest (last-wrote semantics). It is
     INSERT-ONLY: stamped in upsert_publications on rows where it is still NULL (created-by).
     """
     return {
-        "pubmed_id": record.pubmed_id,
-        "doi": record.doi,
+        "pubmed_id": pmid,
+        "doi": parse_doi(article),
         "openalex_work_id": None,
-        "title": record.title,
+        "title": text_or_none(article.find("./MedlineCitation/Article/ArticleTitle")),
         "abstract": None,
-        "journal": record.journal,
-        "pub_year": record.pub_year,
-        "pub_date": None,
+        "journal": text_or_none(article.find("./MedlineCitation/Article/Journal/Title")),
+        "pub_year": parse_pub_year(article),
+        "pub_date": parse_pub_date(article),
         "language": None,
-        "pubmed_authorships": None,
+        "pubmed_authorships": parse_authorships(article),
         "mesh_terms": None,
         "publication_types": None,
-        "citation_count": record.citation_count,
+        "citation_count": None,  # Not available directly in E-utilities efetch response.
         "citation_counts_by_year": None,
         "openalex_enriched_at": None,
         "source_therapeutic_area_id": therapeutic_area_id,
@@ -1334,21 +931,6 @@ def _tag_publications_for_therapeutic_area(
     )
 
 
-def _author_link_row(publication_id: str, record: PublicationRecord, hcp_id: str) -> Dict[str, object]:
-    """Fixed key set for every author-link upsert row (explicit nulls for shape consistency)."""
-    return {
-        "publication_id": publication_id,
-        "hcp_id": hcp_id,
-        "author_position": record.author_position,
-        "is_first_author": record.is_first_author,
-        "is_senior_author": record.is_senior_author,
-        "total_authors": record.total_authors,
-        "openalex_author_id": None,
-        "disambiguation_method": None,
-        "disambiguation_confidence": None,
-    }
-
-
 def _fetch_publication_ids_for_pmids(supabase: Client, pmids: Sequence[str]) -> Dict[str, str]:
     if not pmids:
         return {}
@@ -1374,48 +956,32 @@ def _fetch_publication_ids_for_pmids(supabase: Client, pmids: Sequence[str]) -> 
     return pmid_to_id
 
 
-def summarize_v2_write_counts(
-    unique_hcps: Sequence[HCPRecord],
-    publication_records: Sequence[PublicationRecord],
-) -> Dict[str, int]:
-    unique_pmids = {record.pubmed_id for record in publication_records}
+def summarize_v2_write_counts(publication_rows: Sequence[Dict[str, object]]) -> Dict[str, int]:
+    """Dry-run projection of what would be written. Publications-only now: no hcps_v2,
+    publication_authors_v2, or hcp_therapeutic_areas_v2 writes originate here."""
+    n = len(publication_rows)
     return {
-        HCPS_TABLE: len(unique_hcps),
-        PUBLICATIONS_TABLE: len(unique_pmids),
-        PUBLICATION_AUTHORS_TABLE: len(publication_records),
-        HCP_THERAPEUTIC_AREAS_TABLE: len(unique_hcps),
-        PUBLICATION_THERAPEUTIC_AREAS_TABLE: len(unique_pmids),
+        PUBLICATIONS_TABLE: n,
+        PUBLICATION_THERAPEUTIC_AREAS_TABLE: n,
     }
 
 
 def upsert_publications(
     supabase: Client,
-    publication_records: Sequence[PublicationRecord],
-    hcp_id_map: Dict[str, str],
-    therapeutic_area_id: Optional[str],
+    publication_rows: Sequence[Dict[str, object]],
     start_batch: int = 0,
     on_batch_complete: Optional[Callable[[int, int], None]] = None,
     ingestion_run_id: Optional[str] = None,
-) -> Tuple[int, int]:
-    pubs_by_pmid: Dict[str, Dict[str, object]] = {}
-    author_links_by_pmid: Dict[str, List[Tuple[PublicationRecord, str]]] = defaultdict(list)
+) -> int:
+    """Persist publications_v2 rows UNCONDITIONALLY, keyed by pubmed_id. No HCP resolution, no
+    author-link writes (Step F owns publication_authors_v2), no attribution gate. TA linking +
+    source_therapeutic_area_id backfill happen in a separate post-upsert step over ALL pmids."""
+    rows = list(publication_rows)
+    if not rows:
+        return 0
 
-    for record in publication_records:
-        hcp_id = _resolve_hcp_id(record, hcp_id_map)
-        if not hcp_id:
-            continue
-        if record.pubmed_id not in pubs_by_pmid:
-            pubs_by_pmid[record.pubmed_id] = _publication_v2_row(record, therapeutic_area_id)
-        author_links_by_pmid[record.pubmed_id].append((record, hcp_id))
-
-    publication_rows = list(pubs_by_pmid.values())
-    if not publication_rows:
-        return 0, 0
-
-    ordered_pmids = [row["pubmed_id"] for row in publication_rows if row.get("pubmed_id")]
     batch_size = PUBLICATION_UPSERT_BATCH_SIZE
-    total_batches = (len(publication_rows) + batch_size - 1) // batch_size
-    author_link_count = 0
+    total_batches = (len(rows) + batch_size - 1) // batch_size
 
     if start_batch > 0:
         print(
@@ -1428,15 +994,14 @@ def upsert_publications(
             continue
 
         i = batch_idx * batch_size
-        batch = publication_rows[i : i + batch_size]
+        batch = rows[i : i + batch_size]
         batch_pmids = [str(row["pubmed_id"]) for row in batch if row.get("pubmed_id")]
 
         try:
-            response = supabase_execute(
-                lambda rows=batch: supabase.table(PUBLICATIONS_TABLE).upsert(
-                    rows,
+            supabase_execute(
+                lambda b=batch: supabase.table(PUBLICATIONS_TABLE).upsert(
+                    b,
                     on_conflict="pubmed_id",
-                    returning="representation",
                 ).execute()
             )
         except Exception as exc:
@@ -1458,179 +1023,10 @@ def upsert_publications(
             except Exception as exc:
                 print(f"  [warn] ingestion_run_id insert-only stamp failed for batch at {i}: {exc}")
 
-        pmid_to_id = {
-            str(row["pubmed_id"]): row["id"]
-            for row in (response.data or [])
-            if row.get("pubmed_id") and row.get("id")
-        }
-        missing_pmids = [pmid for pmid in batch_pmids if pmid not in pmid_to_id]
-        if missing_pmids:
-            pmid_to_id.update(_fetch_publication_ids_for_pmids(supabase, missing_pmids))
-
-        author_rows: List[Dict[str, object]] = []
-        deduped_author_keys: Set[Tuple[str, str]] = set()
-        for pmid in batch_pmids:
-            publication_id = pmid_to_id.get(pmid)
-            if not publication_id:
-                continue
-            for record, hcp_id in author_links_by_pmid.get(pmid, []):
-                key = (publication_id, hcp_id)
-                if key in deduped_author_keys:
-                    continue
-                deduped_author_keys.add(key)
-                author_rows.append(_author_link_row(publication_id, record, hcp_id))
-
-        if author_rows:
-            try:
-                supabase_execute(
-                    lambda rows=author_rows: supabase.table(PUBLICATION_AUTHORS_TABLE).upsert(
-                        rows,
-                        on_conflict="publication_id,hcp_id",
-                    ).execute()
-                )
-            except Exception as exc:
-                raise RuntimeError(
-                    f"Failed to upsert publication_authors_v2 batch starting at {i}: {exc}"
-                ) from exc
-            author_link_count += len(author_rows)
-
-        if therapeutic_area_id and batch_pmids:
-            _tag_publications_for_therapeutic_area(
-                supabase, batch_pmids, therapeutic_area_id
-            )
-
         if on_batch_complete:
             on_batch_complete(batch_idx + 1, total_batches)
 
-    return len(publication_rows), author_link_count
-
-
-def fetch_hcps_with_low_publication_counts(
-    supabase: Client,
-    max_publications: int = 2,
-) -> List[Dict[str, object]]:
-    try:
-        hcps_response = supabase_execute(
-            lambda: supabase.table(HCPS_TABLE).select("id,first_name,last_name").execute()
-        )
-        pubs_response = supabase_execute(
-            lambda: supabase.table(PUBLICATION_AUTHORS_TABLE).select("hcp_id,publication_id").execute()
-        )
-    except Exception as exc:
-        raise RuntimeError(f"Failed to load HCP/publication counts for second pass: {exc}") from exc
-
-    pub_counts: Dict[str, int] = {}
-    for row in pubs_response.data or []:
-        hcp_id = row.get("hcp_id")
-        if hcp_id:
-            pub_counts[hcp_id] = pub_counts.get(hcp_id, 0) + 1
-
-    low_pub_hcps: List[Dict[str, object]] = []
-    for hcp in hcps_response.data or []:
-        hcp_id = hcp.get("id")
-        if not hcp_id:
-            continue
-        if pub_counts.get(hcp_id, 0) <= max_publications:
-            low_pub_hcps.append(hcp)
-    return low_pub_hcps
-
-
-def run_author_enrichment_second_pass(
-    supabase: Client,
-    session: requests.Session,
-    base_url: str,
-    email: Optional[str],
-    tool_name: str,
-    per_call: int,
-    therapeutic_area_id: str,
-    ingestion_run_id: Optional[str] = None,
-) -> int:
-    """
-    For HCPs with sparse publication history, fetch career-spanning author publications.
-    """
-    low_pub_hcps = fetch_hcps_with_low_publication_counts(supabase, max_publications=2)
-    low_pub_hcps = low_pub_hcps[:500]
-    if not low_pub_hcps:
-        print("Second pass: no HCPs with fewer than 3 publications found.")
-        return 0
-
-    print(f"Second pass: found {len(low_pub_hcps)} HCPs with fewer than 3 publications.")
-    total_upserted = 0
-    for hcp in tqdm(low_pub_hcps, desc="enriching authors", unit="hcp"):
-        hcp_id = hcp.get("id")
-        first_name = clean_person_name(hcp.get("first_name"))
-        last_name = clean_person_name(hcp.get("last_name"))
-        if not hcp_id:
-            continue
-
-        author_query = build_author_query(first_name, last_name)
-        if not author_query:
-            continue
-
-        try:
-            pmids = pubmed_esearch_all(
-                session=session,
-                base_url=base_url,
-                query=author_query,
-                per_call=per_call,
-                email=email,
-                tool_name=tool_name,
-            )
-        except Exception as exc:
-            print(f"Second pass warning: failed search for HCP {hcp_id}: {exc}")
-            continue
-
-        if not pmids:
-            continue
-
-        pmids = pmids[:50]
-
-        try:
-            articles = pubmed_efetch(
-                session=session,
-                base_url=base_url,
-                pmids=pmids,
-                email=email,
-                tool_name=tool_name,
-            )
-            rows = extract_publication_rows_for_hcp(articles, hcp_id, first_name, last_name)
-            if not rows:
-                continue
-            publication_records = [
-                PublicationRecord(
-                    pubmed_id=str(row["pubmed_id"]),
-                    title=row.get("title"),
-                    journal=row.get("journal"),
-                    pub_year=row.get("pub_year"),
-                    citation_count=row.get("citation_count"),
-                    doi=row.get("doi"),
-                    hcp_dedupe_key="",
-                    hcp_id=hcp_id,
-                )
-                for row in rows
-            ]
-            # therapeutic_area_id=None AND ingestion_run_id=None ON PURPOSE: these are the author's
-            # FULL publication history (back-catalog on unrelated topics), ingested only for
-            # career-depth enrichment. They are neither this TA's papers (so no publication_
-            # therapeutic_areas_v2 link / source_therapeutic_area_id backfill -- both guarded by
-            # `if therapeutic_area_id`) NOR this run's batch (so no ingestion_run_id stamp). Only the
-            # PRIMARY windowed-query papers carry the run_id, so "WHERE ingestion_run_id=X" returns
-            # just the primary batch (the orchestrator's batch_pubs.txt), not the ~10K enrichment
-            # substrate. The pubs + author-links are still written (career depth preserved); if an
-            # enrichment pub later matches a real query, created-by semantics stamp it properly then.
-            pub_count, author_count = upsert_publications(
-                supabase=supabase,
-                publication_records=publication_records,
-                hcp_id_map={},
-                therapeutic_area_id=None,
-                ingestion_run_id=None,
-            )
-            total_upserted += author_count or pub_count
-        except Exception as exc:
-            print(f"Second pass warning: failed upsert for HCP {hcp_id}: {exc}")
-            continue
-
-    return total_upserted
+    return len(rows)
 
 
 def get_therapeutic_area_id_by_slug(supabase: Client, slug: str) -> str:
@@ -1651,64 +1047,6 @@ def get_therapeutic_area_id_by_slug(supabase: Client, slug: str) -> str:
     if not rows or not rows[0].get("id"):
         raise RuntimeError(f"No therapeutic_areas row found for slug '{slug}'.")
     return rows[0]["id"]
-
-
-def upsert_hcp_therapeutic_area_links(
-    supabase: Client,
-    hcp_ids: Sequence[str],
-    therapeutic_area_id: str,
-    publication_counts: Optional[Dict[str, int]] = None,
-    start_batch: int = 0,
-    on_batch_complete: Optional[Callable[[int, int], None]] = None,
-) -> int:
-    if not hcp_ids:
-        return 0
-
-    unique_hcp_ids = list({hcp_id for hcp_id in hcp_ids if hcp_id})
-    if not unique_hcp_ids:
-        return 0
-
-    batch_size = TA_LINK_UPSERT_BATCH_SIZE
-    total_batches = (len(unique_hcp_ids) + batch_size - 1) // batch_size
-    upserted = 0
-
-    if start_batch > 0:
-        print(
-            f"Resuming HCP TA link upsert from batch {start_batch + 1}/{total_batches} "
-            f"(skipping {start_batch} prior batches)..."
-        )
-
-    for batch_idx in range(total_batches):
-        if batch_idx < start_batch:
-            upserted += min(batch_size, len(unique_hcp_ids) - batch_idx * batch_size)
-            continue
-
-        i = batch_idx * batch_size
-        batch_ids = unique_hcp_ids[i : i + batch_size]
-        rows = [
-            {
-                "hcp_id": hcp_id,
-                "therapeutic_area_id": therapeutic_area_id,
-                "publication_count": (publication_counts or {}).get(hcp_id, 0),
-            }
-            for hcp_id in batch_ids
-        ]
-
-        try:
-            supabase_execute(
-                lambda: supabase.table(HCP_THERAPEUTIC_AREAS_TABLE).upsert(
-                    rows,
-                    on_conflict="hcp_id,therapeutic_area_id",
-                ).execute()
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to upsert hcp_therapeutic_areas_v2 links: {exc}") from exc
-
-        upserted += len(rows)
-        if on_batch_complete:
-            on_batch_complete(batch_idx + 1, total_batches)
-
-    return upserted
 
 
 def upsert_publication_therapeutic_area_links(
@@ -1786,11 +1124,14 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
     # AUTHORITATIVE batch identity: when requested, accumulate the PRIMARY windowed-query pmids
     # (the esearch result set) across the TA loop and emit them at the end. This is the orchestrator's
     # source of truth for "this cycle's batch", replacing the unreliable insert-only run_id reverse-
-    # derivation (which under-captures re-ingested papers that kept an older run_id). It is PRIMARY-ONLY:
-    # the second pass (author-history enrichment) fetches its own pmids inside
-    # run_author_enrichment_second_pass and never touches `pmids`, so enrichment pmids cannot leak in.
+    # derivation (which under-captures re-ingested papers that kept an older run_id).
     primary_pmids_out = getattr(args, "primary_pmids_out", None) if args else None
     primary_pmids_accum: List[str] = []
+
+    # Per-TA funnel counters -> run_summary.json (instrumentation). The hard guard below turns a
+    # silent "consumed N candidates, persisted ~0" into a non-zero exit.
+    run_summary_out = getattr(args, "run_summary_out", None) if args else None
+    ta_funnels: List[Dict[str, Any]] = []
 
     ta_slugs_to_run = (
         [slug.strip() for slug in args.ta.split(",") if slug.strip()]
@@ -1808,6 +1149,20 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         print("[DRY RUN] No Supabase writes will be performed.")
 
     for ta_slug in ta_slugs_to_run:
+        # Funnel appended by reference now; mutated in place as the stages run, so the early
+        # `continue` paths (quiet week, no efetch payload) still leave a recorded row.
+        funnel: Dict[str, Any] = {
+            "ta_slug": ta_slug,
+            "esearch_candidates": 0,
+            "efetch_articles": 0,
+            "extracted_pmids": 0,
+            "publications_upserted": 0,
+            "pub_ta_links_upserted": 0,
+            "write_skipped_by_checkpoint": False,
+            "dry_run": dry_run,
+        }
+        ta_funnels.append(funnel)
+
         checkpoint_path = get_checkpoint_path(ta_slug)
         checkpoint: Optional[Dict[str, Any]] = None
 
@@ -1928,6 +1283,7 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         if primary_pmids_out is not None:
             primary_pmids_accum.extend(str(p) for p in pmids)
 
+        funnel["esearch_candidates"] = len(pmids)
         if not pmids:
             print(f"No PubMed results found for {query_label}.")
             continue
@@ -1941,6 +1297,7 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
             email=email,
             tool_name=tool_name,
         )
+        funnel["efetch_articles"] = len(articles)
         if not articles:
             print(f"No article payloads returned by efetch for {query_label}.")
             continue
@@ -1952,26 +1309,18 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
             }
             save_checkpoint(checkpoint, ta_slug)
 
-        hcps_by_key, publication_records = extract_records(articles)
-        unique_hcps = list(hcps_by_key.values())
-        print(
-            f"Extracted {len(unique_hcps)} unique HCP profiles and "
-            f"{len(publication_records)} author-publication links."
-        )
-
-        if checkpoint is not None:
-            checkpoint["phases"]["hcp_extract"] = {
-                "complete": True,
-                "unique_hcps_count": len(unique_hcps),
-            }
-            save_checkpoint(checkpoint, ta_slug)
+        # Build publication rows (one per unique pmid) directly from the article XML. HCP identities
+        # are NOT minted here -- create_hcps_v2 (stage 2) owns identity; Step F (stage 5) builds
+        # publication_authors_v2. Raw author data is preserved in pubmed_authorships for that linkage.
+        publication_rows = extract_publication_rows(articles, therapeutic_area_id)
+        funnel["extracted_pmids"] = len(publication_rows)
+        print(f"Built {len(publication_rows)} publication row(s) from {len(articles)} article(s).")
 
         if dry_run:
-            v2_counts = summarize_v2_write_counts(unique_hcps, publication_records)
+            v2_counts = summarize_v2_write_counts(publication_rows)
             print("Sample publication titles:")
-            for article in articles[:5]:
-                title = text_or_none(article.find("./MedlineCitation/Article/ArticleTitle"))
-                print(f"  - {title or '(no title)'}")
+            for row in publication_rows[:5]:
+                print(f"  - {row.get('title') or '(no title)'}")
             print("\n[DRY RUN] v2 tables that would be written:")
             for table_name, row_count in v2_counts.items():
                 print(f"  {table_name}: {row_count:,} rows")
@@ -1980,192 +1329,60 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         assert supabase is not None
         assert checkpoint is not None
 
-        hcp_total_batches = (
-            (len(unique_hcps) + HCP_UPSERT_BATCH_SIZE - 1) // HCP_UPSERT_BATCH_SIZE
-            if unique_hcps
-            else 0
-        )
-        checkpoint["phases"]["hcp_upsert"]["total_batches"] = hcp_total_batches
-        hcp_start_batch = resolve_hcp_upsert_start_batch(checkpoint, hcp_total_batches)
-        stale_complete = checkpoint["phases"]["hcp_upsert"].get("complete_batches", 0) or 0
-        if stale_complete > hcp_total_batches:
-            checkpoint["phases"]["hcp_upsert"]["complete_batches"] = 0
-        if is_hcp_upsert_complete(checkpoint, hcp_total_batches):
-            print(
-                f"Checkpoint: HCP upsert complete "
-                f"({hcp_total_batches}/{hcp_total_batches} batches); rebuilding ID map..."
-            )
-
-        def on_hcp_batch(batch_num: int, total: int) -> None:
-            checkpoint["phases"]["hcp_upsert"]["complete_batches"] = batch_num
-            checkpoint["phases"]["hcp_upsert"]["total_batches"] = total
-            if batch_num % CHECKPOINT_EVERY_N_BATCHES == 0 or batch_num == total:
-                save_checkpoint(checkpoint, ta_slug)
-
-        print("Upserting HCPs into Supabase...")
-        hcp_id_map = upsert_hcps(
-            supabase,
-            unique_hcps,
-            start_batch=hcp_start_batch,
-            on_batch_complete=on_hcp_batch,
-        )
-        checkpoint["phases"]["hcp_upsert"]["complete_batches"] = hcp_total_batches
-        checkpoint["phases"]["hcp_upsert"]["total_batches"] = hcp_total_batches
-        save_checkpoint(checkpoint, ta_slug)
-        print(f"Mapped {len(hcp_id_map)} HCP keys to DB IDs.")
-
-        pub_total_batches = 0
-        pub_start_batch = 0
+        all_pmids = [str(row["pubmed_id"]) for row in publication_rows if row.get("pubmed_id")]
 
         def on_publication_batch(batch_num: int, total: int) -> None:
             checkpoint["phases"]["publication_upsert"]["complete_batches"] = batch_num
             checkpoint["phases"]["publication_upsert"]["total_batches"] = total
-            checkpoint["phases"]["author_link_upsert"]["complete_batches"] = batch_num
-            checkpoint["phases"]["author_link_upsert"]["total_batches"] = total
             if batch_num % CHECKPOINT_EVERY_N_BATCHES == 0 or batch_num == total:
                 save_checkpoint(checkpoint, ta_slug)
 
-        print("Upserting publications into Supabase...")
+        pub_total_batches = (
+            (len(publication_rows) + PUBLICATION_UPSERT_BATCH_SIZE - 1) // PUBLICATION_UPSERT_BATCH_SIZE
+            if publication_rows
+            else 0
+        )
+        print("Upserting publications into Supabase (unconditional; keyed by pubmed_id)...")
         if is_batch_phase_complete(checkpoint, "publication_upsert"):
-            pub_start_batch = checkpoint["phases"]["publication_upsert"]["complete_batches"]
-            pub_total_batches = checkpoint["phases"]["publication_upsert"]["total_batches"]
+            pub_count = len(publication_rows)
+            funnel["write_skipped_by_checkpoint"] = True
             print(
                 f"Checkpoint: publication upsert complete "
                 f"({pub_total_batches}/{pub_total_batches} batches); skipping."
             )
         else:
             pub_start_batch = checkpoint["phases"]["publication_upsert"].get("complete_batches", 0)
-
-            unique_pmids_with_hcps = {
-                record.pubmed_id
-                for record in publication_records
-                if _resolve_hcp_id(record, hcp_id_map)
-            }
-            pub_total_batches = (
-                (len(unique_pmids_with_hcps) + PUBLICATION_UPSERT_BATCH_SIZE - 1)
-                // PUBLICATION_UPSERT_BATCH_SIZE
-                if unique_pmids_with_hcps
-                else 0
-            )
             checkpoint["phases"]["publication_upsert"]["total_batches"] = pub_total_batches
-            checkpoint["phases"]["author_link_upsert"]["total_batches"] = pub_total_batches
-            pub_count, author_link_count = upsert_publications(
+            pub_count = upsert_publications(
                 supabase,
-                publication_records,
-                hcp_id_map,
-                therapeutic_area_id=therapeutic_area_id,
+                publication_rows,
                 start_batch=pub_start_batch,
                 on_batch_complete=on_publication_batch,
                 ingestion_run_id=ingestion_run_id,
             )
             checkpoint["phases"]["publication_upsert"]["complete_batches"] = pub_total_batches
-            checkpoint["phases"]["author_link_upsert"]["complete_batches"] = pub_total_batches
             save_checkpoint(checkpoint, ta_slug)
-            print(
-                f"Upserted {pub_count} publications_v2 rows and "
-                f"{author_link_count} publication_authors_v2 rows."
-            )
+        funnel["publications_upserted"] = pub_count
+        print(f"Upserted {pub_count} publications_v2 rows for {query_label}.")
 
-        unique_pmids_with_hcps = {
-            record.pubmed_id
-            for record in publication_records
-            if _resolve_hcp_id(record, hcp_id_map)
-        }
-        pmid_to_publication_id = _fetch_publication_ids_for_pmids(supabase, list(unique_pmids_with_hcps))
-        publication_ids_for_ta = list(pmid_to_publication_id.values())
-
-        hcp_publication_counts: Dict[str, int] = defaultdict(int)
-        for record in publication_records:
-            hcp_id = _resolve_hcp_id(record, hcp_id_map)
-            if hcp_id:
-                hcp_publication_counts[hcp_id] += 1
-
-        unique_hcp_ids = list({hcp_id for hcp_id in hcp_id_map.values() if hcp_id})
-        ta_total_batches = (
-            (len(unique_hcp_ids) + TA_LINK_UPSERT_BATCH_SIZE - 1) // TA_LINK_UPSERT_BATCH_SIZE
-            if unique_hcp_ids
-            else 0
-        )
-        checkpoint["phases"]["ta_link_upsert"]["total_batches"] = ta_total_batches
-
-        def on_ta_link_batch(batch_num: int, total: int) -> None:
-            checkpoint["phases"]["ta_link_upsert"]["complete_batches"] = batch_num
-            checkpoint["phases"]["ta_link_upsert"]["total_batches"] = total
-            if batch_num % CHECKPOINT_EVERY_N_BATCHES == 0 or batch_num == total:
-                save_checkpoint(checkpoint, ta_slug)
-
-        print("Upserting HCP therapeutic area links...")
-        if is_batch_phase_complete(checkpoint, "ta_link_upsert"):
-            link_count = len(unique_hcp_ids)
-            print(
-                f"Checkpoint: HCP TA link upsert complete "
-                f"({ta_total_batches}/{ta_total_batches} batches); skipping."
-            )
-        else:
-            ta_start_batch = checkpoint["phases"]["ta_link_upsert"].get("complete_batches", 0)
-            link_count = upsert_hcp_therapeutic_area_links(
-                supabase=supabase,
-                hcp_ids=unique_hcp_ids,
-                therapeutic_area_id=therapeutic_area_id,
-                publication_counts=dict(hcp_publication_counts),
-                start_batch=ta_start_batch,
-                on_batch_complete=on_ta_link_batch,
-            )
-            checkpoint["phases"]["ta_link_upsert"]["complete_batches"] = ta_total_batches
-            save_checkpoint(checkpoint, ta_slug)
-        print(f"Upserted {link_count} hcp_therapeutic_areas_v2 rows for {query_label}.")
-
-        pub_ta_total_batches = (
-            (len(publication_ids_for_ta) + TA_LINK_UPSERT_BATCH_SIZE - 1) // TA_LINK_UPSERT_BATCH_SIZE
-            if publication_ids_for_ta
-            else 0
-        )
-        checkpoint["phases"]["publication_ta_link_upsert"]["total_batches"] = pub_ta_total_batches
-
-        def on_pub_ta_link_batch(batch_num: int, total: int) -> None:
-            checkpoint["phases"]["publication_ta_link_upsert"]["complete_batches"] = batch_num
-            checkpoint["phases"]["publication_ta_link_upsert"]["total_batches"] = total
-            if batch_num % CHECKPOINT_EVERY_N_BATCHES == 0 or batch_num == total:
-                save_checkpoint(checkpoint, ta_slug)
-
-        print("Upserting publication therapeutic area links...")
+        # publication_therapeutic_areas_v2 links + source_therapeutic_area_id backfill, UNGATED over
+        # EVERY persisted pub of this TA. source_ta_id feeds author_pub_flat.source_ta_id, which
+        # drives create_hcps_v2 --ta scoping -- so this is load-bearing, not cosmetic.
+        print("Upserting publication therapeutic area links (ungated)...")
         if is_batch_phase_complete(checkpoint, "publication_ta_link_upsert"):
-            pub_ta_link_count = len(publication_ids_for_ta)
-            print(
-                f"Checkpoint: publication TA link upsert complete "
-                f"({pub_ta_total_batches}/{pub_ta_total_batches} batches); skipping."
-            )
+            pub_ta_link_count = checkpoint["phases"]["publication_ta_link_upsert"].get("total_batches", 0)
+            print("Checkpoint: publication TA link upsert complete; skipping.")
         else:
-            pub_ta_start_batch = checkpoint["phases"]["publication_ta_link_upsert"].get("complete_batches", 0)
-            pub_ta_link_count = upsert_publication_therapeutic_area_links(
-                supabase=supabase,
-                publication_ids=publication_ids_for_ta,
-                therapeutic_area_id=therapeutic_area_id,
-                start_batch=pub_ta_start_batch,
-                on_batch_complete=on_pub_ta_link_batch,
+            pub_ta_link_count = _tag_publications_for_therapeutic_area(
+                supabase, all_pmids, therapeutic_area_id
             )
-            checkpoint["phases"]["publication_ta_link_upsert"]["complete_batches"] = pub_ta_total_batches
+            checkpoint["phases"]["publication_ta_link_upsert"]["complete_batches"] = 1
+            checkpoint["phases"]["publication_ta_link_upsert"]["total_batches"] = 1
             save_checkpoint(checkpoint, ta_slug)
+        funnel["pub_ta_links_upserted"] = pub_ta_link_count
         print(
             f"Upserted {pub_ta_link_count} publication_therapeutic_areas_v2 rows for {query_label}."
         )
-
-        if not dry_run:
-            print(f"Starting second pass author enrichment for {query_label}...")
-            second_pass_count = run_author_enrichment_second_pass(
-                supabase=supabase,
-                session=session,
-                base_url=base_url,
-                email=email,
-                tool_name=tool_name,
-                per_call=per_call,
-                therapeutic_area_id=therapeutic_area_id,
-                ingestion_run_id=ingestion_run_id,
-            )
-            print(
-                f"Second pass upserted {second_pass_count} publication_authors_v2 rows "
-                f"for {query_label}."
-            )
 
     # Emit the authoritative PRIMARY pmid set (batch identity for the orchestrator). Written even
     # when empty (0 primary papers -> empty file), so the caller can distinguish "quiet window,
@@ -2178,9 +1395,54 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         )
         print(f"[pubmed_pipeline] wrote {len(deduped)} primary pmid(s) -> {primary_pmids_out}")
 
+    # HARD GUARD (instrumentation part 3): a stage that consumed candidates AND fetched article
+    # payloads but persisted ~0 publications is the exact silent-loss failure this refactor exists to
+    # kill. Flag any such TA (dry-run and checkpoint-skip runs are exempt: they legitimately write 0).
+    starved = [
+        f for f in ta_funnels
+        if not f["dry_run"]
+        and not f["write_skipped_by_checkpoint"]
+        and f["esearch_candidates"] > 0
+        and f["efetch_articles"] > 0
+        and f["publications_upserted"] == 0
+    ]
+
+    totals = {
+        "esearch_candidates": sum(f["esearch_candidates"] for f in ta_funnels),
+        "efetch_articles": sum(f["efetch_articles"] for f in ta_funnels),
+        "extracted_pmids": sum(f["extracted_pmids"] for f in ta_funnels),
+        "publications_upserted": sum(f["publications_upserted"] for f in ta_funnels),
+        "pub_ta_links_upserted": sum(f["pub_ta_links_upserted"] for f in ta_funnels),
+    }
+    run_summary = {
+        "ingestion_run_id": ingestion_run_id,
+        "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "dry_run": dry_run,
+        "per_ta": ta_funnels,
+        "totals": totals,
+        "starved_tas": [f["ta_slug"] for f in starved],
+    }
+    summary_path = Path(run_summary_out) if run_summary_out else (REPO_ROOT / "pubmed_run_summary.json")
+    try:
+        summary_path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+        print(f"[pubmed_pipeline] wrote run summary -> {summary_path}")
+    except OSError as exc:
+        print(f"[pubmed_pipeline] [warn] could not write run summary to {summary_path}: {exc}")
+
     if dry_run:
         print("Dry run completed.")
         return ingestion_run_id
+
+    if starved:
+        detail = ", ".join(
+            f"{f['ta_slug']}(cand={f['esearch_candidates']}, "
+            f"articles={f['efetch_articles']}, upserted=0)"
+            for f in starved
+        )
+        raise SystemExit(
+            f"[pubmed_pipeline] FAIL: {len(starved)} TA(s) consumed candidates but persisted 0 "
+            f"publications: {detail}. See {summary_path}."
+        )
 
     print("Pipeline run completed.")
     return ingestion_run_id
@@ -2239,6 +1501,15 @@ def main() -> None:
              "This is the authoritative batch identity for the orchestrator -- primary papers only, "
              "NOT second-pass author-history/enrichment pmids. Written even if empty (0 primary "
              "papers -> empty file).",
+    )
+    parser.add_argument(
+        "--run-summary-out",
+        type=str,
+        default=None,
+        metavar="FILE",
+        help="Write the funnel-counter run summary (esearch_candidates/efetch_articles/"
+             "publications_upserted/... per TA + totals) as JSON to FILE. Defaults to "
+             "pubmed_run_summary.json at the repo root. Drives the non-zero-exit hard guard.",
     )
     parser.add_argument(
         "--reset-checkpoint",

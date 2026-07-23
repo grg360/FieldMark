@@ -9,7 +9,7 @@ Last updated: May 26, 2026 EOD
 ## Ingestion (Workstream A — publication-keyed HCPs)
 
 ### `pubmed_pipeline.py`
-Fetches publications from PubMed via E-utilities API using per-TA MeSH queries. Creates publications, publication_authors, and HCP records (publication-keyed). US-affiliation filtered. Origin of Workstream A.
+Fetches publications from PubMed via E-utilities API using per-TA MeSH queries. Persists **publications only** (`publications_v2`, keyed by pubmed_id, with `publication_therapeutic_areas_v2` + `source_therapeutic_area_id` + raw `pubmed_authorships`). Does NOT create HCPs, `publication_authors_v2`, or `hcp_therapeutic_areas_v2` — HCP identity is minted later, OpenAlex-first, by `create_hcps_v2.py`. Origin of Workstream A.
 
 ### `pubmed_backfill_rebuild.py`
 One-time rebuild of PubMed publication ingestion. Handles edge cases the main pipeline missed (older publications, alternative author parsings).
@@ -168,11 +168,12 @@ Generates AI narratives for HCP profiles using Claude API. Writes to hcp_narrati
 ## Run Sequence Cheat Sheet
 
 **Initial data foundation (in order):**
-1. pubmed_pipeline.py → ingest publications + HCPs
-2. openalex_pipeline.py → enrich citations/career data
-3. trials_pipeline.py → ingest clinical trials
-4. nppes_workstream_b_ingest.py → add NPI-keyed HCPs
-5. open_payments_aggregator.py + medicare_aggregator.py → aggregate utilization data
+1. pubmed_pipeline.py → ingest **publications only** (publications_v2; no HCP creation)
+2. openalex_pipeline.py → enrich pubs (authorships) + citations/career data
+3. create_hcps_v2.py → create HCPs OpenAlex-first from the author inventory (runs AFTER OpenAlex enrich; this is where HCP identity is minted)
+4. trials_pipeline.py → ingest clinical trials
+5. nppes_workstream_b_ingest.py → add NPI-keyed HCPs
+6. open_payments_aggregator.py + medicare_aggregator.py → aggregate utilization data
 
 **Linkage layer:**
 6. trial_ta_mapping.py → tag trials by therapeutic area

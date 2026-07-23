@@ -96,32 +96,30 @@ Each phase has: what to run, what to verify, what can break.
 
 ### Phase 1: PubMed publication ingestion
 
-Pulls publications matching the new TA's PubMed query, creates HCP rows for paper authors (via UPSERT on `first_name, last_name, institution`), creates `publications` rows, creates `hcp_therapeutic_areas` linkage.
+> **ARCHITECTURE UPDATE (v2):** `pubmed_pipeline.py` now persists **publications only** — it does NOT
+> create HCPs. HCP identity is resolved OpenAlex-first, AFTER ingestion (Phase 2 → create_hcps_v2.py).
+> The name-UPSERT HCP path described below is removed; the old duplicate-HCP and no-NPI failure modes
+> no longer apply at ingest. Follow `docs/TA_BUILD_GUIDE.md` for the current chain.
+
+Pulls publications matching the new TA's PubMed query into `publications_v2` (keyed by pubmed_id), tagging
+`source_therapeutic_area_id` + `publication_therapeutic_areas_v2` and storing raw `pubmed_authorships`
+(JSONB) for later OpenAlex-driven author resolution. No `hcps_v2` or `hcp_therapeutic_areas_v2` writes.
 
 ```powershell
-python pubmed_pipeline.py
+python scripts/ingest/pubmed_pipeline.py --ta new-ta-slug --reset-checkpoint
 ```
 
 **Verify:**
 
 ```sql
--- How many new HCPs were ingested with this TA tagged?
-SELECT COUNT(DISTINCT hta.hcp_id) AS hcp_count
-FROM hcp_therapeutic_areas hta
-JOIN therapeutic_areas ta ON ta.id = hta.therapeutic_area_id
+-- How many publications were persisted for this TA?
+SELECT COUNT(*) FROM publications_v2 p
+JOIN publication_therapeutic_areas_v2 pta ON pta.publication_id = p.id
+JOIN therapeutic_areas ta ON ta.id = pta.therapeutic_area_id
 WHERE ta.slug = 'new-ta-slug';
-
--- How many publications were ingested?
-SELECT COUNT(*) FROM publications
-WHERE created_at >= '<today_date>';
 ```
 
-Expected: thousands of HCPs, hundreds-to-thousands of publications.
-
-**What can break:**
-
-- **Duplicate HCPs created.** `pubmed_pipeline.py` line 768 uses `on_conflict="first_name,last_name,institution"` for UPSERT. NULL institutions don't match (Postgres NULL ≠ NULL), so HCPs without institution data get duplicated on every run. Mitigation: don't re-run with overlapping queries.
-- **HCPs ingested without NPI.** All PubMed-ingested HCPs have `source = 'publication_ingestion'` and NULL `npi_number`. NPI must be added by Phase 3 (NPI Discovery) or Phase 4 (NPPES Workstream B).
+Expected: hundreds-to-thousands of publications. HCP counts come LATER, after create_hcps_v2.py (Phase 2).
 
 ### Phase 2: NPPES Workstream B ingestion
 
@@ -554,9 +552,9 @@ Documented from real expansion sessions. Watch for these.
 **Cause:** OpenAlex's author disambiguation aggregates multiple real people with the same common name into one OpenAlex author ID.
 **Mitigation:** Anti-inflation guard in Phase 8 Block 1 caps `effective career_pubs` at 2x in-corpus count when ratio exceeds 50x. Lives in this doc and in chat history. **v1.x backlog: extract to versioned SQL file.**
 
-### 2. PubMed-ingested HCPs missing NPI
+### 2. HCPs missing NPI
 **Symptom:** Real canonicals (e.g., academic chairs) show NULL `npi_number`, NULL `nppes_career_stage_years`, NULL engagement data. They score artificially low in Established cohort_score.
-**Cause:** Phase 1 (pubmed_pipeline.py) creates HCPs without NPIs. Phase 2 (NPPES Workstream B) only catches HCPs whose taxonomy is in its filter. Specialties outside the filter never get NPI-matched.
+**Cause:** HCPs are created OpenAlex-first by `create_hcps_v2.py` (Phase 2) without NPIs — pubmed_pipeline.py no longer creates HCPs at all. NPPES Workstream B only catches HCPs whose taxonomy is in its filter; specialties outside the filter never get NPI-matched.
 **Mitigation:** Phase 3 (NPI Discovery via `targeted_nppes_enrichment.py`) catches these. Confirm it ran successfully.
 
 ### 3. UPSERT-without-delete orphan rows
@@ -681,7 +679,7 @@ Cron-runnable. Idempotent. Logged to a refresh history table for audit.
 
 | File | Phase | Purpose |
 |------|-------|---------|
-| `pubmed_pipeline.py` | 1 | PubMed publication + author ingestion |
+| `pubmed_pipeline.py` | 1 | PubMed publication ingestion (publications_v2 only; no HCP creation) |
 | `nppes_workstream_b_ingest.py` | 2 | NPPES individual provider ingestion (taxonomy-filtered) |
 | `targeted_nppes_enrichment.py` | 3 | NPI discovery for publication-ingested HCPs |
 | `nppes_api_backfill.py` | 4 | NPPES taxonomy backfill for HCPs with NPI |

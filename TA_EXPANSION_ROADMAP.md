@@ -102,8 +102,8 @@ Each new TA requires the following work. Estimated 1.5-2.5 weeks per TA with pro
 
 ### Week 1: Data Foundation
 1. **PubMed MeSH query construction** — Define query string (e.g., PUBMED_QUERY_IMMUNOLOGY_US). Test against PubMed. Validate hit count vs expected. (1-2 days)
-2. **Run pubmed_pipeline.py** for the new TA → ingest publications + HCPs. (1 day runtime)
-3. **Run openalex_pipeline.py** + career_enrichment_from_clusters.py for new HCPs. (1-2 day runtime)
+2. **Run pubmed_pipeline.py** for the new TA → ingest **publications only** (no HCPs; keyed by pubmed_id, tags source_therapeutic_area_id + pubmed_authorships). (1 day runtime)
+3. **Create HCPs via the OpenAlex chain** → openalex_pipeline.py (enrich pubs) → build_author_flat.sql → inventory upsert → **create_hcps_v2.py** (OpenAlex-first identity), then career_enrichment_from_clusters.py. HCP identity is minted here, NOT at ingestion. (1-2 day runtime)
 4. **Trial ingestion** — Add TA-relevant ClinicalTrials.gov conditions to trial_ta_mapping.py keyword lists. (0.5 day)
 5. **Run trial_ta_mapping.py** → tag trials. (15 min runtime)
 6. **Run trial_investigator_matcher.py** → link trials to new HCPs. (1-2 hours runtime)

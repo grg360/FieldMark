@@ -199,15 +199,22 @@ def build_ingest_date_args(
 
 def cmd_ingest(
     slug: str, ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
-    primary_pmids_out: Optional[str] = None,
+    primary_pmids_out: Optional[str] = None, run_summary_out: Optional[str] = None,
 ) -> List[str]:
-    cmd = py("pubmed") + ["--ta", slug]
+    # --reset-checkpoint ALWAYS: a stale per-TA checkpoint marks publication_upsert complete by
+    # batch-count without verifying the DB. On resume the writes are skipped, so the batch is lost
+    # (23 vs 368 pubs, proven A/B). Stages are idempotent upserts, so always re-writing is safe;
+    # resuming is not. (The name-based HCP path that made the loss silent is now removed -- ingest
+    # persists publications only -- but re-writing every cycle is still the correct posture.)
+    cmd = py("pubmed") + ["--ta", slug, "--reset-checkpoint"]
     if ingest_limit is not None:
         cmd += ["--limit", str(ingest_limit)]
     if date_args:
         cmd += date_args
     if primary_pmids_out is not None:
         cmd += ["--primary-pmids-out", primary_pmids_out]
+    if run_summary_out is not None:
+        cmd += ["--run-summary-out", run_summary_out]
     return cmd
 
 
@@ -454,6 +461,7 @@ def print_plan(
     T = str(work / "ta_hcp_ids.txt")
     S = str(work / "run_summary.json")
     P = str(work / "primary_pmids.txt")
+    IS = str(work / "ingest_run_summary.json")
     HCP = "<HCP_RUN_ID>"
     PUB = "<PUB_RUN_ID>"
     TAID = "<TA_ID>"
@@ -467,7 +475,7 @@ def print_plan(
         ingest_label += "  [unbounded]"
 
     plan: List[Tuple[str, List[str]]] = [
-        (ingest_label, cmd_ingest(slug, ingest_limit, date_args, P)),
+        (ingest_label, cmd_ingest(slug, ingest_limit, date_args, P, IS)),
         ("   [quiet-week gate] if primary_pmids.txt is EMPTY -> skip whole cycle (incl. all billed OpenAlex), mark SUCCESS/skipped, exit 0", []),
         ("1b openalex enrich pubs -> publications_v2.authorships  [GATE-A: ALL enriched_at IS NULL DOI pubs "
          "= primary + 2nd-pass author-history + any backlog; BILLED, NOT just the ~primary batch]",
@@ -532,6 +540,7 @@ def run_cycle(
     batch_pubs = work / "batch_pubs.txt"
     ta_hcp_ids = work / "ta_hcp_ids.txt"
     run_summary = work / "run_summary.json"
+    ingest_summary = work / "ingest_run_summary.json"  # stage-1 funnel counters + hard-guard summary
     primary_pmids = work / "primary_pmids.txt"  # authoritative batch identity, emitted by stage 1
     snapshot = date.today().isoformat()
     started_at = datetime.now(timezone.utc).isoformat()
@@ -569,7 +578,7 @@ def run_cycle(
         if running(1):
             pub_run_id = run_stage(
                 1, "ingest",
-                cmd_ingest(slug, ingest_limit, date_args, str(primary_pmids)),
+                cmd_ingest(slug, ingest_limit, date_args, str(primary_pmids), str(ingest_summary)),
                 capture_pattern=r"\[pubmed_pipeline\]\s+ingestion_run_id=(\S+)",
             )
             if not pub_run_id:
