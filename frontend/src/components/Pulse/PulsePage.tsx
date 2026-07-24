@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { NSCLC_PULSE } from "../../lib/pulseFixture";
 import { PULSE_COLORS } from "../../lib/pulse";
 import PulseHeader from "./PulseHeader";
+import PulseCaveats from "./PulseCaveats";
 import ConsensusSnapshot from "./ConsensusSnapshot";
 import ThemeList from "./ThemeList";
 
@@ -33,6 +34,9 @@ export default function PulsePage() {
     <div style={pageStyle}>
       <div style={columnStyle}>
         <PulseHeader therapeuticArea={pulse.therapeutic_area} window={pulse.window} />
+        {/* Caveats surfaced up front — the movement-reliability warning must be seen
+            before the reader interprets the theme-list movement figures. */}
+        <PulseCaveats caveats={pulse.caveats} />
         <ConsensusSnapshot themes={pulse.themes} />
         <ThemeList themes={pulse.themes} />
       </div>
