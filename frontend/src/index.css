@@ -2,6 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── FieldMark design tokens ─────────────────────────────────────────────────
+   Single source of truth for type, color, and elevation. Mirrored in
+   src/lib/designTokens.ts for inline-styled components. Dark theme only.
+   See docs/FIELDMARK_DESIGN_SYSTEM.md. */
+:root {
+  /* Typefaces (IBM Plex superfamily; loaded in index.html) */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-serif: 'IBM Plex Serif', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Ground & surfaces (warm near-black) */
+  --ground: #0a0a0a;
+  --surface-well: #0d0c0b;
+  --surface-card: #171512;
+  --surface-raised: #1b1915;
+
+  /* Ink (warm neutral, top-toned whites) */
+  --ink-1: #F4F2EC;
+  --ink-2: #C7C3BA;
+  --ink-3: #928E86;
+  --ink-4: #77736B;
+  --ink-5: #57534b;
+
+  /* Accent — the only accent */
+  --amber: #E8A020;
+  --amber-soft: rgba(232, 160, 32, 0.16);
+
+  /* Secondary — selection, links, bars, secondary actions */
+  --indigo: #5566E8;
+  --indigo-link: #8B93F2;
+  --indigo-soft: rgba(85, 102, 232, 0.12);
+
+  /* Semantic */
+  --est-green: #5FA97E;
+  --violet: #8B78E8;
+  --info: #4FA3C7;
+
+  /* Hairlines — containment only, never separation */
+  --hair: rgba(255, 255, 255, 0.045);
+  --hair-strong: rgba(255, 255, 255, 0.10);
+
+  /* Incomplete-data fill — periods still filling (see design system doc) */
+  --incomplete-data: #4a4632;
+}
+
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
@@ -14,10 +59,79 @@ body {
   min-height: 100dvh;
   margin: 0;
   padding: 0;
-  background-color: #0A0A0B;
-  color: #E8E6DF;
+  background-color: var(--ground);
+  color: #ECEAE4;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Elevation utilities (§Elevation) ────────────────────────────────────────
+   Depth through light logic. Raised surfaces catch a top highlight + soft
+   shadow; recessed surfaces sink with an inner shadow. Hairlines contain a
+   shape; they never separate two cards. */
+.elevation-card {
+  background: var(--surface-card);
+  border-radius: 11px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(255, 255, 255, 0.045),
+    0 12px 26px -18px rgba(0, 0, 0, 0.85);
+}
+
+.elevation-well {
+  background: var(--surface-well);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.elevation-raised {
+  background: var(--surface-raised);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 18px 34px -14px rgba(0, 0, 0, 0.95);
+}
+
+/* Motion is limited to the hover/active elevation transition (≤160ms). */
+.elevation-interactive {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+.elevation-interactive:hover {
+  transform: translateY(-2px);
+  background: var(--surface-raised);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 18px 34px -14px rgba(0, 0, 0, 0.95);
+}
+@media (prefers-reduced-motion: reduce) {
+  .elevation-interactive { transition: none; }
+  .elevation-interactive:hover { transform: none; }
+}
+
+/* Numeric values from the monospace rule (§2): tabular, right-alignable. */
+.fm-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Keyboard focus (visible, indigo — never amber) ──────────────────────────
+   Preflight removes the UA outline; restore a clear ring for keyboard users
+   only, so mouse clicks stay clean. */
+:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
 }
 
 /*

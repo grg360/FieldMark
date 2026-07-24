@@ -1,10 +1,17 @@
 import type { CSSProperties, ReactNode } from "react";
+import { COLOR, FONT } from "../../lib/designTokens";
 
 /**
- * Shared primitives for the admin page. The palette matches the established
- * non-feed pages (WatchlistsPage / FollowUpsPage / PublicationsListPage):
- * #0A0A0B bg, #111113 cards, #1E1E22 borders, #E8E6DF text, #E8A020 accent,
- * monospace for data. No new dependency — plain inline-styled markup.
+ * Shared primitives for the admin page.
+ *
+ * NOTE (design-token migration): the accent and the data font are now sourced
+ * from the design tokens (COLOR.amber, FONT.mono → IBM Plex Mono). The remaining
+ * neutrals below (cool-toned #111113 card / #1E1E22 border / #E8E6DF text) are
+ * the older utility-page palette and DELIBERATELY diverge from the warm design
+ * surfaces (--surface-card #171512, warm inks). They are left as-is: there is no
+ * exact design token for them and force-mapping would visually drift the admin
+ * page with no design reference. Flagged in the report as needing its own token
+ * pass. See docs/FIELDMARK_DESIGN_SYSTEM.md.
  */
 
 export const PALETTE = {
@@ -14,12 +21,12 @@ export const PALETTE = {
   muted: "#9B9892",
   dim: "#6B6A65",
   faint: "#3A3A3F",
-  accent: "#E8A020",
+  accent: COLOR.amber, // token-sourced (identical value to the old #E8A020)
   green: "#4ADE80",
   red: "#F87171",
 } as const;
 
-export const MONO = "monospace";
+export const MONO = FONT.mono;
 
 export function Section({
   title,

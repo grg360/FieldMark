@@ -281,14 +281,16 @@ half-populated bar for a real decline.
 
 **Canonical treatment:** a period that is not yet complete renders its bar in the muted, de-ambered
 fill `--incomplete-data` (`#4a4632`) instead of the live series color (`rgba(232,160,32,0.82)` for
-the amber publication series). No amber, no full saturation — the muted fill reads as “provisional”
-without competing for attention.
+the amber publication series). Complete periods render at **full presence** — bar opacity is not used
+to encode anything on this chart, so a faded bar means exactly one thing: incomplete. The muted fill
+reads as “provisional” without competing for attention.
 
 ```tsx
-// year >= currentYear (and the immediately-prior year, if indexing lag warrants) is provisional.
-const isProjected = p.year >= currentYear - 1;
+// Only the current calendar year is still filling — indexing lag in this corpus is weeks, so the
+// prior year is already complete. Opacity encodes nothing here; the muted fill is the sole cue.
+const isProjected = p.year >= currentYear;
 const barColor = isProjected ? 'var(--incomplete-data)' /* #4a4632 */
-                             : 'rgba(232,160,32,0.82)';   /* live amber series */
+                             : 'rgba(232,160,32,0.82)';   /* live amber series, full presence */
 ```
 
 Apply the same pattern to any surface showing a period that is still accumulating: use
@@ -300,10 +302,12 @@ and — where space allows — label the provisional segment (a caption, a hatch
 > formula (recent papers have few citations → low bar opacity). That was coincidental, not canonical:
 > a genuinely low-but-complete year would also grey out, and a highly-cited recent preprint would
 > not. This treatment is now implemented explicitly in `DetailScreen.tsx` (the Publication Timeline):
-> `isProjected = p.year >= new Date().getFullYear() - 1` drives the `--incomplete-data` fill for the
-> current + prior year, and the hover tooltip labels them “In progress — indexing lag.” It is the
-> canonical incomplete-period treatment going forward; the opacity heuristic still applies to
-> *complete* historical years (as a citation-maturity cue) but no longer governs the provisional ones.
+> `isProjected = p.year >= new Date().getFullYear()` drives the `--incomplete-data` fill for the
+> current year only (the prior year is complete — real indexing lag here is weeks), and the hover
+> tooltip labels it “In progress — indexing lag.” The citation-maturity opacity heuristic is **fully
+> retired**: it overloaded one visual channel (opacity) with two meanings a viewer could not tell
+> apart (maturity vs. incompleteness). Opacity now encodes nothing on this chart; the muted
+> `--incomplete-data` fill is the single, unambiguous cue for “still filling.”
 
 ---
 
