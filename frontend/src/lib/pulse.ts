@@ -1,0 +1,168 @@
+// Scientific Pulse — payload types + pure display logic.
+//
+// The hard product rules live here as pure functions so every component derives
+// them identically (and so they are trivially testable). See the build brief:
+//   1. The 20-count display gate: below it, NEVER show a percentage or a
+//      percentage-change arrow — the number is Poisson noise at that volume.
+//   2. Below the gate, a qualitative label from a fixed vocabulary replaces the arrow.
+//
+// No `any`. Payload shape mirrors sql/04_pulse_payload.sql (prototype: hardcoded
+// in pulseFixture.ts; no API plumbing yet).
+
+export interface PulseWindow {
+  current_start: string;
+  current_end: string;
+  prior_start: string;
+  prior_end: string;
+  lag_days: number;
+  window_days: number;
+}
+
+export interface PulseTotals {
+  current_pubs: number;
+  prior_pubs: number;
+}
+
+export interface PulseTheme {
+  name: string;
+  description: string;
+  cur_pubs: number;
+  prior_pubs: number;
+  lifetime_pubs: number;
+  /** Percent of primary-theme pubs in the current window. May be null. */
+  cur_share: number | null;
+  /** Percent of primary-theme pubs in the prior window. May be null. */
+  prior_share: number | null;
+  // Composition within the current window.
+  reviews: number;
+  trials: number;
+  commentary: number;
+  guidance: number;
+}
+
+export type PulseEventType = "guideline" | "consensus" | "retraction";
+
+export interface PulseEvent {
+  theme: string;
+  type: PulseEventType;
+  title: string;
+  journal: string;
+  date: string;
+}
+
+export interface PulsePayload {
+  therapeutic_area: string;
+  generated_at: string;
+  window: PulseWindow;
+  totals: PulseTotals;
+  themes: PulseTheme[];
+  events: PulseEvent[];
+}
+
+// ── Rule 1: the display gate ────────────────────────────────────────────────
+// A theme below this many current-window publications never shows a percentage
+// or a percentage-change arrow. Absolute count + qualitative label only.
+export const PUBLICATION_GATE = 20;
+
+export function isThemeGated(theme: PulseTheme): boolean {
+  return theme.cur_pubs < PUBLICATION_GATE;
+}
+
+// ── Rule 2: the qualitative vocabulary (exactly these four, nothing else) ────
+export type MovementLabel =
+  | "Increasing attention"
+  | "Steady"
+  | "Decreasing attention"
+  | "Emerging";
+
+// Derived from the count delta only — no numbers in the label. "Emerging" takes
+// precedence: a young theme (lifetime < 600) that is growing is a frontier
+// signal, which is exactly what the audience wants surfaced, so it is labelled
+// as such rather than merely "Increasing attention".
+export function qualitativeLabel(theme: PulseTheme): MovementLabel {
+  const { cur_pubs, prior_pubs, lifetime_pubs } = theme;
+  if (lifetime_pubs < 600 && cur_pubs > prior_pubs) return "Emerging";
+  if (cur_pubs > prior_pubs) return "Increasing attention";
+  if (cur_pubs < prior_pubs) return "Decreasing attention";
+  return "Steady";
+}
+
+// ── Above-gate movement: signed percentage change vs the prior window ────────
+// Null when there is no prior baseline to divide by (a genuinely new theme).
+export function pctChange(cur: number, prior: number): number | null {
+  if (!Number.isFinite(prior) || prior <= 0) return null;
+  return ((cur - prior) / prior) * 100;
+}
+
+export type MovementDirection = "up" | "down" | "flat";
+
+export function movementDirection(cur: number, prior: number): MovementDirection {
+  if (cur > prior) return "up";
+  if (cur < prior) return "down";
+  return "flat";
+}
+
+// ── Formatters ──────────────────────────────────────────────────────────────
+const INT_FMT = new Intl.NumberFormat("en-US");
+
+export function formatInt(n: number): string {
+  return INT_FMT.format(n);
+}
+
+/** Signed percentage, one decimal: +4.2% / -6.0%. */
+export function formatSignedPct(n: number): string {
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(1)}%`;
+}
+
+/** Unsigned share percentage, one decimal, or an em dash for null (Rule 4). */
+export function formatShare(share: number | null): string {
+  if (share == null || !Number.isFinite(share)) return "—";
+  return `${share.toFixed(1)}%`;
+}
+
+// Snapshot denominator (Rule: label the denominator plainly). Attention share is
+// computed over PRIMARY-THEME publications in the window, not all publications —
+// so the denominator is the sum of the themes' current counts.
+export function primaryThemeTotal(themes: PulseTheme[]): number {
+  return themes.reduce((sum, t) => sum + t.cur_pubs, 0);
+}
+
+/** Bar proportion (0–1) from counts — a faithful visual of the count share.
+ *  Uses counts, not the share field, so it is defined even below the gate
+ *  (where the share NUMBER must never be rendered). */
+export function countProportion(theme: PulseTheme, denominator: number): number {
+  if (denominator <= 0) return 0;
+  return theme.cur_pubs / denominator;
+}
+
+// Date formatting for the window line: "Jun 8, 2026" from an ISO date string.
+// Parsed as UTC (no time zone drift on a bare YYYY-MM-DD).
+export function formatWindowDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+export function themesRankedByCurrent(themes: PulseTheme[]): PulseTheme[] {
+  return [...themes].sort((a, b) => b.cur_pubs - a.cur_pubs);
+}
+
+// Shared palette — the live app's values (matches ScoreBreakdownV3 / DemoPage).
+// Centralised so the Pulse components don't scatter magic hex.
+export const PULSE_COLORS = {
+  bg: "#0A0A0B",
+  card: "#141414",
+  cardAlt: "#0D0D10",
+  line: "#1E1E22",
+  text: "#E8E6DF",
+  muted: "#9B9892",
+  mutedDim: "#6B6A65",
+  amber: "#E8A020",
+  indigo: "#5C5FE8",
+} as const;
