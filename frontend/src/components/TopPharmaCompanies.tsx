@@ -198,7 +198,7 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
                       fontSize: 13,
                       color: isActive ? ROW_STYLE.activeTextPrimary : ROW_STYLE.restingTextPrimary,
                       fontWeight: 500,
-                      fontFamily: "system-ui, sans-serif",
+                      fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
                       transition: "color 150ms ease",
                     }}>
                       {entry.manufacturer_clean}
@@ -206,7 +206,7 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
                     <span style={{
                       fontSize: 11,
                       color: isActive ? ROW_STYLE.activeTextSecondary : ROW_STYLE.restingTextSecondary,
-                      fontFamily: "system-ui, sans-serif",
+                      fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
                       transition: "color 150ms ease",
                     }}>
                       {entry.payment_count} {entry.payment_count === 1 ? "payment" : "payments"}
@@ -214,8 +214,13 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
                   </div>
                   <span style={{
                     fontSize: 14,
-                    color: isActive ? ROW_STYLE.activeAmount : ROW_STYLE.restingAmount,
-                    fontFamily: "monospace",
+                    // One-amber rule (§5.5): only the top-paying (dominant) row's amount is amber;
+                    // every other row's amount is neutral.
+                    color: idx === 0
+                      ? (isActive ? ROW_STYLE.activeAmount : ROW_STYLE.restingAmount)
+                      : "#C7C3BA",
+                    fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+                    fontVariantNumeric: "tabular-nums",
                     fontWeight: 500,
                     flexShrink: 0,
                     marginLeft: 12,
@@ -244,7 +249,7 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #1E1E22" }}>
-                    <span style={{ fontSize: 12, color: "#E8E6DF", fontWeight: 500, fontFamily: "system-ui, sans-serif" }}>
+                    <span style={{ fontSize: 12, color: "#E8E6DF", fontWeight: 500, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
                       {entry.manufacturer_clean}
                     </span>
                     <span style={{
@@ -255,23 +260,23 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
                       padding: "2px 7px",
                       borderRadius: 3,
                       letterSpacing: "0.04em",
-                      fontFamily: "system-ui, sans-serif",
+                      fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
                     }}>
                       {status.label}
                     </span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, fontFamily: "system-ui, sans-serif" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
                       <span style={{ color: "#6B6A65" }}>Most recent</span>
-                      <span style={{ color: "#E8E6DF", fontFamily: "monospace" }}>{formatShortDate(entry.most_recent_payment_date)}</span>
+                      <span style={{ color: "#E8E6DF", fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{formatShortDate(entry.most_recent_payment_date)}</span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, fontFamily: "system-ui, sans-serif" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
                       <span style={{ color: "#6B6A65" }}>Total payments</span>
-                      <span style={{ color: "#E8E6DF", fontFamily: "monospace" }}>{entry.payment_count}</span>
+                      <span style={{ color: "#E8E6DF", fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{entry.payment_count}</span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, fontFamily: "system-ui, sans-serif" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
                       <span style={{ color: "#6B6A65" }}>Avg per payment</span>
-                      <span style={{ color: "#E8E6DF", fontFamily: "monospace" }}>{formatCompactDollar(avgPerPayment)}</span>
+                      <span style={{ color: "#E8E6DF", fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{formatCompactDollar(avgPerPayment)}</span>
                     </div>
                   </div>
                 </div>

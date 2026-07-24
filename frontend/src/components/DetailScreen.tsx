@@ -27,6 +27,7 @@ import GlobalFooter from "./GlobalFooter";
 import ContactAccessCard from "./ContactAccessCard";
 import { RIGHT_RAIL_HEADER_STYLE, RIGHT_RAIL_SECTION_STYLE } from "./rightRailStyles";
 import { RISING_STAR_METHODOLOGY } from "../lib/methodologyConfig";
+import { FONT, COLOR } from "../lib/designTokens";
 import { FI_ACCENT_MUTED, mockFieldIntelContributorCount } from "../lib/fieldIntelligenceUi";
 import FieldInsights from "./FieldInsights/FieldInsights";
 import RelationshipSection from "./RelationshipSection/RelationshipSection";
@@ -359,15 +360,21 @@ type EngagementMixSlice = {
   endAngle: number;
 };
 
+// Slice colors are assigned DYNAMICALLY by rank in buildEngagementMixSlices (largest → amber, per
+// §5.5); the `color` here is an unused placeholder kept only to satisfy the shape. slice→category
+// mapping (key/label) is what matters and is stable.
 const ENGAGEMENT_MIX_DEFS: { key: EngagementMixKey; label: string; color: string }[] = [
-  { key: "speakerBureau", label: "Speaker Bureau", color: "#9B6DFF" },
-  { key: "consulting", label: "Consulting", color: "#4ECDC4" },
-  { key: "honoraria", label: "Honoraria", color: "#FFD700" },
-  { key: "education", label: "Education", color: "#7B9EBD" },
-  { key: "royalty", label: "Royalty", color: "#E8A020" },
-  { key: "foodBeverage", label: "Food & Beverage", color: "#4A9D5F" },
-  { key: "travelLodging", label: "Travel & Lodging", color: "#C95E83" },
+  { key: "speakerBureau", label: "Speaker Bureau", color: "#6b6760" },
+  { key: "consulting", label: "Consulting", color: "#6b6760" },
+  { key: "honoraria", label: "Honoraria", color: "#6b6760" },
+  { key: "education", label: "Education", color: "#6b6760" },
+  { key: "royalty", label: "Royalty", color: "#6b6760" },
+  { key: "foodBeverage", label: "Food & Beverage", color: "#6b6760" },
+  { key: "travelLodging", label: "Travel & Lodging", color: "#6b6760" },
 ];
+
+// Non-dominant engagement slices: indigo / green / neutral at restrained saturation.
+const ENGAGEMENT_NON_DOMINANT = ["#5566E8", "#5FA97E", "#7B9EBD", "#8f8b83", "#6b6760", "#4A9D5F"];
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -426,8 +433,13 @@ function buildEngagementMixSlices(mix: HCP["engagementMix"]): EngagementMixSlice
     const startAngle = angle;
     const endAngle = angle + sliceAngle;
     angle = endAngle;
+    // One-amber rule (§5.5): amber goes to the DOMINANT (largest) slice, whatever category that
+    // is for this HCP — not hard-assigned. Every other slice is indigo / green / neutral so
+    // nothing out-shouts the role-1 score numeral. slice→category (label) is unchanged.
+    const color = idx === 0 ? "#E8A020" : ENGAGEMENT_NON_DOMINANT[(idx - 1) % ENGAGEMENT_NON_DOMINANT.length];
     return {
       ...item,
+      color,
       percent: Math.round((item.value / total) * 100),
       startAngle,
       endAngle,
@@ -1195,11 +1207,19 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 className="fm-detail-heading"
-                style={{ fontSize: 18, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}
+                style={{
+                  fontFamily: FONT.sans,
+                  fontSize: 30,
+                  fontWeight: 600,
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.05,
+                  color: "#F4F2EC",
+                  marginBottom: 6,
+                }}
               >
                 {hcp.name}
               </div>
-              <div className="fm-detail-subheading" style={{ fontSize: 14, color: "#6B6A65", marginBottom: 12 }}>
+              <div className="fm-detail-subheading" style={{ fontSize: 13.5, color: "#928E86", marginBottom: 12 }}>
                 <DetailSubline hcp={hcp} />
               </div>
             </div>
@@ -1290,7 +1310,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 }}
               >
                 {saved ? (
-                  <BookmarkCheck size={24} color="#3FB8AF" fill="#3FB8AF" />
+                  <BookmarkCheck size={24} color={COLOR.info} fill={COLOR.info} />
                 ) : (
                   <Bookmark size={24} color="#5A9B7F" />
                 )}
@@ -1331,16 +1351,30 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             </div>
           ) : (
             <>
-              <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                {narrativeSectionLabel(hcp.cohort_classification)}
-              </div>
               <div
                 style={{
-                  borderLeft: `3px solid ${cohortBarColor}`,
-                  paddingLeft: 12,
-                  fontSize: 14,
-                  color: "#E8E6DF",
-                  lineHeight: 1.6,
+                  fontFamily: FONT.sans,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: COLOR.ink4,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.18em",
+                  marginBottom: 14,
+                }}
+              >
+                {narrativeSectionLabel(hcp.cohort_classification)}
+              </div>
+              {/* Thesis rule: 2px amber left rule marks FieldMark's synthesized claim about the
+                  expert (§5 amber use #4). Body is role-7 serif — the editorial voice for the most
+                  valuable, most-skippable content. */}
+              <div
+                style={{
+                  borderLeft: `2px solid ${COLOR.amber}`,
+                  paddingLeft: 16,
+                  fontFamily: FONT.serif,
+                  fontSize: 15,
+                  color: "#BDB9B0",
+                  lineHeight: 1.72,
                 }}
               >
                 {renderNarrative()}
@@ -1357,39 +1391,50 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
               borderBottom: "1px solid #1E1E22",
             }}
           >
-            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+            <div
+              style={{
+                fontFamily: FONT.sans,
+                fontSize: 11,
+                fontWeight: 600,
+                color: COLOR.ink4,
+                textTransform: "uppercase",
+                letterSpacing: "0.18em",
+                marginBottom: 16,
+              }}
+            >
               Signal Summary
             </div>
 
-            <div style={{ borderLeft: `3px solid ${cohortBarColor}`, paddingLeft: 12 }}>
+            {/* Thesis rule (amber) + role-6 micro-labels + role-7 serif body. */}
+            <div style={{ borderLeft: `2px solid ${COLOR.amber}`, paddingLeft: 16 }}>
             {hcp.signal_strength && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontFamily: FONT.sans, fontSize: 10, fontWeight: 600, color: "#6E6A62", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 7 }}>
                   Signal
                 </div>
-                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                <div style={{ fontFamily: FONT.serif, fontSize: 14.5, color: "#BDB9B0", lineHeight: 1.72 }}>
                   {hcp.signal_strength}
                 </div>
               </div>
             )}
 
             {hcp.why_now && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontFamily: FONT.sans, fontSize: 10, fontWeight: 600, color: "#6E6A62", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 7 }}>
                   Why Now
                 </div>
-                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                <div style={{ fontFamily: FONT.serif, fontSize: 14.5, color: "#BDB9B0", lineHeight: 1.72 }}>
                   {hcp.why_now}
                 </div>
               </div>
             )}
 
             {hcp.engagement_angle && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: "#6B6A65", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontFamily: FONT.sans, fontSize: 10, fontWeight: 600, color: "#6E6A62", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 7 }}>
                   Engagement Angle
                 </div>
-                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                <div style={{ fontFamily: FONT.serif, fontSize: 14.5, color: "#BDB9B0", lineHeight: 1.72 }}>
                   {hcp.engagement_angle}
                 </div>
               </div>
@@ -1397,10 +1442,11 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
 
             {hcp.caution_flags && (
               <div>
-                <div style={{ fontSize: 10, color: "#E8A04E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                {/* Caution keeps its amber-orange warn tint — a semantic, not decoration. */}
+                <div style={{ fontFamily: FONT.sans, fontSize: 10, fontWeight: 600, color: "#E8A04E", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 7 }}>
                   Caution
                 </div>
-                <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5 }}>
+                <div style={{ fontFamily: FONT.serif, fontSize: 14.5, color: "#BDB9B0", lineHeight: 1.72 }}>
                   {hcp.caution_flags}
                 </div>
               </div>
@@ -1445,7 +1491,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           <>
             {hcp.paymentsByYear && (
               <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
-                <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                <div style={{ fontFamily: FONT.sans, fontSize: 11, fontWeight: 600, color: COLOR.ink4, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 14 }}>
                   Engagement Timeline
                 </div>
                 <YearBarChart
@@ -1459,7 +1505,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             )}
             {hcp.beneficiariesByYear && (
               <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}>
-                <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+                <div style={{ fontFamily: FONT.sans, fontSize: 11, fontWeight: 600, color: COLOR.ink4, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 14 }}>
                   Patient Volume
                 </div>
                 <YearBarChart
@@ -1477,7 +1523,7 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
             className="fm-detail-section fm-section-publication-timeline"
             style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1E1E22" }}
           >
-            <div style={{ fontSize: 15, color: "#E8E6DF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+            <div style={{ fontFamily: FONT.sans, fontSize: 11, fontWeight: 600, color: COLOR.ink4, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 14 }}>
               Publication timeline
             </div>
             {pubTimelineLoading ? (
@@ -1513,9 +1559,14 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 {pubTimeline.map((p) => {
                   const isActive = tooltip === p.year;
                   const barHeight = p.pubCount === 0 ? 0 : Math.max(2, (p.pubCount / maxValue) * 80);
-                  const citationOpacity = p.pubCount === 0
-                    ? 0
-                    : 0.3 + Math.min(1, p.avgCitations / 30) * 0.7;
+                  // Incomplete-data treatment (design system §7): ONLY the current calendar year is
+                  // still filling (indexing lag in this corpus is weeks, so the prior year is already
+                  // complete). Provisional years render in the muted, de-ambered --incomplete-data
+                  // fill; complete years render in the live series color at full presence. Opacity is
+                  // no longer used to encode anything on this chart — the old citation-maturity
+                  // opacity heuristic is retired, so "faded" means exactly one thing: incomplete.
+                  const isProjected = p.year >= new Date().getFullYear();
+                  const barFill = isProjected ? "var(--incomplete-data)" : cohortBarColor;
                   return (
                     <div
                       key={p.year}
@@ -1555,13 +1606,17 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                           <div style={{ fontSize: 11, fontFamily: "monospace", color: "#6B6A65" }}>
                             avg {p.avgCitations.toFixed(1)} citations
                           </div>
+                          {isProjected && (
+                            <div style={{ fontSize: 10, color: "#8f8b83", marginTop: 2 }}>
+                              In progress — indexing lag
+                            </div>
+                          )}
                         </div>
                       )}
                       <div
                         style={{
                           width: "100%",
-                          backgroundColor: cohortBarColor,
-                          opacity: citationOpacity,
+                          backgroundColor: barFill,
                           height: `${barHeight}px`,
                           marginBottom: 8,
                         }}
@@ -1609,23 +1664,25 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                 <div style={RIGHT_RAIL_HEADER_STYLE}>
                   Identification
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontFamily: "monospace" }}>
+                {/* §2 monospace rule: NPI is an opaque registry identifier → mono/tabular; State
+                    (a place) and Specialty (a category) are language → sans. */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13, fontFamily: FONT.sans }}>
                   {hcp.npiNumber ? (
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#6B6A65" }}>NPI</span>
-                      <span style={{ color: "#E8E6DF" }}>{hcp.npiNumber}</span>
+                      <span style={{ color: "#8f8b83" }}>NPI</span>
+                      <span style={{ color: "#DAD7CF", fontFamily: FONT.mono, fontVariantNumeric: "tabular-nums" }}>{hcp.npiNumber}</span>
                     </div>
                   ) : null}
                   {addressResult ? (
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <span style={{ color: "#6B6A65" }}>{addressResult.label}</span>
-                      <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{addressResult.content}</span>
+                      <span style={{ color: "#8f8b83" }}>{addressResult.label}</span>
+                      <span style={{ color: "#DAD7CF", textAlign: "right", maxWidth: "65%" }}>{addressResult.content}</span>
                     </div>
                   ) : null}
                   {hcp.npiSpecialty ? (
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <span style={{ color: "#6B6A65", flexShrink: 0 }}>Specialty</span>
-                      <span style={{ color: "#E8E6DF", textAlign: "right", maxWidth: "65%" }}>{hcp.npiSpecialty}</span>
+                      <span style={{ color: "#8f8b83", flexShrink: 0 }}>Specialty</span>
+                      <span style={{ color: "#DAD7CF", textAlign: "right", maxWidth: "65%" }}>{hcp.npiSpecialty}</span>
                     </div>
                   ) : null}
                 </div>
@@ -1636,15 +1693,16 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
                     rel="noopener noreferrer"
                     style={{
                       display: "block",
-                      marginTop: 12,
-                      padding: "8px 12px",
+                      marginTop: 14,
+                      padding: "9px 12px",
                       backgroundColor: "transparent",
-                      border: "1px solid #1E1E22",
-                      color: "#6B6A65",
-                      fontSize: 12,
+                      border: "1px solid rgba(255,255,255,0.09)",
+                      color: "#B6B2AA",
+                      fontSize: 12.5,
+                      fontFamily: FONT.sans,
                       textDecoration: "none",
                       textAlign: "center",
-                      borderRadius: 4,
+                      borderRadius: 8,
                     }}
                   >
                     View on NPI Registry →
@@ -1867,16 +1925,15 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
           </div>
 
           <div
+            className="elevation-well"
             style={{
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              borderRadius: 4,
-              padding: 12,
-              marginBottom: 16,
+              padding: "14px 16px",
+              marginBottom: 12,
             }}
           >
-            <div style={{ fontSize: 12, color: "#9B9892", lineHeight: 1.5 }}>
-              Crowdsourced MSL intelligence — coming Q3 2026
+            {/* Honest empty state — no field notes yet, no invented ship date. */}
+            <div style={{ fontSize: 12.5, color: "#8f8b83", lineHeight: 1.5, fontFamily: FONT.sans }}>
+              No field notes yet — add the first.
             </div>
           </div>
 
@@ -1886,10 +1943,11 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
               width: "100%",
               height: 40,
               backgroundColor: "transparent",
-              border: "1px solid #1E1E22",
-              color: "#6B6A65",
-              fontSize: 13,
-              borderRadius: 4,
+              border: "1px dashed rgba(255,255,255,0.12)",
+              color: "#77736B",
+              fontSize: 12.5,
+              fontFamily: FONT.sans,
+              borderRadius: 8,
               cursor: "pointer",
             }}
           >
@@ -1990,14 +2048,15 @@ export default function DetailScreen({ hcp, onBack, onAddNote, onYearPress, taSl
 const fiSecondaryBtnStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
-  background: "rgba(120, 200, 255, 0.08)",
-  border: "1px solid rgba(120, 200, 255, 0.25)",
-  borderRadius: 4,
-  color: "rgba(120, 200, 255, 1)",
+  // Secondary action → indigo (§5), not amber.
+  background: "rgba(85, 102, 232, 0.10)",
+  border: "1px solid rgba(85, 102, 232, 0.35)",
+  borderRadius: 8,
+  color: "#AEB4F5",
   fontSize: 13,
   fontWeight: 500,
   cursor: "pointer",
-  fontFamily: "system-ui, sans-serif",
+  fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
 };
 
 function ValidationField({
@@ -2013,13 +2072,14 @@ function ValidationField({
 }) {
   return (
     <div>
-      <div style={{ fontSize: 12, color: "#9B9892", marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 12, color: "#928E86", marginBottom: 8, fontFamily: FONT.sans }}>{label}</div>
       <div style={{ display: "flex", gap: 6 }}>
         {options.map((opt) => {
           const isSelected = selected === opt;
-          let bgColor = "#0D0D10";
-          let borderColor = "#1E1E22";
-          let textColor = "#6B6A65";
+          // Idle → warm ghost; selected keeps the confirm/partial/dispute traffic-light semantic.
+          let bgColor = "transparent";
+          let borderColor = "rgba(255,255,255,0.08)";
+          let textColor = "#8f8b83";
 
           if (isSelected) {
             if (opt === "Confirms" || opt === "High" || opt === "Strong" || opt === "Accelerating") {
@@ -2047,8 +2107,9 @@ function ValidationField({
                 border: `1px solid ${borderColor}`,
                 color: textColor,
                 fontSize: 12,
+                fontFamily: FONT.sans,
                 padding: "8px 0",
-                borderRadius: 3,
+                borderRadius: 8,
                 cursor: "pointer",
               }}
             >
