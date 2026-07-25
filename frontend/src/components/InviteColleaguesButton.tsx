@@ -3,6 +3,7 @@ import { getMyInvites, primaryInvite, type MyInvite } from "../lib/invites";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import InviteEmailForm from "./HomePage/InviteEmailForm";
 import InviteShareCard from "./HomePage/InviteShareCard";
+import { COLOR, ELEVATION, FONT, TYPE } from "../lib/designTokens";
 
 /**
  * Compact "Invite colleagues" entry point for the top bar, next to the avatar.
@@ -46,22 +47,22 @@ export default function InviteColleaguesButton() {
           display: "inline-flex",
           alignItems: "center",
           gap: 5,
-          background: "rgba(232,160,32,0.10)",
-          border: "1px solid rgba(232,160,32,0.45)",
-          color: "#E8A020",
+          background: COLOR.amberSoft,
+          border: "1px solid rgba(232,160,32,0.45)", // COLOR.amber at 45%
+          color: COLOR.amber,
           borderRadius: 999,
           padding: "5px 12px",
           fontSize: 12,
           fontWeight: 600,
           cursor: "pointer",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: FONT.sans,
           whiteSpace: "nowrap",
           lineHeight: 1,
         }}
       >
         Invites
         {isDesktop ? (
-          <span style={{ color: "#9B9892", fontWeight: 500 }}>· {invite.uses_remaining} left</span>
+          <span style={{ color: COLOR.ink3, fontWeight: 500 }}>· {invite.uses_remaining} left</span>
         ) : null}
       </button>
 
@@ -100,15 +101,13 @@ function InviteModalContent({ invite, onClose }: { invite: MyInvite; onClose: ()
         aria-label="Invite colleagues"
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: "#0D0D10",
-          border: "1px solid #1E1E22",
-          borderRadius: 8,
+          ...ELEVATION.card,
           padding: 24,
           maxWidth: 480,
           width: "100%",
           maxHeight: "calc(100dvh - 32px)",
           overflowY: "auto",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: FONT.sans,
         }}
       >
         <div
@@ -120,15 +119,7 @@ function InviteModalContent({ invite, onClose }: { invite: MyInvite; onClose: ()
             marginBottom: 12,
           }}
         >
-          <div
-            style={{
-              fontSize: 11,
-              color: "#6B6A65",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              fontWeight: 500,
-            }}
-          >
+          <div style={TYPE.microLabel}>
             Invite Colleagues
           </div>
           <button
@@ -138,7 +129,7 @@ function InviteModalContent({ invite, onClose }: { invite: MyInvite; onClose: ()
             style={{
               background: "none",
               border: "none",
-              color: "#6B6A65",
+              color: COLOR.ink4,
               fontSize: 18,
               lineHeight: 1,
               cursor: "pointer",
@@ -149,21 +140,17 @@ function InviteModalContent({ invite, onClose }: { invite: MyInvite; onClose: ()
           </button>
         </div>
 
-        <p style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, margin: "0 0 12px 0" }}>
+        <p style={{ ...TYPE.bodyUI, margin: "0 0 12px 0" }}>
           Share your personal link. Anyone you invite gets FieldMark access — and their own invites to pass on.
         </p>
         <InviteShareCard code={invite.code} usesRemaining={invite.uses_remaining} />
 
         <div
           style={{
-            borderTop: "1px solid #1E1E22",
+            ...TYPE.microLabel,
+            borderTop: `1px solid ${COLOR.hair}`,
             margin: "16px 0 12px",
             paddingTop: 12,
-            fontSize: 11,
-            color: "#6B6A65",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            fontWeight: 500,
           }}
         >
           Or email an invite

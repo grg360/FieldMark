@@ -4,6 +4,7 @@ import SearchBar from "./SearchBar";
 import UserMenu from "./UserMenu";
 import InviteColleaguesButton from "./InviteColleaguesButton";
 import { useMediaQuery } from "../lib/useMediaQuery";
+import { COLOR, FONT } from "../lib/designTokens";
 
 interface TopBarProps {
   onLogoPress?: () => void;
@@ -48,8 +49,8 @@ export default function TopBar({
       className="fm-topbar flex items-center justify-between px-4"
       style={{
         height: 48,
-        borderBottom: "1px solid #1E1E22",
-        backgroundColor: "#0A0A0B",
+        borderBottom: `1px solid ${COLOR.hairStrong}`,
+        backgroundColor: COLOR.ground,
       }}
     >
       <button
@@ -68,9 +69,9 @@ export default function TopBar({
           cursor: onLogoPress ? "pointer" : "default",
           fontSize: 20,
           fontWeight: 500,
-          color: logoHover && onLogoPress ? "#F5D060" : "#E8A020",
+          color: logoHover && onLogoPress ? COLOR.amberHover : COLOR.amber,
           opacity: logoHover && onLogoPress ? 0.92 : 1,
-          fontFamily: "system-ui, sans-serif",
+          fontFamily: FONT.sans,
           minHeight: 0,
           lineHeight: 1,
           letterSpacing: "0.09em",
@@ -96,8 +97,8 @@ export default function TopBar({
             aria-expanded={isSearchOpen}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="7.5" cy="7.5" r="5.5" stroke="#6B6A65" strokeWidth="1.5" />
-              <line x1="11.5" y1="11.5" x2="16" y2="16" stroke="#6B6A65" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="7.5" cy="7.5" r="5.5" stroke={COLOR.ink4} strokeWidth="1.5" />
+              <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={COLOR.ink4} strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
         ) : null}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/authHelpers";
 import { useIsAdmin } from "../lib/useIsAdmin";
+import { COLOR, ELEVATION, FONT, TYPE } from "../lib/designTokens";
 
 export default function UserMenu() {
   const navigate = useNavigate();
@@ -48,8 +49,8 @@ export default function UserMenu() {
           height: 32,
           borderRadius: "50%",
           backgroundColor: "transparent",
-          border: "1.5px solid #E8A020",
-          color: "#E8A020",
+          border: `1.5px solid ${COLOR.amber}`,
+          color: COLOR.amber,
           fontSize: 12,
           fontWeight: 600,
           cursor: "pointer",
@@ -65,14 +66,11 @@ export default function UserMenu() {
       {open ? (
         <div
           style={{
+            ...ELEVATION.card,
             position: "absolute",
             top: 40,
             right: 0,
-            backgroundColor: "#0F0F12",
-            border: "1px solid #1E1E22",
-            borderRadius: 6,
             minWidth: 220,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
             overflow: "hidden",
             zIndex: 100,
           }}
@@ -82,9 +80,10 @@ export default function UserMenu() {
               transition: background-color 120ms;
             }
             .fm-menu-item:hover {
-              background-color: #1E1C26 !important;
+              background-color: ${COLOR.surfaceRaised} !important;
             }
             .fm-menu-signout:hover {
+              /* COLOR.danger (#E8704E) at 8% */
               background-color: rgba(232, 112, 78, 0.08) !important;
             }
           `}</style>
@@ -93,13 +92,14 @@ export default function UserMenu() {
               style={{
                 padding: "10px 12px",
                 fontSize: 12,
-                color: "#9B9892",
-                borderBottom: "1px solid #1E1E22",
+                color: COLOR.ink3,
+                borderBottom: `1px solid ${COLOR.hair}`,
+                fontFamily: FONT.sans,
               }}
             >
               {profile.first_name} {profile.last_name}
               {profile.company ? (
-                <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: COLOR.ink4, marginTop: 2 }}>
                   {profile.company}
                 </div>
               ) : null}
@@ -168,7 +168,7 @@ export default function UserMenu() {
             <span
               style={{
                 fontSize: 10,
-                color: "#6B6A65",
+                color: COLOR.ink4,
                 display: "inline-block",
                 transform: hcpDrawerOpen ? "rotate(90deg)" : "rotate(0deg)",
                 transition: "transform 0.15s ease",
@@ -305,7 +305,7 @@ export default function UserMenu() {
             type="button"
             onClick={() => signOut()}
             className="fm-menu-item fm-menu-signout"
-            style={{ ...menuItemStyle, color: "#E8704E" }}
+            style={{ ...menuItemStyle, color: COLOR.danger }}
           >
             Sign Out
           </button>
@@ -320,11 +320,11 @@ const menuItemStyle: CSSProperties = {
   padding: "6px 12px",
   backgroundColor: "transparent",
   border: "none",
-  color: "#E8E6DF",
+  color: COLOR.ink1,
   fontSize: 13,
   textAlign: "left",
   cursor: "pointer",
-  fontFamily: "system-ui, sans-serif",
+  fontFamily: FONT.sans,
 };
 
 const subMenuItemStyle: CSSProperties = {
@@ -332,33 +332,20 @@ const subMenuItemStyle: CSSProperties = {
   padding: "5px 12px 5px 24px",
   backgroundColor: "transparent",
   border: "none",
-  color: "#C8C5BE",
+  color: COLOR.ink2,
   fontSize: 12,
   textAlign: "left",
   cursor: "pointer",
-  fontFamily: "system-ui, sans-serif",
+  fontFamily: FONT.sans,
 };
 
 const sectionLabelStyle: CSSProperties = {
+  ...TYPE.microLabel,
   padding: "8px 12px 2px",
-  fontSize: 10,
-  fontWeight: 600,
-  color: "#6B6A65",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  fontFamily: "system-ui, sans-serif",
-};
-
-const subsectionLabelStyle: CSSProperties = {
-  padding: "6px 12px 2px",
-  fontSize: 13,
-  fontWeight: 500,
-  color: "#E8E6DF",
-  fontFamily: "system-ui, sans-serif",
 };
 
 const sectionDividerStyle: CSSProperties = {
   height: 1,
-  backgroundColor: "#1E1E22",
+  backgroundColor: COLOR.hair,
   margin: "4px 0",
 };
