@@ -97,6 +97,7 @@ import {
 } from "./lib/routeSlugs";
 import type { CohortFeedResult, HCPDetailResponse, RisingStar } from "./lib/types";
 import DemoPage from "./pages/DemoPage";
+import PulsePage from "./components/Pulse/PulsePage";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
@@ -723,7 +724,7 @@ function FeedLayout({
 
       <DashboardTabs />
 
-      <div style={{ padding: "0 16px 8px", fontSize: 10, fontFamily: "monospace", color: "#3A3A3F" }}>
+      <div style={{ padding: "0 16px 8px", fontSize: 11, fontFamily: "'IBM Plex Mono', ui-monospace, monospace", letterSpacing: "0.08em", color: "#57534b" }}>
         {formatUpdatedLabel()}
       </div>
 
@@ -742,10 +743,11 @@ function FeedLayout({
         <span
           className="fm-section-header-left"
           style={{
-            fontSize: 15,
-            fontWeight: 500,
-            color: "#E8E6DF",
-            fontFamily: "system-ui, sans-serif",
+            fontSize: 30,
+            fontWeight: 600,
+            letterSpacing: "-0.02em",
+            color: "#F4F2EC",
+            fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
           }}
         >
           {formatSectionHeaderLabel()}
@@ -766,12 +768,14 @@ function FeedLayout({
                 }
               }}
               style={{
-                backgroundColor: states.length > 0 ? "rgba(232,160,32,0.1)" : "#0D0D10",
-                border: `1px solid ${states.length > 0 ? "#E8A020" : "#1E1E22"}`,
-                color: states.length > 0 ? "#E8A020" : "#6B6A65",
-                borderRadius: 3,
-                padding: "3px 10px",
-                fontSize: 11,
+                // Territory-active → indigo selection (§5); inactive → warm ghost.
+                backgroundColor: states.length > 0 ? "rgba(85,102,232,0.12)" : "transparent",
+                border: `1px solid ${states.length > 0 ? "rgba(85,102,232,0.5)" : "rgba(255,255,255,0.09)"}`,
+                color: states.length > 0 ? "#AEB4F5" : "#B6B2AA",
+                borderRadius: 8,
+                padding: "5px 12px",
+                fontSize: 12.5,
+                fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
                 cursor: "pointer",
                 marginLeft: 8,
               }}
@@ -786,21 +790,22 @@ function FeedLayout({
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 4,
-                backgroundColor: "#0D0D10",
-                border: "1px solid #1E1E22",
-                borderRadius: 3,
-                padding: "3px 8px",
+                gap: 6,
+                // Landscape control → indigo (navigation, per the design's Landscape button).
+                backgroundColor: "rgba(85,102,232,0.10)",
+                border: "1px solid rgba(85,102,232,0.40)",
+                borderRadius: 8,
+                padding: "5px 12px",
                 cursor: "pointer",
-                fontFamily: "system-ui, -apple-system, sans-serif",
+                fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
               }}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <rect x="0" y="6" width="2" height="4" fill="#6B6A65" />
-                <rect x="4" y="3" width="2" height="7" fill="#6B6A65" />
-                <rect x="8" y="0" width="2" height="10" fill="#6B6A65" />
+                <rect x="0" y="6" width="2" height="4" fill="#AEB4F5" />
+                <rect x="4" y="3" width="2" height="7" fill="#AEB4F5" />
+                <rect x="8" y="0" width="2" height="10" fill="#AEB4F5" />
               </svg>
-              <span style={{ fontSize: 11, color: "#6B6A65" }}>
+              <span style={{ fontSize: 12.5, color: "#AEB4F5" }}>
                 {selectedIndication !== "All" ? `${selectedIndication} Landscape` : "Landscape"}
               </span>
             </button>
@@ -1328,6 +1333,7 @@ export default function App() {
       <TAProvider>
       <Routes>
       <Route path="/demo" element={<DemoPage />} />
+      <Route path="/pulse" element={<PulsePage />} />
       <Route path="/join/:code" element={<SignupScreen />} />
       <Route path="/join" element={<SignupScreen />} />
       <Route

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFilterContext } from "../lib/filter-context";
 import { apiSlugForTaId, getTopInstitutionsInTerritory, type TerritoryInstitution } from "../lib/api";
+import { FONT, COLOR } from "../lib/designTokens";
 
 interface Props {
   taSlug: string;
@@ -41,17 +42,23 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
     <div style={{ margin: "0 16px 16px", overflow: "hidden" }}>
       <div
         style={{
-          fontSize: 11,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "#6B6A65",
-          marginBottom: 8,
+          marginBottom: 12,
           display: "flex",
-          alignItems: "center",
+          alignItems: "baseline",
           justifyContent: "space-between",
         }}
       >
-        <span>
+        {/* Eyebrow role (§type 5): sans, 11/600, 0.18em, --ink-4 */}
+        <span
+          style={{
+            fontFamily: FONT.sans,
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.18em",
+            color: COLOR.ink4,
+          }}
+        >
           {states.length > 0 ? "Institutions in your territory" : "Top institutions"}
         </span>
         <button
@@ -60,17 +67,17 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
           style={{
             background: "none",
             border: "none",
-            color: "#9B9892",
-            fontSize: 11,
+            color: COLOR.indigoLink,
+            fontSize: 12,
             cursor: "pointer",
             padding: 0,
             textDecoration: "none",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "#E8A020";
+            e.currentTarget.style.color = COLOR.indigoLinkHover;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = "#9B9892";
+            e.currentTarget.style.color = COLOR.indigoLink;
           }}
         >
           View all →
@@ -91,39 +98,31 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
             key={inst.slug}
             type="button"
             onClick={() => navigate(`/institution/${inst.slug}?ta=${institutionsSlug}`)}
+            className="elevation-card elevation-interactive"
             style={{
               flexShrink: 0,
               width: 220,
               minHeight: 96,
-              padding: "10px 12px",
-              backgroundColor: "#0F0F12",
-              border: "1px solid #1E1E22",
-              borderRadius: 6,
+              padding: "16px 18px",
               textAlign: "left",
               cursor: "pointer",
-              transition: "background-color 120ms, border-color 120ms",
-              color: "#E8E6DF",
-              fontFamily: "system-ui, sans-serif",
+              color: COLOR.ink1,
+              fontFamily: FONT.sans,
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
-              gap: 6,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#15131A";
-              e.currentTarget.style.borderColor = "#2A2730";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#0F0F12";
-              e.currentTarget.style.borderColor = "#1E1E22";
+              gap: 10,
             }}
           >
+            {/* Card-title treatment at strip scale (the 21px display title would overflow a
+                220px card); the design's own institution-name spec. */}
             <div
               style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: "#E8E6DF",
-                lineHeight: 1.3,
+                fontSize: 13.5,
+                fontWeight: 600,
+                letterSpacing: "-0.005em",
+                color: "#E7E4DC",
+                lineHeight: 1.35,
                 overflow: "hidden",
                 display: "-webkit-box",
                 WebkitLineClamp: 2,
@@ -133,18 +132,26 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
               {inst.institution_name}
             </div>
 
-            <div style={{ display: "flex", gap: 8, fontSize: 11 }}>
-              <span style={{ color: "#9B6DFF", fontWeight: 600 }}>
-                {inst.rising_star_count} RS
+            {/* Counts are mono (data rule); the RS/Est unit labels are sans. Cohort-count
+                coloring kept as-is (rising violet, established amber). */}
+            <div style={{ display: "flex", gap: 14, fontSize: 12.5 }}>
+              <span>
+                <span style={{ fontFamily: FONT.mono, fontWeight: 600, color: "#9B6DFF", fontVariantNumeric: "tabular-nums" }}>
+                  {inst.rising_star_count}
+                </span>
+                <span style={{ color: "#6E6A62" }}> RS</span>
               </span>
-              <span style={{ color: "#E8A020", fontWeight: 600 }}>
-                {inst.established_count} Est
+              <span>
+                <span style={{ fontFamily: FONT.mono, fontWeight: 600, color: "#E8A020", fontVariantNumeric: "tabular-nums" }}>
+                  {inst.established_count}
+                </span>
+                <span style={{ color: "#6E6A62" }}> Est</span>
               </span>
             </div>
 
             {inst.top_rising_star_name ? (
-              <div style={{ fontSize: 11, color: "#6B6A65" }}>
-                Top: <span style={{ color: "#9B9892" }}>{inst.top_rising_star_name}</span>
+              <div style={{ fontSize: 12, color: "#6E6A62" }}>
+                Top: <span style={{ color: "#B6B2AA" }}>{inst.top_rising_star_name}</span>
               </div>
             ) : null}
           </button>

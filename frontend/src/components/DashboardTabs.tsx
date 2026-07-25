@@ -62,9 +62,10 @@ export default function DashboardTabs() {
         const isFieldIntel = t.value === "field-intelligence";
         const isTelescope = t.value === "telescope";
 
-        let activeBg = "#0D0D10";
-        let activeFg = "#6B6A65";
-        let activeBorder = "1px solid #1E1E22";
+        // Idle → warm ghost chip; active states set below.
+        let activeBg = "transparent";
+        let activeFg = "#8f8b83";
+        let activeBorder = "1px solid rgba(255,255,255,0.08)";
 
         if (active) {
           if (isSocial || isTelescope) {
@@ -76,9 +77,11 @@ export default function DashboardTabs() {
             activeFg = "rgba(120, 200, 255, 1)";
             activeBorder = "1px solid rgba(120, 200, 255, 0.35)";
           } else {
-            activeBg = "#E8A020";
-            activeFg = "#0A0A0B";
-            activeBorder = "1px solid #E8A020";
+            // Active cohort → indigo (§5), not amber. Social/telescope/field-intel keep their
+            // own semantic blues above.
+            activeBg = "rgba(85,102,232,0.12)";
+            activeFg = "#AEB4F5";
+            activeBorder = "1px solid rgba(85,102,232,0.50)";
           }
         }
 
@@ -98,7 +101,7 @@ export default function DashboardTabs() {
               color: activeFg,
               fontWeight: active ? 600 : 400,
               fontSize: 12,
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
               cursor: "pointer",
               transition: "background-color 120ms, color 120ms, border-color 120ms",
               whiteSpace: "nowrap",
