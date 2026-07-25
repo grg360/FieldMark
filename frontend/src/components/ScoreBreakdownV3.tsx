@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { EstablishedScoreBreakdown } from "../lib/api";
 import InfoTooltip from "./InfoTooltip";
 import MiniCollaboratorNetwork from "./MiniCollaboratorNetwork";
+import { formatScoreFloor1 } from "../lib/cohort-metrics";
 
 interface ScoreBreakdownV3Props {
   data: EstablishedScoreBreakdown | null;
@@ -44,18 +45,20 @@ export default function ScoreBreakdownV3({ data, loading }: ScoreBreakdownV3Prop
     );
   }
 
-  const cohortScoreDisplay = Math.round(Number(data.cohort_score));
+  // Floor to one decimal (see formatScoreFloor1) — no invented 100 ceiling on US-scope scores.
+  const cohortScoreDisplay = formatScoreFloor1(data.cohort_score);
   const sci = data.scientific;
   const net = data.network;
   const ind = data.industry;
 
   const sectionHeaderStyle: React.CSSProperties = {
-    fontSize: 15,
-    color: "#E8E6DF",
+    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+    fontSize: 11,
+    color: "#77736B",
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    marginBottom: 12,
-    fontWeight: 500,
+    letterSpacing: "0.18em",
+    marginBottom: 14,
+    fontWeight: 600,
   };
 
   const scoreRowStyle: React.CSSProperties = {
@@ -114,7 +117,7 @@ export default function ScoreBreakdownV3({ data, loading }: ScoreBreakdownV3Prop
           style={{
             height: "100%",
             width: `${Math.min(100, Math.max(0, value))}%`,
-            backgroundColor: "#5C5FE8",
+            backgroundColor: "#5566E8",
             borderRadius: 2,
           }}
         />

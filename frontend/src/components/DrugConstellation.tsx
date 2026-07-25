@@ -122,7 +122,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
         <div style={RIGHT_RAIL_HEADER_STYLE}>
           Drug Engagement
         </div>
-        <div style={{ fontSize: 11, color: "#6B6A65", padding: "12px 0", fontFamily: "system-ui, sans-serif" }}>
+        <div style={{ fontSize: 11, color: "#6B6A65", padding: "12px 0", fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
           No payment data available.
         </div>
       </div>
@@ -186,7 +186,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
             gap: 10,
             fontSize: 11,
             color: "#6B6A65",
-            fontFamily: "system-ui, sans-serif",
+            fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
           }}
         >
           {summaryParts.map((part, index) => (
@@ -235,7 +235,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
                     color: "#E8E6DF",
                     fontWeight: 500,
                     textTransform: "uppercase",
-                    fontFamily: "system-ui, sans-serif",
+                    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -252,7 +252,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
                     fontSize: 13,
                     color: "#E8E6DF",
                     textAlign: "right",
-                    fontFamily: "monospace",
+                    fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
                   }}
                 >
                   {formatCurrency(drug.total_amount_usd)}
@@ -269,7 +269,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
                     fontSize: 12,
                     fontWeight: 500,
                     color: trendColor,
-                    fontFamily: "system-ui, sans-serif",
+                    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
                     textAlign: "right",
                   }}
                 >
@@ -286,7 +286,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
                     flexShrink: 0,
                     fontSize: 11,
                     color: "#6B6A65",
-                    fontFamily: "system-ui, sans-serif",
+                    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
                     textAlign: "right",
                   }}
                 >
@@ -324,7 +324,7 @@ export default function DrugConstellation({ hcpId }: DrugConstellationProps) {
           marginTop: 10,
           fontSize: 10,
           color: "#6B6A65",
-          fontFamily: "system-ui, sans-serif",
+          fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
         }}
       >
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>

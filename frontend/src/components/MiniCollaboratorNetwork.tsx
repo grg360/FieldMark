@@ -67,15 +67,17 @@ export default function MiniCollaboratorNetwork({
                 return (
                   <span
                     style={{
-                      fontSize: 9,
+                      // Est chip → muted green (§5); rising → violet (cohort). Tint chips, mono value.
+                      fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+                      fontSize: 9.5,
                       fontWeight: 600,
-                      color: isRisingStar ? "#FFFFFF" : "#0A0A0B",
-                      backgroundColor: isRisingStar ? "#9B6DFF" : "#FFD700",
-                      padding: "1px 5px",
-                      borderRadius: 3,
+                      color: isRisingStar ? "#B9A6F5" : "#7FB58C",
+                      backgroundColor: isRisingStar ? "rgba(155,109,255,0.14)" : "rgba(95,169,126,0.13)",
+                      padding: "2px 6px",
+                      borderRadius: 4,
                       lineHeight: 1.2,
                       flexShrink: 0,
-                      fontFeatureSettings: '"tnum"',
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {isRisingStar ? "RS" : "EST"} {Math.round(c.cohort_score)}
@@ -101,14 +103,14 @@ export default function MiniCollaboratorNetwork({
           <div
             style={{
               fontSize: 11,
-              color: hcpId ? "#9B6DFF" : "#9B9892",
+              // Link → indigo (§5). The shared-paper count is mono (data rule).
+              color: hcpId ? "#8B93F2" : "#9B9892",
               flexShrink: 0,
               marginLeft: 8,
-              fontFeatureSettings: '"tnum"',
               cursor: hcpId ? "pointer" : "default",
               textDecoration: hcpId ? "underline" : "none",
               textUnderlineOffset: 2,
-              textDecorationColor: "#9B6DFF55",
+              textDecorationColor: "#8B93F255",
             }}
             onClick={(e) => {
               if (!hcpId) return;
@@ -116,7 +118,10 @@ export default function MiniCollaboratorNetwork({
               navigate(`/hcp/${hcpId}/publications-with/${c.hcp_id}`);
             }}
           >
-            {c.shared_publications} co-authored papers
+            <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontVariantNumeric: "tabular-nums" }}>
+              {c.shared_publications}
+            </span>{" "}
+            co-authored papers
           </div>
         </button>
       ))}
