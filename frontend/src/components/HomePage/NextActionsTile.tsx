@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NextActionWithHcp } from "../../lib/home";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -52,14 +53,14 @@ function truncate(text: string, maxLen: number): string {
 function renderPriorityGlyph(priority: string): ReactNode {
   if (priority === "high") {
     return (
-      <span style={{ color: "#E8A020", fontSize: 11, lineHeight: 1, flexShrink: 0 }}>
+      <span style={{ color: COLOR.amber, fontSize: 11, lineHeight: 1, flexShrink: 0 }}>
         {String.fromCharCode(0x25B2)}
       </span>
     );
   }
   if (priority === "low") {
     return (
-      <span style={{ color: "#6B6A65", fontSize: 11, lineHeight: 1, flexShrink: 0 }}>
+      <span style={{ color: COLOR.ink4, fontSize: 11, lineHeight: 1, flexShrink: 0 }}>
         {String.fromCharCode(0x2193)}
       </span>
     );
@@ -70,20 +71,20 @@ function renderPriorityGlyph(priority: string): ReactNode {
 function renderDueContext(action: NextActionWithHcp): ReactNode {
   if (action.overdue && action.due_at) {
     return (
-      <span style={{ fontSize: 11, color: "#E8A020", flexShrink: 0, textAlign: "right" }}>
+      <span style={{ fontSize: 11, color: COLOR.amber, flexShrink: 0, textAlign: "right" }}>
         {String.fromCharCode(0x26A0)} {formatDueDate(action.due_at)} {String.fromCharCode(0x00B7)} Overdue
       </span>
     );
   }
   if (action.due_at) {
     return (
-      <span style={{ fontSize: 11, color: "#9B9892", flexShrink: 0, textAlign: "right" }}>
+      <span style={{ fontSize: 11, color: COLOR.ink3, flexShrink: 0, textAlign: "right" }}>
         {formatDueDate(action.due_at)}
       </span>
     );
   }
   return (
-    <span style={{ fontSize: 11, color: "#6B6A65", flexShrink: 0, textAlign: "right" }}>
+    <span style={{ fontSize: 11, color: COLOR.ink4, flexShrink: 0, textAlign: "right" }}>
       No due date
     </span>
   );
@@ -94,23 +95,14 @@ export default function NextActionsTile({ actions }: Props) {
 
   return (
     <HomeTile>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ ...TYPE.eyebrow, marginBottom: 12 }}>
         My Next 3 Actions
       </div>
 
       {actions.length === 0 ? (
         <div>
-          <div style={{ fontSize: 14, color: "#E8E6DF" }}>No actions scheduled yet.</div>
-          <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 4 }}>
+          <div style={{ fontSize: 14, color: COLOR.ink1 }}>No actions scheduled yet.</div>
+          <div style={{ fontSize: 12, color: COLOR.ink4, marginTop: 4 }}>
             Track HCPs and add follow-ups, and your next actions will appear here.
           </div>
         </div>
@@ -130,7 +122,7 @@ export default function NextActionsTile({ actions }: Props) {
               }}
               style={{
                 padding: "12px 0",
-                borderBottom: index < actions.length - 1 ? "1px solid #1E1E22" : "none",
+                borderBottom: index < actions.length - 1 ? `1px solid ${COLOR.hair}` : "none",
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
@@ -142,8 +134,8 @@ export default function NextActionsTile({ actions }: Props) {
                   width: 22,
                   height: 22,
                   borderRadius: "50%",
-                  backgroundColor: "#1E1E22",
-                  color: "#9B9892",
+                  backgroundColor: COLOR.surfaceRaised,
+                  color: COLOR.ink3,
                   fontSize: 11,
                   fontWeight: 600,
                   display: "flex",
@@ -162,7 +154,7 @@ export default function NextActionsTile({ actions }: Props) {
                     style={{
                       fontSize: 14,
                       fontWeight: 500,
-                      color: "#E8E6DF",
+                      color: COLOR.ink1,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -174,7 +166,7 @@ export default function NextActionsTile({ actions }: Props) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#9B9892",
+                    color: COLOR.ink3,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",

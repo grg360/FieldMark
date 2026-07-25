@@ -5,6 +5,7 @@ import type { InstitutionIndexEntry } from "../../lib/api";
 import { getInstitutionsByNames, getPinnedInstitutionsForUser, type PinnedInstitution } from "../../lib/institutionPins";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useTA } from "../../lib/TAContext";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -51,11 +52,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
   const hasMore = pins.length > MAX_VISIBLE;
 
   const titleStyle: CSSProperties = {
-    fontSize: 11,
-    color: "#6B6A65",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    fontWeight: 600,
+    ...TYPE.eyebrow,
     marginBottom: 8,
   };
 
@@ -88,12 +85,12 @@ export default function YourInstitutionsTile({ userId }: Props) {
       </div>
 
       {loading ? (
-        <div style={{ fontSize: 13, color: "#6B6A65", padding: "16px 0", textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: COLOR.ink4, padding: "16px 0", textAlign: "center" }}>
           Loading...
         </div>
       ) : pins.length === 0 ? (
         <div style={{ padding: "16px 0", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#9B9892", marginBottom: 6 }}>
+          <div style={{ fontSize: 13, color: COLOR.ink3, marginBottom: 6 }}>
             No pinned institutions yet.
           </div>
           <button
@@ -102,7 +99,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
             onClick={() => navigate(`/institutions/${dataSlug}`)}
             style={{
               background: "none",
-              border: "1px solid #1E1E22",
+              border: `1px solid ${COLOR.hair}`,
               color: "#9B6DFF",
               fontSize: 12,
               cursor: "pointer",
@@ -135,13 +132,13 @@ export default function YourInstitutionsTile({ userId }: Props) {
                   cursor: "pointer",
                   fontFamily: "inherit",
                   textAlign: "left",
-                  color: "#E8E6DF",
+                  color: COLOR.ink1,
                   fontSize: 13,
                   transition: "background-color 120ms, border-color 120ms",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#15131A";
-                  e.currentTarget.style.borderColor = "#1E1E22";
+                  e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
+                  e.currentTarget.style.borderColor = COLOR.hair;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "transparent";
@@ -154,12 +151,12 @@ export default function YourInstitutionsTile({ userId }: Props) {
                 </span>
                 {stats ? (
                   <span style={{ display: "flex", gap: 8, alignItems: "baseline", flexShrink: 0, fontSize: 12 }}>
-                    <span style={{ color: "#E8E6DF", fontWeight: 600 }}>{stats.investigator_count.toLocaleString()}</span>
+                    <span style={{ ...TYPE.dataValue, fontSize: 12, color: COLOR.ink1 }}>{stats.investigator_count.toLocaleString()}</span>
                     {stats.rising_star_count > 0 ? (
-                      <span style={{ color: "#9B6DFF", fontWeight: 600 }}>{stats.rising_star_count}{String.fromCharCode(0x2605)}</span>
+                      <span style={{ ...TYPE.dataValue, fontSize: 12, color: "#9B6DFF" }}>{stats.rising_star_count}{String.fromCharCode(0x2605)}</span>
                     ) : null}
                     {stats.established_count > 0 ? (
-                      <span style={{ color: "#E8A020", fontWeight: 600 }}>{stats.established_count}</span>
+                      <span style={{ ...TYPE.dataValue, fontSize: 12, color: "#E8A020" }}>{stats.established_count}</span>
                     ) : null}
                   </span>
                 ) : null}
@@ -167,7 +164,7 @@ export default function YourInstitutionsTile({ userId }: Props) {
             );
           })}
           {hasMore ? (
-            <div style={{ fontSize: 11, color: "#6B6A65", padding: "4px 10px" }}>
+            <div style={{ fontSize: 11, color: COLOR.ink4, padding: "4px 10px" }}>
               +{pins.length - MAX_VISIBLE} more
             </div>
           ) : null}
