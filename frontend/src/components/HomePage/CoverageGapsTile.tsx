@@ -5,6 +5,7 @@ import { getHcpOverview } from "../../lib/aiOverviews";
 import { getTrackedHcpsInTerritory, type CoverageGapHcp, type TerritoryCoverageStats, type TrackedHcpChip } from "../../lib/home";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { useTA } from "../../lib/TAContext";
+import { COLOR, FONT, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -110,16 +111,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
   return (
     <HomeTile>
       <style>{`@keyframes fmShimmer { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ ...TYPE.eyebrow, marginBottom: 12 }}>
         Your HCP Portfolio
       </div>
 
@@ -127,16 +119,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
         <>
           {trackedChips.length > 0 ? (
             <div style={{ marginBottom: 16 }}>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "#6B6A65",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  fontWeight: 600,
-                  marginBottom: 8,
-                }}
-              >
+              <div style={{ ...TYPE.microLabel, marginBottom: 8 }}>
                 Tracking ({trackedChips.length})
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
@@ -167,7 +150,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                         fontSize: 11,
                         fontWeight: 500,
                         cursor: "pointer",
-                        fontFamily: "system-ui, -apple-system, sans-serif",
+                        fontFamily: FONT.sans,
                         whiteSpace: "nowrap",
                         transition: "opacity 120ms",
                       }}
@@ -188,6 +171,8 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
           {hasStats ? (() => {
             const opportunitiesRemaining = stats.total_rising_stars_in_territory - stats.tracked_count;
             return (
+              {/* Territory View intentionally NOT migrated in this pass — it entangles
+                  coverage logic with styling and gets its own branch later. */}
               <div style={{ marginBottom: 16 }}>
                 <div
                   style={{
@@ -215,16 +200,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
             );
           })() : null}
 
-          <div
-            style={{
-              fontSize: 10,
-              color: "#6B6A65",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              fontWeight: 500,
-              marginBottom: 8,
-            }}
-          >
+          <div style={{ ...TYPE.microLabel, marginBottom: 8 }}>
             {stats?.territory_label
               ? `Untracked HCPs in the ${stats.territory_label}:`
               : "Untracked HCPs in your territory:"}
@@ -235,7 +211,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
               <div
                 key={gap.hcp_id}
                 style={{
-                  borderBottom: index < gaps.length - 1 ? "1px solid #1E1E22" : "none",
+                  borderBottom: index < gaps.length - 1 ? `1px solid ${COLOR.hair}` : "none",
                 }}
               >
                 <div
@@ -263,7 +239,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                       style={{
                         fontSize: 14,
                         fontWeight: 500,
-                        color: "#E8E6DF",
+                        color: COLOR.ink1,
                         marginBottom: 2,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -275,7 +251,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                     <div
                       style={{
                         fontSize: 12,
-                        color: "#9B9892",
+                        color: COLOR.ink3,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -284,7 +260,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                       {gap.institution ?? "Unknown institution"}
                       {gap.state ? (
                         <>
-                          <span style={{ color: "#6B6A65" }}> {String.fromCharCode(0x00B7)} </span>
+                          <span style={{ color: COLOR.ink4 }}> {String.fromCharCode(0x00B7)} </span>
                           {gap.state}
                         </>
                       ) : null}
@@ -303,8 +279,8 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                                 AI Synthesis
                               </span>
                             </div>
-                            <div style={{ height: 12, background: "linear-gradient(90deg, #1E1E22 0%, #2A2A30 50%, #1E1E22 100%)", borderRadius: 3, width: "85%", animation: "fmShimmer 1.5s infinite" }} />
-                            <div style={{ height: 12, background: "linear-gradient(90deg, #1E1E22 0%, #2A2A30 50%, #1E1E22 100%)", borderRadius: 3, width: "70%", animation: "fmShimmer 1.5s infinite" }} />
+                            <div style={{ height: 12, background: "linear-gradient(90deg, #1b1915 0%, #26221c 50%, #1b1915 100%)", borderRadius: 3, width: "85%", animation: "fmShimmer 1.5s infinite" }} />
+                            <div style={{ height: 12, background: "linear-gradient(90deg, #1b1915 0%, #26221c 50%, #1b1915 100%)", borderRadius: 3, width: "70%", animation: "fmShimmer 1.5s infinite" }} />
                           </div>
                         );
                       }
@@ -335,9 +311,9 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                           </div>
                           <div
                             style={{
-                              fontSize: 12,
-                              color: "#9B9892",
-                              lineHeight: 1.5,
+                              ...TYPE.bodyProse,
+                              fontSize: 13,
+                              lineHeight: 1.6,
                             }}
                           >
                             {overview.body}
@@ -393,7 +369,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                           letterSpacing: "0.05em",
                           lineHeight: 1.2,
                           cursor: trackingId === gap.hcp_id ? "default" : "pointer",
-                          fontFamily: "system-ui, -apple-system, sans-serif",
+                          fontFamily: FONT.sans,
                           opacity: trackingId === gap.hcp_id ? 0.6 : 1,
                         }}
                       >
@@ -404,7 +380,7 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
                 </div>
 
                 {errorByHcp[gap.hcp_id] ? (
-                  <div style={{ fontSize: 11, color: "#E84545", paddingBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: COLOR.danger, paddingBottom: 8 }}>
                     {errorByHcp[gap.hcp_id]}
                   </div>
                 ) : null}
