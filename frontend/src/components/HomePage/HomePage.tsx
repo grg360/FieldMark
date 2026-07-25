@@ -29,6 +29,7 @@ import {
   type TerritoryCoverageStats,
   type TerritoryProfile,
 } from "../../lib/home";
+import { COLOR } from "../../lib/designTokens";
 import AppLayout from "../AppLayout";
 import CoverageGapsTile from "./CoverageGapsTile";
 import HomeHero from "./HomeHero";
@@ -187,7 +188,7 @@ export default function HomePage() {
           <div
             style={{
               fontSize: 15,
-              color: "#6B6A65",
+              color: COLOR.ink4,
               lineHeight: 1.6,
               textAlign: "center",
               padding: "48px 0",

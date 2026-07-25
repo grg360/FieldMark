@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ELEVATION, FONT, SPACE } from "../../lib/designTokens";
 
 interface Props {
   children: ReactNode;
@@ -6,11 +7,9 @@ interface Props {
 }
 
 const baseStyle: CSSProperties = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 6,
-  padding: 20,
-  fontFamily: "system-ui, -apple-system, sans-serif",
+  ...ELEVATION.card,
+  padding: SPACE.xl,
+  fontFamily: FONT.sans,
 };
 
 export default function HomeTile({ children, style }: Props) {
