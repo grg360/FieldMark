@@ -734,6 +734,13 @@ const SLUG_BY_TA_ID: Record<string, string> = Object.fromEntries(
   Object.entries(TA_ID_MAP).map(([slug, id]) => [id, slug]),
 );
 
+// Community qualification gate (read layer), NSCLC ONLY — the 500 patient-volume
+// floor was derived from NSCLC's distribution; other TAs stay ungated until their
+// own distributions are examined (rare disease is inherently low-volume). The
+// leading neq branch makes the predicate a no-op for non-NSCLC rows. Mirrors the
+// gate inside the get_community_filtered RPCs (sql/community_qualification_gate.sql).
+const COMMUNITY_GATE_OR = `therapeutic_area_id.neq.${TA_ID_MAP.nsclc},patient_volume.gte.500,pharma_engagement.gt.0`;
+
 export function apiSlugForTaId(taId: string): string | undefined {
   return SLUG_BY_TA_ID[taId];
 }
@@ -1810,10 +1817,10 @@ export async function getHCPDetail(
           .select("normalized_score, scope_type, scope_value")
           .eq("hcp_id", hcpId)
           .eq("therapeutic_area_id", taId)
-          // Community qualification gate (read layer): a rank row only counts as
-          // Community membership with real clinical/engagement signal. Mirrors
-          // the get_community_filtered RPCs.
-          .or("patient_volume.gte.500,pharma_engagement.gt.0"),
+          // Community qualification gate (read layer, NSCLC only): a rank row
+          // only counts as Community membership with real clinical/engagement
+          // signal. No-op for other TAs via the neq branch.
+          .or(COMMUNITY_GATE_OR),
       ]);
 
       const estData = (estCohort as { data?: Array<Record<string, unknown>> | null }).data ?? [];
@@ -2381,9 +2388,9 @@ export async function getCommunityScoreBreakdown(
       .eq("hcp_id", hcpId)
       .eq("therapeutic_area_id", taId)
       .eq("scope_type", "global")
-      // Community qualification gate (read layer): gated-out HCPs get no
-      // Community scorecard (function returns null below).
-      .or("patient_volume.gte.500,pharma_engagement.gt.0")
+      // Community qualification gate (read layer, NSCLC only): gated-out HCPs
+      // get no Community scorecard (function returns null below).
+      .or(COMMUNITY_GATE_OR)
       .maybeSingle(),
     supabase
       .from("hcp_open_payments_summary_v2")
@@ -2594,11 +2601,11 @@ export async function searchHCPs(
     }
   }
 
-  // Community qualification gate (read layer): hcps_v2.cohort_classification is
-  // denormalized, so a Community-classified match must also pass the board gate
-  // (patient_volume >= 500 OR pharma_engagement > 0 on hcp_community_ranks_v2).
-  // Gated-out HCPs (misclassified academics on the career-stage floor) are
-  // dropped from search results entirely — they have no board to land on.
+  // Community qualification gate (read layer, NSCLC only): hcps_v2.
+  // cohort_classification is denormalized, so a Community-classified match must
+  // also hold at least one qualifying rank row — any non-NSCLC row, or an NSCLC
+  // row passing the gate. Gated-out HCPs (misclassified academics on the
+  // career-stage floor) are dropped from search results entirely.
   const communityIds = [...byHcpId.values()]
     .filter((h) => h.cohortClassification === "community")
     .map((h) => h.id);
@@ -2607,7 +2614,7 @@ export async function searchHCPs(
       .from("hcp_community_ranks_v2")
       .select("hcp_id")
       .in("hcp_id", communityIds)
-      .or("patient_volume.gte.500,pharma_engagement.gt.0");
+      .or(COMMUNITY_GATE_OR);
     const qualified = new Set((gateRows ?? []).map((r) => String(r.hcp_id)));
     for (const id of communityIds) {
       if (!qualified.has(id)) byHcpId.delete(id);

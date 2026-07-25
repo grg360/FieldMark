@@ -1,34 +1,47 @@
--- Community qualification gate — read layer only (applied 2026-07-25).
+-- Community qualification gate — read layer only, NSCLC ONLY (2026-07-25).
 --
--- An HCP qualifies for the Community board only if:
+-- An NSCLC HCP qualifies for the Community board only if:
 --     patient_volume >= 500 OR pharma_engagement > 0
 --
--- Rationale: ~1,414 NSCLC HCPs (and equivalents in other TAs) have zero patient
--- volume AND zero pharma engagement, ranking onto the board via the career-stage
--- floor alone — misclassified academics (Ozols, Karp, Shanafelt), not community
--- clinicians. The 500 floor also removes the sub-500 volume tail scoring on the
--- same floor. NSCLC: 4,722 of 6,480 qualify.
+-- Rationale: ~1,414 NSCLC HCPs have zero patient volume AND zero pharma
+-- engagement, ranking onto the board via the career-stage floor alone —
+-- misclassified academics (Ozols, Karp, Shanafelt), not community clinicians.
+-- The 500 floor also removes the sub-500 volume tail scoring on the same
+-- floor. NSCLC: 4,722 of 6,480 qualify.
 --
--- hcp_community_ranks_v2 / hcp_community_scores_v2 are NOT modified — this is a
--- WHERE clause on reads. Both overloads of both RPCs (legacy 6-param and themed
--- 7-param) carry the gate; the line added to each is:
+-- TA SCOPING: the 500 floor was derived from NSCLC's patient-volume
+-- distribution ONLY. Other TAs are deliberately ungated (rare disease is
+-- inherently low-volume — a blanket 500 floor cut its board by 71%). When a TA
+-- becomes visible, examine its distribution and set its own floor, extending
+-- the predicate per-TA.
 --
---     AND (cr.patient_volume >= 500 OR cr.pharma_engagement > 0)
+-- hcp_community_ranks_v2 / hcp_community_scores_v2 are NOT modified — this is
+-- a WHERE clause on reads. Both overloads of both RPCs (legacy 6-param and
+-- themed 7-param) carry the gate; the line added to each, immediately after
+-- the p_states clause, is:
 --
--- placed immediately after the p_states clause in:
+--     AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid
+--          OR cr.patient_volume >= 500 OR cr.pharma_engagement > 0)
+--
+-- ('c0065b03-…' = NSCLC. The leading <> branch makes the gate a no-op for
+-- every other TA's rows.) Functions carrying the gate:
 --   * public.get_community_filtered(p_ta_id, p_scope_type, p_scope_values, p_states, p_limit, p_offset)
 --   * public.get_community_filtered(p_ta_id, p_scope_type, p_scope_values, p_states, p_canonical_theme_ids, p_limit, p_offset)
 --   * public.get_community_filtered_count(p_ta_id, p_scope_type, p_scope_values, p_states)
 --   * public.get_community_filtered_count(p_ta_id, p_scope_type, p_scope_values, p_states, p_canonical_theme_ids)
 --
--- Applied to the live DB on 2026-07-25 by re-running each function's
--- pg_get_functiondef output with the gate line inserted (CREATE OR REPLACE).
--- To re-apply after a function rebuild, insert the same line after the
--- p_states clause in each overload.
+-- Applied to the live DB on 2026-07-25 via CREATE OR REPLACE on each
+-- function's pg_get_functiondef output. To re-apply after a function rebuild,
+-- insert the same line after the p_states clause in each overload.
 --
--- The same gate exists at the app read layer (all with the identical predicate):
+-- The same TA-scoped predicate exists at the app read layer (as the PostgREST
+-- .or() string `therapeutic_area_id.neq.<nsclc-id>,patient_volume.gte.500,
+-- pharma_engagement.gt.0`, shared constant COMMUNITY_GATE_OR):
 --   frontend/src/lib/api.ts — profile cohort resolution (hcp_community_ranks_v2 read)
 --   frontend/src/lib/api.ts — getCommunityScoreBreakdown (global-scope rank read)
 --   frontend/src/lib/api.ts — searchHCPs (post-filter on community-classified matches)
 --   scripts/narrative/generate_narratives_v2.py — fetch_community_top_hcp_ids (batch)
 --   scripts/narrative/generate_narratives_v2.py — single-HCP community cross-check
+--
+-- Deliberately ungated: scripts/utilities/take_weekly_snapshot.py (archives raw
+-- table state) and watchlist/tracked-HCP chips (user-curated relationships).

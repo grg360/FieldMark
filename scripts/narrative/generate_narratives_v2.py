@@ -153,6 +153,17 @@ ESTABLISHED_DEFAULT_TOP_N = 100
 
 # Pipeline behavior
 COMMUNITY_DEFAULT_TOP_N = 500
+
+# Community qualification gate (read layer), NSCLC ONLY — the 500 patient-volume
+# floor was derived from NSCLC's distribution; other TAs stay ungated until their
+# own distributions are examined. The leading therapeutic_area_id.neq branch makes
+# the predicate a no-op for non-NSCLC rows. Mirrors the get_community_filtered
+# RPCs (sql/community_qualification_gate.sql).
+COMMUNITY_GATE_NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
+COMMUNITY_GATE_OR = (
+    f"therapeutic_area_id.neq.{COMMUNITY_GATE_NSCLC_TA_ID},"
+    "patient_volume.gte.500,pharma_engagement.gt.0"
+)
 API_SLEEP_SECONDS = 0.5
 PROGRESS_EVERY = 25
 MAX_TOKENS_RESPONSE = 600
@@ -724,9 +735,10 @@ def fetch_community_top_hcp_ids(
                 .eq("therapeutic_area_id", ta_id)
                 .eq("scope_type", "region")
                 .eq("scope_value", "US")
-                # Community qualification gate (read layer, mirrors the board RPCs):
-                # no narrative targeting for career-stage-floor-only HCPs.
-                .or_("patient_volume.gte.500,pharma_engagement.gt.0")
+                # Community qualification gate (read layer, NSCLC only, mirrors
+                # the board RPCs): no narrative targeting for NSCLC HCPs on the
+                # career-stage floor alone. No-op for other TAs.
+                .or_(COMMUNITY_GATE_OR)
                 .order("rank", desc=False)
                 .range(0, top_n - 1)
                 .execute()
@@ -1984,22 +1996,24 @@ def run_pipeline(
             f"{hcp_rows[0].get('first_name') or ''} {hcp_rows[0].get('last_name') or ''}"
         ).strip()
         if expected_cohort == "community":
-            # Community qualification gate: refuse single-HCP regeneration for an
-            # HCP the board no longer shows (patient_volume < 500 AND no pharma
-            # engagement) — same read-layer rule as the board RPCs and selector.
+            # Community qualification gate (NSCLC only): refuse single-HCP
+            # regeneration for an HCP the board no longer shows. Qualifies via
+            # any non-NSCLC rank row, or an NSCLC row passing the gate — same
+            # read-layer rule as the board RPCs and the batch selector.
             gate_resp = (
                 supabase.table("hcp_community_ranks_v2")
                 .select("hcp_id")
                 .eq("hcp_id", single_hcp_id)
-                .or_("patient_volume.gte.500,pharma_engagement.gt.0")
+                .or_(COMMUNITY_GATE_OR)
                 .limit(1)
                 .execute()
             )
             if not (gate_resp.data or []):
                 raise ValueError(
-                    f"HCP {single_hcp_id} does not pass the Community qualification "
-                    "gate (patient_volume >= 500 OR pharma_engagement > 0) — "
-                    "excluded from the board, no narrative should be generated."
+                    f"HCP {single_hcp_id} does not pass the NSCLC Community "
+                    "qualification gate (patient_volume >= 500 OR "
+                    "pharma_engagement > 0) — excluded from the board, no "
+                    "narrative should be generated."
                 )
         print(f"Single-HCP mode: {hcp_name or single_hcp_id} ({single_hcp_id})")
         print(f"Cohort cross-check passed: {expected_cohort}")
