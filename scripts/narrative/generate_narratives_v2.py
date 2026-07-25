@@ -1381,9 +1381,12 @@ def format_hcp_facts_community(ctx: HCPContext) -> str:
         lines.append(f"Medicare Patient Volume: {pd['medicare_volume']}th percentile within TA")
     if "career_stage" in pd:
         lines.append(f"Career Stage Score: {pd['career_stage']}th percentile within TA")
-    if ctx.pharma_engagement_lifetime is not None:
+    # Emit engagement facts only when there is real engagement: $0/null lifetime
+    # spend must produce NO engagement lines, or the model asserts engagement
+    # for HCPs who have none.
+    if ctx.pharma_engagement_lifetime:
         lines.append(f"Lifetime Pharma Engagement: ${ctx.pharma_engagement_lifetime:,.0f}")
-    if ctx.pharma_companies_distinct is not None:
+    if ctx.pharma_companies_distinct:
         lines.append(f"Distinct Pharma Companies (lifetime): {ctx.pharma_companies_distinct}")
     return "\n".join(lines)
 
@@ -1697,9 +1700,22 @@ def build_prompt_established(ctx: HCPContext) -> str:
 def build_prompt_community(ctx: HCPContext) -> str:
     """Prompt for Community cohort — active community physician framing."""
     facts = format_hcp_facts(ctx, "community")
+    has_engagement = bool(ctx.pharma_engagement_lifetime)
+    if has_engagement:
+        selection_framing = (
+            "This HCP has been algorithmically selected as a top Community-cohort name within their therapeutic area — a practicing clinician with meaningful patient volume, industry engagement experience, and demonstrated openness to medical affairs interaction. "
+        )
+        no_engagement_rule = ""
+    else:
+        selection_framing = (
+            "This HCP has been algorithmically selected as a top Community-cohort name within their therapeutic area — a practicing clinician with meaningful patient volume. "
+        )
+        no_engagement_rule = (
+            "- IMPORTANT: This HCP has NO recorded pharma engagement data. Ground every field in patient volume and clinical practice ONLY. Do NOT assert or imply industry engagement, engagement history, medical-affairs interaction, sponsored exchange, or openness to industry — no such data exists for this HCP.\n"
+        )
     prompt = (
         "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about an active community physician. "
-        "This HCP has been algorithmically selected as a top Community-cohort name within their therapeutic area — a practicing clinician with meaningful patient volume, industry engagement experience, and demonstrated openness to medical affairs interaction. "
+        + selection_framing +
         "They are NOT framed as a researcher or KOL; they are a practitioner. "
         "The MSL value here is patient-care impact, real-world treatment patterns, and practical clinical perspective — not citation metrics or trial leadership. "
         "Percentile data below is computed within the community cohort in their TA.\n\n"
@@ -1712,8 +1728,17 @@ def build_prompt_community(ctx: HCPContext) -> str:
         '  "caution_flags": "string or null"\n'
         "}\n\n"
         "Constraints:\n"
-        "- narrative: exactly 3 sentences. Frame as an active community physician with patient-care impact and industry engagement experience. Reference practice setting, pharma engagement history, and breadth of industry relationships. Do NOT frame as a researcher or KOL — they're a practitioner.\n"
-        "- why_now: exactly 1 sentence. Why an MSL would engage now — recent prescribing patterns, current engagement breadth, or career-stage signals.\n"
+        + no_engagement_rule +
+        (
+            "- narrative: exactly 3 sentences. Frame as an active community physician with patient-care impact and industry engagement experience. Reference practice setting, pharma engagement history, and breadth of industry relationships. Do NOT frame as a researcher or KOL — they're a practitioner.\n"
+            if has_engagement else
+            "- narrative: exactly 3 sentences. Frame as an active community physician with patient-care impact. Reference practice setting and patient volume. Do NOT frame as a researcher or KOL — they're a practitioner. Do NOT reference pharma engagement or industry relationships.\n"
+        ) +
+        (
+            "- why_now: exactly 1 sentence. Why an MSL would engage now — recent prescribing patterns, current engagement breadth, or career-stage signals.\n"
+            if has_engagement else
+            "- why_now: exactly 1 sentence. Why an MSL would engage now — recent prescribing patterns, patient volume, or career-stage signals; do not cite engagement history.\n"
+        ) +
         "- engagement_angle: exactly 2 sentences. Suggest topics relevant to a community physician's practice — patient case discussion, clinical pearls, real-world evidence rather than basic science. Tone should be practical.\n"
         "- signal_strength: exactly 1 sentence. Honest confidence statement. Community signals are different from research signals — say so if relevant.\n"
         "- caution_flags: 1 sentence OR the JSON literal null. Use null in most cases — high pharma engagement in Community is common and not inherently a flag. Only populate when there is a SPECIFIC actionable concern: engagement breadth so extreme it suggests low signal per relationship (e.g., 30+ companies), evidence of recent inactivity, or specific competitor saturation. Do NOT use this field to hedge.\n"
