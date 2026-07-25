@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getTADisplayName, searchHCPs, type HCPSearchResult } from "../lib/api";
 import { formatScoreFloor1 } from "../lib/cohort-metrics";
+import { COLOR, ELEVATION, FONT, RADIUS, TYPE } from "../lib/designTokens";
 
 interface SearchBarProps {
   isOpen?: boolean;
@@ -70,14 +71,15 @@ function SearchResultRow({
         textAlign: "left",
         background: "transparent",
         border: "none",
-        borderBottom: "1px solid #1E1E22",
+        borderBottom: `1px solid ${COLOR.hair}`,
         borderLeft: "3px solid transparent",
         padding: "10px 12px",
         cursor: "pointer",
+        fontFamily: FONT.sans,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderLeftColor = cohortAccent(cohort);
-        e.currentTarget.style.backgroundColor = "#111113";
+        e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderLeftColor = "transparent";
@@ -86,14 +88,14 @@ function SearchResultRow({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#E8E6DF" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: COLOR.ink1 }}>
             {crossTaLabel ? `${name} — ${crossTaLabel}` : name}
           </div>
           {result.institution ? (
             <div
               style={{
                 fontSize: 12,
-                color: "#6B6A65",
+                color: COLOR.ink4,
                 marginTop: 2,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -121,9 +123,8 @@ function SearchResultRow({
         </div>
         <span
           style={{
+            ...TYPE.dataValue,
             fontSize: 12,
-            fontFamily: "monospace",
-            color: "#6B6A65",
             flexShrink: 0,
           }}
         >
@@ -217,14 +218,21 @@ export default function SearchBar({
   const hasInTa = inCurrentTA.length > 0;
   const hasCrossTa = inOtherTAs.length > 0;
 
+  const helperTextStyle = {
+    ...TYPE.bodyUI,
+    padding: "12px 14px",
+    fontSize: 12,
+    color: COLOR.ink4,
+  };
+
   const dropdownContents = loading ? (
-    <div style={{ padding: "12px 14px", fontSize: 12, color: "#6B6A65" }}>Searching…</div>
+    <div style={helperTextStyle}>Searching…</div>
   ) : trimmed.length < 2 ? (
-    <div style={{ padding: "12px 14px", fontSize: 12, color: "#6B6A65" }}>
+    <div style={helperTextStyle}>
       Type at least 2 characters.
     </div>
   ) : !hasInTa && !hasCrossTa ? (
-    <div style={{ padding: "12px 14px", fontSize: 12, color: "#6B6A65" }}>
+    <div style={helperTextStyle}>
       {`No HCPs match '${trimmed}'.`}
     </div>
   ) : (
@@ -243,12 +251,9 @@ export default function SearchBar({
         <>
           <div
             style={{
+              ...TYPE.microLabel,
               padding: "8px 12px 4px",
-              fontSize: 11,
-              color: "#6B6A65",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              borderTop: hasInTa ? "1px solid #1E1E22" : undefined,
+              borderTop: hasInTa ? `1px solid ${COLOR.hair}` : undefined,
             }}
           >
             Also found in other TAs:
@@ -299,8 +304,8 @@ export default function SearchBar({
               pointerEvents: "none",
             }}
           >
-            <circle cx="7.5" cy="7.5" r="5.5" stroke="#6B6A65" strokeWidth="1.5" />
-            <line x1="11.5" y1="11.5" x2="16" y2="16" stroke="#6B6A65" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="7.5" cy="7.5" r="5.5" stroke={COLOR.ink4} strokeWidth="1.5" />
+            <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={COLOR.ink4} strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           <input
             ref={inputRef}
@@ -316,29 +321,26 @@ export default function SearchBar({
             style={{
               width: "100%",
               height: 32,
-              backgroundColor: "#111113",
-              border: "1px solid #1E1E22",
-              borderRadius: 4,
-              color: "#E8E6DF",
+              backgroundColor: COLOR.surfaceWell,
+              border: `1px solid ${COLOR.hair}`,
+              borderRadius: RADIUS.well,
+              color: COLOR.ink1,
               fontSize: 13,
               padding: "0 12px 0 32px",
               outline: "none",
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: FONT.sans,
             }}
           />
         </div>
         {showDropdown ? (
           <div
             style={{
+              ...ELEVATION.card,
               position: "absolute",
               left: 0,
               right: 0,
               top: "100%",
               marginTop: 4,
-              backgroundColor: "#111113",
-              border: "1px solid #1E1E22",
-              borderRadius: 4,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
               maxHeight: 320,
               overflowY: "auto",
               zIndex: 50,
@@ -357,8 +359,8 @@ export default function SearchBar({
       style={{
         position: "relative",
         zIndex: 50,
-        backgroundColor: "#0A0A0B",
-        borderBottom: "1px solid #1E1E22",
+        backgroundColor: COLOR.ground,
+        borderBottom: `1px solid ${COLOR.hair}`,
         padding: "8px 16px 12px",
       }}
     >
@@ -373,13 +375,14 @@ export default function SearchBar({
           style={{
             flex: 1,
             height: 36,
-            backgroundColor: "#111113",
-            border: "1px solid #1E1E22",
-            borderRadius: 4,
-            color: "#E8E6DF",
+            backgroundColor: COLOR.surfaceWell,
+            border: `1px solid ${COLOR.hair}`,
+            borderRadius: RADIUS.well,
+            color: COLOR.ink1,
             fontSize: 14,
             padding: "0 12px",
             outline: "none",
+            fontFamily: FONT.sans,
           }}
         />
         <button
@@ -389,7 +392,7 @@ export default function SearchBar({
           style={{
             background: "none",
             border: "none",
-            color: "#6B6A65",
+            color: COLOR.ink4,
             fontSize: 18,
             cursor: "pointer",
             padding: 4,
@@ -403,15 +406,12 @@ export default function SearchBar({
       {showDropdown ? (
         <div
           style={{
+            ...ELEVATION.card,
             position: "absolute",
             left: 16,
             right: 16,
             top: "100%",
             marginTop: 4,
-            backgroundColor: "#111113",
-            border: "1px solid #1E1E22",
-            borderRadius: 4,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
             maxHeight: 320,
             overflowY: "auto",
           }}
