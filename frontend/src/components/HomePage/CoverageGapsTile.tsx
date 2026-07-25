@@ -170,9 +170,9 @@ export default function CoverageGapsTile({ gaps, stats, onTrack, refreshTrigger 
 
           {hasStats ? (() => {
             const opportunitiesRemaining = stats.total_rising_stars_in_territory - stats.tracked_count;
+            // Territory View intentionally NOT migrated in this pass — it entangles
+            // coverage logic with styling and gets its own branch later.
             return (
-              {/* Territory View intentionally NOT migrated in this pass — it entangles
-                  coverage logic with styling and gets its own branch later. */}
               <div style={{ marginBottom: 16 }}>
                 <div
                   style={{
