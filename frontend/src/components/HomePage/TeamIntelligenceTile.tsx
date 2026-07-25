@@ -1,5 +1,6 @@
 import { useState } from "react";
 import InviteModal from "./InviteModal";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -20,15 +21,7 @@ export default function TeamIntelligenceTile({ userId }: Props) {
             marginBottom: 12,
           }}
         >
-          <div
-            style={{
-              fontSize: 11,
-              color: "#6B6A65",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              fontWeight: 500,
-            }}
-          >
+          <div style={TYPE.eyebrow}>
             Team Intelligence
           </div>
           <span
@@ -47,13 +40,13 @@ export default function TeamIntelligenceTile({ userId }: Props) {
           </span>
         </div>
 
-        <p style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.5, margin: "0 0 12px 0" }}>
+        <p style={{ fontSize: 13, color: COLOR.ink1, lineHeight: 1.5, margin: "0 0 12px 0" }}>
           No colleagues connected yet.
         </p>
-        <p style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, margin: "0 0 8px 0" }}>
+        <p style={{ fontSize: 13, color: COLOR.ink3, lineHeight: 1.5, margin: "0 0 8px 0" }}>
           Invite teammates to unlock:
         </p>
-        <ul style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.6, margin: "0 0 16px 0", paddingLeft: 20 }}>
+        <ul style={{ fontSize: 13, color: COLOR.ink3, lineHeight: 1.6, margin: "0 0 16px 0", paddingLeft: 20 }}>
           <li>Shared field insights</li>
           <li>Territory coverage visibility</li>
           <li>Cross-account briefing</li>
@@ -67,7 +60,7 @@ export default function TeamIntelligenceTile({ userId }: Props) {
             border: "none",
             padding: 0,
             fontSize: 13,
-            color: "#6B6A65",
+            color: COLOR.ink4,
             cursor: "pointer",
             fontFamily: "inherit",
             display: "inline-flex",

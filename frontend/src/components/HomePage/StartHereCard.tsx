@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, getMslProfile } from "../../lib/authHelpers";
 import { taSlugToLabel } from "../../lib/routeSlugs";
+import { COLOR, ELEVATION, FONT, SPACE, TYPE } from "../../lib/designTokens";
 
 const DISMISS_KEY = "fieldmark_starthere_dismissed";
 
@@ -60,11 +61,9 @@ export default function StartHereCard({ isColdStart }: Props) {
   return (
     <div
       style={{
-        backgroundColor: "#0D0D10",
-        border: "1px solid #1E1E22",
-        borderRadius: 6,
-        padding: 20,
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        ...ELEVATION.card,
+        padding: SPACE.xl,
+        fontFamily: FONT.sans,
       }}
     >
       <div
@@ -76,15 +75,7 @@ export default function StartHereCard({ isColdStart }: Props) {
           marginBottom: 6,
         }}
       >
-        <div
-          style={{
-            fontSize: 11,
-            color: "#E8A020",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            fontWeight: 600,
-          }}
-        >
+        <div style={{ ...TYPE.eyebrow, color: COLOR.amber }}>
           Start here
         </div>
         <button
@@ -94,7 +85,7 @@ export default function StartHereCard({ isColdStart }: Props) {
           style={{
             background: "none",
             border: "none",
-            color: "#6B6A65",
+            color: COLOR.ink4,
             fontSize: 18,
             lineHeight: 1,
             cursor: "pointer",
@@ -105,10 +96,10 @@ export default function StartHereCard({ isColdStart }: Props) {
         </button>
       </div>
 
-      <div style={{ fontSize: 16, fontWeight: 600, color: "#E8E6DF", marginBottom: 6 }}>
+      <div style={{ fontSize: 16, fontWeight: 600, color: COLOR.ink1, marginBottom: 6 }}>
         {firstName ? `Welcome, ${firstName}. ` : "Welcome. "}Get value in 5 minutes.
       </div>
-      <p style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5, margin: "0 0 16px 0" }}>
+      <p style={{ fontSize: 13, color: COLOR.ink3, lineHeight: 1.5, margin: "0 0 16px 0" }}>
         Your {ta} territory is ready. The fastest way to feel FieldMark is to look at a real KOL.
       </p>
 
@@ -133,7 +124,7 @@ export default function StartHereCard({ isColdStart }: Props) {
           Track HCPs in your territory
         </button>
       </div>
-      <p style={{ fontSize: 11, color: "#6B6A65", lineHeight: 1.5, margin: "12px 0 0 0" }}>
+      <p style={{ fontSize: 11, color: COLOR.ink4, lineHeight: 1.5, margin: "12px 0 0 0" }}>
         Untracked HCPs in your territory are listed below in Your HCP Portfolio &mdash; hit + Track to
         build your dashboard.
       </p>
@@ -142,9 +133,9 @@ export default function StartHereCard({ isColdStart }: Props) {
 }
 
 const primaryAction: CSSProperties = {
-  backgroundColor: "rgba(232,160,32,0.1)",
-  border: "1px solid #E8A020",
-  color: "#E8A020",
+  backgroundColor: COLOR.amberSoft,
+  border: `1px solid ${COLOR.amber}`,
+  color: COLOR.amber,
   borderRadius: 4,
   padding: "8px 16px",
   fontSize: 13,
@@ -154,9 +145,9 @@ const primaryAction: CSSProperties = {
 };
 
 const ghostAction: CSSProperties = {
-  backgroundColor: "#0A0A0B",
-  border: "1px solid #1E1E22",
-  color: "#9B9892",
+  backgroundColor: COLOR.surfaceWell,
+  border: `1px solid ${COLOR.hair}`,
+  color: COLOR.ink3,
   borderRadius: 4,
   padding: "8px 16px",
   fontSize: 13,
