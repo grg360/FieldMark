@@ -1809,7 +1809,11 @@ export async function getHCPDetail(
           .from("hcp_community_ranks_v2")
           .select("normalized_score, scope_type, scope_value")
           .eq("hcp_id", hcpId)
-          .eq("therapeutic_area_id", taId),
+          .eq("therapeutic_area_id", taId)
+          // Community qualification gate (read layer): a rank row only counts as
+          // Community membership with real clinical/engagement signal. Mirrors
+          // the get_community_filtered RPCs.
+          .or("patient_volume.gte.500,pharma_engagement.gt.0"),
       ]);
 
       const estData = (estCohort as { data?: Array<Record<string, unknown>> | null }).data ?? [];
@@ -2377,6 +2381,9 @@ export async function getCommunityScoreBreakdown(
       .eq("hcp_id", hcpId)
       .eq("therapeutic_area_id", taId)
       .eq("scope_type", "global")
+      // Community qualification gate (read layer): gated-out HCPs get no
+      // Community scorecard (function returns null below).
+      .or("patient_volume.gte.500,pharma_engagement.gt.0")
       .maybeSingle(),
     supabase
       .from("hcp_open_payments_summary_v2")
@@ -2584,6 +2591,26 @@ export async function searchHCPs(
       existing.therapeuticAreaIds = [
         ...new Set([...existing.therapeuticAreaIds, ...therapeuticAreaIds]),
       ];
+    }
+  }
+
+  // Community qualification gate (read layer): hcps_v2.cohort_classification is
+  // denormalized, so a Community-classified match must also pass the board gate
+  // (patient_volume >= 500 OR pharma_engagement > 0 on hcp_community_ranks_v2).
+  // Gated-out HCPs (misclassified academics on the career-stage floor) are
+  // dropped from search results entirely — they have no board to land on.
+  const communityIds = [...byHcpId.values()]
+    .filter((h) => h.cohortClassification === "community")
+    .map((h) => h.id);
+  if (communityIds.length > 0) {
+    const { data: gateRows } = await supabase
+      .from("hcp_community_ranks_v2")
+      .select("hcp_id")
+      .in("hcp_id", communityIds)
+      .or("patient_volume.gte.500,pharma_engagement.gt.0");
+    const qualified = new Set((gateRows ?? []).map((r) => String(r.hcp_id)));
+    for (const id of communityIds) {
+      if (!qualified.has(id)) byHcpId.delete(id);
     }
   }
 

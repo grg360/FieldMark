@@ -724,6 +724,9 @@ def fetch_community_top_hcp_ids(
                 .eq("therapeutic_area_id", ta_id)
                 .eq("scope_type", "region")
                 .eq("scope_value", "US")
+                # Community qualification gate (read layer, mirrors the board RPCs):
+                # no narrative targeting for career-stage-floor-only HCPs.
+                .or_("patient_volume.gte.500,pharma_engagement.gt.0")
                 .order("rank", desc=False)
                 .range(0, top_n - 1)
                 .execute()
@@ -1980,6 +1983,24 @@ def run_pipeline(
         hcp_name = (
             f"{hcp_rows[0].get('first_name') or ''} {hcp_rows[0].get('last_name') or ''}"
         ).strip()
+        if expected_cohort == "community":
+            # Community qualification gate: refuse single-HCP regeneration for an
+            # HCP the board no longer shows (patient_volume < 500 AND no pharma
+            # engagement) — same read-layer rule as the board RPCs and selector.
+            gate_resp = (
+                supabase.table("hcp_community_ranks_v2")
+                .select("hcp_id")
+                .eq("hcp_id", single_hcp_id)
+                .or_("patient_volume.gte.500,pharma_engagement.gt.0")
+                .limit(1)
+                .execute()
+            )
+            if not (gate_resp.data or []):
+                raise ValueError(
+                    f"HCP {single_hcp_id} does not pass the Community qualification "
+                    "gate (patient_volume >= 500 OR pharma_engagement > 0) — "
+                    "excluded from the board, no narrative should be generated."
+                )
         print(f"Single-HCP mode: {hcp_name or single_hcp_id} ({single_hcp_id})")
         print(f"Cohort cross-check passed: {expected_cohort}")
     else:
