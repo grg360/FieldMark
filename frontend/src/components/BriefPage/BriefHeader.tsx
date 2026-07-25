@@ -1,4 +1,5 @@
 import type { BriefHcp } from "../../lib/briefs";
+import { formatScoreFloor1 } from "../../lib/cohort-metrics";
 
 interface Props {
   hcp: BriefHcp;
@@ -85,7 +86,7 @@ export default function BriefHeader({ hcp, generatedAt, hasRelationship }: Props
               color: "#0A0A0B",
             }}
           >
-            Score {Math.round(hcp.score)}
+            Score {formatScoreFloor1(hcp.score)}
           </span>
         ) : null}
 
