@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import TopBar from "./TopBar";
 import GlobalFooter from "./GlobalFooter";
+import { COLOR, FONT, SPACE } from "../lib/designTokens";
 
 export interface BreadcrumbItem {
   label: string;
@@ -30,16 +31,16 @@ export default function AppLayout({
   return (
     <div
       style={{
-        backgroundColor: "#0A0A0B",
+        backgroundColor: COLOR.ground,
         minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: FONT.sans,
       }}
     >
       <div
         style={{
           maxWidth,
           margin: "0 auto",
-          padding: 16,
+          padding: SPACE.lg,
           width: "100%",
           boxSizing: "border-box",
         }}
@@ -58,7 +59,7 @@ export default function AppLayout({
               alignItems: "center",
               gap: 6,
               fontSize: 12,
-              color: "#9B9892",
+              color: COLOR.ink3,
               marginTop: 16,
               marginBottom: 16,
               flexWrap: "wrap",
@@ -79,25 +80,25 @@ export default function AppLayout({
                       border: "none",
                       padding: 0,
                       fontSize: 12,
-                      color: "#9B9892",
+                      color: COLOR.ink3,
                       cursor: "pointer",
                       fontFamily: "inherit",
                       textDecoration: "none",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.color = "#E8E6DF";
+                      e.currentTarget.style.color = COLOR.ink1;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.color = "#9B9892";
+                      e.currentTarget.style.color = COLOR.ink3;
                     }}
                   >
                     {crumb.label}
                   </button>
                 ) : (
-                  <span style={{ color: "#E8E6DF" }}>{crumb.label}</span>
+                  <span style={{ color: COLOR.ink1 }}>{crumb.label}</span>
                 )}
                 {index < breadcrumbs.length - 1 ? (
-                  <span style={{ color: "#3A3A3F" }}>{String.fromCharCode(0x203a)}</span>
+                  <span style={{ color: COLOR.ink5 }}>{String.fromCharCode(0x203a)}</span>
                 ) : null}
               </span>
             ))}
