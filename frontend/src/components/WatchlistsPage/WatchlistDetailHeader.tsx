@@ -35,7 +35,8 @@ export default function WatchlistDetailHeader({ watchlist, onEdit }: Props) {
               style={{
                 fontSize: 18,
                 fontWeight: 600,
-                color: "#E8E6DF",
+                letterSpacing: "-0.01em",
+                color: "#F2F0EA",
                 margin: 0,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -45,7 +46,7 @@ export default function WatchlistDetailHeader({ watchlist, onEdit }: Props) {
             </h2>
           </div>
           {watchlist.description ? (
-            <p style={{ fontSize: 12, color: "#9B9892", margin: "4px 0 0 0", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12.5, color: "#928E86", margin: "4px 0 0 0", lineHeight: 1.5 }}>
               {watchlist.description}
             </p>
           ) : null}
@@ -54,10 +55,10 @@ export default function WatchlistDetailHeader({ watchlist, onEdit }: Props) {
               display: "inline-block",
               marginTop: 8,
               fontSize: 11,
-              color: "#6B6A65",
-              backgroundColor: "#1E1E22",
-              borderRadius: 3,
-              padding: "2px 8px",
+              color: "#928E86",
+              backgroundColor: "#0d0c0b",
+              borderRadius: 6,
+              padding: "3px 9px",
             }}
           >
             {hcpLabel}

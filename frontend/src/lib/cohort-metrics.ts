@@ -33,6 +33,19 @@ export function formatCohortScore(n: number | null | undefined): string {
 }
 
 /**
+ * Score numeral display: FLOOR to one decimal. A scope that tops out at 99.82 shows 99.8, not an
+ * invented 100 — integer rounding manufactured a ceiling no HCP earned and collapsed the top-cluster
+ * spread. 100.0 shows only where a scope genuinely reaches it. Display layer only: the stored
+ * cohort_score / rising_star_percentile keep full precision.
+ * Use for Established (cohort_score) and Rising Star (rising_star_percentile) ONLY — never for the
+ * three sub-scores (Scientific/Network/Pharma stay integers), community, or any raw momentum score.
+ */
+export function formatScoreFloor1(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return (Math.floor(Number(n) * 10) / 10).toFixed(1);
+}
+
+/**
  * Assumes normalized_score is a 0–100 percentile where higher = stronger;
  * maps to a "Top X%" label (e.g. 93 → Top 7%).
  */

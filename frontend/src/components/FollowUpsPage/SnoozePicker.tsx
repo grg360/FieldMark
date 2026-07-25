@@ -32,10 +32,10 @@ function dateToIso(date: Date): string {
 }
 
 const chipStyle = {
-  backgroundColor: "#1E1E22",
+  backgroundColor: "#0d0c0b",
   color: "#E8E6DF",
-  border: "1px solid #2A2A30",
-  borderRadius: 6,
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: 8,
   padding: "8px 14px",
   fontSize: 13,
   cursor: "pointer",
@@ -116,9 +116,9 @@ export default function SnoozePicker({ onSnooze, onCancel }: Props) {
       {showCustom ? (
         <div
           style={{
-            backgroundColor: "#0D0D10",
-            border: "1px solid #1E1E22",
-            borderRadius: 6,
+            backgroundColor: "#0d0c0b",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 8,
             padding: 8,
             display: "inline-block",
             // @ts-expect-error CSS custom properties for react-day-picker
@@ -133,7 +133,7 @@ export default function SnoozePicker({ onSnooze, onCancel }: Props) {
             onSelect={(date) => handleCustomSelect(date)}
             styles={{
               caption: { color: "#E8E6DF", fontSize: 13 },
-              day: { color: "#E8E6DF", fontSize: 13, fontFamily: "system-ui, -apple-system, sans-serif" },
+              day: { color: "#E8E6DF", fontSize: 13, fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif" },
               head_cell: { color: "#9B9892" },
               nav_button: { color: "#9B9892" },
             }}

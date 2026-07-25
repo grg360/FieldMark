@@ -50,25 +50,27 @@ export default function FilterButton({ onClick, taSlug }: FilterButtonProps) {
       onClick={onClick}
       aria-label={count > 0 ? `Open filters, ${count} active` : "Open filters"}
       style={{
+        // Active-filter state keeps its coral semantic; idle → warm ghost matching the
+        // All US / Landscape controls.
         background: count > 0 ? "rgba(216, 90, 48, 0.10)" : "transparent",
-        border: count > 0 ? "1px solid rgba(216, 90, 48, 0.40)" : "1px solid transparent",
-        padding: "6px 10px 6px 8px",
+        border: count > 0 ? "1px solid rgba(216, 90, 48, 0.40)" : "1px solid rgba(255,255,255,0.09)",
+        padding: "5px 12px 5px 10px",
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
         gap: 6,
-        borderRadius: 3,
+        borderRadius: 8,
         position: "relative",
         transition: "background-color 150ms ease, border-color 150ms ease, color 150ms ease",
         flexShrink: 0,
       }}
     >
       <svg
-        width="20"
-        height="20"
+        width="18"
+        height="18"
         viewBox="0 0 24 24"
         fill="none"
-        stroke={count > 0 ? "#D85A30" : "#6B6A65"}
+        stroke={count > 0 ? "#D85A30" : "#B6B2AA"}
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -79,9 +81,9 @@ export default function FilterButton({ onClick, taSlug }: FilterButtonProps) {
       </svg>
       <span
         style={{
-          fontSize: 11,
-          color: count > 0 ? "#D85A30" : "#6B6A65",
-          fontFamily: "system-ui, sans-serif",
+          fontSize: 12.5,
+          color: count > 0 ? "#D85A30" : "#B6B2AA",
+          fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
           transition: "color 150ms ease",
         }}
       >

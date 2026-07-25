@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import type { LandscapePoint } from "../lib/api";
+import { formatScoreFloor1 } from "../lib/cohort-metrics";
 
 interface Props {
   points: LandscapePoint[];
@@ -79,8 +80,8 @@ function CustomTooltip({
           {point.archetype}
         </div>
       )}
-      <div>Momentum: {Math.round(point.momentum_composite)}</div>
-      <div>Visibility: {Math.round(point.visibility_composite)}</div>
+      <div>Momentum: {formatScoreFloor1(point.momentum_composite)}</div>
+      <div>Visibility: {formatScoreFloor1(point.visibility_composite)}</div>
       <div>Rank #{point.us_rank} US</div>
     </div>
   );

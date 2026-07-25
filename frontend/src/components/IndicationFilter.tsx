@@ -189,17 +189,18 @@ export default function IndicationFilter({
             className="fm-indication-chip"
             style={{
               flexShrink: 0,
-              padding: "6px 12px",
-              borderRadius: 4,
+              padding: "6px 14px",
+              borderRadius: 8,
               fontSize: 12,
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
               cursor: "pointer",
               whiteSpace: "nowrap",
-              background: isSelected ? "rgba(120, 200, 255, 0.12)" : "transparent",
+              // Active indication selection → indigo (§5); idle → warm ghost.
+              background: isSelected ? "rgba(85,102,232,0.12)" : "transparent",
               border: isSelected
-                ? "1px solid rgba(120, 200, 255, 0.4)"
-                : "1px solid #1E1E22",
-              color: isSelected ? "rgba(120, 200, 255, 1)" : "#6B6A65",
+                ? "1px solid rgba(85,102,232,0.50)"
+                : "1px solid rgba(255,255,255,0.08)",
+              color: isSelected ? "#AEB4F5" : "#8f8b83",
               transition: "all 0.15s ease",
               display: "flex",
               alignItems: "center",

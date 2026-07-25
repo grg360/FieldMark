@@ -126,8 +126,8 @@ export default function FollowUpRow({
     padding: "8px 16px",
     minHeight: 32,
     backgroundColor: "transparent",
-    border: "1px solid #1E1E22",
-    borderRadius: 6,
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 8,
     fontSize: 13,
     fontWeight: 500,
     color: "#E8E6DF",
@@ -138,16 +138,15 @@ export default function FollowUpRow({
 
   return (
     <div
+      className="elevation-card"
       style={{
-        backgroundColor: "#0D0D10",
-        borderRadius: 8,
         padding: "16px 20px",
         borderLeft: stripe ? `3px solid ${stripe}` : undefined,
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: sourceConfig ? 8 : 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#E8E6DF", lineHeight: 1.3 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", lineHeight: 1.3 }}>
             {row.hcp.name}
           </div>
           {row.hcp.institution ? (
@@ -274,7 +273,7 @@ export default function FollowUpRow({
             fontSize: 13,
             fontWeight: 500,
             cursor: pending ? "default" : "pointer",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
             opacity: pending ? 0.6 : 1,
           }}
         >
@@ -296,7 +295,7 @@ export default function FollowUpRow({
               fontSize: 13,
               fontWeight: 500,
               cursor: pending ? "default" : "pointer",
-              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
             }}
           >
             View Source Brief
@@ -316,7 +315,7 @@ export default function FollowUpRow({
               fontSize: 13,
               fontWeight: 500,
               cursor: pending ? "default" : "pointer",
-              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
             }}
           >
             Generate Brief

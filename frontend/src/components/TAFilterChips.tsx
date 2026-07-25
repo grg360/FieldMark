@@ -68,15 +68,16 @@ export default function TAFilterChips({ selected, onSelect }: TAFilterChipsProps
             className="fm-ta-chip"
             style={{
               flexShrink: 0,
-              padding: "6px 12px",
-              borderRadius: 4,
+              padding: "6px 14px",
+              borderRadius: 8,
               fontSize: 14,
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
               cursor: "pointer",
               whiteSpace: "nowrap",
-              background: isSelected ? "#1A1A1E" : "transparent",
-              border: isSelected ? "1px solid #E8A020" : "1px solid #16161A",
-              color: isSelected ? "#E8A020" : "#3A3A3F",
+              // Selection → indigo (§5: amber stays scarce for the score numeral / brand); idle → warm ghost.
+              background: isSelected ? "rgba(85,102,232,0.12)" : "transparent",
+              border: isSelected ? "1px solid rgba(85,102,232,0.50)" : "1px solid rgba(255,255,255,0.08)",
+              color: isSelected ? "#AEB4F5" : "#8f8b83",
               transition: "all 0.15s ease",
               opacity: 1,
             }}

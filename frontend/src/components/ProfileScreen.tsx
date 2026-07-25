@@ -106,8 +106,8 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
         width: 36,
         height: 20,
         borderRadius: 10,
-        backgroundColor: on ? "#0A1F16" : "#1E1E22",
-        border: on ? "1px solid #1D9E75" : "1px solid #1E1E22",
+        backgroundColor: on ? "#0A1F16" : "#1c1b18",
+        border: on ? "1px solid #1D9E75" : "1px solid rgba(255,255,255,0.12)",
         position: "relative",
         cursor: "pointer",
         transition: "background-color 150ms, border-color 150ms",
@@ -262,13 +262,13 @@ export default function ProfileScreen() {
   }
 
   return (
-    <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif" }}>
       {/* Nav bar */}
       <div
         className="fm-nav"
         style={{
           height: 48,
-          borderBottom: "1px solid #1E1E22",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -301,13 +301,13 @@ export default function ProfileScreen() {
 
       <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
         {/* Profile header */}
-        <div style={{ padding: "24px 16px 16px", borderBottom: "1px solid #1E1E22", display: "flex", flexDirection: "column", alignItems: "center", gridColumn: "1 / -1" }}>
+        <div style={{ padding: "24px 16px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", alignItems: "center", gridColumn: "1 / -1" }}>
           <div
             style={{
               width: 56,
               height: 56,
               borderRadius: "50%",
-              backgroundColor: "#1A1A1E",
+              backgroundColor: "#171512",
               border: "1px solid #E8A020",
               display: "flex",
               alignItems: "center",
@@ -320,7 +320,7 @@ export default function ProfileScreen() {
                 : "??"}
             </span>
           </div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginTop: 12, textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", marginTop: 12, textAlign: "center" }}>
             {profile?.first_name && profile?.last_name
               ? `${profile.first_name} ${profile.last_name}`
               : "..."}
@@ -336,8 +336,8 @@ export default function ProfileScreen() {
                 display: "flex",
                 alignItems: "center",
                 gap: 4,
-                backgroundColor: "#0D0D10",
-                border: "1px solid #1E1E22",
+                backgroundColor: "#0d0c0b",
+                border: "1px solid rgba(255,255,255,0.08)",
                 borderRadius: 3,
                 padding: "4px 12px",
               }}
@@ -349,12 +349,12 @@ export default function ProfileScreen() {
         </div>
 
         <div className="fm-profile-body">
-          <div className="fm-profile-col-left" style={{ borderBottom: "1px solid #1E1E22" }}>
+          <div className="fm-profile-col-left" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             <div style={{ padding: "20px 16px 16px" }}>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginBottom: 16 }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginBottom: 16 }}>
                 Default view
               </div>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginBottom: 8 }}>
                 Therapeutic area
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -366,8 +366,8 @@ export default function ProfileScreen() {
                       type="button"
                       onClick={() => handleTAChange(ta)}
                       style={{
-                        backgroundColor: isSelected ? "#0D0D0A" : "#111113",
-                        border: `1px solid ${isSelected ? "#E8A020" : "#1E1E22"}`,
+                        backgroundColor: isSelected ? "#0D0D0A" : "#171512",
+                        border: `1px solid ${isSelected ? "#E8A020" : "rgba(255,255,255,0.10)"}`,
                         color: isSelected ? "#E8A020" : "#E8E6DF",
                         borderRadius: 4,
                         padding: "10px 12px",
@@ -382,7 +382,7 @@ export default function ProfileScreen() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginTop: 16, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginTop: 16, marginBottom: 8 }}>
                 Default indication
               </div>
               <div
@@ -404,8 +404,8 @@ export default function ProfileScreen() {
                       onClick={() => setSelectedIndication(chip)}
                       style={{
                         flexShrink: 0,
-                        backgroundColor: isSelected ? "#0D0D0A" : "#0D0D10",
-                        border: `1px solid ${isSelected ? "#E8A020" : "#1E1E22"}`,
+                        backgroundColor: isSelected ? "#0D0D0A" : "#0d0c0b",
+                        border: `1px solid ${isSelected ? "#E8A020" : "rgba(255,255,255,0.10)"}`,
                         color: isSelected ? "#E8A020" : "#6B6A65",
                         borderRadius: 3,
                         padding: "6px 12px",
@@ -424,11 +424,11 @@ export default function ProfileScreen() {
           </div>
 
           <div className="fm-profile-col-right">
-            <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1E1E22" }}>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginBottom: 16 }}>
+            <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginBottom: 16 }}>
                 Territory
               </div>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginBottom: 8 }}>
                 Region
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -440,8 +440,8 @@ export default function ProfileScreen() {
                       type="button"
                       onClick={() => handleRegionChange(region)}
                       style={{
-                        backgroundColor: isSelected ? "#0D0D0A" : "#0D0D10",
-                        border: `1px solid ${isSelected ? "#E8A020" : "#1E1E22"}`,
+                        backgroundColor: isSelected ? "#0D0D0A" : "#0d0c0b",
+                        border: `1px solid ${isSelected ? "#E8A020" : "rgba(255,255,255,0.10)"}`,
                         color: isSelected ? "#E8A020" : "#6B6A65",
                         borderRadius: 3,
                         padding: "6px 12px",
@@ -455,17 +455,17 @@ export default function ProfileScreen() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginTop: 16, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginTop: 16, marginBottom: 8 }}>
                 States covered
               </div>
               <div
                 style={{
-                  backgroundColor: "#0D0D10",
-                  border: "1px solid #1E1E22",
+                  backgroundColor: "#0d0c0b",
+                  border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 4,
                   padding: "8px 12px",
                   fontSize: 13,
-                  fontFamily: "monospace",
+                  fontFamily: "'IBM Plex Mono', monospace",
                   color: "#E8E6DF",
                 }}
               >
@@ -474,8 +474,8 @@ export default function ProfileScreen() {
               <div style={{ fontSize: 11, color: "#3A3A3F", marginTop: 8 }}>Changes here propagate to Coverage Gaps and territory-scoped surfaces.</div>
             </div>
 
-            <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1E1E22" }}>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginBottom: 16 }}>
+            <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginBottom: 16 }}>
                 Notifications
               </div>
               {[
@@ -490,7 +490,7 @@ export default function ProfileScreen() {
                     alignItems: "center",
                     justifyContent: "space-between",
                     minHeight: 44,
-                    borderBottom: i < arr.length - 1 ? "1px solid #1E1E22" : "none",
+                    borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
                     paddingTop: i === 0 ? 0 : 12,
                     paddingBottom: i < arr.length - 1 ? 12 : 0,
                   }}
@@ -511,7 +511,7 @@ export default function ProfileScreen() {
 
         {/* Account section — full width */}
         <div className="fm-profile-account" style={{ padding: "20px 16px 32px" }}>
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#77736B", fontWeight: 600, marginBottom: 16 }}>
             Account
           </div>
 
@@ -521,7 +521,7 @@ export default function ProfileScreen() {
               alignItems: "center",
               justifyContent: "space-between",
               height: 44,
-              borderBottom: "1px solid #1E1E22",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
               cursor: "default",
             }}
           >

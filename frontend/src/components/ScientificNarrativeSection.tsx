@@ -14,6 +14,7 @@ import {
   buildResearchFocusClaimKey,
 } from "../lib/beliefClaimKey";
 import { taIdForApiSlug } from "../lib/api";
+import { FONT } from "../lib/designTokens";
 
 interface ScientificNarrativeSectionProps {
   hcpId: string;
@@ -229,7 +230,7 @@ function AdvocacySubsection({
 
   return (
     <div style={{ marginBottom: 36 }}>
-      <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginBottom: 14, letterSpacing: 0.2 }}>
+      <div style={{ fontFamily: FONT.sans, fontSize: 11, fontWeight: 600, color: "#8f8b83", textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 14 }}>
         {label}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -422,7 +423,7 @@ export default function ScientificNarrativeSection({
   const bullet = String.fromCharCode(8226);
 
   return (
-    <section style={{ marginBottom: 0, padding: "20px 24px 0", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <section style={{ marginBottom: 0, padding: "20px 24px 0", fontFamily: FONT.sans }}>
       <div
         style={{
           display: "flex",
@@ -431,7 +432,7 @@ export default function ScientificNarrativeSection({
           gap: 12,
         }}
       >
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", margin: 0 }}>
           Belief Profile
         </h2>
         <span
@@ -451,12 +452,13 @@ export default function ScientificNarrativeSection({
 
       <p
         style={{
-          fontSize: 14,
-          color: "#9B9892",
+          fontFamily: FONT.serif,
+          fontSize: 15,
+          color: "#A8A49B",
           fontStyle: "italic",
           marginTop: 12,
-          marginBottom: 20,
-          lineHeight: 1.6,
+          marginBottom: 22,
+          lineHeight: 1.72,
         }}
       >
         {narrative.headline}
@@ -488,7 +490,7 @@ export default function ScientificNarrativeSection({
 
       {narrative.research_focus.length > 0 ? (
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "#E8E6DF", marginBottom: 12 }}>
+          <div style={{ fontFamily: FONT.sans, fontSize: 11, fontWeight: 600, color: "#8f8b83", textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 12 }}>
             Research Focus
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

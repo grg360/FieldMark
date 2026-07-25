@@ -51,7 +51,8 @@ function SidebarItem({
       style={{
         ...itemBase,
         padding: isMobile ? "8px 12px" : "10px 12px",
-        backgroundColor: active ? "#1E1E22" : "transparent",
+        // Selected nav item → warm-neutral raised fill (kept neutral, not indigo, per boundary).
+        backgroundColor: active ? "#1c1b18" : "transparent",
         flexShrink: isMobile ? 0 : undefined,
         whiteSpace: isMobile ? "nowrap" : undefined,
       }}
@@ -126,7 +127,7 @@ export default function WatchlistsSidebar({
               ...itemBase,
               padding: "8px 12px",
               flexShrink: 0,
-              border: "1px dashed #2A2A30",
+              border: "1px dashed rgba(255,255,255,0.12)",
               color: "#9B9892",
               whiteSpace: "nowrap",
             }}
@@ -180,7 +181,7 @@ export default function WatchlistsSidebar({
           ...itemBase,
           marginTop: 8,
           padding: "10px 12px",
-          border: "1px dashed #2A2A30",
+          border: "1px dashed rgba(255,255,255,0.12)",
           color: "#9B9892",
           justifyContent: "center",
         }}

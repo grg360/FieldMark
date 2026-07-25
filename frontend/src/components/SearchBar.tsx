@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getTADisplayName, searchHCPs, type HCPSearchResult } from "../lib/api";
+import { formatScoreFloor1 } from "../lib/cohort-metrics";
 
 interface SearchBarProps {
   isOpen?: boolean;
@@ -39,10 +40,9 @@ function SearchResultRow({
 }) {
   const cohort = result.cohortClassification ?? "unclassified";
   const badge = COHORT_BADGE[cohort] ?? COHORT_BADGE.unclassified;
-  const scoreDisplay =
-    result.cohortScore != null && Number.isFinite(result.cohortScore)
-      ? Math.round(result.cohortScore).toLocaleString()
-      : "—";
+  // Score-honesty fix: floor to one decimal (no invented 100 ceiling). formatScoreFloor1
+  // returns an em dash for null/non-finite.
+  const scoreDisplay = formatScoreFloor1(result.cohortScore);
   const name = `${result.firstName} ${result.lastName}`.trim();
 
   const handleClick = () => {

@@ -12,9 +12,9 @@ interface Props {
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box" as const,
-  backgroundColor: "#0A0A0B",
-  border: "1px solid #1E1E22",
-  borderRadius: 4,
+  backgroundColor: "#0d0c0b",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: 8,
   padding: "8px 10px",
   fontSize: 13,
   color: "#E8E6DF",
@@ -96,22 +96,23 @@ export default function EditWatchlistModal({
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: "#0D0D10",
-          border: "1px solid #1E1E22",
-          borderRadius: 8,
+          backgroundColor: "#171512",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 48px -18px rgba(0,0,0,0.9)",
+          borderRadius: 11,
           padding: 24,
           maxWidth: 480,
           width: "100%",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         }}
       >
         <h2
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: "#E8E6DF",
+            color: "#77736B",
             textTransform: "uppercase",
-            letterSpacing: "0.06em",
+            letterSpacing: "0.18em",
             margin: "0 0 16px 0",
           }}
         >

@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { HCP } from "../data/hcpData";
 import { useRelationships } from "../contexts/RelationshipsContext";
-import { formatCohortScore, formatEngagementDollar, formatIntDisplay } from "../lib/cohort-metrics";
+import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatScoreFloor1 } from "../lib/cohort-metrics";
 import { institutionToSlug } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import { buildSubline } from "../lib/subline";
 import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
+import { FONT, COLOR } from "../lib/designTokens";
 
 function risingStarArchetypeShortLabel(archetype: string | null | undefined): string {
   switch (archetype) {
@@ -112,6 +113,62 @@ function RisingStarSignalTile({
           }}
         />
       </div>
+    </div>
+  );
+}
+
+// Card-local metric cell — the design's recessed well-strip treatment (§Elevation tier 2 +
+// §type role 6/9). FORKED from StatPillWithTooltip's default pill rather than restyling that
+// shared primitive: it is passed as `children` to StatPillWithTooltip, so the tooltip machinery
+// (positioning + TOOLTIP_MAP copy) is preserved. `pct` drives the 2px indigo fill and is provided
+// only for percentile metrics (Established Scientific/Network/Pharma); other cohorts pass null so
+// no misleading bar is drawn under a dollar amount or a raw count.
+function CardMetricCell({
+  label,
+  value,
+  pct,
+}: {
+  label: string;
+  value: string;
+  pct: number | null;
+}) {
+  return (
+    <div style={{ background: "#0d0c0b", padding: "11px 13px 12px", width: "100%", boxSizing: "border-box" }}>
+      <div
+        style={{
+          fontSize: 9.5,
+          fontWeight: 600,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "#6E6A62",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          marginTop: 5,
+          fontFamily: FONT.mono,
+          fontSize: 17,
+          fontWeight: 500,
+          color: "#DAD7CF",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
+      {pct != null && Number.isFinite(pct) && (
+        <div style={{ marginTop: 8, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.07)" }}>
+          <div
+            style={{
+              height: "100%",
+              width: `${Math.max(0, Math.min(100, pct))}%`,
+              background: COLOR.indigo,
+              borderRadius: 2,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -451,7 +508,9 @@ function cardStatusStyle(status: string): { bg: string; fg: string; border?: str
     case "engaged":
       return { bg: "#3FB8AF", fg: "#0A0A0B" };
     case "active_relationship":
-      return { bg: "#E8A020", fg: "#0A0A0B" };
+      // --info cyan, not amber: amber stays scarce for the score numeral. Other status
+      // semantics (contacted/engaged/paused) are unchanged.
+      return { bg: COLOR.info, fg: "#0A0A0B" };
     case "paused":
       return { bg: "transparent", fg: "#E8A020", border: "1px solid #E8A020" };
     default:
@@ -570,6 +629,18 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
     effectiveCohort === "established"
       ? formatScoreInt(hcp.cohortScore ?? null)
       : formatCohortScore(hcp.cohortScore ?? null);
+
+  // Score numeral: floor to one decimal for Established (cohort_score) and Rising Star /
+  // Dark Horse (rising_star_percentile) — see formatScoreFloor1. Community/workhorse/unclassified
+  // keep integer display. Numeral size stays 28px.
+  const numeralScoreRaw = hcp.cohortScore ?? hcp.score ?? null;
+  const usesFloorScore =
+    effectiveCohort === "established" ||
+    effectiveCohort === "rising_star" ||
+    effectiveCohort === "dark_horse";
+  const numeralScoreDisplay = usesFloorScore
+    ? formatScoreFloor1(numeralScoreRaw)
+    : formatScoreInt(numeralScoreRaw);
 
   function renderScoreChip() {
     if (isCommunityPlain) {
@@ -707,17 +778,16 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
   return (
     <>
       <div
-        className="fm-hcp-card"
+        className="fm-hcp-card elevation-card elevation-interactive"
         onClick={handleCardClick}
         style={{
           position: "relative",
-          backgroundColor: "#1C1C20",
-          border: "1px solid #2A2A2E",
+          // Tier-1 card surface (fill, radius 11, top-highlight + soft shadow) comes from
+          // .elevation-card; hover→tier-3 from .elevation-interactive. Only the cohort accent
+          // stripe stays inline — cohort colors are untouched per the redesign scope.
           borderLeft: `3px solid ${borderAccentColor}`,
-          borderRadius: 4,
-          margin: "0 16px 8px",
-          padding: "12px",
-          paddingBottom: 36,
+          margin: "0 16px 12px",
+          padding: "18px 20px 40px",
           cursor: "pointer",
         }}
       >
@@ -734,10 +804,12 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap", minWidth: 0 }}>
             <span
               style={{
-                fontSize: 17,
-                fontWeight: 500,
-                color: "#E8E6DF",
-                fontFamily: "system-ui, sans-serif",
+                fontSize: 21,
+                fontWeight: 600,
+                letterSpacing: "-0.015em",
+                lineHeight: 1.1,
+                color: "#F2F0EA",
+                fontFamily: FONT.sans,
                 minWidth: 0,
                 flexShrink: 1,
                 overflow: "hidden",
@@ -748,6 +820,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
               {hcp.name}
             </span>
             {countryCode && (
+              // Flag emoji per the List mockup (it shows 🇺🇸, not a mono country code).
               <img
                 src={`https://flagcdn.com/16x12/${countryCode}.png`}
                 srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
@@ -814,10 +887,10 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           <div
             className="fm-hcp-institution"
             style={{
-              fontSize: 12,
-              color: "#B8B4AC",
-              fontFamily: "system-ui, sans-serif",
-              marginTop: 4,
+              fontSize: 13,
+              color: "#928E86",
+              fontFamily: FONT.sans,
+              marginTop: 7,
               lineHeight: 1.4,
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -831,22 +904,23 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
                   onClick={handleInstitutionClick}
                   style={{
                     cursor: "pointer",
-                    borderBottom: "1px dotted #6B6A65",
+                    color: COLOR.indigoLink,
+                    borderBottom: "1px solid rgba(139,147,242,0.35)",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "#E8E6DF";
+                    e.currentTarget.style.color = COLOR.indigoLinkHover;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "inherit";
+                    e.currentTarget.style.color = COLOR.indigoLink;
                   }}
                 >
                   {cardInstitution}
                 </span>
                 {cardState ? (
-                  <>
+                  <span style={{ color: "#57534b" }}>
                     {" \u00b7 "}
                     {cardState}
-                  </>
+                  </span>
                 ) : null}
               </>
             ) : (
@@ -874,16 +948,59 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
             textAlign: "right",
             zIndex: 1,
           }}
-          aria-label={`FieldMark Score ${formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}`}
+          aria-label={`FieldMark Score ${numeralScoreDisplay}`}
         >
-          <div style={{ fontSize: 28, fontWeight: 600, color: accentColor, lineHeight: 1 }}>
-            {formatScoreInt(hcp.cohortScore ?? hcp.score ?? null)}
+          <div
+            style={{
+              fontSize: 28,
+              fontWeight: 600,
+              color: accentColor,
+              lineHeight: 1,
+              letterSpacing: "-0.01em",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {numeralScoreDisplay}
           </div>
           {displayRank != null && (
-            <div style={{ fontSize: 10, color: "#E8E6DF", marginTop: 6, lineHeight: 1.4, letterSpacing: 0.4 }}>
-              #{displayRank}{" "}
-              {isRisingCohort ? risingScopeLabel : (hcp.country ?? "US").toUpperCase()}
-              {!isRisingCohort && hcp.global_rank != null ? ` · #${hcp.global_rank} GLOBAL` : ""}
+            // Rank string carries the added presence (numeral stays 28): mono ranks + sans unit
+            // labels, US brighter than GLOBAL, per the monospace rule (#N is a rank → mono; the
+            // US/GLOBAL scope word is a categorical label → sans).
+            <div style={{ fontSize: 11, marginTop: 8, lineHeight: 1.3, whiteSpace: "nowrap" }}>
+              <span
+                style={{
+                  fontFamily: FONT.mono,
+                  fontSize: 13.5,
+                  fontWeight: 700,
+                  color: "#E4E1D9",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                #{displayRank}
+              </span>
+              <span style={{ fontFamily: FONT.sans, color: "#77736B", letterSpacing: "0.06em" }}>
+                {" "}
+                {isRisingCohort ? risingScopeLabel : (hcp.country ?? "US").toUpperCase()}
+              </span>
+              {!isRisingCohort && hcp.global_rank != null && (
+                <>
+                  <span style={{ color: "#3d3a34" }}> · </span>
+                  <span
+                    style={{
+                      fontFamily: FONT.mono,
+                      fontWeight: 500,
+                      color: "#8f8b83",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    #{hcp.global_rank}
+                  </span>
+                  <span style={{ fontFamily: FONT.sans, color: "#57534b", letterSpacing: "0.06em" }}>
+                    {" "}
+                    GLOBAL
+                  </span>
+                </>
+              )}
             </div>
           )}
         </button>
@@ -953,30 +1070,25 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           </div>
         )}
 
-        {/* Why_now insight band — 3-line clamp; full narrative on card click → detail */}
+        {/* Why_now narrative — role-7 serif prose, 3-line clamp; no filled band (the design
+            sets prose directly on the card). Full narrative on card click → detail. */}
         {(hcp.why_now || hcp.narrative) ? (
-          <div
+          <p
             style={{
-              marginTop: 14,
-              padding: "12px 14px",
-              background: "#2A2A30",
-              borderRadius: 4,
-            }}
-          >
-            <span style={{
-              fontSize: 12,
-              color: "#D0CCC4",
-              fontFamily: "system-ui, sans-serif",
-              lineHeight: 1.55,
+              margin: "15px 0 0",
+              fontFamily: FONT.serif,
+              fontSize: 13.5,
+              lineHeight: 1.58,
+              color: "#A29E96",
               display: "-webkit-box",
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
               textOverflow: "ellipsis",
-            }}>
-              {hcp.why_now ?? hcp.narrative}
-            </span>
-          </div>
+            }}
+          >
+            {hcp.why_now ?? hcp.narrative}
+          </p>
         ) : null}
 
         {/* Row 4: Stat pills (cohort_classification-driven) */}
@@ -1036,7 +1148,9 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
               tooltip={RISING_STAR_TILE_TOOLTIPS["NETWORK VISIBILITY"]}
             />
           </div>
-        ) : (
+        ) : isRisingCohort ? (
+        // Dark Horse (rising family) keeps its existing pill row incl. the cohort-colored
+        // archetype pill — cohort specifics untouched.
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           {statPillKeys.map((key) => (
             <div key={key} style={{ flex: 1, minWidth: 0 }}>
@@ -1103,6 +1217,38 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
             </div>
           ))}
         </div>
+        ) : (
+          // Established / Community / Workhorse / unclassified: recessed well strip (tier-2),
+          // mono values, indigo percentile bar for Established only.
+          <div
+            style={{
+              marginTop: 16,
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 1,
+              background: "rgba(255,255,255,0.05)",
+              borderRadius: 8,
+              overflow: "hidden",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.5)",
+            }}
+          >
+            {statPillKeys.map((key) => {
+              const val = statValueForKey(hcp, effectiveCohort, key);
+              const pct = effectiveCohort === "established" ? Number(val) : null;
+              return (
+                <StatPillWithTooltip
+                  key={key}
+                  label={key}
+                  value={val}
+                  tooltipKey={key}
+                  activeTooltip={activeTooltip}
+                  onTooltipChange={setActiveTooltip}
+                >
+                  <CardMetricCell label={key} value={val} pct={pct} />
+                </StatPillWithTooltip>
+              );
+            })}
+          </div>
         )}
 
         {hcpId ? (
@@ -1144,16 +1290,17 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 3,
+                  gap: 4,
                   lineHeight: 1,
-                  color: "#9B9892",
+                  color: COLOR.indigoLink,
                   fontSize: 11,
-                  fontFamily: "system-ui, -apple-system, sans-serif",
                   pointerEvents: "none",
                 }}
               >
                 <span style={{ fontSize: 11 }}>{String.fromCodePoint(0x1F4DD)}</span>
-                <span>{insightCount}</span>
+                <span style={{ fontFamily: FONT.mono, fontVariantNumeric: "tabular-nums" }}>
+                  {insightCount}
+                </span>
               </div>
             ) : null}
 
@@ -1216,7 +1363,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
               }}
             >
               {saved ? (
-                <BookmarkCheck size={14} color="#3FB8AF" fill="#3FB8AF" />
+                <BookmarkCheck size={14} color={COLOR.info} fill={COLOR.info} />
               ) : (
                 <Bookmark size={14} color="#5A9B7F" />
               )}

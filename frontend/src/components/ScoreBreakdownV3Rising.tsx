@@ -2,6 +2,7 @@ import React from "react";
 import type { RisingStarScoreBreakdown } from "../lib/api";
 import { RIGHT_RAIL_HEADER_STYLE } from "./rightRailStyles";
 import ScoreKpiTile from "./ScoreKpiTile";
+import { formatScoreFloor1 } from "../lib/cohort-metrics";
 
 interface ScoreBreakdownV3RisingProps {
   data: RisingStarScoreBreakdown | null;
@@ -150,7 +151,8 @@ export default function ScoreBreakdownV3Rising({ data, loading }: ScoreBreakdown
     );
   }
 
-  const scoreDisplay = Math.round(data.rising_star_percentile);
+  // Rising Star score = rising_star_percentile, floored to one decimal (see formatScoreFloor1).
+  const scoreDisplay = formatScoreFloor1(data.rising_star_percentile);
   const badgeColor = archetypeColor(data.archetype);
   const rankSubtext =
     data.us_rank != null

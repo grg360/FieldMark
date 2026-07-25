@@ -253,6 +253,35 @@ hepatologist -> community; every real AD KOL retained. This should be STANDARD f
 
 ---
 
+## 0z. TWO INGEST SCRIPTS - READ BEFORE SECTION 1 (added 2026-07-23)
+
+This playbook documents `ingest_publications.py` as the canonical ingester. **The orchestrator
+(`reingest_cycle.py`, stage 1) calls a DIFFERENT script: `pubmed_pipeline.py`.** They now do the same job
+but read their query from DIFFERENT places:
+
+| | canonical per this playbook | what the orchestrator runs |
+|---|---|---|
+| script | `scripts/ingest/ingest_publications.py` | `scripts/ingest/pubmed_pipeline.py` |
+| query source | `therapeutic_area_ingestion_config.pubmed_query` (DB table) | `config/therapeutic_areas/<slug>.json` |
+
+**Consequence for a new TA:** authoring the query ONLY in the DB config table (as section 2a instructs) is
+NOT enough if you intend to run the weekly orchestrator - `pubmed_pipeline.py` will look for a JSON config
+and not find your query. **Populate BOTH** until the two are reconciled, and verify with
+`python scripts/reingest_cycle.py --ta <slug> --dry-run` before a real run.
+
+**Behavioural convergence (2026-07-23):** `pubmed_pipeline.py` was refactored to be publications-only - it
+no longer mints HCPs, no longer gates publication persistence on author resolution, and now populates
+`pub_date` + `pubmed_authorships`. It therefore now matches the section-1 architectural rule this playbook
+already stated for `ingest_publications.py`. (Before that refactor it created HCPs from PubMed names, whose
+`identity_hash` collided with `create_hcps_v2`'s OpenAlex-derived one - that mismatch silently dropped ~94%
+of publications on any checkpoint-resumed run.)
+
+**Open debt:** decide which ingester is canonical and retire or reconcile the other, including the config
+source. Until then, treat section 1 step 1 as "whichever ingester you run - it must be publications-only,
+and its query must be reachable from the config source THAT script reads."
+
+---
+
 ## 1. The canonical pipeline order (v2)
 
 HCP identity is resolved **OpenAlex-first**, AFTER publication ingestion. Publication ingestion does
