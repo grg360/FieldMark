@@ -409,3 +409,11 @@ export const NSCLC_PULSE: PulsePayload = {
     "Current window includes a backfill recovery month (June 2026) and a deflated prior month (January 2026). Movement figures are not reliable until three consecutive clean cycles have run.",
   ],
 };
+
+// Pulse payloads by indication slug (the same TA token the cohort tabs scope
+// by — resolveFeedRoute's indicationSlug). A TA absent from this map has no
+// Pulse yet: the DashboardTabs chip hides itself and /pulse/:ta renders an
+// honest empty state.
+export const PULSE_BY_TA: Record<string, PulsePayload> = {
+  nsclc: NSCLC_PULSE,
+};

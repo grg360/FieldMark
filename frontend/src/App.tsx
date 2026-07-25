@@ -1334,6 +1334,7 @@ export default function App() {
       <Routes>
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/pulse" element={<PulsePage />} />
+      <Route path="/pulse/:ta" element={<PulsePage />} />
       <Route path="/join/:code" element={<SignupScreen />} />
       <Route path="/join" element={<SignupScreen />} />
       <Route
