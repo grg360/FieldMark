@@ -7,16 +7,17 @@ const COHORT_COLOR_COMMUNITY = "#7B9EBD";
 const sectionHeadingStyle = {
   fontSize: 22,
   fontWeight: 600,
-  color: "#E8E6DF",
+  letterSpacing: "-0.01em",
+  color: "#F2F0EA",
   marginTop: 32,
   marginBottom: 12,
-  fontFamily: "system-ui, -apple-system, sans-serif",
+  fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
 };
 
 const subheadingStyle = {
   fontSize: 14,
   fontWeight: 600,
-  color: "#E8E6DF",
+  color: "#F2F0EA",
   marginTop: 16,
   marginBottom: 8,
 };
@@ -30,12 +31,12 @@ const bodyStyle = {
 };
 
 const formulaStyle = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  fontFamily: "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
   fontSize: 13,
   color: "#B8B4AC",
-  backgroundColor: "#0F0F11",
-  border: "1px solid #1E1E22",
-  borderRadius: 4,
+  backgroundColor: "#0d0c0b",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 8,
   padding: "14px 16px",
   marginTop: 12,
   marginBottom: 20,
@@ -54,17 +55,18 @@ const archetypeListStyle = {
 
 const dividerStyle = {
   height: 1,
-  backgroundColor: "#1E1E22",
+  backgroundColor: "rgba(255,255,255,0.08)",
   margin: "32px 0 0 0",
 };
 
 const pageHeadingStyle = {
   fontSize: 32,
   fontWeight: 600,
-  color: "#E8E6DF",
+  letterSpacing: "-0.02em",
+  color: "#F4F2EC",
   marginTop: 8,
   marginBottom: 8,
-  fontFamily: "system-ui, -apple-system, sans-serif",
+  fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
 };
 
 const ledeStyle = {
@@ -114,13 +116,13 @@ export default function MethodologyPage() {
         The Established cohort surfaces HCPs whose influence is already recognized. The score is a weighted composite of three signals:
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Scientific Influence (50%)</strong> - Publication leadership in the therapeutic area. This is the largest signal because for Established HCPs, the publication record is the most direct evidence of expertise. The signal is built from senior- and first-author paper counts, citation impact, and contributions to clinical practice guidelines, weighted to reward both volume and authorship seniority.
+        <strong style={{ color: "#F2F0EA" }}>Scientific Influence (50%)</strong> - Publication leadership in the therapeutic area. This is the largest signal because for Established HCPs, the publication record is the most direct evidence of expertise. The signal is built from senior- and first-author paper counts, citation impact, and contributions to clinical practice guidelines, weighted to reward both volume and authorship seniority.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Network Influence (35%)</strong> - Position within the therapeutic area's co-authorship network. Established HCPs are connected - to each other, to emerging researchers, and to the institutions that shape the field. We measure this using three centrality metrics from network science: degree (how many co-authorship connections), eigenvector (how connected those connections are), and betweenness (how often this HCP serves as a bridge between research subcommunities).
+        <strong style={{ color: "#F2F0EA" }}>Network Influence (35%)</strong> - Position within the therapeutic area's co-authorship network. Established HCPs are connected - to each other, to emerging researchers, and to the institutions that shape the field. We measure this using three centrality metrics from network science: degree (how many co-authorship connections), eigenvector (how connected those connections are), and betweenness (how often this HCP serves as a bridge between research subcommunities).
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Pharma Engagement (15%)</strong> - CMS Open Payments record. This reflects the breadth and depth of pharma relationships - payment volume, number of companies, drugs covered, and contract activity. It is a secondary signal because pharma engagement varies meaningfully by therapeutic area and individual HCP preference, and because publication and network signals are stronger evidence of scientific standing.
+        <strong style={{ color: "#F2F0EA" }}>Pharma Engagement (15%)</strong> - CMS Open Payments record. This reflects the breadth and depth of pharma relationships - payment volume, number of companies, drugs covered, and contract activity. It is a secondary signal because pharma engagement varies meaningfully by therapeutic area and individual HCP preference, and because publication and network signals are stronger evidence of scientific standing.
       </p>
       <p style={bodyStyle}>Established scores are computed using the formula:</p>
       <div style={formulaStyle}>
@@ -136,16 +138,16 @@ export default function MethodologyPage() {
       </p>
       <p style={bodyStyle}>The Rising Star score is built from four signals, organized into two composites:</p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Scientific Momentum (35%)</strong> - Change in publication output between the 2016-2020 window and the 2021-2025 window. Built from change in senior-author paper count, citation volume, and senior-author share.
+        <strong style={{ color: "#F2F0EA" }}>Scientific Momentum (35%)</strong> - Change in publication output between the 2016-2020 window and the 2021-2025 window. Built from change in senior-author paper count, citation volume, and senior-author share.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Network Momentum (35%)</strong> - Change in co-authorship network centrality between the same two windows. Built from eigenvector, degree, and betweenness deltas.
+        <strong style={{ color: "#F2F0EA" }}>Network Momentum (35%)</strong> - Change in co-authorship network centrality between the same two windows. Built from eigenvector, degree, and betweenness deltas.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Scientific Visibility (15%)</strong> - Current publication footprint in the recent window: total publications and citation rate.
+        <strong style={{ color: "#F2F0EA" }}>Scientific Visibility (15%)</strong> - Current publication footprint in the recent window: total publications and citation rate.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Network Visibility (15%)</strong> - Current co-authorship centrality in the recent 5-year window.
+        <strong style={{ color: "#F2F0EA" }}>Network Visibility (15%)</strong> - Current co-authorship centrality in the recent 5-year window.
       </p>
       <p style={bodyStyle}>The four signals roll up through two intermediate composites:</p>
       <div style={formulaStyle}>
@@ -172,19 +174,19 @@ export default function MethodologyPage() {
         The Community cohort surfaces practicing clinicians whose influence flows from patient care rather than from publication or pharma standing alone. The scoring formula reflects that:
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Patient Volume (40%)</strong> - Estimated unique Medicare beneficiaries over a 3-year window. The largest single signal because patient volume is the most direct measure of community clinical reach.
+        <strong style={{ color: "#F2F0EA" }}>Patient Volume (40%)</strong> - Estimated unique Medicare beneficiaries over a 3-year window. The largest single signal because patient volume is the most direct measure of community clinical reach.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Pharma Engagement (30%)</strong> - Total payments and engagement breadth from CMS Open Payments. Significant in this cohort because community-level pharma engagement is itself a signal of clinical relevance.
+        <strong style={{ color: "#F2F0EA" }}>Pharma Engagement (30%)</strong> - Total payments and engagement breadth from CMS Open Payments. Significant in this cohort because community-level pharma engagement is itself a signal of clinical relevance.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Group Practice Signal (15%)</strong> - Practice setting context, including group affiliation and practice size.
+        <strong style={{ color: "#F2F0EA" }}>Group Practice Signal (15%)</strong> - Practice setting context, including group affiliation and practice size.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Career Years (10%)</strong> - Years since NPI enumeration, providing career-stage grounding.
+        <strong style={{ color: "#F2F0EA" }}>Career Years (10%)</strong> - Years since NPI enumeration, providing career-stage grounding.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Publication Signal (5%)</strong> - Publication activity. Weighted low because Community HCPs are defined by practice, not by publication output.
+        <strong style={{ color: "#F2F0EA" }}>Publication Signal (5%)</strong> - Publication activity. Weighted low because Community HCPs are defined by practice, not by publication output.
       </p>
       <p style={bodyStyle}>
         Community HCPs must have NPI registration and demonstrated clinical activity (either Open Payments engagement or measurable Medicare patient volume) to appear at all.
@@ -193,11 +195,11 @@ export default function MethodologyPage() {
       <h2 style={sectionHeadingStyle}>Data sources</h2>
       <p style={bodyStyle}>FieldMark draws from six public data sources:</p>
       <ul style={archetypeListStyle}>
-        <li><strong style={{ color: "#E8E6DF" }}>PubMed and OpenAlex</strong> - publication records, authorship attribution, citation activity, and the co-authorship edges that underlie the network influence calculations.</li>
-        <li><strong style={{ color: "#E8E6DF" }}>ClinicalTrials.gov</strong> - investigator participation in registered clinical trials, including role (principal investigator vs. sub-investigator) and trial phase.</li>
-        <li><strong style={{ color: "#E8E6DF" }}>CMS Open Payments</strong> - pharma payments and engagement records, refreshed quarterly. Currently using the PY2024 dataset.</li>
-        <li><strong style={{ color: "#E8E6DF" }}>NPPES</strong> - National Plan and Provider Enumeration System. Provides authoritative HCP credentials, taxonomy, and practice locations.</li>
-        <li><strong style={{ color: "#E8E6DF" }}>Medicare Provider Utilization and Payment Data</strong> - patient volume and practice pattern data, updated annually.</li>
+        <li><strong style={{ color: "#F2F0EA" }}>PubMed and OpenAlex</strong> - publication records, authorship attribution, citation activity, and the co-authorship edges that underlie the network influence calculations.</li>
+        <li><strong style={{ color: "#F2F0EA" }}>ClinicalTrials.gov</strong> - investigator participation in registered clinical trials, including role (principal investigator vs. sub-investigator) and trial phase.</li>
+        <li><strong style={{ color: "#F2F0EA" }}>CMS Open Payments</strong> - pharma payments and engagement records, refreshed quarterly. Currently using the PY2024 dataset.</li>
+        <li><strong style={{ color: "#F2F0EA" }}>NPPES</strong> - National Plan and Provider Enumeration System. Provides authoritative HCP credentials, taxonomy, and practice locations.</li>
+        <li><strong style={{ color: "#F2F0EA" }}>Medicare Provider Utilization and Payment Data</strong> - patient volume and practice pattern data, updated annually.</li>
       </ul>
       <p style={bodyStyle}>
         These sources are combined deliberately. NPPES provides the authoritative identity layer; PubMed and OpenAlex provide the scientific record; ClinicalTrials.gov provides operational research activity; Open Payments and Medicare provide the engagement and clinical activity context.
@@ -208,22 +210,22 @@ export default function MethodologyPage() {
         No methodology is perfect, and several real limitations shape what FieldMark can and cannot tell you:
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Coverage is not uniform.</strong> Open Payments has data on a minority of Established HCPs in some therapeutic areas - when pharma engagement records are absent, that HCP scores zero on the Pharma Engagement dimension, which can affect their composite even when their actual pharma engagement is non-trivial. Publication data is more uniform but still incomplete for international researchers and for HCPs whose publication records pre-date OpenAlex's earliest reliable coverage.
+        <strong style={{ color: "#F2F0EA" }}>Coverage is not uniform.</strong> Open Payments has data on a minority of Established HCPs in some therapeutic areas - when pharma engagement records are absent, that HCP scores zero on the Pharma Engagement dimension, which can affect their composite even when their actual pharma engagement is non-trivial. Publication data is more uniform but still incomplete for international researchers and for HCPs whose publication records pre-date OpenAlex's earliest reliable coverage.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>HCPs without sufficient signal do not appear.</strong> The platform requires real data signal - a registered NPI, demonstrated clinical activity, or substantive publication record - to surface an HCP. A real HCP whose data footprint is too thin for any of the three cohorts will not appear in FieldMark. Coverage will improve over time as data sources expand and as MSLs flag gaps for review.
+        <strong style={{ color: "#F2F0EA" }}>HCPs without sufficient signal do not appear.</strong> The platform requires real data signal - a registered NPI, demonstrated clinical activity, or substantive publication record - to surface an HCP. A real HCP whose data footprint is too thin for any of the three cohorts will not appear in FieldMark. Coverage will improve over time as data sources expand and as MSLs flag gaps for review.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Cohort classification is not destiny.</strong> The classification reflects current signal across our data sources. An HCP near a cohort boundary can shift as new data arrives. We treat cohort assignment as a starting point for MSL judgment, not as an immutable label.
+        <strong style={{ color: "#F2F0EA" }}>Cohort classification is not destiny.</strong> The classification reflects current signal across our data sources. An HCP near a cohort boundary can shift as new data arrives. We treat cohort assignment as a starting point for MSL judgment, not as an immutable label.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Rising Star is academic-only by design.</strong> Non-academic emerging voices - community oncologists building reputation, biotech-affiliated researchers, international investigators not yet visible in US-centric databases - do not appear as Rising Stars in v1. Identifying emerging influence outside academia is on the roadmap but requires different signal architecture.
+        <strong style={{ color: "#F2F0EA" }}>Rising Star is academic-only by design.</strong> Non-academic emerging voices - community oncologists building reputation, biotech-affiliated researchers, international investigators not yet visible in US-centric databases - do not appear as Rising Stars in v1. Identifying emerging influence outside academia is on the roadmap but requires different signal architecture.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>International coverage is imperfect.</strong> Address parsing and institution normalization across countries is harder than within the US, and some international researchers may be misclassified. The current cohort logic is calibrated against US-skewed data.
+        <strong style={{ color: "#F2F0EA" }}>International coverage is imperfect.</strong> Address parsing and institution normalization across countries is harder than within the US, and some international researchers may be misclassified. The current cohort logic is calibrated against US-skewed data.
       </p>
       <p style={bodyStyle}>
-        <strong style={{ color: "#E8E6DF" }}>Industry-affiliated HCPs are excluded from cohort classification when identifiable.</strong> HCPs whose primary affiliation is pharma or biotech are removed from the cohort universe to keep the platform focused on field-side voices. This filter is imperfect - some industry-affiliated HCPs are not yet identified and may appear; some academic researchers with industry consulting roles are correctly retained.
+        <strong style={{ color: "#F2F0EA" }}>Industry-affiliated HCPs are excluded from cohort classification when identifiable.</strong> HCPs whose primary affiliation is pharma or biotech are removed from the cohort universe to keep the platform focused on field-side voices. This filter is imperfect - some industry-affiliated HCPs are not yet identified and may appear; some academic researchers with industry consulting roles are correctly retained.
       </p>
 
       <h2 style={sectionHeadingStyle}>A note on community refinement</h2>
