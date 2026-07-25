@@ -83,9 +83,9 @@ function FollowUpIndicator({ row }: { row: TrackedHcpRow }) {
 const headerCell: CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
-  color: "#6B6A65",
+  color: "#77736B",
   textTransform: "uppercase",
-  letterSpacing: "0.06em",
+  letterSpacing: "0.11em",
 };
 
 export default function TrackedHcpsList({ rows, loading, viewMode }: Props) {
@@ -112,10 +112,8 @@ export default function TrackedHcpsList({ rows, loading, viewMode }: Props) {
           return (
             <div
               key={row.relationship_id}
+              className="elevation-card"
               style={{
-                backgroundColor: "#0D0D10",
-                border: "1px solid #1E1E22",
-                borderRadius: 6,
                 padding: 12,
               }}
             >
@@ -208,7 +206,7 @@ export default function TrackedHcpsList({ rows, loading, viewMode }: Props) {
           gridTemplateColumns: "2fr 2fr 1.2fr 1fr 0.7fr 0.8fr 1fr",
           gap: 12,
           padding: "8px 12px",
-          borderBottom: "1px solid #1E1E22",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
         }}
       >
         <span style={headerCell}>Name</span>
@@ -230,7 +228,7 @@ export default function TrackedHcpsList({ rows, loading, viewMode }: Props) {
               gridTemplateColumns: "2fr 2fr 1.2fr 1fr 0.7fr 0.8fr 1fr",
               gap: 12,
               padding: "12px",
-              borderBottom: "1px solid #1E1E22",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
               alignItems: "center",
             }}
           >

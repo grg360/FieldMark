@@ -19,9 +19,9 @@ interface Props {
 }
 
 const selectStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 4,
+  backgroundColor: "#0d0c0b",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: 8,
   padding: "6px 10px",
   fontSize: 12,
   color: "#E8E6DF",
@@ -123,9 +123,9 @@ export default function TrackedHcpsFilterBar({
               gap: 10,
               marginTop: 8,
               padding: 12,
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              borderRadius: 4,
+              backgroundColor: "#171512",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 8,
             }}
           >
             {controls}

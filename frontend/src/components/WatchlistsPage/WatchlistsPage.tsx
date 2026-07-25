@@ -121,7 +121,7 @@ export default function WatchlistsPage() {
   return (
     <>
       <AppLayout breadcrumbs={buildBreadcrumbs()}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: "0 0 16px 0" }}>
+        <h1 style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "#F4F2EC", margin: "0 0 16px 0" }}>
           Watchlists
         </h1>
 
@@ -162,10 +162,10 @@ export default function WatchlistsPage() {
                     />
                   ) : (
                     <div style={{ marginBottom: 12 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", margin: 0 }}>
                         All Tracked HCPs
                       </h2>
-                      <p style={{ fontSize: 12, color: "#9B9892", margin: "4px 0 0 0" }}>
+                      <p style={{ fontSize: 12.5, color: "#928E86", margin: "4px 0 0 0" }}>
                         Every HCP you&apos;ve tracked, across watchlists.
                       </p>
                     </div>

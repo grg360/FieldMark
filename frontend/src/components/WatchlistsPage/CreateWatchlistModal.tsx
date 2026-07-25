@@ -21,9 +21,9 @@ const COLOR_PRESETS: Array<{ label: string; value: string | null }> = [
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box" as const,
-  backgroundColor: "#0A0A0B",
-  border: "1px solid #1E1E22",
-  borderRadius: 4,
+  backgroundColor: "#0d0c0b",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: 8,
   padding: "8px 10px",
   fontSize: 13,
   color: "#E8E6DF",
@@ -83,22 +83,23 @@ export default function CreateWatchlistModal({ userId, onClose, onCreated }: Pro
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: "#0D0D10",
-          border: "1px solid #1E1E22",
-          borderRadius: 8,
+          backgroundColor: "#171512",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 48px -18px rgba(0,0,0,0.9)",
+          borderRadius: 11,
           padding: 24,
           maxWidth: 480,
           width: "100%",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         }}
       >
         <h2
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: "#E8E6DF",
+            color: "#77736B",
             textTransform: "uppercase",
-            letterSpacing: "0.06em",
+            letterSpacing: "0.18em",
             margin: "0 0 16px 0",
           }}
         >
@@ -148,7 +149,7 @@ export default function CreateWatchlistModal({ userId, onClose, onCreated }: Pro
                     color === preset.value
                       ? "2px solid #E8E6DF"
                       : "2px solid #1E1E22",
-                  boxShadow: color === preset.value ? "0 0 0 2px #0D0D10, 0 0 0 4px #E8E6DF" : undefined,
+                  boxShadow: color === preset.value ? "0 0 0 2px #171512, 0 0 0 4px #E8E6DF" : undefined,
                   backgroundColor: preset.value ?? "#0A0A0B",
                   cursor: "pointer",
                   padding: 0,
