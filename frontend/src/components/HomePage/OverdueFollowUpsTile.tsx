@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { NextActionWithHcp } from "../../lib/home";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -24,26 +25,17 @@ export default function OverdueFollowUpsTile({ overdueFollowUps, totalCount }: P
 
   return (
     <HomeTile>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ ...TYPE.eyebrow, marginBottom: 12 }}>
         Overdue Follow-Ups
         {totalCount > 0 ? (
-          <span style={{ marginLeft: 6, color: "#E8A020" }}>({totalCount})</span>
+          <span style={{ marginLeft: 6, color: COLOR.amber }}>({totalCount})</span>
         ) : null}
       </div>
 
       {overdueFollowUps.length === 0 ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#3FB8AF", fontSize: 14 }}>{String.fromCharCode(0x2713)}</span>
-          <span style={{ fontSize: 14, color: "#E8E6DF" }}>Nothing overdue.</span>
+          <span style={{ fontSize: 14, color: COLOR.ink1 }}>Nothing overdue.</span>
         </div>
       ) : (
         <div>
@@ -61,18 +53,18 @@ export default function OverdueFollowUpsTile({ overdueFollowUps, totalCount }: P
               }}
               style={{
                 padding: "10px 0",
-                borderBottom: index < overdueFollowUps.length - 1 ? "1px solid #1E1E22" : "none",
+                borderBottom: index < overdueFollowUps.length - 1 ? `1px solid ${COLOR.hair}` : "none",
                 cursor: "pointer",
               }}
             >
-              <div style={{ fontSize: 14, fontWeight: 500, color: "#E8E6DF", marginBottom: 2 }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: COLOR.ink1, marginBottom: 2 }}>
                 {action.hcp.name}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                 <span
                   style={{
                     fontSize: 12,
-                    color: "#9B9892",
+                    color: COLOR.ink3,
                     flex: 1,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -82,7 +74,7 @@ export default function OverdueFollowUpsTile({ overdueFollowUps, totalCount }: P
                   {truncate(action.body, 80)}
                 </span>
                 {action.due_at ? (
-                  <span style={{ fontSize: 11, color: "#E8A020", flexShrink: 0 }}>
+                  <span style={{ ...TYPE.dataValue, fontSize: 11, color: COLOR.amber, flexShrink: 0 }}>
                     {formatDueDateShort(action.due_at)}
                   </span>
                 ) : null}

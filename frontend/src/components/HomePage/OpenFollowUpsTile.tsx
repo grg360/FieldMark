@@ -1,4 +1,5 @@
 import type { OpenFollowUpStats } from "../../lib/home";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
 function BucketRow({
   count,
   label,
-  countColor = "#E8E6DF",
+  countColor = COLOR.ink1,
 }: {
   count: number;
   label: string;
@@ -24,8 +25,8 @@ function BucketRow({
         fontSize: 14,
       }}
     >
-      <span style={{ color: "#9B9892" }}>{label}</span>
-      <span style={{ fontSize: 20, fontWeight: 600, color: countColor }}>{count}</span>
+      <span style={{ color: COLOR.ink3 }}>{label}</span>
+      <span style={{ ...TYPE.dataValue, fontSize: 20, textAlign: "right", color: countColor }}>{count}</span>
     </div>
   );
 }
@@ -33,27 +34,18 @@ function BucketRow({
 export default function OpenFollowUpsTile({ stats }: Props) {
   return (
     <HomeTile>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ ...TYPE.eyebrow, marginBottom: 12 }}>
         Open Follow-Ups
       </div>
 
       {!stats || stats.total === 0 ? (
-        <div style={{ fontSize: 14, color: "#9B9892" }}>No open follow-ups.</div>
+        <div style={{ fontSize: 14, color: COLOR.ink3 }}>No open follow-ups.</div>
       ) : (
         <div>
           <BucketRow
             count={stats.overdue}
             label="overdue"
-            countColor={stats.overdue > 0 ? "#E8A020" : "#E8E6DF"}
+            countColor={stats.overdue > 0 ? COLOR.amber : COLOR.ink1}
           />
           <BucketRow count={stats.due_this_week} label="due this week" />
           <BucketRow count={stats.future} label="future" />
