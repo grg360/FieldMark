@@ -218,7 +218,7 @@ export default function TrackedHcpsList({ rows, loading, viewMode }: Props) {
         <span style={headerCell}>Last activity</span>
       </div>
 
-      {rows.map((row) => {
+      {rows.map((row, index) => {
         const institutionLine = [row.institution, row.state].filter(Boolean).join(", ");
         return (
           <div
@@ -228,7 +228,9 @@ export default function TrackedHcpsList({ rows, loading, viewMode }: Props) {
               gridTemplateColumns: "2fr 2fr 1.2fr 1fr 0.7fr 0.8fr 1fr",
               gap: 12,
               padding: "12px",
-              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              // Last row: no border — the GlobalFooter's top rule follows it.
+              borderBottom:
+                index < rows.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
               alignItems: "center",
             }}
           >

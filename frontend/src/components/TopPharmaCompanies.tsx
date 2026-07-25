@@ -27,7 +27,6 @@ const ROW_STYLE = {
 
 const CORAL_BAR_MIN = 0.07;
 const CORAL_BAR_MAX = 0.12;
-const CORAL_BAR_ACTIVE = 0.18;
 const CORAL_OVERLAY_ACTIVE = 0.03;
 
 function formatCompactDollar(n: number): string {
@@ -131,7 +130,9 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
           const restingBarOpacity = idx === 0
             ? CORAL_BAR_MAX
             : CORAL_BAR_MIN + ((entries.length - 1 - idx) / Math.max(1, entries.length - 1)) * (CORAL_BAR_MAX - CORAL_BAR_MIN);
-          const barOpacity = isActive ? CORAL_BAR_ACTIVE : restingBarOpacity;
+          // Selected row: the proportional bar fades out entirely — the coral border
+          // and overlay tint carry the active state without the shading detail.
+          const barOpacity = isActive ? 0 : restingBarOpacity;
           const avgPerPayment = entry.payment_count > 0
             ? entry.total_amount_usd / entry.payment_count
             : 0;
@@ -141,8 +142,13 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
               <button
                 type="button"
                 onClick={() => setActiveIndex(isActive ? null : idx)}
-                onMouseEnter={() => setActiveIndex(idx)}
-                onMouseLeave={() => {
+                // Hover-open is mouse-only: on touch, the synthesized mouseenter fired
+                // before click, so a tap opened the tray then click-toggled it shut.
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") setActiveIndex(idx);
+                }}
+                onPointerLeave={(e) => {
+                  if (e.pointerType !== "mouse") return;
                   setTimeout(() => {
                     if (!popoverHovered) setActiveIndex((current) => (current === idx ? null : current));
                   }, 60);
@@ -233,8 +239,11 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
               {isActive && (
                 <div
                   role="dialog"
-                  onMouseEnter={() => setPopoverHovered(true)}
-                  onMouseLeave={() => {
+                  onPointerEnter={(e) => {
+                    if (e.pointerType === "mouse") setPopoverHovered(true);
+                  }}
+                  onPointerLeave={(e) => {
+                    if (e.pointerType !== "mouse") return;
                     setPopoverHovered(false);
                     setActiveIndex(null);
                   }}

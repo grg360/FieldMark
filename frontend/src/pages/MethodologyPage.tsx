@@ -53,12 +53,6 @@ const archetypeListStyle = {
   marginBottom: 14,
 };
 
-const dividerStyle = {
-  height: 1,
-  backgroundColor: "rgba(255,255,255,0.08)",
-  margin: "32px 0 0 0",
-};
-
 const pageHeadingStyle = {
   fontSize: 32,
   fontWeight: 600,
@@ -236,7 +230,6 @@ export default function MethodologyPage() {
         The methodology described on this page is current as of the platform's most recent scoring run. Methodology evolves; when it does, this page will be updated first, and every surface in the platform that references the score will be updated to match.
       </p>
 
-      <div style={dividerStyle} />
     </AppLayout>
   );
 }

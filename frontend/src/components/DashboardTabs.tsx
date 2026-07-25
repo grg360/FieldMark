@@ -58,31 +58,16 @@ export default function DashboardTabs() {
     >
       {DASHBOARDS.map((t) => {
         const active = t.value === track;
-        const isSocial = t.value === "social";
-        const isFieldIntel = t.value === "field-intelligence";
-        const isTelescope = t.value === "telescope";
 
-        // Idle → warm ghost chip; active states set below.
+        // Idle → warm ghost chip; active → indigo selection (§5) for every tab.
         let activeBg = "transparent";
         let activeFg = "#8f8b83";
         let activeBorder = "1px solid rgba(255,255,255,0.08)";
 
         if (active) {
-          if (isSocial || isTelescope) {
-            activeBg = "#1A2530";
-            activeFg = "#6BA3D8";
-            activeBorder = "1px solid #2A3848";
-          } else if (isFieldIntel) {
-            activeBg = "rgba(120, 200, 255, 0.2)";
-            activeFg = "rgba(120, 200, 255, 1)";
-            activeBorder = "1px solid rgba(120, 200, 255, 0.35)";
-          } else {
-            // Active cohort → indigo (§5), not amber. Social/telescope/field-intel keep their
-            // own semantic blues above.
-            activeBg = "rgba(85,102,232,0.12)";
-            activeFg = "#AEB4F5";
-            activeBorder = "1px solid rgba(85,102,232,0.50)";
-          }
+          activeBg = "rgba(85,102,232,0.12)";
+          activeFg = "#AEB4F5";
+          activeBorder = "1px solid rgba(85,102,232,0.50)";
         }
 
         return (
