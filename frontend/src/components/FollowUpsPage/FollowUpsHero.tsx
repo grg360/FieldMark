@@ -6,10 +6,10 @@ interface Props {
 
 export default function FollowUpsHero({ stats }: Props) {
   return (
-    <div style={{ paddingBottom: 24, borderBottom: "1px solid #1E1E22", marginBottom: 0 }}>
+    <div style={{ paddingBottom: 24, borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 24, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-          <span style={{ fontSize: 52, fontWeight: 700, color: "#E8E6DF", lineHeight: 1 }}>
+          <span style={{ fontSize: 52, fontWeight: 700, letterSpacing: "-0.02em", color: "#F4F2EC", lineHeight: 1 }}>
             {stats?.open_total ?? 0}
           </span>
           <span style={{ fontSize: 14, color: "#9B9892", fontWeight: 500 }}>

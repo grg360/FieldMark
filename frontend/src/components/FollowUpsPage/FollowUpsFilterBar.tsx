@@ -14,9 +14,9 @@ interface Props {
 }
 
 const selectStyle = {
-  backgroundColor: "#0D0D10",
-  border: "1px solid #1E1E22",
-  borderRadius: 4,
+  backgroundColor: "#0d0c0b",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: 8,
   padding: "8px 12px",
   fontSize: 13,
   color: "#E8E6DF",

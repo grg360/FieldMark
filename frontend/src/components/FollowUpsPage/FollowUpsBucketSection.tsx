@@ -71,10 +71,10 @@ export default function FollowUpsBucketSection({
   return (
     <section>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", lineHeight: 1.2 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", lineHeight: 1.2 }}>
           {label}
         </div>
-        <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#77736B", textTransform: "uppercase", letterSpacing: "0.11em", marginTop: 4 }}>
           {rows.length} item{rows.length === 1 ? "" : "s"}
         </div>
       </div>
