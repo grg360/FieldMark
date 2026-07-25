@@ -32,6 +32,7 @@ export const COLOR = {
 
   // Accent — the ONLY accent (see §accent rule)
   amber: "#E8A020",
+  amberHover: "#F5D060", // hover state for amber interactive text (logo/wordmark)
   amberSoft: "rgba(232,160,32,0.16)", // dominant chart value / thesis-rule tint
 
   // Secondary — selection, links, bars, secondary actions
@@ -44,6 +45,7 @@ export const COLOR = {
   estGreen: "#5FA97E", // cohort / est chips
   violet: "#8B78E8", // belief / provenance strength
   info: "#4FA3C7", // bookmark / saved
+  danger: "#E8704E", // Sign Out / destructive actions
 
   // Hairlines — containment only, never separation
   hair: "rgba(255,255,255,0.045)",
