@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { FiToast } from "./FieldIntelligenceShared";
+import { COLOR, FONT } from "../lib/designTokens";
 
 const UTILITY_LINKS = ["About", "Methodology", "Privacy"] as const;
 const COMING_SOON_TOAST = "Coming soon";
@@ -12,8 +13,8 @@ const mutedTextStyle: CSSProperties = {
   padding: 0,
   fontSize: 11,
   lineHeight: LINE_HEIGHT,
-  color: "rgba(232, 230, 223, 0.5)",
-  fontFamily: "system-ui, sans-serif",
+  color: COLOR.ink4,
+  fontFamily: FONT.sans,
 };
 
 interface GlobalFooterProps {
@@ -46,7 +47,7 @@ export default function GlobalFooter({ onToast }: GlobalFooterProps) {
       <footer
         style={{
           width: "100%",
-          borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+          borderTop: `1px solid ${COLOR.hairStrong}`,
           paddingTop: 24,
           paddingBottom: 16,
           paddingLeft: 16,
@@ -98,7 +99,7 @@ export default function GlobalFooter({ onToast }: GlobalFooterProps) {
               gap: 4,
               fontSize: 11,
               lineHeight: LINE_HEIGHT,
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: FONT.sans,
               gridColumn: narrow ? 1 : 2,
               gridRow: narrow ? 2 : 1,
               justifySelf: narrow ? "start" : "end",
@@ -107,7 +108,7 @@ export default function GlobalFooter({ onToast }: GlobalFooterProps) {
             {UTILITY_LINKS.map((label, index) => (
               <span key={label} style={{ display: "inline-flex", alignItems: "baseline", gap: 4 }}>
                 {index > 0 ? (
-                  <span style={{ color: "rgba(232, 230, 223, 0.35)" }} aria-hidden>
+                  <span style={{ color: COLOR.ink5 }} aria-hidden>
                     ·
                   </span>
                 ) : null}
@@ -120,16 +121,16 @@ export default function GlobalFooter({ onToast }: GlobalFooterProps) {
                     padding: 0,
                     margin: 0,
                     cursor: "pointer",
-                    color: "rgba(232, 230, 223, 0.5)",
+                    color: COLOR.ink4,
                     fontSize: 11,
                     lineHeight: LINE_HEIGHT,
                     fontFamily: "inherit",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "rgba(232, 230, 223, 0.75)";
+                    e.currentTarget.style.color = COLOR.ink2;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "rgba(232, 230, 223, 0.5)";
+                    e.currentTarget.style.color = COLOR.ink4;
                   }}
                 >
                   {label}
@@ -145,9 +146,9 @@ export default function GlobalFooter({ onToast }: GlobalFooterProps) {
               fontSize: 14,
               fontWeight: 500,
               lineHeight: LINE_HEIGHT,
-              color: "#E8A020",
+              color: COLOR.amber,
               letterSpacing: "0.09em",
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: FONT.sans,
               gridColumn: narrow ? 1 : 1,
               gridRow: narrow ? 1 : 1,
             }}
