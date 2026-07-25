@@ -14,13 +14,21 @@ export interface PulseWindow {
   current_end: string;
   prior_start: string;
   prior_end: string;
-  lag_days: number;
-  window_days: number;
+  lag_months: number;
+  window_months: number;
 }
 
 export interface PulseTotals {
   current_pubs: number;
   prior_pubs: number;
+}
+
+// One point on the monthly publication curve (payload input for a later component;
+// carried through the types now, not yet rendered).
+export interface PulseMonthly {
+  /** First-of-month ISO date, e.g. "2026-04-01". */
+  month: string;
+  pubs: number;
 }
 
 export interface PulseTheme {
@@ -53,10 +61,16 @@ export interface PulseEvent {
 export interface PulsePayload {
   therapeutic_area: string;
   generated_at: string;
+  /** Time grain of the windows. Day grain is unsupported (most pub_dates are month-precision). */
+  grain: "month";
   window: PulseWindow;
   totals: PulseTotals;
   themes: PulseTheme[];
   events: PulseEvent[];
+  /** Monthly publication counts spanning both windows (input for the not-yet-built curve). */
+  monthly: PulseMonthly[];
+  /** Data-quality caveats to surface in the UI verbatim — never hide these. */
+  caveats: string[];
 }
 
 // ── Rule 1: the display gate ────────────────────────────────────────────────
@@ -147,6 +161,38 @@ export function formatWindowDate(iso: string): string {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+// ── Month-grain formatting (windows are month-precision; see caveats) ────────
+// "Apr 2026" from a first-of-month ISO date.
+export function formatMonthLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+// First-of-month ISO one month earlier, e.g. "2026-07-01" → "2026-06-01".
+export function priorMonthIso(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setUTCMonth(d.getUTCMonth() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Inclusive month range for a window whose end is EXCLUSIVE (first-of-next-month).
+// start "2026-04-01", endExclusive "2026-07-01" → "Apr–Jun 2026" (collapses the shared year).
+export function formatMonthRange(startIso: string, endExclusiveIso: string): string {
+  const start = new Date(`${startIso}T00:00:00Z`);
+  const lastInclusive = new Date(`${priorMonthIso(endExclusiveIso)}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(lastInclusive.getTime())) {
+    return `${startIso}–${endExclusiveIso}`;
+  }
+  const sameYear = start.getUTCFullYear() === lastInclusive.getUTCFullYear();
+  const startMonth = start.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  if (sameYear) {
+    return `${startMonth}–${formatMonthLabel(lastInclusive.toISOString().slice(0, 10))}`;
+  }
+  return `${formatMonthLabel(startIso)}–${formatMonthLabel(lastInclusive.toISOString().slice(0, 10))}`;
 }
 
 export function themesRankedByCurrent(themes: PulseTheme[]): PulseTheme[] {
