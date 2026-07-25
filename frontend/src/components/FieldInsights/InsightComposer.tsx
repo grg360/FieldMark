@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
+import { track } from "../../lib/analytics";
 import {
   createNote,
   updateNote,
@@ -266,6 +267,13 @@ export default function InsightComposer({
           insightCategoryOtherLabel: insightCategory === "other" ? trimmedCategoryOther : null,
           whyItMatters: trimmedWhy.length > 0 ? trimmedWhy : null,
           interactionTypeOtherLabel: interactionType === "other" && trimmedInteractionOther.length > 0 ? trimmedInteractionOther : null,
+        });
+        // Fires only on a successful NEW insight (createNote resolved). Enums only —
+        // never the note body or the free-text "other" labels.
+        track("insight_captured", {
+          insight_strength: insightStrength,
+          interaction_type: interactionType,
+          insight_category: insightCategory,
         });
       }
 

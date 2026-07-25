@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { track } from "./analytics";
 
 export type RelationshipStatus =
   | "not_engaged"
@@ -385,6 +386,10 @@ export async function createNextAction(
 
     const action = data as NextAction;
 
+    // Fires only after the insert confirms. Covers both callers (brief save +
+    // inline composer); created_from is an enum, no PII.
+    track("followup_created", { created_from: params.createdFrom ?? "hcp_detail_followup" });
+
     const { error: relError } = await supabase
       .from("msl_hcp_relationships")
       .update({ last_interaction_at: new Date().toISOString() })
@@ -527,6 +532,13 @@ export async function updateNextAction(
     }
 
     const action = data as NextAction;
+
+    // Fires only on a successful completion. Gated on completedAt being truthy —
+    // it's only ever set to a timestamp (no un-complete path), so no false
+    // positives from snooze/edit updates. Covers both completion call sites.
+    if (updates.completedAt) {
+      track("followup_completed");
+    }
 
     if (updates.completedAt !== undefined) {
       const { error: relError } = await supabase

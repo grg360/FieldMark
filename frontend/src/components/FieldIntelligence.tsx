@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { track } from "../lib/analytics";
 import { getRecentPosts, therapeuticAreaToChannel } from "../data/mockFieldIntelligencePosts";import { buildFieldIntelligenceThreadPath, taLabelToSlug } from "../lib/routeSlugs";
 import { FiAvatar, FiMslVerified } from "./FieldIntelligenceShared";
 import FieldIntelligenceThread from "./FieldIntelligenceThread";
@@ -21,6 +22,13 @@ export default function FieldIntelligence({
   const params = useParams();
   const location = useLocation();
   const channel = therapeuticAreaToChannel(therapeuticArea);
+
+  // Appetite signal: fires when the Field Intelligence screen opens (and on TA
+  // change). Reader-side only — the post/reply flow is still mock, so those
+  // events (and is_seeded) are deferred until FI has a real backend.
+  useEffect(() => {
+    track("field_intel_viewed", { therapeutic_area: taLabelToSlug(therapeuticArea) });
+  }, [therapeuticArea]);
 
   const recentPosts = useMemo(() => {
     const taPosts = channel ? getRecentPosts(20, channel) : [];
