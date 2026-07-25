@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { BriefRef } from "../../lib/home";
 import { formatRelative } from "../FieldInsights/dateFormat";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -12,21 +13,12 @@ export default function RecentBriefsTile({ briefs }: Props) {
 
   return (
     <HomeTile>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ ...TYPE.eyebrow, marginBottom: 12 }}>
         Recent Briefs
       </div>
 
       {briefs.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: COLOR.ink3, lineHeight: 1.5 }}>
           No briefs generated yet. Generate one from any HCP.
         </div>
       ) : (
@@ -36,7 +28,7 @@ export default function RecentBriefsTile({ briefs }: Props) {
               key={brief.id}
               style={{
                 padding: "12px 0",
-                borderBottom: index < briefs.length - 1 ? "1px solid #1E1E22" : "none",
+                borderBottom: index < briefs.length - 1 ? `1px solid ${COLOR.hair}` : "none",
               }}
             >
               <button
@@ -48,7 +40,7 @@ export default function RecentBriefsTile({ briefs }: Props) {
                   padding: 0,
                   fontSize: 14,
                   fontWeight: 500,
-                  color: "#E8E6DF",
+                  color: COLOR.ink1,
                   cursor: "pointer",
                   fontFamily: "inherit",
                   display: "inline-flex",
@@ -60,7 +52,7 @@ export default function RecentBriefsTile({ briefs }: Props) {
                 {brief.hcp_name}
                 <span style={{ fontSize: 12 }}>{String.fromCodePoint(0x2728)}</span>
               </button>
-              <div style={{ fontSize: 11, color: "#6B6A65" }}>
+              <div style={{ fontSize: 11, color: COLOR.ink4 }}>
                 {formatRelative(brief.generated_at)}
               </div>
             </div>

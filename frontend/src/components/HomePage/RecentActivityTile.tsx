@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ActivityEvent, ActivityEventType } from "../../lib/home";
 import { formatRelative } from "../FieldInsights/dateFormat";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -148,21 +149,12 @@ export default function RecentActivityTile({ activity }: Props) {
 
   return (
     <HomeTile>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ ...TYPE.eyebrow, marginBottom: 12 }}>
         Recent Relationship Activity
       </div>
 
       {activity.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: COLOR.ink3, lineHeight: 1.5 }}>
           Your activity will appear here as you work.
         </div>
       ) : (
@@ -171,16 +163,7 @@ export default function RecentActivityTile({ activity }: Props) {
             const collapsed = collapseEvents(group.events);
             return (
               <div key={group.label} style={{ marginBottom: 16 }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "#6B6A65",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    fontWeight: 500,
-                    marginBottom: 8,
-                  }}
-                >
+                <div style={{ ...TYPE.microLabel, marginBottom: 8 }}>
                   {group.label}
                 </div>
                 {collapsed.map((entry, index) => {
@@ -203,7 +186,7 @@ export default function RecentActivityTile({ activity }: Props) {
                         gap: 12,
                         padding: "10px 0",
                         borderBottom:
-                          index < collapsed.length - 1 ? "1px solid #1E1E22" : "none",
+                          index < collapsed.length - 1 ? `1px solid ${COLOR.hair}` : "none",
                         cursor: "pointer",
                       }}
                     >
@@ -211,10 +194,10 @@ export default function RecentActivityTile({ activity }: Props) {
                         {eventIcon(event.type)}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.4 }}>
+                        <div style={{ fontSize: 13, color: COLOR.ink1, lineHeight: 1.4 }}>
                           {entry.label}
                         </div>
-                        <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: COLOR.ink4, marginTop: 2 }}>
                           {formatRelative(event.timestamp)}
                         </div>
                       </div>

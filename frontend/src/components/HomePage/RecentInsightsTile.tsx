@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import type { InsightWithHcp } from "../../lib/home";
 import { formatRelative } from "../FieldInsights/dateFormat";
+import { COLOR, TYPE } from "../../lib/designTokens";
 import HomeTile from "./HomeTile";
 
 interface Props {
@@ -46,21 +47,12 @@ export default function RecentInsightsTile({ insights }: Props) {
 
   return (
     <HomeTile>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B6A65",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ ...TYPE.eyebrow, marginBottom: 12 }}>
         Recent Insights
       </div>
 
       {insights.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#9B9892", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: COLOR.ink3, lineHeight: 1.5 }}>
           No insights recorded yet. Start capturing what you observe.
         </div>
       ) : (
@@ -72,7 +64,7 @@ export default function RecentInsightsTile({ insights }: Props) {
                 key={insight.id}
                 style={{
                   padding: "12px 0",
-                  borderBottom: index < insights.length - 1 ? "1px solid #1E1E22" : "none",
+                  borderBottom: index < insights.length - 1 ? `1px solid ${COLOR.hair}` : "none",
                 }}
               >
                 <button
@@ -84,7 +76,7 @@ export default function RecentInsightsTile({ insights }: Props) {
                     padding: 0,
                     fontSize: 14,
                     fontWeight: 500,
-                    color: "#E8E6DF",
+                    color: COLOR.ink1,
                     cursor: "pointer",
                     fontFamily: "inherit",
                     marginBottom: 6,
@@ -108,12 +100,12 @@ export default function RecentInsightsTile({ insights }: Props) {
                       {interactionTypeLabel(insight.interaction_type)}
                     </span>
                   ) : null}
-                  <span style={{ fontSize: 11, color: "#6B6A65" }}>
+                  <span style={{ fontSize: 11, color: COLOR.ink4 }}>
                     {formatRelative(insight.occurred_at)}
                   </span>
                 </div>
 
-                <p style={{ fontSize: 13, color: "#9B9892", margin: 0, lineHeight: 1.4 }}>
+                <p style={{ fontSize: 13, color: COLOR.ink3, margin: 0, lineHeight: 1.4 }}>
                   {truncate(insight.body, 100)}
                 </p>
               </div>
