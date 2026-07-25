@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { HomeSummaryCounts, TerritoryProfile } from "../../lib/home";
+import { COLOR, FONT, TYPE } from "../../lib/designTokens";
 
 interface Props {
   firstName: string;
@@ -19,9 +20,9 @@ function pluralize(count: number, singular: string, plural: string): string {
 }
 
 const pillStyle = {
-  backgroundColor: "#1E1E22",
-  color: "#E8E6DF",
-  border: "none",
+  backgroundColor: COLOR.surfaceRaised,
+  color: COLOR.ink2,
+  border: `1px solid ${COLOR.hair}`,
   borderRadius: 3,
   padding: "3px 8px",
   fontSize: 10,
@@ -30,7 +31,7 @@ const pillStyle = {
   letterSpacing: "0.05em",
   lineHeight: 1.2,
   cursor: "pointer",
-  fontFamily: "system-ui, -apple-system, sans-serif",
+  fontFamily: FONT.sans,
 };
 
 export default function HomeHero({ firstName, summary, territory }: Props) {
@@ -54,18 +55,18 @@ export default function HomeHero({ firstName, summary, territory }: Props) {
   );
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 600, color: "#E8E6DF", margin: "0 0 8px 0" }}>
+    <div style={{ fontFamily: FONT.sans }}>
+      <h1 style={{ ...TYPE.display, margin: "0 0 8px 0" }}>
         {getGreeting()}, {firstName}.
       </h1>
 
-      <p style={{ fontSize: 14, color: "#9B9892", margin: "0 0 16px 0", lineHeight: 1.5 }}>
-        <span style={{ color: summary.overdue_followups > 0 ? "#E8A020" : "#9B9892" }}>
+      <p style={{ fontSize: 14, color: COLOR.ink3, margin: "0 0 16px 0", lineHeight: 1.5 }}>
+        <span style={{ color: summary.overdue_followups > 0 ? COLOR.amber : COLOR.ink3 }}>
           {summary.overdue_followups} {overdueLabel}
         </span>
-        <span style={{ color: "#6B6A65" }}> {String.fromCharCode(0x00B7)} </span>
+        <span style={{ color: COLOR.ink4 }}> {String.fromCharCode(0x00B7)} </span>
         <span>{summary.open_followups} {openLabel}</span>
-        <span style={{ color: "#6B6A65" }}> {String.fromCharCode(0x00B7)} </span>
+        <span style={{ color: COLOR.ink4 }}> {String.fromCharCode(0x00B7)} </span>
         <span>{summary.watched_hcps} {watchedLabel}</span>
       </p>
 
@@ -89,7 +90,7 @@ export default function HomeHero({ firstName, summary, territory }: Props) {
       </div>
 
       {hasTerritoryData ? (
-        <p style={{ fontSize: 12, color: "#6B6A65", margin: 0, lineHeight: 1.4 }}>
+        <p style={{ fontSize: 12, color: COLOR.ink4, margin: 0, lineHeight: 1.4 }}>
           {label}
           {label && states.length > 0 ? ` ${middot} ` : ""}
           {states.join(` ${middot} `)}
