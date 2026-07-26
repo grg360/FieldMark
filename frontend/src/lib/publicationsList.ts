@@ -114,48 +114,18 @@ export async function getPublicationsByInternalPair(
   limit: number = 50,
 ): Promise<PublicationListRow[]> {
   try {
-    const { data: hcp1Auth } = await supabase
-      .from("publication_authors_v2")
-      .select("publication_id")
-      .eq("hcp_id", hcp1Id);
-
-    const hcp1PubIds = new Set((hcp1Auth ?? []).map((a: { publication_id: string }) => a.publication_id));
-    if (hcp1PubIds.size === 0) return [];
-
-    const { data: hcp2Auth } = await supabase
-      .from("publication_authors_v2")
-      .select("publication_id")
-      .eq("hcp_id", hcp2Id);
-
-    const sharedPubIds = (hcp2Auth ?? [])
-      .map((a: { publication_id: string }) => a.publication_id)
-      .filter((id: string) => hcp1PubIds.has(id));
-
-    if (sharedPubIds.length === 0) return [];
-
-    const CHUNK_SIZE = 100;
-    const allPubs: PublicationListRow[] = [];
-
-    for (let i = 0; i < sharedPubIds.length; i += CHUNK_SIZE) {
-      const chunk = sharedPubIds.slice(i, i + CHUNK_SIZE);
-      const { data } = await supabase
-        .from("publications_v2")
-        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi, pubmed_authorships")
-        .in("id", chunk);
-
-      for (const row of (data ?? []) as PublicationDbRow[]) {
-        allPubs.push(mapPublicationRow(row));
-      }
-    }
-
-    allPubs.sort((a, b) => {
-      const aCites = a.citation_count ?? 0;
-      const bCites = b.citation_count ?? 0;
-      if (bCites !== aCites) return bCites - aCites;
-      return (b.pub_year ?? 0) - (a.pub_year ?? 0);
+    // DB-side intersection (get_shared_publications RPC): a single
+    // publication_authors_v2 self-join, ordered + limited in SQL. Replaces the
+    // former client-side fetch-both-then-intersect, which relied on the implicit
+    // 1000-row PostgREST cap and would silently drop shared papers for any author
+    // exceeding it as the corpus grows.
+    const { data, error } = await supabase.rpc("get_shared_publications", {
+      p_hcp1: hcp1Id,
+      p_hcp2: hcp2Id,
+      p_limit: limit,
     });
-
-    return allPubs.slice(0, limit);
+    if (error || !data) return [];
+    return (data as PublicationDbRow[]).map(mapPublicationRow);
   } catch (err) {
     console.warn("getPublicationsByInternalPair: error", err);
     return [];
