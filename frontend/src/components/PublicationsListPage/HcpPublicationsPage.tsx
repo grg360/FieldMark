@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import {
   getPublicationsForHcp,
   type PublicationListRow,
 } from "../../lib/publicationsList";
 import { resolvePrimaryTaId, taDisplayNameForId } from "../../lib/api";
+import { COLOR, TYPE } from "../../lib/designTokens";
+import AppLayout from "../AppLayout";
 import PublicationCard from "./PublicationCard";
 
 export default function HcpPublicationsPage() {
   const { id: hcpId } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const location = useLocation();
   const navTaId = (location.state as { taId?: string } | null)?.taId;
   const [taId, setTaId] = useState<string | undefined>(navTaId);
@@ -60,40 +61,25 @@ export default function HcpPublicationsPage() {
     };
   }, [hcpId, taId]);
 
-  function goBack() {
-    if (hcpId) navigate(`/hcp/${hcpId}`);
-    else navigate(-1);
-  }
+  const breadcrumbs = [
+    { label: "Home", path: "/me" },
+    ...(hcpId ? [{ label: hcpName || "Profile", path: `/hcp/${hcpId}` }] : []),
+    { label: "Publications" },
+  ];
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <button
-        type="button"
-        onClick={goBack}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#9B6DFF",
-          fontSize: 13,
-          cursor: "pointer",
-          padding: 0,
-          marginBottom: 16,
-        }}
-      >
-        {String.fromCharCode(0x2190)} Back to profile
-      </button>
-
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0, marginBottom: 6 }}>
+    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1000}>
+      <h1 style={{ ...TYPE.display, fontSize: 22, margin: 0, marginBottom: 6 }}>
         Source Publications
       </h1>
-      <div style={{ fontSize: 13, color: "#9B9892", marginBottom: 24 }}>
+      <div style={{ fontSize: 13, color: COLOR.ink3, marginBottom: 24 }}>
         {hcpName ? `Senior/first-authored ${taId ? `${taDisplayNameForId(taId)} ` : ""}publications backing ${hcpName}'s scientific positions` : `Senior/first-authored ${taId ? `${taDisplayNameForId(taId)} ` : ""}publications backing this investigator's scientific positions`}
       </div>
 
       {loading ? (
-        <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0" }}>Loading publications...</div>
+        <div style={{ fontSize: 13, color: COLOR.ink4, padding: "24px 0" }}>Loading publications...</div>
       ) : pubs.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0" }}>No source publications found.</div>
+        <div style={{ fontSize: 13, color: COLOR.ink4, padding: "24px 0" }}>No source publications found.</div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 16 }}>
           {pubs.map((pub) => (
@@ -101,7 +87,7 @@ export default function HcpPublicationsPage() {
           ))}
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }
 

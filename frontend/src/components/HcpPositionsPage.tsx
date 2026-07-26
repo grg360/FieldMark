@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import {
   getAllPositionsForHcp,
   type EvidencePosition,
@@ -8,6 +8,8 @@ import {
 } from "../lib/scientificPositions";
 import { resolvePrimaryTaId, taDisplayNameForId } from "../lib/api";
 import { supabase } from "../lib/supabase";
+import { COLOR, ELEVATION, TYPE } from "../lib/designTokens";
+import AppLayout from "./AppLayout";
 
 const POLARITY_OPTIONS: { value: PositionType | "all"; label: string; color: string }[] = [
   { value: "all", label: "All", color: "#9B9892" },
@@ -42,7 +44,6 @@ function polarityLabel(type: PositionType): string {
 
 export default function HcpPositionsPage() {
   const { id: hcpId } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const location = useLocation();
   const navTaId = (location.state as { taId?: string } | null)?.taId;
   const [taId, setTaId] = useState<string | undefined>(navTaId);
@@ -112,33 +113,18 @@ export default function HcpPositionsPage() {
     return byPolarity;
   }, [positions]);
 
-  function goBack() {
-    if (hcpId) navigate(`/hcp/${hcpId}`);
-    else navigate(-1);
-  }
+  const breadcrumbs = [
+    { label: "Home", path: "/me" },
+    ...(hcpId ? [{ label: hcpName || "Profile", path: `/hcp/${hcpId}` }] : []),
+    { label: "Scientific Positions" },
+  ];
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <button
-        type="button"
-        onClick={goBack}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#9B6DFF",
-          fontSize: 13,
-          cursor: "pointer",
-          padding: 0,
-          marginBottom: 16,
-        }}
-      >
-        {String.fromCharCode(0x2190)} Back to profile
-      </button>
-
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0, marginBottom: 6 }}>
+    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1000}>
+      <h1 style={{ ...TYPE.display, fontSize: 22, margin: 0, marginBottom: 6 }}>
         All Scientific Positions
       </h1>
-      <div style={{ fontSize: 13, color: "#9B9892", marginBottom: 24 }}>
+      <div style={{ fontSize: 13, color: COLOR.ink3, marginBottom: 24 }}>
         {hcpName
           ? `All extracted scientific positions for ${hcpName}${taId ? ` (${taDisplayNameForId(taId)})` : ""}`
           : `All extracted scientific positions for this investigator${taId ? ` (${taDisplayNameForId(taId)})` : ""}`}
@@ -160,8 +146,8 @@ export default function HcpPositionsPage() {
                 borderRadius: 999,
                 cursor: "pointer",
                 backgroundColor: active ? `${opt.color}26` : "transparent",
-                color: active ? opt.color : "#9B9892",
-                border: `1px solid ${active ? opt.color : "#1E1E22"}`,
+                color: active ? opt.color : COLOR.ink3,
+                border: `1px solid ${active ? opt.color : COLOR.hairStrong}`,
               }}
             >
               {opt.label} ({count})
@@ -177,9 +163,9 @@ export default function HcpPositionsPage() {
           style={{
             fontSize: 13,
             padding: "6px 10px",
-            backgroundColor: "#0D0D10",
-            color: "#E8E6DF",
-            border: "1px solid #1E1E22",
+            backgroundColor: COLOR.surfaceWell,
+            color: COLOR.ink1,
+            border: `1px solid ${COLOR.hairStrong}`,
             borderRadius: 6,
             cursor: "pointer",
           }}
@@ -193,9 +179,9 @@ export default function HcpPositionsPage() {
       </div>
 
       {loading ? (
-        <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0" }}>Loading positions...</div>
+        <div style={{ fontSize: 13, color: COLOR.ink4, padding: "24px 0" }}>Loading positions...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#6B6A65", padding: "24px 0" }}>
+        <div style={{ fontSize: 13, color: COLOR.ink4, padding: "24px 0" }}>
           No positions match the current filters.
         </div>
       ) : (
@@ -205,7 +191,7 @@ export default function HcpPositionsPage() {
           ))}
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }
 
@@ -217,11 +203,9 @@ function PositionRow({ pos }: { pos: EvidencePosition }) {
   return (
     <div
       style={{
+        ...ELEVATION.card,
         padding: "16px 18px",
-        backgroundColor: "#0D0D10",
-        border: "1px solid #1E1E22",
         borderLeft: `3px solid ${color}`,
-        borderRadius: 8,
       }}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
@@ -238,38 +222,38 @@ function PositionRow({ pos }: { pos: EvidencePosition }) {
           {label}
         </span>
         {pos.position_category ? (
-          <span style={{ fontSize: 11, color: "#9B9892" }}>{pos.position_category}</span>
+          <span style={{ fontSize: 11, color: COLOR.ink3 }}>{pos.position_category}</span>
         ) : null}
         {pos.drug_name ? (
-          <span style={{ fontSize: 11, color: "#9B9892" }}>
+          <span style={{ fontSize: 11, color: COLOR.ink3 }}>
             {bullet} {pos.drug_name}
           </span>
         ) : null}
         {pos.biomarker ? (
-          <span style={{ fontSize: 11, color: "#9B9892" }}>
+          <span style={{ fontSize: 11, color: COLOR.ink3 }}>
             {bullet} {pos.biomarker}
           </span>
         ) : null}
       </div>
 
-      <div style={{ fontSize: 13, color: "#E8E6DF", lineHeight: 1.5, marginBottom: 8 }}>
+      <div style={{ fontSize: 13, color: COLOR.ink1, lineHeight: 1.5, marginBottom: 8 }}>
         {pos.position_text}
       </div>
 
       <div
         style={{
+          ...TYPE.bodyProse,
           fontSize: 12,
-          color: "#6B6A65",
-          fontStyle: "italic",
+          color: COLOR.ink4,
           marginLeft: 10,
           marginBottom: 10,
-          lineHeight: 1.5,
+          lineHeight: 1.6,
         }}
       >
         &quot;{pos.evidence_excerpt}&quot;
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 11, color: "#6B6A65" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 11, color: COLOR.ink4 }}>
         {pos.pub_year ? <span>{pos.pub_year}</span> : null}
         {pos.journal ? <span>{bullet} {pos.journal}</span> : null}
         {pos.citation_count != null ? <span>{bullet} {pos.citation_count} citations</span> : null}
@@ -278,7 +262,7 @@ function PositionRow({ pos }: { pos: EvidencePosition }) {
             href={`https://doi.org/${pos.doi}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "#9B6DFF", textDecoration: "none" }}
+            style={{ color: COLOR.indigoLink, textDecoration: "none" }}
           >
             {bullet} DOI
           </a>
@@ -288,7 +272,7 @@ function PositionRow({ pos }: { pos: EvidencePosition }) {
             href={`https://pubmed.ncbi.nlm.nih.gov/${pos.pubmed_id}/`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "#9B6DFF", textDecoration: "none" }}
+            style={{ color: COLOR.indigoLink, textDecoration: "none" }}
           >
             {bullet} PubMed
           </a>

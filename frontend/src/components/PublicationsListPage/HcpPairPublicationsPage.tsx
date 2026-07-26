@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import {
   getPublicationsByInternalPair,
   type PublicationListRow,
 } from "../../lib/publicationsList";
+import { COLOR } from "../../lib/designTokens";
+import AppLayout from "../AppLayout";
 import PublicationCard from "./PublicationCard";
 
 async function fetchHcpName(hcpId: string): Promise<string> {
@@ -19,7 +21,6 @@ async function fetchHcpName(hcpId: string): Promise<string> {
 
 export default function HcpPairPublicationsPage() {
   const { id: hcpId, partnerId } = useParams<{ id: string; partnerId: string }>();
-  const navigate = useNavigate();
   const [pubs, setPubs] = useState<PublicationListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [hcpName, setHcpName] = useState<string>("");
@@ -51,10 +52,6 @@ export default function HcpPairPublicationsPage() {
     };
   }, [hcpId, partnerId]);
 
-  function goBack() {
-    navigate(-1);
-  }
-
   const arrow = String.fromCharCode(0x2194);
   const headerTitle = hcpName && partnerName
     ? `${hcpName} ${arrow} ${partnerName}`
@@ -63,37 +60,28 @@ export default function HcpPairPublicationsPage() {
     ? `${pubs.length} shared publication${pubs.length === 1 ? "" : "s"}`
     : "";
 
+  const breadcrumbs = [
+    { label: "Home", path: "/me" },
+    ...(hcpId ? [{ label: hcpName || "Profile", path: `/hcp/${hcpId}` }] : []),
+    { label: "Shared publications" },
+  ];
+
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <button
-        type="button"
-        onClick={goBack}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#9B6DFF",
-          fontSize: 13,
-          cursor: "pointer",
-          padding: 0,
-          marginBottom: 16,
-        }}
-      >
-        {String.fromCharCode(0x2190)} Back
-      </button>
+    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1000}>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 22, color: "#E8E6DF", fontWeight: 600, marginBottom: 4 }}>
+        <div style={{ fontSize: 22, color: COLOR.ink1, fontWeight: 600, marginBottom: 4 }}>
           {headerTitle}
         </div>
         {headerSubtitle && (
-          <div style={{ fontSize: 13, color: "#9B9892" }}>
+          <div style={{ fontSize: 13, color: COLOR.ink3 }}>
             {headerSubtitle}
           </div>
         )}
       </div>
       {loading ? (
-        <div style={{ fontSize: 13, color: "#6B6A65" }}>Loading publications...</div>
+        <div style={{ fontSize: 13, color: COLOR.ink4 }}>Loading publications...</div>
       ) : pubs.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#6B6A65" }}>No shared publications found.</div>
+        <div style={{ fontSize: 13, color: COLOR.ink4 }}>No shared publications found.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {pubs.map((pub) => (
@@ -101,6 +89,6 @@ export default function HcpPairPublicationsPage() {
           ))}
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }
