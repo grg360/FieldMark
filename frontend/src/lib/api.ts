@@ -1,4 +1,5 @@
 import { firstEmbedded } from "./cohort-metrics";
+import { formatByline } from "./authorByline";
 import { dedupeHCPs } from "./hcp-dedupe";
 import { countriesForRegion, type RegionKey } from "./regions";
 import { resolveFilterScope } from "./rank-filters";
@@ -2714,39 +2715,9 @@ export interface BibliographyPaper {
   journal: string | null;
   citations: number | null;
   isFirstAuthor: boolean;
-  coAuthors: string;
-}
-
-interface PubmedAuthorshipEntry {
-  position?: number | null;
-  fore_name?: string | null;
-  last_name?: string | null;
-  initials?: string | null;
-}
-
-function formatCoAuthors(
-  pubmedAuthorships: unknown,
-  currentHcpAuthorPosition: number | null,
-): string {
-  if (!Array.isArray(pubmedAuthorships)) return "";
-  const others: string[] = [];
-  for (const entry of pubmedAuthorships as PubmedAuthorshipEntry[]) {
-    if (!entry || typeof entry !== "object") continue;
-    if (
-      currentHcpAuthorPosition != null &&
-      entry.position === currentHcpAuthorPosition
-    ) {
-      continue;
-    }
-    const last = (entry.last_name ?? "").trim();
-    const initials = (entry.initials ?? "").trim();
-    if (!last) continue;
-    others.push(initials ? `${last} ${initials}` : last);
-  }
-  if (others.length === 0) return "";
-  const shown = others.slice(0, 3).join(", ");
-  const remaining = others.length - 3;
-  return remaining > 0 ? `${shown}, + ${remaining} more` : shown;
+  // Full citation-style byline in author order, including the subject HCP and
+  // collective/consortium authors. See lib/authorByline.
+  authors: string;
 }
 
 export async function getPublicationsByYearForHcp(
@@ -2798,7 +2769,7 @@ export async function getPublicationsByYearForHcp(
       journal: pub.journal,
       citations: pub.citation_count,
       isFirstAuthor: row.is_first_author === true,
-      coAuthors: formatCoAuthors(pub.pubmed_authorships, row.author_position),
+      authors: formatByline(pub.pubmed_authorships),
     });
   }
   papers.sort((a, b) => (b.citations ?? 0) - (a.citations ?? 0));

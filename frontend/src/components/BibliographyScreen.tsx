@@ -73,11 +73,11 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
         {paper.title}
       </div>
 
-      {/* Row 3: journal + co-authors */}
+      {/* Row 3: journal + full author byline */}
       <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.4 }}>
         {paper.journal ? <span style={{ color: COLOR.amber }}>{paper.journal}</span> : null}
-        {paper.journal && paper.coAuthors ? <span style={{ color: COLOR.ink5 }}> · </span> : null}
-        {paper.coAuthors ? <span style={{ color: COLOR.ink4 }}>{paper.coAuthors}</span> : null}
+        {paper.journal && paper.authors ? <span style={{ color: COLOR.ink5 }}> · </span> : null}
+        {paper.authors ? <span style={{ color: COLOR.ink4 }}>{paper.authors}</span> : null}
       </div>
 
       {/* Row 4: PMID + view abstract */}

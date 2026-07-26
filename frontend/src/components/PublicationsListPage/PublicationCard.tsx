@@ -1,12 +1,18 @@
 import type { PublicationListRow } from "../../lib/publicationsList";
+import { formatByline } from "../../lib/authorByline";
 import { COLOR, ELEVATION, FONT } from "../../lib/designTokens";
 
 interface Props {
   pub: PublicationListRow;
 }
 
+// Collaborator/standalone cards have room; cap the byline at 10 names then
+// "+ N more" so long consortium lists don't bury the title.
+const BYLINE_CAP = 10;
+
 export default function PublicationCard({ pub }: Props) {
   const pubmedUrl = pub.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pub.pmid}/` : null;
+  const byline = formatByline(pub.pubmed_authorships, BYLINE_CAP);
 
   return (
     <div
@@ -55,8 +61,8 @@ export default function PublicationCard({ pub }: Props) {
 
       <div style={{ fontSize: 12, color: COLOR.ink3, marginBottom: 8, lineHeight: 1.4 }}>
         {pub.journal ? <span style={{ color: COLOR.amber }}>{pub.journal}</span> : null}
-        {pub.journal ? <span> · </span> : null}
-        <span>Authors not available</span>
+        {pub.journal && byline ? <span> · </span> : null}
+        <span>{byline || "Authors not available"}</span>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: COLOR.ink4 }}>

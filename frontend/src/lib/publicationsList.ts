@@ -11,6 +11,8 @@ export interface PublicationListRow {
   doi: string | null;
   is_first_author?: boolean;
   author_position?: number | null;
+  // Raw pubmed_authorships JSON; PublicationCard formats it into a byline.
+  pubmed_authorships?: unknown;
 }
 
 type PublicationDbRow = {
@@ -22,6 +24,7 @@ type PublicationDbRow = {
   pub_date: string | null;
   citation_count: number | null;
   doi: string | null;
+  pubmed_authorships: unknown;
 };
 
 function mapPublicationRow(row: PublicationDbRow): PublicationListRow {
@@ -34,6 +37,7 @@ function mapPublicationRow(row: PublicationDbRow): PublicationListRow {
     pub_date: row.pub_date,
     citation_count: row.citation_count,
     doi: row.doi,
+    pubmed_authorships: row.pubmed_authorships,
   };
 }
 
@@ -82,7 +86,7 @@ export async function getPublicationsByTheme(
       const chunk = pmids.slice(i, i + CHUNK_SIZE);
       const { data } = await supabase
         .from("publications_v2")
-        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi")
+        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi, pubmed_authorships")
         .in("pubmed_id", chunk);
 
       for (const row of (data ?? []) as PublicationDbRow[]) {
@@ -136,7 +140,7 @@ export async function getPublicationsByInternalPair(
       const chunk = sharedPubIds.slice(i, i + CHUNK_SIZE);
       const { data } = await supabase
         .from("publications_v2")
-        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi")
+        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi, pubmed_authorships")
         .in("id", chunk);
 
       for (const row of (data ?? []) as PublicationDbRow[]) {
@@ -216,7 +220,7 @@ export async function getPublicationsByPartner(
       const chunk = sharedIdsArr.slice(i, i + CHUNK_SIZE);
       const { data } = await supabase
         .from("publications_v2")
-        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi")
+        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi, pubmed_authorships")
         .in("id", chunk);
       for (const row of (data ?? []) as PublicationDbRow[]) {
         allPubs.push(mapPublicationRow(row));
@@ -267,7 +271,7 @@ export async function getPublicationsForHcp(
       const chunk = publicationIds.slice(i, i + CHUNK_SIZE);
       const { data, error } = await supabase
         .from("publications_v2")
-        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi")
+        .select("id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi, pubmed_authorships")
         .in("id", chunk);
 
       if (error) {
