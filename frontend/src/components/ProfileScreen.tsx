@@ -8,16 +8,13 @@ import {
   clearMslProfileCache,
   type MslProfile,
 } from "../lib/authHelpers";
-
-const BackArrow = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <path d="M12 3l-6 6 6 6" stroke="#6B6A65" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+import { COLOR } from "../lib/designTokens";
+import TopBar from "./TopBar";
+import GlobalFooter from "./GlobalFooter";
 
 const ChevronRight = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <path d="M6 4l4 4-4 4" stroke="#3A3A3F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M6 4l4 4-4 4" stroke={COLOR.ink5} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -121,7 +118,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
           width: 16,
           height: 16,
           borderRadius: "50%",
-          backgroundColor: on ? "#1D9E75" : "#6B6A65",
+          backgroundColor: on ? "#1D9E75" : COLOR.ink4,
           position: "absolute",
           top: 1,
           left: on ? 17 : 1,
@@ -245,14 +242,14 @@ export default function ProfileScreen() {
     return (
       <div
         style={{
-          backgroundColor: "#0A0A0B",
+          backgroundColor: COLOR.ground,
           minHeight: "100dvh",
           maxWidth: 480,
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#6B6A65",
+          color: COLOR.ink4,
           fontSize: 13,
         }}
       >
@@ -262,26 +259,22 @@ export default function ProfileScreen() {
   }
 
   return (
-    <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif" }}>
-      {/* Nav bar */}
+    <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif" }}>
+      <TopBar onLogoPress={() => navigate("/me")} />
+      <div className="fm-screen" style={{ maxWidth: 480, margin: "0 auto", boxSizing: "border-box" }}>
+      {/* Settings sub-bar — the Save action; global home nav lives in the TopBar above. */}
       <div
         className="fm-nav"
         style={{
           height: 48,
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          borderBottom: `1px solid ${COLOR.hairStrong}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 16px",
         }}
       >
-        <button
-          onClick={() => navigate("/me")}
-          style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: 4 }}
-        >
-          <BackArrow />
-          <span style={{ fontSize: 13, color: "#6B6A65" }}>Home</span>
-        </button>
+        <span style={{ fontSize: 13, fontWeight: 600, color: COLOR.ink2, letterSpacing: "0.02em" }}>Settings</span>
         <div style={{ display: "flex", alignItems: "center" }}>
           {error ? (
             <span style={{ fontSize: 11, color: "#E8704E", marginRight: 8 }}>
@@ -325,7 +318,7 @@ export default function ProfileScreen() {
               ? `${profile.first_name} ${profile.last_name}`
               : "..."}
           </div>
-          <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 4, textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: COLOR.ink4, marginTop: 4, textAlign: "center" }}>
             {profile?.role ?? "Medical Science Liaison"}
             {profile?.company ? ` · ${profile.company}` : ""}
           </div>
@@ -343,7 +336,7 @@ export default function ProfileScreen() {
               }}
             >
               <LinkedInIcon />
-              <span style={{ fontSize: 11, color: "#6B6A65" }}>Verified via LinkedIn</span>
+              <span style={{ fontSize: 11, color: COLOR.ink4 }}>Verified via LinkedIn</span>
             </div>
           ) : null}
         </div>
@@ -368,7 +361,7 @@ export default function ProfileScreen() {
                       style={{
                         backgroundColor: isSelected ? "#0D0D0A" : "#171512",
                         border: `1px solid ${isSelected ? "#E8A020" : "rgba(255,255,255,0.10)"}`,
-                        color: isSelected ? "#E8A020" : "#E8E6DF",
+                        color: isSelected ? "#E8A020" : COLOR.ink1,
                         borderRadius: 4,
                         padding: "10px 12px",
                         fontSize: 13,
@@ -406,7 +399,7 @@ export default function ProfileScreen() {
                         flexShrink: 0,
                         backgroundColor: isSelected ? "#0D0D0A" : "#0d0c0b",
                         border: `1px solid ${isSelected ? "#E8A020" : "rgba(255,255,255,0.10)"}`,
-                        color: isSelected ? "#E8A020" : "#6B6A65",
+                        color: isSelected ? "#E8A020" : COLOR.ink4,
                         borderRadius: 3,
                         padding: "6px 12px",
                         fontSize: 12,
@@ -419,7 +412,7 @@ export default function ProfileScreen() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, color: "#3A3A3F", marginTop: 8 }}>Your feed opens here by default.</div>
+              <div style={{ fontSize: 11, color: COLOR.ink5, marginTop: 8 }}>Your feed opens here by default.</div>
             </div>
           </div>
 
@@ -442,7 +435,7 @@ export default function ProfileScreen() {
                       style={{
                         backgroundColor: isSelected ? "#0D0D0A" : "#0d0c0b",
                         border: `1px solid ${isSelected ? "#E8A020" : "rgba(255,255,255,0.10)"}`,
-                        color: isSelected ? "#E8A020" : "#6B6A65",
+                        color: isSelected ? "#E8A020" : COLOR.ink4,
                         borderRadius: 3,
                         padding: "6px 12px",
                         fontSize: 12,
@@ -466,12 +459,12 @@ export default function ProfileScreen() {
                   padding: "8px 12px",
                   fontSize: 13,
                   fontFamily: "'IBM Plex Mono', monospace",
-                  color: "#E8E6DF",
+                  color: COLOR.ink1,
                 }}
               >
                 {statesCovered.length > 0 ? statesCovered.join(", ") : "No states assigned"}
               </div>
-              <div style={{ fontSize: 11, color: "#3A3A3F", marginTop: 8 }}>Changes here propagate to Coverage Gaps and territory-scoped surfaces.</div>
+              <div style={{ fontSize: 11, color: COLOR.ink5, marginTop: 8 }}>Changes here propagate to Coverage Gaps and territory-scoped surfaces.</div>
             </div>
 
             <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -496,8 +489,8 @@ export default function ProfileScreen() {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 13, color: "#E8E6DF" }}>{label}</div>
-                    <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 2 }}>{desc}</div>
+                    <div style={{ fontSize: 13, color: COLOR.ink1 }}>{label}</div>
+                    <div style={{ fontSize: 11, color: COLOR.ink4, marginTop: 2 }}>{desc}</div>
                   </div>
                   <Toggle
                     on={notifications[key]}
@@ -525,7 +518,7 @@ export default function ProfileScreen() {
               cursor: "default",
             }}
           >
-            <span style={{ fontSize: 13, color: "#E8E6DF" }}>Data & privacy</span>
+            <span style={{ fontSize: 13, color: COLOR.ink1 }}>Data & privacy</span>
             <ChevronRight />
           </div>
 
@@ -548,6 +541,8 @@ export default function ProfileScreen() {
           </button>
         </div>
       </div>
+      </div>
+      <GlobalFooter />
     </div>
   );
 }
