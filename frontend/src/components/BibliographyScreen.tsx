@@ -1,6 +1,10 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { HCP } from "../data/hcpData";
 import { getPublicationsByYearForHcp, type BibliographyPaper } from "../lib/api";
+import { COLOR, ELEVATION, FONT } from "../lib/designTokens";
+import TopBar from "./TopBar";
+import GlobalFooter from "./GlobalFooter";
 
 interface BibliographyScreenProps {
   hcp: HCP;
@@ -8,11 +12,9 @@ interface BibliographyScreenProps {
   onBack: () => void;
 }
 
-const BackArrow = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <path d="M12 3l-6 6 6 6" stroke="#6B6A65" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+// Link violet used for cross-references across the platform (cohort/rising-star
+// accent). Frozen hex, not a token — matches the "View" links elsewhere.
+const LINK_VIOLET = "#9B6DFF";
 
 function PaperCard({ paper }: { paper: BibliographyPaper }) {
   function handleViewAbstract(e: React.MouseEvent) {
@@ -24,21 +26,20 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
   return (
     <div
       style={{
-        backgroundColor: "#111113",
-        border: "1px solid #1E1E22",
-        borderLeft: "3px solid #E8A020",
-        borderRadius: 4,
+        ...ELEVATION.card,
+        borderLeft: `3px solid ${COLOR.amber}`,
         padding: 12,
         cursor: "default",
+        fontFamily: FONT.sans,
       }}
     >
       {/* Row 1: author pill + citations */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div
           style={{
-            backgroundColor: paper.isFirstAuthor ? "#0A1F16" : "#0D0D10",
-            border: `1px solid ${paper.isFirstAuthor ? "#1D9E75" : "#1E1E22"}`,
-            color: paper.isFirstAuthor ? "#1D9E75" : "#6B6A65",
+            backgroundColor: paper.isFirstAuthor ? "#0A1F16" : COLOR.surfaceWell,
+            border: `1px solid ${paper.isFirstAuthor ? "#1D9E75" : COLOR.hair}`,
+            color: paper.isFirstAuthor ? "#1D9E75" : COLOR.ink4,
             fontSize: 10,
             padding: "2px 8px",
             borderRadius: 3,
@@ -48,10 +49,10 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
           {paper.isFirstAuthor ? "First author" : "Co-author"}
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 3 }}>
-          <span className="fm-bib-citation" style={{ fontSize: 16, fontFamily: "monospace", fontWeight: 500, color: "#E8A020", lineHeight: 1 }}>
+          <span className="fm-bib-citation" style={{ fontSize: 16, fontFamily: FONT.mono, fontWeight: 500, color: COLOR.amber, lineHeight: 1 }}>
             {paper.citations != null ? paper.citations.toLocaleString() : "—"}
           </span>
-          <span style={{ fontSize: 10, color: "#6B6A65", lineHeight: 1, marginBottom: 1 }}>citations</span>
+          <span style={{ fontSize: 10, color: COLOR.ink4, lineHeight: 1, marginBottom: 1 }}>citations</span>
         </div>
       </div>
 
@@ -60,7 +61,7 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
         style={{
           marginTop: 8,
           fontSize: 13,
-          color: "#E8E6DF",
+          color: COLOR.ink1,
           fontWeight: 500,
           lineHeight: 1.4,
           display: "-webkit-box",
@@ -74,14 +75,14 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
 
       {/* Row 3: journal + co-authors */}
       <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.4 }}>
-        {paper.journal ? <span style={{ color: "#E8A020" }}>{paper.journal}</span> : null}
-        {paper.journal && paper.coAuthors ? <span style={{ color: "#3A3A3F" }}> · </span> : null}
-        {paper.coAuthors ? <span style={{ color: "#6B6A65" }}>{paper.coAuthors}</span> : null}
+        {paper.journal ? <span style={{ color: COLOR.amber }}>{paper.journal}</span> : null}
+        {paper.journal && paper.coAuthors ? <span style={{ color: COLOR.ink5 }}> · </span> : null}
+        {paper.coAuthors ? <span style={{ color: COLOR.ink4 }}>{paper.coAuthors}</span> : null}
       </div>
 
       {/* Row 4: PMID + view abstract */}
       <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontFamily: "monospace", color: "#3A3A3F" }}>
+        <span style={{ fontSize: 11, fontFamily: FONT.mono, color: COLOR.ink5 }}>
           {paper.pmid ? `PMID ${paper.pmid}` : "—"}
         </span>
         <button
@@ -92,11 +93,12 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
             border: "none",
             padding: 0,
             fontSize: 11,
-            color: paper.pmid ? "#6B6A65" : "#3A3A3F",
+            fontWeight: 500,
+            color: paper.pmid ? LINK_VIOLET : COLOR.ink5,
             cursor: paper.pmid ? "pointer" : "default",
           }}
         >
-          View abstract →
+          View Abstract
         </button>
       </div>
     </div>
@@ -104,6 +106,7 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
 }
 
 export default function BibliographyScreen({ hcp, year, onBack }: BibliographyScreenProps) {
+  const navigate = useNavigate();
   const [papers, setPapers] = React.useState<BibliographyPaper[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -127,99 +130,95 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
     };
   }, [hcp.hcp_id, hcp.id, year]);
 
+  const crumbLinkStyle: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    padding: 0,
+    fontSize: 12,
+    color: COLOR.ink3,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  };
+
   return (
-    <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Nav bar */}
+    <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
       <div
-        className="fm-nav"
+        className="fm-screen"
         style={{
-          height: 48,
-          borderBottom: "1px solid #1E1E22",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 16px",
+          maxWidth: 480,
+          margin: "0 auto",
+          fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
+          overflowX: "hidden",
         }}
       >
-        <button
-          onClick={onBack}
-          style={{
-            background: "none",
-            border: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-            padding: 4,
-          }}
-        >
-          <BackArrow />
-          <span style={{ fontSize: 13, color: "#6B6A65" }}>{hcp.name}</span>
-        </button>
+        <TopBar onLogoPress={() => navigate("/me")} />
 
-        <span
-          style={{
-            position: "absolute",
-            left: "50%",
-            transform: "translateX(-50%)",
-            fontSize: 14,
-            fontFamily: "monospace",
-            fontWeight: 500,
-            color: "#E8A020",
-          }}
+        {/* Breadcrumb — the HCP crumb returns to the profile that spawned this
+            view via onBack (a sub-screen state reset), not a route navigation. */}
+        <nav
+          aria-label="Breadcrumb"
+          style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "12px 16px 4px" }}
         >
-          {year}
-        </span>
+          <button type="button" style={crumbLinkStyle} onClick={() => navigate("/me")}>
+            Home
+          </button>
+          <span style={{ color: COLOR.ink5 }}>{String.fromCharCode(0x203a)}</span>
+          <button type="button" style={crumbLinkStyle} onClick={onBack}>
+            {hcp.name}
+          </button>
+          <span style={{ color: COLOR.ink5 }}>{String.fromCharCode(0x203a)}</span>
+          <span style={{ fontSize: 12, color: COLOR.ink1 }}>{year} Publications</span>
+        </nav>
 
-        <span style={{ fontSize: 12, fontFamily: "monospace", color: "#6B6A65" }}>
-          {loading ? "loading..." : `${papers.length} papers`}
-        </span>
-      </div>
+        <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+          {/* Section header */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              padding: "8px 16px 8px",
+            }}
+          >
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: COLOR.ink4 }}>
+              Publications
+            </span>
+            <span style={{ fontSize: 11, color: COLOR.ink5 }}>
+              {loading ? "loading…" : `${papers.length} papers · sorted by citations`}
+            </span>
+          </div>
 
-      <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-        {/* Section header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "16px 16px 8px",
-          }}
-        >
-          <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6B6A65" }}>
-            Publications
-          </span>
-          <span style={{ fontSize: 11, color: "#3A3A3F" }}>sorted by citations</span>
+          {/* Paper cards */}
+          {loading ? (
+            <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    backgroundColor: COLOR.surfaceWell,
+                    border: `1px solid ${COLOR.hair}`,
+                    borderLeft: `3px solid ${COLOR.hair}`,
+                    borderRadius: 4,
+                    padding: 12,
+                    height: 110,
+                  }}
+                />
+              ))}
+            </div>
+          ) : papers.length === 0 ? (
+            <div style={{ padding: "32px 16px", textAlign: "center", fontSize: 13, color: COLOR.ink4 }}>
+              No publications for {year}.
+            </div>
+          ) : (
+            <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {papers.map((paper) => (
+                <PaperCard key={paper.id} paper={paper} />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Paper cards */}
-        {loading ? (
-          <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  backgroundColor: "#111113",
-                  border: "1px solid #1E1E22",
-                  borderLeft: "3px solid #1E1E22",
-                  borderRadius: 4,
-                  padding: 12,
-                  height: 110,
-                }}
-              />
-            ))}
-          </div>
-        ) : papers.length === 0 ? (
-          <div style={{ padding: "32px 16px", textAlign: "center", fontSize: 13, color: "#6B6A65" }}>
-            No publications for {year}.
-          </div>
-        ) : (
-          <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {papers.map((paper) => (
-              <PaperCard key={paper.id} paper={paper} />
-            ))}
-          </div>
-        )}
+        <GlobalFooter />
       </div>
     </div>
   );
