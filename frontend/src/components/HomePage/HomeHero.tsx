@@ -57,7 +57,7 @@ export default function HomeHero({ firstName, summary, territory }: Props) {
   return (
     <div style={{ fontFamily: FONT.sans }}>
       <h1 style={{ ...TYPE.display, margin: "0 0 8px 0" }}>
-        {getGreeting()}, {firstName}.
+        {getGreeting()}, {firstName}
       </h1>
 
       <p style={{ fontSize: 14, color: COLOR.ink3, margin: "0 0 16px 0", lineHeight: 1.5 }}>
