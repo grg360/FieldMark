@@ -141,35 +141,23 @@ export default function InstitutionRoute() {
     navigate(`/hcp/${String(hcpId)}`);
   }
 
-  const backButtonStyle = {
-    padding: 0,
-    border: "none",
-    background: "transparent",
-    color: COLOR.ink4,
-    fontSize: 13,
-    cursor: "pointer",
-  } as const;
-
   if (notFound) {
     return (
       <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
-        <TopBar onLogoPress={() => navigate("/me")} />
         <div
           className="fm-screen"
           style={{
             maxWidth: 480,
             margin: "0 auto",
-            padding: 32,
-            color: COLOR.ink3,
             fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
           }}
         >
-          <button type="button" onClick={() => navigate("/")} style={backButtonStyle}>
-            {"\u2190"} Home
-          </button>
-          <h1 style={{ fontSize: 22, color: COLOR.ink1, marginTop: 16, fontWeight: 600 }}>
-            Institution not found
-          </h1>
+          <TopBar onLogoPress={() => navigate("/me")} />
+          <div style={{ padding: 32, color: COLOR.ink3 }}>
+            <h1 style={{ fontSize: 22, color: COLOR.ink1, marginTop: 16, fontWeight: 600 }}>
+              Institution not found
+            </h1>
+          </div>
         </div>
       </div>
     );
@@ -177,7 +165,6 @@ export default function InstitutionRoute() {
 
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
-    <TopBar onLogoPress={() => navigate("/me")} />
     <div
       className="fm-screen"
       style={{
@@ -187,11 +174,8 @@ export default function InstitutionRoute() {
         overflowX: "hidden",
       }}
     >
+      <TopBar onLogoPress={() => navigate("/me")} />
       <div style={{ padding: "16px 16px 16px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
-        <button type="button" onClick={() => navigate("/")} style={backButtonStyle}>
-          {"\u2190"} Home
-        </button>
-
         {loading && !summary ? (
           <div style={{ fontSize: 13, color: COLOR.ink4, marginTop: 12 }}>Loading...</div>
         ) : null}
