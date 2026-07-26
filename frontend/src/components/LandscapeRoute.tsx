@@ -7,6 +7,8 @@ import {
   type LandscapePoint,
 } from "../lib/api";
 import { indicationSlugToLabel } from "../lib/routeSlugs";
+import { COLOR } from "../lib/designTokens";
+import TopBar from "./TopBar";
 import GlobalFooter from "./GlobalFooter";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
 import LandscapeQuadrantChart from "./LandscapeQuadrantChart";
@@ -46,18 +48,18 @@ export default function LandscapeRoute() {
   }
 
   return (
+    <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
+    <TopBar onLogoPress={() => navigate("/me")} />
     <div
       className="fm-screen"
       style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100dvh",
         maxWidth: 480,
         margin: "0 auto",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         overflowX: "hidden",
       }}
     >
-      <div style={{ padding: "16px 16px 8px", borderBottom: "1px solid #1E1E22" }}>
+      <div style={{ padding: "16px 16px 8px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         <button
           type="button"
           onClick={() => navigate("/")}
@@ -65,17 +67,17 @@ export default function LandscapeRoute() {
             padding: 0,
             border: "none",
             background: "transparent",
-            color: "#6B6A65",
+            color: COLOR.ink4,
             fontSize: 13,
             cursor: "pointer",
           }}
         >
           {"\u2190"} Home
         </button>
-        <h1 style={{ fontSize: 22, color: "#E8E6DF", margin: "8px 0 4px", fontWeight: 600 }}>
+        <h1 style={{ fontSize: 22, color: COLOR.ink1, margin: "8px 0 4px", fontWeight: 600 }}>
           {taLabel} Landscape
         </h1>
-        <div style={{ fontSize: 13, color: "#6B6A65" }}>
+        <div style={{ fontSize: 13, color: COLOR.ink4 }}>
           Top 100 US Rising Stars {"\u00b7"} momentum vs visibility
         </div>
       </div>
@@ -135,6 +137,7 @@ export default function LandscapeRoute() {
       </div>
 
       <GlobalFooter />
+    </div>
     </div>
   );
 }
