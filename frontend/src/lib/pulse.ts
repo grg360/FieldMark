@@ -9,6 +9,8 @@
 // No `any`. Payload shape mirrors sql/04_pulse_payload.sql (prototype: hardcoded
 // in pulseFixture.ts; no API plumbing yet).
 
+import { COLOR } from "./designTokens";
+
 export interface PulseWindow {
   current_start: string;
   current_end: string;
@@ -199,16 +201,18 @@ export function themesRankedByCurrent(themes: PulseTheme[]): PulseTheme[] {
   return [...themes].sort((a, b) => b.cur_pubs - a.cur_pubs);
 }
 
-// Shared palette — the live app's values (matches ScoreBreakdownV3 / DemoPage).
-// Centralised so the Pulse components don't scatter magic hex.
+// Shared palette — now mapped onto the design-system tokens (COLOR) so Pulse
+// reads as one system with the migrated shell. Centralised so the Pulse
+// components don't scatter magic hex; the key names are unchanged so no
+// component needed editing when this was warmed.
 export const PULSE_COLORS = {
-  bg: "#0A0A0B",
-  card: "#141414",
-  cardAlt: "#0D0D10",
-  line: "#1E1E22",
-  text: "#E8E6DF",
-  muted: "#9B9892",
-  mutedDim: "#6B6A65",
-  amber: "#E8A020",
-  indigo: "#5C5FE8",
+  bg: COLOR.ground,
+  card: COLOR.surfaceCard,
+  cardAlt: COLOR.surfaceWell,
+  line: COLOR.hairStrong,
+  text: COLOR.ink1,
+  muted: COLOR.ink3,
+  mutedDim: COLOR.ink4,
+  amber: COLOR.amber,
+  indigo: COLOR.indigo,
 } as const;
