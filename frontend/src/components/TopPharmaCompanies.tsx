@@ -12,11 +12,16 @@ const STATUS_STYLE: Record<CompanyStatus, { bg: string; border: string; color: s
   lapsed: { bg: "#1E1E22", border: "#6B6A65", color: "#6B6A65", label: "LAPSED" },
 };
 
+// Proportional payment-share bar color. Palette green (COLOR.estGreen #5FA97E =
+// rgb 95,169,126), replacing the former coral. Centralized as an rgb triple so
+// the bar and active-overlay opacities compose from one source.
+const BAR_RGB = "95, 169, 126";
+
 const ROW_STYLE = {
   restingBg: "#0D0D10",
   restingBorder: "#1E1E22",
   activeBg: "#15131A",
-  activeBorder: "#D85A30",
+  activeBorder: "#5FA97E",
   restingTextPrimary: "#E8E6DF",
   restingTextSecondary: "#6B6A65",
   restingAmount: "#E8A020",
@@ -25,9 +30,9 @@ const ROW_STYLE = {
   activeAmount: "#FAC775",
 };
 
-const CORAL_BAR_MIN = 0.07;
-const CORAL_BAR_MAX = 0.12;
-const CORAL_OVERLAY_ACTIVE = 0.03;
+const BAR_MIN = 0.07;
+const BAR_MAX = 0.12;
+const BAR_OVERLAY_ACTIVE = 0.03;
 
 function formatCompactDollar(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "$0";
@@ -128,9 +133,9 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
           const isActive = activeIndex === idx;
           const barWidthPct = Math.max(0, Math.min(100, (entry.total_amount_usd / maxAmount) * 100));
           const restingBarOpacity = idx === 0
-            ? CORAL_BAR_MAX
-            : CORAL_BAR_MIN + ((entries.length - 1 - idx) / Math.max(1, entries.length - 1)) * (CORAL_BAR_MAX - CORAL_BAR_MIN);
-          // Selected row: the proportional bar fades out entirely — the coral border
+            ? BAR_MAX
+            : BAR_MIN + ((entries.length - 1 - idx) / Math.max(1, entries.length - 1)) * (BAR_MAX - BAR_MIN);
+          // Selected row: the proportional bar fades out entirely — the green border
           // and overlay tint carry the active state without the shading detail.
           const barOpacity = isActive ? 0 : restingBarOpacity;
           const avgPerPayment = entry.payment_count > 0
@@ -176,7 +181,7 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
                     top: 0,
                     bottom: 0,
                     width: `${barWidthPct}%`,
-                    background: `rgba(216, 90, 48, ${barOpacity})`,
+                    background: `rgba(${BAR_RGB}, ${barOpacity})`,
                     transition: "background-color 150ms ease",
                   }}
                 />
@@ -185,7 +190,7 @@ export default function TopPharmaCompanies({ hcpId }: TopPharmaCompaniesProps) {
                     style={{
                       position: "absolute",
                       inset: 0,
-                      background: `rgba(216, 90, 48, ${CORAL_OVERLAY_ACTIVE})`,
+                      background: `rgba(${BAR_RGB}, ${BAR_OVERLAY_ACTIVE})`,
                       pointerEvents: "none",
                     }}
                   />
