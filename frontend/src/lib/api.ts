@@ -1,5 +1,5 @@
 import { firstEmbedded } from "./cohort-metrics";
-import { formatByline } from "./authorByline";
+import { formatBibliographyByline } from "./authorByline";
 import { dedupeHCPs } from "./hcp-dedupe";
 import { countriesForRegion, type RegionKey } from "./regions";
 import { resolveFilterScope } from "./rank-filters";
@@ -2715,6 +2715,7 @@ export interface BibliographyPaper {
   journal: string | null;
   citations: number | null;
   isFirstAuthor: boolean;
+  isSeniorAuthor: boolean;
   // Full citation-style byline in author order, including the subject HCP and
   // collective/consortium authors. See lib/authorByline.
   authors: string;
@@ -2731,6 +2732,7 @@ export async function getPublicationsByYearForHcp(
       `
       author_position,
       is_first_author,
+      is_senior_author,
       publications_v2!inner (
         id,
         pubmed_id,
@@ -2748,6 +2750,7 @@ export async function getPublicationsByYearForHcp(
   const rows = data as unknown as Array<{
     author_position: number | null;
     is_first_author: boolean | null;
+    is_senior_author: boolean | null;
     publications_v2: {
       id: string;
       pubmed_id: string | null;
@@ -2769,7 +2772,8 @@ export async function getPublicationsByYearForHcp(
       journal: pub.journal,
       citations: pub.citation_count,
       isFirstAuthor: row.is_first_author === true,
-      authors: formatByline(pub.pubmed_authorships),
+      isSeniorAuthor: row.is_senior_author === true,
+      authors: formatBibliographyByline(pub.pubmed_authorships, row.author_position),
     });
   }
   papers.sort((a, b) => (b.citations ?? 0) - (a.citations ?? 0));

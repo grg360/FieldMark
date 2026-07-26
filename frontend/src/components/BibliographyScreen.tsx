@@ -33,20 +33,28 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
         fontFamily: FONT.sans,
       }}
     >
-      {/* Row 1: author pill + citations */}
+      {/* Row 1: author-role pill + citations. First = teal, Senior/PI = info-blue,
+          everyone else = neutral. is_senior_author comes from the DB (handles the
+          last-named-author / trailing-collective case). */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div
           style={{
-            backgroundColor: paper.isFirstAuthor ? "#0A1F16" : COLOR.surfaceWell,
-            border: `1px solid ${paper.isFirstAuthor ? "#1D9E75" : COLOR.hair}`,
-            color: paper.isFirstAuthor ? "#1D9E75" : COLOR.ink4,
+            backgroundColor: paper.isFirstAuthor
+              ? "#0A1F16"
+              : paper.isSeniorAuthor
+                ? "rgba(79,163,199,0.14)"
+                : COLOR.surfaceWell,
+            border: `1px solid ${
+              paper.isFirstAuthor ? "#1D9E75" : paper.isSeniorAuthor ? COLOR.info : COLOR.hair
+            }`,
+            color: paper.isFirstAuthor ? "#1D9E75" : paper.isSeniorAuthor ? COLOR.info : COLOR.ink4,
             fontSize: 10,
             padding: "2px 8px",
             borderRadius: 3,
             lineHeight: 1.4,
           }}
         >
-          {paper.isFirstAuthor ? "First author" : "Co-author"}
+          {paper.isFirstAuthor ? "First author" : paper.isSeniorAuthor ? "Senior author" : "Co-author"}
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 3 }}>
           <span className="fm-bib-citation" style={{ fontSize: 16, fontFamily: FONT.mono, fontWeight: 500, color: COLOR.amber, lineHeight: 1 }}>

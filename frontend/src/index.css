@@ -311,6 +311,7 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 8px !important;
     flex-direction: unset !important;
+    align-items: start !important;
   }
   .fm-bib-citation {
     font-size: 20px !important;
