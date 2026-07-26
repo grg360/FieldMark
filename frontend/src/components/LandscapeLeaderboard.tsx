@@ -1,4 +1,5 @@
 import type { LeaderboardEntry } from "../lib/api";
+import { COLOR } from "../lib/designTokens";
 
 interface Props {
   title: string;
@@ -24,13 +25,13 @@ export default function LandscapeLeaderboard({
         padding: 16,
         border: "1px solid #1E1E22",
         borderRadius: 6,
-        backgroundColor: "#0A0A0B",
+        backgroundColor: COLOR.ground,
       }}
     >
       <div
         style={{
           fontSize: 13,
-          color: "#E8E6DF",
+          color: COLOR.ink1,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           fontWeight: 500,
@@ -39,7 +40,7 @@ export default function LandscapeLeaderboard({
         {title}
       </div>
       {subtitle ? (
-        <div style={{ fontSize: 10, color: "#6B6A65", marginTop: 4 }}>{subtitle}</div>
+        <div style={{ fontSize: 10, color: COLOR.ink4, marginTop: 4 }}>{subtitle}</div>
       ) : null}
 
       <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -63,14 +64,14 @@ export default function LandscapeLeaderboard({
               textAlign: "left",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#15131A";
+              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 14, color: "#E8E6DF", fontWeight: 500 }}>
+              <div style={{ fontSize: 14, color: COLOR.ink1, fontWeight: 500 }}>
                 {showRanks ? `${entry.rank}. ` : ""}
                 {entry.name}
               </div>
@@ -78,7 +79,7 @@ export default function LandscapeLeaderboard({
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#6B6A65",
+                    color: COLOR.ink4,
                     marginTop: 2,
                     overflow: "hidden",
                     textOverflow: "ellipsis",

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { InstitutionCollaboration } from "../lib/api";
 import { institutionToSlug } from "../lib/institutionUtils";
+import { COLOR } from "../lib/designTokens";
 
 interface Props {
   collaborations: InstitutionCollaboration[];
@@ -25,7 +26,7 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
       <div
         style={{
           fontSize: 13,
-          color: "#E8E6DF",
+          color: COLOR.ink1,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           marginBottom: 4,
@@ -33,7 +34,7 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
       >
         Top Internal Collaborations
       </div>
-      <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: COLOR.ink4, marginBottom: 12 }}>
         Investigator pairs ranked by shared publications
       </div>
 
@@ -46,37 +47,37 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
               justifyContent: "space-between",
               alignItems: "center",
               padding: "12px 16px",
-              backgroundColor: "#15131A",
+              backgroundColor: COLOR.surfaceRaised,
               borderRadius: 4,
               cursor: "default",
               transition: "background-color 120ms",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#1A1820";
+              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#15131A";
+              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
             }}
           >
-            <div style={{ fontSize: 13, color: "#E8E6DF" }}>
+            <div style={{ fontSize: 13, color: COLOR.ink1 }}>
               <a
                 href={`/hcp/${c.hcp1_id}`}
                 onClick={(e) => {
                   e.preventDefault();
                   onHcpClick(c.hcp1_id);
                 }}
-                style={{ color: "#E8E6DF", textDecoration: "none" }}
+                style={{ color: COLOR.ink1, textDecoration: "none" }}
               >
                 {c.hcp1_name}
               </a>
-              <span style={{ margin: "0 8px", color: "#6B6A65" }}>{"\u2194"}</span>
+              <span style={{ margin: "0 8px", color: COLOR.ink4 }}>{"\u2194"}</span>
               <a
                 href={`/hcp/${c.hcp2_id}`}
                 onClick={(e) => {
                   e.preventDefault();
                   onHcpClick(c.hcp2_id);
                 }}
-                style={{ color: "#E8E6DF", textDecoration: "none" }}
+                style={{ color: COLOR.ink1, textDecoration: "none" }}
               >
                 {c.hcp2_name}
               </a>
@@ -101,7 +102,7 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
               }}
             >
               <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{c.shared_publications}</span>
-              <span style={{ fontSize: 12, color: "#9B9892" }}>papers</span>
+              <span style={{ fontSize: 12, color: COLOR.ink3 }}>papers</span>
             </button>
           </div>
         ))}

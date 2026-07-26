@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { ExternalPartnerInstitution } from "../lib/api";
 import { institutionToSlug } from "../lib/institutionUtils";
+import { COLOR } from "../lib/designTokens";
 
 interface Props {
   partners: ExternalPartnerInstitution[];
@@ -25,7 +26,7 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
       <div
         style={{
           fontSize: 13,
-          color: "#E8E6DF",
+          color: COLOR.ink1,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           marginBottom: 4,
@@ -33,7 +34,7 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
       >
         Top External Partner Institutions
       </div>
-      <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: COLOR.ink4, marginBottom: 12 }}>
         Ranked by total co-publications with {sourceInstitutionName}
       </div>
 
@@ -47,23 +48,23 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
               justifyContent: "space-between",
               alignItems: "center",
               padding: "10px 12px",
-              backgroundColor: "#15131A",
+              backgroundColor: COLOR.surfaceRaised,
               borderRadius: 4,
               cursor: "pointer",
               transition: "background-color 120ms",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#1A1820";
+              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#15131A";
+              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
                   fontSize: 13,
-                  color: "#E8E6DF",
+                  color: COLOR.ink1,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -71,7 +72,7 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
               >
                 {p.institution_name}
               </div>
-              <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: COLOR.ink4, marginTop: 2 }}>
                 {p.source_investigators_count}{" "}
                 {p.source_investigators_count === 1 ? "investigator" : "investigators"}
                 {" \u2194 "}
@@ -79,11 +80,11 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
                 {p.partner_investigators_count === 1 ? "investigator" : "investigators"}
               </div>
               {p.top_connection ? (
-                <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: COLOR.ink4, marginTop: 4 }}>
                   Top pair:{" "}
-                  <span style={{ color: "#9B9892" }}>{p.top_connection.source_name}</span>
+                  <span style={{ color: COLOR.ink3 }}>{p.top_connection.source_name}</span>
                   {" \u2194 "}
-                  <span style={{ color: "#9B9892" }}>{p.top_connection.partner_name}</span>
+                  <span style={{ color: COLOR.ink3 }}>{p.top_connection.partner_name}</span>
                   {" ("}
                   {p.top_connection.shared_publications} papers
                   {")"}
@@ -111,7 +112,7 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
               }}
             >
               <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{p.total_shared_publications}</span>
-              <span style={{ fontSize: 12, color: "#9B9892" }}>co-pubs</span>
+              <span style={{ fontSize: 12, color: COLOR.ink3 }}>co-pubs</span>
             </button>
           </div>
         ))}

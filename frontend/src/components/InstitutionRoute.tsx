@@ -19,6 +19,8 @@ import {
 import { getInstitutionResearchThemes, type InstitutionResearchTheme } from "../lib/institutionThemes";
 import { slugToInstitution } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
+import { COLOR } from "../lib/designTokens";
+import TopBar from "./TopBar";
 import GlobalFooter from "./GlobalFooter";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
 import InstitutionExternalPartnersPanel from "./InstitutionExternalPartnersPanel";
@@ -52,8 +54,8 @@ function PipelineBucket({
           flexShrink: 0,
         }}
       />
-      <span style={{ fontSize: 12, color: "#9B9892" }}>
-        <span style={{ color: "#E8E6DF", fontWeight: 600 }}>{count}</span> {label}
+      <span style={{ fontSize: 12, color: COLOR.ink3 }}>
+        <span style={{ color: COLOR.ink1, fontWeight: 600 }}>{count}</span> {label}
       </span>
     </span>
   );
@@ -143,69 +145,70 @@ export default function InstitutionRoute() {
     padding: 0,
     border: "none",
     background: "transparent",
-    color: "#6B6A65",
+    color: COLOR.ink4,
     fontSize: 13,
     cursor: "pointer",
   } as const;
 
   if (notFound) {
     return (
-      <div
-        className="fm-screen"
-        style={{
-          backgroundColor: "#0A0A0B",
-          minHeight: "100dvh",
-          maxWidth: 480,
-          margin: "0 auto",
-          padding: 32,
-          color: "#9B9892",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-        }}
-      >
-        <button type="button" onClick={() => navigate("/")} style={backButtonStyle}>
-          {"\u2190"} Home
-        </button>
-        <h1 style={{ fontSize: 22, color: "#E8E6DF", marginTop: 16, fontWeight: 600 }}>
-          Institution not found
-        </h1>
+      <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
+        <TopBar onLogoPress={() => navigate("/me")} />
+        <div
+          className="fm-screen"
+          style={{
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: 32,
+            color: COLOR.ink3,
+            fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
+          }}
+        >
+          <button type="button" onClick={() => navigate("/")} style={backButtonStyle}>
+            {"\u2190"} Home
+          </button>
+          <h1 style={{ fontSize: 22, color: COLOR.ink1, marginTop: 16, fontWeight: 600 }}>
+            Institution not found
+          </h1>
+        </div>
       </div>
     );
   }
 
   return (
+    <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
+    <TopBar onLogoPress={() => navigate("/me")} />
     <div
       className="fm-screen"
       style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100dvh",
         maxWidth: 480,
         margin: "0 auto",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         overflowX: "hidden",
       }}
     >
-      <div style={{ padding: "16px 16px 16px", borderBottom: "1px solid #1E1E22" }}>
+      <div style={{ padding: "16px 16px 16px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         <button type="button" onClick={() => navigate("/")} style={backButtonStyle}>
           {"\u2190"} Home
         </button>
 
         {loading && !summary ? (
-          <div style={{ fontSize: 13, color: "#6B6A65", marginTop: 12 }}>Loading...</div>
+          <div style={{ fontSize: 13, color: COLOR.ink4, marginTop: 12 }}>Loading...</div>
         ) : null}
 
         {summary ? (
           <>
-            <h1 style={{ fontSize: 22, color: "#E8E6DF", margin: "8px 0 4px", fontWeight: 600 }}>
+            <h1 style={{ fontSize: 22, color: COLOR.ink1, margin: "8px 0 4px", fontWeight: 600 }}>
               {summary.institution_name}
             </h1>
-            <div style={{ fontSize: 13, color: "#6B6A65" }}>
+            <div style={{ fontSize: 13, color: COLOR.ink4 }}>
               {summary.total_investigators} {taDisplayName} investigators {"\u00b7"}{" "}
               {summary.rising_star_count} Rising Star
               {summary.rising_star_count !== 1 ? "s" : ""} {"\u00b7"} {summary.established_count}{" "}
               Established
             </div>
             {summary.top_investigator ? (
-              <div style={{ fontSize: 13, color: "#9B9892", marginTop: 6 }}>
+              <div style={{ fontSize: 13, color: COLOR.ink3, marginTop: 6 }}>
                 Top investigator:{" "}
                 <a
                   href={`/hcp/${summary.top_investigator.hcp_id}`}
@@ -226,7 +229,7 @@ export default function InstitutionRoute() {
                 style={{
                   marginTop: 16,
                   padding: "12px 14px",
-                  backgroundColor: "#15131A",
+                  backgroundColor: COLOR.surfaceRaised,
                   border: "1px solid #2A2730",
                   borderRadius: 6,
                   display: "inline-flex",
@@ -238,7 +241,7 @@ export default function InstitutionRoute() {
                 <span
                   style={{
                     fontSize: 11,
-                    color: "#6B6A65",
+                    color: COLOR.ink4,
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
@@ -338,6 +341,7 @@ export default function InstitutionRoute() {
       ) : null}
 
       <GlobalFooter />
+    </div>
     </div>
   );
 }
