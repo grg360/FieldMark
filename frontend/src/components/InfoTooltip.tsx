@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface InfoTooltipProps {
   content: string;
@@ -66,28 +67,30 @@ export default function InfoTooltip({
         {children}
       </span>
 
-      {visible && coords && (
-        <div
-          style={{
-            position: "fixed",
-            left: coords.left,
-            top: coords.top,
-            width: 240,
-            backgroundColor: "#111113",
-            border: "1px solid #E8A020",
-            borderRadius: 4,
-            padding: "10px 12px",
-            fontSize: 11,
-            lineHeight: 1.5,
-            color: "#9B9892",
-            zIndex: 10000,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
-            pointerEvents: "none",
-          }}
-        >
-          {content}
-        </div>
-      )}
+      {visible && coords &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: coords.left,
+              top: coords.top,
+              width: 240,
+              backgroundColor: "#111113",
+              border: "1px solid #E8A020",
+              borderRadius: 4,
+              padding: "10px 12px",
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: "#9B9892",
+              zIndex: 10000,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
+              pointerEvents: "none",
+            }}
+          >
+            {content}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

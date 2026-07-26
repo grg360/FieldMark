@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface TooltipDef {
   title: string;
@@ -232,40 +233,44 @@ export function StatPillWithTooltip({
         )}
       </div>
 
-      {/* Always render when open so we can measure height; hide until positioned */}
-      {isOpen && def && (
-        <div
-          ref={tooltipRef}
-          style={{
-            position: "fixed",
-            left: pos ? pos.left : -9999,
-            top: pos ? pos.top : -9999,
-            width: TOOLTIP_WIDTH,
-            backgroundColor: "#111113",
-            border: "1px solid #E8A020",
-            borderRadius: 4,
-            padding: "10px 12px",
-            zIndex: 200,
-            pointerEvents: "none",
-          }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 500, color: "#E8E6DF" }}>{def.title}</div>
-          <div style={{ fontSize: 11, color: "#9B9892", marginTop: 4, lineHeight: 1.5 }}>{def.body}</div>
+      {/* Always render when open so we can measure height; hide until positioned.
+          Portaled to document.body so the card's hover transform (which creates a
+          stacking context) can't trap this fixed tooltip behind sibling cards. */}
+      {isOpen && def &&
+        createPortal(
           <div
+            ref={tooltipRef}
             style={{
-              position: "absolute",
-              bottom: -5,
-              left: pos ? pos.pointerLeft : "50%",
-              transform: "translateX(-50%)",
-              width: 0,
-              height: 0,
-              borderLeft: "4px solid transparent",
-              borderRight: "4px solid transparent",
-              borderTop: "4px solid #E8A020",
+              position: "fixed",
+              left: pos ? pos.left : -9999,
+              top: pos ? pos.top : -9999,
+              width: TOOLTIP_WIDTH,
+              backgroundColor: "#111113",
+              border: "1px solid #E8A020",
+              borderRadius: 4,
+              padding: "10px 12px",
+              zIndex: 200,
+              pointerEvents: "none",
             }}
-          />
-        </div>
-      )}
+          >
+            <div style={{ fontSize: 12, fontWeight: 500, color: "#E8E6DF" }}>{def.title}</div>
+            <div style={{ fontSize: 11, color: "#9B9892", marginTop: 4, lineHeight: 1.5 }}>{def.body}</div>
+            <div
+              style={{
+                position: "absolute",
+                bottom: -5,
+                left: pos ? pos.pointerLeft : "50%",
+                transform: "translateX(-50%)",
+                width: 0,
+                height: 0,
+                borderLeft: "4px solid transparent",
+                borderRight: "4px solid transparent",
+                borderTop: "4px solid #E8A020",
+              }}
+            />
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
