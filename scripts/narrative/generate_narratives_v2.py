@@ -315,6 +315,31 @@ def pick_latest_scores(score_rows: List[Dict]) -> Dict[Tuple[str, str], Dict]:
     return latest
 
 
+def collect_top_n_hcp_ids(make_query, top_n: int, page_size: int = 1000) -> List[str]:
+    """Page through an ordered rank query until top_n rows or exhaustion.
+
+    PostgREST caps any single response at 1000 rows (server max-rows), so a
+    single .range(0, top_n - 1) silently truncates whenever top_n > 1000.
+    make_query must return a FRESH ordered query builder on each call (builders
+    are single-use). page_size must stay <= the server cap so a short batch
+    reliably means exhaustion, not truncation.
+    """
+    ids: List[str] = []
+    offset = 0
+    while offset < top_n:
+        upper = min(offset + page_size, top_n) - 1
+        response = make_query().range(offset, upper).execute()
+        batch = response.data or []
+        for row in batch:
+            hcp_id = row.get("hcp_id")
+            if hcp_id:
+                ids.append(str(hcp_id))
+        if len(batch) < (upper - offset + 1):
+            break
+        offset += len(batch)
+    return ids
+
+
 def fetch_top_n_hcp_ids_from_rank_view(
     supabase: Client,
     rank_table: str,
@@ -364,29 +389,24 @@ def fetch_rising_star_top_hcp_ids_v3(
     for ta_id in visible_ta_ids:
         try:
             if str(ta_id) == AD_TA_ID:
-                response = (
-                    supabase.table("hcp_rising_composite_v1")
-                    .select("hcp_id")
-                    .eq("therapeutic_area_id", ta_id)
-                    .eq("scope_type", "global")
-                    .order("rank", desc=False)
-                    .range(0, top_n - 1)
-                    .execute()
-                )
+                def make_query(ta_id=ta_id):
+                    return (
+                        supabase.table("hcp_rising_composite_v1")
+                        .select("hcp_id")
+                        .eq("therapeutic_area_id", ta_id)
+                        .eq("scope_type", "global")
+                        .order("rank", desc=False)
+                    )
             else:
-                response = (
-                    supabase.table("hcp_rising_star_ranks_v3")
-                    .select("hcp_id")
-                    .eq("therapeutic_area_id", ta_id)
-                    .not_.is_("us_rank", "null")
-                    .order("us_rank", desc=False)
-                    .range(0, top_n - 1)
-                    .execute()
-                )
-            for row in response.data or []:
-                hcp_id = row.get("hcp_id")
-                if hcp_id:
-                    selected.add(str(hcp_id))
+                def make_query(ta_id=ta_id):
+                    return (
+                        supabase.table("hcp_rising_star_ranks_v3")
+                        .select("hcp_id")
+                        .eq("therapeutic_area_id", ta_id)
+                        .not_.is_("us_rank", "null")
+                        .order("us_rank", desc=False)
+                    )
+            selected.update(collect_top_n_hcp_ids(make_query, top_n))
         except Exception as exc:
             print(f"[load] rising selection query failed for TA {ta_id}: {exc}")
     return selected
@@ -693,20 +713,16 @@ def fetch_established_top_hcp_ids(
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
         try:
-            response = (
-                supabase.table("hcp_established_ranks_v3")
-                .select("hcp_id,rank")
-                .eq("therapeutic_area_id", ta_id)
-                .eq("scope_type", "region")
-                .eq("scope_value", "US")
-                .order("rank", desc=False)
-                .range(0, top_n - 1)
-                .execute()
-            )
-            for row in response.data or []:
-                hcp_id = row.get("hcp_id")
-                if hcp_id:
-                    selected.add(str(hcp_id))
+            def make_query(ta_id=ta_id):
+                return (
+                    supabase.table("hcp_established_ranks_v3")
+                    .select("hcp_id,rank")
+                    .eq("therapeutic_area_id", ta_id)
+                    .eq("scope_type", "region")
+                    .eq("scope_value", "US")
+                    .order("rank", desc=False)
+                )
+            selected.update(collect_top_n_hcp_ids(make_query, top_n))
         except Exception as exc:
             print(f"[load] hcp_established_ranks_v3 query failed for TA {ta_id}: {exc}")
     return selected
@@ -729,24 +745,20 @@ def fetch_community_top_hcp_ids(
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
         try:
-            response = (
-                supabase.table("hcp_community_ranks_v2")
-                .select("hcp_id,rank")
-                .eq("therapeutic_area_id", ta_id)
-                .eq("scope_type", "region")
-                .eq("scope_value", "US")
-                # Community qualification gate (read layer, NSCLC only, mirrors
-                # the board RPCs): no narrative targeting for NSCLC HCPs on the
-                # career-stage floor alone. No-op for other TAs.
-                .or_(COMMUNITY_GATE_OR)
-                .order("rank", desc=False)
-                .range(0, top_n - 1)
-                .execute()
-            )
-            for row in response.data or []:
-                hcp_id = row.get("hcp_id")
-                if hcp_id:
-                    selected.add(str(hcp_id))
+            def make_query(ta_id=ta_id):
+                return (
+                    supabase.table("hcp_community_ranks_v2")
+                    .select("hcp_id,rank")
+                    .eq("therapeutic_area_id", ta_id)
+                    .eq("scope_type", "region")
+                    .eq("scope_value", "US")
+                    # Community qualification gate (read layer, NSCLC only, mirrors
+                    # the board RPCs): no narrative targeting for NSCLC HCPs on the
+                    # career-stage floor alone. No-op for other TAs.
+                    .or_(COMMUNITY_GATE_OR)
+                    .order("rank", desc=False)
+                )
+            selected.update(collect_top_n_hcp_ids(make_query, top_n))
         except Exception as exc:
             print(f"[load] hcp_community_ranks_v2 query failed for TA {ta_id}: {exc}")
     return selected
