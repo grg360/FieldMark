@@ -43,6 +43,7 @@ export default function InviteColleaguesButton() {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         title="Invite colleagues"
+        className="fm-pill-button"
         style={{
           // Match the UserMenu avatar circle next to it: transparent fill,
           // 1.5px amber ring, 32px height, all-amber text. Stays a pill.
