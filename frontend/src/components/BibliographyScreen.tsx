@@ -198,7 +198,7 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
 
           {/* Paper cards */}
           {loading ? (
-            <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="fm-bib-grid" style={{ padding: "0 16px 32px" }}>
               {Array.from({ length: 3 }).map((_, i) => (
                 <div
                   key={i}
@@ -218,7 +218,7 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
               No publications for {year}.
             </div>
           ) : (
-            <div className="fm-bib-grid" style={{ padding: "0 16px 32px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="fm-bib-grid" style={{ padding: "0 16px 32px" }}>
               {papers.map((paper) => (
                 <PaperCard key={paper.id} paper={paper} />
               ))}

@@ -185,6 +185,16 @@ button {
   z-index: 2;
 }
 
+/* Bibliography cards — grid at all widths so align-items:start (natural card
+   height, no stretch-to-tallest) never depends on a media query matching or on
+   overriding an inline display. 1 column by default; 2 columns from 600px. */
+.fm-bib-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
 /* ─── Tablet layout (≥600px) ─────────────────────────────────────────── */
 @media (min-width: 600px) {
 
@@ -305,13 +315,9 @@ button {
     display: grid !important;
   }
 
-  /* ── Bibliography two-column cards ── */
+  /* ── Bibliography: 2 columns at tablet+ (base rule handles grid + align) ── */
   .fm-bib-grid {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
-    flex-direction: unset !important;
-    align-items: start !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .fm-bib-citation {
     font-size: 20px !important;
