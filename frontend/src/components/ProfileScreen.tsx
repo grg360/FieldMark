@@ -385,11 +385,8 @@ export default function ProfileScreen() {
               <div
                 style={{
                   display: "flex",
+                  flexWrap: "wrap",
                   gap: 8,
-                  overflowX: "auto",
-                  scrollbarWidth: "none",
-                  msOverflowStyle: "none",
-                  paddingBottom: 2,
                 }}
               >
                 {(INDICATIONS[selectedTA] ?? []).map((chip) => {
