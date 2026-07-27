@@ -15,7 +15,7 @@
   /* Ground & surfaces (warm near-black) */
   --ground: #0a0a0a;
   --surface-well: #0d0c0b;
-  --surface-card: #151515; /* fully neutral; was warm #171512, read brown at scale */
+  --surface-card: #161515; /* one point of red over neutral — a trace of warmth, no brown cast */
   --surface-raised: #1b1915;
 
   /* Ink (warm neutral, top-toned whites) */

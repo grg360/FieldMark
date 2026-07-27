@@ -20,7 +20,7 @@ export const COLOR = {
   // Ground & surfaces (warm near-black)
   ground: "#0a0a0a",
   surfaceWell: "#0d0c0b", // recessed
-  surfaceCard: "#151515", // raised (fully neutral; was warm #171512, read brown at scale)
+  surfaceCard: "#161515", // raised (one point of red over neutral — a trace of warmth, no brown cast)
   surfaceRaised: "#1b1915", // hover / active
 
   // Ink (warm neutral, top-toned whites)
