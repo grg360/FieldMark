@@ -44,14 +44,18 @@ export default function InviteColleaguesButton() {
         aria-haspopup="dialog"
         title="Invite colleagues"
         style={{
+          // Match the UserMenu avatar circle next to it: transparent fill,
+          // 1.5px amber ring, 32px height, all-amber text. Stays a pill.
           display: "inline-flex",
           alignItems: "center",
           gap: 5,
-          background: COLOR.amberSoft,
-          border: "1px solid rgba(232,160,32,0.45)", // COLOR.amber at 45%
+          background: "transparent",
+          border: `1.5px solid ${COLOR.amber}`,
           color: COLOR.amber,
           borderRadius: 999,
-          padding: "5px 12px",
+          height: 32,
+          padding: "0 12px",
+          boxSizing: "border-box",
           fontSize: 12,
           fontWeight: 600,
           cursor: "pointer",
@@ -62,7 +66,7 @@ export default function InviteColleaguesButton() {
       >
         Invites
         {isDesktop ? (
-          <span style={{ color: COLOR.ink3, fontWeight: 500 }}>· {invite.uses_remaining} left</span>
+          <span style={{ color: COLOR.amber, fontWeight: 500 }}>· {invite.uses_remaining} left</span>
         ) : null}
       </button>
 
