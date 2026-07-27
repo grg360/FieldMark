@@ -274,13 +274,14 @@ export default function BeliefClaimReactionPanel({
                         type="button"
                         onClick={() => handleSelect(question.id, option.value)}
                         style={{
+                          // Compact centered chip — matches the Field Intelligence
+                          // ValidationField answer chips directly below this section.
                           position: "relative",
                           display: "flex",
                           flexDirection: "column",
-                          alignItems: "stretch",
-                          justifyContent: "flex-start",
-                          minHeight: 68,
-                          padding: "10px 8px 8px",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "8px 10px",
                           borderRadius: 8,
                           border: selected
                             ? `1px solid ${BP_ACCENT}`
@@ -289,20 +290,20 @@ export default function BeliefClaimReactionPanel({
                           color: selected ? "#FFFFFF" : "rgba(232, 230, 223, 0.7)",
                           cursor: "pointer",
                           fontFamily: "system-ui, sans-serif",
-                          fontSize: 11,
+                          fontSize: 12,
                           lineHeight: 1.35,
                           textAlign: "center",
                           boxShadow: selected ? `0 4px 12px ${BP_ACCENT_SHADOW}` : "none",
                           overflow: "hidden",
                         }}
                       >
-                        <span style={{ flex: 1 }}>{option.label}</span>
+                        <span>{option.label}</span>
                         {showAggregates ? (
                           <span
                             style={{
                               fontSize: 10,
                               color: selected ? "rgba(255, 255, 255, 0.7)" : "rgba(232, 230, 223, 0.45)",
-                              marginTop: 6,
+                              marginTop: 4,
                               fontFamily: "monospace",
                             }}
                           >

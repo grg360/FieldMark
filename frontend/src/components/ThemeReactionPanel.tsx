@@ -133,13 +133,14 @@ export default function ThemeReactionPanel({
                       type="button"
                       onClick={() => onSelect(question.id, option.value)}
                       style={{
+                        // Compact centered chip — matches the Field Intelligence
+                        // ValidationField answer chips on the HCP profile.
                         position: "relative",
                         display: "flex",
                         flexDirection: "column",
-                        alignItems: "stretch",
-                        justifyContent: "flex-start",
-                        minHeight: 72,
-                        padding: "10px 8px 8px",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "8px 10px",
                         borderRadius: 8,
                         border: selected
                           ? `1px solid ${FI_ACCENT}`
@@ -148,19 +149,19 @@ export default function ThemeReactionPanel({
                         color: selected ? "#FFFFFF" : "rgba(232, 230, 223, 0.7)",
                         cursor: "pointer",
                         fontFamily: "system-ui, sans-serif",
-                        fontSize: 11,
+                        fontSize: 12,
                         lineHeight: 1.35,
                         textAlign: "center",
                         boxShadow: selected ? "0 4px 12px rgba(120, 200, 255, 0.15)" : "none",
                         overflow: "hidden",
                       }}
                     >
-                      <span style={{ flex: 1 }}>{option.label}</span>
+                      <span>{option.label}</span>
                       <span
                         style={{
                           fontSize: 10,
                           color: selected ? FI_ACCENT_MUTED : "rgba(232, 230, 223, 0.45)",
-                          marginTop: 6,
+                          marginTop: 4,
                           fontFamily: "monospace",
                         }}
                       >
