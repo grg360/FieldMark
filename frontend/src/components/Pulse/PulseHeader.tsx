@@ -39,10 +39,24 @@ export default function PulseHeader({ therapeuticArea, window }: PulseHeaderProp
       <div style={wordmarkStyle}>Scientific Pulse</div>
       <h1 style={taNameStyle}>{therapeuticArea}</h1>
 
+      {/* One-line orienting subtitle: what this page IS, before any mechanics. */}
+      <p
+        style={{
+          margin: "10px 0 0",
+          fontSize: 14,
+          lineHeight: 1.5,
+          color: PULSE_COLORS.muted,
+          maxWidth: 560,
+        }}
+      >
+        Where scientific attention is moving in this therapeutic area, measured across
+        published literature.
+      </p>
+
       {/* Rule 3: always show the window. Month grain — the current calendar month is
           deliberately excluded because publication indexing lags, so the newest shown
           month is the last COMPLETE one. */}
-      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{ fontSize: 13, color: PULSE_COLORS.text, fontFeatureSettings: '"tnum"' }}>
           Updated through{" "}
           <span style={{ color: PULSE_COLORS.amber, fontWeight: 600 }}>

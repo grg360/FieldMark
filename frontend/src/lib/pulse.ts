@@ -209,10 +209,10 @@ export function themesRankedByCurrent(themes: PulseTheme[]): PulseTheme[] {
 // (see the movement-reliability caveat): every theme spikes in it, so an inline
 // sparkline that included it would read as the same hockey stick everywhere and
 // imply explosive growth across the board — a visual claim the collapsed caveat
-// can't undo. Inline sparklines therefore use the leading clean months only
-// (Jan–May of the current 6-month series). This trims the SHAPE only; the
-// count/share/movement figures stay on the full 3-vs-3 windows, and the
-// drill-down curve still shows the complete labelled record.
+// can't undo. The charts therefore use the leading clean months only (Jan–May
+// of the current 6-month series) — BOTH the inline sparkline and the drill-down
+// curve. This trims the SHAPE only; the count/share/movement figures stay on
+// the full 3-vs-3 windows (June included).
 export function sparklineSeries(theme: PulseTheme): PulseMonthly[] {
   if (theme.monthly.length <= 1) return theme.monthly;
   return theme.monthly.slice(0, -1);
