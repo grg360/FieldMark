@@ -22,6 +22,8 @@ order.
 | `community_qualification_gate.sql` | All four `get_community_filtered` / `get_community_filtered_count` overloads, carrying the NSCLC community-qualification gate (rationale in the header comment). |
 | `get_shared_publications.sql` | `get_shared_publications(uuid, uuid, int)` — DB-side co-authored-publication intersection for a pair of HCPs. |
 | `get_partner_publications.sql` | `get_partner_publications(text, text, int)` — DB-side co-authored-publication intersection for a pair of institutions. |
+| `get_pulse_synthesis_facts.sql` | `get_pulse_synthesis_facts(text)` — the allowed current-window fact set (per-theme counts/share/composition, totals, window, events) handed to the Pulse TA-synthesis model; excluded fields (prior, movement, monthly, lifetime) never leave the DB. |
+| `pulse_ai_synthesis.sql` | Cache table for the Pulse TA-level AI synthesis paragraph, keyed on `(ta_slug, window_start, window_end)`; written by the `generate-pulse-synthesis` Edge Function, read on page load. |
 
 Definitions were captured from the live database via `pg_get_functiondef`
 (2026-07-27) and verified to match what is deployed. If a function is changed

@@ -5,6 +5,7 @@ import { PULSE_COLORS } from "../../lib/pulse";
 import { COLOR, FONT } from "../../lib/designTokens";
 import AppLayout from "../AppLayout";
 import PulseHeader from "./PulseHeader";
+import PulseSynthesis from "./PulseSynthesis";
 import PulseCaveats from "./PulseCaveats";
 import PulseEvents from "./PulseEvents";
 import PulseConfidence from "./PulseConfidence";
@@ -67,6 +68,12 @@ export default function PulsePage() {
     <AppLayout maxWidth={760}>
       <div style={columnStyle}>
         <PulseHeader therapeuticArea={pulse.therapeutic_area} window={pulse.window} />
+        {/* AI synthesis opens the page — one paragraph on where attention sits. */}
+        <PulseSynthesis
+          taSlug={taSlug}
+          windowStart={pulse.window.current_start}
+          windowEnd={pulse.window.current_end}
+        />
         {/* Content first: the merged, ranked theme list, then events. */}
         <ThemeList themes={pulse.themes} />
         <PulseEvents events={pulse.events} />
