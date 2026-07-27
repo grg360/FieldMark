@@ -2,6 +2,7 @@
     "grain": "month",
     "events": [
         {
+            "doi": "10.1016/j.jtcvs.2026.03.622",
             "date": "2026-05-02",
             "type": "guideline",
             "theme": "Perioperative Immunotherapy in Resectable NSCLC",

@@ -50,28 +50,15 @@ export default function PulseCaveats({ caveats }: PulseCaveatsProps) {
         padding: "14px 16px",
       }}
     >
+      {/* Plain eyebrow header — reads as a section like THEMES / LOWER VOLUME
+          (no disclosure marker, no count); still toggles the caveats on click. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         style={summaryStyle}
       >
-        <span
-          aria-hidden
-          style={{
-            fontSize: 10,
-            width: 10,
-            flexShrink: 0,
-            transform: open ? "rotate(90deg)" : "none",
-            transition: "transform 120ms ease",
-          }}
-        >
-          {"▸"}
-        </span>
         Data caveats
-        <span style={{ letterSpacing: "normal", textTransform: "none", color: PULSE_COLORS.mutedDim }}>
-          ({caveats.length})
-        </span>
       </button>
 
       {open && (
@@ -124,7 +111,7 @@ export default function PulseCaveats({ caveats }: PulseCaveatsProps) {
                     color: PULSE_COLORS.muted,
                   }}
                 >
-                  <span aria-hidden style={{ color: PULSE_COLORS.mutedDim, flexShrink: 0 }}>
+                  <span aria-hidden style={{ color: PULSE_COLORS.indigo, flexShrink: 0 }}>
                     ·
                   </span>
                   <span>{caveat}</span>

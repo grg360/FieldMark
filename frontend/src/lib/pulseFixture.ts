@@ -419,6 +419,7 @@ export const NSCLC_PULSE: PulsePayload = {
       title:
         "The 2026 American Association for Thoracic Surgery (AATS) Expert Consensus Document: Evaluation and Management of N2+ Non-Small Cell Lung Cancer.",
       journal: "The Journal of thoracic and cardiovascular surgery",
+      doi: "10.1016/j.jtcvs.2026.03.622",
     },
   ],
   monthly: [

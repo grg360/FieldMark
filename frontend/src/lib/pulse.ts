@@ -61,6 +61,9 @@ export interface PulseEvent {
   title: string;
   journal: string;
   date: string;
+  /** DOI (bare, no URL prefix) if the source publication has one — links the
+   *  event to the full article. May be null. */
+  doi: string | null;
 }
 
 export interface PulsePayload {

@@ -116,12 +116,20 @@ function Tile({ value, label }: { value: number; label: string }) {
   );
 }
 
-function Chevron({ open, size = 10 }: { open: boolean; size?: number }) {
+function Chevron({
+  open,
+  size = 10,
+  color = PULSE_COLORS.mutedDim,
+}: {
+  open: boolean;
+  size?: number;
+  color?: string;
+}) {
   return (
     <span
       aria-hidden
       style={{
-        color: PULSE_COLORS.mutedDim,
+        color,
         fontSize: size,
         width: size,
         flexShrink: 0,
@@ -261,24 +269,21 @@ function Tier1Cell({
         padding: "12px 14px",
       }}
     >
-      {/* Line 1: name (clamped to two lines so half-width cells don't over-truncate) */}
-      <span style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-        <span style={{ marginTop: 3 }}>
-          <Chevron open={open} />
-        </span>
-        <span
-          style={{
-            fontSize: 14,
-            color: PULSE_COLORS.text,
-            lineHeight: 1.3,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
-          {theme.name}
-        </span>
+      {/* Line 1: name (clamped to two lines so half-width cells don't over-truncate).
+          No chevron — the whole card is the toggle, and the open state shows as an
+          indigo border. */}
+      <span
+        style={{
+          fontSize: 14,
+          color: PULSE_COLORS.text,
+          lineHeight: 1.3,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
+        {theme.name}
       </span>
 
       {/* Line 2: count + share ............ movement */}
@@ -356,7 +361,7 @@ function Tier2Row({ theme }: { theme: PulseTheme }) {
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <Chevron open={open} size={9} />
+          <Chevron open={open} size={9} color={PULSE_COLORS.indigo} />
           <span
             style={{
               fontSize: 13,

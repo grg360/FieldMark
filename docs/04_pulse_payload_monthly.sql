@@ -85,6 +85,7 @@ events AS (
     p.title,
     p.pub_date,
     p.journal,
+    p.doi,
     CASE
       WHEN p.publication_types && ARRAY['Practice Guideline'] THEN 'guideline'
       WHEN p.publication_types && ARRAY['Consensus Statement'] THEN 'consensus'
@@ -151,7 +152,8 @@ SELECT jsonb_pretty(jsonb_build_object(
       'type', e.event_type,
       'title', e.title,
       'journal', e.journal,
-      'date', e.pub_date
+      'date', e.pub_date,
+      'doi', e.doi
     ) ORDER BY e.pub_date DESC), '[]'::jsonb)
     FROM events e
     JOIN theme_canonical_v1 tc ON tc.id = e.canonical_id

@@ -46,11 +46,10 @@ export default function PulseHeader({ therapeuticArea, window }: PulseHeaderProp
           fontSize: 14,
           lineHeight: 1.5,
           color: PULSE_COLORS.muted,
-          maxWidth: 560,
         }}
       >
         Where scientific attention is moving in this therapeutic area, measured across
-        published literature.
+        published{" "}literature.
       </p>
 
       {/* Rule 3: always show the window. Month grain — the current calendar month is
@@ -66,7 +65,8 @@ export default function PulseHeader({ therapeuticArea, window }: PulseHeaderProp
         <div style={{ fontSize: 11.5, color: PULSE_COLORS.mutedDim }}>
           {window.window_months} complete calendar months (
           {formatMonthRange(window.current_start, window.current_end)}) vs the prior{" "}
-          {window.window_months} · current month excluded as incomplete
+          {window.window_months}{" "}
+          <span style={{ color: PULSE_COLORS.indigo }}>·</span> current month excluded as incomplete
         </div>
       </div>
     </header>

@@ -79,9 +79,30 @@ export default function PulseEvents({ events }: PulseEventsProps) {
               {TYPE_LABEL[event.type]}
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: PULSE_COLORS.text, lineHeight: 1.5 }}>
-                {event.title}
-              </div>
+              {/* Title links to the article via DOI when present — drill-down to
+                  the full source. Plain text when the source has no DOI. */}
+              {event.doi ? (
+                <a
+                  href={`https://doi.org/${event.doi}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: 13,
+                    color: PULSE_COLORS.text,
+                    lineHeight: 1.5,
+                    textDecoration: "none",
+                  }}
+                >
+                  {event.title}
+                  <span aria-hidden style={{ color: PULSE_COLORS.indigo, marginLeft: 5, whiteSpace: "nowrap" }}>
+                    ↗
+                  </span>
+                </a>
+              ) : (
+                <div style={{ fontSize: 13, color: PULSE_COLORS.text, lineHeight: 1.5 }}>
+                  {event.title}
+                </div>
+              )}
               <div
                 style={{
                   fontSize: 11.5,
@@ -93,9 +114,9 @@ export default function PulseEvents({ events }: PulseEventsProps) {
                 }}
               >
                 <span style={{ color: PULSE_COLORS.muted }}>{event.theme}</span>
-                <span aria-hidden>·</span>
+                <span aria-hidden style={{ color: PULSE_COLORS.indigo }}>·</span>
                 <span>{event.journal}</span>
-                <span aria-hidden>·</span>
+                <span aria-hidden style={{ color: PULSE_COLORS.indigo }}>·</span>
                 <span style={{ fontFeatureSettings: '"tnum"' }}>{formatWindowDate(event.date)}</span>
               </div>
             </div>

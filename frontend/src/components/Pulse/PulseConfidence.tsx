@@ -36,7 +36,9 @@ export default function PulseConfidence() {
         padding: "14px 16px",
       }}
     >
-      <div style={eyebrowStyle}>Confidence · evidence streams</div>
+      <div style={eyebrowStyle}>
+        Confidence <span style={{ color: PULSE_COLORS.indigo }}>·</span> evidence streams
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {EVIDENCE_STREAMS.map((stream) => {
           const active = stream.state === "active";
