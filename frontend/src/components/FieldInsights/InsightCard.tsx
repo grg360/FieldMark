@@ -238,7 +238,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate }
           </div>
         </div>
 
-        <div style={{ fontFamily: FONT.serif, fontSize: 15, color: "#A8A49B", fontStyle: "italic", lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
+        <div style={{ fontFamily: FONT.serif, fontSize: 15, color: "#A8A49B", lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
           {note.body}
         </div>
 
