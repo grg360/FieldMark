@@ -365,7 +365,7 @@ button {
   /* ── Profile two-column ── */
   .fm-profile-body {
     display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     gap: 0 !important;
     align-items: start !important;
     border-bottom: 1px solid #1E1E22 !important;
