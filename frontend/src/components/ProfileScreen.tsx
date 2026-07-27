@@ -300,7 +300,7 @@ export default function ProfileScreen() {
               width: 56,
               height: 56,
               borderRadius: "50%",
-              backgroundColor: "#171512",
+              backgroundColor: COLOR.surfaceCard,
               border: "1px solid #E8A020",
               display: "flex",
               alignItems: "center",
@@ -359,7 +359,7 @@ export default function ProfileScreen() {
                       type="button"
                       onClick={() => handleTAChange(ta)}
                       style={{
-                        backgroundColor: isSelected ? "#0D0D0A" : "#171512",
+                        backgroundColor: isSelected ? "#0D0D0A" : COLOR.surfaceCard,
                         border: `1px solid ${isSelected ? "#E8A020" : "rgba(255,255,255,0.10)"}`,
                         color: isSelected ? "#E8A020" : COLOR.ink1,
                         borderRadius: 4,

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COLOR } from "../../lib/designTokens";
 import { archiveWatchlist, renameWatchlist, type Watchlist } from "../../lib/watchlists";
 
 interface Props {
@@ -96,7 +97,7 @@ export default function EditWatchlistModal({
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: "#171512",
+          backgroundColor: COLOR.surfaceCard,
           border: "1px solid rgba(255,255,255,0.08)",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 48px -18px rgba(0,0,0,0.9)",
           borderRadius: 11,

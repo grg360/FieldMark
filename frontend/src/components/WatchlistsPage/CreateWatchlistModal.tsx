@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COLOR } from "../../lib/designTokens";
 import { createWatchlist, type Watchlist } from "../../lib/watchlists";
 
 interface Props {
@@ -83,7 +84,7 @@ export default function CreateWatchlistModal({ userId, onClose, onCreated }: Pro
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: "#171512",
+          backgroundColor: COLOR.surfaceCard,
           border: "1px solid rgba(255,255,255,0.08)",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 48px -18px rgba(0,0,0,0.9)",
           borderRadius: 11,
@@ -149,7 +150,7 @@ export default function CreateWatchlistModal({ userId, onClose, onCreated }: Pro
                     color === preset.value
                       ? "2px solid #E8E6DF"
                       : "2px solid #1E1E22",
-                  boxShadow: color === preset.value ? "0 0 0 2px #171512, 0 0 0 4px #E8E6DF" : undefined,
+                  boxShadow: color === preset.value ? `0 0 0 2px ${COLOR.surfaceCard}, 0 0 0 4px #E8E6DF` : undefined,
                   backgroundColor: preset.value ?? "#0A0A0B",
                   cursor: "pointer",
                   padding: 0,

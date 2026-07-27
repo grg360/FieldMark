@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COLOR } from "../../lib/designTokens";
 import type {
   TrackedSortField,
   TrackedSortDirection,
@@ -123,7 +124,7 @@ export default function TrackedHcpsFilterBar({
               gap: 10,
               marginTop: 8,
               padding: 12,
-              backgroundColor: "#171512",
+              backgroundColor: COLOR.surfaceCard,
               border: "1px solid rgba(255,255,255,0.06)",
               borderRadius: 8,
             }}

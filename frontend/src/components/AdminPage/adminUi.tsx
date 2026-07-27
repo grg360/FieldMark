@@ -8,7 +8,7 @@ import { COLOR, FONT } from "../../lib/designTokens";
  * from the design tokens (COLOR.amber, FONT.mono → IBM Plex Mono). The remaining
  * neutrals below (cool-toned #111113 card / #1E1E22 border / #E8E6DF text) are
  * the older utility-page palette and DELIBERATELY diverge from the warm design
- * surfaces (--surface-card #171512, warm inks). They are left as-is: there is no
+ * surfaces (--surface-card #151515, warm inks). They are left as-is: there is no
  * exact design token for them and force-mapping would visually drift the admin
  * page with no design reference. Flagged in the report as needing its own token
  * pass. See docs/FIELDMARK_DESIGN_SYSTEM.md.
