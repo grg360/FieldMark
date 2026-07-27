@@ -2,16 +2,26 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import {
   PULSE_COLORS,
+  countProportion,
   formatInt,
   formatShare,
   formatSignedPct,
   isThemeGated,
   movementDirection,
   pctChange,
+  primaryThemeTotal,
   qualitativeLabel,
+  sparklineSeries,
   themesRankedByCurrent,
 } from "../../lib/pulse";
 import type { MovementLabel, PulseTheme } from "../../lib/pulse";
+import Sparkline, { ThemeCurve } from "./Sparkline";
+
+// Merged theme list — the single ranked view that replaces the old
+// Consensus Snapshot + Themes pair (they showed the same 24 themes twice, one
+// with bars, one with movement). Each row now carries name, count, share, a
+// proportional bar, a movement label/percentage, and a clean-months sparkline;
+// expanding a row reveals the full labelled curve, composition, and lifetime.
 
 interface ThemeListProps {
   themes: PulseTheme[];
@@ -76,6 +86,15 @@ const tileLabelStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
+const drillHeaderStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: PULSE_COLORS.mutedDim,
+  marginBottom: 7,
+};
+
 function Tile({ value, label }: { value: number; label: string }) {
   return (
     <div style={tileStyle}>
@@ -115,9 +134,11 @@ function Movement({ theme }: { theme: PulseTheme }) {
   );
 }
 
-function ThemeRow({ theme }: { theme: PulseTheme }) {
+function ThemeRow({ theme, total }: { theme: PulseTheme; total: number }) {
   const [expanded, setExpanded] = useState(false);
   const gated = isThemeGated(theme);
+  const proportion = countProportion(theme, total);
+  const widthPct = `${(proportion * 100).toFixed(2)}%`;
 
   return (
     <div style={{ borderBottom: `1px solid ${PULSE_COLORS.line}` }}>
@@ -131,72 +152,108 @@ function ThemeRow({ theme }: { theme: PulseTheme }) {
           border: "none",
           cursor: "pointer",
           padding: "13px 0",
-          display: "grid",
-          gridTemplateColumns: "1fr auto",
-          alignItems: "center",
-          gap: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 7,
           textAlign: "left",
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span
-            aria-hidden
-            style={{
-              color: PULSE_COLORS.mutedDim,
-              fontSize: 10,
-              width: 10,
-              flexShrink: 0,
-              transform: expanded ? "rotate(90deg)" : "none",
-              transition: "transform 120ms ease",
-            }}
-          >
-            {"▸"}
-          </span>
-          <span
-            style={{
-              fontSize: 14,
-              color: PULSE_COLORS.text,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {theme.name}
-          </span>
-        </span>
-
+        {/* Line 1: chevron + name ............. count · share · movement */}
         <span
           style={{
             display: "grid",
-            gridTemplateColumns: "44px 56px 120px",
+            gridTemplateColumns: "1fr auto",
             alignItems: "baseline",
-            gap: 10,
-            justifyItems: "end",
+            gap: 12,
+            width: "100%",
           }}
         >
-          {/* count */}
+          <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span
+              aria-hidden
+              style={{
+                color: PULSE_COLORS.mutedDim,
+                fontSize: 10,
+                width: 10,
+                flexShrink: 0,
+                transform: expanded ? "rotate(90deg)" : "none",
+                transition: "transform 120ms ease",
+              }}
+            >
+              {"▸"}
+            </span>
+            <span
+              style={{
+                fontSize: 14,
+                color: PULSE_COLORS.text,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {theme.name}
+            </span>
+          </span>
+
           <span
             style={{
-              fontSize: 14,
-              color: PULSE_COLORS.text,
-              fontWeight: 600,
-              fontFeatureSettings: '"tnum"',
+              display: "grid",
+              gridTemplateColumns: "44px 56px 116px",
+              alignItems: "baseline",
+              gap: 10,
+              justifyItems: "end",
             }}
           >
-            {formatInt(theme.cur_pubs)}
+            <span
+              style={{
+                fontSize: 14,
+                color: PULSE_COLORS.text,
+                fontWeight: 600,
+                fontFeatureSettings: '"tnum"',
+              }}
+            >
+              {formatInt(theme.cur_pubs)}
+            </span>
+            {/* share — em dash when gated (Rule 1) or null (Rule 4) */}
+            <span
+              style={{ fontSize: 12.5, color: PULSE_COLORS.muted, fontFeatureSettings: '"tnum"' }}
+            >
+              {gated ? "—" : formatShare(theme.cur_share)}
+            </span>
+            <Movement theme={theme} />
           </span>
-          {/* share — em dash when gated (Rule 1) or when the value is null (Rule 4) */}
+        </span>
+
+        {/* Line 2: proportional bar .................... sparkline.
+            Bar width is COUNT-based, so it is honest even below the gate where
+            the share number is withheld. A min width keeps a small-but-real
+            theme visible. Indigo, not amber. */}
+        <span style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", paddingLeft: 18 }}>
           <span
             style={{
-              fontSize: 12.5,
-              color: PULSE_COLORS.muted,
-              fontFeatureSettings: '"tnum"',
+              flex: 1,
+              height: 6,
+              backgroundColor: PULSE_COLORS.line,
+              borderRadius: 3,
+              overflow: "hidden",
+              minWidth: 0,
             }}
           >
-            {gated ? "—" : formatShare(theme.cur_share)}
+            <span
+              style={{
+                display: "block",
+                height: "100%",
+                width: widthPct,
+                minWidth: theme.cur_pubs > 0 ? 3 : 0,
+                backgroundColor: PULSE_COLORS.indigo,
+                borderRadius: 3,
+              }}
+            />
           </span>
-          {/* movement */}
-          <Movement theme={theme} />
+          <Sparkline
+            series={sparklineSeries(theme)}
+            ariaLabel={`${theme.name} — 5-month trend`}
+          />
         </span>
       </button>
 
@@ -214,20 +271,16 @@ function ThemeRow({ theme }: { theme: PulseTheme }) {
             {theme.description}
           </p>
 
-          {/* Rule 5: every number traceable. The window counts behind the row's
-              count/share/movement, plus the composition behind Component 5. */}
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 500,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: PULSE_COLORS.mutedDim,
-              marginBottom: 7,
-            }}
-          >
-            Publications
+          {/* Full 6-month curve, June included and explicitly labelled — the
+              complete record. (Inline sparklines drop the backfill month; here,
+              with month ticks + values, that month is transparent, not implied.) */}
+          <div style={drillHeaderStyle}>Monthly publications</div>
+          <div style={{ marginBottom: 16 }}>
+            <ThemeCurve series={theme.monthly} />
           </div>
+
+          {/* Rule 5: every number traceable — window counts + lifetime. */}
+          <div style={drillHeaderStyle}>Publications</div>
           <div
             style={{
               display: "grid",
@@ -242,18 +295,7 @@ function ThemeRow({ theme }: { theme: PulseTheme }) {
             <Tile value={theme.lifetime_pubs} label="Lifetime" />
           </div>
 
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 500,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: PULSE_COLORS.mutedDim,
-              marginBottom: 7,
-            }}
-          >
-            Composition (this window)
-          </div>
+          <div style={drillHeaderStyle}>Composition (this window)</div>
           <div
             style={{
               display: "grid",
@@ -275,6 +317,8 @@ function ThemeRow({ theme }: { theme: PulseTheme }) {
 
 export default function ThemeList({ themes }: ThemeListProps) {
   const ranked = themesRankedByCurrent(themes);
+  const total = primaryThemeTotal(themes);
+
   return (
     <section
       style={{
@@ -284,12 +328,15 @@ export default function ThemeList({ themes }: ThemeListProps) {
       }}
     >
       <div style={sectionHeaderStyle}>Themes</div>
-      <div style={{ fontSize: 11.5, color: PULSE_COLORS.mutedDim, marginBottom: 6 }}>
-        Ranked by publications in this window · expand any theme for its underlying counts
+      {/* Denominator stated plainly: share is of PRIMARY-THEME publications in
+          the window, not all publications. */}
+      <div style={{ fontSize: 11.5, color: PULSE_COLORS.mutedDim, marginBottom: 10 }}>
+        Ranked by share of {formatInt(total)} primary-theme publications this window ·
+        sparkline shows the 5 clean months · expand any theme for its full curve and counts
       </div>
       <div>
         {ranked.map((theme) => (
-          <ThemeRow key={theme.name} theme={theme} />
+          <ThemeRow key={theme.name} theme={theme} total={total} />
         ))}
       </div>
     </section>

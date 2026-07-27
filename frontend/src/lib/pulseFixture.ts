@@ -1,15 +1,17 @@
 // Scientific Pulse — real NSCLC payload (month grain).
 //
-// Verbatim transcription of docs/pulse_payload_2026-07-24.json, produced by
+// Verbatim transcription of docs/pulse_payload_2026-07-27.json, produced by
 // docs/04_pulse_payload_monthly.sql. Stands in for the query output until the
 // persisted-snapshot API exists. Do NOT edit the values — regenerate the JSON and
-// re-transcribe if the query changes.
+// re-transcribe if the query changes. generated_at floats to the run date (the
+// JSON is renamed to match); do not pin it.
 //
 // Notes for the UI paths this exercises:
 //  - Five themes are at/below the 20-count gate — Mesothelioma (19), EGFR Exon 20 (17),
 //    Oligometastatic (11), Adjuvant early-stage (10) — plus Drug-Tolerant Persisters,
 //    which has ZERO rows by design. Both the gated path and the zero-row path must render.
-//  - `monthly` is carried through the types only; no curve component yet.
+//  - Each theme carries a zero-filled 6-month `monthly` series (sparkline input);
+//    the corpus-wide `monthly` array is the sum of them.
 //  - `caveats` must be surfaced in the UI verbatim (see PulseCaveats) — the fourth,
 //    on movement reliability, gets prominence.
 
@@ -18,7 +20,7 @@ import type { PulsePayload } from "./pulse";
 export const NSCLC_PULSE: PulsePayload = {
   grain: "month",
   therapeutic_area: "NSCLC",
-  generated_at: "2026-07-24",
+  generated_at: "2026-07-27",
   window: {
     current_start: "2026-04-01",
     current_end: "2026-07-01",
@@ -45,6 +47,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 14,
       commentary: 2,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 15 }, { month: "2026-02-01", pubs: 27 }, { month: "2026-03-01", pubs: 43 }, { month: "2026-04-01", pubs: 49 }, { month: "2026-05-01", pubs: 72 }, { month: "2026-06-01", pubs: 225 }],
     },
     {
       name: "Tumor Microenvironment and Immune Biology",
@@ -59,6 +62,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 35 }, { month: "2026-02-01", pubs: 53 }, { month: "2026-03-01", pubs: 54 }, { month: "2026-04-01", pubs: 39 }, { month: "2026-05-01", pubs: 65 }, { month: "2026-06-01", pubs: 170 }],
     },
     {
       name: "Real-World Outcomes and Population Research",
@@ -73,6 +77,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 12 }, { month: "2026-02-01", pubs: 20 }, { month: "2026-03-01", pubs: 33 }, { month: "2026-04-01", pubs: 32 }, { month: "2026-05-01", pubs: 46 }, { month: "2026-06-01", pubs: 80 }],
     },
     {
       name: "Early-Stage NSCLC Surgical Management",
@@ -87,6 +92,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 1,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 15 }, { month: "2026-02-01", pubs: 34 }, { month: "2026-03-01", pubs: 25 }, { month: "2026-04-01", pubs: 36 }, { month: "2026-05-01", pubs: 34 }, { month: "2026-06-01", pubs: 73 }],
     },
     {
       name: "EGFR-Mutant NSCLC Treatment",
@@ -101,6 +107,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 21 }, { month: "2026-02-01", pubs: 36 }, { month: "2026-03-01", pubs: 31 }, { month: "2026-04-01", pubs: 29 }, { month: "2026-05-01", pubs: 40 }, { month: "2026-06-01", pubs: 47 }],
     },
     {
       name: "SBRT and Radiation Oncology in NSCLC",
@@ -115,6 +122,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 8,
       commentary: 2,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 11 }, { month: "2026-02-01", pubs: 20 }, { month: "2026-03-01", pubs: 29 }, { month: "2026-04-01", pubs: 29 }, { month: "2026-05-01", pubs: 37 }, { month: "2026-06-01", pubs: 41 }],
     },
     {
       name: "EGFR Resistance Mechanisms",
@@ -129,6 +137,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 2,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 14 }, { month: "2026-02-01", pubs: 15 }, { month: "2026-03-01", pubs: 30 }, { month: "2026-04-01", pubs: 22 }, { month: "2026-05-01", pubs: 32 }, { month: "2026-06-01", pubs: 29 }],
     },
     {
       name: "Perioperative Immunotherapy in Resectable NSCLC",
@@ -143,6 +152,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 1,
       commentary: 0,
       guidance: 1,
+      monthly: [{ month: "2026-01-01", pubs: 8 }, { month: "2026-02-01", pubs: 19 }, { month: "2026-03-01", pubs: 15 }, { month: "2026-04-01", pubs: 9 }, { month: "2026-05-01", pubs: 15 }, { month: "2026-06-01", pubs: 56 }],
     },
     {
       name: "Immunotherapy Resistance Mechanisms",
@@ -157,6 +167,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 1 }, { month: "2026-02-01", pubs: 3 }, { month: "2026-03-01", pubs: 8 }, { month: "2026-04-01", pubs: 11 }, { month: "2026-05-01", pubs: 18 }, { month: "2026-06-01", pubs: 50 }],
     },
     {
       name: "ALK and ROS1 Targeted Therapy",
@@ -171,6 +182,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 4,
       commentary: 1,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 11 }, { month: "2026-02-01", pubs: 22 }, { month: "2026-03-01", pubs: 21 }, { month: "2026-04-01", pubs: 16 }, { month: "2026-05-01", pubs: 25 }, { month: "2026-06-01", pubs: 28 }],
     },
     {
       name: "Immunotherapy Biomarkers and Patient Selection",
@@ -185,6 +197,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 1,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 8 }, { month: "2026-02-01", pubs: 14 }, { month: "2026-03-01", pubs: 9 }, { month: "2026-04-01", pubs: 13 }, { month: "2026-05-01", pubs: 15 }, { month: "2026-06-01", pubs: 39 }],
     },
     {
       name: "Liquid Biopsy and ctDNA Applications",
@@ -199,6 +212,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 15 }, { month: "2026-02-01", pubs: 10 }, { month: "2026-03-01", pubs: 14 }, { month: "2026-04-01", pubs: 12 }, { month: "2026-05-01", pubs: 12 }, { month: "2026-06-01", pubs: 33 }],
     },
     {
       name: "Rare Oncogenic Drivers in NSCLC",
@@ -213,6 +227,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 1,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 7 }, { month: "2026-02-01", pubs: 13 }, { month: "2026-03-01", pubs: 8 }, { month: "2026-04-01", pubs: 14 }, { month: "2026-05-01", pubs: 16 }, { month: "2026-06-01", pubs: 19 }],
     },
     {
       name: "Immune-Related Adverse Event Management",
@@ -227,6 +242,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 2 }, { month: "2026-02-01", pubs: 15 }, { month: "2026-03-01", pubs: 9 }, { month: "2026-04-01", pubs: 14 }, { month: "2026-05-01", pubs: 10 }, { month: "2026-06-01", pubs: 21 }],
     },
     {
       name: "Stage III NSCLC Multimodality Treatment",
@@ -241,6 +257,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 1,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 1 }, { month: "2026-02-01", pubs: 10 }, { month: "2026-03-01", pubs: 10 }, { month: "2026-04-01", pubs: 7 }, { month: "2026-05-01", pubs: 14 }, { month: "2026-06-01", pubs: 17 }],
     },
     {
       name: "Antibody-Drug Conjugates in Thoracic Malignancies",
@@ -255,6 +272,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 1,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 1 }, { month: "2026-02-01", pubs: 9 }, { month: "2026-03-01", pubs: 9 }, { month: "2026-04-01", pubs: 5 }, { month: "2026-05-01", pubs: 10 }, { month: "2026-06-01", pubs: 23 }],
     },
     {
       name: "KRAS-Mutant NSCLC Therapeutics",
@@ -269,6 +287,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 4 }, { month: "2026-02-01", pubs: 7 }, { month: "2026-03-01", pubs: 7 }, { month: "2026-04-01", pubs: 8 }, { month: "2026-05-01", pubs: 7 }, { month: "2026-06-01", pubs: 22 }],
     },
     {
       name: "SCLC Biology and Treatment",
@@ -283,6 +302,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 2 }, { month: "2026-02-01", pubs: 12 }, { month: "2026-03-01", pubs: 6 }, { month: "2026-04-01", pubs: 14 }, { month: "2026-05-01", pubs: 10 }, { month: "2026-06-01", pubs: 13 }],
     },
     {
       name: "CNS Metastases Management",
@@ -297,6 +317,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 6 }, { month: "2026-02-01", pubs: 10 }, { month: "2026-03-01", pubs: 13 }, { month: "2026-04-01", pubs: 6 }, { month: "2026-05-01", pubs: 11 }, { month: "2026-06-01", pubs: 15 }],
     },
     {
       name: "Lung Cancer Screening and Health Disparities",
@@ -311,6 +332,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 1,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 0 }, { month: "2026-02-01", pubs: 5 }, { month: "2026-03-01", pubs: 6 }, { month: "2026-04-01", pubs: 6 }, { month: "2026-05-01", pubs: 7 }, { month: "2026-06-01", pubs: 8 }],
     },
     {
       name: "Mesothelioma Diagnosis and Treatment",
@@ -325,6 +347,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 2 }, { month: "2026-02-01", pubs: 5 }, { month: "2026-03-01", pubs: 4 }, { month: "2026-04-01", pubs: 4 }, { month: "2026-05-01", pubs: 9 }, { month: "2026-06-01", pubs: 6 }],
     },
     {
       name: "EGFR Exon 20 Insertion Targeting",
@@ -339,6 +362,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 2,
       commentary: 1,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 4 }, { month: "2026-02-01", pubs: 8 }, { month: "2026-03-01", pubs: 10 }, { month: "2026-04-01", pubs: 5 }, { month: "2026-05-01", pubs: 5 }, { month: "2026-06-01", pubs: 7 }],
     },
     {
       name: "Oligometastatic NSCLC Local Therapy",
@@ -353,6 +377,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 2,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 3 }, { month: "2026-02-01", pubs: 5 }, { month: "2026-03-01", pubs: 7 }, { month: "2026-04-01", pubs: 4 }, { month: "2026-05-01", pubs: 3 }, { month: "2026-06-01", pubs: 4 }],
     },
     {
       name: "Adjuvant and Targeted Therapy in Early-Stage NSCLC",
@@ -367,6 +392,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 2 }, { month: "2026-02-01", pubs: 2 }, { month: "2026-03-01", pubs: 7 }, { month: "2026-04-01", pubs: 1 }, { month: "2026-05-01", pubs: 4 }, { month: "2026-06-01", pubs: 5 }],
     },
     {
       // Zero rows by design — the gated + empty path must render without a bar or a percentage.
@@ -382,6 +408,7 @@ export const NSCLC_PULSE: PulsePayload = {
       trials: 0,
       commentary: 0,
       guidance: 0,
+      monthly: [{ month: "2026-01-01", pubs: 0 }, { month: "2026-02-01", pubs: 0 }, { month: "2026-03-01", pubs: 0 }, { month: "2026-04-01", pubs: 0 }, { month: "2026-05-01", pubs: 0 }, { month: "2026-06-01", pubs: 0 }],
     },
   ],
   events: [

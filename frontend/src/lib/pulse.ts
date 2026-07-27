@@ -48,6 +48,9 @@ export interface PulseTheme {
   trials: number;
   commentary: number;
   guidance: number;
+  /** This theme's counts across the same 6 months as the corpus-wide `monthly`
+   *  array — zero-filled, so every theme has the same 6 points (sparkline input). */
+  monthly: PulseMonthly[];
 }
 
 export type PulseEventType = "guideline" | "consensus" | "retraction";
@@ -199,6 +202,20 @@ export function formatMonthRange(startIso: string, endExclusiveIso: string): str
 
 export function themesRankedByCurrent(themes: PulseTheme[]): PulseTheme[] {
   return [...themes].sort((a, b) => b.cur_pubs - a.cur_pubs);
+}
+
+// ── Sparkline series: clean months only ──────────────────────────────────────
+// The most recent month in the rolling window is a backfill-recovery artifact
+// (see the movement-reliability caveat): every theme spikes in it, so an inline
+// sparkline that included it would read as the same hockey stick everywhere and
+// imply explosive growth across the board — a visual claim the collapsed caveat
+// can't undo. Inline sparklines therefore use the leading clean months only
+// (Jan–May of the current 6-month series). This trims the SHAPE only; the
+// count/share/movement figures stay on the full 3-vs-3 windows, and the
+// drill-down curve still shows the complete labelled record.
+export function sparklineSeries(theme: PulseTheme): PulseMonthly[] {
+  if (theme.monthly.length <= 1) return theme.monthly;
+  return theme.monthly.slice(0, -1);
 }
 
 // Shared palette — now mapped onto the design-system tokens (COLOR) so Pulse

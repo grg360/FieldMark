@@ -64,6 +64,21 @@ monthly AS (
   WHERE l.pub_date >= b.prior_start AND l.pub_date < b.cur_end
   GROUP BY 1
 ),
+-- The six calendar months spanning both windows (prior_start .. cur_end), for
+-- zero-filling the per-theme series: a theme with no pubs in a month must still
+-- emit that month with pubs=0 so every sparkline has the same six points.
+months AS (
+  SELECT generate_series(b.prior_start, (b.cur_end - interval '1 month')::date, interval '1 month')::date AS month
+  FROM bounds b
+),
+-- Per-theme monthly counts over the same span as `monthly` (corpus-wide).
+theme_monthly AS (
+  SELECT l.canonical_id, date_trunc('month', l.pub_date)::date AS month, count(*) AS pubs
+  FROM labeled l
+  CROSS JOIN bounds b
+  WHERE l.pub_date >= b.prior_start AND l.pub_date < b.cur_end
+  GROUP BY 1, 2
+),
 events AS (
   SELECT
     l.canonical_id,
@@ -115,7 +130,12 @@ SELECT jsonb_pretty(jsonb_build_object(
         'reviews', coalesce(c.reviews, 0),
         'trials', coalesce(c.trials, 0),
         'commentary', coalesce(c.commentary, 0),
-        'guidance', coalesce(c.guidance, 0)
+        'guidance', coalesce(c.guidance, 0),
+        'monthly', (
+          SELECT jsonb_agg(jsonb_build_object('month', m.month, 'pubs', coalesce(tm.pubs, 0)) ORDER BY m.month)
+          FROM months m
+          LEFT JOIN theme_monthly tm ON tm.canonical_id = tc.id AND tm.month = m.month
+        )
       ) AS t,
       coalesce(c.pubs, 0) AS cur_pubs
       FROM theme_canonical_v1 tc

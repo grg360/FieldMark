@@ -6,12 +6,14 @@ import { COLOR, FONT } from "../../lib/designTokens";
 import AppLayout from "../AppLayout";
 import PulseHeader from "./PulseHeader";
 import PulseCaveats from "./PulseCaveats";
-import ConsensusSnapshot from "./ConsensusSnapshot";
+import PulseEvents from "./PulseEvents";
+import PulseConfidence from "./PulseConfidence";
 import ThemeList from "./ThemeList";
 
-// Scientific Pulse — prototype page. Components 1–3 of the build brief
-// (Header + Confidence, Consensus Snapshot, Theme list). Events (4) and the
-// Composition ratio treatment (5) are intentionally not built yet.
+// Scientific Pulse — prototype page. Content-first order: header, the merged
+// theme list (ranked, with bars + sparklines + drill-down), events, then the
+// infrastructure — a compact confidence row and the caveats, collapsed behind
+// a disclosure. The AI synthesis paragraph and sub-themes are a separate pass.
 //
 // Chrome (TopBar + GlobalFooter + warm ground) comes from AppLayout. TA-scoped:
 // /pulse/:ta selects the payload from PULSE_BY_TA by indication slug. Bare
@@ -62,11 +64,13 @@ export default function PulsePage() {
     <AppLayout maxWidth={760}>
       <div style={columnStyle}>
         <PulseHeader therapeuticArea={pulse.therapeutic_area} window={pulse.window} />
-        {/* Caveats surfaced up front — the movement-reliability warning must be seen
-            before the reader interprets the theme-list movement figures. */}
-        <PulseCaveats caveats={pulse.caveats} />
-        <ConsensusSnapshot themes={pulse.themes} />
+        {/* Content first: the merged, ranked theme list, then events. */}
         <ThemeList themes={pulse.themes} />
+        <PulseEvents events={pulse.events} />
+        {/* Infrastructure last: compact confidence row, then caveats collapsed
+            behind a disclosure (verbatim, incl. the movement-reliability warning). */}
+        <PulseConfidence />
+        <PulseCaveats caveats={pulse.caveats} />
       </div>
     </AppLayout>
   );
