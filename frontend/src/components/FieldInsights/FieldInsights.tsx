@@ -4,6 +4,7 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getNotesForHcp, type Note } from "../../lib/relationships";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { FONT } from "../../lib/designTokens";
 import EmptyInsightsState from "./EmptyInsightsState";
 import InsightComposer from "./InsightComposer";
 import InsightComposerModal from "./InsightComposerModal";
@@ -176,9 +177,11 @@ export default function FieldInsights({ hcp }: Props) {
 
       <div
         style={{
-          fontSize: 15,
-          color: "#E8E6DF",
-          letterSpacing: "0.06em",
+          fontFamily: FONT.sans,
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#8f8b83",
+          letterSpacing: "0.18em",
           textTransform: "uppercase",
           marginBottom: 12,
         }}

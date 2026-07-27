@@ -432,8 +432,8 @@ export default function ScientificNarrativeSection({
           gap: 12,
         }}
       >
-        <h2 style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", margin: 0 }}>
-          Belief Profile
+        <h2 style={{ fontFamily: FONT.sans, fontSize: 11, fontWeight: 600, color: "#8f8b83", textTransform: "uppercase", letterSpacing: "0.18em", margin: 0 }}>
+          BELIEF PROFILE
         </h2>
         <span
           style={{
