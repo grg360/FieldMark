@@ -145,36 +145,6 @@ export default function FieldInsights({ hcp }: Props) {
 
   return (
     <div style={sectionStyle}>
-      {!isMobile ? (
-        <InsightComposer
-          userId={userId}
-          hcpId={hcpId}
-          firstName={firstName}
-          isInline
-          onSave={handleSave}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={handleAddClick}
-          aria-label="Add insight"
-          style={{
-            width: "100%",
-            marginBottom: 12,
-            padding: "8px 16px",
-            backgroundColor: "#E8A020",
-            color: "#0A0A0B",
-            border: "none",
-            borderRadius: 4,
-            fontWeight: 500,
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          + Add Insight
-        </button>
-      )}
-
       <div
         style={{
           fontFamily: FONT.sans,
@@ -191,6 +161,36 @@ export default function FieldInsights({ hcp }: Props) {
           ({notes.length})
         </span>
       </div>
+
+      {!isMobile ? (
+        <InsightComposer
+          userId={userId}
+          hcpId={hcpId}
+          firstName={firstName}
+          isInline
+          onSave={handleSave}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={handleAddClick}
+          aria-label="Add insight"
+          style={{
+            width: "75%",
+            marginBottom: 12,
+            padding: "8px 16px",
+            backgroundColor: "#E8A020",
+            color: "#0A0A0B",
+            border: "none",
+            borderRadius: 4,
+            fontWeight: 500,
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          + Add Insight
+        </button>
+      )}
 
       <InsightThread
         notes={notes}

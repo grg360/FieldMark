@@ -69,7 +69,17 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
   const currentColors = statusColor(currentStatus);
 
   return (
-    <div ref={menuRef} style={{ position: "relative", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div
+      ref={menuRef}
+      style={{
+        position: "relative",
+        // Flex (not block) so the pill doesn't ride high on the inline
+        // baseline — keeps it vertically centered against the STATUS label.
+        display: "inline-flex",
+        alignItems: "center",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}
+    >
       <button
         type="button"
         className="fm-pill-button"

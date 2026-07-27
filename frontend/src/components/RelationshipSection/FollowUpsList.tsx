@@ -176,137 +176,149 @@ export default function FollowUpsList({
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          gap: 6,
-          flexWrap: "wrap",
+          flexDirection: "column",
+          gap: 8,
           opacity: composerPending ? 0.6 : 1,
         }}
       >
-        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-          {PRIORITY_OPTIONS.map((priority) => (
-            <button
-              key={priority}
-              type="button"
-              onClick={() => setComposerPriority(priority)}
-              style={{
-                ...pillBase,
-                ...priorityPillStyle(priority, composerPriority === priority),
-              }}
-            >
-              {priority}
-            </button>
-          ))}
-        </div>
+        <style>{`
+          .fm-followup-composer-input::placeholder {
+            color: #9B9892;
+            opacity: 1;
+          }
+        `}</style>
+        <input
+          type="text"
+          className="fm-followup-composer-input"
+          value={composerBody}
+          onChange={(e) => setComposerBody(e.target.value)}
+          placeholder="Add a follow-up..."
+          disabled={composerPending}
+          aria-label="New follow-up"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            backgroundColor: "#0D0D10",
+            border: "1px solid #1E1E22",
+            borderRadius: 4,
+            color: "#E8E6DF",
+            fontSize: 13,
+            padding: "6px 10px",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            outline: "none",
+          }}
+        />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
-          <style>{`
-            .fm-followup-composer-input::placeholder {
-              color: #9B9892;
-              opacity: 1;
-            }
-          `}</style>
-          <input
-            type="text"
-            className="fm-followup-composer-input"
-            value={composerBody}
-            onChange={(e) => setComposerBody(e.target.value)}
-            placeholder="Add a follow-up..."
-            disabled={composerPending}
-            aria-label="New follow-up"
-            style={{
-              flex: 1,
-              minWidth: 120,
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              borderRadius: 4,
-              color: "#E8E6DF",
-              fontSize: 13,
-              padding: "6px 10px",
-              fontFamily: "system-ui, -apple-system, sans-serif",
-              outline: "none",
-            }}
-          />
-
-          <div ref={composerDatePickerRef} style={{ position: "relative", display: "inline-block" }}>
-            <button
-              type="button"
-              onClick={() => setShowComposerDatePicker((open) => !open)}
-              disabled={composerPending}
-              aria-label="Set follow-up due date"
-              aria-expanded={showComposerDatePicker}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 4,
-                fontSize: 12,
-                color: "#9B9892",
-                backgroundColor: "transparent",
-                border: "1px solid #1E1E22",
-                cursor: composerPending ? "default" : "pointer",
-                fontFamily: "system-ui, -apple-system, sans-serif",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {composerDueAt ? formatDueDate(composerDueAt) : "Due date"}
-            </button>
-
-            {showComposerDatePicker ? (
-              <div
+        {/* Relative anchor spans the full component width so the calendar can
+            center within it instead of overflowing the viewport on mobile. */}
+        <div
+          ref={composerDatePickerRef}
+          style={{
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            {PRIORITY_OPTIONS.map((priority) => (
+              <button
+                key={priority}
+                type="button"
+                onClick={() => setComposerPriority(priority)}
                 style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  backgroundColor: "#0D0D10",
-                  border: "1px solid #1E1E22",
-                  borderRadius: 6,
-                  padding: 8,
-                  zIndex: 50,
-                  marginTop: 6,
-                  // @ts-expect-error CSS custom properties for react-day-picker
-                  "--rdp-accent-color": "#E8A020",
-                  "--rdp-background-color": "#0D0D10",
-                  "--rdp-day-color": "#E8E6DF",
-                  "--rdp-day-hover-background": "#1E1E22",
+                  ...pillBase,
+                  ...priorityPillStyle(priority, composerPriority === priority),
                 }}
               >
-                <DayPicker
-                  mode="single"
-                  selected={composerDueAt ? new Date(composerDueAt) : undefined}
-                  onSelect={handleComposerDateSelect}
-                  styles={{
-                    caption: { color: "#E8E6DF", fontSize: 13 },
-                    day: { color: "#E8E6DF", fontSize: 13, fontFamily: "system-ui, -apple-system, sans-serif" },
-                    head_cell: { color: "#9B9892" },
-                    nav_button: { color: "#9B9892" },
-                  }}
-                />
-              </div>
-            ) : null}
+                {priority}
+              </button>
+            ))}
           </div>
 
           <button
             type="button"
-            className="fm-pill-button"
-            onClick={() => void handleComposerSave()}
-            disabled={composerPending || composerBody.trim().length === 0}
+            onClick={() => setShowComposerDatePicker((open) => !open)}
+            disabled={composerPending}
+            aria-label="Set follow-up due date"
+            aria-expanded={showComposerDatePicker}
             style={{
-              backgroundColor: "#E8A020",
-              color: "#0A0A0B",
-              padding: "3px 8px",
-              borderRadius: 3,
-              fontSize: 10,
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              lineHeight: 1.2,
-              border: "none",
-              cursor: composerPending || composerBody.trim().length === 0 ? "default" : "pointer",
+              padding: "6px 10px",
+              borderRadius: 4,
+              fontSize: 12,
+              color: "#9B9892",
+              backgroundColor: "transparent",
+              border: "1px solid #1E1E22",
+              cursor: composerPending ? "default" : "pointer",
               fontFamily: "system-ui, -apple-system, sans-serif",
-              opacity: composerBody.trim().length === 0 ? 0.5 : 1,
+              whiteSpace: "nowrap",
             }}
           >
-            Save
+            {composerDueAt ? formatDueDate(composerDueAt) : "Due Date"}
           </button>
+
+          {showComposerDatePicker ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                maxWidth: "calc(100vw - 32px)",
+                backgroundColor: "#0D0D10",
+                border: "1px solid #1E1E22",
+                borderRadius: 6,
+                padding: 8,
+                zIndex: 50,
+                marginTop: 6,
+                // @ts-expect-error CSS custom properties for react-day-picker
+                "--rdp-accent-color": "#E8A020",
+                "--rdp-background-color": "#0D0D10",
+                "--rdp-day-color": "#E8E6DF",
+                "--rdp-day-hover-background": "#1E1E22",
+              }}
+            >
+              <DayPicker
+                mode="single"
+                selected={composerDueAt ? new Date(composerDueAt) : undefined}
+                onSelect={handleComposerDateSelect}
+                styles={{
+                  caption: { color: "#E8E6DF", fontSize: 13 },
+                  day: { color: "#E8E6DF", fontSize: 13, fontFamily: "system-ui, -apple-system, sans-serif" },
+                  head_cell: { color: "#9B9892" },
+                  nav_button: { color: "#9B9892" },
+                }}
+              />
+            </div>
+          ) : null}
         </div>
+
+        <button
+          type="button"
+          className="fm-pill-button"
+          onClick={() => void handleComposerSave()}
+          disabled={composerPending || composerBody.trim().length === 0}
+          style={{
+            width: "100%",
+            backgroundColor: "#E8A020",
+            color: "#0A0A0B",
+            padding: "8px 0",
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            lineHeight: 1.2,
+            border: "none",
+            cursor: composerPending || composerBody.trim().length === 0 ? "default" : "pointer",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            opacity: composerBody.trim().length === 0 ? 0.5 : 1,
+          }}
+        >
+          Save
+        </button>
       </div>
 
       {openActions.length > 0 ? (
