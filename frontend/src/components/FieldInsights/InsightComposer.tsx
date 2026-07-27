@@ -106,6 +106,14 @@ function dateInputToOccurredAt(dateValue: string, useNow: boolean): string {
   return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).toISOString();
 }
 
+// Grow a textarea to fit its content so typing adds new lines below
+// instead of scrolling inside a fixed-height box.
+function autoGrowTextarea(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 interface Props {
   userId: string;
   hcpId: string;
@@ -155,6 +163,8 @@ export default function InsightComposer({
     cancel: () => {},
   });
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const whyItMattersRef = useRef<HTMLTextAreaElement>(null);
 
   const isToday = isSameCalendarDay(new Date(dateValue + "T12:00:00"), new Date());
   const showForm = expanded || Boolean(editingNote) || !isInline || forceExpanded;
@@ -163,6 +173,14 @@ export default function InsightComposer({
   useEffect(() => {
     if (forceExpanded) setExpanded(true);
   }, [forceExpanded]);
+
+  useEffect(() => {
+    autoGrowTextarea(bodyRef.current);
+  }, [body, showForm]);
+
+  useEffect(() => {
+    autoGrowTextarea(whyItMattersRef.current);
+  }, [whyItMatters, showForm]);
 
   useEffect(() => {
     if (!showDatePicker) return;
@@ -356,6 +374,7 @@ export default function InsightComposer({
         }
       `}</style>
       <textarea
+        ref={bodyRef}
         className="fm-insight-composer-textarea"
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -371,7 +390,8 @@ export default function InsightComposer({
           fontSize: 14,
           padding: 12,
           lineHeight: 1.5,
-          resize: "vertical",
+          resize: "none",
+          overflow: "hidden",
           outline: "none",
           fontFamily: "system-ui, -apple-system, sans-serif",
           boxSizing: "border-box",
@@ -386,6 +406,7 @@ export default function InsightComposer({
           What's the strategic implication of this insight? This is what your manager will see in their weekly brief.
         </div>
         <textarea
+          ref={whyItMattersRef}
           className="fm-insight-composer-textarea"
           value={whyItMatters}
           onChange={(e) => setWhyItMatters(e.target.value)}
@@ -401,7 +422,8 @@ export default function InsightComposer({
             fontSize: 13,
             padding: 12,
             lineHeight: 1.5,
-            resize: "vertical",
+            resize: "none",
+            overflow: "hidden",
             outline: "none",
             fontFamily: "system-ui, -apple-system, sans-serif",
             boxSizing: "border-box",

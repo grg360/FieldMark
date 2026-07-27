@@ -114,6 +114,16 @@ export default function FollowUpsList({
   const [composerPending, setComposerPending] = useState(false);
 
   const composerDatePickerRef = useRef<HTMLDivElement>(null);
+  const composerBodyRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the composer textarea so long text wraps onto new lines
+  // instead of scrolling horizontally (and collapses back after save).
+  useEffect(() => {
+    const el = composerBodyRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [composerBody]);
 
   useEffect(() => {
     if (!showComposerDatePicker) return;
@@ -187,8 +197,9 @@ export default function FollowUpsList({
             opacity: 1;
           }
         `}</style>
-        <input
-          type="text"
+        <textarea
+          ref={composerBodyRef}
+          rows={1}
           className="fm-followup-composer-input"
           value={composerBody}
           onChange={(e) => setComposerBody(e.target.value)}
@@ -198,14 +209,18 @@ export default function FollowUpsList({
           style={{
             width: "100%",
             boxSizing: "border-box",
+            display: "block",
             backgroundColor: "#0D0D10",
             border: "1px solid #1E1E22",
             borderRadius: 4,
             color: "#E8E6DF",
             fontSize: 13,
+            lineHeight: 1.4,
             padding: "6px 10px",
             fontFamily: "system-ui, -apple-system, sans-serif",
             outline: "none",
+            resize: "none",
+            overflow: "hidden",
           }}
         />
 
