@@ -11,7 +11,7 @@ $log     = Join-Path $logDir "reingest-nsclc-$stamp.log"
 
 $python = "C:\Users\garre\AppData\Local\Programs\Python\Python312\python.exe"
 
-& $python "scripts\reingest_cycle.py" --ta nsclc --days 10 --execute *>&1 |
+& $python -u "scripts\reingest_cycle.py" --ta nsclc --days 10 --execute *>&1 |
     Tee-Object -FilePath $log -Append
 
 $code = $LASTEXITCODE
