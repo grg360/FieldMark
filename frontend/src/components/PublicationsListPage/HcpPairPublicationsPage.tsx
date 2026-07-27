@@ -55,15 +55,15 @@ export default function HcpPairPublicationsPage() {
   const arrow = String.fromCharCode(0x2194);
   const headerTitle = hcpName && partnerName
     ? `${hcpName} ${arrow} ${partnerName}`
-    : "Shared publications";
+    : "Co-Authored Papers";
   const headerSubtitle = pubs.length > 0
-    ? `${pubs.length} shared publication${pubs.length === 1 ? "" : "s"}`
+    ? `${pubs.length} Co-Authored Paper${pubs.length === 1 ? "" : "s"}`
     : "";
 
   const breadcrumbs = [
     { label: "Home", path: "/me" },
     ...(hcpId ? [{ label: hcpName || "Profile", path: `/hcp/${hcpId}` }] : []),
-    { label: "Shared publications" },
+    { label: "Co-Authored Papers" },
   ];
 
   return (
@@ -81,11 +81,11 @@ export default function HcpPairPublicationsPage() {
       {loading ? (
         <div style={{ fontSize: 13, color: COLOR.ink4 }}>Loading publications...</div>
       ) : pubs.length === 0 ? (
-        <div style={{ fontSize: 13, color: COLOR.ink4 }}>No shared publications found.</div>
+        <div style={{ fontSize: 13, color: COLOR.ink4 }}>No co-authored papers found.</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="fm-bib-grid">
           {pubs.map((pub) => (
-            <PublicationCard key={pub.publication_id} pub={pub} />
+            <PublicationCard key={pub.id} pub={pub} />
           ))}
         </div>
       )}

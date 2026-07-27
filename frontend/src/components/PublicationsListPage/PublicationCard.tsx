@@ -21,6 +21,9 @@ export default function PublicationCard({ pub }: Props) {
         borderLeft: `3px solid ${COLOR.amber}`,
         padding: "14px 16px",
         fontFamily: FONT.sans,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -59,13 +62,24 @@ export default function PublicationCard({ pub }: Props) {
         {pub.title}
       </div>
 
-      <div style={{ fontSize: 12, color: COLOR.ink3, marginBottom: 8, lineHeight: 1.4 }}>
+      <div
+        style={{
+          fontSize: 12,
+          color: COLOR.ink3,
+          marginBottom: 8,
+          lineHeight: 1.4,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
         {pub.journal ? <span style={{ color: COLOR.amber }}>{pub.journal}</span> : null}
         {pub.journal && byline ? <span> · </span> : null}
         <span>{byline || "Authors not available"}</span>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: COLOR.ink4 }}>
+      <div style={{ marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: COLOR.ink4 }}>
         <span style={{ fontFamily: FONT.mono }}>{pub.pmid ? `PMID ${pub.pmid}` : ""}</span>
         {pubmedUrl ? (
           <a
@@ -74,7 +88,7 @@ export default function PublicationCard({ pub }: Props) {
             rel="noopener noreferrer"
             style={{ color: COLOR.indigoLink, textDecoration: "none" }}
           >
-            View abstract →
+            View Abstract
           </a>
         ) : null}
       </div>

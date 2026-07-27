@@ -31,6 +31,9 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
         padding: 12,
         cursor: "default",
         fontFamily: FONT.sans,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
       }}
     >
       {/* Row 1: author-role pill + citations. First = teal, Senior/PI = info-blue,
@@ -102,8 +105,9 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
         {paper.authors ? <span style={{ color: COLOR.ink4 }}>{paper.authors}</span> : null}
       </div>
 
-      {/* Row 4: PMID + view abstract */}
-      <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      {/* Row 4: PMID + view abstract — pinned to the card bottom so it aligns
+          across equal-height (stretched) cards regardless of content height. */}
+      <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontFamily: FONT.mono, color: COLOR.ink5 }}>
           {paper.pmid ? `PMID ${paper.pmid}` : "—"}
         </span>
