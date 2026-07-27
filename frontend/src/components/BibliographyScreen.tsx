@@ -81,8 +81,22 @@ function PaperCard({ paper }: { paper: BibliographyPaper }) {
         {paper.title}
       </div>
 
-      {/* Row 3: journal + full author byline */}
-      <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.4 }}>
+      {/* Row 3: journal + full author byline. Visually clamped to 2 lines so card
+          heights stay near-uniform (the byline is the dominant height variance).
+          The clamp is display-only — the subject-anchored string from
+          formatBibliographyByline is untouched; the clamp may hide part of the
+          tail. */}
+      <div
+        style={{
+          marginTop: 4,
+          fontSize: 12,
+          lineHeight: 1.4,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
         {paper.journal ? <span style={{ color: COLOR.amber }}>{paper.journal}</span> : null}
         {paper.journal && paper.authors ? <span style={{ color: COLOR.ink5 }}> · </span> : null}
         {paper.authors ? <span style={{ color: COLOR.ink4 }}>{paper.authors}</span> : null}

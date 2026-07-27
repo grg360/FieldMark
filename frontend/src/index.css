@@ -185,14 +185,16 @@ button {
   z-index: 2;
 }
 
-/* Bibliography cards — grid at all widths so align-items:start (natural card
-   height, no stretch-to-tallest) never depends on a media query matching or on
-   overriding an inline display. 1 column by default; 2 columns from 600px. */
+/* Bibliography cards — grid at all widths (unconditional, so it never depends on
+   a media query matching or on overriding an inline display). 1 column by
+   default; 2 columns from 600px. align-items:stretch gives aligned row bottoms;
+   the byline is line-clamped in PaperCard so contents are near-uniform height,
+   leaving almost nothing for stretch to fill. */
 .fm-bib-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* ─── Tablet layout (≥600px) ─────────────────────────────────────────── */
