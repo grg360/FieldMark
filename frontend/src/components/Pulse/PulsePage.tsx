@@ -24,6 +24,9 @@ const columnStyle: CSSProperties = {
   width: "100%",
   maxWidth: 720,
   margin: "0 auto",
+  // Breathing room so the "Scientific Pulse" wordmark doesn't butt against the
+  // global header line.
+  paddingTop: 24,
   display: "flex",
   flexDirection: "column",
   gap: 20,
