@@ -1,4 +1,56 @@
-﻿
+# ── Secrets ──
 .env
 **/.env
+
+# ── Dependencies ──
 node_modules/
+
+# ── Python ──
+__pycache__/
+*.pyc
+
+# ── Pipeline working dirs ──
+.reingest_work/
+logs/
+backups/
+www/
+
+# ── Pipeline artifacts ──
+*_checkpoint.json
+*_checkpoint.json.bak
+*_log.json
+*_run*.json
+backfill_*.json
+proof_run*.json
+cycle_*.json
+gate_*.json
+failed_batches_*.json
+ta_tagging_rebuild_log.json
+workstream_b_dryrun_results.json
+
+# ── Scan / scratch outputs ──
+/*.txt
+/*.sql
+!/build_author_flat.sql
+!/schema.sql
+!/schema2.sql
+!/insert_ad_concepts.sql
+!/insert_ad_config.sql
+!/regions_config_load.sql
+!/build_inventory_ad.sql
+/*.csv
+/*.dump
+!/README*
+
+# ── Source data drops ──
+Medicare/
+NPPES/
+OpenPayments/
+
+# ── Documents & archives ──
+*.docx
+*.zip
+*.png
+CommunityExplorer.jsx
+"Claude Docs/"
+"Latest Documentation/"
