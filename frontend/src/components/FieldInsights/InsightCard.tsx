@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { softDeleteNote, type InteractionType, type InsightStrength, type Note } from "../../lib/relationships";
 import { formatOccurredAt, formatRelative } from "./dateFormat";
+import { FONT } from "../../lib/designTokens";
 import InsightComposer from "./InsightComposer";
 
 function interactionTypeLabel(type: InteractionType): string {
@@ -237,7 +238,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate }
           </div>
         </div>
 
-        <div style={{ fontSize: 14, color: "#E8E6DF", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+        <div style={{ fontFamily: FONT.serif, fontSize: 15, color: "#A8A49B", fontStyle: "italic", lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
           {note.body}
         </div>
 
