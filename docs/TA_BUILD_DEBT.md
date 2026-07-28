@@ -6809,3 +6809,30 @@ feed, else NSCLC rising goes dark (rising_composite_v1 is AD-only today). Then T
 ALSO LOGGED (Established twin): established_scoring.py:298 selects plain career_first_pub_year (corrupted col).
 Established RANKS are clean (career age not in its ranking math - projection-only), but Established CARDS may
 DISPLAY the corrupted start year. Same display bug we fixed for rising. Low priority, don't lose it.
+
+---
+
+## SESSION July 28 — congress dual-chip fix: two follow-ups logged
+
+Context: /congress/asco-2026 showed EST + RISING chips on the same presenter (Le, Skoulidis, Goldberg,
+Elamin). Fixed in display: chip + rank + band now come only from the assigned cohort per
+hcps_v2.cohort_classification; null classification -> no chip, presenter lands in a
+"TRACKED - NOT CURRENTLY IN A COHORT" group. Cohort assignment itself was verified exclusive
+(all 122 dual-rank-table HCPs are rising_star). Two follow-ups deliberately NOT done in that pass:
+
+**1. api.ts collaborator blocks guess cohort by precedence, not classification.**
+`lib/api.ts` (~:1924 and ~:2090, the [establishedRanks, rising*] Promise.all blocks) join both rank
+tables and derive `cohort_kind` by rising-first precedence without consulting cohort_classification.
+No dual badge (if/else), and the precedence coincidentally matches the invariant today - but it labels
+null-classification HCPs "established" whenever they merely appear in hcp_established_ranks_v3 (the
+Paik case below). Fix = route through cohort_classification. NOTE: this alters displayed cohort scores
+on collaborator panels, so it needs its own pass and its own review - do not fold into unrelated work.
+
+**2. DATA gap: real Established ranks with null cohort_classification.**
+18 of 47 ASCO confirmed presenters carry an hcp_established_ranks_v3 rank but NULL
+hcps_v2.cohort_classification - including Paik #79, Ganti #152, Molina #185. That is upstream of any
+display surface: the ranks table covers a wider pool than classification has been assigned to (or
+classification lapsed for these). Founder wants to understand WHY before deciding anything.
+Do NOT patch in display; the congress page now honestly shows them unchipped in the
+not-currently-in-a-cohort group until this is resolved. Investigate cohort_classification writers
+(scripts/classify/cohort_classification_v2.py) vs established ranks coverage.

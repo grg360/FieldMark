@@ -13,6 +13,7 @@ import {
   relevanceFor,
   type Congress,
   type CongressState,
+  type Relevance,
 } from "../../lib/congresses";
 import {
   getCongressSocial,
@@ -21,7 +22,7 @@ import {
   type CongressSocial,
 } from "../../lib/congressSocial";
 
-// Tiny volume sparkline (observed days only). Muted by default; amber for the live card.
+// Tiny volume sparkline (observed days only). Muted by default; amber for the featured card.
 function VolumeSparks({ daily, color, width = 110, height = 22 }: {
   daily: { d: string; n: number }[]; color: string; width?: number; height?: number;
 }) {
@@ -39,11 +40,11 @@ function VolumeSparks({ daily, color, width = 110, height = 22 }: {
 
 const INT = new Intl.NumberFormat("en-US");
 
-// Congress Calendar — the year an MSL plans around. This increment renders the
-// time rail + the grouped congress list from config, with real calendar states
-// and (for congresses we hold abstracts for) real confirmed-presenter counts.
-// The live social card and per-congress social sparklines are the next increment;
-// until then the social column shows the honest empty state, never an estimate.
+// Congress Calendar — the year an MSL plans around. Renders the time rail, the
+// state-grouped congress list, and the featured slot: the live congress while a
+// meeting is on (LIVE outranks everything), otherwise the most recently ended
+// congress we hold data for. All figures are real (RPC + presenter counts) —
+// a congress with nothing captured shows the honest empty state, never an estimate.
 
 const TA_SLUG = "nsclc";
 const TA_LABEL = "Oncology";
@@ -67,6 +68,14 @@ const ROW_OPACITY: Record<CongressState, number> = {
 };
 
 const REL_COLOR = { high: COLOR.amber, moderate: COLOR.ink3, low: COLOR.ink5 } as const;
+
+// Rail label brightness/weight is THERAPEUTIC-AREA RELEVANCE — three tiers,
+// progressively muted. Never state, never lane (lanes only resolve collisions).
+const RAIL_LABEL: Record<Relevance, { color: string; weight: number }> = {
+  high: { color: COLOR.ink1, weight: 600 },
+  moderate: { color: COLOR.ink3, weight: 500 },
+  low: { color: COLOR.ink5, weight: 400 },
+};
 
 const mono = (size: number, color = COLOR.ink3): React.CSSProperties => ({
   fontFamily: FONT.mono, fontSize: size, color, letterSpacing: "0.04em",
@@ -147,6 +156,20 @@ export default function CongressCalendarPage() {
     [now],
   );
 
+  // Most recently ended congress we actually hold data for (captured social or
+  // abstracts) — fills the featured slot between meetings. A congress with no
+  // data would render an all-dash card, so it never features. LIVE outranks this:
+  // while a meeting is on, the most-recent card drops entirely (one featured
+  // card keeps amber scarce; the congress remains reachable from its list row).
+  const mostRecentCongress = useMemo(() => {
+    return CONGRESSES
+      .filter((c) => {
+        const st = congressState(c, now);
+        return (st === "recently_past" || st === "past") && (c.social_capture_start || c.abstract_source);
+      })
+      .sort((a, b) => b.end_date.localeCompare(a.end_date))[0] ?? null;
+  }, [now]);
+
   useEffect(() => {
     let cancelled = false;
     supabase
@@ -189,22 +212,34 @@ export default function CongressCalendarPage() {
           </div>
         </div>
 
-        {/* ── live card (only when a congress is live) ── */}
-        {liveCongress && (() => {
-          const c = liveCongress;
-          const d = liveDay(c, now);
+        {/* ── featured congress — LIVE while a meeting is on (always outranks);
+               otherwise the MOST RECENT congress we hold data for. Same card
+               treatment for both; the recent variant drops the day-counter and
+               closes line (live-only constructs) but keeps the amber treatment. */}
+        {(liveCongress || mostRecentCongress) && (() => {
+          const isLive = liveCongress != null;
+          const c = (liveCongress ?? mostRecentCongress)!;
+          const d = isLive ? liveDay(c, now) : null;
           const s = socialBySlug[c.slug];
           const confirmed = confirmedBySlug[c.slug];
           const rel = relevanceFor(c, TA_SLUG);
+          // Real figures only — RPC social totals + counted presenters. WoW is a
+          // live-week construct; the recent variant shows the three closing stats.
+          const tiles = [
+            { k: "POSTS", v: s ? INT.format(s.total_posts) : "—", c: COLOR.ink1 },
+            { k: "VOICES", v: s ? INT.format(s.voices) : "—", c: COLOR.ink1 },
+            ...(isLive ? [{ k: "WoW", v: s && s.wow_pct != null ? `${s.wow_pct > 0 ? "+" : ""}${s.wow_pct}%` : "—", c: COLOR.amber }] : []),
+            { k: "CONFIRMED", v: confirmed != null ? String(confirmed) : "—", c: COLOR.ink1 },
+          ];
           return (
             <div>
-              <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600, marginBottom: 8 }}>LIVE NOW</div>
+              <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600, marginBottom: 8 }}>{isLive ? "LIVE NOW" : "MOST RECENT"}</div>
               <div style={{ border: `1px solid ${COLOR.amber}`, borderRadius: 6, background: "linear-gradient(180deg, rgba(232,160,32,0.055), rgba(232,160,32,0.015))", display: "flex", flexDirection: isMobile ? "column" : "row" }}>
-                <div style={{ flex: 1, padding: "20px 22px", [isMobile ? "borderBottom" : "borderRight"]: `1px solid rgba(232,160,32,0.22)` }}>
+                <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", alignItems: "flex-start", [isMobile ? "borderBottom" : "borderRight"]: `1px solid rgba(232,160,32,0.22)` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLOR.amber }} />
                     <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600 }}>
-                      LIVE{d ? ` · DAY ${d.day} OF ${d.of}` : ""}
+                      {isLive ? `LIVE${d ? ` · DAY ${d.day} OF ${d.of}` : ""}` : "MOST RECENT"}
                     </div>
                   </div>
                   <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, marginBottom: 6 }}>{c.short_name}</div>
@@ -215,15 +250,17 @@ export default function CongressCalendarPage() {
                     <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>CAPTURED VIA</div><span style={{ color: COLOR.amber }}>{c.hashtags[0]}</span></div>
                     <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>RELEVANCE</div><span style={{ color: COLOR.ink1 }}>{rel ? rel.toUpperCase() : "—"}</span> · {TA_LABEL}</div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/congress/${c.slug}`)}
+                    style={{ marginTop: 18, background: "none", border: "1px solid rgba(232,160,32,0.4)", borderRadius: 4, padding: "7px 14px", cursor: "pointer", ...mono(10, COLOR.amber), letterSpacing: "0.14em", fontWeight: 600 }}
+                  >
+                    OPEN CONGRESS →
+                  </button>
                 </div>
                 <div style={{ width: isMobile ? "100%" : 452, boxSizing: "border-box", padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "rgba(232,160,32,0.18)", border: "1px solid rgba(232,160,32,0.18)", borderRadius: 2 }}>
-                    {[
-                      { k: "POSTS", v: s ? INT.format(s.total_posts) : "—", c: COLOR.ink1 },
-                      { k: "VOICES", v: s ? INT.format(s.voices) : "—", c: COLOR.ink1 },
-                      { k: "WoW", v: s && s.wow_pct != null ? `${s.wow_pct > 0 ? "+" : ""}${s.wow_pct}%` : "—", c: COLOR.amber },
-                      { k: "CONFIRMED", v: confirmed != null ? String(confirmed) : "—", c: COLOR.ink1 },
-                    ].map((st) => (
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length},1fr)`, gap: 1, background: "rgba(232,160,32,0.18)", border: "1px solid rgba(232,160,32,0.18)", borderRadius: 2 }}>
+                    {tiles.map((st) => (
                       <div key={st.k} style={{ background: COLOR.surfaceWell, padding: "10px 11px" }}>
                         <div style={{ ...mono(8.5, "#8A6524"), letterSpacing: "0.1em", marginBottom: 7 }}>{st.k}</div>
                         <div style={{ ...mono(17, st.c), fontWeight: 600 }}>{st.v}</div>
@@ -253,6 +290,13 @@ export default function CongressCalendarPage() {
             <div style={mono(10, COLOR.ink5)}>Position and spacing are true to the calendar. Marker weight is therapeutic-area relevance, not size of meeting.</div>
           </div>
           <div style={{ position: "relative", height: 150 }}>
+            {/* calendar strip — uniform column tint down to the baseline, so the
+                rail reads as a calendar surface rather than a bare axis */}
+            <div style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 34, background: COLOR.surfaceCard, borderRadius: 2 }} />
+            {/* hairline dividers at every month boundary (incl. both strip edges) */}
+            {[...rail.months.map((m) => m.leftPct), 100].map((pct, i) => (
+              <div key={`boundary-${i}`} style={{ position: "absolute", top: 0, bottom: 34, left: `${pct}%`, width: 1, background: COLOR.hair }} />
+            ))}
             {/* month columns */}
             {rail.months.map((m) => (
               <div key={m.label + m.leftPct} style={{ position: "absolute", bottom: 6, left: `${m.leftPct}%`, ...mono(9, COLOR.ink5), letterSpacing: "0.1em" }}>{m.label}</div>
@@ -260,19 +304,20 @@ export default function CongressCalendarPage() {
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 34, height: 1, background: COLOR.hairStrong }} />
             {/* now line */}
             <div style={{ position: "absolute", top: 0, bottom: 22, width: 1, background: COLOR.amber, left: `${rail.nowPct}%` }} />
-            <div style={{ position: "absolute", top: -2, transform: "translateX(-50%)", ...mono(9, COLOR.amber), letterSpacing: "0.14em", fontWeight: 600, background: COLOR.surfaceWell, padding: "0 5px", left: `${rail.nowPct}%` }}>NOW</div>
-            {/* markers — lane sets vertical position (collision), relevance sets weight/brightness */}
+            <div style={{ position: "absolute", top: -2, transform: "translateX(-50%)", ...mono(9, COLOR.amber), letterSpacing: "0.14em", fontWeight: 600, background: COLOR.surfaceCard, padding: "0 5px", left: `${rail.nowPct}%` }}>NOW</div>
+            {/* markers — lane sets vertical position only (collision); label
+                brightness/weight is TA relevance (RAIL_LABEL), never lane or state */}
             {rail.markers.map(({ congress, leftPct, lane }) => {
               const st = congressState(congress, now);
               const rel = relevanceFor(congress, TA_SLUG);
-              const bright = rel === "high";
+              const lbl = rel ? RAIL_LABEL[rel] : RAIL_LABEL.low;
               const labelBottom = lane === 0 ? 60 : 88;   // two lanes
               const lineHeight = labelBottom - 38;         // connect dot up to the label
               return (
                 <div key={congress.slug} style={{ position: "absolute", bottom: 0, left: `${leftPct}%` }}>
                   <div style={{ position: "absolute", bottom: 38, left: 0, width: 1, background: STATE_STYLE[st].dot, height: lineHeight }} />
                   <div style={{ position: "absolute", bottom: 31, left: -3.5, width: 7, height: 7, borderRadius: "50%", background: STATE_STYLE[st].dot }} />
-                  <div style={{ position: "absolute", left: 0, transform: "translateX(-50%)", whiteSpace: "nowrap", bottom: labelBottom, ...mono(9.5, bright ? COLOR.ink1 : COLOR.ink4), letterSpacing: "0.08em", fontWeight: bright ? 600 : 400 }}>{congress.short_name}</div>
+                  <div style={{ position: "absolute", left: 0, transform: "translateX(-50%)", whiteSpace: "nowrap", bottom: labelBottom, ...mono(9.5, lbl.color), letterSpacing: "0.08em", fontWeight: lbl.weight }}>{congress.short_name}</div>
                 </div>
               );
             })}
