@@ -7,7 +7,7 @@ import {
 } from "../../lib/publicationsList";
 import { COLOR } from "../../lib/designTokens";
 import AppLayout from "../AppLayout";
-import PublicationCard from "./PublicationCard";
+import PublicationList from "./PublicationList";
 
 async function fetchHcpName(hcpId: string): Promise<string> {
   const { data } = await supabase
@@ -83,11 +83,7 @@ export default function HcpPairPublicationsPage() {
       ) : pubs.length === 0 ? (
         <div style={{ fontSize: 13, color: COLOR.ink4 }}>No co-authored papers found.</div>
       ) : (
-        <div className="fm-bib-grid">
-          {pubs.map((pub) => (
-            <PublicationCard key={pub.id} pub={pub} />
-          ))}
-        </div>
+        <PublicationList pubs={pubs} />
       )}
     </AppLayout>
   );

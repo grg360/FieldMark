@@ -13,6 +13,66 @@ export interface PublicationListRow {
   author_position?: number | null;
   // Raw pubmed_authorships JSON; PublicationCard formats it into a byline.
   pubmed_authorships?: unknown;
+  // Characterisation line (enriched post-fetch). Either may be null; when both
+  // are null the line renders nothing — no placeholder.
+  studyType?: string | null;   // mapped from publication_types
+  themeShort?: string | null;  // theme_canonical_v1.short_name, primary theme
+}
+
+// Map raw MeSH publication_types to a short study-type label, most specific first.
+// "Phase 3 RCT" reads "Phase 3", not both. Returns null when nothing recognised.
+export function mapStudyType(types: string[] | null | undefined): string | null {
+  if (!types || types.length === 0) return null;
+  const has = (needle: string) => types.some((t) => t.toLowerCase().includes(needle));
+  if (has("phase iii")) return "Phase 3";
+  if (has("phase iv")) return "Phase 4";
+  if (has("phase ii")) return "Phase 2";
+  if (has("phase i")) return "Phase 1";
+  if (has("meta-analysis")) return "Meta-analysis";
+  if (has("systematic review")) return "Systematic review";
+  if (has("randomized controlled")) return "Randomised trial";
+  if (has("observational study")) return "Observational";
+  if (has("case reports")) return "Case report";
+  if (has("review")) return "Review";
+  return null;
+}
+
+// Enrich built rows with the characterisation-line inputs in two batched queries
+// (publication_types by id; primary theme short_name by publication_id), uniform
+// across every entry point — including the RPC-backed pair/partner lists whose
+// rows don't carry publication_types.
+async function enrichCharacterisation(rows: PublicationListRow[]): Promise<PublicationListRow[]> {
+  if (rows.length === 0) return rows;
+  const ids = rows.map((r) => r.id);
+  const CHUNK = 200;
+  const typesById = new Map<string, string[] | null>();
+  const themeById = new Map<string, string>();
+
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const [{ data: pubs }, { data: themes }] = await Promise.all([
+      supabase.from("publications_v2").select("id, publication_types").in("id", chunk),
+      supabase
+        .from("publication_theme_v1")
+        .select("publication_id, theme_canonical_v1(short_name, canonical_name)")
+        .in("publication_id", chunk)
+        .eq("is_primary", true),
+    ]);
+    for (const p of (pubs ?? []) as { id: string; publication_types: string[] | null }[]) {
+      typesById.set(p.id, p.publication_types);
+    }
+    for (const t of (themes ?? []) as { publication_id: string; theme_canonical_v1: { short_name: string | null; canonical_name: string | null } | null }[]) {
+      const tc = t.theme_canonical_v1;
+      const label = tc?.short_name ?? tc?.canonical_name ?? null;
+      if (label) themeById.set(t.publication_id, label);
+    }
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    studyType: mapStudyType(typesById.get(r.id)),
+    themeShort: themeById.get(r.id) ?? null,
+  }));
 }
 
 type PublicationDbRow = {
@@ -101,7 +161,7 @@ export async function getPublicationsByTheme(
       return (b.pub_year ?? 0) - (a.pub_year ?? 0);
     });
 
-    return allPubs.slice(0, limit);
+    return enrichCharacterisation(allPubs.slice(0, limit));
   } catch (err) {
     console.warn("getPublicationsByTheme: error", err);
     return [];
@@ -125,7 +185,7 @@ export async function getPublicationsByInternalPair(
       p_limit: limit,
     });
     if (error || !data) return [];
-    return (data as PublicationDbRow[]).map(mapPublicationRow);
+    return enrichCharacterisation((data as PublicationDbRow[]).map(mapPublicationRow));
   } catch (err) {
     console.warn("getPublicationsByInternalPair: error", err);
     return [];
@@ -151,7 +211,7 @@ export async function getPublicationsByPartner(
       p_limit: limit,
     });
     if (error || !data) return [];
-    return (data as PublicationDbRow[]).map(mapPublicationRow);
+    return enrichCharacterisation((data as PublicationDbRow[]).map(mapPublicationRow));
   } catch (err) {
     console.warn("getPublicationsByPartner: error", err);
     return [];
@@ -208,7 +268,7 @@ export async function getPublicationsForHcp(
       return (b.pub_year ?? 0) - (a.pub_year ?? 0);
     });
 
-    return sorted.slice(0, limit);
+    return enrichCharacterisation(sorted.slice(0, limit));
   } catch (err) {
     console.warn("getPublicationsForHcp: error", err);
     return [];

@@ -75,6 +75,9 @@ export default function Composer({
         {isThread && mode.title && (
           <span style={{ fontFamily: FONT.serif, fontSize: 14.5, lineHeight: 1.4, color: COLOR.ink2 }}>{mode.title}</span>
         )}
+        {isThread && (
+          <span style={{ ...mono(9.5, COLOR.ink5), lineHeight: 1.5 }}>Your question becomes the thread&rsquo;s anchor.</span>
+        )}
         {!isThread && mode.replyingTo && (
           <span style={mono(9.5, COLOR.ink5)}>replying to {mode.replyingTo}</span>
         )}

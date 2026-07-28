@@ -7,7 +7,7 @@ import {
 import { resolvePrimaryTaId, taDisplayNameForId } from "../../lib/api";
 import { COLOR, TYPE } from "../../lib/designTokens";
 import AppLayout from "../AppLayout";
-import PublicationCard from "./PublicationCard";
+import PublicationList from "./PublicationList";
 
 export default function HcpPublicationsPage() {
   const { id: hcpId } = useParams<{ id: string }>();
@@ -81,11 +81,7 @@ export default function HcpPublicationsPage() {
       ) : pubs.length === 0 ? (
         <div style={{ fontSize: 13, color: COLOR.ink4, padding: "24px 0" }}>No source publications found.</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 16 }}>
-          {pubs.map((pub) => (
-            <PublicationCard key={pub.id} pub={pub} />
-          ))}
-        </div>
+        <PublicationList pubs={pubs} />
       )}
     </AppLayout>
   );

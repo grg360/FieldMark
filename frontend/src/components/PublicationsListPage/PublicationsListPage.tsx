@@ -9,7 +9,7 @@ import {
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import AppLayout from "../AppLayout";
-import PublicationCard from "./PublicationCard";
+import PublicationList from "./PublicationList";
 
 export default function PublicationsListPage() {
   const [searchParams] = useSearchParams();
@@ -120,17 +120,7 @@ export default function PublicationsListPage() {
         </div>
       ) : (
         <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
-              gap: 12,
-            }}
-          >
-            {visiblePubs.map((pub) => (
-              <PublicationCard key={pub.id} pub={pub} />
-            ))}
-          </div>
+          <PublicationList pubs={visiblePubs} />
 
           {!showAll && pubs.length > 50 ? (
             <div style={{ marginTop: 24, textAlign: "center" }}>
