@@ -60,12 +60,15 @@ SELECT CASE WHEN (SELECT total FROM bounds) = 0 THEN NULL ELSE jsonb_build_objec
                   ELSE NULL END,
   'daily', (SELECT jsonb_agg(jsonb_build_object('d', d, 'n', n) ORDER BY d) FROM daily),
   -- Top voices (engagement not modelled yet — ranked by post volume, share of total).
+  -- LIMIT 30 (was 8): the detail page classifies voices into individual vs
+  -- organizational panels client-side and shows the top 8 of EACH class, so it
+  -- needs headroom beyond the overall top 8 (which ran 5 orgs / 3 individuals).
   'top_voices', (
     SELECT jsonb_agg(jsonb_build_object('handle', handle, 'name', dn, 'posts', n, 'share', share) ORDER BY n DESC)
     FROM (
       SELECT handle, mode() WITHIN GROUP (ORDER BY display_name) AS dn, count(*) AS n,
              round(100.0 * count(*) / nullif((SELECT total FROM bounds), 0)) AS share
-      FROM posts GROUP BY handle ORDER BY count(*) DESC LIMIT 8
+      FROM posts GROUP BY handle ORDER BY count(*) DESC LIMIT 30
     ) v
   ),
   -- Topic share via co-occurring hashtags (the congress's own tags excluded).

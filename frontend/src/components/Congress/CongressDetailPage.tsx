@@ -11,7 +11,15 @@ import {
   relevanceFor,
   type Congress,
 } from "../../lib/congresses";
-import { getCongressSocial, meetsThreshold, SOCIAL_THRESHOLD, type CongressSocial } from "../../lib/congressSocial";
+import {
+  classifyVoice,
+  getCongressSocial,
+  meetsThreshold,
+  SOCIAL_THRESHOLD,
+  type CongressSocial,
+  type CongressVoice,
+  type VoiceProfile,
+} from "../../lib/congressSocial";
 
 const TA_SLUG = "nsclc";
 const TA_LABEL = "Oncology";
@@ -249,7 +257,7 @@ export default function CongressDetailPage() {
   const congress = useMemo(() => CONGRESSES.find((c) => c.slug === slug) ?? null, [slug]);
   const [presenters, setPresenters] = useState<ConfirmedPresenter[]>([]);
   const [social, setSocial] = useState<CongressSocial | null>(null);
-  const [followersByHandle, setFollowersByHandle] = useState<Record<string, number>>({});
+  const [voiceProfiles, setVoiceProfiles] = useState<Record<string, VoiceProfile>>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -286,24 +294,27 @@ export default function CongressDetailPage() {
       })).sort((a, b) => (boardRank(a) ?? 99999) - (boardRank(b) ?? 99999));
 
       const s = await getCongressSocial(congress);
-      // Follower counts for the top voices (social_users_v2 is public-read).
-      let followers: Record<string, number> = {};
+      // Profiles for the top voices (social_users_v2 is public-read): follower
+      // counts for display, display_name + bio for the individual/organizational
+      // classification heuristic (see classifyVoice in lib/congressSocial.ts).
+      let profiles: Record<string, VoiceProfile> = {};
       if (s?.top_voices?.length) {
         const { data: users } = await supabase
           .from("social_users_v2")
-          .select("handle, follower_count")
+          .select("handle, display_name, bio, follower_count")
           .eq("platform", "twitter")
           .in("handle", s.top_voices.map((v) => v.handle));
-        followers = Object.fromEntries(
-          ((users ?? []) as Array<{ handle: string; follower_count: number | null }>)
-            .filter((u) => u.follower_count != null)
-            .map((u) => [u.handle.toLowerCase(), u.follower_count as number]),
+        profiles = Object.fromEntries(
+          ((users ?? []) as Array<{ handle: string } & VoiceProfile>).map((u) => [
+            u.handle.toLowerCase(),
+            { display_name: u.display_name, bio: u.bio, follower_count: u.follower_count },
+          ]),
         );
       }
       if (cancelled) return;
       setPresenters(built);
       setSocial(s);
-      setFollowersByHandle(followers);
+      setVoiceProfiles(profiles);
       setLoaded(true);
     })();
     return () => { cancelled = true; };
@@ -424,72 +435,97 @@ export default function CongressDetailPage() {
                 </div>
                 <VolumeChart c={congress} s={social} />
               </div>
-              {/* voices | topics + what-we-don't-have */}
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, alignItems: "start" }}>
-                <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
-                    <div style={eyebrow(COLOR.ink3)}>TOP VOICES · BY POST VOLUME</div>
-                    <div style={mono(10, COLOR.ink5)}>{INT.format(social.voices)} voices</div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    {(() => {
-                      // Share bar scaled to the leading voice, not 100% — the top
-                      // account holds ~2% of an 11k-post conversation.
-                      const maxShare = Math.max(1, ...social.top_voices.map((v) => v.share));
-                      return social.top_voices.map((v, i) => {
-                        const followers = followersByHandle[v.handle.toLowerCase()];
-                        return (
-                          <div key={v.handle} style={{ display: "grid", gridTemplateColumns: "22px 1fr 120px", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${COLOR.hair}` }}>
-                            <div style={{ ...mono(11, COLOR.ink5), fontVariantNumeric: "tabular-nums" }}>{i + 1}</div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 13.5, fontWeight: 600, color: COLOR.ink1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
-                              <div style={{ ...mono(10, COLOR.ink5), marginTop: 3 }}>
-                                @{v.handle}{followers != null ? ` · ${COMPACT.format(followers)} followers` : ""}
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                <span style={mono(10, COLOR.ink3)}>{INT.format(v.posts)}</span>
-                                <span style={mono(10, COLOR.ink4)}>{v.share}%</span>
-                              </div>
-                              <div style={{ height: 4, background: COLOR.hairStrong, borderRadius: 1, overflow: "hidden" }}>
-                                <div style={{ height: "100%", width: `${(v.share / maxShare) * 100}%`, background: COLOR.indigo, borderRadius: 1 }} />
-                              </div>
-                            </div>
+              {/* Three ranked-list panels in one row — individual voices,
+                  organizational voices, hot topics. They're homogeneous lists of
+                  matched length, so they align without ragged bottoms; WHAT WE
+                  DON'T HAVE is prose in a different register and runs full-width
+                  beneath as the section's closer (no column pairing = no dead
+                  space under a short neighbour). */}
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16, alignItems: "start" }}>
+                {(() => {
+                  // Split the RPC's top 30 voices by the classification heuristic;
+                  // each panel shows its own top 8 with bars scaled to that
+                  // panel's leading voice. Share % recomputed from raw counts —
+                  // the RPC's integer share rounds small voices to 0.
+                  const classed = social.top_voices.map((v) => ({
+                    v,
+                    cls: classifyVoice(v.handle, voiceProfiles[v.handle.toLowerCase()]),
+                  }));
+                  const pct = (v: CongressVoice) => (100 * v.posts) / Math.max(1, social.total_posts);
+                  const voicePanel = (title: string, voices: CongressVoice[]) => {
+                    const maxPosts = Math.max(1, ...voices.map((v) => v.posts));
+                    return (
+                      <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
+                        <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 6 }}>{title}</div>
+                        {/* the split is a heuristic, and says so */}
+                        <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 12 }}>
+                          Individual vs organizational is inferred from account name and profile text — not verified.
+                        </div>
+                        {voices.length === 0 ? (
+                          <div style={mono(10, COLOR.ink5)}>None among the top 30 voices.</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            {voices.map((v, i) => {
+                              const followers = voiceProfiles[v.handle.toLowerCase()]?.follower_count;
+                              return (
+                                <div key={v.handle} style={{ display: "grid", gridTemplateColumns: "16px minmax(0,1fr) 84px", gap: 10, alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${COLOR.hair}` }}>
+                                  <div style={{ ...mono(11, COLOR.ink5), fontVariantNumeric: "tabular-nums" }}>{i + 1}</div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: COLOR.ink1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
+                                    <div style={{ ...mono(9.5, COLOR.ink5), marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      @{v.handle}{followers != null ? ` · ${COMPACT.format(followers)} followers` : ""}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                      <span style={mono(9.5, COLOR.ink3)}>{INT.format(v.posts)}</span>
+                                      <span style={mono(9.5, COLOR.ink4)}>{pct(v).toFixed(1)}%</span>
+                                    </div>
+                                    <div style={{ height: 4, background: COLOR.hairStrong, borderRadius: 1, overflow: "hidden" }}>
+                                      <div style={{ height: "100%", width: `${(v.posts / maxPosts) * 100}%`, background: COLOR.indigo, borderRadius: 1 }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      });
+                        )}
+                      </div>
+                    );
+                  };
+                  return (
+                    <>
+                      {voicePanel("INDIVIDUAL VOICES · BY POST VOLUME", classed.filter((x) => x.cls === "individual").map((x) => x.v).slice(0, 8))}
+                      {voicePanel("ORGANIZATIONAL VOICES · BY POST VOLUME", classed.filter((x) => x.cls === "org").map((x) => x.v).slice(0, 8))}
+                    </>
+                  );
+                })()}
+                <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
+                  <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 6 }}>HOT TOPICS · CO-OCCURRING HASHTAGS</div>
+                  <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 14 }}>
+                    Percent of the {INT.format(social.total_posts)} {congress.hashtags[0]} posts that also carry each tag. A post can carry several or none, so these don&rsquo;t sum to 100%.
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+                    {(() => {
+                      // Bar scaled to the LEADING tag (top ~4%), not to 100% — otherwise every
+                      // bar reads as empty. The % beside the bar keeps the absolute value.
+                      const maxShare = Math.max(1, ...social.hot_hashtags.map((h) => h.share));
+                      return social.hot_hashtags.map((h) => (
+                        <div key={h.tag}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                            <span style={mono(12, COLOR.ink2)}>{h.tag}</span>
+                            <span style={mono(11, COLOR.ink3)}>{h.share}%</span>
+                          </div>
+                          <div style={{ height: 5, background: COLOR.hairStrong, borderRadius: 1, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${(h.share / maxShare) * 100}%`, background: COLOR.indigo, borderRadius: 1 }} />
+                          </div>
+                        </div>
+                      ));
                     })()}
                   </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
-                    <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 6 }}>HOT TOPICS · CO-OCCURRING HASHTAGS</div>
-                    <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 14 }}>
-                      Percent of the {INT.format(social.total_posts)} {congress.hashtags[0]} posts that also carry each tag. A post can carry several or none, so these don&rsquo;t sum to 100%.
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-                      {(() => {
-                        // Bar scaled to the LEADING tag (top ~4%), not to 100% — otherwise every
-                        // bar reads as empty. The % beside the bar keeps the absolute value.
-                        const maxShare = Math.max(1, ...social.hot_hashtags.map((h) => h.share));
-                        return social.hot_hashtags.map((h) => (
-                          <div key={h.tag}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                              <span style={mono(12, COLOR.ink2)}>{h.tag}</span>
-                              <span style={mono(11, COLOR.ink3)}>{h.share}%</span>
-                            </div>
-                            <div style={{ height: 5, background: COLOR.hairStrong, borderRadius: 1, overflow: "hidden" }}>
-                              <div style={{ height: "100%", width: `${(h.share / maxShare) * 100}%`, background: COLOR.indigo, borderRadius: 1 }} />
-                            </div>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  </div>
-                  <DontHavePanel hasAbstracts={hasAbstracts} />
-                </div>
               </div>
+              <DontHavePanel hasAbstracts={hasAbstracts} />
             </div>
           ) : (
             // Honest empty state — below the 250/40 threshold (or no posts yet).
