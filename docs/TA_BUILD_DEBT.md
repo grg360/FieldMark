@@ -6853,8 +6853,22 @@ Display rule adopted: v2 cohort picks the rank table (established -> est rank, r
 rising rank), no chip otherwise. Consequence: the 4 dual-rank presenters (Le, Skoulidis, Goldberg,
 Elamin) read EST, not RISING.
 
-Follow-up #1 above (api.ts collaborator blocks) should route through hcp_cohort_classification_v2,
-NOT hcps_v2.cohort_classification. Full inventory of stale-column readers: see the July 28
+**FINAL RULE July 28 (supersedes the v2 display mapping above): congress chips = BOARD
+MEMBERSHIP, rising first.** Founder reviewed the v2 repoint's effect (dual-board presenters
+flipping to EST) and chose board membership as the chip construct: chip the board an MSL can
+browse the presenter on; dual-board HCPs show RISING (the smaller, deliberate list - 209 US
+members vs 3,178 EST). hcp_cohort_classification_v2 (career structure) is deliberately NOT
+consulted for chips - it remains authoritative for career-structure questions only. Verified:
+the ingest's us_rank IS NOT NULL lookup already equals the feed's visible-US-board membership
+(us_rank populated only for the 209 board members; get_rising_star_filtered has no rank gate,
+just TA + country scoping). A reported "3,065 over-included us_rank carriers" figure matched
+nothing in hcp_rising_star_ranks_v3 (209 us_rank rows TOTAL, all TAs) - if that number resurfaces,
+find its source table first.
+
+Follow-up #1 above (api.ts collaborator blocks) should therefore align with the same
+board-membership-rising-first rule (which its precedence already implements) - its remaining
+defect is only the null-classification labeling noted above. Full inventory of stale-column
+readers: see the July 28
 "stale cohort_classification readers" sweep in the session report / commit message - notable:
 searchHCPs community-gate post-filter (api.ts ~:2605) keys the gate on the stale column (73.6%
 null -> gate mostly dormant); getHCPById deep-link path (api.ts ~:1529) drives DetailScreen
