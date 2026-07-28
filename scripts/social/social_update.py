@@ -142,30 +142,21 @@ def backfill_ta_tags(client: Client, hashtag_ta_map: Dict[str, str]) -> Dict[str
     results: Dict[str, int] = {}
 
     for ta, hashtags in ta_to_hashtags.items():
-        select_resp = (
+        # Case-insensitive match: captured_via_query stores the config's original
+        # case (e.g. "#WCLC26") while the map keys are lowercased — a plain IN
+        # never matched, so the backfill silently no-oped. ilike with no wildcard
+        # is exact-match, case-insensitive.
+        #
+        # Update by filter directly (no select-then-IN-by-id round trip: 1000
+        # UUIDs in a querystring exceeds the request-line limit and 400s).
+        resp = (
             client.table("social_posts_v2")
-            .select("id")
-            .in_("captured_via_query", hashtags)
+            .update({"therapeutic_areas": [ta]})
+            .or_(",".join(f"captured_via_query.ilike.{t}" for t in hashtags))
             .is_("therapeutic_areas", "null")
             .execute()
         )
-
-        ids = [row["id"] for row in (select_resp.data or [])]
-
-        if not ids:
-            results[ta] = 0
-            continue
-
-        updated = 0
-        BATCH = 1000
-        for i in range(0, len(ids), BATCH):
-            batch_ids = ids[i : i + BATCH]
-            client.table("social_posts_v2").update(
-                {"therapeutic_areas": [ta]}
-            ).in_("id", batch_ids).execute()
-            updated += len(batch_ids)
-
-        results[ta] = updated
+        results[ta] = len(resp.data or [])
 
     return results
 
