@@ -2,7 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1ZNPOtynvUbehIzYIUtpl6yPLsShGzjHG5yBY85IeahEYQnlbdopTF4tTFpjQrX
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9
@@ -21502,5 +21501,4 @@ CREATE EVENT TRIGGER pgrst_drop_watch ON sql_drop
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1ZNPOtynvUbehIzYIUtpl6yPLsShGzjHG5yBY85IeahEYQnlbdopTF4tTFpjQrX
 
