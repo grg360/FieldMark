@@ -50,8 +50,7 @@ function fmtDates(c: Congress): string {
     ? `${s.getUTCDate()}–${e.getUTCDate()} ${mon(e)} ${yr}`
     : `${s.getUTCDate()} ${mon(s)} – ${e.getUTCDate()} ${mon(e)} ${yr}`;
 }
-function fmtSessionDate(iso: string | null): string {
-  if (!iso) return "session time not yet published";
+function fmtSessionDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) +
     " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -101,7 +100,15 @@ function VolumeChart({ c, s }: { c: Congress; s: CongressSocial }) {
     d.setUTCDate(d.getUTCDate() + 7);
     return d.toISOString().slice(0, 10);
   })();
-  const daily = s.daily.filter((p) => p.d <= cutoff);
+  const windowed = s.daily.filter((p) => p.d <= cutoff);
+  // Tighten the domain to the final data point: trailing zero-days inside the
+  // window render as invisible bars — dead space right of the last visible bar.
+  // Interior quiet days still draw; only the empty tail is dropped.
+  const lastDataIdx = (() => {
+    for (let i = windowed.length - 1; i >= 0; i--) if (windowed[i].n > 0) return i;
+    return windowed.length - 1;
+  })();
+  const daily = windowed.slice(0, lastDataIdx + 1);
   const hiddenDays = s.daily.length - daily.length;
   const hiddenPosts = s.daily.slice(daily.length).reduce((sum, p) => sum + p.n, 0);
   if (daily.length === 0) return null;
@@ -161,39 +168,8 @@ function VolumeChart({ c, s }: { c: Congress; s: CongressSocial }) {
       <div style={{ ...mono(9, COLOR.ink5), marginTop: 8, lineHeight: 1.6 }}>
         Bars use a square-root scale so the pre-meeting build stays legible against the in-session peak; exact counts on hover. Days before capture began are unobserved, not zero — we don&rsquo;t draw them.
         {hiddenDays > 0 && (
-          <> Shown through {fmtShortDay(cutoff)} (meeting end + 7 days); capture continues to {fmtShortDay(s.last_day)} — {INT.format(hiddenPosts)} further posts across {hiddenDays} days beyond the shown window.</>
+          <> Shown through {fmtShortDay(daily[daily.length - 1].d)} — the last day with captured posts inside meeting end + 7 days; capture continues to {fmtShortDay(s.last_day)} with {INT.format(hiddenPosts)} further posts beyond the shown window.</>
         )}
-      </div>
-    </div>
-  );
-}
-
-// "What we don't have" — abstract-aware. Rendered as a bordered panel in the
-// right column of the voices/topics row when social clears threshold, and as a
-// standalone trailing panel otherwise (the honesty block must never disappear).
-function DontHavePanel({ hasAbstracts, standalone = false }: { hasAbstracts: boolean; standalone?: boolean }) {
-  return (
-    <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hairStrong}`, borderRadius: 6, padding: "18px 20px", ...(standalone ? { maxWidth: 900 } : {}) }}>
-      <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 14 }}>WHAT WE DON&rsquo;T HAVE</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {(hasAbstracts
-          ? [
-              ["Abstract bodies", "not licensed for display — titles and metadata only"],
-              ["Attendance", "unobtainable, and we will not estimate it"],
-              ["Presence in Chicago", "presenting is not attending; hashtag activity is not attendance either"],
-              ["Identity classification", "we don't compute a likely-HCP share of the conversation"],
-            ]
-          : [
-              ["Session schedule", "no published abstract list for this congress"],
-              ["Attendance", "unobtainable, and we will not estimate it"],
-              ["Confirmed presenters", "expert connection here is inference from hashtag activity, labelled as such"],
-            ]
-        ).map(([k, v]) => (
-          <div key={k} style={{ display: "flex", gap: 11, alignItems: "baseline" }}>
-            <span style={mono(11, "#3A352F")}>—</span>
-            <span style={{ fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.5, color: COLOR.ink3 }}><span style={{ color: COLOR.ink2 }}>{k}</span> · {v}</span>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -201,18 +177,6 @@ function DontHavePanel({ hasAbstracts, standalone = false }: { hasAbstracts: boo
 
 // Compact follower formatting for the Top Voices panel (49,684 -> "49.7K").
 const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-
-// Rank bands so a top-of-board KOL isn't shown equal to a rank-2000+ presenter.
-// All are legitimately tracked; the band header sets the expectation.
-const BANDS: { label: string; max: number }[] = [
-  { label: "TOP 50", max: 50 },
-  { label: "RANK 51–250", max: 250 },
-  { label: "RANK 251–1000", max: 1000 },
-  { label: "RANK 1000+", max: Infinity },
-];
-function bandIndex(r: number): number {
-  return BANDS.findIndex((b) => r <= b.max);
-}
 
 function PresenterCard({ p }: { p: ConfirmedPresenter }) {
   return (
@@ -236,7 +200,7 @@ function PresenterCard({ p }: { p: ConfirmedPresenter }) {
           <div key={i} style={{ borderLeft: `2px solid ${COLOR.hairStrong}`, paddingLeft: 11 }}>
             <div style={{ fontFamily: FONT.serif, fontSize: 13.5, lineHeight: 1.5, color: COLOR.ink2 }} dangerouslySetInnerHTML={{ __html: a.title }} />
             <div style={{ ...mono(9.5, COLOR.ink5), marginTop: 5 }}>
-              {a.session_type} · <span style={{ color: a.date ? COLOR.ink4 : COLOR.ink5 }}>{fmtSessionDate(a.date)}</span>
+              {a.session_type}{a.date ? <> · <span style={{ color: COLOR.ink4 }}>{fmtSessionDate(a.date)}</span></> : null}
             </div>
           </div>
         ))}
@@ -371,7 +335,6 @@ export default function CongressDetailPage() {
             {hasAbstracts ? (
               <>
                 <div>This page draws on two sources. The meeting&rsquo;s published abstract list gives us <span style={{ color: COLOR.ink1 }}>confirmed presenters</span>, session types, and — where the schedule is set — presentation times. Public posts captured under <span style={{ color: COLOR.amber }}>{congress.hashtags[0]}</span> give us the surrounding conversation.</div>
-                <div>What we do not have: abstract bodies (not licensed for display), and any record of attendance. Presenting is not the same as attending, and hashtag activity is not attendance either.</div>
                 <div style={{ color: COLOR.ink1, fontWeight: 600 }}>We&rsquo;re showing you our work, including the parts that aren&rsquo;t finished. That&rsquo;s the deal.</div>
               </>
             ) : (
@@ -456,11 +419,7 @@ export default function CongressDetailPage() {
                     const maxPosts = Math.max(1, ...voices.map((v) => v.posts));
                     return (
                       <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
-                        <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 6 }}>{title}</div>
-                        {/* the split is a heuristic, and says so */}
-                        <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 12 }}>
-                          Individual vs organizational is inferred from account name and profile text — not verified.
-                        </div>
+                        <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 12 }}>{title}</div>
                         {voices.length === 0 ? (
                           <div style={mono(10, COLOR.ink5)}>None among the top 30 voices.</div>
                         ) : (
@@ -503,21 +462,20 @@ export default function CongressDetailPage() {
                 <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
                   <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 6 }}>HOT TOPICS · CO-OCCURRING HASHTAGS</div>
                   <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 14 }}>
-                    Percent of the {INT.format(social.total_posts)} {congress.hashtags[0]} posts that also carry each tag. A post can carry several or none, so these don&rsquo;t sum to 100%.
+                    Posts among the {INT.format(social.total_posts)} {congress.hashtags[0]} posts that also carry each tag. A post can carry several or none. Bars are scaled to the leading tag.
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
                     {(() => {
-                      // Bar scaled to the LEADING tag (top ~4%), not to 100% — otherwise every
-                      // bar reads as empty. The % beside the bar keeps the absolute value.
-                      const maxShare = Math.max(1, ...social.hot_hashtags.map((h) => h.share));
+                      // Bars scaled to the LEADING tag, values are raw post counts.
+                      const maxPosts = Math.max(1, ...social.hot_hashtags.map((h) => h.posts));
                       return social.hot_hashtags.map((h) => (
                         <div key={h.tag}>
                           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
                             <span style={mono(12, COLOR.ink2)}>{h.tag}</span>
-                            <span style={mono(11, COLOR.ink3)}>{h.share}%</span>
+                            <span style={mono(11, COLOR.ink3)}>{INT.format(h.posts)}</span>
                           </div>
                           <div style={{ height: 5, background: COLOR.hairStrong, borderRadius: 1, overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${(h.share / maxShare) * 100}%`, background: COLOR.indigo, borderRadius: 1 }} />
+                            <div style={{ height: "100%", width: `${(h.posts / maxPosts) * 100}%`, background: COLOR.indigo, borderRadius: 1 }} />
                           </div>
                         </div>
                       ));
@@ -525,7 +483,6 @@ export default function CongressDetailPage() {
                   </div>
                 </div>
               </div>
-              <DontHavePanel hasAbstracts={hasAbstracts} />
             </div>
           ) : (
             // Honest empty state — below the 250/40 threshold (or no posts yet).
@@ -546,58 +503,19 @@ export default function CongressDetailPage() {
             scrolling 47 cards is a choice, not an obstacle before the signal */}
         {hasAbstracts && (
           <div>
-            {(() => {
-              const ranks = presenters.map(boardRank).filter((r): r is number => r != null);
-              const lo = ranks.length ? Math.min(...ranks) : null;
-              const hi = ranks.length ? Math.max(...ranks) : null;
-              return (
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-                  <div style={eyebrow(COLOR.ink3)}>CONFIRMED PRESENTERS · FROM THE ABSTRACT LIST</div>
-                  <div style={mono(10, COLOR.ink5)}>{presenters.length} tracked experts{lo != null && hi != null ? ` · board ranks #${lo}–#${hi}` : ""}</div>
-                </div>
-              );
-            })()}
-            {/* Bands key on the assigned-cohort rank — the same number the chip
-                shows. Unclassified presenters get their own group rather than a
-                fake placement in a numeric band. */}
-            {BANDS.map((band, bi) => {
-              const inBand = presenters.filter((p) => { const r = boardRank(p); return r != null && bandIndex(r) === bi; });
-              if (inBand.length === 0) return null;
-              return (
-                <div key={band.label} style={{ marginBottom: 18 }}>
-                  <div style={{ ...mono(9.5, bi === 0 ? COLOR.amber : COLOR.ink4), letterSpacing: "0.14em", fontWeight: 600, marginBottom: 9, paddingBottom: 6, borderBottom: `1px solid ${COLOR.hair}` }}>
-                    {band.label} <span style={{ color: COLOR.ink5 }}>· {inBand.length}</span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-                    {inBand.map((p) => <PresenterCard key={p.speaker_key} p={p} />)}
-                  </div>
-                </div>
-              );
-            })}
-            {(() => {
-              const unclassified = presenters.filter((p) => boardRank(p) == null);
-              if (unclassified.length === 0) return null;
-              return (
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ ...mono(9.5, COLOR.ink5), letterSpacing: "0.14em", fontWeight: 600, marginBottom: 9, paddingBottom: 6, borderBottom: `1px solid ${COLOR.hair}` }}>
-                    TRACKED · NOT ON A RANKED BOARD <span style={{ color: COLOR.ink5 }}>· {unclassified.length}</span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-                    {unclassified.map((p) => <PresenterCard key={p.speaker_key} p={p} />)}
-                  </div>
-                </div>
-              );
-            })()}
-            {/* the two-population statement — stated plainly, not buried */}
-            <div style={{ marginTop: 14, padding: "13px 15px", border: `1px solid ${COLOR.hair}`, borderRadius: 6, background: COLOR.surfaceWell, fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.6, color: COLOR.ink3, maxWidth: 900 }}>
-              These {presenters.length} are confirmed from the abstract list — a fact, not an inference. Almost none of them appear in the {congress.hashtags[0]} conversation: a check of Heymach, Herbst, Govindan, Skoulidis, J&auml;nne, Sabari, and Rotow returned zero posts each. <span style={{ color: COLOR.ink1 }}>The conversation and the podium are different populations — social absence is not evidence of absence from the meeting.</span>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={eyebrow(COLOR.ink3)}>CONFIRMED PRESENTERS</div>
+              <div style={mono(10, COLOR.ink5)}>{presenters.length} tracked experts</div>
+            </div>
+            <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 16 }}>
+              Presenting is not the same as attending.
+            </div>
+            {/* flat grid, sorted by board rank (rank-less presenters sort last) */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+              {presenters.map((p) => <PresenterCard key={p.speaker_key} p={p} />)}
             </div>
           </div>
         )}
-
-        {/* WHAT WE DON'T HAVE — lives in the voices/topics row above when social
-            clears threshold; falls back to a trailing panel here otherwise. */}
-        {!aboveThreshold && <DontHavePanel hasAbstracts={hasAbstracts} standalone />}
 
         {!loaded && <div style={mono(10, COLOR.ink5)}>Loading…</div>}
       </div>
