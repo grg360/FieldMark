@@ -26,6 +26,8 @@ import {
   SimulatedChip,
   VerifiedBadge,
 } from "./fiUi";
+import { useForumWriter } from "./useForumWriter";
+import Composer from "./Composer";
 
 const FLAG_REASONS = [
   "Reads as clinical recommendation",
@@ -123,7 +125,7 @@ function PostByline({ post, isMobile }: { post: ForumPost; isMobile: boolean }) 
   );
 }
 
-function PostActions({ post, isMobile }: { post: ForumPost; isMobile: boolean }) {
+function PostActions({ post, isMobile, onReply }: { post: ForumPost; isMobile: boolean; onReply?: (post: ForumPost) => void }) {
   const touch = isMobile ? { minHeight: 44 } : undefined;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -131,7 +133,11 @@ function PostActions({ post, isMobile }: { post: ForumPost; isMobile: boolean })
       {!isMobile && post.compliance_state === "on_anchor" && (
         <ComplianceChip state="on_anchor" fragment={post.anchor_fragment} />
       )}
-      <div style={touch}><DisabledControl variant="ghost">Reply</DisabledControl></div>
+      {onReply ? (
+        <button type="button" onClick={() => onReply(post)} style={{ ...mono(10.5, COLOR.indigoLink), letterSpacing: "0.08em", background: "none", border: `1px solid rgba(85,102,232,0.3)`, borderRadius: 4, padding: "8px 12px", cursor: "pointer", ...touch }}>Reply</button>
+      ) : (
+        <div style={touch}><DisabledControl variant="ghost">Reply</DisabledControl></div>
+      )}
       <div style={touch}><DisabledControl variant="ghost">Flag</DisabledControl></div>
     </div>
   );
@@ -139,7 +145,7 @@ function PostActions({ post, isMobile }: { post: ForumPost; isMobile: boolean })
 
 // A single visible post (on-anchor / context-note / under-review). Removed posts
 // render via RemovedPlaceholder instead.
-function PostBody({ post, record, isMobile }: { post: ForumPost; record?: ModerationRecord; isMobile: boolean }) {
+function PostBody({ post, record, isMobile, onReply }: { post: ForumPost; record?: ModerationRecord; isMobile: boolean; onReply?: (post: ForumPost) => void }) {
   if (post.compliance_state === "removed") return <RemovedPlaceholder post={post} record={record} />;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -150,7 +156,7 @@ function PostBody({ post, record, isMobile }: { post: ForumPost; record?: Modera
       {(post.compliance_state === "context_note" || post.compliance_state === "under_review") && (
         <AttachedNote post={post} />
       )}
-      <PostActions post={post} isMobile={isMobile} />
+      <PostActions post={post} isMobile={isMobile} onReply={onReply} />
     </div>
   );
 }
@@ -158,9 +164,21 @@ function PostBody({ post, record, isMobile }: { post: ForumPost; record?: Modera
 export default function ThreadPage() {
   const { id } = useParams();
   const isMobile = useMediaQuery("(max-width: 640px)");
+  const isWriter = useForumWriter();
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [records, setRecords] = useState<ModerationRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // Active reply composer target (writer only): null = closed; parentPostId null
+  // = replying to the thread question.
+  const [replyTarget, setReplyTarget] = useState<{ parentPostId: string | null; replyingTo?: string } | null>(null);
+
+  async function reload() {
+    if (!id) return;
+    const [t, m] = await Promise.all([getThread(id), getModerationQueue()]);
+    setDetail(t.data);
+    setRecords(m.data ?? []);
+    setLoaded(true);
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -211,6 +229,7 @@ export default function ThreadPage() {
 
   const { thread, anchor } = detail;
   const roots = childrenOf.get("__root__") ?? [];
+  const onReply = isWriter ? (post: ForumPost) => setReplyTarget({ parentPostId: post.id, replyingTo: post.author_handle }) : undefined;
 
   const renderPost = (post: ForumPost, nested: boolean, parentHandle?: string) => {
     const kids = childrenOf.get(post.id) ?? [];
@@ -229,7 +248,7 @@ export default function ThreadPage() {
           {nested && flat && post.compliance_state !== "removed" && parentHandle && (
             <span style={mono(9.5, COLOR.ink5)}>replying to {parentHandle}</span>
           )}
-          <PostBody post={post} record={recordByPost.get(post.id)} isMobile={isMobile} />
+          <PostBody post={post} record={recordByPost.get(post.id)} isMobile={isMobile} onReply={onReply} />
         </div>
         {visibleKids.map((k) => renderPost(k, true, post.author_handle))}
         {hiddenRemoved.length > 0 && (
@@ -327,9 +346,28 @@ export default function ThreadPage() {
           </span>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <DisabledControl variant="ghost">SAVE DRAFT</DisabledControl>
-            <DisabledControl variant="solid-amber">CHECK &amp; POST</DisabledControl>
+            {isWriter ? (
+              <button
+                type="button"
+                onClick={() => setReplyTarget({ parentPostId: null })}
+                style={{ ...mono(10.5, "#0a0a0a"), letterSpacing: "0.08em", background: COLOR.amber, border: "1px solid rgba(232,160,32,0.5)", borderRadius: 4, padding: "8px 14px", cursor: "pointer" }}
+              >
+                CHECK &amp; POST
+              </button>
+            ) : (
+              <DisabledControl variant="solid-amber">CHECK &amp; POST</DisabledControl>
+            )}
           </div>
         </div>
+
+        {/* Active reply composer (writer only) */}
+        {replyTarget && (
+          <Composer
+            mode={{ kind: "reply", threadId: thread.id, parentPostId: replyTarget.parentPostId, pubmedId: anchor.pubmed_id, journalAbbrev: anchor.journal_abbrev, replyingTo: replyTarget.replyingTo }}
+            onClose={() => setReplyTarget(null)}
+            onPosted={() => { setReplyTarget(null); reload(); }}
+          />
+        )}
 
         {/* ── What flagging offers — rendered, inert (the five reasons) ── */}
         <div style={{ padding: 18, background: COLOR.surfaceWell, border: `1px solid ${COLOR.hair}`, display: "flex", flexDirection: "column", gap: 10 }}>

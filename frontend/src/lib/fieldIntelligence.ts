@@ -179,6 +179,56 @@ export interface DiscussAffordance {
   primary_thread_id: string | null;
 }
 
+// ── Write path (founder-gated in the DB; UI mirrors it) ─────────────────────
+// All writes go through SECURITY DEFINER RPCs that self-gate on the caller's
+// auth.uid() and run the content check server-side. The client cannot bypass
+// either — there are no INSERT grants on the tables.
+
+export interface WriteResult {
+  ok: boolean;
+  reason?: string;
+  thread_id?: string;
+  post_id?: string;
+}
+
+// The demo write handle (pseudonymous, per the surface's anonymous-to-peers model).
+export const FORUM_WRITE_HANDLE = "@demo_msl";
+
+export async function canWriteForum(): Promise<boolean> {
+  const { data, error } = await supabase.rpc("fi_can_write");
+  return !error && data === true;
+}
+
+export async function createThread(
+  pubmedId: string,
+  questionTitle: string,
+  questionBody: string,
+): Promise<WriteResult> {
+  const { data, error } = await supabase.rpc("fi_create_thread", {
+    p_pubmed_id: pubmedId,
+    p_question_title: questionTitle,
+    p_question_body: questionBody,
+    p_handle: FORUM_WRITE_HANDLE,
+  });
+  if (error) return { ok: false, reason: error.message };
+  return data as WriteResult;
+}
+
+export async function createReply(
+  threadId: string,
+  parentPostId: string | null,
+  body: string,
+): Promise<WriteResult> {
+  const { data, error } = await supabase.rpc("fi_create_reply", {
+    p_thread_id: threadId,
+    p_parent_post_id: parentPostId,
+    p_body: body,
+    p_handle: FORUM_WRITE_HANDLE,
+  });
+  if (error) return { ok: false, reason: error.message };
+  return data as WriteResult;
+}
+
 export async function getDiscussAffordances(
   pubmedIds: string[],
 ): Promise<Record<string, DiscussAffordance>> {

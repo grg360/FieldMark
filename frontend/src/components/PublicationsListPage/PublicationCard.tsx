@@ -95,7 +95,7 @@ export default function PublicationCard({ pub }: Props) {
       </div>
 
       {/* Field Intelligence discuss affordance — the only way to open a thread. */}
-      <DiscussAffordance pmid={pub.pmid} />
+      <DiscussAffordance pmid={pub.pmid} journalAbbrev={pub.journal} title={pub.title} />
     </div>
   );
 }

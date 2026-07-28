@@ -41,6 +41,11 @@ async function flush() {
   for (const w of current) w.resolve(cache.get(w.pmid) ?? null);
 }
 
+// Drop a cached entry so a card re-fetches after a thread is created on it.
+export function invalidateAffordance(pmid: string) {
+  cache.delete(pmid);
+}
+
 function request(pmid: string): Promise<DiscussAffordance | null> {
   if (cache.has(pmid)) return Promise.resolve(cache.get(pmid) ?? null);
   return new Promise((resolve) => {
