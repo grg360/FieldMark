@@ -3035,6 +3035,7 @@ export async function getRisingVoices(
 export interface ShareOfVoiceRow {
   handle: string;
   display_name: string | null;
+  post_count: number;
   total_engagement: number;
   engagement_pct: number;
   rank_within_ta: number;
@@ -3075,7 +3076,9 @@ export async function getSocialAnalytics(
   const [sovResult, topicsResult, trendingResult] = await Promise.all([
     supabase
       .from("mv_social_share_of_voice_by_ta")
-      .select("handle, display_name, total_engagement, engagement_pct, rank_within_ta")
+      // Ranked by post volume (rank_within_ta = post_count DESC in the MV), not
+      // engagement — share of voice measures sustained presence, not virality.
+      .select("handle, display_name, post_count, total_engagement, engagement_pct, rank_within_ta")
       .eq("ta_slug", mvSlug)
       .order("rank_within_ta", { ascending: true })
       .limit(50),

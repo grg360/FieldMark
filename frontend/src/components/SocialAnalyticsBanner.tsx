@@ -52,17 +52,19 @@ export default function SocialAnalyticsBanner({ selectedTA }: SocialAnalyticsBan
     };
   }, [selectedTA]);
 
-  // Build SOV pie data: top 5 by engagement, "Others" aggregates the rest
+  // Build SOV pie data: top 5 by POST VOLUME, "Others" aggregates the rest.
+  // Weighted by post count, not engagement — a single viral post shouldn't
+  // outweigh a clinician's sustained presence (see the MV comment).
   const sov = data?.shareOfVoice || [];
-  const sovTotal = sov.reduce((sum, r) => sum + (r.total_engagement || 0), 0);
+  const sovTotal = sov.reduce((sum, r) => sum + (r.post_count || 0), 0);
   const top5 = sov.slice(0, 5);
   const others = sov.slice(5);
-  const othersTotal = others.reduce((sum, r) => sum + (r.total_engagement || 0), 0);
+  const othersTotal = others.reduce((sum, r) => sum + (r.post_count || 0), 0);
 
   const pieData: { name: string; value: number; pct: number }[] = top5.map((r) => ({
     name: r.display_name || r.handle,
-    value: r.total_engagement,
-    pct: sovTotal > 0 ? (r.total_engagement / sovTotal) * 100 : 0,
+    value: r.post_count,
+    pct: sovTotal > 0 ? (r.post_count / sovTotal) * 100 : 0,
   }));
   if (othersTotal > 0) {
     pieData.push({
@@ -114,7 +116,7 @@ export default function SocialAnalyticsBanner({ selectedTA }: SocialAnalyticsBan
               textAlign: "center",
             }}
           >
-            Share of voice · engagement-weighted · last 90 days
+            Share of voice · by post volume · last 90 days
           </div>
           {loading ? (
             <div style={{ fontSize: 11, color: "#6B6A65", textAlign: "center", padding: 20 }}>loading…</div>
