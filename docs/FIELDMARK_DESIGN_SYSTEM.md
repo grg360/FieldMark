@@ -327,3 +327,59 @@ and — where space allows — label the provisional segment (a caption, a hatch
 7. No borders separating cards; depth comes from tier shadows. Motion only on hover/selection.
 8. Keyboard focus must be visible — the global `:focus-visible` indigo ring covers it; don't remove
    outlines without replacing them.
+
+---
+
+## Field Intelligence — anchored-discussion patterns (additions)
+
+Introduced by the Field Intelligence Forum (anchored discussion + moderation).
+Additions, not replacements: the surface already had pseudonymous handles,
+verification badges, reply counts and the topic-only footer. All patterns reuse
+the existing palette — none introduces a new accent hue. Red (`COLOR.danger`)
+appears only for removal, at the same chroma and lightness as amber and indigo.
+Implemented in `components/FieldIntelligenceForum/fiUi.tsx`.
+
+**01 · Publication anchor** — indigo, 2px left rule. A card carrying PMID,
+journal, year, citation count and title, with a scope statement naming what is
+on and off topic. The indigo left rule marks it as platform-authored rather than
+user-authored. Required at the head of every thread; collapses to a chip in
+lists, composers and on mobile. Never editable by the poster.
+
+**02 · Compliance-state chip** — four states only: on anchor (muted green),
+under review (amber), context note attached (indigo), removed (red). One chip
+per post, always with a reason fragment — never a bare colour. Amber is reserved
+for "a human is looking at this"; red only ever means an action has already been
+taken. This is the one place the system uses a fifth hue, at the same chroma and
+lightness as amber and indigo.
+
+**03 · Attached note** — auto-signal / peer-flag. A tinted block below the post
+body, labelled with its source. It explains the concern in the paper's own terms
+and states what happens next and by when. The note is additive — the post stays
+legible. This is the pattern that lets borderline content stay visible while
+being visibly qualified, which is the difference between a moderated forum and a
+censored one.
+
+**04 · Removal placeholder** — keeps its slot. A removed post keeps its position
+and depth in the thread and states the clause, the timing, whether the author was
+notified, and the appeal window. Removed text is visible to the author and to
+reviewers, never to peers. Silent deletion is not available in the design — an
+invisible removal cannot be audited — and it is not available in the schema
+either: removal is modelled as a state, never a delete. The queue counts
+prevented drafts alongside removals for the same reason.
+
+**05 · Simulation marker** — `SIMULATED`. Dashed amber outline, mono, per post —
+dashed because no production state uses a dashed border, so it can never be
+mistaken for a live compliance state. Paired with a persistent header strip.
+Prototype-only, and it is the marker that must survive any screenshot: real
+papers, fabricated discussion, no real individual named as a participant. If a
+single post is cropped out of the page, the chip must be in the crop.
+
+**06 · Discuss affordance** — on every publication card. A fixed block on the
+right of any publication card, in two states: dashed and empty ("No discussion
+yet. Ask the first question.") or filled indigo with a reply count and a recency
+line. It is the only way to open a thread — there is no composer on the forum
+surface at all. That makes the anchor structural: a post without a citation is
+not refused, it is unreachable. Appears in the year bibliography, co-authored
+publications and institution partner publications; congress abstracts pending a
+decision on whether an abstract anchors strongly enough. Compliance state is
+never shown on this block.

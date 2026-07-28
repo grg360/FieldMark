@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AppLayout from "../AppLayout";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { getModerationQueue, type ModerationRecord, type QueueState } from "../../lib/fieldIntelligence";
 import { DisabledControl, mono, PrototypeStrip } from "./fiUi";
@@ -132,6 +133,7 @@ function CaseDetail({ record }: { record: ModerationRecord }) {
 }
 
 export default function ModerationPage() {
+  const isMobile = useMediaQuery("(max-width: 640px)");
   const [records, setRecords] = useState<ModerationRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -167,7 +169,7 @@ export default function ModerationPage() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "340px 1fr", gap: 16, alignItems: "start" }}>
           {/* queue list */}
           <div style={{ display: "flex", flexDirection: "column", gap: 1, background: COLOR.hairStrong, border: `1px solid ${COLOR.hairStrong}` }}>
             {records.map((r) => {

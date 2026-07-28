@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { COLOR, FONT } from "../../lib/designTokens";
 import {
   getModerationQueue,
@@ -104,7 +105,9 @@ function RemovedPlaceholder({ post, record }: { post: ForumPost; record?: Modera
   );
 }
 
-function PostByline({ post }: { post: ForumPost }) {
+// On mobile, compliance state moves INTO the byline so a fast scroll still reads
+// the state from the handle row (Design mobile treatment).
+function PostByline({ post, isMobile }: { post: ForumPost; isMobile: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
       <HandleAvatar handle={post.author_handle} size={24} />
@@ -112,43 +115,49 @@ function PostByline({ post }: { post: ForumPost }) {
       <VerifiedBadge small />
       <span style={mono(10, COLOR.ink5)}>{post.recency_label}</span>
       {post.compliance_state === "under_review" && <ComplianceChip state="under_review" />}
+      {isMobile && post.compliance_state === "on_anchor" && (
+        <ComplianceChip state="on_anchor" fragment={post.anchor_fragment} />
+      )}
       <SimulatedChip />
     </div>
   );
 }
 
-function PostActions({ post }: { post: ForumPost }) {
+function PostActions({ post, isMobile }: { post: ForumPost; isMobile: boolean }) {
+  const touch = isMobile ? { minHeight: 44 } : undefined;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-      {post.compliance_state === "on_anchor" && (
+      {/* on desktop the on-anchor chip sits with the actions; on mobile it's in the byline */}
+      {!isMobile && post.compliance_state === "on_anchor" && (
         <ComplianceChip state="on_anchor" fragment={post.anchor_fragment} />
       )}
-      <DisabledControl variant="ghost">Reply</DisabledControl>
-      <DisabledControl variant="ghost">Flag</DisabledControl>
+      <div style={touch}><DisabledControl variant="ghost">Reply</DisabledControl></div>
+      <div style={touch}><DisabledControl variant="ghost">Flag</DisabledControl></div>
     </div>
   );
 }
 
 // A single visible post (on-anchor / context-note / under-review). Removed posts
 // render via RemovedPlaceholder instead.
-function PostBody({ post, record }: { post: ForumPost; record?: ModerationRecord }) {
+function PostBody({ post, record, isMobile }: { post: ForumPost; record?: ModerationRecord; isMobile: boolean }) {
   if (post.compliance_state === "removed") return <RemovedPlaceholder post={post} record={record} />;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <PostByline post={post} />
+      <PostByline post={post} isMobile={isMobile} />
       <p style={{ margin: 0, fontFamily: FONT.serif, fontSize: 15, lineHeight: 1.7, color: COLOR.ink2, maxWidth: "72ch" }}>
         {post.body}
       </p>
       {(post.compliance_state === "context_note" || post.compliance_state === "under_review") && (
         <AttachedNote post={post} />
       )}
-      <PostActions post={post} />
+      <PostActions post={post} isMobile={isMobile} />
     </div>
   );
 }
 
 export default function ThreadPage() {
   const { id } = useParams();
+  const isMobile = useMediaQuery("(max-width: 640px)");
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [records, setRecords] = useState<ModerationRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -203,19 +212,28 @@ export default function ThreadPage() {
   const { thread, anchor } = detail;
   const roots = childrenOf.get("__root__") ?? [];
 
-  const renderPost = (post: ForumPost, nested: boolean) => {
+  const renderPost = (post: ForumPost, nested: boolean, parentHandle?: string) => {
     const kids = childrenOf.get(post.id) ?? [];
     // No-placeholder removed children collapse to a single summary line (mobile + desktop).
     const hiddenRemoved = kids.filter((k) => k.compliance_state === "removed" && !k.placeholder_shown);
     const visibleKids = kids.filter((k) => k.placeholder_shown);
+    // Nesting caps at two levels. On mobile, nested replies flatten (no indent) with
+    // a "replying to @handle" line; removed placeholders keep full width regardless.
+    const flat = isMobile;
+    const indentStyle = nested && !flat
+      ? { marginLeft: 34, borderLeft: `1px solid ${COLOR.hair}`, paddingLeft: 20 }
+      : undefined;
     return (
-      <div key={post.id} style={nested ? { marginLeft: 34, borderLeft: `1px solid ${COLOR.hair}`, paddingLeft: 20 } : undefined}>
+      <div key={post.id} style={indentStyle}>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "18px 0", borderBottom: `1px solid ${COLOR.hair}` }}>
-          <PostBody post={post} record={recordByPost.get(post.id)} />
+          {nested && flat && post.compliance_state !== "removed" && parentHandle && (
+            <span style={mono(9.5, COLOR.ink5)}>replying to {parentHandle}</span>
+          )}
+          <PostBody post={post} record={recordByPost.get(post.id)} isMobile={isMobile} />
         </div>
-        {visibleKids.map((k) => renderPost(k, true))}
+        {visibleKids.map((k) => renderPost(k, true, post.author_handle))}
         {hiddenRemoved.length > 0 && (
-          <div style={{ marginLeft: 34, paddingLeft: 20, borderLeft: `1px solid ${COLOR.hair}` }}>
+          <div style={flat ? undefined : { marginLeft: 34, paddingLeft: 20, borderLeft: `1px solid ${COLOR.hair}` }}>
             <div style={{ ...mono(10, COLOR.ink5), padding: "12px 0", fontStyle: "italic" }}>
               {hiddenRemoved.length} {hiddenRemoved.length === 1 ? "reply" : "replies"} removed by moderation — no placeholder shown to peers
             </div>
@@ -232,7 +250,9 @@ export default function ThreadPage() {
         <Link to="/field-intelligence" style={{ ...mono(10.5, COLOR.ink3), letterSpacing: "0.1em" }}>← ALL THREADS</Link>
 
         {/* ── Publication anchor (pattern 01): indigo 2px left rule ── */}
-        <div style={{ padding: 20, background: COLOR.surfaceCard, border: `1px solid ${COLOR.hairStrong}`, borderLeft: `2px solid ${COLOR.indigo}`, display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* On mobile the anchor stays on screen: a sticky two-line card at the top
+            of the thread — the paper is the only thing that never scrolls away. */}
+        <div style={{ padding: isMobile ? "12px 14px" : 20, background: COLOR.surfaceCard, border: `1px solid ${COLOR.hairStrong}`, borderLeft: `2px solid ${COLOR.indigo}`, display: "flex", flexDirection: "column", gap: isMobile ? 8 : 12, ...(isMobile ? { position: "sticky" as const, top: 0, zIndex: 10 } : {}) }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={{ ...mono(9.5, COLOR.indigoLink), letterSpacing: "0.14em", background: "rgba(85,102,232,0.1)", border: "1px solid rgba(85,102,232,0.3)", padding: "3px 7px" }}>PUBLICATION ANCHOR</span>
             <span style={mono(11, COLOR.ink3)}>PMID {anchor.pubmed_id}</span>
@@ -246,12 +266,18 @@ export default function ThreadPage() {
             <a href={`https://pubmed.ncbi.nlm.nih.gov/${anchor.pubmed_id}/`} target="_blank" rel="noreferrer" style={{ ...mono(11, COLOR.indigoLink) }}>Open in PubMed ↗</a>
             <span style={mono(11, COLOR.ink5)}>Author list not reproduced in-product</span>
           </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 13px", background: "rgba(85,102,232,0.05)", border: "1px solid rgba(85,102,232,0.16)" }}>
-            <span style={{ ...mono(9.5, COLOR.indigoLink), letterSpacing: "0.12em", flexShrink: 0, paddingTop: 2 }}>SCOPE</span>
-            <span style={{ fontSize: 12.5, lineHeight: 1.6, color: COLOR.ink3 }}>
-              On topic: {anchor.scope_on_topic}. Off topic: {anchor.scope_off_topic}.
-            </span>
-          </div>
+          {/* On mobile the scope collapses to a tap-to-read line to keep the anchor
+              to two lines; on desktop the full scope statement renders. */}
+          {isMobile ? (
+            <span style={mono(9.5, COLOR.indigoLink)}>Scope: results as published · tap to read the paper</span>
+          ) : (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 13px", background: "rgba(85,102,232,0.05)", border: "1px solid rgba(85,102,232,0.16)" }}>
+              <span style={{ ...mono(9.5, COLOR.indigoLink), letterSpacing: "0.12em", flexShrink: 0, paddingTop: 2 }}>SCOPE</span>
+              <span style={{ fontSize: 12.5, lineHeight: 1.6, color: COLOR.ink3 }}>
+                On topic: {anchor.scope_on_topic}. Off topic: {anchor.scope_off_topic}.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── The anchored question ── */}
@@ -285,9 +311,11 @@ export default function ThreadPage() {
 
         {/* ── Reply composer — rendered, inert ── */}
         <div style={{ marginTop: 16, padding: 18, background: COLOR.surfaceCard, border: `1px solid ${COLOR.hairStrong}`, display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Anchor reappears as a pill above the composer (mobile treatment; shown
+              on all widths — the composer never lets you forget the anchor). */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ ...mono(9, COLOR.indigoLink), letterSpacing: "0.12em", background: "rgba(85,102,232,0.1)", border: "1px solid rgba(85,102,232,0.3)", padding: "2px 7px" }}>ANCHOR PMID {anchor.pubmed_id}</span>
             <span style={{ ...mono(9.5, COLOR.amber), letterSpacing: "0.14em" }}>REPLYING WITHIN ANCHOR</span>
-            <span style={mono(10.5, COLOR.ink3)}>PMID {anchor.pubmed_id} · {anchor.journal_abbrev}</span>
             <span style={mono(10, COLOR.ink5)}>locked to this thread</span>
           </div>
           <div style={{ padding: 14, background: COLOR.surfaceWell, border: `1px solid ${COLOR.hair}`, ...serif(15, COLOR.ink5) }}>
