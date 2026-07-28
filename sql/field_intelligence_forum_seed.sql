@@ -142,7 +142,7 @@ BEGIN
       'Author notified with both clauses', 7, 0.91,
       'Removed under Scope 3.2 — clinical recommendation. The reply advised a treatment sequence and described directing prescriber behaviour, neither of which is a discussion of what the anchored publication reports.',
       'Second action on this account in 90 days → posting rate limit applied. Third action → referral to the author''s own compliance contact under the MSL attestation. Retained for 7 years — exportable on request from a member company''s compliance function.',
-      '[{"t":"67m","event":"reply posted — classifier 0.91 recommendation likelihood — auto-held from view"},{"t":"67m","event":"author shown the clause and offered an edit; no edit made"},{"t":"44m","event":"peer flag received (reason: reads as clinical recommendation)"},{"t":"26m","event":"reviewer M. Okonkwo removed the reply, clauses 3.2 + 3.4 cited"},{"t":"26m","event":"placeholder published in thread — reply chain preserved"}]'::jsonb);
+      '[{"t":"67m","event":"reply posted — classifier 0.91 recommendation likelihood — auto-held from view"},{"t":"67m","event":"author shown the clause and offered an edit; no edit made"},{"t":"44m","event":"peer flag received (reason: reads as clinical recommendation)"},{"t":"26m","event":"a Medical Affairs Reviewer removed the reply, clauses 3.2 + 3.4 cited"},{"t":"26m","event":"placeholder published in thread — reply chain preserved"}]'::jsonb);
 END
 $seed$;
 

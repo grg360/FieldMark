@@ -30,13 +30,17 @@ export default function DashboardTabs() {
   });
 
   function handleDashboardClick(nextTrack: Track) {
+    // Field Intelligence is now the anchored-discussion Forum (a real, DB-backed
+    // surface), not the old mock in-feed track. Treat the chip as a nav link to
+    // the forum index — no setTrack, so returning to the feed never re-opens the
+    // superseded mock surface. The forum is oncology-wide, so it is not TA-scoped.
+    if (nextTrack === "field-intelligence") {
+      navigate("/field-intelligence");
+      return;
+    }
     if (nextTrack === track) return;
     setTrack(nextTrack);
     const dashboardSlug = trackToDashboardSlug(nextTrack);
-    if (nextTrack === "field-intelligence") {
-      navigate(`/${route.taSlug}/field-intelligence`);
-      return;
-    }
     navigate(
       buildFeedPath(route.taSlug, dashboardSlug, route.indicationSlug),
     );
