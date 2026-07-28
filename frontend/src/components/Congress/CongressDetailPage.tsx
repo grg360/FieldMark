@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { supabase } from "../../lib/supabase";
 import {
@@ -121,6 +122,7 @@ function PresenterCard({ p }: { p: ConfirmedPresenter }) {
 
 export default function CongressDetailPage() {
   const { slug } = useParams();
+  const isMobile = useMediaQuery("(max-width: 640px)");
   const [params] = useSearchParams();
   const now = useMemo(() => {
     const o = import.meta.env.DEV ? params.get("now") : null;
@@ -260,7 +262,7 @@ export default function CongressDetailPage() {
                   <div style={{ ...mono(9.5, bi === 0 ? COLOR.amber : COLOR.ink4), letterSpacing: "0.14em", fontWeight: 600, marginBottom: 9, paddingBottom: 6, borderBottom: `1px solid ${COLOR.hair}` }}>
                     {band.label} <span style={{ color: COLOR.ink5 }}>· {inBand.length}</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                     {inBand.map((p) => <PresenterCard key={p.speaker_key} p={p} />)}
                   </div>
                 </div>
@@ -303,24 +305,29 @@ export default function CongressDetailPage() {
                 <VolumeChart c={congress} s={social} />
               </div>
               {/* topics + voices */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
                 <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
                   <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 6 }}>CO-OCCURRING HASHTAGS</div>
                   <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 14 }}>
                     Percent of the {INT.format(social.total_posts)} {congress.hashtags[0]} posts that also carry each tag. A post can carry several or none, so these don&rsquo;t sum to 100%.
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-                    {social.hot_hashtags.map((h) => (
-                      <div key={h.tag}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                          <span style={mono(12, COLOR.ink2)}>{h.tag}</span>
-                          <span style={mono(11, COLOR.ink3)}>{h.share}%</span>
+                    {(() => {
+                      // Bar scaled to the LEADING tag (top ~4%), not to 100% — otherwise every
+                      // bar reads as empty. The % beside the bar keeps the absolute value.
+                      const maxShare = Math.max(1, ...social.hot_hashtags.map((h) => h.share));
+                      return social.hot_hashtags.map((h) => (
+                        <div key={h.tag}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                            <span style={mono(12, COLOR.ink2)}>{h.tag}</span>
+                            <span style={mono(11, COLOR.ink3)}>{h.share}%</span>
+                          </div>
+                          <div style={{ height: 5, background: COLOR.hairStrong, borderRadius: 1, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${(h.share / maxShare) * 100}%`, background: COLOR.indigo, borderRadius: 1 }} />
+                          </div>
                         </div>
-                        <div style={{ height: 5, background: COLOR.hairStrong, borderRadius: 1, overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${Math.min(100, h.share)}%`, background: COLOR.indigo, borderRadius: 1 }} />
-                        </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
                 <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { supabase } from "../../lib/supabase";
 import {
@@ -126,6 +127,7 @@ function useRail(now: Date) {
 
 export default function CongressCalendarPage() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 640px)");
   const [params] = useSearchParams();
   // Dev-only reference-date override so the LIVE / IMMINENT treatments can be
   // exercised before a congress is actually live (e.g. /congress?now=2026-05-31).
@@ -197,8 +199,8 @@ export default function CongressCalendarPage() {
           return (
             <div>
               <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600, marginBottom: 8 }}>LIVE NOW</div>
-              <div style={{ border: `1px solid ${COLOR.amber}`, borderRadius: 6, background: "linear-gradient(180deg, rgba(232,160,32,0.055), rgba(232,160,32,0.015))", display: "flex" }}>
-                <div style={{ flex: 1, padding: "20px 22px", borderRight: `1px solid rgba(232,160,32,0.22)` }}>
+              <div style={{ border: `1px solid ${COLOR.amber}`, borderRadius: 6, background: "linear-gradient(180deg, rgba(232,160,32,0.055), rgba(232,160,32,0.015))", display: "flex", flexDirection: isMobile ? "column" : "row" }}>
+                <div style={{ flex: 1, padding: "20px 22px", [isMobile ? "borderBottom" : "borderRight"]: `1px solid rgba(232,160,32,0.22)` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLOR.amber }} />
                     <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600 }}>
@@ -214,7 +216,7 @@ export default function CongressCalendarPage() {
                     <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>RELEVANCE</div><span style={{ color: COLOR.ink1 }}>{rel ? rel.toUpperCase() : "—"}</span> · {TA_LABEL}</div>
                   </div>
                 </div>
-                <div style={{ width: 452, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ width: isMobile ? "100%" : 452, boxSizing: "border-box", padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "rgba(232,160,32,0.18)", border: "1px solid rgba(232,160,32,0.18)", borderRadius: 2 }}>
                     {[
                       { k: "POSTS", v: s ? INT.format(s.total_posts) : "—", c: COLOR.ink1 },
@@ -231,7 +233,7 @@ export default function CongressCalendarPage() {
                   {s && meetsThreshold(s) ? (
                     <div>
                       <div style={{ ...mono(8.5, "#8A6524"), letterSpacing: "0.11em", marginBottom: 9 }}>DAILY POST VOLUME · OBSERVED DAYS</div>
-                      <VolumeSparks daily={s.daily} color={COLOR.amber} width={408} height={44} />
+                      <VolumeSparks daily={s.daily} color={COLOR.amber} width={isMobile ? 300 : 408} height={44} />
                     </div>
                   ) : null}
                   <div style={{ ...mono(9.5, COLOR.ink4), marginTop: "auto" }}>
@@ -243,7 +245,8 @@ export default function CongressCalendarPage() {
           );
         })()}
 
-        {/* ── time rail ── */}
+        {/* ── time rail (desktop only — mobile relies on the stacked list) ── */}
+        {!isMobile && (
         <div style={{ background: COLOR.surfaceWell, border: `1px solid ${COLOR.hairStrong}`, borderRadius: 6, padding: "16px 18px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
             <div style={{ ...mono(10, COLOR.ink3), letterSpacing: "0.16em", fontWeight: 600 }}>THE YEAR — PROPORTIONAL TIME</div>
@@ -275,12 +278,15 @@ export default function CongressCalendarPage() {
             })}
           </div>
         </div>
+        )}
 
         {/* ── list ── */}
         <div>
+          {!isMobile && (
           <div style={{ display: "grid", gridTemplateColumns: "220px 150px 190px 90px 130px 1fr 96px", gap: 14, padding: "0 12px 8px", ...mono(9, COLOR.ink5), letterSpacing: "0.13em", fontWeight: 500, borderBottom: `1px solid ${COLOR.hairStrong}` }}>
             <div>CONGRESS</div><div>DATES</div><div>LOCATION</div><div>COUNTDOWN</div><div>TA RELEVANCE</div><div>SOCIAL SIGNAL</div><div style={{ textAlign: "right" }}>EXPERTS</div>
           </div>
+          )}
           {groups.map((g) => (
             <div key={g.key}>
               <div style={{ padding: "18px 12px 8px", ...mono(10, g.key === "live" || g.key === "imminent" ? COLOR.amber : COLOR.ink4), letterSpacing: "0.16em", fontWeight: 600 }}>{g.title}</div>
@@ -289,17 +295,55 @@ export default function CongressCalendarPage() {
                 const rel = relevanceFor(c, TA_SLUG);
                 const confirmed = confirmedBySlug[c.slug];
                 const hasAbstracts = !!c.abstract_source;
+                const s = socialBySlug[c.slug];
+                const mobileSignal = s && meetsThreshold(s)
+                  ? `${INT.format(s.total_posts)} posts`
+                  : s ? `${INT.format(s.total_posts)}/${SOCIAL_THRESHOLD.posts} posts` : "no captured posts";
+                const rowStyleBase = {
+                  padding: "13px 12px", width: "100%", textAlign: "left" as const,
+                  background: "none", border: "none", borderBottom: `1px solid ${COLOR.hair}`,
+                  borderLeft: `2px solid ${STATE_STYLE[st].dot}`, cursor: "pointer", opacity: ROW_OPACITY[st],
+                };
+                const relBars = (h: number) => (
+                  <div style={{ display: "flex", gap: 2 }}>
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} style={{ width: 12, height: h, borderRadius: 1, background: rel && (i < { high: 3, moderate: 2, low: 1 }[rel]) ? REL_COLOR[rel] : COLOR.hairStrong }} />
+                    ))}
+                  </div>
+                );
+                if (isMobile) {
+                  return (
+                    <button key={c.slug} type="button" onClick={() => navigate(`/congress/${c.slug}`)}
+                      style={{ ...rowStyleBase, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: STATE_STYLE[st].nameFg }}>{c.short_name}</div>
+                        <div style={{ ...mono(13, st === "live" ? COLOR.amber : COLOR.ink2), fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{countdownLabel(c, now)}</div>
+                      </div>
+                      <div style={mono(10.5, COLOR.ink4)}>{fmtDates(c)} · {c.city}{c.state ? `, ${c.state}` : `, ${c.country}`}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {relBars(3)}
+                        <div style={{ ...mono(9, rel ? REL_COLOR[rel] : COLOR.ink5), letterSpacing: "0.08em", fontWeight: 500 }}>{rel ? rel.toUpperCase() : "—"}</div>
+                        <div style={{ width: 1, height: 10, background: COLOR.hairStrong }} />
+                        <div style={mono(9.5, COLOR.ink5)}>{mobileSignal}</div>
+                        {hasAbstracts && confirmed != null && (
+                          <>
+                            <div style={{ width: 1, height: 10, background: COLOR.hairStrong }} />
+                            <div style={mono(9.5, COLOR.ink3)}>{confirmed} confirmed</div>
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  );
+                }
                 return (
                   <button
                     key={c.slug}
                     type="button"
                     onClick={() => navigate(`/congress/${c.slug}`)}
                     style={{
+                      ...rowStyleBase,
                       display: "grid", gridTemplateColumns: "220px 150px 190px 90px 130px 1fr 96px", gap: 14,
-                      alignItems: "center", padding: "13px 12px", width: "100%", textAlign: "left",
-                      background: "none", border: "none", borderBottom: `1px solid ${COLOR.hair}`,
-                      borderLeft: `2px solid ${STATE_STYLE[st].dot}`, cursor: "pointer",
-                      opacity: ROW_OPACITY[st],
+                      alignItems: "center",
                     }}
                   >
                     <div>
