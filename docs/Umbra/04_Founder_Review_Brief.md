@@ -1,0 +1,1 @@
+Review the architecture and Breast sequence, resolve the named founder decisions, and request the development-agent response. Decide US-first versus global-first scope, launch breadth, subtype visibility, HER2-low treatment, entitlement, Lab and replay budgets, representative validation depth, paid-content stopping point, and merge owner.

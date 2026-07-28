@@ -1,0 +1,7 @@
+Audit the repository at tag umbra-audit-base (commit 48540a5), not a branch. Branches are moving; the tag is fixed so your findings stay anchored.
+
+git clone https://github.com/grg360/FieldMark.git
+cd FieldMark
+git checkout umbra-audit-base
+
+This puts you in detached HEAD state, which is correct — you are not committing anything. Your documentation set is in docs/Umbra/; start with UMBRA_AUDIT_BRIEF.md.
