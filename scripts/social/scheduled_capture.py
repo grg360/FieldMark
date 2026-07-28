@@ -1,21 +1,28 @@
 """
-Scheduled social capture - the cadence policy for congress hashtags.
+Scheduled social capture - the cadence policy for congress + standing queries.
 
 Weekly baseline (Mondays): capture every dated, unexpired hashtag in
-social_capture_config.json (active_until != null). Evergreen community tags
-(active_until: null) are deliberately NOT auto-captured - price their weekly
-volume with a manual probe before adding them to the schedule.
+social_capture_config.json (active_until != null).
 
-Daily escalation: a tag is captured every day from DAILY_WINDOW_DAYS before
-its meeting's start_date through end_date - the run-up curve is what we want
-resolution on, and the live window matters even more. Meeting dates come from
-config/congresses.json, matched by hashtag with 4-digit years collapsed
+Daily escalation: a dated tag is captured every day from DAILY_WINDOW_DAYS
+before its meeting's start_date through end_date - the run-up curve is what we
+want resolution on, and the live window matters even more. Meeting dates come
+from config/congresses.json, matched by hashtag with 4-digit years collapsed
 (#wclc2026 == #wclc26). Dated tags with no congress entry (e.g. #AASLD2026)
 stay weekly-only.
 
+Standing daily queries: entries marked "cadence": "daily" (hashtags OR topic
+queries) run every day regardless of active_until - the standing NSCLC
+conversation (founder-approved 2026-07-28: #lcsm, #nsclc, #lungcancer, #sclc
+and the NSCLC topic query). Daily cadence is affordable because capture is
+incremental: twitter_capture passes since_id from its checkpoint, so each run
+reads only new posts and the 7-day search window is overlap margin, not a
+daily re-purchase. Evergreens WITHOUT a cadence marker (e.g. #bcsm) remain
+unscheduled - probe before adding.
+
 Invoked by scripts/run_social_capture.ps1 (Windows Task Scheduler, daily).
-Runs twitter_capture.py --tag per selected tag, then a single
-social_update.py --refresh-only for TA backfill + view refresh.
+Runs twitter_capture.py --tag / --topic-query per selected query, then a
+single social_update.py --refresh-only for TA backfill + view refresh.
 
 Console output is deliberately ASCII-only: unattended runs die silently on
 cp1252 consoles otherwise.
@@ -71,19 +78,29 @@ def main() -> int:
     cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     windows = congress_windows()
 
-    selected = []
+    # (mode, value, reason): mode "tag" -> twitter_capture --tag, "topic" -> --topic-query
+    selected: list[tuple[str, str, str]] = []
     for entry in cfg.get("twitter", {}).get("active_hashtags", []):
         tag = entry.get("tag", "")
+        if not tag:
+            continue
+        if entry.get("cadence") == "daily":
+            selected.append(("tag", tag, "standing-daily"))
+            continue
         until = entry.get("active_until")
-        if not tag or not until:
-            continue  # evergreen community tags are not auto-captured
+        if not until:
+            continue  # evergreen without a cadence marker: not auto-captured
         if date.fromisoformat(until) < today:
             continue  # expired
         w: Optional[Tuple[date, date, str]] = windows.get(canon(tag))
         in_daily = w is not None and (w[0] - timedelta(days=DAILY_WINDOW_DAYS)) <= today <= w[1]
         if in_daily or weekly:
             reason = f"daily-window:{w[2]}" if in_daily else "weekly"
-            selected.append((tag, reason))
+            selected.append(("tag", tag, reason))
+    for entry in cfg.get("twitter", {}).get("topic_queries", []):
+        q = str(entry.get("query", "")).strip()
+        if q and entry.get("cadence") == "daily":
+            selected.append(("topic", q, "standing-daily"))
 
     mode = "weekly baseline" if weekly else "daily check"
     print(f"[scheduled_capture] {today.isoformat()} ({mode}): {len(selected)} tag(s) selected", flush=True)
@@ -92,15 +109,16 @@ def main() -> int:
         return 0
 
     failures = 0
-    for tag, reason in selected:
-        print(f"[scheduled_capture] Capturing {tag} ({reason})", flush=True)
-        cmd = [sys.executable, "-u", str(SCRIPT_DIR / "twitter_capture.py"), "--tag", tag]
+    for mode, value, reason in selected:
+        print(f"[scheduled_capture] Capturing {value} ({reason})", flush=True)
+        flag = "--tag" if mode == "tag" else "--topic-query"
+        cmd = [sys.executable, "-u", str(SCRIPT_DIR / "twitter_capture.py"), flag, value]
         if args.dry_run:
             cmd.append("--dry-run")
         rc = subprocess.run(cmd, cwd=str(SCRIPT_DIR)).returncode
         if rc != 0:
             failures += 1
-            print(f"[scheduled_capture] {tag} FAILED with exit code {rc}", flush=True)
+            print(f"[scheduled_capture] {value} FAILED with exit code {rc}", flush=True)
 
     # One TA backfill + view refresh for the whole batch.
     refresh_cmd = [sys.executable, "-u", str(SCRIPT_DIR / "social_update.py"), "--refresh-only"]

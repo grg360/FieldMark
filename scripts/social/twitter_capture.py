@@ -332,6 +332,7 @@ def fetch_twitter_posts(
     cursor: Optional[str],
     dry_run: bool,
     max_results: int,
+    since_id: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     """
     Fetch one page of posts from Twitter API.
@@ -355,6 +356,8 @@ def fetch_twitter_posts(
     }
     if cursor:
         params["next_token"] = cursor
+    if since_id:
+        params["since_id"] = since_id
 
     for attempt in range(MAX_RETRIES):
         try:
@@ -597,13 +600,35 @@ def run_capture_for_query(
         # Reset completed state so each invocation re-checks for new posts
         state["completed"] = False
 
+    # Incremental capture: pass the last COMPLETED run's newest post id as
+    # since_id, so scheduled runs read only new posts instead of re-buying the
+    # whole trailing 7-day window every day (X bills per post READ; the DB
+    # upsert deduplicates rows but not cost). Rules:
+    # - newest_id only advances when a run finishes pagination, so an
+    #   interrupted run never opens a gap;
+    # - a resumed run (next_token present) finishes its old sweep without
+    #   since_id first;
+    # - the 7-day search window is the overlap margin for missed runs.
+    run_since_id: Optional[str] = None
+    if checkpoint_namespace != "reply_captures" and not next_token and not dry_run:
+        run_since_id = state.get("newest_id")
+    run_newest_id: Optional[str] = None
+
     while True:
         payloads, new_next_token = fetch_twitter_posts(
             query,
             next_token,
             dry_run=dry_run,
             max_results=max_results,
+            since_id=run_since_id,
         )
+        # The first page's meta.newest_id is the newest post of the whole run.
+        if run_newest_id is None:
+            for payload in payloads:
+                meta_newest = (payload.get("meta") or {}).get("newest_id")
+                if meta_newest:
+                    run_newest_id = str(meta_newest)
+                    break
         if not dry_run:
             stats.requests_made += 1
 
@@ -651,6 +676,16 @@ def run_capture_for_query(
         save_checkpoint(CHECKPOINT_PATH, checkpoint)
 
         if not new_next_token:
+            # Pagination finished: advance newest_id (monotonic snowflake ids).
+            if checkpoint_namespace != "reply_captures" and not dry_run and run_newest_id:
+                prev = state.get("newest_id")
+                try:
+                    advance = prev is None or int(run_newest_id) > int(prev)
+                except (TypeError, ValueError):
+                    advance = True
+                if advance:
+                    state["newest_id"] = run_newest_id
+                    save_checkpoint(CHECKPOINT_PATH, checkpoint)
             break
         if dry_run:
             # Dry-run fixture intentionally single page to avoid fake pagination.

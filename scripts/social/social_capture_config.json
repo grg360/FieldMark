@@ -49,7 +49,8 @@
         "min_faves": 3,
         "active_until": null,
         "therapeutic_area": "oncology",
-        "rationale": "Lung Cancer Social Media community - major MSL-relevant signal"
+        "rationale": "Lung Cancer Social Media community - major MSL-relevant signal",
+        "cadence": "daily"
       },
       {
         "tag": "#bcsm",
@@ -133,21 +134,24 @@
         "min_faves": 3,
         "active_until": null,
         "therapeutic_area": "oncology",
-        "rationale": "Small cell lung cancer disease-specific tag"
+        "rationale": "Small cell lung cancer disease-specific tag",
+        "cadence": "daily"
       },
       {
         "tag": "#nsclc",
         "min_faves": 3,
         "active_until": null,
         "therapeutic_area": "oncology",
-        "rationale": "NSCLC disease-specific tag - the core TA conversation"
+        "rationale": "NSCLC disease-specific tag - the core TA conversation",
+        "cadence": "daily"
       },
       {
         "tag": "#lungcancer",
         "min_faves": 3,
         "active_until": null,
         "therapeutic_area": "oncology",
-        "rationale": "Lung cancer disease-specific tag (broad umbrella)"
+        "rationale": "Lung cancer disease-specific tag (broad umbrella)",
+        "cadence": "daily"
       },
       {
         "tag": "#melanoma",
@@ -217,7 +221,8 @@
       {
         "query": "(NSCLC OR \"non-small cell lung cancer\")",
         "min_faves": 20,
-        "therapeutic_area": "oncology"
+        "therapeutic_area": "oncology",
+        "cadence": "daily"
       },
       {
         "query": "(MASLD OR NASH OR \"non-alcoholic steatohepatitis\")",
