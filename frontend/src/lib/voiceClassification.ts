@@ -49,8 +49,13 @@ function stripMentions(text: string): string {
 
 // Leading segment of the display name, @-mentions and emoji/symbols removed, so
 // the name-shape test isn't defeated by a trailing emoji or a specialty suffix.
+// Variation selectors / ZWJ / skin-tone modifiers are stripped FIRST: they are
+// Unicode Marks (\p{M}), which the main pass deliberately keeps to preserve
+// accented names, but an emoji's trailing U+FE0F variation selector would
+// otherwise survive as a stray token and defeat the personal-name test.
 function nameSegment(dn: string): string {
   return stripMentions(dn.split(/[|·]/)[0])
+    .replace(/[\u200D\uFE0E\uFE0F\u{1F3FB}-\u{1F3FF}]/gu, "")
     .replace(/[^\p{L}\p{M} .'-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
