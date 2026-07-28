@@ -30,7 +30,10 @@ const IND_CRED = /\b(MD|M\.D\.|PhD|Ph\.D\.|MBBS|DO|PharmD|MPH|MSc|RN|NP|PA-C|FAC
 const IND_HANDLE = /(^dr[_a-z]|_dr_|md$|_md|phd$|_phd)/i;
 const IND_FIRST_PERSON = /\b(I|I'm|my|mine|me)\b/;
 const IND_NAME_SHAPE = /^[\p{L}]+([ .'-][\p{L}]+){1,3}\.?$/u;
-const ORG_CAMEL = /^[A-Z][a-z]+[A-Z]/;
+// Fused CamelCase brand tokens ("OncoDaily", "OncLive") read organizational —
+// checked per display-name token so "OncoDaily Lung" scores too, with common
+// surname prefixes (McCollom, MacDonald, DiMaggio, ...) excluded.
+const ORG_CAMEL_TOKEN = /^(?!Mc|Mac|De|Di|Da|Du|La|Le|Van|Von|O')[A-Z][a-z]+[A-Z]/;
 
 export function classifyVoice(handle: string, profile: VoiceProfile | undefined): VoiceClass {
   const dn = (profile?.display_name ?? "").trim();
@@ -43,7 +46,7 @@ export function classifyVoice(handle: string, profile: VoiceProfile | undefined)
   if (ORG_BIO.test(bio)) org += 1;
   if (ORG_PLURAL.test(bio)) org += 1;
   if (ORG_HANDLE.test(handle) && !dnCred) org += 1;
-  if (ORG_CAMEL.test(dn) && !dn.includes(" ")) org += 1;
+  if (dn.split(/\s+/).some((t) => ORG_CAMEL_TOKEN.test(t))) org += 1;
   if (dnCred && !/\bMD Anderson\b/i.test(dn)) ind += 2;
   if (IND_CRED.test(bio)) ind += 2;
   if (IND_HANDLE.test(handle)) ind += 2;

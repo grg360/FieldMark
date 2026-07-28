@@ -1,4 +1,6 @@
-export type SocialConfidenceTier = "likely_hcp" | "possibly_hcp" | "unverified";
+// "organization" is assigned by classifyVoice BEFORE any bio-based HCP grading:
+// an institution is not a possible HCP, however clinical its bio vocabulary.
+export type SocialConfidenceTier = "likely_hcp" | "possibly_hcp" | "unverified" | "organization";
 export type SocialPlatform = "twitter" | "bluesky";
 export type DiscoveryMethod = "hashtag" | "reply";
 

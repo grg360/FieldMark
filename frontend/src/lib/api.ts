@@ -3002,7 +3002,12 @@ export async function getRisingVoices(
     )
     .eq("ta_slug", mvSlug)
     .not("engagement_per_follower", "is", null)
-    .gte("post_count", 4)
+    // Display gate (founder-picked from the measured distribution, 2026-07-28):
+    // >=10 posts in the 90-day window. Median across plotted individuals was 13;
+    // engagement-per-follower over a handful of posts is noise, and an account
+    // posting less than ~weekly isn't emerging. Same reasoning as Pulse's
+    // 20-count display gate. Leaves 111 of 181 individuals as of the decision.
+    .gte("post_count", 10)
     .gte("follower_count", 100)
     .gte("total_engagement", 20)
     .order("engagement_per_follower", { ascending: false })
@@ -3186,7 +3191,9 @@ function buildReplyNarrative(row: {
   const name = row.displayName || row.handle;
   const followers = row.followerCount.toLocaleString();
   let bioFraming = " Bio is sparse or non-clinical — verify before engaging.";
-  if (row.confidenceTier === "likely_hcp") {
+  if (row.confidenceTier === "organization") {
+    bioFraming = " Institutional account — HCP assessment does not apply.";
+  } else if (row.confidenceTier === "likely_hcp") {
     bioFraming = " Bio shows clinical credentials.";
   } else if (row.confidenceTier === "possibly_hcp") {
     bioFraming = " Bio shows clinical context but no explicit credential.";
@@ -3242,8 +3249,10 @@ function buildNarrative(row: {
   // Source signal
   parts.push(`. Captured via ${row.sourceHashtag}.`);
 
-  // Confidence framing
-  if (row.confidenceTier === "likely_hcp") {
+  // Confidence framing — never write a person-assessment about an institution.
+  if (row.confidenceTier === "organization") {
+    parts.push(" Institutional account — HCP assessment does not apply.");
+  } else if (row.confidenceTier === "likely_hcp") {
     parts.push(" Bio shows clinical credentials.");
   } else if (row.confidenceTier === "possibly_hcp") {
     parts.push(" Bio shows clinical context but no explicit credential.");
@@ -3285,7 +3294,16 @@ export async function getSocialCandidates(
   const candidates: SocialCandidateRow[] = (voiceData || []).map((v: any) => {
     const handle: string = v.handle;
     const bio: string = v.bio || "";
-    const confidenceTier = deriveConfidenceTier(bio);
+    // classifyVoice runs FIRST: institutional bios are saturated with clinical
+    // vocabulary, so grading them on it produced "POSSIBLY HCP" for Moffitt and
+    // ASCO. Organizations never proceed to HCP confidence assessment.
+    const isOrganization =
+      classifyVoice(handle, {
+        display_name: v.display_name ?? null,
+        bio: v.bio ?? null,
+        follower_count: v.follower_count ?? null,
+      }) === "org";
+    const confidenceTier: SocialConfidenceTier = isOrganization ? "organization" : deriveConfidenceTier(bio);
     const sourceHashtag = v.dominant_source_hashtag || "—";
     const followerCount: number = v.follower_count || 0;
     const totalEngagement: number = v.total_engagement || 0;

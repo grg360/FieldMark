@@ -5,7 +5,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
   Cell,
 } from "recharts";
@@ -36,55 +35,38 @@ function buildProfileUrl(p: ChartPoint): string {
     : `https://twitter.com/${p.handle}`;
 }
 
-function CustomTooltip({ active, payload }: any) {
-  if (!active || !payload || !payload.length) return null;
-  const p: ChartPoint = payload[0].payload;
-  const url = buildProfileUrl(p);
-  const platformLabel = (p.platform || "twitter").toLowerCase() === "bluesky" ? "Bluesky" : "Twitter";
+// Stationary detail panel — replaces the cursor-following tooltip. 181 points
+// cluster tightly on the log-log scatter, so a floating card fired overlapping
+// tooltips that flew with every cursor move. Same content, fixed position
+// beneath the chart; updates on hover, locks on click. No jitter, no point
+// displacement — position is data and stays truthful.
+function DetailPanel({ point, pinned }: { point: ChartPoint | null; pinned: boolean }) {
+  if (!point) {
+    return (
+      <div className="rv-detail-panel" style={{ borderTop: "1px solid #2A2A2E", marginTop: 12, paddingTop: 12, minHeight: 64, display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: "#6B6A65" }}>Hover a point for details — click to pin it here.</span>
+      </div>
+    );
+  }
+  const url = buildProfileUrl(point);
+  const platformLabel = (point.platform || "twitter").toLowerCase() === "bluesky" ? "Bluesky" : "Twitter";
   return (
-    <div
-      style={{
-        backgroundColor: "#111113",
-        border: "1px solid #E8A020",
-        borderRadius: 4,
-        padding: "10px 12px",
-        fontFamily: "system-ui, sans-serif",
-        maxWidth: 260,
-        pointerEvents: "auto",
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div style={{ fontSize: 13, fontWeight: 500, color: "#E8E6DF", marginBottom: 4 }}>
-        {p.displayName || p.handle}
+    <div className="rv-detail-panel" style={{ borderTop: "1px solid #2A2A2E", marginTop: 12, paddingTop: 12, minHeight: 64, display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+      <div style={{ minWidth: 180 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "#E8E6DF" }}>
+          {point.displayName || point.handle}
+          {pinned && <span style={{ fontSize: 9, color: "#E8A020", marginLeft: 8, letterSpacing: "0.08em" }}>PINNED</span>}
+        </div>
+        <div style={{ fontSize: 11, color: "#8A8884", fontFamily: "monospace", marginTop: 2 }}>@{point.handle}</div>
       </div>
-      <div style={{ fontSize: 11, color: "#8A8884", marginBottom: 8, fontFamily: "monospace" }}>
-        @{p.handle}
+      <div style={{ display: "flex", gap: 20, fontSize: 11, color: "#B8B4AC" }}>
+        <div><div style={{ color: "#6B6A65", fontSize: 10 }}>FOLLOWERS</div>{point.followerCount.toLocaleString()}</div>
+        <div><div style={{ color: "#6B6A65", fontSize: 10 }}>POSTS</div>{point.postCount}</div>
+        <div><div style={{ color: "#6B6A65", fontSize: 10 }}>ENGAGEMENT</div>{point.totalEngagement.toLocaleString()}</div>
+        <div><div style={{ color: "#6B6A65", fontSize: 10 }}>ENG/FOLLOWER</div>{(point.engagementPerFollower * 100).toFixed(2)}%</div>
       </div>
-      <div style={{ fontSize: 11, color: "#B8B4AC", lineHeight: 1.5 }}>
-        <div>Followers: {p.followerCount.toLocaleString()}</div>
-        <div>Posts: {p.postCount}</div>
-        <div>Engagement: {p.totalEngagement.toLocaleString()}</div>
-        <div>Eng/follower: {(p.engagementPerFollower * 100).toFixed(2)}%</div>
-      </div>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          display: "inline-block",
-          marginTop: 10,
-          padding: "6px 10px",
-          fontSize: 11,
-          fontWeight: 500,
-          color: "#E8A020",
-          background: "transparent",
-          border: "1px solid #E8A020",
-          borderRadius: 3,
-          textDecoration: "none",
-          cursor: "pointer",
-        }}
-      >
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        style={{ marginLeft: "auto", padding: "6px 10px", fontSize: 11, fontWeight: 500, color: "#E8A020", background: "transparent", border: "1px solid #E8A020", borderRadius: 3, textDecoration: "none", cursor: "pointer", whiteSpace: "nowrap" }}>
         View on {platformLabel} ↗
       </a>
     </div>
@@ -102,6 +84,9 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pinnedPoint, setPinnedPoint] = useState<ChartPoint | null>(null);
+  // Last-hovered point stays displayed after the cursor leaves — a stationary
+  // panel going blank on mouse-out would flicker just as badly as the tooltip.
+  const [hoveredPoint, setHoveredPoint] = useState<ChartPoint | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +117,8 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
           hcpMatched: r.hcp_matched,
         }));
       setPoints(mapped);
+      setHoveredPoint(null);
+      setPinnedPoint(null);
       setLoading(false);
     });
 
@@ -145,8 +132,8 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
     function handleOutsideClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
       // Don't unpin if clicking the tooltip itself or its children
-      const tooltipEl = target.closest(".recharts-tooltip-wrapper");
-      if (tooltipEl) return;
+      const panelEl = target.closest(".rv-detail-panel");
+      if (panelEl) return;
       // Don't unpin if clicking a chart dot (that triggers a new pin)
       const dotEl = target.closest(".recharts-symbols");
       if (dotEl) return;
@@ -184,7 +171,7 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
         </span>
       </div>
       <div style={{ fontSize: 12, color: "#8A8884", marginBottom: 12, lineHeight: 1.4 }}>
-        Engagement-per-follower vs. follower count. Upper-left = small audience, high engagement. Click any dot to open profile.
+        Engagement-per-follower vs. follower count, individuals with ≥10 posts in the window. Upper-left = small audience, high engagement. Hover a dot for details below; click to pin.
       </div>
 
       {/* Legend */}
@@ -278,13 +265,6 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
                   style: { textAnchor: "middle" },
                 }}
               />
-              <Tooltip
-                content={<CustomTooltip />}
-                cursor={{ strokeDasharray: "3 3" }}
-                wrapperStyle={{ pointerEvents: "auto", outline: "none" }}
-                active={pinnedPoint !== null ? true : undefined}
-                payload={pinnedPoint ? [{ payload: pinnedPoint }] : undefined}
-              />
               <Scatter
                 name="Voices"
                 data={points}
@@ -294,7 +274,7 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
                   const { cx, cy, payload } = props;
                   const color = getDotColor(payload);
                   return (
-                    <g style={{ cursor: "pointer" }}>
+                    <g style={{ cursor: "pointer" }} onMouseEnter={() => setHoveredPoint(payload)}>
                       <circle
                         cx={cx}
                         cy={cy}
@@ -318,6 +298,9 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
             </ScatterChart>
           </ResponsiveContainer>
         </div>
+      )}
+      {!loading && !error && points.length > 0 && (
+        <DetailPanel point={pinnedPoint ?? hoveredPoint} pinned={pinnedPoint !== null} />
       )}
     </div>
   );

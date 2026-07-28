@@ -12,12 +12,15 @@ function formatFollowerCount(n: number): string {
 }
 
 function getConfidenceTierLabel(tier: string): string {
+  if (tier === "organization") return "Organization";
   if (tier === "likely_hcp") return "Likely HCP";
   if (tier === "possibly_hcp") return "Possibly HCP";
   return "Unverified";
 }
 
 function getConfidenceTierColors(tier: string): { bg: string; fg: string } {
+  // Organization: neutral, no HCP-confidence claim — a class, not a grade.
+  if (tier === "organization") return { bg: "#1A1A1C", fg: "#8A8884" };
   if (tier === "likely_hcp") return { bg: "#0F1A24", fg: "#6BA3D8" };
   if (tier === "possibly_hcp") return { bg: "#1F1A0A", fg: "#C49A4A" };
   return { bg: "#1A1A1C", fg: "#6B6A65" };
