@@ -6836,3 +6836,29 @@ classification lapsed for these). Founder wants to understand WHY before decidin
 Do NOT patch in display; the congress page now honestly shows them unchipped in the
 not-currently-in-a-cohort group until this is resolved. Investigate cohort_classification writers
 (scripts/classify/cohort_classification_v2.py) vs established ranks coverage.
+
+**RESOLVED July 28 (same day) - #2 was the wrong table, not a data gap.**
+hcps_v2.cohort_classification is a stale denormalized column (73.6% null across the 3,178 US
+Established board, last bulk-written 2026-07-24, no maintainer found). The authoritative source is
+hcp_cohort_classification_v2 (written by scripts/classify/cohort_classification_v2.py; complete
+coverage, zero null; per-TA career-structure taxonomy: established / rising_eligible / too_young /
+community). Congress detail page repointed to it (join hcp_id + therapeutic_area_id); all 18
+resolve to established; the no-chip band empties.
+
+TAXONOMY WARNING for anyone touching this next: career structure != board membership.
+Measured July 28 (NSCLC): rising board 1,588 = 965 established + 618 rising_eligible + 4 missing +
+1 community; est board (US) 3,178 = 3,170 established + 8 community; all 122 board-overlap HCPs are
+career-established. rising_eligible means eligible for rising evaluation, NOT on the rising board.
+Display rule adopted: v2 cohort picks the rank table (established -> est rank, rising_eligible ->
+rising rank), no chip otherwise. Consequence: the 4 dual-rank presenters (Le, Skoulidis, Goldberg,
+Elamin) read EST, not RISING.
+
+Follow-up #1 above (api.ts collaborator blocks) should route through hcp_cohort_classification_v2,
+NOT hcps_v2.cohort_classification. Full inventory of stale-column readers: see the July 28
+"stale cohort_classification readers" sweep in the session report / commit message - notable:
+searchHCPs community-gate post-filter (api.ts ~:2605) keys the gate on the stale column (73.6%
+null -> gate mostly dormant); getHCPById deep-link path (api.ts ~:1529) drives DetailScreen
+"Unclassified" banners off it; established/community/rising scoring scripts SELECT their input
+population from it (board drift risk on re-run); generate-brief and generate-hcp-synthesis Edge
+Functions feed it to prompts; us_institution_state_lookup.sql uses IS NULL as a "publication HCP"
+proxy. Each needs its own pass; none changed yet.

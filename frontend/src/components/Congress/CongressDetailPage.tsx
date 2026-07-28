@@ -15,6 +15,8 @@ import { getCongressSocial, meetsThreshold, SOCIAL_THRESHOLD, type CongressSocia
 
 const TA_SLUG = "nsclc";
 const TA_LABEL = "Oncology";
+// NSCLC TA UUID (mirrors lib/api.ts TA_ID_MAP.nsclc, which is module-private).
+const TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d";
 const INT = new Intl.NumberFormat("en-US");
 const mono = (size: number, color = COLOR.ink3): React.CSSProperties => ({
   fontFamily: FONT.mono, fontSize: size, color, letterSpacing: "0.04em",
@@ -27,7 +29,10 @@ interface PresenterAbstract { title: string; session_type: string; date: string 
 interface ConfirmedPresenter {
   speaker_key: string; name: string; hcp_id: string;
   established_rank: number | null; rising_rank: number | null;
-  cohort: string | null; // hcps_v2.cohort_classification — the exclusive assignment
+  // hcp_cohort_classification_v2.cohort — the authoritative per-TA career-structure
+  // taxonomy (established / rising_eligible / too_young / community). NOT
+  // hcps_v2.cohort_classification, which is stale-denormalized (73.6% null).
+  cohort: string | null;
   institution: string | null; abstracts: PresenterAbstract[];
 }
 
@@ -45,13 +50,16 @@ function fmtSessionDate(iso: string | null): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) +
     " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
-// Cohort assignment is exclusive (hcps_v2.cohort_classification) but the rank
-// tables overlap — every HCP in both tables is classified rising_star. The
-// displayed rank therefore comes from the assigned cohort's table only; a null
-// classification claims no rank and shows no chip, never a guess.
+// The classification picks which board rank an HCP may claim. Career structure
+// (hcp_cohort_classification_v2) and board membership (the two ranks tables) are
+// different constructs — the rising board is ~61% career-established HCPs, and
+// rising_eligible means eligible for rising evaluation, not on the board. So:
+// established -> the Established board rank; rising_eligible -> the Rising board
+// rank; anything else (community, too_young, no row) claims no rank and shows no
+// chip — these tables carry no community rank, and we never guess.
 function cohortRank(p: ConfirmedPresenter): number | null {
   if (p.cohort === "established") return p.established_rank;
-  if (p.cohort === "rising_star") return p.rising_rank;
+  if (p.cohort === "rising_eligible") return p.rising_rank;
   return null;
 }
 
@@ -210,11 +218,11 @@ function PresenterCard({ p }: { p: ConfirmedPresenter }) {
           <div style={{ ...mono(10.5, COLOR.ink5), marginTop: 4 }}>{p.institution ?? "—"}</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          {/* One chip only — the assigned cohort's. Dual chips were the bug. */}
+          {/* One chip only — the classification-matched board rank. Dual chips were the bug. */}
           {p.cohort === "established" && p.established_rank != null && (
             <span style={{ ...mono(9, COLOR.estGreen), border: `1px solid ${COLOR.estGreen}`, borderRadius: 3, padding: "3px 6px", fontWeight: 600, whiteSpace: "nowrap" }}>EST #{p.established_rank}</span>
           )}
-          {p.cohort === "rising_star" && p.rising_rank != null && (
+          {p.cohort === "rising_eligible" && p.rising_rank != null && (
             <span style={{ ...mono(9, COLOR.indigoLink), border: `1px solid ${COLOR.indigo}`, borderRadius: 3, padding: "3px 6px", fontWeight: 600, whiteSpace: "nowrap" }}>RISING #{p.rising_rank}</span>
           )}
         </div>
@@ -260,12 +268,18 @@ export default function CongressDetailPage() {
       const rows = (pres ?? []) as Array<{ speaker_key: string; speaker_display_name: string; hcp_id: string; established_rank: number | null; rising_rank: number | null }>;
       const keys = rows.map((r) => r.speaker_key);
       const ids = rows.map((r) => r.hcp_id);
-      const [{ data: abs }, { data: hcps }] = await Promise.all([
+      const [{ data: abs }, { data: hcps }, { data: cls }] = await Promise.all([
         keys.length
           ? supabase.from("congress_abstracts").select("speaker_key, presentation_title, session_type, presentation_start").eq("congress_slug", congress.slug).in("speaker_key", keys)
           : Promise.resolve({ data: [] as never[] }),
         ids.length
-          ? supabase.from("hcps_v2").select("id, institution_canonical, cohort_classification").in("id", ids)
+          ? supabase.from("hcps_v2").select("id, institution_canonical").in("id", ids)
+          : Promise.resolve({ data: [] as never[] }),
+        // Authoritative cohort: hcp_cohort_classification_v2 (per-TA career
+        // structure, complete coverage) — NOT hcps_v2.cohort_classification,
+        // which is stale-denormalized and 73.6% null on the US Established board.
+        ids.length
+          ? supabase.from("hcp_cohort_classification_v2").select("hcp_id, cohort").eq("therapeutic_area_id", TA_ID).in("hcp_id", ids)
           : Promise.resolve({ data: [] as never[] }),
       ]);
       const absByKey = new Map<string, PresenterAbstract[]>();
@@ -273,12 +287,13 @@ export default function CongressDetailPage() {
         (absByKey.get(a.speaker_key) ?? absByKey.set(a.speaker_key, []).get(a.speaker_key)!)
           .push({ title: a.presentation_title, session_type: a.session_type, date: a.presentation_start });
       }
-      const hcpById = new Map((((hcps ?? []) as Array<{ id: string; institution_canonical: string | null; cohort_classification: string | null }>)).map((h) => [String(h.id), h]));
+      const instById = new Map((((hcps ?? []) as Array<{ id: string; institution_canonical: string | null }>)).map((h) => [String(h.id), h.institution_canonical]));
+      const cohortById = new Map((((cls ?? []) as Array<{ hcp_id: string; cohort: string }>)).map((r) => [String(r.hcp_id), r.cohort]));
       const built: ConfirmedPresenter[] = rows.map((r) => ({
         speaker_key: r.speaker_key, name: r.speaker_display_name, hcp_id: String(r.hcp_id),
         established_rank: r.established_rank, rising_rank: r.rising_rank,
-        cohort: hcpById.get(String(r.hcp_id))?.cohort_classification ?? null,
-        institution: hcpById.get(String(r.hcp_id))?.institution_canonical ?? null,
+        cohort: cohortById.get(String(r.hcp_id)) ?? null,
+        institution: instById.get(String(r.hcp_id)) ?? null,
         abstracts: absByKey.get(r.speaker_key) ?? [],
       })).sort((a, b) => (cohortRank(a) ?? 99999) - (cohortRank(b) ?? 99999));
 
@@ -541,7 +556,7 @@ export default function CongressDetailPage() {
               return (
                 <div style={{ marginBottom: 18 }}>
                   <div style={{ ...mono(9.5, COLOR.ink5), letterSpacing: "0.14em", fontWeight: 600, marginBottom: 9, paddingBottom: 6, borderBottom: `1px solid ${COLOR.hair}` }}>
-                    TRACKED · NOT CURRENTLY IN A COHORT <span style={{ color: COLOR.ink5 }}>· {unclassified.length}</span>
+                    TRACKED · NO BOARD RANK IN THEIR COHORT <span style={{ color: COLOR.ink5 }}>· {unclassified.length}</span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                     {unclassified.map((p) => <PresenterCard key={p.speaker_key} p={p} />)}
