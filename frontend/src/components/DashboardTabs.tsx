@@ -58,15 +58,16 @@ export default function DashboardTabs() {
         msOverflowStyle: "none",
       }}
     >
-      {/* Pulse — a literature view, NOT a cohort. It deliberately reads different
-          from the cohort chips: amber accent + waveform glyph + trailing divider,
-          and it never takes the indigo active state (clicking navigates to the
-          standalone TA-scoped /pulse/:ta page rather than filtering this feed).
-          Pulse is per-TA: the chip only renders when the current indication has
-          a payload in PULSE_BY_TA, so TAs without a Pulse (e.g. AD) never get a
-          dead-end link. */}
+      {/* Pulse & Congress — navigation links, NOT cohorts. They deliberately read
+          different from the cohort chips: amber accent + glyph + a divider before
+          the chips, and they never take the indigo active state (clicking
+          navigates away rather than filtering this feed).
+          Pulse is per-TA: it only renders when the current indication has a
+          payload in PULSE_BY_TA, so TAs without a Pulse (e.g. AD) never get a
+          dead-end link. Congress is NOT TA-scoped — the calendar shows all
+          congresses with TA relevance as a column — so it always renders and
+          routes to /congress with no :ta param. */}
       {PULSE_BY_TA[route.indicationSlug] ? (
-        <>
       <button
         role="tab"
         aria-selected={false}
@@ -101,6 +102,39 @@ export default function DashboardTabs() {
         </svg>
         Pulse
       </button>
+      ) : null}
+      <button
+        role="tab"
+        aria-selected={false}
+        onClick={() => navigate("/congress")}
+        style={{
+          flex: "0 0 auto",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "8px 14px",
+          minHeight: 36,
+          backgroundColor: "transparent",
+          border: "1px solid rgba(232,160,32,0.35)",
+          borderRadius: 6,
+          color: COLOR.amber,
+          fontWeight: 400,
+          fontSize: 12,
+          fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+          transition: "background-color 120ms, color 120ms, border-color 120ms",
+        }}
+      >
+        {/* calendar glyph */}
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+          <rect x="1" y="2.5" width="10" height="8.5" rx="1" stroke={COLOR.amber} strokeWidth="1.2" />
+          <line x1="1" y1="5.2" x2="11" y2="5.2" stroke={COLOR.amber} strokeWidth="1.2" />
+          <line x1="3.5" y1="1" x2="3.5" y2="3" stroke={COLOR.amber} strokeWidth="1.2" strokeLinecap="round" />
+          <line x1="8.5" y1="1" x2="8.5" y2="3" stroke={COLOR.amber} strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        Congress
+      </button>
       <span
         aria-hidden
         style={{
@@ -110,8 +144,6 @@ export default function DashboardTabs() {
           backgroundColor: COLOR.hairStrong,
         }}
       />
-        </>
-      ) : null}
       {DASHBOARDS.map((t) => {
         const active = t.value === track;
 
