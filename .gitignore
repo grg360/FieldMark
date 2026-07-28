@@ -67,3 +67,5 @@ frontend_dump.md
 merge_rerun.log
 ctgov_silverberg_probe.py
 *.log
+*checkpoint*.json
+*aggregator_log*.json
