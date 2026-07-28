@@ -1,6 +1,7 @@
 import type { PublicationListRow } from "../../lib/publicationsList";
 import { formatByline } from "../../lib/authorByline";
 import { COLOR, ELEVATION, FONT } from "../../lib/designTokens";
+import DiscussAffordance from "../FieldIntelligenceForum/DiscussAffordance";
 
 interface Props {
   pub: PublicationListRow;
@@ -92,6 +93,9 @@ export default function PublicationCard({ pub }: Props) {
           </a>
         ) : null}
       </div>
+
+      {/* Field Intelligence discuss affordance — the only way to open a thread. */}
+      <DiscussAffordance pmid={pub.pmid} />
     </div>
   );
 }
