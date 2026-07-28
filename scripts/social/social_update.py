@@ -45,10 +45,15 @@ def init_supabase() -> Client:
     return create_client(get_required_env("SUPABASE_URL"), get_required_env("SUPABASE_KEY"))
 
 
-def load_hashtag_ta_map() -> Dict[str, str]:
-    """Read social_capture_config.json and build a hashtag -> therapeutic_area map.
+def load_hashtag_ta_map() -> tuple[Dict[str, str], Dict[str, str]]:
+    """Read social_capture_config.json and build query -> therapeutic_area maps.
 
-    Returns lowercase hashtag -> TA slug, e.g. {'#asco26': 'oncology', '#easl2026': 'hepatology'}.
+    Returns (hashtag_map, topic_map):
+      hashtag_map — lowercase hashtag -> TA slug, e.g. {'#asco26': 'oncology'}.
+      topic_map — topic query text (config case, as stored in
+        captured_via_query) -> TA slug. Topic-query posts were previously never
+        TA-tagged: the map was hashtag-only, so their rows stayed
+        therapeutic_areas NULL and invisible to the TA-scoped social views.
     """
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(f"Config not found: {CONFIG_PATH}")
@@ -57,7 +62,6 @@ def load_hashtag_ta_map() -> Dict[str, str]:
         config = json.load(f)
 
     mapping: Dict[str, str] = {}
-
     twitter_tags = config.get("twitter", {}).get("active_hashtags", [])
     for entry in twitter_tags:
         tag = entry.get("tag", "").lower().strip()
@@ -65,7 +69,14 @@ def load_hashtag_ta_map() -> Dict[str, str]:
         if tag and ta:
             mapping[tag] = ta
 
-    return mapping
+    topic_mapping: Dict[str, str] = {}
+    for entry in config.get("twitter", {}).get("topic_queries", []):
+        q = str(entry.get("query", "")).strip()
+        ta = str(entry.get("therapeutic_area", "")).strip()
+        if q and ta:
+            topic_mapping[q] = ta
+
+    return mapping, topic_mapping
 
 
 def run_capture(args: argparse.Namespace) -> int:
@@ -130,7 +141,11 @@ def run_reply_capture(args: argparse.Namespace, t0_epoch: float) -> int:
     return result.returncode
 
 
-def backfill_ta_tags(client: Client, hashtag_ta_map: Dict[str, str]) -> Dict[str, int]:
+def backfill_ta_tags(
+    client: Client,
+    hashtag_ta_map: Dict[str, str],
+    topic_ta_map: Dict[str, str] | None = None,
+) -> Dict[str, int]:
     """Tag any NULL therapeutic_areas rows in social_posts_v2 based on captured_via_query.
 
     Returns a dict of {ta_slug: rows_updated}.
@@ -140,6 +155,19 @@ def backfill_ta_tags(client: Client, hashtag_ta_map: Dict[str, str]) -> Dict[str
         ta_to_hashtags.setdefault(ta, []).append(tag)
 
     results: Dict[str, int] = {}
+
+    # Topic-query posts: captured_via_query stores the exact config query text
+    # (parens/quotes make it unsafe for the or_/ilike list below), so match each
+    # with a plain eq — same source string, so case always agrees.
+    for q, ta in (topic_ta_map or {}).items():
+        resp = (
+            client.table("social_posts_v2")
+            .update({"therapeutic_areas": [ta]})
+            .eq("captured_via_query", q)
+            .is_("therapeutic_areas", "null")
+            .execute()
+        )
+        results[ta] = results.get(ta, 0) + len(resp.data or [])
 
     for ta, hashtags in ta_to_hashtags.items():
         # Case-insensitive match: captured_via_query stores the config's original
@@ -156,7 +184,7 @@ def backfill_ta_tags(client: Client, hashtag_ta_map: Dict[str, str]) -> Dict[str
             .is_("therapeutic_areas", "null")
             .execute()
         )
-        results[ta] = len(resp.data or [])
+        results[ta] = results.get(ta, 0) + len(resp.data or [])
 
     return results
 
@@ -267,15 +295,15 @@ def main() -> int:
 
     # ASCII-only console output: Windows cp1252 consoles crash on U+2192 etc.
     print("\n[tag] Loading hashtag -> TA map from social_capture_config.json...")
-    hashtag_ta_map = load_hashtag_ta_map()
-    print(f"[tag] Map loaded: {len(hashtag_ta_map)} hashtags across {len(set(hashtag_ta_map.values()))} TAs")
+    hashtag_ta_map, topic_ta_map = load_hashtag_ta_map()
+    print(f"[tag] Map loaded: {len(hashtag_ta_map)} hashtags + {len(topic_ta_map)} topic queries across {len(set(hashtag_ta_map.values()) | set(topic_ta_map.values()))} TAs")
 
     if args.dry_run:
         print("[tag] Dry run - skipping TA backfill (no DB writes)")
         backfill_results: Dict[str, int] = {}
     else:
         print("[tag] Running TA backfill on social_posts_v2...")
-        backfill_results = backfill_ta_tags(client, hashtag_ta_map)
+        backfill_results = backfill_ta_tags(client, hashtag_ta_map, topic_ta_map)
 
     if args.dry_run:
         print("[refresh] Dry run - skipping view refresh")

@@ -136,6 +136,20 @@
         "rationale": "Small cell lung cancer disease-specific tag"
       },
       {
+        "tag": "#nsclc",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "NSCLC disease-specific tag - the core TA conversation"
+      },
+      {
+        "tag": "#lungcancer",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Lung cancer disease-specific tag (broad umbrella)"
+      },
+      {
         "tag": "#melanoma",
         "min_faves": 3,
         "active_until": null,

@@ -699,6 +699,43 @@ def run_single_tag(
     return stats
 
 
+def run_single_topic(
+    client: Client,
+    config: Dict[str, Any],
+    needle: str,
+    dry_run: bool,
+    max_results: int,
+) -> CaptureStats:
+    """Capture only one configured topic query via --topic-query (substring match).
+
+    Unlike --tag there is no ad-hoc fallback: topic queries carry their own
+    min_faves thresholds and must come from config."""
+    stats = CaptureStats()
+    checkpoint = load_checkpoint(CHECKPOINT_PATH)
+
+    target = None
+    for item in iter_topic_queries(config):
+        if needle.lower() in str(item.get("captured_via_query", "")).lower():
+            target = item
+            break
+    if target is None:
+        raise ValueError(f"No configured topic query matches {needle!r} (see twitter.topic_queries).")
+
+    run_capture_for_query(
+        client=client,
+        query=target["query"],
+        query_key=target["query_key"],
+        captured_via_query=target["captured_via_query"],
+        discovery_source="hashtag_capture",
+        checkpoint=checkpoint,
+        stats=stats,
+        dry_run=dry_run,
+        max_results=max_results,
+        checkpoint_namespace="queries",
+    )
+    return stats
+
+
 def run_all(client: Client, config: Dict[str, Any], dry_run: bool, max_results: int) -> CaptureStats:
     """Capture all active hashtags + topic queries via --all."""
     stats = CaptureStats()
@@ -839,6 +876,12 @@ def main() -> None:
     load_dotenv()
     parser = argparse.ArgumentParser(description="Twitter/X social capture (architecture outline).")
     parser.add_argument("--tag", type=str, default=None, help="Single hashtag to capture, e.g. #ASCO2026")
+    parser.add_argument(
+        "--topic-query",
+        type=str,
+        default=None,
+        help="Single configured topic query to capture, matched by substring (e.g. NSCLC). Must exist in config twitter.topic_queries.",
+    )
     parser.add_argument("--all", action="store_true", help="Capture all active hashtags and topic queries")
     parser.add_argument(
         "--profile",
@@ -884,15 +927,23 @@ def main() -> None:
         print("Twitter capture disabled by config: twitter.enabled=false")
         return
 
-    mode_flags = [bool(args.tag), bool(args.all), bool(args.profile), bool(args.capture_replies)]
+    mode_flags = [bool(args.tag), bool(args.topic_query), bool(args.all), bool(args.profile), bool(args.capture_replies)]
     if sum(mode_flags) != 1:
-        raise ValueError("Specify exactly one mode: --tag, --all, --profile, or --capture-replies.")
+        raise ValueError("Specify exactly one mode: --tag, --topic-query, --all, --profile, or --capture-replies.")
 
     client = get_supabase_client()
     if args.capture_replies:
         stats = run_capture_replies(
             client,
             args,
+            dry_run=args.dry_run,
+            max_results=args.max_results,
+        )
+    elif args.topic_query:
+        stats = run_single_topic(
+            client,
+            config,
+            args.topic_query,
             dry_run=args.dry_run,
             max_results=args.max_results,
         )
