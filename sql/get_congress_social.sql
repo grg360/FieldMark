@@ -21,7 +21,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $function$
 WITH posts AS (
-  SELECT posted_at, handle
+  SELECT posted_at, handle, display_name, hashtags
   FROM social_posts_v2
   WHERE hashtags && p_hashtags
 ),
@@ -58,7 +58,26 @@ SELECT CASE WHEN (SELECT total FROM bounds) = 0 THEN NULL ELSE jsonb_build_objec
   'wow_pct', CASE WHEN (SELECT prior7 FROM wow) > 0
                   THEN round(100.0 * ((SELECT last7 FROM wow) - (SELECT prior7 FROM wow)) / (SELECT prior7 FROM wow))
                   ELSE NULL END,
-  'daily', (SELECT jsonb_agg(jsonb_build_object('d', d, 'n', n) ORDER BY d) FROM daily)
+  'daily', (SELECT jsonb_agg(jsonb_build_object('d', d, 'n', n) ORDER BY d) FROM daily),
+  -- Top voices (engagement not modelled yet — ranked by post volume, share of total).
+  'top_voices', (
+    SELECT jsonb_agg(jsonb_build_object('handle', handle, 'name', dn, 'posts', n, 'share', share) ORDER BY n DESC)
+    FROM (
+      SELECT handle, mode() WITHIN GROUP (ORDER BY display_name) AS dn, count(*) AS n,
+             round(100.0 * count(*) / nullif((SELECT total FROM bounds), 0)) AS share
+      FROM posts GROUP BY handle ORDER BY count(*) DESC LIMIT 8
+    ) v
+  ),
+  -- Topic share via co-occurring hashtags (the congress's own tags excluded).
+  'hot_hashtags', (
+    SELECT jsonb_agg(jsonb_build_object('tag', tag, 'posts', n, 'share', share) ORDER BY n DESC)
+    FROM (
+      SELECT tag, count(*) AS n, round(100.0 * count(*) / nullif((SELECT total FROM bounds), 0)) AS share
+      FROM (SELECT unnest(hashtags) AS tag FROM posts) u
+      WHERE tag <> ALL(p_hashtags)
+      GROUP BY tag ORDER BY count(*) DESC LIMIT 8
+    ) h
+  )
 ) END
 $function$;
 

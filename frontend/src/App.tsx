@@ -99,6 +99,7 @@ import type { CohortFeedResult, HCPDetailResponse, RisingStar } from "./lib/type
 import DemoPage from "./pages/DemoPage";
 import PulsePage from "./components/Pulse/PulsePage";
 import CongressCalendarPage from "./components/Congress/CongressCalendarPage";
+import CongressDetailPage from "./components/Congress/CongressDetailPage";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
@@ -1355,6 +1356,7 @@ export default function App() {
           <Route path="/me/watchlists/:watchlistId" element={<WatchlistsPage />} />
           <Route path="/me/follow-ups" element={<FollowUpsPage />} />
           <Route path="/congress" element={<CongressCalendarPage />} />
+          <Route path="/congress/:slug" element={<CongressDetailPage />} />
           <Route path="/" element={<FeedLayout />} />
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />

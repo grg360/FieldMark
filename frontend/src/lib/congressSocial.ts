@@ -12,6 +12,19 @@ import type { Congress } from "./congresses";
 
 export const SOCIAL_THRESHOLD = { posts: 250, accounts: 40 } as const;
 
+export interface CongressVoice {
+  handle: string;
+  name: string;
+  posts: number;
+  share: number; // % of total posts
+}
+
+export interface CongressHashtag {
+  tag: string;
+  posts: number;
+  share: number; // % of total posts carrying this co-hashtag
+}
+
 export interface CongressSocial {
   total_posts: number;
   voices: number;
@@ -19,6 +32,8 @@ export interface CongressSocial {
   last_day: string;
   wow_pct: number | null;
   daily: { d: string; n: number }[];
+  top_voices: CongressVoice[];
+  hot_hashtags: CongressHashtag[];
 }
 
 export function meetsThreshold(s: CongressSocial): boolean {

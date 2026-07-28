@@ -25,7 +25,7 @@ order.
 | `get_pulse_synthesis_facts.sql` | `get_pulse_synthesis_facts(text)` — the allowed current-window fact set (per-theme counts/share/composition, totals, window, events) handed to the Pulse TA-synthesis model; excluded fields (prior, movement, monthly, lifetime) never leave the DB. |
 | `pulse_ai_synthesis.sql` | Cache table for the Pulse TA-level AI synthesis paragraph, keyed on `(ta_slug, window_start, window_end)`; written by the `generate-pulse-synthesis` Edge Function, read on page load. |
 | `congress_schema.sql` | Congress calendar tables — `congress_abstracts` (ASCO abstract **metadata only**; `AbstractBody` never stored) and `congress_confirmed_presenters` (speaker matched to exactly one NSCLC board HCP). Loaded by `scripts/congress/ingest_asco_abstracts.py`. |
-| `get_congress_social.sql` | `get_congress_social(text[], date)` — per-congress social aggregation over `social_posts_v2` by hashtag set (total posts, voices, WoW, observed-days daily series). SECURITY DEFINER; returns NULL when no posts. |
+| `get_congress_social.sql` | `get_congress_social(text[], date)` — per-congress social aggregation over `social_posts_v2` by hashtag set (total posts, voices, WoW, observed-days daily series, top voices by volume, co-occurring-hashtag topic share). SECURITY DEFINER; returns NULL when no posts. |
 
 Definitions were captured from the live database via `pg_get_functiondef`
 (2026-07-27) and verified to match what is deployed. If a function is changed
