@@ -274,19 +274,20 @@ def main() -> int:
 
     client = init_supabase()
 
-    print("\n[tag] Loading hashtag → TA map from social_capture_config.json...")
+    # ASCII-only console output: Windows cp1252 consoles crash on U+2192 etc.
+    print("\n[tag] Loading hashtag -> TA map from social_capture_config.json...")
     hashtag_ta_map = load_hashtag_ta_map()
     print(f"[tag] Map loaded: {len(hashtag_ta_map)} hashtags across {len(set(hashtag_ta_map.values()))} TAs")
 
     if args.dry_run:
-        print("[tag] Dry run — skipping TA backfill (no DB writes)")
+        print("[tag] Dry run - skipping TA backfill (no DB writes)")
         backfill_results: Dict[str, int] = {}
     else:
         print("[tag] Running TA backfill on social_posts_v2...")
         backfill_results = backfill_ta_tags(client, hashtag_ta_map)
 
     if args.dry_run:
-        print("[refresh] Dry run — skipping view refresh")
+        print("[refresh] Dry run - skipping view refresh")
         refresh_ok = False
     else:
         refresh_ok = refresh_views(client)

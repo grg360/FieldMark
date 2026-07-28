@@ -1,0 +1,301 @@
+{
+  "twitter": {
+    "enabled": true,
+    "active_hashtags": [
+      {
+        "tag": "#ASCO2026",
+        "min_faves": 5,
+        "active_until": "2026-06-15",
+        "therapeutic_area": "oncology",
+        "rationale": "ASCO 2026 May 29-June 2"
+      },
+      {
+        "tag": "#EASL2026",
+        "min_faves": 3,
+        "active_until": "2026-07-01",
+        "therapeutic_area": "hepatology",
+        "rationale": "EASL Congress June 17-20"
+      },
+      {
+        "tag": "#AASLD2026",
+        "min_faves": 3,
+        "active_until": "2026-12-15",
+        "therapeutic_area": "hepatology",
+        "rationale": "AASLD The Liver Meeting November"
+      },
+      {
+        "tag": "#ESMO2026",
+        "min_faves": 5,
+        "active_until": "2026-11-10",
+        "therapeutic_area": "oncology",
+        "rationale": "ESMO Congress Oct 23-27; tail capture through Nov 10"
+      },
+      {
+        "tag": "#ESMO26",
+        "min_faves": 5,
+        "active_until": "2026-11-10",
+        "therapeutic_area": "oncology",
+        "rationale": "ESMO 2026 - 2-digit year variant"
+      },
+      {
+        "tag": "#ASCO26",
+        "min_faves": 5,
+        "active_until": "2026-06-15",
+        "therapeutic_area": "oncology",
+        "rationale": "ASCO 2026 - 2-digit year variant"
+      },
+      {
+        "tag": "#lcsm",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Lung Cancer Social Media community - major MSL-relevant signal"
+      },
+      {
+        "tag": "#bcsm",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Breast Cancer Social Media community"
+      },
+      {
+        "tag": "#gynonc",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Gynecologic Oncology community"
+      },
+      {
+        "tag": "#oncodaily",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Active oncology community/publication"
+      },
+      {
+        "tag": "#livertwitter",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "hepatology",
+        "rationale": "Active hepatology community tag"
+      },
+      {
+        "tag": "#mmsm",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Multiple Myeloma Social Media community"
+      },
+      {
+        "tag": "#gyncsm",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Gynecologic Cancer Social Media community (more active than #gynonc)"
+      },
+      {
+        "tag": "#kidneycancer",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Kidney cancer disease-specific tag"
+      },
+      {
+        "tag": "#prostatecancer",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Prostate cancer disease-specific tag"
+      },
+      {
+        "tag": "#bladdercancer",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Bladder cancer disease-specific tag"
+      },
+      {
+        "tag": "#colorectalcancer",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Colorectal cancer disease-specific tag"
+      },
+      {
+        "tag": "#multiplemyeloma",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Multiple myeloma disease-specific tag"
+      },
+      {
+        "tag": "#sclc",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Small cell lung cancer disease-specific tag"
+      },
+      {
+        "tag": "#melanoma",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Melanoma disease-specific tag"
+      },
+      {
+        "tag": "#ctdna",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Circulating tumor DNA biomarker community"
+      },
+      {
+        "tag": "#liquidbiopsy",
+        "min_faves": 3,
+        "active_until": null,
+        "therapeutic_area": "oncology",
+        "rationale": "Liquid biopsy biomarker community"
+      },
+      {
+        "tag": "#eha2026",
+        "min_faves": 5,
+        "active_until": "2026-06-30",
+        "therapeutic_area": "oncology",
+        "rationale": "European Hematology Association Congress June 13-16, 2026"
+      },
+      {
+        "tag": "#WCLC26",
+        "min_faves": 3,
+        "active_until": "2026-09-30",
+        "therapeutic_area": "oncology",
+        "rationale": "WCLC 2026 Sep 12-15 - 2-digit year variant"
+      },
+      {
+        "tag": "#WCLC2026",
+        "min_faves": 3,
+        "active_until": "2026-09-30",
+        "therapeutic_area": "oncology",
+        "rationale": "WCLC 2026 Sep 12-15"
+      },
+      {
+        "tag": "#SITC26",
+        "min_faves": 3,
+        "active_until": "2026-11-20",
+        "therapeutic_area": "oncology",
+        "rationale": "SITC Annual Meeting Nov 4-8"
+      },
+      {
+        "tag": "#SABCS26",
+        "min_faves": 3,
+        "active_until": "2026-12-22",
+        "therapeutic_area": "oncology",
+        "rationale": "San Antonio Breast Cancer Symposium Dec 8-11"
+      },
+      {
+        "tag": "#ASH26",
+        "min_faves": 3,
+        "active_until": "2026-12-28",
+        "therapeutic_area": "oncology",
+        "rationale": "ASH Annual Meeting Dec 12-15"
+      }
+    ],
+    "topic_queries": [
+      {
+        "query": "(NSCLC OR \"non-small cell lung cancer\")",
+        "min_faves": 20,
+        "therapeutic_area": "oncology"
+      },
+      {
+        "query": "(MASLD OR NASH OR \"non-alcoholic steatohepatitis\")",
+        "min_faves": 10,
+        "therapeutic_area": "hepatology"
+      }
+    ]
+  },
+  "bluesky": {
+    "enabled": true,
+    "active_hashtags": [
+      "#medsky",
+      "#oncology",
+      "#hepatology",
+      "#nash",
+      "#raredisease"
+    ],
+    "feeds": []
+  },
+  "profiles": {
+    "ASCO": {
+      "primary_hashtags": [
+        "#ASCO26",
+        "#ASCO2026"
+      ],
+      "secondary_hashtags": [
+        "#lcsm",
+        "#bcsm",
+        "#mmsm",
+        "#gyncsm",
+        "#kidneycancer",
+        "#prostatecancer",
+        "#bladdercancer",
+        "#colorectalcancer",
+        "#multiplemyeloma",
+        "#sclc",
+        "#melanoma",
+        "#ctdna",
+        "#liquidbiopsy",
+        "#oncodaily"
+      ],
+      "description": "ASCO Annual Meeting (May-June). Captures conference hashtag plus oncology subspecialty communities."
+    },
+    "ESMO": {
+      "primary_hashtags": [
+        "#ESMO26",
+        "#ESMO2026"
+      ],
+      "secondary_hashtags": [
+        "#lcsm",
+        "#bcsm",
+        "#mmsm",
+        "#gyncsm",
+        "#kidneycancer",
+        "#prostatecancer",
+        "#bladdercancer",
+        "#colorectalcancer",
+        "#multiplemyeloma",
+        "#sclc",
+        "#melanoma",
+        "#ctdna",
+        "#liquidbiopsy",
+        "#oncodaily"
+      ],
+      "description": "ESMO Congress (September). Same secondary universe as ASCO; different primary tag."
+    },
+    "EASL": {
+      "primary_hashtags": [
+        "#EASL2026"
+      ],
+      "secondary_hashtags": [
+        "#livertwitter"
+      ],
+      "description": "EASL Congress (June). Hepatology focus."
+    },
+    "AASLD": {
+      "primary_hashtags": [
+        "#AASLD2026"
+      ],
+      "secondary_hashtags": [
+        "#livertwitter"
+      ],
+      "description": "AASLD The Liver Meeting (November). Hepatology focus."
+    },
+    "EHA": {
+      "primary_hashtags": [
+        "#eha2026"
+      ],
+      "secondary_hashtags": [
+        "#mmsm"
+      ],
+      "description": "European Hematology Association Congress (June). Heme focus."
+    }
+  }
+}
