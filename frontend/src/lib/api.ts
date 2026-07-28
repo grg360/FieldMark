@@ -3976,11 +3976,16 @@ export async function getInstitutionSummary(
         .from("hcps_v2")
         .select("id, first_name, last_name, country")
         .eq(institutionColumnForTa(taId), institutionName)
+        // Stable unique order: unordered .range() pagination overlaps across pages
+        // for institutions past one page, duplicating/skipping HCPs (see below).
+        .order("id", { ascending: true })
         .range(offset, offset + pageSize - 1),
   );
   if (!hcps) return null;
 
-  const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
+  // Dedupe defensively so total_investigators and the chunked rank counts can't
+  // double-count a duplicated id; .order("id") above is the real fix.
+  const hcpIds = Array.from(new Set((hcps as InstitutionHcpRow[]).map((h) => String(h.id))));
   if (hcpIds.length === 0) {
     return {
       institution_name: institutionName,
@@ -4106,11 +4111,15 @@ export async function getInstitutionLeaderboards(
         .from("hcps_v2")
         .select("id, first_name, last_name")
         .eq(institutionColumnForTa(taId), institutionName)
+        // Stable unique order so paginated .range() pages cannot overlap (dup HCPs).
+        .order("id", { ascending: true })
         .range(offset, offset + pageSize - 1),
   );
   if (!hcps || hcps.length === 0) return empty;
 
-  const hcpIds = (hcps as InstitutionHcpRow[]).map((h) => String(h.id));
+  // Dedupe defensively (matches getInstitutionCollaborations) so a duplicated id
+  // can't fan out across .in() chunks; .order("id") above is the real fix.
+  const hcpIds = Array.from(new Set((hcps as InstitutionHcpRow[]).map((h) => String(h.id))));
   const nameMap = new Map(
     (hcps as InstitutionHcpRow[]).map((h) => [
       String(h.id),
@@ -4283,6 +4292,8 @@ export async function getInstitutionCollaborations(
         .from("hcps_v2")
         .select("id, first_name, last_name")
         .eq(institutionColumn, institutionName)
+        // Stable unique order so paginated .range() pages cannot overlap (dup HCPs).
+        .order("id", { ascending: true })
         .range(offset, offset + pageSize - 1),
   );
   if (!hcps || hcps.length === 0) return [];
@@ -4370,11 +4381,15 @@ export async function getInstitutionExternalPartners(
         .from("hcps_v2")
         .select("id")
         .eq(sourceColumn, sourceInstitutionName)
+        // Stable unique order so paginated .range() pages cannot overlap (dup HCPs).
+        .order("id", { ascending: true })
         .range(offset, offset + pageSize - 1),
   );
   if (!sourceHcps || sourceHcps.length === 0) return [];
 
-  const sourceHcpIds = (sourceHcps as InstitutionHcpRow[]).map((h) => String(h.id));
+  // Dedupe defensively so a duplicated source id can't double-count collaborations;
+  // .order("id") above is the real fix.
+  const sourceHcpIds = Array.from(new Set((sourceHcps as InstitutionHcpRow[]).map((h) => String(h.id))));
   const sourceNameMap = new Map<string, string>();
 
   for (const chunk of chunkInstitutionHcpIds(sourceHcpIds)) {
