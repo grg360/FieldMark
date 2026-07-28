@@ -12,14 +12,13 @@ import {
   type Congress,
 } from "../../lib/congresses";
 import {
-  classifyVoice,
   getCongressSocial,
   meetsThreshold,
   SOCIAL_THRESHOLD,
   type CongressSocial,
   type CongressVoice,
-  type VoiceProfile,
 } from "../../lib/congressSocial";
+import { classifyVoice, type VoiceProfile } from "../../lib/voiceClassification";
 
 const TA_SLUG = "nsclc";
 const TA_LABEL = "Oncology";

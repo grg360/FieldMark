@@ -177,7 +177,7 @@ export default function RisingVoicesChart({ selectedTA }: RisingVoicesChartProps
             letterSpacing: "0.04em",
           }}
         >
-          Rising Voices — Last 30 days
+          Rising Voices — Last 90 days
         </span>
         <span style={{ fontSize: 10, color: "#6B6A65" }}>
           {loading ? "loading…" : `${points.length} voices`}

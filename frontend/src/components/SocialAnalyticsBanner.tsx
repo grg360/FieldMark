@@ -114,7 +114,7 @@ export default function SocialAnalyticsBanner({ selectedTA }: SocialAnalyticsBan
               textAlign: "center",
             }}
           >
-            Share of voice · engagement-weighted · last 30 days
+            Share of voice · engagement-weighted · last 90 days
           </div>
           {loading ? (
             <div style={{ fontSize: 11, color: "#6B6A65", textAlign: "center", padding: 20 }}>loading…</div>
@@ -194,7 +194,7 @@ export default function SocialAnalyticsBanner({ selectedTA }: SocialAnalyticsBan
               textAlign: "center",
             }}
           >
-            Hot topics · share of conversation · last 30 days
+            Hot topics · share of conversation · last 90 days
           </div>
           {loading ? (
             <div style={{ fontSize: 11, color: "#6B6A65", textAlign: "center", padding: 20 }}>loading…</div>

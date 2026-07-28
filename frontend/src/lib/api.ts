@@ -5,6 +5,7 @@ import { countriesForRegion, type RegionKey } from "./regions";
 import { resolveFilterScope } from "./rank-filters";
 import { institutionToSlug } from "./institutionUtils";
 import { supabase } from "./supabase";
+import { classifyVoice } from "./voiceClassification";
 import type { ResearchTheme } from "../types/researchTheme";
 import type { SocialCandidate, SocialConfidenceTier } from "../types/social";
 import type {
@@ -3010,7 +3011,20 @@ export async function getRisingVoices(
   if (error) {
     return { data: null, error };
   }
-  return { data: data as RisingVoiceRow[], error: null };
+
+  // Individuals only: this is a digital-opinion-leader view — Moffitt and
+  // OncLive aren't KOLs. A matched HCP is a person by definition; everything
+  // else goes through the shared classifier (lib/voiceClassification.ts).
+  const rows = (data as RisingVoiceRow[]).filter(
+    (r) =>
+      r.hcp_matched ||
+      classifyVoice(r.handle, {
+        display_name: r.display_name,
+        bio: r.bio,
+        follower_count: r.follower_count,
+      }) === "individual",
+  );
+  return { data: rows, error: null };
 }
 
 export interface ShareOfVoiceRow {
