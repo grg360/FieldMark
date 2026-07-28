@@ -3113,8 +3113,29 @@ export async function getSocialAnalytics(
 
 export type SocialCandidateRow = SocialCandidate;
 
-function deriveConfidenceTier(bio: string | null): SocialConfidenceTier {
-  if (!bio) return "unverified";
+// Explicit post-nominal credentials — strongest when in the display NAME (a
+// person asserting their own degree), also honored in the bio.
+const DISPLAY_NAME_CRED = /\b(M\.?D\.?|Ph\.?D\.?|D\.?O\.?|MBBS|Pharm\.?D\.?|FASCO|FACP|FRCP|FRCPC|DPhil|MRCP)\b/i;
+// Credential embedded in the handle (@marklewismd, @drrishabhonco) — a weaker
+// signal than a display-name credential: it never reaches "likely", only lifts
+// an otherwise-unverified account to "possibly".
+const HANDLE_CRED = /(^dr[_a-z0-9]|_dr(_|$)|md$|_md$|phd$|_phd$|mbbs$)/i;
+
+function deriveConfidenceTier(
+  bio: string | null,
+  displayName?: string | null,
+  handle?: string | null,
+): SocialConfidenceTier {
+  // A credential in the display name is an explicit self-asserted credential —
+  // "Mark Lewis, MD, FASCO" is a likely HCP regardless of bio wording. This runs
+  // before the bio checks because deriveConfidenceTier previously read bio only,
+  // grading credentialed clinicians "possibly" on bio vocabulary alone.
+  if (displayName && DISPLAY_NAME_CRED.test(displayName)) return "likely_hcp";
+
+  if (!bio) {
+    // No bio, but a credential in the handle is a weak positive signal.
+    return handle && HANDLE_CRED.test(handle) ? "possibly_hcp" : "unverified";
+  }
   const b = bio.toLowerCase();
 
   // Strong HCP signals: clinical credentials + role
@@ -3155,6 +3176,9 @@ function deriveConfidenceTier(bio: string | null): SocialConfidenceTier {
     /\bcenter\b.*\b(cancer|medical)\b/,
   ];
   if (weakPatterns.some((p) => p.test(b))) return "possibly_hcp";
+
+  // Nothing in the bio, but a handle credential still lifts to possibly.
+  if (handle && HANDLE_CRED.test(handle)) return "possibly_hcp";
 
   return "unverified";
 }
@@ -3303,7 +3327,9 @@ export async function getSocialCandidates(
         bio: v.bio ?? null,
         follower_count: v.follower_count ?? null,
       }) === "org";
-    const confidenceTier: SocialConfidenceTier = isOrganization ? "organization" : deriveConfidenceTier(bio);
+    const confidenceTier: SocialConfidenceTier = isOrganization
+      ? "organization"
+      : deriveConfidenceTier(bio, v.display_name ?? null, handle);
     const sourceHashtag = v.dominant_source_hashtag || "—";
     const followerCount: number = v.follower_count || 0;
     const totalEngagement: number = v.total_engagement || 0;

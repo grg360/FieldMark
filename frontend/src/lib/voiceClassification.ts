@@ -29,29 +29,61 @@ const ORG_PLURAL = /\b(we|our|us|join us|follow us)\b/i;
 const IND_CRED = /\b(MD|M\.D\.|PhD|Ph\.D\.|MBBS|DO|PharmD|MPH|MSc|RN|NP|PA-C|FACP|FASCO|FRCP|FRCPC|Prof|Professor|Dr|Dra)\b\.?/;
 const IND_HANDLE = /(^dr[_a-z]|_dr_|md$|_md|phd$|_phd)/i;
 const IND_FIRST_PERSON = /\b(I|I'm|my|mine|me)\b/;
-const IND_NAME_SHAPE = /^[\p{L}]+([ .'-][\p{L}]+){1,3}\.?$/u;
+// A plain personal name in the display name's LEADING segment (before a
+// "| specialty" or ", credentials" suffix) dominates incidental institutional
+// vocabulary: "Adam Feuerstein" (biotech reporter) and "Johan Pluvy | Thoracic
+// Oncology" are people, not orgs. Requires >=2 letter-tokens so single-token
+// hyphenated brands ("Dana-Farber", "OncoAlert") don't qualify.
+const PERSONAL_NAME = /^\p{L}[\p{L}\p{M}'.-]*( \p{L}[\p{L}\p{M}'.-]*){1,3}$/u;
 // Fused CamelCase brand tokens ("OncoDaily", "OncLive") read organizational —
 // checked per display-name token so "OncoDaily Lung" scores too, with common
 // surname prefixes (McCollom, MacDonald, DiMaggio, ...) excluded.
 const ORG_CAMEL_TOKEN = /^(?!Mc|Mac|De|Di|Da|Du|La|Le|Van|Von|O')[A-Z][a-z]+[A-Z]/;
 
+// @-mentions are employer/affiliation tags ("@statnews", "@ClevelandClinic"),
+// not self-description — scanning them for institutional vocabulary mislabels
+// individuals who name where they work. Strip before any org scan.
+function stripMentions(text: string): string {
+  return text.replace(/@\w+/g, " ");
+}
+
+// Leading segment of the display name, @-mentions and emoji/symbols removed, so
+// the name-shape test isn't defeated by a trailing emoji or a specialty suffix.
+function nameSegment(dn: string): string {
+  return stripMentions(dn.split(/[|·]/)[0])
+    .replace(/[^\p{L}\p{M} .'-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function classifyVoice(handle: string, profile: VoiceProfile | undefined): VoiceClass {
   const dn = (profile?.display_name ?? "").trim();
   const bio = (profile?.bio ?? "").trim();
   const followers = profile?.follower_count ?? 0;
+  const seg = nameSegment(dn);
+  const bioClean = stripMentions(bio);
   let org = 0;
   let ind = 0;
   const dnCred = IND_CRED.test(dn);
-  if (ORG_DN.test(dn)) org += 2;
-  if (ORG_BIO.test(bio)) org += 1;
-  if (ORG_PLURAL.test(bio)) org += 1;
+  const hasCamelToken = dn.split(/\s+/).some((t) => ORG_CAMEL_TOKEN.test(t));
+  // A clean human name: personal-name shape, at least one lowercase letter (a
+  // cased Latin name has one; the "JSMO" acronym in a society's name and bare
+  // CJK society names do not), no institutional word, and no fused-brand token
+  // (keeps two-token CamelCase brands like "OncoDaily Lung" out).
+  const isPersonalName =
+    PERSONAL_NAME.test(seg) && /\p{Ll}/u.test(seg) && !ORG_DN.test(seg) && !hasCamelToken;
+  // Org-name vocabulary is scanned on the LEADING segment only, so a personal
+  // name followed by "| Thoracic Oncology" doesn't read as institutional.
+  if (ORG_DN.test(seg)) org += 2;
+  if (ORG_BIO.test(bioClean)) org += 1;
+  if (ORG_PLURAL.test(bioClean)) org += 1;
   if (ORG_HANDLE.test(handle) && !dnCred) org += 1;
-  if (dn.split(/\s+/).some((t) => ORG_CAMEL_TOKEN.test(t))) org += 1;
+  if (hasCamelToken) org += 1;
   if (dnCred && !/\bMD Anderson\b/i.test(dn)) ind += 2;
-  if (IND_CRED.test(bio)) ind += 2;
+  if (IND_CRED.test(bioClean)) ind += 2;
   if (IND_HANDLE.test(handle)) ind += 2;
-  if (IND_FIRST_PERSON.test(bio)) ind += 1;
-  if (IND_NAME_SHAPE.test(dn) && !ORG_DN.test(dn)) ind += 1;
+  if (IND_FIRST_PERSON.test(bioClean)) ind += 1;
+  if (isPersonalName) ind += 2; // a clean human name is a strong individual signal
   if (org === ind) return followers >= 25000 ? "org" : "individual";
   return org > ind ? "org" : "individual";
 }
