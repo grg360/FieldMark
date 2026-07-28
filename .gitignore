@@ -54,5 +54,7 @@ OpenPayments/
 CommunityExplorer.jsx
 "Claude Docs/"
 "Latest Documentation/"
-congress/
+congress/*
 !congress/README.md
+Claude Docs/
+Latest Documentation/
