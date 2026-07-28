@@ -13,6 +13,30 @@ import {
   type Congress,
   type CongressState,
 } from "../../lib/congresses";
+import {
+  getCongressSocial,
+  meetsThreshold,
+  SOCIAL_THRESHOLD,
+  type CongressSocial,
+} from "../../lib/congressSocial";
+
+// Tiny volume sparkline (observed days only). Muted by default; amber for the live card.
+function VolumeSparks({ daily, color, width = 110, height = 22 }: {
+  daily: { d: string; n: number }[]; color: string; width?: number; height?: number;
+}) {
+  const max = Math.max(1, ...daily.map((p) => p.n));
+  const gap = 1.5;
+  const bw = daily.length ? (width - gap * (daily.length - 1)) / daily.length : width;
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap, height, width }}>
+      {daily.map((p) => (
+        <div key={p.d} title={`${p.d}: ${p.n}`} style={{ width: bw, background: color, height: Math.max(1, (p.n / max) * height), borderRadius: 1 }} />
+      ))}
+    </div>
+  );
+}
+
+const INT = new Intl.NumberFormat("en-US");
 
 // Congress Calendar — the year an MSL plans around. This increment renders the
 // time rail + the grouped congress list from config, with real calendar states
@@ -114,6 +138,12 @@ export default function CongressCalendarPage() {
   const groups = useMemo(() => groupCongresses(now), [now]);
   const rail = useRail(now);
   const [confirmedBySlug, setConfirmedBySlug] = useState<Record<string, number>>({});
+  const [socialBySlug, setSocialBySlug] = useState<Record<string, CongressSocial | null>>({});
+
+  const liveCongress = useMemo(
+    () => CONGRESSES.find((c) => congressState(c, now) === "live") ?? null,
+    [now],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +161,18 @@ export default function CongressCalendarPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Social: only fetch for congresses whose capture has started (others have no
+  // posts and correctly render the empty state without a query).
+  useEffect(() => {
+    let cancelled = false;
+    const targets = CONGRESSES.filter((c) => c.social_capture_start);
+    Promise.all(targets.map((c) => getCongressSocial(c).then((s) => [c.slug, s] as const))).then((pairs) => {
+      if (cancelled) return;
+      setSocialBySlug(Object.fromEntries(pairs));
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const nowLabel = now.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
 
   return (
@@ -144,6 +186,62 @@ export default function CongressCalendarPage() {
             <div style={mono(11, COLOR.ink4)}>{nowLabel}</div>
           </div>
         </div>
+
+        {/* ── live card (only when a congress is live) ── */}
+        {liveCongress && (() => {
+          const c = liveCongress;
+          const d = liveDay(c, now);
+          const s = socialBySlug[c.slug];
+          const confirmed = confirmedBySlug[c.slug];
+          const rel = relevanceFor(c, TA_SLUG);
+          return (
+            <div>
+              <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600, marginBottom: 8 }}>LIVE NOW</div>
+              <div style={{ border: `1px solid ${COLOR.amber}`, borderRadius: 6, background: "linear-gradient(180deg, rgba(232,160,32,0.055), rgba(232,160,32,0.015))", display: "flex" }}>
+                <div style={{ flex: 1, padding: "20px 22px", borderRight: `1px solid rgba(232,160,32,0.22)` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLOR.amber }} />
+                    <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600 }}>
+                      LIVE{d ? ` · DAY ${d.day} OF ${d.of}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, marginBottom: 6 }}>{c.short_name}</div>
+                  <div style={{ fontFamily: FONT.serif, fontSize: 15, color: COLOR.ink3, marginBottom: 16 }}>{c.society_full}</div>
+                  <div style={{ display: "flex", gap: 24, ...mono(11, COLOR.ink3), flexWrap: "wrap" }}>
+                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>DATES</div>{fmtDates(c)}</div>
+                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>LOCATION</div>{c.venue ? `${c.venue} · ` : ""}{c.city}{c.state ? `, ${c.state}` : ""}</div>
+                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>CAPTURED VIA</div><span style={{ color: COLOR.amber }}>{c.hashtags[0]}</span></div>
+                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>RELEVANCE</div><span style={{ color: COLOR.ink1 }}>{rel ? rel.toUpperCase() : "—"}</span> · {TA_LABEL}</div>
+                  </div>
+                </div>
+                <div style={{ width: 452, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "rgba(232,160,32,0.18)", border: "1px solid rgba(232,160,32,0.18)", borderRadius: 2 }}>
+                    {[
+                      { k: "POSTS", v: s ? INT.format(s.total_posts) : "—", c: COLOR.ink1 },
+                      { k: "VOICES", v: s ? INT.format(s.voices) : "—", c: COLOR.ink1 },
+                      { k: "WoW", v: s && s.wow_pct != null ? `${s.wow_pct > 0 ? "+" : ""}${s.wow_pct}%` : "—", c: COLOR.amber },
+                      { k: "CONFIRMED", v: confirmed != null ? String(confirmed) : "—", c: COLOR.ink1 },
+                    ].map((st) => (
+                      <div key={st.k} style={{ background: COLOR.surfaceWell, padding: "10px 11px" }}>
+                        <div style={{ ...mono(8.5, "#8A6524"), letterSpacing: "0.1em", marginBottom: 7 }}>{st.k}</div>
+                        <div style={{ ...mono(17, st.c), fontWeight: 600 }}>{st.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {s && meetsThreshold(s) ? (
+                    <div>
+                      <div style={{ ...mono(8.5, "#8A6524"), letterSpacing: "0.11em", marginBottom: 9 }}>DAILY POST VOLUME · OBSERVED DAYS</div>
+                      <VolumeSparks daily={s.daily} color={COLOR.amber} width={408} height={44} />
+                    </div>
+                  ) : null}
+                  <div style={{ ...mono(9.5, COLOR.ink4), marginTop: "auto" }}>
+                    Social volume under {c.hashtags[0]}. Not attendance. Confirmed presenters come from the abstract list — the conversation and the podium are different populations.
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── time rail ── */}
         <div style={{ background: COLOR.surfaceWell, border: `1px solid ${COLOR.hairStrong}`, borderRadius: 6, padding: "16px 18px 12px" }}>
@@ -219,12 +317,27 @@ export default function CongressCalendarPage() {
                       </div>
                       <div style={{ ...mono(9.5, rel ? REL_COLOR[rel] : COLOR.ink5), letterSpacing: "0.08em", fontWeight: 500 }}>{rel ? rel.toUpperCase() : "—"}</div>
                     </div>
-                    {/* Social signal — honest empty state until the social increment wires it.
-                        Congresses with no captured posts show nothing rather than an estimate. */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 110, height: 1, background: COLOR.hairStrong }} />
-                      <div style={mono(10, COLOR.ink5)}>no captured posts</div>
-                    </div>
+                    {/* Social signal — sparkline once past the 250/40 threshold; below it,
+                        the honest state (counts toward threshold); no posts → nothing. */}
+                    {(() => {
+                      const s = socialBySlug[c.slug];
+                      if (s && meetsThreshold(s)) {
+                        return (
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                            <VolumeSparks daily={s.daily} color={COLOR.ink4} width={110} height={22} />
+                            <div style={mono(10, COLOR.ink3)}>{INT.format(s.total_posts)} posts</div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 110, height: 1, background: COLOR.hairStrong }} />
+                          <div style={mono(10, COLOR.ink5)}>
+                            {s ? `${INT.format(s.total_posts)}/${SOCIAL_THRESHOLD.posts} posts` : "no captured posts"}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* Experts — confirmed presenters (fact) for congresses we hold abstracts
                         for; otherwise no inference is shown here yet. */}
                     <div style={{ textAlign: "right" }}>
@@ -244,9 +357,9 @@ export default function CongressCalendarPage() {
           ))}
         </div>
 
-        {/* footer — Design copy, verbatim */}
+        {/* footer — distinguishes the confirmed vs inferred populations (the point of the page) */}
         <div style={{ padding: "12px 14px", border: `1px solid ${COLOR.hair}`, borderRadius: 6, background: COLOR.surfaceWell, fontFamily: FONT.serif, fontSize: 13.5, lineHeight: 1.6, color: COLOR.ink3 }}>
-          Countdowns are to the first day of the meeting. Expert counts are tracked experts showing public activity under the congress hashtag — <span style={{ color: COLOR.ink2 }}>a signal of engagement with the conversation, not a record of attendance.</span> Congresses with no captured posts show nothing rather than an estimate.
+          Confirmed presenters come from the meeting&rsquo;s published abstract list. Expert counts for congresses without abstract data are tracked experts showing public activity under the congress hashtag — <span style={{ color: COLOR.ink2 }}>a signal of engagement with the conversation, not a record of attendance.</span> Congresses with no captured posts show nothing rather than an estimate.
         </div>
       </div>
     </AppLayout>
