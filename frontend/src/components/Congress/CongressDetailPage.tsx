@@ -48,21 +48,72 @@ function bestRank(p: ConfirmedPresenter): number {
 }
 
 // Volume curve — observed days only (bars); light amber during congress days.
+// Square-root y-scale: the series spans ~45x (55 -> 2,492), so a linear scale
+// crushes the pre-meeting run-up into invisible stubs. sqrt keeps the run-up
+// build legible against the in-session peak while staying monotonic and zero-at-zero.
 function VolumeChart({ c, s }: { c: Congress; s: CongressSocial }) {
-  const max = Math.max(1, ...s.daily.map((p) => p.n));
+  const H = 150;
+  const rootMax = Math.sqrt(Math.max(1, ...s.daily.map((p) => p.n)));
+  const barH = (n: number) => (n <= 0 ? 0 : Math.max(2, (Math.sqrt(n) / rootMax) * H));
   const inCongress = (d: string) => d >= c.start_date && d <= c.end_date;
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 150 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: H }}>
         {s.daily.map((p) => (
           <div key={p.d} title={`${p.d}: ${INT.format(p.n)}`}
             style={{ flex: 1, background: inCongress(p.d) ? COLOR.amber : COLOR.ink5,
-              height: Math.max(1, (p.n / max) * 150), borderRadius: "1px 1px 0 0" }} />
+              height: barH(p.n), borderRadius: "1px 1px 0 0" }} />
         ))}
       </div>
       <div style={{ height: 1, background: COLOR.hairStrong, margin: "2px 0 6px" }} />
       <div style={{ display: "flex", justifyContent: "space-between", ...mono(9.5, COLOR.ink5) }}>
         <span>{s.daily[0]?.d}</span><span>{s.daily[s.daily.length - 1]?.d}</span>
+      </div>
+      <div style={{ ...mono(9, COLOR.ink5), marginTop: 6 }}>
+        Bars use a square-root scale so the pre-meeting build stays legible against the in-session peak; exact counts on hover.
+      </div>
+    </div>
+  );
+}
+
+// Rank bands so a top-of-board KOL isn't shown equal to a rank-2000+ presenter.
+// All are legitimately tracked; the band header sets the expectation.
+const BANDS: { label: string; max: number }[] = [
+  { label: "TOP 50", max: 50 },
+  { label: "RANK 51–250", max: 250 },
+  { label: "RANK 251–1000", max: 1000 },
+  { label: "RANK 1000+", max: Infinity },
+];
+function bandIndex(r: number): number {
+  return BANDS.findIndex((b) => r <= b.max);
+}
+
+function PresenterCard({ p }: { p: ConfirmedPresenter }) {
+  return (
+    <div style={{ border: `1px solid ${COLOR.hair}`, borderRadius: 6, background: COLOR.surfaceCard, padding: "14px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div>
+          <Link to={`/hcp/${p.hcp_id}`} style={{ fontSize: 15, fontWeight: 600, color: COLOR.ink1 }}>{p.name}</Link>
+          <div style={{ ...mono(10.5, COLOR.ink5), marginTop: 4 }}>{p.institution ?? "—"}</div>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {p.established_rank != null && (
+            <span style={{ ...mono(9, COLOR.estGreen), border: `1px solid ${COLOR.estGreen}`, borderRadius: 3, padding: "3px 6px", fontWeight: 600, whiteSpace: "nowrap" }}>EST #{p.established_rank}</span>
+          )}
+          {p.rising_rank != null && (
+            <span style={{ ...mono(9, COLOR.indigoLink), border: `1px solid ${COLOR.indigo}`, borderRadius: 3, padding: "3px 6px", fontWeight: 600, whiteSpace: "nowrap" }}>RISING #{p.rising_rank}</span>
+          )}
+        </div>
+      </div>
+      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+        {p.abstracts.map((a, i) => (
+          <div key={i} style={{ borderLeft: `2px solid ${COLOR.hairStrong}`, paddingLeft: 11 }}>
+            <div style={{ fontFamily: FONT.serif, fontSize: 13.5, lineHeight: 1.5, color: COLOR.ink2 }} dangerouslySetInnerHTML={{ __html: a.title }} />
+            <div style={{ ...mono(9.5, COLOR.ink5), marginTop: 5 }}>
+              {a.session_type} · <span style={{ color: a.date ? COLOR.ink4 : COLOR.ink5 }}>{fmtSessionDate(a.date)}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -190,40 +241,31 @@ export default function CongressDetailPage() {
         {/* CONFIRMED PRESENTERS — leads the page */}
         {hasAbstracts && (
           <div>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={eyebrow(COLOR.ink3)}>CONFIRMED PRESENTERS · FROM THE ABSTRACT LIST</div>
-              <div style={mono(10, COLOR.ink5)}>{presenters.length} tracked {TA_LABEL} experts</div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {presenters.map((p) => (
-                <div key={p.speaker_key} style={{ border: `1px solid ${COLOR.hair}`, borderRadius: 6, background: COLOR.surfaceCard, padding: "14px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                    <div>
-                      <Link to={`/hcp/${p.hcp_id}`} style={{ fontSize: 15, fontWeight: 600, color: COLOR.ink1 }}>{p.name}</Link>
-                      <div style={{ ...mono(10.5, COLOR.ink5), marginTop: 4 }}>{p.institution ?? "—"}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      {p.established_rank != null && (
-                        <span style={{ ...mono(9, COLOR.estGreen), border: `1px solid ${COLOR.estGreen}`, borderRadius: 3, padding: "3px 6px", fontWeight: 600, whiteSpace: "nowrap" }}>EST #{p.established_rank}</span>
-                      )}
-                      {p.rising_rank != null && (
-                        <span style={{ ...mono(9, COLOR.indigoLink), border: `1px solid ${COLOR.indigo}`, borderRadius: 3, padding: "3px 6px", fontWeight: 600, whiteSpace: "nowrap" }}>RISING #{p.rising_rank}</span>
-                      )}
-                    </div>
+            {(() => {
+              const ranks = presenters.map(bestRank).filter((r) => r < 99999);
+              const lo = ranks.length ? Math.min(...ranks) : null;
+              const hi = ranks.length ? Math.max(...ranks) : null;
+              return (
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div style={eyebrow(COLOR.ink3)}>CONFIRMED PRESENTERS · FROM THE ABSTRACT LIST</div>
+                  <div style={mono(10, COLOR.ink5)}>{presenters.length} tracked experts{lo != null && hi != null ? ` · board ranks #${lo}–#${hi}` : ""}</div>
+                </div>
+              );
+            })()}
+            {BANDS.map((band, bi) => {
+              const inBand = presenters.filter((p) => bandIndex(bestRank(p)) === bi);
+              if (inBand.length === 0) return null;
+              return (
+                <div key={band.label} style={{ marginBottom: 18 }}>
+                  <div style={{ ...mono(9.5, bi === 0 ? COLOR.amber : COLOR.ink4), letterSpacing: "0.14em", fontWeight: 600, marginBottom: 9, paddingBottom: 6, borderBottom: `1px solid ${COLOR.hair}` }}>
+                    {band.label} <span style={{ color: COLOR.ink5 }}>· {inBand.length}</span>
                   </div>
-                  <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-                    {p.abstracts.map((a, i) => (
-                      <div key={i} style={{ borderLeft: `2px solid ${COLOR.hairStrong}`, paddingLeft: 11 }}>
-                        <div style={{ fontFamily: FONT.serif, fontSize: 13.5, lineHeight: 1.5, color: COLOR.ink2 }} dangerouslySetInnerHTML={{ __html: a.title }} />
-                        <div style={{ ...mono(9.5, COLOR.ink5), marginTop: 5 }}>
-                          {a.session_type} · <span style={{ color: a.date ? COLOR.ink4 : COLOR.ink5 }}>{fmtSessionDate(a.date)}</span>
-                        </div>
-                      </div>
-                    ))}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    {inBand.map((p) => <PresenterCard key={p.speaker_key} p={p} />)}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
             {/* the two-population statement — stated plainly, not buried */}
             <div style={{ marginTop: 14, padding: "13px 15px", border: `1px solid ${COLOR.hair}`, borderRadius: 6, background: COLOR.surfaceWell, fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.6, color: COLOR.ink3, maxWidth: 900 }}>
               These {presenters.length} are confirmed from the abstract list — a fact, not an inference. Almost none of them appear in the {congress.hashtags[0]} conversation: a check of Heymach, Herbst, Govindan, Skoulidis, J&auml;nne, Sabari, and Rotow returned zero posts each. <span style={{ color: COLOR.ink1 }}>The conversation and the podium are different populations — social absence is not evidence of absence from the meeting.</span>
@@ -238,15 +280,22 @@ export default function CongressDetailPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* stats + volume */}
               <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
-                <div style={{ display: "flex", gap: 28, marginBottom: 16, flexWrap: "wrap" }}>
-                  {[
-                    { k: "POSTS", v: INT.format(social.total_posts) },
-                    { k: "VOICES", v: INT.format(social.voices) },
-                    { k: "WoW", v: social.wow_pct != null ? `${social.wow_pct > 0 ? "+" : ""}${social.wow_pct}%` : "—" },
-                  ].map((s2) => (
-                    <div key={s2.k}><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.11em", marginBottom: 6 }}>{s2.k}</div><div style={{ ...mono(20, s2.k === "WoW" ? COLOR.amber : COLOR.ink1), fontWeight: 600 }}>{s2.v}</div></div>
-                  ))}
-                </div>
+                {(() => {
+                  const last = new Date(`${social.last_day}T00:00:00Z`);
+                  const md = (off: number) => { const d = new Date(last); d.setUTCDate(d.getUTCDate() - off); return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }); };
+                  // Short capture window: "WoW" is the meeting week vs the run-up week,
+                  // not a steady-state rate — name both windows so it can't be misread.
+                  const wowWindow = `${md(6)}–${md(0)} vs ${md(13)}–${md(7)}`;
+                  return (
+                    <div style={{ display: "flex", gap: 28, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                      <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.11em", marginBottom: 6 }}>POSTS</div><div style={{ ...mono(20, COLOR.ink1), fontWeight: 600 }}>{INT.format(social.total_posts)}</div></div>
+                      <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.11em", marginBottom: 6 }}>VOICES</div><div style={{ ...mono(20, COLOR.ink1), fontWeight: 600 }}>{INT.format(social.voices)}</div></div>
+                      {social.wow_pct != null && (
+                        <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.11em", marginBottom: 6 }}>MEETING WK vs RUN-UP WK</div><div style={{ ...mono(20, COLOR.amber), fontWeight: 600 }}>{social.wow_pct > 0 ? "+" : ""}{social.wow_pct}%</div><div style={{ ...mono(9, COLOR.ink5), marginTop: 4 }}>{wowWindow}</div></div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div style={{ ...mono(9.5, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 8 }}>POSTS PER DAY UNDER {congress.hashtags[0]}</div>
                 <div style={{ fontFamily: FONT.serif, fontSize: 13, lineHeight: 1.55, color: COLOR.ink4, marginBottom: 14, maxWidth: 820 }}>
                   This is social volume, not attendance. Days before capture began are unobserved, not zero — we don&rsquo;t draw them.
@@ -256,7 +305,10 @@ export default function CongressDetailPage() {
               {/* topics + voices */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hair}`, borderRadius: 6, padding: "18px 20px" }}>
-                  <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 14 }}>HOT TOPICS · SHARE OF CONVERSATION</div>
+                  <div style={{ ...eyebrow(COLOR.ink3), marginBottom: 6 }}>CO-OCCURRING HASHTAGS</div>
+                  <div style={{ fontFamily: FONT.serif, fontSize: 12.5, lineHeight: 1.5, color: COLOR.ink5, marginBottom: 14 }}>
+                    Percent of the {INT.format(social.total_posts)} {congress.hashtags[0]} posts that also carry each tag. A post can carry several or none, so these don&rsquo;t sum to 100%.
+                  </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
                     {social.hot_hashtags.map((h) => (
                       <div key={h.tag}>
