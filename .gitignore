@@ -58,3 +58,12 @@ congress/*
 !congress/README.md
 Claude Docs/
 Latest Documentation/
+supabase/.temp/
+scripts/**/*.csv
+supabase/.temp/
+scripts/**/*.csv
+archive/
+frontend_dump.md
+merge_rerun.log
+ctgov_silverberg_probe.py
+*.log
