@@ -100,6 +100,7 @@ import DemoPage from "./pages/DemoPage";
 import PulsePage from "./components/Pulse/PulsePage";
 import CongressCalendarPage from "./components/Congress/CongressCalendarPage";
 import CongressDetailPage from "./components/Congress/CongressDetailPage";
+import ForumIndexPage from "./components/FieldIntelligenceForum/ForumIndexPage";
 type AppHCP = Omit<UIHCP, "id"> & {
   id: string;
   hcp_id?: string;
@@ -1357,6 +1358,7 @@ export default function App() {
           <Route path="/me/follow-ups" element={<FollowUpsPage />} />
           <Route path="/congress" element={<CongressCalendarPage />} />
           <Route path="/congress/:slug" element={<CongressDetailPage />} />
+          <Route path="/field-intelligence" element={<ForumIndexPage />} />
           <Route path="/" element={<FeedLayout />} />
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />
