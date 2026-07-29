@@ -65,9 +65,11 @@ interface Focus {
 
 export default function CompositionChart({
   composition,
+  assetName,
   full = false,
 }: {
   composition: Composition;
+  assetName?: string;
   full?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>("share");
@@ -82,6 +84,12 @@ export default function CompositionChart({
 
   const maxCorpus = Math.max(1, ...composition.columns.map((c) => c.corpus));
   const colHeight = full ? 360 : 190;
+  const firstCol = composition.columns[0];
+  const lastFull = [...composition.columns].reverse().find((c) => !c.isPartial) ?? firstCol;
+  const modeNote =
+    mode === "share"
+      ? "Columns normalised to 100%. Reads the mix; hides how volume changed."
+      : "Column height is publications that year. Reads growth; small shares get hard to see.";
 
   const readout =
     hover.readout ??
@@ -89,30 +97,67 @@ export default function CompositionChart({
       ? bandReadout(composition.bands.find((b) => b.key === held))
       : "Hover a band for its year, share and count. Click to hold one theme across the whole window.");
 
+  const toggle = (
+    <div style={{ display: "flex", gap: 1 }}>
+      <button type="button" style={modeBtn(mode === "share")} onClick={() => setMode("share")}>
+        Share %
+      </button>
+      <button type="button" style={modeBtn(mode === "volume")} onClick={() => setMode("volume")}>
+        Volume
+      </button>
+    </div>
+  );
+
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: 24,
-          marginBottom: full ? 20 : 6,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={eyebrow}>
-          Theme composition · {composition.window[0]} → {composition.window[composition.window.length - 1]}
+      {full ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 40,
+            paddingBottom: 22,
+            marginBottom: 4,
+            borderBottom: `1px solid ${COLOR.hairStrong}`,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div style={{ ...eyebrow, marginBottom: 12 }}>
+              {assetName ? `${assetName} · ` : ""}theme composition
+            </div>
+            <h2 style={{ margin: "0 0 12px", fontFamily: FONT.sans, fontSize: 27, fontWeight: 500, letterSpacing: "-0.01em", color: COLOR.ink1 }}>
+              What this literature is about, and how that changed
+            </h2>
+            <div style={{ fontFamily: FONT.serif, fontSize: 16, lineHeight: 1.55, color: COLOR.ink2, maxWidth: 700 }}>
+              Each column is one publication year, divided by canonical theme. Volume moved from{" "}
+              {firstCol.corpus} papers in {firstCol.year} to {lastFull.corpus} in {lastFull.year}.
+              Both are observations about publishing, not statements about the therapy.
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+            {toggle}
+            <div style={{ ...note, textAlign: "right", maxWidth: 230 }}>{modeNote}</div>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 1 }}>
-          <button type="button" style={modeBtn(mode === "share")} onClick={() => setMode("share")}>
-            Share %
-          </button>
-          <button type="button" style={modeBtn(mode === "volume")} onClick={() => setMode("volume")}>
-            Volume
-          </button>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 24,
+            marginBottom: 6,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={eyebrow}>
+            Theme composition · {composition.window[0]} → {composition.window[composition.window.length - 1]}
+          </div>
+          {toggle}
         </div>
-      </div>
+      )}
 
       <div
         style={{

@@ -127,6 +127,7 @@ export default function AssetPage() {
   const asset = slug ? assetBySlug(slug) : undefined;
   const [data, setData] = useState<AssetPageData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fullComposition, setFullComposition] = useState(false);
 
   useEffect(() => {
     if (!asset) {
@@ -175,7 +176,25 @@ export default function AssetPage() {
           <StatTiles o={o} />
 
           <div style={{ padding: "28px 32px 30px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
-            <CompositionChart composition={composition} />
+            <CompositionChart composition={composition} assetName={asset.generic} full={fullComposition} />
+            {!composition.gated ? (
+              <button
+                type="button"
+                onClick={() => setFullComposition((v) => !v)}
+                style={{
+                  marginTop: 18,
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  fontFamily: FONT.mono,
+                  fontSize: 11,
+                  color: COLOR.indigoLink,
+                }}
+              >
+                {fullComposition ? "Collapse composition ↑" : "See the full composition view →"}
+              </button>
+            ) : null}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 420px" }}>
