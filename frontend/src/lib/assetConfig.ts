@@ -25,6 +25,11 @@ export interface AssetConfig {
   first_approval_year: number | null;
   nsclc_indication_count: number | null;
   is_backbone: boolean;
+  // Controlled-vocabulary molecular target(s); array for multi-target agents, null
+  // where no molecular target exists (backbone chemo, and lurbinectedin). Never
+  // key group membership on this being null — key on is_backbone. See the config
+  // commit and [[asset-target-field]].
+  target: string[] | null;
   match: AssetMatch;
   /** Present only where the match vocabulary overlaps another asset (paclitaxel
    *  ↔ nab-paclitaxel). Surfaced verbatim in "What this page counted". */
