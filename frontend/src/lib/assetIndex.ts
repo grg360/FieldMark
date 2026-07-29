@@ -4,8 +4,9 @@
 // config (assetConfig.ts). Every measured quantity comes from the database: each
 // asset's distinct-publication count (asset_mention_v1), each group's distinct
 // union (asset_group_distinct — NOT the sum of members), and each asset's density
-// tier (asset_density_tiers — years clearing 40 themed). Where config and the DB
-// could disagree, config decides which drugs exist and where they sit.
+// tier (asset_density_tiers — how many of the 7 completed years 2019–2025 clear 40
+// themed; 2026 is in progress and excluded from the measure, Rule B). Where config
+// and the DB could disagree, config decides which drugs exist and where they sit.
 
 import { supabase } from "./supabase";
 import {
@@ -19,8 +20,10 @@ import { NSCLC_CORPUS_TOTAL } from "./assets";
 
 export type DensityTier = "dense" | "intermittent" | "sparse";
 
+// Rule B: measured over the 7 completed years 2019–2025 (2026 excluded from the
+// measure). DENSE = clears the gate in all 7; SPARSE = in none; INTERMITTENT = some.
 export function densityTier(yearsCleared: number): DensityTier {
-  if (yearsCleared >= 8) return "dense";
+  if (yearsCleared >= 7) return "dense";
   if (yearsCleared >= 1) return "intermittent";
   return "sparse";
 }

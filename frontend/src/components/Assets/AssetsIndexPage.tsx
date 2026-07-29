@@ -75,7 +75,7 @@ function AssetRow({ row, denom, showAlso }: { row: IndexAssetRow; denom: number;
       </Link>
       <span
         style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.1em", color: TIER_COLOR[row.tier] }}
-        title={`${DENSITY_LABEL[row.tier]} — clears 40 themed in ${row.yearsCleared} of 8 years`}
+        title={`${DENSITY_LABEL[row.tier]} — clears 40 themed in ${row.yearsCleared} of 7 completed years (2019–2025); 2026 in progress`}
       >
         {DENSITY_GLYPH[row.tier]}
       </span>
@@ -228,8 +228,8 @@ function IndexBody({
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         <div style={{ padding: "14px 0", fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.6, color: COLOR.ink3 }}>{scaleNote}</div>
         <div style={{ padding: "14px 0 14px 22px", borderLeft: `1px solid ${COLOR.hair}`, fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.6, color: COLOR.ink3 }}>
-          Density is measured, not judged: how many years clear 40 themed publications. It predicts the
-          page, nothing about the therapy.
+          Density is measured, not judged: how many of the 7 completed years (2019–2025) clear 40
+          themed publications; 2026 is in progress. It predicts the page, nothing about the therapy.
         </div>
       </div>
 
