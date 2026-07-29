@@ -276,7 +276,8 @@ function MobileSearchButton({ search }: { search: NavSearch }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Search"
-        style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center" }}
+        className="fm-pill-button"
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", minHeight: 0 }}
       >
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
           <circle cx="7.5" cy="7.5" r="5.5" stroke={COLOR.ink3} strokeWidth="1.5" />
@@ -336,10 +337,14 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
       aria-label="Account menu"
       aria-haspopup="menu"
       aria-expanded={open}
+      // fm-pill-button carries `min-height: 0 !important`, exempting this from the
+      // global `button { min-height: 44px }` tap-target rule that was forcing the
+      // height to 44 (oval, taller than wide). Same opt-out the old UserMenu used.
+      className="fm-pill-button"
       style={{
         // Exact old-TopBar UserMenu dimensions: 32×32, border-radius 50%. flexShrink
-        // 0 so the bar's flex row can't compress the width into an oval; boxSizing
-        // border-box keeps it 32 square regardless.
+        // 0 so the bar's flex row can't compress the width; boxSizing border-box
+        // keeps it 32 square regardless.
         width: 32,
         height: 32,
         minWidth: 32,
@@ -410,6 +415,7 @@ function MenuRow({ label, hint, hintAmber, tall, onClick }: { label: string; hin
     <button
       type="button"
       onClick={onClick}
+      className="fm-pill-button"
       style={{
         width: "100%",
         display: "flex",
