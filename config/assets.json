@@ -12,6 +12,9 @@
       ],
       "display_code": "AZD9291",
       "drug_class": "3rd-generation EGFR TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": 2015,
       "nsclc_indication_count": 4,
@@ -38,6 +41,9 @@
       ],
       "display_code": "ZD1839",
       "drug_class": "1st-generation EGFR TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": 2003,
       "nsclc_indication_count": 1,
@@ -64,6 +70,9 @@
       ],
       "display_code": "OSI-774",
       "drug_class": "1st-generation EGFR TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": 2004,
       "nsclc_indication_count": 1,
@@ -91,6 +100,9 @@
       ],
       "display_code": "BIBW 2992",
       "drug_class": "2nd-generation EGFR TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": 2013,
       "nsclc_indication_count": 2,
@@ -118,6 +130,9 @@
       ],
       "display_code": "PF-00299804",
       "drug_class": "2nd-generation EGFR TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": 2018,
       "nsclc_indication_count": 1,
@@ -142,6 +157,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "1st-generation EGFR TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": null,
       "nsclc_indication_count": null,
@@ -166,6 +184,9 @@
       ],
       "display_code": "TAK-788",
       "drug_class": "EGFR exon 20 TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": 2021,
       "nsclc_indication_count": 1,
@@ -193,6 +214,9 @@
       ],
       "display_code": "YH25448",
       "drug_class": "3rd-generation EGFR TKI",
+      "target": [
+        "EGFR"
+      ],
       "route": "oral",
       "first_approval_year": 2024,
       "nsclc_indication_count": 1,
@@ -220,6 +244,11 @@
       ],
       "display_code": "PF-02341066",
       "drug_class": "ALK/ROS1/MET TKI",
+      "target": [
+        "ALK",
+        "ROS1",
+        "MET"
+      ],
       "route": "oral",
       "first_approval_year": 2011,
       "nsclc_indication_count": 2,
@@ -246,6 +275,9 @@
       ],
       "display_code": "LDK378",
       "drug_class": "2nd-generation ALK TKI",
+      "target": [
+        "ALK"
+      ],
       "route": "oral",
       "first_approval_year": 2014,
       "nsclc_indication_count": 1,
@@ -273,6 +305,9 @@
       ],
       "display_code": "CH5424802",
       "drug_class": "2nd-generation ALK TKI",
+      "target": [
+        "ALK"
+      ],
       "route": "oral",
       "first_approval_year": 2015,
       "nsclc_indication_count": 2,
@@ -300,6 +335,9 @@
       ],
       "display_code": "AP26113",
       "drug_class": "2nd-generation ALK TKI",
+      "target": [
+        "ALK"
+      ],
       "route": "oral",
       "first_approval_year": 2017,
       "nsclc_indication_count": 1,
@@ -327,6 +365,10 @@
       ],
       "display_code": "PF-06463922",
       "drug_class": "3rd-generation ALK/ROS1 TKI",
+      "target": [
+        "ALK",
+        "ROS1"
+      ],
       "route": "oral",
       "first_approval_year": 2018,
       "nsclc_indication_count": 1,
@@ -354,6 +396,9 @@
       ],
       "display_code": "X-396",
       "drug_class": "ALK TKI",
+      "target": [
+        "ALK"
+      ],
       "route": "oral",
       "first_approval_year": 2024,
       "nsclc_indication_count": 1,
@@ -380,6 +425,10 @@
       ],
       "display_code": "RXDX-101",
       "drug_class": "ROS1/NTRK TKI",
+      "target": [
+        "ROS1",
+        "NTRK"
+      ],
       "route": "oral",
       "first_approval_year": 2019,
       "nsclc_indication_count": 1,
@@ -406,6 +455,10 @@
       ],
       "display_code": "TPX-0005",
       "drug_class": "ROS1/NTRK TKI",
+      "target": [
+        "ROS1",
+        "NTRK"
+      ],
       "route": "oral",
       "first_approval_year": 2023,
       "nsclc_indication_count": 1,
@@ -433,6 +486,9 @@
       ],
       "display_code": "AMG 510",
       "drug_class": "KRAS G12C inhibitor",
+      "target": [
+        "KRAS G12C"
+      ],
       "route": "oral",
       "first_approval_year": 2021,
       "nsclc_indication_count": 1,
@@ -460,6 +516,9 @@
       ],
       "display_code": "MRTX849",
       "drug_class": "KRAS G12C inhibitor",
+      "target": [
+        "KRAS G12C"
+      ],
       "route": "oral",
       "first_approval_year": 2022,
       "nsclc_indication_count": 1,
@@ -487,6 +546,9 @@
       ],
       "display_code": "MK-3475",
       "drug_class": "anti-PD-1 antibody",
+      "target": [
+        "PD-1"
+      ],
       "route": "IV",
       "first_approval_year": 2014,
       "nsclc_indication_count": 6,
@@ -516,6 +578,9 @@
       ],
       "display_code": "ONO-4538",
       "drug_class": "anti-PD-1 antibody",
+      "target": [
+        "PD-1"
+      ],
       "route": "IV",
       "first_approval_year": 2014,
       "nsclc_indication_count": 4,
@@ -544,6 +609,9 @@
       ],
       "display_code": "MPDL3280A",
       "drug_class": "anti-PD-L1 antibody",
+      "target": [
+        "PD-L1"
+      ],
       "route": "IV",
       "first_approval_year": 2016,
       "nsclc_indication_count": 3,
@@ -570,6 +638,9 @@
       ],
       "display_code": "MEDI4736",
       "drug_class": "anti-PD-L1 antibody",
+      "target": [
+        "PD-L1"
+      ],
       "route": "IV",
       "first_approval_year": 2017,
       "nsclc_indication_count": 2,
@@ -594,6 +665,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "anti-PD-1 antibody",
+      "target": [
+        "PD-1"
+      ],
       "route": "IV",
       "first_approval_year": 2018,
       "nsclc_indication_count": 1,
@@ -616,6 +690,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "anti-CTLA-4 antibody",
+      "target": [
+        "CTLA-4"
+      ],
       "route": "IV",
       "first_approval_year": 2011,
       "nsclc_indication_count": 2,
@@ -638,6 +715,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "anti-CTLA-4 antibody",
+      "target": [
+        "CTLA-4"
+      ],
       "route": "IV",
       "first_approval_year": 2022,
       "nsclc_indication_count": 1,
@@ -662,6 +742,9 @@
       ],
       "display_code": "BGB-A317",
       "drug_class": "anti-PD-1 antibody",
+      "target": [
+        "PD-1"
+      ],
       "route": "IV",
       "first_approval_year": 2024,
       "nsclc_indication_count": 1,
@@ -688,6 +771,9 @@
       ],
       "display_code": "CS1001",
       "drug_class": "anti-PD-L1 antibody",
+      "target": [
+        "PD-L1"
+      ],
       "route": "IV",
       "first_approval_year": null,
       "nsclc_indication_count": null,
@@ -715,6 +801,9 @@
       ],
       "display_code": "T-DXd",
       "drug_class": "HER2-directed antibody-drug conjugate",
+      "target": [
+        "HER2"
+      ],
       "route": "IV",
       "first_approval_year": 2019,
       "nsclc_indication_count": 1,
@@ -742,6 +831,9 @@
       ],
       "display_code": "Dato-DXd",
       "drug_class": "TROP2-directed antibody-drug conjugate",
+      "target": [
+        "TROP2"
+      ],
       "route": "IV",
       "first_approval_year": 2025,
       "nsclc_indication_count": null,
@@ -767,6 +859,9 @@
       ],
       "display_code": "HER3-DXd",
       "drug_class": "HER3-directed antibody-drug conjugate",
+      "target": [
+        "HER3"
+      ],
       "route": "IV",
       "first_approval_year": null,
       "nsclc_indication_count": null,
@@ -793,6 +888,9 @@
       ],
       "display_code": "Teliso-V",
       "drug_class": "c-MET antibody-drug conjugate",
+      "target": [
+        "MET"
+      ],
       "route": "IV",
       "first_approval_year": 2025,
       "nsclc_indication_count": 1,
@@ -820,6 +918,9 @@
       ],
       "display_code": "INC280",
       "drug_class": "MET inhibitor",
+      "target": [
+        "MET"
+      ],
       "route": "oral",
       "first_approval_year": 2020,
       "nsclc_indication_count": 1,
@@ -844,6 +945,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "MET inhibitor",
+      "target": [
+        "MET"
+      ],
       "route": "oral",
       "first_approval_year": 2021,
       "nsclc_indication_count": 1,
@@ -869,6 +973,9 @@
       ],
       "display_code": "LOXO-292",
       "drug_class": "RET inhibitor",
+      "target": [
+        "RET"
+      ],
       "route": "oral",
       "first_approval_year": 2020,
       "nsclc_indication_count": 1,
@@ -896,6 +1003,9 @@
       ],
       "display_code": "BLU-667",
       "drug_class": "RET inhibitor",
+      "target": [
+        "RET"
+      ],
       "route": "oral",
       "first_approval_year": 2020,
       "nsclc_indication_count": 1,
@@ -923,6 +1033,10 @@
       ],
       "display_code": "JNJ-61186372",
       "drug_class": "EGFR-MET bispecific antibody",
+      "target": [
+        "EGFR",
+        "MET"
+      ],
       "route": "IV",
       "first_approval_year": 2021,
       "nsclc_indication_count": 2,
@@ -950,6 +1064,9 @@
       ],
       "display_code": "GSK2118436",
       "drug_class": "BRAF inhibitor",
+      "target": [
+        "BRAF"
+      ],
       "route": "oral",
       "first_approval_year": 2013,
       "nsclc_indication_count": 1,
@@ -974,6 +1091,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "MEK inhibitor",
+      "target": [
+        "MEK"
+      ],
       "route": "oral",
       "first_approval_year": 2013,
       "nsclc_indication_count": 1,
@@ -996,6 +1116,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "anti-VEGF antibody",
+      "target": [
+        "VEGF"
+      ],
       "route": "IV",
       "first_approval_year": 2004,
       "nsclc_indication_count": 1,
@@ -1018,6 +1141,9 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "anti-VEGFR2 antibody",
+      "target": [
+        "VEGFR2"
+      ],
       "route": "IV",
       "first_approval_year": 2014,
       "nsclc_indication_count": 1,
@@ -1042,6 +1168,9 @@
       ],
       "display_code": "AMG 757",
       "drug_class": "DLL3-directed bispecific T-cell engager",
+      "target": [
+        "DLL3"
+      ],
       "route": "IV",
       "first_approval_year": 2024,
       "nsclc_indication_count": null,
@@ -1068,6 +1197,7 @@
       ],
       "display_code": "PM01183",
       "drug_class": "oncogenic transcription inhibitor",
+      "target": null,
       "route": "IV",
       "first_approval_year": 2020,
       "nsclc_indication_count": null,
@@ -1092,6 +1222,10 @@
       ],
       "display_code": "AK112",
       "drug_class": "PD-1/VEGF bispecific antibody",
+      "target": [
+        "PD-1",
+        "VEGF"
+      ],
       "route": "IV",
       "first_approval_year": null,
       "nsclc_indication_count": null,
@@ -1116,6 +1250,7 @@
       ],
       "display_code": "CDDP",
       "drug_class": "platinum agent",
+      "target": null,
       "route": "IV",
       "first_approval_year": 1978,
       "nsclc_indication_count": null,
@@ -1142,6 +1277,7 @@
       ],
       "display_code": "CBDCA",
       "drug_class": "platinum agent",
+      "target": null,
       "route": "IV",
       "first_approval_year": 1989,
       "nsclc_indication_count": null,
@@ -1166,6 +1302,7 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "antifolate",
+      "target": null,
       "route": "IV",
       "first_approval_year": 2004,
       "nsclc_indication_count": 2,
@@ -1188,6 +1325,7 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "taxane",
+      "target": null,
       "route": "IV",
       "first_approval_year": 1992,
       "nsclc_indication_count": null,
@@ -1213,6 +1351,7 @@
       ],
       "display_code": "ABI-007",
       "drug_class": "albumin-bound taxane",
+      "target": null,
       "route": "IV",
       "first_approval_year": 2005,
       "nsclc_indication_count": 1,
@@ -1240,6 +1379,7 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "taxane",
+      "target": null,
       "route": "IV",
       "first_approval_year": 1996,
       "nsclc_indication_count": 1,
@@ -1262,6 +1402,7 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "nucleoside analogue",
+      "target": null,
       "route": "IV",
       "first_approval_year": 1996,
       "nsclc_indication_count": 1,
@@ -1284,6 +1425,7 @@
       "development_codes": [],
       "display_code": null,
       "drug_class": "vinca alkaloid",
+      "target": null,
       "route": "IV",
       "first_approval_year": 1994,
       "nsclc_indication_count": 1,
