@@ -17,23 +17,23 @@ import {
 } from "./assetConfig";
 import { NSCLC_CORPUS_TOTAL } from "./assets";
 
-export type DensityTier = "dense" | "intermittent" | "pooled";
+export type DensityTier = "dense" | "intermittent" | "sparse";
 
 export function densityTier(yearsCleared: number): DensityTier {
   if (yearsCleared >= 8) return "dense";
   if (yearsCleared >= 1) return "intermittent";
-  return "pooled";
+  return "sparse";
 }
 
 export const DENSITY_GLYPH: Record<DensityTier, string> = {
   dense: "▰▰▰",
   intermittent: "▰▰▱",
-  pooled: "▰▱▱",
+  sparse: "▰▱▱",
 };
 export const DENSITY_LABEL: Record<DensityTier, string> = {
   dense: "DENSE",
   intermittent: "INTERMITTENT",
-  pooled: "POOLED",
+  sparse: "SPARSE",
 };
 
 export interface IndexAssetRow {
@@ -132,7 +132,7 @@ export async function loadAssetIndex(): Promise<AssetIndexModel> {
   const backboneRows = BACKBONE_ASSETS.map((a) => rowFor(a)).sort((x, y) => y.n - x.n);
   const nullNonBackbone = DEPLOYMENT_ASSETS.filter((a) => a.target == null).map((a) => rowFor(a));
 
-  const legend: Record<DensityTier, number> = { dense: 0, intermittent: 0, pooled: 0 };
+  const legend: Record<DensityTier, number> = { dense: 0, intermittent: 0, sparse: 0 };
   for (const a of DEPLOYMENT_ASSETS) legend[densityTier(yearsByGeneric[a.generic] ?? 0)]++;
 
   const flat = DEPLOYMENT_ASSETS.map((a) => rowFor(a)).sort((x, y) => y.n - x.n);

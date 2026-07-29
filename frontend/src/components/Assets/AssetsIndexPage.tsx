@@ -37,7 +37,7 @@ const note = { fontFamily: FONT.mono, fontSize: 10, lineHeight: 1.7, color: COLO
 const TIER_COLOR: Record<DensityTier, string> = {
   dense: COLOR.ink2,
   intermittent: COLOR.ink3,
-  pooled: COLOR.ink5,
+  sparse: COLOR.ink5,
 };
 
 function ctlBtn(active: boolean): React.CSSProperties {
@@ -215,7 +215,7 @@ function IndexBody({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink3 }}>
-          {(["dense", "intermittent", "pooled"] as DensityTier[]).map((t) => (
+          {(["dense", "intermittent", "sparse"] as DensityTier[]).map((t) => (
             <span key={t} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <span style={{ letterSpacing: "0.1em", color: TIER_COLOR[t] }}>{DENSITY_GLYPH[t]}</span>
               {DENSITY_LABEL[t]} {legend[t]}
