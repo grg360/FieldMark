@@ -1,0 +1,1302 @@
+{
+  "therapeutic_area": "nsclc",
+  "corpus_note": "Matched against lung-cancer publications (source TA 'nsclc', which includes SCLC). title+abstract, case-insensitive; codes word-boundary. development_codes pruned to terms with corpus hits; display_code is the most literature-used code.",
+  "assets": [
+    {
+      "generic": "Osimertinib",
+      "brand_names": [
+        "Tagrisso"
+      ],
+      "development_codes": [
+        "AZD9291"
+      ],
+      "display_code": "AZD9291",
+      "drug_class": "3rd-generation EGFR TKI",
+      "route": "oral",
+      "first_approval_year": 2015,
+      "nsclc_indication_count": 4,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Osimertinib"
+        ],
+        "brands": [
+          "Tagrisso"
+        ],
+        "codes": [
+          "AZD9291"
+        ]
+      }
+    },
+    {
+      "generic": "Gefitinib",
+      "brand_names": [
+        "Iressa"
+      ],
+      "development_codes": [
+        "ZD1839"
+      ],
+      "display_code": "ZD1839",
+      "drug_class": "1st-generation EGFR TKI",
+      "route": "oral",
+      "first_approval_year": 2003,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Gefitinib"
+        ],
+        "brands": [
+          "Iressa"
+        ],
+        "codes": [
+          "ZD1839"
+        ]
+      }
+    },
+    {
+      "generic": "Erlotinib",
+      "brand_names": [
+        "Tarceva"
+      ],
+      "development_codes": [
+        "OSI-774"
+      ],
+      "display_code": "OSI-774",
+      "drug_class": "1st-generation EGFR TKI",
+      "route": "oral",
+      "first_approval_year": 2004,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Erlotinib"
+        ],
+        "brands": [
+          "Tarceva"
+        ],
+        "codes": [
+          "OSI-774"
+        ]
+      }
+    },
+    {
+      "generic": "Afatinib",
+      "brand_names": [
+        "Gilotrif",
+        "Giotrif"
+      ],
+      "development_codes": [
+        "BIBW 2992"
+      ],
+      "display_code": "BIBW 2992",
+      "drug_class": "2nd-generation EGFR TKI",
+      "route": "oral",
+      "first_approval_year": 2013,
+      "nsclc_indication_count": 2,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Afatinib"
+        ],
+        "brands": [
+          "Gilotrif",
+          "Giotrif"
+        ],
+        "codes": [
+          "BIBW 2992"
+        ]
+      }
+    },
+    {
+      "generic": "Dacomitinib",
+      "brand_names": [
+        "Vizimpro"
+      ],
+      "development_codes": [
+        "PF-00299804"
+      ],
+      "display_code": "PF-00299804",
+      "drug_class": "2nd-generation EGFR TKI",
+      "route": "oral",
+      "first_approval_year": 2018,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Dacomitinib"
+        ],
+        "brands": [
+          "Vizimpro"
+        ],
+        "codes": [
+          "PF-00299804"
+        ]
+      }
+    },
+    {
+      "generic": "Icotinib",
+      "brand_names": [
+        "Conmana"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "1st-generation EGFR TKI",
+      "route": "oral",
+      "first_approval_year": null,
+      "nsclc_indication_count": null,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Icotinib"
+        ],
+        "brands": [
+          "Conmana"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Mobocertinib",
+      "brand_names": [
+        "Exkivity"
+      ],
+      "development_codes": [
+        "TAK-788"
+      ],
+      "display_code": "TAK-788",
+      "drug_class": "EGFR exon 20 TKI",
+      "route": "oral",
+      "first_approval_year": 2021,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Mobocertinib"
+        ],
+        "brands": [
+          "Exkivity"
+        ],
+        "codes": [
+          "TAK-788"
+        ]
+      }
+    },
+    {
+      "generic": "Lazertinib",
+      "brand_names": [
+        "Leclaza",
+        "Lazcluze"
+      ],
+      "development_codes": [
+        "YH25448"
+      ],
+      "display_code": "YH25448",
+      "drug_class": "3rd-generation EGFR TKI",
+      "route": "oral",
+      "first_approval_year": 2024,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Lazertinib"
+        ],
+        "brands": [
+          "Leclaza",
+          "Lazcluze"
+        ],
+        "codes": [
+          "YH25448"
+        ]
+      }
+    },
+    {
+      "generic": "Crizotinib",
+      "brand_names": [
+        "Xalkori"
+      ],
+      "development_codes": [
+        "PF-02341066"
+      ],
+      "display_code": "PF-02341066",
+      "drug_class": "ALK/ROS1/MET TKI",
+      "route": "oral",
+      "first_approval_year": 2011,
+      "nsclc_indication_count": 2,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Crizotinib"
+        ],
+        "brands": [
+          "Xalkori"
+        ],
+        "codes": [
+          "PF-02341066"
+        ]
+      }
+    },
+    {
+      "generic": "Ceritinib",
+      "brand_names": [
+        "Zykadia"
+      ],
+      "development_codes": [
+        "LDK378"
+      ],
+      "display_code": "LDK378",
+      "drug_class": "2nd-generation ALK TKI",
+      "route": "oral",
+      "first_approval_year": 2014,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Ceritinib"
+        ],
+        "brands": [
+          "Zykadia"
+        ],
+        "codes": [
+          "LDK378"
+        ]
+      }
+    },
+    {
+      "generic": "Alectinib",
+      "brand_names": [
+        "Alecensa"
+      ],
+      "development_codes": [
+        "CH5424802",
+        "RO5424802"
+      ],
+      "display_code": "CH5424802",
+      "drug_class": "2nd-generation ALK TKI",
+      "route": "oral",
+      "first_approval_year": 2015,
+      "nsclc_indication_count": 2,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Alectinib"
+        ],
+        "brands": [
+          "Alecensa"
+        ],
+        "codes": [
+          "CH5424802",
+          "RO5424802"
+        ]
+      }
+    },
+    {
+      "generic": "Brigatinib",
+      "brand_names": [
+        "Alunbrig"
+      ],
+      "development_codes": [
+        "AP26113"
+      ],
+      "display_code": "AP26113",
+      "drug_class": "2nd-generation ALK TKI",
+      "route": "oral",
+      "first_approval_year": 2017,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Brigatinib"
+        ],
+        "brands": [
+          "Alunbrig"
+        ],
+        "codes": [
+          "AP26113"
+        ]
+      }
+    },
+    {
+      "generic": "Lorlatinib",
+      "brand_names": [
+        "Lorbrena",
+        "Lorviqua"
+      ],
+      "development_codes": [
+        "PF-06463922"
+      ],
+      "display_code": "PF-06463922",
+      "drug_class": "3rd-generation ALK/ROS1 TKI",
+      "route": "oral",
+      "first_approval_year": 2018,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Lorlatinib"
+        ],
+        "brands": [
+          "Lorbrena",
+          "Lorviqua"
+        ],
+        "codes": [
+          "PF-06463922"
+        ]
+      }
+    },
+    {
+      "generic": "Ensartinib",
+      "brand_names": [
+        "Ensacove"
+      ],
+      "development_codes": [
+        "X-396"
+      ],
+      "display_code": "X-396",
+      "drug_class": "ALK TKI",
+      "route": "oral",
+      "first_approval_year": 2024,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Ensartinib"
+        ],
+        "brands": [
+          "Ensacove"
+        ],
+        "codes": [
+          "X-396"
+        ]
+      }
+    },
+    {
+      "generic": "Entrectinib",
+      "brand_names": [
+        "Rozlytrek"
+      ],
+      "development_codes": [
+        "RXDX-101"
+      ],
+      "display_code": "RXDX-101",
+      "drug_class": "ROS1/NTRK TKI",
+      "route": "oral",
+      "first_approval_year": 2019,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Entrectinib"
+        ],
+        "brands": [
+          "Rozlytrek"
+        ],
+        "codes": [
+          "RXDX-101"
+        ]
+      }
+    },
+    {
+      "generic": "Repotrectinib",
+      "brand_names": [
+        "Augtyro"
+      ],
+      "development_codes": [
+        "TPX-0005"
+      ],
+      "display_code": "TPX-0005",
+      "drug_class": "ROS1/NTRK TKI",
+      "route": "oral",
+      "first_approval_year": 2023,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Repotrectinib"
+        ],
+        "brands": [
+          "Augtyro"
+        ],
+        "codes": [
+          "TPX-0005"
+        ]
+      }
+    },
+    {
+      "generic": "Sotorasib",
+      "brand_names": [
+        "Lumakras",
+        "Lumykras"
+      ],
+      "development_codes": [
+        "AMG 510"
+      ],
+      "display_code": "AMG 510",
+      "drug_class": "KRAS G12C inhibitor",
+      "route": "oral",
+      "first_approval_year": 2021,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Sotorasib"
+        ],
+        "brands": [
+          "Lumakras",
+          "Lumykras"
+        ],
+        "codes": [
+          "AMG 510"
+        ]
+      }
+    },
+    {
+      "generic": "Adagrasib",
+      "brand_names": [
+        "Krazati"
+      ],
+      "development_codes": [
+        "MRTX849"
+      ],
+      "display_code": "MRTX849",
+      "drug_class": "KRAS G12C inhibitor",
+      "route": "oral",
+      "first_approval_year": 2022,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Adagrasib"
+        ],
+        "brands": [
+          "Krazati"
+        ],
+        "codes": [
+          "MRTX849"
+        ]
+      }
+    },
+    {
+      "generic": "Pembrolizumab",
+      "brand_names": [
+        "Keytruda"
+      ],
+      "development_codes": [
+        "MK-3475",
+        "lambrolizumab"
+      ],
+      "display_code": "MK-3475",
+      "drug_class": "anti-PD-1 antibody",
+      "route": "IV",
+      "first_approval_year": 2014,
+      "nsclc_indication_count": 6,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Pembrolizumab"
+        ],
+        "brands": [
+          "Keytruda"
+        ],
+        "codes": [
+          "MK-3475",
+          "lambrolizumab"
+        ]
+      }
+    },
+    {
+      "generic": "Nivolumab",
+      "brand_names": [
+        "Opdivo"
+      ],
+      "development_codes": [
+        "BMS-936558",
+        "MDX-1106",
+        "ONO-4538"
+      ],
+      "display_code": "ONO-4538",
+      "drug_class": "anti-PD-1 antibody",
+      "route": "IV",
+      "first_approval_year": 2014,
+      "nsclc_indication_count": 4,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Nivolumab"
+        ],
+        "brands": [
+          "Opdivo"
+        ],
+        "codes": [
+          "BMS-936558",
+          "MDX-1106",
+          "ONO-4538"
+        ]
+      }
+    },
+    {
+      "generic": "Atezolizumab",
+      "brand_names": [
+        "Tecentriq"
+      ],
+      "development_codes": [
+        "MPDL3280A"
+      ],
+      "display_code": "MPDL3280A",
+      "drug_class": "anti-PD-L1 antibody",
+      "route": "IV",
+      "first_approval_year": 2016,
+      "nsclc_indication_count": 3,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Atezolizumab"
+        ],
+        "brands": [
+          "Tecentriq"
+        ],
+        "codes": [
+          "MPDL3280A"
+        ]
+      }
+    },
+    {
+      "generic": "Durvalumab",
+      "brand_names": [
+        "Imfinzi"
+      ],
+      "development_codes": [
+        "MEDI4736"
+      ],
+      "display_code": "MEDI4736",
+      "drug_class": "anti-PD-L1 antibody",
+      "route": "IV",
+      "first_approval_year": 2017,
+      "nsclc_indication_count": 2,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Durvalumab"
+        ],
+        "brands": [
+          "Imfinzi"
+        ],
+        "codes": [
+          "MEDI4736"
+        ]
+      }
+    },
+    {
+      "generic": "Cemiplimab",
+      "brand_names": [
+        "Libtayo"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "anti-PD-1 antibody",
+      "route": "IV",
+      "first_approval_year": 2018,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Cemiplimab"
+        ],
+        "brands": [
+          "Libtayo"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Ipilimumab",
+      "brand_names": [
+        "Yervoy"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "anti-CTLA-4 antibody",
+      "route": "IV",
+      "first_approval_year": 2011,
+      "nsclc_indication_count": 2,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Ipilimumab"
+        ],
+        "brands": [
+          "Yervoy"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Tremelimumab",
+      "brand_names": [
+        "Imjudo"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "anti-CTLA-4 antibody",
+      "route": "IV",
+      "first_approval_year": 2022,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Tremelimumab"
+        ],
+        "brands": [
+          "Imjudo"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Tislelizumab",
+      "brand_names": [
+        "Tevimbra"
+      ],
+      "development_codes": [
+        "BGB-A317"
+      ],
+      "display_code": "BGB-A317",
+      "drug_class": "anti-PD-1 antibody",
+      "route": "IV",
+      "first_approval_year": 2024,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Tislelizumab"
+        ],
+        "brands": [
+          "Tevimbra"
+        ],
+        "codes": [
+          "BGB-A317"
+        ]
+      }
+    },
+    {
+      "generic": "Sugemalimab",
+      "brand_names": [
+        "Cejemly"
+      ],
+      "development_codes": [
+        "CS1001"
+      ],
+      "display_code": "CS1001",
+      "drug_class": "anti-PD-L1 antibody",
+      "route": "IV",
+      "first_approval_year": null,
+      "nsclc_indication_count": null,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Sugemalimab"
+        ],
+        "brands": [
+          "Cejemly"
+        ],
+        "codes": [
+          "CS1001"
+        ]
+      }
+    },
+    {
+      "generic": "Trastuzumab deruxtecan",
+      "brand_names": [
+        "Enhertu"
+      ],
+      "development_codes": [
+        "T-DXd",
+        "DS-8201"
+      ],
+      "display_code": "T-DXd",
+      "drug_class": "HER2-directed antibody-drug conjugate",
+      "route": "IV",
+      "first_approval_year": 2019,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "trastuzumab deruxtecan"
+        ],
+        "brands": [
+          "Enhertu"
+        ],
+        "codes": [
+          "T-DXd",
+          "DS-8201"
+        ]
+      }
+    },
+    {
+      "generic": "Datopotamab deruxtecan",
+      "brand_names": [
+        "Datroway"
+      ],
+      "development_codes": [
+        "Dato-DXd"
+      ],
+      "display_code": "Dato-DXd",
+      "drug_class": "TROP2-directed antibody-drug conjugate",
+      "route": "IV",
+      "first_approval_year": 2025,
+      "nsclc_indication_count": null,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "datopotamab"
+        ],
+        "brands": [
+          "Datroway"
+        ],
+        "codes": [
+          "Dato-DXd"
+        ]
+      }
+    },
+    {
+      "generic": "Patritumab deruxtecan",
+      "brand_names": [],
+      "development_codes": [
+        "HER3-DXd",
+        "U3-1402"
+      ],
+      "display_code": "HER3-DXd",
+      "drug_class": "HER3-directed antibody-drug conjugate",
+      "route": "IV",
+      "first_approval_year": null,
+      "nsclc_indication_count": null,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "patritumab"
+        ],
+        "brands": [],
+        "codes": [
+          "HER3-DXd",
+          "U3-1402"
+        ]
+      }
+    },
+    {
+      "generic": "Telisotuzumab vedotin",
+      "brand_names": [
+        "Emrelis"
+      ],
+      "development_codes": [
+        "ABBV-399",
+        "Teliso-V"
+      ],
+      "display_code": "Teliso-V",
+      "drug_class": "c-MET antibody-drug conjugate",
+      "route": "IV",
+      "first_approval_year": 2025,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "telisotuzumab"
+        ],
+        "brands": [
+          "Emrelis"
+        ],
+        "codes": [
+          "ABBV-399",
+          "Teliso-V"
+        ]
+      }
+    },
+    {
+      "generic": "Capmatinib",
+      "brand_names": [
+        "Tabrecta"
+      ],
+      "development_codes": [
+        "INC280"
+      ],
+      "display_code": "INC280",
+      "drug_class": "MET inhibitor",
+      "route": "oral",
+      "first_approval_year": 2020,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Capmatinib"
+        ],
+        "brands": [
+          "Tabrecta"
+        ],
+        "codes": [
+          "INC280"
+        ]
+      }
+    },
+    {
+      "generic": "Tepotinib",
+      "brand_names": [
+        "Tepmetko"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "MET inhibitor",
+      "route": "oral",
+      "first_approval_year": 2021,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Tepotinib"
+        ],
+        "brands": [
+          "Tepmetko"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Selpercatinib",
+      "brand_names": [
+        "Retevmo",
+        "Retsevmo"
+      ],
+      "development_codes": [
+        "LOXO-292"
+      ],
+      "display_code": "LOXO-292",
+      "drug_class": "RET inhibitor",
+      "route": "oral",
+      "first_approval_year": 2020,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Selpercatinib"
+        ],
+        "brands": [
+          "Retevmo",
+          "Retsevmo"
+        ],
+        "codes": [
+          "LOXO-292"
+        ]
+      }
+    },
+    {
+      "generic": "Pralsetinib",
+      "brand_names": [
+        "Gavreto"
+      ],
+      "development_codes": [
+        "BLU-667"
+      ],
+      "display_code": "BLU-667",
+      "drug_class": "RET inhibitor",
+      "route": "oral",
+      "first_approval_year": 2020,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Pralsetinib"
+        ],
+        "brands": [
+          "Gavreto"
+        ],
+        "codes": [
+          "BLU-667"
+        ]
+      }
+    },
+    {
+      "generic": "Amivantamab",
+      "brand_names": [
+        "Rybrevant"
+      ],
+      "development_codes": [
+        "JNJ-61186372",
+        "JNJ-372"
+      ],
+      "display_code": "JNJ-61186372",
+      "drug_class": "EGFR-MET bispecific antibody",
+      "route": "IV",
+      "first_approval_year": 2021,
+      "nsclc_indication_count": 2,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Amivantamab"
+        ],
+        "brands": [
+          "Rybrevant"
+        ],
+        "codes": [
+          "JNJ-61186372",
+          "JNJ-372"
+        ]
+      }
+    },
+    {
+      "generic": "Dabrafenib",
+      "brand_names": [
+        "Tafinlar"
+      ],
+      "development_codes": [
+        "GSK2118436"
+      ],
+      "display_code": "GSK2118436",
+      "drug_class": "BRAF inhibitor",
+      "route": "oral",
+      "first_approval_year": 2013,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Dabrafenib"
+        ],
+        "brands": [
+          "Tafinlar"
+        ],
+        "codes": [
+          "GSK2118436"
+        ]
+      }
+    },
+    {
+      "generic": "Trametinib",
+      "brand_names": [
+        "Mekinist"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "MEK inhibitor",
+      "route": "oral",
+      "first_approval_year": 2013,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Trametinib"
+        ],
+        "brands": [
+          "Mekinist"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Bevacizumab",
+      "brand_names": [
+        "Avastin"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "anti-VEGF antibody",
+      "route": "IV",
+      "first_approval_year": 2004,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Bevacizumab"
+        ],
+        "brands": [
+          "Avastin"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Ramucirumab",
+      "brand_names": [
+        "Cyramza"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "anti-VEGFR2 antibody",
+      "route": "IV",
+      "first_approval_year": 2014,
+      "nsclc_indication_count": 1,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Ramucirumab"
+        ],
+        "brands": [
+          "Cyramza"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Tarlatamab",
+      "brand_names": [
+        "Imdelltra"
+      ],
+      "development_codes": [
+        "AMG 757"
+      ],
+      "display_code": "AMG 757",
+      "drug_class": "DLL3-directed bispecific T-cell engager",
+      "route": "IV",
+      "first_approval_year": 2024,
+      "nsclc_indication_count": null,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Tarlatamab"
+        ],
+        "brands": [
+          "Imdelltra"
+        ],
+        "codes": [
+          "AMG 757"
+        ]
+      }
+    },
+    {
+      "generic": "Lurbinectedin",
+      "brand_names": [
+        "Zepzelca"
+      ],
+      "development_codes": [
+        "PM01183"
+      ],
+      "display_code": "PM01183",
+      "drug_class": "oncogenic transcription inhibitor",
+      "route": "IV",
+      "first_approval_year": 2020,
+      "nsclc_indication_count": null,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Lurbinectedin"
+        ],
+        "brands": [
+          "Zepzelca"
+        ],
+        "codes": [
+          "PM01183"
+        ]
+      }
+    },
+    {
+      "generic": "Ivonescimab",
+      "brand_names": [],
+      "development_codes": [
+        "AK112"
+      ],
+      "display_code": "AK112",
+      "drug_class": "PD-1/VEGF bispecific antibody",
+      "route": "IV",
+      "first_approval_year": null,
+      "nsclc_indication_count": null,
+      "is_backbone": false,
+      "match": {
+        "names": [
+          "Ivonescimab"
+        ],
+        "brands": [],
+        "codes": [
+          "AK112"
+        ]
+      }
+    },
+    {
+      "generic": "Cisplatin",
+      "brand_names": [
+        "Platinol"
+      ],
+      "development_codes": [
+        "CDDP"
+      ],
+      "display_code": "CDDP",
+      "drug_class": "platinum agent",
+      "route": "IV",
+      "first_approval_year": 1978,
+      "nsclc_indication_count": null,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "Cisplatin"
+        ],
+        "brands": [
+          "Platinol"
+        ],
+        "codes": [
+          "CDDP"
+        ]
+      }
+    },
+    {
+      "generic": "Carboplatin",
+      "brand_names": [
+        "Paraplatin"
+      ],
+      "development_codes": [
+        "CBDCA"
+      ],
+      "display_code": "CBDCA",
+      "drug_class": "platinum agent",
+      "route": "IV",
+      "first_approval_year": 1989,
+      "nsclc_indication_count": null,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "Carboplatin"
+        ],
+        "brands": [
+          "Paraplatin"
+        ],
+        "codes": [
+          "CBDCA"
+        ]
+      }
+    },
+    {
+      "generic": "Pemetrexed",
+      "brand_names": [
+        "Alimta"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "antifolate",
+      "route": "IV",
+      "first_approval_year": 2004,
+      "nsclc_indication_count": 2,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "Pemetrexed"
+        ],
+        "brands": [
+          "Alimta"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Paclitaxel",
+      "brand_names": [
+        "Taxol"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "taxane",
+      "route": "IV",
+      "first_approval_year": 1992,
+      "nsclc_indication_count": null,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "Paclitaxel"
+        ],
+        "brands": [
+          "Taxol"
+        ],
+        "codes": []
+      },
+      "match_note": "Counts include nab-paclitaxel papers, which also discuss paclitaxel."
+    },
+    {
+      "generic": "Nab-paclitaxel",
+      "brand_names": [
+        "Abraxane"
+      ],
+      "development_codes": [
+        "ABI-007"
+      ],
+      "display_code": "ABI-007",
+      "drug_class": "albumin-bound taxane",
+      "route": "IV",
+      "first_approval_year": 2005,
+      "nsclc_indication_count": 1,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "nab-paclitaxel",
+          "albumin-bound paclitaxel",
+          "nanoparticle albumin-bound"
+        ],
+        "brands": [
+          "Abraxane"
+        ],
+        "codes": [
+          "ABI-007"
+        ]
+      },
+      "match_note": "A subset of these papers also appear under paclitaxel."
+    },
+    {
+      "generic": "Docetaxel",
+      "brand_names": [
+        "Taxotere"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "taxane",
+      "route": "IV",
+      "first_approval_year": 1996,
+      "nsclc_indication_count": 1,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "Docetaxel"
+        ],
+        "brands": [
+          "Taxotere"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Gemcitabine",
+      "brand_names": [
+        "Gemzar"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "nucleoside analogue",
+      "route": "IV",
+      "first_approval_year": 1996,
+      "nsclc_indication_count": 1,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "Gemcitabine"
+        ],
+        "brands": [
+          "Gemzar"
+        ],
+        "codes": []
+      }
+    },
+    {
+      "generic": "Vinorelbine",
+      "brand_names": [
+        "Navelbine"
+      ],
+      "development_codes": [],
+      "display_code": null,
+      "drug_class": "vinca alkaloid",
+      "route": "IV",
+      "first_approval_year": 1994,
+      "nsclc_indication_count": 1,
+      "is_backbone": true,
+      "match": {
+        "names": [
+          "Vinorelbine"
+        ],
+        "brands": [
+          "Navelbine"
+        ],
+        "codes": []
+      }
+    }
+  ]
+}
