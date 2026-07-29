@@ -8,7 +8,7 @@
 // Backbone chemotherapy and the one deployment asset with no molecular target sit
 // in their own sections; membership keys on is_backbone, never on target == null.
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AssetNav from "./AssetNav";
 import { COLOR, FONT } from "../../lib/designTokens";
@@ -130,6 +130,45 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ marginTop: 14, border: `1px solid ${COLOR.hairStrong}`, background: COLOR.surfaceCard, padding: "20px 22px" }}>
       {children}
+    </div>
+  );
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// In-flow return-to-top anchor — Design Mobile Nav frame 1c ("Named rows · in-flow
+// anchors"). A 46px row that sits in the content flow (64px at the very end), no
+// overlay, no scroll threshold. It exists only where the list already breaks —
+// every sixth target group and at the end — so the non-sticky nav is never more
+// than roughly one screen away. Mobile only. Clicking returns to the top, which is
+// where the nav lives.
+function AnchorRow({ label, end }: { label: string; end?: boolean }) {
+  return (
+    <div
+      onClick={scrollToTop}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") scrollToTop();
+      }}
+      style={{
+        height: end ? 64 : 46,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 14px",
+        cursor: "pointer",
+        background: COLOR.ground,
+        borderTop: end ? `1px solid ${COLOR.hairStrong}` : "none",
+        borderBottom: end ? "none" : `1px solid ${COLOR.hairStrong}`,
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = COLOR.surfaceRaised)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = COLOR.ground)}
+    >
+      <span style={{ fontFamily: FONT.mono, fontSize: 9.5, letterSpacing: "0.13em", color: COLOR.ink4 }}>{label}</span>
+      <span style={{ fontFamily: FONT.mono, fontSize: end ? 11 : 9.5, letterSpacing: "0.13em", color: COLOR.amber }}>↑ TOP &amp; NAV</span>
     </div>
   );
 }
@@ -281,21 +320,29 @@ function IndexBody({
       <div style={{ paddingTop: 8 }}>
         {view === "target" ? (
           <>
-            {model.targetGroups.map((g) => {
+            {model.targetGroups.map((g, i) => {
               const groupMax = Math.max(1, ...g.rows.map((r) => r.n));
               const denom = useWithin ? groupMax : model.globalMax;
+              // In-flow return anchor after every sixth target group (mobile only,
+              // frame 1c) — not after the last group, which the END anchor covers.
+              const showAnchor = isMobile && (i + 1) % 6 === 0 && i < model.targetGroups.length - 1;
               return (
-                <div key={g.target} style={{ padding: "20px 0 6px", borderBottom: `1px solid ${COLOR.hair}` }}>
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, paddingBottom: 10 }}>
-                    <span style={{ fontFamily: FONT.mono, fontSize: 13, fontWeight: 500, letterSpacing: "0.14em", color: COLOR.amber }}>{g.target}</span>
-                    <span style={{ fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink4 }}>
-                      {g.rows.length} asset{g.rows.length === 1 ? "" : "s"} · {g.distinctPubs.toLocaleString()} distinct publications
-                    </span>
+                <Fragment key={g.target}>
+                  <div style={{ padding: "20px 0 6px", borderBottom: `1px solid ${COLOR.hair}` }}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, paddingBottom: 10 }}>
+                      <span style={{ fontFamily: FONT.mono, fontSize: 13, fontWeight: 500, letterSpacing: "0.14em", color: COLOR.amber }}>{g.target}</span>
+                      <span style={{ fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink4 }}>
+                        {g.rows.length} asset{g.rows.length === 1 ? "" : "s"} · {g.distinctPubs.toLocaleString()} distinct publications
+                      </span>
+                    </div>
+                    {g.rows.map((r) => (
+                      <AssetRow key={r.slug} row={r} denom={denom} showAlso isMobile={isMobile} />
+                    ))}
                   </div>
-                  {g.rows.map((r) => (
-                    <AssetRow key={r.slug} row={r} denom={denom} showAlso isMobile={isMobile} />
-                  ))}
-                </div>
+                  {showAnchor ? (
+                    <AnchorRow label={`${i + 1} OF ${model.counts.targetGroups} GROUPS`} />
+                  ) : null}
+                </Fragment>
               );
             })}
 
@@ -369,6 +416,8 @@ function IndexBody({
             </div>
           </div>
         )}
+
+        {isMobile ? <AnchorRow end label={`END · ${model.counts.targetGroups} GROUPS`} /> : null}
 
         <div style={{ ...note, marginTop: 36 }}>
           FieldMark NSCLC corpus, {model.header.corpus.toLocaleString()} records, indexed {formatIndexDate()}.

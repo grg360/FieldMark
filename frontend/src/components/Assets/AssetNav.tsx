@@ -1,14 +1,16 @@
-// The new top-level navigation bar — Design frame 1e.
+// The new top-level navigation bar — Design frame 1e (desktop) + Mobile Nav frame
+// 1a "Cell grid · floating marker" (≤767px).
 //
-// SCOPE: this bar renders on the asset routes ONLY. The rest of the app keeps its
-// existing chrome until the supervised global rollout. Links that point at existing
+// SCOPE: this bar renders on the asset routes ONLY. Links that point at existing
 // surfaces work; they just land on pages still wearing the old chrome, which is
 // expected and temporary. Targets live in NAV_ITEMS so the rollout can repoint
 // them in one place. "Assets" is the new fourth axis; nothing else moves.
 //
-// Mobile (≤767px): the wordmark stays fixed and the links become a single
-// horizontally scrollable strip — never wrapping onto a second line. Desktop is
-// unchanged.
+// Mobile (≤767px): a 3×2 cell grid on a 1px rule grid — equal cells with shared
+// seams so it reads as a matrix, not a wrapped row. All six items visible with full
+// labels, no icons, no scrolling, no interaction to reveal. Active = 2px amber cap
+// rule + lifted cell fill + brighter label. Replaces the old horizontal scroll
+// strip entirely. Desktop (≥768px) is unchanged.
 
 import { Link } from "react-router-dom";
 import { COLOR, FONT } from "../../lib/designTokens";
@@ -33,21 +35,76 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Pulse", to: "/pulse" },
 ];
 
+// Seam colour for the rule grid — the 1px gaps between opaque cells reveal it.
+const SEAM = COLOR.hairStrong;
+
 export default function AssetNav({ active }: { active?: AssetNavKey }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
 
+  if (isMobile) {
+    return (
+      <nav aria-label="Primary">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 1,
+            background: SEAM,
+            borderBottom: `1px solid ${SEAM}`,
+          }}
+        >
+          {NAV_ITEMS.map((item) => {
+            const isActive = item.key != null && item.key === active;
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                aria-current={isActive ? "page" : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: 53,
+                  padding: "0 11px",
+                  background: isActive ? COLOR.surfaceRaised : COLOR.ground,
+                  boxShadow: isActive ? `inset 0 2px 0 ${COLOR.amber}` : "none",
+                  textDecoration: "none",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: FONT.mono,
+                    fontSize: 11.5,
+                    lineHeight: 1.2,
+                    letterSpacing: "0.07em",
+                    textTransform: "uppercase",
+                    color: isActive ? COLOR.ink1 : COLOR.ink3,
+                    fontWeight: isActive ? 500 : 400,
+                    overflowWrap: "anywhere",
+                    hyphens: "auto",
+                  }}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    );
+  }
+
+  // Desktop (≥768px) — unchanged: wordmark + inline links.
   return (
     <nav
       style={{
         display: "flex",
         alignItems: "center",
-        gap: isMobile ? 14 : 26,
+        gap: 26,
         minHeight: 46,
-        padding: isMobile ? "0 16px" : "0 24px",
+        padding: "0 24px",
         borderBottom: `1px solid ${COLOR.hairStrong}`,
         backgroundColor: COLOR.ground,
-        // Desktop wraps only in the (never-hit) overflow case; mobile never wraps.
-        flexWrap: isMobile ? "nowrap" : "wrap",
+        flexWrap: "wrap",
       }}
       aria-label="Primary"
     >
@@ -66,19 +123,7 @@ export default function AssetNav({ active }: { active?: AssetNavKey }) {
       >
         FIELDMARK
       </Link>
-      <div
-        style={{
-          display: "flex",
-          gap: isMobile ? 18 : 20,
-          // Mobile: one scrollable strip, links never wrap; desktop unchanged.
-          flexWrap: isMobile ? "nowrap" : "wrap",
-          overflowX: isMobile ? "auto" : "visible",
-          WebkitOverflowScrolling: "touch",
-          minWidth: 0,
-          flex: isMobile ? 1 : "0 1 auto",
-          paddingBottom: isMobile ? 0 : undefined,
-        }}
-      >
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
         {NAV_ITEMS.map((item) => {
           const isActive = item.key != null && item.key === active;
           return (
@@ -96,7 +141,6 @@ export default function AssetNav({ active }: { active?: AssetNavKey }) {
                 borderBottom: isActive ? `1px solid ${COLOR.amber}` : "1px solid transparent",
                 lineHeight: 1,
                 whiteSpace: "nowrap",
-                flex: "none",
                 transition: "color 0.15s ease",
               }}
               onMouseEnter={(e) => {
