@@ -9,7 +9,14 @@ is 'nsclc', which includes SCLC). Matching mirrors the validation:
 
 One edge per (publication, asset). Terms are applied in priority order
 name -> code -> brand, with ON CONFLICT DO NOTHING, so the strongest signal wins
-matched_via. Idempotent: truncates and rebuilds. Run on reingest.
+matched_via. Idempotent: full rebuild each run.
+
+SWAP-IN: the ~95s of matching runs against a TEMP staging table, so the live
+asset_publication_v1 is never locked for the compute. Only the final swap
+(TRUNCATE + copy of the precomputed rows) briefly locks the live table (~2s) --
+keeping its OID so the asset_mention_v1 view / RLS / grants survive. This is the
+same fix build_author_flat needed; asset_publication_v1 has a reader (the asset
+page), so it must not be locked for the whole build. Run on reingest (weekly).
 
 Usage:  python scripts/assets/build_asset_matches.py [--dry-run]
 """
@@ -49,6 +56,7 @@ def main() -> int:
         print("DATABASE_URL not set", file=sys.stderr)
         return 1
 
+    import time
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute("SET statement_timeout='600s'")
         # Corpus scoped to the lung-cancer TA (includes SCLC), matching validation.
@@ -61,14 +69,25 @@ def main() -> int:
         cur.execute("SELECT count(*) FROM corpus")
         corpus_n = cur.fetchone()[0]
 
-        if not args.dry_run:
-            cur.execute("TRUNCATE public.asset_publication_v1")
+        # Swap-in build: the ~95s matching runs against a STAGING table so the live
+        # asset_publication_v1 is never locked for the compute. Only the final swap
+        # (truncate + copy of precomputed rows) briefly locks the live table — the
+        # same fix build_author_flat needed.
+        cur.execute("""
+            CREATE TEMP TABLE staging (
+              publication_id uuid NOT NULL,
+              asset_generic  text NOT NULL,
+              matched_via    text NOT NULL,
+              match_term     text NOT NULL,
+              PRIMARY KEY (publication_id, asset_generic)
+            )
+        """)
 
         total_edges = 0
         for a in assets:
             gen = a["generic"]
             m = a["match"]
-            # priority order: names, then codes, then brands
+            # priority order: names, then codes, then brands (first match wins matched_via)
             plan = (
                 [("name", n, False) for n in m.get("names", [])]
                 + [("code", c, True) for c in m.get("codes", [])]
@@ -84,7 +103,7 @@ def main() -> int:
                     cur.execute(f"SELECT count(*) FROM corpus WHERE {where}", (param,))
                     continue
                 cur.execute(
-                    f"""INSERT INTO public.asset_publication_v1 (publication_id, asset_generic, matched_via, match_term)
+                    f"""INSERT INTO staging (publication_id, asset_generic, matched_via, match_term)
                         SELECT id, %s, %s, %s FROM corpus WHERE {where}
                         ON CONFLICT (publication_id, asset_generic) DO NOTHING""",
                     (gen, via, term, param),
@@ -94,14 +113,26 @@ def main() -> int:
             print(f"  {gen:<28} +{asset_edges} edges")
 
         if args.dry_run:
-            print(f"[dry-run] corpus={corpus_n}; wrote nothing")
+            print(f"[dry-run] corpus={corpus_n}; matched {total_edges} edges into staging; wrote nothing")
             return 0
+
+        conn.commit()  # end the long compute txn; staging (temp) persists in-session
+
+        # ── swap: short transaction, the only time the live table is locked ──
+        t0 = time.time()
+        cur.execute("BEGIN")
+        cur.execute("TRUNCATE public.asset_publication_v1")
+        cur.execute("""INSERT INTO public.asset_publication_v1
+                         (publication_id, asset_generic, matched_via, match_term)
+                       SELECT publication_id, asset_generic, matched_via, match_term FROM staging""")
+        conn.commit()
+        swap_s = time.time() - t0
 
         cur.execute("SELECT count(DISTINCT publication_id) FROM public.asset_publication_v1")
         distinct_pubs = cur.fetchone()[0]
-        conn.commit()
         print(f"\ncorpus={corpus_n}  edges={total_edges}  distinct publications={distinct_pubs} "
               f"({100*distinct_pubs/corpus_n:.1f}% of corpus)")
+        print(f"live-table lock window (swap only): {swap_s:.2f}s")
     return 0
 
 

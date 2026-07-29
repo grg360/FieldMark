@@ -50,6 +50,9 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       8c derive_career_first_pub_year_v2.py --ta <slug> --ingestion-run-id <HCP_RUN_ID> --snapshot-date <TODAY> --execute
                       8d cohort_classification_v2.py --ta <slug> --execute
   9 score             rising_score.py --ta <slug> --execute
+ 10 asset_matches      build_asset_matches.py  (rebuild asset_publication_v1 from config/assets.json)
+                      NON-BLOCKING + NSCLC-ONLY: runs after scoring; failure -> WARN (not FAILED), so a
+                      stale asset table never gates the cycle. Swap-in build (~2s live lock, ~95s total).
 
 SNAPSHOT-DATE: captured ONCE at cycle start and passed identically to 8b and 8c (they must match
 or 8c reads zero rows - a real past bug).
@@ -99,7 +102,18 @@ SCRIPTS: Dict[str, str] = {
     "career_first": "scripts/enrich/derive_career_first_pub_year_v2.py",
     "cohort": "scripts/classify/cohort_classification_v2.py",
     "rising_score": "scripts/score/rising_score.py",
+    "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
 }
+
+# Stage 10 ASSET MATCHES: rebuild asset_publication_v1 from config/assets.json (the Drug
+# Intelligence vocabulary is the file; this derives the asset<->publication edges). NSCLC-ONLY --
+# the config is scoped to the lung-cancer corpus -- so it runs only when --ta nsclc. NON-BLOCKING:
+# it comes AFTER the scoring chain and its failure is isolated (noted WARN, never FAILED), because
+# a stale asset table costs little (~400 NSCLC pubs/month) and must never gate the rising scores.
+# SWAP-IN: the ~95s truncate-and-rebuild matches into a temp staging table off the live table, then
+# swaps in the precomputed rows in a ~2s transaction -- so a concurrent asset-page read never blocks
+# for the full build (the same fix build_author_flat needed). Weekly cadence = this cron's cadence.
+ASSET_MATCHES_TA = "nsclc"
 
 # 1c FLATTEN: full rebuild of author_pub_flat from publications_v2.authorships (TA-agnostic, unbilled
 # SQL). GATE-D is satisfied by ORDER -- it runs AFTER 1b, so it flattens the freshly-enriched pubs.
@@ -143,8 +157,10 @@ STAGE_ORDER: List[Tuple[int, str]] = [
     (7, "dedup"),
     (8, "career"),
     (9, "score"),
+    (10, "asset_matches"),
 ]
 STAGE_NAME_TO_NUM = {name: n for n, name in STAGE_ORDER}
+MAX_STAGE = STAGE_ORDER[-1][0]
 
 
 class StageFailure(Exception):
@@ -306,6 +322,11 @@ def cmd_cohort(slug: str) -> List[str]:
 
 def cmd_rising_score(slug: str) -> List[str]:
     return py("rising_score") + ["--ta", slug, "--execute"]
+
+
+def cmd_build_asset_matches() -> List[str]:
+    # 10: rebuild asset_publication_v1 from config/assets.json (swap-in; no args -- reads DATABASE_URL).
+    return py("asset_matches")
 
 
 # ---------------------------------------------------------------------------
@@ -499,6 +520,10 @@ def print_plan(
         ("8c career_first_pub_year", cmd_career_first(slug, HCP, snapshot)),
         ("8d cohort_classification", cmd_cohort(slug)),
         ("9  rising_score", cmd_rising_score(slug)),
+        (("10 asset_matches (rebuild asset_publication_v1 from config/assets.json; swap-in ~2s live lock; "
+          "NON-BLOCKING -- WARN not FAILED)" if slug == ASSET_MATCHES_TA
+          else f"10 asset_matches  [SKIPPED: NSCLC-only, ta={slug}]"),
+         cmd_build_asset_matches() if slug == ASSET_MATCHES_TA else []),
     ]
 
     print("=" * 72)
@@ -719,6 +744,22 @@ def run_cycle(
             run_stage(9, "rising_score", cmd_rising_score(slug))
             note(9, "score", "OK")
 
+        # 10 ASSET MATCHES (NSCLC only) -- NON-BLOCKING. After the scoring chain; failure is
+        # isolated so it never marks the cycle FAILED (a stale asset table costs ~400 pubs/month
+        # and must not gate the rising scores). Skipped for non-NSCLC TAs (no asset config).
+        if running(10):
+            if slug != ASSET_MATCHES_TA:
+                note(10, "asset_matches", f"SKIPPED(not {ASSET_MATCHES_TA})")
+            else:
+                try:
+                    run_stage(10, "asset_matches", cmd_build_asset_matches())
+                    note(10, "asset_matches", "OK")
+                except Exception as ae:  # non-blocking: log + continue (StageFailure incl.)
+                    note(10, "asset_matches", f"WARN({type(ae).__name__})")
+                    print(f"\n[reingest_cycle] WARN: stage 10 asset_matches failed ({ae}); "
+                          f"cycle still SUCCESS (non-blocking). Asset table left at prior build.",
+                          file=sys.stderr)
+
     except StageFailure as f:
         note(f.stage_no, f.name, f"FAILED(exit={f.returncode})")
         write_completion_marker(work, {
@@ -761,7 +802,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--maxdate", default=None, metavar="YYYY/MM/DD",
                    help="Explicit stage-1 window end (with --mindate). Mutually exclusive with --days.")
     p.add_argument("--resume-from", metavar="STAGE", default=None,
-                   help="Skip to a stage (number 1-9 or name: "
+                   help=f"Skip to a stage (number 1-{MAX_STAGE} or name: "
                         + ", ".join(name for _, name in STAGE_ORDER)
                         + "), reusing the last run's ids/files from the work dir.")
     args = p.parse_args()
@@ -777,12 +818,12 @@ def resolve_resume(value: Optional[str]) -> Optional[int]:
     if value is None:
         return None
     v = value.strip().lower()
-    if v.isdigit() and 1 <= int(v) <= 9:
+    if v.isdigit() and 1 <= int(v) <= MAX_STAGE:
         return int(v)
     if v in STAGE_NAME_TO_NUM:
         return STAGE_NAME_TO_NUM[v]
     raise SystemExit(
-        f"--resume-from: unknown stage '{value}'. Use 1-9 or one of: "
+        f"--resume-from: unknown stage '{value}'. Use 1-{MAX_STAGE} or one of: "
         + ", ".join(name for _, name in STAGE_ORDER)
     )
 
