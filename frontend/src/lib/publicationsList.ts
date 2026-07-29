@@ -1,4 +1,10 @@
 import { supabase } from "./supabase";
+import { assetByGeneric, assetSlug } from "./assetConfig";
+
+export interface PublicationAssetRef {
+  generic: string;
+  slug: string;
+}
 
 export interface PublicationListRow {
   id: string;
@@ -27,6 +33,9 @@ export interface PublicationListRow {
   // be paywalled ("View on publisher").
   fullTextUrl?: string | null;
   fullTextIsOa?: boolean;
+  // Assets this publication matched (asset_publication_v1), for the lateral entry
+  // point: asset names in the bibliography row link to /assets/:slug (frame 1e).
+  assets?: PublicationAssetRef[];
 }
 
 // Map raw MeSH publication_types to a short study-type label, most specific first.
@@ -58,17 +67,28 @@ export async function enrichCharacterisation(rows: PublicationListRow[]): Promis
   const typesById = new Map<string, string[] | null>();
   const themeById = new Map<string, string>();
   const fullTextById = new Map<string, { url: string; isOa: boolean }>();
+  const assetsById = new Map<string, PublicationAssetRef[]>();
 
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
-    const [{ data: pubs }, { data: themes }] = await Promise.all([
+    const [{ data: pubs }, { data: themes }, { data: assetRows }] = await Promise.all([
       supabase.from("publications_v2").select("id, publication_types, open_access, doi").in("id", chunk),
       supabase
         .from("publication_theme_v1")
         .select("publication_id, theme_canonical_v1(short_name, canonical_name)")
         .in("publication_id", chunk)
         .eq("is_primary", true),
+      supabase.from("asset_publication_v1").select("publication_id, asset_generic").in("publication_id", chunk),
     ]);
+    for (const a of (assetRows ?? []) as { publication_id: string; asset_generic: string }[]) {
+      const cfg = assetByGeneric(a.asset_generic);
+      if (!cfg) continue; // only assets in the config vocabulary become links
+      const list = assetsById.get(a.publication_id) ?? [];
+      if (!list.some((x) => x.generic === cfg.generic)) {
+        list.push({ generic: cfg.generic, slug: assetSlug(cfg.generic) });
+      }
+      assetsById.set(a.publication_id, list);
+    }
     for (const p of (pubs ?? []) as {
       id: string;
       publication_types: string[] | null;
@@ -100,6 +120,7 @@ export async function enrichCharacterisation(rows: PublicationListRow[]): Promis
       themeShort: themeById.get(r.id) ?? null,
       fullTextUrl: ft?.url ?? null,
       fullTextIsOa: ft?.isOa ?? false,
+      assets: (assetsById.get(r.id) ?? []).sort((a, b) => a.generic.localeCompare(b.generic)),
     };
   });
 }

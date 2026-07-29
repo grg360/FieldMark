@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type { PublicationListRow } from "../../lib/publicationsList";
 import { formatByline } from "../../lib/authorByline";
 import { COLOR, ELEVATION, FONT } from "../../lib/designTokens";
@@ -83,6 +84,26 @@ export default function PublicationCard({ pub, affordance, isMobile }: Props) {
         {/* characterisation line — beneath the title, only when it has content */}
         {characterisation && (
           <div style={{ ...mono(11, COLOR.ink3), letterSpacing: "0.02em" }}>{characterisation}</div>
+        )}
+
+        {/* assets mentioned — the lateral entry point into the asset pages
+            (frame 1e). Each name links to /assets/:slug; nothing renders when the
+            publication matched no tracked asset. Capped so a chemo-heavy paper's
+            long backbone list doesn't overrun the row. */}
+        {pub.assets && pub.assets.length > 0 && (
+          <div style={{ ...mono(10.5, COLOR.ink4), letterSpacing: "0.04em", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+            <span style={{ color: COLOR.ink5 }}>ASSETS</span>
+            {pub.assets.slice(0, 4).map((a) => (
+              <Link
+                key={a.slug}
+                to={`/assets/${a.slug}`}
+                style={{ color: COLOR.indigoLink, textDecoration: "underline", textUnderlineOffset: 3 }}
+              >
+                {a.generic.toLowerCase()}
+              </Link>
+            ))}
+            {pub.assets.length > 4 && <span style={{ color: COLOR.ink5 }}>+{pub.assets.length - 4}</span>}
+          </div>
         )}
 
         {/* byline (kept — collaboration intelligence) */}
