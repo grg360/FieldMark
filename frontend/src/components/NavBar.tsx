@@ -328,8 +328,11 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
   };
   const showInvites = !!menu.invite && menu.invite.uses_remaining > 0;
 
-  // Established treatment: a perfect amber circle with the user's initials, no
-  // container border and no caret. Opens the five-row menu on click.
+  // Established treatment (exact old TopBar UserMenu): a 32×32 circle, transparent
+  // fill, 1.5px amber ring, amber initials — the amber reads correctly as a ring; a
+  // solid fill of the same token (#E8A020) reads yellow at this size. No caret.
+  // fm-pill-button opts out of the global `button { min-height: 44px }`; flexShrink
+  // 0 + minWidth keep it square in the flex row.
   const pill = (
     <button
       type="button"
@@ -337,22 +340,17 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
       aria-label="Account menu"
       aria-haspopup="menu"
       aria-expanded={open}
-      // fm-pill-button carries `min-height: 0 !important`, exempting this from the
-      // global `button { min-height: 44px }` tap-target rule that was forcing the
-      // height to 44 (oval, taller than wide). Same opt-out the old UserMenu used.
       className="fm-pill-button"
       style={{
-        // Exact old-TopBar UserMenu dimensions: 32×32, border-radius 50%. flexShrink
-        // 0 so the bar's flex row can't compress the width; boxSizing border-box
-        // keeps it 32 square regardless.
         width: 32,
         height: 32,
         minWidth: 32,
         flexShrink: 0,
         boxSizing: "border-box",
         borderRadius: "50%",
-        background: COLOR.amber,
-        border: "none",
+        backgroundColor: "transparent",
+        border: `1.5px solid ${COLOR.amber}`,
+        color: COLOR.amber,
         padding: 0,
         cursor: "pointer",
         display: "flex",
@@ -362,7 +360,6 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
         fontSize: 12,
         fontWeight: 600,
         letterSpacing: "0.02em",
-        color: COLOR.ground,
       }}
     >
       {menu.initials}
