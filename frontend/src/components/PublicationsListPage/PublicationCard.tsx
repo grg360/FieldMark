@@ -17,9 +17,19 @@ interface Props {
 // goes down, content per row goes up — the intended trade for a literature audience.
 const BYLINE_CAP = 10;
 
+// Author-position chip — three-way (First / Senior / Co), preserving the year
+// bibliography's richer treatment across every surface. Senior = last-named /
+// trailing-collective author, from is_senior_author.
+function authorChip(pub: PublicationListRow) {
+  if (pub.is_first_author) return { label: "First author", fg: "#3FB8AF", bg: "rgba(63,184,175,0.15)", border: "#3FB8AF" };
+  if (pub.is_senior_author) return { label: "Senior author", fg: COLOR.info, bg: "rgba(79,163,199,0.14)", border: COLOR.info };
+  return { label: "Co-author", fg: COLOR.ink3, bg: "rgba(107,106,101,0.15)", border: COLOR.ink5 };
+}
+
 export default function PublicationCard({ pub, affordance, isMobile }: Props) {
   const pubmedUrl = pub.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pub.pmid}/` : null;
-  const byline = formatByline(pub.pubmed_authorships, BYLINE_CAP);
+  const byline = pub.bylineText ?? formatByline(pub.pubmed_authorships, BYLINE_CAP);
+  const chip = authorChip(pub);
 
   // Characterisation line: study type · theme, whatever exists. Nothing when empty.
   const characterisation = [pub.studyType, pub.themeShort].filter(Boolean).join(" · ");
@@ -48,12 +58,12 @@ export default function PublicationCard({ pub, affordance, isMobile }: Props) {
           <span style={{ ...mono(10.5, COLOR.ink5) }}>
             {pub.citation_count != null ? `${pub.citation_count.toLocaleString()} citations` : "—"}
           </span>
-          {/* author-position chip — preserved as-is */}
+          {/* author-position chip — three-way (First / Senior / Co) */}
           <span
             style={{
-              backgroundColor: pub.is_first_author ? "rgba(63,184,175,0.15)" : "rgba(107,106,101,0.15)",
-              border: `1px solid ${pub.is_first_author ? "#3FB8AF" : COLOR.ink5}`,
-              color: pub.is_first_author ? "#3FB8AF" : COLOR.ink3,
+              backgroundColor: chip.bg,
+              border: `1px solid ${chip.border}`,
+              color: chip.fg,
               fontSize: 10,
               fontWeight: 600,
               padding: "2px 8px",
@@ -61,7 +71,7 @@ export default function PublicationCard({ pub, affordance, isMobile }: Props) {
               lineHeight: 1.4,
             }}
           >
-            {pub.is_first_author ? "First author" : "Co-author"}
+            {chip.label}
           </span>
         </div>
 

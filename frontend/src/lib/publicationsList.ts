@@ -10,9 +10,14 @@ export interface PublicationListRow {
   citation_count: number | null;
   doi: string | null;
   is_first_author?: boolean;
+  is_senior_author?: boolean;
   author_position?: number | null;
   // Raw pubmed_authorships JSON; PublicationCard formats it into a byline.
   pubmed_authorships?: unknown;
+  // Pre-formatted byline (subject-anchored). When present, the card renders this
+  // verbatim instead of formatting pubmed_authorships — used by the year
+  // bibliography, whose byline comes from formatBibliographyByline upstream.
+  bylineText?: string;
   // Characterisation line (enriched post-fetch). Either may be null; when both
   // are null the line renders nothing — no placeholder.
   studyType?: string | null;   // mapped from publication_types
@@ -41,7 +46,7 @@ export function mapStudyType(types: string[] | null | undefined): string | null 
 // (publication_types by id; primary theme short_name by publication_id), uniform
 // across every entry point — including the RPC-backed pair/partner lists whose
 // rows don't carry publication_types.
-async function enrichCharacterisation(rows: PublicationListRow[]): Promise<PublicationListRow[]> {
+export async function enrichCharacterisation(rows: PublicationListRow[]): Promise<PublicationListRow[]> {
   if (rows.length === 0) return rows;
   const ids = rows.map((r) => r.id);
   const CHUNK = 200;

@@ -19,8 +19,12 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: "discussed", label: "DISCUSSED" },
 ];
 
-export default function PublicationList({ pubs }: { pubs: PublicationListRow[] }) {
-  const isMobile = useMediaQuery("(max-width: 640px)");
+export default function PublicationList({ pubs, narrow = false }: { pubs: PublicationListRow[]; narrow?: boolean }) {
+  // `narrow` forces the stacked row layout regardless of viewport — used inside
+  // the fixed-480px profile bibliography screen, where the container is narrow
+  // even on desktop.
+  const viewportMobile = useMediaQuery("(max-width: 640px)");
+  const isMobile = viewportMobile || narrow;
   const [sort, setSort] = useState<Sort>("cited");
   const [affordances, setAffordances] = useState<Record<string, DiscussAffordance>>({});
 

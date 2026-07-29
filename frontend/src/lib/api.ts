@@ -2714,6 +2714,7 @@ export interface BibliographyPaper {
   pmid: string | null;
   title: string;
   journal: string | null;
+  pubDate: string | null;
   citations: number | null;
   isFirstAuthor: boolean;
   isSeniorAuthor: boolean;
@@ -2741,6 +2742,7 @@ export async function getPublicationsByYearForHcp(
         journal,
         citation_count,
         pub_year,
+        pub_date,
         pubmed_authorships
       )
       `,
@@ -2759,6 +2761,7 @@ export async function getPublicationsByYearForHcp(
       journal: string | null;
       citation_count: number | null;
       pub_year: number | null;
+      pub_date: string | null;
       pubmed_authorships: unknown;
     } | null;
   }>;
@@ -2771,6 +2774,7 @@ export async function getPublicationsByYearForHcp(
       pmid: pub.pubmed_id,
       title: pub.title ?? "(Untitled)",
       journal: pub.journal,
+      pubDate: pub.pub_date,
       citations: pub.citation_count,
       isFirstAuthor: row.is_first_author === true,
       isSeniorAuthor: row.is_senior_author === true,

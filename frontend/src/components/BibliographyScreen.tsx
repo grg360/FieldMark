@@ -1,10 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { HCP } from "../data/hcpData";
-import { getPublicationsByYearForHcp, type BibliographyPaper } from "../lib/api";
-import { COLOR, ELEVATION, FONT } from "../lib/designTokens";
+import { getPublicationsByYearForHcp } from "../lib/api";
+import { enrichCharacterisation, type PublicationListRow } from "../lib/publicationsList";
+import { COLOR } from "../lib/designTokens";
 import TopBar from "./TopBar";
 import GlobalFooter from "./GlobalFooter";
+import PublicationList from "./PublicationsListPage/PublicationList";
 
 interface BibliographyScreenProps {
   hcp: HCP;
@@ -12,128 +14,9 @@ interface BibliographyScreenProps {
   onBack: () => void;
 }
 
-// Link violet used for cross-references across the platform (cohort/rising-star
-// accent). Frozen hex, not a token — matches the "View" links elsewhere.
-const LINK_VIOLET = "#9B6DFF";
-
-function PaperCard({ paper }: { paper: BibliographyPaper }) {
-  function handleViewAbstract(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!paper.pmid) return;
-    window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, "_blank", "noopener,noreferrer");
-  }
-
-  return (
-    <div
-      style={{
-        ...ELEVATION.card,
-        borderLeft: `3px solid ${COLOR.amber}`,
-        padding: 12,
-        cursor: "default",
-        fontFamily: FONT.sans,
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-      }}
-    >
-      {/* Row 1: author-role pill + citations. First = teal, Senior/PI = info-blue,
-          everyone else = neutral. is_senior_author comes from the DB (handles the
-          last-named-author / trailing-collective case). */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div
-          style={{
-            backgroundColor: paper.isFirstAuthor
-              ? "#0A1F16"
-              : paper.isSeniorAuthor
-                ? "rgba(79,163,199,0.14)"
-                : COLOR.surfaceWell,
-            border: `1px solid ${
-              paper.isFirstAuthor ? "#1D9E75" : paper.isSeniorAuthor ? COLOR.info : COLOR.hair
-            }`,
-            color: paper.isFirstAuthor ? "#1D9E75" : paper.isSeniorAuthor ? COLOR.info : COLOR.ink4,
-            fontSize: 10,
-            padding: "2px 8px",
-            borderRadius: 3,
-            lineHeight: 1.4,
-          }}
-        >
-          {paper.isFirstAuthor ? "First author" : paper.isSeniorAuthor ? "Senior author" : "Co-author"}
-        </div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 3 }}>
-          <span className="fm-bib-citation" style={{ fontSize: 16, fontFamily: FONT.mono, fontWeight: 500, color: COLOR.amber, lineHeight: 1 }}>
-            {paper.citations != null ? paper.citations.toLocaleString() : "—"}
-          </span>
-          <span style={{ fontSize: 10, color: COLOR.ink4, lineHeight: 1, marginBottom: 1 }}>citations</span>
-        </div>
-      </div>
-
-      {/* Row 2: title */}
-      <div
-        style={{
-          marginTop: 8,
-          fontSize: 13,
-          color: COLOR.ink1,
-          fontWeight: 500,
-          lineHeight: 1.4,
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}
-      >
-        {paper.title}
-      </div>
-
-      {/* Row 3: journal + full author byline. Visually clamped to 2 lines so card
-          heights stay near-uniform (the byline is the dominant height variance).
-          The clamp is display-only — the subject-anchored string from
-          formatBibliographyByline is untouched; the clamp may hide part of the
-          tail. */}
-      <div
-        style={{
-          marginTop: 4,
-          fontSize: 12,
-          lineHeight: 1.4,
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}
-      >
-        {paper.journal ? <span style={{ color: COLOR.amber }}>{paper.journal}</span> : null}
-        {paper.journal && paper.authors ? <span style={{ color: COLOR.ink5 }}> · </span> : null}
-        {paper.authors ? <span style={{ color: COLOR.ink4 }}>{paper.authors}</span> : null}
-      </div>
-
-      {/* Row 4: PMID + view abstract — pinned to the card bottom so it aligns
-          across equal-height (stretched) cards regardless of content height. */}
-      <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontFamily: FONT.mono, color: COLOR.ink5 }}>
-          {paper.pmid ? `PMID ${paper.pmid}` : "—"}
-        </span>
-        <button
-          onClick={handleViewAbstract}
-          disabled={!paper.pmid}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            fontSize: 11,
-            fontWeight: 500,
-            color: paper.pmid ? LINK_VIOLET : COLOR.ink5,
-            cursor: paper.pmid ? "pointer" : "default",
-          }}
-        >
-          View Abstract
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function BibliographyScreen({ hcp, year, onBack }: BibliographyScreenProps) {
   const navigate = useNavigate();
-  const [papers, setPapers] = React.useState<BibliographyPaper[]>([]);
+  const [papers, setPapers] = React.useState<PublicationListRow[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -147,8 +30,15 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
     setLoading(true);
     void (async () => {
       const data = await getPublicationsByYearForHcp(String(targetId), year);
+      const rows: PublicationListRow[] = data.map((p) => ({
+        id: p.id, pmid: p.pmid, title: p.title, journal: p.journal,
+        pub_year: year, pub_date: p.pubDate, citation_count: p.citations, doi: null,
+        is_first_author: p.isFirstAuthor, is_senior_author: p.isSeniorAuthor,
+        bylineText: p.authors,
+      }));
+      const enriched = await enrichCharacterisation(rows);
       if (cancelled) return;
-      setPapers(data);
+      setPapers(enriched);
       setLoading(false);
     })();
     return () => {
@@ -210,36 +100,20 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
               Publications
             </span>
             <span style={{ fontSize: 11, color: COLOR.ink5 }}>
-              {loading ? "loading…" : `${papers.length} papers · sorted by citations`}
+              {loading ? "loading…" : `${papers.length} papers`}
             </span>
           </div>
 
           {/* Paper cards */}
           {loading ? (
-            <div className="fm-bib-grid" style={{ padding: "0 16px 32px" }}>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    backgroundColor: COLOR.surfaceWell,
-                    border: `1px solid ${COLOR.hair}`,
-                    borderLeft: `3px solid ${COLOR.hair}`,
-                    borderRadius: 4,
-                    padding: 12,
-                    height: 110,
-                  }}
-                />
-              ))}
-            </div>
+            <div style={{ padding: "16px", fontSize: 13, color: COLOR.ink4 }}>Loading…</div>
           ) : papers.length === 0 ? (
             <div style={{ padding: "32px 16px", textAlign: "center", fontSize: 13, color: COLOR.ink4 }}>
               No publications for {year}.
             </div>
           ) : (
-            <div className="fm-bib-grid" style={{ padding: "0 16px 32px" }}>
-              {papers.map((paper) => (
-                <PaperCard key={paper.id} paper={paper} />
-              ))}
+            <div style={{ padding: "0 16px 32px" }}>
+              <PublicationList pubs={papers} narrow />
             </div>
           )}
         </div>
