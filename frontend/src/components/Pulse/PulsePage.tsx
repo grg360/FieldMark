@@ -42,7 +42,7 @@ export default function PulsePage() {
 
   if (!pulse) {
     return (
-      <AppLayout maxWidth={760}>
+      <AppLayout width="reading">
         <div
           style={{
             ...columnStyle,
@@ -65,7 +65,7 @@ export default function PulsePage() {
   }
 
   return (
-    <AppLayout maxWidth={760}>
+    <AppLayout width="reading">
       <div style={columnStyle}>
         <PulseHeader therapeuticArea={pulse.therapeutic_area} window={pulse.window} />
         {/* AI synthesis opens the page — one paragraph on where attention sits. */}

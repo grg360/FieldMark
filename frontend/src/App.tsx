@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { CONTENT_WIDTH } from "./lib/designTokens";
 import {
   Link,
   Navigate,
@@ -703,7 +704,7 @@ function FeedLayout({
         style={{
           backgroundColor: "#0A0A0B",
           minHeight: "100dvh",
-          maxWidth: 720,
+          maxWidth: CONTENT_WIDTH.reading,
           margin: "0 auto",
           fontFamily: "system-ui, -apple-system, sans-serif",
           overflowX: "hidden",
@@ -1209,7 +1210,7 @@ function HCPDetailRoute() {
         style={{
           backgroundColor: "#0A0A0B",
           minHeight: "100dvh",
-          maxWidth: 720,
+          maxWidth: CONTENT_WIDTH.reading,
           margin: "0 auto",
           color: "#6B6A65",
           padding: 24,
@@ -1227,7 +1228,7 @@ function HCPDetailRoute() {
         style={{
           backgroundColor: "#0A0A0B",
           minHeight: "100dvh",
-          maxWidth: 720,
+          maxWidth: CONTENT_WIDTH.reading,
           margin: "0 auto",
           padding: 24,
           fontFamily: "system-ui, sans-serif",
@@ -1310,7 +1311,7 @@ function FIThreadRoute() {
       style={{
         backgroundColor: "#0A0A0B",
         minHeight: "100dvh",
-        maxWidth: 720,
+        maxWidth: CONTENT_WIDTH.reading,
         margin: "0 auto",
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}

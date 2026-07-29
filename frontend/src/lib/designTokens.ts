@@ -195,6 +195,15 @@ export const RADIUS = {
   pill: 20,
 } as const;
 
+// ── Content width tokens ─────────────────────────────────────────────────────
+// The three platform content widths. Every surface picks one; a raw number is the
+// signal a fourth width is being invented (the state this replaced). READING for
+// single-column scanning lists and prose; STANDARD (the default) for dashboards,
+// profiles, tables and indexes; WIDE only for a surface with one genuinely wide
+// artifact — a multi-column chart or wide table — that compresses badly below it.
+export const CONTENT_WIDTH = { reading: 880, standard: 1120, wide: 1440 } as const;
+export type ContentWidth = keyof typeof CONTENT_WIDTH;
+
 // Incomplete-data fill — the canonical treatment for a period still filling
 // (e.g. the greyed projected years in the publication timeline). Documented so
 // every surface uses the same muted, de-ambered fill for not-yet-complete data.

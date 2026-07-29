@@ -68,7 +68,7 @@ export default function HcpPublicationsPage() {
   ];
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1000}>
+    <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <h1 style={{ ...TYPE.display, fontSize: 22, margin: 0, marginBottom: 6 }}>
         Source Publications
       </h1>

@@ -7,7 +7,7 @@ import {
   type LandscapePoint,
 } from "../lib/api";
 import { indicationSlugToLabel } from "../lib/routeSlugs";
-import { COLOR } from "../lib/designTokens";
+import { COLOR, CONTENT_WIDTH } from "../lib/designTokens";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
@@ -52,7 +52,7 @@ export default function LandscapeRoute() {
     <div
       className="fm-screen"
       style={{
-        maxWidth: 480,
+        maxWidth: CONTENT_WIDTH.wide,
         margin: "0 auto",
         fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         overflowX: "hidden",

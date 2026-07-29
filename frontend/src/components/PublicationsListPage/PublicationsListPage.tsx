@@ -94,7 +94,7 @@ export default function PublicationsListPage() {
   const visiblePubs = showAll ? pubs : pubs.slice(0, 50);
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1100}>
+    <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
           {headerInfo.title}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CONTENT_WIDTH } from "../lib/designTokens";
 import { HCP } from "../data/hcpData";
 import { getCityData } from "../data/cityFeedData";
 import HCPCard from "./HCPCard";
@@ -78,7 +79,7 @@ export default function CityFeedScreen({ city, ta, onBack }: CityFeedScreenProps
       style={{
         backgroundColor: "#0A0A0B",
         minHeight: "100dvh",
-        maxWidth: 480,
+        maxWidth: CONTENT_WIDTH.reading,
         margin: "0 auto",
         fontFamily: "system-ui, -apple-system, sans-serif",
         overflowX: "hidden",

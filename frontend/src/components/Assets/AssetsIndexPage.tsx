@@ -11,7 +11,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import NavBar from "../NavBar";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, CONTENT_WIDTH } from "../../lib/designTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import {
@@ -202,7 +202,7 @@ export default function AssetsIndexPage() {
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: FONT.sans }}>
       {/* NavBar inside the column so it spans the content width (1180); the gutter
           lives on the inner wrapper, not the bar. */}
-      <div style={{ maxWidth: 1180, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: CONTENT_WIDTH.standard, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
         <NavBar />
         <div style={{ padding: isMobile ? "0 16px 96px" : "0 24px 96px" }}>
           {loading ? (

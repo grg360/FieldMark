@@ -8,7 +8,7 @@ import {
   clearMslProfileCache,
   type MslProfile,
 } from "../lib/authHelpers";
-import { COLOR } from "../lib/designTokens";
+import { COLOR, CONTENT_WIDTH } from "../lib/designTokens";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 
@@ -244,7 +244,7 @@ export default function ProfileScreen() {
         style={{
           backgroundColor: COLOR.ground,
           minHeight: "100dvh",
-          maxWidth: 480,
+          maxWidth: CONTENT_WIDTH.reading,
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
@@ -264,7 +264,7 @@ export default function ProfileScreen() {
           (the .fm-screen class sizes it to 880px at >=600), matching the other
           standalone pages. Rendering them outside made them full-bleed vs the
           inset content. */}
-      <div className="fm-screen" style={{ maxWidth: 480, margin: "0 auto", boxSizing: "border-box" }}>
+      <div className="fm-screen" style={{ maxWidth: CONTENT_WIDTH.reading, margin: "0 auto", boxSizing: "border-box" }}>
       <NavBar />
       {/* Settings sub-bar — the Save action; global home nav lives in the TopBar above. */}
       <div

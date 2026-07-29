@@ -12,7 +12,7 @@ import NavBar from "../NavBar";
 import CompositionChart from "./CompositionChart";
 import LandingNow from "./LandingNow";
 import { AuthorsPanel, CongressPanel, ForumPanel } from "./RightRail";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, CONTENT_WIDTH } from "../../lib/designTokens";
 import { assetBySlug, identityLine, matchTerms, type AssetConfig } from "../../lib/assetConfig";
 import { NSCLC_CORPUS_TOTAL, formatIndexDate } from "../../lib/assets";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -219,7 +219,7 @@ export default function AssetPage() {
 
   if (!asset) {
     return shell(
-      <div style={{ maxWidth: 900, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: CONTENT_WIDTH.standard, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
         <NavBar />
         <div style={{ padding: "60px 24px", fontFamily: FONT.mono, fontSize: 13, color: COLOR.ink3 }}>
           No drug matches “{slug}”. <Link to="/assets" style={{ color: COLOR.indigoLink }}>Back to the drug index →</Link>
@@ -233,7 +233,7 @@ export default function AssetPage() {
   const themedPct = o && o.total_pubs > 0 ? o.themed / o.total_pubs : 0;
 
   return shell(
-    <div style={{ maxWidth: 1440, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+    <div style={{ maxWidth: CONTENT_WIDTH.wide, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
       <NavBar />
       <Header asset={asset} mobile={isMobile} />
 

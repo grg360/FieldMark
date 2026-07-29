@@ -120,7 +120,7 @@ export default function HcpPositionsPage() {
   ];
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1000}>
+    <AppLayout breadcrumbs={breadcrumbs}>
       <h1 style={{ ...TYPE.display, fontSize: 22, margin: 0, marginBottom: 6 }}>
         All Scientific Positions
       </h1>

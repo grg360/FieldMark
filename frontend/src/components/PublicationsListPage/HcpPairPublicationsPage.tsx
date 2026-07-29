@@ -67,7 +67,7 @@ export default function HcpPairPublicationsPage() {
   ];
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1000}>
+    <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 22, color: COLOR.ink1, fontWeight: 600, marginBottom: 4 }}>
           {headerTitle}

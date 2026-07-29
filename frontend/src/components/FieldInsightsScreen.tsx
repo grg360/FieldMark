@@ -135,7 +135,7 @@ export default function FieldInsightsScreen() {
   ];
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <div style={{ marginBottom: 24 }}>
         <div style={{ marginBottom: 4 }}>
           <span

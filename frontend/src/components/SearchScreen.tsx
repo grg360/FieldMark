@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { CONTENT_WIDTH } from "../lib/designTokens";
 import { HCP, hcpData } from "../data/hcpData";
 import HCPCard from "./HCPCard";
 import ActionTray from "./ActionTray";
@@ -110,7 +111,7 @@ export default function SearchScreen({ onBack, onCardPress }: SearchScreenProps)
       style={{
         backgroundColor: "#0A0A0B",
         minHeight: "100dvh",
-        maxWidth: 480,
+        maxWidth: CONTENT_WIDTH.reading,
         margin: "0 auto",
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}

@@ -201,7 +201,7 @@ export default function CongressCalendarPage() {
   const nowLabel = now.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
 
   return (
-    <AppLayout maxWidth={1200}>
+    <AppLayout>
       <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 20, display: "flex", flexDirection: "column", gap: 24 }}>
         {/* header */}
         <div>

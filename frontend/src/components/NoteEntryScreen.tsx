@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CONTENT_WIDTH } from "../lib/designTokens";
 import { HCP } from "../data/hcpData";
 
 interface NoteEntryScreenProps {
@@ -43,7 +44,7 @@ export default function NoteEntryScreen({ hcp, onBack }: NoteEntryScreenProps) {
   const taIndications = INDICATIONS_BY_TA[hcp.specialty] ?? [];
 
   return (
-    <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: 480, margin: "0 auto" }}>
+    <div className="fm-screen" style={{ backgroundColor: "#0A0A0B", minHeight: "100dvh", maxWidth: CONTENT_WIDTH.reading, margin: "0 auto" }}>
       {/* Nav bar */}
       <div
         className="fm-nav"

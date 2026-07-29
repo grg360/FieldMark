@@ -60,7 +60,7 @@ export default function BriefPage() {
       ];
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <AppLayout breadcrumbs={breadcrumbs} width="reading">
 
       {loading ? (
         <div

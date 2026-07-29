@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { CONTENT_WIDTH } from "../lib/designTokens";
 
 // Leaflet is loaded via CDN script tag — typed loosely to avoid module eval issues
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -714,7 +715,7 @@ export default function LandscapeScreen({ ta, indication, onBack, onCityPress }:
       style={{
         backgroundColor: "#0A0A0B",
         minHeight: "100dvh",
-        maxWidth: 480,
+        maxWidth: CONTENT_WIDTH.wide,
         margin: "0 auto",
         fontFamily: "system-ui, -apple-system, sans-serif",
         overflowX: "hidden",

@@ -211,14 +211,14 @@ export default function ThreadPage() {
 
   if (!loaded) {
     return (
-      <AppLayout maxWidth={900}>
+      <AppLayout width="reading">
         <div style={{ paddingTop: 24, ...mono(11, COLOR.ink5) }}>Loading…</div>
       </AppLayout>
     );
   }
   if (!detail) {
     return (
-      <AppLayout maxWidth={900}>
+      <AppLayout width="reading">
         <div style={{ paddingTop: 24, fontFamily: FONT.sans, color: COLOR.ink2 }}>
           <div style={{ ...mono(10.5, COLOR.ink4), letterSpacing: "0.14em", marginBottom: 8 }}>THREAD NOT FOUND</div>
           <Link to="/field-intelligence" style={{ color: COLOR.indigoLink }}>← All threads</Link>
@@ -263,7 +263,7 @@ export default function ThreadPage() {
   };
 
   return (
-    <AppLayout maxWidth={900}>
+    <AppLayout width="reading">
       <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 16, display: "flex", flexDirection: "column", gap: 18 }}>
         <PrototypeStrip />
         <Link to="/field-intelligence" style={{ ...mono(10.5, COLOR.ink3), letterSpacing: "0.1em" }}>← ALL THREADS</Link>

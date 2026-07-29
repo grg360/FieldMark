@@ -285,7 +285,7 @@ export default function CongressDetailPage() {
 
   if (!congress) {
     return (
-      <AppLayout maxWidth={1100}>
+      <AppLayout>
         <div style={{ paddingTop: 40, fontFamily: FONT.sans, color: COLOR.ink2 }}>
           <div style={{ ...eyebrow(COLOR.ink4), marginBottom: 8 }}>CONGRESS NOT FOUND</div>
           <Link to="/congress" style={{ color: COLOR.indigoLink }}>← Congress Calendar</Link>
@@ -301,7 +301,7 @@ export default function CongressDetailPage() {
   const aboveThreshold = social != null && meetsThreshold(social);
 
   return (
-    <AppLayout maxWidth={1100}>
+    <AppLayout>
       <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 16, display: "flex", flexDirection: "column", gap: 20 }}>
         {/* breadcrumb */}
         <div style={{ ...mono(11, COLOR.ink5), display: "flex", gap: 8 }}>

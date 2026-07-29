@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import NavBar from "./NavBar";
 import SearchBar from "./SearchBar";
 import GlobalFooter from "./GlobalFooter";
-import { COLOR, FONT, SPACE } from "../lib/designTokens";
+import { COLOR, FONT, SPACE, CONTENT_WIDTH, type ContentWidth } from "../lib/designTokens";
 
 export interface BreadcrumbItem {
   label: string;
@@ -13,9 +13,11 @@ export interface BreadcrumbItem {
 interface Props {
   breadcrumbs?: BreadcrumbItem[];
   children: ReactNode;
-  maxWidth?: number;
-  // Opt-in KOL search: when BOTH are provided, TopBar renders the SearchBar.
-  // Pages that omit them (settings, watchlists, institutions) are unchanged.
+  // Content column width token — READING / STANDARD / WIDE. No numeric escape
+  // hatch: a surface picks a token, never a raw number. Defaults to STANDARD.
+  width?: ContentWidth;
+  // Opt-in KOL search in the surface header: when BOTH are provided, the header
+  // renders the SearchBar. Pages that omit them are unchanged.
   currentTaId?: string;
   onSearchSelect?: (hcpId: string, taId: string) => void;
 }
@@ -23,10 +25,11 @@ interface Props {
 export default function AppLayout({
   breadcrumbs,
   children,
-  maxWidth = 960,
+  width = "standard",
   currentTaId,
   onSearchSelect,
 }: Props) {
+  const maxWidth = CONTENT_WIDTH[width];
   const navigate = useNavigate();
 
   return (

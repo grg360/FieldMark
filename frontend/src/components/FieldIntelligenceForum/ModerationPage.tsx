@@ -154,7 +154,7 @@ export default function ModerationPage() {
   const current = records.find((r) => r.id === selected) ?? null;
 
   return (
-    <AppLayout maxWidth={1120}>
+    <AppLayout width="reading">
       <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 16, display: "flex", flexDirection: "column", gap: 20 }}>
         <PrototypeStrip />
 

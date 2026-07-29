@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { HCP } from "../data/hcpData";
 import { getPublicationsByYearForHcp } from "../lib/api";
 import { enrichCharacterisation, type PublicationListRow } from "../lib/publicationsList";
-import { COLOR } from "../lib/designTokens";
+import { COLOR, CONTENT_WIDTH } from "../lib/designTokens";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import PublicationList from "./PublicationsListPage/PublicationList";
@@ -61,7 +61,7 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
       <div
         className="fm-screen"
         style={{
-          maxWidth: 480,
+          maxWidth: CONTENT_WIDTH.reading,
           margin: "0 auto",
           fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
           overflowX: "hidden",

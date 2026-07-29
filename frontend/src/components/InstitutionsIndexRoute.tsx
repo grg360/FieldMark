@@ -111,7 +111,7 @@ export default function InstitutionsIndexRoute() {
   ];
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs} maxWidth={1100}>
+    <AppLayout breadcrumbs={breadcrumbs}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
           {taSlug.toUpperCase()} Institutions

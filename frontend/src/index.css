@@ -201,9 +201,6 @@ button {
 @media (min-width: 600px) {
 
   /* ── Shared: wider content containers ── */
-  .fm-screen {
-    max-width: 880px !important;
-  }
 
   /* ── Shared: nav bars 56px ── */
   .fm-nav {

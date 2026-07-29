@@ -77,7 +77,7 @@ export default function AdminPage() {
 
   if (gate === "checking") {
     return (
-      <AppLayout maxWidth={1120}>
+      <AppLayout>
         <div style={{ color: PALETTE.dim, fontSize: 13, padding: "48px 0" }}>Loading...</div>
       </AppLayout>
     );
@@ -87,7 +87,7 @@ export default function AdminPage() {
   if (gate === "denied") return <Navigate to="/me" replace />;
 
   return (
-    <AppLayout breadcrumbs={[{ label: "Home", path: "/me" }, { label: "Admin" }]} maxWidth={1120}>
+    <AppLayout breadcrumbs={[{ label: "Home", path: "/me" }, { label: "Admin" }]}>
       <div
         style={{
           display: "flex",

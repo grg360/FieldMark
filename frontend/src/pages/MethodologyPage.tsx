@@ -79,7 +79,7 @@ export default function MethodologyPage() {
   ];
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <h1 style={pageHeadingStyle}>How FieldMark Works</h1>
       <p style={ledeStyle}>
         FieldMark identifies and ranks Healthcare Professionals (HCPs) in specific therapeutic areas using public scientific and administrative data. This page explains how that works - what we measure, why, and the boundaries of what the platform can and cannot tell you.

@@ -65,7 +65,7 @@ export default function ForumIndexPage() {
   }, [anchors]);
 
   return (
-    <AppLayout maxWidth={1120}>
+    <AppLayout width="reading">
       <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 16, display: "flex", flexDirection: "column", gap: 22 }}>
         <PrototypeStrip />
 

@@ -19,7 +19,7 @@ import {
 import { getInstitutionResearchThemes, type InstitutionResearchTheme } from "../lib/institutionThemes";
 import { slugToInstitution } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
-import { COLOR } from "../lib/designTokens";
+import { COLOR, CONTENT_WIDTH } from "../lib/designTokens";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
@@ -147,7 +147,7 @@ export default function InstitutionRoute() {
         <div
           className="fm-screen"
           style={{
-            maxWidth: 480,
+            maxWidth: CONTENT_WIDTH.standard,
             margin: "0 auto",
             fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
           }}
@@ -168,7 +168,7 @@ export default function InstitutionRoute() {
     <div
       className="fm-screen"
       style={{
-        maxWidth: 480,
+        maxWidth: CONTENT_WIDTH.standard,
         margin: "0 auto",
         fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         overflowX: "hidden",
