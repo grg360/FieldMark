@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import NavBar from "./NavBar";
-import SearchBar from "./SearchBar";
 import GlobalFooter from "./GlobalFooter";
 import { COLOR, FONT, SPACE, CONTENT_WIDTH, type ContentWidth } from "../lib/designTokens";
 
@@ -52,16 +51,10 @@ export default function AppLayout({
           boxSizing: "border-box",
         }}
       >
-        <NavBar />
+        {/* Search rides in the bar (right-aligned), forwarded from the page's TA id
+            + select handler; absent where no TA. */}
+        <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} />
         <div style={{ padding: SPACE.lg }}>
-        {/* Search left the bar (NAV-BUILD-01): it renders in the surface header
-            only where the page supplies a TA id and a select handler — today that
-            is Home. Absent, not disabled, everywhere else. */}
-        {currentTaId && onSearchSelect ? (
-          <div style={{ marginBottom: 12 }}>
-            <SearchBar variant="inline" currentTaId={currentTaId} onSelect={onSearchSelect} />
-          </div>
-        ) : null}
 
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <nav

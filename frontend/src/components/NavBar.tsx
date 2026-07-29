@@ -19,8 +19,16 @@ import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/
 import { useIsAdmin } from "../lib/useIsAdmin";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { getMyInvites, primaryInvite, type MyInvite } from "../lib/invites";
+import SearchBar from "./SearchBar";
 import InviteShareCard from "./HomePage/InviteShareCard";
 import InviteEmailForm from "./HomePage/InviteEmailForm";
+
+// Search wiring, forwarded from surfaces that supply a therapeutic-area id. When
+// absent (no TA), search does not render — absent, not disabled.
+interface NavSearch {
+  currentTaId: string;
+  onSearchSelect: (hcpId: string, taId: string) => void;
+}
 
 type NavKey = "home" | "territory" | "people" | "drugs" | "congresses" | "pulse";
 
@@ -67,7 +75,13 @@ function initialsOf(profile: MslProfile | null): string {
   return "··";
 }
 
-export default function NavBar() {
+export default function NavBar({
+  currentTaId,
+  onSearchSelect,
+}: {
+  currentTaId?: string;
+  onSearchSelect?: (hcpId: string, taId: string) => void;
+} = {}) {
   const location = useLocation();
   const isMobile = useMediaQuery("(max-width: 767px)");
   const active = activeKey(location.pathname);
@@ -103,7 +117,14 @@ export default function NavBar() {
     initials: initialsOf(profile),
   };
 
-  return isMobile ? <MobileBar active={active} menu={menu} /> : <DesktopBar active={active} menu={menu} />;
+  const search: NavSearch | null =
+    currentTaId && onSearchSelect ? { currentTaId, onSearchSelect } : null;
+
+  return isMobile ? (
+    <MobileBar active={active} menu={menu} search={search} />
+  ) : (
+    <DesktopBar active={active} menu={menu} search={search} />
+  );
 }
 
 interface MenuData {
@@ -115,7 +136,7 @@ interface MenuData {
 }
 
 // ── Desktop ──────────────────────────────────────────────────────────────────
-function DesktopBar({ active, menu }: { active: NavKey | null; menu: MenuData }) {
+function DesktopBar({ active, menu, search }: { active: NavKey | null; menu: MenuData; search: NavSearch | null }) {
   return (
     <nav
       style={{
@@ -131,7 +152,7 @@ function DesktopBar({ active, menu }: { active: NavKey | null; menu: MenuData })
     >
       <Link
         to="/me"
-        style={{ fontFamily: FONT.mono, fontSize: 12.5, letterSpacing: "0.2em", color: COLOR.ink1, textDecoration: "none" }}
+        style={{ fontFamily: FONT.mono, fontSize: 12.5, letterSpacing: "0.2em", color: COLOR.amber, textDecoration: "none" }}
       >
         FIELDMARK
       </Link>
@@ -169,13 +190,18 @@ function DesktopBar({ active, menu }: { active: NavKey | null; menu: MenuData })
         })}
       </div>
       <span style={{ flex: 1 }} />
+      {search ? (
+        <div style={{ width: 280, flex: "none" }}>
+          <SearchBar variant="inline" currentTaId={search.currentTaId} onSelect={search.onSearchSelect} />
+        </div>
+      ) : null}
       <AvatarMenu menu={menu} mobile={false} />
     </nav>
   );
 }
 
 // ── Mobile ───────────────────────────────────────────────────────────────────
-function MobileBar({ active, menu }: { active: NavKey | null; menu: MenuData }) {
+function MobileBar({ active, menu, search }: { active: NavKey | null; menu: MenuData; search: NavSearch | null }) {
   return (
     <nav aria-label="Primary">
       {/* 36px utility strip */}
@@ -190,10 +216,13 @@ function MobileBar({ active, menu }: { active: NavKey | null; menu: MenuData }) 
           background: COLOR.ground,
         }}
       >
-        <Link to="/me" style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", color: COLOR.ink1, textDecoration: "none" }}>
+        <Link to="/me" style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", color: COLOR.amber, textDecoration: "none" }}>
           FIELDMARK
         </Link>
-        <AvatarMenu menu={menu} mobile />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {search ? <MobileSearchButton search={search} /> : null}
+          <AvatarMenu menu={menu} mobile />
+        </div>
       </div>
       {/* 3×2 cell grid — six items, no empty cell */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
@@ -236,6 +265,39 @@ function MobileBar({ active, menu }: { active: NavKey | null; menu: MenuData }) 
   );
 }
 
+// Mobile search — a magnifier in the utility strip (not a seventh cell) that opens
+// the overlay search panel, the old TopBar mobile affordance. Rendered only when a
+// TA exists.
+function MobileSearchButton({ search }: { search: NavSearch }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Search"
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center" }}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+          <circle cx="7.5" cy="7.5" r="5.5" stroke={COLOR.ink3} strokeWidth="1.5" />
+          <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={COLOR.ink3} strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open ? (
+        <SearchBar
+          isOpen
+          currentTaId={search.currentTaId}
+          onClose={() => setOpen(false)}
+          onSelect={(hcpId, taId) => {
+            setOpen(false);
+            search.onSearchSelect(hcpId, taId);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
 // ── Avatar menu (dropdown / sheet) ───────────────────────────────────────────
 function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
   const navigate = useNavigate();
@@ -265,6 +327,8 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
   };
   const showInvites = !!menu.invite && menu.invite.uses_remaining > 0;
 
+  // Established treatment: a perfect amber circle with the user's initials, no
+  // container border and no caret. Opens the five-row menu on click.
   const pill = (
     <button
       type="button"
@@ -273,32 +337,24 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
       aria-haspopup="menu"
       aria-expanded={open}
       style={{
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        background: COLOR.amber,
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
         display: "flex",
         alignItems: "center",
-        gap: mobile ? 7 : 8,
-        border: `1px solid ${COLOR.hairStrong}`,
-        background: "transparent",
-        padding: mobile ? 0 : "4px 8px 4px 4px",
-        cursor: "pointer",
+        justifyContent: "center",
+        fontFamily: FONT.mono,
+        fontSize: 12,
+        fontWeight: 600,
+        letterSpacing: "0.02em",
+        color: COLOR.ground,
       }}
     >
-      <span
-        style={{
-          width: 22,
-          height: 22,
-          background: COLOR.surfaceRaised,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: FONT.mono,
-          fontSize: 9.5,
-          letterSpacing: "0.04em",
-          color: open ? COLOR.amber : COLOR.ink2,
-        }}
-      >
-        {menu.initials}
-      </span>
-      <span style={{ fontSize: 10, color: open ? COLOR.amber : COLOR.ink4 }}>{open ? "▴" : "▾"}</span>
+      {menu.initials}
     </button>
   );
 
