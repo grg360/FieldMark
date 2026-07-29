@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#08090A;}
+  body{font-family:'IBM Plex Mono',ui-monospace,monospace;-webkit-font-smoothing:antialiased;}
+  *{box-sizing:border-box;}
+  a{color:#7FB3BB;text-decoration:none;border-bottom:1px solid rgba(127,179,187,.35);}
+  a:hover{color:#A9D3D9;border-bottom-color:rgba(169,211,217,.6);}
+</style>
+</helmet>
+
+<div style="background:#08090A;padding:48px 48px 96px;display:flex;flex-direction:column;gap:26px;min-height:100vh">
+
+  <div style="display:flex;flex-direction:column;gap:11px;max-width:1000px">
+    <div style="font:500 10px 'IBM Plex Mono';letter-spacing:.22em;color:#7C8288">FIELDMARK · /COHORTS · RANKED LEDGER · BUILD REFERENCE</div>
+    <div style="font:400 30px 'Source Serif 4',Georgia,serif;color:#E7E8E9;letter-spacing:-.01em">Cohort Ledger �?? single current spec</div>
+    <div style="font:400 13.5px/1.65 'Source Serif 4',Georgia,serif;color:#9BA1A6;text-wrap:pretty">One component, three cohort configurations. Supersedes every earlier frame in the exploration file: this is the only drawing Code should build from. Rank leads because it is the only figure that separates anyone; score columns collapse where their own cohort's spread cannot discriminate; the summary line carries what varies; the drawer carries the reasoning and the trace. Click any row to open its drawer, and the bookmark to track.</div>
+  </div>
+
+  <div style="width:1440px;flex-shrink:0;display:flex;flex-direction:row;border:1px solid rgba(255,255,255,.09);background:#0B0D10">
+    <div style="flex:1;padding:16px 18px;border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:7px">
+      <div style="font:500 9px 'IBM Plex Mono';letter-spacing:.18em;color:#7C8288">SHARED �?? ONE COMPONENT</div>
+      <div style="font:400 10.5px/1.8 'IBM Plex Mono';color:#9BA1A6;letter-spacing:.02em">RANK BLOCK · PLEX SANS CONDENSED 600 / 40PX<br>COHORT EDGE RULE, LEFT · 3PX<br>TRACK EDGE RULE, RIGHT · 3PX<br>INDEX · SECONDARY TIER, MONO 500 / 18PX<br>SCORE CELLS · TERTIARY, MONO 400 / 13PX<br>SUMMARY LINE · SERIF, BRIGHT QUANTITIES<br>RESOLUTION BANDS · �??TREAT AS TIED�??<br>ROW DRAWER · WHY + TRACE<br>OURS ZONE · ATTACHMENTS, TRACK, STATE<br>FOOTER CAVEATS · MOBILE 390 SHELL</div>
+    </div>
+    <div style="flex:1;padding:16px 18px;border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:7px">
+      <div style="font:500 9px 'IBM Plex Mono';letter-spacing:.18em;color:#7C8288">COHORT-DRIVEN �?? CONFIGURATION</div>
+      <div style="font:400 10.5px/1.8 'IBM Plex Mono';color:#9BA1A6;letter-spacing:.02em">SCORE COLUMN SET, LABELS, WIDTHS<br>SUPPRESSION · COMPUTED PER COHORT<br>PROFILE TAG · RS ONLY<br>RELATIONSHIP STATE · RS + COM<br>CURRENCY CELL · COM ONLY<br>SECOND LINE UNDER THE NAME<br>WHICH COLUMNS SORT<br>MOBILE METRIC PAIRING<br>BAND BOUNDARIES AND THEIR NOTES<br>FOOTER CAVEAT TEXT</div>
+    </div>
+    <div style="flex:1.3;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
+      <div style="font:500 9px 'IBM Plex Mono';letter-spacing:.18em;color:#7C8288">RULES THAT MUST NOT BE SIMPLIFIED IN BUILD</div>
+      <div style="font:400 12.5px/1.6 'Source Serif 4',Georgia,serif;color:#A8AEB3;text-wrap:pretty">Suppression is <strong style="color:#CDD1D4;font-weight:600">computed from the visible cohort's spread</strong>, never a hard-coded 99. A column collapses to �??�??�?? only where its spread sits inside that cohort's resolution; values below the ceiling always print. Established's two columns collapse, Rising Star's four do not.</div>
+      <div style="font:400 12.5px/1.6 'Source Serif 4',Georgia,serif;color:#A8AEB3;text-wrap:pretty">Nothing sorts on Pharma or Engagement, and neither carries a bar or a hue. No trajectory column ships until quarter-over-quarter history exists.</div>
+    </div>
+  </div>
+
+  <div style="width:1440px;flex-shrink:0;display:flex;flex-direction:row;border:1px solid rgba(255,255,255,.09);background:#0E1013">
+    <sc-for list="{{ palette }}" as="c" hint-placeholder-count="3">
+      <div style="flex:1;display:flex;flex-direction:row;gap:12px;padding:15px 18px;border-right:1px solid rgba(255,255,255,.07)">
+        <div style="width:3px;flex-shrink:0;background:{{ c.c }}"></div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;flex-direction:row;align-items:baseline;gap:8px">
+            <span style="font:600 9.5px 'IBM Plex Mono';letter-spacing:.14em;color:{{ c.c }}">{{ c.tag }}</span>
+            <span style="font:500 13.5px 'Source Serif 4',Georgia,serif;color:#E7E8E9">{{ c.label }}</span>
+          </div>
+          <span style="font:400 9.5px 'IBM Plex Mono';color:#7C8288;letter-spacing:.08em">{{ c.hex }}</span>
+        </div>
+      </div>
+    </sc-for>
+    <div style="flex:1.15;display:flex;flex-direction:column;gap:6px;padding:15px 18px">
+      <span style="font:500 9px 'IBM Plex Mono';letter-spacing:.18em;color:#7C8288">RESERVED, NOT COHORT COLOUR</span>
+      <span style="font:400 10px/1.7 'IBM Plex Mono';color:#9BA1A6;letter-spacing:.03em"><span style="color:#E0A75E">#E0A75E AMBER</span> �?? RANK, PLATFORM-WIDE<br><span style="color:#8FAAC9">#8FAAC9 STEEL</span> �?? DOWNWARD RANK MOVE, HELD UNTIL HISTORY EXISTS</span>
+    </div>
+  </div>
+
+  <sc-for list="{{ configs }}" as="C" hint-placeholder-count="3">
+    <div style="display:flex;flex-direction:row;gap:28px;align-items:flex-start;flex-shrink:0">
+
+      <div style="width:1440px;flex-shrink:0;background:#0E1013;border:1px solid rgba(255,255,255,.09)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,.09)">
+          <span style="display:flex;flex-direction:row;align-items:center;gap:9px">
+            <span style="width:3px;height:14px;background:{{ C.cc }}"></span>
+            <span style="font:600 9.5px 'IBM Plex Mono';color:{{ C.cc }};letter-spacing:.14em">{{ C.tag }}</span>
+            <span style="font:500 13px 'IBM Plex Mono';color:#E7E8E9;letter-spacing:.02em">{{ C.title }}</span>
+          </span>
+          <span style="font:400 10.5px 'IBM Plex Mono';color:#7C8288;letter-spacing:.1em">{{ C.meta }}</span>
+        </div>
+
+        <div style="display:flex;flex-direction:row;align-items:flex-end;padding:10px 20px 8px 23px;border-bottom:1px solid rgba(255,255,255,.14);background:#0B0D10">
+          <div style="width:104px;padding-right:12px;font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#E0A75E">RANK<br><span style="color:#7C8288">US · GLOBAL</span></div>
+          <div style="flex:1;min-width:300px;font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#63696E">PHYSICIAN<br><span style="color:#7C8288">{{ C.nameSub }}</span></div>
+          <div style="width:88px;text-align:right;font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#63696E">INDEX<br><span style="color:#7C8288">IN COHORT</span></div>
+          <sc-for list="{{ C.heads }}" as="h" hint-placeholder-count="3">
+            <div style="width:{{ h.w }}px;text-align:right;font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#63696E">{{ h.a }}<br><span style="color:#7C8288">{{ h.b }}</span></div>
+          </sc-for>
+          <div style="display:flex;flex-direction:row;align-items:flex-end;margin-left:24px;padding-left:18px;border-left:1px solid rgba(255,255,255,.12)">
+            <div style="width:126px;text-align:right;font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#63696E">ATTACHMENTS<br><span style="color:#7C8288">WHERE PRESENT</span></div>
+            <div style="width:44px;text-align:right;font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#63696E">TRK<br><span style="color:#7C8288">MINE</span></div>
+            <sc-if value="{{ C.hasState }}" hint-placeholder-val="{{ true }}">
+              <div style="width:104px;text-align:right;font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#63696E">STATE<br><span style="color:#7C8288">OUR CONTACT</span></div>
+            </sc-if>
+          </div>
+        </div>
+
+        <sc-for list="{{ C.bands }}" as="B" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:12px;padding:7px 20px 7px 23px;background:#0A0C0E;border-bottom:1px solid rgba(255,255,255,.07)">
+            <span style="font:500 9.5px 'IBM Plex Mono';letter-spacing:.16em;color:#9BA1A6">{{ B.label }}</span>
+            <span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span>
+            <span style="font:400 9.5px 'IBM Plex Mono';letter-spacing:.1em;color:#767C81">{{ B.note }}</span>
+          </div>
+          <sc-for list="{{ B.rows }}" as="r" hint-placeholder-count="5">
+            <div style="position:relative;border-bottom:1px solid rgba(255,255,255,.06)">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{{ C.cc }}"></div>
+              <div style="position:absolute;right:0;top:0;bottom:0;width:3px;background:{{ r.trackRule }}"></div>
+              <sc-if value="{{ r.isOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:3px;top:0;bottom:0;width:2px;background:#E0A75E"></div>
+              </sc-if>
+              <div onClick="{{ r.toggle }}" style="display:flex;flex-direction:row;align-items:flex-start;padding:13px 20px 13px 23px;cursor:pointer" style-hover="background:#131619">
+                <div style="width:104px;padding-right:12px;display:flex;flex-direction:column;gap:1px">
+                  <div style="display:flex;flex-direction:row;align-items:baseline;gap:5px">
+                    <span style="font:600 40px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace;color:#E0A75E;font-variant-numeric:tabular-nums;line-height:.86;letter-spacing:-.015em">{{ r.rank }}</span>
+                    <span style="font:500 9.5px 'IBM Plex Mono';color:#A07B45;letter-spacing:.12em">US</span>
+                  </div>
+                  <span style="font:400 9.5px 'IBM Plex Mono';color:#7C8288;letter-spacing:.06em">#{{ r.gl }} GLOBAL</span>
+                </div>
+                <div style="flex:1;min-width:300px;padding-right:24px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;flex-direction:row;align-items:baseline;gap:9px;flex-wrap:wrap">
+                    <span style="font:500 17px 'Source Serif 4',Georgia,serif;color:#EDEEEF;letter-spacing:-.005em">{{ r.name }}</span>
+                    <span style="font:400 10px 'IBM Plex Mono';color:#9BA1A6;letter-spacing:.08em">US</span>
+                    <sc-if value="{{ r.hasTag }}" hint-placeholder-val="{{ false }}">
+                      <span style="font:600 8.5px 'IBM Plex Mono';color:#9BA1A6;letter-spacing:.14em;border:1px solid rgba(255,255,255,.18);padding:2px 5px">{{ r.tag }}</span>
+                    </sc-if>
+                    <span style="font:400 10.5px 'IBM Plex Mono';color:#7C8288;letter-spacing:.02em">{{ r.meta }}</span>
+                  </div>
+                  <div style="font:400 13.5px/1.55 'Source Serif 4',Georgia,serif;color:#8F959A;max-width:104ch;text-wrap:pretty"><sc-for list="{{ r.nar }}" as="n" hint-placeholder-count="4"><span style="color:{{ n.c }};font-weight:{{ n.w }}">{{ n.t }}</span></sc-for></div>
+                </div>
+                <div style="width:88px;text-align:right;padding-top:5px;font:500 18px 'IBM Plex Mono';color:#C6CACD;font-variant-numeric:tabular-nums">{{ r.idx }}</div>
+                <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="3">
+                  <div style="width:{{ c.w }}px;text-align:right;padding-top:10px">
+                    <sc-if value="{{ c.num }}" hint-placeholder-val="{{ true }}">
+                      <span style="font:400 13px 'IBM Plex Mono';color:{{ c.c }};font-variant-numeric:tabular-nums">{{ c.v }}</span>
+                    </sc-if>
+                    <sc-if value="{{ c.txt }}" hint-placeholder-val="{{ false }}">
+                      <span style="font:400 9.5px 'IBM Plex Mono';color:#71787E;letter-spacing:.1em">{{ c.v }}</span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+                <div style="display:flex;flex-direction:row;align-items:flex-start;margin-left:24px;padding-left:18px;border-left:1px solid rgba(255,255,255,.07)">
+                  <div style="width:126px;padding-top:9px;display:flex;flex-direction:row;align-items:baseline;justify-content:flex-end;gap:14px">
+                    <sc-for list="{{ r.inds }}" as="i" hint-placeholder-count="1">
+                      <span style="display:flex;flex-direction:row;align-items:baseline;gap:4px">
+                        <span style="font:400 8.5px 'IBM Plex Mono';color:#767C81;letter-spacing:.1em">{{ i.label }}</span>
+                        <span style="font:500 12.5px 'IBM Plex Mono';color:#A8AEB3;font-variant-numeric:tabular-nums">{{ i.n }}</span>
+                      </span>
+                    </sc-for>
+                  </div>
+                  <div style="width:44px;padding-top:5px;display:flex;flex-direction:row;justify-content:flex-end">
+                    <span onClick="{{ r.toggleTrack }}" title="{{ r.trackTitle }}" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid {{ r.trackBorder }}" style-hover="border-color:rgba(255,255,255,.34)">
+                      <sc-if value="{{ r.tracked }}" hint-placeholder-val="{{ false }}">
+                        <svg width="9" height="13" viewBox="0 0 9 13" aria-hidden="true"><path d="M0.5 0.5h8v12L4.5 8.6 0.5 12.5z" fill="#E7E8E9" stroke="#E7E8E9"></path></svg>
+                      </sc-if>
+                      <sc-if value="{{ r.untracked }}" hint-placeholder-val="{{ true }}">
+                        <svg width="9" height="13" viewBox="0 0 9 13" aria-hidden="true"><path d="M0.5 0.5h8v12L4.5 8.6 0.5 12.5z" fill="none" stroke="#7C8288"></path></svg>
+                      </sc-if>
+                    </span>
+                  </div>
+                  <sc-if value="{{ C.hasState }}" hint-placeholder-val="{{ true }}">
+                    <div style="width:104px;padding-top:9px;display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:7px">
+                      <span style="font:400 11px 'IBM Plex Mono';color:{{ r.stateC }};letter-spacing:.14em">{{ r.stateLabel }}</span>
+                      <span style="font:400 12px 'IBM Plex Mono';color:{{ r.stateC }};width:12px;text-align:right">{{ r.stateGlyph }}</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+
+              <sc-if value="{{ r.isOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:row;gap:48px;padding:6px 20px 22px 127px;background:#0A0C0F;border-top:1px solid rgba(255,255,255,.06)">
+                  <div style="flex:1;max-width:540px;display:flex;flex-direction:column;gap:9px;padding-top:14px">
+                    <div style="font:500 9px 'IBM Plex Mono';letter-spacing:.18em;color:#7C8288">WHAT PLACED THIS ROW HERE</div>
+                    <div style="font:400 13.5px/1.6 'Source Serif 4',Georgia,serif;color:#CDD1D4;text-wrap:pretty">{{ r.why }}</div>
+                    <div style="font:400 10px/1.6 'IBM Plex Mono';color:#767C81;letter-spacing:.04em;padding-top:2px">THE SUMMARY LINE ABOVE IS MODEL SYNTHESIS OVER THE SOURCES AT RIGHT · REVIEW BEFORE USE · NO CLINICAL CLAIM</div>
+                  </div>
+                  <div style="width:620px;display:flex;flex-direction:column;padding-top:14px">
+                    <div style="font:500 9px 'IBM Plex Mono';letter-spacing:.18em;color:#7C8288;padding-bottom:9px">TRACE</div>
+                    <sc-for list="{{ r.trace }}" as="s" hint-placeholder-count="4">
+                      <div style="display:flex;flex-direction:row;align-items:baseline;gap:14px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)">
+                        <span style="width:176px;flex-shrink:0;font:400 10px 'IBM Plex Mono';letter-spacing:.1em;color:#7C8288">{{ s.label }}</span>
+                        <span style="flex:1;font:400 11.5px 'IBM Plex Mono';color:#C6CACD">{{ s.value }}</span>
+                        <a href="#top" style="font:400 10px 'IBM Plex Mono';letter-spacing:.08em;flex-shrink:0">OPEN �??</a>
+                      </div>
+                    </sc-for>
+                    <div style="font:400 10px/1.6 'IBM Plex Mono';color:#767C81;letter-spacing:.06em;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);margin-top:2px">{{ C.traceFoot }}</div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </sc-for>
+
+        <div style="padding:14px 20px 16px 23px;display:flex;flex-direction:column;gap:5px;max-width:1180px">
+          <sc-for list="{{ C.notes }}" as="n" hint-placeholder-count="2">
+            <div style="font:400 10px/1.75 'IBM Plex Mono';color:#767C81;letter-spacing:.04em">{{ n.t }}</div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;flex-shrink:0">
+        <div style="font:500 9.5px 'IBM Plex Mono';letter-spacing:.16em;color:#7C8288">MOBILE · 390 · {{ C.tag }}</div>
+        <div style="width:390px;flex-shrink:0;background:#0E1013;border:1px solid rgba(255,255,255,.09)">
+          <div style="padding:12px 14px 10px;border-bottom:1px solid rgba(255,255,255,.12)">
+            <div style="font:500 12px 'IBM Plex Mono';color:#E7E8E9;letter-spacing:.02em">{{ C.title }}</div>
+            <div style="font:400 9.5px 'IBM Plex Mono';color:#7C8288;letter-spacing:.08em;padding-top:4px">{{ C.mobileMeta }}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;background:#0A0C0E;border-bottom:1px solid rgba(255,255,255,.07)">
+            <span style="font:500 9px 'IBM Plex Mono';letter-spacing:.14em;color:#9BA1A6">{{ C.mBandLabel }}</span>
+            <span style="flex:1;height:1px;background:rgba(255,255,255,.09)"></span>
+            <span style="font:400 9px 'IBM Plex Mono';letter-spacing:.06em;color:#767C81">{{ C.mBandNote }}</span>
+          </div>
+          <sc-for list="{{ C.mobile }}" as="r" hint-placeholder-count="4">
+            <div style="position:relative;border-bottom:1px solid rgba(255,255,255,.06)">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{{ C.cc }}"></div>
+              <div style="position:absolute;right:0;top:0;bottom:0;width:3px;background:{{ r.trackRule }}"></div>
+              <sc-if value="{{ r.isOpenM }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:3px;top:0;bottom:0;width:2px;background:#E0A75E"></div>
+              </sc-if>
+              <div style="display:flex;flex-direction:row;gap:10px;padding:13px 12px 13px 17px;min-height:64px;align-items:flex-start">
+                <div onClick="{{ r.toggleM }}" style="flex:1;min-width:0;display:flex;flex-direction:row;gap:10px;cursor:pointer">
+                  <div style="width:54px;flex-shrink:0;display:flex;flex-direction:column;gap:1px">
+                    <div style="display:flex;flex-direction:row;align-items:baseline;gap:4px">
+                      <span style="font:600 32px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace;color:#E0A75E;font-variant-numeric:tabular-nums;line-height:.86;letter-spacing:-.015em">{{ r.rank }}</span>
+                      <span style="font:500 8.5px 'IBM Plex Mono';color:#A07B45;letter-spacing:.1em">US</span>
+                    </div>
+                    <span style="font:400 8.5px 'IBM Plex Mono';color:#7C8288;letter-spacing:.04em">IDX {{ r.idx }}</span>
+                  </div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                    <div style="display:flex;flex-direction:row;align-items:baseline;gap:7px;flex-wrap:wrap">
+                      <span style="font:500 15.5px 'Source Serif 4',Georgia,serif;color:#EDEEEF">{{ r.name }}</span>
+                      <sc-if value="{{ r.hasTag }}" hint-placeholder-val="{{ false }}">
+                        <span style="font:600 8px 'IBM Plex Mono';color:#9BA1A6;letter-spacing:.12em;border:1px solid rgba(255,255,255,.18);padding:1px 4px">{{ r.tag }}</span>
+                      </sc-if>
+                    </div>
+                    <span style="font:400 9.5px 'IBM Plex Mono';color:#7C8288;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.meta }}</span>
+                    <div style="font:400 12.5px/1.5 'Source Serif 4',Georgia,serif;color:#8F959A;text-wrap:pretty"><sc-for list="{{ r.nar }}" as="n" hint-placeholder-count="4"><span style="color:{{ n.c }};font-weight:{{ n.w }}">{{ n.t }}</span></sc-for></div>
+                    <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:12px;padding-top:4px">
+                      <sc-for list="{{ r.mcells }}" as="c" hint-placeholder-count="2">
+                        <span style="display:flex;flex-direction:row;align-items:baseline;gap:4px">
+                          <span style="font:400 8.5px 'IBM Plex Mono';color:#767C81;letter-spacing:.08em">{{ c.label }}</span>
+                          <span style="font:400 11.5px 'IBM Plex Mono';color:{{ c.c }};font-variant-numeric:tabular-nums">{{ c.v }}</span>
+                        </span>
+                      </sc-for>
+                      <sc-if value="{{ r.hasStateM }}" hint-placeholder-val="{{ false }}">
+                        <span style="font:400 10px 'IBM Plex Mono';color:{{ r.stateC }};letter-spacing:.12em">{{ r.stateGlyph }} {{ r.stateLabel }}</span>
+                      </sc-if>
+                      <sc-for list="{{ r.inds }}" as="i" hint-placeholder-count="1">
+                        <span style="display:flex;flex-direction:row;align-items:baseline;gap:3px">
+                          <span style="font:400 8.5px 'IBM Plex Mono';color:#767C81;letter-spacing:.08em">{{ i.label }}</span>
+                          <span style="font:500 11.5px 'IBM Plex Mono';color:#A8AEB3;font-variant-numeric:tabular-nums">{{ i.n }}</span>
+                        </span>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+                <span onClick="{{ r.toggleTrackM }}" title="{{ r.trackTitle }}" style="width:44px;height:44px;margin:-8px -8px 0 0;flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;padding-top:12px;cursor:pointer">
+                  <sc-if value="{{ r.tracked }}" hint-placeholder-val="{{ false }}">
+                    <svg width="10" height="14" viewBox="0 0 9 13" aria-hidden="true"><path d="M0.5 0.5h8v12L4.5 8.6 0.5 12.5z" fill="#E7E8E9" stroke="#E7E8E9"></path></svg>
+                  </sc-if>
+                  <sc-if value="{{ r.untracked }}" hint-placeholder-val="{{ true }}">
+                    <svg width="10" height="14" viewBox="0 0 9 13" aria-hidden="true"><path d="M0.5 0.5h8v12L4.5 8.6 0.5 12.5z" fill="none" stroke="#7C8288"></path></svg>
+                  </sc-if>
+                </span>
+              </div>
+              <sc-if value="{{ r.isOpenM }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:2px 14px 16px 71px;background:#0A0C0F;border-top:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:9px">
+                  <div style="font:500 8.5px 'IBM Plex Mono';letter-spacing:.16em;color:#7C8288;padding-top:12px">WHAT PLACED THIS ROW HERE</div>
+                  <div style="font:400 12.5px/1.6 'Source Serif 4',Georgia,serif;color:#CDD1D4;text-wrap:pretty">{{ r.why }}</div>
+                  <sc-for list="{{ r.trace }}" as="s" hint-placeholder-count="4">
+                    <div style="display:flex;flex-direction:row;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06)">
+                      <span style="font:400 9.5px 'IBM Plex Mono';letter-spacing:.08em;color:#7C8288">{{ s.label }}</span>
+                      <a href="#top" style="font:400 9.5px 'IBM Plex Mono';letter-spacing:.06em">OPEN �??</a>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="padding:12px 14px 14px 17px;font:400 9.5px/1.75 'IBM Plex Mono';color:#767C81;letter-spacing:.04em">{{ C.mobileNote }}</div>
+        </div>
+      </div>
+
+    </div>
+  </sc-for>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1200}}">
+const COH = {
+  EST: { c: "#6E8F76", label: "Established", hex: "#6E8F76 · DEEP SAGE" },
+  RS:  { c: "#9A8CC8", label: "Rising Star", hex: "#9A8CC8 · PURPLE" },
+  COM: { c: "#B0848F", label: "Community",   hex: "#B0848F · ROSE" }
+};
+
+const STATE = {
+  targeted:  { label: "TARGETED",  glyph: "�?�", c: "#8F959A" },
+  contacted: { label: "CONTACTED", glyph: "�?�", c: "#A8AEB3" },
+  active:    { label: "ACTIVE",    glyph: "�?�", c: "#C6CACD" },
+  none:      { label: "",          glyph: "·", c: "#5E656A" }
+};
+
+const CFG = [
+  {
+    tag: "EST", title: "ESTABLISHED / NSCLC",
+    meta: "1,284 HCP · SCIENTIFIC + NETWORK RANK THE COHORT · PHARMA EXCLUDED",
+    nameSub: "INSTITUTION · GENERATED SUMMARY",
+    cols: [
+      { key: "sci", a: "SCI", b: "CEILING", w: 66, kind: "pct" },
+      { key: "net", a: "NET", b: "CEILING", w: 66, kind: "pct" },
+      { key: "ph",  a: "PHARMA", b: "NOT RANKED", w: 120, kind: "pct", noRank: true, absent: "NO OP DATA" }
+    ],
+    mobileMeta: "1,284 HCP · RANK ORDER · SCI/NET AT CEILING",
+    mBandLabel: "BAND A · 1�??8", mBandNote: "TIED WITHIN 0.3",
+    mobileNote: "SCI / NET SHOW �??�??�?? AT THE COHORT CEILING AND A NUMERAL ONLY BELOW IT · PHARMA IS INFORMATIONAL, EXCLUDED FROM RANK, PRESENT FOR 7% OF THE COHORT.",
+    traceFoot: "FULL PUBLICATION, GUIDELINE, TRIAL AND PAYMENT RECORDS LIVE ON THE PROFILE �?? THIS SURFACE CARRIES ONLY RANK AND SCORE.",
+    notes: [
+      "SCI AND NET COLLAPSE TO �??�??�?? BECAUSE THE VISIBLE SPREAD SITS INSIDE THIS COHORT'S RESOLUTION; A NUMERAL PRINTS ONLY BELOW THE CEILING. THE THRESHOLD IS COMPUTED PER COHORT, NEVER HARD-CODED.",
+      "INDEX = SCI + NET COMPOSITE · CEILING 99.82 · NOBODY REACHES 100 · RANK IS THE ONLY FIGURE ON THIS ROW THAT SEPARATES ANYONE.",
+      "PHARMA IS EXCLUDED FROM THE RANKING · OPEN PAYMENTS EXISTS FOR 7% OF US ESTABLISHED HCP · �??NO OP DATA�?? IS ABSENCE OF A RECORD, NOT ABSENCE OF PAYMENT.",
+      "QUARTER-OVER-QUARTER RANK HISTORY IS NOT COLLECTED YET, SO NO TRAJECTORY COLUMN IS DRAWN �?? IT ARRIVES WITH THE DATA, NOT BEFORE IT."
+    ],
+    bands: [
+      { label: "BAND A · RANK 1�??8", note: "INDEX 99.8 �?? 99.5 · SPREAD 0.3 · INSIDE COHORT RESOLUTION �?? TREAT AS TIED", n: 5 },
+      { label: "BAND B · RANK 9�??14", note: "INDEX 99.5 �?? 99.3 · SPREAD 0.2 · TREAT AS TIED", n: 3 }
+    ],
+    rows: [
+      { rank: 1, gl: 18, name: "Gregory J. Riely", meta: "Memorial Sloan Kettering Cancer Center · NY", idx: "99.8", sci: 100, net: 100, ph: 70, inds: [["DOC", 1]],
+        nar: [["Eight senior-author NSCLC publications", 1], [" in five years alongside ", 0], ["12 guideline contributions", 1], [" �?? the heaviest consensus-panel load in the cohort.", 0]] },
+      { rank: 2, gl: 19, name: "Suresh S. Ramalingam", meta: "Emory University · GA", idx: "99.8", sci: 100, net: 100, ph: 45, inds: [["DOC", 3]],
+        nar: [["Twenty-five senior-author publications", 1], [" and ", 0], ["five guideline contributions", 1], [", output tracking his own trial portfolio.", 0]] },
+      { rank: 3, gl: 32, name: "Pasi A. Jänne", meta: "Dana-Farber Cancer Institute · MA", idx: "99.7", sci: 100, net: 100, ph: 85,
+        nar: [["27 senior-author publications", 1], [", cited ", 0], ["14.2K times", 1], [" in the window �?? translational weight rather than panel presence.", 0]] },
+      { rank: 4, gl: 21, name: "Fred R. Hirsch", meta: "Mount Sinai Health System · NY", idx: "99.7", sci: 100, net: 99, ph: null,
+        nar: [["Thirteen publications against 11 guideline contributions", 1], [" �?? an interpreter of evidence, concentrated in biomarker and testing standards.", 0]] },
+      { rank: 7, gl: 50, name: "John V. Heymach", meta: "The University of Texas MD Anderson · TX", idx: "99.5", sci: 99, net: 100, ph: 95, inds: [["DOC", 6]],
+        nar: [["35 publications", 1], [", ", 0], ["512 unique co-authors", 1], [" and ", 0], ["seven podium sessions", 1], [" in 12 months, with no guideline footprint.", 0]] },
+      { rank: 10, gl: 66, name: "Julie R. Brahmer", meta: "Johns Hopkins Medicine · MD", idx: "99.4", sci: 99, net: 100, ph: 76,
+        nar: [["Six guideline contributions", 1], [" on ", 0], ["nine recent publications", 1], [" �?? influence carried by toxicity-management standards.", 0]] },
+      { rank: 13, gl: 79, name: "Heather A. Wakelee", meta: "Stanford University · CA", idx: "99.3", sci: 97, net: 99, ph: null,
+        nar: [["17 publications", 1], [" across the perioperative setting; ", 0], ["Scientific 97", 1], [" is the only sub-ceiling score in view.", 0]] },
+      { rank: 14, gl: 78, name: "Edward B. Garon", meta: "University of California, Los Angeles · CA", idx: "99.3", sci: 99, net: 98, ph: 62,
+        nar: [["Five senior-author publications", 1], [" against ", 0], ["six trials as PI", 1], [" �?? trial leadership outpacing publication.", 0]] }
+    ]
+  },
+  {
+    tag: "RS", title: "RISING STARS / NSCLC",
+    meta: "412 HCP · FOUR METRICS · ALL FOUR DISCRIMINATE, SO ALL FOUR PRINT",
+    nameSub: "PROFILE TAG · INSTITUTION · GENERATED SUMMARY",
+    hasState: true,
+    cols: [
+      { key: "scimom", a: "SCI MOM", b: "PCTILE", w: 74, kind: "pct" },
+      { key: "netmom", a: "NET MOM", b: "PCTILE", w: 74, kind: "pct" },
+      { key: "scivis", a: "SCI VIS", b: "PCTILE", w: 74, kind: "pct" },
+      { key: "netvis", a: "NET VIS", b: "PCTILE", w: 74, kind: "pct" }
+    ],
+    mobilePairs: [["MOM", ["scimom", "netmom"]], ["VIS", ["scivis", "netvis"]]],
+    mobileMeta: "412 HCP · MOMENTUM AND VISIBILITY PAIR BY FAMILY",
+    mBandLabel: "BAND A · 1�??4", mBandNote: "TIED WITHIN 2.1",
+    mobileNote: "FOUR COLUMNS DO NOT FIT 390, SO THEY PAIR BY FAMILY RATHER THAN DROP �?? MOM = SCIENTIFIC / NETWORK MOMENTUM, VIS = SCIENTIFIC / NETWORK VISIBILITY.",
+    traceFoot: "MOMENTUM IS MEASURED AGAINST THIS HCP'S OWN FIVE-YEAR BASELINE; VISIBILITY IS A PERCENTILE WITHIN THE RISING STAR COHORT.",
+    notes: [
+      "NO SUPPRESSION HERE: MOMENTUM AND VISIBILITY RUN 44 TO 100 ACROSS THIS COHORT, SO EVERY VALUE CARRIES INFORMATION AND EVERY VALUE PRINTS. THE SAME COMPUTED RULE THAT COLLAPSES ESTABLISHED'S TWO COLUMNS LEAVES ALL FOUR OF THESE STANDING.",
+      "PROFILE TAGS (BALANCED / SCIENCE) DESCRIBE THE PHYSICIAN AND SIT WITH THE NAME. RELATIONSHIP STATE DESCRIBES OUR CONTACT AND SITS RIGHT OF THE HAIRLINE WITH THE OTHER CONTROLS.",
+      "SCORES ARE PERCENTILES WITHIN THE RISING STAR COHORT AND ARE NOT COMPARABLE WITH ESTABLISHED OR COMMUNITY FIGURES."
+    ],
+    bands: [
+      { label: "BAND A · RANK 1�??4", note: "INDEX 99.1 �?? 97.4 · SPREAD 1.7 · INSIDE COHORT RESOLUTION �?? TREAT AS TIED", n: 4 },
+      { label: "BAND B · RANK 5�??12", note: "INDEX 97.1 �?? 94.8 · SPREAD 2.3 · SEPARATION BEGINS HERE", n: 3 }
+    ],
+    rows: [
+      { rank: 1, gl: 1, name: "Sally C. M. Lau", tag: "BALANCED", meta: "NYU Langone Health · NY", idx: "99.1", state: "contacted", scimom: 90, netmom: 96, scivis: 84, netvis: 87, inds: [["DOC", 2], ["PIN", 4]],
+        nar: [["Collaborator network expanded ten-fold to 257", 1], [", driving ", 0], ["96th-percentile network momentum", 1], [" in five years.", 0]] },
+      { rank: 2, gl: 2, name: "Aditi P. Singh", tag: "BALANCED", meta: "University of Pennsylvania · PA", idx: "98.6", state: "active", scimom: 91, netmom: 94, scivis: 92, netvis: 79,
+        nar: [["Network expanded fourfold to 159", 1], [", a ", 0], ["94th-percentile momentum score", 1], [" on a still-narrow visibility base.", 0]] },
+      { rank: 3, gl: 3, name: "Joshua E. Reuss", tag: "BALANCED", meta: "Georgetown University · DC", idx: "98.2", state: "targeted", scimom: 88, netmom: 85, scivis: 90, netvis: 83,
+        nar: [["Even movement on all four measures", 1], [" �?? no outlier, which is itself the signal at this rank.", 0]] },
+      { rank: 4, gl: 4, name: "Karen L. Reckamp", tag: "SCIENCE", meta: "Cedars-Sinai Medical Center · CA", idx: "97.4", state: "none", scimom: 95, netmom: 68, scivis: 93, netvis: 77,
+        nar: [["Scientific momentum 95 against network momentum 68", 1], [" �?? publishing faster than she is collaborating.", 0]] },
+      { rank: 5, gl: 5, name: "Tejas Patil", tag: "SCIENCE", meta: "University of Colorado Denver · CO", idx: "97.1", state: "none", scimom: 98, netmom: 74, scivis: 94, netvis: 86,
+        nar: [["Citations up 795 and publications nearly tripled", 1], [" �?? ", 0], ["98th-percentile scientific momentum", 1], [" with network momentum lagging at 74.", 0]] },
+      { rank: 9, gl: 9, name: "Xiuning Le", tag: "SCIENCE", meta: "The University of Texas MD Anderson · TX", idx: "96.0", state: "none", scimom: 99, netmom: 60, scivis: 100, netvis: 99, inds: [["PIN", 2]],
+        nar: [["18 of 21 senior-author publications landed in the last five years", 1], [", but ", 0], ["network momentum sits at 60", 1], [" �?? output ahead of collaboration.", 0]] },
+      { rank: 12, gl: 12, name: "Misako Nagasaka", tag: "BALANCED", meta: "University of California, Irvine · CA", idx: "94.8", state: "targeted", scimom: 71, netmom: 66, scivis: 58, netvis: 44,
+        nar: [["Lowest visibility in view at 58 and 44", 1], [" on moderate momentum �?? early in the cohort, not declining within it.", 0]] }
+    ]
+  },
+  {
+    tag: "COM", title: "COMMUNITY / NSCLC",
+    meta: "8,140 HCP · CMS-DERIVED · VOLUME 40% · ENGAGEMENT 30% · SETTING 15% · CAREER 10% · PUBLICATION 5%",
+    nameSub: "SPECIALTY · LOCATION · GENERATED SUMMARY",
+    hasState: true,
+    cols: [
+      { key: "eng", a: "ENGAGEMENT", b: "CMS · NOT RANKED", w: 122, kind: "money", noRank: true, absent: "NONE RECORDED" },
+      { key: "co",  a: "COMPANIES", b: "DISTINCT", w: 86, kind: "count" },
+      { key: "yrs", a: "YEARS", b: "IN PRACTICE", w: 74, kind: "count" }
+    ],
+    mobileMeta: "8,140 HCP · ENGAGEMENT IS INFORMATIONAL, NOT RANKED",
+    mBandLabel: "BAND A · 1�??5", mBandNote: "4�??5 TIED AT 91",
+    mobileNote: "ENGAGEMENT IS A CMS PAYMENT TOTAL AND NOTHING SORTS ON IT · �??NONE RECORDED�?? MEANS CMS HOLDS NO RECORD, WHICH IS NOT THE SAME AS NO RELATIONSHIP.",
+    traceFoot: "COMMUNITY SCORES ARE CMS-DERIVED AND LED BY PRACTICE VOLUME; MANY HCP IN THIS COHORT HAVE NO PUBLICATIONS AT ALL, WHICH IS EXPECTED AND NOT A GAP.",
+    notes: [
+      "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE, AND NOTHING SORTS ON IT �?? IT SITS AT THE SAME TERTIARY TIER AS EVERY OTHER FIGURE SO THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
+      "�??NONE RECORDED�?? MEANS CMS HOLDS NO PAYMENT RECORD. NO RELATIONSHIP AND NO RECORD ARE INDISTINGUISHABLE IN THE SOURCE, SO THE ROW SAYS WHAT IS KNOWN AND NOTHING MORE �?? RANK IS UNAFFECTED, SINCE ENGAGEMENT IS 30% OF A SCORE LED BY PRACTICE VOLUME.",
+      "SCORES ARE PERCENTILES WITHIN THE COMMUNITY COHORT · A COMMUNITY 94 AND AN ESTABLISHED 94 ARE DIFFERENT MEASUREMENTS."
+    ],
+    bands: [
+      { label: "BAND A · RANK 1�??5", note: "INDEX 100 �?? 91 · SPREAD 9 · RANKS 4�??5 TIED AT 91", n: 5 },
+      { label: "BAND B · RANK 6�??20", note: "INDEX 90 �?? 84 · SPREAD 6 · CLOSELY PACKED", n: 2 }
+    ],
+    rows: [
+      { rank: 1, gl: 1, name: "Maen Hussein", meta: "Medical Oncology · Lady Lake, FL", idx: "100", state: "targeted", eng: "$81.0K", co: 60, yrs: 21, inds: [["DOC", 6]],
+        nar: [["60 distinct company relationships over 21 years", 1], [" �?? ", 0], ["the broadest engagement history in the cohort", 1], [", and an accessible first contact.", 0]] },
+      { rank: 2, gl: 2, name: "Stephen Divers", meta: "Hematology & Oncology · Hot Springs, AR", idx: "94", state: "targeted", eng: "$37.0K", co: 61, yrs: 21,
+        nar: [["61 companies", 1], [" against a mid-range payment total �?? ", 0], ["breadth without concentration", 1], [".", 0]] },
+      { rank: 3, gl: 3, name: "John Waples", meta: "Medical Oncology · Huntsville, AL", idx: "93", state: "none", eng: "$6.5K", co: 41, yrs: 20,
+        nar: [["41 companies on $6.5K", 1], [" �?? many brief relationships rather than a few sustained ones.", 0]] },
+      { rank: 4, gl: 4, name: "Rachel Layman", meta: "Medical Oncology · Sugar Land, TX", idx: "91", state: "contacted", eng: "$14.2K", co: 33, yrs: 17,
+        nar: [["Tied at 91 with the row below", 1], [" �?? the ordering between them is arbitrary and the band says so.", 0]] },
+      { rank: 5, gl: 5, name: "Alan Rosenberg", meta: "Medical Oncology · Boise, ID", idx: "91", state: "none", eng: "$2.1K", co: 12, yrs: 24,
+        nar: [["24 years in practice on 12 company relationships", 1], [" �?? long tenure, narrow engagement.", 0]] },
+      { rank: 10, gl: 10, name: "Thomas Buroker", meta: "Medical Oncology · Ankeny, IA", idx: "86", state: "none", eng: null, co: null, yrs: 20,
+        nar: [["No CMS payment record", 1], [" in 20 years of practice. Ranked on ", 0], ["practice volume and setting", 1], [", which carry 55% of this cohort's score.", 0]] },
+      { rank: 14, gl: 14, name: "Priya Raman", meta: "Medical Oncology · Phoenix, AZ", idx: "84", state: "targeted", eng: "$1.2K", co: 4, yrs: 9,
+        nar: [["No senior-author record", 1], ["; ", 0], ["community practice covering four counties", 1], [" �?? relevant for reach, not for evidence generation.", 0]] }
+    ]
+  }
+];
+
+class Component extends DCLogic {
+  state = { open: "EST-2", openM: null, tracked: { "EST-2": true, "RS-1": true, "COM-2": true } };
+
+  // A column collapses only where its own cohort's visible spread cannot
+  // discriminate. Threshold is derived, never a hard-coded 99.
+  suppression(C) {
+    const res = {};
+    C.cols.forEach(col => {
+      if (col.kind !== "pct" || col.noRank) { res[col.key] = null; return; }
+      const vals = C.rows.map(r => r[col.key]).filter(v => typeof v === "number");
+      const hi = Math.max.apply(null, vals), lo = Math.min.apply(null, vals);
+      // inside resolution when the whole column sits within 3 percentile points
+      res[col.key] = (hi - lo) <= 3 ? hi - 1 : null;
+    });
+    return res;
+  }
+
+  trace(C, r) {
+    const t = C.cols.map(col => ({
+      label: (col.a + " " + col.b).replace(" · NOT RANKED", "").toUpperCase(),
+      value: r[col.key] === null || r[col.key] === undefined
+        ? "no record held"
+        : (col.kind === "money" ? r[col.key] + " · CMS Open Payments 2024"
+           : col.kind === "count" ? r[col.key] + " · counted from CMS"
+           : "percentile " + r[col.key] + " within " + COH[C.tag].label + " · methodology v4.2")
+    }));
+    t.push({ label: "COHORT RANK", value: "#" + r.rank + " of " + C.meta.split(" ")[0] + " " + COH[C.tag].label + " · #" + r.gl + " global" });
+    return t;
+  }
+
+  why(C, r, sup) {
+    const collapsed = C.cols.filter(c => sup[c.key] !== null && r[c.key] >= sup[c.key]);
+    if (collapsed.length >= 2) {
+      return "Both ranking scores sit at this cohort's ceiling (" + collapsed.map(c => c.a + " " + r[c.key]).join(", ") +
+        "), so neither contributes separation here �?? position #" + r.rank + " rests on fractions of a percentile against everyone else at the ceiling.";
+    }
+    if (collapsed.length === 1) {
+      const other = C.cols.filter(c => c.kind === "pct" && !c.noRank && collapsed.indexOf(c) < 0)[0];
+      return other
+        ? other.a + " " + r[other.key] + " is the only ranking score with room to move, and it is what holds this row at #" + r.rank + "."
+        : "One ranking score sits at the ceiling; the other is what holds this row at #" + r.rank + ".";
+    }
+    const spread = C.cols.filter(c => c.kind === "pct" && !c.noRank).map(c => c.a + " " + r[c.key]).join(" · ");
+    if (spread) return "All ranking scores discriminate in this cohort (" + spread + "), so #" + r.rank + " is a real position rather than a tie-break �?? the band note states how much of the ordering is meaningful.";
+    return "Ranked on practice volume, setting and career stage �?? " + (r.eng === null
+      ? "no CMS payment record exists, and engagement is 30% of a score led by practice volume, so its absence does not move this row."
+      : "engagement of " + r.eng + " is informational and contributes 30%.");
+  }
+
+  build(C) {
+    const sup = this.suppression(C);
+    const emph = nar => nar.map(x => ({ t: x[0], c: x[1] ? "#EDEEEF" : "#8F959A", w: x[1] ? 600 : 400 }));
+    const mk = (r, key) => {
+      const id = C.tag + "-" + r.rank;
+      const on = !!this.state.tracked[id];
+      const st = STATE[r.state || "none"];
+      const cells = C.cols.map(col => {
+        const v = r[col.key];
+        if (v === null || v === undefined) {
+          return col.absent
+            ? { w: col.w, num: false, txt: true, v: col.absent }
+            : { w: col.w, num: true, txt: false, v: "�??", c: "#71787E" };
+        }
+        const hidden = sup[col.key] !== null && v >= sup[col.key];
+        return { w: col.w, num: true, txt: false, v: hidden ? "�??" : v, c: hidden ? "#71787E" : (col.noRank ? "#8F959A" : "#EDEEEF") };
+      });
+      const mcells = C.mobilePairs
+        ? C.mobilePairs.map(p => ({ label: p[0], v: p[1].map(k => r[k]).join(" / "), c: "#8F959A" }))
+        : C.cols.map((col, i) => ({ label: col.a, v: cells[i].v, c: cells[i].num ? cells[i].c : "#71787E" }));
+      return {
+        rank: String(r.rank), gl: String(r.gl), name: r.name, meta: r.meta, idx: r.idx,
+        tag: r.tag || "", hasTag: !!r.tag, nar: emph(r.nar), cells, mcells,
+        inds: (r.inds || []).map(i => ({ label: i[0], n: i[1] })),
+        why: this.why(C, r, sup), trace: this.trace(C, r),
+        stateLabel: st.label, stateGlyph: st.glyph, stateC: st.c,
+        hasStateM: !!C.hasState && !!r.state && r.state !== "none",
+        tracked: on, untracked: !on,
+        trackRule: on ? "#C6CACD" : "transparent",
+        trackBorder: on ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.14)",
+        trackTitle: on ? "Tracked �?? click to stop tracking" : "Track this HCP",
+        toggleTrack: e => { if (e && e.stopPropagation) e.stopPropagation(); this.toggleTrack(id); },
+        toggleTrackM: e => { if (e && e.stopPropagation) e.stopPropagation(); this.toggleTrack(id); },
+        isOpen: this.state.open === id, isOpenM: this.state.openM === id,
+        toggle: () => this.setState(s => ({ open: s.open === id ? null : id })),
+        toggleM: () => this.setState(s => ({ openM: s.openM === id ? null : id }))
+      };
+    };
+    let i = 0;
+    const bands = C.bands.map(b => {
+      const rows = C.rows.slice(i, i + b.n).map(r => mk(r));
+      i += b.n;
+      return { label: b.label, note: b.note, rows };
+    });
+    return Object.assign({}, C, {
+      cc: COH[C.tag].c,
+      heads: C.cols.map(c => ({ a: c.a, b: c.b, w: c.w })),
+      hasState: !!C.hasState,
+      bands,
+      mobile: C.rows.slice(0, 4).map(r => mk(r))
+    });
+  }
+
+  toggleTrack(id) {
+    this.setState(s => ({ tracked: Object.assign({}, s.tracked, { [id]: !s.tracked[id] }) }));
+  }
+
+  renderVals() {
+    return {
+      configs: CFG.map(C => this.build(C)),
+      palette: ["EST", "RS", "COM"].map(k => Object.assign({ tag: k }, COH[k]))
+    };
+  }
+}
+</script>
+</body>
+</html>
