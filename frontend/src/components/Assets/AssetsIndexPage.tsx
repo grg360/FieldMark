@@ -238,6 +238,27 @@ function IndexBody({
   // In flat view "within target" has no meaning — bars fall back to the whole index.
   const useWithin = view === "target" && scale === "within";
 
+  // Return-anchor placement — RULE OF RECORD: accumulate ROWS, drop an anchor at
+  // the first group boundary past ROWS_PER_ANCHOR, then reset and repeat. Anchors
+  // fall on group boundaries only (never mid-group, which would read as a false
+  // section break). Keyed to rows, not group count, so it travels to any TA whose
+  // group sizes differ — volume-sorted groups no longer front-load the spacing.
+  // Mobile only. Maps group index → cumulative rows shown at that boundary.
+  const ROWS_PER_ANCHOR = 14;
+  const anchorCumRows = new Map<number, number>();
+  {
+    let sinceLast = 0;
+    let cumulative = 0;
+    model.targetGroups.forEach((g, i) => {
+      sinceLast += g.rows.length;
+      cumulative += g.rows.length;
+      if (sinceLast >= ROWS_PER_ANCHOR && i < model.targetGroups.length - 1) {
+        anchorCumRows.set(i, cumulative);
+        sinceLast = 0;
+      }
+    });
+  }
+
   return (
     <>
       {/* Header */}
@@ -323,9 +344,9 @@ function IndexBody({
             {model.targetGroups.map((g, i) => {
               const groupMax = Math.max(1, ...g.rows.map((r) => r.n));
               const denom = useWithin ? groupMax : model.globalMax;
-              // In-flow return anchor after every sixth target group (mobile only,
-              // frame 1c) — not after the last group, which the END anchor covers.
-              const showAnchor = isMobile && (i + 1) % 6 === 0 && i < model.targetGroups.length - 1;
+              // In-flow return anchor at row-accumulation boundaries (mobile only,
+              // frame 1c) — never after the last group, which the END anchor covers.
+              const showAnchor = isMobile && anchorCumRows.has(i);
               return (
                 <Fragment key={g.target}>
                   <div style={{ padding: "20px 0 6px", borderBottom: `1px solid ${COLOR.hair}` }}>
@@ -340,7 +361,7 @@ function IndexBody({
                     ))}
                   </div>
                   {showAnchor ? (
-                    <AnchorRow label={`${i + 1} OF ${model.counts.targetGroups} GROUPS`} />
+                    <AnchorRow label={`${anchorCumRows.get(i)} OF ${model.counts.rows} ROWS`} />
                   ) : null}
                 </Fragment>
               );
@@ -417,7 +438,7 @@ function IndexBody({
           </div>
         )}
 
-        {isMobile ? <AnchorRow end label={`END · ${model.counts.targetGroups} GROUPS`} /> : null}
+        {isMobile ? <AnchorRow end label={`END · ${model.counts.rows} ROWS`} /> : null}
 
         <div style={{ ...note, marginTop: 36 }}>
           FieldMark NSCLC corpus, {model.header.corpus.toLocaleString()} records, indexed {formatIndexDate()}.
