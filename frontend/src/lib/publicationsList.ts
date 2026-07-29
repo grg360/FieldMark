@@ -22,6 +22,11 @@ export interface PublicationListRow {
   // are null the line renders nothing — no placeholder.
   studyType?: string | null;   // mapped from publication_types
   themeShort?: string | null;  // theme_canonical_v1.short_name, primary theme
+  // Full-text access (enriched). fullTextUrl null → no DOI, render nothing.
+  // fullTextIsOa true → open-access, readable at oa_url; false → DOI link, may
+  // be paywalled ("View on publisher").
+  fullTextUrl?: string | null;
+  fullTextIsOa?: boolean;
 }
 
 // Map raw MeSH publication_types to a short study-type label, most specific first.
@@ -52,19 +57,33 @@ export async function enrichCharacterisation(rows: PublicationListRow[]): Promis
   const CHUNK = 200;
   const typesById = new Map<string, string[] | null>();
   const themeById = new Map<string, string>();
+  const fullTextById = new Map<string, { url: string; isOa: boolean }>();
 
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
     const [{ data: pubs }, { data: themes }] = await Promise.all([
-      supabase.from("publications_v2").select("id, publication_types").in("id", chunk),
+      supabase.from("publications_v2").select("id, publication_types, open_access, doi").in("id", chunk),
       supabase
         .from("publication_theme_v1")
         .select("publication_id, theme_canonical_v1(short_name, canonical_name)")
         .in("publication_id", chunk)
         .eq("is_primary", true),
     ]);
-    for (const p of (pubs ?? []) as { id: string; publication_types: string[] | null }[]) {
+    for (const p of (pubs ?? []) as {
+      id: string;
+      publication_types: string[] | null;
+      open_access: { is_oa?: boolean; oa_url?: string | null } | null;
+      doi: string | null;
+    }[]) {
       typesById.set(p.id, p.publication_types);
+      // Open access with a URL is the readable case; else fall back to the DOI
+      // (publisher page, possibly paywalled); no DOI → no link.
+      const oa = p.open_access;
+      if (oa?.is_oa && oa.oa_url) {
+        fullTextById.set(p.id, { url: oa.oa_url, isOa: true });
+      } else if (p.doi) {
+        fullTextById.set(p.id, { url: `https://doi.org/${p.doi}`, isOa: false });
+      }
     }
     for (const t of (themes ?? []) as { publication_id: string; theme_canonical_v1: { short_name: string | null; canonical_name: string | null } | null }[]) {
       const tc = t.theme_canonical_v1;
@@ -73,11 +92,16 @@ export async function enrichCharacterisation(rows: PublicationListRow[]): Promis
     }
   }
 
-  return rows.map((r) => ({
-    ...r,
-    studyType: mapStudyType(typesById.get(r.id)),
-    themeShort: themeById.get(r.id) ?? null,
-  }));
+  return rows.map((r) => {
+    const ft = fullTextById.get(r.id);
+    return {
+      ...r,
+      studyType: mapStudyType(typesById.get(r.id)),
+      themeShort: themeById.get(r.id) ?? null,
+      fullTextUrl: ft?.url ?? null,
+      fullTextIsOa: ft?.isOa ?? false,
+    };
+  });
 }
 
 type PublicationDbRow = {

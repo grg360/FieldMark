@@ -90,11 +90,27 @@ export default function PublicationCard({ pub, affordance, isMobile }: Props) {
           {byline || "Authors not available"}
         </div>
 
-        {pubmedUrl && (
-          <a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ ...mono(10.5, COLOR.indigoLink), textDecoration: "none", width: "fit-content" }}>
-            View Abstract ↗
-          </a>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 2 }}>
+          {pubmedUrl && (
+            <a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ ...mono(10.5, COLOR.indigoLink), textDecoration: "none" }}>
+              View Abstract ↗
+            </a>
+          )}
+          {/* Full-text access — open-access reads as such; else a publisher link
+              that doesn't imply readability; no DOI → nothing. */}
+          {pub.fullTextUrl && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <a href={pub.fullTextUrl} target="_blank" rel="noopener noreferrer" style={{ ...mono(10.5, pub.fullTextIsOa ? "#7fb094" : COLOR.indigoLink), textDecoration: "none" }}>
+                {pub.fullTextIsOa ? "Read full text ↗" : "View on publisher ↗"}
+              </a>
+              {pub.fullTextIsOa && (
+                <span style={{ ...mono(8.5, "#7fb094"), letterSpacing: "0.1em", border: "1px solid rgba(95,169,126,0.35)", borderRadius: 2, padding: "1px 5px" }}>
+                  OPEN ACCESS
+                </span>
+              )}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* right: discussion affordance (compact) + reserved slots */}
