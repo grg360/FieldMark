@@ -10,7 +10,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import AssetNav from "./AssetNav";
+import NavBar from "../NavBar";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -200,7 +200,7 @@ export default function AssetsIndexPage() {
 
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: FONT.sans }}>
-      <AssetNav active="assets" />
+      <NavBar />
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: isMobile ? "0 16px 96px" : "0 24px 96px", width: "100%", boxSizing: "border-box" }}>
         {loading ? (
           <div style={{ ...note, padding: "40px 0", fontSize: 12 }}>Loading assets…</div>

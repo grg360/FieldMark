@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import AssetNav from "./AssetNav";
+import NavBar from "../NavBar";
 import CompositionChart from "./CompositionChart";
 import LandingNow from "./LandingNow";
 import { AuthorsPanel, CongressPanel, ForumPanel } from "./RightRail";
@@ -31,7 +31,7 @@ const metaMono = { fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink4 } as c
 function shell(children: React.ReactNode) {
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: FONT.sans }}>
-      <AssetNav active="assets" />
+      <NavBar />
       {children}
     </div>
   );
