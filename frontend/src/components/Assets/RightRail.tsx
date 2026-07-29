@@ -1,0 +1,151 @@
+// Asset page right rail — Design frames 1a / 1b.
+//
+// Who publishes on the asset, congress presence, and forum threads. Each panel
+// prints its own count and shows an honest empty state when the data is absent —
+// a section is dropped only because the data is, never padded to look fuller.
+
+import { Link } from "react-router-dom";
+import { COLOR, FONT } from "../../lib/designTokens";
+import { authorInitialName, authorRankLabel } from "../../lib/assetLogic";
+import type { AuthorsPayload, CongressPresenter, ForumThread } from "../../lib/assetPage";
+
+const eyebrow = {
+  fontFamily: FONT.mono,
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: "0.16em",
+  textTransform: "uppercase" as const,
+  color: COLOR.ink3,
+} as const;
+const metaMono = { fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink4, lineHeight: 1.6 } as const;
+const emptyProse = { fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.55, color: COLOR.ink3 } as const;
+
+function prettyCongress(slug: string): string {
+  return slug.replace(/-/g, " ").toUpperCase();
+}
+
+export function AuthorsPanel({ authors }: { authors: AuthorsPayload }) {
+  const rows = authors.authors;
+  const max = Math.max(1, ...rows.map((r) => r.c));
+  return (
+    <div style={{ padding: "26px 26px 24px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+      <div style={{ ...eyebrow, marginBottom: 14 }}>Who publishes on this asset</div>
+      {rows.length === 0 ? (
+        <div style={emptyProse}>No authorship on this asset has resolved to the HCP graph yet.</div>
+      ) : (
+        <div>
+          {rows.map((r) => (
+            <div key={r.hcp_id} style={{ padding: "11px 0", borderBottom: `1px solid ${COLOR.hair}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+                <Link
+                  to={`/hcp/${r.hcp_id}`}
+                  style={{ fontFamily: FONT.sans, fontSize: 13, fontWeight: 500, color: COLOR.ink1, textDecoration: "none" }}
+                >
+                  {authorInitialName(r.first_name, r.last_name)}
+                </Link>
+                <span style={{ fontFamily: FONT.mono, fontSize: 12, color: r.c === max ? COLOR.amber : COLOR.ink1, flex: "none" }}>
+                  {r.c}
+                </span>
+              </div>
+              <div style={{ height: 3, background: COLOR.hairStrong, margin: "8px 0 7px", borderRadius: 2 }}>
+                <div style={{ height: 3, width: `${((r.c / max) * 100).toFixed(0)}%`, background: COLOR.indigo, borderRadius: 2 }} />
+              </div>
+              <div style={metaMono}>{authorRankLabel(r.board_rank, r.scope_type, r.scope_value)}</div>
+            </div>
+          ))}
+          <div style={{ ...metaMono, marginTop: 12 }}>
+            {authors.resolved.toLocaleString()} authors resolved to the HCP graph in total; the{" "}
+            {rows.length} most prolific on this asset are shown, ranked by publication count only.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CongressPanel({ presenters }: { presenters: CongressPresenter[] }) {
+  return (
+    <div style={{ padding: "24px 26px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+      <div style={{ ...eyebrow, marginBottom: 14 }}>Congress presence</div>
+      {presenters.length === 0 ? (
+        <div style={emptyProse}>
+          No confirmed presenter on this asset matches the published congress programmes.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {presenters.map((p, i) => (
+              <div
+                key={`${p.hcp_id}-${p.congress}-${i}`}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  paddingBottom: 9,
+                  borderBottom: i < presenters.length - 1 ? `1px solid ${COLOR.hair}` : "none",
+                }}
+              >
+                <div>
+                  <Link
+                    to={`/hcp/${p.hcp_id}`}
+                    style={{ fontFamily: FONT.sans, fontSize: 12, fontWeight: 500, color: COLOR.ink1, textDecoration: "none" }}
+                  >
+                    {p.name}
+                  </Link>
+                  <div style={{ ...metaMono, marginTop: 4 }}>
+                    {p.established_rank != null ? `NSCLC ESTABLISHED #${p.established_rank}` : "CONFIRMED PRESENTER"}
+                  </div>
+                </div>
+                <div style={{ fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink3, textAlign: "right", flex: "none" }}>
+                  {prettyCongress(p.congress)}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...metaMono, marginTop: 13 }}>
+            Confirmed from published congress programmes. Unconfirmed sessions are not listed.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function ForumPanel({ threads }: { threads: ForumThread[] }) {
+  return (
+    <div style={{ padding: "24px 26px" }}>
+      <div style={{ ...eyebrow, marginBottom: 14 }}>Forum threads on these papers</div>
+      {threads.length === 0 ? (
+        <div style={emptyProse}>No forum thread is anchored to this asset's papers yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {threads.map((t, i) => (
+            <div
+              key={t.id}
+              style={{
+                paddingBottom: i < threads.length - 1 ? 12 : 0,
+                borderBottom: i < threads.length - 1 ? `1px solid ${COLOR.hair}` : "none",
+              }}
+            >
+              <Link
+                to={`/field-intelligence/thread/${t.id}`}
+                style={{ fontFamily: FONT.sans, fontSize: 12, fontWeight: 500, lineHeight: 1.4, color: COLOR.ink1, textDecoration: "none" }}
+              >
+                {t.title}
+              </Link>
+              <div style={{ ...metaMono, marginTop: 6 }}>
+                {[
+                  t.reply_count != null ? `${t.reply_count} REPLIES` : null,
+                  t.recency_label ? t.recency_label.toUpperCase() : null,
+                  t.scope_label ? t.scope_label.toUpperCase() : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

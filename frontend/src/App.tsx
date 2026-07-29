@@ -43,6 +43,7 @@ import DetailScreen from "./components/DetailScreen";
 import NoteEntryScreen from "./components/NoteEntryScreen";
 import BibliographyScreen from "./components/BibliographyScreen";
 import AssetsIndexPage from "./components/Assets/AssetsIndexPage";
+import AssetPage from "./components/Assets/AssetPage";
 import LandscapeScreen from "./components/LandscapeScreen";
 import LandscapeRoute from "./components/LandscapeRoute";
 import InstitutionRoute from "./components/InstitutionRoute";
@@ -1362,6 +1363,7 @@ export default function App() {
           <Route path="/congress" element={<CongressCalendarPage />} />
           <Route path="/congress/:slug" element={<CongressDetailPage />} />
           <Route path="/assets" element={<AssetsIndexPage />} />
+          <Route path="/assets/:slug" element={<AssetPage />} />
           <Route path="/field-intelligence" element={<ForumIndexPage />} />
           <Route path="/field-intelligence/thread/:id" element={<ThreadPage />} />
           <Route path="/field-intelligence/moderation" element={<ModerationPage />} />
