@@ -5,9 +5,14 @@
 // surfaces work; they just land on pages still wearing the old chrome, which is
 // expected and temporary. Targets live in NAV_ITEMS so the rollout can repoint
 // them in one place. "Assets" is the new fourth axis; nothing else moves.
+//
+// Mobile (≤767px): the wordmark stays fixed and the links become a single
+// horizontally scrollable strip — never wrapping onto a second line. Desktop is
+// unchanged.
 
 import { Link } from "react-router-dom";
 import { COLOR, FONT } from "../../lib/designTokens";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 
 type AssetNavKey = "assets";
 
@@ -29,17 +34,20 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function AssetNav({ active }: { active?: AssetNavKey }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+
   return (
     <nav
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 26,
-        height: 46,
-        padding: "0 24px",
+        gap: isMobile ? 14 : 26,
+        minHeight: 46,
+        padding: isMobile ? "0 16px" : "0 24px",
         borderBottom: `1px solid ${COLOR.hairStrong}`,
         backgroundColor: COLOR.ground,
-        flexWrap: "wrap",
+        // Desktop wraps only in the (never-hit) overflow case; mobile never wraps.
+        flexWrap: isMobile ? "nowrap" : "wrap",
       }}
       aria-label="Primary"
     >
@@ -53,11 +61,24 @@ export default function AssetNav({ active }: { active?: AssetNavKey }) {
           color: COLOR.amber,
           textDecoration: "none",
           lineHeight: 1,
+          flex: "none",
         }}
       >
         FIELDMARK
       </Link>
-      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: isMobile ? 18 : 20,
+          // Mobile: one scrollable strip, links never wrap; desktop unchanged.
+          flexWrap: isMobile ? "nowrap" : "wrap",
+          overflowX: isMobile ? "auto" : "visible",
+          WebkitOverflowScrolling: "touch",
+          minWidth: 0,
+          flex: isMobile ? 1 : "0 1 auto",
+          paddingBottom: isMobile ? 0 : undefined,
+        }}
+      >
         {NAV_ITEMS.map((item) => {
           const isActive = item.key != null && item.key === active;
           return (
@@ -74,6 +95,8 @@ export default function AssetNav({ active }: { active?: AssetNavKey }) {
                 marginBottom: -15,
                 borderBottom: isActive ? `1px solid ${COLOR.amber}` : "1px solid transparent",
                 lineHeight: 1,
+                whiteSpace: "nowrap",
+                flex: "none",
                 transition: "color 0.15s ease",
               }}
               onMouseEnter={(e) => {

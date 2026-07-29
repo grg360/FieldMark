@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import AssetNav from "./AssetNav";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { formatIndexDate } from "../../lib/assets";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import {
   loadAssetIndex,
   DENSITY_GLYPH,
@@ -52,8 +53,55 @@ function ctlBtn(active: boolean): React.CSSProperties {
   };
 }
 
-function AssetRow({ row, denom, showAlso }: { row: IndexAssetRow; denom: number; showAlso: boolean }) {
+function AssetRow({
+  row,
+  denom,
+  showAlso,
+  isMobile,
+}: {
+  row: IndexAssetRow;
+  denom: number;
+  showAlso: boolean;
+  isMobile: boolean;
+}) {
   const width = denom > 0 ? `${Math.max(1, (row.n / denom) * 100).toFixed(1)}%` : "0%";
+  const glyphTitle = `${DENSITY_LABEL[row.tier]} — clears 40 themed in ${row.yearsCleared} of 7 completed years (2019–2025); 2026 in progress`;
+  const name = (
+    <Link
+      to={`/assets/${row.slug}`}
+      style={{ fontFamily: FONT.sans, fontSize: 13, color: COLOR.ink1, textDecoration: "none" }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = COLOR.amber)}
+      onMouseLeave={(e) => (e.currentTarget.style.color = COLOR.ink1)}
+    >
+      {row.generic}
+    </Link>
+  );
+  const glyph = (
+    <span
+      style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.1em", color: TIER_COLOR[row.tier] }}
+      title={glyphTitle}
+    >
+      {DENSITY_GLYPH[row.tier]}
+    </span>
+  );
+  const n = (
+    <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 12, color: COLOR.ink1, fontVariantNumeric: "tabular-nums" }}>
+      {row.n.toLocaleString()}
+    </span>
+  );
+
+  // Mobile drops the bar and the ALSO cross-reference — name · glyph · count only —
+  // so rows stop overflowing below ~568px. Volume stays as the number; density
+  // stays as the glyph. Desktop layout is unchanged.
+  if (isMobile) {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: 12, padding: "10px 0", borderTop: `1px solid ${COLOR.hair}` }}>
+        {name}
+        {glyph}
+        {n}
+      </div>
+    );
+  }
   return (
     <div
       style={{
@@ -65,28 +113,12 @@ function AssetRow({ row, denom, showAlso }: { row: IndexAssetRow; denom: number;
         borderTop: `1px solid ${COLOR.hair}`,
       }}
     >
-      <Link
-        to={`/assets/${row.slug}`}
-        style={{ fontFamily: FONT.sans, fontSize: 13, color: COLOR.ink1, textDecoration: "none" }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = COLOR.amber)}
-        onMouseLeave={(e) => (e.currentTarget.style.color = COLOR.ink1)}
-      >
-        {row.generic}
-      </Link>
-      <span
-        style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.1em", color: TIER_COLOR[row.tier] }}
-        title={`${DENSITY_LABEL[row.tier]} — clears 40 themed in ${row.yearsCleared} of 7 completed years (2019–2025); 2026 in progress`}
-      >
-        {DENSITY_GLYPH[row.tier]}
-      </span>
+      {name}
+      {glyph}
       <div style={{ height: 5, background: COLOR.hairStrong, borderRadius: 2 }}>
         <div style={{ height: 5, width, background: COLOR.indigo, borderRadius: 2 }} />
       </div>
-      <span
-        style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 12, color: COLOR.ink1, fontVariantNumeric: "tabular-nums" }}
-      >
-        {row.n.toLocaleString()}
-      </span>
+      {n}
       <span style={{ fontFamily: FONT.mono, fontSize: 9, letterSpacing: "0.08em", color: COLOR.ink4, textAlign: "right" }}>
         {showAlso && row.alsoTargets.length > 0 ? `ALSO ${row.alsoTargets.join(", ")}` : ""}
       </span>
@@ -108,6 +140,7 @@ export default function AssetsIndexPage() {
   const [failed, setFailed] = useState(false);
   const [view, setView] = useState<View>("target");
   const [scale, setScale] = useState<Scale>("within");
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   useEffect(() => {
     let alive = true;
@@ -129,7 +162,7 @@ export default function AssetsIndexPage() {
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: FONT.sans }}>
       <AssetNav active="assets" />
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 24px 96px", width: "100%", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: isMobile ? "0 16px 96px" : "0 24px 96px", width: "100%", boxSizing: "border-box" }}>
         {loading ? (
           <div style={{ ...note, padding: "40px 0", fontSize: 12 }}>Loading assets…</div>
         ) : failed || !model ? (
@@ -137,7 +170,7 @@ export default function AssetsIndexPage() {
             The asset index could not be loaded.
           </div>
         ) : (
-          <IndexBody model={model} view={view} setView={setView} scale={scale} setScale={setScale} scaleNote={scaleNote} />
+          <IndexBody model={model} view={view} setView={setView} scale={scale} setScale={setScale} scaleNote={scaleNote} isMobile={isMobile} />
         )}
       </div>
     </div>
@@ -151,6 +184,7 @@ function IndexBody({
   scale,
   setScale,
   scaleNote,
+  isMobile,
 }: {
   model: AssetIndexModel;
   view: View;
@@ -158,6 +192,7 @@ function IndexBody({
   scale: Scale;
   setScale: (s: Scale) => void;
   scaleNote: string;
+  isMobile: boolean;
 }) {
   const h = model.header;
   const legend = model.legend;
@@ -167,11 +202,11 @@ function IndexBody({
   return (
     <>
       {/* Header */}
-      <div style={{ padding: "34px 0 22px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
-        <h1 style={{ margin: "0 0 12px", fontFamily: FONT.sans, fontSize: 27, fontWeight: 500, letterSpacing: "-0.01em", color: COLOR.ink1 }}>
+      <div style={{ padding: isMobile ? "24px 0 20px" : "34px 0 22px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+        <h1 style={{ margin: "0 0 12px", fontFamily: FONT.sans, fontSize: isMobile ? 22 : 27, fontWeight: 500, letterSpacing: "-0.01em", color: COLOR.ink1 }}>
           Assets index · NSCLC corpus
         </h1>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 340px", gap: 36, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 340px", gap: isMobile ? 18 : 36, alignItems: "start" }}>
           <div style={{ fontFamily: FONT.serif, fontSize: 16, lineHeight: 1.55, color: COLOR.ink2 }}>
             Organised by molecular target, because that is how treatment is selected and how a
             territory is worked. Grouping cuts across modality: amivantamab is a bispecific antibody
@@ -225,9 +260,18 @@ function IndexBody({
       </div>
 
       {/* Scale note + density explainer */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
-        <div style={{ padding: "14px 0", fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.6, color: COLOR.ink3 }}>{scaleNote}</div>
-        <div style={{ padding: "14px 0 14px 22px", borderLeft: `1px solid ${COLOR.hair}`, fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.6, color: COLOR.ink3 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 300px", gap: isMobile ? 4 : 0, borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+        <div style={{ padding: isMobile ? "14px 0 4px" : "14px 0", fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.6, color: COLOR.ink3 }}>{scaleNote}</div>
+        <div
+          style={{
+            padding: isMobile ? "0 0 14px" : "14px 0 14px 22px",
+            borderLeft: isMobile ? "none" : `1px solid ${COLOR.hair}`,
+            fontFamily: FONT.mono,
+            fontSize: 11,
+            lineHeight: 1.6,
+            color: COLOR.ink3,
+          }}
+        >
           Density is measured, not judged: how many of the 7 completed years (2019–2025) clear 40
           themed publications; 2026 is in progress. It predicts the page, nothing about the therapy.
         </div>
@@ -249,7 +293,7 @@ function IndexBody({
                     </span>
                   </div>
                   {g.rows.map((r) => (
-                    <AssetRow key={r.slug} row={r} denom={denom} showAlso />
+                    <AssetRow key={r.slug} row={r} denom={denom} showAlso isMobile={isMobile} />
                   ))}
                 </div>
               );
@@ -270,7 +314,7 @@ function IndexBody({
                 <span style={{ fontFamily: FONT.mono, fontSize: 12, color: COLOR.ink1 }}>is_backbone</span>, never on target being null.
               </div>
               {model.backbone.rows.map((r) => (
-                <AssetRow key={r.slug} row={r} denom={Math.max(1, ...model.backbone.rows.map((x) => x.n))} showAlso={false} />
+                <AssetRow key={r.slug} row={r} denom={Math.max(1, ...model.backbone.rows.map((x) => x.n))} showAlso={false} isMobile={isMobile} />
               ))}
               <div style={{ ...note, marginTop: 12 }}>
                 Row counts sum to {model.backbone.rowSum.toLocaleString()} because these agents are
@@ -291,7 +335,7 @@ function IndexBody({
                   </span>
                 </div>
                 {model.nullNonBackbone.map((r) => (
-                  <AssetRow key={r.slug} row={r} denom={Math.max(1, ...model.nullNonBackbone.map((x) => x.n))} showAlso={false} />
+                  <AssetRow key={r.slug} row={r} denom={Math.max(1, ...model.nullNonBackbone.map((x) => x.n))} showAlso={false} isMobile={isMobile} />
                 ))}
                 <div style={{ fontFamily: FONT.mono, fontSize: 13, lineHeight: 1.7, color: COLOR.ink3, maxWidth: 820, marginTop: 12 }}>
                   A deployment asset with <span style={{ color: COLOR.ink1 }}>target = null</span> and{" "}
@@ -316,7 +360,7 @@ function IndexBody({
           /* Flat · volume */
           <div style={{ paddingTop: 14 }}>
             {model.flat.map((r) => (
-              <AssetRow key={r.slug} row={r} denom={model.globalMax} showAlso={false} />
+              <AssetRow key={r.slug} row={r} denom={model.globalMax} showAlso={false} isMobile={isMobile} />
             ))}
             <div style={{ ...note, marginTop: 16 }}>
               All 43 deployment assets by publication volume, on one axis (osimertinib at{" "}
