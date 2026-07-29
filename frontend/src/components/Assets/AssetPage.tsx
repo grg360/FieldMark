@@ -15,6 +15,7 @@ import { AuthorsPanel, CongressPanel, ForumPanel } from "./RightRail";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { assetBySlug, identityLine, matchTerms, type AssetConfig } from "../../lib/assetConfig";
 import { NSCLC_CORPUS_TOTAL, formatIndexDate } from "../../lib/assets";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { buildComposition } from "../../lib/assetLogic";
 import { loadAssetPage, type AssetPageData, type AssetOverview } from "../../lib/assetPage";
 
@@ -41,22 +42,26 @@ function pctOf(n: number, d: number): string {
 }
 
 // ── Header ───────────────────────────────────────────────────────────────────
-function Header({ asset }: { asset: AssetConfig }) {
+// The one element that does not vary with volume — same on the dense, sparse and
+// mobile pages, only resized.
+function Header({ asset, mobile }: { asset: AssetConfig; mobile: boolean }) {
   return (
-    <div style={{ padding: "26px 32px 22px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+    <div style={{ padding: mobile ? "20px 16px 16px" : "26px 32px 22px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 40, flexWrap: "wrap" }}>
         <div>
           <div style={{ ...eyebrow, marginBottom: 12 }}>Assets</div>
-          <h1 style={{ margin: "0 0 10px", fontFamily: FONT.sans, fontSize: 40, fontWeight: 500, letterSpacing: "-0.015em", color: COLOR.ink1 }}>
+          <h1 style={{ margin: "0 0 10px", fontFamily: FONT.sans, fontSize: mobile ? 27 : 40, fontWeight: 500, letterSpacing: "-0.015em", lineHeight: 1.1, color: COLOR.ink1 }}>
             {asset.generic}
           </h1>
-          <div style={{ fontFamily: FONT.mono, fontSize: 12, lineHeight: 1.5, color: COLOR.ink3 }}>
+          <div style={{ fontFamily: FONT.mono, fontSize: mobile ? 11 : 12, lineHeight: 1.5, color: COLOR.ink3 }}>
             {identityLine(asset)}
           </div>
         </div>
-        <span style={{ padding: "7px 10px", border: `1px solid ${COLOR.hairStrong}`, fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink3 }}>
-          {asset.is_backbone ? "Backbone agent" : "Deployment asset"}
-        </span>
+        {mobile ? null : (
+          <span style={{ padding: "7px 10px", border: `1px solid ${COLOR.hairStrong}`, fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink3 }}>
+            {asset.is_backbone ? "Backbone agent" : "Deployment asset"}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -75,7 +80,33 @@ function Tile({ label, value, sub, amber }: { label: string; value: string; sub:
   );
 }
 
-function StatTiles({ o }: { o: AssetOverview }) {
+function StatTiles({ o, mobile }: { o: AssetOverview; mobile: boolean }) {
+  if (mobile) {
+    // Two hero tiles; the remaining ratios ride a compact mono line (they also
+    // appear in full in "What this page counted").
+    return (
+      <div style={{ borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+          <div style={{ padding: "14px 16px", borderRight: `1px solid ${COLOR.hairStrong}` }}>
+            <div style={{ ...eyebrow, fontSize: 9, marginBottom: 8 }}>Publications</div>
+            <div style={{ fontFamily: FONT.mono, fontSize: 26, fontWeight: 500, lineHeight: 1, color: COLOR.amber }}>
+              {o.total_pubs.toLocaleString()}
+            </div>
+          </div>
+          <div style={{ padding: "14px 16px" }}>
+            <div style={{ ...eyebrow, fontSize: 9, marginBottom: 8 }}>2026 to date</div>
+            <div style={{ fontFamily: FONT.mono, fontSize: 26, fontWeight: 500, lineHeight: 1, color: COLOR.amber }}>
+              {o.ytd_2026.toLocaleString()}
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "12px 16px", fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink4 }}>
+          {o.authors_resolved.toLocaleString()} authors · {pctOf(o.open_access, o.total_pubs)} open access ·{" "}
+          {pctOf(o.themed, o.total_pubs)} themed
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
       <Tile label="Publications" amber value={o.total_pubs.toLocaleString()} sub={`of ${NSCLC_CORPUS_TOTAL.toLocaleString()} NSCLC corpus`} />
@@ -87,11 +118,44 @@ function StatTiles({ o }: { o: AssetOverview }) {
   );
 }
 
+// A collapsible section for the mobile right rail — a row with its count that
+// expands to the full panel (frame 1d collapses authorship/congress/forum to
+// rows; the count is the answer most of the time, provenance stays reachable).
+function MobileSection({ label, count, children }: { label: string; count: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 16px",
+          minHeight: 52,
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: COLOR.ink1,
+        }}
+      >
+        <span style={{ fontFamily: FONT.sans, fontSize: 14 }}>{label}</span>
+        <span style={{ fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink4 }}>
+          {count} {open ? "↑" : "→"}
+        </span>
+      </button>
+      {open ? <div>{children}</div> : null}
+    </div>
+  );
+}
+
 // ── What this page counted ───────────────────────────────────────────────────
-function WhatCounted({ asset, o, themedPct }: { asset: AssetConfig; o: AssetOverview; themedPct: number }) {
+function WhatCounted({ asset, o, themedPct, mobile }: { asset: AssetConfig; o: AssetOverview; themedPct: number; mobile: boolean }) {
   const terms = matchTerms(asset);
   return (
-    <div style={{ padding: "20px 32px 24px", borderTop: `1px solid ${COLOR.hairStrong}`, background: COLOR.surfaceWell }}>
+    <div style={{ padding: mobile ? "20px 16px 28px" : "20px 32px 24px", borderTop: `1px solid ${COLOR.hairStrong}`, background: COLOR.surfaceWell }}>
       <div style={{ ...eyebrow, marginBottom: 10, color: COLOR.ink4 }}>What this page counted</div>
       <div style={{ fontFamily: FONT.mono, fontSize: 12, lineHeight: 1.7, color: COLOR.ink3, maxWidth: 1000 }}>
         {o.total_pubs.toLocaleString()} records with{" "}
@@ -128,6 +192,7 @@ export default function AssetPage() {
   const [data, setData] = useState<AssetPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fullComposition, setFullComposition] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   useEffect(() => {
     if (!asset) {
@@ -165,15 +230,35 @@ export default function AssetPage() {
 
   return shell(
     <div style={{ maxWidth: 1440, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      <Header asset={asset} />
+      <Header asset={asset} mobile={isMobile} />
 
       {loading || !data || !o || !composition ? (
-        <div style={{ padding: "40px 32px", ...metaMono }}>
+        <div style={{ padding: isMobile ? "32px 16px" : "40px 32px", ...metaMono }}>
           {loading ? "Loading…" : "This asset page could not be loaded."}
         </div>
+      ) : isMobile ? (
+        <>
+          <StatTiles o={o} mobile />
+          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+            <CompositionChart composition={composition} mobile />
+          </div>
+          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+            <LandingNow landing={data.landing} mobile />
+          </div>
+          <MobileSection label="Who publishes" count={data.authors.resolved.toLocaleString()}>
+            <AuthorsPanel authors={data.authors} />
+          </MobileSection>
+          <MobileSection label="Congress presence" count={`${data.congress.length} confirmed`}>
+            <CongressPanel presenters={data.congress} />
+          </MobileSection>
+          <MobileSection label="Forum threads" count={String(data.forum.length)}>
+            <ForumPanel threads={data.forum} />
+          </MobileSection>
+          <WhatCounted asset={asset} o={o} themedPct={themedPct} mobile />
+        </>
       ) : (
         <>
-          <StatTiles o={o} />
+          <StatTiles o={o} mobile={false} />
 
           <div style={{ padding: "28px 32px 30px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
             <CompositionChart composition={composition} assetName={asset.generic} full={fullComposition} />
@@ -208,7 +293,7 @@ export default function AssetPage() {
             </div>
           </div>
 
-          <WhatCounted asset={asset} o={o} themedPct={themedPct} />
+          <WhatCounted asset={asset} o={o} themedPct={themedPct} mobile={false} />
         </>
       )}
     </div>,

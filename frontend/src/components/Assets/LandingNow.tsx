@@ -6,6 +6,7 @@
 // months of history the sparkline is suppressed and replaced with "no trajectory"
 // and the reason — never a two-bar line inviting a reading it cannot support.
 
+import { useState } from "react";
 import { COLOR, FONT } from "../../lib/designTokens";
 import {
   trajectory,
@@ -108,13 +109,74 @@ function PaperCard({ paper }: { paper: LandingPaper }) {
   );
 }
 
+function CompactCard({ paper }: { paper: LandingPaper }) {
+  const traj = trajectory(paper.citation_counts_by_year, paper.pub_year);
+  return (
+    <div style={{ padding: "14px 0", borderBottom: `1px solid ${COLOR.hair}` }}>
+      <div style={{ fontFamily: FONT.sans, fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: COLOR.ink1 }}>
+        {paper.title}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap", ...metaMono }}>
+        <span>
+          {paper.pub_year}
+          {paper.journal ? ` · ${paper.journal.toUpperCase()}` : ""}
+        </span>
+        {paper.citation_count != null ? (
+          <span style={{ color: COLOR.ink2 }}>{paper.citation_count.toLocaleString()} CIT</span>
+        ) : null}
+        <span style={{ color: verdictColor(traj.verdict) }}>
+          {traj.verdict === "none" ? "NO TRAJECTORY" : VERDICT_LABEL[traj.verdict]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function MobileLanding({ landing }: { landing: LandingPayload }) {
+  const [expanded, setExpanded] = useState(false);
+  const papers = landing.papers;
+  const shown = expanded ? papers : papers.slice(0, 2);
+  const rest = papers.length - shown.length;
+  return (
+    <div>
+      <div style={{ ...eyebrow, marginBottom: 6 }}>What is landing now</div>
+      <div style={{ fontFamily: FONT.serif, fontSize: 13, fontStyle: "italic", lineHeight: 1.5, color: COLOR.ink3, marginBottom: 14 }}>
+        By 12-month accrual, not lifetime total.
+      </div>
+      {papers.length === 0 ? (
+        <div style={{ fontFamily: FONT.serif, fontSize: 13, lineHeight: 1.55, color: COLOR.ink3 }}>
+          No paper yet carries a readable citation trajectory.
+        </div>
+      ) : (
+        <>
+          {shown.map((p) => (
+            <CompactCard key={p.id} paper={p} />
+          ))}
+          {rest > 0 ? (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              style={{ marginTop: 14, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: FONT.mono, fontSize: 11, color: COLOR.indigoLink }}
+            >
+              {rest} more →
+            </button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function LandingNow({
   landing,
   bibliographyHref,
+  mobile = false,
 }: {
   landing: LandingPayload;
   bibliographyHref?: string;
+  mobile?: boolean;
 }) {
+  if (mobile) return <MobileLanding landing={landing} />;
   const papers = landing.papers;
   return (
     <div>

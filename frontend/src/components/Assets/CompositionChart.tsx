@@ -67,10 +67,12 @@ export default function CompositionChart({
   composition,
   assetName,
   full = false,
+  mobile = false,
 }: {
   composition: Composition;
   assetName?: string;
   full?: boolean;
+  mobile?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>("share");
   const [held, setHeld] = useState<string | null>(null);
@@ -78,6 +80,9 @@ export default function CompositionChart({
 
   const focusKey = held ?? hover.key;
 
+  if (mobile) {
+    return <MobileComposition composition={composition} />;
+  }
   if (composition.gated) {
     return <GatedComposition composition={composition} />;
   }
@@ -354,6 +359,80 @@ export default function CompositionChart({
 function bandReadout(band: ThemeBand | undefined): string | null {
   if (!band) return null;
   return `${band.label} · ${pct(band.closingShare)} of themed papers in ${band.pooledN ? "the closing year" : "the window"} · ${band.pooledN} papers across the window`;
+}
+
+// ── Mobile (frame 1d) ────────────────────────────────────────────────────────
+// Keeps the composition but compact: share columns and the top four bands with
+// their closing share and Δ. The full movement view lives on desktop. A gated
+// asset shows the same pooled bar it shows on desktop.
+function MobileComposition({ composition }: { composition: Composition }) {
+  const bands = composition.bands;
+  const topBands = bands.slice(0, 4);
+  if (composition.gated) {
+    return (
+      <div>
+        <div style={{ ...eyebrow, marginBottom: 12 }}>Theme composition</div>
+        <div style={{ ...note, fontSize: 11, color: COLOR.amber, marginBottom: 10 }}>
+          GATED · pooled across {composition.themedTotal} themed papers — under {THEMED_PERIOD_GATE}/year
+          for a year-over-year view.
+        </div>
+        <div style={{ display: "flex", gap: 1, height: 30 }}>
+          {bands.map((b) => (
+            <div key={b.key} style={{ width: `${(b.pooledShare * 100).toFixed(2)}%`, background: b.color }} />
+          ))}
+        </div>
+        <div style={{ marginTop: 14 }}>
+          {topBands.map((b) => (
+            <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${COLOR.hair}`, minHeight: 44, boxSizing: "border-box" }}>
+              <span style={{ width: 9, height: 9, flex: "none", background: b.color }} />
+              <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: COLOR.ink1 }}>{b.label}</span>
+              <span style={{ fontFamily: FONT.mono, fontSize: 12, color: COLOR.ink1 }}>{pct(b.pooledShare)}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ ...note, marginTop: 12 }}>Top four of {bands.length} bands.</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div style={{ ...eyebrow, marginBottom: 12 }}>Theme composition</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 112 }}>
+        {composition.columns.map((col) => (
+          <div key={col.year} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 1, height: "100%" }}>
+            {col.segments.map((seg) => {
+              const band = bands.find((b) => b.key === seg.key)!;
+              return (
+                <div key={seg.key} style={{ minHeight: 1, height: `${(seg.share * 100).toFixed(2)}%`, background: band.color }} />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
+        {composition.columns.map((col) => (
+          <div key={col.year} style={{ flex: 1, textAlign: "center", fontFamily: FONT.mono, fontSize: 9, color: COLOR.ink5 }}>
+            {`'${String(col.year).slice(2)}`}
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 16 }}>
+        {topBands.map((b) => (
+          <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${COLOR.hair}`, minHeight: 44, boxSizing: "border-box" }}>
+            <span style={{ width: 9, height: 9, flex: "none", background: b.color }} />
+            <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: COLOR.ink1 }}>{b.label}</span>
+            <span style={{ fontFamily: FONT.mono, fontSize: 12, color: COLOR.ink1 }}>{pct(b.closingShare)}</span>
+            <span style={{ width: 44, textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink3 }}>
+              {signedPp(b.deltaPp)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...note, marginTop: 12 }}>
+        Top four of {bands.length} bands. Full composition view on desktop.
+      </div>
+    </div>
+  );
 }
 
 // ── Gated / pooled view (frame 1b) ───────────────────────────────────────────
