@@ -20,7 +20,7 @@ import { getInstitutionResearchThemes, type InstitutionResearchTheme } from "../
 import { slugToInstitution } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import { COLOR } from "../lib/designTokens";
-import TopBar from "./TopBar";
+import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
 import InstitutionExternalPartnersPanel from "./InstitutionExternalPartnersPanel";
@@ -152,7 +152,7 @@ export default function InstitutionRoute() {
             fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
           }}
         >
-          <TopBar onLogoPress={() => navigate("/me")} />
+          <NavBar />
           <div style={{ padding: 32, color: COLOR.ink3 }}>
             <h1 style={{ fontSize: 22, color: COLOR.ink1, marginTop: 16, fontWeight: 600 }}>
               Institution not found
@@ -174,7 +174,7 @@ export default function InstitutionRoute() {
         overflowX: "hidden",
       }}
     >
-      <TopBar onLogoPress={() => navigate("/me")} />
+      <NavBar />
       <div style={{ padding: "16px 16px 16px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         {loading && !summary ? (
           <div style={{ fontSize: 13, color: COLOR.ink4, marginTop: 12 }}>Loading...</div>

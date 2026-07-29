@@ -87,6 +87,17 @@ export default function HomeHero({ firstName, summary, territory }: Props) {
         >
           Open Watchlists
         </button>
+        {/* Interim entry point (NAV-BUILD-01 §07): Field Insights was reachable only
+            from the avatar menu, whose WORKSPACE/DISCOVER groups are removed. This
+            link keeps it reachable from Home until Home is redesigned. */}
+        <button
+          type="button"
+          className="fm-pill-button"
+          onClick={() => navigate("/me/insights")}
+          style={pillStyle}
+        >
+          Field Insights
+        </button>
       </div>
 
       {hasTerritoryData ? (

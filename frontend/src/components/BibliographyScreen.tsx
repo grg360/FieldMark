@@ -4,7 +4,7 @@ import { HCP } from "../data/hcpData";
 import { getPublicationsByYearForHcp } from "../lib/api";
 import { enrichCharacterisation, type PublicationListRow } from "../lib/publicationsList";
 import { COLOR } from "../lib/designTokens";
-import TopBar from "./TopBar";
+import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import PublicationList from "./PublicationsListPage/PublicationList";
 
@@ -67,7 +67,7 @@ export default function BibliographyScreen({ hcp, year, onBack }: BibliographySc
           overflowX: "hidden",
         }}
       >
-        <TopBar onLogoPress={() => navigate("/me")} />
+        <NavBar />
 
         {/* Breadcrumb — the HCP crumb returns to the profile that spawned this
             view via onBack (a sub-screen state reset), not a route navigation. */}

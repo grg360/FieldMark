@@ -8,7 +8,7 @@ import {
 } from "../lib/api";
 import { indicationSlugToLabel } from "../lib/routeSlugs";
 import { COLOR } from "../lib/designTokens";
-import TopBar from "./TopBar";
+import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
 import LandscapeQuadrantChart from "./LandscapeQuadrantChart";
@@ -49,7 +49,7 @@ export default function LandscapeRoute() {
 
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
-    <TopBar onLogoPress={() => navigate("/me")} />
+    <NavBar />
     <div
       className="fm-screen"
       style={{

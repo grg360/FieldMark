@@ -9,7 +9,7 @@ import {
   type MslProfile,
 } from "../lib/authHelpers";
 import { COLOR } from "../lib/designTokens";
-import TopBar from "./TopBar";
+import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 
 const ChevronRight = () => (
@@ -265,7 +265,7 @@ export default function ProfileScreen() {
           standalone pages. Rendering them outside made them full-bleed vs the
           inset content. */}
       <div className="fm-screen" style={{ maxWidth: 480, margin: "0 auto", boxSizing: "border-box" }}>
-      <TopBar onLogoPress={() => navigate("/me")} />
+      <NavBar />
       {/* Settings sub-bar — the Save action; global home nav lives in the TopBar above. */}
       <div
         className="fm-nav"

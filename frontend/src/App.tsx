@@ -33,7 +33,8 @@ import SignupScreen from "./components/SignupScreen";
 import AuthWrapper from "./components/AuthWrapper";
 import { RelationshipsProvider } from "./contexts/RelationshipsContext";
 import WelcomeWizard from "./components/WelcomeWizard";
-import TopBar from "./components/TopBar";
+import NavBar from "./components/NavBar";
+import SearchBar from "./components/SearchBar";
 import FieldIntelligenceThread from "./components/FieldIntelligenceThread";
 import TAFilterChips from "./components/TAFilterChips";
 import HCPCard from "./components/HCPCard";
@@ -708,16 +709,18 @@ function FeedLayout({
           overflowX: "hidden",
         }}
       >
-      <TopBar
-        onRefreshPress={() => void fetchHCPs(true)}
-        onScoringExplainedPress={() => {
-          setScoringExplainedScroll(null);
-          setScoringExplainedOpen(true);
-        }}
-        refreshing={refreshingFeed}
-        currentTaId={getTAIdForLabel(selectedTA)}
-        onSearchSelect={(hcpId, taId) => void handleSearchSelect(hcpId, taId)}
-      />
+      <NavBar />
+      {/* Search left the bar (NAV-BUILD-01) — the feed keeps it in its own header,
+          absent when no TA id resolves. */}
+      {getTAIdForLabel(selectedTA) ? (
+        <div style={{ padding: "8px 16px 0" }}>
+          <SearchBar
+            variant="inline"
+            currentTaId={getTAIdForLabel(selectedTA) as string}
+            onSelect={(hcpId, taId) => void handleSearchSelect(hcpId, taId)}
+          />
+        </div>
+      ) : null}
 
       <TAFilterChips selected={selectedTA} />
 
@@ -1312,7 +1315,7 @@ function FIThreadRoute() {
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
-      <TopBar currentTaId={getTAIdForLabel(taLabel)} />
+      <NavBar />
       <FieldIntelligenceThread
         postId={threadId}
         onBack={() => navigate(`/${ta ?? "oncology"}/field-intelligence`)}
