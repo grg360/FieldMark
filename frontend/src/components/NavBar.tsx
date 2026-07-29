@@ -337,8 +337,14 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
       aria-haspopup="menu"
       aria-expanded={open}
       style={{
+        // Exact old-TopBar UserMenu dimensions: 32×32, border-radius 50%. flexShrink
+        // 0 so the bar's flex row can't compress the width into an oval; boxSizing
+        // border-box keeps it 32 square regardless.
         width: 32,
         height: 32,
+        minWidth: 32,
+        flexShrink: 0,
+        boxSizing: "border-box",
         borderRadius: "50%",
         background: COLOR.amber,
         border: "none",
