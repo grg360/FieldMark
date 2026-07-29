@@ -37,16 +37,20 @@ export default function AppLayout({
         fontFamily: FONT.sans,
       }}
     >
-      <NavBar />
+      {/* NavBar aligns to the content column: it sits inside the same max-width
+          container as the content and fills it (width:100%), so its width is the
+          column's width on every surface — no per-surface override. Gutters live on
+          the content wrapper below, not on the bar. */}
       <div
         style={{
           maxWidth,
           margin: "0 auto",
-          padding: SPACE.lg,
           width: "100%",
           boxSizing: "border-box",
         }}
       >
+        <NavBar />
+        <div style={{ padding: SPACE.lg }}>
         {/* Search left the bar (NAV-BUILD-01): it renders in the surface header
             only where the page supplies a TA id and a select handler — today that
             is Home. Absent, not disabled, everywhere else. */}
@@ -112,7 +116,8 @@ export default function AppLayout({
 
         {children}
 
-        <GlobalFooter />
+          <GlobalFooter />
+        </div>
       </div>
     </div>
   );

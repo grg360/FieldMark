@@ -200,17 +200,21 @@ export default function AssetsIndexPage() {
 
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: FONT.sans }}>
-      <NavBar />
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: isMobile ? "0 16px 96px" : "0 24px 96px", width: "100%", boxSizing: "border-box" }}>
-        {loading ? (
-          <div style={{ ...note, padding: "40px 0", fontSize: 12 }}>Loading assets…</div>
-        ) : failed || !model ? (
-          <div style={{ ...note, padding: "40px 0", fontSize: 12, color: COLOR.ink3 }}>
-            The drug index could not be loaded.
-          </div>
-        ) : (
-          <IndexBody model={model} view={view} setView={setView} scale={scale} setScale={setScale} scaleNote={scaleNote} isMobile={isMobile} />
-        )}
+      {/* NavBar inside the column so it spans the content width (1180); the gutter
+          lives on the inner wrapper, not the bar. */}
+      <div style={{ maxWidth: 1180, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <NavBar />
+        <div style={{ padding: isMobile ? "0 16px 96px" : "0 24px 96px" }}>
+          {loading ? (
+            <div style={{ ...note, padding: "40px 0", fontSize: 12 }}>Loading assets…</div>
+          ) : failed || !model ? (
+            <div style={{ ...note, padding: "40px 0", fontSize: 12, color: COLOR.ink3 }}>
+              The drug index could not be loaded.
+            </div>
+          ) : (
+            <IndexBody model={model} view={view} setView={setView} scale={scale} setScale={setScale} scaleNote={scaleNote} isMobile={isMobile} />
+          )}
+        </div>
       </div>
     </div>
   );

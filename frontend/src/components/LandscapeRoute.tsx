@@ -49,7 +49,6 @@ export default function LandscapeRoute() {
 
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
-    <NavBar />
     <div
       className="fm-screen"
       style={{
@@ -59,6 +58,7 @@ export default function LandscapeRoute() {
         overflowX: "hidden",
       }}
     >
+      <NavBar />
       <div style={{ padding: "16px 16px 8px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         <button
           type="button"

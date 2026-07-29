@@ -28,10 +28,11 @@ const eyebrow = {
 } as const;
 const metaMono = { fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink4 } as const;
 
+// NavBar is mounted INSIDE each content column (below), not here, so the bar aligns
+// to the column width on this surface like every other.
 function shell(children: React.ReactNode) {
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: FONT.sans }}>
-      <NavBar />
       {children}
     </div>
   );
@@ -218,8 +219,11 @@ export default function AssetPage() {
 
   if (!asset) {
     return shell(
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 24px", fontFamily: FONT.mono, fontSize: 13, color: COLOR.ink3 }}>
-        No drug matches “{slug}”. <Link to="/assets" style={{ color: COLOR.indigoLink }}>Back to the drug index →</Link>
+      <div style={{ maxWidth: 900, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <NavBar />
+        <div style={{ padding: "60px 24px", fontFamily: FONT.mono, fontSize: 13, color: COLOR.ink3 }}>
+          No drug matches “{slug}”. <Link to="/assets" style={{ color: COLOR.indigoLink }}>Back to the drug index →</Link>
+        </div>
       </div>,
     );
   }
@@ -230,6 +234,7 @@ export default function AssetPage() {
 
   return shell(
     <div style={{ maxWidth: 1440, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      <NavBar />
       <Header asset={asset} mobile={isMobile} />
 
       {loading || !data || !o || !composition ? (
