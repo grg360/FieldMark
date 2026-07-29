@@ -92,7 +92,7 @@ export default function PublicationCard({ pub, affordance, isMobile }: Props) {
             long backbone list doesn't overrun the row. */}
         {pub.assets && pub.assets.length > 0 && (
           <div style={{ ...mono(10.5, COLOR.ink4), letterSpacing: "0.04em", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-            <span style={{ color: COLOR.ink5 }}>ASSETS</span>
+            <span style={{ color: COLOR.ink5 }}>DRUGS</span>
             {pub.assets.slice(0, 4).map((a) => (
               <Link
                 key={a.slug}

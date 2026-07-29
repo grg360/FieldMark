@@ -206,7 +206,7 @@ export default function AssetsIndexPage() {
           <div style={{ ...note, padding: "40px 0", fontSize: 12 }}>Loading assets…</div>
         ) : failed || !model ? (
           <div style={{ ...note, padding: "40px 0", fontSize: 12, color: COLOR.ink3 }}>
-            The asset index could not be loaded.
+            The drug index could not be loaded.
           </div>
         ) : (
           <IndexBody model={model} view={view} setView={setView} scale={scale} setScale={setScale} scaleNote={scaleNote} isMobile={isMobile} />
@@ -264,7 +264,7 @@ function IndexBody({
       {/* Header */}
       <div style={{ padding: isMobile ? "24px 0 20px" : "34px 0 22px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         <h1 style={{ margin: "0 0 12px", fontFamily: FONT.sans, fontSize: isMobile ? 22 : 27, fontWeight: 500, letterSpacing: "-0.01em", color: COLOR.ink1 }}>
-          Assets index · NSCLC corpus
+          Drugs index · NSCLC corpus
         </h1>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 340px", gap: isMobile ? 18 : 36, alignItems: "start" }}>
           <div style={{ fontFamily: FONT.serif, fontSize: 16, lineHeight: 1.55, color: COLOR.ink2 }}>

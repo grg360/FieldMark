@@ -4,13 +4,17 @@
 // SCOPE: this bar renders on the asset routes ONLY. Links that point at existing
 // surfaces work; they just land on pages still wearing the old chrome, which is
 // expected and temporary. Targets live in NAV_ITEMS so the rollout can repoint
-// them in one place. "Assets" is the new fourth axis; nothing else moves.
+// them in one place. The "Drugs" axis is the section internally named "assets"
+// (route /assets, key "assets") — the display label is "Drugs" because this surface
+// covers everyone's molecules, not one company's pipeline; the internal vocabulary
+// stays "asset". Bibliography is intentionally absent (its canonical route and the
+// route users actually reach disagree; it returns once that is fixed).
 //
 // Mobile (≤767px): a 3×2 cell grid on a 1px rule grid — equal cells with shared
-// seams so it reads as a matrix, not a wrapped row. All six items visible with full
+// seams so it reads as a matrix, not a wrapped row. All items visible with full
 // labels, no icons, no scrolling, no interaction to reveal. Active = 2px amber cap
-// rule + lifted cell fill + brighter label. Replaces the old horizontal scroll
-// strip entirely. Desktop (≥768px) is unchanged.
+// rule + lifted cell fill + brighter label. With five items the sixth slot is an
+// inert blank cell (completed, not a seam gap). Desktop (≥768px) is a single row.
 
 import { Link } from "react-router-dom";
 import { COLOR, FONT } from "../../lib/designTokens";
@@ -29,9 +33,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Territory", to: "/me" },
   { label: "Cohorts", to: "/oncology/established/nsclc" },
-  { label: "Assets", to: "/assets", key: "assets" },
+  { label: "Drugs", to: "/assets", key: "assets" },
   { label: "Congresses", to: "/congress" },
-  { label: "Bibliography", to: "/" },
   { label: "Pulse", to: "/pulse" },
 ];
 
@@ -88,6 +91,12 @@ export default function AssetNav({ active }: { active?: AssetNavKey }) {
               </Link>
             );
           })}
+          {/* The 3×2 matrix has six slots; five items leave one vacant. Render it
+              as an inert cell with the inactive fill so the grid reads as a matrix
+              with a blank slot — not a seam-coloured gap where a cell failed to
+              render. It is also where the sixth axis (Bibliography) will sit once
+              its route bug is resolved. */}
+          <div aria-hidden="true" style={{ background: COLOR.ground, minHeight: 53 }} />
         </div>
       </nav>
     );

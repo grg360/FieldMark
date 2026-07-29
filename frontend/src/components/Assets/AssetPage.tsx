@@ -49,7 +49,7 @@ function Header({ asset, mobile }: { asset: AssetConfig; mobile: boolean }) {
     <div style={{ padding: mobile ? "20px 16px 16px" : "26px 32px 22px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 40, flexWrap: "wrap" }}>
         <div>
-          <div style={{ ...eyebrow, marginBottom: 12 }}>Assets</div>
+          <div style={{ ...eyebrow, marginBottom: 12 }}>Drugs</div>
           <h1 style={{ margin: "0 0 10px", fontFamily: FONT.sans, fontSize: mobile ? 27 : 40, fontWeight: 500, letterSpacing: "-0.015em", lineHeight: 1.1, color: COLOR.ink1 }}>
             {asset.generic}
           </h1>
@@ -219,7 +219,7 @@ export default function AssetPage() {
   if (!asset) {
     return shell(
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 24px", fontFamily: FONT.mono, fontSize: 13, color: COLOR.ink3 }}>
-        No asset matches “{slug}”. <Link to="/assets" style={{ color: COLOR.indigoLink }}>Back to the asset index →</Link>
+        No drug matches “{slug}”. <Link to="/assets" style={{ color: COLOR.indigoLink }}>Back to the drug index →</Link>
       </div>,
     );
   }

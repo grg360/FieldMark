@@ -24,6 +24,12 @@ Laptop setup complete (5/29). XPS 13 now a functional FieldMark dev machine.
 
 
 
+\## Vocabulary
+
+\- The Drug Intelligence section displays as **"Drugs"** in the UI (nav item, page titles, section labels), but the internal vocabulary stays **"asset"** everywhere: route `/assets`, `config/assets.json`, tables `asset_publication_v1` / `asset_mention_v1`, components `AssetNav` / `AssetPage` / `AssetsIndexPage`, RPCs `asset_*`, config key `is_backbone`. Do not reconcile them — "Drugs" (display) and "asset" (code/data) are intentionally different. "Assets" is pharma-internal vocabulary for a company's own pipeline; this surface covers everyone's drugs.
+
+
+
 \## Machine notes
 
 \- Desktop: primary dev, basement, where long pipelines run
