@@ -371,13 +371,22 @@ export async function loadLedgerMeta(cfg: CohortConfig): Promise<LedgerMeta> {
   return { cohortTotal: Number(d.cohort_total) || 0, ceilings: d.ceilings ?? {} };
 }
 
-export async function loadLedger(cfg: CohortConfig, limit = 60): Promise<LedgerData> {
-  const { data, error } = await supabase.rpc(cfg.rpc, { p_limit: limit });
+export const LEDGER_PAGE_SIZE = 1000; // PostgREST hard cap; also our page size
+
+/** One rank-keyed page. Pass afterRank = the last rank already held (0 for the first
+ *  page); the RPC returns rows with rank > afterRank, ordered by rank. No offset, so
+ *  no dup/skip. hasMore is true when a full page came back. */
+export async function loadLedgerPage(
+  cfg: CohortConfig,
+  afterRank = 0,
+  limit = LEDGER_PAGE_SIZE,
+): Promise<LedgerData & { hasMore: boolean }> {
+  const { data, error } = await supabase.rpc(cfg.rpc, { p_limit: limit, p_after_rank: afterRank });
   if (error) {
     console.error(`${cfg.rpc} failed:`, error.message);
-    return { cohortTotal: 0, rows: [] };
+    return { cohortTotal: 0, rows: [], hasMore: false };
   }
   const d = (data as { cohort_total?: number; rows?: unknown[] }) ?? {};
   const rows: LedgerRow[] = ((d.rows ?? []) as Record<string, unknown>[]).map((r) => mapRow(cfg, r));
-  return { cohortTotal: Number(d.cohort_total) || rows.length, rows };
+  return { cohortTotal: Number(d.cohort_total) || rows.length, rows, hasMore: rows.length === limit };
 }

@@ -11,13 +11,14 @@
 // there. Not in stage 2: tags, relationship-state column, per-row controls
 // (track/attachments), mobile — stages 3–4.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import NavBar from "../NavBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
 import {
   COHORTS,
-  loadLedger,
+  loadLedgerPage,
   loadLedgerMeta,
   thresholds,
   cellDisplay,
@@ -25,7 +26,6 @@ import {
   why,
   trace,
   type CohortConfig,
-  type LedgerData,
   type LedgerMeta,
   type LedgerRow,
   type Band,
@@ -223,48 +223,142 @@ function BandHeader({ band }: { band: Band }) {
   );
 }
 
+// The tail (everyone below the tied head) is the heavy part — up to ~6,470 rows, each
+// with a drawer. It is window-virtualised: only the rows near the viewport mount, and
+// nearing the end triggers the next rank-keyed page. Heights are dynamic (summary wrap,
+// and the single open drawer), measured per row via measureElement's ResizeObserver.
+function VirtualTail({
+  cfg,
+  rows,
+  th,
+  cohortTotal,
+  open,
+  onToggle,
+  onNearEnd,
+}: {
+  cfg: CohortConfig;
+  rows: LedgerRow[];
+  th: Record<string, number | null>;
+  cohortTotal: number;
+  open: string | null;
+  onToggle: (id: string) => void;
+  onNearEnd: () => void;
+}) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+
+  // distance from the document top to the top of the list, so the window virtualiser
+  // places rows correctly beneath the (non-virtualised) head. Re-measured on resize.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const measure = () => setScrollMargin(el.getBoundingClientRect().top + window.scrollY);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  const virtualizer = useWindowVirtualizer({
+    count: rows.length,
+    estimateSize: () => 108,
+    overscan: 8,
+    scrollMargin,
+  });
+  const items = virtualizer.getVirtualItems();
+
+  // load the next page when the last mounted row is within 8 of the end
+  const last = items[items.length - 1];
+  useEffect(() => {
+    if (last && last.index >= rows.length - 8) onNearEnd();
+  }, [last, rows.length, onNearEnd]);
+
+  return (
+    <div ref={listRef} style={{ position: "relative", height: virtualizer.getTotalSize(), width: "100%" }}>
+      {items.map((vi) => {
+        const row = rows[vi.index];
+        const id = `${cfg.tag}-${row.rank}`;
+        return (
+          <div
+            key={vi.key}
+            data-index={vi.index}
+            ref={virtualizer.measureElement}
+            style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start - scrollMargin}px)` }}
+          >
+            <Row cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function CohortLedger() {
   const [tag, setTag] = useState<string>("EST");
   const cfg = COHORTS.find((c) => c.tag === tag) ?? COHORTS[0];
-  const [data, setData] = useState<LedgerData | null>(null);
+  const [rows, setRows] = useState<LedgerRow[]>([]);
   const [meta, setMeta] = useState<LedgerMeta | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const loadingMore = useRef(false); // guards concurrent page fetches
 
+  // cohort change → reset and load meta + the first rank page in parallel
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    setData(null);
+    setFailed(false);
+    setRows([]);
     setMeta(null);
+    setHasMore(false);
     setOpen(null);
-    // meta (cohort-level ceilings + total) and rows load in parallel; suppression is
-    // driven by meta.ceilings, so the dash decision never depends on which rows arrive.
-    Promise.all([loadLedgerMeta(cfg), loadLedger(cfg, 60)])
-      .then(([m, d]) => alive && (setMeta(m), setData(d), setLoading(false)))
-      .catch(() => alive && setLoading(false));
+    loadingMore.current = true;
+    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0)])
+      .then(([m, page]) => {
+        if (!alive) return;
+        setMeta(m);
+        setRows(page.rows);
+        setHasMore(page.hasMore);
+        setFailed(page.rows.length === 0);
+        setLoading(false);
+        loadingMore.current = false;
+      })
+      .catch(() => {
+        if (!alive) return;
+        setFailed(true);
+        setLoading(false);
+        loadingMore.current = false;
+      });
     return () => {
       alive = false;
     };
   }, [cfg]);
 
+  const loadMore = useCallback(() => {
+    if (loadingMore.current || !hasMore) return;
+    loadingMore.current = true;
+    const afterRank = rows.length ? rows[rows.length - 1].rank : 0;
+    loadLedgerPage(cfg, afterRank)
+      .then((page) => {
+        setRows((prev) => [...prev, ...page.rows]);
+        setHasMore(page.hasMore);
+        loadingMore.current = false;
+      })
+      .catch(() => {
+        loadingMore.current = false;
+      });
+  }, [cfg, hasMore, rows]);
+
   const th = meta ? thresholds(cfg, meta.ceilings) : {};
-  const { headBands, tailRows } = data ? layout(cfg, data.rows) : { headBands: [], tailRows: [] };
-  const cohortTotal = meta?.cohortTotal ?? data?.cohortTotal ?? 0;
+  const { headBands, tailRows } = layout(cfg, rows);
+  const cohortTotal = meta?.cohortTotal ?? rows.length;
   const metaLine = meta ? cfg.meta.replace("{total}", cohortTotal.toLocaleString()) : "";
+
+  const toggle = useCallback((id: string) => setOpen((o) => (o === id ? null : id)), []);
 
   const renderRow = (row: LedgerRow) => {
     const id = `${cfg.tag}-${row.rank}`;
-    return (
-      <Row
-        key={id}
-        cfg={cfg}
-        row={row}
-        cohortTotal={cohortTotal}
-        th={th}
-        open={open === id}
-        onToggle={() => setOpen((o) => (o === id ? null : id))}
-      />
-    );
+    return <Row key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} />;
   };
 
   return (
@@ -290,26 +384,41 @@ export default function CohortLedger() {
 
             {loading ? (
               <div style={{ padding: "28px 23px", ...mono(11), color: P.ink5 }}>Loading ledger…</div>
-            ) : !data || data.rows.length === 0 ? (
+            ) : failed || rows.length === 0 ? (
               <div style={{ padding: "28px 23px", ...mono(11), color: P.ink5 }}>The {cfg.label} ledger could not be loaded.</div>
             ) : (
               <>
-                {/* saturated head — the "treat as tied" bands */}
+                {/* saturated head — the "treat as tied" bands (never virtualised; ≤ a handful of rows) */}
                 {headBands.map((band) => (
                   <div key={band.label}>
                     <BandHeader band={band} />
                     {band.rows.map(renderRow)}
                   </div>
                 ))}
-                {/* below the head the index separates people — a plain ranked list */}
+                {/* below the head the index separates people — a plain, virtualised ranked list */}
                 {tailRows.length > 0 ? (
                   <>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 20px 7px 23px", background: P.band, borderBottom: `1px solid ${P.line}` }}>
                       <span style={{ ...mono(9.5, 500), letterSpacing: ".16em", color: P.ink4 }}>RANKED</span>
                       <span style={{ flex: 1, height: 1, background: P.lineMed }} />
-                      <span style={{ ...mono(9.5), letterSpacing: ".1em", color: "#767C81" }}>BELOW THE TIED HEAD · THE INDEX SEPARATES EACH ROW</span>
+                      <span style={{ ...mono(9.5), letterSpacing: ".1em", color: "#767C81" }}>
+                        BELOW THE TIED HEAD · THE INDEX SEPARATES EACH ROW
+                      </span>
                     </div>
-                    {tailRows.map(renderRow)}
+                    <VirtualTail
+                      cfg={cfg}
+                      rows={tailRows}
+                      th={th}
+                      cohortTotal={cohortTotal}
+                      open={open}
+                      onToggle={toggle}
+                      onNearEnd={loadMore}
+                    />
+                    {hasMore ? (
+                      <div style={{ padding: "12px 23px", ...mono(10), color: P.ink5, letterSpacing: ".08em", borderTop: `1px solid ${P.line}` }}>
+                        Loading more of the cohort… {rows.length.toLocaleString()} of {cohortTotal.toLocaleString()}
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
               </>
