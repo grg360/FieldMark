@@ -17,6 +17,7 @@ import FieldInsights from "../FieldInsights/FieldInsights";
 import MiniCollaboratorNetwork from "../MiniCollaboratorNetwork";
 import BibliographyScreen from "../BibliographyScreen";
 import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
+import ProfileSecondaryControls from "./ProfileSecondaryControls";
 import {
   loadHcpProfile,
   loadFieldPresence,
@@ -395,6 +396,14 @@ export default function HcpProfileBrief() {
           <SectionHead id="relationship" tag="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS · SYNCS WITH THE LEDGER" />
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
             <ProfileRelationshipControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
+          </div>
+        </div>
+
+        {/* CONTACT & CONTROLS — contact/access, field-review, add-context, report-issue, opt-out */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SectionHead id="contact" tag="CONTACT & CONTROLS" sub="REACH · FIELD REVIEW · REPORT · OPT-OUT" />
+          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
+            <ProfileSecondaryControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
           </div>
         </div>
 

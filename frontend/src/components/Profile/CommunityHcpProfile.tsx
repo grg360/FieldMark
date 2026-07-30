@@ -15,6 +15,7 @@ import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
+import ProfileSecondaryControls from "./ProfileSecondaryControls";
 import {
   loadCommunityProfile,
   trajectory,
@@ -336,12 +337,20 @@ export default function CommunityHcpProfile() {
 
         {/* ◆ RELATIONSHIP — track, add-to-watchlist, status, follow-ups (ported from
             DetailScreen; canonical StatusEditor replaces the earlier custom menu — one
-            status control, in sync with the ledger). Opt-out kept below. */}
+            status control, in sync with the ledger). */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS · SYNCS WITH THE LEDGER" />
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px" }}>
             <ProfileRelationshipControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
-            <span style={{ ...mono(9), lineHeight: 1.55, color: P.ink6, letterSpacing: ".02em" }}>Are you {p.hcp.name}? Request opt-out or claim this profile. Payment data is federal public record and cannot be removed here.</span>
+          </div>
+        </div>
+
+        {/* ◆ CONTACT & CONTROLS — contact/access, field-review, add-context, report-issue,
+            opt-out (the functional opt-out replaces the earlier text line — one affordance) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SectionHead glyph="◆" tag="CONTACT & CONTROLS" sub="REACH · FIELD REVIEW · REPORT · OPT-OUT / CLAIM" />
+          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px" }}>
+            <ProfileSecondaryControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
           </div>
         </div>
       </div>
