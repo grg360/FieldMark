@@ -12,7 +12,7 @@ import StrategicOpportunities from "./StrategicOpportunities";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 
 export default function BriefPage() {
-  const { hcpId } = useParams();
+  const { id: hcpId } = useParams(); // standardized to :id across /hcp routes (stage-4 cutover)
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const [brief, setBrief] = useState<Brief | null>(null);

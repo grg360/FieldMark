@@ -1384,8 +1384,12 @@ export default function App() {
           <Route path="/hcp/:id/positions" element={<HcpPositionsPage />} />
           <Route path="/hcp/:id/profile" element={<ProfileDispatch />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
-          <Route path="/hcp/:hcpId/brief" element={<BriefPage />} />
-          <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />
+          <Route path="/hcp/:id/brief" element={<BriefPage />} />
+          {/* CUTOVER (stage 4): the primary HCP surface is now the two-spine profile.
+              /hcp/:id renders ProfileDispatch; /hcp/:id/profile also resolves to it (kept
+              so existing /profile links + bookmarks work). DetailScreen / HCPDetailRoute
+              are DISCONNECTED — retained in the codebase, unrouted, for recovery. */}
+          <Route path="/hcp/:id" element={<ProfileDispatch />} />
           <Route
             path="/:ta/field-intelligence/thread/:threadId"
             element={<FIThreadRoute />}
