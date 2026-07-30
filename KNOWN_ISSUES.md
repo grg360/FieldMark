@@ -66,3 +66,16 @@ Both exhibit **both** wrong-states:
 **Fix (recommended fix-now — one line, low risk):** point `isSaved` at the watchlist set (`savedHcpIds.has(hcpId)`, same source as the ledger's `isTracked`); both `HCPCard` and `DetailScreen` then read correctly, no per-consumer change.
 
 **Caveat the fix must settle:** `savedHcpIds` is currently loaded from the **default watchlist only** (`getWatchlistItems(userId, defaultList.id)`), so it — and the ledger's `isTracked`, and the recommended fix — treat "tracked" as "in the default watchlist," missing HCPs held only in a non-default watchlist. Decide whether "tracked" means default-list or any-list before landing the fix; if any-list, load `savedHcpIds` from all watchlists.
+
+## Field-intel & data-issue submissions persist nothing (both HCP surfaces)
+
+**Status:** flagged, not fixed. Report only (found during the HCP profile migration, 2026-07-30).
+
+**The gap.** The field-intelligence review and data-issue controls present as functional but have **no write path** — an MSL fills them in, hits submit, sees a success acknowledgement, and nothing is saved. This is true on **both** the old and new HCP surfaces:
+
+- **DetailScreen (being sunset):** the "Submit validation" button is a literal no-op — `onClick={() => {}}`. Contextualize ("Add context"), opt-out/claim, and report-data-issue submit handlers are **toast-only** (`showFiToast(...)`) with no persistence. The `field_intel_*` tables are **SELECT-only** (read grants only; `lib/fieldIntelligence.ts` exposes reads exclusively), so there is nowhere for a write to land.
+- **New two-spine profile (`ProfileSecondaryControls`):** faithfully reproduces this non-persistence, by design, with **honest toasts** that say the submission path is not wired (e.g. "Field review recorded — the submission path is not yet wired; stored locally only") rather than faking success. `ContactAccessCard` is the one genuinely-live read in that block.
+
+**Impact.** Across the whole product, MSLs submitting field-intel reviews (Data-matches-field-reality / Engagement / Credibility / Momentum) and data-issue reports are **saving nothing** — the aggregate FI chips therefore stay UNRATED forever, and reported data issues are lost. The controls invite contribution the system cannot retain. (Note capture via `FieldInsights` → `createNote` → `msl_hcp_notes` DOES persist — this gap is specifically the field-intel validation and the issue/context/opt-out flows.)
+
+**Needs a persistence decision (not now):** a write path for field-intel reviews and data-issue/opt-out/context submissions — tables with write grants (or an RPC), an aggregation model for the FI chips (how N reviews roll up to a rating), and identity handling ("contributor UUID only"). When built, **both** the new profile's `ProfileSecondaryControls` and the retained (sunset) DetailScreen logic adopt the same path. Until then the honest toasts stand; do not present these as working submissions.
