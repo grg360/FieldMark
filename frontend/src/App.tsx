@@ -1382,7 +1382,7 @@ export default function App() {
           <Route path="/hcp/:id/publications" element={<HcpPublicationsPage />} />
           <Route path="/hcp/:id/publications-with/:partnerId" element={<HcpPairPublicationsPage />} />
           <Route path="/hcp/:id/positions" element={<HcpPositionsPage />} />
-          <Route path="/hcp/:id/brief" element={<ProfileDispatch />} />
+          <Route path="/hcp/:id/profile" element={<ProfileDispatch />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
           <Route path="/hcp/:hcpId/brief" element={<BriefPage />} />
           <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />

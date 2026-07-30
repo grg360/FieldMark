@@ -16,10 +16,10 @@ import {
   addHcpToDefaultOrCreate,
   removeFromWatchlist,
   getWatchlists,
-  getWatchlistItems,
   type RelationshipMap,
   type RelationshipStatus,
 } from "../lib/relationships";
+import { getTrackedHcpIds } from "../lib/watchlists";
 import { supabase } from "../lib/supabase";
 
 async function fetchInsightCountByHcpId(userId: string): Promise<Map<string, number>> {
@@ -97,12 +97,12 @@ async function fetchBriefExistsByHcpId(userId: string): Promise<Set<string>> {
 
 interface RelationshipsContextValue {
   relationshipMap: RelationshipMap;
+  // isSaved and isTracked both return watchlist-union membership (the "All Tracked ·
+  // across watchlists" truth). Every bookmark reader uses these; they agree by construction.
   isSaved: (hcpId: string) => boolean;
-  // isTracked is the truthful "in a watchlist" test (savedHcpIds), unlike isSaved which
-  // returns true for any HCP with a relationship row (e.g. one that only has a status
-  // set). The cohort ledger's TRACK bookmark must read this, not isSaved.
   isTracked: (hcpId: string) => boolean;
   toggleSave: (hcpId: string, createdFrom: string) => Promise<void>;
+  refreshTracked: () => Promise<void>; // re-derive the union after watchlist-popover edits
   getStatus: (hcpId: string) => RelationshipStatus;
   setStatus: (hcpId: string, status: RelationshipStatus, createdFrom: string) => Promise<void>;
   isLoading: boolean;
@@ -171,13 +171,11 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       const listId = defaultList?.id ?? null;
       setDefaultWatchlistId(listId);
 
-      if (listId) {
-        const items = await getWatchlistItems(user.id, listId);
-        if (myGen !== loadGenerationRef.current) return;
-        setSavedHcpIds(new Set(items.map((item) => item.hcp_id).filter(Boolean)));
-      } else {
-        setSavedHcpIds(new Set());
-      }
+      // tracked = member of ANY non-archived watchlist (union), not just the default and
+      // not "has a relationship row". This is the truth every bookmark control reads.
+      const tracked = await getTrackedHcpIds(user.id);
+      if (myGen !== loadGenerationRef.current) return;
+      setSavedHcpIds(tracked);
     } catch (err) {
       console.error("RelationshipsProvider: load failed", err);
     } finally {
@@ -203,13 +201,21 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     };
   }, [loadUserData, resetState]);
 
-  const isSaved = useCallback(
-    (hcpId: string) => relationshipMap.has(hcpId),
-    [relationshipMap],
-  );
-
-  // truthful "is this HCP in a watchlist" — the bookmark's source of truth
+  // Bookmark truth = member of ≥1 watchlist (savedHcpIds is the union). isSaved and
+  // isTracked now return the SAME thing, so every bookmark reader (HCPCard, DetailScreen,
+  // cohort ledger, the two-spine profile) agrees. Previously isSaved read relationshipMap,
+  // which is true for any HCP with a relationship row (status/note/follow-up) — a bookmark
+  // filled for HCPs that were never tracked.
+  const isSaved = useCallback((hcpId: string) => savedHcpIds.has(hcpId), [savedHcpIds]);
   const isTracked = useCallback((hcpId: string) => savedHcpIds.has(hcpId), [savedHcpIds]);
+
+  // re-derive the tracked union (call after watchlist-popover edits, which the context
+  // doesn't otherwise observe)
+  const refreshTracked = useCallback(async () => {
+    if (!userId) return;
+    const tracked = await getTrackedHcpIds(userId);
+    setSavedHcpIds(tracked);
+  }, [userId]);
 
   const getStatus = useCallback(
     (hcpId: string): RelationshipStatus => relationshipMap.get(hcpId)?.status ?? "not_engaged",
@@ -310,12 +316,8 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
         if (!wasSaved) {
           const result = await addHcpToDefaultOrCreate(userId, hcpId, createdFrom);
           setDefaultWatchlistId(result.watchlist.id);
-
           const map = await getRelationshipMap(userId);
           setRelationshipMap(new Map(map));
-
-          const items = await getWatchlistItems(userId, result.watchlist.id);
-          setSavedHcpIds(new Set(items.map((item) => item.hcp_id).filter(Boolean)));
         } else {
           let listId = defaultWatchlistId;
           if (!listId) {
@@ -336,13 +338,13 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
           }
 
           await removeFromWatchlist(userId, listId, rel.id);
-
-          const items = await getWatchlistItems(userId, listId);
-          setSavedHcpIds(new Set(items.map((item) => item.hcp_id).filter(Boolean)));
-
           const map = await getRelationshipMap(userId);
           setRelationshipMap(new Map(map));
         }
+        // re-derive the tracked union: untracking the default list still leaves the HCP
+        // tracked if it sits in another watchlist, and vice versa.
+        const tracked = await getTrackedHcpIds(userId);
+        setSavedHcpIds(tracked);
       } catch (err) {
         setSavedHcpIds((prev) => {
           const next = new Set(prev);
@@ -363,6 +365,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       isSaved,
       isTracked,
       toggleSave,
+      refreshTracked,
       getStatus,
       setStatus,
       isLoading,
@@ -374,7 +377,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       refreshBriefExists,
       refreshAll: loadUserData,
     }),
-    [relationshipMap, isSaved, isTracked, toggleSave, getStatus, setStatus, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists, loadUserData],
+    [relationshipMap, isSaved, isTracked, toggleSave, refreshTracked, getStatus, setStatus, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists, loadUserData],
   );
 
   return (

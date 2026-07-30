@@ -286,6 +286,36 @@ export async function getWatchlistMembershipsForRelationship(
   }
 }
 
+/** The set of hcp_ids that are members of AT LEAST ONE of the user's non-archived
+ *  watchlists — the product's "All Tracked · across watchlists" definition. This is the
+ *  single source of truth every bookmark/track control reads from (HCPCard, DetailScreen,
+ *  the cohort ledger, the two-spine profile). Distinct from "has a relationship row",
+ *  which is true for any HCP the user has ever touched (status, note, follow-up). */
+export async function getTrackedHcpIds(userId: string): Promise<Set<string>> {
+  try {
+    const { data, error } = await supabase
+      .from("msl_watchlist_items")
+      .select("msl_hcp_relationships!inner(hcp_id, user_id), msl_watchlists!inner(user_id, archived_at)")
+      .eq("msl_hcp_relationships.user_id", userId)
+      .eq("msl_watchlists.user_id", userId)
+      .is("msl_watchlists.archived_at", null);
+    if (error) {
+      console.warn("getTrackedHcpIds: supabase error", error);
+      return new Set();
+    }
+    const out = new Set<string>();
+    for (const row of data ?? []) {
+      const rel = (row as { msl_hcp_relationships: unknown }).msl_hcp_relationships;
+      const hcpId = Array.isArray(rel) ? (rel[0] as { hcp_id?: string })?.hcp_id : (rel as { hcp_id?: string })?.hcp_id;
+      if (hcpId) out.add(hcpId);
+    }
+    return out;
+  } catch (err) {
+    console.warn("getTrackedHcpIds: error", err);
+    return new Set();
+  }
+}
+
 export async function getTrackedHcpsForUser(
   userId: string,
   params: TrackedHcpQueryParams = {},

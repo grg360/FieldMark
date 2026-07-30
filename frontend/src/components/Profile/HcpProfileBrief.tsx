@@ -11,6 +11,8 @@ import { Link, useParams } from "react-router-dom";
 import NavBar from "../NavBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
 import { supabase } from "../../lib/supabase";
+import FieldInsights from "../FieldInsights/FieldInsights";
+import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import {
   loadHcpProfile,
   loadFieldPresence,
@@ -340,31 +342,21 @@ export default function HcpProfileBrief() {
           </div>
         </div>
 
-        {/* FIELD PRESENCE — the only section an MSL can fill */}
+        {/* FIELD PRESENCE — the only section an MSL can fill. Functional capture (composer
+            + list) ported from DetailScreen; writes msl_hcp_notes via createNote. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead id="field" tag="FIELD PRESENCE" count={`${notes.length} CONTRIBUTION${notes.length === 1 ? "" : "S"}`} sub="MSL-CAPTURED · STRUCTURED REACTIONS · YOUR TEAM ONLY" />
-          {notes.length ? (
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
-              {notes.slice(0, 8).map((n, i) => (
-                <div key={i} style={{ padding: "13px 20px", borderBottom: i < Math.min(notes.length, 8) - 1 ? `1px solid ${P.line}` : "none", display: "flex", flexDirection: "column", gap: 5 }}>
-                  <div style={{ display: "flex", gap: 10, ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>
-                    {n.belief_claim_title ? <span style={{ color: P.ink3 }}>{n.belief_claim_title.toUpperCase()}</span> : n.insight_category ? <span style={{ color: P.ink3 }}>{n.insight_category.toUpperCase()}</span> : null}
-                    <span>{(n.occurred_at ?? n.created_at ?? "").slice(0, 10)}</span>
-                  </div>
-                  <span style={{ ...serif(13.5), color: P.ink2, lineHeight: 1.5, textWrap: "pretty" }}>{n.body}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ border: `1px solid ${P.lineStrong}`, background: P.band, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
-              <span style={{ ...serif(16, 600), color: P.ink1 }}>Nobody on your team has logged an interaction with {p.hcp.name}.</span>
-              <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>This is the section you can change today, and the only one that moves the Brief. A single note gives the record a second observation — which is what unlocks movement, corroboration, and a real summary.</span>
-              <div style={{ display: "flex", gap: 14, paddingTop: 4 }}>
-                <span style={{ ...mono(10, 600), letterSpacing: ".1em", color: P.amber, padding: "8px 14px", border: `1px solid rgba(224,167,94,.5)` }}>+ LOG FIRST INSIGHT</span>
-                <span style={{ ...mono(10, 500), letterSpacing: ".1em", color: P.ink4, padding: "8px 14px", border: `1px solid ${P.lineStrong}` }}>REQUEST TERRITORY HISTORY</span>
-              </div>
-            </div>
-          )}
+          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
+            <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} />
+          </div>
+        </div>
+
+        {/* RELATIONSHIP — track, add-to-watchlist, status, follow-ups (ported from DetailScreen) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SectionHead id="relationship" tag="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS · SYNCS WITH THE LEDGER" />
+          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
+            <ProfileRelationshipControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
+          </div>
         </div>
 
         {/* THE RECORD */}

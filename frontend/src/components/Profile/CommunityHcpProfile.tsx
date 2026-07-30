@@ -11,8 +11,9 @@ import { Link, useParams } from "react-router-dom";
 import NavBar from "../NavBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
 import { useRelationships } from "../../contexts/RelationshipsContext";
-import type { RelationshipStatus } from "../../lib/relationships";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
+import FieldInsights from "../FieldInsights/FieldInsights";
+import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import {
   loadCommunityProfile,
   trajectory,
@@ -38,7 +39,6 @@ const STATUS_LABEL: Record<RelationshipStatus, string> = {
   not_engaged: "Not Engaged", targeted: "Targeted", contacted: "Contacted",
   engaged: "Engaged", active_relationship: "Active Relationship", paused: "Paused",
 };
-const STATUS_ORDER: RelationshipStatus[] = ["not_engaged", "targeted", "contacted", "engaged", "active_relationship", "paused"];
 
 function TrajCell({ dir, trend }: { dir: TrajectoryDir; trend: number | null }) {
   if (dir === "insufficient") return <span style={{ ...mono(9), color: P.ink6, letterSpacing: ".04em" }}>insufficient history</span>;
@@ -74,7 +74,6 @@ export default function CommunityHcpProfile() {
   const [p, setP] = useState<CommunityProfile | null>(null);
   const [notes, setNotes] = useState<FieldNote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [sort, setSort] = useState<"recency" | "trajectory" | "amount">("recency");
 
   useEffect(() => {
@@ -225,25 +224,10 @@ export default function CommunityHcpProfile() {
           <div style={{ ...serif(12.5), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
             This practitioner has no published record. Everything above the engagement data is machine-derived from claims and payments, or written by a person who was in the room. The second kind is scarce and load-bearing here.
           </div>
-          {notes.length ? (
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
-              {notes.slice(0, 8).map((nt, i) => (
-                <div key={i} style={{ padding: "13px 20px", borderBottom: i < Math.min(notes.length, 8) - 1 ? `1px solid ${P.line}` : "none", display: "flex", flexDirection: "column", gap: 5 }}>
-                  <div style={{ display: "flex", gap: 10, ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>
-                    {nt.insight_category ? <span style={{ color: P.ink3 }}>{nt.insight_category.toUpperCase()}</span> : null}
-                    <span>{(nt.occurred_at ?? nt.created_at ?? "").slice(0, 10)}</span>
-                  </div>
-                  <span style={{ ...serif(13.5), color: P.ink2, lineHeight: 1.5, textWrap: "pretty" }}>{nt.body}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ border: `1px solid ${P.lineStrong}`, background: P.band, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
-              <span style={{ ...serif(16, 600), color: P.ink1 }}>No field insight has been captured on this practitioner.</span>
-              <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>With no publication record and no field capture, this profile is entirely machine-derived: claims volume, payment disclosures, setting. That is enough to plan a first call and not enough to plan a second.</span>
-              <span style={{ ...mono(10, 600), letterSpacing: ".1em", color: P.amber, padding: "8px 14px", border: `1px solid rgba(224,167,94,.5)`, alignSelf: "flex-start" }}>+ BE THE FIRST TO CONTRIBUTE</span>
-            </div>
-          )}
+          {/* functional capture (composer + list) ported from DetailScreen; msl_hcp_notes */}
+          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
+            <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} />
+          </div>
         </div>
 
         {/* ◆ WHY THIS PRACTITIONER */}
@@ -329,29 +313,13 @@ export default function CommunityHcpProfile() {
           </div>
         </div>
 
-        {/* ◆ RELATIONSHIP */}
+        {/* ◆ RELATIONSHIP — track, add-to-watchlist, status, follow-ups (ported from
+            DetailScreen; canonical StatusEditor replaces the earlier custom menu — one
+            status control, in sync with the ledger). Opt-out kept below. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SectionHead glyph="◆" tag="RELATIONSHIP" />
+          <SectionHead glyph="◆" tag="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS · SYNCS WITH THE LEDGER" />
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
-              <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>STATUS</span>
-              <button onClick={() => setMenuOpen((o) => !o)} style={{ background: "none", border: `1px solid ${P.lineStrong}`, padding: "5px 12px", cursor: "pointer", ...mono(10, 600), letterSpacing: ".08em", color: P.ink1 }}>{STATUS_LABEL[status].toUpperCase()} ▾</button>
-              {menuOpen ? (
-                <>
-                  <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                  <div style={{ position: "absolute", top: 30, left: 60, zIndex: 41, background: "#0C0E11", border: `1px solid ${P.lineStrong}`, minWidth: 190 }}>
-                    {STATUS_ORDER.map((st) => (
-                      <button key={st} onClick={() => { setMenuOpen(false); if (id && st !== status) void rel.setStatus(id, st, "community_profile"); }}
-                        style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: st === status ? P.band : "transparent", border: "none", borderBottom: `1px solid ${P.line}`, cursor: "pointer", ...mono(10.5), color: st === status ? P.ink1 : P.ink4 }}>{STATUS_LABEL[st]}</button>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>FIELD NOTES</span>
-              <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5 }}>{notes.length ? `${notes.length} note${notes.length === 1 ? "" : "s"} captured — see Field Insights above.` : "No field notes yet — add the first."}</span>
-            </div>
+            <ProfileRelationshipControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
             <span style={{ ...mono(9), lineHeight: 1.55, color: P.ink6, letterSpacing: ".02em" }}>Are you {p.hcp.name}? Request opt-out or claim this profile. Payment data is federal public record and cannot be removed here.</span>
           </div>
         </div>
