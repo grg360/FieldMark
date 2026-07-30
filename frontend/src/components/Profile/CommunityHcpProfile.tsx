@@ -42,11 +42,36 @@ const STATUS_LABEL: Record<RelationshipStatus, string> = {
   engaged: "Engaged", active_relationship: "Active Relationship", paused: "Paused",
 };
 
-function TrajCell({ dir, trend }: { dir: TrajectoryDir; trend: number | null }) {
-  if (dir === "insufficient") return <span style={{ ...mono(9), color: P.ink6, letterSpacing: ".04em" }}>insufficient history</span>;
-  const c = dir === "growing" ? "#7FB39A" : dir === "contracting" ? "#C08A8A" : P.ink4;
-  const arrow = dir === "growing" ? "↑" : dir === "contracting" ? "↓" : "→";
-  return <span style={{ ...mono(9.5, 500), color: c, letterSpacing: ".06em" }}>{arrow} {dir}{trend != null ? ` ${trend > 0 ? "+" : ""}${Math.round(trend)}%` : ""}</span>;
+// Frame trajectory palette: GROWING green, CONTRACTING red, STABLE neutral.
+const TRAJ_COLOR: Record<TrajectoryDir, string> = { growing: "#57A878", contracting: "#C65F4E", stable: "#8B8F86", insufficient: "#6F7370" };
+
+// Small line-chart across the reporting years, drawn as the frame does. Only rendered
+// where ≥2 years carry a value — otherwise the honest "insufficient history" state, no
+// line, no arrow, no implied momentum.
+function Sparkline({ series, color }: { series: (number | null)[]; color: string }) {
+  const vals = series.map((v) => v ?? 0);
+  const max = Math.max(...vals, 1);
+  const n = vals.length;
+  const pts = vals.map((v, i) => `${(i * 88) / (n - 1)},${19 - (v / max) * 17}`).join(" ");
+  return (
+    <svg width="88" height="20" viewBox="0 0 88 20" fill="none" aria-hidden>
+      <polyline points={pts} stroke={color} strokeWidth="1.25" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
+function TrajCell({ dir, trend, series }: { dir: TrajectoryDir; trend: number | null; series: (number | null)[] }) {
+  const drawable = series.filter((v) => (v ?? 0) > 0).length >= 2;
+  const color = TRAJ_COLOR[dir];
+  if (dir === "insufficient" || !drawable) {
+    return <span style={{ ...mono(9), color: TRAJ_COLOR.insufficient, letterSpacing: ".04em" }}>insufficient history</span>;
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+      <Sparkline series={series} color={color} />
+      <span style={{ ...mono(8.5, 600), color, letterSpacing: ".08em" }}>{dir.toUpperCase()}{trend != null ? ` ${trend > 0 ? "+" : ""}${Math.round(trend)}%` : ""}</span>
+    </div>
+  );
 }
 
 function SectionHead({ id, glyph, tag, count, sub }: { id?: string; glyph: string; tag: string; count?: string; sub?: string }) {
@@ -175,11 +200,17 @@ export default function CommunityHcpProfile() {
                   <span style={{ ...mono(11), color: P.ink5 }}>/ 100</span>
                 </div>
                 <span style={{ ...mono(9.5), color: P.ink5, letterSpacing: ".04em" }}>Rank {sc.rank?.toLocaleString()} of {sc.scope_size?.toLocaleString()} · NSCLC community cohort</span>
-                {/* decomposition — weights are real; exact per-component contributions are not persisted */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, paddingTop: 6 }}>
-                  {[["Practice volume", 40], ["Engagement", 30], ["Setting", 15], ["Career", 10], ["Publication", 5]].map(([l, w]) => (
-                    <div key={l as string} style={{ display: "flex", justifyContent: "space-between", ...mono(9.5), color: P.ink4 }}>
-                      <span>{l}</span><span style={{ color: P.ink5 }}>{w}% weight</span>
+                {/* decomposition — weight bars (frame panel treatment). Bars show the real
+                    scoring WEIGHTS (40/30/15/10/5); exact per-component contribution values
+                    are computed in the pipeline and not persisted, so weights are shown. */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 8 }}>
+                  {([["Practice volume", 40], ["Engagement", 30], ["Setting", 15], ["Career", 10], ["Publication", 5]] as [string, number][]).map(([l, w]) => (
+                    <div key={l} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 96, ...mono(9), color: P.ink4, letterSpacing: ".02em" }}>{l}</span>
+                      <span style={{ flex: 1, height: 4, background: P.line, borderRadius: 1 }}>
+                        <span style={{ display: "block", height: 4, width: `${w}%`, background: l === "Publication" && (sc.total_career_pubs ?? 0) === 0 ? P.lineStrong : P.rose, borderRadius: 1 }} />
+                      </span>
+                      <span style={{ width: 30, textAlign: "right", ...mono(9), color: P.ink3, fontVariantNumeric: "tabular-nums" }}>{w}%</span>
                     </div>
                   ))}
                 </div>
@@ -195,6 +226,11 @@ export default function CommunityHcpProfile() {
             )}
           </div>
         </div>
+
+        {/* two-column body per the frame: main content left, right rail right */}
+        <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+        {/* ─────────── MAIN (left) ─────────── */}
+        <div style={{ flex: "1 1 520px", minWidth: 0, display: "flex", flexDirection: "column", gap: 24 }}>
 
         {/* ◆ INDUSTRY ENGAGEMENT RECORD — PRIMARY (the spine) */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -214,20 +250,20 @@ export default function CommunityHcpProfile() {
               </div>
               {/* column heads */}
               <div style={{ display: "flex", padding: "8px 20px", borderBottom: `1px solid ${P.line}`, ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6, background: P.head }}>
-                <span style={{ flex: "2 1 160px" }}>PRODUCT · REPORTING ENTITY</span>
-                <span style={{ width: 90, textAlign: "right" }}>TRANSFERS</span>
-                <span style={{ width: 74, textAlign: "right" }}>PAYMENTS</span>
-                <span style={{ width: 120, textAlign: "right" }}>TRAJECTORY 22–24</span>
+                <span style={{ flex: "2 1 150px" }}>PRODUCT · REPORTING ENTITY</span>
+                <span style={{ width: 84, textAlign: "right" }}>TRANSFERS</span>
+                <span style={{ width: 62, textAlign: "right" }}>PAYMENTS</span>
+                <span style={{ width: 108, textAlign: "right" }}>2019–24</span>
               </div>
               {sortedShown.map((d, i) => <ProductRow key={i} d={d} />)}
               {/* footer: threshold + legend */}
               <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10, ...mono(9), color: P.ink5, letterSpacing: ".04em" }}>
                 <span>{eng.distinct_drugs} products with reported transfers · {shown.length} above the ${MATERIALITY_USD.toLocaleString()} disclosure-materiality threshold shown</span>
                 <span style={{ display: "flex", gap: 12 }}>
-                  <span style={{ color: "#7FB39A" }}>● growing {legend.growing}</span>
-                  <span style={{ color: P.ink4 }}>● stable {legend.stable}</span>
-                  <span style={{ color: "#C08A8A" }}>● contracting {legend.contracting}</span>
-                  {legend.insufficient ? <span style={{ color: P.ink6 }}>● insufficient {legend.insufficient}</span> : null}
+                  <span style={{ color: TRAJ_COLOR.growing }}>● growing {legend.growing}</span>
+                  <span style={{ color: TRAJ_COLOR.stable }}>● stable {legend.stable}</span>
+                  <span style={{ color: TRAJ_COLOR.contracting }}>● contracting {legend.contracting}</span>
+                  {legend.insufficient ? <span style={{ color: TRAJ_COLOR.insufficient }}>● insufficient {legend.insufficient}</span> : null}
                 </span>
               </div>
             </div>
@@ -243,7 +279,7 @@ export default function CommunityHcpProfile() {
         {/* ◆ FIELD INSIGHTS — SECOND SPINE */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="FIELD INSIGHTS" count={`(${notes.length})`} sub="SECOND SPINE · MSL-CAPTURED · YOUR TEAM ONLY" />
-          <div style={{ ...serif(12.5), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
+          <div style={{ ...mono(10.5), color: P.ink4, lineHeight: 1.7, letterSpacing: ".01em", textWrap: "pretty" }}>
             This practitioner has no published record. Everything above the engagement data is machine-derived from claims and payments, or written by a person who was in the room. The second kind is scarce and load-bearing here.
           </div>
           {/* functional capture (composer + list) ported from DetailScreen; msl_hcp_notes */}
@@ -275,6 +311,11 @@ export default function CommunityHcpProfile() {
             </div>
           </div>
         ) : null}
+
+        </div>{/* ─────────── /MAIN ─────────── */}
+
+        {/* ─────────── RIGHT RAIL ─────────── */}
+        <div style={{ flex: "1 1 320px", maxWidth: 380, display: "flex", flexDirection: "column", gap: 24 }}>
 
         {/* ◆ ENGAGEMENT MIX */}
         {p.mix && mixTotal > 0 ? (
@@ -353,6 +394,9 @@ export default function CommunityHcpProfile() {
             <ProfileSecondaryControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
           </div>
         </div>
+
+        </div>{/* ─────────── /RIGHT RAIL ─────────── */}
+        </div>{/* ─────────── /two-column body ─────────── */}
       </div>
     </Shell>
   );
@@ -368,9 +412,9 @@ function ProductRow({ d }: { d: Product }) {
         <span style={{ ...mono(11.5, 500), color: P.ink1, letterSpacing: ".02em" }}>{d.drug}</span>
         <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".02em" }}>{d.entity ? d.entity.toUpperCase() : "—"} · SPAN {spanTxt}</span>
       </div>
-      <span style={{ width: 90, textAlign: "right", ...mono(12), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
-      <span style={{ width: 74, textAlign: "right", ...mono(11), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"}</span>
-      <span style={{ width: 120, textAlign: "right" }}><TrajCell dir={dir} trend={d.trend_pct} /></span>
+      <span style={{ width: 84, textAlign: "right", ...mono(12), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
+      <span style={{ width: 62, textAlign: "right", ...mono(11), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"}</span>
+      <span style={{ width: 108, display: "flex", justifyContent: "flex-end" }}><TrajCell dir={dir} trend={d.trend_pct} series={[d.py2022, d.py2023, d.py2024]} /></span>
     </div>
   );
 }
