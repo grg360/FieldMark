@@ -3,16 +3,23 @@
 // ONE config-driven component across three cohorts. Stage 1 wired Established; stage 2
 // adds Rising Star and Community as sibling configs. The computed rules Design flagged
 // as MUST-NOT-BE-SIMPLIFIED live here as pure functions and are cohort-agnostic:
-//   • suppression() — a percentile column collapses to "—" only where the visible
-//     cohort's own spread cannot discriminate (spread ≤ 3 points); values below the
-//     derived ceiling always print. The SAME function collapses Established's two
-//     columns (spread 0–3) and leaves Rising Star's four standing (spread 41–93),
-//     and never touches Community's money/count columns (not percentile). Nothing is
-//     hard-coded per cohort.
-//   • why() — the drawer's "what placed this row here" is derived from the suppression
+//   • suppression is CEILING-SATURATION, not a column/page property (the correctness
+//     fix). A score cell dashes iff its value sits within the window of that column's
+//     WHOLE-COHORT ceiling (its max) — a cohort-level fact fetched once via ledger_meta
+//     (a cheap max() aggregate), never recomputed from the loaded rows. So the dash
+//     decision is identical whether 60 rows or the full 3,178 are loaded: leaders
+//     pinned at the ceiling dash, tail HCP with real separation print their numerals.
+//     Established's smoothly-declining scores collapse only at the head; Rising's
+//     genuine ceiling cells dash and the rest print; Community's money/count columns
+//     have no ceiling and never suppress. thresholds() turns ceilings into per-column
+//     dash thresholds.
+//   • bands are a HEAD-ONLY "treat as tied" device — the same ceiling-proximity logic
+//     on the INDEX column. Rows whose index is within the cohort's resolution of the
+//     index ceiling form the tied bands; below that boundary the ledger is a plain
+//     ranked list. layout() splits the loaded rows into head bands + tail.
+//   • why() — the drawer's "what placed this row here" is derived from the threshold
 //     state + the row's scores, per cohort, never written per row.
-// Bands are grouped by index spread within each cohort's resolution. Source of fact is
-// the DB (established_ledger / rising_ledger / community_ledger RPCs).
+// Source of fact is the DB (ledger_meta for ceilings; *_ledger RPCs for rows).
 
 import { supabase } from "./supabase";
 
@@ -140,27 +147,28 @@ export interface LedgerData {
   rows: LedgerRow[];
 }
 
-// ── Suppression (computed, never a constant) ─────────────────────────────────
-export const SUPPRESSION_WINDOW = 3; // percentile points; a column within this cannot discriminate
+/** Cohort-level facts, fetched once via ledger_meta (a cheap max() aggregate over the
+ *  whole cohort) — independent of which rows are paged in. `ceilings` holds each
+ *  percentile ranking column's whole-cohort max; money/count/not-ranked columns are
+ *  absent (they never suppress). */
+export interface LedgerMeta {
+  cohortTotal: number;
+  ceilings: Record<string, number>;
+}
 
-/** Per column: the ceiling at/above which the value collapses to "—", or null if the
- *  column discriminates (spread exceeds the window) and every value prints. Money and
- *  count columns are never percentile scores, so they are never suppressed. */
-export function suppression(cfg: CohortConfig, rows: LedgerRow[]): Record<string, number | null> {
+// ── Suppression = ceiling saturation (computed once per cohort, not per page) ─────
+export const SUPPRESSION_WINDOW = 3; // a cell dashes when it sits within this of the ceiling
+
+/** Per column: the threshold at/above which a value dashes ("—"), i.e. ceiling − window,
+ *  or null for columns that never suppress (money, count, or a not-ranked percentile,
+ *  and any column with no ceiling in meta). The threshold is a cohort constant derived
+ *  from the whole-cohort ceiling — it does NOT depend on the loaded rows, so the dash
+ *  decision is stable across all scrolling and paging. */
+export function thresholds(cfg: CohortConfig, ceilings: Record<string, number>): Record<string, number | null> {
   const res: Record<string, number | null> = {};
   for (const col of cfg.cols) {
-    if (col.kind !== "pct" || col.noRank) {
-      res[col.key] = null;
-      continue;
-    }
-    const vals = rows.map((r) => r.scores[col.key]).filter((v): v is number => typeof v === "number" && v > 0);
-    if (vals.length === 0) {
-      res[col.key] = null;
-      continue;
-    }
-    const hi = Math.max(...vals);
-    const lo = Math.min(...vals);
-    res[col.key] = hi - lo <= SUPPRESSION_WINDOW ? hi - 1 : null;
+    const ceil = ceilings[col.key];
+    res[col.key] = col.kind === "pct" && !col.noRank && typeof ceil === "number" ? ceil - SUPPRESSION_WINDOW : null;
   }
   return res;
 }
@@ -178,52 +186,75 @@ function money(v: number): string {
  *   pct+noRank (Pharma): null or ≤0 → "NO OP DATA" (a 0 is an absent record, not a measured low).
  *   money (Engagement): null → "NONE RECORDED" (CMS holds no record — Buroker case).
  *   count (Companies): null → em-dash, never 0.
- *   pct: null → dash; at/above the derived ceiling → dash; else the numeral prints. */
-export function cellDisplay(row: LedgerRow, col: ScoreCol, sup: Record<string, number | null>): CellDisplay {
+ *   pct: null → dash; at/above the cohort dash threshold (ceiling − window) → dash; else prints.
+ *  `th` carries the per-column dash thresholds from thresholds() — cohort constants, so
+ *  the same value dashes or prints regardless of which page it lands on. */
+export function cellDisplay(row: LedgerRow, col: ScoreCol, th: Record<string, number | null>): CellDisplay {
   const v = row.scores[col.key];
   if (v === null || v === undefined || (col.noRank && col.kind === "pct" && v <= 0)) {
     return col.absent ? { text: col.absent, kind: "absent" } : { text: "—", kind: "dash" };
   }
   if (col.kind === "money") return { text: money(v), kind: "num" };
   if (col.kind === "count") return { text: String(Math.round(v)), kind: "num" };
-  const ceiling = sup[col.key];
-  if (ceiling !== null && v >= ceiling) return { text: "—", kind: "dash" };
+  const threshold = th[col.key];
+  if (threshold !== null && v >= threshold) return { text: "—", kind: "dash" };
   return { text: String(Math.round(v)), kind: "num" };
 }
 
-// ── Resolution bands (grouped by index spread within cohort resolution) ──────
+// ── Head-only "treat as tied" bands (ceiling-proximity on the INDEX column) ──────
+// The saturated head is the prefix of rows whose index sits within the cohort's
+// resolution of the index ceiling (= the top row's index). Those rows are grouped into
+// tied bands; below the boundary the index separates people, so the ledger is a plain
+// ranked list with no band headers. Like suppression, the boundary is anchored to a
+// cohort-level ceiling, not to what is loaded — the head is always inside the first page.
 export interface Band {
-  label: string; // BAND A · RANK 1–8
+  label: string; // BAND A · RANK 1–7
   note: string;
   rows: LedgerRow[];
 }
 
-export function bands(cfg: CohortConfig, rows: LedgerRow[]): Band[] {
-  const out: Band[] = [];
+export interface LedgerLayout {
+  headBands: Band[];
+  tailRows: LedgerRow[];
+  headMaxRank: number; // last rank inside the tied head (0 if no head)
+}
+
+export function layout(cfg: CohortConfig, rows: LedgerRow[]): LedgerLayout {
+  if (rows.length === 0) return { headBands: [], tailRows: [], headMaxRank: 0 };
+  const idxCeiling = rows[0].idx; // ranked by index, so the top row carries the ceiling
+  const boundary = idxCeiling - cfg.bandResolution;
+
+  // prefix of rows still within resolution of the ceiling = the tied head
+  let headEnd = 0;
+  while (headEnd < rows.length && rows[headEnd].idx >= boundary) headEnd++;
+  const head = rows.slice(0, headEnd);
+  const tailRows = rows.slice(headEnd);
+
+  const headBands: Band[] = [];
   let i = 0;
   let letter = 65; // 'A'
-  while (i < rows.length) {
+  const d = cfg.idxDecimals;
+  while (i < head.length) {
     const start = i;
-    const hi = rows[i].idx;
+    const hi = head[i].idx;
     i++;
-    while (i < rows.length && hi - rows[i].idx <= cfg.bandResolution) i++;
-    const group = rows.slice(start, i);
+    while (i < head.length && hi - head[i].idx <= cfg.bandResolution) i++;
+    const group = head.slice(start, i);
     const lo = group[group.length - 1].idx;
     const spread = +(hi - lo).toFixed(2);
     const r0 = group[0].rank;
     const r1 = group[group.length - 1].rank;
-    const d = cfg.idxDecimals;
-    out.push({
+    headBands.push({
       label: `BAND ${String.fromCharCode(letter)} · RANK ${r0}${r1 > r0 ? `–${r1}` : ""}`,
       note:
         group.length > 1
-          ? `INDEX ${hi.toFixed(d)} → ${lo.toFixed(d)} · SPREAD ${spread} · INSIDE COHORT RESOLUTION — TREAT AS TIED`
-          : `INDEX ${hi.toFixed(d)} · SEPARATION BEGINS HERE`,
+          ? `INDEX ${hi.toFixed(d)} → ${lo.toFixed(d)} · SPREAD ${spread} · WITHIN COHORT RESOLUTION — TREAT AS TIED`
+          : `INDEX ${hi.toFixed(d)} · TIED AT THE COHORT CEILING`,
       rows: group,
     });
     letter++;
   }
-  return out;
+  return { headBands, tailRows, headMaxRank: head.length ? head[head.length - 1].rank : 0 };
 }
 
 // ── Drawer "why" (derived from suppression state + scores) ───────────────────
@@ -231,7 +262,7 @@ function scoreLabel(col: ScoreCol, v: number): string {
   return `${col.label} ${Math.round(v)}`;
 }
 
-export function why(cfg: CohortConfig, row: LedgerRow, sup: Record<string, number | null>): string {
+export function why(cfg: CohortConfig, row: LedgerRow, th: Record<string, number | null>): string {
   const rankCols = cfg.cols.filter((c) => c.kind === "pct" && !c.noRank);
 
   // Community (and any cohort with no percentile ranking columns): the ranking is
@@ -247,9 +278,9 @@ export function why(cfg: CohortConfig, row: LedgerRow, sup: Record<string, numbe
 
   const collapsed = rankCols.filter(
     (c) =>
-      sup[c.key] !== null &&
+      th[c.key] !== null &&
       typeof row.scores[c.key] === "number" &&
-      (row.scores[c.key] as number) >= (sup[c.key] as number),
+      (row.scores[c.key] as number) >= (th[c.key] as number),
   );
   if (collapsed.length >= 2) {
     return `Both ranking scores sit at this cohort's ceiling (${collapsed
@@ -325,6 +356,19 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     idx: Number(r.idx),
     summary: (r.summary as string) ?? null,
   };
+}
+
+/** Fetch the cohort-level ceilings + total once per cohort load. This is the cheap
+ *  max() aggregate that makes suppression scope-independent — it must NOT be derived
+ *  from the loaded rows. */
+export async function loadLedgerMeta(cfg: CohortConfig): Promise<LedgerMeta> {
+  const { data, error } = await supabase.rpc("ledger_meta", { p_cohort: cfg.tag });
+  if (error || !data) {
+    console.error("ledger_meta failed:", error?.message);
+    return { cohortTotal: 0, ceilings: {} };
+  }
+  const d = data as { cohort_total?: number; ceilings?: Record<string, number> };
+  return { cohortTotal: Number(d.cohort_total) || 0, ceilings: d.ceilings ?? {} };
 }
 
 export async function loadLedger(cfg: CohortConfig, limit = 60): Promise<LedgerData> {

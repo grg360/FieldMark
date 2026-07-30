@@ -18,13 +18,15 @@ import { CONTENT_WIDTH } from "../../lib/designTokens";
 import {
   COHORTS,
   loadLedger,
-  suppression,
+  loadLedgerMeta,
+  thresholds,
   cellDisplay,
-  bands,
+  layout,
   why,
   trace,
   type CohortConfig,
   type LedgerData,
+  type LedgerMeta,
   type LedgerRow,
   type Band,
 } from "../../lib/cohortLedger";
@@ -113,14 +115,14 @@ function Row({
   cfg,
   row,
   cohortTotal,
-  sup,
+  th,
   open,
   onToggle,
 }: {
   cfg: CohortConfig;
   row: LedgerRow;
   cohortTotal: number;
-  sup: Record<string, number | null>;
+  th: Record<string, number | null>;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -164,7 +166,7 @@ function Row({
         </div>
         {/* score cells */}
         {cfg.cols.map((col) => {
-          const d = cellDisplay(row, col, sup);
+          const d = cellDisplay(row, col, th);
           if (d.kind === "absent") {
             return (
               <div key={col.key} style={{ width: col.w, textAlign: "right", paddingTop: 10 }}>
@@ -185,7 +187,7 @@ function Row({
         <div style={{ display: "flex", gap: 48, padding: "6px 20px 22px 127px", background: P.drawer, borderTop: `1px solid ${P.line}` }}>
           <div style={{ flex: 1, maxWidth: 540, display: "flex", flexDirection: "column", gap: 9, paddingTop: 14 }}>
             <div style={{ ...mono(9, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
-            <div style={{ ...serif(13.5), lineHeight: 1.6, color: "#CDD1D4", textWrap: "pretty" }}>{why(cfg, row, sup)}</div>
+            <div style={{ ...serif(13.5), lineHeight: 1.6, color: "#CDD1D4", textWrap: "pretty" }}>{why(cfg, row, th)}</div>
             <div style={{ ...mono(10), lineHeight: 1.6, color: "#767C81", letterSpacing: ".04em", paddingTop: 2 }}>
               THE SUMMARY LINE ABOVE IS MODEL SYNTHESIS OVER THE SOURCES AT RIGHT · REVIEW BEFORE USE · NO CLINICAL CLAIM
             </div>
@@ -225,6 +227,7 @@ export default function CohortLedger() {
   const [tag, setTag] = useState<string>("EST");
   const cfg = COHORTS.find((c) => c.tag === tag) ?? COHORTS[0];
   const [data, setData] = useState<LedgerData | null>(null);
+  const [meta, setMeta] = useState<LedgerMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -232,18 +235,37 @@ export default function CohortLedger() {
     let alive = true;
     setLoading(true);
     setData(null);
+    setMeta(null);
     setOpen(null);
-    loadLedger(cfg, 60)
-      .then((d) => alive && (setData(d), setLoading(false)))
+    // meta (cohort-level ceilings + total) and rows load in parallel; suppression is
+    // driven by meta.ceilings, so the dash decision never depends on which rows arrive.
+    Promise.all([loadLedgerMeta(cfg), loadLedger(cfg, 60)])
+      .then(([m, d]) => alive && (setMeta(m), setData(d), setLoading(false)))
       .catch(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
   }, [cfg]);
 
-  const sup = data ? suppression(cfg, data.rows) : {};
-  const grouped = data ? bands(cfg, data.rows) : [];
-  const metaLine = data ? cfg.meta.replace("{total}", data.cohortTotal.toLocaleString()) : "";
+  const th = meta ? thresholds(cfg, meta.ceilings) : {};
+  const { headBands, tailRows } = data ? layout(cfg, data.rows) : { headBands: [], tailRows: [] };
+  const cohortTotal = meta?.cohortTotal ?? data?.cohortTotal ?? 0;
+  const metaLine = meta ? cfg.meta.replace("{total}", cohortTotal.toLocaleString()) : "";
+
+  const renderRow = (row: LedgerRow) => {
+    const id = `${cfg.tag}-${row.rank}`;
+    return (
+      <Row
+        key={id}
+        cfg={cfg}
+        row={row}
+        cohortTotal={cohortTotal}
+        th={th}
+        open={open === id}
+        onToggle={() => setOpen((o) => (o === id ? null : id))}
+      />
+    );
+  };
 
   return (
     <div style={{ background: P.page, minHeight: "100vh" }}>
@@ -271,25 +293,26 @@ export default function CohortLedger() {
             ) : !data || data.rows.length === 0 ? (
               <div style={{ padding: "28px 23px", ...mono(11), color: P.ink5 }}>The {cfg.label} ledger could not be loaded.</div>
             ) : (
-              grouped.map((band) => (
-                <div key={band.label}>
-                  <BandHeader band={band} />
-                  {band.rows.map((row) => {
-                    const id = `${cfg.tag}-${row.rank}`;
-                    return (
-                      <Row
-                        key={id}
-                        cfg={cfg}
-                        row={row}
-                        cohortTotal={data.cohortTotal}
-                        sup={sup}
-                        open={open === id}
-                        onToggle={() => setOpen((o) => (o === id ? null : id))}
-                      />
-                    );
-                  })}
-                </div>
-              ))
+              <>
+                {/* saturated head — the "treat as tied" bands */}
+                {headBands.map((band) => (
+                  <div key={band.label}>
+                    <BandHeader band={band} />
+                    {band.rows.map(renderRow)}
+                  </div>
+                ))}
+                {/* below the head the index separates people — a plain ranked list */}
+                {tailRows.length > 0 ? (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 20px 7px 23px", background: P.band, borderBottom: `1px solid ${P.line}` }}>
+                      <span style={{ ...mono(9.5, 500), letterSpacing: ".16em", color: P.ink4 }}>RANKED</span>
+                      <span style={{ flex: 1, height: 1, background: P.lineMed }} />
+                      <span style={{ ...mono(9.5), letterSpacing: ".1em", color: "#767C81" }}>BELOW THE TIED HEAD · THE INDEX SEPARATES EACH ROW</span>
+                    </div>
+                    {tailRows.map(renderRow)}
+                  </>
+                ) : null}
+              </>
             )}
 
             {/* footer caveats */}
