@@ -32,7 +32,7 @@ export interface Product {
 }
 
 export interface CommunityProfile {
-  hcp: { id: string; name: string; first_name: string | null; last_name: string | null; specialty: string | null; city: string | null; state: string | null; npi: string | null };
+  hcp: { id: string; name: string; first_name: string | null; last_name: string | null; specialty: string | null; institution: string | null; city: string | null; state: string | null; npi: string | null };
   practice_shape: { patient_volume: number | null; setting: string | null; career_years: number | null; drug_breadth: number | null; total_career_pubs: number | null };
   score: { composite: number | null; normalized: number | null; rank: number | null; scope_size: number | null; publication_signal: number | null; total_career_pubs: number | null } | null;
   has_score: boolean | null;

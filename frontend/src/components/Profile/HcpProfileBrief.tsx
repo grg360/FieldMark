@@ -7,11 +7,15 @@
 // serif-over-mono, OPEN ↗ trace links, review-before-use disclaimer.
 
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import NavBar from "../NavBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
 import { supabase } from "../../lib/supabase";
+import { institutionToSlug } from "../../lib/institutionUtils";
+import { getEstablishedScoreBreakdown, type TopCollaborator } from "../../lib/api";
 import FieldInsights from "../FieldInsights/FieldInsights";
+import MiniCollaboratorNetwork from "../MiniCollaboratorNetwork";
+import BibliographyScreen from "../BibliographyScreen";
 import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import {
   loadHcpProfile,
@@ -168,9 +172,13 @@ function PositionCard({ pos, sourceRows, count }: { pos: ProfilePosition; source
 
 export default function HcpProfileBrief() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [p, setP] = useState<HcpProfile | null>(null);
   const [notes, setNotes] = useState<FieldNote[]>([]);
   const [ceilings, setCeilings] = useState<{ sci?: number; net?: number }>({});
+  const [collaborators, setCollaborators] = useState<TopCollaborator[]>([]);
+  const [bibYear, setBibYear] = useState<number | null>(null); // per-year bibliography overlay
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -188,11 +196,23 @@ export default function HcpProfileBrief() {
       setCeilings(((meta.data as { ceilings?: { sci?: number; net?: number } })?.ceilings) ?? {});
       setLoading(false);
     }).catch(() => alive && setLoading(false));
+    // collaborator network — same source DetailScreen uses (established score breakdown)
+    getEstablishedScoreBreakdown(id).then((b) => alive && setCollaborators(b?.top_collaborators ?? [])).catch(() => {});
     return () => { alive = false; };
   }, [id]);
 
+  // honor a #hash on arrival (e.g. #belief-profile deep-links) once content is laid out
+  useEffect(() => {
+    if (loading || !location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, location.hash]);
+
   if (loading) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>Loading profile…</div></Shell>;
   if (!p || !p.hcp?.name) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>This profile could not be loaded.</div></Shell>;
+
+  // per-year bibliography drill-down — same component DetailScreen uses (no canonical URL exists)
+  if (bibYear !== null) return <BibliographyScreen hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} year={bibYear} onBack={() => setBibYear(null)} />;
 
   const s = p.scores;
   const nPos = positionCount(p);
@@ -221,7 +241,7 @@ export default function HcpProfileBrief() {
             <Link to="/cohorts/ledger" style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
           </div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>
-            {[["BRIEF", "brief"], [`BELIEF ${nPos}`, "belief"], [`FIELD ${notes.length}`, "field"], ["SIGNAL", "signal"], ["RECORD", "record"], ["INTEL", "intel"]].map(([t, a]) => (
+            {[["BRIEF", "brief"], [`BELIEF ${nPos}`, "belief-profile"], [`FIELD ${notes.length}`, "field"], ["SIGNAL", "signal"], ["RECORD", "record"], ["INTEL", "intel"]].map(([t, a]) => (
               <a key={a} href={`#${a}`} style={{ color: P.ink5, textDecoration: "none" }}>{t}</a>
             ))}
           </div>
@@ -236,10 +256,29 @@ export default function HcpProfileBrief() {
               <span style={{ ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>INDEX · RANK {s?.rank ?? "—"} US · #{s?.global_rank ?? "—"} GLOBAL</span>
             </div>
             <span style={{ ...serif(24, 600), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4 }}>{p.hcp.name}</span>
-            <span style={{ ...mono(11), color: P.ink4, letterSpacing: ".02em" }}>{[p.hcp.institution, loc].filter(Boolean).join(" · ")}</span>
-            <span style={{ ...mono(9.5, 500), letterSpacing: ".08em", color: P.ink6 }}>
-              {p.hcp.npi ? `NPI ${p.hcp.npi}` : ""}{p.hcp.specialty ? ` · ${p.hcp.specialty.toUpperCase()}` : ""} · VERIFIED NPI REGISTRY
+            <span style={{ ...mono(11), color: P.ink4, letterSpacing: ".02em" }}>
+              {p.hcp.institution ? (
+                <a href={`/institution/${institutionToSlug(p.hcp.institution)}`}
+                   onClick={(e) => { e.preventDefault(); navigate(`/institution/${institutionToSlug(p.hcp.institution!)}`); }}
+                   style={{ color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>{p.hcp.institution}</a>
+              ) : null}
+              {p.hcp.institution && loc ? " · " : ""}{loc}
             </span>
+            <span style={{ ...mono(9.5, 500), letterSpacing: ".08em", color: P.ink6 }}>
+              {p.hcp.npi ? (
+                <a href={`https://npiregistry.cms.hhs.gov/provider-view/${p.hcp.npi}`} target="_blank" rel="noopener noreferrer"
+                   style={{ color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>NPI {p.hcp.npi} ↗</a>
+              ) : null}{p.hcp.specialty ? ` · ${p.hcp.specialty.toUpperCase()}` : ""} · VERIFIED NPI REGISTRY
+            </span>
+            {/* nav parity — Generate Brief + full-page publications / positions */}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 8 }}>
+              <button onClick={() => navigate(`/hcp/${p.hcp.id}/brief`)} title="Generate a pre-meeting brief"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", background: "none", border: `1px solid rgba(224,167,94,.5)`, cursor: "pointer", ...mono(10, 600), letterSpacing: ".08em", color: P.amber, borderRadius: 2 }}>✦ GENERATE BRIEF</button>
+              <button onClick={() => navigate(`/hcp/${p.hcp.id}/publications`, { state: { taId: undefined } })} title="All publications"
+                style={{ padding: "7px 13px", background: "none", border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(10, 500), letterSpacing: ".08em", color: P.ink3, borderRadius: 2 }}>ALL PUBLICATIONS ↗</button>
+              <button onClick={() => navigate(`/hcp/${p.hcp.id}/positions`)} title="Full positions page"
+                style={{ padding: "7px 13px", background: "none", border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(10, 500), letterSpacing: ".08em", color: P.ink3, borderRadius: 2 }}>ALL POSITIONS ↗</button>
+            </div>
           </div>
           <div style={{ padding: "16px 24px", display: "flex", gap: 36, flexWrap: "wrap", alignItems: "flex-start" }}>
             <ScoreCell label="INDEX" sub="IN COHORT" value={s?.index ?? null} decimals={1} basis={s?.vs_cohort_mean != null ? `${s.vs_cohort_mean > 0 ? "+" : ""}${s.vs_cohort_mean} VS COHORT MEAN` : ""} />
@@ -291,7 +330,7 @@ export default function HcpProfileBrief() {
 
         {/* BELIEF PROFILE */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SectionHead id="belief" tag="BELIEF PROFILE" count={`${nPos} POSITION${nPos === 1 ? "" : "S"} · ${nSrc} SOURCE${nSrc === 1 ? "" : "S"} · ALL PUBLISHED`} sub="POSITIONS DESCRIBE THE PUBLISHED WORK · NOT THE PERSON" />
+          <SectionHead id="belief-profile" tag="BELIEF PROFILE" count={`${nPos} POSITION${nPos === 1 ? "" : "S"} · ${nSrc} SOURCE${nSrc === 1 ? "" : "S"} · ALL PUBLISHED`} sub="POSITIONS DESCRIBE THE PUBLISHED WORK · NOT THE PERSON" />
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
             {/* synthesis paragraph or its withheld state */}
             {hasSynthPara ? (
@@ -372,11 +411,11 @@ export default function HcpProfileBrief() {
                 </div>
               ))}
             </div>
-            {/* timeline (years present + zero years drawn as the shape of the record) */}
+            {/* timeline — click a year to open its per-year bibliography (same as DetailScreen) */}
             {p.record.timeline && p.record.timeline.length ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>PUBLICATION TIMELINE</span>
-                <Timeline data={p.record.timeline} />
+                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>PUBLICATION TIMELINE · CLICK A YEAR</span>
+                <Timeline data={p.record.timeline} onYearPress={(y) => setBibYear(y)} />
               </div>
             ) : null}
             {/* pharma engagement */}
@@ -395,10 +434,15 @@ export default function HcpProfileBrief() {
             </div>
             {/* engagement mix */}
             {p.record.engagement_mix ? <EngagementMix mix={p.record.engagement_mix} /> : null}
-            {/* collaborators — no co-authorship network table in stage 1 */}
+            {/* collaborators — MiniCollaboratorNetwork (co-pub nav → /publications-with), same
+                component and data (established score breakdown) DetailScreen uses */}
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>TOP COLLABORATORS</span>
-              <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5 }}>The co-authorship collaborator network is not wired in stage 1 — the shared-position tallies it needs do not exist yet.</span>
+              {collaborators.length ? (
+                <MiniCollaboratorNetwork hcpName={p.hcp.name} hcpId={p.hcp.id} collaborators={collaborators} />
+              ) : (
+                <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5 }}>No co-authorship network on record for this HCP.</span>
+              )}
             </div>
           </div>
         </div>
@@ -447,7 +491,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Timeline({ data }: { data: { year: number; count: number }[] }) {
+function Timeline({ data, onYearPress }: { data: { year: number; count: number }[]; onYearPress?: (year: number) => void }) {
   const years = data.map((d) => d.year);
   const lo = Math.min(...years), hi = Math.max(...years);
   const max = Math.max(...data.map((d) => d.count), 1);
@@ -458,7 +502,9 @@ function Timeline({ data }: { data: { year: number; count: number }[] }) {
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 56 }}>
         {span.map((d) => (
-          <div key={d.year} title={`${d.year}: ${d.count}`} style={{ flex: 1, height: `${(d.count / max) * 100}%`, minHeight: d.count ? 2 : 1, background: d.count ? P.sage : "rgba(255,255,255,.06)" }} />
+          <div key={d.year} title={`${d.year}: ${d.count} — open bibliography`}
+            onClick={() => d.count > 0 && onYearPress?.(d.year)}
+            style={{ flex: 1, height: `${(d.count / max) * 100}%`, minHeight: d.count ? 2 : 1, background: d.count ? P.sage : "rgba(255,255,255,.06)", cursor: onYearPress && d.count > 0 ? "pointer" : "default" }} />
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", ...mono(8.5), color: P.ink6, paddingTop: 4 }}>

@@ -56,6 +56,7 @@ begin
     select id, first_name, last_name,
            trim(coalesce(first_name,'') || ' ' || coalesce(last_name,'')) as name,
            npi_number, npi_specialty,
+           coalesce(institution_canonical, institution_normalized) as institution,
            nppes_practice_city as city,
            coalesce(nppes_practice_state, derived_state) as state
     from hcps_v2 where id = p_hcp_id
@@ -91,7 +92,7 @@ begin
   )
   select json_build_object(
     'hcp', (select json_build_object('id', p_hcp_id, 'name', name, 'first_name', first_name,
-        'last_name', last_name, 'specialty', npi_specialty, 'city', city, 'state', state, 'npi', npi_number) from h),
+        'last_name', last_name, 'specialty', npi_specialty, 'institution', institution, 'city', city, 'state', state, 'npi', npi_number) from h),
     'practice_shape', (select json_build_object(
         'patient_volume', patient_volume, 'setting', nppes_practice_setting,
         'career_years', coalesce(nppes_career_stage_years, career_years::int),

@@ -7,9 +7,10 @@
 // achievement — neutral weight, counts always beside amounts. Live data only.
 
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import NavBar from "../NavBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
+import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
 import FieldInsights from "../FieldInsights/FieldInsights";
@@ -70,6 +71,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export default function CommunityHcpProfile() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const rel = useRelationships();
   const [p, setP] = useState<CommunityProfile | null>(null);
   const [notes, setNotes] = useState<FieldNote[]>([]);
@@ -129,7 +131,26 @@ export default function CommunityHcpProfile() {
               <span style={{ color: P.ink5, border: `1px solid ${P.lineStrong}`, padding: "1px 6px" }}>NO PUBLICATION RECORD</span>
             </div>
             <span style={{ ...serif(24, 600), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4 }}>{p.hcp.name}</span>
-            <span style={{ ...mono(10.5), color: P.ink4, letterSpacing: ".02em" }}>{[p.hcp.specialty, loc, p.hcp.npi ? `NPI ${p.hcp.npi}` : ""].filter(Boolean).join(" · ")}</span>
+            <span style={{ ...mono(10.5), color: P.ink4, letterSpacing: ".02em" }}>
+              {p.hcp.specialty ? `${p.hcp.specialty} · ` : ""}
+              {p.hcp.institution ? (
+                <>
+                  <a href={`/institution/${institutionToSlug(p.hcp.institution)}`}
+                     onClick={(e) => { e.preventDefault(); navigate(`/institution/${institutionToSlug(p.hcp.institution!)}`); }}
+                     style={{ color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>{p.hcp.institution}</a>{" · "}
+                </>
+              ) : null}
+              {loc}
+              {p.hcp.npi ? (
+                <> · <a href={`https://npiregistry.cms.hhs.gov/provider-view/${p.hcp.npi}`} target="_blank" rel="noopener noreferrer"
+                       style={{ color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>NPI {p.hcp.npi} ↗</a></>
+              ) : null}
+            </span>
+            {/* nav parity — Generate Brief entry point (only entry once DetailScreen retires) */}
+            <div style={{ paddingTop: 8 }}>
+              <button onClick={() => navigate(`/hcp/${p.hcp.id}/brief`)} title="Generate a pre-meeting brief"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", background: "none", border: `1px solid rgba(224,167,94,.5)`, cursor: "pointer", ...mono(10, 600), letterSpacing: ".08em", color: P.amber, borderRadius: 2 }}>✦ GENERATE BRIEF</button>
+            </div>
             {/* practice shape */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "10px 20px", paddingTop: 12 }}>
               {[["PATIENT VOLUME", ps.patient_volume != null ? `${ps.patient_volume.toLocaleString()} vol · signal` : "—"],
