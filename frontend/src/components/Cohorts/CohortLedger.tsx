@@ -16,6 +16,8 @@ import { Link } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import NavBar from "../NavBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
+import { useRelationships } from "../../contexts/RelationshipsContext";
+import type { RelationshipStatus } from "../../lib/relationships";
 import {
   COHORTS,
   loadLedgerPage,
@@ -90,7 +92,90 @@ function CohortTabs({ active, onPick }: { active: string; onPick: (tag: string) 
   );
 }
 
+// ── Our-side controls (stage 3) — INSIGHT · TRACK · STATE, columned right ──────
+// Widths shared by the header and the rows so the columns line up.
+const OURS = { insight: 62, track: 44, state: 108 } as const;
+
+// The six-state relationship ladder Design designed: read by FILL COUNT, not hue (no new
+// colour enters the row — amber stays with rank). Not Engaged 0 · Targeted 1 · Contacted
+// 2 · Engaged 3 · Active Relationship 4; Paused is off-ladder (four segments outlined
+// with a strike rule). Same values as the profile's STATUS dropdown.
+const STATUS_ORDER: RelationshipStatus[] = [
+  "not_engaged",
+  "targeted",
+  "contacted",
+  "engaged",
+  "active_relationship",
+  "paused",
+];
+const STATUS_LABEL: Record<RelationshipStatus, string> = {
+  not_engaged: "Not Engaged",
+  targeted: "Targeted",
+  contacted: "Contacted",
+  engaged: "Engaged",
+  active_relationship: "Active Relationship",
+  paused: "Paused",
+};
+const STATUS_FILL: Record<RelationshipStatus, number> = {
+  not_engaged: 0,
+  targeted: 1,
+  contacted: 2,
+  engaged: 3,
+  active_relationship: 4,
+  paused: -1, // off-ladder
+};
+const LADDER_SEGMENTS = 4;
+
+// Four-segment fill ladder. Filled segments read the state; Paused shows all outlined
+// with a diagonal strike. Ink only — no hue.
+function StateLadder({ status }: { status: RelationshipStatus }) {
+  const fill = STATUS_FILL[status];
+  const paused = fill < 0;
+  return (
+    <div style={{ position: "relative", display: "flex", gap: 3, alignItems: "center" }}>
+      {Array.from({ length: LADDER_SEGMENTS }).map((_, i) => {
+        const on = !paused && i < fill;
+        return (
+          <span
+            key={i}
+            style={{
+              width: 6,
+              height: 12,
+              background: on ? P.ink1 : "transparent",
+              border: `1px solid ${on ? P.ink1 : P.lineStrong}`,
+              borderRadius: 1,
+            }}
+          />
+        );
+      })}
+      {paused ? (
+        <span style={{ position: "absolute", left: -2, right: -2, top: "50%", height: 1, background: P.ink4, transform: "rotate(-16deg)" }} />
+      ) : null}
+    </div>
+  );
+}
+
+// Bookmark glyph — filled when tracked, outlined when not. Legible down a long list.
+function Bookmark({ on }: { on: boolean }) {
+  return (
+    <svg width="12" height="15" viewBox="0 0 12 15" aria-hidden>
+      <path
+        d="M1 1.5h10v12l-5-3.2-5 3.2z"
+        fill={on ? P.ink0 : "none"}
+        stroke={on ? P.ink0 : P.ink5}
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
+  const head = (label: string, sub: string, w: number, align: "left" | "right" | "center" = "right") => (
+    <div style={{ width: w, textAlign: align, ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+      {label}<br /><span style={{ color: P.ink5 }}>{sub}</span>
+    </div>
+  );
   return (
     <div style={{ display: "flex", alignItems: "flex-end", padding: "10px 20px 8px 23px", borderBottom: `1px solid ${P.lineStrong}`, background: P.head }}>
       <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.amber }}>
@@ -107,6 +192,11 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
           {c.label}<br /><span style={{ color: P.ink5 }}>{c.sub}</span>
         </div>
       ))}
+      {/* our-side controls — universal across cohorts */}
+      <div style={{ width: 14 }} />
+      {head("INSIGHT", "CAPTURED", OURS.insight)}
+      {head("TRK", "MINE", OURS.track, "center")}
+      {head("STATE", "OUR CONTACT", OURS.state, "left")}
     </div>
   );
 }
@@ -126,10 +216,19 @@ function Row({
   open: boolean;
   onToggle: () => void;
 }) {
+  const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const tracked = isTracked(row.hcpId);
+  const status = getStatus(row.hcpId);
+  const insight = getInsightCount(row.hcpId);
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
   return (
     <div style={{ position: "relative", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: cfg.markerColor }} />
       {open ? <div style={{ position: "absolute", left: 3, top: 0, bottom: 0, width: 2, background: P.amber }} /> : null}
+      {/* right track edge lights up when this row is tracked — legible down the list */}
+      {tracked ? <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 3, background: P.ink2 }} /> : null}
       <div
         onClick={onToggle}
         style={{ display: "flex", alignItems: "flex-start", padding: "13px 20px 13px 23px", cursor: "pointer" }}
@@ -150,6 +249,12 @@ function Row({
         <div style={{ flex: 1, minWidth: 300, paddingRight: 24, display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
             <span style={{ ...serif(17, 500), color: P.ink0, letterSpacing: "-.005em" }}>{row.name}</span>
+            {/* archetype chip — Rising Star only, a physician attribute inline with the name */}
+            {row.archetype ? (
+              <span style={{ ...mono(9, 500), color: P.ink3, letterSpacing: ".1em", padding: "1px 6px", border: `1px solid ${P.lineStrong}`, borderRadius: 2, alignSelf: "center" }}>
+                {row.archetype.toUpperCase()}
+              </span>
+            ) : null}
             {row.chips.map((chip, i) => (
               <span key={i} style={{ ...mono(i === 0 ? 10 : 10.5), color: i === 0 ? P.ink4 : P.ink5, letterSpacing: i === 0 ? ".08em" : ".02em" }}>
                 {chip}
@@ -181,6 +286,57 @@ function Row({
             </div>
           );
         })}
+
+        {/* ── our-side controls (stage 3) ─────────────────────────────────── */}
+        <div style={{ width: 14 }} />
+        {/* INSIGHT — count of captured field insights; blank where none */}
+        <div style={{ width: OURS.insight, textAlign: "right", paddingTop: 10 }}>
+          {insight > 0 ? (
+            <span style={{ ...mono(13), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
+          ) : null}
+        </div>
+        {/* TRACK — bookmark toggle (does not open the drawer) */}
+        <div style={{ width: OURS.track, display: "flex", justifyContent: "center", paddingTop: 8 }}>
+          <button
+            onClick={(e) => { stop(e); void toggleSave(row.hcpId, "cohort_ledger"); }}
+            title={tracked ? "Tracked — click to untrack" : "Track this HCP"}
+            style={{ background: "none", border: "none", padding: 4, cursor: "pointer", lineHeight: 0, minHeight: 0 }}
+          >
+            <Bookmark on={tracked} />
+          </button>
+        </div>
+        {/* STATE — six-state fill ladder + menu */}
+        <div style={{ width: OURS.state, paddingTop: 8, position: "relative" }}>
+          <button
+            onClick={(e) => { stop(e); setMenuOpen((o) => !o); }}
+            title={STATUS_LABEL[status]}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0 }}
+          >
+            <StateLadder status={status} />
+            <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em", whiteSpace: "nowrap" }}>
+              {STATUS_LABEL[status].toUpperCase()}
+            </span>
+          </button>
+          {menuOpen ? (
+            <>
+              <div onClick={(e) => { stop(e); setMenuOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div onClick={stop} style={{ position: "absolute", top: 26, left: 0, zIndex: 41, background: "#0C0E11", border: `1px solid ${P.lineStrong}`, boxShadow: "0 8px 24px rgba(0,0,0,.5)", minWidth: 176 }}>
+                {STATUS_ORDER.map((s) => (
+                  <button
+                    key={s}
+                    onClick={(e) => { stop(e); setMenuOpen(false); if (s !== status) void setStatus(row.hcpId, s, "cohort_ledger"); }}
+                    style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "7px 10px", background: s === status ? P.rowHover : "transparent", border: "none", borderBottom: `1px solid ${P.line}`, cursor: "pointer", textAlign: "left" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = P.rowHover)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = s === status ? P.rowHover : "transparent")}
+                  >
+                    <StateLadder status={s} />
+                    <span style={{ ...mono(10), color: s === status ? P.ink1 : P.ink4, letterSpacing: ".04em" }}>{STATUS_LABEL[s]}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
 
       {open ? (

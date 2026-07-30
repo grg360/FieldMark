@@ -11,11 +11,14 @@ import {
 import { getCurrentUser } from "../lib/authHelpers";
 import {
   getRelationshipMap,
+  getOrCreateRelationship,
+  updateRelationshipStatus,
   addHcpToDefaultOrCreate,
   removeFromWatchlist,
   getWatchlists,
   getWatchlistItems,
   type RelationshipMap,
+  type RelationshipStatus,
 } from "../lib/relationships";
 import { supabase } from "../lib/supabase";
 
@@ -95,7 +98,13 @@ async function fetchBriefExistsByHcpId(userId: string): Promise<Set<string>> {
 interface RelationshipsContextValue {
   relationshipMap: RelationshipMap;
   isSaved: (hcpId: string) => boolean;
+  // isTracked is the truthful "in a watchlist" test (savedHcpIds), unlike isSaved which
+  // returns true for any HCP with a relationship row (e.g. one that only has a status
+  // set). The cohort ledger's TRACK bookmark must read this, not isSaved.
+  isTracked: (hcpId: string) => boolean;
   toggleSave: (hcpId: string, createdFrom: string) => Promise<void>;
+  getStatus: (hcpId: string) => RelationshipStatus;
+  setStatus: (hcpId: string, status: RelationshipStatus, createdFrom: string) => Promise<void>;
   isLoading: boolean;
   getInsightCount: (hcpId: string) => number;
   refreshInsightCounts: () => Promise<void>;
@@ -197,6 +206,45 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
   const isSaved = useCallback(
     (hcpId: string) => relationshipMap.has(hcpId),
     [relationshipMap],
+  );
+
+  // truthful "is this HCP in a watchlist" — the bookmark's source of truth
+  const isTracked = useCallback((hcpId: string) => savedHcpIds.has(hcpId), [savedHcpIds]);
+
+  const getStatus = useCallback(
+    (hcpId: string): RelationshipStatus => relationshipMap.get(hcpId)?.status ?? "not_engaged",
+    [relationshipMap],
+  );
+
+  // Write the relationship status to the same msl_hcp_relationships row the profile's
+  // STATUS dropdown writes (creating the row if the ledger is the first touch), so the
+  // ledger and profile stay in sync. Optimistic, with revert on failure.
+  const setStatus = useCallback(
+    async (hcpId: string, status: RelationshipStatus, createdFrom: string) => {
+      if (!userId) return;
+      const prev = relationshipMap.get(hcpId);
+      setRelationshipMap((m) => {
+        const next = new Map(m);
+        const cur = next.get(hcpId);
+        if (cur) next.set(hcpId, { ...cur, status });
+        return next;
+      });
+      try {
+        const rel = prev ?? (await getOrCreateRelationship(userId, hcpId, createdFrom));
+        await updateRelationshipStatus(userId, rel.id, status);
+        const map = await getRelationshipMap(userId); // cache invalidated by the write
+        setRelationshipMap(new Map(map));
+      } catch (err) {
+        setRelationshipMap((m) => {
+          const next = new Map(m);
+          if (prev) next.set(hcpId, prev);
+          return next;
+        });
+        console.error("setStatus failed", err);
+        throw err;
+      }
+    },
+    [userId, relationshipMap],
   );
 
   const getInsightCount = useCallback(
@@ -313,7 +361,10 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     () => ({
       relationshipMap,
       isSaved,
+      isTracked,
       toggleSave,
+      getStatus,
+      setStatus,
       isLoading,
       getInsightCount,
       refreshInsightCounts,
@@ -323,7 +374,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       refreshBriefExists,
       refreshAll: loadUserData,
     }),
-    [relationshipMap, isSaved, toggleSave, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists, loadUserData],
+    [relationshipMap, isSaved, isTracked, toggleSave, getStatus, setStatus, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists, loadUserData],
   );
 
   return (

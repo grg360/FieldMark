@@ -137,6 +137,7 @@ export interface LedgerRow {
   hcpId: string;
   name: string;
   chips: string[]; // small mono chips after the name (state·institution, or specialty·location)
+  archetype: string | null; // Rising Star only — physician attribute chip inline with the name
   scores: Record<string, number | null>; // keyed by col.key
   idx: number; // composite index
   summary: string | null; // generated narrative headline (plain prose)
@@ -352,6 +353,7 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     hcpId: S(r.hcp_id),
     name,
     chips,
+    archetype: cfg.tag === "RS" ? ((r.archetype as string) ?? null) : null,
     scores,
     idx: Number(r.idx),
     summary: (r.summary as string) ?? null,
