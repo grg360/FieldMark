@@ -44,3 +44,25 @@ The staleness is the mild part. The concerning part: **those 5 ids were deleted 
 **Impact today:** low. Rising is a single page (208 < 1000), so rank-keyed pagination never splits at 113 and no row is skipped. But duplicate ranks would break key-pagination for any cohort large enough to page across the tie, and they read wrong to users.
 
 **Remediation (not now):** same rebuild of `hcp_rising_star_ranks_v3` against current `hcps_v2` should re-derive unique ranks; verify uniqueness after.
+
+## Bookmark control reads isSaved (has-relationship), not watchlist membership
+
+**Status:** flagged, not fixed. Report only (cohort ledger stage 3 investigation, 2026-07-29).
+
+**The bug.** `RelationshipsContext.isSaved(hcpId)` returns `relationshipMap.has(hcpId)` — true for **any HCP with a `msl_hcp_relationships` row**, not only HCPs in a watchlist. A relationship row is created by `getOrCreateRelationship` on *any* first touch: setting a status, adding a note/insight, a follow-up, a brief — not just tracking. Untracking (`removeFromWatchlist`) deletes only the `msl_watchlist_items` row and leaves the relationship row. So `isSaved` is true in cases where the HCP is not tracked.
+
+**Blast radius — two surfaces render a bookmark off `isSaved`:**
+- **`HCPCard.tsx`** (`saved = isSaved(hcpId)` → `BookmarkCheck` filled vs `Bookmark` outline; toggle `toggleSave(hcpId,"cohort_card")`). The feed/list card — highest traffic.
+- **`DetailScreen.tsx`** (`saved = isSaved(hcpId)` → same; toggle `"hcp_detail"`). The HCP profile page.
+
+Both exhibit **both** wrong-states:
+1. **Filled after untracking** — untrack removes the watchlist item but the relationship row persists, so the bookmark stays filled; the click reads as a no-op.
+2. **Filled for a status-only HCP** — any HCP given a status/note/follow-up/brief but never tracked shows a filled bookmark on load.
+
+**Not affected:** `CohortLedger` (stage 3 uses the new `isTracked`, watchlist-truth). `WatchlistsPage`/`TrackedHcpsList` (renders watchlist items directly — inherently correct). `HomePage` (no `isSaved` bookmark). `OpportunityCard`/`StrategicOpportunities` `isSaved` is an unrelated local prop (brief opportunities by index), a name collision only.
+
+**Live blast radius (2026-07-29):** 73 relationship rows, 34 watchlisted → **39 rows render a wrong-state filled bookmark** (38 `targeted`, 1 `engaged`), across **5 users** (the entire current userbase). Not a corner case — essentially every "targeted" HCP shows as bookmarked.
+
+**Fix (recommended fix-now — one line, low risk):** point `isSaved` at the watchlist set (`savedHcpIds.has(hcpId)`, same source as the ledger's `isTracked`); both `HCPCard` and `DetailScreen` then read correctly, no per-consumer change.
+
+**Caveat the fix must settle:** `savedHcpIds` is currently loaded from the **default watchlist only** (`getWatchlistItems(userId, defaultList.id)`), so it — and the ledger's `isTracked`, and the recommended fix — treat "tracked" as "in the default watchlist," missing HCPs held only in a non-default watchlist. Decide whether "tracked" means default-list or any-list before landing the fix; if any-list, load `savedHcpIds` from all watchlists.
