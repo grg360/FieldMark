@@ -48,6 +48,7 @@ import AssetsIndexPage from "./components/Assets/AssetsIndexPage";
 import AssetPage from "./components/Assets/AssetPage";
 import CohortLedger from "./components/Cohorts/CohortLedger";
 import HcpProfileBrief from "./components/Profile/HcpProfileBrief";
+import ProfileDispatch from "./components/Profile/ProfileDispatch";
 import LandscapeScreen from "./components/LandscapeScreen";
 import LandscapeRoute from "./components/LandscapeRoute";
 import InstitutionRoute from "./components/InstitutionRoute";
@@ -1381,7 +1382,7 @@ export default function App() {
           <Route path="/hcp/:id/publications" element={<HcpPublicationsPage />} />
           <Route path="/hcp/:id/publications-with/:partnerId" element={<HcpPairPublicationsPage />} />
           <Route path="/hcp/:id/positions" element={<HcpPositionsPage />} />
-          <Route path="/hcp/:id/brief" element={<HcpProfileBrief />} />
+          <Route path="/hcp/:id/brief" element={<ProfileDispatch />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
           <Route path="/hcp/:hcpId/brief" element={<BriefPage />} />
           <Route path="/hcp/:hcpId" element={<HCPDetailRoute />} />
