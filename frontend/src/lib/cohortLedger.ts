@@ -50,6 +50,9 @@ export interface CohortConfig {
   rpc: string; // source RPC
   notes: string[];
   traceFoot: string;
+  // Mobile (≤767): Design pairs score columns rather than dropping them. When present,
+  // each entry is one metric group shown as "a / b"; absent → columns show one-per-cell.
+  mobilePairs?: { label: string; keys: string[] }[];
 }
 
 // ── Cohort configurations (form from the Build Reference; hues confirmed against the
@@ -91,6 +94,11 @@ export const RS_CONFIG: CohortConfig = {
     { key: "netmom", label: "NET MOM", sub: "PCTILE", w: 74, kind: "pct" },
     { key: "scivis", label: "SCI VIS", sub: "PCTILE", w: 74, kind: "pct" },
     { key: "netvis", label: "NET VIS", sub: "PCTILE", w: 74, kind: "pct" },
+  ],
+  // four columns don't fit 390, so they pair by family rather than drop
+  mobilePairs: [
+    { label: "MOM", keys: ["scimom", "netmom"] },
+    { label: "VIS", keys: ["scivis", "netvis"] },
   ],
   bandResolution: 2.1,
   idxDecimals: 1,
@@ -200,6 +208,30 @@ export function cellDisplay(row: LedgerRow, col: ScoreCol, th: Record<string, nu
   const threshold = th[col.key];
   if (threshold !== null && v >= threshold) return { text: "—", kind: "dash" };
   return { text: String(Math.round(v)), kind: "num" };
+}
+
+export interface MobileCell {
+  label: string;
+  value: string;
+}
+
+/** Mobile score cells (≤767). Uses the SAME cellDisplay (so suppression em-dashes and
+ *  absent text carry over unchanged); columns pair by family where cfg.mobilePairs is
+ *  set (Rising Star: MOM = sci/net momentum, VIS = sci/net visibility) rather than being
+ *  dropped, else one cell per column. Nothing here is viewport-derived. */
+export function mobileCells(cfg: CohortConfig, row: LedgerRow, th: Record<string, number | null>): MobileCell[] {
+  if (cfg.mobilePairs) {
+    return cfg.mobilePairs.map((p) => ({
+      label: p.label,
+      value: p.keys
+        .map((k) => {
+          const col = cfg.cols.find((c) => c.key === k);
+          return col ? cellDisplay(row, col, th).text : "—";
+        })
+        .join(" / "),
+    }));
+  }
+  return cfg.cols.map((col) => ({ label: col.label, value: cellDisplay(row, col, th).text }));
 }
 
 // ── Head-only "treat as tied" bands (ceiling-proximity on the INDEX column) ──────

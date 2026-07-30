@@ -24,6 +24,7 @@ import {
   loadLedgerMeta,
   thresholds,
   cellDisplay,
+  mobileCells,
   layout,
   why,
   trace,
@@ -32,6 +33,20 @@ import {
   type LedgerRow,
   type Band,
 } from "../../lib/cohortLedger";
+
+// ≤767px is the mobile treatment (stage 4). Reactive to viewport changes / rotation.
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const on = () => setMobile(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return mobile;
+}
 
 // Frame palette (self-contained; the ledger's visual system per the Build Reference)
 const P = {
@@ -59,7 +74,10 @@ const mono = (s: number, w = 400) => ({ font: `${w} ${s}px 'IBM Plex Mono',ui-mo
 const serif = (s: number, w = 400) => ({ font: `${w} ${s}px 'Source Serif 4',Georgia,serif` } as const);
 
 // One tab per cohort. Selecting a tab swaps the whole config; the surface stays put.
-function CohortTabs({ active, onPick }: { active: string; onPick: (tag: string) => void }) {
+// At 390 the three full labels won't sit side by side, so each tab takes an equal third
+// of the width and shows the short tag (EST / RS / COM) — still all three, still one at
+// a time, no scroll or overflow.
+function CohortTabs({ active, onPick, isMobile }: { active: string; onPick: (tag: string) => void; isMobile: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "stretch", gap: 0, borderBottom: `1px solid ${P.lineMed}` }}>
       {COHORTS.map((c) => {
@@ -71,8 +89,10 @@ function CohortTabs({ active, onPick }: { active: string; onPick: (tag: string) 
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "11px 18px",
+              justifyContent: isMobile ? "center" : "flex-start",
+              flex: isMobile ? 1 : "0 0 auto",
+              gap: isMobile ? 6 : 8,
+              padding: isMobile ? "11px 6px" : "11px 18px",
               background: on ? P.card : "transparent",
               border: "none",
               borderRight: `1px solid ${P.line}`,
@@ -82,8 +102,8 @@ function CohortTabs({ active, onPick }: { active: string; onPick: (tag: string) 
             }}
           >
             <span style={{ width: 3, height: 12, background: c.markerColor, opacity: on ? 1 : 0.5 }} />
-            <span style={{ ...mono(10.5, on ? 600 : 500), letterSpacing: ".12em", color: on ? P.ink1 : P.ink5 }}>
-              {c.label.toUpperCase()}
+            <span style={{ ...mono(isMobile ? 11 : 10.5, on ? 600 : 500), letterSpacing: isMobile ? ".1em" : ".12em", color: on ? P.ink1 : P.ink5, whiteSpace: "nowrap" }}>
+              {isMobile ? c.tag : c.label.toUpperCase()}
             </span>
           </button>
         );
@@ -369,6 +389,135 @@ function Row({
   );
 }
 
+// ── Mobile row (≤767) — a stacked card. Rank leads, cohort marker on the left edge,
+// name + archetype, meta, summary, the score columns paired by family (suppression
+// preserved), and the four stage-3 controls inline and reachable: bookmark top-right,
+// state ladder + insight in a controls row, archetype chip by the name. The drawer
+// stacks why over trace. Nothing here recomputes suppression/bands — same th/layout.
+function MobileRow({
+  cfg,
+  row,
+  cohortTotal,
+  th,
+  open,
+  onToggle,
+}: {
+  cfg: CohortConfig;
+  row: LedgerRow;
+  cohortTotal: number;
+  th: Record<string, number | null>;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const tracked = isTracked(row.hcpId);
+  const status = getStatus(row.hcpId);
+  const insight = getInsightCount(row.hcpId);
+  const cells = mobileCells(cfg, row, th);
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
+  return (
+    <div style={{ position: "relative", borderBottom: `1px solid ${P.line}` }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: cfg.markerColor }} />
+      {open ? <div style={{ position: "absolute", left: 3, top: 0, bottom: 0, width: 2, background: P.amber }} /> : null}
+      {tracked ? <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 3, background: P.ink2 }} /> : null}
+
+      <div onClick={onToggle} style={{ padding: "13px 16px 14px 19px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 7 }}>
+        {/* rank + track/index */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={{ font: `600 34px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
+            <span style={{ ...mono(8.5, 500), color: "#A07B45", letterSpacing: ".12em" }}>US</span>
+            <span style={{ ...mono(8.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={(e) => { stop(e); void toggleSave(row.hcpId, "cohort_ledger"); }} title={tracked ? "Tracked — tap to untrack" : "Track"} style={{ background: "none", border: "none", padding: 4, cursor: "pointer", lineHeight: 0, minHeight: 0 }}>
+              <Bookmark on={tracked} />
+            </button>
+            <span style={{ ...mono(17, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{row.idx.toFixed(cfg.idxDecimals)}</span>
+          </div>
+        </div>
+
+        {/* name + archetype + meta */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ ...serif(16, 500), color: P.ink0 }}>{row.name}</span>
+          {row.archetype ? (
+            <span style={{ ...mono(8.5, 500), color: P.ink3, letterSpacing: ".08em", padding: "1px 5px", border: `1px solid ${P.lineStrong}`, borderRadius: 2 }}>{row.archetype.toUpperCase()}</span>
+          ) : null}
+        </div>
+        {row.chips.length ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+            {row.chips.map((chip, i) => (
+              <span key={i} style={{ ...mono(9.5), color: i === 0 ? P.ink4 : P.ink5, letterSpacing: ".02em" }}>{chip}</span>
+            ))}
+          </div>
+        ) : null}
+
+        {/* summary */}
+        {row.summary ? <div style={{ ...serif(13), lineHeight: 1.5, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div> : null}
+
+        {/* score columns — paired by family, suppression preserved */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 16px", paddingTop: 1 }}>
+          {cells.map((c) => (
+            <span key={c.label} style={{ display: "inline-flex", alignItems: "baseline", gap: 5 }}>
+              <span style={{ ...mono(8.5, 500), color: P.ink6, letterSpacing: ".12em" }}>{c.label}</span>
+              <span style={{ ...mono(12), color: c.value === "—" ? P.dash : P.ink1, fontVariantNumeric: "tabular-nums" }}>{c.value}</span>
+            </span>
+          ))}
+        </div>
+
+        {/* stage-3 controls row: state ladder (tap → menu) + insight */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, paddingTop: 2, position: "relative" }}>
+          <button onClick={(e) => { stop(e); setMenuOpen((o) => !o); }} title={STATUS_LABEL[status]} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "2px 0", cursor: "pointer", minHeight: 0 }}>
+            <StateLadder status={status} />
+            <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>{STATUS_LABEL[status].toUpperCase()}</span>
+          </button>
+          {insight > 0 ? (
+            <span style={{ ...mono(9), color: P.ink4, letterSpacing: ".08em" }}>
+              INSIGHT <span style={{ color: P.ink2 }}>{insight}</span>
+            </span>
+          ) : null}
+          {menuOpen ? (
+            <>
+              <div onClick={(e) => { stop(e); setMenuOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div onClick={stop} style={{ position: "absolute", top: 26, left: 0, zIndex: 41, background: "#0C0E11", border: `1px solid ${P.lineStrong}`, boxShadow: "0 8px 24px rgba(0,0,0,.5)", minWidth: 190 }}>
+                {STATUS_ORDER.map((s) => (
+                  <button key={s} onClick={(e) => { stop(e); setMenuOpen(false); if (s !== status) void setStatus(row.hcpId, s, "cohort_ledger"); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "9px 11px", background: s === status ? P.rowHover : "transparent", border: "none", borderBottom: `1px solid ${P.line}`, cursor: "pointer", textAlign: "left" }}>
+                    <StateLadder status={s} />
+                    <span style={{ ...mono(10.5), color: s === status ? P.ink1 : P.ink4, letterSpacing: ".04em" }}>{STATUS_LABEL[s]}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {/* drawer — why over trace, stacked */}
+      {open ? (
+        <div style={{ padding: "4px 16px 18px 19px", background: P.drawer, borderTop: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 10 }}>
+            <div style={{ ...mono(8.5, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
+            <div style={{ ...serif(13), lineHeight: 1.55, color: "#CDD1D4", textWrap: "pretty" }}>{why(cfg, row, th)}</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ ...mono(8.5, 500), letterSpacing: ".18em", color: P.ink5, paddingBottom: 7 }}>TRACE</div>
+            {trace(cfg, row, cohortTotal).map((s, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "6px 0", borderTop: `1px solid ${P.line}` }}>
+                <span style={{ flexShrink: 0, ...mono(9), letterSpacing: ".08em", color: P.ink5, width: 118 }}>{s.label}</span>
+                <span style={{ flex: 1, ...mono(10.5), color: P.ink2 }}>{s.value}</span>
+                <Link to={`/hcp/${row.hcpId}`} style={{ ...mono(9), letterSpacing: ".08em", flexShrink: 0, color: "#7FB3BB", textDecoration: "none", borderBottom: "1px solid rgba(127,179,187,.35)" }}>OPEN ↗</Link>
+              </div>
+            ))}
+            <div style={{ ...mono(9), lineHeight: 1.55, color: "#767C81", letterSpacing: ".04em", paddingTop: 9, borderTop: `1px solid ${P.line}`, marginTop: 2 }}>{cfg.traceFoot}</div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BandHeader({ band }: { band: Band }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 20px 7px 23px", background: P.band, borderBottom: `1px solid ${P.line}` }}>
@@ -391,6 +540,7 @@ function VirtualTail({
   open,
   onToggle,
   onNearEnd,
+  isMobile,
 }: {
   cfg: CohortConfig;
   rows: LedgerRow[];
@@ -399,9 +549,11 @@ function VirtualTail({
   open: string | null;
   onToggle: (id: string) => void;
   onNearEnd: () => void;
+  isMobile: boolean;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+  const RowComp = isMobile ? MobileRow : Row; // identical props; mobile cards are taller
 
   // distance from the document top to the top of the list, so the window virtualiser
   // places rows correctly beneath the (non-virtualised) head. Re-measured on resize.
@@ -416,11 +568,16 @@ function VirtualTail({
 
   const virtualizer = useWindowVirtualizer({
     count: rows.length,
-    estimateSize: () => 108,
+    estimateSize: () => (isMobile ? 210 : 108),
     overscan: 8,
     scrollMargin,
   });
   const items = virtualizer.getVirtualItems();
+
+  // re-measure when the layout mode flips (row heights change wholesale)
+  useLayoutEffect(() => {
+    virtualizer.measure();
+  }, [isMobile, virtualizer]);
 
   // load the next page when the last mounted row is within 8 of the end
   const last = items[items.length - 1];
@@ -440,7 +597,7 @@ function VirtualTail({
             ref={virtualizer.measureElement}
             style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start - scrollMargin}px)` }}
           >
-            <Row cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} />
+            <RowComp cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} />
           </div>
         );
       })}
@@ -511,10 +668,12 @@ export default function CohortLedger() {
   const metaLine = meta ? cfg.meta.replace("{total}", cohortTotal.toLocaleString()) : "";
 
   const toggle = useCallback((id: string) => setOpen((o) => (o === id ? null : id)), []);
+  const isMobile = useIsMobile();
+  const RowComp = isMobile ? MobileRow : Row;
 
   const renderRow = (row: LedgerRow) => {
     const id = `${cfg.tag}-${row.rank}`;
-    return <Row key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} />;
+    return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} />;
   };
 
   return (
@@ -524,19 +683,20 @@ export default function CohortLedger() {
         <div style={{ padding: "24px 20px 96px", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
             {/* cohort toggle */}
-            <CohortTabs active={tag} onPick={setTag} />
+            <CohortTabs active={tag} onPick={setTag} isMobile={isMobile} />
 
-            {/* header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
+            {/* header — title + meta stack on mobile so the long meta line doesn't crush */}
+            <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 6 : 0, justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
               <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <span style={{ width: 3, height: 14, background: cfg.markerColor }} />
                 <span style={{ ...mono(9.5, 600), color: cfg.markerColor, letterSpacing: ".14em" }}>{cfg.tag}</span>
                 <span style={{ ...mono(13, 500), color: P.ink1, letterSpacing: ".02em" }}>{cfg.title}</span>
               </span>
-              <span style={{ ...mono(10.5), color: P.ink5, letterSpacing: ".1em" }}>{metaLine}</span>
+              <span style={{ ...mono(10.5), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
             </div>
 
-            <ColumnHeads cfg={cfg} />
+            {/* column heads are a desktop device; on mobile each card carries its own labels */}
+            {isMobile ? null : <ColumnHeads cfg={cfg} />}
 
             {loading ? (
               <div style={{ padding: "28px 23px", ...mono(11), color: P.ink5 }}>Loading ledger…</div>
@@ -569,6 +729,7 @@ export default function CohortLedger() {
                       open={open}
                       onToggle={toggle}
                       onNearEnd={loadMore}
+                      isMobile={isMobile}
                     />
                     {hasMore ? (
                       <div style={{ padding: "12px 23px", ...mono(10), color: P.ink5, letterSpacing: ".08em", borderTop: `1px solid ${P.line}` }}>
