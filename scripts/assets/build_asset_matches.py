@@ -43,6 +43,39 @@ def code_regex(code: str) -> str:
     return r"(^|[^a-z0-9])" + re.escape(code.lower()) + r"([^a-z0-9]|$)"
 
 
+def containment_map(assets: list) -> tuple[list, dict]:
+    """Detect substring containment among name+brand terms.
+
+    names/brands are matched by UNANCHORED substring, so a term that is a substring of a
+    longer roster term over-counts (e.g. 'paclitaxel' matches inside 'nab-paclitaxel').
+    Word-boundary regex does NOT help — a hyphen satisfies the boundary, so
+    '...-paclitaxel' still matches. The fix is to require the shorter term to appear
+    INDEPENDENTLY of every term that contains it (see the matcher below).
+
+    Returns:
+      pairs    -- [(short_term, short_generic, long_term, long_generic), ...] for logging
+      contains -- {short_term_lower: [container_term_lower, ...] longest-first} for the matcher
+
+    Cross-asset only: a term contained in a longer term of the SAME asset never inflates a
+    different drug (the longer term already yields the edge and (pub, asset) is deduped), so
+    it is left untouched — this keeps the fix to exactly the affected pair.
+    """
+    terms: list[tuple[str, str]] = []  # (generic, term_lower)
+    for a in assets:
+        m = a.get("match", {})
+        for t in m.get("names", []) + m.get("brands", []):
+            terms.append((a["generic"], t.lower()))
+    pairs: list[tuple[str, str, str, str]] = []
+    contains: dict[str, set] = {}
+    for gi, ti in terms:
+        for gj, tj in terms:
+            if ti != tj and gi != gj and ti in tj:
+                pairs.append((ti, gi, tj, gj))
+                contains.setdefault(ti, set()).add(tj)
+    # longest container first so nested containers don't fragment one another on removal
+    return pairs, {k: sorted(v, key=len, reverse=True) for k, v in contains.items()}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="Report counts, write nothing.")
@@ -50,6 +83,17 @@ def main() -> int:
 
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     assets = config["assets"]
+
+    # Containment guard — runs every build so new over-counting pairs surface LOUDLY when the
+    # roster grows, rather than silently inflating a shorter term. Feeds `contained_by` to the
+    # matcher below so a contained term only counts where it appears independently.
+    containment, contained_by = containment_map(assets)
+    print(f"[containment] {len(containment)} substring-containment pair(s) in the name/brand roster:")
+    for st, sg, lt, lg in containment:
+        print(f"[containment]   '{st}' ({sg}) is contained in '{lt}' ({lg}) "
+              f"-> '{sg}' counts only where '{st}' appears independently of '{lt}'")
+    if not containment:
+        print("[containment]   none")
 
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
@@ -96,17 +140,35 @@ def main() -> int:
             asset_edges = 0
             for via, term, is_code in plan:
                 if is_code:
-                    where = "txt ~ %s"; param = code_regex(term)
+                    # development codes: word-boundary regex (unchanged)
+                    where = "txt ~ %s"; where_params = [code_regex(term)]
                 else:
-                    where = "txt LIKE %s"; param = f"%{term.lower()}%"
+                    tl = term.lower()
+                    containers = contained_by.get(tl, [])
+                    if containers:
+                        # Substring-containment fix: this name/brand term is a substring of one
+                        # or more longer roster terms. Strip every container from the text
+                        # first (longest-first), then require the term to still appear — so it
+                        # must occur INDEPENDENTLY of its containers. This is the exact logic
+                        # the audit used to measure the 226-edge over-count.
+                        expr = "txt"
+                        where_params = []
+                        for c in containers:
+                            expr = f"replace({expr}, %s, '')"
+                            where_params.append(c)
+                        where = f"{expr} LIKE %s"
+                        where_params.append(f"%{tl}%")
+                    else:
+                        # unchanged: unanchored substring for uncontained names/brands
+                        where = "txt LIKE %s"; where_params = [f"%{tl}%"]
                 if args.dry_run:
-                    cur.execute(f"SELECT count(*) FROM corpus WHERE {where}", (param,))
+                    cur.execute(f"SELECT count(*) FROM corpus WHERE {where}", tuple(where_params))
                     continue
                 cur.execute(
                     f"""INSERT INTO staging (publication_id, asset_generic, matched_via, match_term)
                         SELECT id, %s, %s, %s FROM corpus WHERE {where}
                         ON CONFLICT (publication_id, asset_generic) DO NOTHING""",
-                    (gen, via, term, param),
+                    (gen, via, term, *where_params),
                 )
                 asset_edges += cur.rowcount
             total_edges += asset_edges
