@@ -1,5 +1,66 @@
 # Known issues
 
+## Asset matcher — unhyphenated orthographic variants evade containment stripping
+
+**Status:** flagged 2026-07-31, not fixed. Low severity for NSCLC. Residual from the paclitaxel/nab-paclitaxel containment fix in `build_asset_matches.py`.
+
+**The problem.** The containment fix strips containing terms exactly as they appear in the roster (`nab-paclitaxel`, `albumin-bound paclitaxel`) before testing whether the shorter term (`paclitaxel`) still appears independently. Abstracts also render the drug unhyphenated as `nab paclitaxel` (space, not hyphen), which is not one of the stripped roster terms — so `paclitaxel` survives the removal as apparently-standalone and still counts toward Paclitaxel.
+
+**Scope.** Residual inflation is unquantified but expected to be small for NSCLC, where the hyphenated forms dominate the corpus. Low severity here.
+
+**Why it rises for breast.** This climbs in priority for the breast-cancer roster, where taxane and trastuzumab-family naming variants are substantially messier and the containment guard will fire more often. Each unstripped orthographic variant (spacing, hyphenation) is a fresh bleed-through path, so the gap widens as the roster grows into that territory.
+
+## Asset matcher — Paclitaxel = 1,144 not yet verified from a native rebuild
+
+**Status:** verification pending 2026-07-31, not a defect. Confirm on the next full rebuild of `asset_publication_v1`.
+
+**The gap.** The current live Paclitaxel value (1,144) was produced by a targeted DELETE of 226 spurious edges, not by the fixed matcher running end to end. The pre-fix audit and the post-fix simulation shared the same predicate construction (strip `nab-paclitaxel` / `albumin-bound paclitaxel`, then require standalone `paclitaxel` or `taxol`), so they agreed *by construction* rather than independently.
+
+**To confirm.** On the next full rebuild of `asset_publication_v1`, confirm Paclitaxel returns 1,144 natively, with Nab-paclitaxel 318, Osimertinib 3,310, and Pembrolizumab 2,978 unchanged. Until then, treat 1,144 as verified-by-DELETE, not verified-by-rebuild.
+
+## `score_ranks_v2.cohort` is not a cohort — it's three independent gates (platform-wide, deferred)
+
+**Status:** flagged 2026-07-31, NOT built. Separate from the Telescope rising-layer re-point (that fix is local to `export_telescope_data.py` and does not touch this). This is the platform-wide root cause.
+
+**The problem.** `hcp_score_ranks_v2.cohort` (values `rising`/`established`/`community`) is written by three *independent* scoring scripts keyed off *different* criteria, so the three "cohorts" are neither mutually exclusive nor exhaustive:
+
+- **rising** — `scoring_pipeline.py` gates purely on a career-age band (`career_age ∈ [3,10]` with non-null first-pub-year and TA membership; `scripts/score/scoring_pipeline.py:891–923`). It never reads the cohort label. This is a DEMOGRAPHIC gate — any mid-career HCP with ≥1 TA pub — so it swells to ~234k rows / ~72,557 global / ~10,497 US "rising," with meaningless global ranks (e.g. Joao V. Alessi #23,852). Quality only affects rank/tier, not membership.
+- **established** — `established_scoring.py` reads the persisted label `hcps_v2.cohort_classification='established'`.
+- **community** — `community_scoring.py` reads `hcps_v2.cohort_classification='community'` (positive gate: US + NPI + payments/Medicare footprint + not AMC-linked).
+
+Because rising ignores the label while established/community read it, the same US mid-career publishing clinician can land in BOTH `rising` and `community`. HCPs with null/garbage first-pub-year, or career_age <3 / >10 but unlabeled, fall through into NO cohort (implicit "unclassified", silently dropped).
+
+**The fix (deferred, platform-wide).** `score_ranks.cohort` should be derived from the POSITIVE `cohort_classification` labels (`established` / `rising_star` / `community`) with an explicit `uncategorized` value, enforced mutually exclusive and exhaustive — every HCP forced into exactly one, none silently dropped. This touches every cohort surface, not just Telescope; scope and sequence it deliberately.
+
+## Rising-star table graveyard — prune the demographic tables after confirming no readers (deferred)
+
+**Status:** flagged 2026-07-31, NOT built. Audit-then-deprecate.
+
+**The landscape:**
+- `hcp_score_ranks_v2` (cohort='rising') / `..._deduped_v2` — the ~234k-row career-age DEMOGRAPHIC gate above. NOT authoritative rising-star signal.
+- `hcp_rising_star_ranks_v3` — **authoritative NSCLC** rising star: trajectory-based (Scientific/Network Momentum + Visibility → composite), gated on `cohort_classification='rising_star'`, US-scoped via `us_rank`. 1,588 rows (209 US). Writer: `rising_star_scoring.py`.
+- `hcp_rising_composite_v1` — **authoritative AD** rising star (2-axis: Scientific Emergence + Network Influence). 5,719 rows / 3,052 HCPs. Writer: `rising_composite_scoring.py`.
+
+**The move.** After the Telescope re-point lands, grep every reader (frontend RPCs, `api.ts`, other exports/scripts) of `hcp_score_ranks_v2` cohort='rising' and `..._deduped_v2`. Once confirmed no live surface depends on the demographic rising slice, mark v2/deduped_v2 rising for deprecation. v3 (NSCLC) and composite_v1 (AD) are the keepers. (Note: `score_ranks_v2` established/community slices and the established/community readers are a separate question — this note is scoped to the rising slice.)
+
+## Telescope focus data — split to a lazily-loaded file if mobile bundle feels heavy (deferred)
+
+**Status:** deferred optimization, not built (2026-07-30). Flagged when the focus enrichment landed.
+
+**Context.** `export_telescope_data.py` now bakes each node's real top-5 collaborators (`focus_collaborators`) into `telescope_nsclc_nodes.json` for the focus view — this took the NSCLC nodes file from ~367 KB to ~1.9 MB (top-5, no per-collaborator institution; institution is recovered by hcp_id lookup on focus). Overview (nodes + edges) is unchanged; the focus data is additive and imported statically, so every client downloads it up front.
+
+**The deferred move.** If the mobile bundle feels heavy, split the focus data into a SEPARATE JSON keyed by node id, lazily loaded when a node is focused. The overview file drops back to ~367 KB (light first paint); focus loads on demand. Not needed yet — 1.9 MB static is acceptable for now — but this is the escape hatch, and the export already computes the data in a shape that's trivial to emit as a side file keyed by `id`.
+
+## #1 scoring enhancement — REGIMEN-AWARE community scoring (do not build yet)
+
+**Status:** specced by oncology-advisor review 2026-07-30; deliberately deferred to post-launch. The flat drug-set signal ships first.
+
+**The insight.** Isolated HCPCS drug codes are individually weak NSCLC signals — the advisor confirmed all the curated agents are NSCLC-relevant but cross-indication (claims carry no diagnosis). CO-ADMINISTRATION patterns are strong: pemetrexed + platinum + pembrolizumab together is near-diagnostic for NSCLC practice; carboplatin alone is nearly uninformative. Same-provider, same-day or tightly-clustered drug combinations detected from claims would substantially outperform the flat set that drives the 2026-07 re-score.
+
+**The build (post-launch):** co-administration detection over `hcp_hcpcs_detail` (or richer claim-line data if per-day granularity is needed — the current PUF is annual per provider×code, so true same-day clustering may require the claims-line files; scope this first), a regimen→NSCLC-specificity weighting, and a scored regimen signal replacing/augmenting the flat spend+volume blend.
+
+**Spec artifact:** the advisor's full regimen→signal-strength table is NOT yet in the repo — only the two anchor examples above were relayed. Obtain the table and commit it (e.g. `docs/nsclc_regimen_signal_table.md`) before building; the examples alone are not a spec.
+
 ## Drug Intelligence — INTERMITTENT density tier conflates rising and declining assets
 
 **Status:** flagged, not built. Needs a proper design pass (touches the index legend, the row tooltip, and probably the asset detail page). Do NOT bolt onto the density threshold fix.
@@ -66,6 +127,38 @@ Both exhibit **both** wrong-states:
 **Fix (recommended fix-now — one line, low risk):** point `isSaved` at the watchlist set (`savedHcpIds.has(hcpId)`, same source as the ledger's `isTracked`); both `HCPCard` and `DetailScreen` then read correctly, no per-consumer change.
 
 **Caveat the fix must settle:** `savedHcpIds` is currently loaded from the **default watchlist only** (`getWatchlistItems(userId, defaultList.id)`), so it — and the ledger's `isTracked`, and the recommended fix — treat "tracked" as "in the default watchlist," missing HCPs held only in a non-default watchlist. Decide whether "tracked" means default-list or any-list before landing the fix; if any-list, load `savedHcpIds` from all watchlists.
+
+## Community scoring — normalized_score is per-TA (cross-TA incomparable) and the snapshot is stale
+
+**Status:** flagged, not fixed. Report only (community score reconciliation, 2026-07-30).
+
+**The property (by design, but a standing misreading trap).** `hcp_community_scores_v2.normalized_score` is a min-max rescale of `composite_score` computed **per therapeutic area** (`community_scoring.py:normalize_0_100`, applied per `ta_id`). Exactly one row per TA reads 100 — the TA's composite max. Verified 2026-07-30: the table holds exactly 3 rows at normalized = 100, one per TA: Guy Young (Rare Disease, composite 77.02), Maen Hussein (NSCLC, composite 67.52), David Dies (Hepatology, composite 67.50). Within a TA, normalized and composite produce **identical ordering** (monotonic transform); across TAs, neither normalized NOR composite is comparable (each TA's inputs are min-max normalized within that TA before weighting). A cross-TA query like `where normalized_score = 100` returns multiple rows and reads like duplicate cohort leaders — it is not; it is one leader per TA. Any future surface that mixes TAs must not rank or compare on either column.
+
+**The real defect: staleness.** The entire community scoring snapshot was materialized `scored_at 2026-05-27` (run `3e626506-8894-46ec-a2fb-5b1e6f61341d`) — it pre-dates the July Open Payments and profile work. A rescore (`scripts/score/community_scoring.py`) is owed; ranks derive live from the materialized columns, so the rescore alone refreshes every surface.
+
+**Display note (2026-07-30):** all three community surfaces (card, ledger, profile) render `normalized_score`, reconciled 2026-07-30. Hussein reads 100/#1 on all three — correct within NSCLC on both scales (his composite 67.52 leads Divers 63.47). Whether to display raw composite instead (an absolute 0–100-bounded scale where the NSCLC top is ~67.5) is a product decision; it would change the numeral on every community surface but not any ordering.
+
+## Paid-vs-administered overlay — real alignment needs the full claim set (data task)
+
+**Status:** flagged, not built. The practice-first profile ships the honest reduced version (report, 2026-07-30).
+
+**The limit.** The practice-first community profile's PAID AROUND vs ADMINISTERED overlay compares Open Payments products against the administered record — but the administered side is only `hcp_medicare_summary_v2.top_hcpcs_codes` (**10 codes**, rank order, no per-code volumes) out of ~130 distinct codes billed, and HCPCS→agent-name mapping via `ta_hcpcs_codes` is **32% complete** across the top-200 cohort's held codes (the reference is NSCLC-scoped; supportive-care/NOC codes don't resolve). So "ALIGNED: 0" inside that window is an artifact of incomplete data on both sides — an alignment could exist at code #15 and never show. Per-code beneficiaries/services/dollars are also not retained, so alignment cards cannot carry magnitudes.
+
+**What ships until then (data-gated):** buckets render only when the current HCP's data populates them — 1, 2, or 3 buckets per HCP, never an empty bucket, a "0", or an apology. The ROUTE SPLIT (oral · Part-D-invisible vs injectable · no-claim vs route-unknown) is computed from the paid-around side alone via `config/assets.json` + `config/drug_routes.json` — complete data, genuinely valid. ALIGNED renders only on a real non-empty intersection with the named top codes. Meaningful absences (no engagement record at all, no Part B claims) keep their honest states; neutral data gaps drop silently.
+
+**Upgrade path — the data is ALREADY ON DISK, free (2026-07-30):** `Medicare/medicare_provider_service_20{21,22,23}.parquet` (~375MB each, downloaded May 6) hold the FULL per-NPI × per-HCPCS claim detail — `hcpcs_code`, `hcpcs_description`, `hcpcs_drug_indicator`, `place_of_service`, `total_beneficiaries`, `total_services`, payment averages. This is not expensive claims data as previously assumed; the next data task is a deliberate per-HCP HCPCS-detail ingest joined by NPI (all ~130 codes with volumes), which unlocks real alignment + the frame's magnitude bars as drawn.
+
+**Step 1 DONE (2026-07-30):** `hcpcs_descriptors` lookup table built from the three parquets — 6,353 distinct codes, CMS official descriptions, most-recent-year-wins dedup (5,661 from 2023, 409 from 2022, 283 from 2021). Join format verified against `top_hcpcs_codes` (5-char uppercase, exact equality, no normalization needed); all 10 of Hussein's top codes resolve (vs 3/10 via the NSCLC-scoped `ta_hcpcs_codes`). DDL+grants in `migrations/2026_07_30_hcpcs_descriptors.sql`. NOT yet wired into any profile surface — profile join is a separate brief.
+
+## hcp_medicare_summary_v2 — two semantics defects, exposed by the claims-detail cross-check
+
+**Status:** flagged, not fixed. Found 2026-07-30 while verifying `hcp_hcpcs_detail` against the summary (Hussein reconstruction, exact-match proof).
+
+**Defect 1 — `total_medicare_payment_3yr` is not "Medicare paid."** The stored value reconstructs EXACTLY (ratio 1.000) as `Σ(avg_medicare_payment × total_beneficiaries)` — a per-SERVICE average multiplied by patient count, which is not a total of anything. True paid (`Σ(avg × total_services)`, now stored as `hcp_hcpcs_detail.total_paid_est`) is **$12.16M** for Hussein over 3 years vs the summary's **$1.28M** — understated ~9.5×. Every surface rendering "Medicare paid" from the summary (practice-first header + Scale & Setting) shows the broken figure. This is the per-service-average-as-total trap, already committed by the legacy aggregation.
+
+**Defect 2 — `beneficiaries_2021/22/23` are per-code sums, not unique patients.** Each year's stored count equals `Σ tot_benes` across that year's code rows EXACTLY (all three years) — a patient counted once per code billed. So the yearly numbers are beneficiary-CODE instances, the "UNIQUE BENEFICIARIES PER YEAR" chart label is false, and even "beneficiary-years" understates the duplication. `total_beneficiaries_3yr_unique_est` (20,879 for Hussein; derivation unverified) is the only person-scale figure. The −57% slope survives as a RELATIVE signal (identical semantics each year), but the axis labels and "patient panel" figures need rework in the next profile brief.
+
+**Remediation (not now):** recompute the summary from `hcp_hcpcs_detail` (true paid = Σ total_paid_est; label yearly counts as code-summed instances or derive honest uniques where possible), then re-label the practice-first Practice Reality panel accordingly. Do not fix display-side only — the summary table is the defect.
 
 ## Field-intel & data-issue submissions persist nothing (both HCP surfaces)
 
