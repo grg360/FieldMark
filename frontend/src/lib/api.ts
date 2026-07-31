@@ -1368,11 +1368,24 @@ export async function getVerifiedDOLs(
       return { data: [], error: null };
     }
 
+    // Gate rationale: all 151 high-confidence dol_matches_v2 rows were reviewed
+    // by hand on 2026-07-31 against the physician records they claim. 7 were
+    // confirmed misattributions (4.6%) and 4 more held as uncertain. The signal
+    // that separated right from wrong was the institution token, not name
+    // similarity: every misattribution matched on a GENERIC token (medical,
+    // health, hospital, technology, cancer, national), while every
+    // distinctive-token match (danafarber, anderson, juntendo, royal marsden)
+    // was correct. display_name_similarity is a poor discriminator because
+    // credential suffixes (", MD, FASCO") depress it — 0.65 correct vs 0.83
+    // wrong in this dataset. 140 rows are now verified_by_human = true and
+    // render; 11 remain held. The panel gates on human verification, not on
+    // score.
     const { data: matchRows, error: matchError } = await supabase
       .from("dol_matches_v2")
       .select("hcp_id, social_user_id, match_confidence")
       .in("hcp_id", filteredHcpIds)
-      .eq("match_confidence", "high");
+      .eq("match_confidence", "high")
+      .eq("verified_by_human", true);
 
     if (matchError) {
       return { data: null, error: matchError.message };
