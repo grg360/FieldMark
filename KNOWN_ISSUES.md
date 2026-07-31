@@ -172,3 +172,31 @@ Both exhibit **both** wrong-states:
 **Impact.** Across the whole product, MSLs submitting field-intel reviews (Data-matches-field-reality / Engagement / Credibility / Momentum) and data-issue reports are **saving nothing** — the aggregate FI chips therefore stay UNRATED forever, and reported data issues are lost. The controls invite contribution the system cannot retain. (Note capture via `FieldInsights` → `createNote` → `msl_hcp_notes` DOES persist — this gap is specifically the field-intel validation and the issue/context/opt-out flows.)
 
 **Needs a persistence decision (not now):** a write path for field-intel reviews and data-issue/opt-out/context submissions — tables with write grants (or an RPC), an aggregation model for the FI chips (how N reviews roll up to a rating), and identity handling ("contributor UUID only"). When built, **both** the new profile's `ProfileSecondaryControls` and the retained (sunset) DetailScreen logic adopt the same path. Until then the honest toasts stand; do not present these as working submissions.
+
+## Established & community snapshots — RLS enabled with no policy, anon reads return zero rows
+
+**Status:** flagged 2026-07-31, not fixed. Not a defect today — no surface reads either table — but any future established or community movement band blocks on this.
+
+**The problem.** `hcp_established_snapshots` and `hcp_community_snapshots` have RLS enabled with **no policy**, so anon reads return zero rows. Any surface built against them (e.g. an established/community analogue of Home's WHAT MOVED band) would silently render empty rather than error.
+
+**The fix (when a reader exists).** Mirrors what was applied to `hcp_rising_star_snapshots` on 2026-07-31: public-read SELECT policy + `GRANT SELECT` to anon/authenticated + `NOTIFY pgrst, 'reload schema'`.
+
+## getTrackedHcpsInTerritory does not filter by territory despite its name
+
+**Status:** flagged 2026-07-31, not fixed. Shipped behavior.
+
+**The problem.** `getTrackedHcpsInTerritory` (`frontend/src/lib/home.ts:1211`) reads `territory_states` only as a guard (empty → return `[]`), then returns **all** of the user's relationship HCPs with no state filter applied. Callers expecting territory scoping will silently get national results.
+
+## Home portfolio chips — cohort read from the stale hcps_v2.cohort_classification column
+
+**Status:** flagged 2026-07-31, not fixed. Visible on Home.
+
+**The problem.** The portfolio chips read cohort from `hcps_v2.cohort_classification`, the stale column that is ~73.6% NULL, so some chips render uncohorted (gray, no color). The current values live in `hcp_cohort_classification_v2`. Same class of defect as the community score reading a stale snapshot: a surface bound to a column that is no longer maintained.
+
+## Rising stars — two US-ranked HCPs have NULL state; one institution mis-resolved
+
+**Status:** flagged 2026-07-31, not fixed. Report only.
+
+**The problem.** Two US-ranked rising-star HCPs have NULL state — Hatim Husain (UCSD) and Kellie N. Smith — and are therefore **invisible to any territory filter** rather than misplaced by it: no state-scoped band or coverage stat can ever surface them.
+
+**Related mis-resolution.** Smith's `institution_canonical` resolves to "Bloomberg (United States)", an apparent OpenAlex/ROR mis-resolution — likely the Bloomberg~Kimmel Institute at Johns Hopkins. She renders at US rank 77 with that institution label.
