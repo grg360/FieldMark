@@ -1,14 +1,16 @@
 // Home — "intelligence-led, ledger lens" redesign.
 // Layout authority: docs/design/Home Redesign.dc.html (project 3c3a6c73), with the binding
 // FRAME EXCEPTIONS: NavBar is the shipped 6-item bar via AppLayout (the frame's own top bar
-// is ignored); only four links are wired (/cohorts/ledger, /me/follow-ups, /institutions/:ta,
-// /me/insights); every other affordance is non-interactive; the session date is the live
-// clock. DATA RULES: WHAT MOVED = 8-Jun snapshot vs current ranks_v3 ("compared against 8 Jun
+// is ignored); wired links are /cohorts/ledger, /me/follow-ups, /institutions/:ta,
+// /me/insights, and portfolio chips → /hcp/:id (the exception covers affordances with NO
+// route, e.g. Skyview / All briefs); every other affordance is non-interactive; the session
+// date is the live clock. DATA RULES: WHAT MOVED = 8-Jun snapshot vs current ranks_v3 ("compared against 8 Jun
 // 2026"); no dispersion/tied/confidence anywhere; follow-ups ordered by priority then due;
 // insight bodies rendered VERBATIM; tracked = getTrackedHcpIds; institutions = national pins.
 // Where the frame implies data that does not exist (per-institution "tracked" count,
-// per-HCP portfolio ranks, per-HCP "why now" line, publications-90d / trials / peers), it is
-// omitted rather than proxied.
+// per-HCP "why now" line, publications-90d / trials / peers), it is omitted rather than
+// proxied. Portfolio chips (name + cohort + us_rank badge) ARE sourceable via
+// getTrackedHcpsInTerritory — the shipped home's tracking-chip reader.
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -30,12 +32,14 @@ import {
   getRecentActivityForUser,
   getTerritoryCoverageStats,
   getTerritoryProfile,
+  getTrackedHcpsInTerritory,
   type ActivityEvent,
   type BriefRef,
   type NextActionWithHcp,
   type OpenFollowUpStats,
   type TerritoryCoverageStats,
   type TerritoryProfile,
+  type TrackedHcpChip,
 } from "../../lib/home";
 import AppLayout from "../AppLayout";
 
@@ -78,6 +82,7 @@ export default function HomePage() {
   const [briefs, setBriefs] = useState<BriefRef[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [moved, setMoved] = useState<WhatMoved | null>(null);
+  const [portfolioChips, setPortfolioChips] = useState<TrackedHcpChip[]>([]);
   const [institutions, setInstitutions] = useState<{ name: string; hcp: number | null; rising: number | null }[]>([]);
 
   useEffect(() => {
@@ -102,7 +107,7 @@ export default function HomePage() {
         setTaSlug(indicationSlug || "nsclc");
         setTA(parentSlug, indicationSlug);
 
-        const [statsD, trackedIds, coverageD, territoryD, actionsD, overdueD, insightsD, briefsD, activityD, pinsD] = await Promise.all([
+        const [statsD, trackedIds, coverageD, territoryD, actionsD, overdueD, insightsD, briefsD, activityD, pinsD, chipsD] = await Promise.all([
           getOpenFollowUpStats(user.id),
           getTrackedHcpIds(user.id),
           getTerritoryCoverageStats(user.id, resolvedTaId),
@@ -113,11 +118,15 @@ export default function HomePage() {
           getRecentBriefsForUser(user.id, 5),
           getRecentActivityForUser(user.id, 6),
           getPinnedInstitutionsForUser(user.id),
+          getTrackedHcpsInTerritory(user.id),
         ]);
         if (cancelled) return;
 
         setStats(statsD);
         setTrackedCount(trackedIds.size);
+        // chips scoped to the SAME population as the count: getTrackedHcpIds (watchlist
+        // membership) — getTrackedHcpsInTerritory alone is looser (any relationship row).
+        setPortfolioChips(chipsD.filter((c) => trackedIds.has(c.hcp_id)));
         setCoverage(coverageD);
         setTerritory(territoryD);
         setNextActions(actionsD);
@@ -275,53 +284,33 @@ export default function HomePage() {
                 </div>
               </section>
 
-              {/* THE RECORD — desktop (insights | briefs + relationship activity) */}
+              {/* THE RECORD — desktop. Header stays over the insights (the provenance note
+                  belongs to the verbatim notes); briefs + relationship activity moved to the
+                  rail below YOUR PORTFOLIO, where they carry their own RowCap headers like
+                  every other rail block. */}
               {isDesktop ? (
                 <section>
                   <SectionHead label="THE RECORD" note="MSL-CAPTURED · YOUR TEAM ONLY" />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22 }}>
-                    {/* insights (verbatim) */}
-                    <div>
-                      <RowCap left="RECENT INSIGHTS" right={`${insights.length} LOGGED`} />
-                      <div style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-                        {insights.slice(0, 3).map((n, i) => (
-                          <div key={n.id}>
-                            {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 20px" }} /> : null}
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 20px" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                                {n.interaction_type ? <span style={{ ...mono(9, 400, MID, ".14em"), border: `1px solid ${DIM2}`, padding: "4px 6px" }}>{n.interaction_type.replace(/_/g, " ").toUpperCase()}</span> : null}
-                                <span style={serif(16, 400, INK2)}>{`${n.hcp_first_name ?? ""} ${n.hcp_last_name ?? ""}`.trim()}</span>
-                                <span style={mono(10, 400, DIM)}>{fmtDue(n.occurred_at)}</span>
-                              </div>
-                              {/* body VERBATIM from msl_hcp_notes (test rows render as stored) */}
-                              <div style={serif(14, 300, MID, 1.5)}>{n.body}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {/* insights (verbatim) — full main-column width; never truncated or clamped */}
+                    <RowCap left="RECENT INSIGHTS" right={`${insights.length} LOGGED`} />
+                    <div style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+                      {insights.slice(0, 3).map((n, i) => (
+                        <div key={n.id}>
+                          {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 20px" }} /> : null}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 20px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                              {n.interaction_type ? <span style={{ ...mono(9, 400, MID, ".14em"), border: `1px solid ${DIM2}`, padding: "4px 6px" }}>{n.interaction_type.replace(/_/g, " ").toUpperCase()}</span> : null}
+                              <span style={serif(16, 400, INK2)}>{`${n.hcp_first_name ?? ""} ${n.hcp_last_name ?? ""}`.trim()}</span>
+                              <span style={mono(10, 400, DIM)}>{fmtDue(n.occurred_at)}</span>
                             </div>
+                            {/* body VERBATIM from msl_hcp_notes (test rows render as stored) */}
+                            <div style={serif(14, 300, MID, 1.5)}>{n.body}</div>
                           </div>
-                        ))}
-                        <div style={{ height: 1, background: HAIR, margin: "0 20px" }} />
-                        <div style={{ padding: "13px 20px" }}><span className="fmhome-link" onClick={go.insights} style={mono(10, 400, GOLD_LINK)}>ALL INSIGHTS ↗</span></div>
-                      </div>
-                    </div>
-                    {/* briefs (non-interactive per Exc.9) + relationship activity (non-interactive) */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <RowCap left="RECENT BRIEFS" right={briefs.length ? `${briefs.length} RECENT` : "NONE"} />
-                      <div style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-                        {briefs.length === 0 ? <div style={{ padding: "14px 20px", ...serif(14, 300, MID) }}>No briefs yet.</div> : briefs.map((b, i) => (
-                          <div key={b.id}>
-                            {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 20px" }} /> : null}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14, padding: "14px 20px", alignItems: "baseline" }}>
-                              <span style={serif(16, 400, INK2)}>{b.hcp_name}</span>
-                              <span style={mono(10, 400, DIM)}>{fmtDue(b.generated_at)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ ...mono(10, 400, MID, ".14em"), paddingTop: 8 }}>RELATIONSHIP ACTIVITY</div>
-                      <div style={{ background: CARD, border: `1px solid ${BORDER}`, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-                        {activity.length === 0 ? <span style={serif(14, 300, MID)}>No recent activity.</span> : activity.map((e) => (
-                          <span key={e.id} style={serif(14, 300, MID, 1.4)}><span style={{ color: INK2 }}>{e.label}</span></span>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
+                      <div style={{ height: 1, background: HAIR, margin: "0 20px" }} />
+                      <div style={{ padding: "13px 20px" }}><span className="fmhome-link" onClick={go.insights} style={mono(10, 400, GOLD_LINK)}>ALL INSIGHTS ↗</span></div>
                     </div>
                   </div>
                 </section>
@@ -366,12 +355,71 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* portfolio — count only (per-HCP ranks not sourceable; non-interactive) */}
+                {/* portfolio — named chips via getTrackedHcpsInTerritory (the shipped home's
+                    tracking-chip reader: name + cohort + us_rank badge for rising stars),
+                    filtered to the getTrackedHcpIds population so chips and count agree.
+                    Chip treatment carried over from the shipped surface (canonical cohort
+                    colors); chips navigate to /hcp/:id as the shipped tile did — the
+                    four-links exception covers affordances with no route, not this one. */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", ...mono(10, 400, MID, ".14em") }}><span>YOUR PORTFOLIO</span><span style={{ color: DIM }}>PINNED BY YOU</span></div>
-                  <div style={{ background: CARD, border: `1px solid ${BORDER}`, padding: 18, display: "flex", alignItems: "baseline", gap: 9 }}>
-                    <span style={mono(28, 400, INK1)}>{trackedCount}</span>
-                    <span style={serif(14, 300, MID, 1.3)}>investigators tracked across your watchlists</span>
+                  <div style={{ background: CARD, border: `1px solid ${BORDER}`, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
+                      <span style={mono(28, 400, INK1)}>{trackedCount}</span>
+                      <span style={serif(14, 300, MID, 1.3)}>investigators tracked across your watchlists</span>
+                    </div>
+                    {portfolioChips.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {portfolioChips.map((chip) => {
+                          const cohortColor = chip.cohort === "rising_star" ? "#9B6DFF"
+                            : chip.cohort === "established" ? "#E8A020"
+                            : chip.cohort === "community" ? "#4A90E2"
+                            : "#6B6A65";
+                          const cohortBg = chip.cohort === "rising_star" ? "rgba(155,109,255,0.15)"
+                            : chip.cohort === "established" ? "rgba(232,160,32,0.15)"
+                            : chip.cohort === "community" ? "rgba(74,144,226,0.15)"
+                            : "rgba(107,106,101,0.15)";
+                          return (
+                            <span
+                              key={chip.hcp_id}
+                              onClick={() => navigate(`/hcp/${chip.hcp_id}`)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", backgroundColor: cohortBg, color: cohortColor, border: `1px solid ${cohortColor}`, borderRadius: 3, fontSize: 11, fontWeight: 500, fontFamily: "system-ui, -apple-system, sans-serif", whiteSpace: "nowrap", cursor: "pointer" }}
+                            >
+                              <span>{chip.name}</span>
+                              {chip.cohort_rank !== null ? (
+                                <span style={{ fontSize: 10, opacity: 0.85 }}>#{chip.cohort_rank}</span>
+                              ) : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* recent briefs — moved from THE RECORD (list-shaped; treatment unchanged) */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <RowCap left="RECENT BRIEFS" right={briefs.length ? `${briefs.length} RECENT` : "NONE"} />
+                  <div style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+                    {briefs.length === 0 ? <div style={{ padding: "14px 20px", ...serif(14, 300, MID) }}>No briefs yet.</div> : briefs.map((b, i) => (
+                      <div key={b.id}>
+                        {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 20px" }} /> : null}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14, padding: "14px 20px", alignItems: "baseline" }}>
+                          <span style={serif(16, 400, INK2)}>{b.hcp_name}</span>
+                          <span style={mono(10, 400, DIM)}>{fmtDue(b.generated_at)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* relationship activity — moved from THE RECORD (treatment unchanged) */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ ...mono(10, 400, MID, ".14em") }}>RELATIONSHIP ACTIVITY</div>
+                  <div style={{ background: CARD, border: `1px solid ${BORDER}`, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+                    {activity.length === 0 ? <span style={serif(14, 300, MID)}>No recent activity.</span> : activity.map((e) => (
+                      <span key={e.id} style={serif(14, 300, MID, 1.4)}><span style={{ color: INK2 }}>{e.label}</span></span>
+                    ))}
                   </div>
                 </div>
 
