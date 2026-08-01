@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#08080a; color:#ece7dd; -webkit-font-smoothing:antialiased; }
+  a { color:#d8a94b; text-decoration:none; }
+  a:hover { color:#e9c273; }
+  [data-hs]::-webkit-scrollbar { display:none; }
+  @keyframes panelIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+  @keyframes sheetIn { from { transform:translateY(18px); opacity:0; } to { transform:none; opacity:1; } }
+</style>
+</helmet>
+
+<section id="1a" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:28px;background:#08080a;min-height:100vh;font-family:Newsreader,Georgia,serif">
+
+  <div style="display:flex;align-items:baseline;gap:14px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#d8a94b;border:1px solid rgba(216,169,75,.45);padding:3px 7px">1a</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#635f58">People — navigation &amp; filter strip · ledger register</span>
+  </div>
+
+  <div style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap">
+
+    <!-- ============ DESKTOP ============ -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#635f58">Desktop · 1280</div>
+
+      <div data-screen-label="Desktop nav strip" style="position:relative;width:1280px;background:#0a0a0c;border:1px solid rgba(255,255,255,.09);border-radius:3px;overflow:hidden">
+
+        <!-- identity bar -->
+        <div style="display:flex;align-items:center;gap:28px;height:56px;padding:0 24px;border-bottom:1px solid rgba(255,255,255,.07)">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.28em;text-transform:uppercase;color:#d8a94b">Fieldmark</div>
+          <div style="flex:1;max-width:460px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.13);padding:0 2px 7px">
+            <input placeholder="Search HCP, institution, trial" style="flex:1;background:transparent;border:0;outline:none;color:#ece7dd;font-family:Newsreader,serif;font-size:14.5px" />
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;color:#4e4b45">⌘K</span>
+          </div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#d8a94b;border:1px solid rgba(216,169,75,.4);padding:5px 10px">Invites · 9</div>
+            <div style="width:28px;height:28px;border-radius:50%;border:1px solid rgba(216,169,75,.5);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#d8a94b">GG</div>
+          </div>
+        </div>
+
+        <!-- SUBJECT: domain + therapeutic area -->
+        <div style="display:flex;align-items:flex-end;gap:22px;height:62px;padding:0 24px;border-bottom:1px solid rgba(255,255,255,.07)">
+          <div style="display:flex;align-items:center;gap:12px;padding-bottom:9px">
+            <sc-for list="{{ domainTabs }}" as="d" hint-placeholder-count="2">
+              <div onClick="{{ d.onClick }}" style="cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:{{ d.color }}">{{ d.label }}</div>
+            </sc-for>
+          </div>
+          <div style="width:1px;height:22px;background:rgba(255,255,255,.1);margin-bottom:11px"></div>
+
+          <div style="display:flex;align-items:flex-end;gap:26px;flex:1">
+            <sc-for list="{{ taTabs }}" as="t" hint-placeholder-count="4">
+              <div onClick="{{ t.onClick }}" style="position:relative;cursor:pointer;padding-bottom:11px;font-family:Newsreader,serif;font-size:16.5px;line-height:1;white-space:nowrap;color:{{ t.color }}">
+                {{ t.label }}
+                <div style="position:absolute;left:-2px;right:-2px;bottom:-1px;height:1.5px;background:{{ t.rule }}"></div>
+              </div>
+            </sc-for>
+
+            <div style="position:relative;padding-bottom:11px">
+              <div onClick="{{ toggleTa }}" style="cursor:pointer;display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:{{ moreColor }}">
+                <span>All areas</span>
+                <span style="color:#4e4b45">{{ moreMeta }}</span>
+                <span style="font-size:9px;color:#d8a94b">▾</span>
+              </div>
+
+              <sc-if value="{{ taOpen }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div onClick="{{ closeTa }}" style="position:fixed;inset:0;z-index:40"></div>
+                  <div style="position:absolute;top:calc(100% + 1px);left:-16px;z-index:50;width:660px;background:#101013;border:1px solid rgba(255,255,255,.12);box-shadow:0 24px 60px rgba(0,0,0,.6);animation:panelIn .16s ease-out">
+                    <div style="display:grid;grid-template-columns:238px 1fr">
+                      <div style="padding:18px 20px;border-right:1px solid rgba(255,255,255,.08)">
+                        <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#d8a94b;margin-bottom:14px">Live now · {{ liveCount }}</div>
+                        <div style="display:flex;flex-direction:column">
+                          <sc-for list="{{ liveRows }}" as="r" hint-placeholder-count="3">
+                            <div onClick="{{ r.onClick }}" style="cursor:pointer;display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                              <span style="font-family:Newsreader,serif;font-size:15.5px;color:{{ r.color }}">{{ r.label }}</span>
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:#5b5852">{{ r.meta }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </div>
+                      <div style="padding:18px 20px">
+                        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
+                          <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7d786f">On the roadmap · {{ plannedCount }}</div>
+                          <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#4e4b45">Sequenced by coverage depth</div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 24px">
+                          <sc-for list="{{ plannedRows }}" as="p" hint-placeholder-count="8">
+                            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                              <span style="font-family:Newsreader,serif;font-size:14.5px;color:#6f6b64">{{ p.label }}</span>
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#57534c">{{ p.when }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 20px;border-top:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.015)">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#57534c">Planned areas open as coverage clears review</span>
+                      <a href="#1a" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase">Request an area →</a>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEWS (what) + SCOPE (who / where) -->
+        <div style="display:flex;align-items:stretch;justify-content:space-between;gap:32px;padding:0 24px;border-bottom:1px solid rgba(255,255,255,.12)">
+          <div style="display:flex;align-items:flex-end;gap:18px;flex:none">
+            <sc-for list="{{ viewTabs }}" as="v" hint-placeholder-count="5">
+              <div onClick="{{ v.onClick }}" style="position:relative;cursor:pointer;display:flex;align-items:center;gap:7px;padding:17px 0 15px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;white-space:nowrap;color:{{ v.color }}">
+                <span style="width:4px;height:4px;background:{{ v.dot }}"></span>
+                {{ v.label }}
+                <div style="position:absolute;left:0;right:0;bottom:-1px;height:1.5px;background:{{ v.rule }}"></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 0;flex:none">
+            <sc-if value="{{ segmentedCohort }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#57534c;white-space:nowrap">Cohort</span>
+                <div style="display:flex;align-items:stretch;border:1px solid rgba(255,255,255,.11)">
+                  <sc-for list="{{ cohortTabs }}" as="c" hint-placeholder-count="4">
+                    <div onClick="{{ c.onClick }}" style="cursor:pointer;padding:6px 10px;white-space:nowrap;border-left:1px solid {{ c.divider }};font-family:Newsreader,serif;font-size:13.5px;line-height:1.2;background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ dropdownCohort }}" hint-placeholder-val="{{ false }}">
+              <div style="position:relative">
+                <div onClick="{{ toggleCohort }}" style="cursor:pointer;display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,.11);padding:7px 12px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#57534c">Cohort</span>
+                  <span style="font-family:Newsreader,serif;font-size:13.5px;color:#ece7dd">{{ cohortLabel }}</span>
+                  <span style="font-size:9px;color:#d8a94b">▾</span>
+                </div>
+                <sc-if value="{{ cohortOpen }}" hint-placeholder-val="{{ false }}">
+                  <div>
+                    <div onClick="{{ closeCohort }}" style="position:fixed;inset:0;z-index:40"></div>
+                    <div style="position:absolute;top:calc(100% + 4px);right:0;z-index:50;min-width:180px;background:#101013;border:1px solid rgba(255,255,255,.12);box-shadow:0 18px 44px rgba(0,0,0,.6);animation:panelIn .14s ease-out">
+                      <sc-for list="{{ cohortTabs }}" as="c" hint-placeholder-count="4">
+                        <div onClick="{{ c.onClick }}" style="cursor:pointer;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);font-family:Newsreader,serif;font-size:14px;color:{{ c.color }}">{{ c.label }}</div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <div style="width:1px;height:22px;background:rgba(255,255,255,.09)"></div>
+
+            <div style="display:flex;align-items:center;gap:7px">
+              <div style="cursor:pointer;border:1px solid rgba(255,255,255,.11);padding:6px 10px;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#a49d92" style-hover="border-color:rgba(255,255,255,.24);color:#ece7dd">Filters</div>
+              <div style="cursor:pointer;border:1px solid rgba(255,255,255,.11);padding:6px 10px;display:flex;align-items:center;gap:7px;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#a49d92" style-hover="border-color:rgba(255,255,255,.24);color:#ece7dd">All US <span style="font-size:9px;color:#d8a94b">▾</span></div>
+              <div style="cursor:pointer;border:1px solid rgba(216,169,75,.42);background:rgba(216,169,75,.07);padding:6px 11px;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#d8a94b" style-hover="background:rgba(216,169,75,.13)">{{ landscapeLabel }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- surface beneath, to show the strip in context -->
+        <div style="padding:22px 24px 26px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#4e4b45">Updated just now</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:8px">
+            <div style="display:flex;align-items:baseline;gap:12px">
+              <span style="font-family:Newsreader,serif;font-size:27px;font-weight:400;letter-spacing:-.01em;color:#ece7dd">{{ title }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#7d786f">{{ subtitle }}</span>
+            </div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#57534c">2,410 physicians</span>
+          </div>
+
+          <div style="margin-top:26px;display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:9px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7d786f">Top institutions</span>
+            <a href="#1a" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase">View all →</a>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ stubRows }}" as="s" hint-placeholder-count="3">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <span style="font-family:Newsreader,serif;font-size:16px;color:#c3bcb0">{{ s.name }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#57534c">{{ s.meta }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:26px;max-width:1280px;padding-top:4px">
+        <div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:9.5px;line-height:1.7;letter-spacing:.08em;text-transform:uppercase;color:#57534c">Row 1 — subject. Domain reads as a scope label; live areas are serif tabs. Roadmap sits behind “All areas”.</div>
+        <div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:9.5px;line-height:1.7;letter-spacing:.08em;text-transform:uppercase;color:#57534c">Row 2 left — views (what you’re looking at), mono tabs anchored to the rule that carries the surface.</div>
+        <div style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:9.5px;line-height:1.7;letter-spacing:.08em;text-transform:uppercase;color:#57534c">Row 2 right — scope (who / where). Cohort is labelled as a filter, grouped with Filters, region, landscape.</div>
+      </div>
+    </div>
+
+    <!-- ============ MOBILE ============ -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#635f58">Mobile · 390</div>
+
+      <div data-screen-label="Mobile nav strip" style="position:relative;width:390px;height:720px;background:#0a0a0c;border:1px solid rgba(255,255,255,.09);border-radius:3px;overflow:hidden">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 16px;border-bottom:1px solid rgba(255,255,255,.07)">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:#d8a94b">Fieldmark</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#d8a94b;border:1px solid rgba(216,169,75,.4);padding:4px 8px">9 invites</div>
+            <div style="width:26px;height:26px;border-radius:50%;border:1px solid rgba(216,169,75,.5);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#d8a94b">GG</div>
+          </div>
+        </div>
+
+        <div style="padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.07)">
+          <input placeholder="Search HCP, institution, trial" style="width:100%;background:transparent;border:0;outline:none;color:#ece7dd;font-family:Newsreader,serif;font-size:15px" />
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px 0">
+          <sc-for list="{{ domainTabs }}" as="d" hint-placeholder-count="2">
+            <div onClick="{{ d.onClick }}" style="cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:{{ d.color }}">{{ d.label }}</div>
+          </sc-for>
+        </div>
+
+        <div onClick="{{ openSheet }}" style="cursor:pointer;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:6px 16px 13px;border-bottom:1px solid rgba(255,255,255,.07)">
+          <div style="display:flex;align-items:baseline;gap:9px">
+            <span style="font-family:Newsreader,serif;font-size:24px;line-height:1.1;color:#ece7dd">{{ ta }}</span>
+            <span style="font-size:10px;color:#d8a94b">▾</span>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#57534c;padding-bottom:4px">{{ sheetMeta }}</span>
+        </div>
+
+        <div data-hs="1" style="display:flex;align-items:stretch;gap:20px;padding:0 16px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(255,255,255,.12)">
+          <sc-for list="{{ viewTabs }}" as="v" hint-placeholder-count="5">
+            <div onClick="{{ v.onClick }}" style="position:relative;cursor:pointer;display:flex;align-items:center;gap:6px;padding:14px 0 12px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;color:{{ v.color }}">
+              <span style="width:4px;height:4px;background:{{ v.dot }}"></span>
+              {{ v.label }}
+              <div style="position:absolute;left:0;right:0;bottom:-1px;height:1.5px;background:{{ v.rule }}"></div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px 0">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;color:#57534c">Cohort</span>
+          <div data-hs="1" style="display:flex;align-items:stretch;border:1px solid rgba(255,255,255,.11);overflow-x:auto;scrollbar-width:none">
+            <sc-for list="{{ cohortTabs }}" as="c" hint-placeholder-count="4">
+              <div onClick="{{ c.onClick }}" style="cursor:pointer;padding:7px 11px;white-space:nowrap;border-left:1px solid {{ c.divider }};font-family:Newsreader,serif;font-size:13px;background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div data-hs="1" style="display:flex;align-items:center;gap:8px;padding:11px 16px 13px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(255,255,255,.07)">
+          <div style="flex:none;border:1px solid rgba(255,255,255,.11);padding:7px 11px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#a49d92">Filters</div>
+          <div style="flex:none;border:1px solid rgba(255,255,255,.11);padding:7px 11px;display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#a49d92">All US <span style="font-size:8px;color:#d8a94b">▾</span></div>
+          <div style="flex:none;border:1px solid rgba(216,169,75,.42);background:rgba(216,169,75,.07);padding:7px 11px;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#d8a94b">{{ landscapeLabel }}</div>
+        </div>
+
+        <div style="padding:16px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;color:#4e4b45">Updated just now</div>
+          <div style="font-family:Newsreader,serif;font-size:21px;color:#ece7dd;margin-top:6px">{{ title }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#7d786f;margin-top:5px">{{ subtitle }} · 2,410 physicians</div>
+          <div style="margin-top:18px;display:flex;flex-direction:column">
+            <sc-for list="{{ stubRows }}" as="s" hint-placeholder-count="3">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <span style="font-family:Newsreader,serif;font-size:15px;color:#c3bcb0">{{ s.name }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;color:#57534c">{{ s.meta }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ sheet }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;justify-content:flex-end">
+            <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(6,6,8,.72)"></div>
+            <div style="position:relative;background:#101013;border-top:1px solid rgba(255,255,255,.14);max-height:86%;overflow-y:auto;animation:sheetIn .2s ease-out">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 16px 12px;border-bottom:1px solid rgba(255,255,255,.08)">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7d786f">{{ domainLabel }} — therapeutic areas</span>
+                <span onClick="{{ closeSheet }}" style="cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7d786f">✕</span>
+              </div>
+              <div style="padding:16px">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#d8a94b">Live now · {{ liveCount }}</div>
+                <div style="display:flex;flex-direction:column;margin-top:8px">
+                  <sc-for list="{{ liveRows }}" as="r" hint-placeholder-count="3">
+                    <div onClick="{{ r.onClick }}" style="cursor:pointer;display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+                      <span style="font-family:Newsreader,serif;font-size:17px;color:{{ r.color }}">{{ r.label }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:#5b5852">{{ r.meta }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7d786f;margin-top:22px">On the roadmap · {{ plannedCount }}</div>
+                <div style="display:flex;flex-direction:column;margin-top:8px">
+                  <sc-for list="{{ plannedRows }}" as="p" hint-placeholder-count="6">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                      <span style="font-family:Newsreader,serif;font-size:15.5px;color:#6f6b64">{{ p.label }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#57534c">{{ p.when }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <a href="#1a" style="display:block;margin-top:20px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase">Request an area →</a>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="width:390px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;line-height:1.7;letter-spacing:.08em;text-transform:uppercase;color:#57534c">Mobile keeps the same order: subject → view → scope. Tap the area name for the live/roadmap sheet.</div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1820,&quot;height&quot;:1100},&quot;cohortControl&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;segmented&quot;,&quot;dropdown&quot;],&quot;default&quot;:&quot;segmented&quot;,&quot;tsType&quot;:&quot;'segmented'|'dropdown'&quot;,&quot;section&quot;:&quot;Structure&quot;},&quot;plannedInline&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Structure&quot;},&quot;showLiveCounts&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Structure&quot;}}">
+class Component extends DCLogic {
+  state = { domain: 'onc', ta: 'NSCLC', view: 'pulse', cohort: 'established', taOpen: false, cohortOpen: false, sheet: false };
+
+  get data() {
+    return {
+      onc: {
+        label: 'Oncology',
+        live: [{ n: 'NSCLC', c: '2,410 HCPs' }, { n: 'CAR-T', c: '880 HCPs' }, { n: 'DLBCL', c: '640 HCPs' }],
+        planned: [['Melanoma', 'Q3 2026'], ['CLL', 'Q3 2026'], ['AML', 'Q4 2026'], ['Breast', 'Q4 2026'], ['Prostate', 'Q4 2026'], ['Colorectal', '2027'], ['Bladder', '2027'], ['Ovarian', '2027'], ['Gastric', '2027'], ['RCC', 'Backlog'], ['Multiple myeloma', 'Backlog'], ['Head & neck', 'Backlog']]
+      },
+      imm: {
+        label: 'Immunology',
+        live: [{ n: 'IBD', c: '1,120 HCPs' }],
+        planned: [['Rheumatoid arthritis', 'Q4 2026'], ['Psoriasis', 'Q4 2026'], ['Atopic dermatitis', '2027'], ['Lupus', '2027'], ['Multiple sclerosis', 'Backlog'], ['Asthma', 'Backlog']]
+      }
+    };
+  }
+
+  get views() {
+    return [['pulse', 'Pulse'], ['congress', 'Congress'], ['social', 'Social'], ['telescope', 'Telescope'], ['field', 'Field intelligence']];
+  }
+
+  get cohorts() {
+    return [['all', 'All'], ['established', 'Established'], ['rising', 'Rising Stars'], ['community', 'Community']];
+  }
+
+  pickTa(n) { this.setState({ ta: n, taOpen: false, sheet: false }); }
+
+  renderVals() {
+    const gold = '#d8a94b', ink = '#ece7dd', mid = '#8e887e', dim = '#5f5b54';
+    const d = this.data[this.state.domain];
+    const inlinePlanned = this.props.plannedInline ?? false;
+    const cohortMode = this.props.cohortControl ?? 'segmented';
+    const showCounts = this.props.showLiveCounts ?? true;
+
+    const domainTabs = Object.keys(this.data).map(k => ({
+      label: this.data[k].label,
+      color: k === this.state.domain ? gold : dim,
+      onClick: () => this.setState({ domain: k, ta: this.data[k].live[0].n, taOpen: false, sheet: false })
+    }));
+
+    const taTabs = [{ label: 'All', key: '__all' }]
+      .concat(d.live.map(x => ({ label: x.n, key: x.n })))
+      .concat(inlinePlanned ? d.planned.slice(0, 2).map(p => ({ label: p[0], key: p[0], planned: true })) : [])
+      .map(t => {
+        const active = t.key === '__all' ? this.state.ta === 'All' : this.state.ta === t.key;
+        return {
+          label: t.label,
+          color: t.planned ? '#59554f' : active ? ink : mid,
+          rule: active ? gold : 'transparent',
+          onClick: t.planned ? () => {} : () => this.pickTa(t.key === '__all' ? 'All' : t.key)
+        };
+      });
+
+    const viewTabs = this.views.map(([k, label]) => {
+      const active = k === this.state.view;
+      return {
+        label, color: active ? gold : mid, dot: active ? gold : 'rgba(255,255,255,.16)',
+        rule: active ? gold : 'transparent',
+        onClick: () => this.setState({ view: k })
+      };
+    });
+
+    const cohortTabs = this.cohorts.map(([k, label], i) => {
+      const active = k === this.state.cohort;
+      return {
+        label,
+        color: active ? gold : mid,
+        bg: active ? 'rgba(216,169,75,.09)' : 'transparent',
+        divider: i === 0 ? 'transparent' : 'rgba(255,255,255,.11)',
+        onClick: () => this.setState({ cohort: k, cohortOpen: false })
+      };
+    });
+
+    const cohortLabel = (this.cohorts.find(c => c[0] === this.state.cohort) || ['', 'All'])[1];
+    const taLabel = this.state.ta === 'All' ? d.label : this.state.ta;
+
+    return {
+      domainTabs, taTabs, viewTabs, cohortTabs, cohortLabel,
+      ta: taLabel,
+      domainLabel: d.label,
+      taOpen: this.state.taOpen,
+      sheet: this.state.sheet,
+      cohortOpen: this.state.cohortOpen,
+      segmentedCohort: cohortMode === 'segmented',
+      dropdownCohort: cohortMode === 'dropdown',
+      toggleTa: () => this.setState(s => ({ taOpen: !s.taOpen })),
+      closeTa: () => this.setState({ taOpen: false }),
+      toggleCohort: () => this.setState(s => ({ cohortOpen: !s.cohortOpen })),
+      closeCohort: () => this.setState({ cohortOpen: false }),
+      openSheet: () => this.setState({ sheet: true }),
+      closeSheet: () => this.setState({ sheet: false }),
+      liveCount: d.live.length,
+      plannedCount: d.planned.length,
+      moreMeta: d.live.length + ' live · ' + d.planned.length + ' planned',
+      moreColor: this.state.taOpen ? gold : mid,
+      sheetMeta: d.live.length + ' live · ' + d.planned.length + ' planned',
+      liveRows: d.live.map(x => ({
+        label: x.n,
+        meta: showCounts ? x.c : 'Live',
+        color: x.n === this.state.ta ? gold : ink,
+        onClick: () => this.pickTa(x.n)
+      })),
+      plannedRows: d.planned.map(p => ({ label: p[0], when: p[1] })),
+      title: d.label + ' — ' + taLabel,
+      subtitle: (this.views.find(v => v[0] === this.state.view) || ['', ''])[1] + ' · ' + cohortLabel,
+      landscapeLabel: taLabel + ' landscape',
+      stubRows: [
+        { name: 'Memorial Sloan Kettering', meta: '118 HCPs · 24 rising' },
+        { name: 'MD Anderson Cancer Center', meta: '104 HCPs · 19 rising' },
+        { name: 'Dana-Farber Cancer Institute', meta: '91 HCPs · 16 rising' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

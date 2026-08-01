@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#08090a; }
+  a { color:#71b3a7; text-decoration:none; }
+  a:hover { color:#9fd2c8; }
+  ::selection { background:#3a3117; color:#f0ece2; }
+  input, textarea { font-family:'Spectral', Georgia, serif; }
+</style>
+</helmet>
+
+<div style="background:#08090a;min-height:100vh;padding-bottom:80px;font-family:'Spectral', Georgia, serif;color:#e6e2d8">
+
+  <div style="display:flex;align-items:center;gap:26px;padding:11px 26px;border-bottom:1px solid #17191a;background:#0a0b0c;position:sticky;top:0;z-index:20">
+    <span style="font:700 11px/1 'IBM Plex Mono',monospace;letter-spacing:.22em;color:#d99a3c">FIELDMARK</span>
+    <span style="width:1px;height:12px;background:#222524"></span>
+    <div style="display:flex;gap:20px;align-items:center">
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#767d78">HOME</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#767d78">TERRITORY</span>
+      <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#e6e2d8;border-bottom:1px solid #d99a3c;padding-bottom:3px">PEOPLE</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#767d78">DRUGS</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#767d78">CONGRESSES</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#767d78">PULSE</span>
+    </div>
+    <div style="margin-left:auto;width:22px;height:22px;border-radius:50%;border:1px solid #d99a3c;display:flex;align-items:center;justify-content:center;font:600 8px/1 'IBM Plex Mono',monospace;color:#d99a3c">AR</div>
+  </div>
+
+  <div style="max-width:1340px;margin:0 auto;padding:0 26px">
+
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 0 16px">
+      <span style="width:2px;height:9px;background:#3d4340"></span>
+      <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#5f6762">EST. ESTABLISHED / WHALE</span>
+      <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">·</span>
+      <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#5f6762">RANK 7 OF 85</span>
+      <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#71b3a7">↩ BACK TO LEDGER</span>
+      <div style="margin-left:auto;display:flex;gap:16px;align-items:center">
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">SIGNAL</span>
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">RELATIONSHIP</span>
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">CONTROLS</span>
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">FIELD</span>
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">RECORD</span>
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">BRIEF</span>
+        <span style="width:1px;height:10px;background:#242726"></span>
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">BELIEF</span>
+        <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e5551">RESEARCH</span>
+      </div>
+    </div>
+
+    <div data-screen-label="Identity" style="border:1px solid #1e2120;border-left:4px solid #71b3a7;background:#0c0d0e">
+      <div style="padding:22px 24px 20px">
+        <div style="display:flex;align-items:baseline;gap:12px">
+          <span style="font:600 30px/1 'IBM Plex Mono',monospace;letter-spacing:-.01em;color:#d99a3c">99.6</span>
+          <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#5f6762">INDEX · RANK 7 OF 85 · EST. COHORT</span>
+        </div>
+        <div style="font:700 31px/1.1 'Spectral',Georgia,serif;color:#f0ece2;margin-top:8px">John V. Heymach</div>
+        <div style="font:400 13px/1.4 'Spectral',Georgia,serif;color:#71b3a7;margin-top:6px">The University of Texas MD Anderson Cancer Center · TX</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px">
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7;border-bottom:1px solid #2f4a46;padding-bottom:2px">NPI 1487884464 ↗</span>
+          <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">INTERNAL MEDICINE · MEDICAL ONCOLOGY</span>
+          <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">VERIFIED NPI REGISTRY</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#d99a3c;border:1px solid #6b4d1c;padding:10px 14px" style-hover="background:#171208">▽ GENERATE BRIEF</span>
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#9aa19b;border:1px solid #232726;padding:10px 14px" style-hover="border-color:#3a3f3d;color:#e6e2d8">ALL PUBLICATIONS ↗</span>
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#9aa19b;border:1px solid #232726;padding:10px 14px" style-hover="border-color:#3a3f3d;color:#e6e2d8">ALL POSITIONS ↗</span>
+        </div>
+      </div>
+      <div style="border-top:1px solid #1a1d1c;padding:16px 24px 14px">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,190px));gap:20px">
+          <div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">INDEX<br>IN COHORT</div>
+            <div style="font:600 22px/1.1 'IBM Plex Mono',monospace;color:#d99a3c;margin-top:8px">99.6</div>
+            <div style="height:3px;background:#191c1b;margin-top:9px"><div style="width:99.6%;height:3px;background:#71b3a7"></div></div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542;margin-top:6px">7TH OF 85 IN COHORT</div>
+          </div>
+          <div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">SCIENTIFIC<br>INFLUENCE</div>
+            <div style="font:600 22px/1.1 'IBM Plex Mono',monospace;color:#d99a3c;margin-top:8px">99</div>
+            <div style="height:3px;background:#191c1b;margin-top:9px"><div style="width:99%;height:3px;background:#71b3a7"></div></div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542;margin-top:6px">PUBLICATION LEADERSHIP + CITATION</div>
+          </div>
+          <div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">NETWORK<br>INFLUENCE</div>
+            <div style="font:600 22px/1.1 'IBM Plex Mono',monospace;color:#d99a3c;margin-top:8px">100</div>
+            <div style="height:3px;background:#191c1b;margin-top:9px"><div style="width:100%;height:3px;background:#71b3a7"></div></div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542;margin-top:6px">AT COHORT CEILING</div>
+          </div>
+          <div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">PHARMA<br>ENGAGEMENT</div>
+            <div style="font:600 22px/1.1 'IBM Plex Mono',monospace;color:#d99a3c;margin-top:8px">95</div>
+            <div style="height:3px;background:#191c1b;margin-top:9px"><div style="width:95%;height:3px;background:#71b3a7"></div></div>
+            <div style="font:400 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542;margin-top:6px">PERCENTILE, EST. COHORT</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;padding-top:12px;border-top:1px solid #161918">
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">289 PUBLICATIONS</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">8 POSITIONS</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">27 THEMES</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">6 FIELD INSIGHTS</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">SCORES SOURCED 2026</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:14px;margin-top:12px;border:1px solid #17191a;background:#0a0b0c;padding:9px 16px">
+      <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">ORIENTATION FIRST · THE SCHOLARLY RECORD BELOW</span>
+      <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#71b3a7">RELEVANCE MATCHING V2 STAGE ↗</span>
+    </div>
+
+    <div data-screen-label="Signal Summary" style="margin-top:30px">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">SIGNAL SUMMARY</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">WHO IS THIS</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">GENERATED SYNTHESIS</span>
+      </div>
+      <div style="border:1px solid #1e2120;background:#0c0d0e;padding:20px 24px">
+        <p style="margin:0;font:400 14px/1.62 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">Heymach's scientific identity in NSCLC centers on targeted therapy mechanisms and resistance pathways, reflected in 54 NSCLC senior-author publications, including 35 in the last 5 years — a concentration of recent output that distinguishes him even within a cohort of recognized experts. His Scientific Influence sits at the top of the Established NSCLC cohort, driven by publication leadership and citation impact, and his Network Influence is at the ceiling of the cohort, reflecting a co-authorship graph centrality that positions him as a connective hub across major NSCLC research groups globally. He has also contributed to 1 TA guideline publication, and his Pharma Engagement stands at the 95th percentile within the Established cohort, indicating broad and active industry collaboration across 23 distinct companies.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;padding-top:12px;border-top:1px solid #161918">
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">MODEL SYNTHESIS OVER THE SOURCED AUDIT</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">REVIEW BEFORE USE</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">NO CLINICAL CLAIM</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">METHODOLOGY ↗</span>
+        </div>
+      </div>
+    </div>
+
+    <div data-screen-label="Relationship" style="margin-top:30px">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">RELATIONSHIP</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">TRACK · STATUS · FOLLOW-UPS</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">SYNCS WITH THE LEDGER</span>
+      </div>
+      <div style="border:1px solid #1e2120;background:#0c0d0e;padding:18px 24px 20px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#e6e2d8;border:1px solid #2a2e2c;padding:9px 13px">▮ TRACKED</span>
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:9px 13px" style-hover="border-color:#3a3f3d;color:#e6e2d8">+ ADD TO LIST</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:20px">
+          <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">STATUS</span>
+          <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:6px 9px">NOT ENGAGED</span>
+        </div>
+        <div style="margin-top:20px">
+          <div style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#8b918b">FOLLOW-UPS</div>
+          <div style="margin-top:10px;border:1px solid #1c1f1e;background:#0a0b0b;padding:11px 13px;font:400 13px/1.4 'Spectral',Georgia,serif;color:#5f6762">Add a follow-up…</div>
+          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:10px">
+            <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#5f6762;background:#111413;padding:8px 11px">LOW</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#e6e2d8;background:#1d211f;padding:8px 11px">NORMAL</span>
+            <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#5f6762;background:#111413;padding:8px 11px">HIGH</span>
+            <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:8px 11px">DUE DATE</span>
+          </div>
+          <div style="margin-top:10px;background:#8a6a1e;padding:9px;text-align:center;font:700 9px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#120d02" style-hover="background:#a07d26">SAVE</div>
+        </div>
+      </div>
+    </div>
+
+    <div data-screen-label="Contact &amp; Controls" style="margin-top:30px">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">CONTACT &amp; CONTROLS</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">ACCESS · FIELD REVIEW · REPORT · OPT-OUT</span>
+      </div>
+      <div style="border:1px solid #1e2120;background:#0c0d0e;padding:18px 24px 20px">
+        <div style="font:400 15px/1.5 'Spectral',Georgia,serif;color:#b9b4aa">No public contact information available yet.</div>
+      </div>
+    </div>
+
+    <div data-screen-label="Field Insights" style="margin-top:30px">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">FIELD INSIGHTS</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">6 CAPTURED · MSL-ENTERED</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">TEAM OBSERVATION · NEVER A SCORED POSITION</span>
+      </div>
+      <div style="border:1px solid #1e2120;background:#0c0d0e">
+
+        <div style="display:flex;align-items:center;gap:12px;padding:13px 24px;border-bottom:1px solid #1a1d1c;background:#0a0b0b">
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#d99a3c">+ CAPTURE</span>
+          <span style="flex:1;font:400 13.5px/1.4 'Spectral',Georgia,serif;color:#5f6762">Add an insight about Dr. Heymach…</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">SOURCE · TAG · LINK A POSITION</span>
+        </div>
+
+        <div style="padding:18px 24px;border-bottom:1px solid #141716" style-hover="background:#0e100f">
+          <div style="display:flex;align-items:baseline;gap:12px">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94">PHONE</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d99a3c;border:1px solid #5c4419;padding:3px 6px">STRATEGIC</span>
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#5f6762">JUN 6, 2026</span>
+            <span style="margin-left:auto;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">EDIT</span>
+          </div>
+          <p style="margin:11px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">On a steering committee call following the LAURA trial readout, Heymach pushed back hard on the framing that osimertinib's benefit in stage III EGFR-mutant NSCLC validates a chemotherapy-free consolidation paradigm broadly. His point: the biomarker context is everything — EGFR-mutant patients are precisely the population where layering IO on top adds toxicity without a clear immunologic rationale. He's not against consolidation strategies, but he's drawing a sharp line between oncogene-driven and IO-eligible populations.</p>
+          <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-top:11px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">LINKED POSITION</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46;padding-bottom:2px">ONCOGENE-DRIVEN ICB LIMITS ↗</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">·</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">ADDED JUN 29, 2026 · A. RIVERA</span>
+          </div>
+        </div>
+
+        <div style="padding:18px 24px;border-bottom:1px solid #141716" style-hover="background:#0e100f">
+          <div style="display:flex;align-items:baseline;gap:12px">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94">CONFERENCE</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #2a2e2c;padding:3px 6px">NOTABLE</span>
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#5f6762">MAY 30, 2026</span>
+            <span style="margin-left:auto;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">EDIT</span>
+          </div>
+          <p style="margin:11px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">In a brief follow-up exchange at the IASLC welcome reception, Heymach mentioned offhand that he's been fielding more questions from fellows and junior attendings about perioperative IO sequencing than about any other topic this cycle — his read is that the MATTERHORN and CheckMate 77T data have created genuine confusion at the practice level about which regimen, which stage cutoff, and which surgical window. He didn't frame it as a gap we need to fill specifically, more of a general observation about where the field's head is right now. Worth noting — single signal.</p>
+          <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-top:11px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">LINKED POSITION</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46;padding-bottom:2px">PERIOPERATIVE IMMUNOTHERAPY EFFICACY ↗</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">·</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">ADDED JUN 29, 2026 · A. RIVERA</span>
+          </div>
+        </div>
+
+        <div style="padding:18px 24px;border-bottom:1px solid #141716" style-hover="background:#0e100f">
+          <div style="display:flex;align-items:baseline;gap:12px">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94">TUMOR BOARD</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d99a3c;border:1px solid #5c4419;padding:3px 6px">STRATEGIC</span>
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#5f6762">MAY 13, 2026</span>
+            <span style="margin-left:auto;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">EDIT</span>
+          </div>
+          <p style="margin:11px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">After a tumor board case involving a STK11-mutant LUAD patient who progressed on first-line chemoimmunotherapy, Heymach anchored on the lactate–MCT4–GPR81 axis as the mechanistic explanation for why standard IO just doesn't move the needle here — and mentioned his group is actively looking at combination strategies targeting that pathway. Didn't name a specific compound, but the framing was clearly translational, not just academic. Seemed genuinely energized by it.</p>
+          <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-top:11px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">LINKED POSITION</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46;padding-bottom:2px">RESISTANCE REVERSAL STRATEGIES ↗</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">·</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">ADDED JUN 29, 2026 · A. RIVERA</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 24px">
+          <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#71b3a7">VIEW ALL 6 ↓</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">3 STRATEGIC · 2 NOTABLE · 1 UNTAGGED</span>
+          <span style="margin-left:auto;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">EXPORT TO LEDGER ↗</span>
+        </div>
+      </div>
+
+      <sc-if value="{{ showFieldIntelligence }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:baseline;gap:10px;padding:22px 0 8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">FIELD INTELLIGENCE</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">TEAM RATINGS</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">NOT SET · REQUIRES 2 RATERS</span>
+      </div>
+      <div style="border:1px solid #1a1d1c;background:#0a0b0b;padding:18px 24px 20px">
+        <div style="font:400 14px/1.5 'Spectral',Georgia,serif;color:#ddd8cd">Field Intelligence pending — be among the first to contribute.</div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-top:16px">
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">COMMUNITY CONFIDENCE</span>
+          <span style="margin-left:auto;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">0%</span>
+          <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#5f6762">0 MSLS · 2 REQUIRED</span>
+        </div>
+        <div style="height:3px;background:#191c1b;margin-top:8px"></div>
+
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px 32px;margin-top:20px">
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#8b918b">DATA MATCHES FIELD REALITY</span>
+              <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">UNRATED</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:9px">
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">CONFIRMS</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">PARTIAL</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">DISPUTES</span>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#8b918b">ENGAGEMENT POTENTIAL</span>
+              <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">UNRATED</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:9px">
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">HIGH</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">MODERATE</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">LOW</span>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#8b918b">SCIENTIFIC CREDIBILITY</span>
+              <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">UNRATED</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:9px">
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">STRONG</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">MODERATE</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">EARLY</span>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#8b918b">MOMENTUM TRAJECTORY</span>
+              <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">UNRATED</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:9px">
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">ACCELERATING</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">STEADY</span>
+              <span style="flex:1;text-align:center;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9aa19b;border:1px solid #232726;padding:11px 8px" style-hover="border-color:#3a3f3d;color:#e6e2d8">PLATEAUING</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;border:1px solid #2f4436;background:#0d1411;padding:11px;text-align:center;font:700 9px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#8caf94" style-hover="background:#111a15;border-color:#3d5847">SUBMIT VALIDATION</div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid #141716">
+          <span style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">YOUR IDENTITY IS NEVER SHARED · CONTRIBUTOR UUID ONLY</span>
+          <span style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">UNTIL TWO RATERS AGREE, A DIMENSION READS UNRATED RATHER THAN AS A FINDING</span>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+
+    <div data-screen-label="The Record" style="margin-top:30px">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">THE RECORD</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">289 SOURCES</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">SCIENTIFIC AND COMMERCIAL FOOTPRINT AT EQUAL WEIGHT</span>
+      </div>
+      <div style="border:1px solid #1e2120;background:#0c0d0e;padding:20px 24px">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,150px));gap:20px">
+          <div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">PUBLICATIONS</div>
+            <div style="font:600 24px/1.1 'IBM Plex Mono',monospace;color:#e6e2d8;margin-top:8px">289</div>
+          </div>
+          <div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">SENIOR AUTHOR</div>
+            <div style="font:600 24px/1.1 'IBM Plex Mono',monospace;color:#71b3a7;margin-top:8px">54</div>
+          </div>
+          <div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">SENIOR, 5YR</div>
+            <div style="font:600 24px/1.1 'IBM Plex Mono',monospace;color:#71b3a7;margin-top:8px">35</div>
+          </div>
+          <div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">GUIDELINES</div>
+            <div style="font:600 24px/1.1 'IBM Plex Mono',monospace;color:#d99a3c;margin-top:8px">1</div>
+          </div>
+        </div>
+
+        <div style="margin-top:22px;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">PUBLICATION TIMELINE · BY 3-YEAR BLOCK</div>
+        <div style="display:flex;align-items:flex-end;gap:6px;height:60px;margin-top:12px">
+          <div style="flex:1;height:6%;background:#8caf94"></div>
+          <div style="flex:1;height:40%;background:#8caf94"></div>
+          <div style="flex:1;height:44%;background:#8caf94"></div>
+          <div style="flex:1;height:34%;background:#8caf94"></div>
+          <div style="flex:1;height:82%;background:#8caf94"></div>
+          <div style="flex:1;height:62%;background:#8caf94"></div>
+          <div style="flex:1;height:46%;background:#8caf94"></div>
+          <div style="flex:1;height:74%;background:#8caf94"></div>
+          <div style="flex:1;height:40%;background:#8caf94"></div>
+          <div style="flex:1;height:32%;background:#8caf94"></div>
+          <div style="flex:1;height:10%;background:#586b5c"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:7px">
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">1994</span>
+          <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">2026</span>
+        </div>
+
+        <sc-if value="{{ showPharmaDetail }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid #161918">
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">PHARMA ENGAGEMENT · OPEN PAYMENTS · 23 COMPANIES</div>
+          <div style="display:flex;flex-direction:column;gap:0;margin-top:12px">
+            <div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid #141716">
+              <span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#c9c4ba">ASTRAZENECA PHARMACEUTICALS LP</span>
+              <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">46 PAYMENTS</span>
+              <span style="margin-left:auto;font:600 10px/1 'IBM Plex Mono',monospace;color:#8caf94">$71.4K</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid #141716">
+              <span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#c9c4ba">GENENTECH PHARMACEUTICALS, INC.</span>
+              <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">31 PAYMENTS</span>
+              <span style="margin-left:auto;font:600 10px/1 'IBM Plex Mono',monospace;color:#8caf94">$36.7K</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid #141716">
+              <span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#c9c4ba">BOEHRINGER INGELHEIM PHARMACEUTICALS, INC.</span>
+              <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">22 PAYMENTS</span>
+              <span style="margin-left:auto;font:600 10px/1 'IBM Plex Mono',monospace;color:#8caf94">$29.1K</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid #141716">
+              <span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#c9c4ba">SANOFI-AVENTIS US LLC</span>
+              <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">9 PAYMENTS</span>
+              <span style="margin-left:auto;font:600 10px/1 'IBM Plex Mono',monospace;color:#8caf94">$27.4K</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid #141716">
+              <span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#c9c4ba">AMGEN PHARMACEUTICALS, INC.</span>
+              <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">19 PAYMENTS</span>
+              <span style="margin-left:auto;font:600 10px/1 'IBM Plex Mono',monospace;color:#8caf94">$26.2K</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <div style="display:grid;grid-template-columns:.9fr 1.1fr;gap:28px;margin-top:20px;padding-top:16px;border-top:1px solid #161918">
+        <div>
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">ENGAGEMENT MIX · BY SPEND · $313.3K TOTAL</div>
+          <div style="display:flex;align-items:center;gap:24px;margin-top:14px">
+            <div style="position:relative;width:116px;height:116px;flex:none;border-radius:50%;background:conic-gradient(#d99a3c 0turn .76turn,#71b3a7 .76turn .90turn,#8caf94 .90turn .96turn,#6b7370 .96turn .98turn,#454b47 .98turn 1turn)">
+              <div style="position:absolute;inset:31px;border-radius:50%;background:#0c0d0e"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="width:7px;height:7px;background:#d99a3c;flex:none"></span>
+                <div>
+                  <div style="font:400 13px/1.3 'Spectral',Georgia,serif;color:#ddd8cd">Consulting</div>
+                  <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5f6762;margin-top:4px">$239.4K · 76%</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="width:7px;height:7px;background:#71b3a7;flex:none"></span>
+                <div>
+                  <div style="font:400 13px/1.3 'Spectral',Georgia,serif;color:#ddd8cd">Speaker Bureau</div>
+                  <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5f6762;margin-top:4px">$42.9K · 14%</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="width:7px;height:7px;background:#8caf94;flex:none"></span>
+                <div>
+                  <div style="font:400 13px/1.3 'Spectral',Georgia,serif;color:#ddd8cd">Travel &amp; Lodging</div>
+                  <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5f6762;margin-top:4px">$20.1K · 6%</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="width:7px;height:7px;background:#6b7370;flex:none"></span>
+                <div>
+                  <div style="font:400 13px/1.3 'Spectral',Georgia,serif;color:#ddd8cd">Food &amp; Beverage</div>
+                  <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5f6762;margin-top:4px">$6.0K · 2%</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="width:7px;height:7px;background:#454b47;flex:none"></span>
+                <div>
+                  <div style="font:400 13px/1.3 'Spectral',Georgia,serif;color:#ddd8cd">Honoraria</div>
+                  <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5f6762;margin-top:4px">$4.9K · 2%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">TOP COLLABORATORS</div>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+              <span style="display:flex;align-items:center;gap:5px;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d"><span style="width:5px;height:5px;border-radius:50%;background:#8caf94"></span>GROWING</span>
+              <span style="display:flex;align-items:center;gap:5px;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d"><span style="width:5px;height:5px;border-radius:50%;background:#8b918b"></span>STABLE</span>
+              <span style="display:flex;align-items:center;gap:5px;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d"><span style="width:5px;height:5px;border-radius:50%;background:#d99a3c"></span>DECLINING</span>
+              <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">ALL MD ANDERSON</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;margin-top:10px">
+            <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid #141716">
+              <span style="width:5px;height:5px;border-radius:50%;background:#8caf94"></span>
+              <span style="font:700 14px/1.3 'Spectral',Georgia,serif;color:#f0ece2">Jianjun Zhang</span>
+              <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94;border:1px solid #2f4436;padding:3px 6px">EST 98</span>
+              <span style="margin-left:auto;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">97 CO-AUTHORED PAPERS ↗</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid #141716">
+              <span style="width:5px;height:5px;border-radius:50%;background:#8caf94"></span>
+              <span style="font:700 14px/1.3 'Spectral',Georgia,serif;color:#f0ece2">Don L. Gibbons</span>
+              <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94;border:1px solid #2f4436;padding:3px 6px">EST 97</span>
+              <span style="margin-left:auto;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">91 CO-AUTHORED PAPERS ↗</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid #141716">
+              <span style="width:5px;height:5px;border-radius:50%;background:#8b918b"></span>
+              <span style="font:700 14px/1.3 'Spectral',Georgia,serif;color:#f0ece2">Ignacio I. Wistuba</span>
+              <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94;border:1px solid #2f4436;padding:3px 6px">EST 99</span>
+              <span style="margin-left:auto;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">89 CO-AUTHORED PAPERS ↗</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid #141716">
+              <span style="width:5px;height:5px;border-radius:50%;background:#d99a3c"></span>
+              <span style="font:700 14px/1.3 'Spectral',Georgia,serif;color:#f0ece2">Stephen G. Swisher</span>
+              <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8b918b;border:1px solid #2a2e2c;padding:3px 6px">EST 94</span>
+              <span style="margin-left:auto;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">73 CO-AUTHORED PAPERS ↗</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid #141716">
+              <span style="width:5px;height:5px;border-radius:50%;background:#8caf94"></span>
+              <span style="font:700 14px/1.3 'Spectral',Georgia,serif;color:#f0ece2">Xiuning Le</span>
+              <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94;border:1px solid #2f4436;padding:3px 6px">EST 99</span>
+              <span style="margin-left:auto;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">62 CO-AUTHORED PAPERS ↗</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#71b3a7">ALL COLLABORATORS ↓</span>
+            <span style="margin-left:auto;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">NETWORK INFLUENCE AT COHORT CEILING</span>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div data-screen-label="The Brief" style="margin-top:30px">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">THE BRIEF</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">WHAT MOVED</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">SINGLE ALLOCATION FROM SOURCED EVIDENCE · NO CLINICAL CLAIM</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="border:1px solid #1e2120;background:#0c0d0e;padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+          <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">TOP SCORED POSITION</span>
+          <div style="font:700 15px/1.3 'Spectral',Georgia,serif;color:#f0ece2">Perioperative Immunotherapy Efficacy</div>
+          <p style="margin:0;font:400 12.5px/1.55 'Spectral',Georgia,serif;color:#b9b4aa;text-wrap:pretty">The investigator's published record strongly advances perioperative checkpoint blockade combined with chemotherapy as superior to chemotherapy alone in resectable NSCLC, demonstrating improved event-free survival and pathological complete response without meaningful toxicity increase, and arguing that benefit extends across PD-L1 and disease-stage subgroups.</p>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:auto;padding-top:12px;border-top:1px solid #161918">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">7 PAPERS · 2 FIELD NOTES</span>
+            <span style="margin-left:auto;font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">↓ POSITIONS</span>
+          </div>
+        </div>
+        <div style="border:1px solid #1e2120;background:#0c0d0e;padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+          <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">MOST CHANGED · WITHHELD</span>
+          <div style="font:400 15px/1.3 'Spectral',Georgia,serif;color:#e6e2d8">No dated movement to report.</div>
+          <p style="margin:0;font:400 12.5px/1.55 'Spectral',Georgia,serif;color:#b9b4aa;text-wrap:pretty">A delta needs two dated observations of the same position. There are no position snapshots over time in stage 1, so there is no prior state to compare against.</p>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:auto;padding-top:12px;border-top:1px solid #161918">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">REQUIRES ≥2 DATED OBSERVATIONS</span>
+            <span style="margin-left:auto;font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">LOG A NOTE</span>
+          </div>
+        </div>
+        <div style="border:1px solid #1e2120;background:#0c0d0e;padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+          <span style="font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">WHAT THE SILENCE IS · WITHHELD</span>
+          <div style="font:400 15px/1.3 'Spectral',Georgia,serif;color:#e6e2d8">Silence detection is stage 2.</div>
+          <p style="margin:0;font:400 12.5px/1.55 'Spectral',Georgia,serif;color:#b9b4aa;text-wrap:pretty">The record is dense enough (289 sources) for absence to be a finding, but naming which topics are silent needs the coherent topic taxonomy, which is stage 2.</p>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:auto;padding-top:12px;border-top:1px solid #161918">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#454b47">COVERAGE MAP</span>
+            <span style="margin-left:auto;font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">TAXONOMY STAGE ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:30px"></div>
+
+    <div data-screen-label="Belief Profile">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">BELIEF PROFILE</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">8 POSITIONS · 27 THEMES · ALL PUBLISHED</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">POSITIONS ASSERTED IN THE PUBLISHED WORK · NOT SET FOR FUTURE</span>
+      </div>
+      <div style="border:1px solid #1e2120;background:#0c0d0e;padding:20px 24px 22px">
+        <p style="margin:0;font:400 14px/1.62 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">A translational-clinical investigator whose published record spans perioperative immunotherapy trials, radioimmunotherapy combinations, and mechanistic dissection of resistance to checkpoint blockade — with a unifying focus on biomarker-guided patient selection and reversing immunosuppressive tumor microenvironments.</p>
+
+        <div style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.18em;color:#8b918b;margin:24px 0 0;padding-bottom:10px;border-bottom:1px solid #1c1f1e">STRONGLY ASSERTED · 4</div>
+
+        <div style="padding:16px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Perioperative Immunotherapy Efficacy</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d99a3c;border:1px solid #5c4419;padding:3px 6px">STRONG SIGNAL</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.92</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">The investigator's published record strongly advances perioperative checkpoint blockade combined with chemotherapy as superior to chemotherapy alone in resectable NSCLC, demonstrating improved event-free survival and pathological complete response without meaningful toxicity increase, and arguing that benefit extends across PD-L1 and disease-stage subgroups.</p>
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d;margin-top:12px">BASIS: 7 PUBLICATIONS · SOURCED 2024</div>
+          <div style="display:grid;grid-template-columns:1.1fr .95fr .95fr;gap:20px;margin-top:12px">
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">EVIDENCE</div>
+              <div style="display:flex;flex-direction:column;gap:5px;margin-top:7px">
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">NEJM 2023</span> FIRST AUTHOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">LANCET ONCOL 2024</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">FIELD CORROBORATION</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">1 MSL CAPTURE LINKED · MAY 30, 2026</div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">MOVEMENT</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">NO PRIOR STATE · FIRST OBSERVED 2023</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:baseline;margin-top:12px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">DOES THIS SPEAK TO YOURS?</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">+ LOG A REACTION</span>
+          </div>
+        </div>
+
+        <div style="padding:16px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Radioimmunotherapy Combinations</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.87</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">Across multiple papers, the investigator has advanced the position that combining radiation (SABR/SBRT) with checkpoint inhibitors offers synergistic antitumor benefit — demonstrated by improved event-free survival with I-SABR in early-stage disease and hypothesized abscopal benefits in metastatic disease — while consistently emphasizing the need for patient stratification to realize this benefit.</p>
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d;margin-top:12px">BASIS: 5 PUBLICATIONS · SOURCED 2020–2024</div>
+          <div style="display:grid;grid-template-columns:1.1fr .95fr .95fr;gap:20px;margin-top:12px">
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">EVIDENCE</div>
+              <div style="display:flex;flex-direction:column;gap:5px;margin-top:7px">
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">LANCET 2023</span> SENIOR (CO-1ST) <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">J IMMUNOTHER CANCER 2022</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">FIELD CORROBORATION</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">NOT DETECTED · 0 MSL CAPTURES LINKED</div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">MOVEMENT</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">NO PRIOR STATE · FIRST OBSERVED 2020</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:baseline;margin-top:12px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">DOES THIS SPEAK TO YOURS?</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">+ LOG A REACTION</span>
+          </div>
+        </div>
+
+        <div style="padding:16px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Resistance Reversal Strategies</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.86</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">The investigator's published record consistently identifies and proposes specific mechanistic strategies to reverse immunotherapy and TKI resistance — including IL-6 blockade to re-sensitize EGFR-mutant tumors to anti-PD-1, lactate–MCT4–GPR81 axis targeting in STK11/LKB1-mutant LUAD, ATR inhibition combined with anti-PD-L1, and CD73/adenosine pathway blockade — reflecting a sustained research program in resistance reversal.</p>
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d;margin-top:12px">BASIS: 9 PUBLICATIONS · SOURCED 2021–2024</div>
+          <div style="display:grid;grid-template-columns:1.1fr .95fr .95fr;gap:20px;margin-top:12px">
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">EVIDENCE</div>
+              <div style="display:flex;flex-direction:column;gap:5px;margin-top:7px">
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">NAT MED 2024</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">CANCER CELL 2023</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">CLIN CANCER RES 2022</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">FIELD CORROBORATION</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">1 MSL CAPTURE LINKED · MAY 13, 2026</div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">MOVEMENT</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">NO PRIOR STATE · FIRST OBSERVED 2021</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:baseline;margin-top:12px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">DOES THIS SPEAK TO YOURS?</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">+ LOG A REACTION</span>
+          </div>
+        </div>
+
+        <div style="padding:16px 0">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Precision IO Selection</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.84</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">Across oncogene-driven, EGFR-mutant, and STK11/LKB1-mutant NSCLC papers, the investigator has repeatedly advanced the position that blanket exclusion from immunotherapy is inappropriate, and that oncogene-specific biomarker profiling — including TMB, PD-L1, CD73, IL-6, and MCT4 — should guide patient selection to identify immunotherapy-eligible subgroups within otherwise refractory populations.</p>
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d;margin-top:12px">BASIS: 6 PUBLICATIONS · SOURCED 2021–2024</div>
+          <div style="display:grid;grid-template-columns:1.1fr .95fr .95fr;gap:20px;margin-top:12px">
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">EVIDENCE</div>
+              <div style="display:flex;flex-direction:column;gap:5px;margin-top:7px">
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">CANCER CELL 2023</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">J IMMUNOTHER CANCER 2023</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+                <div style="font:400 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b"><span style="color:#c9c4ba;font-weight:600">J THORAC ONCOL 2021</span> SENIOR <span style="color:#71b3a7;border-bottom:1px solid #2f4a46">PUBMED ↗</span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">FIELD CORROBORATION</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">NOT DETECTED · 0 MSL CAPTURES LINKED</div>
+            </div>
+            <div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#3f4542">MOVEMENT</div>
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8b918b;margin-top:7px">NO PRIOR STATE · FIRST OBSERVED 2021</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:baseline;margin-top:12px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">DOES THIS SPEAK TO YOURS?</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">+ LOG A REACTION</span>
+          </div>
+        </div>
+
+        <div style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.18em;color:#8b918b;margin:20px 0 0;padding:16px 0 10px;border-top:1px solid #1c1f1e;border-bottom:1px solid #1c1f1e">FREQUENTLY ECHOED · 4</div>
+
+        <div style="padding:16px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Immunotherapy Resistance Mechanisms</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.79</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">The investigator has repeatedly flagged that primary and acquired resistance to checkpoint blockade remains an inadequately understood and clinically urgent problem, identifying specific genomic drivers — STK11/LKB1 loss, KEAP1 mutation, EGFR defects — as sources of immunosuppressive tumor microenvironments that are not addressed by current standard approaches.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:11px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">BASIS: 11 PUBLICATIONS</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">NO FIELD CORROBORATION</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">EVIDENCE ↗</span>
+          </div>
+        </div>
+
+        <div style="padding:16px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Biomarker-Guided Trial Design</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.77</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">Across numerous papers, the investigator has flagged the absence of validated predictive biomarkers for immunotherapy and radioimmunotherapy as a critical gap, arguing that trials are underpowered without prospective biomarker stratification and that patient selection frameworks must integrate molecular markers such as ctDNA, TMB, PD-L1, LKB1, and ATM status.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:11px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">BASIS: 8 PUBLICATIONS</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">NO FIELD CORROBORATION</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">EVIDENCE ↗</span>
+          </div>
+        </div>
+
+        <div style="padding:16px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Oncogene-Driven ICB Limits</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8caf94;border:1px solid #2f4436;padding:3px 6px">FIELD-CORROBORATED</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.74</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">The investigator has consistently raised the caution that patients with targetable oncogene alterations — particularly EGFR mutations — derive limited benefit from immune checkpoint blockade due to characteristically immune-inert tumor microenvironments marked by low TMB, low PD-L1, and reduced cytotoxic infiltration, while simultaneously arguing that limitation is not absolute for all patients within these subtypes.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:11px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">BASIS: 6 PUBLICATIONS</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">1 MSL CAPTURE LINKED · JUN 6, 2026</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">EVIDENCE ↗</span>
+          </div>
+        </div>
+
+        <div style="padding:16px 0">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font:700 16px/1.25 'Spectral',Georgia,serif;color:#f0ece2">Radioimmunotherapy Patient Stratification</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">CONF 0.71</span>
+          </div>
+          <p style="margin:8px 0 0;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">The investigator has repeatedly cautioned that combining radiation with immunotherapy does not benefit unselected metastatic NSCLC patients and that current evidence is insufficient to define optimal patient selection, urging phase 3 confirmation before broad adoption of radioimmunotherapy combination as standard of care.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:11px">
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">BASIS: 4 PUBLICATIONS</span>
+            <span style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">NO FIELD CORROBORATION</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#71b3a7">EVIDENCE ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div data-screen-label="Research Involvement" style="margin-top:30px">
+      <div style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px">
+        <span style="width:3px;height:10px;background:#d99a3c"></span>
+        <span style="font:700 10px/1 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#d99a3c">RESEARCH INVOLVEMENT</span>
+        <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4b514d">27 THEMES · PUBLICATION-SOURCED</span>
+        <span style="margin-left:auto;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">ACTIVE IN THESE AREAS · ANY AUTHORSHIP ROLE · INVOLVEMENT, NOT ADVOCACY</span>
+      </div>
+      <div style="border:1px solid #1e2120;background:#0c0d0e;padding:20px 24px 22px">
+        <p style="margin:0 0 6px;font:400 13.5px/1.6 'Spectral',Georgia,serif;color:#ddd8cd;text-wrap:pretty">Themes are extracted from this HCP's authored publications in NSCLC — any authorship position counts. They show where the work is. They are a weaker claim than the positions above: involvement in an area is not a stance on it.</p>
+        <div style="padding:14px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font:700 15px/1.25 'Spectral',Georgia,serif;color:#e6e2d8">EGFR exon 20 insertion TKIs</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8b918b;border:1px solid #2a2e2c;padding:3px 6px">CORE</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:7px">
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">ACTIVE IN · 6 PUBLICATIONS</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 38105521 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 37744981 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 36992471 ↗</span>
+          </div>
+        </div>
+        <div style="padding:14px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font:700 15px/1.25 'Spectral',Georgia,serif;color:#e6e2d8">HER2-mutant NSCLC targeted therapy</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8b918b;border:1px solid #2a2e2c;padding:3px 6px">CORE</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:7px">
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">ACTIVE IN · 5 PUBLICATIONS</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 38470669 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 37884418 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 36241957 ↗</span>
+          </div>
+        </div>
+        <div style="padding:14px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font:700 15px/1.25 'Spectral',Georgia,serif;color:#e6e2d8">EGFR TKI resistance mechanisms</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8b918b;border:1px solid #2a2e2c;padding:3px 6px">CORE</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:7px">
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">ACTIVE IN · 9 PUBLICATIONS</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 38820657 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 37610344 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 36109745 ↗</span>
+          </div>
+        </div>
+        <div style="padding:14px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font:700 15px/1.25 'Spectral',Georgia,serif;color:#e6e2d8">KRAS-mutant co-mutation resistance biomarkers</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8b918b;border:1px solid #2a2e2c;padding:3px 6px">CORE</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:7px">
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">ACTIVE IN · 7 PUBLICATIONS</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 39084412 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 38214436 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 37207796 ↗</span>
+          </div>
+        </div>
+        <div style="padding:14px 0;border-bottom:1px solid #141716">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font:700 15px/1.25 'Spectral',Georgia,serif;color:#e6e2d8">Perioperative immunotherapy resectable NSCLC</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8b918b;border:1px solid #2a2e2c;padding:3px 6px">CORE</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:7px">
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">ACTIVE IN · 7 PUBLICATIONS</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 38199042 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 37490744 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 36106925 ↗</span>
+          </div>
+        </div>
+        <div style="padding:14px 0">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font:700 15px/1.25 'Spectral',Georgia,serif;color:#e6e2d8">ATR inhibition DNA damage response</span>
+            <span style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8b918b;border:1px solid #2a2e2c;padding:3px 6px">CORE</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:7px">
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">ACTIVE IN · 4 PUBLICATIONS</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 38884213 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 37504280 ↗</span>
+            <span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#71b3a7;border-bottom:1px solid #2f4a46">PMID 36377511 ↗</span>
+          </div>
+        </div>
+        <sc-if value="{{ themesExpanded }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:12px;padding-top:14px;border-top:1px solid #161918">
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#4b514d">REMAINING 21 THEMES · LOWER DISPLAY RANK</div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px 24px;margin-top:11px">
+            <sc-for list="{{ moreThemes }}" as="theme" hint-placeholder-count="21">
+              <div style="display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid #141716">
+                <span style="font:400 12.5px/1.35 'Spectral',Georgia,serif;color:#c9c4ba">{{ theme.name }}</span>
+                <span style="margin-left:auto;flex:none;white-space:nowrap;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#4b514d">{{ theme.count }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid #161918">
+          <span onClick="{{ toggleThemes }}" style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#71b3a7;cursor:pointer;border-bottom:1px solid #2f4a46;padding-bottom:3px" style-hover="color:#9fd2c8">{{ themesToggleLabel }}</span>
+          <span style="margin-left:auto;font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#3f4542">INVOLVEMENT IS NOT ADVOCACY · SEE POSITIONS ABOVE FOR ASSERTED STANCES</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showFieldIntelligence&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Structure&quot;},&quot;showPharmaDetail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Structure&quot;}}">
+class Component extends DCLogic {
+  state = { themesExpanded: false };
+  moreThemes = [
+    ['MET exon 14 skipping NSCLC', '5 PUBS'],
+    ['ALK rearranged NSCLC therapy', '5 PUBS'],
+    ['ROS1 fusion targeted therapy', '4 PUBS'],
+    ['RET fusion NSCLC', '4 PUBS'],
+    ['KRAS G12C inhibitor resistance', '6 PUBS'],
+    ['STK11/LKB1 immune evasion', '6 PUBS'],
+    ['KEAP1/NFE2L2 pathway alterations', '4 PUBS'],
+    ['ctDNA minimal residual disease', '5 PUBS'],
+    ['Neoadjuvant chemoimmunotherapy pCR', '6 PUBS'],
+    ['Stereotactic ablative radiotherapy', '5 PUBS'],
+    ['Abscopal response immunoradiotherapy', '3 PUBS'],
+    ['Tumor immune microenvironment profiling', '7 PUBS'],
+    ['CD73 adenosine pathway blockade', '3 PUBS'],
+    ['IL-6 blockade immune resensitization', '3 PUBS'],
+    ['Antiangiogenic TKI combinations', '5 PUBS'],
+    ['VEGF pathway NSCLC', '4 PUBS'],
+    ['Brain metastasis systemic therapy', '4 PUBS'],
+    ['Small cell lung cancer subtypes', '3 PUBS'],
+    ['Immune-related adverse events', '3 PUBS'],
+    ['Smoking signature mutational burden', '4 PUBS'],
+    ['Multi-omic patient stratification', '5 PUBS']
+  ];
+  renderVals() {
+    const expanded = this.state.themesExpanded;
+    return {
+      themesExpanded: expanded,
+      themesToggleLabel: expanded ? 'COLLAPSE TO TOP 6 ↑' : 'ALL 27 THEMES ↓',
+      toggleThemes: () => this.setState(s => ({ themesExpanded: !s.themesExpanded })),
+      moreThemes: this.moreThemes.map(([name, count]) => ({ name, count })),
+      showFieldIntelligence: this.props.showFieldIntelligence ?? true,
+      showPayoffWaypoint: this.props.showPayoffWaypoint ?? true,
+      showPharmaDetail: this.props.showPharmaDetail ?? true
+    };
+  }
+}
+</script>
+</body>
+</html>

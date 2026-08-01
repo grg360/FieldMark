@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+html,body{margin:0;padding:0;background:#0a0a09;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+::selection{background:#3a2f18;color:#f2ede3;}
+a{color:#a9bada;text-decoration:none;}
+a:hover{color:#d9e3f5;}
+@keyframes fmIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<!--
+  Drugs (Assets) Index — "Volume III" editorial redesign.
+  Frame source: claude.ai/design project 1be10392. Materialized to docs/design 2026-07-31.
+
+  Implemented as frontend/src/components/Assets/AssetsIndexPage.tsx, driven ENTIRELY by the
+  real data via loadAssetIndex() (asset_mention_v1 distinct counts, asset_group_distinct
+  unions, asset_density_tiers, config roster + targets). The DCLogic's base() arrays below
+  are MOCK stand-ins for that data — the build swaps them for the live model. Their values
+  were audited and match (Osimertinib 3,310, Pembrolizumab 2,978, Crizotinib 1,577 shown
+  once per ALK/MET/ROS1 group — one distinct per-drug count, not three).
+
+  The index date + corpus total are the COMPUTED values from asset_index_meta()
+  (index_date = max(built_at); corpus = live NSCLC-ingest count), never the old hardcoded
+  "24 Jul 2026" / 85,302 constants (which had drifted 5 days).
+
+  Structure the build reproduces: nav; header (title + reach stats: deployment/backbone/all
+  reach + NSCLC corpus + overlap note); VIEW (by target / flat) + ORDER (volume / A–Z)
+  controls; SECTION 01 target chapters (masonry, rank · serif name · density glyph · mono
+  count · ALSO IN for multi-target); SECTION 02 backbone chemotherapy; SECTION 03 untargeted
+  (target null, not backbone); sticky BRIEFING rail (hover preview / click pin → rank,
+  share, carried-by, peers, Open asset record) with keyboard nav; footer with computed
+  date/corpus. Full frame markup + DCLogic live in the Design project (1be10392); this
+  on-disk copy is the committed authority record + the implementation notes above.
+-->
+
+<div style="background:#0a0a09;min-height:100vh;font-family:'Source Serif 4',Georgia,serif;color:#e6e1d8;padding:34px">
+  <div style="font:600 11.5px/1 'IBM Plex Mono',monospace;letter-spacing:.26em;color:#c9903c">FIELDMARK — DRUGS INDEX · NSCLC · VOLUME III</div>
+  <div style="margin-top:14px;font:400 14.5px/1.55 'Source Serif 4',serif;color:#a9a399;max-width:760px">Organized by molecular target. Distinct-publication counts (not asset–publication edges), NSCLC-scoped; multi-target drugs (e.g. Crizotinib under ALK · MET · ROS1) show one per-drug count once per group. Reproduced by AssetsIndexPage.tsx against the live loadAssetIndex() model; the index date and corpus total are computed (asset_index_meta), not hardcoded.</div>
+</div>
+
+</x-dc>
+</body>
+</html>

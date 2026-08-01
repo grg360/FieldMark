@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0a0b0b; }
+  body { -webkit-font-smoothing:antialiased; }
+  * { box-sizing:border-box; }
+  a { color:#5b8dd9; text-decoration:none; border-bottom:1px solid #26364d; }
+  a:hover { color:#8ab0e8; border-bottom-color:#3f5a80; }
+  input, textarea, button { font-family:inherit; }
+  ::placeholder { color:#4d534f; }
+</style>
+</helmet>
+
+<div style="background:#0a0b0b;color:#cfcbc0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;line-height:1.5;min-height:100vh;font-variant-numeric:tabular-nums">
+
+<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 28px;background:#0d0e0e;border-bottom:1px solid #1c1e1e">
+  <div style="font-size:11px;letter-spacing:0.3em;color:#d69a3c;font-weight:700">FIELDMARK</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="font-size:10px;letter-spacing:0.12em;color:#d69a3c;border:1px solid #493a20;border-radius:2px;padding:4px 10px">Invites · 9 left</div>
+    <div style="width:22px;height:22px;border-radius:50%;background:#1c1e1e;color:#8a8f8c;font-size:9px;display:flex;align-items:center;justify-content:center;letter-spacing:0.06em">GG</div>
+  </div>
+</div>
+
+<div style="display:flex;gap:8px;padding:10px 28px;font-size:10px;letter-spacing:0.1em;color:#4d534f;border-bottom:1px solid #141616">
+  <a href="#" style="color:#6b716e;border:0">Home</a><span>/</span>
+  <a href="#" style="color:#6b716e;border:0">Community</a><span>/</span>
+  <span style="color:#9a9f9b">Maen Hussein</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 330px 360px;border-bottom:1px solid #1c1e1e;background:#0d0e0e">
+  <div style="padding:22px 28px 24px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span style="font-size:9px;letter-spacing:0.16em;color:#5b8dd9;border:1px solid #2c3f5c;border-radius:2px;padding:3px 8px">COMMUNITY</span>
+      <span style="font-size:9px;letter-spacing:0.16em;color:#d69a3c;border:1px solid #493a20;border-radius:2px;padding:3px 8px">TARGETED</span>
+      <span style="font-size:9px;letter-spacing:0.16em;color:#4d534f">NO PUBLICATION RECORD</span>
+    </div>
+    <div style="font-family:'Source Serif 4',Georgia,serif;font-size:34px;line-height:1.05;color:#e6e2d8;letter-spacing:-0.01em;margin-bottom:12px">Maen Hussein</div>
+    <div style="font-size:11px;letter-spacing:0.06em;color:#7f857f;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <span>Medical Oncology · Internal Medicine</span><span style="color:#3a403c">·</span>
+      <span>Lady Lake, FL 32159</span><span style="color:#3a403c">·</span>
+      <span>NPI 1356325506</span>
+    </div>
+    <div style="font-size:11px;letter-spacing:0.04em;color:#7f857f;margin-bottom:18px">Florida Cancer Specialists &amp; Research Institute · group practice, 4 sites</div>
+    <div style="display:flex;gap:8px">
+      <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;letter-spacing:0.14em;padding:7px 13px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">✦ BRIEF</button>
+      <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;letter-spacing:0.14em;padding:7px 13px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">+ LIST</button>
+      <button style="background:#101519;border:1px solid #2c3f5c;color:#5b8dd9;font-size:10px;letter-spacing:0.14em;padding:7px 13px;border-radius:2px;cursor:pointer" style-hover="border-color:#3f5a80">◗ TRACKED</button>
+      <button style="background:transparent;border:1px solid #232626;color:#6b716e;font-size:10px;letter-spacing:0.1em;padding:7px 13px;border-radius:2px;cursor:pointer" style-hover="color:#9a9f9b">NPI Registry →</button>
+    </div>
+  </div>
+
+  <div style="padding:22px 26px;border-left:1px solid #1c1e1e">
+    <div style="font-size:9px;letter-spacing:0.2em;color:#5c625f;margin-bottom:16px">PRACTICE SHAPE</div>
+    <div style="display:flex;flex-direction:column;gap:9px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:11px;color:#7f857f">Patient panel</span><span style="font-size:12px;color:#e6e2d8;font-weight:500">43,138 <span style="color:#5c625f;font-weight:400">bene-yrs / 3yr</span></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:11px;color:#7f857f">Services</span><span style="font-size:12px;color:#e6e2d8;font-weight:500">1.24M <span style="color:#5c625f;font-weight:400">line items</span></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:11px;color:#7f857f">Medicare paid</span><span style="font-size:12px;color:#e6e2d8;font-weight:500">$1.27M</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:11px;color:#7f857f">Setting</span><span style="font-size:12px;color:#e6e2d8;font-weight:500">Office <span style="color:#5c625f;font-weight:400">· 94% of services</span></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:11px;color:#7f857f">Geography</span><span style="font-size:12px;color:#e6e2d8;font-weight:500">Micropolitan</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:11px;color:#7f857f">Career</span><span style="font-size:12px;color:#e6e2d8;font-weight:500">21 yrs <span style="color:#5c625f;font-weight:400">post-fellowship</span></span></div>
+    </div>
+  </div>
+
+  <div style="padding:22px 26px;border-left:1px solid #1c1e1e">
+    <div style="font-size:9px;letter-spacing:0.2em;color:#5c625f;margin-bottom:10px">COMMUNITY SCORE</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
+      <span style="font-size:40px;line-height:1;color:#5b8dd9;font-weight:500;letter-spacing:-0.02em">68</span>
+      <span style="font-size:12px;color:#5c625f">/ 100</span>
+      <span style="font-size:10px;color:#d69a3c;letter-spacing:0.1em;margin-left:6px">99th pct</span>
+    </div>
+    <div style="font-size:10px;color:#7f857f;line-height:1.6;margin-bottom:14px">Rank <span style="color:#d69a3c">1 of 214</span> · NSCLC · FL community cohort</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:grid;grid-template-columns:118px 1fr 34px;align-items:center;gap:8px"><span style="font-size:10px;color:#7f857f">Practice vol · 40</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:78%;background:#5b8dd9"></span></span><span style="font-size:10px;color:#cfcbc0;text-align:right">31.2</span></div>
+      <div style="display:grid;grid-template-columns:118px 1fr 34px;align-items:center;gap:8px"><span style="font-size:10px;color:#7f857f">Engagement · 30</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:82%;background:#5b8dd9"></span></span><span style="font-size:10px;color:#cfcbc0;text-align:right">24.6</span></div>
+      <div style="display:grid;grid-template-columns:118px 1fr 34px;align-items:center;gap:8px"><span style="font-size:10px;color:#7f857f">Setting · 15</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:55%;background:#5b8dd9"></span></span><span style="font-size:10px;color:#cfcbc0;text-align:right">8.3</span></div>
+      <div style="display:grid;grid-template-columns:118px 1fr 34px;align-items:center;gap:8px"><span style="font-size:10px;color:#7f857f">Career · 10</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:40%;background:#5b8dd9"></span></span><span style="font-size:10px;color:#cfcbc0;text-align:right">4.0</span></div>
+      <div style="display:grid;grid-template-columns:118px 1fr 34px;align-items:center;gap:8px"><span style="font-size:10px;color:#7f857f">Publication · 5</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:0%;background:#5b8dd9"></span></span><span style="font-size:10px;color:#5c625f;text-align:right">0.0</span></div>
+    </div>
+    <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:12px">No indexed publications — the 5-point publication component contributes nothing and is not redistributed. Community scores are structurally capped at 95.</div>
+  </div>
+</div>
+
+<div style="border-bottom:1px solid #1c1e1e;background:#0b0c0c;padding:20px 28px 24px">
+  <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+    <span style="color:#d69a3c;font-size:8px">◆</span>
+    <span style="font-size:9px;letter-spacing:0.2em;color:#6b716e">ORIENTATION</span>
+    <span style="font-size:9px;letter-spacing:0.14em;color:#4d534f">— MACHINE-DERIVED · READ FIRST</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px">
+    <div>
+      <div style="font-size:9px;letter-spacing:0.16em;color:#5c625f;margin-bottom:7px">WHO THIS IS</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.55;color:#cfcbc0;text-wrap:pretty">A high-volume community infusion practice in small-town Florida. Office-based, group of four sites, twenty-one years in. Nearly everything he bills is chemotherapy and supportive care he administers himself.</div>
+    </div>
+    <div>
+      <div style="font-size:9px;letter-spacing:0.16em;color:#5c625f;margin-bottom:7px">WHAT CHANGED</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.55;color:#cfcbc0;text-wrap:pretty">The panel halved. <span style="color:#d69a3c">20,199 → 8,728</span> beneficiaries across 2021–2023, while services per patient rose. Fewer people, treated harder. The data shows the shape of the change, not its cause.</div>
+    </div>
+    <div>
+      <div style="font-size:9px;letter-spacing:0.16em;color:#5c625f;margin-bottom:7px">THE ANGLE</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.55;color:#cfcbc0;text-wrap:pretty">He is paid around targeted and oral agents. He administers immunotherapy and cytotoxics. Those two lists barely touch — which is the conversation, and the first section below.</div>
+    </div>
+  </div>
+</div>
+
+<div style="border-bottom:1px solid #1c1e1e;padding:22px 28px 26px">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:24px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="color:#d69a3c;font-size:8px">◆</span>
+      <span style="font-size:9px;letter-spacing:0.2em;color:#6b716e">PAID AROUND vs ADMINISTERED</span>
+      <span style="font-size:9px;letter-spacing:0.14em;color:#4d534f">— CROSS-DOMAIN · OPEN PAYMENTS × MEDICARE PART B</span>
+    </div>
+    <div style="font-size:10px;color:#5c625f">11 products above threshold · 24 administered codes</div>
+  </div>
+  <div style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;line-height:1.4;color:#e6e2d8;margin-bottom:14px;text-wrap:pretty">Two of eleven products he is paid around appear in his claims at all — and both sit at the bottom of his volume. The drugs that fill his chairs carry no reported relationship.</div>
+  <div style="background:#0d0e0e;border:1px solid #1c1e1e;border-radius:2px;padding:11px 14px;font-size:10.5px;line-height:1.7;color:#6b716e;margin-bottom:18px;text-wrap:pretty">Part B claims see what is infused or injected in the office. Oral agents dispense through Part D and are <span style="color:#9a9f9b">structurally invisible here</span> — six of the nine unmatched products are oral, and their absence means nothing. The three injectables with no administration recorded are the ones worth reading.</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:1px;background:#1c1e1e;border:1px solid #1c1e1e;border-radius:2px">
+
+    <div style="background:#0d0e0e;padding:16px 18px 18px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:10px;letter-spacing:0.16em;color:#d69a3c">ALIGNED</span>
+        <span style="font-size:16px;color:#d69a3c">2</span>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.6;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #171919">Paid around it and administers it.</div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="padding:9px 10px;margin:0 -10px;border-radius:2px;cursor:default" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:12px;color:#e6e2d8;letter-spacing:0.04em">ONIVYDE</span><span style="font-size:12px;color:#d69a3c">$11.4K</span></div>
+          <div style="font-size:10px;color:#6b716e;line-height:1.6">irinotecan liposome · J9205 · Ipsen</div>
+          <div style="font-size:10px;color:#7f857f;line-height:1.6">38 beneficiaries · <span style="color:#b8574a">0.4% of drug volume</span></div>
+        </div>
+        <div style="padding:9px 10px;margin:0 -10px;border-radius:2px;cursor:default" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:12px;color:#e6e2d8;letter-spacing:0.04em">TECENTRIQ</span><span style="font-size:12px;color:#d69a3c">$2.1K</span></div>
+          <div style="font-size:10px;color:#6b716e;line-height:1.6">atezolizumab · J9022 · Genentech</div>
+          <div style="font-size:10px;color:#7f857f;line-height:1.6">114 beneficiaries · <span style="color:#b8574a">1.2% of drug volume</span></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:16px;padding-top:14px;border-top:1px solid #171919;text-wrap:pretty">His largest single relationship, $11.4K over 14 payments, sits against thirty-eight patients. Alignment by name only.</div>
+    </div>
+
+    <div style="background:#0d0e0e;padding:16px 18px 18px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:10px;letter-spacing:0.16em;color:#5b8dd9">PAID AROUND · NOT ADMINISTERED</span>
+        <span style="font-size:16px;color:#5b8dd9">9</span>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.6;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #171919">Split by whether Part B could have seen it.</div>
+
+      <div style="font-size:9px;letter-spacing:0.14em;color:#5c625f;margin-bottom:8px">ORAL · INVISIBLE TO PART B · 6</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;margin:0 -6px;border-radius:2px" style-hover="background:#121414"><span style="font-size:11px;color:#b6b2a8">TAGRISSO</span><span style="font-size:11px;color:#7f857f">$5.6K</span></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;margin:0 -6px;border-radius:2px" style-hover="background:#121414"><span style="font-size:11px;color:#b6b2a8">BRUKINSA</span><span style="font-size:11px;color:#7f857f">$2.8K</span></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;margin:0 -6px;border-radius:2px" style-hover="background:#121414"><span style="font-size:11px;color:#b6b2a8">VENCLEXTA</span><span style="font-size:11px;color:#7f857f">$1.8K</span></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;margin:0 -6px;border-radius:2px" style-hover="background:#121414"><span style="font-size:11px;color:#b6b2a8">FOTIVDA</span><span style="font-size:11px;color:#7f857f">$1.8K</span></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;margin:0 -6px;border-radius:2px" style-hover="background:#121414"><span style="font-size:11px;color:#b6b2a8">ORSERDU</span><span style="font-size:11px;color:#7f857f">$1.6K</span></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;margin:0 -6px;border-radius:2px" style-hover="background:#121414"><span style="font-size:11px;color:#b6b2a8">IMBRUVICA</span><span style="font-size:11px;color:#7f857f">$1.4K</span></div>
+      </div>
+
+      <div style="font-size:9px;letter-spacing:0.14em;color:#b8574a;margin-bottom:8px">INJECTABLE · NO ADMINISTRATION RECORDED · 3</div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:7px 8px;margin:0 -8px;border-radius:2px;border-left:2px solid #b8574a" style-hover="background:#121414">
+          <div><div style="font-size:11.5px;color:#e6e2d8">BESREMI</div><div style="font-size:10px;color:#6b716e">ropeginterferon · SC · PharmaEssentia</div></div>
+          <div style="text-align:right"><div style="font-size:11.5px;color:#cfcbc0">$2.8K</div><div style="font-size:10px;color:#5c625f">6 pmts</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:7px 8px;margin:0 -8px;border-radius:2px;border-left:2px solid #b8574a" style-hover="background:#121414">
+          <div><div style="font-size:11.5px;color:#e6e2d8">VIVIMUSTA</div><div style="font-size:10px;color:#6b716e">bendamustine · IV · Acrotech</div></div>
+          <div style="text-align:right"><div style="font-size:11.5px;color:#cfcbc0">$1.9K</div><div style="font-size:10px;color:#5c625f">5 pmts</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:7px 8px;margin:0 -8px;border-radius:2px;border-left:2px solid #b8574a" style-hover="background:#121414">
+          <div><div style="font-size:11.5px;color:#e6e2d8">RYBREVANT</div><div style="font-size:10px;color:#6b716e">amivantamab · IV · Janssen</div></div>
+          <div style="text-align:right"><div style="font-size:11.5px;color:#cfcbc0">$1.2K</div><div style="font-size:10px;color:#5c625f">5 pmts</div></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:14px;padding-top:12px;border-top:1px solid #171919;text-wrap:pretty">Three infusibles with a relationship and no claims. Either the product has not entered the practice, or it entered after the 2023 claims window closed.</div>
+    </div>
+
+    <div style="background:#0d0e0e;padding:16px 18px 18px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:10px;letter-spacing:0.16em;color:#4e9e6a">ADMINISTERED · NO ENGAGEMENT</span>
+        <span style="font-size:16px;color:#4e9e6a">22</span>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.6;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #171919">His actual practice. No reported transfers of value against any of it.</div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="padding:6px 8px;margin:0 -8px;border-radius:2px" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11.5px;color:#e6e2d8">pembrolizumab</span><span style="font-size:11px;color:#cfcbc0">2,847</span></div>
+          <div style="height:3px;background:#141616;margin-top:5px"><div style="height:3px;width:100%;background:#4e9e6a"></div></div>
+        </div>
+        <div style="padding:6px 8px;margin:0 -8px;border-radius:2px" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11.5px;color:#e6e2d8">paclitaxel protein-bound</span><span style="font-size:11px;color:#cfcbc0">1,204</span></div>
+          <div style="height:3px;background:#141616;margin-top:5px"><div style="height:3px;width:42%;background:#4e9e6a"></div></div>
+        </div>
+        <div style="padding:6px 8px;margin:0 -8px;border-radius:2px" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11.5px;color:#e6e2d8">denosumab</span><span style="font-size:11px;color:#cfcbc0">986</span></div>
+          <div style="height:3px;background:#141616;margin-top:5px"><div style="height:3px;width:35%;background:#4e9e6a"></div></div>
+        </div>
+        <div style="padding:6px 8px;margin:0 -8px;border-radius:2px" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11.5px;color:#e6e2d8">bevacizumab-awwb</span><span style="font-size:11px;color:#cfcbc0">743</span></div>
+          <div style="height:3px;background:#141616;margin-top:5px"><div style="height:3px;width:26%;background:#4e9e6a"></div></div>
+        </div>
+        <div style="padding:6px 8px;margin:0 -8px;border-radius:2px" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11.5px;color:#e6e2d8">rituximab-abbs</span><span style="font-size:11px;color:#cfcbc0">512</span></div>
+          <div style="height:3px;background:#141616;margin-top:5px"><div style="height:3px;width:18%;background:#4e9e6a"></div></div>
+        </div>
+        <div style="padding:6px 8px;margin:0 -8px;border-radius:2px" style-hover="background:#121414">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11.5px;color:#e6e2d8">azacitidine</span><span style="font-size:11px;color:#cfcbc0">388</span></div>
+          <div style="height:3px;background:#141616;margin-top:5px"><div style="height:3px;width:14%;background:#4e9e6a"></div></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:14px;padding-top:12px;border-top:1px solid #171919;text-wrap:pretty">Beneficiaries, 3-yr. Sixteen further codes below 300 patients. <a href="#treat" style="color:#5b8dd9;border:0">Full administration table ↓</a></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;align-items:flex-start;margin-top:18px;padding:14px 16px;background:#0f0d0a;border:1px solid #2e2416;border-radius:2px">
+    <span style="color:#d69a3c;font-size:8px;line-height:2.2">◆</span>
+    <div>
+      <div style="font-size:9px;letter-spacing:0.18em;color:#d69a3c;margin-bottom:6px">WHAT TO DO WITH THIS</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.55;color:#cfcbc0;max-width:98ch;text-wrap:pretty">The relationship record describes a targeted-therapy prescriber. The claims describe an immunotherapy-and-cytotoxic infusion practice. Both are true — the orals simply do not appear in Part B. Do not treat the gap as disengagement; treat it as a question about where the injectables went. RYBREVANT is the sharpest one: a relationship since 2022, an IV agent, and no administration on record through 2023.</div>
+    </div>
+  </div>
+</div>
+
+<div style="border-bottom:1px solid #1c1e1e;padding:22px 28px 26px;background:#0b0c0c">
+  <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
+    <span style="color:#d69a3c;font-size:8px">◆</span>
+    <span style="font-size:9px;letter-spacing:0.2em;color:#6b716e">PRACTICE REALITY</span>
+    <span style="font-size:9px;letter-spacing:0.14em;color:#4d534f">— MEDICARE PART B 2021–2023 · NPPES · 100% COVERAGE</span>
+  </div>
+
+  <sc-if value="{{ framingQuestion }}" hint-placeholder-val="{{ true }}">
+    <div style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;line-height:1.4;color:#e6e2d8;margin-bottom:18px;max-width:110ch;text-wrap:pretty">His panel fell 57% in three years while the work per patient went up. Ask him what moved — a partner's retirement, a site, a payer, a referral pattern. The claims record the shape of it and nothing about the reason.</div>
+  </sc-if>
+  <sc-if value="{{ framingNeutral }}">
+    <div style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;line-height:1.4;color:#e6e2d8;margin-bottom:18px;max-width:110ch;text-wrap:pretty">Beneficiary counts fell from 20,199 to 8,728 across 2021–2023. Services per beneficiary rose from 23.8 to 37.7 over the same period.</div>
+  </sc-if>
+  <sc-if value="{{ framingFlagged }}">
+    <div style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;line-height:1.4;color:#e6e2d8;margin-bottom:18px;max-width:110ch;text-wrap:pretty"><span style="color:#b8574a">Panel contraction, −57% over three years.</span> Steepest decline in the FL community cohort's top decile. Services per beneficiary rose 58% against it.</div>
+  </sc-if>
+
+  <div style="display:grid;grid-template-columns:1fr 400px;gap:1px;background:#1c1e1e;border:1px solid #1c1e1e;border-radius:2px">
+    <div style="background:#0d0e0e;padding:20px 24px 18px">
+      <div style="display:grid;grid-template-columns:334px 1fr;gap:28px;align-items:start">
+
+        <div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
+            <span style="font-size:9px;letter-spacing:0.16em;color:#5c625f">BENEFICIARIES / YR</span>
+            <span style="font-size:9px;letter-spacing:0.1em;color:#4d534f">hover</span>
+          </div>
+          <div style="position:relative;height:128px;border-bottom:1px solid #232626">
+            <div style="position:absolute;left:0;right:0;top:0;height:1px;background:#171919"></div>
+            <div style="position:absolute;left:0;right:0;top:64px;height:1px;background:#141616"></div>
+            <svg viewBox="0 0 334 128" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:128px;overflow:visible">
+              <polygon points="34,14 167,53 300,88 300,128 34,128" fill="#12202f"></polygon>
+              <polyline points="34,14 167,53 300,88" fill="none" stroke="#5b8dd9" stroke-width="1.5"></polyline>
+              <circle cx="34" cy="14" r="3.5" fill="#0d0e0e" stroke="#5b8dd9" stroke-width="1.5"></circle>
+              <circle cx="167" cy="53" r="3.5" fill="#0d0e0e" stroke="#5b8dd9" stroke-width="1.5"></circle>
+              <circle cx="300" cy="88" r="3.5" fill="#0d0e0e" stroke="#b8574a" stroke-width="1.5"></circle>
+            </svg>
+            <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr)">
+              <div onMouseEnter="{{ hover2021 }}" onMouseLeave="{{ hoverOff }}" style="cursor:default;border-radius:2px" style-hover="background:#121414"></div>
+              <div onMouseEnter="{{ hover2022 }}" onMouseLeave="{{ hoverOff }}" style="cursor:default;border-radius:2px" style-hover="background:#121414"></div>
+              <div onMouseEnter="{{ hover2023 }}" onMouseLeave="{{ hoverOff }}" style="cursor:default;border-radius:2px" style-hover="background:#121414"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);padding-top:8px">
+            <div><div style="font-size:13px;color:#e6e2d8;letter-spacing:-0.01em">20,199</div><div style="font-size:10px;letter-spacing:0.12em;color:#5c625f;margin-top:2px">2021</div></div>
+            <div style="text-align:center"><div style="font-size:13px;color:#cfcbc0;letter-spacing:-0.01em">14,211</div><div style="font-size:10px;letter-spacing:0.12em;color:#5c625f;margin-top:2px">2022 <span style="color:#b8574a">−30%</span></div></div>
+            <div style="text-align:right"><div style="font-size:13px;color:#e6e2d8;letter-spacing:-0.01em">8,728</div><div style="font-size:10px;letter-spacing:0.12em;color:#5c625f;margin-top:2px">2023 <span style="color:#b8574a">−39%</span></div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #171919">
+            <span style="font-size:18px;color:#b8574a;letter-spacing:-0.01em">−57%</span>
+            <span style="font-size:10px;color:#6b716e;line-height:1.5">panel change<br>across three years</span>
+            <span style="margin-left:auto;text-align:right"><span style="font-size:18px;color:#d69a3c;letter-spacing:-0.01em">+58%</span><br><span style="font-size:10px;color:#6b716e">services / patient</span></span>
+          </div>
+        </div>
+
+        <div>
+          <div style="padding:10px 12px;background:#101212;border:1px solid #1c1e1e;border-radius:2px;min-height:38px;font-size:11px;color:#9a9f9b;line-height:1.6;margin-bottom:14px">{{ trendDetail }}</div>
+          <div style="font-size:9px;letter-spacing:0.16em;color:#5c625f;margin-bottom:8px">HOW TO READ IT</div>
+          <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.55;color:#cfcbc0;margin-bottom:14px;text-wrap:pretty">A halved panel with rising intensity per patient is not the same shape as a practice winding down. Something narrowed the front door while the chairs stayed full. Claims cannot say which.</div>
+          <div style="font-size:10px;color:#5c625f;line-height:1.65;text-wrap:pretty">2023 is the most recent complete Medicare Part B year published. The three annual counts sum to 43,138 beneficiary-years — that is not 43,138 distinct people, and a patient treated across all three years is counted three times.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#0d0e0e;padding:20px 22px 18px;display:flex;flex-direction:column;gap:0">
+      <div style="font-size:9px;letter-spacing:0.16em;color:#5c625f;margin-bottom:14px">SCALE &amp; SETTING</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #171919"><span style="font-size:11px;color:#7f857f">Services, 3-yr</span><span style="font-size:14px;color:#e6e2d8">1,238,904</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #171919"><span style="font-size:11px;color:#7f857f">Medicare paid, 3-yr</span><span style="font-size:14px;color:#e6e2d8">$1,271,440</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #171919"><span style="font-size:11px;color:#7f857f">Services / beneficiary</span><span style="font-size:14px;color:#e6e2d8">28.7 <span style="font-size:10px;color:#b8574a">↑ 58% since 2021</span></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #171919"><span style="font-size:11px;color:#7f857f">Place of service</span><span style="font-size:12px;color:#e6e2d8">Office · 94%</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #171919"><span style="font-size:11px;color:#7f857f">Rurality (RUCA)</span><span style="font-size:12px;color:#e6e2d8">Micropolitan</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #171919"><span style="font-size:11px;color:#7f857f">Organisation</span><span style="font-size:12px;color:#e6e2d8">Group · 4 sites</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #171919"><span style="font-size:11px;color:#7f857f">Career stage</span><span style="font-size:12px;color:#e6e2d8">Established · 21 yrs</span></div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:14px;text-wrap:pretty">Office-based at 94% means the drug decision is his and the chair is his. Micropolitan RUCA puts the nearest academic centre 68 miles away — 21% of the cohort sits in this band.</div>
+      <sc-if value="{{ coverageBadges }}">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #171919">
+          <span style="font-size:9px;letter-spacing:0.1em;color:#4e9e6a;border:1px solid #22402f;border-radius:2px;padding:3px 7px">MEDICARE 100%</span>
+          <span style="font-size:9px;letter-spacing:0.1em;color:#4e9e6a;border:1px solid #22402f;border-radius:2px;padding:3px 7px">NPPES 99%</span>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+
+<div id="treat" style="border-bottom:1px solid #1c1e1e;padding:22px 28px 26px">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:24px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="color:#d69a3c;font-size:8px">◆</span>
+      <span style="font-size:9px;letter-spacing:0.2em;color:#6b716e">WHAT HE ADMINISTERS</span>
+      <span style="font-size:9px;letter-spacing:0.14em;color:#4d534f">— TOP HCPCS · 3-YR AGGREGATE</span>
+    </div>
+    <div style="font-size:10px;color:#5c625f">13 of 24 codes shown · $1.23M of $1.27M (97%)</div>
+  </div>
+  <div style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;line-height:1.4;color:#e6e2d8;margin-bottom:16px;max-width:110ch;text-wrap:pretty">Pembrolizumab is half of everything. Then taxanes, bone support, and a biosimilar bench that is deeper than the cohort median — he has moved bevacizumab and rituximab to biosimilars entirely.</div>
+
+  <div style="border:1px solid #1c1e1e;border-radius:2px;background:#0d0e0e">
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:10px 16px;border-bottom:1px solid #1c1e1e;font-size:9px;letter-spacing:0.14em;color:#5c625f">
+      <span>CODE</span><span>AGENT</span><span>CLASS</span><span style="text-align:right">BENEFICIARIES</span><span style="text-align:right">SERVICES</span><span style="text-align:right">MEDICARE PAID</span><span>SHARE OF PAID</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">J9271</span>
+      <span style="font-size:12px;color:#e6e2d8">pembrolizumab <span style="color:#6b716e">· KEYTRUDA</span></span>
+      <span style="font-size:11px;color:#7f857f">PD-1 inhibitor</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">2,847</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">148,200</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$590,100</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:100%;background:#4e9e6a"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">J9264</span>
+      <span style="font-size:12px;color:#e6e2d8">paclitaxel protein-bound <span style="color:#6b716e">· ABRAXANE</span></span>
+      <span style="font-size:11px;color:#7f857f">taxane</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">1,204</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">63,400</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$196,300</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:33%;background:#4e9e6a"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">J0897</span>
+      <span style="font-size:12px;color:#e6e2d8">denosumab <span style="color:#6b716e">· XGEVA / PROLIA</span></span>
+      <span style="font-size:11px;color:#7f857f">bone-modifying</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">986</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">41,900</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$88,400</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:15%;background:#4e9e6a"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">Q5107</span>
+      <span style="font-size:12px;color:#e6e2d8">bevacizumab-awwb <span style="color:#6b716e">· MVASI</span></span>
+      <span style="font-size:11px;color:#7f857f">VEGF · biosimilar</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">743</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">38,600</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$71,200</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:12%;background:#4e9e6a"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">Q5115</span>
+      <span style="font-size:12px;color:#e6e2d8">rituximab-abbs <span style="color:#6b716e">· TRUXIMA</span></span>
+      <span style="font-size:11px;color:#7f857f">CD20 · biosimilar</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">512</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">24,100</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$63,000</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:11%;background:#4e9e6a"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">J9025</span>
+      <span style="font-size:12px;color:#e6e2d8">azacitidine</span>
+      <span style="font-size:11px;color:#7f857f">hypomethylating</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">388</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">21,700</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$22,300</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:4%;background:#4e9e6a"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">J9217</span>
+      <span style="font-size:12px;color:#e6e2d8">leuprolide acetate</span>
+      <span style="font-size:11px;color:#7f857f">hormonal</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">341</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">9,800</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$41,600</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:7%;background:#4e9e6a"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center;border-left:2px solid #d69a3c" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">J9022</span>
+      <span style="font-size:12px;color:#e6e2d8">atezolizumab <span style="color:#6b716e">· TECENTRIQ</span></span>
+      <span style="font-size:11px;color:#d69a3c">PD-L1 · engaged</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">114</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">7,060</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$48,200</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:8%;background:#d69a3c"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center;border-left:2px solid #d69a3c" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">J9205</span>
+      <span style="font-size:12px;color:#e6e2d8">irinotecan liposome <span style="color:#6b716e">· ONIVYDE</span></span>
+      <span style="font-size:11px;color:#d69a3c">cytotoxic · engaged</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">38</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">2,140</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$19,400</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:3%;background:#d69a3c"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">96413</span>
+      <span style="font-size:12px;color:#e6e2d8">chemo administration, IV infusion, 1st hr</span>
+      <span style="font-size:11px;color:#7f857f">procedure</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">3,918</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">38,900</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$38,100</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:6%;background:#3b5f90"></span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center" style-hover="background:#121414">
+      <span style="font-size:11px;color:#7f857f">96365</span>
+      <span style="font-size:12px;color:#e6e2d8">IV infusion, therapeutic, 1st hr</span>
+      <span style="font-size:11px;color:#7f857f">procedure</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">2,104</span>
+      <span style="font-size:12px;color:#cfcbc0;text-align:right">11,200</span>
+      <span style="font-size:12px;color:#e6e2d8;text-align:right">$11,300</span>
+      <span style="height:4px;background:#141616;align-self:center"><span style="display:block;height:4px;width:2%;background:#3b5f90"></span></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;border-bottom:1px solid #141616;align-items:center;background:#0b0c0c">
+      <span style="font-size:11px;color:#5c625f">J3590</span>
+      <span style="font-size:12px;color:#6b716e;font-style:italic">no name mapping in reference table</span>
+      <span style="font-size:11px;color:#5c625f">unclassified biologic</span>
+      <span style="font-size:12px;color:#7f857f;text-align:right">96</span>
+      <span style="font-size:12px;color:#7f857f;text-align:right">3,900</span>
+      <span style="font-size:12px;color:#7f857f;text-align:right">$31,200</span>
+      <span style="font-size:9px;color:#5c625f;letter-spacing:0.1em;align-self:center">DATA TASK</span>
+    </div>
+    <div style="display:grid;grid-template-columns:78px 1.6fr 1fr 96px 96px 104px 132px;gap:12px;padding:9px 16px;align-items:center;background:#0b0c0c">
+      <span style="font-size:11px;color:#5c625f">J9999</span>
+      <span style="font-size:12px;color:#6b716e;font-style:italic">no name mapping in reference table</span>
+      <span style="font-size:11px;color:#5c625f">antineoplastic NOC</span>
+      <span style="font-size:12px;color:#7f857f;text-align:right">42</span>
+      <span style="font-size:12px;color:#7f857f;text-align:right">1,100</span>
+      <span style="font-size:12px;color:#7f857f;text-align:right">$15,400</span>
+      <span style="font-size:9px;color:#5c625f;letter-spacing:0.1em;align-self:center">DATA TASK</span>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;gap:24px;margin-top:10px;font-size:10px;color:#5c625f;line-height:1.65">
+    <div style="max-width:96ch;text-wrap:pretty">Two codes carry billing volume with no agent name. HCPCS→product mapping is 71% complete against this cohort; the unmapped tail is unclassified and NOC codes, which resolve only by pairing with NDC-level data. Named here as a gap rather than dropped from the total.</div>
+    <div style="white-space:nowrap"><a href="#" style="color:#5b8dd9;border:0">show all 24 codes</a></div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 360px;border-bottom:1px solid #1c1e1e">
+  <div style="border-right:1px solid #1c1e1e">
+
+    <div style="padding:22px 28px 24px;border-bottom:1px solid #1c1e1e">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span style="color:#d69a3c;font-size:8px">◆</span>
+          <span style="font-size:9px;letter-spacing:0.2em;color:#6b716e">FIELD INSIGHTS (2)</span>
+          <span style="font-size:9px;letter-spacing:0.14em;color:#4d534f">— SECOND SPINE</span>
+        </div>
+        <div style="font-size:10px;color:#5c625f">1 contributor · last capture Jun 25 2026</div>
+      </div>
+      <div style="font-size:10.5px;color:#6b716e;line-height:1.7;margin-bottom:14px;max-width:92ch;text-wrap:pretty">Everything above this line is machine-derived from claims and payments. Everything in this section was written by a person who was in the room. The second kind is scarce and load-bearing here.</div>
+      <input placeholder="Add an insight about Dr. Hussein…" style="width:100%;background:#0d0e0e;border:1px solid #232626;border-radius:2px;padding:10px 12px;color:#cfcbc0;font-size:11px;margin-bottom:14px;outline:none" style-focus="border-color:#3a403c" />
+
+      <div style="border:1px solid #1c1e1e;border-radius:2px;background:#0d0e0e;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:9px;letter-spacing:0.14em;color:#9a9f9b;border:1px solid #2a2d2d;border-radius:2px;padding:3px 7px">TUMOR BOARD</span>
+          <span style="font-size:9px;letter-spacing:0.14em;color:#4e9e6a;border:1px solid #22402f;border-radius:2px;padding:3px 7px">STRATEGIC</span>
+          <span style="font-size:10px;color:#5c625f">May 22, 2026</span>
+          <span style="margin-left:auto;font-size:11px;color:#4d534f;letter-spacing:0.2em">···</span>
+        </div>
+        <div style="font-family:'Source Serif 4',Georgia,serif;font-size:15px;line-height:1.6;color:#cfcbc0;text-wrap:pretty">During a follow-up tumor board case discussion, Dr. Hussein pushed back on the sequencing rationale for using our agent earlier in the treatment line, anchoring hard on his real-world experience with a competitor — specifically citing what he described as cleaner tolerability data in his older, frailer patients. He is not dismissing the efficacy story, but the safety profile comparison is doing real work in his decision-making for the community oncology population, which skews older and has more comorbidities than typical trial enrollees.</div>
+        <div style="font-size:10px;color:#5c625f;margin-top:10px">Added Jun 25 2026 · MSL, Southeast</div>
+      </div>
+
+      <div style="border:1px solid #1c1e1e;border-radius:2px;background:#0d0e0e;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:9px;letter-spacing:0.14em;color:#9a9f9b;border:1px solid #2a2d2d;border-radius:2px;padding:3px 7px">PHONE</span>
+          <span style="font-size:9px;letter-spacing:0.14em;color:#d69a3c;border:1px solid #493a20;border-radius:2px;padding:3px 7px">NOTABLE</span>
+          <span style="font-size:10px;color:#5c625f">May 6, 2026</span>
+          <span style="margin-left:auto;font-size:11px;color:#4d534f;letter-spacing:0.2em">···</span>
+        </div>
+        <div style="font-family:'Source Serif 4',Georgia,serif;font-size:15px;line-height:1.6;color:#cfcbc0;text-wrap:pretty">On a brief phone check-in last week, Dr. Hussein flagged that prior authorization turnaround for our agent has been running 10–14 days longer than expected through the dominant payer in his Lady Lake patient base — he named the plan specifically. He is not blaming the drug, but the friction is quietly pushing him toward alternatives where the PA pathway is more predictable. Single mention, but he seemed genuinely frustrated rather than just venting.</div>
+        <div style="font-size:10px;color:#5c625f;margin-top:10px">Added Jun 25 2026 · MSL, Southeast</div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:11px 14px;background:#0b0c0c;border:1px solid #1c1e1e;border-radius:2px">
+        <span style="color:#5b8dd9;font-size:8px;line-height:2">◆</span>
+        <div style="font-size:10.5px;color:#7f857f;line-height:1.7;text-wrap:pretty">Both notes concern a payer and a tolerability argument in an older population — consistent with a micropolitan, office-based panel and a 94% office share. The field record and the claims record agree on the setting even where they disagree on the drug.</div>
+      </div>
+    </div>
+
+    <div style="padding:22px 28px 24px;border-bottom:1px solid #1c1e1e">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span style="color:#d69a3c;font-size:8px">◆</span>
+          <span style="font-size:9px;letter-spacing:0.2em;color:#6b716e">INDUSTRY ENGAGEMENT RECORD</span>
+          <span style="font-size:9px;letter-spacing:0.14em;color:#4d534f">— CONTEXT</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:9px;letter-spacing:0.14em;color:#5c625f;margin-right:2px">SORT</span>
+          <button style="background:#111313;border:1px solid #3a403c;color:#cfcbc0;font-size:9px;letter-spacing:0.12em;padding:5px 10px;border-radius:2px;cursor:pointer">AMOUNT</button>
+          <button style="background:transparent;border:1px solid #232626;color:#6b716e;font-size:9px;letter-spacing:0.12em;padding:5px 10px;border-radius:2px;cursor:pointer" style-hover="color:#9a9f9b">RECENCY</button>
+          <button style="background:transparent;border:1px solid #232626;color:#6b716e;font-size:9px;letter-spacing:0.12em;padding:5px 10px;border-radius:2px;cursor:pointer" style-hover="color:#9a9f9b">ADMINISTERED</button>
+        </div>
+      </div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17px;line-height:1.4;color:#e6e2d8;margin-bottom:12px;text-wrap:pretty">$81.8K lifetime across 60 reporting entities. Broad, shallow, and mostly meals.</div>
+      <div style="background:#0d0e0e;border:1px solid #1c1e1e;border-radius:2px;padding:11px 14px;font-size:10.5px;line-height:1.7;color:#6b716e;margin-bottom:14px;text-wrap:pretty">CMS Open Payments, 2019–2024. A record of <span style="color:#9a9f9b">disclosed transfers of value</span>, published federally. It describes contact between industry and this practice — not influence, not prescribing, not quality of care, and not standing relative to other practitioners. Payment counts sit beside every amount because thirty $40 meals and one $10K consulting agreement are different facts. <span style="color:#9a9f9b">No per-year trend is shown: at company and at product grain the annual columns are single-year blips and mostly zeros, and a line drawn through them would state a direction the data cannot support.</span></div>
+
+      <div style="border:1px solid #1c1e1e;border-radius:2px;background:#0d0e0e">
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:10px 14px;border-bottom:1px solid #1c1e1e;font-size:9px;letter-spacing:0.14em;color:#5c625f">
+          <span>PRODUCT</span><span>REPORTING ENTITY</span><span style="text-align:right">TRANSFERS</span><span style="text-align:right">PAYMENTS</span><span>ACTIVE SPAN</span><span>IN HIS CLAIMS</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">ONIVYDE</span><span style="font-size:11px;color:#8a8f8c">Ipsen Biopharmaceuticals</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$11.4K</span><span style="font-size:11px;color:#7f857f;text-align:right">14 pmts</span><span style="font-size:11px;color:#7f857f">Mar 2021 – Aug 2024</span><span style="font-size:10px;color:#d69a3c;letter-spacing:0.08em">YES · 38 benes</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">TAGRISSO</span><span style="font-size:11px;color:#8a8f8c">AstraZeneca Pharmaceuticals</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$5.6K</span><span style="font-size:11px;color:#7f857f;text-align:right">22 pmts</span><span style="font-size:11px;color:#7f857f">Jan 2019 – Sep 2024</span><span style="font-size:10px;color:#5c625f;letter-spacing:0.08em">ORAL · PART D</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">BRUKINSA</span><span style="font-size:11px;color:#8a8f8c">BeiGene USA</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$2.8K</span><span style="font-size:11px;color:#7f857f;text-align:right">9 pmts</span><span style="font-size:11px;color:#7f857f">Jun 2022 – Aug 2023</span><span style="font-size:10px;color:#5c625f;letter-spacing:0.08em">ORAL · PART D</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">BESREMI</span><span style="font-size:11px;color:#8a8f8c">PharmaEssentia USA</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$2.8K</span><span style="font-size:11px;color:#7f857f;text-align:right">6 pmts</span><span style="font-size:11px;color:#7f857f">Feb 2022 – Jun 2023</span><span style="font-size:10px;color:#b8574a;letter-spacing:0.08em">INJECTABLE · NONE</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">TECENTRIQ</span><span style="font-size:11px;color:#8a8f8c">Genentech USA</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$2.1K</span><span style="font-size:11px;color:#7f857f;text-align:right">7 pmts</span><span style="font-size:11px;color:#7f857f">Apr 2020 – May 2024</span><span style="font-size:10px;color:#d69a3c;letter-spacing:0.08em">YES · 114 benes</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">VIVIMUSTA</span><span style="font-size:11px;color:#8a8f8c">Acrotech Biopharma</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$1.9K</span><span style="font-size:11px;color:#7f857f;text-align:right">5 pmts</span><span style="font-size:11px;color:#7f857f">Nov 2022 – Feb 2024</span><span style="font-size:10px;color:#b8574a;letter-spacing:0.08em">INJECTABLE · NONE</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">FOTIVDA</span><span style="font-size:11px;color:#8a8f8c">Aveo Oncology</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$1.8K</span><span style="font-size:11px;color:#7f857f;text-align:right">7 pmts</span><span style="font-size:11px;color:#7f857f">Apr 2021 – Nov 2023</span><span style="font-size:10px;color:#5c625f;letter-spacing:0.08em">ORAL · PART D</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">VENCLEXTA</span><span style="font-size:11px;color:#8a8f8c">AbbVie Inc.</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$1.8K</span><span style="font-size:11px;color:#7f857f;text-align:right">11 pmts</span><span style="font-size:11px;color:#7f857f">Feb 2019 – Jun 2022</span><span style="font-size:10px;color:#5c625f;letter-spacing:0.08em">ORAL · PART D</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">ORSERDU</span><span style="font-size:11px;color:#8a8f8c">Stemline Therapeutics</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$1.6K</span><span style="font-size:11px;color:#7f857f;text-align:right">4 pmts</span><span style="font-size:11px;color:#7f857f">Mar 2023 – Jul 2024</span><span style="font-size:10px;color:#5c625f;letter-spacing:0.08em">ORAL · PART D</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;border-bottom:1px solid #141616;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">IMBRUVICA</span><span style="font-size:11px;color:#8a8f8c">Janssen Biotech</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$1.4K</span><span style="font-size:11px;color:#7f857f;text-align:right">12 pmts</span><span style="font-size:11px;color:#7f857f">Jan 2019 – Oct 2023</span><span style="font-size:10px;color:#5c625f;letter-spacing:0.08em">ORAL · PART D</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 80px 74px 152px 1fr;gap:12px;padding:9px 14px;align-items:baseline" style-hover="background:#121414">
+          <span style="font-size:12px;color:#e6e2d8;letter-spacing:0.03em">RYBREVANT</span><span style="font-size:11px;color:#8a8f8c">Janssen Biotech</span><span style="font-size:12px;color:#cfcbc0;text-align:right">$1.2K</span><span style="font-size:11px;color:#7f857f;text-align:right">5 pmts</span><span style="font-size:11px;color:#7f857f">May 2022 – Jun 2023</span><span style="font-size:10px;color:#b8574a;letter-spacing:0.08em">INJECTABLE · NONE</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:20px;margin-top:10px;font-size:10px;color:#5c625f">
+        <span>25 products with reported transfers · 11 above the $1,000 disclosure-materiality threshold shown · <a href="#" style="color:#5b8dd9;border:0">show all 25</a></span>
+        <span style="display:flex;gap:14px"><span style="color:#d69a3c">● aligned 2</span><span style="color:#5c625f">● oral 6</span><span style="color:#b8574a">● injectable, none 3</span></span>
+      </div>
+    </div>
+
+    <div style="padding:22px 28px 26px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">
+        <span style="color:#d69a3c;font-size:8px">◆</span>
+        <span style="font-size:9px;letter-spacing:0.2em;color:#6b716e">WHY THIS PRACTITIONER</span>
+      </div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:15px;line-height:1.65;color:#cfcbc0;max-width:96ch;padding-left:14px;border-left:1px solid #232626;text-wrap:pretty">Dr. Hussein runs one of the larger community infusion panels in Florida — 43,138 beneficiary-years and 1.24M services across 2021–2023, 94% of it in his own office, in a micropolitan market 68 miles from the nearest academic centre. He is a pembrolizumab-and-taxane practice with an unusually complete biosimilar bench, and his panel has halved over three years while services per patient rose by more than half. He carries reported transfers from 60 distinct companies, an unusually wide surface for a practice this size, but the engagement is broad rather than deep and it points at a different set of drugs than the ones he gives. Two products entered his disclosure record in the last eighteen months; neither appears in his claims.</div>
+    </div>
+  </div>
+
+  <div style="background:#0b0c0c">
+    <div style="padding:20px 22px;border-bottom:1px solid #1c1e1e">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:9px;letter-spacing:0.18em;color:#6b716e">◆ ENGAGEMENT MIX</span>
+        <span style="font-size:10px;color:#5c625f">$81.8K LIFETIME</span>
+      </div>
+      <div style="display:flex;height:6px;margin-bottom:14px;gap:1px">
+        <div style="width:53%;background:#d69a3c"></div><div style="width:21%;background:#5b8dd9"></div><div style="width:19%;background:#4e9e6a"></div><div style="width:5%;background:#8a7fb8"></div><div style="width:2%;background:#4d534f"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:grid;grid-template-columns:9px 1fr auto 34px;gap:9px;align-items:center"><span style="width:7px;height:7px;background:#d69a3c;display:block"></span><span style="font-size:11px;color:#b6b2a8">Consulting</span><span style="font-size:11px;color:#cfcbc0">$42.7K</span><span style="font-size:10px;color:#5c625f;text-align:right">53%</span></div>
+        <div style="display:grid;grid-template-columns:9px 1fr auto 34px;gap:9px;align-items:center"><span style="width:7px;height:7px;background:#5b8dd9;display:block"></span><span style="font-size:11px;color:#b6b2a8">Speaker bureau</span><span style="font-size:11px;color:#cfcbc0">$16.7K</span><span style="font-size:10px;color:#5c625f;text-align:right">21%</span></div>
+        <div style="display:grid;grid-template-columns:9px 1fr auto 34px;gap:9px;align-items:center"><span style="width:7px;height:7px;background:#4e9e6a;display:block"></span><span style="font-size:11px;color:#b6b2a8">Food &amp; beverage</span><span style="font-size:11px;color:#cfcbc0">$15.5K</span><span style="font-size:10px;color:#5c625f;text-align:right">19%</span></div>
+        <div style="display:grid;grid-template-columns:9px 1fr auto 34px;gap:9px;align-items:center"><span style="width:7px;height:7px;background:#8a7fb8;display:block"></span><span style="font-size:11px;color:#b6b2a8">Honoraria</span><span style="font-size:11px;color:#cfcbc0">$3.8K</span><span style="font-size:10px;color:#5c625f;text-align:right">5%</span></div>
+        <div style="display:grid;grid-template-columns:9px 1fr auto 34px;gap:9px;align-items:center"><span style="width:7px;height:7px;background:#4d534f;display:block"></span><span style="font-size:11px;color:#b6b2a8">Travel, lodging</span><span style="font-size:11px;color:#cfcbc0">$1.7K</span><span style="font-size:10px;color:#5c625f;text-align:right">2%</span></div>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:12px;text-wrap:pretty">Consulting concentrates in one relationship (Ipsen, $14.2K / 18 payments). The remainder is thin and widely spread.</div>
+    </div>
+
+    <div style="padding:20px 22px;border-bottom:1px solid #1c1e1e">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:9px;letter-spacing:0.18em;color:#6b716e">◆ REPORTING ENTITIES</span>
+        <span style="font-size:10px;color:#5c625f">60 DISTINCT</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 60px 54px;gap:8px;align-items:baseline"><span style="font-size:11px;color:#b6b2a8">Ipsen Biopharmaceuticals</span><span style="font-size:10px;color:#5c625f;text-align:right">18 pmts</span><span style="font-size:11px;color:#cfcbc0;text-align:right">$14.2K</span></div>
+        <div style="display:grid;grid-template-columns:1fr 60px 54px;gap:8px;align-items:baseline"><span style="font-size:11px;color:#b6b2a8">Bristol Myers Squibb</span><span style="font-size:10px;color:#5c625f;text-align:right">70 pmts</span><span style="font-size:11px;color:#cfcbc0;text-align:right">$10.8K</span></div>
+        <div style="display:grid;grid-template-columns:1fr 60px 54px;gap:8px;align-items:baseline"><span style="font-size:11px;color:#b6b2a8">Pfizer Inc.</span><span style="font-size:10px;color:#5c625f;text-align:right">78 pmts</span><span style="font-size:11px;color:#cfcbc0;text-align:right">$7.2K</span></div>
+        <div style="display:grid;grid-template-columns:1fr 60px 54px;gap:8px;align-items:baseline"><span style="font-size:11px;color:#b6b2a8">AstraZeneca</span><span style="font-size:10px;color:#5c625f;text-align:right">39 pmts</span><span style="font-size:11px;color:#cfcbc0;text-align:right">$6.6K</span></div>
+        <div style="display:grid;grid-template-columns:1fr 60px 54px;gap:8px;align-items:baseline"><span style="font-size:11px;color:#b6b2a8">Janssen Biotech</span><span style="font-size:10px;color:#5c625f;text-align:right">58 pmts</span><span style="font-size:11px;color:#cfcbc0;text-align:right">$6.4K</span></div>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:12px">55 further entities below $4K, aggregating $41.8K. Merck — whose pembrolizumab is half his drug spend — is not among them.</div>
+    </div>
+
+    <div style="padding:20px 22px;border-bottom:1px solid #1c1e1e">
+      <div style="font-size:9px;letter-spacing:0.18em;color:#6b716e;margin-bottom:12px">◆ DATA COVERAGE</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 52px 34px;gap:8px;align-items:center"><span style="font-size:11px;color:#b6b2a8">Medicare Part B</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:100%;background:#4e9e6a"></span></span><span style="font-size:10px;color:#cfcbc0;text-align:right">100%</span></div>
+        <div style="display:grid;grid-template-columns:1fr 52px 34px;gap:8px;align-items:center"><span style="font-size:11px;color:#b6b2a8">NPPES</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:99%;background:#4e9e6a"></span></span><span style="font-size:10px;color:#cfcbc0;text-align:right">99%</span></div>
+        <div style="display:grid;grid-template-columns:1fr 52px 34px;gap:8px;align-items:center"><span style="font-size:11px;color:#b6b2a8">Open Payments</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:94%;background:#4e9e6a"></span></span><span style="font-size:10px;color:#cfcbc0;text-align:right">94%</span></div>
+        <div style="display:grid;grid-template-columns:1fr 52px 34px;gap:8px;align-items:center"><span style="font-size:11px;color:#d69a3c">HCPCS → agent name</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:71%;background:#d69a3c"></span></span><span style="font-size:10px;color:#d69a3c;text-align:right">71%</span></div>
+        <div style="display:grid;grid-template-columns:1fr 52px 34px;gap:8px;align-items:center"><span style="font-size:11px;color:#5c625f">Publications</span><span style="height:3px;background:#1c1e1e;display:block"><span style="display:block;height:3px;width:0%;background:#4d534f"></span></span><span style="font-size:10px;color:#5c625f;text-align:right">0%</span></div>
+      </div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.65;margin-top:12px;text-wrap:pretty">Coverage is measured across the 200-HCP community cohort, not this record alone. The name-mapping gap is a build task, not a property of the practitioner.</div>
+    </div>
+
+    <div style="padding:20px 22px;border-bottom:1px solid #1c1e1e">
+      <div style="font-size:9px;letter-spacing:0.18em;color:#6b716e;margin-bottom:10px">◆ FIELD INTELLIGENCE</div>
+      <div style="font-size:10px;color:#7f857f;line-height:1.6;margin-bottom:12px">Validation pending — 0 MSLs have reviewed this profile.</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px"><span style="font-size:9px;letter-spacing:0.14em;color:#d69a3c">COMMUNITY CONFIDENCE</span><span style="font-size:10px;color:#5c625f">0 MSLs</span></div>
+      <div style="font-size:10px;color:#7f857f;margin-bottom:6px">Claims record matches practice reality</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Confirms</button>
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Partial</button>
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Disputes</button>
+      </div>
+      <div style="font-size:10px;color:#7f857f;margin-bottom:6px">Panel decline — known cause?</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Yes</button>
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Suspect</button>
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">No</button>
+      </div>
+      <div style="font-size:10px;color:#7f857f;margin-bottom:6px">Access in practice</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Open</button>
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Gated</button>
+        <button style="background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;padding:7px 4px;border-radius:2px;cursor:pointer" style-hover="border-color:#3a403c;color:#cfcbc0">Closed</button>
+      </div>
+      <button style="width:100%;background:#0f1010;border:1px solid #232626;color:#5c625f;font-size:10px;letter-spacing:0.14em;padding:9px;border-radius:2px;cursor:not-allowed">Submit validation</button>
+      <div style="font-size:9px;color:#4d534f;text-align:center;margin-top:8px">Your identity is never shared. Contributor GUID only.</div>
+    </div>
+
+    <div style="padding:20px 22px;border-bottom:1px solid #1c1e1e">
+      <div style="font-size:9px;letter-spacing:0.18em;color:#6b716e;margin-bottom:12px">◆ RELATIONSHIP</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-size:11px;color:#7f857f">Status</span><span style="font-size:9px;letter-spacing:0.14em;color:#d69a3c;border:1px solid #493a20;border-radius:2px;padding:4px 9px">TARGETED</span></div>
+      <div style="font-size:9px;letter-spacing:0.14em;color:#5c625f;margin-bottom:7px">FOLLOW-UPS</div>
+      <input placeholder="Add a follow-up…" style="width:100%;background:#0d0e0e;border:1px solid #232626;border-radius:2px;padding:9px 11px;color:#cfcbc0;font-size:11px;outline:none;margin-bottom:8px" style-focus="border-color:#3a403c" />
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-bottom:12px">
+        <button style="background:transparent;border:1px solid #232626;color:#6b716e;font-size:9px;letter-spacing:0.1em;padding:5px 9px;border-radius:2px;cursor:pointer">LOW</button>
+        <button style="background:#111313;border:1px solid #3a403c;color:#cfcbc0;font-size:9px;letter-spacing:0.1em;padding:5px 9px;border-radius:2px;cursor:pointer">NORMAL</button>
+        <button style="background:transparent;border:1px solid #232626;color:#6b716e;font-size:9px;letter-spacing:0.1em;padding:5px 9px;border-radius:2px;cursor:pointer">HIGH</button>
+        <button style="background:transparent;border:1px solid #232626;color:#6b716e;font-size:9px;letter-spacing:0.1em;padding:5px 9px;border-radius:2px;cursor:pointer">Due date</button>
+      </div>
+      <button style="width:100%;background:#d69a3c;border:1px solid #d69a3c;color:#120d05;font-size:10px;letter-spacing:0.2em;font-weight:500;padding:9px;border-radius:2px;cursor:pointer" style-hover="background:#e2a94e">SAVE</button>
+    </div>
+
+    <div style="padding:20px 22px">
+      <div style="font-size:9px;letter-spacing:0.18em;color:#6b716e;margin-bottom:10px">◆ FIELD NOTES</div>
+      <div style="border:1px dashed #232626;border-radius:2px;padding:14px;text-align:center;font-size:10px;color:#5c625f;margin-bottom:10px">No field notes yet — add the first.</div>
+      <button style="width:100%;background:#111313;border:1px solid #232626;color:#9a9f9b;font-size:10px;letter-spacing:0.12em;padding:9px;border-radius:2px;cursor:pointer;margin-bottom:8px" style-hover="border-color:#3a403c;color:#cfcbc0">Add context</button>
+      <button style="width:100%;background:transparent;border:1px solid #232626;color:#6b716e;font-size:10px;letter-spacing:0.12em;padding:9px;border-radius:2px;cursor:pointer" style-hover="color:#9a9f9b">Report data issue</button>
+      <div style="font-size:9px;color:#4d534f;line-height:1.7;margin-top:14px">Are you Dr. Hussein? <a href="#">Request opt-out or claim this profile.</a> Payment and claims data are federal public record and cannot be removed by us.</div>
+    </div>
+  </div>
+</div>
+
+<sc-if value="{{ specimens }}" hint-placeholder-val="{{ true }}">
+<div style="padding:22px 28px 40px;background:#090a0a">
+  <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+    <span style="color:#4d534f;font-size:8px">◆</span>
+    <span style="font-size:9px;letter-spacing:0.2em;color:#5c625f">HONEST EMPTY STATES</span>
+    <span style="font-size:9px;letter-spacing:0.14em;color:#3a403c">— SPECIMENS, NOT PART OF THE PAGE</span>
+  </div>
+  <div style="font-size:10.5px;color:#5c625f;line-height:1.7;margin-bottom:16px">Every absence names itself and says what it costs the reader. Nothing degrades to zero, "N/A", or a hidden section.</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#1c1e1e;border:1px solid #1c1e1e;border-radius:2px">
+    <div style="background:#0b0c0c;padding:16px 18px">
+      <div style="font-size:9px;letter-spacing:0.14em;color:#5c625f;margin-bottom:10px">NO PART B CLAIMS</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.5;color:#9a9f9b;margin-bottom:10px;text-wrap:pretty">No Medicare Part B activity 2021–2023. Practice reality cannot be stated.</div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.7;text-wrap:pretty">Usually a practice with no Medicare-age panel, a pediatric or VA setting, or a clinician who bills under a group NPI. It is not evidence of a small practice. The spine of this profile is missing — read the engagement record alone, and read it carefully.</div>
+    </div>
+    <div style="background:#0b0c0c;padding:16px 18px">
+      <div style="font-size:9px;letter-spacing:0.14em;color:#5c625f;margin-bottom:10px">CODE PRESENT, NAME UNKNOWN</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.5;color:#9a9f9b;margin-bottom:10px;text-wrap:pretty">$31,200 billed under J3590. We cannot yet say what it was.</div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.7;text-wrap:pretty">Unclassified and NOC codes carry real volume and no agent name until NDC-level data is joined. The row stays in the table with its dollars intact and the gap named, rather than being dropped to make the total look clean.</div>
+    </div>
+    <div style="background:#0b0c0c;padding:16px 18px">
+      <div style="font-size:9px;letter-spacing:0.14em;color:#5c625f;margin-bottom:10px">NO ENGAGEMENT RECORD</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:14.5px;line-height:1.5;color:#9a9f9b;margin-bottom:10px;text-wrap:pretty">No reported transfers of value, 2019–2024. The cross-domain view collapses.</div>
+      <div style="font-size:10px;color:#5c625f;line-height:1.7;text-wrap:pretty">This is a fact about disclosure, not about the practitioner. 1,190 community HCPs in this cohort have none. Without a paid-around list there is nothing to cross against the administered list — plan from claims volume and setting alone.</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;slopeFraming&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;question&quot;,&quot;neutral&quot;,&quot;flagged&quot;],&quot;default&quot;:&quot;question&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Practice reality&quot;},&quot;showCoverageBadges&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Practice reality&quot;},&quot;showSpecimens&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Page&quot;}}">
+class Component extends DCLogic {
+  state = { hy: null };
+  renderVals() {
+    const f = this.props.slopeFraming ?? 'question';
+    const detail = {
+      '2021': '2021 · 20,199 beneficiaries · 480,900 services · 23.8 services per beneficiary · $512K Medicare paid',
+      '2022': '2022 · 14,211 beneficiaries · −29.6% YoY · 430,600 services · 30.3 per beneficiary · $441K Medicare paid',
+      '2023': '2023 · 8,728 beneficiaries · −38.6% YoY · 327,400 services · 37.5 per beneficiary · $318K Medicare paid'
+    };
+    const set = (y) => () => this.setState({ hy: y });
+    return {
+      framingQuestion: f === 'question',
+      framingNeutral: f === 'neutral',
+      framingFlagged: f === 'flagged',
+      coverageBadges: this.props.showCoverageBadges ?? false,
+      specimens: this.props.showSpecimens ?? true,
+      trendDetail: this.state.hy
+        ? detail[this.state.hy]
+        : '2021–2023 aggregate · 43,138 beneficiary-years · 1,238,904 services · $1,271,440 Medicare paid · −56.8% panel change',
+      hover2021: set('2021'),
+      hover2022: set('2022'),
+      hover2023: set('2023'),
+      hoverOff: () => this.setState({ hy: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

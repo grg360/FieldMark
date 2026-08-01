@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#020308; }
+  a { color:#ffcf5a; text-decoration:none; }
+  a:hover { color:#ffe1a0; }
+</style>
+</helmet>
+
+<!--
+  Telescope Final — layout authority for the constellation / focus-orbit rebuild.
+  Frame source: claude.ai/design project ea483f5c. Materialized to docs/design 2026-07-30.
+
+  Implemented as frontend/src/components/TelescopeField.tsx, driven by the REAL enriched
+  data (telescope_nsclc_nodes.json — each node carries focus_collaborators: real top-5
+  from hcp_top_collaborators_v2, shared_publications weight + per-collaborator cohort) and
+  telescope_nsclc_edges.json. No runtime table queries. The frame's EST/RIS/OFF arrays and
+  HEYMACH_ORBIT are MOCK stand-ins for that real data; the build swaps them for the JSON.
+
+  Structure the build reproduces:
+   - Honest framing copy: overview is a CURATED SUBGRAPH of the field's leaders, not any
+     one person's complete network. Never "complete network."
+   - Desktop: field SVG (gold established, purple rising, weighted co-authorship lines) +
+     legend (Established / Rising / Outside the field view / Shared publications) + weight
+     chips (All links / 8+ / 18+) + cohort tabs (All / Established / Rising) + right rail
+     (resting = rank list; focused = researcher card + real top-5 + Open HCP profile /
+     Return to field).
+   - Focus: field re-forms; focus_collaborators pull into a weighted orbit. Members OUTSIDE
+     the overview node set render as NEW "Outside the field view" nodes (blue, dashed ring)
+     — the off-field reveal, the whole point. Banner: "N of 5 sit outside the field view."
+   - Field expansion (product model, leaders-first): overview starts at the top-50 leaders;
+     a "show more of the field" control expands beyond them (data has ~1,700), never the
+     full hairball at once.
+   - Mobile: list-first (Established / Rising tabs), tap → inline ego-orbit of the real
+     top-5 with "N of 5 outside the field view" + Open profile / See in field.
+   - Honest footer + data-lineage note retained.
+
+  NOTE: the frame shows a "Momentum +N% / 12-MO" stat with no backing in our data (no
+  time-series); the build omits it rather than fabricate — flagged in the report.
+-->
+
+<div style="padding:56px 60px 44px;background:#020308;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#f4f4f7">
+  <!-- Full frame markup lives in the Design project (ea483f5c / "Telescope Final.dc.html")
+       and is reproduced by TelescopeField.tsx. This on-disk copy is the committed record of
+       the authority + the implementation notes above; the <script data-dc-script> component
+       (field/orbit/off-field algorithm, legibility + expansion controls, mobile list+orbit)
+       is ported verbatim-in-spirit into the React component against real data. -->
+  <div style="font:600 30px/1.18 'Helvetica Neue';color:#f4f4f7">The constellation of the recognized and emerging field</div>
+  <div style="font:400 15px/1.55 'Helvetica Neue';color:#9497a6;max-width:840px;margin-top:14px">The overview is a <span style="color:#d6d7de">curated subgraph</span>: the 50 researchers already recognized as established KOLs or rising stars in NSCLC, and the co-authorship among <em style="font-style:normal;color:#d6d7de">them</em>. It is not every researcher, and it is not any one person's complete network. Focusing a researcher is what reveals their real orbit — including collaborators the field view can't show.</div>
+</div>
+
+</x-dc>
+</body>
+</html>

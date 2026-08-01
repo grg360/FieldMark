@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#02030a; }
+  a { color:#ffd89b; text-decoration:none; }
+  a:hover { color:#ffe8c4; }
+  input.sv-q { all:unset; box-sizing:border-box; }
+  @keyframes sv-tw { 0%,100% { opacity:1 } 50% { opacity:0.38 } }
+  @keyframes sv-tws { 0%,100% { opacity:1 } 50% { opacity:0.62 } }
+  @keyframes sv-drift {
+    0%   { transform:translate(0px,0px) }
+    25%  { transform:translate(2.5px,-1.8px) }
+    50%  { transform:translate(0.6px,2.4px) }
+    75%  { transform:translate(-2.2px,0.8px) }
+    100% { transform:translate(0px,0px) }
+  }
+  @keyframes sv-bloom { from { opacity:0; transform:scale(0.2) } to { opacity:1; transform:scale(1) } }
+  @keyframes sv-breathe { 0%,100% { opacity:0.42 } 50% { opacity:0.8 } }
+  @keyframes sv-rise {
+    0%   { transform:scale(0.3);  opacity:0 }
+    14%  { opacity:0.32 }
+    100% { transform:scale(3.1);  opacity:0 }
+  }
+  @keyframes sv-swell { 0%,100% { opacity:0.82 } 46% { opacity:1 } }
+  @keyframes sv-shoot  { 0%{opacity:0;transform:translate(0,0)} 1.4%{opacity:0} 2.2%{opacity:.85} 4.6%{opacity:.85} 6.4%{opacity:0;transform:translate(-760px,340px)} 100%{opacity:0;transform:translate(-760px,340px)} }
+  @keyframes sv-shoot2 { 0%{opacity:0;transform:translate(0,0)} 41%{opacity:0} 42.4%{opacity:.7} 44.6%{opacity:.7} 46.6%{opacity:0;transform:translate(560px,290px)} 100%{opacity:0;transform:translate(560px,290px)} }
+  @keyframes sv-shoot3 { 0%{opacity:0;transform:translate(0,0)} 18%{opacity:0} 19.2%{opacity:.55} 21.8%{opacity:.55} 24%{opacity:0;transform:translate(-430px,236px)} 100%{opacity:0;transform:translate(-430px,236px)} }
+  @keyframes sv-shoot4 { 0%{opacity:0;transform:translate(0,0)} 63%{opacity:0} 64.2%{opacity:.62} 66.4%{opacity:.62} 68.6%{opacity:0;transform:translate(-520px,180px)} 100%{opacity:0;transform:translate(-520px,180px)} }
+  @keyframes sv-shoot5 { 0%{opacity:0;transform:translate(0,0)} 8%{opacity:0} 9.4%{opacity:.9} 12.6%{opacity:.9} 15.4%{opacity:0;transform:translate(-920px,414px)} 100%{opacity:0;transform:translate(-920px,414px)} }
+  @keyframes sv-shoot6 { 0%{opacity:0;transform:translate(0,0)} 77%{opacity:0} 78%{opacity:.42} 79.8%{opacity:.42} 81.4%{opacity:0;transform:translate(330px,208px)} 100%{opacity:0;transform:translate(330px,208px)} }
+  @keyframes sv-shoot7 { 0%{opacity:0;transform:translate(0,0)} 33%{opacity:0} 34%{opacity:.48} 35.9%{opacity:.48} 37.6%{opacity:0;transform:translate(-360px,300px)} 100%{opacity:0;transform:translate(-360px,300px)} }
+</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;gap:40px;padding:0 0 64px;background:#02030a;font-family:Jost,'Helvetica Neue',Helvetica,Arial,sans-serif">
+
+  <div style="{{ frameStyle }}">
+  <div data-screen-label="Skyview — free camera" ref="{{ hostRef }}" style="position:relative;width:100%;height:100%;overflow:hidden;background:#04060d;cursor:grab;touch-action:none;user-select:none" onPointerDown="{{ onDown }}" onPointerMove="{{ onMove }}" onPointerUp="{{ onUp }}" onPointerLeave="{{ onLeave }}" onWheel="{{ onWheel }}">
+
+    <div style="position:absolute;inset:0;background:radial-gradient(120% 90% at 22% 8%, rgba(28,42,86,0.55) 0%, rgba(8,11,24,0) 58%), radial-gradient(90% 80% at 88% 92%, rgba(52,28,76,0.42) 0%, rgba(8,11,24,0) 55%), radial-gradient(70% 60% at 50% 50%, rgba(10,16,34,0.9) 0%, #04060d 78%)"></div>
+    <div style="position:absolute;left:-12%;top:14%;width:130%;height:44%;transform:rotate(-13deg);background:radial-gradient(closest-side, rgba(126,150,214,0.085) 0%, rgba(126,150,214,0.03) 42%, rgba(126,150,214,0) 76%);filter:blur(46px)"></div>
+    <div style="position:absolute;left:8%;top:52%;width:52%;height:38%;transform:rotate(-9deg);background:radial-gradient(closest-side, rgba(176,138,224,0.055) 0%, rgba(176,138,224,0) 72%);filter:blur(58px)"></div>
+
+    <svg ref="{{ svgRef }}" viewBox="{{ viewBox }}" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;display:block">
+      <defs>
+        <linearGradient id="svTrail" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"></stop>
+          <stop offset="60%" stop-color="#cfe0ff" stop-opacity="0.18"></stop>
+          <stop offset="100%" stop-color="#cfe0ff" stop-opacity="0"></stop>
+        </linearGradient>
+        <linearGradient id="svTrail2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.75"></stop>
+          <stop offset="70%" stop-color="#e6d4ff" stop-opacity="0.12"></stop>
+          <stop offset="100%" stop-color="#e6d4ff" stop-opacity="0"></stop>
+        </linearGradient>
+        <linearGradient id="svTrail3" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fff4e0" stop-opacity="0.95"></stop>
+          <stop offset="55%" stop-color="#ffd89b" stop-opacity="0.2"></stop>
+          <stop offset="100%" stop-color="#ffd89b" stop-opacity="0"></stop>
+        </linearGradient>
+      </defs>
+
+      <g ref="{{ farRef }}">
+        <sc-for list="{{ dustFar }}" as="d" hint-placeholder-count="0">
+          <circle cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r }}" style="{{ d.style }}"></circle>
+        </sc-for>
+      </g>
+
+      <g ref="{{ midRef }}">
+        <sc-for list="{{ dustMid }}" as="d" hint-placeholder-count="0">
+          <circle cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r }}" style="{{ d.style }}"></circle>
+        </sc-for>
+      </g>
+
+      <g ref="{{ worldRef }}">
+        <g>
+          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="0">
+            <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" style="{{ e.style }}"></line>
+          </sc-for>
+        </g>
+        <g>
+          <sc-for list="{{ rings }}" as="g" hint-placeholder-count="0">
+            <circle cx="0" cy="0" r="{{ g.r }}" style="{{ g.style }}"></circle>
+          </sc-for>
+        </g>
+        <g>
+          <sc-for list="{{ stars }}" as="s" hint-placeholder-count="0">
+            <g style="{{ s.gStyle }}">
+              <g style="{{ s.bloomStyle }}">
+                <g style="{{ s.driftStyle }}">
+                  <circle cx="0" cy="0" r="{{ s.pingR }}" style="{{ s.pingStyle }}"></circle>
+                  <circle cx="0" cy="0" r="{{ s.pingR }}" style="{{ s.ping2Style }}"></circle>
+                  <circle cx="0" cy="0" r="{{ s.r }}" style="{{ s.style }}"></circle>
+                </g>
+              </g>
+            </g>
+          </sc-for>
+        </g>
+      </g>
+
+      <g ref="{{ meteorRef }}">
+        <g style="transform:translate(1120px,110px);animation:sv-shoot 27s linear infinite">
+          <line x1="0" y1="0" x2="150" y2="-67" stroke="url(#svTrail)" stroke-width="1.4" stroke-linecap="round"></line>
+        </g>
+        <g style="transform:translate(150px,170px);animation:sv-shoot2 38s linear infinite">
+          <line x1="0" y1="0" x2="-124" y2="-64" stroke="url(#svTrail2)" stroke-width="1.2" stroke-linecap="round"></line>
+        </g>
+        <g style="transform:translate(880px,55px);animation:sv-shoot3 31s linear -6s infinite">
+          <line x1="0" y1="0" x2="108" y2="-59" stroke="url(#svTrail)" stroke-width="1.1" stroke-linecap="round"></line>
+        </g>
+        <g style="transform:translate(1180px,430px);animation:sv-shoot4 44s linear -17s infinite">
+          <line x1="0" y1="0" x2="132" y2="-46" stroke="url(#svTrail2)" stroke-width="1.15" stroke-linecap="round"></line>
+        </g>
+        <g style="transform:translate(1210px,-30px);animation:sv-shoot5 63s linear -29s infinite">
+          <line x1="0" y1="0" x2="210" y2="-94" stroke="url(#svTrail3)" stroke-width="1.7" stroke-linecap="round"></line>
+        </g>
+        <g style="transform:translate(340px,780px);animation:sv-shoot6 34s linear -11s infinite">
+          <line x1="0" y1="0" x2="-72" y2="-45" stroke="url(#svTrail2)" stroke-width="0.8" stroke-linecap="round"></line>
+        </g>
+        <g style="transform:translate(770px,280px);animation:sv-shoot7 41s linear -23s infinite">
+          <line x1="0" y1="0" x2="84" y2="-70" stroke="url(#svTrail)" stroke-width="0.75" stroke-linecap="round"></line>
+        </g>
+      </g>
+    </svg>
+
+    <div ref="{{ labelRef }}" style="position:absolute;inset:0;pointer-events:none">
+      <sc-for list="{{ labels }}" as="l" hint-placeholder-count="0">
+        <div data-wx="{{ l.wx }}" data-wy="{{ l.wy }}" data-side="{{ l.side }}" style="{{ l.style }}">{{ l.text }}</div>
+      </sc-for>
+    </div>
+
+    <div style="{{ titleBoxStyle }}">
+      <div style="display:flex;align-items:center;gap:11px;pointer-events:none">
+        <div style="width:5px;height:5px;border-radius:50%;background:#ffd89b;box-shadow:0 0 12px rgba(255,216,155,0.9)"></div>
+        <div style="font:400 11px/1 Jost,sans-serif;letter-spacing:0.42em;text-transform:uppercase;color:#e6e3da">Skyview</div>
+      </div>
+
+      <sc-if value="{{ resting }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:14px;pointer-events:none">
+          <div style="font:200 34px/1.24 Jost,sans-serif;letter-spacing:0.008em;color:#e6e3da;text-wrap:pretty">The constellation of the recognized and emerging field</div>
+          <div style="font:300 15px/1.72 Jost,sans-serif;color:#7c839a;text-wrap:pretty;max-width:400px">A curated subgraph — the fifty researchers already recognized as established or rising in NSCLC, and the co-authorship among them. Not every researcher, and not anyone's complete network.</div>
+          <div style="font:300 13px/1.7 Jost,sans-serif;letter-spacing:0.02em;color:#4d5468;text-wrap:pretty;max-width:390px">Drag to look around. Scroll to move closer. Settle on a star to see its real orbit — then travel from there.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ hasTrail }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <div style="font:400 9px/1 Jost,sans-serif;letter-spacing:0.28em;text-transform:uppercase;color:#3f4658">Your route</div>
+          <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;max-width:430px">
+            <div style="font:300 11px/1 Jost,sans-serif;letter-spacing:0.16em;text-transform:uppercase;color:#4d5468;cursor:pointer;transition:color 220ms ease" style-hover="color:#a8afc2" onClick="{{ pullBack }}">Full sky</div>
+            <sc-for list="{{ trail }}" as="t" hint-placeholder-count="0">
+              <div style="display:flex;align-items:center;gap:11px">
+                <div style="width:12px;height:1px;background:rgba(255,255,255,0.13)"></div>
+                <div style="{{ t.style }}" onClick="{{ t.onClick }}">{{ t.name }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="{{ controlsStyle }}">
+      <div style="width:100%;position:relative">
+        <div style="display:flex;align-items:center;gap:12px;border-bottom:1px solid {{ searchBorder }};padding:0 2px 11px;transition:border-color 260ms ease">
+          <div style="width:9px;height:9px;border-radius:50%;border:1px solid #4d5468;flex:none"></div>
+          <input class="sv-q" type="text" value="{{ query }}" placeholder="Fly to a researcher" onInput="{{ onQuery }}" onFocus="{{ onQueryFocus }}" onPointerDown="{{ stop }}" style="flex:1;font:300 14px/1.2 Jost,sans-serif;letter-spacing:0.04em;color:#e6e3da;caret-color:#ffd89b"></input>
+          <sc-if value="{{ hasQuery }}" hint-placeholder-val="{{ false }}">
+            <div style="font:300 11px/1 Jost,sans-serif;letter-spacing:0.14em;text-transform:uppercase;color:#4d5468;cursor:pointer" onClick="{{ clearQuery }}" style-hover="color:#a8afc2">Clear</div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ showResults }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:0;right:0;top:100%;margin-top:10px;background:rgba(6,9,19,0.82);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.07);border-radius:3px;padding:8px 0;max-height:394px;overflow-y:auto;box-shadow:0 30px 70px rgba(0,0,0,0.5)" onPointerDown="{{ stop }}">
+            <sc-for list="{{ results }}" as="r" hint-placeholder-count="0">
+              <div style="display:flex;align-items:center;gap:13px;padding:11px 18px;cursor:pointer" onClick="{{ r.onClick }}" style-hover="background:rgba(255,255,255,0.04)">
+                <div style="{{ r.dotStyle }}"></div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <div style="font:300 14px/1.2 Jost,sans-serif;color:#dcd9d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+                  <div style="font:300 10px/1.2 Jost,sans-serif;letter-spacing:0.04em;color:#4d5468;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.inst }}</div>
+                </div>
+                <div style="font:300 12px/1 Jost,sans-serif;color:#565d72;flex:none">{{ r.conn }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:14px 18px;font:300 12px/1.5 Jost,sans-serif;color:#4d5468">No one by that name in this sky.</div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex;gap:24px">
+        <sc-for list="{{ cohortTabs }}" as="t" hint-placeholder-count="3">
+          <div style="{{ t.style }}" onClick="{{ t.onClick }}">{{ t.label }}</div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:24px">
+        <sc-for list="{{ densityTabs }}" as="t" hint-placeholder-count="2">
+          <div style="{{ t.style }}" onClick="{{ t.onClick }}">{{ t.label }}</div>
+        </sc-for>
+      </div>
+      <div style="font:300 11px/1.6 Jost,sans-serif;letter-spacing:0.03em;color:#3f4658;text-align:right;max-width:250px;text-wrap:pretty">{{ densityNote }}</div>
+    </div>
+
+    <sc-if value="{{ focused }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ panelStyle }}" onPointerDown="{{ stop }}">
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="{{ selRoleStyle }}">{{ selRole }}</div>
+          <div style="font:200 28px/1.16 Jost,sans-serif;letter-spacing:0.006em;color:#f0ede4">{{ selName }}</div>
+          <div style="font:300 13px/1.5 Jost,sans-serif;color:#7c839a">{{ selInst }}</div>
+        </div>
+
+        <sc-if value="{{ hasStats }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;gap:32px;padding:18px 0;border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06)">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font:300 22px/1 Jost,sans-serif;color:#e6e3da">{{ selConn }}</div>
+              <div style="font:400 9px/1 Jost,sans-serif;letter-spacing:0.2em;text-transform:uppercase;color:#4d5468">Connectivity</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font:300 22px/1 Jost,sans-serif;color:#e6e3da">{{ selShared }}</div>
+              <div style="font:400 9px/1 Jost,sans-serif;letter-spacing:0.2em;text-transform:uppercase;color:#4d5468">Shared works</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font:300 22px/1 Jost,sans-serif;color:#e6e3da">{{ selMomentum }}</div>
+              <div style="font:400 9px/1 Jost,sans-serif;letter-spacing:0.2em;text-transform:uppercase;color:#4d5468">12-mo</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasMomentumNote }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:flex-start;gap:12px;margin-top:-8px">
+            <div style="width:7px;height:7px;border-radius:50%;background:#c3a9ff;box-shadow:0 0 10px rgba(160,116,255,0.8);outline:1px solid rgba(195,169,255,0.4);outline-offset:4px;flex:none;margin-top:5px"></div>
+            <div style="font:300 12px/1.6 Jost,sans-serif;color:#a496c9;text-wrap:pretty">{{ momentumNote }}</div>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font:300 12px/1.65 Jost,sans-serif;color:#8f96ab;text-wrap:pretty">{{ banner }}</div>
+          <sc-if value="{{ hasCollabs }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ collabs }}" as="c" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer" onClick="{{ c.onClick }}" style-hover="background:rgba(255,255,255,0.028)">
+                  <div style="{{ c.dotStyle }}"></div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                    <div style="font:300 15px/1.2 Jost,sans-serif;color:#dcd9d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</div>
+                    <div style="{{ c.subStyle }}">{{ c.sub }}</div>
+                  </div>
+                  <div style="font:300 16px/1 Jost,sans-serif;color:#c9c6bd;flex:none">{{ c.w }}</div>
+                  <div style="font:300 15px/1 Jost,sans-serif;color:#3f4658;flex:none">→</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font:300 10px/1.5 Jost,sans-serif;letter-spacing:0.14em;text-transform:uppercase;color:#3f4658">Travel to any of them — the sky follows</div>
+          </sc-if>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="flex:1;text-align:center;border:1px solid rgba(255,216,155,0.42);color:#ffd89b;border-radius:2px;padding:14px;font:400 11px/1 Jost,sans-serif;letter-spacing:0.18em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(255,216,155,0.09);border-color:rgba(255,216,155,0.7)">Open HCP profile</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="{{ legendStyle }}">
+      <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="{{ l.dotStyle }}"></div>
+          <div style="font:300 11px/1 Jost,sans-serif;letter-spacing:0.14em;text-transform:uppercase;color:#5a6178">{{ l.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="{{ camControlsStyle }}">
+      <div style="font:300 10px/1 Jost,sans-serif;letter-spacing:0.16em;text-transform:uppercase;color:#343b4c;pointer-events:none">Drag · Scroll · Click</div>
+      <sc-if value="{{ canPullBack }}" hint-placeholder-val="{{ false }}">
+        <div style="font:300 11px/1 Jost,sans-serif;letter-spacing:0.18em;text-transform:uppercase;color:#5a6178;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.12);padding-bottom:5px;transition:color 240ms ease,border-color 240ms ease" style-hover="color:#ffd89b;border-color:rgba(255,216,155,0.5)" onClick="{{ pullBack }}">Return to the full sky</div>
+      </sc-if>
+    </div>
+
+    <div style="position:absolute;left:0;right:0;bottom:22px;text-align:center;pointer-events:none">
+      <div style="font:300 10px/1 Jost,sans-serif;letter-spacing:0.14em;color:#343b4c">For verified MSL use only. Content not affiliated with mentioned researchers.</div>
+    </div>
+  </div>
+  </div>
+
+  <div style="display:flex;gap:56px;align-items:flex-start;padding:0 64px">
+
+    <div data-screen-label="Mobile — list-first" style="display:flex;flex-direction:column;gap:18px">
+      <div style="font:400 10px/1 Jost,sans-serif;letter-spacing:0.28em;text-transform:uppercase;color:#4d5468">Mobile 390 · list-first, hop on demand</div>
+
+      <div style="width:390px;height:844px;border-radius:46px;border:1px solid rgba(255,255,255,0.11);background:#04060d;overflow:hidden;position:relative;box-shadow:0 40px 90px rgba(0,0,0,0.55);display:flex;flex-direction:column">
+
+        <div style="position:relative;flex:none;height:158px;overflow:hidden;background:radial-gradient(110% 150% at 30% 0%, rgba(30,44,88,0.6) 0%, rgba(6,9,20,0) 62%), #05070f">
+          <svg viewBox="0 0 390 158" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%">
+            <sc-for list="{{ mSky }}" as="d" hint-placeholder-count="0">
+              <circle cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r }}" style="{{ d.style }}"></circle>
+            </sc-for>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:0 22px 18px;gap:9px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="display:flex;align-items:center;gap:9px">
+                <div style="width:4px;height:4px;border-radius:50%;background:#ffd89b;box-shadow:0 0 10px rgba(255,216,155,0.9)"></div>
+                <div style="font:400 10px/1 Jost,sans-serif;letter-spacing:0.36em;text-transform:uppercase;color:#e6e3da">Skyview</div>
+              </div>
+              <div style="font:300 10px/1 Jost,sans-serif;letter-spacing:0.16em;text-transform:uppercase;color:#4d5468">NSCLC</div>
+            </div>
+            <div style="font:200 22px/1.24 Jost,sans-serif;color:#e6e3da;text-wrap:pretty">Fifty recognized names</div>
+            <div style="font:300 12px/1.55 Jost,sans-serif;color:#6b7288;text-wrap:pretty">Established and rising, and the co-authorship among them. Tap one, then travel collaborator to collaborator.</div>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;padding:0 22px;gap:28px;border-bottom:1px solid rgba(255,255,255,0.06)">
+          <sc-for list="{{ mTabs }}" as="t" hint-placeholder-count="2">
+            <div style="{{ t.style }}" onClick="{{ t.onClick }}">{{ t.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column">
+          <sc-for list="{{ mRows }}" as="r" hint-placeholder-count="8">
+            <div style="border-bottom:1px solid rgba(255,255,255,0.045)">
+              <div style="display:flex;align-items:center;gap:14px;min-height:66px;padding:13px 22px;cursor:pointer" onClick="{{ r.onClick }}">
+                <div style="width:16px;font:300 11px/1 Jost,sans-serif;letter-spacing:0.06em;color:#3f4658;flex:none">{{ r.rank }}</div>
+                <div style="{{ r.dotStyle }}"></div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                  <div style="{{ r.nameStyle }}">{{ r.name }}</div>
+                  <div style="font:300 11px/1.2 Jost,sans-serif;letter-spacing:0.02em;color:#565d72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.inst }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:14px;flex:none">
+                  <div style="width:52px;height:1px;background:rgba(255,255,255,0.08)">
+                    <div style="{{ r.barStyle }}"></div>
+                  </div>
+                  <div style="font:300 13px/1 Jost,sans-serif;color:#8f96ab;width:34px;text-align:right">{{ r.momentum }}</div>
+                </div>
+              </div>
+
+              <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:0 0 20px;display:flex;flex-direction:column;gap:14px;background:radial-gradient(90% 60% at 50% 22%, rgba(24,36,72,0.5) 0%, rgba(5,7,15,0) 70%), #05070f">
+                  <div style="position:relative;width:100%;height:238px">
+                    <svg viewBox="0 0 390 238" style="position:absolute;inset:0;width:100%;height:100%;display:block">
+                      <sc-for list="{{ r.sky }}" as="d" hint-placeholder-count="0">
+                        <circle cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r }}" style="{{ d.style }}"></circle>
+                      </sc-for>
+                      <sc-for list="{{ r.edges }}" as="e" hint-placeholder-count="5">
+                        <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" style="{{ e.style }}"></line>
+                      </sc-for>
+                      <sc-for list="{{ r.rings }}" as="g" hint-placeholder-count="0">
+                        <circle cx="{{ g.cx }}" cy="{{ g.cy }}" r="{{ g.r }}" style="{{ g.style }}"></circle>
+                      </sc-for>
+                      <sc-for list="{{ r.dots }}" as="n" hint-placeholder-count="6">
+                        <circle cx="{{ n.cx }}" cy="{{ n.cy }}" r="{{ n.r }}" style="{{ n.style }}"></circle>
+                      </sc-for>
+                    </svg>
+                    <div style="position:absolute;inset:0;pointer-events:none">
+                      <sc-for list="{{ r.texts }}" as="t" hint-placeholder-count="6">
+                        <div style="{{ t.style }}">{{ t.text }}</div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="font:300 12px/1.6 Jost,sans-serif;color:#6b7288;padding:0 22px;text-wrap:pretty">{{ r.orbitNote }}</div>
+                  <div style="display:flex;flex-direction:column;padding:0 22px">
+                    <sc-for list="{{ r.collabs }}" as="c" hint-placeholder-count="5">
+                      <div style="display:flex;align-items:center;gap:13px;min-height:48px;border-top:1px solid rgba(255,255,255,0.045);cursor:pointer" onClick="{{ c.onClick }}">
+                        <div style="{{ c.dotStyle }}"></div>
+                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                          <div style="font:300 14px/1.2 Jost,sans-serif;color:#dcd9d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</div>
+                          <div style="{{ c.subStyle }}">{{ c.sub }}</div>
+                        </div>
+                        <div style="font:300 15px/1 Jost,sans-serif;color:#c9c6bd;flex:none">{{ c.w }}</div>
+                        <div style="{{ c.hopStyle }}">{{ c.hop }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;gap:10px;padding:6px 22px 0">
+                    <div style="flex:1;text-align:center;border:1px solid rgba(255,216,155,0.4);color:#ffd89b;border-radius:2px;min-height:48px;display:flex;align-items:center;justify-content:center;font:400 11px/1 Jost,sans-serif;letter-spacing:0.16em;text-transform:uppercase">Open profile</div>
+                    <div style="flex:1;text-align:center;border:1px solid rgba(255,255,255,0.1);color:#8f96ab;border-radius:2px;min-height:48px;display:flex;align-items:center;justify-content:center;font:400 11px/1 Jost,sans-serif;letter-spacing:0.16em;text-transform:uppercase">See in sky</div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="flex:none;padding:13px 22px;border-top:1px solid rgba(255,255,255,0.06)">
+          <div style="font:300 9px/1.5 Jost,sans-serif;letter-spacing:0.1em;color:#343b4c;text-align:center;text-wrap:pretty">For verified MSL use only. Content not affiliated with mentioned researchers.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:22px;max-width:520px;padding-top:44px">
+      <div style="font:400 10px/1 Jost,sans-serif;letter-spacing:0.28em;text-transform:uppercase;color:#4d5468">The exploration model</div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font:400 14px/1.4 Jost,sans-serif;color:#c9c6bd">One sky, a free camera</div>
+          <div style="font:300 13px/1.7 Jost,sans-serif;color:#6b7288;text-wrap:pretty">Stars never move. Focus is only where the camera is looking, so nothing is ever modal — drag to pan, scroll to close in, click to settle.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font:400 14px/1.4 Jost,sans-serif;color:#c9c6bd">Roam</div>
+          <div style="font:300 13px/1.7 Jost,sans-serif;color:#6b7288;text-wrap:pretty">The nearest star to the cursor brightens, magnifies and names itself, and its co-authorship lines warm up. Discovery without committing to anything.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font:400 14px/1.4 Jost,sans-serif;color:#c9c6bd">Hop</div>
+          <div style="font:300 13px/1.7 Jost,sans-serif;color:#6b7288;text-wrap:pretty">Every orbit star is a destination. Click one — in the sky or in the panel — and the camera glides there and blooms <em style="font-style:normal;color:#a8afc2">their</em> orbit. Walk the network star to star; the route stays as a breadcrumb you can fly back along.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font:400 14px/1.4 Jost,sans-serif;color:#c9c6bd">Full-bleed, measured not assumed</div>
+          <div style="font:300 13px/1.7 Jost,sans-serif;color:#6b7288;text-wrap:pretty">The sky fills whatever box it is given — a ResizeObserver drives the camera, viewBox, chrome insets and panel width off the measured element, so there is no fixed pixel size anywhere. Use the <em style="font-style:normal;color:#a8afc2">Viewport</em> tweak to preview 1280 → 3440. Because a camera frames by <em style="font-style:normal;color:#a8afc2">both</em> axes, a wider screen shows more sky rather than a stretched one.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font:400 14px/1.4 Jost,sans-serif;color:#c9c6bd">Off-field stars are destinations too</div>
+          <div style="font:300 13px/1.7 Jost,sans-serif;color:#6b7288;text-wrap:pretty">Heymach still reveals Zhang 97 · Gibbons 91 · Wistuba 89 · Swisher 73 · Le 62 — three outside the recognized field. Those three are clickable: the camera travels, and the panel says plainly why there's no ranking behind them.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;frameWidth&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1280&quot;,&quot;1440&quot;,&quot;1920&quot;,&quot;2400&quot;,&quot;3440&quot;],&quot;default&quot;:&quot;1920&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Viewport&quot;,&quot;unit&quot;:&quot;px&quot;},&quot;liveSky&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Sky&quot;},&quot;minWeight&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:11,&quot;min&quot;:3,&quot;max&quot;:30,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Sky&quot;}}">
+const EST = [
+  ['J. Heymach','MD Anderson',98,12],['R. Herbst','Yale Cancer Center',96,7],['P. Jänne','Dana-Farber',95,9],
+  ['S. Ramalingam','Winship / Emory',92,6],['C. Rudin','Memorial Sloan Kettering',91,11],['T. Mok','Chinese Univ. of Hong Kong',90,4],
+  ['S. Peters','CHUV Lausanne',89,14],['E. Felip','Vall d’Hebron',87,8],['J. Brahmer','Johns Hopkins',85,5],
+  ['M. Reck','LungenClinic Grosshansdorf',84,3],['B. Solomon','Peter MacCallum',83,9],['A. Drilon','Memorial Sloan Kettering',82,16],
+  ['L. Sequist','Massachusetts General',81,6],['H. Wakelee','Stanford',79,7],['M. Garassino','Univ. of Chicago',78,13],
+  ['J. Zhang','MD Anderson',77,19],['D. Gibbons','MD Anderson',76,15],['F. Shepherd','Princess Margaret',74,2],
+  ['D. Planchard','Gustave Roussy',73,8],['M. Ahn','Samsung Medical Center',72,6],['N. Reguart','Hospital Clínic Barcelona',70,10],
+  ['M. Awad','Dana-Farber',69,17]
+];
+const RIS = [
+  ['T. Cascone','MD Anderson',64,31],['F. Skoulidis','MD Anderson',61,35],['N. Vokes','MD Anderson',58,38],
+  ['J. Rotow','Dana-Farber',57,29],['B. Ricciuti','Dana-Farber',56,34],['Y. Elamin','MD Anderson',55,27],
+  ['J. Lin','Massachusetts General',55,26],['J. Naidoo','Beaumont / RCSI',55,21],['M. Altan','MD Anderson',54,25],
+  ['A. Schoenfeld','Memorial Sloan Kettering',54,30],['I. Dagogo-Jack','Massachusetts General',53,28],['Z. Piotrowska','Massachusetts General',52,24],
+  ['J. Chaft','Memorial Sloan Kettering',52,14],['H. Yu','Memorial Sloan Kettering',51,23],['C. Aggarwal','Penn Medicine',50,20],
+  ['V. Lam','MD Anderson',49,22],['K. Arbour','Memorial Sloan Kettering',49,24],['P. Paik','Memorial Sloan Kettering',48,18],
+  ['K. Marrone','Johns Hopkins',47,21],['A. Sacher','Princess Margaret',46,26],['L. Mezquita','Hospital Clínic Barcelona',45,25],
+  ['M. Offin','Memorial Sloan Kettering',45,27],['J. Riess','UC Davis',44,19],['J. Sands','Dana-Farber',44,20],
+  ['A. Cortot','CHU Lille',44,16],['M. Nagasaka','UC Irvine',43,22],['G. Lamberti','IRCCS Bologna',42,33],
+  ['A. Elkrief','Memorial Sloan Kettering',40,36]
+];
+const OFF = [
+  ['I. Wistuba','MD Anderson · Pathology'],['S. Swisher','MD Anderson · Thoracic Surgery'],['X. Le','MD Anderson'],
+  ['B. Sepesi','MD Anderson · Thoracic Surgery'],['L. Byers','MD Anderson'],['J. Roth','MD Anderson · Thoracic Surgery'],
+  ['W. Travis','Memorial Sloan Kettering · Pathology'],['M. Ladanyi','Memorial Sloan Kettering · Molecular Path.'],
+  ['D. Jones','Memorial Sloan Kettering · Surgery'],['K. Politi','Yale'],['D. Rimm','Yale · Pathology'],
+  ['A. Hata','Massachusetts General'],['M. Mino-Kenudson','Massachusetts General · Pathology'],['K. Wong','Dana-Farber']
+];
+
+const GOLD = '#ffd89b', PURP = '#c3a9ff', OTHER = '#a8bdd8';
+const TINT = { established: GOLD, rising: PURP, other: OTHER };
+const HALO = { established: 'rgba(255,196,120,0.78)', rising: 'rgba(160,116,255,0.72)', other: 'rgba(140,178,228,0.66)' };
+const ROLE = { established: 'Established', rising: 'Rising', other: 'Outside the recognized field' };
+const LINE = '#7e93c6';
+
+const WW = 3400, WH = 1900;
+const skyHeight = (w) => Math.round(Math.min(1160, Math.max(640, w * 0.52)));
+const hash = (a, b) => { let s = ((a + 1) * 73856093 ^ (b + 1) * 19349663) >>> 0; s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+const rngFrom = (seed) => { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
+const easeInOut = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+function buildField() {
+  const raw = EST.map((d, i) => ({ id: 'e' + i, name: d[0], inst: d[1], cohort: 'established', conn: d[2], mom: d[3] }))
+    .concat(RIS.map((d, i) => ({ id: 'r' + i, name: d[0], inst: d[1], cohort: 'rising', conn: d[2], mom: d[3] })));
+
+  const byInst = new Map();
+  raw.forEach(n => { if (!byInst.has(n.inst)) byInst.set(n.inst, []); byInst.get(n.inst).push(n); });
+  const groups = [...byInst.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  const rand = rngFrom(20260730);
+  const placed = [];
+  groups.forEach(([inst, members], gi) => {
+    const spread = 56 + members.length * 22;
+    const need = spread + 210 + members.length * 16;
+    let best = null, bestScore = -1;
+    for (let t = 0; t < 400; t++) {
+      const x = 230 + rand() * (WW - 460);
+      const y = 200 + rand() * (WH - 400);
+      let nearest = placed.length ? 1e9 : 9999;
+      placed.forEach(p => { nearest = Math.min(nearest, Math.hypot(x - p.x, (y - p.y) * 1.4)); });
+      if (nearest > need) { best = { x, y }; break; }
+      if (nearest > bestScore) { bestScore = nearest; best = { x, y }; }
+    }
+    placed.push({ x: best.x, y: best.y, spread, inst });
+    members.sort((a, b) => b.conn - a.conn);
+    members.forEach((n, k) => {
+      if (members.length === 1) { n.x = best.x; n.y = best.y; return; }
+      const a = k * 2.39996 + gi * 0.9;
+      const rr = spread * (0.34 + 0.66 * Math.sqrt((k + 0.4) / members.length));
+      n.x = best.x + Math.cos(a) * rr * 1.22 + (hash(gi, k) - 0.5) * 26;
+      n.y = best.y + Math.sin(a) * rr * 0.9 + (hash(k, gi) - 0.5) * 22;
+    });
+  });
+
+  const nodes = raw;
+  nodes.forEach((n, i) => { n.i = i; n.tw = 3.4 + hash(i, 3) * 4.6; n.twd = -hash(i, 9) * 7; n.dr = 22 + hash(i, 17) * 26; n.drd = -hash(i, 23) * 30; });
+
+  const edges = [], adj = nodes.map(() => new Map());
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const A = nodes[i], B = nodes[j];
+    const same = A.inst === B.inst;
+    const d = Math.hypot((A.x - B.x) / WW, (A.y - B.y) / WH);
+    const h = hash(i, j), h2 = hash(j * 3, i * 5);
+    let ok, w;
+    if (same) { ok = h < 0.86; w = 9 + Math.floor(h2 * 32); }
+    else { ok = h < 0.30 * Math.exp(-d * 2.2); w = 3 + Math.floor(h2 * 16); }
+    if (ok) { edges.push({ a: i, b: j, w }); adj[i].set(j, w); adj[j].set(i, w); }
+  }
+  nodes.forEach(n => { n.deg = adj[n.i].size; });
+  const leaders = new Set(nodes.slice().sort((a, b) => b.conn - a.conn).slice(0, 18).map(n => n.i));
+  return { nodes, edges, adj, leaders };
+}
+
+const HEYMACH_ORBIT = [
+  { name: 'J. Zhang', inst: 'MD Anderson', cohort: 'established', w: 97, inField: true },
+  { name: 'D. Gibbons', inst: 'MD Anderson', cohort: 'established', w: 91, inField: true },
+  { name: 'I. Wistuba', inst: 'MD Anderson · Pathology', cohort: 'other', w: 89, inField: false },
+  { name: 'S. Swisher', inst: 'MD Anderson · Thoracic Surgery', cohort: 'other', w: 73, inField: false },
+  { name: 'X. Le', inst: 'MD Anderson', cohort: 'other', w: 62, inField: false }
+];
+
+function buildOrbit(g, i) {
+  let out;
+  if (g.nodes[i].name === 'J. Heymach') {
+    out = HEYMACH_ORBIT.map(c => ({ ...c, fieldIndex: g.nodes.findIndex(n => n.name === c.name) }));
+  } else {
+    const n = g.nodes[i];
+    const nb = [...g.adj[i].entries()].sort((a, b) => b[1] - a[1]);
+    const keep = 2 + Math.floor(hash(i, 91) * 2);
+    out = nb.slice(0, keep).map(([j, w]) => ({
+      name: g.nodes[j].name, inst: g.nodes[j].inst, cohort: g.nodes[j].cohort,
+      w: Math.round(w * (1.6 + hash(i, j) * 1.1)), inField: true, fieldIndex: j
+    }));
+    let k = Math.floor(hash(i, 41) * OFF.length);
+    while (out.length < 5) {
+      const o = OFF[k % OFF.length]; k++;
+      if (out.some(c => c.name === o[0])) continue;
+      out.push({ name: o[0], inst: o[1], cohort: 'other', w: Math.round(22 + n.conn * 0.45 + hash(i, k) * 34), inField: false, fieldIndex: -1 });
+    }
+    out.sort((a, b) => b.w - a.w);
+    out = out.slice(0, 5);
+  }
+  const host = g.nodes[i];
+  let off = 0;
+  out.forEach((c, k) => {
+    if (c.fieldIndex >= 0) { c.x = g.nodes[c.fieldIndex].x; c.y = g.nodes[c.fieldIndex].y; return; }
+    const a = -Math.PI / 2 + off * (Math.PI * 2 / 3) + hash(i, k) * 0.9 + 0.5;
+    const rr = 168 + (100 - Math.min(100, c.w)) * 1.9;
+    c.x = host.x + Math.cos(a) * rr * 1.15;
+    c.y = host.y + Math.sin(a) * rr * 0.92;
+    off++;
+  });
+  return out;
+}
+
+function dust(seed, count, w, h, rMin, rMax, oMin, oMax, soft) {
+  const rand = rngFrom(seed), out = [];
+  for (let i = 0; i < count; i++) {
+    const r = rMin + Math.pow(rand(), 1.9) * (rMax - rMin);
+    const o = oMin + Math.pow(rand(), 1.4) * (oMax - oMin);
+    const t = rand();
+    const col = t > 0.93 ? '#ffe6c2' : t > 0.86 ? '#d5c8ff' : t > 0.6 ? '#dce6ff' : '#ffffff';
+    out.push({
+      key: 'd' + seed + '-' + i, cx: (rand() * w).toFixed(1), cy: (rand() * h).toFixed(1), r: r.toFixed(2),
+      style: 'fill:' + col + ';opacity:' + o.toFixed(3) +
+        ';animation:' + (soft ? 'sv-tws ' : 'sv-tw ') + (3 + rand() * 6).toFixed(2) + 's ease-in-out ' + (-rand() * 8).toFixed(2) + 's infinite'
+    });
+  }
+  return out;
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.hostRef = React.createRef();
+    this.svgRef = React.createRef();
+    this.farRef = React.createRef();
+    this.midRef = React.createRef();
+    this.worldRef = React.createRef();
+    this.labelRef = React.createRef();
+    this.meteorRef = React.createRef();
+    const w0 = Number(props.frameWidth) || 1920;
+    this.state = { box: { w: w0, h: skyHeight(w0) }, focus: null, near: null, cohort: 'all', density: 'leaders', query: '', qOpen: false, trail: [], mTab: 'established', mOpen: null };
+    const fit = this.fitCam();
+    this._cam = { ...fit };
+    this._camT = { ...fit };
+    this._anim = null;
+    this._drag = null;
+    this._vel = { x: 0, y: 0 };
+  }
+
+  vw() { return this.state.box.w; }
+  vh() { return this.state.box.h; }
+
+  componentDidMount() {
+    const el = this.hostRef.current;
+    if (el && typeof ResizeObserver !== 'undefined') {
+      this._ro = new ResizeObserver(() => {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        const b = this.state.box;
+        if (Math.abs(b.w - r.width) < 1 && Math.abs(b.h - r.height) < 1) return;
+        const wasFit = !this.state.focus;
+        this.setState({ box: { w: r.width, h: r.height } }, () => {
+          if (wasFit) { this._cam = this.fitCam(); this._camT = { ...this._cam }; }
+          this.paint();
+        });
+      });
+      this._ro.observe(el);
+    }
+    this.paint();
+  }
+  componentDidUpdate() { this.paint(); }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); if (this._ro) this._ro.disconnect(); }
+
+  field() { if (!this._f) this._f = buildField(); return this._f; }
+  orbit(i) { this._oc = this._oc || {}; if (!this._oc[i]) this._oc[i] = buildOrbit(this.field(), i); return this._oc[i]; }
+  dustFar() { if (!this._df) this._df = dust(5501, 340, WW, WH, 0.4, 1.5, 0.06, 0.42, false); return this._df; }
+  dustMid() { if (!this._dm) this._dm = dust(7717, 130, WW, WH, 0.9, 2.3, 0.12, 0.5, true); return this._dm; }
+  mSky() { if (!this._ms) this._ms = dust(3301, 78, 390, 158, 0.4, 1.5, 0.1, 0.55, false); return this._ms; }
+  orbitSky(i) { this._os = this._os || {}; if (!this._os[i]) this._os[i] = dust(9100 + i, 54, 390, 238, 0.4, 1.4, 0.08, 0.42, false); return this._os[i]; }
+
+  fitCam() {
+    const g = this.field();
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    g.nodes.forEach(n => { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); });
+    const z = Math.min(this.vw() * 0.9 / (x1 - x0), this.vh() * 0.8 / (y1 - y0));
+    return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: Math.max(0.24, Math.min(0.95, z)) };
+  }
+
+  paint() {
+    const c = this._cam, VW = this.vw(), VH = this.vh();
+    const lay = (ref, f, zf) => {
+      if (!ref.current) return;
+      const z = 1 + (c.z - 1) * zf;
+      ref.current.style.transform = 'translate(' + (VW / 2) + 'px,' + (VH / 2) + 'px) scale(' + z.toFixed(4) + ') translate(' + (-c.x * f).toFixed(2) + 'px,' + (-c.y * f).toFixed(2) + 'px)';
+    };
+    lay(this.farRef, 0.26, 0.32);
+    lay(this.midRef, 0.56, 0.62);
+    lay(this.worldRef, 1, 1);
+    if (this.meteorRef.current) {
+      const sx = Math.max(0.9, Math.min(2.4, VW / 1400)), sy = Math.max(0.66, Math.min(1.2, VH / 1000));
+      this.meteorRef.current.style.transform = 'translate(' + (-c.x * 0.34 + WW * 0.17).toFixed(2) + 'px,' + (-c.y * 0.34 + WH * 0.17).toFixed(2) + 'px) scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')';
+    }
+    const layer = this.labelRef.current;
+    if (layer) {
+      const chips = layer.querySelectorAll('[data-wx]');
+      for (let i = 0; i < chips.length; i++) {
+        const el = chips[i];
+        const wx = +el.getAttribute('data-wx'), wy = +el.getAttribute('data-wy');
+        el.style.left = (VW / 2 + (wx - c.x) * c.z).toFixed(1) + 'px';
+        el.style.top = (VH / 2 + (wy - c.y) * c.z).toFixed(1) + 'px';
+      }
+    }
+  }
+
+  tick = () => {
+    this._raf = null;
+    let more = false;
+    if (this._anim) {
+      const a = this._anim, t = Math.min(1, (performance.now() - a.t0) / a.dur), e = easeInOut(t);
+      const dip = Math.min(0.3, Math.hypot(a.to.x - a.from.x, a.to.y - a.from.y) / 3600);
+      this._cam = {
+        x: a.from.x + (a.to.x - a.from.x) * e,
+        y: a.from.y + (a.to.y - a.from.y) * e,
+        z: (a.from.z + (a.to.z - a.from.z) * e) * (1 - dip * Math.sin(Math.PI * t))
+      };
+      if (t >= 1) { this._cam = { ...a.to }; this._anim = null; } else more = true;
+    } else if (!this._drag && (Math.abs(this._vel.x) > 0.04 || Math.abs(this._vel.y) > 0.04)) {
+      this._cam = { x: this.clampX(this._cam.x + this._vel.x), y: this.clampY(this._cam.y + this._vel.y), z: this._cam.z };
+      this._camT = { ...this._cam };
+      this._vel.x *= 0.9; this._vel.y *= 0.9;
+      more = true;
+    }
+    this.paint();
+    if (more) this._raf = requestAnimationFrame(this.tick);
+    else { clearTimeout(this._st); this._st = setTimeout(() => this.forceUpdate(), 40); }
+  };
+  kick() { if (!this._raf) this._raf = requestAnimationFrame(this.tick); }
+
+  clampX(x) { const m = this.vw() / (2 * this._cam.z) - 220; return Math.max(-m + 200, Math.min(WW + m - 200, x)); }
+  clampY(y) { const m = this.vh() / (2 * this._cam.z) - 160; return Math.max(-m + 160, Math.min(WH + m - 160, y)); }
+
+  flyTo(to, dur) {
+    this._vel = { x: 0, y: 0 };
+    this._camT = { ...to };
+    this._anim = { from: { ...this._cam }, to, t0: performance.now(), dur: dur || 1150 };
+    this.kick();
+  }
+
+  frameFor(focus) {
+    const g = this.field();
+    const pts = [];
+    if (focus.t === 'f') {
+      const n = g.nodes[focus.i];
+      pts.push({ x: n.x, y: n.y });
+      this.orbit(focus.i).forEach(c => pts.push({ x: c.x, y: c.y }));
+    } else {
+      const c = this.orbit(focus.p)[focus.k], h = g.nodes[focus.p];
+      pts.push({ x: c.x, y: c.y }, { x: h.x, y: h.y });
+    }
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    pts.forEach(p => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+    const VW = this.vw(), VH = this.vh();
+    const panelW = this.panelW();
+    const bw = Math.max(280, x1 - x0), bh = Math.max(220, y1 - y0);
+    const z = Math.max(0.7, Math.min(1.75, Math.min(Math.max(360, VW - panelW - 260) / bw, Math.max(300, VH - 320) / bh)));
+    return { x: (x0 + x1) / 2 + (panelW * 0.42) / z, y: (y0 + y1) / 2 + 24 / z, z };
+  }
+
+  focusOn(focus, pushTrail) {
+    const g = this.field();
+    const name = focus.t === 'f' ? g.nodes[focus.i].name : this.orbit(focus.p)[focus.k].name;
+    this.setState(s => {
+      const trail = pushTrail === false ? s.trail : s.trail.filter(t => t.name !== name).concat([{ name, focus }]).slice(-4);
+      return { focus, near: null, qOpen: false, query: '', trail };
+    });
+    this.flyTo(this.frameFor(focus));
+  }
+  pullBack = (ev) => {
+    if (ev) ev.stopPropagation();
+    this.setState({ focus: null, near: null, trail: [], qOpen: false, query: '' });
+    this.flyTo(this.fitCam(), 1250);
+  };
+
+  panelW() { const w = this.vw(); return w < 1180 ? 300 : w < 1440 ? 330 : w < 1920 ? 360 : 392; }
+  edge() { const w = this.vw(); return w < 1180 ? 28 : w < 1440 ? 36 : w < 1920 ? 48 : 64; }
+
+  toWorld(ev) {
+    const el = this.hostRef.current; if (!el) return null;
+    const r = el.getBoundingClientRect(); if (!r.width) return null;
+    const VW = this.vw(), VH = this.vh();
+    const sx = (ev.clientX - r.left) / r.width * VW, sy = (ev.clientY - r.top) / r.height * VH;
+    return { sx, sy, x: this._cam.x + (sx - VW / 2) / this._cam.z, y: this._cam.y + (sy - VH / 2) / this._cam.z };
+  }
+  hit(p) {
+    let best = null, bd = 1e9;
+    const rad = 58 / this._cam.z;
+    (this._targets || []).forEach(t => {
+      const d = Math.hypot(t.x - p.x, t.y - p.y);
+      if (d < bd) { bd = d; best = t; }
+    });
+    return bd < rad ? best : null;
+  }
+
+  stop = (ev) => { ev.stopPropagation(); };
+  onDown = (ev) => {
+    const p = this.toWorld(ev); if (!p) return;
+    this._anim = null;
+    this._drag = { sx: p.sx, sy: p.sy, wx: p.x, wy: p.y, moved: 0, lx: p.x, ly: p.y };
+    this._vel = { x: 0, y: 0 };
+    if (this.hostRef.current) this.hostRef.current.style.cursor = 'grabbing';
+    if (ev.currentTarget.setPointerCapture && ev.pointerId != null) { try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {} }
+  };
+  onMove = (ev) => {
+    const p = this.toWorld(ev); if (!p) return;
+    if (this._drag) {
+      const d = this._drag;
+      d.moved += Math.abs(p.sx - d.sx) + Math.abs(p.sy - d.sy);
+      const nx = this.clampX(d.wx - (p.sx - d.sx) / this._cam.z);
+      const ny = this.clampY(d.wy - (p.sy - d.sy) / this._cam.z);
+      this._vel = { x: (nx - this._cam.x) * 0.55, y: (ny - this._cam.y) * 0.55 };
+      this._cam = { x: nx, y: ny, z: this._cam.z };
+      this._camT = { ...this._cam };
+      this.paint();
+      return;
+    }
+    const h = this.hit(p);
+    const cur = this.state.near;
+    const same = h && cur && h.key === cur.key;
+    if (this.hostRef.current) this.hostRef.current.style.cursor = h ? 'pointer' : 'grab';
+    if ((!h && cur) || (h && !cur) || (h && cur && !same)) this.setState({ near: h ? { key: h.key, t: h.t, i: h.i, p: h.p, k: h.k } : null });
+  };
+  onUp = (ev) => {
+    const d = this._drag; this._drag = null;
+    if (this.hostRef.current) this.hostRef.current.style.cursor = 'grab';
+    if (!d) return;
+    if (d.moved > 7) { this.kick(); return; }
+    const p = this.toWorld(ev); if (!p) return;
+    const h = this.hit(p);
+    if (h) this.focusOn(h.t === 'f' ? { t: 'f', i: h.i } : { t: 'o', p: h.p, k: h.k });
+    else if (this.state.qOpen) this.setState({ qOpen: false });
+    else if (this.state.focus) this.setState({ focus: null, near: null });
+  };
+  onLeave = () => {
+    this._drag = null;
+    if (this.hostRef.current) this.hostRef.current.style.cursor = 'grab';
+    if (this.state.near) this.setState({ near: null });
+  };
+  onWheel = (ev) => {
+    const p = this.toWorld(ev); if (!p) return;
+    if (ev.preventDefault) ev.preventDefault();
+    this._anim = null;
+    const z0 = this._cam.z;
+    const z = Math.max(Math.min(0.5, this.fitCam().z * 0.85), Math.min(2.3, z0 * Math.exp(-ev.deltaY * 0.0016)));
+    this._cam = { x: p.x - (p.sx - this.vw() / 2) / z, y: p.y - (p.sy - this.vh() / 2) / z, z };
+    this._camT = { ...this._cam };
+    this.paint();
+    clearTimeout(this._zt);
+    this._zt = setTimeout(() => this.forceUpdate(), 120);
+  };
+
+  onQuery = (ev) => this.setState({ query: ev.target.value, qOpen: true });
+  onQueryFocus = () => this.setState({ qOpen: true });
+  clearQuery = (ev) => { if (ev) ev.stopPropagation(); this.setState({ query: '', qOpen: false }); };
+
+  renderVals() {
+    const g = this.field();
+    const { focus, near, cohort, density, query, qOpen } = this.state;
+    const cam = this._camT;
+    const life = this.props.liveSky !== false;
+    const minW = this.props.minWeight == null ? 11 : this.props.minWeight;
+
+    const focusIdx = focus && focus.t === 'f' ? focus.i : null;
+    const orbHost = focus ? (focus.t === 'f' ? focus.i : focus.p) : null;
+    const orb = orbHost != null ? this.orbit(orbHost) : null;
+    const orbFieldIdx = orb ? new Set(orb.filter(c => c.fieldIndex >= 0).map(c => c.fieldIndex)) : new Set();
+    const nearIdx = near && near.t === 'f' ? near.i : null;
+    const hoverAdj = nearIdx != null ? g.adj[nearIdx] : null;
+
+    const inCohort = (n) => cohort === 'all' || n.cohort === cohort;
+    const isLeader = (n) => density === 'full' || g.leaders.has(n.i);
+
+    const targets = [];
+    const stars = [], rings = [];
+    const rad = new Array(g.nodes.length).fill(3);
+    const offRad = {};
+    const seg = (ax, ay, bx, by, ra, rb) => {
+      const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+      const a = Math.min(ra, L * 0.42), b = Math.min(rb, L * 0.42);
+      return {
+        x1: (ax + dx / L * a).toFixed(1), y1: (ay + dy / L * a).toFixed(1),
+        x2: (bx - dx / L * b).toFixed(1), y2: (by - dy / L * b).toFixed(1)
+      };
+    };
+
+    g.nodes.forEach((n, i) => {
+      const isSel = focusIdx === i;
+      const inOrb = orbFieldIdx.has(i);
+      const isNear = nearIdx === i;
+      const adjHover = hoverAdj && hoverAdj.has(i);
+      let op;
+      if (focus) op = isSel ? 1 : inOrb ? 1 : (g.leaders.has(i) ? 0.22 : 0.14);
+      else op = inCohort(n) ? (isLeader(n) ? (n.cohort === 'established' ? 1 : 0.88) : 0.26) : 0.07;
+      if (adjHover) op = Math.max(op, 0.7);
+      const base = (n.cohort === 'established' ? 2.6 + n.conn * 0.036 : 1.9 + n.conn * 0.022) * (isLeader(n) || focus ? 1 : 0.8);
+      let r = base, blur = (n.cohort === 'established' ? 11 : 7) + n.conn * 0.1;
+      if (isSel) { r = base * 2.3; blur *= 2.1; }
+      else if (isNear) { r = base * 1.95; blur *= 1.7; }
+      else if (inOrb) { r = base * 1.5; blur *= 1.4; }
+      const c = TINT[n.cohort];
+      rad[i] = r;
+      if (op > 0.12) targets.push({ key: 'f' + i, t: 'f', i, x: n.x, y: n.y });
+      const rise = n.cohort === 'rising' && life && op > 0.3;
+      const period = Math.max(3.2, 8.6 - n.mom * 0.115) * (isNear || isSel ? 0.5 : 1);
+      stars.push({
+        key: 'n' + i, r: r.toFixed(2),
+        pingR: (r * 2.05).toFixed(2),
+        pingStyle: rise
+          ? 'fill:none;stroke:' + c + ';stroke-width:' + (0.9 - Math.min(0.3, cam.z * 0.16)).toFixed(2) + ';transform-box:fill-box;transform-origin:center;animation:sv-rise ' + period.toFixed(2) + 's cubic-bezier(.15,.7,.35,1) ' + (-hash(i, 61) * period).toFixed(2) + 's infinite'
+          : 'display:none',
+        ping2Style: rise
+          ? 'fill:none;stroke:' + c + ';stroke-width:' + (0.7 - Math.min(0.24, cam.z * 0.13)).toFixed(2) + ';transform-box:fill-box;transform-origin:center;animation:sv-rise ' + period.toFixed(2) + 's cubic-bezier(.15,.7,.35,1) ' + (-hash(i, 61) * period - period * 0.5).toFixed(2) + 's infinite'
+          : 'display:none',
+        gStyle: 'opacity:' + op.toFixed(3) + ';transform:translate(' + n.x.toFixed(1) + 'px,' + n.y.toFixed(1) + 'px);transition:opacity 520ms ease',
+        bloomStyle: '',
+        driftStyle: life ? 'animation:sv-drift ' + n.dr.toFixed(1) + 's ease-in-out ' + n.drd.toFixed(1) + 's infinite' : '',
+        style: 'fill:' + (isSel ? '#fffaf0' : c) +
+          ';filter:drop-shadow(0 0 ' + (blur * 0.4).toFixed(1) + 'px ' + c + ') drop-shadow(0 0 ' + blur.toFixed(1) + 'px ' + HALO[n.cohort] + ')' +
+          ';transition:r 260ms cubic-bezier(.2,.9,.3,1)' +
+          (life && !isSel
+            ? n.cohort === 'rising'
+              ? ';animation:sv-swell ' + (period * 0.5).toFixed(2) + 's ease-in-out ' + n.twd.toFixed(2) + 's infinite'
+              : ';animation:sv-tw ' + n.tw.toFixed(2) + 's ease-in-out ' + n.twd.toFixed(2) + 's infinite'
+            : '')
+      });
+      if (isNear && !isSel) rings.push({
+        key: 'hr' + i, r: (base * 4.4).toFixed(1),
+        style: 'fill:none;stroke:' + c + ';stroke-opacity:0.3;stroke-width:' + (0.9 / cam.z).toFixed(2) + ';transform:translate(' + n.x.toFixed(1) + 'px,' + n.y.toFixed(1) + 'px)'
+      });
+    });
+
+    if (orb) {
+      orb.forEach((c, k) => {
+        if (c.fieldIndex >= 0) return;
+        const isSel = focus.t === 'o' && focus.k === k;
+        const isNear = near && near.t === 'o' && near.p === orbHost && near.k === k;
+        targets.push({ key: 'o' + orbHost + '-' + k, t: 'o', p: orbHost, k, x: c.x, y: c.y });
+        offRad[k] = isSel ? 21 : 16;
+        stars.push({
+          key: 'ox' + orbHost + '-' + k, r: isSel ? 8.6 : isNear ? 7.2 : 5.4, pingR: 0, pingStyle: 'display:none', ping2Style: 'display:none',
+          gStyle: 'opacity:1;transform:translate(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px)',
+          bloomStyle: 'animation:sv-bloom 640ms cubic-bezier(.2,.9,.3,1) both',
+          driftStyle: life ? 'animation:sv-drift 26s ease-in-out ' + (-k * 3.4).toFixed(1) + 's infinite' : '',
+          style: 'fill:' + (isSel ? '#f2f7ff' : OTHER) + ';filter:drop-shadow(0 0 5px ' + OTHER + ') drop-shadow(0 0 18px rgba(140,178,228,0.72));transition:r 260ms cubic-bezier(.2,.9,.3,1)'
+        });
+        rings.push({
+          key: 'og' + orbHost + '-' + k, r: isSel ? 21 : 16,
+          style: 'fill:none;stroke:' + OTHER + ';stroke-opacity:0.42;stroke-width:' + (1 / cam.z).toFixed(2) + ';stroke-dasharray:2.5 5' +
+            ';transform:translate(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px);transition:r 260ms cubic-bezier(.2,.9,.3,1)' +
+            (life ? ';animation:sv-breathe 5.5s ease-in-out infinite' : '')
+        });
+      });
+    }
+    this._targets = targets;
+
+    const edges = [];
+    g.edges.forEach((e, i) => {
+      const A = g.nodes[e.a], B = g.nodes[e.b];
+      let op = 0, col = LINE;
+      const hov = hoverAdj && (e.a === nearIdx || e.b === nearIdx);
+      if (focus) {
+        if (e.w >= 22 && !orbFieldIdx.has(e.a) && !orbFieldIdx.has(e.b) && e.a !== focusIdx && e.b !== focusIdx) op = 0.032;
+      } else if (e.w >= minW && inCohort(A) && inCohort(B)) {
+        op = (isLeader(A) && isLeader(B)) ? 0.04 + Math.min(0.2, e.w * 0.0055) : 0.028;
+      }
+      if (hov) { op = Math.max(op, 0.16 + Math.min(0.34, e.w * 0.007)); col = '#e8c79a'; }
+      if (op <= 0) return;
+      const s = seg(A.x, A.y, B.x, B.y, rad[e.a] + 3, rad[e.b] + 3);
+      edges.push({
+        key: 'e' + i, x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, op,
+        style: 'stroke:' + col + ';stroke-opacity:' + op.toFixed(3) + ';stroke-width:' + (0.22 + e.w * 0.0072).toFixed(2) + 'px;stroke-linecap:round;transition:stroke-opacity 420ms ease'
+      });
+    });
+    edges.sort((a, b) => a.op - b.op);
+
+    if (orb) {
+      const host = g.nodes[orbHost];
+      const hostR = rad[orbHost] + 5;
+      orb.forEach((c, k) => {
+        const endR = c.fieldIndex >= 0 ? rad[c.fieldIndex] + 5 : (offRad[k] || 16) + 5;
+        const s = seg(host.x, host.y, c.x, c.y, hostR, endR);
+        edges.push({
+          key: 'oe' + orbHost + '-' + k, x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, op: 1,
+          style: 'stroke:' + (c.inField ? '#ffd89b' : OTHER) + ';stroke-opacity:' + (0.26 + c.w * 0.0032).toFixed(3) +
+            ';stroke-width:' + (0.3 + c.w * 0.0088).toFixed(2) + 'px;stroke-linecap:round' +
+            (c.inField ? '' : ';stroke-dasharray:3.5 6') + ';transition:stroke-opacity 520ms ease'
+        });
+      });
+    }
+
+    const labels = [], rects = [];
+    const VW = this.vw(), VH = this.vh(), EDGE = this.edge(), PANELW = this.panelW();
+    const PANEL = { x0: VW - EDGE - PANELW - 12, y0: VH * 0.3, x1: VW, y1: VH - 84 };
+    const chip = (wx, wy, text, fs, color, suffix, track, clearance, prefer, avoidPanel) => {
+      const sx = VW / 2 + (wx - cam.x) * cam.z, sy = VH / 2 + (wy - cam.y) * cam.z;
+      if (sx < 40 || sx > VW - 40 || sy < 30 || sy > VH - 30) return;
+      const off = Math.max(16, clearance || 0);
+      const label = suffix ? text + '   ' + suffix : text;
+      const wpx = label.length * fs * 0.5 + 26, hpx = fs + 18;
+      let right = prefer ? prefer === 'r' : sx < VW * 0.66;
+      if (right && sx + off + wpx > VW - 30) right = false;
+      else if (!right && sx - off - wpx < 30) right = true;
+      const box = { x: right ? sx + off : sx - off - wpx, y: sy - hpx / 2, w: wpx, h: hpx };
+      if (box.x < 6 || box.x + box.w > VW - 6 || box.y < 4 || box.y + box.h > VH - 4) return;
+      if (avoidPanel && box.x < PANEL.x1 && PANEL.x0 < box.x + box.w && box.y < PANEL.y1 && PANEL.y0 < box.y + box.h) return;
+      if (rects.some(r => box.x < r.x + r.w + 10 && r.x < box.x + box.w + 10 && box.y < r.y + r.h + 6 && r.y < box.y + box.h + 6)) return;
+      rects.push(box);
+      labels.push({
+        key: 'l' + labels.length, text: label, wx: wx.toFixed(1), wy: wy.toFixed(1), side: right ? 'r' : 'l',
+        style: 'position:absolute;left:' + sx.toFixed(1) + 'px;top:' + sy.toFixed(1) + 'px' +
+          ';transform:translate(' + (right ? off + 'px' : 'calc(-100% - ' + off + 'px)') + ',-50%);white-space:nowrap' +
+          ';font:300 ' + fs + 'px/1 Jost,sans-serif;letter-spacing:' + (track || '0.05em') + ';color:' + color + ';transition:opacity 400ms ease'
+      });
+    };
+
+    if (focus) {
+      const hostN = g.nodes[orbHost];
+      const hostR = (hostN.cohort === 'established' ? 2.6 + hostN.conn * 0.036 : 1.9 + hostN.conn * 0.022) * 2.3 * cam.z + 14;
+      if (focus.t === 'f') chip(hostN.x, hostN.y, hostN.name, 19, '#f6f2e8', null, '0.03em', hostR);
+      else chip(hostN.x, hostN.y, hostN.name, 14, 'rgba(226,223,214,0.62)', null);
+      orb.forEach((c, k) => {
+        const sel = focus.t === 'o' && focus.k === k;
+        const clear = c.inField
+          ? (c.fieldIndex >= 0 ? rad[c.fieldIndex] : 4) * cam.z + 13
+          : (sel ? 21 : 16) * cam.z + 13;
+        const side = c.x < hostN.x ? 'l' : 'r';
+        chip(c.x, c.y, c.name, sel ? 19 : 13, sel ? '#f2f7ff' : c.inField ? '#cdcac1' : '#a8bdd8', sel ? null : String(c.w), sel ? '0.03em' : '0.06em', clear, side);
+      });
+    }
+    const zoomedIn = cam.z > 1.05;
+    const pool = g.nodes.filter(n => inCohort(n) && (zoomedIn || isLeader(n))).slice().sort((a, b) => b.conn - a.conn);
+    pool.slice(0, zoomedIn ? 40 : density === 'full' ? 22 : 14).forEach(n => {
+      if (focus && (n.i === focusIdx || orbFieldIdx.has(n.i))) return;
+      chip(n.x, n.y, n.name, 12.5, focus ? 'rgba(226,223,214,0.3)' : 'rgba(226,223,214,0.5)', null, null, 0, null, !!focus);
+    });
+    if (nearIdx != null) chip(g.nodes[nearIdx].x, g.nodes[nearIdx].y, g.nodes[nearIdx].name, 15, '#f6f2e8', null, '0.03em');
+
+    const quiet = (active) => 'font:' + (active ? 400 : 300) + ' 11px/1 Jost,sans-serif;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;padding-bottom:6px;transition:color 240ms ease,border-color 240ms ease;border-bottom:1px solid ' +
+      (active ? 'rgba(255,216,155,0.6);color:#ffd89b' : 'transparent;color:#4d5468');
+
+    const cohortTabs = [['all', 'All'], ['established', 'Established'], ['rising', 'Rising']].map(([k, label]) => ({
+      key: k, label, style: quiet(cohort === k), onClick: (ev) => { if (ev) ev.stopPropagation(); this.setState({ cohort: k }); }
+    }));
+    const densityTabs = [['leaders', 'Leaders'], ['full', 'Full field']].map(([k, label]) => ({
+      key: k, label, style: quiet(density === k), onClick: (ev) => { if (ev) ev.stopPropagation(); this.setState({ density: k }); }
+    }));
+    const densityNote = density === 'leaders'
+      ? 'The brightest eighteen. Thirty-two fainter researchers are still out there — let your eyes adjust, or close in on them.'
+      : 'All fifty risen. Co-authorship lines thicken with shared publications.';
+
+    const q = query.trim().toLowerCase();
+    const matches = g.nodes.filter(n => !q || n.name.toLowerCase().includes(q) || n.inst.toLowerCase().includes(q))
+      .sort((a, b) => b.conn - a.conn).slice(0, 8);
+    const results = matches.map(n => ({
+      key: n.id, name: n.name, inst: n.inst, conn: n.conn,
+      dotStyle: 'width:7px;height:7px;border-radius:50%;flex:none;background:' + TINT[n.cohort] + ';box-shadow:0 0 9px ' + TINT[n.cohort],
+      onClick: (ev) => { if (ev) ev.stopPropagation(); this.focusOn({ t: 'f', i: n.i }); }
+    }));
+
+    const legend = [
+      { key: 'g', label: 'Established', dotStyle: 'width:6px;height:6px;border-radius:50%;background:' + GOLD + ';box-shadow:0 0 11px rgba(255,216,155,0.85)' },
+      { key: 'p', label: VW < 1600 ? 'Rising — pulse = momentum' : 'Rising — pulsing faster the harder they climb', dotStyle: 'width:5px;height:5px;border-radius:50%;background:' + PURP + ';box-shadow:0 0 11px rgba(160,116,255,0.8);outline:1px solid rgba(195,169,255,0.34);outline-offset:4px' },
+      { key: 'o', label: 'Outside this sky', dotStyle: 'width:5px;height:5px;border-radius:50%;background:' + OTHER + ';box-shadow:0 0 11px rgba(140,178,228,0.7);outline:1px dashed rgba(168,189,216,0.55);outline-offset:3px' },
+      { key: 'l', label: 'Shared publications', dotStyle: 'width:28px;height:1px;background:linear-gradient(90deg,rgba(126,147,198,0.12),rgba(126,147,198,0.8))' }
+    ];
+
+    let selName = '', selInst = '', selRole = '', selRoleStyle = '', selConn = '', selShared = '', selMomentum = '', banner = '', collabs = [], hasStats = false, hasCollabs = false, momentumNote = '', hasMomentumNote = false;
+    if (focus) {
+      if (focus.t === 'f') {
+        const n = g.nodes[focus.i];
+        const off = orb.filter(c => !c.inField).length;
+        hasStats = true; hasCollabs = true;
+        selName = n.name; selInst = n.inst; selRole = ROLE[n.cohort];
+        selRoleStyle = 'font:400 10px/1 Jost,sans-serif;letter-spacing:0.32em;text-transform:uppercase;color:' + TINT[n.cohort];
+        selConn = String(n.conn); selShared = String(orb.reduce((s, c) => s + c.w, 0)); selMomentum = '+' + n.mom + '%';
+        if (n.cohort === 'rising') {
+          const climb = g.nodes.filter(x => x.cohort === 'rising').sort((a, b) => b.mom - a.mom);
+          const place = climb.findIndex(x => x.i === n.i) + 1;
+          const ord = place === 1 ? 'the fastest climb' : place === 2 ? 'the second-fastest climb' : place === 3 ? 'the third-fastest climb' : place + 'th-fastest climb';
+          momentumNote = 'Publication velocity up ' + n.mom + '% over twelve months — ' + ord + ' among the twenty-eight rising.';
+          hasMomentumNote = true;
+        }
+        banner = off > 0
+          ? 'Top five co-authors, weighted by shared publications. ' + off + ' of them sit outside this sky — the overview could never have shown them.'
+          : 'Top five co-authors, weighted by shared publications. All five are already in this sky.';
+        collabs = orb.map((c, k) => ({
+          key: 'c' + k, name: c.name, w: c.w, sub: c.inst,
+          subStyle: 'font:300 11px/1.3 Jost,sans-serif;letter-spacing:0.03em;color:' + (c.inField ? '#565d72' : '#7d90ad') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis',
+          dotStyle: 'width:7px;height:7px;border-radius:50%;flex:none;background:' + TINT[c.cohort] + ';box-shadow:0 0 9px ' + TINT[c.cohort] +
+            (c.inField ? '' : ';outline:1px dashed rgba(168,189,216,0.6);outline-offset:3px'),
+          onClick: (ev) => { if (ev) ev.stopPropagation(); this.focusOn(c.fieldIndex >= 0 ? { t: 'f', i: c.fieldIndex } : { t: 'o', p: orbHost, k }); }
+        }));
+      } else {
+        const c = orb[focus.k], h = g.nodes[focus.p];
+        selName = c.name; selInst = c.inst; selRole = ROLE.other;
+        selRoleStyle = 'font:400 10px/1 Jost,sans-serif;letter-spacing:0.32em;text-transform:uppercase;color:' + OTHER;
+        banner = 'Not among the fifty recognized names, so there is no ranking or momentum behind this star. It is here because ' + h.name + ' has ' + c.w + ' shared publications with them.';
+        collabs = [{
+          key: 'back', name: h.name, w: c.w, sub: h.inst,
+          subStyle: 'font:300 11px/1.3 Jost,sans-serif;letter-spacing:0.03em;color:#565d72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis',
+          dotStyle: 'width:7px;height:7px;border-radius:50%;flex:none;background:' + TINT[h.cohort] + ';box-shadow:0 0 9px ' + TINT[h.cohort],
+          onClick: (ev) => { if (ev) ev.stopPropagation(); this.focusOn({ t: 'f', i: h.i }); }
+        }];
+        hasCollabs = true;
+      }
+    }
+
+    const trail = this.state.trail.map((t, k) => ({
+      key: 'tr' + k + t.name, name: t.name,
+      style: 'font:' + (k === this.state.trail.length - 1 ? 400 : 300) + ' 11px/1 Jost,sans-serif;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer;transition:color 220ms ease;color:' +
+        (k === this.state.trail.length - 1 ? '#ffd89b' : '#4d5468'),
+      onClick: (ev) => { if (ev) ev.stopPropagation(); this.focusOn(t.focus, false); }
+    }));
+
+    const mTab = this.state.mTab, mOpen = this.state.mOpen;
+    const mTabs = [['established', 'Established 22'], ['rising', 'Rising 28']].map(([k, label]) => ({
+      key: k, label,
+      style: 'padding:15px 0;font:' + (mTab === k ? 400 : 300) + ' 11px/1 Jost,sans-serif;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;border-bottom:1px solid ' +
+        (mTab === k ? 'rgba(255,216,155,0.6);color:#ffd89b' : 'transparent;color:#4d5468') + ';margin-bottom:-1px',
+      onClick: () => this.setState({ mTab: k, mOpen: null })
+    }));
+
+    const hopTo = (target) => {
+      const node = g.nodes[target];
+      this.setState({ mTab: node.cohort, mOpen: target }, () => {
+        const host = this.hostRef.current;
+        const root = host ? host.closest('div') : null;
+        const doc = root ? root.ownerDocument : null;
+        if (!doc) return;
+        const scrollers = doc.querySelectorAll('div');
+        for (let i = 0; i < scrollers.length; i++) {
+          const sc = scrollers[i];
+          if (sc.scrollHeight > sc.clientHeight && /auto|scroll/.test(getComputedStyle(sc).overflowY)) {
+            const row = sc.children[[...g.nodes].filter(n => n.cohort === node.cohort).sort((a, b) => b.conn - a.conn).findIndex(n => n.i === target)];
+            if (row) sc.scrollTop += row.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+            break;
+          }
+        }
+      });
+    };
+
+    const listNodes = g.nodes.filter(n => n.cohort === mTab).slice().sort((a, b) => b.conn - a.conn);
+    const mRows = listNodes.map((n, k) => {
+      const open = mOpen === n.i;
+      const row = {
+        key: n.id, rank: String(k + 1).padStart(2, '0'), name: n.name, inst: n.inst, momentum: '+' + n.mom + '%', open,
+        nameStyle: 'font:300 16px/1.2 Jost,sans-serif;color:' + (open ? '#ffd89b' : '#e2dfd6') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color 240ms ease',
+        dotStyle: 'width:7px;height:7px;border-radius:50%;flex:none;background:' + TINT[n.cohort] + ';box-shadow:0 0 10px ' + TINT[n.cohort],
+        barStyle: 'height:1px;width:' + n.conn + '%;background:' + TINT[n.cohort] + ';opacity:0.7',
+        onClick: (ev) => {
+          const el = ev && ev.currentTarget ? ev.currentTarget.parentNode : null;
+          this.setState({ mOpen: open ? null : n.i }, () => {
+            if (open || !el) return;
+            let sc = el.parentElement;
+            while (sc && !(sc.scrollHeight > sc.clientHeight && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+            if (sc) sc.scrollTop += el.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+          });
+        },
+        sky: [], edges: [], dots: [], rings: [], texts: [], collabs: [], orbitNote: ''
+      };
+      if (!open) return row;
+      const o = this.orbit(n.i);
+      const off = o.filter(c => !c.inField).length;
+      row.orbitNote = off > 0
+        ? 'Top five co-authors by shared publications. ' + off + ' of them are outside this sky. Tap anyone in the field to travel to them.'
+        : 'Top five co-authors by shared publications. Tap anyone to travel to them.';
+      row.sky = this.orbitSky(n.i);
+      const ocx = 195, ocy = 116;
+      const p = o.map((c, k2) => {
+        const a = -Math.PI / 2 + k2 * (Math.PI * 2 / o.length) + 0.32;
+        const f = 0.46 + k2 * 0.135;
+        return { x: ocx + Math.cos(a) * 138 * f, y: ocy + Math.sin(a) * 90 * f, right: Math.cos(a) >= -0.12 };
+      });
+      o.forEach((c, k2) => {
+        const md = Math.hypot(p[k2].x - ocx, p[k2].y - ocy) || 1;
+        const ea = 9.5 / md, eb = (c.inField ? 8 : 13) / md;
+        row.edges.push({
+          key: 'me' + k2,
+          x1: (ocx + (p[k2].x - ocx) * ea).toFixed(1), y1: (ocy + (p[k2].y - ocy) * ea).toFixed(1),
+          x2: (p[k2].x - (p[k2].x - ocx) * eb).toFixed(1), y2: (p[k2].y - (p[k2].y - ocy) * eb).toFixed(1),
+          style: 'stroke:' + (c.inField ? '#ffd89b' : OTHER) + ';stroke-opacity:' + (0.24 + c.w * 0.0032).toFixed(3) +
+            ';stroke-width:' + (0.3 + c.w * 0.0078).toFixed(2) + 'px;stroke-linecap:round' + (c.inField ? '' : ';stroke-dasharray:2.5 4.5')
+        });
+        row.dots.push({
+          key: 'md' + k2, cx: p[k2].x.toFixed(1), cy: p[k2].y.toFixed(1), r: 3.6,
+          style: 'fill:' + TINT[c.cohort] + ';filter:drop-shadow(0 0 4px ' + TINT[c.cohort] + ') drop-shadow(0 0 12px ' + HALO[c.cohort] + ')'
+        });
+        if (!c.inField) row.rings.push({ key: 'mg' + k2, cx: p[k2].x.toFixed(1), cy: p[k2].y.toFixed(1), r: 9, style: 'fill:none;stroke:' + OTHER + ';stroke-opacity:0.4;stroke-width:0.8;stroke-dasharray:2 4' });
+        const moff = c.inField ? 11 : 15;
+        row.texts.push({
+          key: 'mt' + k2, text: c.name + '  ' + c.w,
+          style: 'position:absolute;left:' + (p[k2].x / 390 * 100).toFixed(3) + '%;top:' + (p[k2].y / 238 * 100).toFixed(3) + '%' +
+            ';transform:translate(' + (p[k2].right ? moff + 'px' : 'calc(-100% - ' + moff + 'px)') + ',-50%);white-space:nowrap' +
+            ';font:300 10.5px/1 Jost,sans-serif;letter-spacing:0.04em;color:' + (c.inField ? '#cdcac1' : '#a8bdd8')
+        });
+      });
+      row.dots.push({ key: 'mdc', cx: ocx, cy: ocy, r: 6, style: 'fill:#fffaf0;filter:drop-shadow(0 0 6px ' + TINT[n.cohort] + ') drop-shadow(0 0 20px ' + HALO[n.cohort] + ')' });
+      row.texts.push({
+        key: 'mtc', text: n.name,
+        style: 'position:absolute;left:' + (ocx / 390 * 100).toFixed(3) + '%;top:' + ((ocy - 15) / 238 * 100).toFixed(3) + '%' +
+          ';transform:translate(-50%,-100%);white-space:nowrap;font:300 12.5px/1 Jost,sans-serif;letter-spacing:0.03em;color:#f6f2e8'
+      });
+      row.collabs = o.map((c, k2) => ({
+        key: 'mc' + k2, name: c.name, w: c.w, sub: c.inst,
+        subStyle: 'font:300 10px/1.3 Jost,sans-serif;letter-spacing:0.03em;color:' + (c.inField ? '#4d5468' : '#7d90ad') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis',
+        dotStyle: 'width:7px;height:7px;border-radius:50%;flex:none;background:' + TINT[c.cohort] + ';box-shadow:0 0 9px ' + TINT[c.cohort] +
+          (c.inField ? '' : ';outline:1px dashed rgba(168,189,216,0.6);outline-offset:3px'),
+        hop: c.inField ? '→' : '',
+        hopStyle: 'font:300 15px/1 Jost,sans-serif;color:' + (c.inField ? '#5a6178' : 'transparent') + ';flex:none;width:12px;text-align:right',
+        onClick: c.inField ? () => hopTo(c.fieldIndex) : () => {}
+      }));
+      return row;
+    });
+
+    const fw = Number(this.props.frameWidth) || 1920;
+    const narrow = VW < 1440;
+    return {
+      frameStyle: 'width:' + fw + 'px;max-width:100%;aspect-ratio:1 / 0.52;max-height:1160px',
+      viewBox: '0 0 ' + Math.round(VW) + ' ' + Math.round(VH),
+      titleBoxStyle: 'position:absolute;left:' + EDGE + 'px;top:' + (EDGE - 4) + 'px;max-width:' + Math.round(Math.min(460, VW * 0.36)) + 'px;display:flex;flex-direction:column;gap:' + (narrow ? 14 : 18) + 'px',
+      controlsStyle: 'position:absolute;right:' + EDGE + 'px;top:' + (EDGE - 6) + 'px;display:flex;flex-direction:column;align-items:flex-end;gap:' + (narrow ? 16 : 20) + 'px;width:' + Math.round(Math.max(238, Math.min(330, VW * 0.21))) + 'px',
+      panelStyle: 'position:absolute;right:' + EDGE + 'px;bottom:' + (EDGE + 44) + 'px;width:' + PANELW + 'px;box-sizing:border-box;background:rgba(6,9,19,0.62);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.07);border-radius:3px;padding:' + (narrow ? '24px 24px 22px' : '30px 30px 26px') + ';display:flex;flex-direction:column;gap:' + (narrow ? 18 : 22) + 'px;box-shadow:0 40px 90px rgba(0,0,0,0.5);max-height:' + Math.round(VH - EDGE * 2 - 150) + 'px;overflow-y:auto',
+      legendStyle: 'position:absolute;left:' + EDGE + 'px;bottom:' + EDGE + 'px;display:flex;align-items:center;gap:' + (narrow ? 16 : 32) + 'px;pointer-events:none;flex-wrap:wrap;max-width:' + Math.round(Math.max(320, VW - PANELW - EDGE * 2 - 250)) + 'px',
+      camControlsStyle: 'position:absolute;right:' + EDGE + 'px;bottom:' + EDGE + 'px;display:flex;align-items:center;gap:' + (narrow ? 16 : 26) + 'px',
+      hostRef: this.hostRef, svgRef: this.svgRef, farRef: this.farRef, midRef: this.midRef,
+      worldRef: this.worldRef, labelRef: this.labelRef, meteorRef: this.meteorRef,
+      dustFar: this.dustFar(), dustMid: this.dustMid(), mSky: this.mSky(),
+      stars, edges, rings, labels,
+      onDown: this.onDown, onMove: this.onMove, onUp: this.onUp, onLeave: this.onLeave, onWheel: this.onWheel, stop: this.stop,
+      focused: !!focus, resting: !focus && !this.state.trail.length,
+      hasTrail: this.state.trail.length > 0, trail, pullBack: this.pullBack,
+      canPullBack: !!focus || Math.abs(cam.z - this.fitCam().z) > 0.06,
+      selName, selInst, selRole, selRoleStyle, selConn, selShared, selMomentum, banner, collabs, hasStats, hasCollabs,
+      momentumNote, hasMomentumNote,
+      query, hasQuery: query.length > 0, showResults: qOpen, results, noResults: qOpen && results.length === 0,
+      searchBorder: qOpen ? 'rgba(255,216,155,0.5)' : 'rgba(255,255,255,0.1)',
+      onQuery: this.onQuery, onQueryFocus: this.onQueryFocus, clearQuery: this.clearQuery,
+      cohortTabs, densityTabs, densityNote, legend, mTabs, mRows
+    };
+  }
+}
+
+</script>
+</body>
+</html>
