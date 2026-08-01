@@ -200,3 +200,67 @@ Both exhibit **both** wrong-states:
 **The problem.** Two US-ranked rising-star HCPs have NULL state — Hatim Husain (UCSD) and Kellie N. Smith — and are therefore **invisible to any territory filter** rather than misplaced by it: no state-scoped band or coverage stat can ever surface them.
 
 **Related mis-resolution.** Smith's `institution_canonical` resolves to "Bloomberg (United States)", an apparent OpenAlex/ROR mis-resolution — likely the Bloomberg~Kimmel Institute at Johns Hopkins. She renders at US rank 77 with that institution label.
+
+## dol_matches_v2 — no rejection state; reviewed-and-rejected indistinguishable from never-reviewed
+
+**Status:** flagged 2026-07-31, not fixed. Blocks the next DOL review pass.
+
+**The problem.** `dol_matches_v2` has no rejection state — a match reviewed and rejected carries the same `verified_by_human = false` as a match nobody has looked at. The 2026-07-31 review outcomes therefore cannot be recorded: **11 rows are currently held** — 7 confirmed wrong (handles `prarthan_com`, `hyesungkimmd`, `emmaruoyii`, `hans45306825`, `jiajennyliu`, `hangzheng855161`, `yilinmdphd`) and 4 uncertain (`writ__e`, `alej_garciamd`, `aebchang`, `jillfeldman4`).
+
+**The fix (before the next review pass).** A `rejected` boolean or a `review_status` column (`unreviewed` / `confirmed` / `rejected` / `uncertain`). Without it the next reviewer re-examines all 11 held rows from scratch — the work is repeated every pass.
+
+## dol_matching.py — single generic institution token awards 50 of the 70-point threshold
+
+**Status:** flagged 2026-07-31, not fixed. Root cause of every confirmed DOL misattribution in the 2026-07-31 review.
+
+**The problem.** Institution scoring in `dol_matching.py` is token-based and awards 50 points — of the 70-point high-confidence threshold — on a **single token match**. All 7 confirmed misattributions matched on a GENERIC token (`medical`, `health`, `hospital`, `technology`, `cancer`, `national`); every distinctive-token match (`danafarber`, `anderson`, `juntendo`, `royal marsden`) was correct. A generic-token stoplist would likely eliminate the error class.
+
+**Secondary defect.** `display_name_similarity` is depressed by credential suffixes (", MD, FASCO"), making it a poor discriminator: Battisti scored 0.65 and was correct; Zhang scored 0.83 and was wrong. Strip post-nominals before comparing, or stop treating the raw similarity as a quality signal.
+
+## Corpus composition — patient advocate and non-oncologists in NSCLC-tagged hcps_v2 records
+
+**Status:** flagged 2026-07-31, not fixed. Corpus composition issue, not a matching defect.
+
+**The problem.** Jill Feldman is in `hcps_v2` as an HCP but is a lung cancer **patient advocate**, not a clinician (`institution_canonical` = "Patient Advocate Foundation") — she would render in physician panels. Also present in NSCLC-tagged records despite practicing elsewhere: Scott Isaacs (endocrinology), Anoop Misra (diabetes), Luke Tyson (hepatology). Any surface that presents NSCLC-tagged HCPs as NSCLC physicians inherits these.
+
+## hcps_v2 — physician opt-out mechanism lost in the v2 migration
+
+**Status:** flagged 2026-07-31, not fixed. Relevant before public invite-gated signup.
+
+**The problem.** `hcps_v2` has **no physician opt-out mechanism**. The v1 table's read policy was `hcps_public_read USING (opt_out = false)`; the v2 policy is `hcps_v2_public_read USING (true)` and no `opt_out` or equivalent suppression column exists on `hcps_v2`. The capability was lost in the v2 migration — a physician who asks to be removed currently has no data path to suppression.
+
+## Pipeline runs are unrecorded — social capture and weekly reingest both fail silently
+
+**Status:** flagged 2026-07-31, partially mitigated (coverage table created empty; writer not built).
+
+**The problem.** Neither the social capture nor the weekly reingest pipeline records that a run occurred, so both fail silently. Social capture ran 20 May – 3 Jun 2026 (18,526 posts), stopped for seven weeks, and resumed 21 Jul (853 posts) with **nothing between 4 Jun and 20 Jul** — nobody noticed, because post arrival is the only evidence of a run. `pipeline_runs` exists but holds zero rows; `twitter_capture_checkpoint.json` stores per-query cursors only.
+
+**The gap is permanently unobservable by the current pipeline.** `twitter_capture.py` uses only `/2/tweets/search/recent` (~7-day reach); recovery would need `/2/tweets/search/all`, a Pro/Enterprise endpoint.
+
+**The mitigation path.** `social_capture_coverage` was created empty on 2026-07-31; it needs ~5 lines in `twitter_capture.py` to upsert one row per covered date after each successful run. Until then congress WoW volume is **permanently NULL by design**. Do NOT backfill that table from post presence — the record must be what the API was asked to cover, not what came back.
+
+## Congress social daily series — genuine zero-post days indistinguishable from unobserved days
+
+**Status:** flagged 2026-07-31, accepted limitation of the observed-days fix. Resolves when `social_capture_coverage` is populated.
+
+**The problem.** The 2026-07-31 fix replaced `get_congress_social`'s `generate_series` calendar with `GROUP BY posted_at::date` over actual posts, which correctly removes fabricated zeros across the 4 Jun – 20 Jul capture gap. But a **real** zero-post day inside a genuinely covered window now also has no row, so it renders as a gap rather than as quiet. Not yet verified against a congress with continuous capture — ASCO's window has no interior zero days to test with.
+
+**The resolution.** Once `social_capture_coverage` is populated, observed days with no posts can be emitted as true zeros — distinguishing quiet from absence becomes possible only with the observation signal.
+
+## anon/authenticated hold dormant write grants across the public schema
+
+**Status:** flagged 2026-07-31, not fixed. One genuine hole found and closed same day; the pattern remains.
+
+**The problem.** `anon` and `authenticated` hold INSERT, UPDATE and DELETE grants on most tables in the public schema. These are currently **dormant** — RLS denies by default and the only write policies are owner-scoped (`hcp_watchlist` ALL on `auth.uid() = user_id`; `msl_contributions` INSERT with an owner check) — so there is no live write path. But **any future permissive policy on a granted table activates them silently**. The 2026-07-31 audit found one genuine hole: `hcp_cohort_classification_v2` had RLS disabled with all four grants (closed same day).
+
+**The fix (deliberate, not now).** `REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM anon, authenticated`, then grant writes back explicitly to the tables the app writes. Identify those first rather than revoking broadly.
+
+## Bare `tsc --noEmit` is a false pass — and the real typecheck is red at HEAD
+
+**Status:** flagged 2026-07-31, not fixed. Invalidated every typecheck verification in the 2026-07-31 session.
+
+**The problem.** `frontend/tsconfig.json` is solution-style (`"files": []`, references only), so bare `npx tsc --noEmit` type-checks **nothing** and always reports clean. Any agent or script running bare tsc gets a false pass. The real check is `npm run typecheck` (`tsc --noEmit -p tsconfig.app.json`) — and it is **red at HEAD** with ~250 error lines: unused imports in retired components, Telescope typing, `api.ts` supabase-cast issues. All pre-existing.
+
+**The consequence on 2026-07-31.** A JSX syntax error shipped into `AssetPage.tsx` behind a "clean" bare-tsc run and wedged the dev servers (esbuild dependency scan failed; the app served un-prebundled modules and never mounted). Caught and fixed same day.
+
+**The fix.** Two parts, separable: (1) always verify with `npm run typecheck`, never bare tsc; (2) burn down the ~250 pre-existing errors so the real check can gate — most are TS6133 unused-symbol noise in retained-unrouted components and can be fixed mechanically or excluded deliberately.
