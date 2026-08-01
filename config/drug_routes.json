@@ -1,0 +1,18 @@
+{
+  "_comment": "Curated brand->route/generic reference for Open Payments drug names that fall outside config/assets.json (which is NSCLC-only). Same category of artifact as ta_hcpcs_codes: reference data, FDA-label facts, maintained by hand. Used by the practice-first community profile to split paid-around products by route (oral = Part D, invisible to Part B claims; IV/SC = injectable, expected in Part B when administered). Brands not listed here and not in assets.json render as an honest ROUTE UNKNOWN bucket - never guessed.",
+  "routes": {
+    "ONIVYDE":   { "generic": "irinotecan liposome",      "route": "IV",   "maker": "Ipsen" },
+    "BRUKINSA":  { "generic": "zanubrutinib",             "route": "oral", "maker": "BeiGene" },
+    "BESREMI":   { "generic": "ropeginterferon alfa-2b",  "route": "SC",   "maker": "PharmaEssentia" },
+    "VIVIMUSTA": { "generic": "bendamustine",             "route": "IV",   "maker": "Acrotech" },
+    "FOTIVDA":   { "generic": "tivozanib",                "route": "oral", "maker": "AVEO" },
+    "VENCLEXTA": { "generic": "venetoclax",               "route": "oral", "maker": "AbbVie" },
+    "ORSERDU":   { "generic": "elacestrant",              "route": "oral", "maker": "Stemline" },
+    "IMBRUVICA": { "generic": "ibrutinib",                "route": "oral", "maker": "Janssen" },
+    "MONJUVI":   { "generic": "tafasitamab",              "route": "IV",   "maker": "MorphoSys" },
+    "VONJO":     { "generic": "pacritinib",               "route": "oral", "maker": "CTI BioPharma" },
+    "TECENTRIQ": { "generic": "atezolizumab",             "route": "IV",   "maker": "Genentech" },
+    "JAYPIRCA":  { "generic": "pirtobrutinib",            "route": "oral", "maker": "Lilly" },
+    "TIBSOVO":   { "generic": "ivosidenib",               "route": "oral", "maker": "Servier" }
+  }
+}
