@@ -16,6 +16,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CONTENT_WIDTH } from "./lib/designTokens";
+import { useMediaQuery } from "./lib/useMediaQuery";
 import {
   Link,
   Navigate,
@@ -26,18 +27,15 @@ import {
   useParams,
 } from "react-router-dom";
 import { ArrowUp } from "lucide-react";
-import Telescope from "./components/Telescope";
-import TelescopeDrawer from "./components/TelescopeDrawer";
-import TelescopeLegend from "./components/TelescopeLegend";
+import TelescopeField from "./components/TelescopeField";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import SignupScreen from "./components/SignupScreen";
 import AuthWrapper from "./components/AuthWrapper";
 import { RelationshipsProvider } from "./contexts/RelationshipsContext";
 import WelcomeWizard from "./components/WelcomeWizard";
 import NavBar from "./components/NavBar";
+import PeopleNavStrip from "./components/PeopleNavStrip";
 import SearchBar from "./components/SearchBar";
-import FieldIntelligenceThread from "./components/FieldIntelligenceThread";
-import TAFilterChips from "./components/TAFilterChips";
 import HCPCard from "./components/HCPCard";
 import CommunityExplorer from "./components/CommunityExplorer";
 import ActionTray from "./components/ActionTray";
@@ -49,6 +47,7 @@ import AssetPage from "./components/Assets/AssetPage";
 import CohortLedger from "./components/Cohorts/CohortLedger";
 import HcpProfileBrief from "./components/Profile/HcpProfileBrief";
 import ProfileDispatch from "./components/Profile/ProfileDispatch";
+import PracticeFirstProfile from "./components/Profile/PracticeFirstProfile";
 import LandscapeScreen from "./components/LandscapeScreen";
 import LandscapeRoute from "./components/LandscapeRoute";
 import InstitutionRoute from "./components/InstitutionRoute";
@@ -67,11 +66,7 @@ import HcpPairPublicationsPage from "./components/PublicationsListPage/HcpPairPu
 import HcpPositionsPage from "./components/HcpPositionsPage";
 import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
-import SocialTrackEmpty from "./components/SocialTrackEmpty";
-import DashboardTabs from "./components/DashboardTabs";
-import IndicationFilter from "./components/IndicationFilter";
-import FieldIntelligence from "./components/FieldIntelligence";
-import SurfaceHCPForm from "./components/SurfaceHCPForm";
+import SocialPage from "./components/SocialPage";
 import GlobalFooter from "./components/GlobalFooter";
 import InstitutionsInTerritoryPanel from "./components/InstitutionsInTerritoryPanel";
 import { FiToast } from "./components/FieldIntelligenceShared";
@@ -89,7 +84,6 @@ import {
   resolvePrimaryTaId,
 } from "./lib/api";
 import ActiveFilterPills from "./components/ActiveFilterPills";
-import FilterButton from "./components/FilterButton";
 import FilterDrawer from "./components/FilterDrawer";
 import { useFilterContext, statesFromTerritory } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
@@ -406,6 +400,8 @@ function FeedLayout({
   const [indicationCount, setIndicationCount] = useState<number | null>(
     route.indicationCount ?? HOME_INDICATION_COUNT,
   );
+  // Immersive Skyview is a desktop treatment; mobile keeps the stacked list under the nav.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
   const [feedOverlay, setFeedOverlay] = useState<FeedOverlay>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [activeHCP, setActiveHCP] = useState<AppHCP | null>(null);
@@ -423,7 +419,6 @@ function FeedLayout({
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
-  const [surfaceHcpOpen, setSurfaceHcpOpen] = useState(false);
   const [fiToast, setFiToast] = useState<string | null>(null);
   const [telescopeSelectedHcp, setTelescopeSelectedHcp] = useState<{
     id: string;
@@ -476,9 +471,6 @@ function FeedLayout({
   }
 
   function formatSectionHeaderLabel(): string {
-    if (track === "field-intelligence") {
-      return "Field Intelligence";
-    }
     const taLabel =
       track === "telescope" && isTelescopeAvailable(selectedTA, selectedIndication)
         ? selectedTA === "Immunology"
@@ -700,12 +692,19 @@ function FeedLayout({
   const showInactiveIndicationEmpty =
     isCohortFeedTrack(track) && !route.indicationDataActive;
 
+  // Immersive Skyview: the sky fills the whole viewport and the chrome floats over it.
+  // Only when the Telescope is actually available for the current TA/indication (else the
+  // "not available" card renders in the normal stacked layout).
+  const telescopeImmersive =
+    !isNarrow && track === "telescope" && isTelescopeAvailable(selectedTA, selectedIndication);
+
   return (
     <>
       <div
         className="fm-screen"
         style={{
-          backgroundColor: "#0A0A0B",
+          // Immersive Telescope: transparent so the fixed full-bleed sky shows through.
+          backgroundColor: telescopeImmersive ? "transparent" : "#0A0A0B",
           minHeight: "100dvh",
           maxWidth: CONTENT_WIDTH.reading,
           margin: "0 auto",
@@ -713,10 +712,27 @@ function FeedLayout({
           overflowX: "hidden",
         }}
       >
-      <NavBar />
+      {/* Chrome. In the immersive Telescope view this whole block floats translucent
+          OVER the full-bleed sky (positioned above the fixed canvas, z-index 6); the
+          NavBar goes translucent and the fade-out gradient lets the sky show through.
+          Otherwise it stacks normally at the top of the feed. */}
+      <div
+        style={
+          telescopeImmersive
+            ? {
+                position: "relative",
+                zIndex: 6,
+                background:
+                  "linear-gradient(180deg, rgba(2,3,10,0.62) 0%, rgba(2,3,10,0.16) 72%, rgba(2,3,10,0) 100%)",
+              }
+            : undefined
+        }
+      >
+      <NavBar translucent={telescopeImmersive} />
       {/* Search left the bar (NAV-BUILD-01) — the feed keeps it in its own header,
-          absent when no TA id resolves. */}
-      {getTAIdForLabel(selectedTA) ? (
+          absent when no TA id resolves. Skyview carries its own "Fly to a researcher"
+          search, so the feed search is dropped in the immersive view. */}
+      {!telescopeImmersive && getTAIdForLabel(selectedTA) ? (
         <div style={{ padding: "8px 16px 0" }}>
           <SearchBar
             variant="inline"
@@ -726,169 +742,41 @@ function FeedLayout({
         </div>
       ) : null}
 
-      <TAFilterChips selected={selectedTA} />
-
-      <IndicationFilter
-        therapeuticArea={selectedTA}
-        selected={selectedIndication}
-        onSelect={(_indication, count) => {
-          setIndicationCount(count);
-        }}
+      {/* PeopleNavStrip (frame 46473259) — the "ledger register" redesign replaces the
+          TAFilterChips + IndicationFilter + DashboardTabs trio: serif TA tabs + roadmap
+          dropdown (subject), mono view tabs, and the cohort filter grouped with
+          Filters / territory / Landscape (scope). Same handlers, look + organization only. */}
+      <PeopleNavStrip
+        route={route}
+        onOpenFilters={() => setFilterDrawerOpen(true)}
+        userTerritory={userTerritory}
+        showSubjectLine={!telescopeImmersive}
       />
-
-      <DashboardTabs />
-
-      <div style={{ padding: "0 16px 8px", fontSize: 11, fontFamily: "'IBM Plex Mono', ui-monospace, monospace", letterSpacing: "0.08em", color: "#57534b" }}>
-        {formatUpdatedLabel()}
       </div>
 
+      {/* DOL hero — cohort-feed data panel. Updated-label, subject title, and the
+          Filters / territory / Landscape controls now live in PeopleNavStrip above. */}
       {isCohortFeedTrack(track) && <DOLHeroPanel taSlug={taLabelToApiSlug(selectedTA)} />}
 
-      {/* Section header */}
-      <div
-        className="fm-feed-section-header"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 16px 8px",
-        }}
-      >
-        <span
-          className="fm-section-header-left"
-          style={{
-            fontSize: 30,
-            fontWeight: 600,
-            letterSpacing: "-0.02em",
-            color: "#F4F2EC",
-            fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
-          }}
-        >
-          {formatSectionHeaderLabel()}
-        </span>
-        {isCohortFeedTrack(track) && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <FilterButton
-              onClick={() => setFilterDrawerOpen(true)}
-              taSlug={taLabelToApiSlug(selectedTA)}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (states.length > 0) {
-                  setStates([]);
-                } else {
-                  hydrateFromProfile(userTerritory, statesFromTerritory(userTerritory ?? ""));
-                }
-              }}
-              style={{
-                // Territory-active → indigo selection (§5); inactive → warm ghost.
-                backgroundColor: states.length > 0 ? "rgba(85,102,232,0.12)" : "transparent",
-                border: `1px solid ${states.length > 0 ? "rgba(85,102,232,0.5)" : "rgba(255,255,255,0.09)"}`,
-                color: states.length > 0 ? "#AEB4F5" : "#B6B2AA",
-                borderRadius: 8,
-                padding: "5px 12px",
-                fontSize: 12.5,
-                fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
-                cursor: "pointer",
-                marginLeft: 8,
-              }}
-            >
-              {states.length > 0 ? `Territory (${states.length} states)` : "All US"}
-            </button>
-            <button
-              onClick={() => {
-                const indSlug = indicationLabelToSlug(selectedTA, selectedIndication);
-                navigate(`/landscape/${indSlug === "all" ? "nsclc" : indSlug}`);
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                // Landscape control → indigo (navigation, per the design's Landscape button).
-                backgroundColor: "rgba(85,102,232,0.10)",
-                border: "1px solid rgba(85,102,232,0.40)",
-                borderRadius: 8,
-                padding: "5px 12px",
-                cursor: "pointer",
-                fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
-              }}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <rect x="0" y="6" width="2" height="4" fill="#AEB4F5" />
-                <rect x="4" y="3" width="2" height="7" fill="#AEB4F5" />
-                <rect x="8" y="0" width="2" height="10" fill="#AEB4F5" />
-              </svg>
-              <span style={{ fontSize: 12.5, color: "#AEB4F5" }}>
-                {selectedIndication !== "All" ? `${selectedIndication} Landscape` : "Landscape"}
-              </span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {track === "field-intelligence" ? (
-        <FieldIntelligence
-          therapeuticArea={selectedTA}
-          selectedIndication={selectedIndication}
-          onToast={showFiToast}
-          onSurfaceHcp={() => setSurfaceHcpOpen(true)}
-        />
-      ) : track === "social" ? (
-        <SocialTrackEmpty selectedTA={selectedTA} />
-      ) : track === "telescope" ? (
+      {/* FI feed track removed 2026-07-31: it rendered mockFieldIntelligencePosts on a
+          URL-reachable route as though it were real field intelligence. The forum
+          (/field-intelligence) is the one FI system. SurfaceHCPForm is retained
+          unrouted — its chip flow migrates into the forum. */}
+      {track === "telescope" ? (
         isTelescopeAvailable(selectedTA, selectedIndication) ? (
-          <>
-            <TelescopeLegend />
-            <div
-              style={{
-                marginTop: "16px",
-                marginBottom: "16px",
-                padding: "18px 22px",
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "4px",
-                color: "rgba(232, 230, 223, 0.75)",
-                fontSize: "13px",
-                lineHeight: "1.6",
-                fontWeight: 400,
-              }}
-            >
-              {isAdFeed
-                ? "Telescope maps the network of HCPs driving clinical and scientific progress in atopic dermatitis. Each star represents a researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in atopic dermatitis — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it."
-                : "Telescope maps the network of HCPs driving clinical and scientific progress in non-small cell lung cancer. Each star represents a US-based researcher; the lines between them reflect publication collaboration, weighted by shared work. The brightest stars at the center are the field's most recognized KOLs, while the smaller purple stars surrounding them are emerging investigators connected to that core. The brightest purple stars represent the top 100 rising stars in NSCLC — the researchers most likely to become tomorrow's KOLs. Move your cursor to magnify the nearest star and reveal its identity; click any star to view that researcher's profile and closest collaborators. Together, this view surfaces both the established research community and the next generation working alongside it."}
-            </div>
-            <div
-              style={{
-                width: "100%",
-                height: "1000px",
-                minHeight: "1000px",
-                position: "relative",
-                overflow: "hidden",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: "4px",
-              }}
-            >
-              <Telescope
-                taId={indicationTaId}
-                selectedNodeId={telescopeSelectedHcp?.id ?? null}
-                onNodeClick={(node) => setTelescopeSelectedHcp(node)}
-              />
-              <TelescopeDrawer
-                taId={indicationTaId}
-                hcp={telescopeSelectedHcp}
-                onClose={() => setTelescopeSelectedHcp(null)}
-                onViewProfile={(hcpId) => {
-                  setTelescopeSelectedHcp(null);
-                  const taId = getTAIdForLabel(selectedTA);
-                  if (taId) {
-                    void handleSearchSelect(hcpId, taId);
-                  }
-                }}
-                onSelectCollaborator={(collab) => setTelescopeSelectedHcp(collab)}
-              />
-            </div>
-          </>
+          // Telescope Final (frame ea483f5c): self-contained constellation field + focus
+          // orbit + off-field reveal + mobile list. Replaces the old Telescope +
+          // TelescopeDrawer + TelescopeLegend trio (retained unrouted). Reads the static
+          // enriched JSON; opening a profile routes through the same search-select path.
+          <TelescopeField
+            taId={indicationTaId}
+            onOpenProfile={(hcpId) => {
+              const taId = getTAIdForLabel(selectedTA);
+              if (taId) void handleSearchSelect(hcpId, taId);
+              else navigate(`/hcp/${hcpId}`);
+            }}
+            onExit={() => navigate("/me")}
+          />
         ) : (
           <div
             style={{
@@ -1101,15 +989,6 @@ function FeedLayout({
         }}
         scrollToSection={scoringExplainedScroll ?? undefined}
       />
-      {surfaceHcpOpen && (
-        <SurfaceHCPForm
-          onClose={() => setSurfaceHcpOpen(false)}
-          onSubmit={() => {
-            setSurfaceHcpOpen(false);
-            showFiToast("Thanks — we'll review and add this HCP to the platform when confirmed");
-          }}
-        />
-      )}
       <FiToast message={fiToast} />
     </>
   );
@@ -1293,54 +1172,6 @@ function HCPDetailRoute() {
   );
 }
 
-function FIThreadRoute() {
-  const { ta, threadId } = useParams();
-  const navigate = useNavigate();
-  const taLabel = taSlugToLabel(ta);
-  const [fiToast, setFiToast] = useState<string | null>(null);
-
-  function showFiToast(message: string) {
-    setFiToast(message);
-    window.setTimeout(() => setFiToast(null), 3000);
-  }
-
-  if (!threadId) {
-    return <Navigate to={`/${ta ?? "oncology"}/field-intelligence`} replace />;
-  }
-
-  return (
-    <div
-      className="fm-screen"
-      style={{
-        backgroundColor: "#0A0A0B",
-        minHeight: "100dvh",
-        maxWidth: CONTENT_WIDTH.reading,
-        margin: "0 auto",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <NavBar />
-      <FieldIntelligenceThread
-        postId={threadId}
-        onBack={() => navigate(`/${ta ?? "oncology"}/field-intelligence`)}
-        onToast={showFiToast}
-      />
-      <GlobalFooter onToast={showFiToast} />
-      <FiToast message={fiToast} />
-    </div>
-  );
-}
-
-function FieldIntelligenceFeedRoute() {
-  const params = useParams();
-  return (
-    <FeedLayout
-      forcedDashboard="field-intelligence"
-      forcedIndication={params.indication ?? "all"}
-    />
-  );
-}
-
 export default function App() {
   return (
     <TrackProvider>
@@ -1369,8 +1200,16 @@ export default function App() {
           <Route path="/me/follow-ups" element={<FollowUpsPage />} />
           <Route path="/congress" element={<CongressCalendarPage />} />
           <Route path="/congress/:slug" element={<CongressDetailPage />} />
+          {/* Social — top-level destination (NavBar SOCIAL), TA-scoped like Pulse.
+              Placeholder surface until the Public Conversation build lands. The old
+              /:ta/social/:indication feed track is retired (slug mapping removed). */}
+          <Route path="/social" element={<SocialPage />} />
+          <Route path="/social/:ta" element={<SocialPage />} />
           <Route path="/assets" element={<AssetsIndexPage />} />
           <Route path="/cohorts/ledger" element={<CohortLedger />} />
+          {/* Addressable cohort (2026-07-31): established | rising-stars | community.
+              Bare /cohorts/ledger stays routed as the Established default. */}
+          <Route path="/cohorts/ledger/:cohort" element={<CohortLedger />} />
           <Route path="/assets/:slug" element={<AssetPage />} />
           <Route path="/field-intelligence" element={<ForumIndexPage />} />
           <Route path="/field-intelligence/thread/:id" element={<ThreadPage />} />
@@ -1385,20 +1224,17 @@ export default function App() {
           <Route path="/hcp/:id/profile" element={<ProfileDispatch />} />
           <Route path="/institution/:slug" element={<InstitutionRoute />} />
           <Route path="/hcp/:id/brief" element={<BriefPage />} />
+          {/* Practice-first community profile — runs ALONGSIDE the two-spine profile
+              (frame: Community HCP Profile Practice First.dc.html); not a cutover. */}
+          <Route path="/hcp/:id/practice" element={<PracticeFirstProfile />} />
           {/* CUTOVER (stage 4): the primary HCP surface is now the two-spine profile.
               /hcp/:id renders ProfileDispatch; /hcp/:id/profile also resolves to it (kept
               so existing /profile links + bookmarks work). DetailScreen / HCPDetailRoute
               are DISCONNECTED — retained in the codebase, unrouted, for recovery. */}
           <Route path="/hcp/:id" element={<ProfileDispatch />} />
-          <Route
-            path="/:ta/field-intelligence/thread/:threadId"
-            element={<FIThreadRoute />}
-          />
-          <Route
-            path="/:ta/field-intelligence/:indication"
-            element={<FieldIntelligenceFeedRoute />}
-          />
-          <Route path="/:ta/field-intelligence" element={<FieldIntelligenceFeedRoute />} />
+          {/* FI feed track routes removed 2026-07-31 — the forum (/field-intelligence)
+              is the one FI system. Old /:ta/field-intelligence URLs fall through the
+              greedy /:ta/:dashboard match to the default cohort feed. */}
           <Route path="/:ta/:dashboard/:indication" element={<FeedLayout />} />
           <Route path="/:ta/:dashboard" element={<FeedLayout />} />
           <Route path="/:ta" element={<FeedLayout />} />

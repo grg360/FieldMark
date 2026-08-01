@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { softDeleteNote, type InteractionType, type InsightStrength, type Note } from "../../lib/relationships";
 import { formatOccurredAt, formatRelative } from "./dateFormat";
-import { FONT } from "../../lib/designTokens";
+import { COLOR, FONT } from "../../lib/designTokens";
 import InsightComposer from "./InsightComposer";
 
 function interactionTypeLabel(type: InteractionType): string {
@@ -54,9 +54,11 @@ interface Props {
   hcpId: string;
   firstName: string;
   onMutate: () => void;
+  variant?: "ledger";
 }
 
-export default function InsightCard({ note, userId, hcpId, firstName, onMutate }: Props) {
+export default function InsightCard({ note, userId, hcpId, firstName, onMutate, variant }: Props) {
+  const ledger = variant === "ledger";
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -123,12 +125,16 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate }
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div
-        style={{
-          backgroundColor: "#0D0D10",
-          border: "1px solid #1E1E22",
-          borderRadius: 4,
-          padding: 12,
-        }}
+        style={
+          ledger
+            ? { padding: "18px 24px", borderBottom: "1px solid #141716" } // ledger register: tight row, no card chrome
+            : {
+                backgroundColor: "#0D0D10",
+                border: "1px solid #1E1E22",
+                borderRadius: 4,
+                padding: 12,
+              }
+        }
       >
         <div
           style={{
@@ -238,7 +244,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate }
           </div>
         </div>
 
-        <div style={{ fontFamily: FONT.serif, fontSize: 15, color: "#A8A49B", lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
+        <div style={{ fontFamily: FONT.serif, fontSize: 15, color: COLOR.ink1, lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
           {note.body}
         </div>
 

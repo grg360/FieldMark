@@ -2,9 +2,10 @@
 // Layout authority: docs/design/Home Redesign.dc.html (project 3c3a6c73), with the binding
 // FRAME EXCEPTIONS: NavBar is the shipped 6-item bar via AppLayout (the frame's own top bar
 // is ignored); wired links are /cohorts/ledger, /me/follow-ups, /institutions/:ta,
-// /me/insights, and portfolio chips → /hcp/:id (the exception covers affordances with NO
-// route, e.g. Skyview / All briefs); every other affordance is non-interactive; the session
-// date is the live clock. DATA RULES: WHAT MOVED = 8-Jun snapshot vs current ranks_v3 ("compared against 8 Jun
+// /me/insights, /me/watchlists (portfolio figure + rail header + mobile record row,
+// wired 2026-07-31 — the surface was orphaned), and portfolio chips → /hcp/:id (the
+// exception covers affordances with NO route, e.g. Skyview / All briefs); every other
+// affordance is non-interactive; the session date is the live clock. DATA RULES: WHAT MOVED = 8-Jun snapshot vs current ranks_v3 ("compared against 8 Jun
 // 2026"); no dispersion/tied/confidence anywhere; follow-ups ordered by priority then due;
 // insight bodies rendered VERBATIM; tracked = getTrackedHcpIds; institutions = national pins.
 // Where the frame implies data that does not exist (per-institution "tracked" count,
@@ -182,6 +183,7 @@ export default function HomePage() {
     followUps: () => navigate("/me/follow-ups"),
     institutions: () => navigate(`/institutions/${taSlug}`),
     insights: () => navigate("/me/insights"),
+    watchlists: () => navigate("/me/watchlists"),
   };
 
   return (
@@ -212,7 +214,10 @@ export default function HomePage() {
             <div style={{ display: "flex", alignItems: "flex-end", gap: isDesktop ? 46 : 24, flexWrap: "wrap" }}>
               <Metric label="FOLLOW-UPS" sub="OVERDUE" value={String(stats.overdue)} color={RED} />
               <Metric label="FOLLOW-UPS" sub="OPEN" value={String(stats.total)} color={INK2} />
-              <Metric label="PORTFOLIO" sub="TRACKED" value={String(trackedCount)} color={INK2} />
+              {/* portfolio figure links to the watchlists surface (was orphaned — no live inbound nav) */}
+              <div className="fmhome-link" onClick={go.watchlists} style={{ cursor: "pointer" }}>
+                <Metric label="PORTFOLIO" sub="TRACKED" value={String(trackedCount)} color={INK2} />
+              </div>
               <Metric label="RISING STARS" sub="COVERED" value={`${coverage?.coverage_percentage ?? 0}%`} color={GOLD} foot={coverage ? `${coverage.tracked_count} OF ${coverage.total_rising_stars_in_territory}` : undefined} />
             </div>
           </div>
@@ -362,7 +367,7 @@ export default function HomePage() {
                     colors); chips navigate to /hcp/:id as the shipped tile did — the
                     four-links exception covers affordances with no route, not this one. */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", ...mono(10, 400, MID, ".14em") }}><span>YOUR PORTFOLIO</span><span style={{ color: DIM }}>PINNED BY YOU</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", ...mono(10, 400, MID, ".14em") }}><span className="fmhome-link" onClick={go.watchlists} style={{ color: GOLD_LINK }}>YOUR PORTFOLIO ↗</span><span style={{ color: DIM }}>PINNED BY YOU</span></div>
                   <div style={{ background: CARD, border: `1px solid ${BORDER}`, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
                       <span style={mono(28, 400, INK1)}>{trackedCount}</span>
@@ -433,7 +438,7 @@ export default function HomePage() {
                 <div style={{ ...mono(10, 400, INK2, ".16em"), paddingBottom: 10 }}>THE RECORD</div>
                 <div style={{ background: CARD, border: `1px solid ${BORDER}` }}>
                   <RecordRow label="Follow-ups" right={<span><span style={{ color: RED }}>{stats.overdue}</span> OVERDUE ↗</span>} onClick={go.followUps} />
-                  <RecordRow label="Portfolio" right={`${trackedCount} PINNED`} />
+                  <RecordRow label="Portfolio" right={`${trackedCount} PINNED ↗`} onClick={go.watchlists} />
                   <RecordRow label="Institutions" right={`${institutions.length ? institutions.length : ""} ↗`} onClick={go.institutions} />
                   <RecordRow label="Insights" right={<span>{insights.length} LOGGED ↗</span>} onClick={go.insights} />
                   <RecordRow label="Briefs" right={briefs.length ? `${briefs.length} RECENT` : "NONE"} />

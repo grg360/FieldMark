@@ -264,8 +264,8 @@ export default function ProfileScreen() {
           (the .fm-screen class sizes it to 880px at >=600), matching the other
           standalone pages. Rendering them outside made them full-bleed vs the
           inset content. */}
-      <div className="fm-screen" style={{ maxWidth: CONTENT_WIDTH.reading, margin: "0 auto", boxSizing: "border-box" }}>
       <NavBar />
+      <div className="fm-screen" style={{ maxWidth: CONTENT_WIDTH.reading, margin: "0 auto", boxSizing: "border-box" }}>
       {/* Settings sub-bar — the Save action; global home nav lives in the TopBar above. */}
       <div
         className="fm-nav"

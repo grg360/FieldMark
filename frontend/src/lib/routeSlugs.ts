@@ -28,13 +28,18 @@ export const TRACK_TO_DASHBOARD_SLUG: Record<Track, string> = {
   "field-intelligence": "field-intelligence",
 };
 
+// "social" and "field-intelligence" removed 2026-07-31: Social is a top-level
+// destination (/social/:ta) and the FI feed track is deleted (the forum at
+// /field-intelligence is the one FI system). Old /:ta/social and
+// /:ta/field-intelligence URLs fall back to the default cohort feed like any
+// unknown dashboard slug. (The Track union keeps both values for
+// retained-unrouted components; TRACK_TO_DASHBOARD_SLUG is Record<Track,_> so
+// its entries stay, but nothing builds those feed paths anymore.)
 export const DASHBOARD_SLUG_TO_TRACK: Record<string, Track> = {
   established: "established",
   community: "community",
   "rising-stars": "rising-stars",
-  social: "social",
   telescope: "telescope",
-  "field-intelligence": "field-intelligence",
 };
 
 const ONCOLOGY_SLUG_TO_LABEL: Record<string, string> = {
@@ -216,10 +221,6 @@ export function buildFeedPath(taSlug: string, dashboardSlug: string, indicationS
   }
   const ind = indicationSlug ?? "all";
   return `/${taSlug}/${dashboardSlug}/${ind}`;
-}
-
-export function buildFieldIntelligenceThreadPath(taSlug: string, threadId: string): string {
-  return `/${taSlug}/field-intelligence/thread/${threadId}`;
 }
 
 export function buildHcpDetailPath(hcpId: string): string {

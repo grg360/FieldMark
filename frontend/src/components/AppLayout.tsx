@@ -39,10 +39,13 @@ export default function AppLayout({
         fontFamily: FONT.sans,
       }}
     >
-      {/* NavBar aligns to the content column: it sits inside the same max-width
-          container as the content and fills it (width:100%), so its width is the
-          column's width on every surface — no per-surface override. Gutters live on
-          the content wrapper below, not on the bar. */}
+      {/* NavBar is self-centering (2026-07-31): it centers its own content at
+          CONTENT_WIDTH.standard inside a full-bleed seam, identical on every
+          surface — so it mounts ABOVE the page's width wrapper. Wrapping it in
+          the per-page maxWidth would clamp it (the double-wrap problem). */}
+      {/* Search rides in the bar (right-aligned), forwarded from the page's TA id
+          + select handler; absent where no TA. */}
+      <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} />
       <div
         style={{
           maxWidth,
@@ -51,9 +54,6 @@ export default function AppLayout({
           boxSizing: "border-box",
         }}
       >
-        {/* Search rides in the bar (right-aligned), forwarded from the page's TA id
-            + select handler; absent where no TA. */}
-        <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} />
         <div style={{ padding: SPACE.lg }}>
 
         {breadcrumbs && breadcrumbs.length > 0 ? (

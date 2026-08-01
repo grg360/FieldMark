@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { COLOR, ELEVATION, FONT, TYPE } from "../lib/designTokens";
+import { COLOR, CONTENT_WIDTH, ELEVATION, FONT, TYPE } from "../lib/designTokens";
 import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/authHelpers";
 import { useIsAdmin } from "../lib/useIsAdmin";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -30,7 +30,7 @@ interface NavSearch {
   onSearchSelect: (hcpId: string, taId: string) => void;
 }
 
-type NavKey = "home" | "territory" | "people" | "drugs" | "congresses" | "pulse";
+type NavKey = "home" | "people" | "skyview" | "drugs" | "congresses" | "pulse" | "social" | "field-intelligence";
 
 interface NavItem {
   key: NavKey;
@@ -39,16 +39,25 @@ interface NavItem {
 }
 
 // Bar targets — nearest working surface for each axis. HOME → /me (no /home route;
-// People's consolidated /people and a canonical /home come with the cohort-ledger
-// build). PEOPLE → the existing cohort dashboard until /people exists. TERRITORY →
-// the feed root.
+// a canonical /home comes with the cohort-ledger build). PEOPLE → the cohort
+// dashboard until /people exists. TERRITORY was removed 2026-07-31: it rendered
+// the same FeedLayout surface as PEOPLE — territory scope is a filter in the
+// strip, not a destination ("/" stays routed, just unlinked here). SOCIAL is the
+// nav label; the page titles itself "The public conversation". FIELD
+// INTELLIGENCE points at the forum (the real backend), not the feed track.
 const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "Home", to: "/me" },
-  { key: "territory", label: "Territory", to: "/" },
-  { key: "people", label: "People", to: "/oncology/established/nsclc" },
+  // PEOPLE → the cohort ledger (2026-07-31): the ledger is the people surface; the
+  // card feed stays routed at "/" but unlinked.
+  { key: "people", label: "People", to: "/cohorts/ledger" },
+  // SKYVIEW → the immersive telescope view. Nav says SKYVIEW; the strip chip still
+  // says "Telescope" — that rename is on hold, this label is the nav's only.
+  { key: "skyview", label: "SkyView", to: "/oncology/telescope/nsclc" },
   { key: "drugs", label: "Drugs", to: "/assets" },
   { key: "congresses", label: "Congresses", to: "/congress" },
   { key: "pulse", label: "Pulse", to: "/pulse" },
+  { key: "social", label: "Social", to: "/social" },
+  { key: "field-intelligence", label: "Intelligence", to: "/field-intelligence" },
 ];
 
 const SEAM = COLOR.hairStrong;
@@ -60,12 +69,17 @@ function activeKey(pathname: string): NavKey | null {
   if (p.startsWith("/assets")) return "drugs";
   if (p.startsWith("/congress")) return "congresses";
   if (p.startsWith("/pulse")) return "pulse";
+  if (p.startsWith("/social")) return "social";
+  if (p.startsWith("/field-intelligence")) return "field-intelligence";
   if (p.startsWith("/me")) return "home";
-  if (p.startsWith("/institution")) return "territory";
+  if (p.startsWith("/cohorts")) return "people";
+  if (/\/telescope(\/|$)/.test(p)) return "skyview";
   if (p.startsWith("/hcp") || p.startsWith("/landscape")) return "people";
   if (/\/(established|rising-stars|community)(\/|$)/.test(p)) return "people";
-  if (p === "/") return "territory";
-  return null; // feed sub-surfaces (social/telescope/field-intelligence) → no bar mark
+  if (p === "/") return "people"; // feed root resolves the default cohort feed
+  // Unmarked: /institution* (no bar axis since TERRITORY was removed), the
+  // telescope track, and the retained-but-unlinked FI feed track (/:ta/field-intelligence).
+  return null;
 }
 
 function initialsOf(profile: MslProfile | null): string {
@@ -78,9 +92,13 @@ function initialsOf(profile: MslProfile | null): string {
 export default function NavBar({
   currentTaId,
   onSearchSelect,
+  translucent = false,
 }: {
   currentTaId?: string;
   onSearchSelect?: (hcpId: string, taId: string) => void;
+  // Immersive surfaces (Skyview) float the bar over a full-bleed canvas — swap the
+  // opaque ground for a translucent, blurred backdrop so the sky shows through.
+  translucent?: boolean;
 } = {}) {
   const location = useLocation();
   const isMobile = useMediaQuery("(max-width: 767px)");
@@ -121,9 +139,9 @@ export default function NavBar({
     currentTaId && onSearchSelect ? { currentTaId, onSearchSelect } : null;
 
   return isMobile ? (
-    <MobileBar active={active} menu={menu} search={search} />
+    <MobileBar active={active} menu={menu} search={search} translucent={translucent} />
   ) : (
-    <DesktopBar active={active} menu={menu} search={search} />
+    <DesktopBar active={active} menu={menu} search={search} translucent={translucent} />
   );
 }
 
@@ -136,19 +154,31 @@ interface MenuData {
 }
 
 // ── Desktop ──────────────────────────────────────────────────────────────────
-function DesktopBar({ active, menu, search }: { active: NavKey | null; menu: MenuData; search: NavSearch | null }) {
+// Self-centering (2026-07-31): the bar centers its own content at
+// CONTENT_WIDTH.standard inside a full-bleed seam, so it renders identically on
+// every mount. Mount sites must NOT wrap it in a narrower width container —
+// AppLayout and the NavBar-direct pages mount it above their content wrappers.
+function DesktopBar({ active, menu, search, translucent }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean }) {
   return (
     <nav
+      style={{
+        borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : COLOR.hairStrong}`,
+        background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground,
+        ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
+      }}
+      aria-label="Primary"
+    >
+    <div
       style={{
         display: "flex",
         alignItems: "center",
         gap: 20,
         height: 48,
         padding: "0 18px",
-        borderBottom: `1px solid ${COLOR.hairStrong}`,
-        background: COLOR.ground,
+        maxWidth: CONTENT_WIDTH.standard,
+        margin: "0 auto",
+        boxSizing: "border-box",
       }}
-      aria-label="Primary"
     >
       <Link
         to="/me"
@@ -196,12 +226,13 @@ function DesktopBar({ active, menu, search }: { active: NavKey | null; menu: Men
         </div>
       ) : null}
       <AvatarMenu menu={menu} mobile={false} />
+    </div>
     </nav>
   );
 }
 
 // ── Mobile ───────────────────────────────────────────────────────────────────
-function MobileBar({ active, menu, search }: { active: NavKey | null; menu: MenuData; search: NavSearch | null }) {
+function MobileBar({ active, menu, search, translucent }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean }) {
   return (
     <nav aria-label="Primary">
       {/* 36px utility strip */}
@@ -212,8 +243,9 @@ function MobileBar({ active, menu, search }: { active: NavKey | null; menu: Menu
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 12px",
-          borderBottom: `1px solid ${COLOR.hairStrong}`,
-          background: COLOR.ground,
+          borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : COLOR.hairStrong}`,
+          background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground,
+          ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
         }}
       >
         <Link to="/me" style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", color: COLOR.amber, textDecoration: "none" }}>
@@ -224,43 +256,49 @@ function MobileBar({ active, menu, search }: { active: NavKey | null; menu: Menu
           <AvatarMenu menu={menu} mobile />
         </div>
       </div>
-      {/* 3×2 cell grid — six items, no empty cell */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
-        {NAV_ITEMS.map((item) => {
-          const on = item.key === active;
-          return (
-            <Link
-              key={item.key}
-              to={item.to}
-              aria-current={on ? "page" : undefined}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                minHeight: 53,
-                padding: "0 11px",
-                background: on ? COLOR.surfaceRaised : COLOR.ground,
-                boxShadow: on ? `inset 0 2px 0 ${COLOR.amber}` : "none",
-                textDecoration: "none",
-              }}
-            >
-              <span
+      {/* 4-over-4 cell rows — eight items, no empty cell, no unintended wrap:
+          row one Home / People / SkyView / Drugs, row two Congresses / Pulse /
+          Social / Intelligence. Cells flex equally; both rows are even. */}
+      {[NAV_ITEMS.slice(0, 4), NAV_ITEMS.slice(4)].map((row, ri) => (
+        <div key={ri} style={{ display: "flex", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
+          {row.map((item) => {
+            const on = item.key === active;
+            return (
+              <Link
+                key={item.key}
+                to={item.to}
+                aria-current={on ? "page" : undefined}
                 style={{
-                  fontFamily: FONT.mono,
-                  fontSize: 11.5,
-                  lineHeight: 1.2,
-                  letterSpacing: "0.07em",
-                  textTransform: "uppercase",
-                  color: on ? COLOR.ink1 : COLOR.ink3,
-                  fontWeight: on ? 500 : 400,
-                  overflowWrap: "anywhere",
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: 53,
+                  padding: "0 11px",
+                  background: on ? COLOR.surfaceRaised : COLOR.ground,
+                  boxShadow: on ? `inset 0 2px 0 ${COLOR.amber}` : "none",
+                  textDecoration: "none",
                 }}
               >
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
+                <span
+                  style={{
+                    fontFamily: FONT.mono,
+                    fontSize: 11.5,
+                    lineHeight: 1.2,
+                    letterSpacing: "0.07em",
+                    textTransform: "uppercase",
+                    color: on ? COLOR.ink1 : COLOR.ink3,
+                    fontWeight: on ? 500 : 400,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }

@@ -8,16 +8,17 @@ interface Props {
   userId: string;
   hcpId: string;
   onMutate: () => void;
+  variant?: "ledger";
 }
 
-export default function InsightThread({ notes, firstName, userId, hcpId, onMutate }: Props) {
+export default function InsightThread({ notes, firstName, userId, hcpId, onMutate, variant }: Props) {
   const [expanded, setExpanded] = useState(false);
   const showToggle = notes.length > 3;
   const visibleNotes = showToggle && !expanded ? notes.slice(0, 3) : notes;
 
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: variant === "ledger" ? 0 : 8 }}>
         {visibleNotes.map((note) => (
           <InsightCard
             key={note.id}
@@ -26,6 +27,7 @@ export default function InsightThread({ notes, firstName, userId, hcpId, onMutat
             hcpId={hcpId}
             firstName={firstName}
             onMutate={onMutate}
+            variant={variant}
           />
         ))}
       </div>

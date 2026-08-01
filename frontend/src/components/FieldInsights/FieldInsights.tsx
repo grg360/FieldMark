@@ -12,6 +12,12 @@ import InsightThread from "./InsightThread";
 
 interface Props {
   hcp: HCP;
+  /** "ledger" renders tight ledger-register rows (academic brief) instead of the default
+   *  heavy cards. Community passes nothing → default, unchanged. */
+  variant?: "ledger";
+  /** Skip the internal "FIELD INSIGHTS (n)" header when the host provides its own
+   *  section header (kills the doubled header on the academic brief). */
+  hideHeader?: boolean;
 }
 
 function resolveHcpId(hcp: HCP): string {
@@ -24,7 +30,7 @@ function resolveFirstName(hcp: HCP): string {
   return name.split(/\s+/)[0] ?? "this HCP";
 }
 
-export default function FieldInsights({ hcp }: Props) {
+export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
   const hcpId = resolveHcpId(hcp);
   const firstName = resolveFirstName(hcp);
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -144,25 +150,32 @@ export default function FieldInsights({ hcp }: Props) {
   }
 
   return (
-    <div style={sectionStyle}>
-      <div
-        style={{
-          fontFamily: FONT.sans,
-          fontSize: 11,
-          fontWeight: 600,
-          color: "#8f8b83",
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
-        FIELD INSIGHTS{" "}
-        <span style={{ color: "#6B6A65", textTransform: "none", letterSpacing: "normal" }}>
-          ({notes.length})
-        </span>
-      </div>
+    <div style={variant === "ledger" ? { ...sectionStyle, padding: 0, borderBottom: "none" } : sectionStyle}>
+      {hideHeader ? null : (
+        <div
+          style={{
+            fontFamily: FONT.sans,
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#8f8b83",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}
+        >
+          FIELD INSIGHTS{" "}
+          <span style={{ color: "#6B6A65", textTransform: "none", letterSpacing: "normal" }}>
+            ({notes.length})
+          </span>
+        </div>
+      )}
 
-      {!isMobile ? (
+      {variant === "ledger" ? (
+        // ledger capture affordance — a single tight row, per the frame's "+ CAPTURE"
+        <div style={{ borderBottom: "1px solid #1a1d1c", background: "#0a0b0b" }}>
+          <InsightComposer userId={userId} hcpId={hcpId} firstName={firstName} isInline onSave={handleSave} />
+        </div>
+      ) : !isMobile ? (
         <InsightComposer
           userId={userId}
           hcpId={hcpId}
@@ -198,6 +211,7 @@ export default function FieldInsights({ hcp }: Props) {
         userId={userId}
         hcpId={hcpId}
         onMutate={handleMutate}
+        variant={variant}
       />
 
       {isMobile && composerOpen ? (

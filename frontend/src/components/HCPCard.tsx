@@ -380,7 +380,7 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
 
 const COHORT_SCORE_TIP_TEXT = {
   community:
-    "Cohort score (0-100). Weighted combination of pharma engagement total (45%), engagement breadth across companies (25%), Medicare patient volume (15%), and career stage (15%).",
+    "Cohort score (0-100). Weighted combination of Medicare patient volume (40%), pharma engagement (30%), group practice signal (15%), career stage (10%), and publication signal (5%). Normalized 0-100 within the Community cohort.",
   workhorse:
     "Cohort score (0-100). Weighted combination of Medicare patient volume (60%) and career stage (40%). Identifies high-volume practitioners with low pharma engagement — underleveraged influence.",
 } as const;

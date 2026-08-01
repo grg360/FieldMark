@@ -35,9 +35,16 @@ STATEMENT_TIMEOUT_MS = 300_000  # 5 minutes
 # established_scoring.py's (HCP x TA) cartesian product: every globally-'established'
 # HCP got a row for BOTH TAs regardless of TA membership (Hepatology 11,389 ==
 # NSCLC 11,389 — identical counts are the signature), so the seed was ~61% non-NSCLC.
-# Only the established slice is affected; the rising join below stays on
-# hcp_score_ranks_v2, whose rising/community slices are properly TA-scoped.
 # v3 has no `cohort` column (it is established-only) and names the score `cohort_score`.
+#
+# The RISING slice reads hcp_rising_star_ranks_v3 — the authoritative trajectory-based
+# rising-star system (Scientific/Network Momentum + Visibility -> composite), gated on the
+# positive cohort_classification='rising_star' label and US-scoped via us_rank. It REPLACES
+# the former hcp_score_ranks_v2 cohort='rising' join, which was the ~234k-row career-age
+# DEMOGRAPHIC gate (any mid-career HCP with >=1 pub) — that swept in non-rising names with
+# meaningless global ranks (e.g. Joao V. Alessi #23,852). Displayed rank = us_rank (the real
+# selective rank). NODES and EDGES apply the SAME ranks_v3 membership so the two graphs stay
+# identical (see EDGES note below). ranks_v3 is NSCLC-only and has no scope_type column.
 NODES_SQL = """
 WITH top_established AS (
   SELECT
@@ -71,19 +78,18 @@ network_hcps AS (
     h.first_name || ' ' || h.last_name AS name,
     h.institution_normalized AS institution,
     'rising' AS cohort,
-    hsr.rank,
-    hsr.score_at_rank AS score
+    rs.us_rank AS rank,
+    rs.rising_star_percentile AS score
   FROM top_established te
   JOIN publication_authors_v2 pa_te ON pa_te.hcp_id = te.hcp_id
   JOIN publication_authors_v2 pa_rs
     ON pa_rs.publication_id = pa_te.publication_id
     AND pa_rs.hcp_id != te.hcp_id
   JOIN hcps_v2 h ON h.id = pa_rs.hcp_id AND h.country = 'US'
-  JOIN hcp_score_ranks_v2 hsr
-    ON hsr.hcp_id = h.id
-    AND hsr.cohort = 'rising'
-    AND hsr.scope_type = 'global'
-    AND hsr.therapeutic_area_id = te.therapeutic_area_id
+  JOIN hcp_rising_star_ranks_v3 rs
+    ON rs.hcp_id = h.id
+    AND rs.therapeutic_area_id = te.therapeutic_area_id
+    AND rs.us_rank IS NOT NULL
 )
 SELECT * FROM network_hcps;
 """
@@ -112,11 +118,10 @@ network_hcp_ids AS (
     ON pa_rs.publication_id = pa_te.publication_id
     AND pa_rs.hcp_id != te.hcp_id
   JOIN hcps_v2 h ON h.id = pa_rs.hcp_id AND h.country = 'US'
-  JOIN hcp_score_ranks_v2 hsr
-    ON hsr.hcp_id = pa_rs.hcp_id
-    AND hsr.cohort = 'rising'
-    AND hsr.scope_type = 'global'
-    AND hsr.therapeutic_area_id = te.therapeutic_area_id
+  JOIN hcp_rising_star_ranks_v3 rs
+    ON rs.hcp_id = pa_rs.hcp_id
+    AND rs.therapeutic_area_id = te.therapeutic_area_id
+    AND rs.us_rank IS NOT NULL
 )
 SELECT
   LEAST(pa1.hcp_id, pa2.hcp_id)::text AS source,
@@ -229,14 +234,63 @@ GROUP BY LEAST(pa1.hcp_id, pa2.hcp_id), GREATEST(pa1.hcp_id, pa2.hcp_id);
 
 # TA registry — --ta selects which SQL + output paths to use. NSCLC entry uses the
 # original constants verbatim, so `--ta nsclc` (the default) is byte-identical.
+NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
+
+# Focus enrichment (Option 3): bake each node's REAL top-5 collaborators from the
+# validated-clean hcp_top_collaborators_v2 (window 10yr), so the FOCUS view can show a
+# researcher's actual network — including collaborators absent from the bounded overview
+# subgraph (the whole point: e.g. Heymach's Zhang/Gibbons/Swisher). Additive: overview
+# nodes/edges are untouched. Per-collaborator institution is deliberately NOT baked
+# (recover by hcp_id lookup on focus) — it was the largest string weight. Collaborator
+# `cohort` (established / rising / other) is baked for focus-view node coloring and mirrors
+# the overview's two cohorts, resolved via each TA's own rank tables. NSCLC-scoped by the
+# ta id + rising-membership join (%(ta)s), keeping the seed-coupled TA pin intact.
+# Cohort classification uses correlated EXISTS (not JOINs): a collaborator with >1 row in
+# a rank table would fan a JOIN out and duplicate the collaborator, so membership is tested,
+# never joined. Guarantees exactly one row per (seed, rank) → at most 5 per node.
+#   {rising_exists}: the TA-appropriate rising-membership EXISTS clause.
+FOCUS_SQL_TEMPLATE = """
+WITH seed AS (SELECT DISTINCT unnest(%(ids)s::uuid[]) AS hcp_id)  -- DISTINCT: the overview
+-- UNION can list one hcp twice (established seed AND rising co-author, e.g. Riely); an
+-- undeduped seed would fan the join out and duplicate that node's collaborators.
+SELECT tc.hcp_id::text AS seed_id, tc.rank, tc.shared_publications,
+       tc.collaborator_hcp_id::text AS collab_id,
+       trim(coalesce(h.first_name,'') || ' ' || coalesce(h.last_name,'')) AS collab_name,
+       CASE
+         WHEN EXISTS (SELECT 1 FROM hcp_established_ranks_v3 er
+                       WHERE er.hcp_id = tc.collaborator_hcp_id
+                         AND er.therapeutic_area_id = %(ta)s AND er.scope_type = 'global')
+              THEN 'established'
+         WHEN {rising_exists} THEN 'rising'
+         ELSE 'other'
+       END AS collab_cohort
+FROM hcp_top_collaborators_v2 tc
+JOIN seed s ON s.hcp_id = tc.hcp_id
+JOIN hcps_v2 h ON h.id = tc.collaborator_hcp_id
+WHERE tc.therapeutic_area_id = %(ta)s AND tc.window_type = '10yr' AND tc.rank <= 5
+ORDER BY tc.hcp_id, tc.rank
+"""
+
+# NSCLC rising membership → hcp_rising_star_ranks_v3 (authoritative, US-scoped via us_rank).
+# AD → hcp_rising_composite_v1. Kept consistent with the overview rising layer so a
+# focus collaborator colored 'rising' is exactly one that appears in the rising node set.
+NSCLC_RISING_JOIN = """EXISTS (SELECT 1 FROM hcp_rising_star_ranks_v3 sr
+              WHERE sr.hcp_id = tc.collaborator_hcp_id
+                AND sr.therapeutic_area_id = %(ta)s AND sr.us_rank IS NOT NULL)"""
+AD_RISING_JOIN = """EXISTS (SELECT 1 FROM hcp_rising_composite_v1 sr
+              WHERE sr.hcp_id = tc.collaborator_hcp_id
+                AND sr.therapeutic_area_id = %(ta)s AND sr.scope_type = 'global')"""
+
 TA_EXPORTS = {
     "nsclc": {
         "nodes_sql": NODES_SQL, "edges_sql": EDGES_SQL,
         "nodes_path": NODES_PATH, "edges_path": EDGES_PATH,
+        "ta_id": NSCLC_TA_ID, "rising_join": NSCLC_RISING_JOIN,
     },
     "ad": {
         "nodes_sql": AD_NODES_SQL, "edges_sql": AD_EDGES_SQL,
         "nodes_path": AD_NODES_PATH, "edges_path": AD_EDGES_PATH,
+        "ta_id": AD_TA_ID, "rising_join": AD_RISING_JOIN,
     },
 }
 # Accepted --ta aliases -> registry key.
@@ -273,7 +327,7 @@ def json_safe_row(row: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def run_query(sql: str) -> List[Dict[str, Any]]:
+def run_query(sql: str, params: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
     database_url = get_required_env("DATABASE_URL")
 
     try:
@@ -283,7 +337,7 @@ def run_query(sql: str) -> List[Dict[str, Any]]:
         with psycopg.connect(database_url, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(f"SET statement_timeout = {STATEMENT_TIMEOUT_MS}")
-                cur.execute(sql)
+                cur.execute(sql, params or {})
                 rows = cur.fetchall()
         return [json_safe_row(dict(row)) for row in rows]
     except ImportError:
@@ -302,11 +356,30 @@ def run_query(sql: str) -> List[Dict[str, Any]]:
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(f"SET statement_timeout = {STATEMENT_TIMEOUT_MS}")
-            cur.execute(sql)
+            cur.execute(sql, params or {})
             rows = cur.fetchall()
         return [json_safe_row(dict(row)) for row in rows]
     finally:
         conn.close()
+
+
+def enrich_focus(nodes: List[Dict[str, Any]], ta_id: str, rising_join: str) -> None:
+    """Attach `focus_collaborators` (top-5) to each node IN PLACE. Overview fields untouched."""
+    ids = [n["id"] for n in nodes]
+    sql = FOCUS_SQL_TEMPLATE.format(rising_exists=rising_join)
+    rows = run_query(sql, {"ids": ids, "ta": ta_id})
+    from collections import defaultdict
+
+    by_seed: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        by_seed[r["seed_id"]].append({
+            "hcp_id": r["collab_id"],
+            "name": r["collab_name"],
+            "shared_publications": r["shared_publications"],
+            "cohort": r["collab_cohort"],
+        })
+    for n in nodes:
+        n["focus_collaborators"] = by_seed.get(n["id"], [])
 
 
 def payload_size_mb(data: List[Dict[str, Any]]) -> float:
@@ -328,6 +401,14 @@ def main() -> int:
         default="nsclc",
         help="Therapeutic area: 'nsclc' (default) or 'ad'/'atopic-dermatitis'.",
     )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default=None,
+        help="Optional output directory. When set, nodes/edges are written to "
+        "<out-dir>/<original-filename> instead of the live frontend paths — use for a "
+        "dry run that does NOT overwrite the live JSON.",
+    )
     args = parser.parse_args()
     ta_key = TA_ALIASES.get(args.ta.strip().lower())
     if ta_key is None:
@@ -337,6 +418,14 @@ def main() -> int:
         )
         return 1
     cfg = TA_EXPORTS[ta_key]
+
+    out_dir = Path(args.out_dir) if args.out_dir else None
+
+    def eff_path(p: Path) -> Path:
+        return (out_dir / p.name) if out_dir else p
+
+    if out_dir:
+        print(f"[DRY RUN] Writing to {out_dir} — live JSON NOT overwritten.")
 
     load_dotenv()
     try:
@@ -349,14 +438,22 @@ def main() -> int:
         print(f"[{ta_key}] Querying nodes...")
         nodes = run_query(cfg["nodes_sql"])
         print(f"Got {len(nodes)} nodes ({payload_size_mb(nodes):.1f} MB)")
-        print(f"Writing to {cfg['nodes_path']}")
-        write_json_array(cfg["nodes_path"], nodes)
+
+        # Focus enrichment — bake each node's real top-5 collaborators (additive).
+        print(f"[{ta_key}] Enriching nodes with focus_collaborators...")
+        enrich_focus(nodes, cfg["ta_id"], cfg["rising_join"])
+        covered = sum(1 for n in nodes if n.get("focus_collaborators"))
+        print(f"  focus_collaborators on {covered}/{len(nodes)} nodes ({payload_size_mb(nodes):.1f} MB)")
+        nodes_out = eff_path(cfg["nodes_path"])
+        print(f"Writing to {nodes_out}")
+        write_json_array(nodes_out, nodes)
 
         print(f"[{ta_key}] Querying edges...")
         edges = run_query(cfg["edges_sql"])
         print(f"Got {len(edges)} edges ({payload_size_mb(edges):.1f} MB)")
-        print(f"Writing to {cfg['edges_path']}")
-        write_json_array(cfg["edges_path"], edges)
+        edges_out = eff_path(cfg["edges_path"])
+        print(f"Writing to {edges_out}")
+        write_json_array(edges_out, edges)
 
         print("Done.")
         return 0
