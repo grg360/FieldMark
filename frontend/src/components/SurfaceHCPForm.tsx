@@ -1,3 +1,10 @@
+// RETAINED UNROUTED (2026-07-31). The FI feed track that mounted this form was
+// removed (mock data end to end), but this structured chip-based contribution
+// flow — "worth tracking" reason chips + TA + institution — is the design we
+// want to MIGRATE INTO THE FORUM (/field-intelligence) when it grows a real
+// write path. Note before wiring: the institution typeahead below is a
+// hardcoded mock list and onSubmit persists nothing.
+
 import { useState, type CSSProperties } from "react";
 import { FiChip, FiModal } from "./FieldIntelligenceShared";
 

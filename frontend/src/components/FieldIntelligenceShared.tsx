@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
 import { handleAvatarColor, FI_ACCENT_MUTED } from "../lib/fieldIntelligenceUi";
-import { CHANNEL_LABELS, type FIChannel } from "../data/mockFieldIntelligencePosts";
 
 export function FiToast({ message }: { message: string | null }) {
   if (!message) return null;
@@ -134,23 +133,8 @@ export function FiMslVerified() {
   );
 }
 
-export function FiChannelPill({ channel }: { channel: FIChannel }) {
-  return (
-    <span
-      style={{
-        fontSize: 10,
-        fontWeight: 600,
-        padding: "2px 8px",
-        borderRadius: 999,
-        background: "rgba(120, 200, 255, 0.12)",
-        border: "1px solid rgba(120, 200, 255, 0.3)",
-        color: "rgba(120, 200, 255, 1)",
-      }}
-    >
-      {CHANNEL_LABELS[channel]}
-    </span>
-  );
-}
+// FiChannelPill removed 2026-07-31 with the FI feed track — it rendered
+// mockFieldIntelligencePosts channel labels and had no other consumer.
 
 export function FiChip({
   label,
