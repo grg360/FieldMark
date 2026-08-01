@@ -30,9 +30,12 @@ const metaMono = { fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink4 } as c
 
 // NavBar is mounted INSIDE each content column (below), not here, so the bar aligns
 // to the column width on this surface like every other.
+// NavBar mounts here, above the callers' width wrappers — it is self-centering
+// (2026-07-31) and must not sit inside a narrower content container.
 function shell(children: React.ReactNode) {
   return (
     <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: FONT.sans }}>
+      <NavBar />
       {children}
     </div>
   );
@@ -220,7 +223,6 @@ export default function AssetPage() {
   if (!asset) {
     return shell(
       <div style={{ maxWidth: CONTENT_WIDTH.standard, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-        <NavBar />
         <div style={{ padding: "60px 24px", fontFamily: FONT.mono, fontSize: 13, color: COLOR.ink3 }}>
           No drug matches “{slug}”. <Link to="/assets" style={{ color: COLOR.indigoLink }}>Back to the drug index →</Link>
         </div>
@@ -234,7 +236,6 @@ export default function AssetPage() {
 
   return shell(
     <div style={{ maxWidth: CONTENT_WIDTH.wide, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      <NavBar />
       <Header asset={asset} mobile={isMobile} />
 
       {loading || !data || !o || !composition ? (

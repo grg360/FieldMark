@@ -16,7 +16,7 @@ import {
   assetSlug,
   type AssetConfig,
 } from "./assetConfig";
-import { NSCLC_CORPUS_TOTAL } from "./assets";
+import { NSCLC_CORPUS_TOTAL, CORPUS_INDEX_DATE } from "./assets";
 
 export type DensityTier = "dense" | "intermittent" | "sparse";
 
@@ -62,7 +62,8 @@ export interface AssetIndexModel {
     deploymentPubs: number;
     backbonePubs: number;
     allPubs: number;
-    corpus: number;
+    corpus: number; // live NSCLC corpus size — computed (asset_index_meta), not hardcoded
+    indexDate: string; // real corpus build date (max built_at) — computed, not hardcoded
     overlap: number; // deployment + backbone − all
   };
   legend: Record<DensityTier, number>; // over the 43 deployment assets
@@ -99,11 +100,20 @@ export async function loadAssetIndex(): Promise<AssetIndexModel> {
     { key: ALL_KEY, generics: ASSETS.map((a) => a.generic) },
   ];
 
-  const [mentionRes, groupRes, densityRes] = await Promise.all([
+  const [mentionRes, groupRes, densityRes, metaRes] = await Promise.all([
     supabase.from("asset_mention_v1").select("asset_generic, publication_count"),
     supabase.rpc("asset_group_distinct", { p_groups: groupsArg }),
     supabase.rpc("asset_density_tiers"),
+    // Computed corpus meta — real build date (max built_at) + live NSCLC corpus count.
+    // Falls back to the assets.ts constants only if the RPC is unavailable.
+    supabase.rpc("asset_index_meta"),
   ]);
+
+  const metaRow = (Array.isArray(metaRes.data) ? metaRes.data[0] : metaRes.data) as
+    | { index_date?: string; corpus_total?: number | string }
+    | undefined;
+  const indexDate = metaRow?.index_date || CORPUS_INDEX_DATE;
+  const corpus = Number(metaRow?.corpus_total) || NSCLC_CORPUS_TOTAL;
 
   const nByGeneric = new Map<string, number>();
   for (const r of mentionRes.data ?? []) {
@@ -153,7 +163,8 @@ export async function loadAssetIndex(): Promise<AssetIndexModel> {
       deploymentPubs: groupDistinct[DEPLOY_KEY] ?? 0,
       backbonePubs: groupDistinct[BACKBONE_KEY] ?? 0,
       allPubs: groupDistinct[ALL_KEY] ?? 0,
-      corpus: NSCLC_CORPUS_TOTAL,
+      corpus,
+      indexDate,
       overlap:
         (groupDistinct[DEPLOY_KEY] ?? 0) + (groupDistinct[BACKBONE_KEY] ?? 0) - (groupDistinct[ALL_KEY] ?? 0),
     },

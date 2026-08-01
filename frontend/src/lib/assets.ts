@@ -17,11 +17,12 @@ import {
 } from "./assetConfig";
 
 // ── The indexed snapshot ─────────────────────────────────────────────────────
-// Measured 2026-07-28 against the live NSCLC corpus (Stage 1). The corpus total
-// and index date are stated verbatim on every asset page's "What this page
-// counted" line; refresh them when the corpus is re-measured.
+// FALLBACK ONLY. The Drugs Index now derives both values live from the data via the
+// asset_index_meta() RPC (index_date = max(built_at) on asset_publication_v1; corpus =
+// live count of NSCLC-ingest publications_v2) — see loadAssetIndex(). These constants are
+// used only if that RPC is unavailable, and no longer need manual refreshing.
 export const NSCLC_CORPUS_TOTAL = 85302;
-export const CORPUS_INDEX_DATE = "2026-07-24"; // last ingest
+export const CORPUS_INDEX_DATE = "2026-07-24";
 export const CORPUS_MAX_YEAR = 2026; // ahead-of-print records dated later are capped here
 
 export function formatIndexDate(iso: string = CORPUS_INDEX_DATE): string {
