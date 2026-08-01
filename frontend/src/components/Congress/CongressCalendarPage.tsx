@@ -228,7 +228,9 @@ export default function CongressCalendarPage() {
           const tiles = [
             { k: "POSTS", v: s ? INT.format(s.total_posts) : "—", c: COLOR.ink1 },
             { k: "VOICES", v: s ? INT.format(s.voices) : "—", c: COLOR.ink1 },
-            ...(isLive ? [{ k: "WoW", v: s && s.wow_pct != null ? `${s.wow_pct > 0 ? "+" : ""}${s.wow_pct}%` : "—", c: COLOR.amber }] : []),
+            // WoW renders only when the RPC's observation + volume gate passes —
+            // on null the tile is omitted entirely (no zero, no dash).
+            ...(isLive && s && s.wow_pct != null ? [{ k: "WoW", v: `${s.wow_pct > 0 ? "+" : ""}${s.wow_pct}%`, c: COLOR.amber }] : []),
             { k: "CONFIRMED", v: confirmed != null ? String(confirmed) : "—", c: COLOR.ink1 },
           ];
           return (

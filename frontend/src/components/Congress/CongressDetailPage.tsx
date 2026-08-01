@@ -100,9 +100,9 @@ function VolumeChart({ c, s }: { c: Congress; s: CongressSocial }) {
     return d.toISOString().slice(0, 10);
   })();
   const windowed = s.daily.filter((p) => p.d <= cutoff);
-  // Tighten the domain to the final data point: trailing zero-days inside the
-  // window render as invisible bars — dead space right of the last visible bar.
-  // Interior quiet days still draw; only the empty tail is dropped.
+  // The series holds only days with captured posts (2026-07-31: the RPC no
+  // longer emits a calendar, so unobserved days arrive absent, not as zeros).
+  // The trailing-zero trim is kept as a safeguard only.
   const lastDataIdx = (() => {
     for (let i = windowed.length - 1; i >= 0; i--) if (windowed[i].n > 0) return i;
     return windowed.length - 1;
@@ -165,9 +165,9 @@ function VolumeChart({ c, s }: { c: Congress; s: CongressSocial }) {
         ))}
       </div>
       <div style={{ ...mono(9, COLOR.ink5), marginTop: 8, lineHeight: 1.6 }}>
-        Bars use a square-root scale so the pre-meeting build stays legible against the in-session peak; exact counts on hover. Days before capture began are unobserved, not zero — we don&rsquo;t draw them.
+        Bars use a square-root scale so the pre-meeting build stays legible against the in-session peak; exact counts on hover. Only days with captured posts are drawn — a missing day means no capture record, not zero.
         {hiddenDays > 0 && (
-          <> Shown through {fmtShortDay(daily[daily.length - 1].d)} — the last day with captured posts inside meeting end + 7 days; capture continues to {fmtShortDay(s.last_day)} with {INT.format(hiddenPosts)} further posts beyond the shown window.</>
+          <> Shown through {fmtShortDay(daily[daily.length - 1].d)} — the last day with captured posts inside meeting end + 7 days; later capture, through {fmtShortDay(s.last_day)}, holds {INT.format(hiddenPosts)} further posts across {INT.format(hiddenDays)} observed days beyond the shown window.</>
         )}
       </div>
     </div>

@@ -4,8 +4,18 @@
 //
 // Reporting threshold (Design): below 250 posts from 40 accounts, do not render
 // share of voice or topic trend — show the honest empty state. Callers gate on
-// meetsThreshold(). The daily series is observed days only (starts at capture_start);
-// unobserved days are absent, never zero.
+// meetsThreshold().
+//
+// The daily series holds ONLY days with captured posts — unobserved days are
+// absent, never zero (2026-07-31: the RPC's old generate_series emitted the
+// 4 Jun – 20 Jul capture gap as ~47 literal zeros; it no longer emits a calendar).
+// True zero days are indistinguishable from unobserved days until capture runs
+// record their coverage in social_capture_coverage, so they are absent too.
+//
+// wow_pct is NULL unless BOTH 7-day comparison windows are fully covered by
+// social_capture_coverage rows AND both hold >= 50 posts (server-side gate).
+// Nothing populates the coverage table yet, so wow_pct is currently always NULL.
+// On NULL, render nothing — no zero, no dash.
 
 import { supabase } from "./supabase";
 import type { Congress } from "./congresses";
