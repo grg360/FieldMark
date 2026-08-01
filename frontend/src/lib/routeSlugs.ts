@@ -24,7 +24,9 @@ export const TRACK_TO_DASHBOARD_SLUG: Record<Track, string> = {
   community: "community",
   "rising-stars": "rising-stars",
   social: "social",
-  telescope: "telescope",
+  // Track value is "skyview"; the URL slug stays "telescope" (route-segment
+  // rename is a later stage). So skyview → /…/telescope/… .
+  skyview: "telescope",
   "field-intelligence": "field-intelligence",
 };
 
@@ -39,7 +41,8 @@ export const DASHBOARD_SLUG_TO_TRACK: Record<string, Track> = {
   established: "established",
   community: "community",
   "rising-stars": "rising-stars",
-  telescope: "telescope",
+  // URL slug "telescope" resolves to the "skyview" track (segment rename pending).
+  telescope: "skyview",
 };
 
 const ONCOLOGY_SLUG_TO_LABEL: Record<string, string> = {

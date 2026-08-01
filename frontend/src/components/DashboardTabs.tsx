@@ -13,7 +13,7 @@ const DASHBOARDS: { value: Track; label: string }[] = [
   { value: "rising-stars", label: "Rising Stars" },
   { value: "community", label: "Community" },
   { value: "social", label: "Social" },
-  { value: "telescope", label: "Telescope" },
+  { value: "skyview", label: "SkyView" },
   { value: "field-intelligence", label: "Field Intelligence" },
 ];
 

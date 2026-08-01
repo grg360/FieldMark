@@ -53,7 +53,7 @@ const DOMAINS = ["Oncology", "Immunology"];
 // bar. The social feed track is retired outright; the FI feed track is retained
 // unrouted-from-UI (see App.tsx) pending a decision on its contribution flow.
 const VIEWS: { key: string; label: string }[] = [
-  { key: "telescope", label: "Telescope" },
+  { key: "skyview", label: "SkyView" },
 ];
 const COHORTS: { key: Track; label: string }[] = [
   { key: "established", label: "Established" },

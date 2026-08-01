@@ -472,7 +472,7 @@ function FeedLayout({
 
   function formatSectionHeaderLabel(): string {
     const taLabel =
-      track === "telescope" && isTelescopeAvailable(selectedTA, selectedIndication)
+      track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication)
         ? selectedTA === "Immunology"
           ? "Immunology (Atopic Dermatitis) - Telescope"
           : "Oncology (NSCLC) - Telescope"
@@ -696,7 +696,11 @@ function FeedLayout({
   // Only when the Telescope is actually available for the current TA/indication (else the
   // "not available" card renders in the normal stacked layout).
   const telescopeImmersive =
-    !isNarrow && track === "telescope" && isTelescopeAvailable(selectedTA, selectedIndication);
+    !isNarrow && track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication);
+  // The SkyView surface (desktop immersive AND mobile list) drops PeopleNavStrip:
+  // its cohort links were the last remaining path to the card feed. Gated on the
+  // surface, not on `immersive`, so mobile is covered too.
+  const onSkyview = track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication);
 
   return (
     <>
@@ -746,12 +750,14 @@ function FeedLayout({
           TAFilterChips + IndicationFilter + DashboardTabs trio: serif TA tabs + roadmap
           dropdown (subject), mono view tabs, and the cohort filter grouped with
           Filters / territory / Landscape (scope). Same handlers, look + organization only. */}
-      <PeopleNavStrip
-        route={route}
-        onOpenFilters={() => setFilterDrawerOpen(true)}
-        userTerritory={userTerritory}
-        showSubjectLine={!telescopeImmersive}
-      />
+      {!onSkyview && (
+        <PeopleNavStrip
+          route={route}
+          onOpenFilters={() => setFilterDrawerOpen(true)}
+          userTerritory={userTerritory}
+          showSubjectLine={!telescopeImmersive}
+        />
+      )}
       </div>
 
       {/* DOL hero — cohort-feed data panel. Updated-label, subject title, and the
@@ -762,7 +768,7 @@ function FeedLayout({
           URL-reachable route as though it were real field intelligence. The forum
           (/field-intelligence) is the one FI system. SurfaceHCPForm is retained
           unrouted — its chip flow migrates into the forum. */}
-      {track === "telescope" ? (
+      {track === "skyview" ? (
         isTelescopeAvailable(selectedTA, selectedIndication) ? (
           // Telescope Final (frame ea483f5c): self-contained constellation field + focus
           // orbit + off-field reveal + mobile list. Replaces the old Telescope +
@@ -775,7 +781,6 @@ function FeedLayout({
               if (taId) void handleSearchSelect(hcpId, taId);
               else navigate(`/hcp/${hcpId}`);
             }}
-            onExit={() => navigate("/me")}
           />
         ) : (
           <div
