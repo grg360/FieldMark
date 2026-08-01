@@ -25,20 +25,36 @@ import nsclcEdges from "../data/telescope_nsclc_edges.json";
 import adNodes from "../data/telescope_ad_nodes.json";
 import adEdges from "../data/telescope_ad_edges.json";
 
-interface Collab { hcp_id: string; name: string; shared_publications: number; cohort: string }
+// `cohort` + `rank` are the collaborator's OWN standing, baked by the exporter
+// from the rank tables (cohort = the stronger of the cohorts they hold, by
+// percentile; rank = that cohort's rank). Absent/null rank ⇒ genuinely unranked.
+interface Collab { hcp_id: string; name: string; shared_publications: number; cohort: string; rank?: number | null }
 interface RawNode { id: string; name: string; institution: string | null; cohort: string; rank: number | null; score: number | null; focus_collaborators?: Collab[] }
 interface RawEdge { source: string; target: string; weight: number }
 interface FNode { id: string; name: string; inst: string; cohort: string; rank: number | null; conn: number; deg: number; i: number; x: number; y: number; tw: number; twd: number; dr: number; drd: number; rare: boolean; focus_collaborators: Collab[] }
-interface OrbNode { name: string; inst: string; cohort: string; w: number; inField: boolean; fieldIndex: number; hcp_id: string; x: number; y: number }
+// `cohort` is the DRAWING role (off-field stars stay "other"/blue — the visual
+// convention for "not among the fifty drawn"); `srcCohort` + `rank` carry the
+// collaborator's REAL standing so the panel states it truthfully.
+interface OrbNode { name: string; inst: string; cohort: string; srcCohort: string; rank: number | null; w: number; inField: boolean; fieldIndex: number; hcp_id: string; x: number; y: number }
 type Focus = { t: "f"; i: number } | { t: "o"; p: number; k: number };
 
 const AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1";
 const GOLD = "#ffd89b", PURP = "#c3a9ff", OTHER = "#a8bdd8";
-const TINT: Record<string, string> = { established: GOLD, rising: PURP, other: OTHER };
+const TINT: Record<string, string> = { established: GOLD, rising: PURP, community: OTHER, other: OTHER };
 const HALO: Record<string, string> = { established: "rgba(255,196,120,0.78)", rising: "rgba(160,116,255,0.72)", other: "rgba(140,178,228,0.66)" };
-const ROLE: Record<string, string> = { established: "Established", rising: "Rising Star", other: "Outside the recognized field" };
+// ROLE.other is the honest label for a star not drawn among the fifty — it makes
+// NO claim about the person's ranking (that lives in srcCohort/rank).
+const ROLE: Record<string, string> = { established: "Established", rising: "Rising Star", community: "Community", other: "Outside this sky" };
 const LINE = "#7e93c6";
 const WW = 3400, WH = 1900;
+// Dust extends SKY_PAD px beyond the node field on every side; the camera clamps
+// to this padded box so the viewport can never leave the starfield (item 6).
+const SKY_PAD = 200;
+// Off-field stars sit on a fixed decorative orbit ring — constant radius, position
+// varied by ANGLE only. (The old radius encoded shared-pubs inversely across a
+// 12px span, scrambled by the ellipse — a meaningless distance that looked
+// meaningful. Removed.)
+const OFFFIELD_RADIUS = 200;
 const RIS_BUDGET = 80; // working rising set (established seed is always all shown)
 const LEADERS = 24;    // "Leaders" density = the brightest this many
 
@@ -116,29 +132,29 @@ function buildOrbit(g: Field, i: number): OrbNode[] {
   const host = g.nodes[i];
   const out: OrbNode[] = (host.focus_collaborators ?? []).slice(0, 5).map((c) => {
     const fieldIndex = g.idx.has(c.hcp_id) ? g.idx.get(c.hcp_id)! : -1;
-    return { name: c.name, inst: fieldIndex >= 0 ? g.nodes[fieldIndex].inst : (c.cohort === "other" ? "" : "Outside the recognized field"), cohort: fieldIndex >= 0 ? g.nodes[fieldIndex].cohort : "other", w: c.shared_publications, inField: fieldIndex >= 0, fieldIndex, hcp_id: c.hcp_id, x: 0, y: 0 };
+    return { name: c.name, inst: fieldIndex >= 0 ? g.nodes[fieldIndex].inst : "", cohort: fieldIndex >= 0 ? g.nodes[fieldIndex].cohort : "other", srcCohort: c.cohort, rank: c.rank ?? null, w: c.shared_publications, inField: fieldIndex >= 0, fieldIndex, hcp_id: c.hcp_id, x: 0, y: 0 };
   });
   let off = 0;
   out.forEach((c, k) => {
     if (c.fieldIndex >= 0) { c.x = g.nodes[c.fieldIndex].x; c.y = g.nodes[c.fieldIndex].y; return; }
+    // Constant radius; angle only (item 5) — a plainly decorative orbit ring.
     const a = -Math.PI / 2 + off * (Math.PI * 2 / 3) + hash(i, k) * 0.9 + 0.5;
-    const rr = 168 + (100 - Math.min(100, c.w)) * 1.9;
-    c.x = host.x + Math.cos(a) * rr * 1.15;
-    c.y = host.y + Math.sin(a) * rr * 0.92;
+    c.x = host.x + Math.cos(a) * OFFFIELD_RADIUS * 1.15;
+    c.y = host.y + Math.sin(a) * OFFFIELD_RADIUS * 0.92;
     off++;
   });
   return out;
 }
 
 interface DustDot { key: string; cx: string; cy: string; r: string; style: string }
-function dust(seed: number, count: number, w: number, h: number, rMin: number, rMax: number, oMin: number, oMax: number, soft: boolean): DustDot[] {
+function dust(seed: number, count: number, w: number, h: number, rMin: number, rMax: number, oMin: number, oMax: number, soft: boolean, pad = 0): DustDot[] {
   const rand = rngFrom(seed); const out: DustDot[] = [];
   for (let i = 0; i < count; i++) {
     const r = rMin + Math.pow(rand(), 1.9) * (rMax - rMin);
     const o = oMin + Math.pow(rand(), 1.4) * (oMax - oMin);
     const t = rand();
     const col = t > 0.93 ? "#ffe6c2" : t > 0.86 ? "#d5c8ff" : t > 0.6 ? "#dce6ff" : "#ffffff";
-    out.push({ key: "d" + seed + "-" + i, cx: (rand() * w).toFixed(1), cy: (rand() * h).toFixed(1), r: r.toFixed(2),
+    out.push({ key: "d" + seed + "-" + i, cx: (rand() * (w + 2 * pad) - pad).toFixed(1), cy: (rand() * (h + 2 * pad) - pad).toFixed(1), r: r.toFixed(2),
       style: "fill:" + col + ";opacity:" + o.toFixed(3) + ";animation:" + (soft ? "sv-tws " : "sv-tw ") + (3 + rand() * 6).toFixed(2) + "s ease-in-out " + (-rand() * 8).toFixed(2) + "s infinite" });
   }
   return out;
@@ -158,8 +174,8 @@ function sx(s: string): CSSProperties {
 // safeTop = px height of the floating app chrome (nav + TA/cohort controls) at the top of
 // the viewport. The sky PIXELS run full-bleed behind it (dust/meteors/haze), but the
 // interactive layer — camera framing + the Skyview title/search chrome — insets below it so
-// no clickable star renders under the nav. onExit closes the immersive view (→ /me).
-interface Props { taId?: string; onOpenProfile?: (id: string) => void; onExit?: () => void; safeTop?: number }
+// no clickable star renders under the nav.
+interface Props { taId?: string; onOpenProfile?: (id: string) => void; safeTop?: number }
 interface State { box: { w: number; h: number }; focus: Focus | null; near: Focus | null; cohort: "all" | "established" | "rising"; density: "leaders" | "full"; query: string; qOpen: boolean; trail: { name: string; focus: Focus }[]; mTab: "established" | "rising"; mOpen: number | null }
 type Cam = { x: number; y: number; z: number };
 
@@ -169,7 +185,6 @@ class Sky extends Component<Props, State> {
   midRef = createRef<SVGGElement>();
   worldRef = createRef<SVGGElement>();
   labelRef = createRef<HTMLDivElement>();
-  meteorRef = createRef<SVGGElement>();
   _f: Field | null = null;
   _oc: Record<number, OrbNode[]> = {};
   _df: DustDot[] | null = null; _dm: DustDot[] | null = null;
@@ -193,8 +208,8 @@ class Sky extends Component<Props, State> {
   isMobile() { return this.state.box.w < 760; }
   field(): Field { if (!this._f) this._f = buildField(this.props.taId === AD_TA_ID ? (adNodes as unknown as RawNode[]) : (nsclcNodes as unknown as RawNode[]), this.props.taId === AD_TA_ID ? (adEdges as unknown as RawEdge[]) : (nsclcEdges as unknown as RawEdge[])); return this._f; }
   orbit(i: number): OrbNode[] { if (!this._oc[i]) this._oc[i] = buildOrbit(this.field(), i); return this._oc[i]; }
-  dustFar() { if (!this._df) this._df = dust(5501, 340, WW, WH, 0.4, 1.5, 0.06, 0.42, false); return this._df; }
-  dustMid() { if (!this._dm) this._dm = dust(7717, 130, WW, WH, 0.9, 2.3, 0.12, 0.5, true); return this._dm; }
+  dustFar() { if (!this._df) this._df = dust(5501, 380, WW, WH, 0.4, 1.5, 0.06, 0.42, false, SKY_PAD); return this._df; }
+  dustMid() { if (!this._dm) this._dm = dust(7717, 148, WW, WH, 0.9, 2.3, 0.12, 0.5, true, SKY_PAD); return this._dm; }
 
   componentDidMount() {
     const el = this.hostRef.current;
@@ -248,11 +263,9 @@ class Sky extends Component<Props, State> {
       const z = 1 + (c.z - 1) * zf;
       ref.current.style.transform = "translate(" + (VW / 2) + "px," + (VH / 2) + "px) scale(" + z.toFixed(4) + ") translate(" + (-c.x * f).toFixed(2) + "px," + (-c.y * f).toFixed(2) + "px)";
     };
+    // Meteors now live inside the world layer (see render) — no separate overlay
+    // transform; they share worldRef's parallax.
     lay(this.farRef, 0.26, 0.32); lay(this.midRef, 0.56, 0.62); lay(this.worldRef, 1, 1);
-    if (this.meteorRef.current) {
-      const sxc = Math.max(0.9, Math.min(2.4, VW / 1400)), syc = Math.max(0.66, Math.min(1.2, VH / 1000));
-      this.meteorRef.current.style.transform = "translate(" + (-c.x * 0.34 + WW * 0.17).toFixed(2) + "px," + (-c.y * 0.34 + WH * 0.17).toFixed(2) + "px) scale(" + sxc.toFixed(3) + "," + syc.toFixed(3) + ")";
-    }
     const layer = this.labelRef.current;
     if (layer) {
       const chips = layer.querySelectorAll<HTMLElement>("[data-wx]");
@@ -274,15 +287,25 @@ class Sky extends Component<Props, State> {
       if (t >= 1) { this._cam = { ...a.to }; this._anim = null; } else more = true;
     } else if (!this._drag && (Math.abs(this._vel.x) > 0.04 || Math.abs(this._vel.y) > 0.04)) {
       this._cam = { x: this.clampX(this._cam.x + this._vel.x), y: this.clampY(this._cam.y + this._vel.y), z: this._cam.z };
-      this._camT = { ...this._cam }; this._vel.x *= 0.9; this._vel.y *= 0.9; more = true;
+      this._camT = { ...this._cam }; this._vel.x *= 0.82; this._vel.y *= 0.82; more = true;
     }
     this.paint();
     if (more) this._raf = requestAnimationFrame(this.tick);
     else { if (this._st) clearTimeout(this._st); this._st = setTimeout(() => this.forceUpdate(), 40); }
   };
   kick() { if (!this._raf) this._raf = requestAnimationFrame(this.tick); }
-  clampX(x: number) { const m = this.vw() / (2 * this._cam.z) - 220; return Math.max(-m + 200, Math.min(WW + m - 200, x)); }
-  clampY(y: number) { const m = this.vh() / (2 * this._cam.z) - 160; return Math.max(-m + 160, Math.min(WH + m - 160, y)); }
+  // Keep the VIEWPORT within the padded dust box; centre when the field is
+  // smaller than the viewport. Bounds only, not feel (item 6).
+  clampX(x: number) {
+    const half = this.vw() / (2 * this._cam.z);
+    const lo = -SKY_PAD + half, hi = WW + SKY_PAD - half;
+    return lo > hi ? WW / 2 : Math.max(lo, Math.min(hi, x));
+  }
+  clampY(y: number) {
+    const half = this.vh() / (2 * this._cam.z);
+    const lo = -SKY_PAD + half, hi = WH + SKY_PAD - half;
+    return lo > hi ? WH / 2 : Math.max(lo, Math.min(hi, y));
+  }
   flyTo(to: Cam, dur?: number) { this._vel = { x: 0, y: 0 }; this._camT = { ...to }; this._anim = { from: { ...this._cam }, to, t0: performance.now(), dur: dur || 1150 }; this.kick(); }
 
   frameFor(focus: Focus): Cam {
@@ -333,7 +356,7 @@ class Sky extends Component<Props, State> {
     if (this._drag) {
       const d = this._drag; d.moved += Math.abs(p.sx - d.sx) + Math.abs(p.sy - d.sy);
       const nx = this.clampX(d.wx - (p.sx - d.sx) / this._cam.z), ny = this.clampY(d.wy - (p.sy - d.sy) / this._cam.z);
-      this._vel = { x: (nx - this._cam.x) * 0.55, y: (ny - this._cam.y) * 0.55 };
+      this._vel = { x: (nx - this._cam.x) * 0.9, y: (ny - this._cam.y) * 0.9 };
       this._cam = { x: nx, y: ny, z: this._cam.z }; this._camT = { ...this._cam }; this.paint(); return;
     }
     const h = this.hit(p); const cur = this.state.near;
@@ -356,7 +379,11 @@ class Sky extends Component<Props, State> {
   onWheel = (ev: RWheelEvent) => {
     const p = this.toWorld(ev); if (!p) return;
     this._anim = null; const z0 = this._cam.z;
-    const z = Math.max(Math.min(0.5, this.fitCam().z * 0.85), Math.min(2.3, z0 * Math.exp(-ev.deltaY * 0.0016)));
+    // Zoom-out floor = the zoom at which the whole padded starfield fits the
+    // viewport, so a pull-back reaches a genuine full-field view (with the dust
+    // margin) and stops there — never into the void (item 8).
+    const zFloor = Math.min(this.vw() / (WW + 2 * SKY_PAD), this.vh() / (WH + 2 * SKY_PAD));
+    const z = Math.max(zFloor, Math.min(2.3, z0 * Math.exp(-ev.deltaY * 0.0016)));
     this._cam = { x: p.x - (p.sx - this.vw() / 2) / z, y: p.y - (p.sy - this.vh() / 2) / z, z };
     this._camT = { ...this._cam }; this.paint();
     if (this._zt) clearTimeout(this._zt); this._zt = setTimeout(() => this.forceUpdate(), 120);
@@ -460,7 +487,12 @@ class Sky extends Component<Props, State> {
       orb.forEach((c, k) => {
         const endR = c.fieldIndex >= 0 ? rad[c.fieldIndex] + 5 : (offRad[k] || 16) + 5;
         const s = seg(host.x, host.y, c.x, c.y, hostR, endR);
-        edges.push({ key: "oe" + k, op: 1, el: <line key={"oe" + k} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} style={{ stroke: c.inField ? "#ffd89b" : OTHER, strokeOpacity: 0.26 + c.w * 0.0032, strokeWidth: 0.3 + c.w * 0.0088, strokeLinecap: "round", ...(c.inField ? {} : { strokeDasharray: "3.5 6" }), transition: "stroke-opacity 520ms ease" }} /> });
+        // Shared-publication weight legible as THICKNESS (item 5): width spans
+        // ~2.4→8px and opacity ~0.42→0.95 across the weight range, vs the old
+        // near-flat 0.44–0.49px / 0.31–0.33.
+        const owWidth = Math.min(8, 0.8 + Math.min(c.w, 50) * 0.16);
+        const owOpacity = Math.min(0.95, 0.35 + Math.min(c.w, 50) * 0.014);
+        edges.push({ key: "oe" + k, op: 1, el: <line key={"oe" + k} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} style={{ stroke: c.inField ? "#ffd89b" : OTHER, strokeOpacity: owOpacity, strokeWidth: owWidth, strokeLinecap: "round", ...(c.inField ? {} : { strokeDasharray: "3.5 6" }), transition: "stroke-opacity 520ms ease" }} /> });
       });
     }
 
@@ -517,7 +549,7 @@ class Sky extends Component<Props, State> {
             <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: TINT[c.cohort], boxShadow: `0 0 9px ${TINT[c.cohort]}`, ...(c.inField ? {} : { outline: "1px dashed rgba(168,189,216,0.6)", outlineOffset: 3 }) }} />
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ font: "300 15px/1.2 Jost,sans-serif", color: "#dcd9d0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-              <div style={{ font: "300 11px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#565d72" : "#7d90ad", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.inField ? c.inst : "Outside the recognized field"}</div>
+              <div style={{ font: "300 11px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#565d72" : "#7d90ad", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.inField ? c.inst : (c.rank != null && c.srcCohort !== "other" ? ROLE[c.srcCohort] + " #" + c.rank : "Outside this sky")}</div>
             </div>
             <div style={{ font: "300 16px/1 Jost,sans-serif", color: "#c9c6bd", flex: "none" }}>{c.w}</div>
             <div style={{ font: "300 15px/1 Jost,sans-serif", color: c.inField ? "#3f4658" : "transparent", flex: "none" }}>→</div>
@@ -525,8 +557,19 @@ class Sky extends Component<Props, State> {
         ));
       } else {
         const c = orb![focus.k], h = g.nodes[focus.p];
-        selName = c.name; selInst = c.inst || "Outside the recognized field"; selRole = ROLE.other; selRoleColor = OTHER;
-        banner = "Not among the recognized names in this sky, so there is no ranking behind this star. It is here because " + h.name + " has " + c.w + " shared publications with them.";
+        const ta = this.props.taId === AD_TA_ID ? "AD" : "NSCLC";
+        // The star is "outside the sky" (not drawn among the fifty) — but that is a
+        // fact about the DRAWING, not the person. Where the platform ranks them,
+        // SHOW the rank; deny a ranking ONLY when there genuinely is none.
+        const ranked = c.rank != null && (c.srcCohort === "established" || c.srcCohort === "rising" || c.srcCohort === "community");
+        selName = c.name; selInst = "";
+        if (ranked) {
+          selRole = ROLE[c.srcCohort] + " · #" + c.rank; selRoleColor = TINT[c.srcCohort] ?? OTHER;
+          banner = ROLE[c.srcCohort] + " #" + c.rank + " in " + ta + ". This star sits outside the fifty drawn in this sky — it is on " + h.name + "'s orbit because they share " + c.w + " publications.";
+        } else {
+          selRole = ROLE.other; selRoleColor = OTHER;
+          banner = "Not ranked in " + ta + ". It is here because " + h.name + " has " + c.w + " shared publications with them.";
+        }
         collabs = [(
           <div key="back" onClick={(ev) => { ev.stopPropagation(); this.focusOn({ t: "f", i: h.i }); }} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
             <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: TINT[h.cohort], boxShadow: `0 0 9px ${TINT[h.cohort]}` }} />
@@ -555,7 +598,13 @@ class Sky extends Component<Props, State> {
       ["Outside this sky", `width:5px;height:5px;border-radius:50%;background:${OTHER};box-shadow:0 0 11px rgba(140,178,228,0.7);outline:1px dashed rgba(168,189,216,0.55);outline-offset:3px`],
       ["Shared publications", "width:28px;height:1px;background:linear-gradient(90deg,rgba(126,147,198,0.12),rgba(126,147,198,0.8))"],
     ];
-    const canPullBack = !!focus || Math.abs(cam.z - this.fitCam().z) > 0.06;
+    // Reset control: appears whenever the view has left its initial framing —
+    // focus, zoom, OR a pure pan (the old check missed pan, stranding the camera).
+    const fit0 = this.fitCam();
+    const movedFromInitial =
+      Math.abs(cam.z - fit0.z) > 0.06 || Math.abs(cam.x - fit0.x) > 2 || Math.abs(cam.y - fit0.y) > 2;
+    const canReset = !!focus || movedFromInitial;
+    const resetLabel = focus ? "Return to the full sky" : "Reset view";
 
     return (
       <div ref={this.hostRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#04060d", cursor: "grab", touchAction: "none", userSelect: "none" }}
@@ -573,18 +622,21 @@ class Sky extends Component<Props, State> {
           <g ref={this.farRef}>{this.dustFar().map((d) => <circle key={d.key} cx={d.cx} cy={d.cy} r={d.r} style={sx(d.style)} />)}</g>
           <g ref={this.midRef}>{this.dustMid().map((d) => <circle key={d.key} cx={d.cx} cy={d.cy} r={d.r} style={sx(d.style)} />)}</g>
           <g ref={this.worldRef}>
+            {/* Meteors sit in the WORLD layer, FIRST — behind edges and stars — so
+                they share the field's parallax (travel with it on pan) and a star
+                can pass in front of a meteor rather than the meteor always over it. */}
+            <g>
+              <g style={{ transform: "translate(1120px,110px)", animation: "sv-shoot 27s linear infinite" }}><line x1="0" y1="0" x2="150" y2="-67" stroke="url(#svTrail)" strokeWidth="1.4" strokeLinecap="round" /></g>
+              <g style={{ transform: "translate(150px,170px)", animation: "sv-shoot2 38s linear infinite" }}><line x1="0" y1="0" x2="-124" y2="-64" stroke="url(#svTrail2)" strokeWidth="1.2" strokeLinecap="round" /></g>
+              <g style={{ transform: "translate(880px,55px)", animation: "sv-shoot3 31s linear -6s infinite" }}><line x1="0" y1="0" x2="108" y2="-59" stroke="url(#svTrail)" strokeWidth="1.1" strokeLinecap="round" /></g>
+              <g style={{ transform: "translate(1180px,430px)", animation: "sv-shoot4 44s linear -17s infinite" }}><line x1="0" y1="0" x2="132" y2="-46" stroke="url(#svTrail2)" strokeWidth="1.15" strokeLinecap="round" /></g>
+              <g style={{ transform: "translate(1210px,-30px)", animation: "sv-shoot5 63s linear -29s infinite" }}><line x1="0" y1="0" x2="210" y2="-94" stroke="url(#svTrail3)" strokeWidth="1.7" strokeLinecap="round" /></g>
+              <g style={{ transform: "translate(340px,780px)", animation: "sv-shoot6 34s linear -11s infinite" }}><line x1="0" y1="0" x2="-72" y2="-45" stroke="url(#svTrail2)" strokeWidth="0.8" strokeLinecap="round" /></g>
+              <g style={{ transform: "translate(770px,280px)", animation: "sv-shoot7 41s linear -23s infinite" }}><line x1="0" y1="0" x2="84" y2="-70" stroke="url(#svTrail)" strokeWidth="0.75" strokeLinecap="round" /></g>
+            </g>
             <g>{edges.map((e) => e.el)}</g>
             <g>{rings}</g>
             <g>{stars}</g>
-          </g>
-          <g ref={this.meteorRef}>
-            <g style={{ transform: "translate(1120px,110px)", animation: "sv-shoot 27s linear infinite" }}><line x1="0" y1="0" x2="150" y2="-67" stroke="url(#svTrail)" strokeWidth="1.4" strokeLinecap="round" /></g>
-            <g style={{ transform: "translate(150px,170px)", animation: "sv-shoot2 38s linear infinite" }}><line x1="0" y1="0" x2="-124" y2="-64" stroke="url(#svTrail2)" strokeWidth="1.2" strokeLinecap="round" /></g>
-            <g style={{ transform: "translate(880px,55px)", animation: "sv-shoot3 31s linear -6s infinite" }}><line x1="0" y1="0" x2="108" y2="-59" stroke="url(#svTrail)" strokeWidth="1.1" strokeLinecap="round" /></g>
-            <g style={{ transform: "translate(1180px,430px)", animation: "sv-shoot4 44s linear -17s infinite" }}><line x1="0" y1="0" x2="132" y2="-46" stroke="url(#svTrail2)" strokeWidth="1.15" strokeLinecap="round" /></g>
-            <g style={{ transform: "translate(1210px,-30px)", animation: "sv-shoot5 63s linear -29s infinite" }}><line x1="0" y1="0" x2="210" y2="-94" stroke="url(#svTrail3)" strokeWidth="1.7" strokeLinecap="round" /></g>
-            <g style={{ transform: "translate(340px,780px)", animation: "sv-shoot6 34s linear -11s infinite" }}><line x1="0" y1="0" x2="-72" y2="-45" stroke="url(#svTrail2)" strokeWidth="0.8" strokeLinecap="round" /></g>
-            <g style={{ transform: "translate(770px,280px)", animation: "sv-shoot7 41s linear -23s infinite" }}><line x1="0" y1="0" x2="84" y2="-70" stroke="url(#svTrail)" strokeWidth="0.75" strokeLinecap="round" /></g>
           </g>
         </svg>
 
@@ -594,7 +646,7 @@ class Sky extends Component<Props, State> {
         <div style={{ position: "absolute", left: EDGE, top: TOP, maxWidth: Math.round(Math.min(460, VW * 0.36)), display: "flex", flexDirection: "column", gap: narrow ? 14 : 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, pointerEvents: "none" }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#ffd89b", boxShadow: "0 0 12px rgba(255,216,155,0.9)" }} />
-            <div style={{ font: "400 11px/1 Jost,sans-serif", letterSpacing: "0.42em", textTransform: "uppercase", color: "#e6e3da" }}>Skyview</div>
+            <div style={{ font: "400 11px/1 Jost,sans-serif", letterSpacing: "0.42em", textTransform: "uppercase", color: "#e6e3da" }}>SkyView</div>
           </div>
           {!focus && !this.state.trail.length ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 14, pointerEvents: "none" }}>
@@ -691,7 +743,7 @@ class Sky extends Component<Props, State> {
         {/* cam controls */}
         <div style={{ position: "absolute", right: EDGE, bottom: EDGE, display: "flex", alignItems: "center", gap: narrow ? 16 : 26 }}>
           <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#343b4c", pointerEvents: "none" }}>Drag · Scroll · Click</div>
-          {canPullBack ? <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a6178", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.12)", paddingBottom: 5 }} onClick={this.pullBack}>Return to the full sky</div> : null}
+          {canReset ? <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a6178", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.12)", paddingBottom: 5 }} onClick={this.pullBack}>{resetLabel}</div> : null}
         </div>
 
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 22, textAlign: "center", pointerEvents: "none" }}>
@@ -713,7 +765,7 @@ class Sky extends Component<Props, State> {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
               <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#ffd89b", boxShadow: "0 0 10px rgba(255,216,155,0.9)" }} />
-              <div style={{ font: "400 10px/1 Jost,sans-serif", letterSpacing: "0.36em", textTransform: "uppercase", color: "#e6e3da" }}>Skyview</div>
+              <div style={{ font: "400 10px/1 Jost,sans-serif", letterSpacing: "0.36em", textTransform: "uppercase", color: "#e6e3da" }}>SkyView</div>
             </div>
             <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#4d5468" }}>{this.props.taId === AD_TA_ID ? "AD" : "NSCLC"}</div>
           </div>
@@ -755,7 +807,7 @@ class Sky extends Component<Props, State> {
                           <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: TINT[c.cohort], boxShadow: `0 0 9px ${TINT[c.cohort]}`, ...(c.inField ? {} : { outline: "1px dashed rgba(168,189,216,0.6)", outlineOffset: 3 }) }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ font: "300 14px/1.2 Jost,sans-serif", color: "#dcd9d0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-                            <div style={{ font: "300 10px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#4d5468" : "#7d90ad" }}>{c.inField ? c.inst : "Outside the recognized field"}</div>
+                            <div style={{ font: "300 10px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#4d5468" : "#7d90ad" }}>{c.inField ? c.inst : (c.rank != null && c.srcCohort !== "other" ? ROLE[c.srcCohort] + " #" + c.rank : "Outside this sky")}</div>
                           </div>
                           <div style={{ font: "300 15px/1 Jost,sans-serif", color: "#c9c6bd", flex: "none" }}>{c.w}</div>
                           <div style={{ font: "300 15px/1 Jost,sans-serif", color: c.inField ? "#5a6178" : "transparent", flex: "none", width: 12, textAlign: "right" }}>{c.inField ? "→" : ""}</div>
@@ -802,7 +854,7 @@ function MobileOrbit({ host, orbit }: { host: FNode; orbit: OrbNode[] }) {
   );
 }
 
-export default function TelescopeField({ taId, onOpenProfile, onExit }: Props) {
+export default function TelescopeField({ taId, onOpenProfile }: Props) {
   // FULL-BLEED, FULL-VIEWPORT slot. The sky pins to the whole viewport (position:fixed,
   // inset:0) — NOT below the nav — so dust/meteors/haze run edge-to-edge behind the floating
   // chrome (Option 2). A position:fixed slot is not clipped by the app's overflow-hidden
@@ -840,26 +892,6 @@ export default function TelescopeField({ taId, onOpenProfile, onExit }: Props) {
       <div style={{ position: "fixed", inset: 0, background: "#02030a", zIndex: 3, fontFamily: "Jost, 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <Sky key={taId} taId={taId} onOpenProfile={onOpenProfile} safeTop={chromeH} />
       </div>
-      {onExit ? (
-        <button
-          type="button"
-          onClick={onExit}
-          title="Close Skyview"
-          aria-label="Close Skyview"
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f6f2e8"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.32)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#b8b5ac"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.16)"; }}
-          style={{
-            position: "fixed", top: 8, right: 14, zIndex: 30,
-            width: 32, height: 32, borderRadius: "50%", padding: 0, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(6,9,19,0.55)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.16)", color: "#b8b5ac",
-            font: "300 15px/1 Jost, sans-serif", transition: "color 180ms ease, border-color 180ms ease",
-          }}
-        >
-          ✕
-        </button>
-      ) : null}
     </>
   );
 }

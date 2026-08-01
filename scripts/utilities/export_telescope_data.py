@@ -249,6 +249,11 @@ NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
 # a rank table would fan a JOIN out and duplicate the collaborator, so membership is tested,
 # never joined. Guarantees exactly one row per (seed, rank) → at most 5 per node.
 #   {rising_exists}: the TA-appropriate rising-membership EXISTS clause.
+# Return the collaborator's RAW rank in each cohort (established / rising /
+# community). enrich_focus() picks the stronger cohort by PERCENTILE and bakes
+# {cohort, rank} — so the frontend can SHOW "Rising #4" / "Established #296"
+# instead of falsely claiming a ranked person is unrecognized. `{rising_rank}` is
+# the per-TA rising-rank scalar subquery.
 FOCUS_SQL_TEMPLATE = """
 WITH seed AS (SELECT DISTINCT unnest(%(ids)s::uuid[]) AS hcp_id)  -- DISTINCT: the overview
 -- UNION can list one hcp twice (established seed AND rising co-author, e.g. Riely); an
@@ -256,14 +261,13 @@ WITH seed AS (SELECT DISTINCT unnest(%(ids)s::uuid[]) AS hcp_id)  -- DISTINCT: t
 SELECT tc.hcp_id::text AS seed_id, tc.rank, tc.shared_publications,
        tc.collaborator_hcp_id::text AS collab_id,
        trim(coalesce(h.first_name,'') || ' ' || coalesce(h.last_name,'')) AS collab_name,
-       CASE
-         WHEN EXISTS (SELECT 1 FROM hcp_established_ranks_v3 er
-                       WHERE er.hcp_id = tc.collaborator_hcp_id
-                         AND er.therapeutic_area_id = %(ta)s AND er.scope_type = 'global')
-              THEN 'established'
-         WHEN {rising_exists} THEN 'rising'
-         ELSE 'other'
-       END AS collab_cohort
+       (SELECT min(er.rank) FROM hcp_established_ranks_v3 er
+          WHERE er.hcp_id = tc.collaborator_hcp_id
+            AND er.therapeutic_area_id = %(ta)s AND er.scope_type = 'global') AS est_rank,
+       ({rising_rank}) AS rising_rank,
+       (SELECT min(cr.rank) FROM hcp_community_ranks_v2 cr
+          WHERE cr.hcp_id = tc.collaborator_hcp_id
+            AND cr.therapeutic_area_id = %(ta)s) AS community_rank
 FROM hcp_top_collaborators_v2 tc
 JOIN seed s ON s.hcp_id = tc.hcp_id
 JOIN hcps_v2 h ON h.id = tc.collaborator_hcp_id
@@ -271,26 +275,30 @@ WHERE tc.therapeutic_area_id = %(ta)s AND tc.window_type = '10yr' AND tc.rank <=
 ORDER BY tc.hcp_id, tc.rank
 """
 
-# NSCLC rising membership → hcp_rising_star_ranks_v3 (authoritative, US-scoped via us_rank).
-# AD → hcp_rising_composite_v1. Kept consistent with the overview rising layer so a
-# focus collaborator colored 'rising' is exactly one that appears in the rising node set.
-NSCLC_RISING_JOIN = """EXISTS (SELECT 1 FROM hcp_rising_star_ranks_v3 sr
+# Per-TA rising RANK scalar + the cohort's population size (for the percentile
+# comparison). NSCLC → hcp_rising_star_ranks_v3 (US-scoped via us_rank); AD →
+# hcp_rising_composite_v1 (global). Kept consistent with the rising node layer.
+NSCLC_RISING_RANK = """SELECT min(sr.us_rank) FROM hcp_rising_star_ranks_v3 sr
               WHERE sr.hcp_id = tc.collaborator_hcp_id
-                AND sr.therapeutic_area_id = %(ta)s AND sr.us_rank IS NOT NULL)"""
-AD_RISING_JOIN = """EXISTS (SELECT 1 FROM hcp_rising_composite_v1 sr
+                AND sr.therapeutic_area_id = %(ta)s AND sr.us_rank IS NOT NULL"""
+NSCLC_RISING_SIZE = """SELECT count(*) AS c FROM hcp_rising_star_ranks_v3
+              WHERE therapeutic_area_id = %(ta)s AND us_rank IS NOT NULL"""
+AD_RISING_RANK = """SELECT min(sr.rank) FROM hcp_rising_composite_v1 sr
               WHERE sr.hcp_id = tc.collaborator_hcp_id
-                AND sr.therapeutic_area_id = %(ta)s AND sr.scope_type = 'global')"""
+                AND sr.therapeutic_area_id = %(ta)s AND sr.scope_type = 'global'"""
+AD_RISING_SIZE = """SELECT count(*) AS c FROM hcp_rising_composite_v1
+              WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global'"""
 
 TA_EXPORTS = {
     "nsclc": {
         "nodes_sql": NODES_SQL, "edges_sql": EDGES_SQL,
         "nodes_path": NODES_PATH, "edges_path": EDGES_PATH,
-        "ta_id": NSCLC_TA_ID, "rising_join": NSCLC_RISING_JOIN,
+        "ta_id": NSCLC_TA_ID, "rising_rank": NSCLC_RISING_RANK, "rising_size": NSCLC_RISING_SIZE,
     },
     "ad": {
         "nodes_sql": AD_NODES_SQL, "edges_sql": AD_EDGES_SQL,
         "nodes_path": AD_NODES_PATH, "edges_path": AD_EDGES_PATH,
-        "ta_id": AD_TA_ID, "rising_join": AD_RISING_JOIN,
+        "ta_id": AD_TA_ID, "rising_rank": AD_RISING_RANK, "rising_size": AD_RISING_SIZE,
     },
 }
 # Accepted --ta aliases -> registry key.
@@ -363,20 +371,49 @@ def run_query(sql: str, params: Dict[str, Any] | None = None) -> List[Dict[str, 
         conn.close()
 
 
-def enrich_focus(nodes: List[Dict[str, Any]], ta_id: str, rising_join: str) -> None:
-    """Attach `focus_collaborators` (top-5) to each node IN PLACE. Overview fields untouched."""
+def enrich_focus(nodes: List[Dict[str, Any]], ta_id: str, rising_rank: str, rising_size: str) -> None:
+    """Attach `focus_collaborators` (top-5) to each node IN PLACE. Overview fields untouched.
+
+    Each collaborator gets {cohort, rank}: the STRONGER of the cohorts they hold,
+    chosen by percentile (rank / cohort size), ties → rising. `rank` is null only
+    when the collaborator is genuinely unranked in all three cohorts.
+    """
     ids = [n["id"] for n in nodes]
-    sql = FOCUS_SQL_TEMPLATE.format(rising_exists=rising_join)
+    sql = FOCUS_SQL_TEMPLATE.format(rising_rank=rising_rank)
     rows = run_query(sql, {"ids": ids, "ta": ta_id})
+    est_size = (run_query(
+        "SELECT count(*) AS c FROM hcp_established_ranks_v3 "
+        "WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global'", {"ta": ta_id})[0]["c"]) or 1
+    ris_size = (run_query(rising_size, {"ta": ta_id})[0]["c"]) or 1
+    com_size = (run_query(
+        "SELECT count(*) AS c FROM hcp_community_ranks_v2 "
+        "WHERE therapeutic_area_id = %(ta)s", {"ta": ta_id})[0]["c"]) or 1
+
+    def choose(er, rr, cr):
+        # (percentile, cohort, rank, tiebreak) — lower percentile wins; ties → rising.
+        cands = []
+        if er is not None:
+            cands.append((er / est_size, "established", er, 1))
+        if rr is not None:
+            cands.append((rr / ris_size, "rising", rr, 0))
+        if cr is not None:
+            cands.append((cr / com_size, "community", cr, 2))
+        if not cands:
+            return ("other", None)
+        cands.sort(key=lambda c: (c[0], c[3]))
+        return (cands[0][1], cands[0][2])
+
     from collections import defaultdict
 
     by_seed: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for r in rows:
+        cohort, rank = choose(r["est_rank"], r["rising_rank"], r["community_rank"])
         by_seed[r["seed_id"]].append({
             "hcp_id": r["collab_id"],
             "name": r["collab_name"],
             "shared_publications": r["shared_publications"],
-            "cohort": r["collab_cohort"],
+            "cohort": cohort,
+            "rank": rank,
         })
     for n in nodes:
         n["focus_collaborators"] = by_seed.get(n["id"], [])
@@ -441,7 +478,7 @@ def main() -> int:
 
         # Focus enrichment — bake each node's real top-5 collaborators (additive).
         print(f"[{ta_key}] Enriching nodes with focus_collaborators...")
-        enrich_focus(nodes, cfg["ta_id"], cfg["rising_join"])
+        enrich_focus(nodes, cfg["ta_id"], cfg["rising_rank"], cfg["rising_size"])
         covered = sum(1 for n in nodes if n.get("focus_collaborators"))
         print(f"  focus_collaborators on {covered}/{len(nodes)} nodes ({payload_size_mb(nodes):.1f} MB)")
         nodes_out = eff_path(cfg["nodes_path"])
