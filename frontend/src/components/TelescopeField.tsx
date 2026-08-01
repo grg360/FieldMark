@@ -656,7 +656,7 @@ class Sky extends Component<Props, State> {
             </div>
           ) : null}
           {this.state.trail.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+            <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               <div style={{ font: "400 9px/1 Jost,sans-serif", letterSpacing: "0.28em", textTransform: "uppercase", color: "#3f4658" }}>Your route</div>
               <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap", maxWidth: 430 }}>
                 <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#4d5468", cursor: "pointer" }} onClick={this.pullBack}>Full sky</div>
@@ -676,11 +676,11 @@ class Sky extends Component<Props, State> {
           <div style={{ width: "100%", position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${qOpen ? "rgba(255,216,155,0.5)" : "rgba(255,255,255,0.1)"}`, padding: "0 2px 11px", transition: "border-color 260ms ease" }}>
               <div style={{ width: 9, height: 9, borderRadius: "50%", border: "1px solid #4d5468", flex: "none" }} />
-              <input type="text" value={query} placeholder="Fly to a researcher" onChange={(e) => this.setState({ query: e.target.value, qOpen: true })} onFocus={() => this.setState({ qOpen: true })} onPointerDown={this.stop} style={{ all: "unset", boxSizing: "border-box", flex: 1, font: "300 14px/1.2 Jost,sans-serif", letterSpacing: "0.04em", color: "#e6e3da", caretColor: "#ffd89b" }} />
+              <input type="text" value={query} placeholder="Fly to a researcher" onChange={(e) => this.setState({ query: e.target.value, qOpen: true })} onFocus={() => this.setState({ qOpen: true })} onPointerDown={this.stop} onPointerUp={this.stop} style={{ all: "unset", boxSizing: "border-box", flex: 1, font: "300 14px/1.2 Jost,sans-serif", letterSpacing: "0.04em", color: "#e6e3da", caretColor: "#ffd89b" }} />
               {query.length > 0 ? <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "#4d5468", cursor: "pointer" }} onClick={(ev) => { ev.stopPropagation(); this.setState({ query: "", qOpen: false }); }}>Clear</div> : null}
             </div>
             {qOpen ? (
-              <div style={{ position: "absolute", left: 0, right: 0, top: "100%", marginTop: 10, background: "rgba(6,9,19,0.82)", backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 3, padding: "8px 0", maxHeight: 394, overflowY: "auto", boxShadow: "0 30px 70px rgba(0,0,0,0.5)" } as CSSProperties} onPointerDown={this.stop}>
+              <div style={{ position: "absolute", left: 0, right: 0, top: "100%", marginTop: 10, background: "rgba(6,9,19,0.82)", backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 3, padding: "8px 0", maxHeight: 394, overflowY: "auto", boxShadow: "0 30px 70px rgba(0,0,0,0.5)" } as CSSProperties} onPointerDown={this.stop} onPointerUp={this.stop}>
                 {matches.map((n) => (
                   <div key={n.id} onClick={(ev) => { ev.stopPropagation(); this.focusOn({ t: "f", i: n.i }); }} style={{ display: "flex", alignItems: "center", gap: 13, padding: "11px 18px", cursor: "pointer" }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: TINT[n.cohort], boxShadow: `0 0 9px ${TINT[n.cohort]}` }} />
@@ -695,14 +695,14 @@ class Sky extends Component<Props, State> {
               </div>
             ) : null}
           </div>
-          <div style={{ display: "flex", gap: 24 }}>{cohortTabs.map(([k, label]) => <div key={k} style={quiet(cohort === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ cohort: k }); }}>{label}</div>)}</div>
-          <div style={{ display: "flex", gap: 24 }}>{densityTabs.map(([k, label]) => <div key={k} style={quiet(density === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ density: k }); }}>{label}</div>)}</div>
+          <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", gap: 24 }}>{cohortTabs.map(([k, label]) => <div key={k} style={quiet(cohort === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ cohort: k }); }}>{label}</div>)}</div>
+          <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", gap: 24 }}>{densityTabs.map(([k, label]) => <div key={k} style={quiet(density === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ density: k }); }}>{label}</div>)}</div>
           <div style={{ font: "300 11px/1.6 Jost,sans-serif", letterSpacing: "0.03em", color: "#3f4658", textAlign: "right", maxWidth: 250, textWrap: "pretty" } as CSSProperties}>{densityNote}</div>
         </div>
 
         {/* focus panel */}
         {focus ? (
-          <div onPointerDown={this.stop} style={{ position: "absolute", right: EDGE, bottom: EDGE + 44, width: PANELW, boxSizing: "border-box", background: "rgba(6,9,19,0.62)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 3, padding: narrow ? "24px 24px 22px" : "30px 30px 26px", display: "flex", flexDirection: "column", gap: narrow ? 18 : 22, boxShadow: "0 40px 90px rgba(0,0,0,0.5)", maxHeight: Math.round(VH - EDGE * 2 - 150), overflowY: "auto" } as CSSProperties}>
+          <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ position: "absolute", right: EDGE, bottom: EDGE + 44, width: PANELW, boxSizing: "border-box", background: "rgba(6,9,19,0.62)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 3, padding: narrow ? "24px 24px 22px" : "30px 30px 26px", display: "flex", flexDirection: "column", gap: narrow ? 18 : 22, boxShadow: "0 40px 90px rgba(0,0,0,0.5)", maxHeight: Math.round(VH - EDGE * 2 - 150), overflowY: "auto" } as CSSProperties}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ font: "400 10px/1 Jost,sans-serif", letterSpacing: "0.32em", textTransform: "uppercase", color: selRoleColor }}>{selRole}</div>
               <div style={{ font: "200 28px/1.16 Jost,sans-serif", letterSpacing: "0.006em", color: "#f0ede4" }}>{selName}</div>
@@ -740,8 +740,9 @@ class Sky extends Component<Props, State> {
           ))}
         </div>
 
-        {/* cam controls */}
-        <div style={{ position: "absolute", right: EDGE, bottom: EDGE, display: "flex", alignItems: "center", gap: narrow ? 16 : 26 }}>
+        {/* cam controls — shielded like the other overlays (fix 1 + 2) so a moved
+            click on Reset / Return-to-full-sky isn't captured by the host as a pan. */}
+        <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ position: "absolute", right: EDGE, bottom: EDGE, display: "flex", alignItems: "center", gap: narrow ? 16 : 26 }}>
           <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#343b4c", pointerEvents: "none" }}>Drag · Scroll · Click</div>
           {canReset ? <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a6178", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.12)", paddingBottom: 5 }} onClick={this.pullBack}>{resetLabel}</div> : null}
         </div>
