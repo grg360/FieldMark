@@ -12,14 +12,21 @@
 // (track/attachments), mobile — stages 3–4.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import NavBar from "../NavBar";
+import PeopleNavStrip from "../PeopleNavStrip";
+import SearchBar from "../SearchBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
 import { useRelationships } from "../../contexts/RelationshipsContext";
+import { useFilterContext } from "../../lib/filter-context";
+import { useTrack, type Track } from "../../lib/TrackContext";
+import { resolveFeedRoute, trackToDashboardSlug } from "../../lib/routeSlugs";
+import { taIdForApiSlug } from "../../lib/api";
 import type { RelationshipStatus } from "../../lib/relationships";
 import {
   COHORTS,
+  floorFixed,
   loadLedgerPage,
   loadLedgerMeta,
   thresholds,
@@ -73,44 +80,21 @@ const P = {
 const mono = (s: number, w = 400) => ({ font: `${w} ${s}px 'IBM Plex Mono',ui-monospace,monospace` } as const);
 const serif = (s: number, w = 400) => ({ font: `${w} ${s}px 'Source Serif 4',Georgia,serif` } as const);
 
-// One tab per cohort. Selecting a tab swaps the whole config; the surface stays put.
-// At 390 the three full labels won't sit side by side, so each tab takes an equal third
-// of the width and shows the short tag (EST / RS / COM) — still all three, still one at
-// a time, no scroll or overflow.
-function CohortTabs({ active, onPick, isMobile }: { active: string; onPick: (tag: string) => void; isMobile: boolean }) {
-  return (
-    <div style={{ display: "flex", alignItems: "stretch", gap: 0, borderBottom: `1px solid ${P.lineMed}` }}>
-      {COHORTS.map((c) => {
-        const on = c.tag === active;
-        return (
-          <button
-            key={c.tag}
-            onClick={() => onPick(c.tag)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: isMobile ? "center" : "flex-start",
-              flex: isMobile ? 1 : "0 0 auto",
-              gap: isMobile ? 6 : 8,
-              padding: isMobile ? "11px 6px" : "11px 18px",
-              background: on ? P.card : "transparent",
-              border: "none",
-              borderRight: `1px solid ${P.line}`,
-              borderBottom: on ? `2px solid ${c.markerColor}` : "2px solid transparent",
-              cursor: "pointer",
-              minHeight: 0,
-            }}
-          >
-            <span style={{ width: 3, height: 12, background: c.markerColor, opacity: on ? 1 : 0.5 }} />
-            <span style={{ ...mono(isMobile ? 11 : 10.5, on ? 600 : 500), letterSpacing: isMobile ? ".1em" : ".12em", color: on ? P.ink1 : P.ink5, whiteSpace: "nowrap" }}>
-              {isMobile ? c.tag : c.label.toUpperCase()}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+// The in-page cohort tab toggle (CohortTabs) was removed 2026-07-31 when the ledger
+// became the PEOPLE destination: the PeopleNavStrip's cohort row is the single cohort
+// control, driving the addressable /cohorts/ledger/:cohort routes via onPickCohort —
+// URL-addressable where the in-page state was not, and one control system across all
+// people surfaces.
+const COHORT_SLUG_TO_TAG: Record<string, string> = {
+  established: "EST",
+  "rising-stars": "RS",
+  community: "COM",
+};
+const TAG_TO_TRACK: Record<string, Track> = {
+  EST: "established",
+  RS: "rising-stars",
+  COM: "community",
+};
 
 // ── Our-side controls (stage 3) — INSIGHT · TRACK · STATE, columned right ──────
 // Widths shared by the header and the rows so the columns line up.
@@ -287,7 +271,7 @@ function Row({
         </div>
         {/* index */}
         <div style={{ width: 88, textAlign: "right", paddingTop: 5, ...mono(18, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
-          {row.idx.toFixed(cfg.idxDecimals)}
+          {floorFixed(row.idx, cfg.idxDecimals)}
         </div>
         {/* score cells */}
         {cfg.cols.map((col) => {
@@ -435,7 +419,7 @@ function MobileRow({
             <button onClick={(e) => { stop(e); void toggleSave(row.hcpId, "cohort_ledger"); }} title={tracked ? "Tracked — tap to untrack" : "Track"} style={{ background: "none", border: "none", padding: 4, cursor: "pointer", lineHeight: 0, minHeight: 0 }}>
               <Bookmark on={tracked} />
             </button>
-            <span style={{ ...mono(17, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{row.idx.toFixed(cfg.idxDecimals)}</span>
+            <span style={{ ...mono(17, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{floorFixed(row.idx, cfg.idxDecimals)}</span>
           </div>
         </div>
 
@@ -606,8 +590,31 @@ function VirtualTail({
 }
 
 export default function CohortLedger() {
-  const [tag, setTag] = useState<string>("EST");
+  // Cohort from the URL (/cohorts/ledger/:cohort); bare /cohorts/ledger = Established.
+  const params = useParams<{ cohort?: string }>();
+  const navigate = useNavigate();
+  const { setTrack } = useTrack();
+  const { userTerritory } = useFilterContext();
+  const tag = COHORT_SLUG_TO_TAG[(params.cohort ?? "").toLowerCase()] ?? "EST";
   const cfg = COHORTS.find((c) => c.tag === tag) ?? COHORTS[0];
+  const cohortTrack: Track = TAG_TO_TRACK[cfg.tag] ?? "established";
+
+  // Keep TrackContext in sync so the strip's cohort row marks the active cohort here
+  // exactly as it does on the feed.
+  useEffect(() => {
+    setTrack(cohortTrack);
+  }, [cohortTrack, setTrack]);
+
+  // Synthetic feed route for the strip: the ledger RPCs are NSCLC-locked, so the strip's
+  // subject scope is pinned to Oncology/NSCLC until the RPCs take a TA parameter. TA and
+  // indication controls navigate to the (unlinked but routed) card feed as shipped.
+  const stripRoute = resolveFeedRoute({
+    ta: "oncology",
+    dashboard: trackToDashboardSlug(cohortTrack),
+    indication: "nsclc",
+    isHomePath: false,
+  });
+  const nsclcTaId = taIdForApiSlug("nsclc");
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [meta, setMeta] = useState<LedgerMeta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -678,12 +685,30 @@ export default function CohortLedger() {
 
   return (
     <div style={{ background: P.page, minHeight: "100vh" }}>
+      <NavBar />
       <div style={{ maxWidth: CONTENT_WIDTH.wide, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-        <NavBar />
+        {/* search — parity with the feed header (the strip carries no search). NSCLC TA id
+            because the ledger RPCs are NSCLC-locked. */}
+        {nsclcTaId ? (
+          <div style={{ padding: "8px 16px 0" }}>
+            <SearchBar variant="inline" currentTaId={nsclcTaId} onSelect={(hcpId) => navigate(`/hcp/${hcpId}`)} />
+          </div>
+        ) : null}
+        {/* PeopleNavStrip (2026-07-31): the ledger is the PEOPLE destination, so it carries
+            the shipped strip. Cohort row drives /cohorts/ledger/:cohort (one cohort control —
+            the old in-page CohortTabs toggle is gone). Filters/territory chips are suppressed:
+            the ledger RPCs read no filter state. Telescope/Landscape/TA/indication controls
+            navigate to their existing surfaces. */}
+        <PeopleNavStrip
+          route={stripRoute}
+          onOpenFilters={() => {}}
+          userTerritory={userTerritory}
+          showSubjectLine={false}
+          showScopeChips={false}
+          onPickCohort={(key) => navigate(`/cohorts/ledger/${key}`)}
+        />
         <div style={{ padding: "24px 20px 96px", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
-            {/* cohort toggle */}
-            <CohortTabs active={tag} onPick={setTag} isMobile={isMobile} />
 
             {/* header — title + meta stack on mobile so the long meta line doesn't crush */}
             <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 6 : 0, justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>

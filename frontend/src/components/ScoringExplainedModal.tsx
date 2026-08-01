@@ -341,15 +341,16 @@ export default function ScoringExplainedModal({ open, onClose, scrollToSection }
               engagement OR Medicare patient volume). They are ranked within the cohort by a composite score (0–100):
             </p>
             <div style={monoBlock}>
-              <div>45% — Pharma engagement total (lifetime Open Payments dollars)</div>
-              <div style={{ marginTop: 6 }}>25% — Engagement breadth (distinct pharma companies)</div>
-              <div style={{ marginTop: 6 }}>15% — Medicare patient volume (3-year unique beneficiaries)</div>
-              <div style={{ marginTop: 6 }}>15% — Career stage (years since NPI enumeration)</div>
+              <div>40% — Medicare patient volume (3-year unique beneficiaries)</div>
+              <div style={{ marginTop: 6 }}>30% — Pharma engagement (Open Payments dollars)</div>
+              <div style={{ marginTop: 6 }}>15% — Group practice signal (practice setting)</div>
+              <div style={{ marginTop: 6 }}>10% — Career stage (years since NPI enumeration)</div>
+              <div style={{ marginTop: 6 }}>5% — Publication signal (publication activity)</div>
             </div>
             <p style={{ ...bodyText, marginTop: 12 }}>
-              Engagement is weighted highest because pharma engagement is the strongest available signal of MSL-relevant
-              Community standing. Breadth captures recognition across multiple sponsors versus a single deep relationship.
-              Medicare volume and career stage provide practice-level grounding.
+              Patient volume is weighted highest because it is the most direct measure of community clinical reach. Pharma
+              engagement is itself a signal of clinical relevance at the community level. Practice setting, career stage, and
+              publication activity provide practice-level grounding.
             </p>
             <p style={{ ...bodyText, marginTop: 12, fontWeight: 600, color: "#B8B4AC" }}>WORKHORSE subset:</p>
             <p style={bodyText}>

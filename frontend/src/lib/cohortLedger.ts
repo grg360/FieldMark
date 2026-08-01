@@ -3,16 +3,12 @@
 // ONE config-driven component across three cohorts. Stage 1 wired Established; stage 2
 // adds Rising Star and Community as sibling configs. The computed rules Design flagged
 // as MUST-NOT-BE-SIMPLIFIED live here as pure functions and are cohort-agnostic:
-//   • suppression is CEILING-SATURATION, not a column/page property (the correctness
-//     fix). A score cell dashes iff its value sits within the window of that column's
-//     WHOLE-COHORT ceiling (its max) — a cohort-level fact fetched once via ledger_meta
-//     (a cheap max() aggregate), never recomputed from the loaded rows. So the dash
-//     decision is identical whether 60 rows or the full 3,178 are loaded: leaders
-//     pinned at the ceiling dash, tail HCP with real separation print their numerals.
-//     Established's smoothly-declining scores collapse only at the head; Rising's
-//     genuine ceiling cells dash and the rest print; Community's money/count columns
-//     have no ceiling and never suppress. thresholds() turns ceilings into per-column
-//     dash thresholds.
+//   • ceiling-saturation machinery (ledger_meta ceilings → thresholds()) survives, but
+//     CELLS NO LONGER DASH ON IT (2026-07-31): the absolute 3-point window on a
+//     percentile distribution that compresses at the top by construction dashed the
+//     whole first screen of large cohorts. Scores print as stored; the tied-head bands
+//     carry the "spread is inside resolution" honesty, as INDEX always did. thresholds()
+//     still feeds why() — the drawer's ceiling-saturation narrative.
 //   • bands are a HEAD-ONLY "treat as tied" device — the same ceiling-proximity logic
 //     on the INDEX column. Rows whose index is within the cohort's resolution of the
 //     index ceiling form the tied bands; below that boundary the ledger is a plain
@@ -35,6 +31,10 @@ export interface ScoreCol {
   absent?: string; // text shown when the value is absent (NO OP DATA / NONE RECORDED)
   unit?: string; // trace noun for count columns (e.g. "distinct companies")
   prov?: string; // trace provenance (e.g. "Open Payments", "NPPES")
+  // pct display precision: decimals set → floorFixed(v, decimals); absent → integer round.
+  // Established sets 1 (2026-07-31): at integer precision every top-20 SCI reads "99" and
+  // the column carries nothing; at one decimal the 60/40 decomposition is legible.
+  decimals?: number;
 }
 
 export interface CohortConfig {
@@ -65,15 +65,15 @@ export const EST_CONFIG: CohortConfig = {
   nameSub: "INSTITUTION · GENERATED SUMMARY",
   meta: "{total} HCP · SCIENTIFIC + NETWORK RANK THE COHORT · PHARMA EXCLUDED",
   cols: [
-    { key: "sci", label: "SCI", sub: "CEILING", w: 66, kind: "pct" },
-    { key: "net", label: "NET", sub: "CEILING", w: 66, kind: "pct" },
-    { key: "ph", label: "PHARMA", sub: "NOT RANKED", w: 120, kind: "pct", noRank: true, absent: "NO OP DATA" },
+    { key: "sci", label: "SCI", sub: "CEILING", w: 66, kind: "pct", decimals: 1 },
+    { key: "net", label: "NET", sub: "CEILING", w: 66, kind: "pct", decimals: 1 },
+    { key: "ph", label: "PHARMA", sub: "NOT RANKED", w: 120, kind: "pct", noRank: true, absent: "NO OP DATA", decimals: 1 },
   ],
   bandResolution: 0.3,
   idxDecimals: 1,
   rpc: "established_ledger",
   notes: [
-    "SCI AND NET COLLAPSE TO “—” WHERE THE VISIBLE SPREAD SITS INSIDE THIS COHORT'S RESOLUTION; A NUMERAL PRINTS ONLY BELOW THE CEILING. THE THRESHOLD IS COMPUTED PER COHORT, NEVER HARD-CODED.",
+    "SCI AND NET PRINT AS STORED · THE COHORT COMPRESSES AT THE TOP BY CONSTRUCTION, SO NEAR-IDENTICAL HEAD VALUES ARE THE DATA, NOT A DISPLAY ARTEFACT — THE TIED BANDS ABOVE CARRY THAT.",
     "INDEX = SCI + NET COMPOSITE · RANK IS THE ONLY FIGURE ON THIS ROW THAT SEPARATES ANYONE.",
     "PHARMA IS EXCLUDED FROM THE RANKING · OPEN PAYMENTS EXISTS FOR A MINORITY OF US ESTABLISHED HCP · “NO OP DATA” IS ABSENCE OF A RECORD, NOT ABSENCE OF PAYMENT.",
     "QUARTER-OVER-QUARTER RANK HISTORY IS NOT COLLECTED YET, SO NO TRAJECTORY COLUMN IS DRAWN.",
@@ -130,7 +130,7 @@ export const COM_CONFIG: CohortConfig = {
   notes: [
     "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE, AND NOTHING SORTS ON IT — IT SITS AT THE SAME TERTIARY TIER AS EVERY OTHER FIGURE SO THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
     "“NONE RECORDED” MEANS CMS HOLDS NO PAYMENT RECORD. NO RELATIONSHIP AND NO RECORD ARE INDISTINGUISHABLE IN THE SOURCE, SO THE ROW SAYS WHAT IS KNOWN AND NOTHING MORE — RANK IS UNAFFECTED, SINCE ENGAGEMENT IS 30% OF A SCORE LED BY PRACTICE VOLUME AND SETTING (55%).",
-    "SCORES ARE PERCENTILES WITHIN THE COMMUNITY COHORT · A COMMUNITY 94 AND AN ESTABLISHED 94 ARE DIFFERENT MEASUREMENTS.",
+    "SCORES ARE MIN-MAX NORMALIZED 0–100 WITHIN THE COMMUNITY COHORT · A COMMUNITY 94 AND AN ESTABLISHED 94 ARE DIFFERENT MEASUREMENTS.",
   ],
   traceFoot:
     "COMMUNITY SCORES ARE CMS-DERIVED AND LED BY PRACTICE VOLUME; MANY HCP IN THIS COHORT HAVE NO PUBLICATIONS AT ALL, WHICH IS EXPECTED AND NOT A GAP.",
@@ -195,19 +195,31 @@ function money(v: number): string {
  *   pct+noRank (Pharma): null or ≤0 → "NO OP DATA" (a 0 is an absent record, not a measured low).
  *   money (Engagement): null → "NONE RECORDED" (CMS holds no record — Buroker case).
  *   count (Companies): null → em-dash, never 0.
- *   pct: null → dash; at/above the cohort dash threshold (ceiling − window) → dash; else prints.
- *  `th` carries the per-column dash thresholds from thresholds() — cohort constants, so
- *  the same value dashes or prints regardless of which page it lands on. */
-export function cellDisplay(row: LedgerRow, col: ScoreCol, th: Record<string, number | null>): CellDisplay {
+ *   pct: null → dash; else prints AS STORED.
+ *  CEILING SUPPRESSION REMOVED FROM CELLS (2026-07-31): an absolute 3-point window on a
+ *  percentile distribution that compresses at the top by construction dashed the entire
+ *  first screen of every large cohort — the ranking columns showed nothing while the
+ *  not-ranked Pharma column printed. The tied-head band headers carry the honesty
+ *  structurally (TREAT AS TIED), exactly as INDEX always did. The `_th` param is kept so
+ *  call sites and why() (which still narrates ceiling saturation in the drawer) share one
+ *  thresholds() source; it no longer affects cell rendering. */
+export function cellDisplay(row: LedgerRow, col: ScoreCol, _th: Record<string, number | null>): CellDisplay {
   const v = row.scores[col.key];
   if (v === null || v === undefined || (col.noRank && col.kind === "pct" && v <= 0)) {
     return col.absent ? { text: col.absent, kind: "absent" } : { text: "—", kind: "dash" };
   }
   if (col.kind === "money") return { text: money(v), kind: "num" };
   if (col.kind === "count") return { text: String(Math.round(v)), kind: "num" };
-  const threshold = th[col.key];
-  if (threshold !== null && v >= threshold) return { text: "—", kind: "dash" };
-  return { text: String(Math.round(v)), kind: "num" };
+  return { text: col.decimals != null ? floorFixed(v, col.decimals) : String(Math.round(v)), kind: "num" };
+}
+
+/** FLOOR to d decimals — the one display convention for composite index figures
+ *  (2026-07-31): rounding can manufacture a ceiling that does not exist in the data
+ *  (99.95 → "100.0"); floor cannot. Same rule as cohort-metrics.formatScoreFloor1
+ *  (which is floorFixed at d=1, used by the card feed). Display layer only. */
+export function floorFixed(n: number, d: number): string {
+  const f = Math.pow(10, d);
+  return (Math.floor(n * f) / f).toFixed(d);
 }
 
 export interface MobileCell {
@@ -281,8 +293,8 @@ export function layout(cfg: CohortConfig, rows: LedgerRow[]): LedgerLayout {
       label: `BAND ${String.fromCharCode(letter)} · RANK ${r0}${r1 > r0 ? `–${r1}` : ""}`,
       note:
         group.length > 1
-          ? `INDEX ${hi.toFixed(d)} → ${lo.toFixed(d)} · SPREAD ${spread} · WITHIN COHORT RESOLUTION — TREAT AS TIED`
-          : `INDEX ${hi.toFixed(d)} · TIED AT THE COHORT CEILING`,
+          ? `INDEX ${floorFixed(hi, d)} → ${floorFixed(lo, d)} · SPREAD ${spread} · WITHIN COHORT RESOLUTION — TREAT AS TIED`
+          : `INDEX ${floorFixed(hi, d)} · TIED AT THE COHORT CEILING`,
       rows: group,
     });
     letter++;
@@ -292,7 +304,7 @@ export function layout(cfg: CohortConfig, rows: LedgerRow[]): LedgerLayout {
 
 // ── Drawer "why" (derived from suppression state + scores) ───────────────────
 function scoreLabel(col: ScoreCol, v: number): string {
-  return `${col.label} ${Math.round(v)}`;
+  return `${col.label} ${col.decimals != null ? floorFixed(v, col.decimals) : Math.round(v)}`;
 }
 
 export function why(cfg: CohortConfig, row: LedgerRow, th: Record<string, number | null>): string {
@@ -350,7 +362,7 @@ export function trace(cfg: CohortConfig, row: LedgerRow, cohortTotal: number): T
     }
     if (col.kind === "money") return { label, value: `${money(v)} · ${col.prov ?? "Open Payments"} (lifetime)` };
     if (col.kind === "count") return { label, value: `${Math.round(v)} ${col.unit ?? ""} · ${col.prov ?? ""}`.replace(/\s+·\s*$/, "").trim() };
-    return { label, value: `percentile ${v.toFixed(1)} within ${cfg.label} · methodology v4.2` };
+    return { label, value: `percentile ${floorFixed(v, 1)} within ${cfg.label} · methodology v4.2` };
   });
   t.push({
     label: "COHORT RANK",
