@@ -445,3 +445,50 @@ export const NSCLC_PULSE: PulsePayload = {
 export const PULSE_BY_TA: Record<string, PulsePayload> = {
   nsclc: NSCLC_PULSE,
 };
+
+// ── Frozen AI-synthesis capture (option B on the window pin) ─────────────────
+// The prototype serves a STATIC synthesis paragraph that matches the frozen
+// Apr–Jun payload above, and makes NO live model call. Why: the Edge Function's
+// get_pulse_synthesis_facts computes its window from current_date, so on
+// 1 Aug 2026 it rolls to May–Jul while this fixture stays pinned to Apr–Jun — a
+// live call would then describe a different window (and live DB numbers) than
+// the theme list renders. Freezing keeps the page internally consistent until
+// the persisted-snapshot API (option D) lets the window, the numbers, and the
+// paragraph float together.
+//
+// PROVENANCE: this string is an EDITORIAL summary hand-authored from the payload
+// facts — it is NOT a capture of the AI Edge Function's output (that function
+// could not be run at freeze time). PulseSynthesis therefore renders it WITHOUT
+// any AI-synthesis marker. It still holds to the same factual contract the AI
+// prompt enforces: current-window facts only, three sentences, no trend/change
+// language, every claim tied to a number in the payload above. To replace it with
+// a genuine generation, invoke generate-pulse-synthesis against this aligned
+// Apr–Jun window, paste its output here, and restore the AI marker in
+// PulseSynthesis. Regenerate/re-author if the fixture window ever changes.
+export interface PulseSynthesisFixture {
+  ta_slug: string;
+  window_start: string;
+  window_end: string;
+  generated_at: string;
+  body: string;
+}
+
+export const PULSE_SYNTHESIS_BY_TA: Record<string, PulseSynthesisFixture> = {
+  nsclc: {
+    ta_slug: "nsclc",
+    window_start: "2026-04-01",
+    window_end: "2026-07-01",
+    generated_at: "2026-07-27",
+    body:
+      "Published attention concentrates in immuno-oncology: immune checkpoint inhibitor " +
+      "combinations account for 346 publications, 17.9% of the window's primary-theme total, and " +
+      "tumor-microenvironment and immune-biology work for 274, or 14.2% — together close to a " +
+      "third of all activity. Their composition differs: the checkpoint-combination literature " +
+      "carries 14 clinical trials to 7 reviews, an interventional profile, while the " +
+      "microenvironment work is review-weighted at 16 reviews with no trials, reading as " +
+      "consolidation of biology. Real-world outcomes research (158, 8.2%) and early-stage " +
+      "surgical management (143, 7.4%) follow, and a single consensus document falls in the " +
+      "window: the 2026 AATS expert consensus on evaluation and management of N2+ NSCLC, in the " +
+      "Journal of Thoracic and Cardiovascular Surgery.",
+  },
+};

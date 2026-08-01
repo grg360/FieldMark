@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { FONT } from "../../lib/designTokens";
 import { PULSE_COLORS } from "../../lib/pulse";
 import { getPulseSynthesis } from "../../lib/pulseSynthesis";
 
-// TA-level AI synthesis paragraph that opens /pulse/:ta, above the theme list.
-// Marker follows the app's AI-synthesis convention (✨ + "AI Synthesis" chip in
-// the indigo/purple accent — amber stays scarce); body is the serif prose role
-// used by the other narrative blocks. Renders nothing until a body is available
-// (cache read is fast), and nothing if there is none — never a bare marker.
+// TA-level narrative that opens /pulse/:ta, above the theme list.
+//
+// This is an EDITORIAL window summary written from the payload facts — it is NOT
+// AI-generated — so it carries NO AI-synthesis marker: no ✦ sparkle, no "AI
+// Synthesis" chip, no "synthesized from…" line. The ✦ convention is reserved for
+// genuinely generated content (build brief), and the prototype's live AI path is
+// frozen (see pulseSynthesis.ts). When a real generation is captured from the
+// generate-pulse-synthesis Edge Function, restore the AI marker together with it
+// — do not put the marker back over hand-authored text.
 
 interface PulseSynthesisProps {
   taSlug: string;
@@ -15,7 +20,14 @@ interface PulseSynthesisProps {
   windowEnd: string;
 }
 
-const AI_ACCENT = "#9B6DFF";
+const eyebrowStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 500,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: PULSE_COLORS.mutedDim,
+  marginBottom: 12,
+};
 
 export default function PulseSynthesis({ taSlug, windowStart, windowEnd }: PulseSynthesisProps) {
   const [body, setBody] = useState<string | null>(null);
@@ -41,27 +53,7 @@ export default function PulseSynthesis({ taSlug, windowStart, windowEnd }: Pulse
         padding: "18px 18px 16px",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            backgroundColor: "rgba(155,109,255,0.18)",
-            color: AI_ACCENT,
-            padding: "3px 8px",
-            borderRadius: 3,
-            fontSize: 10,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            fontFamily: FONT.sans,
-          }}
-        >
-          <span style={{ fontSize: 11, lineHeight: 1 }}>{String.fromCodePoint(0x2728)}</span>
-          AI Synthesis
-        </span>
-      </div>
+      <div style={eyebrowStyle}>Window summary</div>
 
       <p
         style={{
@@ -75,7 +67,8 @@ export default function PulseSynthesis({ taSlug, windowStart, windowEnd }: Pulse
         {body}
       </p>
 
-      {/* Provenance — states plainly what it was synthesized from. */}
+      {/* Honest provenance — an editorial summary of the window's data, not a
+          model generation. */}
       <div
         style={{
           fontFamily: FONT.sans,
@@ -84,7 +77,7 @@ export default function PulseSynthesis({ taSlug, windowStart, windowEnd }: Pulse
           marginTop: 14,
         }}
       >
-        Synthesized from the current window&rsquo;s publication data.
+        Editorial summary of the current window&rsquo;s publication data.
       </div>
     </section>
   );

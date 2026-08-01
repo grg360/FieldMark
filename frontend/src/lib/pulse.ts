@@ -82,12 +82,86 @@ export interface PulsePayload {
 }
 
 // ── Rule 1: the display gate ────────────────────────────────────────────────
-// A theme below this many current-window publications never shows a percentage
-// or a percentage-change arrow. Absolute count + qualitative label only.
+// A theme below this many publications (in the window a figure is computed on)
+// never shows a percentage or a change figure — the number is Poisson noise at
+// that volume. Absolute count + qualitative label only.
 export const PUBLICATION_GATE = 20;
 
+// The HEADLINE gate: keyed on the full display window's count (cur_pubs). Drives
+// whether the theme's SHARE renders as a number or an em dash. Unchanged.
 export function isThemeGated(theme: PulseTheme): boolean {
   return theme.cur_pubs < PUBLICATION_GATE;
+}
+
+// ── Movement windows: clean months only ─────────────────────────────────────
+// Movement is computed on the CLEAN months, never the full display window. The
+// most recent month is a backfill-recovery spike (and NOT theme-neutral — it
+// added +8.4pp of June share to ICI alone) and the oldest is the deflated tail
+// of an ingest gap; both are excluded from the movement math entirely. This is
+// the same most-recent month sparklineSeries already drops for the charts, plus
+// the deflated oldest month. From the clean interior, the trailing
+// MOVEMENT_WINDOW_MONTHS are the movement "current" window and the leading
+// MOVEMENT_WINDOW_MONTHS the "prior". Headline counts/shares are unaffected —
+// they stay on the full display window.
+export const MOVEMENT_WINDOW_MONTHS = 2;
+
+function cleanInterior(monthly: PulseMonthly[]): PulseMonthly[] {
+  // Needs two full movement windows plus the two excluded edge months.
+  if (monthly.length < 2 * MOVEMENT_WINDOW_MONTHS + 2) return [];
+  return monthly.slice(1, -1);
+}
+
+function sumPubs(months: PulseMonthly[]): number {
+  return months.reduce((total, m) => total + m.pubs, 0);
+}
+
+export function movementCurrentPubs(theme: PulseTheme): number {
+  return sumPubs(cleanInterior(theme.monthly).slice(-MOVEMENT_WINDOW_MONTHS));
+}
+
+export function movementPriorPubs(theme: PulseTheme): number {
+  return sumPubs(cleanInterior(theme.monthly).slice(0, MOVEMENT_WINDOW_MONTHS));
+}
+
+export function movementCurrentTotal(themes: PulseTheme[]): number {
+  return themes.reduce((total, t) => total + movementCurrentPubs(t), 0);
+}
+
+export function movementPriorTotal(themes: PulseTheme[]): number {
+  return themes.reduce((total, t) => total + movementPriorPubs(t), 0);
+}
+
+// The MOVEMENT gate: a theme with fewer than PUBLICATION_GATE publications in the
+// two-month movement CURRENT window shows a qualitative label, not a pp figure.
+// Two-month windows push more themes under the gate than the display window does
+// — correct: less data, less licence to quote a number.
+export function isMovementGated(theme: PulseTheme): boolean {
+  return movementCurrentPubs(theme) < PUBLICATION_GATE;
+}
+
+// ── Above-gate movement: change in SHARE of window, in percentage points ─────
+// The specified primitive is share of attention, NOT raw count change. Share is
+// zero-sum, so it cannot all move one way. Each window's share is the theme's
+// clean-window count over that window's clean-window total. Null only when a
+// window total is empty (no baseline at all).
+export function movementShareDelta(
+  theme: PulseTheme,
+  currentTotal: number,
+  priorTotal: number,
+): number | null {
+  if (currentTotal <= 0 || priorTotal <= 0) return null;
+  const current = (movementCurrentPubs(theme) / currentTotal) * 100;
+  const prior = (movementPriorPubs(theme) / priorTotal) * 100;
+  return current - prior;
+}
+
+export type MovementDirection = "up" | "down" | "flat";
+
+// Keys on the SHARE delta (percentage points), not on the count comparison.
+export function movementDirection(delta: number): MovementDirection {
+  if (delta > 0) return "up";
+  if (delta < 0) return "down";
+  return "flat";
 }
 
 // ── Rule 2: the qualitative vocabulary (exactly these four, nothing else) ────
@@ -97,31 +171,20 @@ export type MovementLabel =
   | "Decreasing attention"
   | "Emerging";
 
-// Derived from the count delta only — no numbers in the label. "Emerging" takes
-// precedence: a young theme (lifetime < 600) that is growing is a frontier
-// signal, which is exactly what the audience wants surfaced, so it is labelled
-// as such rather than merely "Increasing attention".
-export function qualitativeLabel(theme: PulseTheme): MovementLabel {
-  const { cur_pubs, prior_pubs, lifetime_pubs } = theme;
-  if (lifetime_pubs < 600 && cur_pubs > prior_pubs) return "Emerging";
-  if (cur_pubs > prior_pubs) return "Increasing attention";
-  if (cur_pubs < prior_pubs) return "Decreasing attention";
+// Derived from the sign of the clean-window SHARE delta, so the below-gate label
+// agrees in direction with the above-gate figure. No numbers in the label.
+// "Emerging" takes precedence: a young theme (lifetime < 600) gaining share is a
+// frontier signal, exactly what the audience wants surfaced.
+export function qualitativeLabel(
+  theme: PulseTheme,
+  currentTotal: number,
+  priorTotal: number,
+): MovementLabel {
+  const delta = movementShareDelta(theme, currentTotal, priorTotal) ?? 0;
+  if (theme.lifetime_pubs < 600 && delta > 0) return "Emerging";
+  if (delta > 0) return "Increasing attention";
+  if (delta < 0) return "Decreasing attention";
   return "Steady";
-}
-
-// ── Above-gate movement: signed percentage change vs the prior window ────────
-// Null when there is no prior baseline to divide by (a genuinely new theme).
-export function pctChange(cur: number, prior: number): number | null {
-  if (!Number.isFinite(prior) || prior <= 0) return null;
-  return ((cur - prior) / prior) * 100;
-}
-
-export type MovementDirection = "up" | "down" | "flat";
-
-export function movementDirection(cur: number, prior: number): MovementDirection {
-  if (cur > prior) return "up";
-  if (cur < prior) return "down";
-  return "flat";
 }
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -135,6 +198,12 @@ export function formatInt(n: number): string {
 export function formatSignedPct(n: number): string {
   const sign = n > 0 ? "+" : "";
   return `${sign}${n.toFixed(1)}%`;
+}
+
+/** Signed percentage points, one decimal: +4.5 pp / -2.2 pp. */
+export function formatSignedPoints(pp: number): string {
+  const sign = pp > 0 ? "+" : "";
+  return `${sign}${pp.toFixed(1)} pp`;
 }
 
 /** Unsigned share percentage, one decimal, or an em dash for null (Rule 4). */
@@ -201,6 +270,43 @@ export function formatMonthRange(startIso: string, endExclusiveIso: string): str
     return `${startMonth}–${formatMonthLabel(lastInclusive.toISOString().slice(0, 10))}`;
   }
   return `${formatMonthLabel(startIso)}–${formatMonthLabel(lastInclusive.toISOString().slice(0, 10))}`;
+}
+
+// First-of-month ISO one month later, e.g. "2026-05-01" → "2026-06-01". Gives an
+// EXCLUSIVE end to feed formatMonthRange from an inclusive last month.
+export function nextMonthIso(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// ── Movement-window labels for the caption ───────────────────────────────────
+// Derived from a theme's six-point monthly series so the caption never hard-codes
+// month names — all themes share the same months, so any theme's series works.
+// Returns null if the series is too short to define the clean windows.
+export interface MovementWindowLabels {
+  /** Movement current window, e.g. "Apr–May 2026". */
+  current: string;
+  /** Movement prior window, e.g. "Feb–Mar 2026". */
+  prior: string;
+  /** Excluded most-recent month (backfill-recovery spike), e.g. "Jun 2026". */
+  excludedTail: string;
+  /** Excluded oldest month (deflated ingest-gap tail), e.g. "Jan 2026". */
+  excludedHead: string;
+}
+
+export function movementWindowLabels(monthly: PulseMonthly[]): MovementWindowLabels | null {
+  if (monthly.length < 2 * MOVEMENT_WINDOW_MONTHS + 2) return null;
+  const interior = monthly.slice(1, -1);
+  const current = interior.slice(-MOVEMENT_WINDOW_MONTHS);
+  const prior = interior.slice(0, MOVEMENT_WINDOW_MONTHS);
+  return {
+    current: formatMonthRange(current[0].month, nextMonthIso(current[current.length - 1].month)),
+    prior: formatMonthRange(prior[0].month, nextMonthIso(prior[prior.length - 1].month)),
+    excludedTail: formatMonthLabel(monthly[monthly.length - 1].month),
+    excludedHead: formatMonthLabel(monthly[0].month),
+  };
 }
 
 export function themesRankedByCurrent(themes: PulseTheme[]): PulseTheme[] {

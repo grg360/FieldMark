@@ -5,10 +5,14 @@ import {
   countProportion,
   formatInt,
   formatShare,
-  formatSignedPct,
+  formatSignedPoints,
+  isMovementGated,
   isThemeGated,
+  movementCurrentTotal,
   movementDirection,
-  pctChange,
+  movementPriorTotal,
+  movementShareDelta,
+  movementWindowLabels,
   qualitativeLabel,
   sparklineSeries,
   themesRankedByCurrent,
@@ -142,19 +146,30 @@ function Chevron({
   );
 }
 
-function Movement({ theme }: { theme: PulseTheme }) {
-  // Below the gate: qualitative label ONLY, no number, no arrow (Rule 1 & 2).
-  if (isThemeGated(theme)) {
-    const label = qualitativeLabel(theme);
+function Movement({
+  theme,
+  currentTotal,
+  priorTotal,
+}: {
+  theme: PulseTheme;
+  currentTotal: number;
+  priorTotal: number;
+}) {
+  // Below the movement gate: qualitative label ONLY, no number, no arrow. Gated
+  // on the two-month movement window, so more themes fall here than under the
+  // headline gate — correct at this volume (Rule 1 & 2).
+  if (isMovementGated(theme)) {
+    const label = qualitativeLabel(theme, currentTotal, priorTotal);
     return (
       <span style={{ fontSize: 12, color: LABEL_COLOR[label], whiteSpace: "nowrap" }}>
         {label}
       </span>
     );
   }
-  // At or above the gate: directional arrow + signed percentage change.
-  const dir = movementDirection(theme.cur_pubs, theme.prior_pubs);
-  const pct = pctChange(theme.cur_pubs, theme.prior_pubs);
+  // At or above the gate: directional arrow + signed change in SHARE (pp),
+  // computed on the clean movement windows (Apr–May vs Feb–Mar).
+  const delta = movementShareDelta(theme, currentTotal, priorTotal);
+  const dir = movementDirection(delta ?? 0);
   return (
     <span
       style={{
@@ -167,7 +182,7 @@ function Movement({ theme }: { theme: PulseTheme }) {
       <span aria-hidden style={{ marginRight: 3 }}>
         {DIR_GLYPH[dir]}
       </span>
-      {pct == null ? "new" : formatSignedPct(pct)}
+      {delta == null ? "—" : formatSignedPoints(delta)}
     </span>
   );
 }
@@ -235,11 +250,15 @@ function DrillDown({ theme }: { theme: PulseTheme }) {
 function Tier1Cell({
   theme,
   barMax,
+  currentTotal,
+  priorTotal,
   open,
   onToggle,
 }: {
   theme: PulseTheme;
   barMax: number;
+  currentTotal: number;
+  priorTotal: number;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -302,7 +321,7 @@ function Tier1Cell({
           {gated ? "—" : formatShare(theme.cur_share)}
         </span>
         <span style={{ marginLeft: "auto" }}>
-          <Movement theme={theme} />
+          <Movement theme={theme} currentTotal={currentTotal} priorTotal={priorTotal} />
         </span>
       </span>
 
@@ -337,7 +356,15 @@ function Tier1Cell({
 }
 
 // TIER 2 row — light single line: name, count, share. No bar/sparkline/movement.
-function Tier2Row({ theme }: { theme: PulseTheme }) {
+function Tier2Row({
+  theme,
+  currentTotal,
+  priorTotal,
+}: {
+  theme: PulseTheme;
+  currentTotal: number;
+  priorTotal: number;
+}) {
   const [open, setOpen] = useState(false);
   const gated = isThemeGated(theme);
 
@@ -389,10 +416,16 @@ function Tier2Row({ theme }: { theme: PulseTheme }) {
           <span style={{ fontSize: 12, color: PULSE_COLORS.mutedDim, fontFeatureSettings: '"tnum"' }}>
             {gated ? "—" : formatShare(theme.cur_share)}
           </span>
-          {/* Movement renders for ANY above-gate theme regardless of tier: these
-              four are only here because they fell outside the top 12 by rank, not
-              for want of data. Gated rows leave it blank (share carries the em dash). */}
-          <span>{gated ? null : <Movement theme={theme} />}</span>
+          {/* Movement renders for any theme above the HEADLINE gate regardless of
+              tier: these are here only because they fell outside the top 12 by
+              rank, not for want of data. Movement itself still applies the (finer)
+              two-month movement gate, so a thin clean window shows a qualitative
+              label. Headline-gated rows leave it blank (share carries the em dash). */}
+          <span>
+            {gated ? null : (
+              <Movement theme={theme} currentTotal={currentTotal} priorTotal={priorTotal} />
+            )}
+          </span>
         </span>
       </button>
       {open && <DrillDown theme={theme} />}
@@ -409,6 +442,13 @@ export default function ThemeList({ themes }: ThemeListProps) {
   const barMax = Math.max(1, ...ranked.map((t) => t.cur_pubs));
   const tier1 = ranked.slice(0, TIER_1_COUNT);
   const tier2 = ranked.slice(TIER_1_COUNT);
+
+  // Movement denominators — the clean-window totals every theme's share delta is
+  // measured against (computed once, not per row).
+  const movementCurrentDenominator = movementCurrentTotal(themes);
+  const movementPriorDenominator = movementPriorTotal(themes);
+  // Month labels for the caption, derived from the series (never hard-coded).
+  const windows = themes.length > 0 ? movementWindowLabels(themes[0].monthly) : null;
 
   const toggleTier1 = (name: string) =>
     setOpenTier1((prev) => {
@@ -434,10 +474,22 @@ export default function ThemeList({ themes }: ThemeListProps) {
       }}
     >
       <div style={sectionHeaderStyle}>Themes</div>
-      {/* Say what the numbers MEAN, not how they're computed. */}
+      {/* Counts and shares are the full current window; movement is measured
+          separately, on the clean months only. Name both windows and say why the
+          two months are excluded — this must match what actually renders. */}
       <div style={{ fontSize: 11.5, color: PULSE_COLORS.mutedDim, marginBottom: 14, lineHeight: 1.5 }}>
-        Research themes ranked by share of recent publication activity. Movement compares the
-        last 3 months against the prior 3.
+        Research themes ranked by share of the current window&rsquo;s publication activity; the
+        counts and shares shown use that window. Movement is measured separately — the change in
+        each theme&rsquo;s share of attention, in percentage points,{" "}
+        {windows ? (
+          <>
+            comparing {windows.current} against {windows.prior}. {windows.excludedTail} (a
+            backfill-recovery spike, and not theme-neutral) and {windows.excludedHead} (the
+            deflated tail of an ingest gap) are excluded from the movement math.
+          </>
+        ) : (
+          <>comparing the two most recent clean months against the prior two.</>
+        )}
       </div>
 
       <div
@@ -454,6 +506,8 @@ export default function ThemeList({ themes }: ThemeListProps) {
                 key={theme.name}
                 theme={theme}
                 barMax={barMax}
+                currentTotal={movementCurrentDenominator}
+                priorTotal={movementPriorDenominator}
                 open={openTier1.has(theme.name)}
                 onToggle={() => toggleTier1(theme.name)}
               />
@@ -479,7 +533,12 @@ export default function ThemeList({ themes }: ThemeListProps) {
           </div>
           <div>
             {tier2.map((theme) => (
-              <Tier2Row key={theme.name} theme={theme} />
+              <Tier2Row
+                key={theme.name}
+                theme={theme}
+                currentTotal={movementCurrentDenominator}
+                priorTotal={movementPriorDenominator}
+              />
             ))}
           </div>
         </div>
