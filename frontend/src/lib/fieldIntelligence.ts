@@ -47,6 +47,7 @@ export interface ForumThread {
   removed_count: number;
   context_note_count: number;
   is_primary: boolean;
+  created_at: string;
 }
 
 export interface PostNote {
@@ -119,6 +120,22 @@ export async function getForumIndex(): Promise<{ data: ForumIndexAnchor[] | null
     }))
     .sort((a, b) => (b.publication?.citation_count ?? 0) - (a.publication?.citation_count ?? 0));
   return { data: anchors, error: null };
+}
+
+// Which threads carry at least one moderation record. The forum board shows
+// moderation badges only where a record exists; every other thread shows the
+// drawn "NO MODERATION ON THIS THREAD" line (that line keeps card heights even).
+// Records with no thread_id (e.g. blocked_at_composer, never posted) are ignored.
+export async function getModeratedThreadIds(): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("field_intel_moderation_records")
+    .select("thread_id");
+  if (error || !data) return new Set<string>();
+  return new Set(
+    (data as { thread_id: string | null }[])
+      .map((r) => r.thread_id)
+      .filter((id): id is string => !!id),
+  );
 }
 
 export interface ThreadDetail {
