@@ -78,6 +78,28 @@ def fetch_established_cohort(conn, ta_id):
             JOIN hcps_v2 h ON h.id = cc.hcp_id
             WHERE cc.therapeutic_area_id = %s
               AND cc.cohort = 'established'
+              -- Industry/government filter, matching what rising already does. Admit only
+              -- ACADEMIC HCPs, plus GOVERNMENT HCPs at NCI / NIH -- those are engageable
+              -- trialists, not regulators, so they stay. Everything else (INDUSTRY, and
+              -- GOVERNMENT that is FDA/CDC/VA/DoD, plus UNKNOWN / unclassified) is dropped
+              -- from the cohort. matched_pattern carries the classifier's NCI/NIH regex
+              -- ('\bNational Cancer Institute\b' / '\bNational Institutes of Health\b'), so a
+              -- LIKE on the readable substring is the exemption. The classifier is stage 8e of
+              -- the reingest cycle and current for all HCPs.
+              AND EXISTS (
+                SELECT 1 FROM hcp_industry_classification_v1 ic
+                WHERE ic.hcp_id = cc.hcp_id
+                  AND (
+                    ic.classification = 'ACADEMIC'
+                    OR (
+                      ic.classification = 'GOVERNMENT'
+                      AND (
+                        ic.matched_pattern LIKE '%%National Cancer Institute%%'
+                        OR ic.matched_pattern LIKE '%%National Institutes of Health%%'
+                      )
+                    )
+                  )
+              )
             ORDER BY cc.hcp_id
             """,
             (ta_id,),

@@ -290,6 +290,42 @@ class EstablishedScoreRow:
 # ---------------------------------------------------------------------------
 
 
+def _admitted_industry_ids(client: Client, hcp_ids: List[str]) -> Set[str]:
+    """HCP ids the industry/government filter admits -- the SAME predicate that
+    recompute_established_ranks_v3.fetch_established_cohort() applies, so the score
+    table and the rank table agree on membership: classification='ACADEMIC', OR
+    classification='GOVERNMENT' whose matched_pattern is National Cancer Institute /
+    National Institutes of Health (engageable NCI/NIH trialists, kept deliberately).
+    Everything else -- INDUSTRY, FDA/CDC/VA/DoD, UNKNOWN/unclassified -- is excluded.
+
+    fetch_pages only supports eq filters and PostgREST cannot express the OR/LIKE
+    predicate cleanly across a paged scan, so this fetches the classification rows for
+    the established ids and applies the identical predicate in Python.
+    """
+    admitted: Set[str] = set()
+    chunk_size = 300
+    for start in range(0, len(hcp_ids), chunk_size):
+        chunk = hcp_ids[start : start + chunk_size]
+        resp = (
+            client.table("hcp_industry_classification_v1")
+            .select("hcp_id,classification,matched_pattern")
+            .in_("hcp_id", chunk)
+            .execute()
+        )
+        for r in resp.data or []:
+            cls = r.get("classification")
+            mp = r.get("matched_pattern") or ""
+            if cls == "ACADEMIC" or (
+                cls == "GOVERNMENT"
+                and (
+                    "National Cancer Institute" in mp
+                    or "National Institutes of Health" in mp
+                )
+            ):
+                admitted.add(str(r.get("hcp_id")))
+    return admitted
+
+
 def load_established_hcps(client: Client) -> List[Dict[str, Any]]:
     print("Loading established HCPs from hcps_v2...")
     rows = fetch_pages(
@@ -300,8 +336,16 @@ def load_established_hcps(client: Client) -> List[Dict[str, Any]]:
         order_column="id",
         filters=[("eq", "cohort_classification", "established")],
     )
-    print(f"  Loaded {len(rows)} established HCPs")
-    return rows
+    # Industry/government filter (same predicate as the rank script). NCI/NIH exempted.
+    ids = [str(r["id"]) for r in rows if r.get("id")]
+    admitted = _admitted_industry_ids(client, ids)
+    kept = [r for r in rows if str(r.get("id")) in admitted]
+    print(
+        f"  Loaded {len(rows)} established HCPs; kept {len(kept)} after the "
+        f"industry/government filter ({len(rows) - len(kept)} excluded: INDUSTRY, "
+        f"FDA/CDC/VA/DoD, UNKNOWN)"
+    )
+    return kept
 
 
 def load_publications(client: Client) -> List[Dict[str, Any]]:
