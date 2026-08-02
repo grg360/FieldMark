@@ -1,0 +1,329 @@
+tier,hcp_name,rank,institution,institution_city,proposed_npi,medicare_name,medicare_city,medicare_state,provider_type,resolved_from_n_onc,n_whole_file,years_present,gyn_onc_flag,city_match,first_name_jw,name_expansion,high_name_sim,industry_class,a2_reasons
+A1,Mark M. Awad,3,Dana-Farber Cancer Institute,Boston,1831359355,Mark Awad,New York,NY,Medical Oncology,1,22,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,D. Ross Camidge,4,University of Colorado Cancer Center,Aurora,1336239912,David Camidge,Aurora,CO,Medical Oncology,1,1,2021/2022/2023,,Y,0.76,Y,Y,ACADEMIC,
+A1,Alexander Drilon,7,Memorial Sloan Kettering Cancer Center,New York,1578876876,Alexander Edward Drilon,New York,NY,Medical Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Sai Yendamuri,49,Roswell Park Comprehensive Cancer Center,Buffalo,1396940995,Saikrishna Yendamuri,Buffalo,NY,Thoracic Surgery,1,1,2021/2022,,Y,0.84,Y,Y,ACADEMIC,
+A1,Paul K. Paik,52,Memorial Sloan Kettering Cancer Center,New York,1508023870,Paul Paik,New York,NY,Medical Oncology,1,5,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Vivek Verma,78,Allegheny General Hospital,Pittsburgh,1780926022,Vivek Verma,Pittsburgh,PA,Radiation Oncology,1,15,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Stephen G. Chun,121,The University of Texas MD Anderson Cancer Center,Houston,1659682656,Stephen Chun,Houston,TX,Radiation Oncology,1,17,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Apar Kishor Ganti,136,VA Nebraska Western Iowa Health Care System,Omaha,1124076997,Apar Kishor Ganti,Omaha,NE,Medical Oncology,1,3,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,F. Stephen Hodi,150,Dana-Farber Cancer Institute,Boston,1730156324,Frank Hodi,Boston,MA,Medical Oncology,1,1,2021/2022/2023,,Y,0.76,Y,Y,ACADEMIC,
+A1,Jorgé Nieva,167,University of Southern California,Los Angeles,1497717672,Jorge Nieva,Los Angeles,CA,Hematology-Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Millie Das,192,VA Palo Alto Health Care System,Palo Alto,1225182322,Millie Das,Palo Alto,CA,Medical Oncology,1,13,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,André L. Moreira,201,NYU Langone Health,New York,1174503973,Andre Moreira,New York,NY,Pathology,1,5,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Ben Creelan,206,Moffitt Cancer Center,Tampa,1326257262,Benjamin Creelan,Tampa,FL,Medical Oncology,1,1,2021/2022/2023,,Y,0.85,Y,Y,ACADEMIC,
+A1,César A. Moran,213,The University of Texas MD Anderson Cancer Center,Houston,1376639393,Cesar Moran,Houston,TX,Pathology,1,23,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Kai He,230,The Ohio State University,Columbus,1114245420,Kai He,Columbus,OH,Medical Oncology,1,2,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Renato Martins,280,University of Washington Medical Center,Seattle,1396821195,Renato Martins,Seattle,WA,Medical Oncology,1,4,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,M.C. Dobelbower,322,University of Alabama at Birmingham,Birmingham,1699874479,Michael Dobelbower,Birmingham,AL,Gynecological Oncology,1,1,2021/2022/2023,GYN,Y,0.74,Y,Y,ACADEMIC,
+A1,R. Taylor Ripley,337,Baylor College of Medicine,Houston,1154477784,Robert Ripley,Houston,TX,Thoracic Surgery,1,5,2021/2022/2023,,Y,0.75,Y,Y,ACADEMIC,
+A1,David Ross Camidge,439,University of Colorado Cancer Center,Aurora,1336239912,David Camidge,Aurora,CO,Medical Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Chris R. Kelsey,543,Duke Medical Center,Durham,1164552865,Christopher Kelsey,Durham,NC,Radiation Oncology,1,5,2021/2022/2023,,Y,0.89,,Y,ACADEMIC,
+A1,A. John Iafrate,581,Massachusetts General Hospital,Boston,1164403796,Anthony Iafrate,Boston,MA,Pathology,1,1,2021/2022/2023,,Y,0.74,Y,Y,ACADEMIC,
+A1,Jose M. Pacheco,654,University of Colorado Cancer Center,Aurora,1083935456,Jose Pacheco,Aurora,CO,Medical Oncology,1,8,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Bo Lü,670,Thomas Jefferson University,Philadelphia,1245314343,Bo Lu,Columbia,MO,Radiation Oncology,1,7,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,L. Jeffrey Medeiros,709,The University of Texas MD Anderson Cancer Center,Houston,1609979335,Leonard Medeiros,Houston,TX,Pathology,1,5,2021/2022/2023,,Y,0.74,Y,Y,ACADEMIC,
+A1,Martin Gutierrez,882,Hackensack University Medical Center,Hackensack,1558562793,Martin Gutierrez,Hackensack,NJ,Hematology-Oncology,1,35,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,John C. Morris,896,University of Cincinnati,Cincinnati,1407055700,John Morris,Cincinnati,OH,Medical Oncology,1,147,2021,,Y,1.00,Y,Y,ACADEMIC,
+A1,M. Bassetti,921,University of Wisconsin–Madison,Madison,1639332158,Michael Bassetti,Madison,WI,Radiation Oncology,1,1,2021/2022/2023,,Y,0.74,Y,Y,ACADEMIC,
+A1,Keisuke Shirai,944,Dartmouth–Hitchcock Medical Center,Lebanon,1992892905,Keisuke Shirai,Lebanon,NH,Hematology-Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Jean‐Nicolas Vauthey,1032,The University of Texas MD Anderson Cancer Center,Houston,1104912989,Jean Vauthey,Houston,TX,Surgical Oncology,1,1,2021/2022/2023,,Y,0.87,Y,Y,ACADEMIC,
+A1,William E. Carson,1085,The Ohio State University,Columbus,1528019841,William Carson,Columbus,OH,Surgical Oncology,1,6,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,F. Anthony Greco,1171,Sarah Cannon,Nashville,1497791602,Frank Greco,Nashville,TN,Medical Oncology,1,2,2021/2022/2023,,Y,0.76,Y,Y,ACADEMIC,
+A1,J.H. Heinzerling,1178,Levine Cancer Institute,Charlotte,1306045752,John Heinzerling,Charlotte,NC,Radiation Oncology,1,1,2021/2022/2023,,Y,0.78,Y,Y,ACADEMIC,
+A1,Melenda Jeter,1195,The University of Texas MD Anderson Cancer Center,Houston,1245339910,Melenda Jeter,Houston,TX,Radiation Oncology,1,6,2021/2022,,Y,1.00,Y,Y,ACADEMIC,
+A1,Ümit Tapan,1226,Boston Medical Center,Boston,1457581043,Umit Tapan,Boston,MA,Medical Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Anaís Malpica,1297,The University of Texas MD Anderson Cancer Center,Houston,1962596569,Anais Malpica,Houston,TX,Pathology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,J.C. Grecula,1368,The Ohio State University,Columbus,1871691592,John Grecula,Columbus,OH,Radiation Oncology,1,1,2021/2022/2023,,Y,0.78,Y,Y,ACADEMIC,
+A1,Helen J. Ross,1481,Mayo Clinic Hospital,Phoenix,1841282159,Helen Ross,Chicago,IL,Medical Oncology,1,21,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Hugh Auchincloss,1522,Massachusetts General Hospital,Boston,1003076522,Hugh Auchincloss,Boston,MA,Thoracic Surgery,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,G. Marwaha,1555,Rush University Medical Center,Chicago,1669798062,Gaurav Marwaha,Chicago,IL,Radiation Oncology,1,1,2021/2022/2023,,Y,0.75,Y,Y,ACADEMIC,
+A1,Erik P. Sulman,1644,NYU Langone Health,New York,1922261171,Erik Sulman,New York,NY,Radiation Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Kei Suzuki,1852,Inova Health System,Falls Church,1306004742,Kei Suzuki,Falls Church,VA,Thoracic Surgery,1,4,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Gabriel A. Brooks,1867,Dartmouth–Hitchcock Medical Center,Lebanon,1366598955,Gabriel Brooks,Lebanon,NH,Medical Oncology,1,15,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,G. Daniel Grass,1920,Moffitt Cancer Center,Tampa,1316350234,George Grass,Tampa,FL,Radiation Oncology,1,1,2021/2022/2023,,Y,0.75,Y,Y,ACADEMIC,
+A1,Hamid Mirshahidi,1972,Loma Linda University,Loma Linda,1659307015,Hamid Mirshahidi,Loma Linda,CA,Hematology-Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Emily Castellanos,1995,Flatiron Health (United States),New York,1528202579,Emily Castellanos,Philadelphia,PA,Medical Oncology,1,2,2021/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,N.M. Woody,2080,Cleveland Clinic,Cleveland,1891085809,Neil Woody,Cleveland,OH,Radiation Oncology,1,2,2021/2022/2023,,Y,0.78,Y,Y,ACADEMIC,
+A1,Jacques P. Fontaine,2152,Moffitt Cancer Center,Tampa,1205028867,Jacques-Pierre Fontaine,Tampa,FL,Thoracic Surgery,1,7,2021/2022/2023,,Y,0.90,,Y,ACADEMIC,
+A1,A. Chalmers,2231,University of Utah,Salt Lake City,1992025787,Anna Chalmers,Salt Lake City,UT,Hematology-Oncology,1,4,2021/2022/2023,,Y,0.78,Y,Y,ACADEMIC,
+A1,Jason C. Chandler,2232,West Cancer Center,Germantown,1295778330,Jason Chandler,Germantown,TN,Medical Oncology,1,36,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Sherin J. Rouhani,2313,University of Chicago,Chicago,1164879730,Sherin Rouhani,Boston,MA,Medical Oncology,1,2,2021/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,George Miller,2381,New York University,New York,1356549877,George Miller,New York,NY,Surgical Oncology,1,109,2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,Uroosa Ibrahim,2523,Staten Island University Hospital,New York,1235494204,Uroosa Ibrahim,New York,NY,Medical Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,M.M. Dominello,2536,The Barbara Ann Karmanos Cancer Institute,Detroit,1003135500,Michael Dominello,Detroit,MI,Radiation Oncology,1,1,2021/2022/2023,,Y,0.74,Y,Y,ACADEMIC,
+A1,Mark Stoopler,2561,NewYork–Presbyterian Hospital,New York,1295833937,Mark Stoopler,New York,NY,Medical Oncology,1,1,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,K Engelhardt,2609,Medical University of South Carolina,Charleston,1497199558,Kathryn Engelhardt,Charleston,SC,Thoracic Surgery,1,2,2022/2023,,Y,0.74,Y,Y,ACADEMIC,
+A1,John Holland,2775,Oregon Health & Science University,Portland,1104834662,John Holland,Portland,OR,Radiation Oncology,1,38,2021/2023,,Y,1.00,Y,Y,ACADEMIC,
+A1,A.O. Naghavi,2786,Moffitt Cancer Center,Tampa,1396002788,Arash Naghavi,Tampa,FL,Radiation Oncology,1,1,2021/2022/2023,,Y,0.76,Y,Y,ACADEMIC,
+A1,M. Soike,2838,University of Alabama at Birmingham,Birmingham,1912326695,Michael Soike,Birmingham,AL,Radiation Oncology,1,1,2021/2022/2023,,Y,0.74,Y,Y,ACADEMIC,
+A2,Daniel R. Gomez,9,Memorial Sloan Kettering Cancer Center,New York,1790944023,Daniel Gomez,Houston,TX,Radiation Oncology,1,25,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Patrick M. Forde,10,Bloomberg (United States),New York,1467733113,Patrick Forde,Baltimore,MD,Medical Oncology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Balázs Halmos,24,Albert Einstein College of Medicine,Bronx,1013933290,Balazs Halmos,Cleveland,OH,Medical Oncology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Sanja Đačić,41,University of Pittsburgh Medical Center,Pittsburgh,1497727002,Sanja Dacic,New Haven,CT,Pathology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Mizuki Nishino,53,Brigham and Women's Hospital,Boston,1689833014,Michiya Nishino,Boston,MA,Pathology,1,1,2021/2022/2023,,Y,0.71,,N,ACADEMIC,low_name_sim
+A2,Ping Yang,157,Mayo Clinic in Arizona,Scottsdale,1881846483,Peter Yang,Danvers,MA,Hematology-Oncology,1,26,2021/2022/2023,,N,0.54,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jonathan E. Dowell,218,Southwestern Medical Center,Lawton,1497724983,Jonathan Dowell,Dallas,TX,Hematology-Oncology,1,4,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Robert A. Ramirez,252,Ochsner Medical Center,New Orleans,1669665808,Robert Ramirez,Nashville,TN,Medical Oncology,1,58,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Weiwei Tan,292,Pfizer (United States),New York,1245229772,Winston Tan,Jacksonville,FL,Hematology-Oncology,1,16,2021/2022/2023,,N,0.59,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Bingliang Fang,293,The University of Texas MD Anderson Cancer Center,Houston,1982692851,Bruno Fang,East Brunswick,NJ,Medical Oncology,1,2,2021/2022/2023,,N,0.59,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Thomas Burke,293,"Merck & Co., Inc., Rahway, NJ, USA (United States)",Rahway,1346384211,Theodore Burke,Seattle,WA,Pathology,1,25,2021,,N,0.70,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Paul R. Walker,343,East Carolina University,Greenville,1750352233,Patrick Walker,Little Rock,AR,Pathology,1,36,2021/2022/2023,,N,0.71,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Richard S.P. Huang,345,Foundation Medicine (United States),Cambridge,1831159029,Ruoqing Huang,Brooklyn,NY,Pathology,1,25,2021/2022/2023,,N,0.54,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Vincent A. Miller,350,Foundation Medicine (United States),Cambridge,1528403722,Virginia Miller,Huntington,WV,Pathology,1,33,2021/2022/2023,,N,0.72,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Félix G. Fernández,365,Emory University,Atlanta,1326173915,Felix Fernandez,Saint Louis,MO,Thoracic Surgery,1,10,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Janakiraman Subramanian,387,Saint Luke's Hospital,Kansas City,1366589343,Janakiraman Subramanian,Fairfax,VA,Medical Oncology,1,3,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,W. Jeffrey Petty,390,Wake Forest University,Winston-Salem,1164406690,William Petty,Winston Salem,NC,Hematology-Oncology,1,4,2021/2022/2023,,N,0.74,Y,Y,ACADEMIC,city_mismatch
+A2,George R. Simon,444,The University of Texas MD Anderson Cancer Center,Houston,1164438768,George Simon,Celebration,FL,Medical Oncology,1,13,2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Mien‐Chie Hung,454,The University of Texas MD Anderson Cancer Center,Houston,1043715352,Ming-Yang Hung,Omaha,NE,Radiation Oncology,1,5,2023,,N,0.64,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Alice H. Berger,497,Fred Hutch Cancer Center,Seattle,1073533394,Adam Berger,New Brunswick,NJ,Surgical Oncology,1,36,2021/2022/2023,,N,0.54,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Guanghua Xiao,518,Southwestern Medical Center,Lawton,1962416750,Guang-Qian Xiao,Los Angeles,CA,Pathology,1,3,2021/2022/2023,,N,0.87,,Y,ACADEMIC,city_mismatch
+A2,Qiuling Shi,545,The University of Texas MD Anderson Cancer Center,Houston,1699918615,Qiuying Shi,Portland,OR,Pathology,1,4,2021/2022/2023,,N,0.93,,Y,ACADEMIC,city_mismatch
+A2,Fugen Li,580,Dana-Farber Cancer Institute,Boston,1053340117,Faqian Li,San Antonio,TX,Pathology,1,12,2021/2022/2023,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Michael A. White,582,Southwestern Medical Center,Lawton,1780027375,Marissa White,Baltimore,MD,Pathology,1,179,2021/2022/2023,,N,0.66,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Vivek Mittal,587,Cornell University,Ithaca,1992742084,Vimal Mittal,Inverness,FL,Pathology,1,8,2021/2022/2023,,N,0.68,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Mary E. Reid,594,Roswell Park Comprehensive Cancer Center,Buffalo,1821180811,Michelle Reid,Atlanta,GA,Pathology,1,43,2021/2022/2023,,N,0.57,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Robert M. Hoffman,603,University of California San Diego,San Diego,1740214154,Robert Hoffman,Nashville,TN,Pathology,1,45,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,András Khoór,629,WinnMed,Decorah,1043200967,Andras Khoor,Jacksonville,FL,Pathology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Priti S. Hegde,629,Foundation Medicine (United States),Cambridge,1386640589,Poornima Hegde,Farmington,CT,Pathology,1,4,2021/2022/2023,,N,0.69,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Michael A. Davies,664,The University of Texas MD Anderson Cancer Center,Houston,1285797753,Megan Davies,Anchorage,AK,Pathology,1,18,2021/2022,,N,0.61,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Anh T. Le,729,University of Colorado Anschutz Medical Campus,Aurora,1184982100,Anh-Thu Le,Springfield,MO,Thoracic Surgery,1,50,2022/2023,,N,0.87,,Y,ACADEMIC,city_mismatch
+A2,Lawrence H. Schwartz,751,Columbia University Irving Medical Center,New York,1346402641,Lauren Schwartz,Philadelphia,PA,Pathology,1,38,2021/2022/2023,,N,0.86,,Y,ACADEMIC,city_mismatch
+A2,Yan Yan,759,Washington University in St. Louis,St Louis,1710279849,Yiyi Yan,Jacksonville,FL,Hematology-Oncology,1,6,2021/2022/2023,,N,0.57,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Dawen Zhao,790,Wake Forest University,Winston-Salem,1306257472,Dan Zhao,Houston,TX,Hematology-Oncology,1,13,2021/2022/2023,,N,0.75,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Deric L. Wheeler,819,University of Wisconsin–Madison,Madison,1487661161,Darren Wheeler,Las Vegas,NV,Pathology,1,29,2021,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,R. Donald Harvey,846,Emory University,Atlanta,1093758104,Richard Harvey,Macon,GA,Thoracic Surgery,1,34,2021/2022/2023,,N,0.74,Y,Y,ACADEMIC,city_mismatch
+A2,Marie Christine Aubry,854,Mayo Clinic in Arizona,Scottsdale,1730169947,Marie Christine Aubry,Rochester,MN,Pathology,1,2,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,C. Matthew Kinsey,866,University of Vermont,Burlington,1831480771,Conan Kinsey,Salt Lake City,UT,Medical Oncology,1,6,2021/2022/2023,,N,0.76,Y,Y,ACADEMIC,city_mismatch
+A2,Jianxin Shi,872,National Cancer Institute,Bethesda,1245541457,Jiaqi Shi,Ann Arbor,MI,Pathology,1,7,2021/2022/2023,,N,0.85,,Y,GOVERNMENT,city_mismatch;industry_gov
+A2,Wei Zhou,887,Emory University,Atlanta,1952694838,Wendi Zhou,Phoenix,AZ,Pathology,1,9,2021/2022/2023,,N,0.75,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Chung Yin Kong,891,Icahn School of Medicine at Mount Sinai,New York,1538212337,Christina Kong,Stanford,CA,Pathology,1,6,2021/2022/2023,,N,0.70,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Timothy Craig Allen,902,University of Mississippi Medical Center,Jackson,1417945932,Timothy Allen,Galveston,TX,Pathology,1,69,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Diane Tseng,926,Stanford University,Stanford,1164862785,Diane Tseng,Seattle,WA,Medical Oncology,1,4,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,K. G. Mitchell,932,The University of Texas MD Anderson Cancer Center,Houston,1225233760,Katrina Mitchell,Santa Barbara,CA,Surgical Oncology,1,104,2021/2022/2023,,N,0.74,Y,Y,ACADEMIC,city_mismatch
+A2,Catríona M. Dowling,934,NYU Langone Health,New York,1710059316,Christopher Dowling,Lexington,MA,Pathology,1,7,2021/2022,,N,0.63,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Eric L. Snyder,963,University of Utah,Salt Lake City,1659354561,Edward Snyder,New Haven,CT,Pathology,1,33,2021/2022/2023,,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Bin S. Teh,977,Methodist Hospital,Indianapolis,1164414439,Bin Teh,Houston,TX,Radiation Oncology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Weibo Cai,998,University of Wisconsin–Madison,Madison,1790749935,Wayne Cai,Delray Beach,FL,Pathology,1,2,2021/2022/2023,,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Kartik Konduri,1025,Texas Oncology,Oklahoma City,1417995499,Kartik Konduri,Dallas,TX,Medical Oncology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Waun Ki Hong,1045,The University of Texas MD Anderson Cancer Center,Houston,1861625899,Wei Hong,Holmdel,NJ,Pathology,1,6,2021/2022/2023,,N,0.57,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jeroen P. Jansen,1049,UCSF Helen Diller Family Comprehensive Cancer Center,San Francisco,1336148782,John Jansen,Lexington,KY,Pathology,1,17,2021/2022/2023,,N,0.78,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,G. Alexander Patterson,1052,Washington University in St. Louis,St Louis,1154347375,George Patterson,Saint Louis,MO,Thoracic Surgery,1,13,2021/2022/2023,,N,0.75,Y,Y,ACADEMIC,city_mismatch
+A2,Eric Schaefer,1075,Highlands Oncology Group,,1558325118,Eric Schaefer,Fayetteville,AR,Hematology-Oncology,1,16,2021/2022/2023,,,1.00,Y,Y,ACADEMIC,no_inst_city
+A2,Ming You,1079,Medical College of Wisconsin,Milwaukee,1659353845,Mingjian You,Houston,TX,Pathology,1,3,2021/2022/2023,,N,0.90,Y,Y,ACADEMIC,city_mismatch
+A2,Feng Li,1095,Auburn University,Auburn,1053340117,Faqian Li,San Antonio,TX,Pathology,1,12,2021/2022/2023,,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Douglas R. Spitz,1101,University of Iowa,Iowa City,1134125214,Daniel Spitz,West Palm Beach,FL,Medical Oncology,1,4,2021/2022/2023,,N,0.59,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Joseph A. Greer,1106,Harvard University,Cambridge,1194985614,Jonathan Greer,Boston,MA,Surgical Oncology,1,32,2021/2022/2023,,N,0.73,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Stephen A. Rosenberg,1112,Moffitt Cancer Center,Tampa,1932441656,Stephen Rosenberg,Madison,WI,Radiation Oncology,1,35,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Hiran C. Fernando,1123,Virginia Commonwealth University,Richmond,1629023809,Hiran Fernando,Pittsburgh,PA,Thoracic Surgery,1,3,2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Eileen White,1134,"Rutgers, The State University of New Jersey",New Brunswick,1063701407,Evan White,Chula Vista,CA,Radiation Oncology,1,75,2021/2022/2023,,N,0.65,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jun Yan,1166,University of Louisville,Louisville,1427413954,Jie Yan,Detroit,MI,Pathology,1,19,2021/2022/2023,,N,0.60,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Li Su,1180,Harvard University,Cambridge,1245483601,Leon Su,Scottsdale,AZ,Pathology,1,7,2022/2023,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Luis A. Díaz,1189,Memorial Sloan Kettering Cancer Center,New York,1689601460,Luis Diaz,Baltimore,MD,Medical Oncology,1,28,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Nicholas Iannotti,1192,Hematology Oncology Associates,,1154360642,Nicholas Iannotti,Port St Lucie,FL,Hematology-Oncology,1,1,2021/2022/2023,,,1.00,Y,Y,ACADEMIC,no_inst_city
+A2,Li Ding,1212,James S. McDonnell Foundation,St Louis,1568666535,Li Ding,Ypsilanti,MI,Hematology-Oncology,1,10,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Mao Mao,1212,Pfizer (United States),New York,1245594498,Melissa Mao,Orange,CA,Surgical Oncology,1,3,2021/2022/2023,,N,0.54,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Eric H. Rubin,1241,"Merck & Co., Inc., Rahway, NJ, USA (United States)",Rahway,1730154485,Erin Rubin,Houston,TX,Pathology,1,24,2021/2022/2023,,N,0.88,,Y,INDUSTRY,city_mismatch;industry_gov
+A2,Xin Hu,1247,The University of Texas MD Anderson Cancer Center,Houston,1306342480,Xiaobang Hu,Hershey,PA,Pathology,1,13,2023,,N,0.71,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Niamh Coleman,1274,The University of Texas MD Anderson Cancer Center,Houston,1598951303,Neil Coleman,Knoxville,TN,Pathology,1,15,2021/2022/2023,,N,0.67,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Xiaoming Cui,1312,Novartis (United States),New York,1841580743,Xiaoyan Cui,Phoenix,AZ,Pathology,1,1,2021/2022/2023,,N,0.87,,Y,INDUSTRY,city_mismatch;industry_gov
+A2,Karen Kane McDonnell,1335,University of South Carolina,Columbia,1932343316,Kevin Mcdonnell,Duarte,CA,Medical Genetics and Genomics,1,15,2021/2022/2023,,N,0.67,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Alexander R.A. Anderson,1338,Moffitt Cancer Center,Tampa,1154492247,Ann Anderson,New Hyde Park,NY,Pathology,1,223,2021/2022/2023,,N,0.67,Y,Y,ACADEMIC,city_mismatch
+A2,Kamran Mahmood,1351,Duke University,Durham,1164464152,Khalid Mahmood,Webster,TX,Medical Oncology,1,7,2021/2022/2023,,N,0.60,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Eric D. Brooks,1360,The University of Texas MD Anderson Cancer Center,Houston,1447645577,Eric Brooks,Clearwater,FL,Radiation Oncology,1,29,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,John D. Haley,1367,Stony Brook University,Stony Brook,1841344298,Johnny Haley,Palestine,TX,Pathology,1,11,2021,,N,0.93,,Y,ACADEMIC,city_mismatch
+A2,Ivo Abraham,1431,University of Arizona,Tucson,1497172845,Ivy Abraham,Chicago,IL,Hematology-Oncology,1,4,2021/2022/2023,,N,0.82,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Stacy W. Gray,1435,City of Hope,Lancaster,1184736225,Stacy Gray,Duarte,CA,Medical Genetics and Genomics,1,65,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Anthony L. Asher,1444,Carolinas Healthcare System,,1871569400,Alain Asher,Kingman,AZ,Thoracic Surgery,1,14,2021/2022,,,0.61,,N,ACADEMIC,low_name_sim;no_inst_city
+A2,Zhaoxia Qu,1463,University of Pittsburgh,Pittsburgh,1720032907,Zhenhong Qu,Royal Oak,MI,Pathology,1,1,2021/2022/2023,,N,0.68,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,David J. Sher,1482,The University of Texas Southwestern Medical Center,Dallas,1326028648,David Sher,Boston,MA,Radiation Oncology,1,2,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Harrison X. Bai,1494,Johns Hopkins University,Baltimore,1073629937,Hongwei Bai,Worcester,MA,Pathology,1,3,2021/2022/2023,,N,0.56,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Ryan D. Roberts,1499,Nationwide Children's Hospital,Columbus,1235398637,Richard Roberts,Memphis,TN,Pathology,1,75,2021/2022/2023,,N,0.68,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Albert Attia,1501,Vanderbilt University,Nashville,1205008349,Albert Attia,Jacksonville,FL,Radiation Oncology,1,8,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Fei Yang,1523,The University of Texas MD Anderson Cancer Center,Houston,1821052069,Farley Yang,Scottsdale,AZ,Radiation Oncology,1,9,2021/2022/2023,,N,0.55,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Michael J. Guarino,1541,Christiana Care Health System,Wilmington,1316916349,Michael Guarino,Newark,DE,Medical Oncology,1,6,2021,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,A. William Blackstock,1542,Atrium Health Wake Forest Baptist,Winston-Salem,1356323307,Arthur Blackstock,Winston Salem,NC,Radiation Oncology,1,2,2021/2022/2023,,N,0.75,Y,Y,ACADEMIC,city_mismatch
+A2,Elsa R. Flores,1553,Moffitt Cancer Center,Tampa,1396994604,Edna Flores,La Jolla,CA,Hematology-Oncology,1,27,2021/2022/2023,,N,0.70,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Zhongwu Lai,1574,AstraZeneca (United States),Wilmington,1073962684,Zongshan Lai,Detroit,MI,Pathology,1,1,2022/2023,,N,0.72,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Gutian Xiao,1577,University of Pittsburgh,Pittsburgh,1962416750,Guang-Qian Xiao,Los Angeles,CA,Pathology,1,3,2021/2022/2023,,N,0.74,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Christine Garcia,1583,Cornell University,Ithaca,1942216890,Carlos Garcia,Everett,WA,Thoracic Surgery,1,86,2021/2022/2023,,N,0.65,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Xingzhi Song,1590,The University of Texas MD Anderson Cancer Center,Houston,1902002249,Xianyuan Song,Hartford,CT,Pathology,1,6,2021/2022/2023,,N,0.68,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Marcin Imieliński,1607,New York Genome Center,New York,1912167438,Marcin Imielinski,Boston,MA,Pathology,1,1,2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Stephen Abel,1617,Allegheny Health Network,Pittsburgh,1033642319,Stephen Abel,Clarion,PA,Radiation Oncology,1,8,2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Jennifer Beane,1647,Boston University,Boston,1881913259,Joal Beane,Columbus,OH,Surgical Oncology,1,7,2021/2022/2023,,N,0.51,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Bin Zhu,1651,National Cancer Institute,Kyiv,1942466727,Bing Zhu,Hammond,IN,Pathology,1,3,2021/2022/2023,,N,0.94,Y,Y,GOVERNMENT,city_mismatch;industry_gov
+A2,Ranjan Pathak,1657,City of Hope,Lancaster,1770924102,Ranjan Pathak,Chico,CA,Medical Oncology,1,12,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Van K. Morris,1673,The University of Texas MD Anderson Cancer Center,Houston,1134396534,Van Morris,Durham,NC,Hematology-Oncology,1,7,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Xiaohan Hu,1681,"Merck & Co., Inc., Rahway, NJ, USA (United States)",Rahway,1306342480,Xiaobang Hu,Hershey,PA,Pathology,1,13,2023,,N,0.92,,Y,INDUSTRY,city_mismatch;industry_gov
+A2,Qin Qin,1686,AbbVie (United States),North Chicago,1366822660,Qian Qin,Dallas,TX,Medical Oncology,1,1,2021/2022/2023,,N,0.93,,Y,INDUSTRY,city_mismatch;industry_gov
+A2,R. Stephanie Huang,1717,University of Minnesota,Minneapolis,1831159029,Ruoqing Huang,Brooklyn,NY,Pathology,1,25,2021/2022/2023,,N,0.74,Y,Y,ACADEMIC,city_mismatch
+A2,Jianzhong He,1725,The University of Texas MD Anderson Cancer Center,Houston,1336427491,Jing He,Galveston,TX,Pathology,1,18,2021/2022/2023,,N,0.76,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Brett H. Herzog,1758,Washington University in St. Louis,St Louis,1023499282,Brett Herzog,Shiloh,IL,Medical Oncology,1,2,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Aaron M. Newman,1771,California Institute for Regenerative Medicine,San Francisco,1831141548,Alfred Newman,Matthews,NC,Hematology-Oncology,1,44,2021/2022/2023,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jian‐Yue Jin,1785,University Hospitals Seidman Cancer Center,Cleveland,1215900311,James Jin,South Bend,IN,Hematology-Oncology,1,17,2021/2022/2023,,N,0.59,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Robert G. Maki,1792,Cold Spring Harbor Laboratory,Cold Spring Harbor,1538130323,Robert Maki,Philadelphia,PA,Medical Oncology,1,2,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,S. Harrison,1803,Cornell University,Ithaca,1568676344,Sebron Harrison,New York,NY,Thoracic Surgery,1,41,2022/2023,,N,0.75,Y,Y,ACADEMIC,city_mismatch
+A2,Tien Hoang,1843,Kaiser Permanente South San Francisco Medical Center,South San Francisco,1730143975,Thomas Hoang,Texarkana,TX,Thoracic Surgery,1,38,2021/2022/2023,,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Peiying Yang,1856,The University of Texas MD Anderson Cancer Center,Houston,1881846483,Peter Yang,Danvers,MA,Hematology-Oncology,1,26,2021/2022/2023,,N,0.65,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Priyam Banerjee,1865,The University of Texas MD Anderson Cancer Center,Houston,1164497855,Pushpendu Banerjee,La Jolla,CA,Medical Oncology,1,4,2021/2022/2023,,N,0.48,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,John Quackenbush,1882,Brigham and Women's Hospital,Boston,1639151921,Jeffrey Quackenbush,Valparaiso,IN,Radiation Oncology,1,4,2021/2022/2023,,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Joseph P. Eder,1885,Yale University,New Haven,1043233497,Joseph Eder,Boston,MA,Medical Oncology,1,2,2021/2022,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Ximing Tang,1888,The University of Texas MD Anderson Cancer Center,Houston,1508250564,Xiaoyu Tang,Valhalla,NY,Pathology,1,8,2021/2022/2023,,N,0.64,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Martin A. Nowak,1915,Harvard University,Cambridge,1972570323,Michael Nowak,Palm Beach Gardens,FL,Pathology,1,14,2021/2022/2023,,N,0.54,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Paweł K. Mazur,1924,The University of Texas MD Anderson Cancer Center,Houston,1366641375,Paul Mazur,Las Vegas,NV,Thoracic Surgery,1,4,2021/2023,,N,0.71,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Chan Shen,1941,Pennsylvania State University,State College,1679830699,Colette Shen,Chapel Hill,NC,Radiation Oncology,1,10,2021/2022/2023,,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Michael McCleod,1969,Sarah Cannon,Nashville,1316920259,Michael Mccleod,Fort Myers,FL,Hematology-Oncology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Junqin He,1971,The University of Texas MD Anderson Cancer Center,Houston,1336427491,Jing He,Galveston,TX,Pathology,1,18,2021/2022/2023,,N,0.65,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jeffrey S. Weber,1978,NYU Langone Health,New York,1053348706,Jeffrey Weber,Tampa,FL,Medical Oncology,1,80,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Geoffrey J. Markowitz,1979,Cornell University,Ithaca,1457488736,Glen Markowitz,New York,NY,Pathology,1,3,2022/2023,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Anand A. Dalal,1991,Novartis (United States),New York,1801857966,Ashish Dalal,Melbourne,FL,Hematology-Oncology,1,16,2021/2022/2023,,N,0.51,Y,Y,INDUSTRY,city_mismatch;industry_gov
+A2,Mike Hernández,2001,The University of Texas MD Anderson Cancer Center,Houston,1902177074,Marcia Hernandez,Camden,NJ,Gynecological Oncology,1,97,2021/2022/2023,GYN,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,David Sternberg,2004,Daiichi Sankyo (United States),Parsippany,1306002266,David Sternberg,Detroit,MI,Thoracic Surgery,1,4,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Linlin Guo,2040,City Of Hope National Medical Center,Duarte,1346516234,Ling Guo,Columbus,OH,Pathology,1,9,2021/2022/2023,,N,0.82,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Lei Jiang,2046,Moderna Therapeutics (United States),Cambridge,1356501175,Liuyan Jiang,Jacksonville,FL,Pathology,1,14,2021/2022/2023,,N,0.70,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Jennifer G. Whisenant,2056,Vanderbilt University Medical Center,Nashville,1861441974,Jonathan Whisenant,Salt Lake City,UT,Hematology-Oncology,1,3,2021/2022/2023,,N,0.60,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Junghui Koo,2068,Emory University,Atlanta,1780027763,Jamie Koo,Dallas,TX,Pathology,1,19,2021/2022/2023,,N,0.50,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jason W.D. Hearn,2074,University of Michigan–Ann Arbor,,1437475274,Jason Hearn,Ann Arbor,MI,Radiation Oncology,1,7,2021/2022/2023,,,1.00,Y,Y,ACADEMIC,no_inst_city
+A2,Feng Gao,2088,Washington University in St. Louis,St Louis,1326204561,Faye Gao,Rockville,MD,Pathology,1,2,2021/2022/2023,,N,0.55,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Steven D. Shapiro,2089,University of Southern California,Los Angeles,1285694133,Susan Shapiro,Toledo,OH,Pathology,1,39,2021/2022/2023,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Alan Mitchell,2096,Cancer Research And Biostatistics,Seattle,1437423290,Aaron Mitchell,New York,NY,Medical Oncology,1,89,2021/2022/2023,,N,0.80,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jun S. Wei,2115,Center for Cancer Research,Bethesda,1649264813,Jian-Jun Wei,New York,NY,Pathology,1,26,2021/2022/2023,,N,0.67,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Junjia Zhu,2137,Pennsylvania State University,State College,1992047203,Jiang Zhu,Charlotte,NC,Medical Oncology,1,24,2021/2022/2023,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Tim J. Kruser,2150,Northwestern Memorial Hospital,Chicago,1053576926,Timothy Kruser,Madison,WI,Radiation Oncology,1,1,2021/2022/2023,,N,0.87,,Y,ACADEMIC,city_mismatch
+A2,Junjie Zhu,2169,University of Pittsburgh,Pittsburgh,1992047203,Jiang Zhu,Charlotte,NC,Medical Oncology,1,24,2021/2022/2023,,N,0.62,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Guoping Cai,2170,Yale University,New Haven,1356385884,Guoping Cai,Pittsburgh,PA,Pathology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,George J. Netto,2225,University of Alabama at Birmingham,Birmingham,1063464287,Georges Netto,Philadelphia,PA,Pathology,1,1,2021/2022/2023,,N,0.97,,Y,ACADEMIC,city_mismatch
+A2,Shawn J. Rice,2230,Penn State Milton S. Hershey Medical Center,Hershey,1346668225,Stephanie Rice,Flagstaff,AZ,Radiation Oncology,1,49,2021/2022/2023,,N,0.77,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Joyce Liang,2251,Massachusetts General Hospital,Boston,1487788808,John Liang,Washington,DC,Pathology,1,25,2021/2022/2023,,N,0.71,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Uma Giri,2273,The University of Texas MD Anderson Cancer Center,Houston,1215324363,Upama Giri,Fairfax,VA,Hematology-Oncology,1,1,2021/2022/2023,,N,0.72,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Gebra Cuyún Carter,2303,Eli Lilly (United States),Indianapolis,1578535050,Gloria Carter,Pittsburgh,PA,Pathology,1,13,2021/2022/2023,,N,0.73,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Hongkai Ji,2322,Johns Hopkins University,Baltimore,1659328813,Hongxiu Ji,Bellevue,WA,Pathology,1,7,2021/2022/2023,,N,0.89,,Y,ACADEMIC,city_mismatch
+A2,Feng Li,2326,The Ohio State University Wexner Medical Center,Columbus,1053340117,Faqian Li,San Antonio,TX,Pathology,1,12,2021/2022/2023,,N,0.52,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Guojing Zhang,2331,Emory University,Atlanta,1326302597,Gloria Zhang,Cleveland,OH,Pathology,1,8,2021/2022/2023,,N,0.68,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Lauren Young,2335,Foundation Medicine (United States),Cambridge,1366948440,Lena Young,North Chesterfield,VA,Pathology,1,83,2023,,N,0.65,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,T.B. Daniels,2344,Mayo Clinic in Florida,Jacksonville,1700863875,Thomas Daniels,Brooklyn,NY,Radiation Oncology,1,18,2021/2022/2023,,N,0.75,Y,Y,ACADEMIC,city_mismatch
+A2,Kelly Bell,2379,GlaxoSmithKline (United States),Philadelphia,1790712487,Karen Bell,Abington,PA,Pathology,1,62,2021/2022/2023,,N,0.52,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Anna E. Barón,2385,Colorado School of Public Health,Aurora,1013086420,Ari Baron,San Francisco,CA,Hematology-Oncology,1,10,2021/2022/2023,,N,0.57,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Steven I. Blum,2389,Bristol-Myers Squibb (United States),New York,1447632823,Steven Blum,Boston,MA,Medical Oncology,1,12,2023,,N,1.00,Y,Y,INDUSTRY,city_mismatch;industry_gov
+A2,Bin Fang,2400,Moffitt Cancer Center,Tampa,1982692851,Bruno Fang,East Brunswick,NJ,Medical Oncology,1,2,2021/2022/2023,,N,0.72,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Craig S. Meyer,2402,Johnson & Johnson (United States),New Brunswick,1104972835,Christian Meyer,Baltimore,MD,Medical Oncology,1,64,2021/2022/2023,,N,0.70,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Jianfei Qi,2403,"University of Maryland, Baltimore",Baltimore,1407961741,Jiafan Qi,Farmington,CT,Pathology,1,3,2021/2022/2023,,N,0.85,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Wei Zhou,2416,"Merck & Co., Inc., Rahway, NJ, USA (United States)",Rahway,1952694838,Wendi Zhou,Phoenix,AZ,Pathology,1,9,2021/2022/2023,,N,0.75,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Maria Teresa Rizzo,2426,Eli Lilly (United States),Indianapolis,1114949237,Monica Rizzo,Atlanta,GA,Surgical Oncology,1,9,2021/2022/2023,,N,0.73,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Stephanie S. Yee,2478,University of Pennsylvania,Philadelphia,1528078185,Stephen Yee,Oakland,CA,Hematology-Oncology,1,23,2021/2022,,N,0.93,Y,Y,ACADEMIC,city_mismatch
+A2,Younghun Han,2512,Baylor College of Medicine,Houston,1417012576,Yusheng Han,Philadelphia,PA,Pathology,1,12,2022/2023,,N,0.71,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Lü Tian,2552,Stanford University,Stanford,1326379249,Ligeng Tian,Newport News,VA,Hematology-Oncology,1,4,2021/2022/2023,,N,0.60,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,W. Thomas Purcell,2572,University of Colorado Denver,Denver,1336187236,William Purcell,Seattle,WA,Hematology-Oncology,1,1,2021/2022/2023,,N,0.74,Y,Y,ACADEMIC,city_mismatch
+A2,Fangxin Hong,2578,Dana-Farber Cancer Institute,Boston,1366436198,Frederick Hong,Williamsville,NY,Hematology-Oncology,1,2,2021/2022/2023,,N,0.55,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jingsheng Yan,2579,The University of Texas Southwestern Medical Center,Dallas,1427413954,Jie Yan,Detroit,MI,Pathology,1,19,2021/2022/2023,,N,0.70,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Rong Lü,2610,The University of Texas Southwestern Medical Center,Dallas,1558575738,Rommel Lu,Raleigh,NC,Hematology-Oncology,1,8,2021/2022/2023,,N,0.69,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Yingjun Yan,2627,Vanderbilt University Medical Center,Nashville,1710279849,Yiyi Yan,Jacksonville,FL,Hematology-Oncology,1,6,2021/2022/2023,,N,0.68,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Andrea B. McKee,2636,Lahey Medical Center,Peabody,1902990435,Andrea Mckee,Burlington,MA,Radiation Oncology,1,13,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Randolph S. Marks,2637,Mayo Clinic in Arizona,Scottsdale,1952389611,Randolph Marks,Rochester,MN,Medical Oncology,1,12,2021/2022,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Edward E. Graves,2642,Stanford University,Stanford,1396826129,Edith Graves,Opelika,AL,Hematology-Oncology,1,9,2021/2022/2023,,N,0.66,Y,Y,ACADEMIC,city_mismatch
+A2,Fangyong Li,2662,Yale University,New Haven,1053340117,Faqian Li,San Antonio,TX,Pathology,1,12,2021/2022/2023,,N,0.70,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Benjamin Wu,2679,BioClinica (United States),Doylestown,1043339294,Bryan Wu,Medford,OR,Pathology,1,20,2021/2022/2023,,N,0.59,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jiang Bian,2696,University of Florida Health,Gainesville,1821435140,Jessica Bian,South Portland,ME,Medical Oncology,1,2,2021/2022/2023,,N,0.50,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jaeil Ahn,2709,Georgetown University,Washington,1851633911,Janice Ahn,Pittsburgh,PA,Pathology,1,37,2021/2022/2023,,N,0.76,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Mark A. Watson,2716,Washington University in St. Louis,St Louis,1689661555,Michael Watson,Lebanon,PA,Radiation Oncology,1,80,2021/2022/2023,,N,0.59,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Min Tan,2721,Ithaka Harbors,New York,1467518266,Marcus Tan,Nashville,TN,Surgical Oncology,1,31,2021/2022/2023,,N,0.55,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Jiangong Niu,2736,The University of Texas MD Anderson Cancer Center,Houston,1275704892,Jiaxin Niu,Gilbert,AZ,Hematology-Oncology,1,1,2021/2022/2023,,N,0.81,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Ruping Shao,2738,The University of Texas MD Anderson Cancer Center,Houston,1649406190,Ryan Shao,Bristol,VA,Hematology-Oncology,1,1,2021/2022/2023,,N,0.65,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Lei Xuan,2741,The University of Texas Southwestern Medical Center,Dallas,1609808831,Linli Xuan,Olympia,WA,Hematology-Oncology,1,1,2021/2022/2023,,N,0.72,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,George Z. Cheng,2774,University of California System,Oakland,1750437745,George Cheng,Santa Barbara,CA,Radiation Oncology,1,15,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Stephanie G. Worrell,2785,University Hospitals of Cleveland,Cleveland,1851685523,Stephanie Worrell,Tucson,AZ,Thoracic Surgery,1,5,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,W. Burrows,2795,"University of Maryland, Baltimore",Baltimore,1205840444,Whitney Burrows,Philadelphia,PA,Thoracic Surgery,1,3,2021/2023,,N,0.74,Y,Y,ACADEMIC,city_mismatch
+A2,Minghui Zhao,2805,Yale University,New Haven,1083848337,Meng Zhao,Everett,WA,Hematology-Oncology,1,8,2021/2022/2023,,N,0.75,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Nathan P. Ward,2810,Moffitt Cancer Center,Tampa,1063854719,Nicholas Ward,New York City,NY,Pathology,1,15,2021/2022/2023,,N,0.66,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Sandhya Prabhakaran,2812,Moffitt Cancer Center,Tampa,1972766160,Sangeetha Prabhakaran,Albuquerque,NM,Surgical Oncology,1,6,2021/2022/2023,,N,0.83,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Gangqing Hu,2817,West Virginia University,Morgantown,1154417434,Guiying Hu,Houston,TX,Hematology-Oncology,1,3,2021,,N,0.61,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Mariya Farooqui,2826,University of Minnesota,Minneapolis,1245200070,Masih Farooqui,Springfield,MA,Hematology-Oncology,1,7,2021/2022/2023,,N,0.76,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Andrew B. Nixon,2845,Duke Medical Center,Durham,1730285172,Asa Nixon,Dover,NH,Radiation Oncology,1,8,2021/2022/2023,,N,0.55,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,William F. Hartsell,2857,Northwestern Medicine,Chicago,1770574881,William Hartsell,Warrenville,IL,Radiation Oncology,1,1,2021/2022/2023,,N,1.00,Y,Y,ACADEMIC,city_mismatch
+A2,Xiaoyang Su,2865,"Rutgers, The State University of New Jersey",New Brunswick,1659505774,Xiao Su,Saratoga Springs,NY,Hematology-Oncology,1,3,2021/2022/2023,,N,0.90,Y,Y,ACADEMIC,city_mismatch
+A2,Debabrata Saha,2872,The University of Texas Southwestern Medical Center,Dallas,1528359387,Debasmita Saha,Brewer,ME,Internal Medicine,1,8,2021/2022/2023,,N,0.83,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Yimei Han,2876,Eli Lilly (United States),Indianapolis,1417012576,Yusheng Han,Philadelphia,PA,Pathology,1,12,2022/2023,,N,0.61,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Daniel Sanghoon Shin,2887,"University of California, Los Angeles",Los Angeles,1740398395,Dong Shin,Atlanta,GA,Medical Oncology,1,20,2021/2022/2023,,N,0.65,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Ping Yang,2904,The University of Texas MD Anderson Cancer Center,Houston,1881846483,Peter Yang,Danvers,MA,Hematology-Oncology,1,26,2021/2022/2023,,N,0.54,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Amy Webb,2919,The Ohio State University,Columbus,1487813309,Alden Webb,Spokane Valley,WA,Pathology,1,44,2021/2022/2023,,N,0.56,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,R.C. Nichols,2927,University of Florida,Gainesville,1679555270,Romaine Nichols,Jacksonville,FL,Radiation Oncology,1,32,2021/2022/2023,,N,0.74,Y,Y,ACADEMIC,city_mismatch
+A2,Lawrence Hall,2929,University of South Florida,Tampa,1558472514,Lannis Hall,Saint Peters,MO,Radiation Oncology,1,65,2021/2022/2023,,N,0.70,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,M. Henderson,2933,Oregon Health & Science University,Portland,1841370707,Mark Henderson,Columbus,IN,Radiation Oncology,1,51,2021/2022/2023,,N,0.78,Y,Y,ACADEMIC,city_mismatch
+A2,Alexis Bailey,2956,Moffitt Cancer Center,Tampa,1891960928,Alexandra Bailey,Boston,MA,Medical Oncology,1,78,2021/2022/2023,,N,0.82,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Alonso N. Gutiérrez,2957,Baptist Hospital of Miami,Miami,1184685562,Ana Gutierrez,Brownsville,TX,Pathology,1,60,2023,,N,0.70,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Kelly Spencer,2962,Riverside Regional Medical Center,Newport News,1720400906,Kristen Spencer,New Brunswick,NJ,Medical Oncology,1,35,2021/2022/2023,,N,0.50,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Reinier Hernandez,2965,University of Wisconsin–Madison,Madison,1720213580,Roland Hernandez,Seattle,WA,Thoracic Surgery,1,62,2021/2022/2023,,N,0.59,,N,ACADEMIC,low_name_sim;city_mismatch
+A2,Yajun Emily Zhu,2974,Eli Lilly (United States),Indianapolis,1790226116,Yirong Zhu,Rolling Meadows,IL,Hematology-Oncology,1,19,2023,,N,0.62,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+A2,Danielle Murphy,3063,Pfizer (United States),New York,1417912395,Douglas Murphy,Atlanta,GA,Thoracic Surgery,1,90,2021/2022/2023,,N,0.56,,N,INDUSTRY,low_name_sim;city_mismatch;industry_gov
+B,Karen Kelly,32,UC Davis Comprehensive Cancer Center,Sacramento,1477651222,Karen Kelly,Sacramento,CA,Hematology-Oncology,5,108,2021/2022,,Y,1.00,Y,Y,ACADEMIC,
+B,Sarah B. Goldberg,37,Yale Cancer Center,New Haven,1932236395,Sarah Goldberg,New Haven,CT,Medical Oncology,3,47,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,David E. Gerber,48,The University of Texas Southwestern Medical Center,Dallas,1336295039,David Gerber,Dallas,TX,Hematology-Oncology,2,9,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Melissa L. Johnson,54,Sarah Cannon,Nashville,1821269465,Melissa Johnson,Nashville,TN,Medical Oncology,11,589,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Nasser H. Hanna,102,Indiana University Health,Indianapolis,1316903883,Nasser Hanna,Indianapolis,IN,Hematology-Oncology,3,16,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Chi‐Fu Jeffrey Yang,145,Massachusetts General Hospital,Boston,1104117449,Chi-Fu Yang,Boston,MA,Thoracic Surgery,3,51,2021/2022/2023,,Y,0.92,,Y,ACADEMIC,
+B,Timothy F. Burns,161,University of Pittsburgh,Pittsburgh,1639225519,Timothy Burns,Columbus,OH,Medical Oncology,2,37,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Mark F. Berry,173,Stanford University,Stanford,1356508048,Mark Berry,Palo Alto,CA,Thoracic Surgery,2,52,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Douglas B. Johnson,207,Vanderbilt University Medical Center,Nashville,1154597458,Douglas Johnson,Nashville,TN,Medical Oncology,12,365,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,David H. Johnson,291,The University of Texas Southwestern Medical Center,Dallas,1013009422,David Johnson,Dallas,TX,Hematology-Oncology,12,365,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Roy H. Decker,308,Yale University,New Haven,1477673564,Roy Decker,New Haven,CT,Radiation Oncology,2,13,2021,,Y,1.00,Y,Y,ACADEMIC,
+B,Jeffrey Clarke,336,Duke Medical Center,Durham,1295909034,Jeffrey Clarke,Durham,NC,Medical Oncology,2,40,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Hyun‐Sung Lee,399,Baylor College of Medicine,Houston,1992930879,Hun Lee,Houston,TX,Medical Oncology,13,174,2021/2022/2023,,Y,0.80,,N,ACADEMIC,
+B,Yong Yuan,505,Bristol-Myers Squibb (United States),New York,1821487703,Ye Yuan,New York,NY,Radiation Oncology,3,6,2021/2022,,Y,0.62,,N,INDUSTRY,
+B,Shridar Ganesan,635,"Rutgers, The State University of New Jersey",New Brunswick,1619916566,Shridarr Ganesan,New Brunswick,NJ,Medical Oncology,2,4,2021/2022/2023,,Y,0.97,Y,Y,ACADEMIC,
+B,Phuoc T. Tran,640,Johns Hopkins University,Baltimore,1376739037,Phuoc Tran,Baltimore,MD,Radiation Oncology,2,51,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Joseph C. Murray,671,Johns Hopkins University,Baltimore,1700270626,Joseph Murray,Baltimore,MD,Medical Oncology,2,85,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Quynh‐Nhu Nguyen,704,The University of Texas MD Anderson Cancer Center,Houston,1841407780,Quynh - Nhu Nguyen,Houston,TX,Radiation Oncology,2,56,2021/2022/2023,,Y,0.92,,Y,ACADEMIC,
+B,Jorge Gómez,738,Icahn School of Medicine at Mount Sinai,New York,1649241688,Jorge Gomez,New York,NY,Medical Oncology,3,77,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,David T. Wong,781,"University of California, Los Angeles",Los Angeles,1902044951,Deborah Wong,Los Angeles,CA,Hematology-Oncology,5,62,2021/2022/2023,,Y,0.50,,N,ACADEMIC,
+B,Zihai Li,796,The Ohio State University Comprehensive Cancer Center – Arthur G. James Cancer Hospital and Richard J. Solove Research Institute,Columbus,1366745382,Zaibo Li,Columbus,OH,Pathology,6,32,2021/2022/2023,,Y,0.64,,N,ACADEMIC,
+B,Aman Chauhan,841,University of Kentucky,Lexington,1902193147,Aman Chauhan,Miami,FL,Medical Oncology,2,18,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Lawrence Feldman,942,University of Illinois Chicago,Chicago,1871607051,Lawrence Feldman,Chicago,IL,Hematology-Oncology,2,18,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Andrew Chow,973,Memorial Sloan Kettering Cancer Center,New York,1699193995,Andrew Chow,New York,NY,Medical Oncology,2,12,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Thomas J. Smith,985,Johns Hopkins University,Baltimore,1457441008,Thomas Smith,Baltimore,MD,Medical Oncology,6,392,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Matthew H. Taylor,1018,Oregon Health & Science University,Portland,1134239197,Matthew Taylor,Portland,OR,Medical Oncology,8,223,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Limo Chen,1050,The University of Texas MD Anderson Cancer Center,Houston,1912088675,Lei Chen,Houston,TX,Pathology,11,117,2021/2022/2023,,Y,0.75,,N,ACADEMIC,
+B,Monica F. Chen,1107,Memorial Sloan Kettering Cancer Center,New York,1407963192,Margaret Chen,New York,NY,Surgical Oncology,6,114,2021/2022/2023,,Y,0.57,,N,ACADEMIC,
+B,Vivek Gupta,1188,St. John's University,New York,1275516338,Vishal Gupta,New York,NY,Radiation Oncology,6,59,2021/2022/2023,,Y,0.66,,N,ACADEMIC,
+B,Jae Y. Kim,1201,City Of Hope National Medical Center,Duarte,1023147014,Jae Kim,Duarte,CA,Thoracic Surgery,15,507,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Joshua D. Palmer,1216,The Ohio State University Wexner Medical Center,Columbus,1275825283,Joshua Palmer,Columbus,OH,Radiation Oncology,3,71,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,John C. Flíckinger,1453,University of Pittsburgh Medical Center,Pittsburgh,1164495891,John Flickinger,Pittsburgh,PA,Radiation Oncology,2,6,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Yajie Zhang,1464,The University of Texas Southwestern Medical Center,Dallas,1174985006,Yuanyuan Zhang,Dallas,TX,Radiation Oncology,15,81,2021/2022/2023,,Y,0.59,,N,ACADEMIC,
+B,Manik Amin,1527,Dartmouth–Hitchcock Medical Center,Lebanon,1265689889,Manik Amin,Chicago,IL,Hematology,4,43,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Jeffrey Crawford,1528,Duke Medical Center,Durham,1023191277,Jeffrey Crawford,Durham,NC,Hematology-Oncology,3,66,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Soo Ok Lee,1533,University of Rochester,Rochester,1558669804,Solomon Lee,Rochester,NY,Pathology,15,509,2021/2023,,Y,0.85,,N,ACADEMIC,
+B,Gregory A. Vidal,1568,West Cancer Center,Germantown,1730403072,Gregory Vidal,Germantown,TN,Medical Oncology,2,5,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Ming‐Tseh Lin,1611,Johns Hopkins University,Baltimore,1043362536,Ming-Tseh Lin,Baltimore,MD,Pathology,3,62,2021/2022/2023,,Y,0.96,,Y,ACADEMIC,
+B,Michael G. Martin,1662,University of Tennessee Health Science Center,Memphis,1588671085,Michael Martin,Memphis,TN,Hematology-Oncology,6,200,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Daniel Wang,1726,Baylor College of Medicine,Houston,1679834329,Daniel Wang,Houston,TX,Hematology-Oncology,9,74,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Charles Lu,1729,The University of Texas MD Anderson Cancer Center,Houston,1487740551,Charles Lu,Houston,TX,Medical Oncology,3,20,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Yun Zhang,1811,The University of Texas MD Anderson Cancer Center,Houston,1376705590,Yu Zhang,Houston,TX,Pathology,15,81,2021/2022/2023,,Y,0.91,Y,Y,ACADEMIC,
+B,J. Jack Lee,1819,The University of Texas MD Anderson Cancer Center,Houston,1235428475,Joanna Lee,Fremont,CA,Surgical Oncology,31,798,2021/2022/2023,,Y,0.75,Y,Y,ACADEMIC,
+B,Zhigang Zhang,1832,Memorial Sloan Kettering Cancer Center,New York,1649522392,Zesong Zhang,New York,NY,Pathology,6,31,2021/2022/2023,,Y,0.58,,N,ACADEMIC,
+B,William Walsh,1855,University of Massachusetts Chan Medical School,Worcester,1073597274,William Walsh,Worcester,MA,Hematology-Oncology,2,13,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Jennifer M. Johnson,1889,Thomas Jefferson University,Philadelphia,1518127364,Jennifer Johnson,Philadelphia,PA,Medical Oncology,6,653,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Andrew H. Miller,1890,Emory University,Atlanta,1063487999,Audrey Miller,Atlanta,GA,Gynecological Oncology,6,389,2021/2022/2023,GYN,Y,0.80,,N,ACADEMIC,
+B,Huiying Sun,1930,The University of Texas MD Anderson Cancer Center,Houston,1790040038,Hongxia Sun,Houston,TX,Pathology,3,22,2021/2022/2023,,Y,0.57,,N,ACADEMIC,
+B,Arvind Kumar,1931,Icahn School of Medicine at Mount Sinai,New York,1144489295,Anita Kumar,New York,NY,Hematology-Oncology,15,168,2021/2022/2023,,Y,0.62,,N,ACADEMIC,
+B,Jun Zhao,1970,The University of Texas MD Anderson Cancer Center,Houston,1023470697,Jianping Zhao,Houston,TX,Pathology,2,30,2022/2023,,Y,0.67,,N,ACADEMIC,
+B,Yuan Liu,1982,Emory University,Atlanta,1629311451,Yuda Liu,Atlanta,GA,Thoracic Surgery,19,85,2021/2022/2023,,Y,0.87,,Y,ACADEMIC,
+B,Meghan M. Taylor,2023,University of Memphis,Memphis,1932127636,Marie Taylor,Memphis,TN,Radiation Oncology,8,223,2022,,Y,0.59,Y,Y,ACADEMIC,
+B,John Stewart,2039,The University of Texas MD Anderson Cancer Center,Houston,1467514000,John Stewart,Houston,TX,Pathology,4,129,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Haidan Guo,2044,Bloomberg (United States),New York,1922483700,Hua Guo,New York,NY,Pathology,2,6,2021/2022/2023,,Y,0.70,,N,ACADEMIC,
+B,Shuhong Wu,2124,The University of Texas MD Anderson Cancer Center,Houston,1144617309,Susan Wu,Houston,TX,Radiation Oncology,6,62,2021/2022/2023,,Y,0.71,,N,ACADEMIC,
+B,Xinjian Li,2134,The University of Texas MD Anderson Cancer Center,Houston,1871748319,Xiaoxian Li,Houston,TX,Pathology,6,51,2021/2022/2023,,Y,0.77,,N,ACADEMIC,
+B,Patrick J. Ward,2172,Oncology Hematology Care,Cincinnati,1093709297,Patrick Ward,Cincinnati,OH,Medical Oncology,2,20,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Jun Yao,2274,The University of Texas MD Anderson Cancer Center,Houston,1962593376,James Yao,Houston,TX,Medical Oncology,4,18,2021/2022/2023,,Y,0.56,,N,ACADEMIC,
+B,Robert H. Press,2328,Emory University,Atlanta,1427477231,Robert Press,Miami,FL,Radiation Oncology,2,6,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Ju‐Seog Lee,2355,The University of Texas MD Anderson Cancer Center,Houston,1235428475,Joanna Lee,Fremont,CA,Surgical Oncology,31,798,2021/2022/2023,,Y,0.49,,N,ACADEMIC,
+B,Yong Zhou,2394,The University of Texas Health Science Center at Houston,Houston,1407096217,Yan Zhou,Houston,TX,Medical Oncology,6,25,2022/2023,,Y,0.75,,N,ACADEMIC,
+B,Quynh‐Thu Le,2463,Stanford University,Stanford,1316002116,Quynh-Thu Le,Stanford,CA,Radiation Oncology,2,17,2021/2022/2023,,Y,0.96,,Y,ACADEMIC,
+B,Sherven Sharma,2488,"University of California, Los Angeles",Los Angeles,1659458867,Sanjai Sharma,Los Angeles,CA,Hematology-Oncology,13,220,2021/2022/2023,,Y,0.49,,N,ACADEMIC,
+B,Michael L. Steinberg,2509,"University of California, Los Angeles",Los Angeles,1457355984,Michael Steinberg,Los Angeles,CA,Radiation Oncology,3,20,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Benjamin C. Lee,2582,NewYork–Presbyterian Hospital,New York,1164407714,Benjamin Lee,New York,NY,Thoracic Surgery,6,195,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Jonathan R. Thompson,2596,Medical College of Wisconsin,Milwaukee,1093030215,Jonathan Thompson,Milwaukee,WI,Hematology-Oncology,5,294,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Seongho Kim,2614,Wayne State University,Detroit,1871616391,Seung Kim,Detroit,MI,Pathology,21,350,2021/2022/2023,,Y,0.83,,N,ACADEMIC,
+B,Michael D. Feldman,2722,University of Pennsylvania,Philadelphia,1447294335,Michael Feldman,Indianapolis,IN,Pathology,2,32,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Matthew D. Hall,2749,Baptist Hospital of Miami,Miami,1780903575,Matthew Hall,Miami,FL,Radiation Oncology,4,171,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
+B,Sinae Kim,2772,"Rutgers, The State University of New Jersey",New Brunswick,1164591152,Sung Kim,New Brunswick,NJ,Radiation Oncology,21,350,2021/2022/2023,,Y,0.67,,N,ACADEMIC,
+B,Benjamin Li,2807,Pfizer (United States),New York,1831507367,Bob Li,New York,NY,Medical Oncology,4,21,2021/2022/2023,,Y,0.54,,N,INDUSTRY,
+B,Daniel Wiener,2968,Brigham and Women's Hospital,Boston,1528164282,Daniel Wiener,West Roxbury,MA,Thoracic Surgery,2,7,2021/2022/2023,,Y,1.00,Y,Y,ACADEMIC,
