@@ -33,8 +33,9 @@ from tqdm import tqdm
 import requests
 from supabase import Client, create_client
 
-# Load .env file from in project root (same directory as this script)
-load_dotenv(Path(__file__).parent / ".env")
+# Load .env from the repo root. This file is scripts/enrich/<file>, so parents[2] is
+# the repo root (parents[0]=scripts/enrich, [1]=scripts, [2]=repo root).
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
 def get_table_name(base_name: str, target_version: str) -> str:
@@ -180,6 +181,18 @@ def fetch_hcp_ids_for_ingestion_runs(
     return hcp_ids
 
 
+def read_hcp_ids_file(path: str) -> Set[str]:
+    """One HCP uuid per line; blanks ignored. Matches the stage-8 affected-set file
+    format (compute_affected_hcps.py --out) used elsewhere in the cycle."""
+    ids: Set[str] = set()
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            s = line.strip()
+            if s:
+                ids.add(s)
+    return ids
+
+
 def build_scoped_hcp_ids(
     supabase_client: Client,
     *,
@@ -212,6 +225,44 @@ def build_scoped_hcp_ids(
     return scoped
 
 
+def attach_institution_city(
+    supabase_client: Client, candidates: List[Dict[str, Any]]
+) -> Tuple[int, int]:
+    """Populate candidate['institution_city'] for the city-based tiebreak.
+
+    JOIN: institution_geo_lookup.institution_display_name = the HCP's institution string
+    (candidate['institution_short'] = COALESCE(institution_normalized, institution_canonical)),
+    taking institution_geo_lookup.city. institution_display_name and institution_canonical
+    share OpenAlex provenance, so exact-name join lands for ~97% of the retry population.
+    Returns (n_with_city, n_total) for coverage reporting.
+    """
+    names = sorted(
+        {str(c.get("institution_short")).strip() for c in candidates if c.get("institution_short")}
+    )
+    city_by_name: Dict[str, str] = {}
+    chunk = 100  # institution names are long; keep the .in_ URL bounded
+    for i in range(0, len(names), chunk):
+        resp = (
+            supabase_client.table("institution_geo_lookup")
+            .select("institution_display_name,city")
+            .in_("institution_display_name", names[i : i + chunk])
+            .execute()
+            .data
+            or []
+        )
+        for r in resp:
+            nm, city = r.get("institution_display_name"), r.get("city")
+            if nm and city and nm not in city_by_name:
+                city_by_name[nm] = str(city).strip()
+    n_with = 0
+    for c in candidates:
+        city = city_by_name.get(str(c.get("institution_short") or "").strip())
+        c["institution_city"] = city
+        if city:
+            n_with += 1
+    return n_with, len(candidates)
+
+
 def create_supabase_client() -> Client:
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_service_key = os.environ.get("SUPABASE_KEY")
@@ -231,7 +282,58 @@ def get_candidate_hcps(
     limit: Optional[int] = None,
     target_version: str = "v1",
     scoped_hcp_ids: Optional[Set[str]] = None,
+    explicit_hcp_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
+    if explicit_hcp_ids is not None:
+        # --hcp-ids-file: the id list IS the candidate set. BYPASS the min_career_pubs
+        # gate and the openalex/us_only filters (and any --ta/--ingestion-run-id scoping) —
+        # the caller has already chosen who to enrich. npi_number IS NULL is still enforced:
+        # the write path only sets NPI where NULL, so any id that already has an NPI is
+        # fetched-and-skipped here, never overwritten. v2 tables only (enforced in main).
+        hcps_table = get_table_name("hcps", target_version)
+        ids = sorted(explicit_hcp_ids)
+        id_chunk = 150  # keep the .in_ URL under PostgREST's request-line limit
+        out: List[Dict[str, Any]] = []
+        for i in range(0, len(ids), id_chunk):
+            chunk = ids[i : i + id_chunk]
+            batch = (
+                supabase_client.table(hcps_table)
+                .select(
+                    "id,first_name,last_name,middle_name,country,institution_normalized,"
+                    "institution_canonical,total_career_pubs,npi_number,nppes_practice_state,"
+                    "derived_state,ingestion_run_id"
+                )
+                .in_("id", chunk)
+                .is_("npi_number", "null")
+                .execute()
+                .data
+                or []
+            )
+            for row in batch:
+                first = str(row.get("first_name") or "").strip()
+                last = str(row.get("last_name") or "").strip()
+                if not first or not last:
+                    continue
+                nppes_state = (
+                    str(row.get("nppes_practice_state") or row.get("derived_state") or "")
+                    .strip()
+                    .upper()
+                )
+                out.append(
+                    {
+                        "id": row.get("id"),
+                        "first_name": first,
+                        "last_name": last,
+                        "derived_state": nppes_state or None,
+                        "institution_short": row.get("institution_normalized")
+                        or row.get("institution_canonical"),
+                        "total_career_pubs": row.get("total_career_pubs"),
+                    }
+                )
+            if limit is not None and len(out) >= limit:
+                return out[:limit]
+        return out
+
     if target_version == "v1":
         query = (
             supabase_client.table("hcps")
@@ -348,9 +450,14 @@ def search_nppes(
     params = {
         "first_name": nppes_first_name,
         "last_name": last_name,
-        "state": (state or "").strip(),
         "limit": max_results,
     }
+    # State is OFF by default (see --use-state). nppes_practice_state is derived from
+    # institution location and is wrong often enough to suppress real matches (e.g. a KOL
+    # sent TX against an MA record). Only sent when the caller passes a non-empty state.
+    st = (state or "").strip()
+    if st:
+        params["state"] = st
 
     try:
         response = requests.get(
@@ -397,15 +504,16 @@ def _normalize_text(value: Any) -> str:
     return " ".join(str(value or "").lower().strip().split())
 
 
-def _extract_nppes_org_text(nppes_record: Dict[str, Any]) -> str:
-    basic = nppes_record.get("basic") or {}
-    org_name = basic.get("organization_name") or ""
-    if org_name:
-        return _normalize_text(org_name)
-
-    first = basic.get("first_name") or ""
-    last = basic.get("last_name") or ""
-    return _normalize_text(f"{first} {last}")
+def _extract_nppes_location_city(nppes_record: Dict[str, Any]) -> str:
+    """City of the candidate's LOCATION-purpose (practice) address. For NPI-1 individual
+    providers this is the only usable geographic discriminator — organization_name is always
+    empty and practiceLocations is usually empty, so the practice city lives here."""
+    for addr in nppes_record.get("addresses") or []:
+        if str(addr.get("address_purpose") or "").lower() == "location":
+            city = _normalize_text(addr.get("city"))
+            if city:
+                return city
+    return ""
 
 
 def _extract_primary_state(nppes_record: Dict[str, Any]) -> str:
@@ -418,11 +526,15 @@ def _extract_primary_state(nppes_record: Dict[str, Any]) -> str:
     return ""
 
 
-def _has_strong_institution_match(institution_short: Optional[str], org_text: str) -> bool:
-    inst = _normalize_text(institution_short)
-    if not inst:
+def _city_match(hcp_institution_city: Optional[str], candidate_location_city: str) -> bool:
+    """Exact (normalized) match of the HCP's institution city against a candidate's LOCATION
+    address city. City ALONE — deliberately NOT combined with state: OR-ing state in was
+    measured to drop unique resolutions from 110 to 56 by adding spurious matches."""
+    a = _normalize_text(hcp_institution_city)
+    b = _normalize_text(candidate_location_city)
+    if not a or not b:
         return False
-    return inst in org_text or org_text in inst
+    return a == b
 
 
 def _get_primary_taxonomy_description(nppes_record: Dict[str, Any]) -> str:
@@ -507,7 +619,7 @@ def score_nppes_match(
             + _verification_failure_reason(hcp_row, only),
         }
 
-    institution_short = hcp_row.get("institution_short")
+    hcp_institution_city = hcp_row.get("institution_city")
     verified_results = [rec for rec in results if _is_verified_match(hcp_row, rec)]
     if len(verified_results) == 0:
         return {
@@ -520,29 +632,24 @@ def score_nppes_match(
 
     for rec in verified_results:
         npi = rec.get("number")
-        org_text = _extract_nppes_org_text(rec)
+        location_city = _extract_nppes_location_city(rec)
 
-        strong_inst = _has_strong_institution_match(institution_short, org_text)
-        reason_parts = []
-        if strong_inst:
-            reason_parts.append("strong institution match")
-        if not reason_parts:
-            reason_parts.append("no strong discriminator")
+        city_hit = _city_match(hcp_institution_city, location_city)
 
         candidate_entry = {
             "npi": npi,
-            "reason": ", ".join(reason_parts),
-            "org_name": org_text,
+            "reason": "institution city match" if city_hit else "no city discriminator",
+            "location_city": location_city,
             "state": _extract_primary_state(rec),
         }
         candidates.append(candidate_entry)
 
-        if strong_inst:
+        if city_hit:
             strong_matches.append(
                 {
                     "npi": npi,
                     "nppes_data": rec,
-                    "reason": "Strong institution_short match among multiple results.",
+                    "reason": "Institution-city match among multiple verified results.",
                 }
             )
 
@@ -665,14 +772,30 @@ def update_hcp_with_nppes(
                 return False
     else:
         try:
-            response = supabase_client.table(hcps_table).update(
-                {
-                    "npi_number": npi,
-                    "nppes_career_stage_years": nppes_career_stage_years,
-                }
-            ).eq("id", hcp_id).execute()
+            # npi_number IS NULL is enforced ON THE WRITE, not just at candidate
+            # selection: with the npi_source/npi_verified_at stamps riding this
+            # update, an unguarded .eq("id") would let a re-run (or select/write
+            # race) overwrite an NPI set since selection. The predicate makes
+            # that a 0-row update instead.
+            response = (
+                supabase_client.table(hcps_table)
+                .update(
+                    {
+                        "npi_number": npi,
+                        "nppes_career_stage_years": nppes_career_stage_years,
+                        "npi_source": "script",
+                        "npi_verified_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                .eq("id", hcp_id)
+                .is_("npi_number", "null")
+                .execute()
+            )
             if not response.data:
-                print(f"[UPDATE_NO_DATA] hcp_id={hcp_id} npi={npi} - update returned empty data, possible silent failure")
+                print(
+                    f"[UPDATE_NO_DATA] hcp_id={hcp_id} npi={npi} - no row updated: id missing "
+                    f"or npi_number already set (write-time IS NULL guard). Not counted as updated."
+                )
                 return False
         except Exception as exc:
             error_msg = str(exc)
@@ -784,6 +907,24 @@ def main() -> None:
         metavar="UUID",
         help="Scope enrichment to HCPs from a specific Step C ingestion run (repeatable).",
     )
+    parser.add_argument(
+        "--hcp-ids-file",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Enrich exactly the HCP uuids in this file (one per line, stage-8 affected-set "
+             "format). The list defines the candidate set directly and BYPASSES "
+             "--min-career-pubs; it also takes precedence over --ta / --ingestion-run-id. "
+             "v2 only; npi_number IS NULL is still enforced (never overwrites an existing NPI).",
+    )
+    parser.add_argument(
+        "--use-state",
+        action="store_true",
+        default=False,
+        help="Restore the old behaviour: send nppes_practice_state to NPPES. OFF by default "
+             "because that state is derived from institution location and wrongly suppresses "
+             "real matches. State was never the precision mechanism (name + taxonomy are).",
+    )
     args = parser.parse_args()
     dry_run = args.dry_run
     sample_limit = args.sample_limit
@@ -791,6 +932,8 @@ def main() -> None:
     target_version = args.target_version
     ta_slug = args.ta
     ingestion_run_ids = args.ingestion_run_ids
+    hcp_ids_file = args.hcp_ids_file
+    use_state = args.use_state
 
     supabase_client = create_supabase_client()
     build_enrichment_log_table(supabase_client, target_version=target_version)
@@ -798,14 +941,41 @@ def main() -> None:
     scoped_hcp_ids: Optional[Set[str]] = None
     scoped_ta_id: Optional[str] = None
     scoped_ta_name: Optional[str] = None
+    explicit_hcp_ids: Optional[Set[str]] = None
 
-    if target_version == "v2" and not ta_slug and not ingestion_run_ids:
+    if hcp_ids_file:
+        if target_version != "v2":
+            raise SystemExit("--hcp-ids-file requires --target-version v2.")
+        explicit_hcp_ids = read_hcp_ids_file(hcp_ids_file)
+
+    # v2 requires an explicit scope so frozen TAs are never touched. --hcp-ids-file
+    # satisfies that requirement (it is the strictest scope of all).
+    if (
+        target_version == "v2"
+        and not ta_slug
+        and not ingestion_run_ids
+        and explicit_hcp_ids is None
+    ):
         raise SystemExit(
-            "v2 mode requires scoping: pass --ta <slug> and/or --ingestion-run-id <uuid> "
-            "so frozen TAs (e.g. NSCLC) are never touched."
+            "v2 mode requires scoping: pass --ta <slug>, --ingestion-run-id <uuid>, or "
+            "--hcp-ids-file <path> so frozen TAs (e.g. NSCLC) are never touched."
         )
 
-    if ta_slug or ingestion_run_ids:
+    if explicit_hcp_ids is not None:
+        # PRECEDENCE: an explicit id list wins. It defines the candidate set directly and
+        # bypasses the min_career_pubs gate; --ta / --ingestion-run-id are ignored.
+        scoped_hcp_ids = explicit_hcp_ids
+        print(f"\n{'='*60}")
+        print(f"  EXPLICIT ID-LIST RUN: {len(explicit_hcp_ids):,} HCP id(s) from {hcp_ids_file}")
+        print(f"  Candidate set = the id list; --min-career-pubs gate ({min_career_pubs}) BYPASSED.")
+        if ta_slug or ingestion_run_ids:
+            print("  [SCOPE] --hcp-ids-file takes precedence: --ta / --ingestion-run-id ignored.")
+        print("  Only these ids can be selected or updated (npi_number IS NULL still enforced).")
+        print(f"{'='*60}\n")
+        if not explicit_hcp_ids:
+            print("[SCOPE] --hcp-ids-file is empty. Exiting.")
+            return
+    elif ta_slug or ingestion_run_ids:
         if ta_slug:
             scoped_ta_id, scoped_ta_name = resolve_ta_slug(supabase_client, ta_slug)
         scoped_hcp_ids = build_scoped_hcp_ids(
@@ -834,6 +1004,7 @@ def main() -> None:
         limit=sample_limit,
         target_version=target_version,
         scoped_hcp_ids=scoped_hcp_ids,
+        explicit_hcp_ids=explicit_hcp_ids,
     )
 
     if scoped_hcp_ids is not None:
@@ -846,6 +1017,15 @@ def main() -> None:
             raise RuntimeError(
                 f"SAFETY VIOLATION: {len(out_of_scope)} candidate(s) outside scoped HCP set. Aborting."
             )
+
+    # City-based tiebreak signal: attach each HCP's institution city from institution_geo_lookup.
+    n_city, n_total = attach_institution_city(supabase_client, candidates)
+    pct = (100.0 * n_city / n_total) if n_total else 0.0
+    print(
+        f"[TIEBREAK] institution_geo_lookup city attached for {n_city}/{n_total} candidates "
+        f"({pct:.1f}%). Tiebreak uses city ALONE (no state)."
+    )
+    print(f"[STATE] search state filter: {'ON (--use-state)' if use_state else 'OFF (default)'}")
 
     print(
         f"[START] Candidate HCP count: {len(candidates)} "
@@ -863,7 +1043,8 @@ def main() -> None:
         hcp_id = str(hcp.get("id"))
         first_name = str(hcp.get("first_name") or "")
         last_name = str(hcp.get("last_name") or "")
-        state = str(hcp.get("derived_state") or "")
+        # State OFF by default; only sent when --use-state is passed.
+        state = str(hcp.get("derived_state") or "") if use_state else ""
 
         print(
             f"[PROCESS] hcp_id={hcp_id} name={first_name} {last_name} state={state} "

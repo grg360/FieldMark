@@ -325,6 +325,46 @@ def fetch_hcp_pair(cur, primary_id: str, stub_id: str) -> Tuple[Dict[str, Any], 
     return primary, stub
 
 
+def fetch_npi_source(cur, hcp_id: str, npi: str) -> str:
+    """Best-effort provenance of (hcp_id, npi) for NPI-conflict logging: latest
+    live nppes_enrichment_log_v2 row, then npi_match_proposals_v2, else unknown.
+    Read-only. Must run BEFORE the log/proposal FK re-points in this merge so
+    the stub's rows are still attached to the stub id."""
+    cur.execute(
+        """
+        SELECT match_confidence, match_reason, enriched_at
+        FROM nppes_enrichment_log_v2
+        WHERE hcp_id = %s AND matched_npi = %s AND reverted_at IS NULL
+        ORDER BY enriched_at DESC NULLS LAST
+        LIMIT 1
+        """,
+        (hcp_id, npi),
+    )
+    row = cur.fetchone()
+    if row:
+        return (
+            f"nppes_enrichment_log_v2[{row['match_confidence']}] "
+            f"{ns(row['match_reason'])} @ {row['enriched_at']}"
+        )
+    cur.execute(
+        """
+        SELECT match_tier, match_status, applied_at
+        FROM npi_match_proposals_v2
+        WHERE hcp_id = %s AND npi = %s
+        ORDER BY match_calculated_at DESC NULLS LAST
+        LIMIT 1
+        """,
+        (hcp_id, npi),
+    )
+    row = cur.fetchone()
+    if row:
+        return (
+            f"npi_match_proposals_v2[tier={row['match_tier']} "
+            f"status={row['match_status']} applied_at={row['applied_at']}]"
+        )
+    return "unknown (no enrichment-log or proposal row; pre-log or manual)"
+
+
 def count_rows_for_hcp(cur, table: str, hcp_col: str, hcp_id: str) -> int:
     cur.execute(f"SELECT COUNT(*) AS c FROM {table} WHERE {hcp_col} = %s", (hcp_id,))
     row = cur.fetchone()
@@ -458,6 +498,27 @@ def merge_record_into_survivor(
     # Save stub fields first for safe merge sequencing.
     stub_npi = ns(stub.get("npi_number"))
     primary_npi = ns(primary.get("npi_number"))
+
+    # Visibility ONLY — tie rule unchanged: when both records hold DIFFERENT
+    # non-null NPIs the survivor's NPI is kept and the stub's is discarded with
+    # the stub row. 65 duplicate pairs are known to hold NPIs that block their
+    # twin; without this log the discarded NPI vanishes without trace.
+    if primary_npi and stub_npi and primary_npi != stub_npi:
+        survivor_source = fetch_npi_source(cur, primary_id, primary_npi)
+        stub_source = fetch_npi_source(cur, stub_id, stub_npi)
+        print(
+            f"      [NPI_CONFLICT] survivor={primary_id} npi={primary_npi} "
+            f"source={survivor_source}"
+        )
+        print(
+            f"      [NPI_CONFLICT] stub={stub_id} npi={stub_npi} "
+            f"source={stub_source}"
+        )
+        print(
+            f"      [NPI_CONFLICT] winner=survivor (npi {primary_npi} kept); "
+            f"stub npi {stub_npi} discarded with the stub delete"
+        )
+
     payload = compute_primary_update_payload(primary, stub)
 
     # NPI unique-constraint-safe shuffle:

@@ -317,7 +317,10 @@ def cmd_write(args) -> None:
 
     s1 = s2 = 0
     for p in plan:
-        cur.execute("UPDATE hcps_v2 SET npi_number = %s WHERE id = %s AND npi_number IS NULL",
+        # npi_source='human': these NPIs come from the human-reviewed approved CSV
+        # (step 2 of the workflow), not from an automated match.
+        cur.execute("UPDATE hcps_v2 SET npi_number = %s, npi_source = 'human', "
+                    "npi_verified_at = now() WHERE id = %s AND npi_number IS NULL",
                     (p["npi"], p["hid"]))
         s1 += cur.rowcount
     for p in plan:
