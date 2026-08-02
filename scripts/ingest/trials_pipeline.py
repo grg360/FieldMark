@@ -20,6 +20,15 @@ URL = "https://clinicaltrials.gov/api/v2/studies"
 CKPT_DEFAULT = "trials_pipeline_checkpoint.json"
 ROLES = {"PRINCIPAL_INVESTIGATOR", "SUB_INVESTIGATOR", "STUDY_CHAIR", "STUDY_DIRECTOR"}
 
+# --refresh-status mode: trial-fact refresh, keyed by nct_id (no HCP name crawl).
+# Open statuses whose trial facts are worth re-fetching each week.
+OPEN_STATUSES = ("RECRUITING", "NOT_YET_RECRUITING", "ACTIVE_NOT_RECRUITING", "ENROLLING_BY_INVITATION")
+# CT.gov v2 caps pageSize at 1000, but filter.ids is bound by URL LENGTH, not page size:
+# nginx returns 414 (Request-URI Too Large) once the request line passes ~8 KB, which is
+# ~577 NCT ids (11 chars + an encoded comma each). 500/batch stays well under that with
+# headroom for the other query params. This is the real batch cap, not pageSize.
+REFRESH_ID_BATCH = 500
+
 STATE_ABBREV_TO_NAME = {
     "AL": "alabama", "AK": "alaska", "AZ": "arizona", "AR": "arkansas", "CA": "california",
     "CO": "colorado", "CT": "connecticut", "DE": "delaware", "FL": "florida", "GA": "georgia",
@@ -676,6 +685,149 @@ def eta(done: int, total: int, start: float) -> str:
     return f"{m // 60}:{m % 60:02d}"
 
 
+def fetch_by_ids(session: requests.Session, nct_ids: Sequence[str]) -> List[Dict]:
+    """Fetch full study records for a batch of NCT ids via filter.ids. Same 3-attempt
+    429/5xx exponential backoff as ct(). Returns the studies list, which may be SHORTER
+    than the input when CT.gov no longer holds some of the ids."""
+    p = {"filter.ids": ",".join(nct_ids), "pageSize": "1000", "format": "json"}
+    d = 0.5
+    for i in range(3):
+        try:
+            r = session.get(URL, params=p, timeout=(6, 60))
+            if r.status_code == 429 or 500 <= r.status_code < 600:
+                raise requests.HTTPError(response=r)
+            r.raise_for_status()
+            x = r.json().get("studies", [])
+            return [s for s in x if isinstance(s, dict)] if isinstance(x, list) else []
+        except Exception:
+            if i == 2:
+                return []
+            time.sleep(d)
+            d *= 2
+    return []
+
+
+def build_trial_record(st: Dict) -> Optional[Dict]:
+    """Build the clinical_trials upsert dict from a study payload — trial facts ONLY, no
+    investigator extraction. Same field mapping as extract()'s trial block, so the refresh
+    path and the crawl path write identical trial columns."""
+    p = st.get("protocolSection", {}) or {}
+    idm = p.get("identificationModule", {}) or {}
+    nct = ns(idm.get("nctId"))
+    if not nct:
+        return None
+    sm = p.get("statusModule", {}) or {}
+    dm = p.get("designModule", {}) or {}
+    scm = p.get("sponsorCollaboratorsModule", {}) or {}
+    lead = scm.get("leadSponsor", {}) or {}
+    rp = scm.get("responsibleParty", {}) or {}
+    collaborators_raw = scm.get("collaborators", []) or []
+    collaborators_clean = [
+        {"name": ns(c.get("name")), "class": ns(c.get("class"))}
+        for c in collaborators_raw
+        if isinstance(c, dict) and ns(c.get("name"))
+    ]
+    conditions_mod = p.get("conditionsModule", {}) or {}
+    conditions_clean = [ns(c) for c in (conditions_mod.get("conditions", []) or []) if ns(c)]
+    aim = p.get("armsInterventionsModule", {}) or {}
+    interventions_raw = aim.get("interventions", []) or []
+    interventions_clean = [
+        {"type": ns(i.get("type")), "name": ns(i.get("name"))}
+        for i in interventions_raw
+        if isinstance(i, dict) and ns(i.get("name"))
+    ]
+    return {
+        "nct_id": nct,
+        "title": ns(idm.get("briefTitle")) or None,
+        "phase": ph(dm.get("phases")),
+        "status": ns(sm.get("overallStatus")) or None,
+        "sponsor": ns(lead.get("name")) or None,
+        "lead_sponsor_class": ns(lead.get("class")) or None,
+        "study_type": ns(dm.get("studyType")) or None,
+        "responsible_party_type": ns(rp.get("type")) or None,
+        "start_date": dt(((sm.get("startDateStruct", {}) or {}).get("date"))),
+        "completion_date": dt(((sm.get("completionDateStruct", {}) or {}).get("date"))),
+        "collaborators": collaborators_clean if collaborators_clean else None,
+        "conditions": conditions_clean if conditions_clean else None,
+        "interventions": interventions_clean if interventions_clean else None,
+    }
+
+
+def select_open_trial_nct_ids(c: Client, target_version: str) -> List[str]:
+    """Every nct_id in clinical_trials(_v2) whose status is one of OPEN_STATUSES."""
+    trials_table = get_table_name("clinical_trials", target_version)
+    out: List[str] = []
+    o = 0
+    while True:
+        b = (
+            c.table(trials_table)
+            .select("nct_id")
+            .in_("status", list(OPEN_STATUSES))
+            .order("nct_id")
+            .range(o, o + 999)
+            .execute()
+            .data
+            or []
+        )
+        if not b:
+            break
+        out.extend(str(r["nct_id"]) for r in b if r.get("nct_id"))
+        if len(b) < 1000:
+            break
+        o += 1000
+    return out
+
+
+def refresh_status(target_version: str = "v1", dry_run: bool = False) -> None:
+    """--refresh-status: refresh trial-level facts (status, phase, completion_date, sponsor,
+    conditions, interventions, ...) for open-status trials by fetching them from CT.gov BY
+    NCT ID (filter.ids), batched under the URL-length cap.
+
+    Deliberately does NOT query by HCP name and NEVER writes trial_investigators — it calls
+    only upsert_trials() (upsert on nct_id; no duplicate inserts, no investigator rows).
+    Investigator matching stays with the HCP crawl (run()). NCT ids that CT.gov no longer
+    returns are reported and LEFT IN PLACE (never deleted)."""
+    load_dotenv()
+    c = sb()
+    s = requests.Session()
+    s.headers.update({"User-Agent": "FieldMark/1.0"})
+
+    nct_ids = select_open_trial_nct_ids(c, target_version)
+    total = len(nct_ids)
+    n_batches = (total + REFRESH_ID_BATCH - 1) // REFRESH_ID_BATCH
+    print(f"Open-status trials to refresh: {total:,} | batch: {REFRESH_ID_BATCH} ids | CT.gov requests: {n_batches}")
+    if dry_run:
+        print("[DRY RUN] No CT.gov fetch and no database writes.")
+        return
+
+    start = time.time()
+    updated = 0
+    returned_ids: Set[str] = set()
+    for bi in range(0, total, REFRESH_ID_BATCH):
+        batch = nct_ids[bi : bi + REFRESH_ID_BATCH]
+        studies = fetch_by_ids(s, batch)
+        time.sleep(0.1)  # same self-throttle as the HCP crawl
+        records = [rec for rec in (build_trial_record(st) for st in studies) if rec]
+        for rec in records:
+            returned_ids.add(rec["nct_id"])
+        if records:
+            # upsert_trials writes clinical_trials(_v2) ONLY (upsert on nct_id) — no investigator rows.
+            upsert_trials(c, records, target_version)
+            updated += len(records)
+        done = min(bi + REFRESH_ID_BATCH, total)
+        print(f"[{done}/{total}] refreshed | updated: {updated} | ETA: {eta(done, total, start)}")
+
+    missing = [nct for nct in nct_ids if nct not in returned_ids]
+    print("\n=== Status Refresh Summary ===")
+    print(f"Requested (open-status): {total:,} | Updated from CT.gov: {updated:,} | Requests: {n_batches}")
+    print(f"NCT ids CT.gov no longer returns (LEFT IN PLACE, not deleted): {len(missing):,}")
+    for nct in missing[:50]:
+        print(f"  missing (row kept): {nct}")
+    if len(missing) > 50:
+        print(f"  ... and {len(missing) - 50:,} more (all kept)")
+    print(f"Elapsed: {time.time() - start:.0f}s")
+
+
 def run(
     test: bool,
     limit: Optional[int],
@@ -832,5 +984,15 @@ if __name__ == "__main__":
         metavar="SLUG",
         help="Scope to HCPs in one therapeutic area (e.g. atopic-dermatitis).",
     )
+    p.add_argument(
+        "--refresh-status",
+        action="store_true",
+        help="Trial-fact refresh mode: fetch open-status trials by nct_id (filter.ids) and "
+             "update status/phase/completion_date via upsert_trials. Does NOT query by HCP "
+             "name and does NOT write trial_investigators_v2. Separate from the HCP crawl.",
+    )
     a = p.parse_args()
-    run(a.test, a.limit, a.reset_checkpoint, a.target_version, ta_slug=a.ta, dry_run=a.dry_run)
+    if a.refresh_status:
+        refresh_status(a.target_version, dry_run=a.dry_run)
+    else:
+        run(a.test, a.limit, a.reset_checkpoint, a.target_version, ta_slug=a.ta, dry_run=a.dry_run)
