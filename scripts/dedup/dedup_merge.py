@@ -200,20 +200,45 @@ def fetch_npi_flags(cur, hcp_ids: Sequence[str]) -> Dict[str, bool]:
     return {str(r["id"]): bool(r["has_npi"]) for r in cur.fetchall()}
 
 
+def fetch_publink_flags(cur, hcp_ids: Sequence[str]) -> Dict[str, bool]:
+    """has-publication-links flag per hcp_id from publication_authors_v2.
+
+    Leading survivor criterion: publication_authors_v2 is the live register that
+    DEFINES publication-first identity, so any record with a linked paper beats
+    any record with none — structurally, not by happening to have OpenAlex
+    works_count populated (NPI stubs can otherwise win tiebreak 2 via has-NPI
+    against a pub record with no author-metrics row)."""
+    if not hcp_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT hcp_id, count(*) > 0 AS has_publinks
+        FROM publication_authors_v2
+        WHERE hcp_id = ANY(%s::uuid[])
+        GROUP BY hcp_id
+        """,
+        (list(hcp_ids),),
+    )
+    return {str(r["hcp_id"]): bool(r["has_publinks"]) for r in cur.fetchall()}
+
+
 def survivor_sort_key(
     hid: str,
+    publinks_by_hcp: Dict[str, bool],
     works_by_hcp: Dict[str, int],
     npi_by_hcp: Dict[str, bool],
     is_primary_by_hcp: Dict[str, bool],
-) -> Tuple[int, int, int, str]:
+) -> Tuple[int, int, int, int, str]:
     """
     Survivor precedence (lower tuple wins under min()):
-      1) higher OpenAlex works_count
-      2) has NPI
-      3) is_primary OpenAlex link
-      4) lower id (stable deterministic fallback)
+      1) has publication_authors_v2 links (publication-first wins structurally)
+      2) higher OpenAlex works_count
+      3) has NPI
+      4) is_primary OpenAlex link
+      5) lower id (stable deterministic fallback)
     """
     return (
+        -int(bool(publinks_by_hcp.get(hid))),
         -int(works_by_hcp.get(hid, 0)),
         -int(bool(npi_by_hcp.get(hid))),
         -int(bool(is_primary_by_hcp.get(hid))),
@@ -224,14 +249,17 @@ def survivor_sort_key(
 def choose_survivor_many(
     ids: Sequence[str],
     *,
+    publinks_by_hcp: Dict[str, bool],
     works_by_hcp: Dict[str, int],
     npi_by_hcp: Dict[str, bool],
     is_primary_by_hcp: Dict[str, bool],
 ) -> str:
-    """Highest-works_count survivor across N component members (same precedence)."""
+    """Best survivor across N component members (precedence in survivor_sort_key)."""
     return min(
         ids,
-        key=lambda hid: survivor_sort_key(hid, works_by_hcp, npi_by_hcp, is_primary_by_hcp),
+        key=lambda hid: survivor_sort_key(
+            hid, publinks_by_hcp, works_by_hcp, npi_by_hcp, is_primary_by_hcp
+        ),
     )
 
 
@@ -239,26 +267,20 @@ def choose_survivor(
     a_id: str,
     b_id: str,
     *,
+    publinks_by_hcp: Dict[str, bool],
     works_by_hcp: Dict[str, int],
     npi_by_hcp: Dict[str, bool],
     is_primary_by_hcp: Dict[str, bool],
 ) -> Tuple[str, str]:
     """
-    Pick survivor between two duplicate candidates.
-    Precedence:
-      1) higher OpenAlex works_count
-      2) has NPI
-      3) is_primary OpenAlex link
-      4) lower id (stable deterministic fallback)
+    Pick survivor between two duplicate candidates (precedence in
+    survivor_sort_key: publinks > works_count > has-NPI > is_primary > id).
     Returns (survivor_id, merge_away_id).
     """
     survivor_id = min(
         [a_id, b_id],
-        key=lambda hid: (
-            -int(works_by_hcp.get(hid, 0)),
-            -int(bool(npi_by_hcp.get(hid))),
-            -int(bool(is_primary_by_hcp.get(hid))),
-            hid,
+        key=lambda hid: survivor_sort_key(
+            hid, publinks_by_hcp, works_by_hcp, npi_by_hcp, is_primary_by_hcp
         ),
     )
     merge_id = b_id if survivor_id == a_id else a_id
@@ -305,10 +327,20 @@ def compute_primary_update_payload(primary: Dict[str, Any], stub: Dict[str, Any]
     return payload
 
 
+NPI_SOURCE_RANK = {"human": 3, "llm": 2, "script": 1}
+
+
+def npi_source_rank(source: Any) -> int:
+    """Provenance precedence: human > llm > script. NULL/unknown ranks as script
+    (pre-stamp NPIs are script-derived enrichment)."""
+    return NPI_SOURCE_RANK.get(ns(source).lower(), 1)
+
+
 def fetch_hcp_pair(cur, primary_id: str, stub_id: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     cur.execute(
         """
-        SELECT id, npi_number, nppes_practice_state, nppes_practice_city, nppes_practice_setting,
+        SELECT id, npi_number, npi_source, npi_verified_at,
+               nppes_practice_state, nppes_practice_city, nppes_practice_setting,
                nppes_career_stage_years, institution_normalized, total_career_pubs
         FROM hcps_v2
         WHERE id IN (%s, %s)
@@ -452,6 +484,10 @@ def merge_record_into_survivor(
         ("nppes_enrichment_log_v2", "hcp_id"),
         ("hcp_research_themes_v2", "hcp_id"),
         ("hcp_scientific_positions_v1", "hcp_id"),
+        # --- Added 2026-08-02 (FK audit): ON DELETE CASCADE, hcp_id not in any
+        #     unique key. Without a re-point the stub delete silently removes
+        #     its congress rows. ---
+        ("congress_confirmed_presenters", "hcp_id"),
     ]
 
     # Conflict-safe re-points: (hcp_id, *key_cols) is a unique/primary key, so a
@@ -491,6 +527,10 @@ def merge_record_into_survivor(
         ("dol_matches_v2", "hcp_id", ["social_user_id"]),
         ("hcp_affiliation_profile_v2", "hcp_id", []),  # hcp_id-alone unique
         ("hcp_nppes_detail_v2", "hcp_id", []),  # hcp_id-alone unique
+        # --- Added 2026-08-02: postdates the FK audit. FK is ON DELETE CASCADE,
+        #     so a missing re-point SILENTLY DELETES the stub's Medicare claims
+        #     rows instead of blocking — re-point before the stub delete. ---
+        ("hcp_hcpcs_detail", "hcp_id", ["program_year", "hcpcs_code", "place_of_service"]),
     ]
 
     moved: Dict[str, Dict[str, int]] = {}
@@ -499,41 +539,75 @@ def merge_record_into_survivor(
     stub_npi = ns(stub.get("npi_number"))
     primary_npi = ns(primary.get("npi_number"))
 
-    # Visibility ONLY — tie rule unchanged: when both records hold DIFFERENT
-    # non-null NPIs the survivor's NPI is kept and the stub's is discarded with
-    # the stub row. 65 duplicate pairs are known to hold NPIs that block their
-    # twin; without this log the discarded NPI vanishes without trace.
+    stub_npi_source = ns(stub.get("npi_source")) or None
+    stub_npi_verified_at = stub.get("npi_verified_at")
+
+    # Both-sides case: precedence decides (human > llm > script, NULL as script).
+    # Stub outranking primary -> stub's NPI + provenance replace the primary's.
+    # Genuine tie or primary outranks -> primary keeps its own, as before.
+    stub_wins_precedence = (
+        bool(primary_npi)
+        and bool(stub_npi)
+        and primary_npi != stub_npi
+        and npi_source_rank(stub.get("npi_source")) > npi_source_rank(primary.get("npi_source"))
+    )
+
+    # Conflict visibility: when both records hold DIFFERENT non-null NPIs one of
+    # them is discarded — log both sides and the actual outcome. 65 duplicate
+    # pairs are known to hold NPIs that block their twin; without this log the
+    # discarded NPI vanishes without trace.
     if primary_npi and stub_npi and primary_npi != stub_npi:
         survivor_source = fetch_npi_source(cur, primary_id, primary_npi)
         stub_source = fetch_npi_source(cur, stub_id, stub_npi)
         print(
             f"      [NPI_CONFLICT] survivor={primary_id} npi={primary_npi} "
-            f"source={survivor_source}"
+            f"npi_source={primary.get('npi_source') or 'NULL'} log={survivor_source}"
         )
         print(
             f"      [NPI_CONFLICT] stub={stub_id} npi={stub_npi} "
-            f"source={stub_source}"
+            f"npi_source={stub.get('npi_source') or 'NULL'} log={stub_source}"
         )
-        print(
-            f"      [NPI_CONFLICT] winner=survivor (npi {primary_npi} kept); "
-            f"stub npi {stub_npi} discarded with the stub delete"
-        )
+        if stub_wins_precedence:
+            print(
+                f"      [NPI_CONFLICT] winner=stub by npi_source precedence "
+                f"({stub.get('npi_source') or 'NULL'} > {primary.get('npi_source') or 'NULL'}); "
+                f"survivor takes npi {stub_npi}; survivor's own npi {primary_npi} discarded"
+            )
+        else:
+            print(
+                f"      [NPI_CONFLICT] winner=survivor (tie or higher npi_source; "
+                f"npi {primary_npi} kept); stub npi {stub_npi} discarded with the stub delete"
+            )
 
     payload = compute_primary_update_payload(primary, stub)
 
-    # NPI unique-constraint-safe shuffle:
-    # 1) (if needed) NULL stub.npi_number
-    # 2) set primary.npi_number to saved stub value
+    # NPI unique-constraint-safe shuffle — provenance travels with the NPI:
+    # 1) (if moving) NULL stub.npi_number to free the unique slot
+    # 2) set primary npi_number + npi_source + npi_verified_at from the stub
+    # Fires when the primary has no NPI (fill), or when the stub's NPI outranks
+    # the primary's by source precedence (replace).
     needs_npi_shuffle = (not primary_npi) and bool(stub_npi)
+    move_npi = needs_npi_shuffle or stub_wins_precedence
     if dry_run:
-        moved["stub_npi_null"] = {"updated": 1 if needs_npi_shuffle else 0, "deleted_conflicts": 0}
-        moved["primary_npi_update"] = {"updated": 1 if needs_npi_shuffle else 0, "deleted_conflicts": 0}
-    elif needs_npi_shuffle:
+        moved["stub_npi_null"] = {"updated": 1 if move_npi else 0, "deleted_conflicts": 0}
+        moved["primary_npi_update"] = {"updated": 1 if move_npi else 0, "deleted_conflicts": 0}
+        if move_npi:
+            print(
+                f"      [NPI_MOVE plan] survivor={primary_id} takes npi={stub_npi} "
+                f"npi_source={stub_npi_source or 'NULL'} "
+                f"npi_verified_at={stub_npi_verified_at or 'NULL'}"
+                + (" (stub outranks by precedence)" if stub_wins_precedence else "")
+            )
+    elif move_npi:
         try:
             cur.execute("UPDATE hcps_v2 SET npi_number = NULL WHERE id = %s", (stub_id,))
             moved["stub_npi_null"] = {"updated": int(cur.rowcount or 0), "deleted_conflicts": 0}
 
-            cur.execute("UPDATE hcps_v2 SET npi_number = %s WHERE id = %s", (stub_npi, primary_id))
+            cur.execute(
+                "UPDATE hcps_v2 SET npi_number = %s, npi_source = %s, npi_verified_at = %s "
+                "WHERE id = %s",
+                (stub_npi, stub_npi_source, stub_npi_verified_at, primary_id),
+            )
             moved["primary_npi_update"] = {"updated": int(cur.rowcount or 0), "deleted_conflicts": 0}
         except Exception as exc:
             raise RuntimeError(f"NPI shuffle failed (stub={stub_id} -> primary={primary_id}): {exc}") from exc
@@ -680,11 +754,17 @@ def main() -> None:
             works_by_hcp = fetch_works_counts(preload_cur, sorted(all_hcp_ids))
             is_primary_by_hcp = fetch_is_primary_flags(preload_cur, sorted(all_hcp_ids))
             npi_by_hcp = fetch_npi_flags(preload_cur, sorted(all_hcp_ids))
+            publinks_by_hcp = fetch_publink_flags(preload_cur, sorted(all_hcp_ids))
         print(f"Loaded OpenAlex works_count for {len(works_by_hcp):,} / {len(all_hcp_ids):,} component HCP ids")
+        print(
+            f"Loaded publication-link flags: {sum(1 for v in publinks_by_hcp.values() if v):,} "
+            f"of {len(all_hcp_ids):,} component ids have publication_authors_v2 rows"
+        )
 
         for idx, members in enumerate(sorted(components, key=lambda m: -len(m)), start=1):
             survivor_id = choose_survivor_many(
                 members,
+                publinks_by_hcp=publinks_by_hcp,
                 works_by_hcp=works_by_hcp,
                 npi_by_hcp=npi_by_hcp,
                 is_primary_by_hcp=is_primary_by_hcp,
