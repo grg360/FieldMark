@@ -49,10 +49,21 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       8b openalex_author_enrichment.py --hcp-ids-file affected.txt --snapshot-date <TODAY>
                       8c derive_career_first_pub_year_v2.py --ta <slug> --ingestion-run-id <HCP_RUN_ID> --snapshot-date <TODAY> --execute
                       8d cohort_classification_v2.py --ta <slug> --execute
+                      8e hcp_industry_classifier.py  (FULL reclassify of hcps_v2 -> hcp_industry_classification_v1)
+                         Runs AFTER institution_normalized is final (stages 2/8) and BEFORE stage 9, because
+                         scientific_momentum_scoring / network_momentum_scoring INNER JOIN that table filtered to
+                         classification='ACADEMIC'; an HCP with no row is silently dropped from rising scoring.
+                         TA-agnostic (classifies every HCP, no --ta) and run FULL each cycle for now (one pass +
+                         upsert). --hcp-ids-file exists for an incremental pass later but the cycle does not use it.
   9 score             rising_score.py --ta <slug> --execute
  10 asset_matches      build_asset_matches.py  (rebuild asset_publication_v1 from config/assets.json)
                       NON-BLOCKING + NSCLC-ONLY: runs after scoring; failure -> WARN (not FAILED), so a
                       stale asset table never gates the cycle. Swap-in build (~2s live lock, ~95s total).
+ 11 trials_status      trials_pipeline.py --refresh-status --target-version v2  (weekly trial-FACT refresh)
+                      Re-fetches open-status trials BY nct_id (filter.ids, ~500/batch under the URL cap) and
+                      upserts status/phase/completion_date into clinical_trials_v2. Does NOT crawl by HCP name
+                      and writes NO trial_investigators rows -- the HCP crawl stays manual/occasional. TA-agnostic.
+                      NON-BLOCKING (external CT.gov call): failure -> WARN (not FAILED), never gates the cycle.
 
 SNAPSHOT-DATE: captured ONCE at cycle start and passed identically to 8b and 8c (they must match
 or 8c reads zero rows - a real past bug).
@@ -101,8 +112,10 @@ SCRIPTS: Dict[str, str] = {
     "openalex_enrich": "scripts/enrich/openalex_author_enrichment.py",
     "career_first": "scripts/enrich/derive_career_first_pub_year_v2.py",
     "cohort": "scripts/classify/cohort_classification_v2.py",
+    "industry_classify": "scripts/classify/hcp_industry_classifier.py",  # 8e: affiliation-type classification, feeds the rising ACADEMIC filter
     "rising_score": "scripts/score/rising_score.py",
     "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
+    "trials_status_refresh": "scripts/ingest/trials_pipeline.py",     # 11: weekly trial-fact refresh (--refresh-status)
 }
 
 # Stage 10 ASSET MATCHES: rebuild asset_publication_v1 from config/assets.json (the Drug
@@ -158,6 +171,7 @@ STAGE_ORDER: List[Tuple[int, str]] = [
     (8, "career"),
     (9, "score"),
     (10, "asset_matches"),
+    (11, "trials_status"),
 ]
 STAGE_NAME_TO_NUM = {name: n for n, name in STAGE_ORDER}
 MAX_STAGE = STAGE_ORDER[-1][0]
@@ -320,6 +334,14 @@ def cmd_cohort(slug: str) -> List[str]:
     return py("cohort") + ["--ta", slug, "--execute"]
 
 
+def cmd_industry_classify() -> List[str]:
+    # 8e: FULL reclassify of hcps_v2 -> hcp_industry_classification_v1. No --ta (TA-agnostic:
+    # one run covers every HCP) and no --hcp-ids-file (run full each cycle for now; the option
+    # exists on the script for a later incremental pass). The classifier WRITES BY DEFAULT and
+    # takes --dry-run to suppress -- so, like the momentum scripts, execution passes no flag.
+    return py("industry_classify")
+
+
 def cmd_rising_score(slug: str) -> List[str]:
     return py("rising_score") + ["--ta", slug, "--execute"]
 
@@ -327,6 +349,14 @@ def cmd_rising_score(slug: str) -> List[str]:
 def cmd_build_asset_matches() -> List[str]:
     # 10: rebuild asset_publication_v1 from config/assets.json (swap-in; no args -- reads DATABASE_URL).
     return py("asset_matches")
+
+
+def cmd_trials_status_refresh() -> List[str]:
+    # 11: trial-FACT refresh only -- fetch open-status trials by nct_id (filter.ids) and upsert
+    # status/phase/completion_date into clinical_trials_v2. --refresh-status does NOT crawl by HCP
+    # name and writes NO trial_investigators rows (that stays the manual, occasional HCP crawl).
+    # TA-agnostic (refreshes every open trial in the table by status), so it runs once per cycle.
+    return py("trials_status_refresh") + ["--refresh-status", "--target-version", "v2"]
 
 
 # ---------------------------------------------------------------------------
@@ -519,11 +549,17 @@ def print_plan(
         ("8b openalex_enrichment", cmd_openalex_enrich(A, snapshot)),
         ("8c career_first_pub_year", cmd_career_first(slug, HCP, snapshot)),
         ("8d cohort_classification", cmd_cohort(slug)),
+        ("8e industry_classify (FULL reclassify hcps_v2 -> hcp_industry_classification_v1; "
+         "AFTER institution_normalized is final, BEFORE stage 9 -- rising momentum scoring "
+         "INNER JOINs this table on classification='ACADEMIC')", cmd_industry_classify()),
         ("9  rising_score", cmd_rising_score(slug)),
         (("10 asset_matches (rebuild asset_publication_v1 from config/assets.json; swap-in ~2s live lock; "
           "NON-BLOCKING -- WARN not FAILED)" if slug == ASSET_MATCHES_TA
           else f"10 asset_matches  [SKIPPED: NSCLC-only, ta={slug}]"),
          cmd_build_asset_matches() if slug == ASSET_MATCHES_TA else []),
+        ("11 trials_status_refresh (open-status trials refreshed by nct_id via filter.ids; trial facts "
+         "only, NO HCP crawl, NO trial_investigators writes; NON-BLOCKING -- WARN not FAILED)",
+         cmd_trials_status_refresh()),
     ]
 
     print("=" * 72)
@@ -737,6 +773,12 @@ def run_cycle(
             run_stage(8, "openalex_enrichment(8b)", cmd_openalex_enrich(str(affected), snapshot))
             run_stage(8, "career_first_pub_year(8c)", cmd_career_first(slug, hcp_run_id, snapshot))
             run_stage(8, "cohort_classification(8d)", cmd_cohort(slug))
+            # 8e: FULL reclassify of hcps_v2 into hcp_industry_classification_v1. MUST be the last
+            # step of stage 8 -- after institution_normalized is final (create_hcps + the 8a/8b
+            # enrichment above) and BEFORE stage 9. The rising momentum scripts INNER JOIN this
+            # table filtered to classification='ACADEMIC', so any HCP without a current row is
+            # silently dropped from rising scoring. Run full (no --hcp-ids-file) for now.
+            run_stage(8, "industry_classify(8e)", cmd_industry_classify())
             note(8, "career", "OK")
 
         # 9 SCORE
@@ -759,6 +801,21 @@ def run_cycle(
                     print(f"\n[reingest_cycle] WARN: stage 10 asset_matches failed ({ae}); "
                           f"cycle still SUCCESS (non-blocking). Asset table left at prior build.",
                           file=sys.stderr)
+
+        # 11 TRIALS STATUS REFRESH -- NON-BLOCKING. Weekly trial-fact refresh via --refresh-status:
+        # open-status trials re-fetched by nct_id (filter.ids) and upserted (status/phase/completion
+        # date) into clinical_trials_v2. It does NOT crawl by HCP name and writes NO trial_investigators
+        # rows -- that stays the manual, occasional HCP crawl. TA-agnostic (refreshes every open trial),
+        # external CT.gov call, so failure is isolated (WARN not FAILED) and never gates the cycle.
+        if running(11):
+            try:
+                run_stage(11, "trials_status_refresh", cmd_trials_status_refresh())
+                note(11, "trials_status", "OK")
+            except Exception as te:  # non-blocking: log + continue (StageFailure incl.)
+                note(11, "trials_status", f"WARN({type(te).__name__})")
+                print(f"\n[reingest_cycle] WARN: stage 11 trials_status_refresh failed ({te}); "
+                      f"cycle still SUCCESS (non-blocking). Trial facts left at prior refresh.",
+                      file=sys.stderr)
 
     except StageFailure as f:
         note(f.stage_no, f.name, f"FAILED(exit={f.returncode})")

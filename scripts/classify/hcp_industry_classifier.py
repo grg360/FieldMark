@@ -9,6 +9,11 @@ Usage:
     python hcp_industry_classifier.py --dry-run
     python hcp_industry_classifier.py --verbose
     python hcp_industry_classifier.py --batch-size 5000
+    python hcp_industry_classifier.py --hcp-ids-file affected.txt
+
+--hcp-ids-file scopes the run to the ids listed (one uuid per line), matching the
+stage-8 affected-set pattern used elsewhere in the reingest cycle. Omit it to
+classify all of hcps_v2 (a full reclassify) -- which is how the cycle runs it.
 
 Required environment variables (.env):
     DATABASE_URL (port 5432 direct connection, not pooler 6543)
@@ -200,9 +205,30 @@ def classify(institution_normalized: str | None) -> tuple[str, str, str, str | N
     return ("ACADEMIC", "medium", "default_academic", None, institution_normalized)
 
 
-def fetch_hcps(conn) -> list[tuple[str, str | None]]:
+def read_hcp_ids_file(path: str) -> list[str]:
+    """One HCP uuid per line; blanks ignored. Mirrors the affected-set files the
+    stage-8 scripts consume (compute_affected_hcps.py --out)."""
+    ids: list[str] = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            s = line.strip()
+            if s:
+                ids.append(s)
+    return ids
+
+
+def fetch_hcps(conn, hcp_ids: list[str] | None = None) -> list[tuple[str, str | None]]:
+    """All of hcps_v2 (hcp_ids is None -> full reclassify), or just the given ids.
+    id::text = ANY(%s) matches the text uuids read from an --hcp-ids-file."""
     with conn.cursor() as cur:
-        cur.execute("SELECT id::text, institution_normalized FROM hcps_v2")
+        if hcp_ids:
+            cur.execute(
+                "SELECT id::text, institution_normalized FROM hcps_v2 "
+                "WHERE id::text = ANY(%s)",
+                (hcp_ids,),
+            )
+        else:
+            cur.execute("SELECT id::text, institution_normalized FROM hcps_v2")
         return [(row[0], row[1]) for row in cur.fetchall()]
 
 
@@ -294,12 +320,23 @@ def print_verbose_samples(
     help="Print first 20 classifications for each non-ACADEMIC bucket",
 )
 @click.option("--batch-size", default=5000, type=int, help="execute_values chunk size")
-def main(dry_run: bool, verbose: bool, batch_size: int) -> None:
+@click.option(
+    "--hcp-ids-file",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Classify only the HCP ids in this file (one uuid per line, stage-8 "
+         "affected-set pattern). Omit to classify all of hcps_v2 (full reclassify).",
+)
+def main(dry_run: bool, verbose: bool, batch_size: int, hcp_ids_file: str | None) -> None:
     run_id = str(uuid4())
     conn = get_conn()
 
-    print("Fetching HCPs from hcps_v2...")
-    hcps = fetch_hcps(conn)
+    hcp_ids = read_hcp_ids_file(hcp_ids_file) if hcp_ids_file else None
+    if hcp_ids is not None:
+        print(f"Fetching {len(hcp_ids):,} HCP(s) from hcps_v2 (scoped to {hcp_ids_file})...")
+    else:
+        print("Fetching HCPs from hcps_v2 (full reclassify)...")
+    hcps = fetch_hcps(conn, hcp_ids)
     print(f"Loaded {len(hcps):,} HCPs")
 
     summary: Counter = Counter()
