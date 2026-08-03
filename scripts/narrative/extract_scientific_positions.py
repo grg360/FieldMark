@@ -96,21 +96,34 @@ VALID_POSITION_CATEGORIES = frozenset(
 
 RISING_STAR_HCPS_SQL = """
 SELECT hcp_id, 'rising_star' AS cohort, us_rank AS rank_position
-FROM hcp_rising_star_ranks_v3
+FROM hcp_rising_star_ranks_v3 r
 WHERE therapeutic_area_id = %s
   AND us_rank <= 100
+  {skip_existing}
 ORDER BY us_rank
 """
 
 ESTABLISHED_HCPS_SQL = """
 SELECT hcp_id, 'established' AS cohort, rank AS rank_position
-FROM hcp_established_ranks_v3
+FROM hcp_established_ranks_v3 e
 WHERE therapeutic_area_id = %s
   AND scope_type = 'region'
   AND scope_value = 'US'
-  AND rank <= 100
+  AND rank <= 200
+  {skip_existing}
 ORDER BY rank
 """
+
+# When --skip-existing is set, exclude HCPs that already have any position row
+# for this TA, so a re-run only processes the not-yet-covered HCPs (e.g. the
+# established rank 101-200 tail after the top-100 was already extracted). The
+# {alias} is the ranks-table alias so the correlation targets the OUTER row, not
+# the subquery's own hcp_id column. Adds one %s (ta_id) per use.
+SKIP_EXISTING_CLAUSE = """AND NOT EXISTS (
+    SELECT 1 FROM hcp_scientific_positions_v1 sp
+    WHERE sp.hcp_id = {alias}.hcp_id
+      AND sp.therapeutic_area_id = %s
+  )"""
 
 TOP_PAPERS_SQL = """
 WITH ranked AS (
@@ -272,6 +285,12 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_TA,
         help="Therapeutic area to process (default: nsclc).",
     )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip HCPs that already have any position for this TA (only "
+        "process not-yet-covered HCPs, e.g. the established rank 101-200 tail).",
+    )
     return parser.parse_args()
 
 
@@ -292,13 +311,21 @@ def get_target_hcps(
     cohort: str,
     limit: int,
     ta_id: str,
+    skip_existing: bool = False,
 ) -> list[dict[str, Any]]:
     hcps: list[dict[str, Any]] = []
     seen: set[str] = set()
 
+    def build(sql_template: str, alias: str) -> tuple[str, tuple[str, ...]]:
+        if skip_existing:
+            clause = SKIP_EXISTING_CLAUSE.format(alias=alias)
+            return sql_template.format(skip_existing=clause), (ta_id, ta_id)
+        return sql_template.format(skip_existing=""), (ta_id,)
+
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         if cohort in ("rising_star", "both"):
-            cur.execute(RISING_STAR_HCPS_SQL, (ta_id,))
+            sql, params = build(RISING_STAR_HCPS_SQL, "r")
+            cur.execute(sql, params)
             for row in cur.fetchall():
                 hcp_id = str(row["hcp_id"])
                 if hcp_id not in seen:
@@ -306,7 +333,8 @@ def get_target_hcps(
                     hcps.append(dict(row))
 
         if cohort in ("established", "both"):
-            cur.execute(ESTABLISHED_HCPS_SQL, (ta_id,))
+            sql, params = build(ESTABLISHED_HCPS_SQL, "e")
+            cur.execute(sql, params)
             for row in cur.fetchall():
                 hcp_id = str(row["hcp_id"])
                 if hcp_id not in seen:
@@ -503,11 +531,14 @@ def main() -> int:
     }
 
     try:
-        target_hcps = get_target_hcps(conn, args.cohort, effective_limit, ta_id)
+        target_hcps = get_target_hcps(
+            conn, args.cohort, effective_limit, ta_id, args.skip_existing
+        )
         total_hcps = len(target_hcps)
         print(
             f"Loaded {total_hcps} target HCPs "
-            f"(ta={args.ta}, cohort={args.cohort}, limit={effective_limit})"
+            f"(ta={args.ta}, cohort={args.cohort}, limit={effective_limit}, "
+            f"skip_existing={args.skip_existing})"
         )
 
         if total_hcps == 0:
