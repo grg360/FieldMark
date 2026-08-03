@@ -69,3 +69,8 @@ ctgov_silverberg_probe.py
 *.log
 *checkpoint*.json
 *aggregator_log*.json
+# Design frame previews (DesignSync scaffolding)
+frontend/public/_frame/
+
+# Generated NPI enrichment worklists — regenerate as coverage changes
+scripts/enrich/nppes_backfill_ids*.txt
