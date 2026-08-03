@@ -17,6 +17,7 @@ import type { ResearchTheme } from "../../types/researchTheme";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import MiniCollaboratorNetwork from "../MiniCollaboratorNetwork";
 import BibliographyScreen from "../BibliographyScreen";
+import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
 import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
 import { FiToast } from "../FieldIntelligenceShared";
@@ -30,6 +31,7 @@ import {
   money,
   roleLabel,
   journalShort,
+  timelineAxisFloor,
   THRESHOLDS,
   type HcpProfile,
   type FieldNote,
@@ -135,7 +137,12 @@ function EvidenceRail({ sources, count }: { sources: ProfileSource[] | null; cou
 function PositionCard({ pos, sourceRows, count }: { pos: ProfilePosition; sourceRows: ProfileSource[] | null; count: number }) {
   const single = (pos.paper_count ?? 0) <= 1;
   const years = (pos.sources ?? []).map((s) => s.pub_year).filter((y): y is number => y != null);
-  const yr = years.length ? (Math.min(...years) === Math.max(...years) ? `${years[0]}` : `${Math.min(...years)}–${Math.max(...years)}`) : "";
+  // Same axis-floor guard as the career timeline: an ancient mis-linked source year
+  // must not stretch this position's "SOURCED" range. Latent today (no position
+  // sources a pre-2001 pub) but the fragility is identical, so route it through too.
+  const loYear = years.length ? timelineAxisFloor(years) : null;
+  const hiYear = years.length ? Math.max(...years) : null;
+  const yr = loYear == null ? "" : loYear === hiYear ? `${loYear}` : `${loYear}–${hiYear}`;
   return (
     <div style={{ borderTop: `1px solid ${P.line}`, padding: "14px 0", display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
@@ -159,7 +166,7 @@ function PositionCard({ pos, sourceRows, count }: { pos: ProfilePosition; source
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={{ ...mono(8.5, 600), letterSpacing: ".14em", color: P.ink6 }}>MOVEMENT</span>
-          <span style={{ ...mono(9.5), color: P.ink5 }}>NO PRIOR STATE · first sourced {years.length ? Math.min(...years) : "—"}</span>
+          <span style={{ ...mono(9.5), color: P.ink5 }}>NO PRIOR STATE · first sourced {loYear ?? "—"}</span>
         </div>
       </div>
       <div style={{ paddingTop: 2 }}>
@@ -308,7 +315,7 @@ export default function HcpProfileBrief() {
           {p.signal_summary ? (
             <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
               <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty" }}>{p.signal_summary}</span>
-              <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink6 }}>MODEL SYNTHESIS OVER THE SOURCED AUDIT · REVIEW BEFORE USE · NO CLINICAL CLAIM · METHODOLOGY V4.2</span>
+              <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink6 }}>MODEL SYNTHESIS OVER THE SOURCED AUDIT · REVIEW BEFORE USE · NO CLINICAL CLAIM · {p.signal_summary_version ? `PROMPT ${p.signal_summary_version.toUpperCase()}` : "PROMPT VERSION UNRECORDED"}</span>
             </div>
           ) : (
             <Withheld head="SIGNAL SUMMARY · WITHHELD" title="No generated synthesis for this HCP yet." body="The synthesis is generated over the sourced record. None is on file for this HCP in NSCLC." />
@@ -395,6 +402,14 @@ export default function HcpProfileBrief() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* ── ADMINISTERED VOLUME — condensed corroboration beneath the record.
+             withholdSeam: no practice-scale block on the academic profile, so the
+             rule-04 share renders as a deliberate absence, not a missing figure. ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SectionHead id="administered" tag="ADMINISTERED VOLUME" count="MEDICARE PART B · NSCLC CODE SET" sub="DOES THE PUBLICATION RECORD CORRESPOND TO A PRACTICE THAT TREATS AT SCALE" />
+          <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug="nsclc" withholdSeam />
         </div>
 
         {/* ── THE BRIEF — payoff begins ── */}
@@ -620,7 +635,10 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function Timeline({ data, onYearPress }: { data: { year: number; count: number }[]; onYearPress?: (year: number) => void }) {
   const years = data.map((d) => d.year);
-  const lo = Math.min(...years), hi = Math.max(...years);
+  // Axis floor, not data floor: an ancient mis-linked year (disambiguation error)
+  // must not stretch the axis and crush the real record. Counts stay whole — years
+  // below `lo` are simply not drawn as columns; every total elsewhere still includes them.
+  const lo = timelineAxisFloor(years), hi = Math.max(...years);
   const max = Math.max(...data.map((d) => d.count), 1);
   const byYear = new Map(data.map((d) => [d.year, d.count]));
   const span = [];

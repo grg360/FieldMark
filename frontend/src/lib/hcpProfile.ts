@@ -99,6 +99,7 @@ export interface HcpProfile {
     engagement_mix: Record<string, number> | null;
   };
   signal_summary: string | null;
+  signal_summary_version: string | null; // hcp_narratives_v2.prompt_version — footer label reads this, not a literal
 }
 
 export interface FieldNote {
@@ -162,6 +163,32 @@ export function renderSilence(p: HcpProfile): boolean {
 }
 export function lensOn(p: HcpProfile): boolean {
   return positionCount(p) >= THRESHOLDS.lensMinPositions;
+}
+
+/**
+ * Axis floor for a publication timeline. Returns the year that should anchor the
+ * LEFT edge of the axis: the start of the recent body of activity, after dropping
+ * ancient segments that are detached from it by a decades-long gap, plus any leading
+ * isolated singleton that has no supporting pub within ~5 years.
+ *
+ * AXIS ONLY. This never removes a publication or changes any count — it only moves
+ * where the drawn span begins, so a chart isn't crushed into invisibility by one
+ * mis-linked 1865 (or a 1972–1998 disambiguation cluster) sitting behind a 17-year
+ * gap from a modern HCP's real record. Those years remain in the data and in every
+ * total; they simply don't stretch the axis. A normal, contiguous record returns
+ * Math.min(...years) unchanged (no-op).
+ */
+export function timelineAxisFloor(years: number[]): number {
+  const ys = Array.from(new Set(years)).filter((y) => Number.isFinite(y)).sort((a, b) => a - b);
+  if (ys.length <= 1) return ys[0] ?? 0;
+  const DETACH_YEARS = 15; // a gap this large detaches an older segment (a decades-long discontinuity)
+  const SUPPORT_YEARS = 5; // the floor year must have a neighbouring pub within this window
+  // 1. Cut at the LATEST decades-long discontinuity — everything from there forward is the modern body.
+  let i = 0;
+  for (let k = 1; k < ys.length; k++) if (ys[k] - ys[k - 1] >= DETACH_YEARS) i = k;
+  // 2. Nudge past a leading isolated singleton (no support within SUPPORT_YEARS).
+  while (i < ys.length - 1 && ys[i + 1] - ys[i] > SUPPORT_YEARS) i++;
+  return ys[i];
 }
 
 export function money(v: number | null | undefined): string {
