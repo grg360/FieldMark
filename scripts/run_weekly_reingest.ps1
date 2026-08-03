@@ -1,4 +1,11 @@
-﻿$ErrorActionPreference = "Stop"
+﻿# "Continue", NOT "Stop" (2026-08-03): under Stop, the first stderr line a native
+# command writes through *>&1 (e.g. a tqdm progress bar) becomes a terminating
+# NativeCommandError in Windows PowerShell 5.1 — this killed the 2026-08-03 03:00
+# run one second into stage 1, with exit 1 and no FAILED/end lines. Fail-fast
+# never depended on Stop: the explicit $LASTEXITCODE checks and `exit $code` do
+# that work, and they still fail hard (a missing git leaves $LASTEXITCODE null,
+# and null -ne 0 aborts).
+$ErrorActionPreference = "Continue"
 $repo = "C:\Users\garre\Desktop\FieldMark"
 Set-Location $repo
 
@@ -25,6 +32,13 @@ $sha = (& git rev-parse HEAD)
 "=== running at HEAD $sha ===" | Tee-Object -FilePath $log -Append
 
 $python = "C:\Users\garre\AppData\Local\Programs\Python\Python312\python.exe"
+
+# UTF-8 mode for python and every child it spawns (2026-08-03): with stdout on a
+# pipe, Windows Python defaults to cp1252 and reingest_cycle's child-output
+# streaming crashes on the first unencodable char (tqdm's U+2588 bar blocks did
+# exactly this to the 03:00 run, at stage 1, before the Stop-preference bug ate
+# the traceback). Inherited by all stage subprocesses.
+$env:PYTHONUTF8 = "1"
 
 & $python -u "scripts\reingest_cycle.py" --ta nsclc --days 10 --execute *>&1 |
     Tee-Object -FilePath $log -Append
