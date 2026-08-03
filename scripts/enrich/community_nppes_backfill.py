@@ -168,6 +168,44 @@ def select_community_hcps(
     return selected
 
 
+def read_hcp_ids_file(path: str) -> List[str]:
+    """One HCP uuid per line; blanks ignored. Matches the stage-8 affected-set /
+    targeted_nppes_enrichment --hcp-ids-file format."""
+    ids: List[str] = []
+    seen = set()
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            s = line.strip()
+            if s and s not in seen:
+                seen.add(s)
+                ids.append(s)
+    return ids
+
+
+def select_hcps_by_ids(client: Client, hcp_ids: List[str]) -> List[Dict[str, Any]]:
+    """Select exactly the given HCP ids that carry an NPI — no cohort filter, no
+    practice-setting skip. This is a DETAIL FETCH by existing npi_number (writes
+    nppes_enumeration_date etc.), NOT a match: an id with a null npi is dropped
+    here, never matched. Used to backfill established/rising, which the
+    community-scoped selector never reaches."""
+    rows: List[Dict[str, Any]] = []
+    chunk = 150  # keep the .in_ URL bounded
+    for i in range(0, len(hcp_ids), chunk):
+        batch = hcp_ids[i : i + chunk]
+        resp = (
+            client.table("hcps_v2")
+            .select("id,npi_number,nppes_practice_state,nppes_practice_city,nppes_practice_setting")
+            .in_("id", batch)
+            .not_.is_("npi_number", "null")
+            .execute()
+            .data
+            or []
+        )
+        rows.extend(resp)
+    print(f"  Selected {len(rows):,} of {len(hcp_ids):,} requested ids that carry an NPI (detail fetch, no match)")
+    return rows
+
+
 def pick_address(addresses: Any, purpose: str) -> Dict[str, Any]:
     if not isinstance(addresses, list):
         return {}
@@ -448,6 +486,17 @@ def main() -> None:
         action="store_true",
         help="Re-process rows previously marked not_found or api_error in hcp_nppes_detail_v2",
     )
+    parser.add_argument(
+        "--hcp-ids-file",
+        type=str,
+        default=None,
+        help=(
+            "Path to a file of HCP uuids (one per line). When set, process exactly "
+            "those ids that carry an NPI — bypassing the community cohort filter and "
+            "the practice-setting skip. Used to backfill nppes_enumeration_date for "
+            "established/rising, which the community selector never reaches."
+        ),
+    )
     args = parser.parse_args()
     dry_run = bool(args.dry_run)
 
@@ -455,7 +504,14 @@ def main() -> None:
     load_dotenv()
     client = sb()
 
-    hcps = select_community_hcps(client, limit=args.limit, reset_status=bool(args.reset_status))
+    if args.hcp_ids_file:
+        requested = read_hcp_ids_file(args.hcp_ids_file)
+        print(f"  Read {len(requested):,} ids from {args.hcp_ids_file}")
+        hcps = select_hcps_by_ids(client, requested)
+        if args.limit:
+            hcps = hcps[: args.limit]
+    else:
+        hcps = select_community_hcps(client, limit=args.limit, reset_status=bool(args.reset_status))
     started = time.time()
 
     counts = Counter(success=0, not_found=0, error=0, skipped=0)
