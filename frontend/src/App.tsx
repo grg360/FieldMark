@@ -54,6 +54,7 @@ import InstitutionRoute from "./components/InstitutionRoute";
 import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
 import BriefPage from "./components/BriefPage/BriefPage";
 import HomePage from "./components/HomePage/HomePage";
+import TheWeekPage from "./components/TheWeek/TheWeekPage";
 import ProfileScreen from "./components/ProfileScreen";
 import FieldInsightsScreen from "./components/FieldInsightsScreen";
 import MethodologyPage from "./pages/MethodologyPage";
@@ -1196,6 +1197,7 @@ export default function App() {
           <Route path="/landing" element={<LandingRoute />} />
           <Route path="/welcome" element={<WelcomeWizard />} />
           <Route path="/me" element={<HomePage />} />
+          <Route path="/me/week" element={<TheWeekPage />} />
           <Route path="/me/settings" element={<ProfileScreen />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/me/insights" element={<FieldInsightsScreen />} />

@@ -25,6 +25,7 @@ import { getTrackedHcpIds } from "../../lib/watchlists";
 import { getFieldInsightsForCurrentUser, type FieldInsight } from "../../lib/fieldInsights";
 import { getPinnedInstitutionsForUser, getInstitutionsByNames } from "../../lib/institutionPins";
 import { getWhatMoved, type WhatMoved, type Mover } from "../../lib/homeWhatMoved";
+import { loadTheWeekTeaser, type WeekTeaser } from "../../lib/theWeek";
 import {
   getNextActionsForUser,
   getOverdueFollowUpsForUser,
@@ -85,6 +86,7 @@ export default function HomePage() {
   const [moved, setMoved] = useState<WhatMoved | null>(null);
   const [portfolioChips, setPortfolioChips] = useState<TrackedHcpChip[]>([]);
   const [institutions, setInstitutions] = useState<{ name: string; hcp: number | null; rising: number | null }[]>([]);
+  const [weekTeaser, setWeekTeaser] = useState<WeekTeaser | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +141,11 @@ export default function HomePage() {
         // WHAT MOVED — live 8-Jun snapshot vs current, scoped to the user's territory + tracked set.
         const movedD = await getWhatMoved(territoryD?.territory_states ?? [], trackedIds);
         if (!cancelled) setMoved(movedD);
+
+        // THE WEEK — one entry line (count + first event), linking to /me/week.
+        // Own surface; nothing on Home is replaced (frame card 04).
+        const teaser = await loadTheWeekTeaser([...trackedIds]);
+        if (!cancelled) setWeekTeaser(teaser);
 
         // Institutions — national pins hydrated by name (HCP + RISING; no per-user tracked col).
         const pinNames = pinsD.map((p) => p.institution_name).slice(0, 5);
@@ -231,6 +238,32 @@ export default function HomePage() {
           {/* main grid */}
           <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 356px" : "1fr", gap: isDesktop ? 40 : 28, padding: isDesktop ? "32px 30px 56px" : "24px 16px 32px", alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 40, minWidth: 0 }}>
+              {/* THE WEEK — single entry line into the /me/week surface (frame card 04).
+                  Nothing on Home is replaced; this line is added above WHAT MOVED. */}
+              <div
+                className="fmhome-link"
+                onClick={() => navigate("/me/week")}
+                style={{ display: "flex", alignItems: "baseline", gap: 14, padding: "13px 18px", background: CARD, border: `1px solid ${BORDER}`, borderLeft: `2px solid ${GOLD}`, cursor: "pointer", flexWrap: "wrap" }}
+              >
+                <span style={mono(10, 400, GOLD, ".16em")}>THE FORTNIGHT</span>
+                {weekTeaser && weekTeaser.count > 0 ? (
+                  <>
+                    <span style={serif(15, 400, INK2, 1.4)}>
+                      {weekTeaser.pub_count > 0 ? `${weekTeaser.pub_count} new ${weekTeaser.pub_count === 1 ? "publication" : "publications"}` : ""}
+                      {weekTeaser.pub_count > 0 && weekTeaser.mover_count > 0 ? " · " : ""}
+                      {weekTeaser.mover_count > 0 ? `${weekTeaser.mover_count} moved since 8 Jun` : ""}
+                      {weekTeaser.first_line ? <span style={{ color: MID }}> — {weekTeaser.first_line}</span> : null}
+                    </span>
+                    <span style={{ marginLeft: "auto", ...mono(10, 400, GOLD_LINK, ".1em") }}>OPEN ↗</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={serif(15, 400, MID, 1.4)}>Nothing new for the people you track this fortnight.</span>
+                    <span style={{ marginLeft: "auto", ...mono(10, 400, GOLD_LINK, ".1em") }}>OPEN ↗</span>
+                  </>
+                )}
+              </div>
+
               {/* WHAT MOVED */}
               <WhatMovedSection moved={moved} isDesktop={isDesktop} />
 
