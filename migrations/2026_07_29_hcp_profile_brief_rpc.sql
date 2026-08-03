@@ -100,8 +100,12 @@ begin
     from hcp_open_payments_summary_v2 where hcp_id = p_hcp_id limit 1
   ),
   narr as (
-    select narrative_text from hcp_narratives_v2
-    where hcp_id = p_hcp_id and therapeutic_area_slug = 'nsclc' limit 1
+    -- Newest narrative wins: an HCP may carry both an older v1.0 and the current
+    -- established_v2.0 (stance-led, pharma-stripped, regenerated 2026-08-03). Order
+    -- by generated_at so the profile reads the current version from the data.
+    select narrative_text, prompt_version from hcp_narratives_v2
+    where hcp_id = p_hcp_id and therapeutic_area_slug = 'nsclc'
+    order by generated_at desc limit 1
   )
   select json_build_object(
     'hcp', (select json_build_object(
@@ -158,7 +162,8 @@ begin
               'travel', travel_lodging_3yr, 'honoraria', honoraria_3yr, 'education', education_3yr,
               'royalty', royalty_3yr, 'food', food_beverage_3yr) end from opsum)
     ),
-    'signal_summary', (select narrative_text from narr)
+    'signal_summary', (select narrative_text from narr),
+    'signal_summary_version', (select prompt_version from narr)
   ) into v_result;
 
   return v_result;

@@ -171,9 +171,10 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
       )}
 
       {variant === "ledger" ? (
-        // ledger capture affordance — a single tight row, per the frame's "+ CAPTURE"
+        // ledger capture affordance — the frame's "+ CAPTURE" bar (composer renders the
+        // gold marker + serif prompt + SOURCE·TAG·LINK affordance in the ledger register).
         <div style={{ borderBottom: "1px solid #1a1d1c", background: "#0a0b0b" }}>
-          <InsightComposer userId={userId} hcpId={hcpId} firstName={firstName} isInline onSave={handleSave} />
+          <InsightComposer userId={userId} hcpId={hcpId} firstName={firstName} isInline variant="ledger" onSave={handleSave} />
         </div>
       ) : !isMobile ? (
         <InsightComposer

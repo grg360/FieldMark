@@ -121,6 +121,9 @@ interface Props {
   editingNote?: Note;
   isInline?: boolean;
   forceExpanded?: boolean;
+  /** "ledger" renders the collapsed capture line in the academic profile's register
+   *  (serif prompt, no boxed input) instead of the default sans control. */
+  variant?: "ledger";
   onSave: () => void;
   onCancel?: () => void;
 }
@@ -132,6 +135,7 @@ export default function InsightComposer({
   editingNote,
   isInline = false,
   forceExpanded = false,
+  variant,
   onSave,
   onCancel,
 }: Props) {
@@ -324,6 +328,25 @@ export default function InsightComposer({
   };
 
   if (isInline && !showForm) {
+    // Ledger register (academic profile): the frame's "+ CAPTURE" bar — a gold
+    // marker, a serif prompt and the SOURCE · TAG · LINK affordance — rather than a
+    // boxed sans input. The wrapping row (in FieldInsights) supplies the bar chrome.
+    if (variant === "ledger") {
+      return (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setExpanded(true)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setExpanded(true); }}
+          aria-label={`Add an insight about Dr. ${firstName}`}
+          style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 24px", cursor: "text" }}
+        >
+          <span style={{ font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
+          <span style={{ flex: 1, fontFamily: "'Source Serif 4',Georgia,serif", fontSize: 13.5, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
+          <span style={{ font: "400 8px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
+        </div>
+      );
+    }
     return (
       <>
         <style>{`

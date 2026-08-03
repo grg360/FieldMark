@@ -16,23 +16,18 @@ import { fetchHcpThemes, getEstablishedScoreBreakdown, type TopCollaborator } fr
 import type { ResearchTheme } from "../../types/researchTheme";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import MiniCollaboratorNetwork from "../MiniCollaboratorNetwork";
-import BibliographyScreen from "../BibliographyScreen";
 import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
 import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
-import { FiToast } from "../FieldIntelligenceShared";
 import {
   loadHcpProfile,
   loadFieldPresence,
   positionCount,
-  sourceCount,
   renderSynthesis,
-  renderSilence,
   money,
   roleLabel,
   journalShort,
   timelineAxisFloor,
-  THRESHOLDS,
   type HcpProfile,
   type FieldNote,
   type ProfilePosition,
@@ -134,7 +129,7 @@ function EvidenceRail({ sources, count }: { sources: ProfileSource[] | null; cou
   );
 }
 
-function PositionCard({ pos, sourceRows, count }: { pos: ProfilePosition; sourceRows: ProfileSource[] | null; count: number }) {
+function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: ProfileSource[] | null }) {
   const single = (pos.paper_count ?? 0) <= 1;
   const years = (pos.sources ?? []).map((s) => s.pub_year).filter((y): y is number => y != null);
   // Same axis-floor guard as the career timeline: an ancient mis-linked source year
@@ -143,6 +138,14 @@ function PositionCard({ pos, sourceRows, count }: { pos: ProfilePosition; source
   const loYear = years.length ? timelineAxisFloor(years) : null;
   const hiYear = years.length ? Math.max(...years) : null;
   const yr = loYear == null ? "" : loYear === hiYear ? `${loYear}` : `${loYear}–${hiYear}`;
+  // BASIS must agree with the EVIDENCE rail beneath it. The rail is drawn from
+  // sourceRows (the RPC's ≤5-position sample → distinct pubs); BASIS states that
+  // same count. When the theme's full supporting_paper_count exceeds the sample,
+  // the partiality is made legible ("SAMPLE OF M") rather than implied, with
+  // ALL POSITIONS ↗ (header) as the uncapped route.
+  const railPubs = sourceRows?.length ?? 0;
+  const fullPapers = pos.paper_count ?? railPubs;
+  const basisN = railPubs || fullPapers;
   return (
     <div style={{ borderTop: `1px solid ${P.line}`, padding: "14px 0", display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
@@ -152,26 +155,14 @@ function PositionCard({ pos, sourceRows, count }: { pos: ProfilePosition; source
       </div>
       <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty" }}>{pos.summary}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>
-        <span>BASIS {pos.paper_count ?? count} PUBLICATION{(pos.paper_count ?? count) === 1 ? "" : "S"}</span>
+        <span>BASIS {basisN} PUBLICATION{basisN === 1 ? "" : "S"}{fullPapers > basisN && basisN > 0 ? ` · SAMPLE OF ${fullPapers}` : ""}</span>
         {yr ? <span>SOURCED {yr}</span> : null}
       </div>
-      <div style={{ display: "flex", gap: 40, flexWrap: "wrap", paddingTop: 2 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ ...mono(8.5, 600), letterSpacing: ".14em", color: P.ink6 }}>EVIDENCE</span>
-          <EvidenceRail sources={sourceRows} count={count} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ ...mono(8.5, 600), letterSpacing: ".14em", color: P.ink6 }}>FIELD CORROBORATION</span>
-          <span style={{ ...mono(9.5), color: P.ink5 }}>NOT OBSERVED · 0 MSL REACTIONS LOGGED</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ ...mono(8.5, 600), letterSpacing: ".14em", color: P.ink6 }}>MOVEMENT</span>
-          <span style={{ ...mono(9.5), color: P.ink5 }}>NO PRIOR STATE · first sourced {loYear ?? "—"}</span>
-        </div>
-      </div>
-      <div style={{ paddingTop: 2 }}>
-        <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink5 }}>Heard them speak to this? </span>
-        <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.teal }}>+ LOG A REACTION</span>
+      {/* EVIDENCE only — the FIELD CORROBORATION and MOVEMENT columns were string
+          literals (0 reactions, no prior state), not queries, and are removed. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
+        <span style={{ ...mono(8.5, 600), letterSpacing: ".14em", color: P.ink6 }}>EVIDENCE{fullPapers > basisN ? " · SAMPLE, ALL POSITIONS ↗ FOR THE FULL SET" : ""}</span>
+        <EvidenceRail sources={sourceRows} count={basisN} />
       </div>
     </div>
   );
@@ -185,7 +176,6 @@ export default function HcpProfileBrief() {
   const [notes, setNotes] = useState<FieldNote[]>([]);
   const [collaborators, setCollaborators] = useState<TopCollaborator[]>([]);
   const [themes, setThemes] = useState<ResearchTheme[]>([]);
-  const [bibYear, setBibYear] = useState<number | null>(null); // per-year bibliography overlay
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -206,8 +196,10 @@ export default function HcpProfileBrief() {
       setThemes(th.data ?? []);
       setLoading(false);
     }).catch(() => alive && setLoading(false));
-    // collaborator network — same source DetailScreen uses (established score breakdown)
-    getEstablishedScoreBreakdown(id).then((b) => alive && setCollaborators(b?.top_collaborators ?? [])).catch(() => {});
+    // collaborator network — same source DetailScreen uses (established score breakdown).
+    // DEFECT FIX: getEstablishedScoreBreakdown requires (hcpId, taSlug); it was called with
+    // one arg, so the breakdown never resolved and the collaborator rail loaded nothing.
+    getEstablishedScoreBreakdown(id, "nsclc").then((b) => alive && setCollaborators(b?.top_collaborators ?? [])).catch(() => {});
     return () => { alive = false; };
   }, [id]);
 
@@ -221,19 +213,10 @@ export default function HcpProfileBrief() {
   if (loading) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>Loading profile…</div></Shell>;
   if (!p || !p.hcp?.name) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>This profile could not be loaded.</div></Shell>;
 
-  // per-year bibliography drill-down — same component DetailScreen uses (no canonical URL exists)
-  if (bibYear !== null) return <BibliographyScreen hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} year={bibYear} onBack={() => setBibYear(null)} />;
-
   const s = p.scores;
   const nPos = positionCount(p);
-  const nSrc = sourceCount(p);
   const hasSynthPara = renderSynthesis(p);
-  const showSilence = renderSilence(p);
   const loc = [p.hcp.city, p.hcp.state].filter(Boolean).join(", ");
-
-  // top sourced position for the Brief's expected-position card (no objective in stage 1)
-  const topTier = p.belief.tiers?.find((t) => t.positions && t.positions.length);
-  const topPos = topTier?.positions?.[0] ?? null;
 
   return (
     <Shell>
@@ -296,17 +279,13 @@ export default function HcpProfileBrief() {
             <ScoreCell label="NET" sub="CEILING" value={s?.net ?? null} decimals={1} basis={s?.basis_papers != null ? `${s.basis_papers} PAPERS` : ""} />
             <ScoreCell label="PHARMA" sub="NOT RANKED" value={s?.pharma ?? null} decimals={1} noRank absent="NO DISCLOSURES ON RECORD" />
           </div>
+          {/* Identity footer strip (frame): distinct publications, positions, themes,
+              field insights — the record's real footprint. The old line counted
+              "SOURCES" as raw position-statements (mislabeled); publications is the
+              honest depth figure. THIN when the distinct-publication basis is small. */}
           <div style={{ padding: "0 24px 14px", ...mono(9, 500), letterSpacing: ".08em", color: P.ink6 }}>
-            RECORD DEPTH{nSrc < 12 ? " · THIN" : ""} · {nPos} POSITION{nPos === 1 ? "" : "S"} · {nSrc} SOURCE{nSrc === 1 ? "" : "S"} · {notes.length} FIELD NOTE{notes.length === 1 ? "" : "S"}{p.record_depth.oldest ? ` · OLDEST SOURCE ${p.record_depth.oldest}` : ""}
+            {p.record.publications_total ?? "—"} PUBLICATION{p.record.publications_total === 1 ? "" : "S"}{p.record_depth.papers < 12 ? " · THIN SOURCED RECORD" : ""} · {nPos} POSITION{nPos === 1 ? "" : "S"} · {themes.length} THEME{themes.length === 1 ? "" : "S"} · {notes.length} FIELD INSIGHT{notes.length === 1 ? "" : "S"}{p.record_depth.oldest ? ` · OLDEST SOURCE ${p.record_depth.oldest}` : ""}
           </div>
-        </div>
-
-        {/* orientation strip — frame: "ORIENTATION FIRST" + the relevance-matching v2
-            LABEL (a deferred feature; render the label, not the feature). Replaces the
-            old objective-lens strip. */}
-        <div style={{ border: `1px solid ${P.line}`, background: P.band, padding: "11px 16px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <span style={{ ...mono(8.5, 500), letterSpacing: ".16em", color: P.ink5 }}>ORIENTATION FIRST · THE SCHOLARLY RECORD BELOW</span>
-          <span style={{ ...mono(8.5, 500), letterSpacing: ".16em", color: P.teal }}>RELEVANCE MATCHING V2 STAGE ↗</span>
         </div>
 
         {/* ── SIGNAL SUMMARY — who is this (orientation, top) ── */}
@@ -348,14 +327,6 @@ export default function HcpProfileBrief() {
           </div>
         </div>
 
-        {/* ── FIELD INTELLIGENCE — nested after Field Insights per the frame: interactive
-            rating buttons + submit. Write path unwired (field_intel_* SELECT-only, see
-            KNOWN_ISSUES); submit acknowledges honestly rather than faking success. ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SectionHead id="intel" tag="FIELD INTELLIGENCE" count="TEAM RATINGS" sub="NOT SET · REQUIRES 2 RATERS" />
-          <FieldIntelligencePanel />
-        </div>
-
         {/* ── THE RECORD ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead id="record" tag="THE RECORD" count={`${p.record.publications_total ?? ""} SOURCES`} sub="SCIENTIFIC AND COMMERCIAL FOOTPRINT AT EQUAL WEIGHT" />
@@ -373,7 +344,10 @@ export default function HcpProfileBrief() {
             {p.record.timeline && p.record.timeline.length ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>PUBLICATION TIMELINE · CLICK A YEAR</span>
-                <Timeline data={p.record.timeline} onYearPress={(y) => setBibYear(y)} />
+                {/* A year click navigates to the redesigned publications surface (URL
+                    changes to ?year=), not an in-route state overlay — so the year view
+                    is reachable, linkable, and browser-back returns to the profile. */}
+                <Timeline data={p.record.timeline} onYearPress={(y) => navigate(`/hcp/${p.hcp.id}/publications?year=${y}`)} />
               </div>
             ) : null}
             {/* pharma engagement */}
@@ -412,50 +386,20 @@ export default function HcpProfileBrief() {
           <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug="nsclc" withholdSeam />
         </div>
 
-        {/* ── THE BRIEF — payoff begins ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <SectionHead id="brief" tag="THE BRIEF" sub="MODEL SELECTION OVER SOURCED RECORDS · NO CLINICAL CLAIM" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
-            {/* expected position — no objective in stage 1: top sourced position, honestly labelled */}
-            {topPos ? (
-              <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
-                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>TOP SOURCED POSITION{nPos === 1 ? " · ONE POSITION ONLY" : ""}</span>
-                <span style={{ ...serif(15, 600), color: P.ink0, lineHeight: 1.35 }}>{topPos.theme}</span>
-                <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.5, textWrap: "pretty" }}>{topPos.summary}</span>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
-                  <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>{topPos.paper_count ?? 1} PAPER{(topPos.paper_count ?? 1) === 1 ? "" : "S"} · {notes.length} FIELD NOTE{notes.length === 1 ? "" : "S"}</span>
-                  <a href="#belief" style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.teal, textDecoration: "none" }}>→ POSITIONS</a>
-                </div>
-              </div>
-            ) : themes.length ? (
-              /* INVOLVEMENT tier carries the hero when no advocacy position exists — a
-                 weaker claim, labeled as such, never phrased as a stance. */
-              <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
-                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>TOP RESEARCH THEME · INVOLVEMENT, NOT A STANCE</span>
-                <span style={{ ...serif(15, 600), color: P.ink0, lineHeight: 1.35 }}>{themes[0].theme_name}</span>
-                <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.5, textWrap: "pretty" }}>Active in this area across {themes[0].paper_count} publication{themes[0].paper_count === 1 ? "" : "s"} (any authorship position). No sourced advocacy position exists for this HCP — involvement shows where the work is, not what they argue.</span>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
-                  <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>{themes.length} THEME{themes.length === 1 ? "" : "S"} · PUBLICATION-DERIVED</span>
-                  <a href="#themes" style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.teal, textDecoration: "none" }}>→ INVOLVEMENT</a>
-                </div>
-              </div>
-            ) : (
-              <Withheld head="EXPECTED POSITION · WITHHELD" title="No sourced positions yet." body="Nothing has been extracted from the published record for this HCP in NSCLC. This is an absence in the record, not evidence that no position exists." foot="RENDERS FROM ≥1 SOURCED POSITION" />
-            )}
-            {/* what changed — always withheld in stage 1 (no position snapshots) */}
-            <Withheld head="WHAT CHANGED · WITHHELD" title="No dated movement to report." body="A delta needs two dated observations of the same position. There are no position snapshots over time in stage 1, so there is no prior state to compare against." foot={`REQUIRES ≥${THRESHOLDS.deltaMinObservations} DATED OBSERVATIONS · + LOG A NOTE`} />
-            {/* where silent — 12+ sources gate; topic naming is stage 2 */}
-            {showSilence ? (
-              <Withheld head="WHERE THE RECORD IS SILENT · WITHHELD" title="Silence detection is stage 2." body={`The record is dense enough (${nSrc} sources) for absence to be a finding, but naming which topics are silent needs the silence topic taxonomy, which is stage 2.`} foot="THRESHOLD MET · TAXONOMY STAGE 2 → METHOD ↗" />
-            ) : (
-              <Withheld head="WHERE THE RECORD IS SILENT · WITHHELD" title="The record is too thin for silence to be a finding." body={`Absence is only informative against a dense record. With ${nSrc} source${nSrc === 1 ? "" : "s"}, every topic is absent — naming one would be an artefact of thin coverage, not a read on their views.`} foot={`REQUIRES ≥${THRESHOLDS.silenceMinSources} SOURCED POSITIONS → METHOD ↗`} />
-            )}
-          </div>
-        </div>
+        {/* THE BRIEF section removed (2026-08-03, per Design): the frame drops it in
+            both populated and sparse. Its three cards were WHAT CHANGED and WHERE
+            SILENT (permanently withheld literals) plus a TOP SOURCED POSITION /
+            TOP RESEARCH THEME hero that only re-rendered the top-tier position
+            (shown in full under BELIEF PROFILE below) or the first research theme
+            (shown under RESEARCH INVOLVEMENT). No fact is lost. */}
 
         {/* BELIEF PROFILE */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SectionHead id="belief-profile" tag="BELIEF PROFILE" count={`${nPos} POSITION${nPos === 1 ? "" : "S"} · ${nSrc} SOURCE${nSrc === 1 ? "" : "S"} · ALL PUBLISHED`} sub="POSITIONS DESCRIBE THE PUBLISHED WORK · NOT THE PERSON" />
+          {/* DEFECT FIX: header paired a synthesis-layer theme count (nPos) against a
+              raw position-statement count labelled SOURCES (record_depth.sources = 49
+              for Heymach). The true distinct-publication footprint is record_depth.papers
+              (10). Relabel to PUBLICATIONS so the header agrees with the per-card BASIS. */}
+          <SectionHead id="belief-profile" tag="BELIEF PROFILE" count={`${nPos} POSITION${nPos === 1 ? "" : "S"} · ${p.record_depth.papers} PUBLICATION${p.record_depth.papers === 1 ? "" : "S"} · ALL PUBLISHED`} sub="POSITIONS DESCRIBE THE PUBLISHED WORK · NOT THE PERSON" />
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
             {/* synthesis paragraph or its withheld state */}
             {hasSynthPara ? (
@@ -473,7 +417,7 @@ export default function HcpProfileBrief() {
                 <div key={t.key} style={{ paddingTop: 12 }}>
                   <span style={{ ...mono(9.5, 600), letterSpacing: ".14em", color: P.ink4 }}>{t.label} <span style={{ color: P.ink6 }}>{t.positions!.length}</span></span>
                   {t.positions!.map((pos, i) => (
-                    <PositionCard key={i} pos={pos} sourceRows={pos.sources} count={pos.paper_count ?? pos.sources?.length ?? 0} />
+                    <PositionCard key={i} pos={pos} sourceRows={pos.sources} />
                   ))}
                 </div>
               ))
@@ -532,66 +476,11 @@ export default function HcpProfileBrief() {
   );
 }
 
-// Frame's four rating dimensions. Options mirror the frame verbatim. Submission is
-// unwired (field_intel_* tables are SELECT-only per KNOWN_ISSUES) — submit acknowledges
-// honestly, matching the community profile's field-intel panel.
-const FI_DIMENSIONS = [
-  { key: "dataMatch", label: "DATA MATCHES FIELD REALITY", options: ["Confirms", "Partial", "Disputes"] },
-  { key: "engagement", label: "ENGAGEMENT POTENTIAL", options: ["High", "Moderate", "Low"] },
-  { key: "credibility", label: "SCIENTIFIC CREDIBILITY", options: ["Strong", "Moderate", "Early"] },
-  { key: "momentum", label: "MOMENTUM TRAJECTORY", options: ["Accelerating", "Steady", "Plateauing"] },
-] as const;
-
-function FieldIntelligencePanel() {
-  const [answers, setAnswers] = useState<Record<string, string | null>>({ dataMatch: null, engagement: null, credibility: null, momentum: null });
-  const [toast, setToast] = useState<string | null>(null);
-  const complete = FI_DIMENSIONS.every((d) => answers[d.key]);
-  const showToast = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 3200); };
-  return (
-    <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
-      <span style={{ ...serif(14), color: P.ink3, lineHeight: 1.5 }}>Field Intelligence pending — be among the first to contribute.</span>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink5 }}>COMMUNITY CONFIDENCE</span>
-        <span style={{ marginLeft: "auto", ...mono(9, 600), color: P.teal }}>0%</span>
-        <span style={{ ...mono(9), color: P.ink6 }}>0 MSLS · 2 REQUIRED</span>
-      </div>
-      <div style={{ height: 3, background: P.line }} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: "18px 28px" }}>
-        {FI_DIMENSIONS.map((d) => (
-          <div key={d.key}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 9 }}>
-              <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink4 }}>{d.label}</span>
-              <span style={{ ...mono(8, 500), letterSpacing: ".1em", color: answers[d.key] ? P.teal : P.ink6 }}>{answers[d.key] ? answers[d.key]!.toUpperCase() : "UNRATED"}</span>
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {d.options.map((opt) => {
-                const on = answers[d.key] === opt;
-                return (
-                  <button key={opt} type="button"
-                    onClick={() => setAnswers((a) => ({ ...a, [d.key]: a[d.key] === opt ? null : opt }))}
-                    style={{ flex: 1, textAlign: "center", ...mono(9, 600), letterSpacing: ".1em", padding: "11px 6px", cursor: "pointer",
-                      background: on ? "rgba(127,179,187,.10)" : "none", border: `1px solid ${on ? P.teal : P.lineStrong}`, color: on ? P.ink1 : P.ink3, borderRadius: 2 }}>
-                    {opt.toUpperCase()}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-      <button type="button" disabled={!complete}
-        onClick={() => { if (!complete) return; showToast("Field review recorded — the submission path (field-intel write) is not yet wired; stored locally only."); }}
-        style={{ textAlign: "center", padding: "11px 0", ...mono(9, 700), letterSpacing: ".2em", cursor: complete ? "pointer" : "not-allowed",
-          background: complete ? "#0d1411" : "none", border: `1px solid ${complete ? "#2f4436" : P.lineStrong}`, color: complete ? "#8caf94" : P.ink6, borderRadius: 2 }}>
-        SUBMIT VALIDATION
-      </button>
-      <div style={{ ...mono(9), lineHeight: 1.6, color: P.ink6, letterSpacing: ".04em" }}>
-        UNTIL TWO RATERS AGREE, A DIMENSION READS UNRATED RATHER THAN AS A FINDING. YOUR IDENTITY IS NEVER SHARED · CONTRIBUTOR UUID ONLY.
-      </div>
-      <FiToast message={toast} />
-    </div>
-  );
-}
+// FIELD INTELLIGENCE panel removed (2026-08-03): the four-dimension rating grid
+// rendered hardcoded 0% / 0 MSLS on every profile with an unwired submit
+// (field_intel_* tables are SELECT-only). It was a literal, not data. FIELD
+// INSIGHTS — the MSL-captured notes with linked belief positions — is a different
+// block and stays.
 
 // Centrality is the theme's strength grade (core / supporting / peripheral) — rendered
 // as a graded chip, ledger register. Involvement language only.

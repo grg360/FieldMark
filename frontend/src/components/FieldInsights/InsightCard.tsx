@@ -144,45 +144,72 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
             marginBottom: 8,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0 }}>
-            {typeStyle ? (
-              <span style={{ ...chipBase, ...typeStyle }}>{interactionTypeLabel(note.interaction_type)}</span>
-            ) : null}
-            {note.insight_strength !== "routine" ? (
-              <span
-                style={{
-                  ...chipBase,
-                  fontSize: 9,
-                  ...strengthChipStyle(note.insight_strength),
-                  marginLeft: typeStyle ? 6 : 0,
-                }}
-              >
-                {note.insight_strength === "notable" ? "NOTABLE" : "STRATEGIC"}
+          {ledger ? (
+            // Ledger register (academic profile): the two taxonomies are distinguished
+            // STRUCTURALLY, not by hue. SOURCE-TYPE (where the observation came from) is
+            // sage bold mono text with no border; SIGNIFICANCE (how much it matters) is a
+            // bordered mono chip. Platform charcoal/gold/ink only — no purple/orange/blue.
+            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
+              {note.interaction_type !== "general" ? (
+                <span style={{ font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#8caf94", textTransform: "uppercase" }}>
+                  {interactionTypeLabel(note.interaction_type)}
+                </span>
+              ) : null}
+              {note.insight_strength !== "routine" ? (
+                <span style={{
+                  font: "600 8px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", padding: "3px 6px",
+                  color: note.insight_strength === "notable" ? "#9aa19b" : "#d99a3c",
+                  border: `1px solid ${note.insight_strength === "notable" ? "#2a2e2c" : "#5c4419"}`,
+                }}>
+                  {note.insight_strength === "notable" ? "NOTABLE" : "STRATEGIC"}
+                </span>
+              ) : null}
+              <span style={{ font: "400 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#5f6762" }}>
+                {formatOccurredAt(note.occurred_at).toUpperCase()}
               </span>
-            ) : null}
-            {(typeStyle || note.insight_strength !== "routine") && (
-              <span style={{ color: "#6B6A65", margin: "0 6px" }}>·</span>
-            )}
-            <span style={{ fontSize: 12, color: "#9B9892" }}>{formatOccurredAt(note.occurred_at)}</span>
-          </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0 }}>
+              {typeStyle ? (
+                <span style={{ ...chipBase, ...typeStyle }}>{interactionTypeLabel(note.interaction_type)}</span>
+              ) : null}
+              {note.insight_strength !== "routine" ? (
+                <span
+                  style={{
+                    ...chipBase,
+                    fontSize: 9,
+                    ...strengthChipStyle(note.insight_strength),
+                    marginLeft: typeStyle ? 6 : 0,
+                  }}
+                >
+                  {note.insight_strength === "notable" ? "NOTABLE" : "STRATEGIC"}
+                </span>
+              ) : null}
+              {(typeStyle || note.insight_strength !== "routine") && (
+                <span style={{ color: "#6B6A65", margin: "0 6px" }}>·</span>
+              )}
+              <span style={{ fontSize: 12, color: "#9B9892" }}>{formatOccurredAt(note.occurred_at)}</span>
+            </div>
+          )}
 
           <div ref={menuRef} style={{ position: "relative" }}>
+            {/* Ledger register: the last old-system glyph on this block, restyled into
+                the platform's mono/ink control language (was a 16px sans "· · ·"). */}
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
               aria-label="Insight options"
               aria-expanded={menuOpen}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#6B6A65",
-                fontSize: 16,
-                cursor: "pointer",
-                padding: "0 4px",
-                lineHeight: 1,
-              }}
+              onMouseEnter={ledger ? (e) => { e.currentTarget.style.color = "#8b918b"; } : undefined}
+              onMouseLeave={ledger ? (e) => { e.currentTarget.style.color = "#4b514d"; } : undefined}
+              style={
+                ledger
+                  ? { background: "none", border: "none", color: "#4b514d", cursor: "pointer", padding: "0 2px", lineHeight: 1,
+                      font: "700 12px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".08em" }
+                  : { background: "none", border: "none", color: "#6B6A65", fontSize: 16, cursor: "pointer", padding: "0 4px", lineHeight: 1 }
+              }
             >
-              · · ·
+              {ledger ? "···" : "· · ·"}
             </button>
             {menuOpen ? (
               <div
@@ -191,9 +218,9 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                   right: 0,
                   top: "100%",
                   marginTop: 4,
-                  backgroundColor: "#0D0D10",
-                  border: "1px solid #1E1E22",
-                  borderRadius: 4,
+                  backgroundColor: ledger ? "#0E1013" : "#0D0D10",
+                  border: `1px solid ${ledger ? "rgba(255,255,255,.09)" : "#1E1E22"}`,
+                  borderRadius: ledger ? 2 : 4,
                   zIndex: 10,
                   minWidth: 100,
                   boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
@@ -205,17 +232,12 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                     setMenuOpen(false);
                     setEditing(true);
                   }}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "8px 12px",
-                    background: "none",
-                    border: "none",
-                    color: "#E8E6DF",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
+                  style={
+                    ledger
+                      ? { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none",
+                          color: "#C6CACD", cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
+                      : { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "#E8E6DF", fontSize: 13, cursor: "pointer" }
+                  }
                 >
                   Edit
                 </button>
@@ -225,17 +247,12 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                     setMenuOpen(false);
                     setConfirmDelete(true);
                   }}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "8px 12px",
-                    background: "none",
-                    border: "none",
-                    color: "#E8E6DF",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
+                  style={
+                    ledger
+                      ? { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none",
+                          color: "#C6CACD", cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
+                      : { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "#E8E6DF", fontSize: 13, cursor: "pointer" }
+                  }
                 >
                   Delete
                 </button>
@@ -244,56 +261,65 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
           </div>
         </div>
 
-        <div style={{ fontFamily: FONT.serif, fontSize: 15, color: COLOR.ink1, lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
+        {/* Body prose is serif on this platform (both variants); ledger uses the frame's
+            note ink + measure. */}
+        <div style={ledger
+          ? { fontFamily: FONT.serif, fontSize: 13.5, color: "#ddd8cd", lineHeight: 1.6, whiteSpace: "pre-wrap", marginTop: 11, textWrap: "pretty" as const }
+          : { fontFamily: FONT.serif, fontSize: 15, color: COLOR.ink1, lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
           {note.body}
         </div>
 
         {note.belief_claim_title ? (
-          <button
-            type="button"
-            onClick={() => {
+          (() => {
+            // The field-note → sourced-position connection is the most valuable thing on
+            // the block: content, structure and this affordance are preserved. Only the
+            // register changes — the ledger link is teal (gold/teal ledger treatment),
+            // not the old purple pill.
+            const goToClaim = () => {
               const claimEl = note.belief_claim_key
                 ? document.getElementById(`claim-${note.belief_claim_key}`)
                 : null;
-              if (claimEl) {
-                claimEl.scrollIntoView({ behavior: "smooth", block: "start" });
-                return;
-              }
+              if (claimEl) { claimEl.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
               const sectionEl = document.getElementById("belief-profile");
-              if (sectionEl) {
-                sectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
-                return;
-              }
+              if (sectionEl) { sectionEl.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
               navigate(`/hcp/${hcpId}#belief-profile`);
-            }}
-            aria-label={`View linked Belief Profile: ${note.belief_claim_title}`}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: "rgba(155, 109, 255, 0.08)",
-              border: "1px solid rgba(155, 109, 255, 0.30)",
-              color: "#B89BFF",
-              padding: "6px 10px",
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 500,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              marginTop: 10,
-              transition: "background-color 120ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.14)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.08)";
-            }}
-          >
-            <span style={{ color: "#9B9892", fontWeight: 400 }}>Linked Belief Profile:</span>
-            <span>{note.belief_claim_title}</span>
-            <span aria-hidden style={{ color: "#9B9892", marginLeft: 2 }}>{String.fromCharCode(0x2192)}</span>
-          </button>
+            };
+            if (ledger) {
+              return (
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 8, marginTop: 11 }}>
+                  <span style={{ font: "400 8px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".16em", color: "#4b514d" }}>LINKED POSITION</span>
+                  <button
+                    type="button"
+                    onClick={goToClaim}
+                    aria-label={`View linked Belief Profile: ${note.belief_claim_title}`}
+                    style={{ background: "none", border: "none", padding: "0 0 2px", cursor: "pointer",
+                      font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".1em", color: "#71b3a7", borderBottom: "1px solid #2f4a46" }}
+                  >
+                    {note.belief_claim_title.toUpperCase()} ↗
+                  </button>
+                </div>
+              );
+            }
+            return (
+              <button
+                type="button"
+                onClick={goToClaim}
+                aria-label={`View linked Belief Profile: ${note.belief_claim_title}`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  background: "rgba(155, 109, 255, 0.08)", border: "1px solid rgba(155, 109, 255, 0.30)",
+                  color: "#B89BFF", padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 500,
+                  cursor: "pointer", fontFamily: "inherit", marginTop: 10, transition: "background-color 120ms ease",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.14)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.08)"; }}
+              >
+                <span style={{ color: "#9B9892", fontWeight: 400 }}>Linked Belief Profile:</span>
+                <span>{note.belief_claim_title}</span>
+                <span aria-hidden style={{ color: "#9B9892", marginLeft: 2 }}>{String.fromCharCode(0x2192)}</span>
+              </button>
+            );
+          })()
         ) : null}
 
         {showFooter ? (
