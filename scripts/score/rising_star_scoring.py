@@ -266,11 +266,28 @@ def upsert_results(conn, ta_id: str, results: list[dict], run_id: str) -> int:
           enrichment_run_id = EXCLUDED.enrichment_run_id
     """
 
+    # DE-LIST DELETE, same transaction as the upsert (2026-08-03): rows for this
+    # TA whose hcp_id is not in the new result set are removed. Upsert-only
+    # recompute leaves de-listed members (HCPs that left the rising_star cohort,
+    # or whose hcps_v2 row was deleted) holding stale ranks that interleave with
+    # the fresh ordering — the trap that left 5 dangling NSCLC rows at
+    # computed_at 2026-06-22, one still occupying US rank 113. The empty-result
+    # guard (`if not results: return 0` above) means an upstream failure that
+    # produces zero rows deletes NOTHING rather than wiping the board.
+    keep_ids = sorted({r["hcp_id"] for r in results})
     try:
         with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM hcp_rising_star_ranks_v3 "
+                "WHERE therapeutic_area_id = %s AND NOT (hcp_id = ANY(%s::uuid[]))",
+                (ta_id, keep_ids),
+            )
+            delisted = cur.rowcount or 0
             for start in range(0, len(values), UPSERT_BATCH_SIZE):
                 execute_values(cur, sql, values[start : start + UPSERT_BATCH_SIZE])
         conn.commit()
+        if delisted:
+            print(f"[upsert] de-listed {delisted} stale row(s) not in the new result set")
         return len(values)
     except Exception:
         conn.rollback()
