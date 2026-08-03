@@ -1,6 +1,9 @@
 -- Field Intelligence Forum — seed from Design's six frames.
 -- All discussion is fabricated (SIMULATED) for compliance review; the publication
--- anchors are real (join to publications_v2 by pubmed_id). Author handles are the
+-- anchors are real (join to publications_v2 by pubmed_id). Every row seeded here
+-- is is_seed=true — covered by the column DEFAULT (2026_08_03_field_intel_provenance),
+-- so re-running this seed keeps the SEEDED provenance without per-INSERT edits.
+-- Author handles are the
 -- seven sanctioned pseudonyms; Design's non-exemplar threads used a few additional
 -- pseudonyms which are consolidated onto the sanctioned set here.
 --

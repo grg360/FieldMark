@@ -21,6 +21,7 @@ import {
   type ForumIndexAnchor,
   type ForumThread,
 } from "../../lib/fieldIntelligence";
+import { ProvenanceChip } from "./fiUi";
 
 // The card grid stops being readable at roughly two dozen threads; past this the
 // forum renders as the ledger table (item 2 — switched on the LIVE count, not a
@@ -96,8 +97,8 @@ function DisclosureBand({ tail, narrow }: { tail: string; narrow: boolean }) {
           <div style={mono(9.5, C.gold, 0.18, 500)}>ILLUSTRATIVE PROTOTYPE</div>
           <p style={{ ...serif(12.5, C.ink3, 1.5), marginTop: 8 }}>
             Publications, journals and PMIDs are real.{" "}
-            <strong style={{ color: C.ink2, fontWeight: 600 }}>Every post, handle and moderation record is fabricated</strong>{" "}
-            for compliance review. No real individual is represented or quoted.
+            <strong style={{ color: C.ink2, fontWeight: 600 }}>Content marked SEEDED — its posts, handles and moderation records — is fabricated</strong>{" "}
+            for compliance review. Content marked LIVE is authored on this surface by a verified MSL. LIVE posts are checked for recommendation language, off-label content and physician names before publishing.
           </p>
         </div>
       </div>
@@ -109,10 +110,10 @@ function DisclosureBand({ tail, narrow }: { tail: string; narrow: boolean }) {
         <div style={{ width: 2, height: 22, background: C.gold }} />
         <span style={mono(10, C.gold, 0.2, 500)}>ILLUSTRATIVE PROTOTYPE</span>
       </div>
-      <p style={{ ...serif(13.5, C.ink3, 1.55), maxWidth: 780 }}>
+      <p style={{ ...serif(13.5, C.ink3, 1.55), maxWidth: 820 }}>
         Publications, journals and PMIDs are real.{" "}
-        <strong style={{ color: C.ink2, fontWeight: 600 }}>Every post, handle and moderation record on this page is fabricated</strong>{" "}
-        for compliance review. No real individual is represented or quoted.
+        <strong style={{ color: C.ink2, fontWeight: 600 }}>Content marked SEEDED — its posts, handles and moderation records — is fabricated</strong>{" "}
+        for compliance review. Content marked LIVE is authored on this surface by a verified MSL. LIVE posts are checked for recommendation language, off-label content and physician names before publishing.
       </p>
       <div style={{ marginLeft: "auto", ...mono(10, C.faint, 0.15), lineHeight: 1.7, textAlign: "right", flexShrink: 0 }}>
         PERMANENT DISCLOSURE
@@ -298,8 +299,9 @@ function QuestionWindow({ t, moderated }: { t: ForumThread; moderated: boolean }
       <p style={{ ...serif(15, C.ink2, 1.45), height: 44, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
         {t.question_title}
       </p>
-      <div style={{ ...mono(10, C.faint, 0.12), marginTop: 10 }}>
-        {t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"} · {t.recency_label.toUpperCase()}
+      <div style={{ ...mono(10, C.faint, 0.12), marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+        <ProvenanceChip seed={t.is_seed} />
+        <span>{t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"} · {t.recency_label.toUpperCase()}</span>
       </div>
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 7, height: 19 }}>
         <Moderation t={t} moderated={moderated} />

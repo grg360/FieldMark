@@ -2,13 +2,14 @@
 // Used to open a thread from a publication card and to reply within a thread.
 // The anchor is locked (set from the card/thread, never chosen here). On submit
 // the server runs the content check; a flagged draft comes back unpublished with
-// the reason, and stays in the box so it can be edited. Everything posted carries
-// the SIMULATED marker (posts default simulated=true).
+// the reason, and stays in the box so it can be edited. Content authored here is
+// REAL (is_seed=false, simulated=false) and renders with the LIVE provenance chip;
+// only the pre-existing seed corpus carries the SEEDED marker.
 
 import { useState } from "react";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { createReply, createThread, FORUM_WRITE_HANDLE, type WriteResult } from "../../lib/fieldIntelligence";
-import { mono, SimulatedChip } from "./fiUi";
+import { mono, ProvenanceChip } from "./fiUi";
 
 type Mode =
   | { kind: "thread"; pubmedId: string; journalAbbrev: string; title: string }
@@ -125,7 +126,7 @@ export default function Composer({
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8, ...mono(10, COLOR.ink5) }}>
-            Posting as {FORUM_WRITE_HANDLE} · MSL Verified · anonymous to peers <SimulatedChip />
+            Posting as {FORUM_WRITE_HANDLE} · MSL Verified · anonymous to peers <ProvenanceChip seed={false} />
           </span>
           <div style={{ display: "flex", gap: 8 }}>
             <button type="button" onClick={onClose} style={{ ...mono(10.5, COLOR.ink3), background: "none", border: `1px solid ${COLOR.hairStrong}`, borderRadius: 4, padding: "8px 14px", cursor: "pointer" }}>Cancel</button>

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.field_intel_anchors (
   scope_off_topic text NOT NULL,
   thread_count    integer NOT NULL DEFAULT 0,   -- Design's displayed aggregate
   reply_count     integer NOT NULL DEFAULT 0,   -- Design's displayed aggregate
+  is_seed         boolean NOT NULL DEFAULT true, -- fail-safe: only the founder RPC mints is_seed=false
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS public.field_intel_threads (
   context_note_count  integer NOT NULL DEFAULT 0,
   is_primary          boolean NOT NULL DEFAULT true,   -- headline question for the anchor
   simulated           boolean NOT NULL DEFAULT true,
+  is_seed             boolean NOT NULL DEFAULT true,   -- fail-safe; the founder RPC sets false for real threads
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_fi_threads_anchor ON public.field_intel_threads(anchor_id);
@@ -64,6 +66,7 @@ CREATE TABLE IF NOT EXISTS public.field_intel_posts (
   removed_detected_phrases text[],
   placeholder_shown       boolean NOT NULL DEFAULT true,  -- false = nested removal, no slot
   simulated           boolean NOT NULL DEFAULT true,
+  is_seed             boolean NOT NULL DEFAULT true,   -- fail-safe; the founder RPC sets false for real posts
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_fi_posts_thread ON public.field_intel_posts(thread_id);
@@ -77,6 +80,7 @@ CREATE TABLE IF NOT EXISTS public.field_intel_post_notes (
   label            text NOT NULL,     -- "CROSS-TRIAL COMPARISON" / "2 FLAGS · ..."
   body_text        text NOT NULL,     -- the concern in the paper's own terms
   disposition_text text NOT NULL,     -- what happens next and by when
+  is_seed          boolean NOT NULL DEFAULT true,  -- follows its post's provenance
   created_at       timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_fi_notes_post ON public.field_intel_post_notes(post_id);
@@ -105,6 +109,7 @@ CREATE TABLE IF NOT EXISTS public.field_intel_moderation_records (
   follow_up_text    text,
   blocked_reason    text,             -- for blocked_at_composer
   audit_log         jsonb NOT NULL DEFAULT '[]'::jsonb,  -- [{t, event}]
+  is_seed           boolean NOT NULL DEFAULT true,  -- fabricated moderation records are seed
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_fi_mod_post ON public.field_intel_moderation_records(post_id);

@@ -23,7 +23,7 @@ import {
   mono,
   PrototypeStrip,
   serif,
-  SimulatedChip,
+  ProvenanceChip,
   VerifiedBadge,
 } from "./fiUi";
 import { useForumWriter } from "./useForumWriter";
@@ -70,7 +70,7 @@ function RemovedPlaceholder({ post, record }: { post: ForumPost; record?: Modera
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ ...mono(9.5, COLOR.danger), letterSpacing: "0.12em", fontWeight: 600 }}>REMOVED BY MODERATION</span>
         <span style={mono(10.5, COLOR.ink4)}>{post.author_handle} · posted {post.recency_label}</span>
-        <SimulatedChip />
+        <ProvenanceChip seed={post.is_seed} />
       </div>
       <span style={{ fontSize: 13, lineHeight: 1.6, color: COLOR.ink2 }}>
         {record?.clause_text ??
@@ -120,7 +120,7 @@ function PostByline({ post, isMobile }: { post: ForumPost; isMobile: boolean }) 
       {isMobile && post.compliance_state === "on_anchor" && (
         <ComplianceChip state="on_anchor" fragment={post.anchor_fragment} />
       )}
-      <SimulatedChip />
+      <ProvenanceChip seed={post.is_seed} />
     </div>
   );
 }
@@ -306,7 +306,7 @@ export default function ThreadPage() {
             <span style={mono(12.5, COLOR.ink1)}>{thread.author_handle}</span>
             <VerifiedBadge />
             <span style={mono(10.5, COLOR.ink5)}>{thread.recency_label}</span>
-            <SimulatedChip />
+            <ProvenanceChip seed={thread.is_seed} />
           </div>
           <h1 style={{ margin: 0, fontFamily: FONT.serif, fontSize: 27, fontWeight: 400, lineHeight: 1.35, color: COLOR.ink1 }}>
             {thread.question_title}

@@ -142,15 +142,18 @@ BEGIN
     IF v_pub_id IS NULL THEN
       RETURN jsonb_build_object('ok', false, 'reason', 'That publication is not in the FieldMark corpus.');
     END IF;
-    INSERT INTO field_intel_anchors(publication_id, pubmed_id, journal_abbrev, scope_on_topic, scope_off_topic)
+    INSERT INTO field_intel_anchors(publication_id, pubmed_id, journal_abbrev, scope_on_topic, scope_off_topic, is_seed)
       VALUES (v_pub_id, p_pubmed_id, fi_journal_abbrev(v_journal),
         'results, endpoints, methods and limitations as published here',
-        'treatment recommendations, sequencing advice, comparisons to trials this paper was not designed against, and inferences beyond the powered analyses')
+        'treatment recommendations, sequencing advice, comparisons to trials this paper was not designed against, and inferences beyond the powered analyses',
+        false)
       RETURNING id INTO v_anchor;
   END IF;
 
-  INSERT INTO field_intel_threads(anchor_id, question_title, question_body, author_handle, recency_label, is_primary, simulated)
-    VALUES (v_anchor, trim(p_question_title), nullif(trim(p_question_body), ''), v_handle, 'just now', true, true)
+  -- Real thread authored on this surface: is_seed=false, and simulated=false so
+  -- the two flags agree (the RPC is the only path that can mint a non-seed row).
+  INSERT INTO field_intel_threads(anchor_id, question_title, question_body, author_handle, recency_label, is_primary, simulated, is_seed)
+    VALUES (v_anchor, trim(p_question_title), nullif(trim(p_question_body), ''), v_handle, 'just now', true, false, false)
     RETURNING id INTO v_thread;
 
   PERFORM fi_recount(v_thread);
@@ -198,8 +201,11 @@ BEGIN
   END IF;
   SELECT coalesce(max(ordinal), 0) + 1 INTO v_ord FROM field_intel_posts WHERE thread_id = p_thread_id;
 
-  INSERT INTO field_intel_posts(thread_id, parent_post_id, depth, ordinal, author_handle, body, compliance_state, recency_label, placeholder_shown, simulated)
-    VALUES (p_thread_id, p_parent_post_id, v_depth, v_ord, v_handle, trim(p_body), 'on_anchor', 'just now', true, true)
+  -- Real reply: is_seed=false, simulated=false. A real reply onto a seed thread
+  -- is legitimate — the badge is per-row, so the thread stays SEEDED while this
+  -- post reads LIVE.
+  INSERT INTO field_intel_posts(thread_id, parent_post_id, depth, ordinal, author_handle, body, compliance_state, recency_label, placeholder_shown, simulated, is_seed)
+    VALUES (p_thread_id, p_parent_post_id, v_depth, v_ord, v_handle, trim(p_body), 'on_anchor', 'just now', true, false, false)
     RETURNING id INTO v_post;
 
   PERFORM fi_recount(p_thread_id);

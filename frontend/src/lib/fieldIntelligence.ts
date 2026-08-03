@@ -30,6 +30,7 @@ export interface ForumAnchor {
   scope_off_topic: string;
   thread_count: number;
   reply_count: number;
+  is_seed: boolean; // false = a real anchor minted by the founder-gated RPC
   publication: PublicationRef | null;
 }
 
@@ -47,6 +48,7 @@ export interface ForumThread {
   removed_count: number;
   context_note_count: number;
   is_primary: boolean;
+  is_seed: boolean; // false = a real thread; drives the SEEDED/LIVE badge
   created_at: string;
 }
 
@@ -73,6 +75,7 @@ export interface ForumPost {
   removed_body: string | null;
   removed_detected_phrases: string[] | null;
   placeholder_shown: boolean;
+  is_seed: boolean; // false = a real post; drives the SEEDED/LIVE badge (per-row)
   notes: PostNote[];
 }
 

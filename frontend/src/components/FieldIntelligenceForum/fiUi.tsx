@@ -8,13 +8,13 @@ import type { CSSProperties, ReactNode } from "react";
 import { COLOR, FONT } from "../../lib/designTokens";
 import type { ComplianceState } from "../../lib/fieldIntelligence";
 
-export const mono = (size: number, color = COLOR.ink3): CSSProperties => ({
+export const mono = (size: number, color: string = COLOR.ink3): CSSProperties => ({
   fontFamily: FONT.mono,
   fontSize: size,
   color,
   letterSpacing: "0.04em",
 });
-export const serif = (size: number, color = COLOR.ink2): CSSProperties => ({
+export const serif = (size: number, color: string = COLOR.ink2): CSSProperties => ({
   fontFamily: FONT.serif,
   fontSize: size,
   color,
@@ -50,6 +50,46 @@ export function SimulatedChip({ size = 9 }: { size?: number }) {
       }}
     >
       SIMULATED
+    </span>
+  );
+}
+
+// PROVENANCE MARKER — the per-row SEEDED / LIVE distinction (2026-08-03).
+// SEEDED keeps the dashed-amber treatment of the old SIMULATED marker, so
+// fabricated content stays unmistakable and survives a crop of any single row.
+// LIVE is a solid quiet green — a legitimate, production-shaped state, legible
+// beside SEEDED without being louder. Driven by the row's is_seed, never assumed.
+export function ProvenanceChip({ seed, size = 9 }: { seed: boolean; size?: number }) {
+  if (seed) {
+    return (
+      <span
+        style={{
+          ...mono(size, "#b98f45"),
+          letterSpacing: "0.12em",
+          fontWeight: 600,
+          background: "rgba(232,160,32,0.06)",
+          border: "1px dashed rgba(232,160,32,0.42)",
+          padding: "2px 6px",
+          whiteSpace: "nowrap",
+        }}
+      >
+        SEEDED
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        ...mono(size, "#7fb094"),
+        letterSpacing: "0.12em",
+        fontWeight: 600,
+        background: "rgba(95,169,126,0.08)",
+        border: "1px solid rgba(95,169,126,0.30)",
+        padding: "2px 6px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      LIVE
     </span>
   );
 }
