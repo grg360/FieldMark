@@ -1,38 +1,85 @@
-import { useEffect, useState } from "react";
+// Institutions index — /institutions/:ta. Design frame Institutions.dc.html 1a
+// (concentration bands), 1b (network grouping), 1e (mobile 390). Registry-first:
+// rows are registry institutions carrying >=1 ranked HCP in the TA via their
+// PRIMARY link (ladder + tie-break computed in institution_ta_roster_v1), NOT
+// the name-keyed string view. Ordered by ranked-HCP count — deliberately NOT a
+// ranking of institutions; the frame's language on this is kept verbatim.
+// Bands cut on rank thresholds so the shape survives a refilter. The E/R/C
+// cohort split reads at parity with the headline count (full-board counts mean
+// community dominates by volume on many rows — the split is what keeps that
+// legible: 315 as E300/R34/C3 means something different than C300).
+
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Pin, PinOff } from "lucide-react";
-import { getInstitutionsIndex, type InstitutionIndexEntry } from "../lib/api";
 import { getCurrentUser } from "../lib/authHelpers";
 import { getPinnedInstitutionsForUser, pinInstitution, unpinInstitution } from "../lib/institutionPins";
-import { useIsDesktop } from "../lib/useIsDesktop";
-import { institutionToSlug } from "../lib/institutionUtils";
-import AppLayout from "./AppLayout";
+import { taIdForApiSlug } from "../lib/api";
+import {
+  aggregateInstitutions,
+  BAND_LABEL,
+  fetchTaRoster,
+  type InstitutionAgg,
+} from "../lib/institutionRegistry";
+import { useMediaQuery } from "../lib/useMediaQuery";
+import { FONT } from "../lib/designTokens";
+import NavBar from "./NavBar";
+import GlobalFooter from "./GlobalFooter";
+
+const C = {
+  bg: "#0a0a0b",
+  hair: "#141417",
+  hairStrong: "#1e1e21",
+  bandBg: "#0e0e11",
+  ink1: "#e6e3dc",
+  ink2: "#98958d",
+  ink3: "#8b887f",
+  ink4: "#6a6862",
+  ink5: "#575651",
+  ink6: "#4e4d49",
+  amber: "#c9a35c",
+  chipBorder: "#2b2b30",
+  link: "#8fa3ab",
+  toggleBg: "#1d1d20",
+  toggleBorder: "#26262a",
+};
+
+const mono = (size: number, opts?: { ls?: string; color?: string; weight?: number; lh?: number }) => ({
+  fontFamily: FONT.mono,
+  fontSize: size,
+  fontWeight: opts?.weight ?? 400,
+  letterSpacing: opts?.ls ?? "0.1em",
+  color: opts?.color ?? C.ink3,
+  lineHeight: opts?.lh ?? 1,
+});
+
+type Grouping = "concentration" | "network" | "state" | "az";
 
 export default function InstitutionsIndexRoute() {
   const { ta } = useParams<{ ta: string }>();
   const navigate = useNavigate();
   const taSlug = ta ?? "nsclc";
 
-  const [entries, setEntries] = useState<InstitutionIndexEntry[]>([]);
+  const [aggs, setAggs] = useState<InstitutionAgg[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"rising_star_count" | "investigator_count" | "established_count" | "talent_density_pct" | "yield_ratio" | "institution_name">("rising_star_count");
+  const [grouping, setGrouping] = useState<Grouping>("concentration");
   const [userId, setUserId] = useState<string | null>(null);
   const [pinnedSet, setPinnedSet] = useState<Set<string>>(new Set());
-  const [pinPending, setPinPending] = useState<Set<string>>(new Set());
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-
-    getInstitutionsIndex(taSlug)
-      .then((data) => {
-        if (!cancelled) setEntries(data);
-      })
-      .finally(() => {
+    (async () => {
+      const taId = await taIdForApiSlug(taSlug);
+      if (!taId || cancelled) {
         if (!cancelled) setLoading(false);
-      });
-
+        return;
+      }
+      const rows = await fetchTaRoster(taId);
+      if (cancelled) return;
+      setAggs(aggregateInstitutions(rows));
+      setLoading(false);
+    })();
     return () => {
       cancelled = true;
     };
@@ -45,232 +92,505 @@ export default function InstitutionsIndexRoute() {
       if (!user || cancelled) return;
       setUserId(user.id);
       const pins = await getPinnedInstitutionsForUser(user.id);
-      if (cancelled) return;
-      setPinnedSet(new Set(pins.map((p) => p.institution_name)));
+      if (!cancelled) setPinnedSet(new Set(pins.map((p) => p.institution_name)));
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  async function handleTogglePin(institutionName: string) {
+  async function togglePin(name: string) {
     if (!userId) return;
-    if (pinPending.has(institutionName)) return;
-
-    setPinPending((prev) => new Set(prev).add(institutionName));
-    const wasPinned = pinnedSet.has(institutionName);
-
+    const was = pinnedSet.has(name);
     setPinnedSet((prev) => {
       const next = new Set(prev);
-      if (wasPinned) next.delete(institutionName);
-      else next.add(institutionName);
+      if (was) next.delete(name);
+      else next.add(name);
       return next;
     });
-
     try {
-      if (wasPinned) {
-        await unpinInstitution(userId, institutionName);
-      } else {
-        await pinInstitution(userId, institutionName);
-      }
-    } catch (err) {
-      console.warn("handleTogglePin error", err);
+      if (was) await unpinInstitution(userId, name);
+      else await pinInstitution(userId, name);
+    } catch {
       setPinnedSet((prev) => {
         const next = new Set(prev);
-        if (wasPinned) next.add(institutionName);
-        else next.delete(institutionName);
-        return next;
-      });
-    } finally {
-      setPinPending((prev) => {
-        const next = new Set(prev);
-        next.delete(institutionName);
+        if (was) next.add(name);
+        else next.delete(name);
         return next;
       });
     }
   }
 
-  function filteredSorted(): InstitutionIndexEntry[] {
-    const filtered = searchQuery.trim()
-      ? entries.filter((e) => e.institution_name.toLowerCase().includes(searchQuery.toLowerCase()))
-      : entries;
+  const memberSitesByParent = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const a of aggs) {
+      if (a.networkParent) m.set(a.networkParent, (m.get(a.networkParent) ?? 0) + 1);
+    }
+    return m;
+  }, [aggs]);
 
-    return [...filtered].sort((a, b) => {
-      if (sortBy === "institution_name") {
-        return a.institution_name.localeCompare(b.institution_name);
-      }
-      const aVal = (a[sortBy] as number | null) ?? -Infinity;
-      const bVal = (b[sortBy] as number | null) ?? -Infinity;
-      return (bVal as number) - (aVal as number);
-    });
-  }
+  const taUpper = taSlug.toUpperCase().replace(/-/g, " ");
 
-  const isDesktop = useIsDesktop();
-  const sorted = filteredSorted();
-  const breadcrumbs = [
-    { label: "Home", path: "/me" },
-    { label: "Institutions" },
-  ];
+  const openRecord = (a: InstitutionAgg) => navigate(`/institution/${a.slug}?ta=${taSlug}`);
 
-  return (
-    <AppLayout breadcrumbs={breadcrumbs}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
-          {taSlug.toUpperCase()} Institutions
-        </h1>
-        <div style={{ fontSize: 13, color: "#9B9892", marginTop: 6 }}>
-          {entries.length} institutions with {taSlug.toUpperCase()} investigators
-        </div>
+  // ── Row (desktop grid / mobile stack) ─────────────────────────────────────
+  function Row({ a, dense }: { a: InstitutionAgg; dense?: boolean }) {
+    const pinned = pinnedSet.has(a.name);
+    const chips = a.usRanks.slice(0, 7);
+    const overflow = a.usRanks.length - chips.length;
+    const identity = [
+      a.state ?? undefined,
+      a.type,
+      a.nciDesignation ?? undefined,
+      a.isCoe ? "CoE" : undefined,
+    ];
+    const identityLine = (
+      <span style={{ ...mono(11, { ls: "0.05em", lh: 1.5 }) }}>
+        {a.state ? `${a.state} · ` : ""}
+        {a.type} ·{" "}
+        {a.nciDesignation ? (
+          a.nciDesignation
+        ) : (
+          <span style={{ color: C.ink4 }}>NO NCI DESIGNATION</span>
+        )}
+        {a.isCoe ? " · CoE" : ""}
+      </span>
+    );
+    void identity;
+    const networkLine = a.networkParent ? (
+      <span style={{ ...mono(10, { ls: "0.05em", color: C.ink4, lh: 1.5 }) }}>
+        NETWORK <span style={{ color: C.link }}>{a.networkParent}</span>
+        {(memberSitesByParent.get(a.networkParent) ?? 0) > 1
+          ? ` · ${memberSitesByParent.get(a.networkParent)} MEMBER SITES REPRESENTED`
+          : ""}
+      </span>
+    ) : (
+      <span style={{ ...mono(10, { color: C.ink6 }) }}>NO NETWORK PARENT · SINGLE-SITE REGISTRY RECORD</span>
+    );
+    const split = (
+      <div style={{ display: "flex", gap: isMobile ? 10 : 16, ...mono(11), paddingTop: isMobile ? 0 : 5 }}>
+        {([["EST", a.est], ["RIS", a.ris], ["COM", a.com]] as const).map(([label, n]) => (
+          <span key={label}>
+            <span style={{ color: n > 0 ? C.ink1 : "#3e3e42", fontSize: 14 }}>{n}</span> {label}
+          </span>
+        ))}
       </div>
-
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search institutions..."
-          style={{
-            flex: 1,
-            minWidth: 200,
-            padding: "10px 14px",
-            backgroundColor: "#0D0D10",
-            border: "1px solid #1E1E22",
-            borderRadius: 6,
-            color: "#E8E6DF",
-            fontSize: 13,
-            fontFamily: "inherit",
-            outline: "none",
-          }}
-        />
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "#9B9892" }}>Sort by</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+    );
+    const rankChips = (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 3 }}>
+        {chips.map((r, i) => (
+          <span
+            key={`${r}-${i}`}
             style={{
-              padding: "8px 10px",
-              backgroundColor: "#0D0D10",
-              border: "1px solid #1E1E22",
-              borderRadius: 6,
-              color: "#E8E6DF",
-              fontSize: 12,
-              fontFamily: "inherit",
-              cursor: "pointer",
+              padding: "3px 7px",
+              border: r <= 10 ? `1px solid ${C.amber}` : `1px solid ${C.chipBorder}`,
+              ...mono(11, { ls: "0", color: r <= 10 ? C.amber : C.ink3 }),
             }}
           >
-            <option value="rising_star_count">Rising Stars</option>
-            <option value="established_count">Established</option>
-            <option value="investigator_count">Total Investigators</option>
-            <option value="talent_density_pct">Talent Density</option>
-            <option value="yield_ratio">Yield Ratio</option>
-            <option value="institution_name">Name (A-Z)</option>
-          </select>
-        </div>
+            #{r}
+          </span>
+        ))}
+        {overflow > 0 ? <span style={{ padding: "3px 7px", ...mono(11, { ls: "0", color: C.ink5 }) }}>+{overflow}</span> : null}
       </div>
+    );
+    const pin = (
+      <button
+        type="button"
+        className="fm-pill-button"
+        aria-label={pinned ? "Unpin institution" : "Pin institution"}
+        onClick={(e) => {
+          e.stopPropagation();
+          void togglePin(a.name);
+        }}
+        style={{
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          ...mono(15, { ls: "0", color: pinned ? C.amber : "#3e3e42" }),
+          paddingTop: 4,
+        }}
+      >
+        ⌖
+      </button>
+    );
 
-      {loading ? (
-        <div style={{ fontSize: 14, color: "#6B6A65", padding: "48px 0", textAlign: "center" }}>
-          Loading...
+    if (isMobile) {
+      return (
+        <div
+          onClick={() => openRecord(a)}
+          style={{ cursor: "pointer", padding: "15px 16px", borderBottom: `1px solid ${C.hair}` }}
+        >
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 7 }}>
+            <span style={{ ...mono(25, { color: a.band === "A" || a.band === "B" ? C.amber : C.ink3, ls: "0" }), minWidth: 38 }}>
+              {a.memberCount}
+            </span>
+            <span style={{ fontFamily: FONT.serif, fontSize: 17, lineHeight: 1.25, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
+          </div>
+          <div style={{ paddingLeft: 48, display: "flex", flexDirection: "column", gap: 6 }}>
+            {identityLine}
+            {networkLine}
+            {rankChips}
+            {split}
+          </div>
         </div>
-      ) : sorted.length === 0 ? (
-        <div style={{ fontSize: 14, color: "#9B9892", padding: "48px 0", textAlign: "center" }}>
-          No institutions match your search.
-        </div>
-      ) : (
-        <div style={{
+      );
+    }
+    return (
+      <div
+        onClick={() => openRecord(a)}
+        style={{
+          cursor: "pointer",
           display: "grid",
-          gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
-          gap: 12,
-        }}>
-          {sorted.map((entry) => {
-            const isPinned = pinnedSet.has(entry.institution_name);
-            const isToggling = pinPending.has(entry.institution_name);
-            const states = entry.states_present.slice(0, 3).join(", ");
-            const moreStates = entry.states_present.length > 3 ? `, +${entry.states_present.length - 3}` : "";
+          gridTemplateColumns: "120px 1fr 348px 168px 44px",
+          gap: 20,
+          padding: dense ? "16px 28px" : "18px 28px",
+          borderBottom: `1px solid ${C.hair}`,
+          alignItems: "start",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ ...mono(30, { color: a.band === "A" || a.band === "B" ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
+          <span style={{ ...mono(10, { color: C.ink4 }) }}>{a.bestUsRank != null ? `BEST #${a.bestUsRank} US` : "NO US RANK HELD"}</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          <span style={{ fontFamily: FONT.serif, fontSize: 19, lineHeight: 1.2, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
+          {identityLine}
+          {networkLine}
+        </div>
+        {rankChips}
+        {split}
+        {pin}
+      </div>
+    );
+  }
 
+  function BandHeader({ left, right }: { left: string; right?: string }) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          padding: isMobile ? "9px 16px" : "11px 28px",
+          background: C.bandBg,
+          borderTop: `1px solid ${C.hairStrong}`,
+          borderBottom: `1px solid ${C.hairStrong}`,
+          ...mono(isMobile ? 9 : 10, { ls: "0.13em", lh: 1.5 }),
+        }}
+      >
+        <span>{left}</span>
+        {right && !isMobile ? <span style={{ color: C.ink5 }}>{right}</span> : null}
+      </div>
+    );
+  }
+
+  // ── Groupings ─────────────────────────────────────────────────────────────
+  function groupedContent() {
+    if (grouping === "concentration") {
+      const bands: Array<"A" | "B" | "C" | "D"> = ["A", "B", "C", "D"];
+      return bands.map((b) => {
+        const members = aggs.filter((a) => a.band === b);
+        if (members.length === 0) return null;
+        return (
+          <div key={b}>
+            <BandHeader
+              left={`BAND ${b} · ${BAND_LABEL[b]} · ${members.length} INSTITUTION${members.length === 1 ? "" : "S"}`}
+              right={
+                b === "D"
+                  ? "MOST HOLD ONE OR TWO — THE COUNT IS THE WHOLE STORY OF THE ROW"
+                  : "ORDER IS DESCRIPTIVE, NOT A RANKING"
+              }
+            />
+            {members.map((a) => (
+              <Row key={a.id} a={a} dense={b === "D"} />
+            ))}
+          </div>
+        );
+      });
+    }
+    if (grouping === "network") {
+      const byParent = new Map<string, InstitutionAgg[]>();
+      const unparented: InstitutionAgg[] = [];
+      for (const a of aggs) {
+        if (a.networkParent) {
+          const l = byParent.get(a.networkParent);
+          if (l) l.push(a);
+          else byParent.set(a.networkParent, [a]);
+        } else unparented.push(a);
+      }
+      const parents = [...byParent.entries()].sort(
+        (x, y) => y[1].reduce((s, a) => s + a.memberCount, 0) - x[1].reduce((s, a) => s + a.memberCount, 0),
+      );
+      return (
+        <>
+          {parents.map(([parent, members]) => {
+            const total = members.reduce((s, a) => s + a.memberCount, 0);
+            const best = members.reduce<number | null>(
+              (b, a) => (a.bestUsRank != null && (b == null || a.bestUsRank < b) ? a.bestUsRank : b),
+              null,
+            );
             return (
-              <div
-                key={entry.slug}
-                onClick={() => navigate(`/institution/${entry.slug}?ta=${taSlug}`)}
-                style={{
-                  backgroundColor: "#15131A",
-                  borderTop: "1px solid #1E1E22",
-                  borderRight: "1px solid #1E1E22",
-                  borderBottom: "1px solid #1E1E22",
-                  borderLeft: isPinned ? "3px solid #E8A020" : "1px solid #1E1E22",
-                  borderRadius: 8,
-                  padding: "14px 16px",
-                  paddingLeft: isPinned ? 14 : 16,
-                  cursor: "pointer",
-                  transition: "background-color 120ms",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#1A1820";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#15131A";
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#E8E6DF", marginBottom: 2 }}>
-                      {entry.institution_name}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#6B6A65" }}>
-                      {states}{moreStates}
-                    </div>
+              <div key={parent}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    padding: isMobile ? "12px 16px" : "14px 28px",
+                    background: "#101014",
+                    borderBottom: `1px solid ${C.hairStrong}`,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+                    <span style={{ ...mono(22, { color: C.amber, ls: "0" }) }}>{total}</span>
+                    <span style={{ fontFamily: FONT.serif, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{parent}</span>
+                    <span style={{ ...mono(10, { ls: "0.12em", color: C.ink4 }) }}>
+                      {members.length} MEMBER SITE{members.length === 1 ? "" : "S"} REPRESENTED
+                      {best != null ? ` · BEST #${best} US` : ""}
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    className="fm-pill-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleTogglePin(entry.institution_name);
-                    }}
-                    disabled={isToggling}
-                    aria-label={isPinned ? "Unpin institution" : "Pin institution"}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      padding: 4,
-                      cursor: isToggling ? "default" : "pointer",
-                      color: isPinned ? "#E8A020" : "#6B6A65",
-                      flexShrink: 0,
-                      opacity: isToggling ? 0.5 : 1,
-                    }}
-                  >
-                    {isPinned ? <Pin size={16} fill="currentColor" /> : <Pin size={16} />}
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap", alignItems: "baseline" }}>
-                  <div>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#E8E6DF" }}>{entry.investigator_count.toLocaleString()}</span>
-                    <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>investigators</span>
-                  </div>
-                  {entry.rising_star_count > 0 ? (
-                    <div>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: "#9B6DFF" }}>{entry.rising_star_count}</span>
-                          <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>Rising Stars</span>
-                    </div>
-                  ) : null}
-                  {entry.established_count > 0 ? (
-                    <div>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{entry.established_count}</span>
-                      <span style={{ fontSize: 11, color: "#9B9892", marginLeft: 4 }}>established</span>
-                    </div>
+                  {!isMobile ? (
+                    <span style={{ ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>
+                      NETWORK TOTALS ARE SUMS OF THE SITES BELOW — NOTHING IS HIDDEN IN THEM
+                    </span>
                   ) : null}
                 </div>
-
-                {entry.top_rising_star_name && entry.top_rising_star_rank !== null ? (
-                  <div style={{ fontSize: 12, color: "#9B9892", marginTop: 8 }}>
-                    Top: <span style={{ color: "#E8E6DF" }}>{entry.top_rising_star_name}</span>
-                    <span style={{ color: "#9B6DFF", fontWeight: 600, marginLeft: 6 }}>#{entry.top_rising_star_rank}</span>
-                  </div>
-                ) : null}
+                {members
+                  .slice()
+                  .sort((x, y) => y.memberCount - x.memberCount)
+                  .map((a) => (
+                    <div
+                      key={a.id}
+                      onClick={() => openRecord(a)}
+                      style={{
+                        cursor: "pointer",
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "40px 1fr" : "52px 1fr 220px 168px",
+                        gap: isMobile ? 10 : 20,
+                        padding: isMobile ? "13px 16px" : "13px 28px 13px 44px",
+                        borderBottom: `1px solid ${C.hair}`,
+                        alignItems: "center",
+                      }}
+                    >
+                      <span style={{ ...mono(19, { color: a.memberCount >= 5 ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
+                      <span style={{ fontFamily: FONT.serif, fontSize: 16, color: C.ink1 }}>{a.name}</span>
+                      {!isMobile ? (
+                        <span style={{ ...mono(10, { ls: "0.06em" }) }}>
+                          {a.state ?? "—"} · {a.type} ·{" "}
+                          {a.nciDesignation ?? <span style={{ color: C.ink5 }}>NO NCI DESIGNATION</span>}
+                        </span>
+                      ) : null}
+                      {!isMobile ? (
+                        <span style={{ ...mono(11, { ls: "0" }) }}>
+                          {a.est} EST · {a.ris} RIS · {a.com} COM
+                        </span>
+                      ) : null}
+                    </div>
+                  ))}
               </div>
             );
           })}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              padding: isMobile ? "12px 16px" : "14px 28px",
+              background: "#101014",
+              borderBottom: `1px solid ${C.hairStrong}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+              <span style={{ ...mono(22, { color: C.ink3, ls: "0" }) }}>
+                {unparented.reduce((s, a) => s + a.memberCount, 0)}
+              </span>
+              <span style={{ fontFamily: FONT.serif, fontSize: 17, fontWeight: 500, color: C.ink1 }}>Unparented</span>
+              <span style={{ ...mono(10, { ls: "0.12em", color: C.ink4 }) }}>
+                {unparented.length} REPRESENTED INSTITUTIONS HAVE NO NETWORK PARENT
+              </span>
+            </div>
+            {!isMobile ? (
+              <span style={{ ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>NOT A NETWORK — THE ABSENCE OF ONE</span>
+            ) : null}
+          </div>
+          {unparented.map((a) => (
+            <Row key={a.id} a={a} dense />
+          ))}
+        </>
+      );
+    }
+    if (grouping === "state") {
+      const byState = new Map<string, InstitutionAgg[]>();
+      for (const a of aggs) {
+        const key = a.state ?? "NO STATE ON RECORD";
+        const l = byState.get(key);
+        if (l) l.push(a);
+        else byState.set(key, [a]);
+      }
+      const states = [...byState.entries()].sort((x, y) =>
+        x[0] === "NO STATE ON RECORD" ? 1 : y[0] === "NO STATE ON RECORD" ? -1 : x[0].localeCompare(y[0]),
+      );
+      return states.map(([state, members]) => (
+        <div key={state}>
+          <BandHeader
+            left={`${state} · ${members.length} INSTITUTION${members.length === 1 ? "" : "S"} · ${members.reduce((s, a) => s + a.memberCount, 0)} RANKED HCP`}
+          />
+          {members.map((a) => (
+            <Row key={a.id} a={a} dense />
+          ))}
         </div>
-      )}
-    </AppLayout>
+      ));
+    }
+    // A–Z
+    const alpha = [...aggs].sort((x, y) => x.name.localeCompare(y.name));
+    return alpha.map((a) => <Row key={a.id} a={a} dense />);
+  }
+
+  const totalRanked = useMemo(() => {
+    const s = new Set<string>();
+    // memberCount is distinct per institution; distinct overall needs the union —
+    // approximate with the sum is WRONG, so track via aggs is impossible here.
+    // The header states institutions represented; the coverage line is computed
+    // from the roster length at fetch time and carried in aggs order instead.
+    for (const a of aggs) s.add(a.id);
+    return s.size;
+  }, [aggs]);
+  void totalRanked;
+
+  const groupingTabs: Array<[Grouping, string]> = [
+    ["concentration", "Concentration"],
+    ["network", "Network"],
+    ["state", "State"],
+    ["az", "A–Z"],
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
+      <NavBar />
+      <div style={{ flex: 1, width: "100%", maxWidth: 1440, margin: "0 auto" }}>
+        {/* Header block */}
+        <div style={{ padding: isMobile ? "18px 16px 14px" : "26px 28px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              borderLeft: `2px solid ${C.amber}`,
+              paddingLeft: 14,
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                <span style={{ ...mono(11, { color: C.amber, ls: "0.16em", weight: 500 }) }}>INST</span>
+                <span style={{ ...mono(15, { color: C.ink1, ls: "0.1em", weight: 500 }) }}>INSTITUTIONS / {taUpper}</span>
+              </div>
+              <div style={{ fontFamily: FONT.serif, fontSize: 13, lineHeight: 1.5, fontWeight: 300, color: C.ink2 }}>
+                {loading
+                  ? "Resolving the registry…"
+                  : `${aggs.length} registry institutions carry at least one ranked ${taUpper} HCP. Registry institutions carrying none in this cohort are not listed.`}
+              </div>
+            </div>
+            {!isMobile ? (
+              <div style={{ textAlign: "right", ...mono(10, { lh: 1.7, color: C.ink4 }) }}>
+                <div>{aggs.length} REPRESENTED · PRIMARY LINK ONLY · SECONDARY LINKS ON THE RECORD</div>
+                <div style={{ color: C.ink6 }}>ORDERED BY RANKED-HCP COUNT · NOT A RANKING OF INSTITUTIONS</div>
+              </div>
+            ) : null}
+          </div>
+          {isMobile ? (
+            <div style={{ marginTop: 10, ...mono(9, { lh: 1.6, color: C.ink6 }) }}>
+              ORDERED BY RANKED-HCP COUNT · NOT A RANKING OF INSTITUTIONS
+            </div>
+          ) : null}
+        </div>
+
+        {/* Grouping toggle */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: isMobile ? "10px 16px" : "16px 28px 12px",
+            justifyContent: isMobile ? "flex-start" : "flex-end",
+            borderBottom: `1px solid ${C.hairStrong}`,
+            overflowX: "auto",
+          }}
+        >
+          {!isMobile ? <span style={{ ...mono(10, { ls: "0.14em", color: C.ink5 }) }}>GROUPING</span> : null}
+          <div style={{ display: "flex", border: `1px solid ${C.toggleBorder}`, flexShrink: 0 }}>
+            {groupingTabs.map(([key, label], i) => (
+              <button
+                key={key}
+                type="button"
+                className="fm-pill-button"
+                onClick={() => setGrouping(key)}
+                style={{
+                  padding: "6px 12px",
+                  background: grouping === key ? C.toggleBg : "transparent",
+                  color: grouping === key ? C.ink1 : C.ink3,
+                  border: "none",
+                  borderLeft: i > 0 ? `1px solid ${C.toggleBorder}` : "none",
+                  fontFamily: FONT.serif,
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Column header (desktop, concentration/az only) */}
+        {!isMobile && (grouping === "concentration" || grouping === "az" || grouping === "state") ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "120px 1fr 348px 168px 44px",
+              gap: 20,
+              padding: "22px 28px 9px",
+              borderBottom: `1px solid ${C.hairStrong}`,
+              ...mono(9, { ls: "0.13em", color: C.ink5, lh: 1.5 }),
+              textTransform: "uppercase" as const,
+            }}
+          >
+            <div>Ranked<br />HCP · Best</div>
+            <div>Institution<br />Type · Designation · Network</div>
+            <div>Ranks held<br />US, in cohort</div>
+            <div>Cohort split<br />Est · Ris · Com</div>
+            <div>Pin</div>
+          </div>
+        ) : null}
+
+        {loading ? (
+          <div style={{ padding: "48px 28px", ...mono(11, { color: C.ink4 }) }}>RESOLVING THE REGISTRY…</div>
+        ) : aggs.length === 0 ? (
+          <div style={{ padding: "48px 28px", fontFamily: FONT.serif, fontSize: 14, color: C.ink2 }}>
+            No registry institution carries a ranked HCP in this cohort yet.
+          </div>
+        ) : (
+          groupedContent()
+        )}
+
+        {!loading && aggs.length > 0 ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: isMobile ? "16px" : "20px 28px 26px",
+              ...mono(isMobile ? 9 : 10, { lh: 1.7, color: C.ink5 }),
+            }}
+          >
+            <span>
+              {grouping === "concentration" ? "END OF BAND D · " : ""}
+              {aggs.length} OF {aggs.length} REPRESENTED INSTITUTIONS SHOWN
+            </span>
+          </div>
+        ) : null}
+      </div>
+      <GlobalFooter />
+    </div>
   );
 }
