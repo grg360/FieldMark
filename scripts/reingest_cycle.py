@@ -64,6 +64,11 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       upserts status/phase/completion_date into clinical_trials_v2. Does NOT crawl by HCP name
                       and writes NO trial_investigators rows -- the HCP crawl stays manual/occasional. TA-agnostic.
                       NON-BLOCKING (external CT.gov call): failure -> WARN (not FAILED), never gates the cycle.
+ 12 hcpcs_topup       hcpcs_detail_topup.py --execute --triggered-by reingest_cycle
+                      Medicare claims top-up for HCPs that gained an NPI since the last hcp_hcpcs_detail load.
+                      DERIVES its target set (anti-join vs hcp_hcpcs_detail) from local parquets; no-ops when
+                      clean. TA-agnostic. Logs to pipeline_runs as hcpcs_detail_topup.
+                      NON-BLOCKING: failure -> WARN (not FAILED), never gates the cycle.
 
 SNAPSHOT-DATE: captured ONCE at cycle start and passed identically to 8b and 8c (they must match
 or 8c reads zero rows - a real past bug).
@@ -116,6 +121,7 @@ SCRIPTS: Dict[str, str] = {
     "rising_score": "scripts/score/rising_score.py",
     "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
     "trials_status_refresh": "scripts/ingest/trials_pipeline.py",     # 11: weekly trial-fact refresh (--refresh-status)
+    "hcpcs_topup": "scripts/ingest/hcpcs_detail_topup.py",            # 12: Medicare claims top-up for newly-NPI'd HCPs
 }
 
 # Stage 10 ASSET MATCHES: rebuild asset_publication_v1 from config/assets.json (the Drug
@@ -172,6 +178,7 @@ STAGE_ORDER: List[Tuple[int, str]] = [
     (9, "score"),
     (10, "asset_matches"),
     (11, "trials_status"),
+    (12, "hcpcs_topup"),
 ]
 STAGE_NAME_TO_NUM = {name: n for n, name in STAGE_ORDER}
 MAX_STAGE = STAGE_ORDER[-1][0]
@@ -357,6 +364,12 @@ def cmd_trials_status_refresh() -> List[str]:
     # name and writes NO trial_investigators rows (that stays the manual, occasional HCP crawl).
     # TA-agnostic (refreshes every open trial in the table by status), so it runs once per cycle.
     return py("trials_status_refresh") + ["--refresh-status", "--target-version", "v2"]
+
+
+def cmd_hcpcs_topup() -> List[str]:
+    # 12: Medicare claims top-up. Derives its own target set (NPI'd HCPs with no
+    # hcp_hcpcs_detail rows) and no-ops when clean -- TA-agnostic, local parquets only.
+    return py("hcpcs_topup") + ["--execute", "--triggered-by", "reingest_cycle"]
 
 
 # ---------------------------------------------------------------------------
@@ -815,6 +828,22 @@ def run_cycle(
                 note(11, "trials_status", f"WARN({type(te).__name__})")
                 print(f"\n[reingest_cycle] WARN: stage 11 trials_status_refresh failed ({te}); "
                       f"cycle still SUCCESS (non-blocking). Trial facts left at prior refresh.",
+                      file=sys.stderr)
+
+        # 12 HCPCS DETAIL TOP-UP -- NON-BLOCKING. Any HCP that gained an NPI since the last
+        # hcp_hcpcs_detail load (enrichment, crosswalk applies, stub merges) has Medicare claims
+        # in the local parquets and no rows in the table. The script DERIVES its target set
+        # (anti-join) and no-ops when clean, so running it every cycle is free. Local-parquet +
+        # DB-only work, but failure is still isolated (WARN not FAILED): stale claims detail
+        # must never gate the publication cycle. Logs to pipeline_runs as hcpcs_detail_topup.
+        if running(12):
+            try:
+                run_stage(12, "hcpcs_topup", cmd_hcpcs_topup())
+                note(12, "hcpcs_topup", "OK")
+            except Exception as he:  # non-blocking: log + continue (StageFailure incl.)
+                note(12, "hcpcs_topup", f"WARN({type(he).__name__})")
+                print(f"\n[reingest_cycle] WARN: stage 12 hcpcs_topup failed ({he}); "
+                      f"cycle still SUCCESS (non-blocking). Claims detail left at prior load.",
                       file=sys.stderr)
 
     except StageFailure as f:

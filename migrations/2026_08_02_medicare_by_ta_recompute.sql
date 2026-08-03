@@ -12,9 +12,11 @@
 --     includes secondary codes whose specialty gate passes
 --     (npi_specialty ILIKE any of specialty_match_patterns).
 --
--- YoY trend formula (both trend columns): ((y2023 - y2021) / y2021) * 100,
--- NULL when 2021 is empty. ASSUMPTION: matches the legacy column's intent;
--- the original formula is not documented anywhere found.
+-- YoY trend formula (both trend columns): ((y2023 - y2021) * 100.0 / y2021),
+-- NULL when 2021 is empty. CONFIRMED aligned with the summary writer
+-- (scripts/aggregate/medicare_aggregator.py:491-494 computes
+-- beneficiaries_yoy_trend_pct identically, unrounded) — the two surfaces
+-- cannot disagree on basis.
 
 BEGIN;
 
@@ -125,12 +127,13 @@ SELECT gen_random_uuid(), r.hcp_id, r.therapeutic_area_id,
        r.hc_benes, r.hc_srvcs, r.hc_paid, r.hc_codes,
        r.t_benes,  r.t_srvcs,  r.t_paid,  r.t_codes,
        r.drug_units, r.proc_vol,
+       -- unrounded, matching medicare_aggregator.py:491-494 exactly
        CASE WHEN COALESCE(r.b21, 0)  > 0
-            THEN round(((r.b23  - r.b21)::numeric  / r.b21)  * 100, 1) END,
+            THEN (COALESCE(r.b23, 0)  - r.b21)  * 100.0 / r.b21  END,
        r.t_paid,
        r.du21, r.du22, r.du23,
        CASE WHEN COALESCE(r.du21, 0) > 0
-            THEN round(((r.du23 - r.du21)::numeric / r.du21) * 100, 1) END,
+            THEN (COALESCE(r.du23, 0) - r.du21) * 100.0 / r.du21 END,
        t.top_agents, r.years, 'hcp_hcpcs_detail 2026_08_02 rebuild',
        now(), NULL
 FROM rollup r
