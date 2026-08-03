@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#08080a; color:#e6e3dd; -webkit-font-smoothing:antialiased; }
+  a { color:#d8a34a; text-decoration:none; }
+  a:hover { color:#f0c477; }
+  ::selection { background:#3a2f18; }
+</style>
+</helmet>
+
+<section style="display:flex; flex-direction:column; gap:34px; padding:56px 64px 96px; background:#08080a; font-family:'IBM Plex Mono',monospace">
+
+  <div style="display:flex; align-items:baseline; gap:18px; border-bottom:1px solid #1e1e21; padding-bottom:14px">
+    <div style="font-size:11px; letter-spacing:0.22em; color:#d8a34a">FIELDMARK · DESIGN</div>
+    <div style="font-size:11px; letter-spacing:0.14em; color:#6f6d68">PER-HCP PUBLICATIONS SURFACE — REDESIGN</div>
+    <div style="margin-left:auto; display:flex; gap:16px; font-size:10.5px; letter-spacing:0.12em; color:#57554f">
+      <a href="#1a">1a DENSE YEAR</a>
+      <a href="#1b">1b SPARSE YEAR</a>
+      <a href="#1c">1c FULL CAREER</a>
+      <a href="#1d">1d MOBILE</a>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; align-items:flex-start; gap:64px">
+
+    <div id="1a" style="display:flex; gap:34px; align-items:flex-start">
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:center; gap:12px">
+          <div style="font-size:10px; letter-spacing:0.16em; color:#08080a; background:#d8a34a; padding:4px 8px 3px">1a</div>
+          <div style="font-size:11px; letter-spacing:0.16em; color:#8a8782">{{ captionNote }}</div>
+        </div>
+
+        <div style="width:1400px; background:#0d0d0f; border:1px solid #202024">
+
+          <div style="display:flex; align-items:center; gap:26px; padding:0 26px; height:46px; border-bottom:1px solid #1a1a1d; background:#0a0a0c">
+            <div style="font-size:11.5px; letter-spacing:0.3em; color:#d8a34a">FIELDMARK</div>
+            <div style="display:flex; gap:20px; font-size:10.5px; letter-spacing:0.13em; color:#6a6862">
+              <span style="color:#e6e3dd; border-bottom:1px solid #d8a34a; padding-bottom:2px">PEOPLE</span>
+              <span>INSTITUTIONS</span><span>SKYVIEW</span><span>DRUGS</span><span>CONGRESSES</span><span>PULSE</span><span>SOCIAL</span><span>INTELLIGENCE</span>
+            </div>
+            <div style="margin-left:auto; width:22px; height:22px; border-radius:50%; border:1px solid #6b5426; color:#d8a34a; font-size:9px; display:flex; align-items:center; justify-content:center">GG</div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:8px; padding:12px 26px 0; font-size:10.5px; letter-spacing:0.1em; color:#57554f">
+            <span>HOME</span><span style="color:#383632">›</span><a href="#1a">JOHN V. HEYMACH</a><span style="color:#383632">›</span><span style="color:#a8a5a0">2020 PUBLICATIONS</span>
+          </div>
+
+          <div style="display:flex; align-items:flex-end; gap:40px; padding:18px 26px 20px">
+            <div style="display:flex; flex-direction:column; gap:6px">
+              <div style="font-size:10px; letter-spacing:0.2em; color:#57554f">PUBLICATION RECORD</div>
+              <div style="font-family:'Source Serif 4',serif; font-size:44px; line-height:0.95; font-weight:300; color:#e6e3dd; letter-spacing:-0.01em">2020</div>
+            </div>
+            <div style="display:flex; gap:34px; padding-bottom:6px">
+              <div style="display:flex; flex-direction:column; gap:5px">
+                <div style="font-size:22px; color:#d8a34a; letter-spacing:-0.02em">{{ nSenior }}</div>
+                <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">SENIOR AUTHOR</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:5px">
+                <div style="font-size:22px; color:#8a8782; letter-spacing:-0.02em">{{ nCo }}</div>
+                <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">CO-AUTHOR</div>
+              </div>
+              <div style="width:1px; background:#232326"></div>
+              <div style="display:flex; flex-direction:column; gap:5px">
+                <div style="font-size:22px; color:#8a8782; letter-spacing:-0.02em">{{ totalCites }}</div>
+                <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">CITATIONS · THIS YEAR</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:5px">
+                <div style="font-size:22px; color:#7ba36f; letter-spacing:-0.02em">{{ nOa }}</div>
+                <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">OPEN ACCESS · FULL TEXT</div>
+              </div>
+            </div>
+            <div style="margin-left:auto; text-align:right; display:flex; flex-direction:column; gap:5px; padding-bottom:6px">
+              <a href="#1c" style="font-size:10.5px; letter-spacing:0.12em">FULL CAREER RECORD · 312 PAPERS →</a>
+              <div style="font-size:9.5px; letter-spacing:0.1em; color:#4a4844">1998 — 2024</div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0; padding:0 26px; height:44px; border-top:1px solid #1a1a1d; border-bottom:1px solid #1a1a1d; background:#0a0a0c">
+            <div style="font-size:9px; letter-spacing:0.16em; color:#4a4844; margin-right:14px">ORDER</div>
+            <div style="display:flex; gap:2px">
+              <div onClick="{{ setContribution }}" style="{{ tabContribution }}">CONTRIBUTION</div>
+              <div onClick="{{ setCited }}" style="{{ tabCited }}">MOST CITED</div>
+              <div onClick="{{ setRecent }}" style="{{ tabRecent }}">RECENT</div>
+            </div>
+            <div style="width:1px; height:18px; background:#232326; margin:0 20px"></div>
+            <div style="font-size:9px; letter-spacing:0.16em; color:#4a4844; margin-right:14px">NARROW TO</div>
+            <div style="display:flex; gap:2px">
+              <div onClick="{{ toggleOa }}" style="{{ filtOa }}">{{ oaFilterLabel }}</div>
+              <div onClick="{{ toggleThread }}" style="{{ filtThread }}">{{ threadFilterLabel }}</div>
+            </div>
+            <div style="margin-left:auto; display:flex; align-items:center; gap:12px">
+              <div style="font-size:9px; letter-spacing:0.16em; color:#4a4844">ROWS</div>
+              <div style="display:flex; gap:2px">
+                <div onClick="{{ setLedger }}" style="{{ tabLedger }}">LEDGER</div>
+                <div onClick="{{ setDetail }}" style="{{ tabDetail }}">DETAIL</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:84px 1fr 210px; gap:24px; padding:9px 26px; border-bottom:1px solid #1a1a1d; font-size:9px; letter-spacing:0.15em; color:#4a4844">
+            <div style="text-align:right">CITATIONS</div>
+            <div>CONTRIBUTION · TITLE · SOURCE</div>
+            <div>ACCESS &amp; ACTIONS</div>
+          </div>
+
+          <sc-for list="{{ bands }}" as="band" hint-placeholder-count="2">
+            <div>
+              <div style="display:flex; align-items:center; gap:14px; padding:11px 26px 10px; background:#101013; border-bottom:1px solid #1e1e21">
+                <div style="width:2px; height:13px; background:#d8a34a"></div>
+                <div style="font-size:10.5px; letter-spacing:0.2em; color:#e6e3dd">{{ band.label }}</div>
+                <div style="font-size:9.5px; letter-spacing:0.1em; color:#6f6d68">{{ band.note }}</div>
+                <div style="margin-left:auto; font-size:9.5px; letter-spacing:0.11em; color:#57554f">{{ band.count }}</div>
+              </div>
+
+              <sc-for list="{{ band.rows }}" as="p" hint-placeholder-count="5">
+                <div style="display:grid; grid-template-columns:84px 1fr 210px; gap:24px; padding:15px 26px 15px; border-bottom:1px solid #161619" style-hover="background:#101014">
+
+                  <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                    <div style="text-align:right; font-size:23px; line-height:1; color:#d8a34a; letter-spacing:-0.03em; padding-top:2px">{{ p.cites }}</div>
+                  </sc-if>
+                  <sc-if value="{{ p.co }}">
+                    <div style="text-align:right; font-size:15px; line-height:1; color:#6f6d68; letter-spacing:-0.01em; padding-top:6px">{{ p.cites }}</div>
+                  </sc-if>
+
+                  <div style="display:flex; gap:16px; min-width:0">
+                    <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                      <div style="width:2px; background:#8a6a24; flex:none; margin-top:2px"></div>
+                    </sc-if>
+                    <div style="display:flex; flex-direction:column; gap:7px; min-width:0">
+
+                      <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex; align-items:baseline; gap:10px">
+                          <div style="font-size:9.5px; letter-spacing:0.2em; color:#d8a34a">SENIOR AUTHOR</div>
+                          <div style="font-size:9.5px; letter-spacing:0.08em; color:#6f6d68">{{ p.roleNote }}</div>
+                        </div>
+                        <div style="font-family:'Source Serif 4',serif; font-size:21px; line-height:1.24; font-weight:400; color:#f2efe9; letter-spacing:-0.005em; text-wrap:pretty">{{ p.title }}</div>
+                      </sc-if>
+                      <sc-if value="{{ p.co }}">
+                        <div style="display:flex; align-items:baseline; gap:10px">
+                          <div style="font-size:9.5px; letter-spacing:0.2em; color:#6f6d68">CO-AUTHOR</div>
+                          <div style="font-size:9.5px; letter-spacing:0.08em; color:#4a4844">{{ p.roleNote }}</div>
+                        </div>
+                        <div style="font-family:'Source Serif 4',serif; font-size:16.5px; line-height:1.3; font-weight:400; color:#c6c2bb; letter-spacing:0; text-wrap:pretty">{{ p.title }}</div>
+                      </sc-if>
+
+                      <div style="display:flex; flex-wrap:wrap; align-items:baseline; gap:0 10px; font-size:10px; letter-spacing:0.06em; color:#57554f">
+                        <span style="color:#8a8782">{{ p.journal }}</span>
+                        <span style="color:#383632">·</span>
+                        <span>{{ p.pmid }}</span>
+                        <sc-if value="{{ p.hasType }}" hint-placeholder-val="{{ true }}">
+                          <span style="color:#383632">·</span>
+                          <span>{{ p.type }}</span>
+                        </sc-if>
+                        <sc-if value="{{ p.hasDrugs }}">
+                          <span style="color:#383632">·</span>
+                          <span style="color:#b98f42; border-bottom:1px dotted #6b5426">{{ p.drugs }}</span>
+                        </sc-if>
+                      </div>
+
+                      <sc-if value="{{ p.detail }}">
+                        <div style="display:flex; flex-direction:column; gap:6px; padding-top:1px">
+                          <div style="font-size:10.5px; line-height:1.6; letter-spacing:0.02em; color:#6f6d68">{{ p.a1 }}<span style="color:#d8a34a">{{ p.a2 }}</span>{{ p.a3 }}</div>
+                          <sc-if value="{{ p.noType }}">
+                            <div style="font-size:10px; letter-spacing:0.06em; color:#46443f">Study type not recorded for this paper.</div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ p.hasThread }}">
+                        <a href="#1a" style="display:flex; align-items:center; gap:8px; font-size:10px; letter-spacing:0.11em; margin-top:1px">
+                          <span style="width:5px; height:5px; background:#d8a34a; border-radius:50%"></span>
+                          <span>DISCUSSION · {{ p.thread }} REPLIES · LAST {{ p.threadWhen }}</span>
+                        </a>
+                      </sc-if>
+                    </div>
+                  </div>
+
+                  <div style="display:flex; flex-direction:column; gap:7px; align-items:flex-start">
+                    <sc-if value="{{ p.oa }}" hint-placeholder-val="{{ true }}">
+                      <a href="#1a" style="display:flex; align-items:center; gap:7px; font-size:10px; letter-spacing:0.12em; color:#7ba36f">
+                        <span style="border:1px solid #3c5637; padding:2px 5px 1px; font-size:8.5px; letter-spacing:0.14em">OA</span>
+                        <span>READ FULL TEXT ↗</span>
+                      </a>
+                    </sc-if>
+                    <sc-if value="{{ p.paywalled }}">
+                      <div style="font-size:10px; letter-spacing:0.08em; color:#46443f">Subscription only — no full text held.</div>
+                    </sc-if>
+                    <a href="#1a" style="font-size:10px; letter-spacing:0.12em; color:#8a8782">ABSTRACT</a>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+
+          <div style="display:flex; align-items:center; gap:16px; padding:16px 26px 18px; background:#0a0a0c">
+            <div style="font-size:10px; letter-spacing:0.12em; color:#57554f">{{ shownNote }}</div>
+            <div style="margin-left:auto; font-size:9.5px; letter-spacing:0.08em; color:#3f3d39">Assets are shown where a publication matches the 51-asset roster. Most papers match none.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:296px; display:flex; flex-direction:column; gap:22px; padding-top:38px">
+        <div style="font-size:10px; letter-spacing:0.2em; color:#d8a34a; border-bottom:1px solid #1e1e21; padding-bottom:9px">WHAT CHANGED, AND WHY</div>
+
+        <div style="display:flex; gap:12px">
+          <div style="font-size:11px; color:#d8a34a; flex:none; width:14px">1</div>
+          <div style="display:flex; flex-direction:column; gap:6px">
+            <div style="font-size:10.5px; letter-spacing:0.14em; color:#c6c2bb">HIERARCHY</div>
+            <div style="font-size:10.5px; line-height:1.75; color:#6f6d68; letter-spacing:0.01em">Citation count leads as a figure in its own column — it is the one number that separates a landmark from a routine paper, and a column lets the eye scan it without reading. Title follows, in serif, at the only size that varies. Journal and PMID recede to a single provenance line at 10px. The card is gone; rows share one grid so eleven fields stop competing.</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px">
+          <div style="font-size:11px; color:#d8a34a; flex:none; width:14px">2</div>
+          <div style="display:flex; flex-direction:column; gap:6px">
+            <div style="font-size:10.5px; letter-spacing:0.14em; color:#c6c2bb">ROLE BECOMES STRUCTURE</div>
+            <div style="font-size:10.5px; line-height:1.75; color:#6f6d68; letter-spacing:0.01em">Role stopped being a chip. It is the default grouping, a gold rule, a larger title, and a gold citation figure. Six senior-author papers sit above thirty-eight co-authored ones, so the answer to “what is his” is the first thing on the page. In DETAIL rows his surname is picked out of the author string in gold — position shown as a fact, never computed into a number the truncated data cannot support.</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px">
+          <div style="font-size:11px; color:#d8a34a; flex:none; width:14px">3</div>
+          <div style="display:flex; flex-direction:column; gap:6px">
+            <div style="font-size:10.5px; letter-spacing:0.14em; color:#c6c2bb">DENSITY</div>
+            <div style="font-size:10.5px; line-height:1.75; color:#6f6d68; letter-spacing:0.01em">LEDGER rows carry title, source and citations only — roughly twenty-six to a screen against twelve today. DETAIL adds authors and the absence phrases. Nothing collapses by default and nothing is paginated: the count in every band header equals the rows beneath it, and the footer states shown against held.</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px">
+          <div style="font-size:11px; color:#d8a34a; flex:none; width:14px">4</div>
+          <div style="display:flex; flex-direction:column; gap:6px">
+            <div style="font-size:10.5px; letter-spacing:0.14em; color:#c6c2bb">SORTS, AND DISCUSSED</div>
+            <div style="font-size:10.5px; line-height:1.75; color:#6f6d68; letter-spacing:0.01em">Three orders: CONTRIBUTION, MOST CITED, RECENT. Discussed was never an order — with threads on two of forty-four papers it sorted a rounding error to the top. It is now a filter that states its own count, and the row-level affordance appears only where a thread exists. Papers without one show nothing; there is no “ask the first question”.</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px">
+          <div style="font-size:11px; color:#d8a34a; flex:none; width:14px">5</div>
+          <div style="display:flex; flex-direction:column; gap:6px">
+            <div style="font-size:10.5px; letter-spacing:0.14em; color:#c6c2bb">SPARSE FIELDS</div>
+            <div style="font-size:10.5px; line-height:1.75; color:#6f6d68; letter-spacing:0.01em">Assets, study type and theme share the provenance line and simply shorten when absent — no label, no reserved row, so three-quarters of rows read as complete rather than empty. Open access earns the right column, the one place where an absence is stated: “Subscription only — no full text held.”</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex; align-items:center; gap:12px">
+        <div style="font-size:10px; letter-spacing:0.16em; color:#08080a; background:#d8a34a; padding:4px 8px 3px">1b</div>
+        <div style="font-size:11px; letter-spacing:0.16em; color:#8a8782">DESKTOP · SPARSE YEAR · 4 PAPERS</div>
+      </div>
+
+      <div style="width:1400px; background:#0d0d0f; border:1px solid #202024">
+        <div style="display:flex; align-items:center; gap:8px; padding:16px 26px 0; font-size:10.5px; letter-spacing:0.1em; color:#57554f">
+          <span>HOME</span><span style="color:#383632">›</span><a href="#1b">JOHN V. HEYMACH</a><span style="color:#383632">›</span><span style="color:#a8a5a0">2004 PUBLICATIONS</span>
+        </div>
+
+        <div style="display:flex; align-items:flex-end; gap:40px; padding:18px 26px 20px">
+          <div style="display:flex; flex-direction:column; gap:6px">
+            <div style="font-size:10px; letter-spacing:0.2em; color:#57554f">PUBLICATION RECORD</div>
+            <div style="font-family:'Source Serif 4',serif; font-size:44px; line-height:0.95; font-weight:300; color:#e6e3dd">2004</div>
+          </div>
+          <div style="display:flex; gap:34px; padding-bottom:6px">
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:22px; color:#d8a34a">1</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">SENIOR AUTHOR</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:22px; color:#8a8782">3</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">CO-AUTHOR</div>
+            </div>
+            <div style="width:1px; background:#232326"></div>
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:22px; color:#8a8782">1,204</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">CITATIONS · THIS YEAR</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:14px; color:#6f6d68; padding-top:6px">Two of four are open access.</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">FULL TEXT</div>
+            </div>
+          </div>
+          <div style="margin-left:auto; text-align:right; padding-bottom:6px">
+            <a href="#1c" style="font-size:10.5px; letter-spacing:0.12em">FULL CAREER RECORD · 312 PAPERS →</a>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:20px; padding:0 26px; height:44px; border-top:1px solid #1a1a1d; border-bottom:1px solid #1a1a1d; background:#0a0a0c">
+          <div style="font-size:9px; letter-spacing:0.16em; color:#4a4844">ORDER</div>
+          <div style="display:flex; gap:2px">
+            <div style="font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; color:#08080a; background:#d8a34a">CONTRIBUTION</div>
+            <div style="font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; color:#6f6d68">MOST CITED</div>
+            <div style="font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; color:#6f6d68">RECENT</div>
+          </div>
+          <div style="margin-left:auto; font-size:10px; letter-spacing:0.09em; color:#46443f">Four papers — narrowing and row density are off for a year this short.</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:84px 1fr 210px; gap:24px; padding:9px 26px; border-bottom:1px solid #1a1a1d; font-size:9px; letter-spacing:0.15em; color:#4a4844">
+          <div style="text-align:right">CITATIONS</div>
+          <div>CONTRIBUTION · TITLE · SOURCE</div>
+          <div>ACCESS &amp; ACTIONS</div>
+        </div>
+
+        <sc-for list="{{ sparseBands }}" as="band" hint-placeholder-count="2">
+          <div>
+            <div style="display:flex; align-items:center; gap:14px; padding:11px 26px 10px; background:#101013; border-bottom:1px solid #1e1e21">
+              <div style="width:2px; height:13px; background:#d8a34a"></div>
+              <div style="font-size:10.5px; letter-spacing:0.2em; color:#e6e3dd">{{ band.label }}</div>
+              <div style="font-size:9.5px; letter-spacing:0.1em; color:#6f6d68">{{ band.note }}</div>
+              <div style="margin-left:auto; font-size:9.5px; letter-spacing:0.11em; color:#57554f">{{ band.count }}</div>
+            </div>
+            <sc-for list="{{ band.rows }}" as="p" hint-placeholder-count="2">
+              <div style="display:grid; grid-template-columns:84px 1fr 210px; gap:24px; padding:15px 26px; border-bottom:1px solid #161619">
+                <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                  <div style="text-align:right; font-size:23px; line-height:1; color:#d8a34a; letter-spacing:-0.03em; padding-top:2px">{{ p.cites }}</div>
+                </sc-if>
+                <sc-if value="{{ p.co }}">
+                  <div style="text-align:right; font-size:15px; line-height:1; color:#6f6d68; padding-top:6px">{{ p.cites }}</div>
+                </sc-if>
+                <div style="display:flex; gap:16px; min-width:0">
+                  <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                    <div style="width:2px; background:#8a6a24; flex:none; margin-top:2px"></div>
+                  </sc-if>
+                  <div style="display:flex; flex-direction:column; gap:7px; min-width:0">
+                    <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                      <div style="font-size:9.5px; letter-spacing:0.2em; color:#d8a34a">SENIOR AUTHOR</div>
+                      <div style="font-family:'Source Serif 4',serif; font-size:21px; line-height:1.24; color:#f2efe9">{{ p.title }}</div>
+                    </sc-if>
+                    <sc-if value="{{ p.co }}">
+                      <div style="font-size:9.5px; letter-spacing:0.2em; color:#6f6d68">CO-AUTHOR</div>
+                      <div style="font-family:'Source Serif 4',serif; font-size:16.5px; line-height:1.3; color:#c6c2bb">{{ p.title }}</div>
+                    </sc-if>
+                    <div style="display:flex; flex-wrap:wrap; align-items:baseline; gap:0 10px; font-size:10px; letter-spacing:0.06em; color:#57554f">
+                      <span style="color:#8a8782">{{ p.journal }}</span>
+                      <span style="color:#383632">·</span>
+                      <span>{{ p.pmid }}</span>
+                      <sc-if value="{{ p.hasType }}" hint-placeholder-val="{{ true }}">
+                        <span style="color:#383632">·</span>
+                        <span>{{ p.type }}</span>
+                      </sc-if>
+                      <sc-if value="{{ p.hasDrugs }}">
+                        <span style="color:#383632">·</span>
+                        <span style="color:#b98f42; border-bottom:1px dotted #6b5426">{{ p.drugs }}</span>
+                      </sc-if>
+                    </div>
+                    <div style="font-size:10.5px; line-height:1.6; color:#6f6d68">{{ p.a1 }}<span style="color:#d8a34a">{{ p.a2 }}</span>{{ p.a3 }}</div>
+                  </div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:7px; align-items:flex-start">
+                  <sc-if value="{{ p.oa }}" hint-placeholder-val="{{ true }}">
+                    <a href="#1b" style="display:flex; align-items:center; gap:7px; font-size:10px; letter-spacing:0.12em; color:#7ba36f">
+                      <span style="border:1px solid #3c5637; padding:2px 5px 1px; font-size:8.5px; letter-spacing:0.14em">OA</span>
+                      <span>READ FULL TEXT ↗</span>
+                    </a>
+                  </sc-if>
+                  <sc-if value="{{ p.paywalled }}">
+                    <div style="font-size:10px; letter-spacing:0.08em; color:#46443f">Subscription only — no full text held.</div>
+                  </sc-if>
+                  <a href="#1b" style="font-size:10px; letter-spacing:0.12em; color:#8a8782">ABSTRACT</a>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+
+        <div style="display:flex; align-items:center; padding:16px 26px 18px; background:#0a0a0c">
+          <div style="font-size:10px; letter-spacing:0.12em; color:#57554f">END OF 2004 · 4 OF 4 PAPERS HELD</div>
+          <div style="margin-left:auto; font-size:9.5px; letter-spacing:0.08em; color:#3f3d39">No discussion threads on any paper from this year.</div>
+        </div>
+      </div>
+
+      <div style="width:1400px; display:flex; gap:14px; padding-top:6px">
+        <div style="width:2px; background:#232326; flex:none"></div>
+        <div style="font-size:10.5px; line-height:1.75; color:#6f6d68; max-width:900px">A short year keeps the same grid, so the page never looks like a different feature. What drops out is the machinery: no narrowing, no row-density switch, no per-band totals worth reading. Absences that were counts on the dense year become sentences here — “Two of four are open access”, “No discussion threads on any paper from this year” — because at n=4 a figure of 2 reads as an error and a sentence reads as a fact.</div>
+      </div>
+    </div>
+
+    <div id="1c" style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex; align-items:center; gap:12px">
+        <div style="font-size:10px; letter-spacing:0.16em; color:#08080a; background:#d8a34a; padding:4px 8px 3px">1c</div>
+        <div style="font-size:11px; letter-spacing:0.16em; color:#8a8782">DESKTOP · FULL CAREER · 312 PAPERS · PROPOSED</div>
+      </div>
+
+      <div style="width:1400px; background:#0d0d0f; border:1px solid #202024">
+        <div style="display:flex; align-items:center; gap:8px; padding:16px 26px 0; font-size:10.5px; letter-spacing:0.1em; color:#57554f">
+          <span>HOME</span><span style="color:#383632">›</span><a href="#1c">JOHN V. HEYMACH</a><span style="color:#383632">›</span><span style="color:#a8a5a0">PUBLICATIONS · FULL RECORD</span>
+        </div>
+
+        <div style="display:flex; align-items:flex-end; gap:40px; padding:18px 26px 20px">
+          <div style="display:flex; flex-direction:column; gap:6px">
+            <div style="font-size:10px; letter-spacing:0.2em; color:#57554f">PUBLICATION RECORD</div>
+            <div style="font-family:'Source Serif 4',serif; font-size:44px; line-height:0.95; font-weight:300; color:#e6e3dd">1998 — 2024</div>
+          </div>
+          <div style="display:flex; gap:34px; padding-bottom:6px">
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:22px; color:#d8a34a">41</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">SENIOR AUTHOR</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:22px; color:#8a8782">271</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">CO-AUTHOR</div>
+            </div>
+            <div style="width:1px; background:#232326"></div>
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:22px; color:#8a8782">54,180</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">CITATIONS · ALL YEARS</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:5px">
+              <div style="font-size:22px; color:#7ba36f">221</div>
+              <div style="font-size:9px; letter-spacing:0.14em; color:#57554f">OPEN ACCESS · FULL TEXT</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:20px; padding:0 26px; height:44px; border-top:1px solid #1a1a1d; border-bottom:1px solid #1a1a1d; background:#0a0a0c">
+          <div style="font-size:9px; letter-spacing:0.16em; color:#4a4844">ORDER</div>
+          <div style="display:flex; gap:2px">
+            <div style="font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; color:#08080a; background:#d8a34a">CONTRIBUTION</div>
+            <div style="font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; color:#6f6d68">MOST CITED</div>
+            <div style="font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; color:#6f6d68">RECENT</div>
+          </div>
+          <div style="margin-left:auto; font-size:10px; letter-spacing:0.09em; color:#46443f">312 papers · every one reachable from this page</div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px; padding:11px 26px 10px; background:#101013; border-bottom:1px solid #1e1e21">
+          <div style="width:2px; height:13px; background:#d8a34a"></div>
+          <div style="font-size:10.5px; letter-spacing:0.2em; color:#e6e3dd">SENIOR AUTHOR</div>
+          <div style="font-size:9.5px; letter-spacing:0.1em; color:#6f6d68">THE PAPERS THAT ARE HIS · 1998—2024</div>
+          <div style="margin-left:auto; font-size:9.5px; letter-spacing:0.11em; color:#57554f">41 PAPERS · SHOWING 5 MOST CITED</div>
+        </div>
+
+        <sc-for list="{{ careerSenior }}" as="p" hint-placeholder-count="5">
+          <div style="display:grid; grid-template-columns:84px 1fr 210px; gap:24px; padding:13px 26px; border-bottom:1px solid #161619">
+            <div style="text-align:right; font-size:21px; line-height:1; color:#d8a34a; letter-spacing:-0.03em; padding-top:2px">{{ p.cites }}</div>
+            <div style="display:flex; gap:16px">
+              <div style="width:2px; background:#8a6a24; flex:none; margin-top:2px"></div>
+              <div style="display:flex; flex-direction:column; gap:6px">
+                <div style="font-family:'Source Serif 4',serif; font-size:19px; line-height:1.26; color:#f2efe9">{{ p.title }}</div>
+                <div style="display:flex; gap:10px; font-size:10px; letter-spacing:0.06em; color:#57554f">
+                  <span style="color:#8a8782">{{ p.journal }}</span>
+                  <span style="color:#383632">·</span>
+                  <span>{{ p.year }}</span>
+                  <span style="color:#383632">·</span>
+                  <span>{{ p.pmid }}</span>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:7px; align-items:flex-start">
+              <sc-if value="{{ p.oa }}" hint-placeholder-val="{{ true }}">
+                <a href="#1c" style="display:flex; align-items:center; gap:7px; font-size:10px; letter-spacing:0.12em; color:#7ba36f">
+                  <span style="border:1px solid #3c5637; padding:2px 5px 1px; font-size:8.5px; letter-spacing:0.14em">OA</span>
+                  <span>READ FULL TEXT ↗</span>
+                </a>
+              </sc-if>
+              <sc-if value="{{ p.paywalled }}">
+                <div style="font-size:10px; letter-spacing:0.08em; color:#46443f">Subscription only — no full text held.</div>
+              </sc-if>
+              <a href="#1c" style="font-size:10px; letter-spacing:0.12em; color:#8a8782">ABSTRACT</a>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="padding:12px 26px 13px; border-bottom:1px solid #1e1e21">
+          <a href="#1c" style="font-size:10px; letter-spacing:0.13em">ALL 41 SENIOR-AUTHOR PAPERS →</a>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px; padding:11px 26px 10px; background:#101013; border-bottom:1px solid #1e1e21">
+          <div style="width:2px; height:13px; background:#3f3d39"></div>
+          <div style="font-size:10.5px; letter-spacing:0.2em; color:#c6c2bb">CO-AUTHOR · BY YEAR</div>
+          <div style="font-size:9.5px; letter-spacing:0.1em; color:#6f6d68">271 PAPERS · OPEN A YEAR TO SEE ITS ROWS</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:84px 1fr 210px; gap:24px; padding:9px 26px; border-bottom:1px solid #1a1a1d; font-size:9px; letter-spacing:0.15em; color:#4a4844">
+          <div style="text-align:right">CITATIONS</div>
+          <div>YEAR · PAPERS HELD</div>
+          <div>OPEN ACCESS</div>
+        </div>
+
+        <sc-for list="{{ careerYears }}" as="y" hint-placeholder-count="8">
+          <div onClick="{{ noop }}" style="display:grid; grid-template-columns:84px 1fr 210px; gap:24px; padding:11px 26px; border-bottom:1px solid #161619; align-items:center" style-hover="background:#101014">
+            <div style="text-align:right; font-size:14px; color:#6f6d68">{{ y.cites }}</div>
+            <div style="display:flex; align-items:center; gap:16px">
+              <div style="font-family:'Source Serif 4',serif; font-size:19px; color:#e6e3dd; width:56px; flex:none">{{ y.year }}</div>
+              <div style="display:flex; align-items:center; gap:3px; width:230px; flex:none">
+                <sc-for list="{{ y.ticks }}" as="t" hint-placeholder-count="12">
+                  <div style="{{ t }}"></div>
+                </sc-for>
+              </div>
+              <div style="font-size:10.5px; letter-spacing:0.08em; color:#8a8782; width:96px; flex:none">{{ y.countLabel }}</div>
+              <div style="font-size:10.5px; letter-spacing:0.06em; color:#57554f">{{ y.top }}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px">
+              <div style="font-size:10.5px; color:#7ba36f">{{ y.oa }}</div>
+              <div style="margin-left:auto; font-size:12px; color:#4a4844">＋</div>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="display:flex; align-items:center; padding:16px 26px 18px; background:#0a0a0c">
+          <div style="font-size:10px; letter-spacing:0.12em; color:#57554f">27 YEARS · 312 OF 312 PAPERS HELD</div>
+          <div style="margin-left:auto; font-size:9.5px; letter-spacing:0.08em; color:#3f3d39">Years before 2003 hold one or two papers each and are listed together at the foot.</div>
+        </div>
+      </div>
+
+      <div style="width:1400px; display:flex; gap:14px; padding-top:6px">
+        <div style="width:2px; background:#232326; flex:none"></div>
+        <div style="font-size:10.5px; line-height:1.75; color:#6f6d68; max-width:900px">The career view answers the meeting question directly: the forty-one papers that are his sit at the top, ranked by citation, five deep with the rest one click away. Everything co-authored collapses to a year ledger — count, citation total, open-access count, and a tick per paper so volume is legible without rows. Years expand in place; nothing is hidden without a control that names what it holds.</div>
+      </div>
+    </div>
+
+    <div id="1d" style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex; align-items:center; gap:12px">
+        <div style="font-size:10px; letter-spacing:0.16em; color:#08080a; background:#d8a34a; padding:4px 8px 3px">1d</div>
+        <div style="font-size:11px; letter-spacing:0.16em; color:#8a8782">MOBILE · 390 × 844 · DENSE / SPARSE / CAREER</div>
+      </div>
+
+      <div style="display:flex; gap:36px">
+
+        <div style="display:flex; flex-direction:column; gap:10px">
+          <div style="font-size:9.5px; letter-spacing:0.16em; color:#57554f">DENSE YEAR</div>
+          <div style="width:390px; height:844px; overflow:hidden; background:#0d0d0f; border:1px solid #202024; display:flex; flex-direction:column">
+            <div style="padding:14px 16px 0; display:flex; align-items:center; gap:8px; font-size:9.5px; letter-spacing:0.1em; color:#57554f">
+              <span>←</span><span style="color:#a8a5a0">JOHN V. HEYMACH</span>
+            </div>
+            <div style="padding:12px 16px 14px; display:flex; flex-direction:column; gap:12px">
+              <div style="display:flex; align-items:baseline; gap:12px">
+                <div style="font-family:'Source Serif 4',serif; font-size:34px; line-height:1; font-weight:300; color:#e6e3dd">2020</div>
+                <div style="font-size:10px; letter-spacing:0.12em; color:#57554f">{{ papersHeld }}</div>
+              </div>
+              <div style="display:flex; gap:22px">
+                <div style="display:flex; flex-direction:column; gap:4px">
+                  <div style="font-size:18px; color:#d8a34a">{{ nSenior }}</div>
+                  <div style="font-size:8.5px; letter-spacing:0.13em; color:#57554f">SENIOR AUTHOR</div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px">
+                  <div style="font-size:18px; color:#8a8782">{{ nCo }}</div>
+                  <div style="font-size:8.5px; letter-spacing:0.13em; color:#57554f">CO-AUTHOR</div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px">
+                  <div style="font-size:18px; color:#7ba36f">{{ nOa }}</div>
+                  <div style="font-size:8.5px; letter-spacing:0.13em; color:#57554f">OPEN ACCESS</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; gap:2px; padding:0 16px 10px; border-bottom:1px solid #1a1a1d">
+              <div style="font-size:9.5px; letter-spacing:0.12em; padding:6px 10px 5px; color:#08080a; background:#d8a34a">CONTRIBUTION</div>
+              <div style="font-size:9.5px; letter-spacing:0.12em; padding:6px 10px 5px; color:#6f6d68">CITED</div>
+              <div style="font-size:9.5px; letter-spacing:0.12em; padding:6px 10px 5px; color:#6f6d68">RECENT</div>
+            </div>
+
+            <sc-for list="{{ mobileBands }}" as="band" hint-placeholder-count="2">
+              <div>
+                <div style="display:flex; align-items:center; gap:10px; padding:10px 16px 9px; background:#101013; border-bottom:1px solid #1e1e21">
+                  <div style="width:2px; height:11px; background:#d8a34a"></div>
+                  <div style="font-size:9.5px; letter-spacing:0.18em; color:#e6e3dd">{{ band.label }}</div>
+                  <div style="margin-left:auto; font-size:9px; letter-spacing:0.1em; color:#57554f">{{ band.count }}</div>
+                </div>
+                <sc-for list="{{ band.rows }}" as="p" hint-placeholder-count="3">
+                  <div style="display:flex; gap:12px; padding:13px 16px; border-bottom:1px solid #161619">
+                    <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                      <div style="width:2px; background:#8a6a24; flex:none"></div>
+                    </sc-if>
+                    <div style="display:flex; flex-direction:column; gap:6px; min-width:0">
+                      <div style="display:flex; align-items:baseline; gap:9px">
+                        <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                          <div style="font-size:16px; line-height:1; color:#d8a34a; letter-spacing:-0.02em">{{ p.cites }}</div>
+                        </sc-if>
+                        <sc-if value="{{ p.co }}">
+                          <div style="font-size:13px; line-height:1; color:#6f6d68">{{ p.cites }}</div>
+                        </sc-if>
+                        <div style="font-size:8.5px; letter-spacing:0.13em; color:#4a4844">CITATIONS</div>
+                        <sc-if value="{{ p.oa }}" hint-placeholder-val="{{ true }}">
+                          <div style="margin-left:auto; border:1px solid #3c5637; color:#7ba36f; padding:2px 4px 1px; font-size:8px; letter-spacing:0.13em">OA</div>
+                        </sc-if>
+                      </div>
+                      <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                        <div style="font-family:'Source Serif 4',serif; font-size:16.5px; line-height:1.3; color:#f2efe9; text-wrap:pretty">{{ p.title }}</div>
+                      </sc-if>
+                      <sc-if value="{{ p.co }}">
+                        <div style="font-family:'Source Serif 4',serif; font-size:14.5px; line-height:1.32; color:#c6c2bb; text-wrap:pretty">{{ p.title }}</div>
+                      </sc-if>
+                      <div style="font-size:9.5px; letter-spacing:0.05em; color:#57554f">{{ p.mobileSource }}</div>
+                      <sc-if value="{{ p.paywalled }}">
+                        <div style="font-size:9.5px; color:#46443f">Subscription only — no full text held.</div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px">
+          <div style="font-size:9.5px; letter-spacing:0.16em; color:#57554f">SPARSE YEAR</div>
+          <div style="width:390px; height:844px; overflow:hidden; background:#0d0d0f; border:1px solid #202024; display:flex; flex-direction:column">
+            <div style="padding:14px 16px 0; display:flex; align-items:center; gap:8px; font-size:9.5px; letter-spacing:0.1em; color:#57554f">
+              <span>←</span><span style="color:#a8a5a0">JOHN V. HEYMACH</span>
+            </div>
+            <div style="padding:12px 16px 14px; display:flex; flex-direction:column; gap:10px">
+              <div style="display:flex; align-items:baseline; gap:12px">
+                <div style="font-family:'Source Serif 4',serif; font-size:34px; line-height:1; font-weight:300; color:#e6e3dd">2004</div>
+                <div style="font-size:10px; letter-spacing:0.12em; color:#57554f">4 PAPERS HELD</div>
+              </div>
+              <div style="font-size:10.5px; line-height:1.6; color:#6f6d68">One senior-author paper. Two of four are open access. No discussion threads on any paper from this year.</div>
+            </div>
+
+            <sc-for list="{{ sparseBands }}" as="band" hint-placeholder-count="2">
+              <div>
+                <div style="display:flex; align-items:center; gap:10px; padding:10px 16px 9px; background:#101013; border-bottom:1px solid #1e1e21; border-top:1px solid #1a1a1d">
+                  <div style="width:2px; height:11px; background:#d8a34a"></div>
+                  <div style="font-size:9.5px; letter-spacing:0.18em; color:#e6e3dd">{{ band.label }}</div>
+                  <div style="margin-left:auto; font-size:9px; letter-spacing:0.1em; color:#57554f">{{ band.count }}</div>
+                </div>
+                <sc-for list="{{ band.rows }}" as="p" hint-placeholder-count="2">
+                  <div style="display:flex; gap:12px; padding:13px 16px; border-bottom:1px solid #161619">
+                    <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                      <div style="width:2px; background:#8a6a24; flex:none"></div>
+                    </sc-if>
+                    <div style="display:flex; flex-direction:column; gap:6px; min-width:0">
+                      <div style="display:flex; align-items:baseline; gap:9px">
+                        <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                          <div style="font-size:16px; line-height:1; color:#d8a34a">{{ p.cites }}</div>
+                        </sc-if>
+                        <sc-if value="{{ p.co }}">
+                          <div style="font-size:13px; line-height:1; color:#6f6d68">{{ p.cites }}</div>
+                        </sc-if>
+                        <div style="font-size:8.5px; letter-spacing:0.13em; color:#4a4844">CITATIONS</div>
+                        <sc-if value="{{ p.oa }}" hint-placeholder-val="{{ true }}">
+                          <div style="margin-left:auto; border:1px solid #3c5637; color:#7ba36f; padding:2px 4px 1px; font-size:8px; letter-spacing:0.13em">OA</div>
+                        </sc-if>
+                      </div>
+                      <sc-if value="{{ p.senior }}" hint-placeholder-val="{{ true }}">
+                        <div style="font-family:'Source Serif 4',serif; font-size:16.5px; line-height:1.3; color:#f2efe9; text-wrap:pretty">{{ p.title }}</div>
+                      </sc-if>
+                      <sc-if value="{{ p.co }}">
+                        <div style="font-family:'Source Serif 4',serif; font-size:14.5px; line-height:1.32; color:#c6c2bb; text-wrap:pretty">{{ p.title }}</div>
+                      </sc-if>
+                      <div style="font-size:9.5px; letter-spacing:0.05em; color:#57554f">{{ p.mobileSource }}</div>
+                      <div style="font-size:9.5px; line-height:1.55; color:#57554f">{{ p.a1 }}<span style="color:#d8a34a">{{ p.a2 }}</span>{{ p.a3 }}</div>
+                      <sc-if value="{{ p.paywalled }}">
+                        <div style="font-size:9.5px; color:#46443f">Subscription only — no full text held.</div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px">
+          <div style="font-size:9.5px; letter-spacing:0.16em; color:#57554f">FULL CAREER</div>
+          <div style="width:390px; height:844px; overflow:hidden; background:#0d0d0f; border:1px solid #202024; display:flex; flex-direction:column">
+            <div style="padding:14px 16px 0; display:flex; align-items:center; gap:8px; font-size:9.5px; letter-spacing:0.1em; color:#57554f">
+              <span>←</span><span style="color:#a8a5a0">JOHN V. HEYMACH</span>
+            </div>
+            <div style="padding:12px 16px 14px; display:flex; flex-direction:column; gap:12px">
+              <div style="font-family:'Source Serif 4',serif; font-size:28px; line-height:1; font-weight:300; color:#e6e3dd">1998 — 2024</div>
+              <div style="display:flex; gap:22px">
+                <div style="display:flex; flex-direction:column; gap:4px">
+                  <div style="font-size:18px; color:#d8a34a">41</div>
+                  <div style="font-size:8.5px; letter-spacing:0.13em; color:#57554f">SENIOR AUTHOR</div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px">
+                  <div style="font-size:18px; color:#8a8782">271</div>
+                  <div style="font-size:8.5px; letter-spacing:0.13em; color:#57554f">CO-AUTHOR</div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px">
+                  <div style="font-size:18px; color:#8a8782">54,180</div>
+                  <div style="font-size:8.5px; letter-spacing:0.13em; color:#57554f">CITATIONS</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 16px 9px; background:#101013; border-top:1px solid #1a1a1d; border-bottom:1px solid #1e1e21">
+              <div style="width:2px; height:11px; background:#d8a34a"></div>
+              <div style="font-size:9.5px; letter-spacing:0.18em; color:#e6e3dd">SENIOR AUTHOR</div>
+              <div style="margin-left:auto; font-size:9px; letter-spacing:0.1em; color:#57554f">41 · TOP 3</div>
+            </div>
+            <sc-for list="{{ mobileCareerSenior }}" as="p" hint-placeholder-count="3">
+              <div style="display:flex; gap:12px; padding:12px 16px; border-bottom:1px solid #161619">
+                <div style="width:2px; background:#8a6a24; flex:none"></div>
+                <div style="display:flex; flex-direction:column; gap:5px; min-width:0">
+                  <div style="display:flex; align-items:baseline; gap:9px">
+                    <div style="font-size:16px; line-height:1; color:#d8a34a">{{ p.cites }}</div>
+                    <div style="font-size:8.5px; letter-spacing:0.13em; color:#4a4844">CITATIONS</div>
+                  </div>
+                  <div style="font-family:'Source Serif 4',serif; font-size:15.5px; line-height:1.3; color:#f2efe9; text-wrap:pretty">{{ p.title }}</div>
+                  <div style="font-size:9.5px; letter-spacing:0.05em; color:#57554f">{{ p.journal }} · {{ p.year }}</div>
+                </div>
+              </div>
+            </sc-for>
+            <div style="padding:11px 16px; border-bottom:1px solid #1e1e21">
+              <a href="#1d" style="font-size:9.5px; letter-spacing:0.12em">ALL 41 SENIOR-AUTHOR PAPERS →</a>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 16px 9px; background:#101013; border-bottom:1px solid #1e1e21">
+              <div style="width:2px; height:11px; background:#3f3d39"></div>
+              <div style="font-size:9.5px; letter-spacing:0.18em; color:#c6c2bb">CO-AUTHOR · BY YEAR</div>
+              <div style="margin-left:auto; font-size:9px; letter-spacing:0.1em; color:#57554f">271</div>
+            </div>
+            <sc-for list="{{ mobileYears }}" as="y" hint-placeholder-count="6">
+              <div style="display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid #161619">
+                <div style="font-family:'Source Serif 4',serif; font-size:16px; color:#e6e3dd; width:44px; flex:none">{{ y.year }}</div>
+                <div style="display:flex; align-items:center; gap:3px; flex:none">
+                  <sc-for list="{{ y.mticks }}" as="t" hint-placeholder-count="10">
+                    <div style="{{ t }}"></div>
+                  </sc-for>
+                </div>
+                <div style="margin-left:auto; font-size:9.5px; letter-spacing:0.08em; color:#8a8782">{{ y.countLabel }}</div>
+                <div style="font-size:11px; color:#4a4844">＋</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:14px; padding-top:6px; max-width:1200px">
+        <div style="width:2px; background:#232326; flex:none"></div>
+        <div style="font-size:10.5px; line-height:1.75; color:#6f6d68">On mobile the citation figure moves up beside the open-access badge, so the two scannable facts share one line above the title and the eye still reads left-to-right down a single column. Bands, gold rule and title scale survive; the provenance line compresses to journal and year, with PMID behind the row. Order tabs stay, narrowing moves into a sheet.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1200}}">
+class Component extends DCLogic {
+  state = { order: 'contribution', density: 'ledger', oa: false, thread: false };
+
+  // cites, role, month, journal, pmid, title, oa, type, drugs, authors, thread
+  data() {
+    return [
+      [848,'C',5,'The New England journal of medicine',32469185,'Tepotinib in Non-Small-Cell Lung Cancer with MET Exon 14 Skipping Mutations',1,'Phase 2 · Rare oncogenic drivers','tepotinib','Paik PK, Felip E, Veillon R … Heymach JV … +1 more',3,'11 DAYS AGO'],
+      [442,'C',2,'Journal of thoracic oncology',32004713,'IASLC Multidisciplinary Recommendations for Pathologic Assessment of Lung Cancer Resection Specimens After Neoadjuvant Therapy',1,'Review · Perioperative immunotherapy','','Travis WD, Dacic S, Wistuba I … Heymach J … +27 more',0,''],
+      [369,'C',11,'Nature cancer',33521652,'Single-cell analyses reveal increased intratumoral heterogeneity after the onset of therapy resistance in small-cell lung cancer',1,'','','Stewart CA, Gay CM, Xi Y … Heymach JV … +4 more',0,''],
+      [366,'C',9,'Nature cancer',34505064,'Circulating Tumor DNA Dynamics Predict Benefit from Consolidation Immunotherapy in Locally Advanced Non-Small Cell Lung Cancer',1,'Stage III multimodality','','Moding EJ, Liu Y, Nabet BY … Heymach JV … +12 more',0,''],
+      [283,'S',10,'Journal for immunotherapy of cancer',33051340,'Pembrolizumab with or without radiation therapy for metastatic non-small cell lung cancer: a randomized phase I/II trial',1,'Phase 2 · Checkpoint combinations','pembrolizumab','Welsh J, Menon H, Chen D … Heymach JV',5,'2 DAYS AGO'],
+      [228,'C',8,'Nature communications',32801676,'Comprehensive T cell repertoire characterization of non-small cell lung cancer',1,'','','Reuben A, Zhang J, Chiou SH … Heymach JV … +8 more',0,''],
+      [202,'C',7,'Journal of thoracic oncology',32680166,'STING Pathway Expression Identifies NSCLC With an Immune-Responsive Phenotype',1,'','cisplatin','Della Corte CM, Sen T, Gay CM … Heymach JV … +3 more',0,''],
+      [198,'C',5,'Journal of thoracic oncology',32389639,'Programmed Death-Ligand 1 Heterogeneity and Its Impact on Benefit From Immune Checkpoint Inhibitors in NSCLC',1,'IO biomarkers & selection','','Hong L, Negrao MV, Dibaj SS … Heymach JV … +3 more',0,''],
+      [177,'S',9,'Science translational medicine',32878980,'A YAP/FOXM1 axis mediates EMT-associated EGFR inhibitor resistance and increased expression of spindle assembly checkpoint components',1,'','','Nilsson MB, Sun H, Robichaux J … Heymach JV',0,''],
+      [137,'C',1,'Journal of thoracic oncology',31778797,'Phase II Trial of Concurrent Atezolizumab With Chemoradiation for Unresectable NSCLC',1,'Phase 2 · irAE management','atezolizumab, durvalumab','Lin SH, Lin Y, Yao L … Heymach JV … +1 more',0,''],
+      [117,'C',2,'Annals of oncology',32067682,'Clinical activity of programmed cell death 1 (PD-1) blockade in never, light, and heavy smokers with non-small-cell lung cancer and PD-L1 expression ≥50%',0,'IO biomarkers & selection','','Gainor JF, Rizvi H, Jimenez Aguilar E … Heymach JV … +4 more',0,''],
+      [113,'C',1,'Journal of thoracic oncology',31605794,'Phase I Trial of Pembrolizumab and Radiation Therapy after Induction Chemotherapy for Locally Advanced NSCLC',1,'Phase 1 · Checkpoint combinations','pembrolizumab','Jabbour SK, Berman AT, Decker RH … Heymach JV … +6 more',0,''],
+      [104,'S',4,'Cancer discovery',32220845,'Mechanisms and clinical activity of an EGFR and HER2 exon 20-selective kinase inhibitor in non-small cell lung cancer',1,'Rare oncogenic drivers','','Robichaux JP, Elamin YY, Vijayan RSK … Heymach JV',0,''],
+      [96,'C',6,'Clinical cancer research',32220888,'Molecular Determinants of Response to Anti-Programmed Cell Death (PD)-1 and Anti-Programmed Death-Ligand 1 (PD-L1) Blockade in Patients With NSCLC',1,'IO biomarkers & selection','nivolumab','Cascone T, McKenzie JA, Mbofung RM … Heymach JV … +9 more',0,''],
+      [91,'C',3,'Journal of thoracic oncology',32160511,'Tumor Mutational Burden and Efficacy of Immune Checkpoint Inhibitors: A Systematic Review',0,'Review · IO biomarkers & selection','','Ricciuti B, Wang X, Alessi JV … Heymach JV … +14 more',0,''],
+      [88,'C',12,'Cancer cell',33285109,'Patterns of Transcription Factor Programs and Immune Pathway Activation Define Four Major Subtypes of SCLC',1,'','','Gay CM, Stewart CA, Park EM … Heymach JV … +11 more',0,''],
+      [84,'S',7,'Clinical cancer research',32605908,'Targeting the tumour vasculature in combination with immune checkpoint blockade in non-small cell lung cancer',1,'Antiangiogenic combinations','ramucirumab, bevacizumab','Elamin YY, Tsao AS, Le X … Heymach JV',0,''],
+      [79,'C',4,'The Lancet oncology',32222195,'Neoadjuvant nivolumab or nivolumab plus ipilimumab in operable non-small cell lung cancer',1,'Phase 2 · Perioperative immunotherapy','nivolumab, ipilimumab','Cascone T, William WN, Weissferdt A … Heymach JV … +18 more',0,''],
+      [76,'C',8,'Journal of clinical oncology',32552277,'Osimertinib in Patients With EGFR Exon 20 Insertion-Positive Advanced NSCLC',0,'','osimertinib','Piotrowska Z, Wang Y, Sequist LV … Heymach JV … +5 more',0,''],
+      [71,'C',6,'Cancer immunology research',32409596,'Neutrophil-to-Lymphocyte Ratio and Outcomes With Immune Checkpoint Blockade in Advanced NSCLC',1,'IO biomarkers & selection','','Kazandjian D, Gong Y, Keegan P … Heymach JV … +2 more',0,''],
+      [68,'C',3,'Clinical lung cancer',32122763,'Real-World Treatment Patterns and Sequencing in EGFR-Mutant Advanced NSCLC',0,'','erlotinib, osimertinib','Nieva JJ, Reckamp KL, Potter D … Heymach JV … +7 more',0,''],
+      [64,'C',10,'Nature medicine',33020654,'Tumour-intrinsic determinants of response to neoadjuvant chemoimmunotherapy in resectable lung cancer',1,'Perioperative immunotherapy','','Zhang J, Reuben A, Chiou SH … Heymach JV … +21 more',0,''],
+      [61,'C',5,'Journal of thoracic oncology',32439497,'Brain Metastases in EGFR-Mutant NSCLC: Incidence, Management and Outcomes',1,'','osimertinib','Wang N, Le X, Sheshadri A … Heymach JV … +3 more',0,''],
+      [58,'C',2,'Cancer research',32041839,'STK11/LKB1 Loss Drives an Immune-Cold Tumour Microenvironment in KRAS-Mutant Lung Adenocarcinoma',1,'IO biomarkers & selection','','Skoulidis F, Goldberg ME, Greenawalt DM … Heymach JV … +16 more',0,''],
+      [54,'S',11,'Journal of thoracic oncology',33121927,'Vandetanib plus everolimus in patients with RET-rearranged advanced non-small cell lung cancer: a phase I/II study',0,'Phase 1 · Rare oncogenic drivers','vandetanib, everolimus','Le X, Puri S, Negrao MV … Heymach JV',0,''],
+      [51,'C',7,'Clinical cancer research',32601075,'Circulating Cytokine Profiles as Correlates of Benefit From Immune Checkpoint Blockade',1,'','','Le X, Negrao MV, Reuben A … Heymach JV … +6 more',0,''],
+      [47,'C',4,'Journal of thoracic oncology',32294530,'Consensus Definitions for Oligometastatic and Oligoprogressive Disease in NSCLC',1,'Review','','Dingemans AC, Hendriks LEL, Berghmans T … Heymach J … +24 more',0,''],
+      [44,'C',9,'Lung cancer',32888192,'Efficacy of Immune Checkpoint Blockade in KRAS-Mutant NSCLC by Co-Mutation Status',1,'IO biomarkers & selection','pembrolizumab','Arbour KC, Rizvi H, Plodkowski AJ … Heymach JV … +8 more',0,''],
+      [41,'C',1,'Cancer',31724751,'Patient-Reported Outcomes in a Phase III Trial of Chemoradiation With Consolidation Immunotherapy',0,'','durvalumab','Movsas B, Hu C, Sloan J … Heymach JV … +11 more',0,''],
+      [38,'C',6,'Journal of immunotherapy of cancer',32540858,'Radiation-Induced Lymphopenia and Outcomes With Concurrent Checkpoint Blockade',1,'irAE management','','Chen D, Menon H, Verma V … Heymach JV … +5 more',0,''],
+      [35,'S',3,'Clinical cancer research',32122916,'Poziotinib in patients with HER2 exon 20 mutant advanced non-small cell lung cancer',0,'Phase 2 · Rare oncogenic drivers','poziotinib','Elamin YY, Robichaux JP, Carter BW … Heymach JV',0,''],
+      [33,'C',8,'Molecular cancer therapeutics',32605924,'Axl Inhibition Overcomes Resistance to Third-Generation EGFR Inhibitors in Lung Adenocarcinoma',1,'','osimertinib','Taniguchi H, Yamada T, Wang R … Heymach JV … +4 more',0,''],
+      [29,'C',11,'Journal of thoracic oncology',33096270,'ctDNA-Guided Surveillance After Definitive Chemoradiation for Stage III NSCLC',1,'Stage III multimodality','','Xia L, Mehran RJ, Wang N … Heymach JV … +3 more',0,''],
+      [27,'C',5,'Clinical lung cancer',32418718,'Immune-Related Adverse Events and Survival in Patients Receiving PD-1 Blockade',0,'irAE management','nivolumab','Naidoo J, Cottrell TR, Lipson EJ … Heymach JV … +9 more',0,''],
+      [24,'C',2,'Cancer treatment reviews',32032863,'Antiangiogenic Therapy Combined With Immune Checkpoint Blockade in Thoracic Malignancies',1,'Review · Antiangiogenic combinations','ramucirumab, bevacizumab, atezolizumab','Manegold C, Dingemans AC, Gray JE … Heymach JV … +6 more',0,''],
+      [21,'C',7,'Journal of thoracic disease',32642100,'Surgical Outcomes After Neoadjuvant Immunotherapy in a Multicentre Cohort',1,'Perioperative immunotherapy','','Sepesi B, Zhou N, William WN … Heymach JV … +7 more',0,''],
+      [18,'C',10,'Clinical cancer research',33033060,'Spatial Immune Architecture Predicts Recurrence in Resected Lung Adenocarcinoma',1,'','','Parra ER, Zhai J, Tamegnon A … Heymach JV … +6 more',0,''],
+      [15,'C',4,'Lung cancer',32279964,'Second-Line Ramucirumab Plus Docetaxel in Patients Previously Treated With Checkpoint Blockade',0,'Antiangiogenic combinations','ramucirumab, docetaxel','Brahmer JR, Govindan R, Anders RA … Heymach JV … +5 more',0,''],
+      [12,'C',12,'Translational lung cancer research',33209606,'Liquid Biopsy for Resistance Mutation Detection in Advanced NSCLC: A Practical Review',1,'Review','','Le X, Nilsson MB, Goldman JW … Heymach JV … +2 more',0,''],
+      [9,'C',9,'JCO precision oncology',32923878,'Concordance of Tissue and Plasma Next-Generation Sequencing in Advanced Thoracic Cancers',1,'','','Vaidya A, Le X, Negrao MV … Heymach JV … +4 more',0,''],
+      [7,'C',6,'Clinical lung cancer',32565007,'Sarcopenia and Tolerability of Chemoradiation in Locally Advanced NSCLC',0,'','','Nakamura R, Inage Y, Tobita R … Heymach JV … +3 more',0,''],
+      [4,'C',3,'Journal of thoracic oncology',32151780,'Correspondence: On Reporting Standards for Perioperative Immunotherapy Trials',1,'','','Cascone T, Sepesi B, Heymach JV',0,''],
+      [2,'C',11,'Annals of translational medicine',33241076,'Commentary: Sequencing Targeted Therapy and Immunotherapy in Oncogene-Driven Lung Cancer',1,'','osimertinib','Negrao MV, Le X, Heymach JV',0,''],
+      [1,'C',8,'Cancer medicine',32790162,'Editorial: Trial Design Considerations for Rare Oncogenic Drivers',0,'','','Heymach JV, Le X',0,'']
+    ];
+  }
+
+  sparseData() {
+    return [
+      [612,'S',6,'Cancer research',15205334,'Angiogenesis inhibitors and the tumour vasculature: mechanisms of resistance to VEGF blockade',0,'Preclinical · Antiangiogenic combinations','','Heymach JV, Desai J, Manola J',0,''],
+      [391,'C',3,'Journal of clinical oncology',15020609,'Phase II study of the antiangiogenic agent SU11248 in patients with imatinib-resistant gastrointestinal stromal tumour',1,'Phase 2','sunitinib','Demetri GD, van Oosterom AT, Garrett CR … Heymach JV … +9 more',0,''],
+      [148,'C',9,'Clinical cancer research',15328187,'Circulating endothelial cells and endothelial progenitors as pharmacodynamic markers of antiangiogenic therapy',1,'','','Beaudry P, Force J, Naumov GN … Heymach JV … +3 more',0,''],
+      [53,'C',11,'Cancer',15540189,'Vascular endothelial growth factor levels and outcome in patients with advanced soft tissue sarcoma',0,'','','Graeven U, Andre N, Achilles E … Heymach JV … +2 more',0,'']
+    ];
+  }
+
+  careerSeniorData() {
+    return [
+      [1842,'Nature reviews clinical oncology',26099984,'Targeting angiogenesis in lung cancer: mechanisms of resistance and strategies for combination',2015,1],
+      [1104,'Journal of clinical oncology',18378569,'Randomized phase II study of vandetanib alone or with paclitaxel and carboplatin as first-line treatment for advanced non-small-cell lung cancer',2007,0],
+      [812,'Cancer discovery',32220845,'Mechanisms and clinical activity of an EGFR and HER2 exon 20-selective kinase inhibitor in non-small cell lung cancer',2020,1],
+      [694,'Nature medicine',29808006,'Pan-cancer landscape and analysis of ERBB2 mutations identifies poziotinib as a clinically active inhibitor',2018,1],
+      [612,'Cancer research',15205334,'Angiogenesis inhibitors and the tumour vasculature: mechanisms of resistance to VEGF blockade',2004,0]
+    ];
+  }
+
+  // year, papers, cites, oa, top journal
+  yearData() {
+    return [
+      [2024,14,1180,11,'Nature · JTO · Cancer Cell'],
+      [2023,22,4310,17,'Nature Medicine · JCO'],
+      [2022,26,6240,19,'Cancer Cell · Ann Oncol'],
+      [2021,31,7980,24,'Nature Cancer · JTO'],
+      [2020,38,3140,29,'NEJM · Nature Cancer'],
+      [2019,29,5410,21,'JCO · Cancer Discovery'],
+      [2018,24,6870,16,'Nature Medicine · JTO'],
+      [2017,21,4020,13,'JCO · Clin Cancer Res']
+    ];
+  }
+
+  row(r, i) {
+    const [cites, role, month, journal, pmid, title, oa, type, drugs, auth, thread, when] = r;
+    const senior = role === 'S';
+    const cut = auth.indexOf('Heymach');
+    const end = cut < 0 ? 0 : auth.indexOf(' ', auth.indexOf(' ', cut) + 1);
+    const stop = end < 0 ? auth.length : end;
+    return {
+      key: pmid, cites: cites.toLocaleString(), citeN: cites, month, senior, co: !senior,
+      roleNote: senior ? 'LAST-POSITION AUTHOR' : 'LISTED AMONG THE AUTHOR SET',
+      title, journal, pmid: 'PMID ' + pmid, year: r[12],
+      oa: !!oa, paywalled: !oa,
+      type, hasType: !!type, noType: !type,
+      drugs, hasDrugs: !!drugs,
+      thread, hasThread: thread > 0, threadWhen: when,
+      a1: cut < 0 ? auth : auth.slice(0, cut),
+      a2: cut < 0 ? '' : auth.slice(cut, stop),
+      a3: cut < 0 ? '' : auth.slice(stop),
+      mobileSource: journal + ' · 2020',
+      detail: this.state.density === 'detail'
+    };
+  }
+
+  filtered() {
+    let rows = this.data().map((r, i) => this.row(r, i));
+    if (this.state.oa) rows = rows.filter(r => r.oa);
+    if (this.state.thread) rows = rows.filter(r => r.hasThread);
+    return rows;
+  }
+
+  bandsFor(rows) {
+    const order = this.state.order;
+    if (order === 'contribution') {
+      const s = rows.filter(r => r.senior).sort((a, b) => b.citeN - a.citeN);
+      const c = rows.filter(r => r.co).sort((a, b) => b.citeN - a.citeN);
+      const out = [];
+      if (s.length) out.push({ label: 'SENIOR AUTHOR', note: 'THE PAPERS THAT ARE HIS', count: s.length + (s.length === 1 ? ' PAPER' : ' PAPERS'), rows: s });
+      if (c.length) out.push({ label: 'CO-AUTHOR', note: 'LISTED AMONG THE AUTHORS', count: c.length + ' PAPERS', rows: c });
+      return out;
+    }
+    if (order === 'cited') {
+      return [{ label: 'MOST CITED FIRST', note: 'ROLE SHOWN ON EVERY ROW', count: rows.length + ' PAPERS', rows: rows.slice().sort((a, b) => b.citeN - a.citeN) }];
+    }
+    return [{ label: 'MOST RECENT FIRST', note: 'BY PUBLICATION MONTH WITHIN 2020', count: rows.length + ' PAPERS', rows: rows.slice().sort((a, b) => b.month - a.month) }];
+  }
+
+  tab(active) {
+    return 'font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; cursor:pointer; ' +
+      (active ? 'color:#08080a; background:#d8a34a;' : 'color:#6f6d68; background:transparent;');
+  }
+  filt(active) {
+    return 'font-size:10px; letter-spacing:0.13em; padding:5px 11px 4px; cursor:pointer; border:1px solid ' +
+      (active ? '#d8a34a; color:#d8a34a; background:#1a140a;' : '#2a2a2e; color:#6f6d68; background:transparent;');
+  }
+  ticks(n, w) {
+    const out = [];
+    const shown = Math.min(n, 40);
+    for (let i = 0; i < shown; i++) out.push('width:' + w + 'px; height:12px; background:' + (i < 3 ? '#6f6d68' : '#33322f') + '; flex:none');
+    return out;
+  }
+
+  renderVals() {
+    const rows = this.filtered();
+    const total = this.data().reduce((a, r) => a + r[0], 0);
+    const sparse = this.sparseData().map(r => this.row(r, 0));
+    const sSen = sparse.filter(r => r.senior);
+    const sCo = sparse.filter(r => r.co);
+    const mob = this.bandsFor(this.data().map((r, i) => this.row(r, i)));
+
+    const all = this.data();
+    const nTotal = all.length;
+    const nSenior = all.filter(r => r[1] === 'S').length;
+    const nOa = all.filter(r => r[6]).length;
+    const nThread = all.filter(r => r[10] > 0).length;
+
+    return {
+      nTotal, nSenior, nCo: nTotal - nSenior, nOa,
+      captionNote: 'DESKTOP · DENSE YEAR · ' + nTotal + ' PAPERS · INTERACTIVE',
+      papersHeld: nTotal + ' PAPERS HELD',
+      oaFilterLabel: 'OPEN ACCESS · ' + nOa,
+      threadFilterLabel: 'HAS A DISCUSSION THREAD · ' + nThread,
+      totalCites: total.toLocaleString(),
+      bands: this.bandsFor(rows),
+      shownNote: rows.length === nTotal
+        ? 'END OF 2020 · ' + nTotal + ' OF ' + nTotal + ' PAPERS HELD'
+        : 'SHOWING ' + rows.length + ' OF ' + nTotal + ' PAPERS HELD · CLEAR NARROWING TO SEE THE REST',
+      setContribution: () => this.setState({ order: 'contribution' }),
+      setCited: () => this.setState({ order: 'cited' }),
+      setRecent: () => this.setState({ order: 'recent' }),
+      toggleOa: () => this.setState(s => ({ oa: !s.oa })),
+      toggleThread: () => this.setState(s => ({ thread: !s.thread })),
+      setLedger: () => this.setState({ density: 'ledger' }),
+      setDetail: () => this.setState({ density: 'detail' }),
+      noop: () => {},
+      tabContribution: this.tab(this.state.order === 'contribution'),
+      tabCited: this.tab(this.state.order === 'cited'),
+      tabRecent: this.tab(this.state.order === 'recent'),
+      tabLedger: this.tab(this.state.density === 'ledger'),
+      tabDetail: this.tab(this.state.density === 'detail'),
+      filtOa: this.filt(this.state.oa),
+      filtThread: this.filt(this.state.thread),
+      sparseBands: [
+        { label: 'SENIOR AUTHOR', note: 'THE PAPERS THAT ARE HIS', count: '1 PAPER', rows: sSen },
+        { label: 'CO-AUTHOR', note: 'LISTED AMONG THE AUTHORS', count: '3 PAPERS', rows: sCo }
+      ],
+      careerSenior: this.careerSeniorData().map(r => ({
+        cites: r[0].toLocaleString(), journal: r[1], pmid: 'PMID ' + r[2], title: r[3], year: r[4],
+        oa: !!r[5], paywalled: !r[5]
+      })),
+      careerYears: this.yearData().map(y => ({
+        year: y[0], countLabel: y[1] + ' papers', cites: y[2].toLocaleString(),
+        oa: y[3] + ' open access', top: y[4], ticks: this.ticks(y[1], 4), mticks: this.ticks(Math.min(y[1], 14), 3)
+      })),
+      mobileYears: this.yearData().slice(0, 5).map(y => ({
+        year: y[0], countLabel: y[1] + ' papers', mticks: this.ticks(Math.min(y[1], 12), 3)
+      })),
+      mobileBands: mob.map(b => ({ label: b.label, count: b.count, rows: b.rows.slice(0, b.label === 'SENIOR AUTHOR' ? 2 : 3) })),
+      mobileCareerSenior: this.careerSeniorData().slice(0, 3).map(r => ({ cites: r[0].toLocaleString(), title: r[3], journal: r[1], year: r[4] }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

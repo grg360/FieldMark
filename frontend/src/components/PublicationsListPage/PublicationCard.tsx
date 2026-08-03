@@ -11,6 +11,11 @@ interface Props {
   // passes the affordance down so the card doesn't re-fetch. undefined = fetch.
   affordance?: Affordance | null;
   isMobile?: boolean;
+  // Gate the discussion affordance: show OPEN DISCUSSION only where a thread exists,
+  // no "ask the first question" on threadless rows. Set by list surfaces that display
+  // discussion but don't create it (the institution list); left false where thread
+  // creation belongs (the bibliography).
+  existingOnly?: boolean;
 }
 
 // Single-column full-width row (Design frame 01): meta · title · characterisation
@@ -27,7 +32,7 @@ function authorChip(pub: PublicationListRow) {
   return { label: "Co-author", fg: COLOR.ink3, bg: "rgba(107,106,101,0.15)", border: COLOR.ink5 };
 }
 
-export default function PublicationCard({ pub, affordance, isMobile }: Props) {
+export default function PublicationCard({ pub, affordance, isMobile, existingOnly }: Props) {
   const pubmedUrl = pub.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pub.pmid}/` : null;
   const byline = pub.bylineText ?? formatByline(pub.pubmed_authorships, BYLINE_CAP);
   const chip = authorChip(pub);
@@ -136,7 +141,9 @@ export default function PublicationCard({ pub, affordance, isMobile }: Props) {
 
       {/* right: discussion affordance (compact) + reserved slots */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: isMobile ? "flex-start" : "flex-end" }}>
-        <DiscussAffordance pmid={pub.pmid} journalAbbrev={pub.journal} title={pub.title} compact affordance={affordance} />
+        {/* existingOnly (set by the caller): OPEN DISCUSSION only where a thread
+            exists — no "ask the first question" on a threadless row. */}
+        <DiscussAffordance pmid={pub.pmid} journalAbbrev={pub.journal} title={pub.title} compact affordance={affordance} existingOnly={existingOnly} />
         {/* Reserved, empty by design (out of scope this pass): territory relevance
             and "flagged by N MSLs" — rendered as nothing until there is something true. */}
       </div>

@@ -120,7 +120,10 @@ export default function PublicationsListPage() {
         </div>
       ) : (
         <>
-          <PublicationList pubs={visiblePubs} />
+          {/* Institution list displays discussion but does not create it: OPEN
+              DISCUSSION renders only where a thread exists; no "ask the first
+              question" on threadless rows (that lives on the bibliography/forum). */}
+          <PublicationList pubs={visiblePubs} existingOnly />
 
           {!showAll && pubs.length > 50 ? (
             <div style={{ marginTop: 24, textAlign: "center" }}>

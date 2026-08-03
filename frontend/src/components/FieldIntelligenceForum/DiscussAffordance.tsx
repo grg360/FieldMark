@@ -38,6 +38,7 @@ export default function DiscussAffordance({
   title,
   compact = false,
   affordance: provided,
+  existingOnly = false,
 }: {
   pmid: string | null | undefined;
   journalAbbrev?: string | null;
@@ -46,6 +47,10 @@ export default function DiscussAffordance({
   // When the list has already batch-loaded affordances, pass the value (or null)
   // to skip the per-card fetch. `undefined` means "not provided — fetch it".
   affordance?: Affordance | null;
+  // Show ONLY where a thread already exists — render nothing on a threadless row (no
+  // "ask the first question"). For surfaces that display discussion but don't create
+  // it: thread creation belongs on the bibliography/forum path, not on every list row.
+  existingOnly?: boolean;
 }) {
   const navigate = useNavigate();
   const canWrite = useForumWriter();
@@ -85,6 +90,8 @@ export default function DiscussAffordance({
         </button>
       );
     }
+    // existingOnly surfaces render nothing on a threadless row — no create affordance.
+    if (existingOnly) return null;
     // no discussion — dashed, the word + short invitation
     const empty = (
       <span
@@ -114,6 +121,7 @@ export default function DiscussAffordance({
       </div>
     );
   }
+  if (existingOnly) return null;
   return (
     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, padding: 12, border: `1px dashed ${COLOR.hairStrong}`, borderRadius: 4 }}>
       <span style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.14em" }}>FIELD INTELLIGENCE</span>

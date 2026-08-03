@@ -19,7 +19,7 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: "discussed", label: "DISCUSSED" },
 ];
 
-export default function PublicationList({ pubs, narrow = false }: { pubs: PublicationListRow[]; narrow?: boolean }) {
+export default function PublicationList({ pubs, narrow = false, existingOnly = false }: { pubs: PublicationListRow[]; narrow?: boolean; existingOnly?: boolean }) {
   // `narrow` forces the stacked row layout regardless of viewport — used inside
   // the fixed-480px profile bibliography screen, where the container is narrow
   // even on desktop.
@@ -87,6 +87,7 @@ export default function PublicationList({ pubs, narrow = false }: { pubs: Public
             pub={pub}
             isMobile={isMobile}
             affordance={pub.pmid ? affordances[pub.pmid] ?? null : null}
+            existingOnly={existingOnly}
           />
         ))}
       </div>

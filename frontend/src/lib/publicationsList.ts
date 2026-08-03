@@ -36,6 +36,21 @@ export interface PublicationListRow {
   // Assets this publication matched (asset_publication_v1), for the lateral entry
   // point: asset names in the bibliography row link to /assets/:slug (frame 1e).
   assets?: PublicationAssetRef[];
+  // Role structure (from publication_authors_v2): drives the SENIOR AUTHOR / CO-AUTHOR
+  // bands. total_authors backs the "author lists are truncated by the data" note.
+  total_authors?: number | null;
+  // True when a Field Intelligence discussion thread is anchored to this paper's PMID.
+  // The row-level "open discussion" affordance renders ONLY where this is true; there
+  // is no "ask the first question" on a threadless row (that lives on the forum).
+  hasThread?: boolean;
+}
+
+export interface PublicationYearLedgerRow {
+  year: number;
+  paper_count: number;
+  citation_total: number;
+  open_access_count: number;
+  leading_journals: string[]; // top journals that year, by paper count
 }
 
 // Map raw MeSH publication_types to a short study-type label, most specific first.
@@ -264,6 +279,145 @@ export async function getPublicationsByPartner(
     return enrichCharacterisation((data as PublicationDbRow[]).map(mapPublicationRow));
   } catch (err) {
     console.warn("getPublicationsByPartner: error", err);
+    return [];
+  }
+}
+
+// Which of these PMIDs carry a Field Intelligence discussion thread (a forum anchor).
+// One query; empty set on error. Threads exist on a rounding-error fraction of papers,
+// so this is small.
+async function getThreadedPmids(pmids: string[]): Promise<Set<string>> {
+  const clean = pmids.filter(Boolean);
+  if (clean.length === 0) return new Set();
+  const out = new Set<string>();
+  const CHUNK = 300;
+  for (let i = 0; i < clean.length; i += CHUNK) {
+    const { data } = await supabase
+      .from("field_intel_anchors")
+      .select("pubmed_id")
+      .in("pubmed_id", clean.slice(i, i + CHUNK));
+    for (const r of (data ?? []) as { pubmed_id: string }[]) out.add(r.pubmed_id);
+  }
+  return out;
+}
+
+type PubAuthorJoinRow = PublicationDbRow & {
+  is_first_author: boolean | null;
+  is_senior_author: boolean | null;
+  author_position: number | null;
+  total_authors: number | null;
+};
+
+/**
+ * The FULL per-HCP publication record for the publications surface — every paper the
+ * HCP authored (from publication_authors_v2), NOT just the positions-backing subset.
+ * Carries the role flags that drive the SENIOR AUTHOR / CO-AUTHOR bands, is enriched
+ * with the provenance line (study type, theme, assets, full-text access), and marks
+ * which papers have a discussion thread. Optionally scoped to one publication year.
+ */
+export async function getFullPublicationsForHcp(
+  hcpId: string,
+  opts: { year?: number } = {},
+): Promise<PublicationListRow[]> {
+  try {
+    // One join, paged by PostgREST's implicit cap via range. A prolific HCP tops out
+    // around 300 papers (Heymach: 291), well under a single range window, but we page
+    // defensively so growth never silently truncates.
+    const PAGE = 1000;
+    const rows: PubAuthorJoinRow[] = [];
+    for (let from = 0; ; from += PAGE) {
+      let q = supabase
+        .from("publication_authors_v2")
+        .select(
+          "is_first_author, is_senior_author, author_position, total_authors, " +
+            "publications_v2!inner(id, pubmed_id, title, journal, pub_year, pub_date, citation_count, doi, pubmed_authorships)",
+        )
+        .eq("hcp_id", hcpId)
+        .range(from, from + PAGE - 1);
+      if (opts.year != null) q = q.eq("publications_v2.pub_year", opts.year);
+      const { data, error } = await q;
+      if (error) {
+        console.warn("getFullPublicationsForHcp: query error", error);
+        break;
+      }
+      const batch = (data ?? []) as unknown as { is_first_author: boolean | null; is_senior_author: boolean | null; author_position: number | null; total_authors: number | null; publications_v2: PublicationDbRow }[];
+      for (const b of batch) {
+        rows.push({ ...b.publications_v2, is_first_author: b.is_first_author, is_senior_author: b.is_senior_author, author_position: b.author_position, total_authors: b.total_authors });
+      }
+      if (batch.length < PAGE) break;
+    }
+
+    // Dedupe by publication (a pair could yield two link rows in theory), keeping the
+    // strongest role.
+    const byPub = new Map<string, PubAuthorJoinRow>();
+    for (const r of rows) {
+      const prev = byPub.get(r.id);
+      if (!prev || (r.is_senior_author && !prev.is_senior_author)) byPub.set(r.id, r);
+    }
+
+    const mapped: PublicationListRow[] = [...byPub.values()].map((r) => ({
+      ...mapPublicationRow(r),
+      is_first_author: r.is_first_author ?? undefined,
+      is_senior_author: r.is_senior_author ?? undefined,
+      author_position: r.author_position,
+      total_authors: r.total_authors,
+    }));
+
+    const enriched = await enrichCharacterisation(mapped);
+    const threaded = await getThreadedPmids(enriched.map((r) => r.pmid ?? "").filter(Boolean));
+    return enriched.map((r) => ({ ...r, hasThread: !!r.pmid && threaded.has(r.pmid) }));
+  } catch (err) {
+    console.warn("getFullPublicationsForHcp: error", err);
+    return [];
+  }
+}
+
+/**
+ * Co-author year ledger for the full-career view: one grouped aggregate query, one
+ * row per year (citation total, paper count, OA count, leading journals). Cheap — a
+ * single GROUP BY, no per-row enrichment. Senior-author papers are shown individually
+ * above the ledger and are excluded here.
+ */
+export async function getCoAuthorYearLedger(hcpId: string): Promise<PublicationYearLedgerRow[]> {
+  try {
+    // journals need per-year grouping too; PostgREST can't array_agg, so we fetch the
+    // co-author (year, journal, citation, oa) tuples once and fold client-side. Still
+    // one round trip; the payload is one small row per co-authored paper.
+    const rows: { pub_year: number | null; journal: string | null; citation_count: number | null; open_access: { is_oa?: boolean } | null }[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("publication_authors_v2")
+        .select("publications_v2!inner(pub_year, journal, citation_count, open_access)")
+        .eq("hcp_id", hcpId)
+        .eq("is_senior_author", false)
+        .range(from, from + PAGE - 1);
+      if (error) break;
+      const batch = (data ?? []) as unknown as { publications_v2: { pub_year: number | null; journal: string | null; citation_count: number | null; open_access: { is_oa?: boolean } | null } }[];
+      for (const b of batch) rows.push(b.publications_v2);
+      if (batch.length < PAGE) break;
+    }
+    const byYear = new Map<number, { papers: number; cites: number; oa: number; journals: Map<string, number> }>();
+    for (const r of rows) {
+      if (r.pub_year == null) continue;
+      const y = byYear.get(r.pub_year) ?? { papers: 0, cites: 0, oa: 0, journals: new Map() };
+      y.papers += 1;
+      y.cites += r.citation_count ?? 0;
+      if (r.open_access?.is_oa) y.oa += 1;
+      if (r.journal) y.journals.set(r.journal, (y.journals.get(r.journal) ?? 0) + 1);
+      byYear.set(r.pub_year, y);
+    }
+    return [...byYear.entries()]
+      .map(([year, v]) => ({
+        year,
+        paper_count: v.papers,
+        citation_total: v.cites,
+        open_access_count: v.oa,
+        leading_journals: [...v.journals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map((e) => e[0]),
+      }))
+      .sort((a, b) => b.year - a.year);
+  } catch (err) {
+    console.warn("getCoAuthorYearLedger: error", err);
     return [];
   }
 }
