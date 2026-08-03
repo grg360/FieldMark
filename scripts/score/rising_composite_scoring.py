@@ -6,7 +6,17 @@ Combines within-cohort Scientific Emergence with scope-re-derived Network Influe
   rising_composite = w_emergence * emergence_pctile + w_network * network_pctile
 
 Population: rising HCPs with an emergence score in hcp_scientific_emergence_v1
-for the scoped TA (joined to hcps_v2 for geography and names).
+for the scoped TA (joined to hcps_v2 for geography and names), gated by the
+SAME industry/government predicate as recompute_established_ranks_v3 (2026-08-02):
+only ACADEMIC HCPs, plus GOVERNMENT at NCI/NIH, enter the cohort — INDUSTRY,
+other GOVERNMENT, UNKNOWN and unclassified are excluded BEFORE percentiling, so
+survivors are ranked against each other. (Measured before the fix: 185 of 3,052
+AD members were industry/gov/unknown, 15 of them in the global top 100 —
+Sanofi at #2, Pfizer #13, Regeneron #15 on rendered surfaces.)
+
+The writer DELETES de-listed rows (same TA, hcp_id not in the new result set)
+in the same transaction as the upsert — upsert-only recompute leaves stale
+ranks interleaved with fresh ones, the trap established hit.
 
 Scopes mirror recompute_established_ranks_v3:
   - one global row per HCP (scope_type='global', scope_value=NULL)
@@ -74,6 +84,26 @@ def fetch_rising_cohort(conn, ta_id):
             FROM hcp_scientific_emergence_v1 se
             JOIN hcps_v2 h ON h.id = se.hcp_id
             WHERE se.therapeutic_area_id = %s
+              -- Industry/government gate, VERBATIM the established predicate
+              -- (recompute_established_ranks_v3.py). Admit ACADEMIC, plus
+              -- GOVERNMENT at NCI/NIH (engageable trialists, not regulators).
+              -- INDUSTRY, other GOVERNMENT, UNKNOWN and unclassified drop out
+              -- here, before scope percentiling, so survivors are ranked
+              -- against each other. Classifier is reingest stage 8e.
+              AND EXISTS (
+                SELECT 1 FROM hcp_industry_classification_v1 ic
+                WHERE ic.hcp_id = se.hcp_id
+                  AND (
+                    ic.classification = 'ACADEMIC'
+                    OR (
+                      ic.classification = 'GOVERNMENT'
+                      AND (
+                        ic.matched_pattern LIKE '%%National Cancer Institute%%'
+                        OR ic.matched_pattern LIKE '%%National Institutes of Health%%'
+                      )
+                    )
+                  )
+              )
             ORDER BY se.hcp_id
             """,
             (ta_id,),
@@ -141,8 +171,11 @@ def assert_scoped_ta_writes(rows, scoped_ta_id: str) -> None:
 
 
 def upsert_composite(conn, ta_id, rows):
+    # Empty result -> write NOTHING and delete NOTHING. An empty cohort means
+    # something upstream broke (e.g. the classifier table emptied); silently
+    # wiping the board on it would be destructive, not corrective.
     if not rows:
-        return 0
+        return 0, 0
     payload = [
         (
             r["hcp_id"],
@@ -158,8 +191,24 @@ def upsert_composite(conn, ta_id, rows):
     ]
     scoped_rows = [{"therapeutic_area_id": ta_id, **r} for r in rows]
     assert_scoped_ta_writes(scoped_rows, ta_id)
+    keep_ids = sorted({r["hcp_id"] for r in rows})
     try:
         with conn.cursor() as cur:
+            # DE-LIST DELETE, same transaction as the upsert: rows for this TA
+            # whose hcp_id is not in the new result set are removed. Without
+            # this, upsert-only recompute leaves de-listed members (e.g. the
+            # industry class the cohort gate now excludes) holding stale ranks
+            # that interleave with the fresh ordering — the trap established
+            # hit and had to clean up with separate deletes.
+            cur.execute(
+                """
+                DELETE FROM hcp_rising_composite_v1
+                WHERE therapeutic_area_id = %s
+                  AND NOT (hcp_id = ANY(%s::uuid[]))
+                """,
+                (ta_id, keep_ids),
+            )
+            delisted = cur.rowcount or 0
             execute_values(
                 cur,
                 """
@@ -179,7 +228,7 @@ def upsert_composite(conn, ta_id, rows):
                 payload,
             )
         conn.commit()
-        return len(payload)
+        return len(payload), delisted
     except Exception:
         conn.rollback()
         raise
@@ -303,8 +352,8 @@ def main(
         _print_top("US", debug_us_results)
 
     if write:
-        n = upsert_composite(conn, ta_id, all_results)
-        print(f"\nWrote {n} rows to hcp_rising_composite_v1")
+        n, delisted = upsert_composite(conn, ta_id, all_results)
+        print(f"\nWrote {n} rows to hcp_rising_composite_v1; de-listed (deleted) {delisted} stale rows")
     else:
         print(f"\n[dry-run] would have written {len(all_results)} rows to hcp_rising_composite_v1")
 
