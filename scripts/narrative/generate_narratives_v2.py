@@ -63,6 +63,14 @@ def get_table_name(base_name: str, target_version: str) -> str:
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_MODEL = "claude-sonnet-4-6"
 PROMPT_VERSION = "v1.0"
+# Established prompt v2.0 (2026-08-03): adds hcp_scientific_positions_v1 (sourced
+# stances) so the narrative summarises STANCE not just output, and REMOVES all
+# pharma-engagement language. Pharma removal is not stylistic: the pharma
+# percentile the v1.0 prompt cited is the same pharma_engagement_pctile removed
+# from established cohort_score on 2026-08-02 for being 36%-populated and
+# rewarding absence — a signal already judged unfit for ranking must not
+# characterise physicians in prose either.
+ESTABLISHED_PROMPT_VERSION = "established_v2.0"
 RISING_STAR_PROMPT_VERSION = "rising_star_v3.4"
 ANTHROPIC_VERSION = "2023-06-01"
 
@@ -166,7 +174,12 @@ COMMUNITY_GATE_OR = (
 )
 API_SLEEP_SECONDS = 0.5
 PROGRESS_EVERY = 25
-MAX_TOKENS_RESPONSE = 600
+# 1200, not 600 (2026-08-03): the established_v2.0 prompt adds sourced positions
+# and produces materially longer narratives. At 600 the JSON was truncated before
+# its closing brace on position-heavy HCPs (~44% of the first 25 established calls
+# failed "Could not find JSON object"). max_tokens is a cap, not a target — raising
+# it costs nothing for the shorter rising/community outputs, which stop well below.
+MAX_TOKENS_RESPONSE = 1200
 TEMPERATURE = 0.1
 
 
@@ -683,6 +696,72 @@ def fetch_established_leadership_rows(
     return rows_by_pair
 
 
+# Consequence order for presenting positions to the model: cautionary and
+# unmet-need stances are the "must not walk in ignorant" intelligence, so they
+# sort ahead of positive/hypothesis and survive the per-HCP cap even when an HCP
+# has dozens of positive positions. Within a band, higher confidence first.
+_POSITION_TYPE_ORDER = {
+    "cautionary_position": 0,
+    "unmet_need_position": 1,
+    "positive_position": 2,
+    "hypothesis_position": 3,
+}
+POSITIONS_PER_HCP_CAP = 12
+
+
+def fetch_established_positions(
+    hcp_ids: Set[str],
+    visible_ta_ids: List[str],
+) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
+    """Load sourced scientific positions (stances) per (hcp_id, ta_id).
+
+    One row per (publication, extracted stance). Ordered consequence-first
+    (cautionary/unmet-need ahead of positive/hypothesis), then confidence desc,
+    and capped so a critical cautionary stance is never truncated away behind a
+    wall of positive positions. Absence -> no key (the prompt's absence path).
+    """
+    if not hcp_ids or not visible_ta_ids:
+        return {}
+    ids_list = list(hcp_ids)
+    ta_list = list(visible_ta_ids)
+    out: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    batch_size = 500
+    sql = """
+        SELECT hcp_id, therapeutic_area_id, position_text, evidence_excerpt,
+               position_type, position_category, disease_context, drug_name,
+               biomarker, confidence, pub_year
+        FROM hcp_scientific_positions_v1
+        WHERE therapeutic_area_id = ANY(%s::uuid[])
+          AND hcp_id = ANY(%s::uuid[])
+          AND position_text IS NOT NULL
+    """
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(ids_list), batch_size):
+                cur.execute(sql, (ta_list, ids_list[i : i + batch_size]))
+                for row in cur.fetchall():
+                    key = (str(row["hcp_id"]), str(row["therapeutic_area_id"]))
+                    out.setdefault(key, []).append(dict(row))
+    for key, rows in out.items():
+        rows.sort(
+            key=lambda r: (
+                _POSITION_TYPE_ORDER.get(r.get("position_type"), 9),
+                -float(r.get("confidence") or 0.0),
+            )
+        )
+        out[key] = rows[:POSITIONS_PER_HCP_CAP]
+    return out
+
+
+def merge_established_positions(
+    established_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]],
+    positions_by_pair: Dict[Tuple[str, str], List[Dict[str, Any]]],
+) -> None:
+    """Attach sourced positions onto the Established v3 context dicts (key: 'positions')."""
+    for key, entry in established_v3_by_pair.items():
+        entry["positions"] = positions_by_pair.get(key, [])
+
+
 def merge_established_leadership_rows(
     established_v3_by_pair: Dict[Tuple[str, str], Dict[str, Any]],
     leadership_by_pair: Dict[Tuple[str, str], Dict[str, Any]],
@@ -882,8 +961,11 @@ def load_hcp_contexts(
                 {single_hcp_id}, visible_ta_ids
             )
             merge_established_leadership_rows(established_v3_by_pair, leadership_by_pair)
+            positions_by_pair = fetch_established_positions({single_hcp_id}, visible_ta_ids)
+            merge_established_positions(established_v3_by_pair, positions_by_pair)
             print(f"Loaded {len(established_v3_by_pair)} Established v3 HCP x TA rank rows")
             print(f"Merged {len(leadership_by_pair)} Established HCP x TA leadership rows")
+            print(f"Attached positions for {sum(1 for v in positions_by_pair.values() if v)} HCP x TA pairs")
         else:
             print(f"Loaded community HCP {single_hcp_id}")
     elif "rising_star" in target_cohorts:
@@ -911,8 +993,11 @@ def load_hcp_contexts(
         established_v3_by_pair = fetch_established_v3_context_rows(established_ids, visible_ta_ids)
         leadership_by_pair = fetch_established_leadership_rows(established_ids, visible_ta_ids)
         merge_established_leadership_rows(established_v3_by_pair, leadership_by_pair)
+        positions_by_pair = fetch_established_positions(established_ids, visible_ta_ids)
+        merge_established_positions(established_v3_by_pair, positions_by_pair)
         print(f"Loaded {len(established_v3_by_pair)} Established v3 HCP x TA rank rows")
         print(f"Merged {len(leadership_by_pair)} Established HCP x TA leadership rows")
+        print(f"Attached positions for {sum(1 for v in positions_by_pair.values() if v)} HCP x TA pairs")
 
     if not single_hcp_id and "community" in target_cohorts:
         print(f"Selecting community top-{community_top_n} per (TA x visible scope) from hcp_community_ranks_v2...")
@@ -1357,7 +1442,6 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
 
     sci = v3.get("scientific_influence_pctile")
     net = v3.get("network_influence_pctile")
-    pharma = v3.get("pharma_engagement_pctile")
 
     if sci is not None:
         lines.append(
@@ -1369,18 +1453,40 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
             f"Network Influence: {net:.0f}th percentile within Established cohort "
             "(co-authorship graph centrality)"
         )
-    if pharma is not None:
-        lines.append(
-            f"Pharma Engagement: {pharma:.0f}th percentile within Established cohort "
-            "(industry collaboration breadth)"
-        )
-    else:
-        lines.append("Pharma Engagement: no Open Payments data on file for this HCP")
+    # Pharma Engagement is DELIBERATELY ABSENT (established_v2.0). No industry /
+    # Open Payments / commercial fact is provided to the model — this narrative
+    # is a scientific summary of stance and output only.
 
-    if ctx.pharma_engagement_lifetime is not None:
-        lines.append(f"Lifetime Pharma Engagement: ${ctx.pharma_engagement_lifetime:,.0f}")
-    if ctx.pharma_companies_distinct is not None:
-        lines.append(f"Distinct Pharma Companies (lifetime): {ctx.pharma_companies_distinct}")
+    # Sourced positions — the stance evidence. Presented consequence-first
+    # (cautionary/unmet-need already sorted ahead upstream). Type IS labelled
+    # here as input data; the prompt forbids type labels in the output prose.
+    positions = v3.get("positions") or []
+    if positions:
+        lines.append("")
+        lines.append(
+            f"Sourced Positions ({ta_label}) — extracted stances, each traceable to one "
+            "publication. Characterise this expert's stance ONLY from these records:"
+        )
+        for p in positions:
+            ptype = (p.get("position_type") or "").replace("_position", "")
+            cat = p.get("position_category") or "general"
+            ctxt = p.get("disease_context") or "NSCLC"
+            claim = " ".join(str(p.get("position_text") or "").split())[:260]
+            ev = " ".join(str(p.get("evidence_excerpt") or "").split())[:180]
+            conf = p.get("confidence")
+            yr = p.get("pub_year")
+            conf_s = f"{float(conf):.2f}" if conf is not None else "n/a"
+            lines.append(
+                f"  - [{cat} · {ptype}] {ctxt}: \"{claim}\" "
+                f"(evidence: \"{ev}\"; confidence {conf_s}; {yr})"
+            )
+    else:
+        lines.append("")
+        lines.append(
+            f"Sourced Positions ({ta_label}): NONE extracted for this HCP. Do NOT "
+            "characterise any stance, argument, or position — summarise published "
+            "output only and say nothing about what this expert argues."
+        )
     return "\n".join(lines)
 
 
@@ -1689,17 +1795,20 @@ Output ONLY the JSON object. No code fences. No commentary.
 
 
 def build_prompt_established(ctx: HCPContext) -> str:
-    """Prompt for Established cohort - recognized expert framing using v3 methodology."""
+    """Prompt for Established cohort — recognized-expert framing, STANCE-led (v2.0).
+
+    Adds sourced positions and removes all pharma/industry language. See
+    ESTABLISHED_PROMPT_VERSION note: the pharma percentile the v1.0 prompt cited
+    is the signal already removed from ranking for being 36%-populated.
+    """
     facts = format_hcp_facts(ctx, "established")
     prompt = (
-        "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about a recognized scientific expert in their therapeutic area.\n\n"
+        "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about a recognized scientific expert in their therapeutic area. This is a SCIENTIFIC summary: what this expert argues and works on. It is NOT a commercial profile.\n\n"
         "Methodology context (do not restate verbatim, but use to interpret the data):\n"
-        "- This HCP sits within the Established cohort of their TA - the recognized-expert tier (separate from Rising Stars and Community).\n"
-        "- Standing within the Established cohort reflects a weighted blend of signals: 50 percent Scientific Influence (publication leadership and citation impact within the cohort), 35 percent Network Influence (co-authorship graph centrality), 15 percent Pharma Engagement (industry collaboration breadth).\n"
+        "- This HCP sits within the Established cohort of their TA — the recognized-expert tier (separate from Rising Stars and Community).\n"
         "- All percentiles below are computed within the Established cohort in this TA, so a 70th percentile here means top 30 percent among recognized experts, not among all HCPs.\n"
-        "- If Pharma Engagement percentile is absent from the facts, that HCP has no Open Payments data on file - treat this as missing data, not low engagement; ranking reweights the remaining signals proportionally.\n"
-        "- Pharma Engagement phrasing (all five JSON fields): If pharma_engagement_pctile is absent from the facts, treat as missing Open Payments data. If pharma_engagement_pctile is exactly 0.0, do NOT cite it as '0th percentile', 'no documented industry collaboration', or any phrasing that implies a confirmed low engagement finding; instead omit Pharma Engagement from that field or note that 'pharma engagement data is not available for this profile'. If pharma_engagement_pctile is greater than 0.0 but below 5.0, cite as 'at the low end of documented industry collaboration within the Established cohort' (do not use a numeric percentile). If between 5.0 and 99.5, cite as 'Nth percentile' as usual. If >= 99.5, use ceiling phrasing per the rule below. Low documented pharma engagement among Established experts is COMMON and NOT a concern when cited appropriately; do not interpret it as institutional restrictions or limited receptivity.\n"
-        "- Percentile phrasing (all five JSON fields): When citing Scientific Influence, Network Influence, or Publication Leadership percentiles from the facts in narrative, why_now, engagement_angle, signal_strength, or caution_flags: if the value is >= 99.5, do NOT write '99th percentile', '100th percentile', or other numeric ceiling phrasing. Instead describe as 'at the top of the Established [TA] cohort' or 'at the ceiling of the cohort'. Percentiles below 99.5 may be cited as 'Nth percentile' as usual. Pharma Engagement follows the Pharma Engagement phrasing rule above.\n\n"
+        "- 'Sourced Positions' in the facts are stances extracted from this expert's own publications, each traceable to one paper with an evidence excerpt. They are the strongest evidence you hold of what this person actually argues.\n"
+        "- Percentile phrasing (all five JSON fields): if a percentile is >= 99.5, do NOT write '99th'/'100th percentile'; describe as 'at the top of the Established [TA] cohort'. Below 99.5, cite as 'Nth percentile'.\n\n"
         "Return ONLY valid JSON with exactly these five fields:\n"
         "{\n"
         '  "narrative": "string (exactly 3 sentences)",\n'
@@ -1708,16 +1817,19 @@ def build_prompt_established(ctx: HCPContext) -> str:
         '  "signal_strength": "string (exactly 1 sentence)",\n'
         '  "caution_flags": "string or null"\n'
         "}\n\n"
+        "STANCE — the core rule:\n"
+        "- If Sourced Positions are present, the narrative must LEAD with this expert's most consequential stance — what they argue, where they push back, what they treat as settled or as an unmet need. A cautionary or unmet-need position (a toxicity signal, a limitation, an unresolved problem) is often MORE consequential for an MSL than a favourable efficacy position, and should lead when it is the thing an MSL must not walk in ignorant of — do NOT default to the highest-confidence or most positive position. State the KIND of stance implicitly through the claim itself (e.g. write 'has flagged interstitial lung disease as a clinically significant, potentially fatal toxicity signal with this ADC class' — never label it 'a cautionary position').\n"
+        "- TRACEABILITY IS ABSOLUTE: every stance you state must be grounded in a specific Sourced Position record above. NEVER infer a stance, argument, or 'focus on X' from a theme label, a publication count, an institution, or a percentile. If it is not in a Sourced Position, you may not say the expert argues, believes, advocates, favours, or is cautious about it. You may still describe non-stance output (publication volume, guideline contribution, senior-author concentration) from the other facts.\n"
+        "- If Sourced Positions is NONE: say nothing about stance, argument, or position at all. Summarise the published output only (senior-author concentration, guideline role, thematic area of work as WORK not as a viewpoint). Do NOT hedge toward an implied stance ('likely focuses on', 'appears to favour' are forbidden). Absence of positions is not a weaker version of a stance — it is the absence of one.\n\n"
         "Constraints:\n"
-        "- narrative: exactly 3 sentences. Open by anchoring what this expert is scientifically known for in a specific fact from the data — thematic concentration, guideline contribution, methodological voice, or network position. Do NOT open with rank, score, or the phrase 'is a recognized expert' or any close variant; rank and percentiles are already displayed elsewhere in the interface, so the narrative must add what the structured data cannot. Open with what most distinguishes THIS expert from other recognized experts in the cohort — the signal that differentiates them, not merely their largest number. Since every Established expert ranks highly, a shared strength like top-of-cohort network centrality differentiates little; a specific thematic or methodological focus differentiates more. Lead with whatever is genuinely distinctive for this individual. Do not use a fixed opening construction. Do NOT use 'has built [their] scientific identity/reputation around' as an opening construction. State TA-scoped senior-author publication counts using senior_pub_count and senior_pub_recent_5yr (e.g. '54 NSCLC publications as senior author, including 35 in the last 5 years'). NEVER use the phrase 'leadership publications'. Reference Scientific Influence percentile as driven by publication leadership and citation impact. Reference Network Influence when available. Reference Pharma Engagement only per the Pharma Engagement phrasing rules above. If guideline_pub_count is present and greater than 0, you may reference contributor to N TA guideline publications. Career length may appear alone without any publication count. NEVER cite cohort_score, composite score, or any weighted score figure. NEVER cite total_career_pubs, lifetime works, works_count, or any career-total publication figure. NEVER produce an 'X publications over Y years' construction. Avoid hagiography; be specific and data-anchored. Do not invent numbers not present in the facts.\n"
-        "- why_now: one sentence, max 30 words. The single strongest signal making THIS expert worth engaging right now, drawn from the facts (recent senior-author concentration, guideline role, network centrality, or thematic focus). Numbers required. Lead with that signal; do not open with the therapeutic area or its evolution.\n"
-        "- engagement_angle: exactly 2 sentences. Suggest scientific topics where this expert's perspective adds value. Established experts often have strong opinions on methodology, study design, or therapeutic positioning - lean into that.\n"
-        "- signal_strength: exactly 1 sentence. Honest confidence statement. If Pharma Engagement is absent or exactly 0.0 per the phrasing rules, note that pharma engagement data is not available for this profile rather than citing a low percentile.\n"
-        "- caution_flags: 1 sentence OR the JSON literal null. Default to null. Only populate when there is a SPECIFIC, ACTIONABLE concern AT THE HIGH END: very high pharma engagement breadth (20+ distinct companies suggesting saturation), lifetime engagement heavily concentrated with a single direct competitor where the MSL's product directly competes, or documented evidence (not inference) of a specific institutional restriction on industry engagement. Do NOT flag absent or zero Pharma Engagement percentile as a concern. Do NOT infer institutional policies from low pharma scores. Do NOT use this field to hedge, speculate, or restate percentile data - those belong in signal_strength.\n"
-        "- Never cite cohort_score, composite score, or weighted score figures in any JSON field; use rank and percentiles only.\n"
-        "- No markdown. No text outside JSON.\n"
-        "- Do not name specific drug brands or NCT trial numbers.\n"
-        "- Ensure proper spacing between all words. Do not concatenate words together (e.g., write 'and 19th' not 'and19th', 'study design' not 'studydesign').\n\n"
+        "- narrative: exactly 3 sentences. When positions exist, open on the strongest/most consequential stance (per the STANCE rule) grounded in a position record. When they do not, open on what most distinguishes THIS expert's published output — a specific thematic or methodological concentration, guideline contribution, or senior-author record — not their rank or largest number. Do NOT open with rank, score, or 'is a recognized expert'. State TA-scoped senior-author counts using senior_pub_count and senior_pub_recent_5yr (e.g. '54 NSCLC publications as senior author, including 35 in the last 5 years'). ALWAYS label this figure 'senior-author publications' — NEVER 'career publications', 'career output', or a bare 'publications' count; the number is the TA-scoped senior-author count, not a career total, and mislabelling it as career output is wrong. NEVER use the phrase 'leadership publications'. If guideline_pub_count > 0 you may reference contributor to N TA guideline publications. NEVER cite cohort_score, composite score, total_career_pubs, works_count, or any career-total figure; never an 'X publications over Y years' construction. Be specific and data-anchored; avoid hagiography; invent no numbers.\n"
+        "- why_now: one sentence, max 30 words. The single strongest reason to engage THIS expert now — their most consequential sourced stance, a recent senior-author concentration, or a guideline role. Numbers or a specific stance required. Do not open with the therapeutic area.\n"
+        "- engagement_angle: exactly 2 sentences. Where this expert's perspective adds value — anchored, where possible, in the specific stances above (a topic they have argued a position on is a better angle than a topic they merely publish in). Practical and scientific.\n"
+        "- signal_strength: exactly 1 sentence. Honest confidence in this read, grounded in how much sourced evidence exists (number of positions, senior-author depth). Do NOT mention pharma, payments, or industry engagement.\n"
+        "- caution_flags: 1 sentence OR the JSON literal null. Default to null. Only populate for a SPECIFIC, ACTIONABLE scientific concern evident in the sourced record (e.g. the expert's own published caution about a mechanism or toxicity that directly bears on an MSL conversation). Do NOT reference pharma engagement, payments, or industry relationships. Do NOT hedge or speculate.\n"
+        "- NO INDUSTRY LANGUAGE: do not mention Open Payments, pharma engagement, industry collaboration, payments, or commercial relationships in ANY field. None of that data is provided and it is out of scope for this version.\n"
+        "- NO TREND OR MOVEMENT LANGUAGE: there is a single rank snapshot and no history. Do not write 'rising', 'emerging', 'increasingly', 'growing', 'trajectory', 'momentum', or any change-over-time claim about this Established expert.\n"
+        "- No markdown. No text outside JSON. Do not name specific drug brands or NCT trial numbers (drug CLASSES and mechanisms are fine). Ensure proper spacing between words.\n\n"
         "HCP context:\n"
         f"{facts}\n"
     )
@@ -1914,11 +2026,12 @@ def upsert_narrative(
 ) -> None:
     """Write narrative to hcp_narratives."""
     generated_at = datetime.now(timezone.utc).isoformat()
-    prompt_version = (
-        RISING_STAR_PROMPT_VERSION
-        if ctx.cohort_classification == "rising_star"
-        else PROMPT_VERSION
-    )
+    if ctx.cohort_classification == "rising_star":
+        prompt_version = RISING_STAR_PROMPT_VERSION
+    elif ctx.cohort_classification == "established":
+        prompt_version = ESTABLISHED_PROMPT_VERSION
+    else:
+        prompt_version = PROMPT_VERSION
     if target_version == "v2":
         row = {
             "hcp_id": ctx.hcp_id,
