@@ -1,10 +1,19 @@
 // Platform navigation — Design frame NAV-BUILD-01. Replaces TopBar on every
 // authenticated route and supersedes AssetNav (retired).
 //
-// Six sections: Home · Territory · People · Drugs · Congresses · Pulse. Desktop is
-// a single 48px row (wordmark · rule · labels · avatar pill); mobile (≤767px) is a
-// 36px utility strip over a 3×2 cell grid — six items fill it exactly, no empty
-// cell. Non-sticky. Wordmark → /me on every route and both breakpoints.
+// Eight sections in taxonomy order — corpus (People · Institutions · SkyView),
+// streams (Drugs · Congresses · Pulse · Social), forum (Intelligence). HOME has no
+// label (2026-08-02): the wordmark IS home — it routes to /me on every route and
+// both breakpoints, and a duplicate label was the price of fitting INSTITUTIONS
+// into the 1120 bar. Desktop is a single 48px row (wordmark · rule · labels ·
+// avatar pill); mobile (≤767px) is a 36px utility strip over a 4-over-4 cell
+// grid — eight items fill it exactly, no empty cell. Non-sticky.
+//
+// WIDTH BUDGET (2026-08-02, measured): eight labels at gap 18 + search 232 +
+// right-rail marginLeft:auto (no spacer child) leave ~9px true slack against the
+// padded column edge inside CONTENT_WIDTH.standard with search mounted. The bar
+// is FULL — a ninth label does not fit flat; that is the restructure trigger,
+// not a tweak.
 //
 // The avatar menu is five rows — Settings, Methodology, Invite (self-hiding at 0),
 // Admin (isAdmin only), Sign out — as a desktop dropdown and a full-width mobile
@@ -30,7 +39,7 @@ interface NavSearch {
   onSearchSelect: (hcpId: string, taId: string) => void;
 }
 
-type NavKey = "home" | "people" | "skyview" | "drugs" | "congresses" | "pulse" | "social" | "field-intelligence";
+type NavKey = "people" | "institutions" | "skyview" | "drugs" | "congresses" | "pulse" | "social" | "field-intelligence";
 
 interface NavItem {
   key: NavKey;
@@ -38,18 +47,21 @@ interface NavItem {
   to: string;
 }
 
-// Bar targets — nearest working surface for each axis. HOME → /me (no /home route;
-// a canonical /home comes with the cohort-ledger build). PEOPLE → the cohort
-// dashboard until /people exists. TERRITORY was removed 2026-07-31: it rendered
-// the same FeedLayout surface as PEOPLE — territory scope is a filter in the
-// strip, not a destination ("/" stays routed, just unlinked here). SOCIAL is the
-// nav label; the page titles itself "The public conversation". FIELD
-// INTELLIGENCE points at the forum (the real backend), not the feed track.
+// Bar targets — nearest working surface for each axis. HOME is the wordmark, not
+// a label (both wordmarks route to /me; a canonical /home still slots there when
+// it ships). PEOPLE → the cohort dashboard until /people exists. TERRITORY was
+// removed 2026-07-31: it rendered the same FeedLayout surface as PEOPLE —
+// territory scope is a filter in the strip, not a destination ("/" stays routed,
+// just unlinked here). SOCIAL is the nav label; the page titles itself "The
+// public conversation". FIELD INTELLIGENCE points at the forum (the real
+// backend), not the feed track.
 const NAV_ITEMS: NavItem[] = [
-  { key: "home", label: "Home", to: "/me" },
   // PEOPLE → the cohort ledger (2026-07-31): the ledger is the people surface; the
   // card feed stays routed at "/" but unlinked.
   { key: "people", label: "People", to: "/cohorts/ledger" },
+  // INSTITUTIONS → the NSCLC index for now, matching SKYVIEW's NSCLC-hardcoded
+  // target; both generalize together when the bar goes TA-aware.
+  { key: "institutions", label: "Institutions", to: "/institutions/nsclc" },
   // SKYVIEW → the immersive telescope view. Nav says SKYVIEW; the strip chip still
   // says "Telescope" — that rename is on hold, this label is the nav's only.
   { key: "skyview", label: "SkyView", to: "/oncology/telescope/nsclc" },
@@ -71,14 +83,15 @@ function activeKey(pathname: string): NavKey | null {
   if (p.startsWith("/pulse")) return "pulse";
   if (p.startsWith("/social")) return "social";
   if (p.startsWith("/field-intelligence")) return "field-intelligence";
-  if (p.startsWith("/me")) return "home";
+  // Covers BOTH the index (/institutions/:ta) and detail (/institution/:slug).
+  if (p.startsWith("/institution")) return "institutions";
   if (p.startsWith("/cohorts")) return "people";
   if (/\/telescope(\/|$)/.test(p)) return "skyview";
   if (p.startsWith("/hcp") || p.startsWith("/landscape")) return "people";
   if (/\/(established|rising-stars|community)(\/|$)/.test(p)) return "people";
   if (p === "/") return "people"; // feed root resolves the default cohort feed
-  // Unmarked: /institution* (no bar axis since TERRITORY was removed), the
-  // telescope track, and the retained-but-unlinked FI feed track (/:ta/field-intelligence).
+  // Unmarked: /me (home is the wordmark, not a label), the telescope track, and
+  // the retained-but-unlinked FI feed track (/:ta/field-intelligence).
   return null;
 }
 
@@ -187,7 +200,9 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
         FIELDMARK
       </Link>
       <span style={{ width: 1, height: 20, background: SEAM, flex: "none" }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
+      {/* gap 18 (was 22): measured trade — 28px recovered toward fitting
+          INSTITUTIONS while keeping the search input at a typeable width. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
         {NAV_ITEMS.map((item) => {
           const on = item.key === active;
           return (
@@ -219,13 +234,21 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
           );
         })}
       </div>
-      <span style={{ flex: 1 }} />
-      {search ? (
-        <div style={{ width: 280, flex: "none" }}>
-          <SearchBar variant="inline" currentTaId={search.currentTaId} onSelect={search.onSearchSelect} />
-        </div>
-      ) : null}
-      <AvatarMenu menu={menu} mobile={false} />
+      {/* Right rail replaces the flex-1 spacer (2026-08-02): a zero-width spacer
+          still cost one 20px container gap; marginLeft:auto reclaims it. With
+          labels at gap 18 and search at 232 the rail lands exactly on the padded
+          column edge with ~9px true slack — verified against the padded edge,
+          not scrollWidth (the old bar overflowed its padding by 21.8px). */}
+      <div style={{ display: "flex", alignItems: "center", gap: 20, marginLeft: "auto" }}>
+        {search ? (
+          // 232 (was 280): the width the eight-label row needs back after the
+          // gap shave; gap-shaving alone could not close the deficit.
+          <div style={{ width: 232, flex: "none" }}>
+            <SearchBar variant="inline" currentTaId={search.currentTaId} onSelect={search.onSearchSelect} />
+          </div>
+        ) : null}
+        <AvatarMenu menu={menu} mobile={false} />
+      </div>
     </div>
     </nav>
   );
@@ -256,9 +279,11 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
           <AvatarMenu menu={menu} mobile />
         </div>
       </div>
-      {/* 4-over-4 cell rows — eight items, no empty cell, no unintended wrap:
-          row one Home / People / SkyView / Drugs, row two Congresses / Pulse /
-          Social / Intelligence. Cells flex equally; both rows are even. */}
+      {/* 4-over-4 cell rows — eight items, no empty cell: row one People /
+          Institutions / SkyView / Drugs, row two Congresses / Pulse / Social /
+          Intelligence. Cells flex equally; both rows are even. INSTITUTIONS
+          wraps to two lines on phones exactly as INTELLIGENCE already does
+          (minHeight 53 absorbs it) — accepted, measured trade. */}
       {[NAV_ITEMS.slice(0, 4), NAV_ITEMS.slice(4)].map((row, ri) => (
         <div key={ri} style={{ display: "flex", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
           {row.map((item) => {
