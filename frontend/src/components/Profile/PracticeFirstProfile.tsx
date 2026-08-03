@@ -22,6 +22,7 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getOrCreateRelationship, type RelationshipStatus } from "../../lib/relationships";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
 import FieldInsights from "../FieldInsights/FieldInsights";
+import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
 import RelationshipSection from "../RelationshipSection/RelationshipSection";
 import AddToWatchlistPopover from "../AddToWatchlistPopover";
 import ContextualizeHCPForm from "../ContextualizeHCPForm";
@@ -585,6 +586,12 @@ export default function PracticeFirstProfile() {
           </div>
         </div>
       ) : null}
+
+      {/* ── ADMINISTERED VOLUME — beneath practice scale; seam shown (this page
+             carries the practice-scale block, so rule 04's denominator is visible) ── */}
+      <div style={{ padding: "22px 28px 26px", borderBottom: `1px solid ${F.line}` }}>
+        <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug="nsclc" />
+      </div>
 
       {/* ── lower two-column: insights + engagement + why | rail ── */}
       <div style={{ display: "flex", flexWrap: "wrap", borderBottom: `1px solid ${F.line}` }}>
