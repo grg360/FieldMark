@@ -5,12 +5,31 @@ Reorders HCPs qualified as Established via hcp_cohort_classification_v2
 (cohort='established') using:
 
   cohort_score =
-    0.50 * scientific_influence_pctile
-    + 0.35 * network_influence_pctile (re-derived within scope)
-    + 0.15 * pharma_engagement_pctile
+    0.59 * scientific_influence_pctile
+    + 0.41 * network_influence_pctile (re-derived within scope)
+    + 0.00 * pharma_engagement_pctile   (excluded from ranking — see below)
 
-Missing signal data is treated as percentile 0 (penalizing). We may revisit
-later (e.g., impute median or weight only available signals).
+PHARMA WEIGHT IS ZERO (2026-08-02). pharma_engagement_pctile stays populated
+on the row and stays displayed on the ledger — it is excluded from RANKING,
+not from the surface. Rationale:
+
+  Only 73 of 202 top-200 US-established HCPs have a pharma_engagement row.
+  The chain leaks twice: 156 have an NPI, 101 have any Open Payments record,
+  73 have NSCLC-attributed payments. The prior formula omitted the component
+  and renormalised total_w from 1.0 to 0.85 when pharma was absent, so a
+  missing pharma row scored ~99.7 on sci+net alone while a present one
+  dragged the composite toward the pharma percentile. Absence was rewarded
+  and presence penalised. Of the 129 zeros, roughly 50 are genuine
+  non-engagers, 28 have payments that failed NSCLC attribution, 46 have no
+  NPI, and 5 await an Open Payments top-up — so a third of the zeros mean
+  something other than zero. Revisit the weight when NPI coverage and TA
+  attribution make absence unambiguous.
+
+NOTE on missing signals: the composite RENORMALISES over the components that
+are present (it does NOT treat missing as 0 — only the stored per-component
+display columns default to 0). That renormalisation is exactly what made the
+pharma component perverse at 27% coverage; with two well-covered components
+it is benign, but check coverage before adding any weight back.
 
 Scope rows (same intent as the old hcp_established_ranks_v2 materialization):
   - every Established HCP gets a global scope row (scope_type='global',
@@ -247,9 +266,9 @@ def upsert_ranks(conn, ta_id, rows):
 @click.option("--ta", default="nsclc", help="Therapeutic area slug")
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=30, type=int, help="Print top N for region/US scope")
-@click.option("--w-scientific", default=0.50, type=float)
-@click.option("--w-network", default=0.35, type=float)
-@click.option("--w-pharma", default=0.15, type=float)
+@click.option("--w-scientific", default=0.59, type=float)
+@click.option("--w-network", default=0.41, type=float)
+@click.option("--w-pharma", default=0.0, type=float)
 def main(
     ta: str,
     dry_run: bool,
@@ -311,12 +330,15 @@ def main(
             net_value = scope_net_pctiles.get(hcp_id)
             pharma_value = pharma_scores.get(hcp_id)
 
+            # Zero-weight components are skipped entirely so they can neither
+            # contribute nor participate in the missing-component renormalisation
+            # (the pharma perversity documented in the header).
             components = []
-            if sci_value is not None:
+            if sci_value is not None and w_sci > 0:
                 components.append((w_sci, float(sci_value)))
-            if net_value is not None:
+            if net_value is not None and w_net > 0:
                 components.append((w_net, float(net_value)))
-            if pharma_value is not None:
+            if pharma_value is not None and w_pha > 0:
                 components.append((w_pha, float(pharma_value)))
 
             if not components:
