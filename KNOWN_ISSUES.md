@@ -264,3 +264,63 @@ Both exhibit **both** wrong-states:
 **The consequence on 2026-07-31.** A JSX syntax error shipped into `AssetPage.tsx` behind a "clean" bare-tsc run and wedged the dev servers (esbuild dependency scan failed; the app served un-prebundled modules and never mounted). Caught and fixed same day.
 
 **The fix.** Two parts, separable: (1) always verify with `npm run typecheck`, never bare tsc; (2) burn down the ~250 pre-existing errors so the real check can gate — most are TS6133 unused-symbol noise in retained-unrouted components and can be fixed mechanically or excluded deliberately.
+
+## No ADVOCACY classification bucket — ACADEMIC is a fallback, not a determination
+
+**Status:** flagged 2026-08-02, not fixed. Surfaced by the AD rising refilter putting an advocacy org at #2.
+
+**The problem.** `hcp_industry_classifier.py` has four values — ACADEMIC, INDUSTRY, GOVERNMENT, UNKNOWN — and **ACADEMIC is the fallback for anything unmatched**, not a positive determination. Patient advocacy organisations therefore pass every ACADEMIC gate. Korey Capozza (National Eczema Association) ranks **#2 on the AD rising board** after the 2026-08-02 refilter; Jill Feldman (Patient Advocate Foundation) is in `hcps_v2` as an NSCLC HCP. Related: the "Corpus composition" entry above — this is the classifier-level mechanism behind it.
+
+**The reading rule.** Wherever `classification = 'ACADEMIC'` is used as a gate — established scoring, rising scoring (NSCLC and AD) — it means "not matched as anything else," not "verified academic clinician."
+
+## `total_career_pubs` is redefined mid-cycle — three writers, two meanings
+
+**Status:** flagged 2026-08-02, not fixed. Explains the collapsed NPPES enrichment gate.
+
+**The problem.** Stage 2 (`create_hcps_v2.py`) sets `total_career_pubs` to the count of distinct pub ids in the HCP's cluster; stage 8a (`career_enrichment_from_clusters.py`) **overwrites it with OpenAlex works_count** — a different, narrower quantity; stage 7 (`dedup_merge.py`) also writes it (max-of-pair on merge). Anything gating on the column is gating on a value whose meaning changes within a single cycle.
+
+**Measured consequence.** `targeted_nppes_enrichment.py`'s `min_career_pubs=500` gate now admits almost nobody: **1,064 of 1,065 previously-qualifying HCPs read under 500 today**.
+
+## Open Payments joins by NPI once — same staleness class Medicare had
+
+**Status:** flagged 2026-08-02, not fixed. The Medicare twin was closed by reingest stage 12; this one is still open.
+
+**The problem.** `hcp_open_payments_summary_v2` and `hcp_open_payments_by_ta_v2` were populated by an NPI join at aggregation time. HCPs matched since — **80 on 2026-08-02 alone** (34 crosswalk applies + 46 stub merges) — have payment records in the source data and no rows in the aggregates.
+
+**The fix shape.** The same derived anti-join top-up pattern as `scripts/ingest/hcpcs_detail_topup.py`: NPIs present on `hcps_v2` with no aggregate rows, probed against the Open Payments source, inserted idempotently, logged to `pipeline_runs`.
+
+## `established_scoring.py` conflates can't-know with zero on the pharma component
+
+**Status:** flagged 2026-08-02, not fixed. LATENT — nothing reads `hcp_established_scores_v2`.
+
+**The problem.** The pharma-breadth component renormalises away only for **non-US** HCPs (structural absence — Open Payments cannot exist for them). A **US** HCP with no payments row scores a genuine 0.0 and is penalised. Of the top-200 US-established, **46 have no NPI and 28 have Open Payments that failed NSCLC attribution** — both classes are scored as real zeros when the honest value is "unknown." Mirror image of the pharma renormalisation removed from `recompute_established_ranks_v3.py` on 2026-08-02 (absence rewarded there; absence penalised here — same root conflation, opposite polarity).
+
+**Why it can wait.** No live reader. Revisit alongside the ranks-v3 pharma weight when NPI coverage and TA attribution make absence unambiguous.
+
+## Institution linker misses exact canonical names — 77 ranked HCPs from pattern gaps
+
+**Status:** flagged 2026-08-02, not fixed. Cheapest high-yield fix in the institutions data layer.
+
+**The problem.** "Icahn School of Medicine at Mount Sinai" is **literally a `canonical_name` in `reference_institutions`** and its 19 ranked carriers are unlinked in `hcp_institutions_v2`. Same class: Northwestern 21, UCSF 13, Boston Children's 12, Cincinnati Children's 12 — **77 ranked HCPs unlinked by pattern gaps on records that already exist** (the linker either predates the records or misses trivial variants like "…Hospital Medical Center" vs "…Hospital"). These render in the institution record pages' unresolved line until relinked.
+
+## Five registry alias-pairs are the same institution twice — 80 of 91 primary-link ties
+
+**Status:** flagged 2026-08-02, not fixed. The primary-link ladder tie-break papers over it deterministically; the registry is the real fix.
+
+**The problem.** UTSW / "Southwestern Medical Center" (39 HCPs linked to both), Anschutz / University of Colorado (19), OHSU spelled two ways (15), Atrium / Wake Forest Baptist (9 — a real merger the registry should encode via `network_parent`, not duplicate rows), and MUSC / University of South Carolina (5 — **different universities**; that one is a `match_patterns` over-reach bug, not an alias). Merging/aliasing these resolves **80 of the 91** ties the primary-link ladder tie-breaks today (`institution_primary_links_v1.tie_broken` flags every one).
+
+## Non-blocking cycle stages fail invisibly — WARN never reaches Last Result
+
+**Status:** flagged 2026-08-02, not fixed. Supplements the "Pipeline runs are unrecorded" entry above — `pipeline_runs` now has its first writer (stage 12), which enables the fix.
+
+**The problem.** Reingest stages 10 (`asset_matches`), 11 (`trials_status_refresh`) and 12 (`hcpcs_topup`) WARN and let the cycle exit 0 **by design** (correct — they must not gate publication ingest), so their failures never reach Task Scheduler's Last Result. The run log (`logs/reingest-nsclc-*.log`) is the only record and nothing reads it. This is the exact mechanism by which social capture stayed dead for seven weeks.
+
+**The fix shape.** Stage 12 writes `pipeline_runs`; a "no successful `hcpcs_detail_topup` run in 8 days" check (and equivalent rows for stages 10/11) makes silence detectable from inside the product instead of from the basement.
+
+## Weekly cron depends on machine power state — a missed slot leaves no trace
+
+**Status:** flagged 2026-08-02, partially mitigated same day (WakeToRun set to True; Balanced power plan confirmed to allow wake timers on AC).
+
+**The problem.** The Monday 2026-07-27 03:00 reingest slot **never fired**: `WakeToRun` was False, the desktop was asleep, and `StartWhenAvailable` did not catch up. A missed slot leaves no trace except a stale last-run timestamp — nothing alerts, nothing records the absence (same observability hole as the non-blocking-stages entry above).
+
+**The residual fragility.** Scheduled infrastructure on a desktop under a desk is the underlying problem: wake timers mitigate sleep but not power cuts, reboots pending login, or the machine simply being off. The runner now logs the HEAD sha per run and pulls `--ff-only` before executing (2026-08-02), so *when* it runs is traceable and current; *whether* it ran still requires someone to look.
