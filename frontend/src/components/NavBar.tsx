@@ -39,7 +39,7 @@ interface NavSearch {
   onSearchSelect: (hcpId: string, taId: string) => void;
 }
 
-type NavKey = "people" | "institutions" | "skyview" | "drugs" | "congresses" | "pulse" | "social" | "field-intelligence";
+type NavKey = "people" | "drugs" | "trials" | "congresses" | "institutions" | "field-intelligence" | "social" | "pulse" | "skyview";
 
 interface NavItem {
   key: NavKey;
@@ -55,21 +55,23 @@ interface NavItem {
 // just unlinked here). SOCIAL is the nav label; the page titles itself "The
 // public conversation". FIELD INTELLIGENCE points at the forum (the real
 // backend), not the feed track.
+// Order (2026-08-03): People · Drugs · Trials · Congresses · Institutions ·
+// Intelligence · Social · Pulse · SkyView. Nine items — fits the 1120 bar once
+// search left it for its own row below (see DesktopBar / the search row).
 const NAV_ITEMS: NavItem[] = [
-  // PEOPLE → the cohort ledger (2026-07-31): the ledger is the people surface; the
-  // card feed stays routed at "/" but unlinked.
+  // PEOPLE → the cohort ledger; the card feed stays routed at "/" but unlinked.
   { key: "people", label: "People", to: "/cohorts/ledger" },
-  // INSTITUTIONS → the NSCLC index for now, matching SKYVIEW's NSCLC-hardcoded
-  // target; both generalize together when the bar goes TA-aware.
-  { key: "institutions", label: "Institutions", to: "/institutions/nsclc" },
-  // SKYVIEW → the immersive telescope view. Nav says SKYVIEW; the strip chip still
-  // says "Telescope" — that rename is on hold, this label is the nav's only.
-  { key: "skyview", label: "SkyView", to: "/oncology/telescope/nsclc" },
   { key: "drugs", label: "Drugs", to: "/assets" },
+  // TRIALS → the open-trials surface (2026-08-03).
+  { key: "trials", label: "Trials", to: "/trials" },
   { key: "congresses", label: "Congresses", to: "/congress" },
-  { key: "pulse", label: "Pulse", to: "/pulse" },
-  { key: "social", label: "Social", to: "/social" },
+  // INSTITUTIONS / SKYVIEW → NSCLC-hardcoded targets; generalize when the bar goes TA-aware.
+  { key: "institutions", label: "Institutions", to: "/institutions/nsclc" },
   { key: "field-intelligence", label: "Intelligence", to: "/field-intelligence" },
+  { key: "social", label: "Social", to: "/social" },
+  { key: "pulse", label: "Pulse", to: "/pulse" },
+  // SKYVIEW → immersive telescope; the strip chip still says "Telescope" (rename on hold).
+  { key: "skyview", label: "SkyView", to: "/oncology/telescope/nsclc" },
 ];
 
 const SEAM = COLOR.hairStrong;
@@ -79,6 +81,7 @@ const SEAM = COLOR.hairStrong;
 function activeKey(pathname: string): NavKey | null {
   const p = pathname;
   if (p.startsWith("/assets")) return "drugs";
+  if (p.startsWith("/trials")) return "trials";
   if (p.startsWith("/congress")) return "congresses";
   if (p.startsWith("/pulse")) return "pulse";
   if (p.startsWith("/social")) return "social";
@@ -239,17 +242,24 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
           labels at gap 18 and search at 232 the rail lands exactly on the padded
           column edge with ~9px true slack — verified against the padded edge,
           not scrollWidth (the old bar overflowed its padding by 21.8px). */}
+      {/* Search left the bar (2026-08-03): nine labels need the width, so search
+          moved to its own row below. Right rail is the avatar only. */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginLeft: "auto" }}>
-        {search ? (
-          // 232 (was 280): the width the eight-label row needs back after the
-          // gap shave; gap-shaving alone could not close the deficit.
-          <div style={{ width: 232, flex: "none" }}>
-            <SearchBar variant="inline" currentTaId={search.currentTaId} onSelect={search.onSearchSelect} />
-          </div>
-        ) : null}
         <AvatarMenu menu={menu} mobile={false} />
       </div>
     </div>
+    {search ? (
+      // Search row: its own band below the bar, left-aligned at input width so it
+      // does not stretch thin. Only renders where a TA is supplied (Home, The Week);
+      // the feed and ledger keep their own search rows and pass no TA to NavBar.
+      <div style={{ borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : SEAM}`, background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground, ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}) }}>
+        <div style={{ maxWidth: CONTENT_WIDTH.standard, margin: "0 auto", padding: "10px 18px", boxSizing: "border-box" }}>
+          <div style={{ width: 360, maxWidth: "100%" }}>
+            <SearchBar variant="inline" currentTaId={search.currentTaId} onSelect={search.onSearchSelect} />
+          </div>
+        </div>
+      </div>
+    ) : null}
     </nav>
   );
 }
@@ -279,12 +289,10 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
           <AvatarMenu menu={menu} mobile />
         </div>
       </div>
-      {/* 4-over-4 cell rows — eight items, no empty cell: row one People /
-          Institutions / SkyView / Drugs, row two Congresses / Pulse / Social /
-          Intelligence. Cells flex equally; both rows are even. INSTITUTIONS
-          wraps to two lines on phones exactly as INTELLIGENCE already does
-          (minHeight 53 absorbs it) — accepted, measured trade. */}
-      {[NAV_ITEMS.slice(0, 4), NAV_ITEMS.slice(4)].map((row, ri) => (
+      {/* 3-over-3-over-3 cell grid (2026-08-03) — nine items divide evenly into
+          three rows of three; wider cells than the old 4-wide, so long labels wrap
+          less. minHeight 53 absorbs any two-line label. */}
+      {[NAV_ITEMS.slice(0, 3), NAV_ITEMS.slice(3, 6), NAV_ITEMS.slice(6, 9)].map((row, ri) => (
         <div key={ri} style={{ display: "flex", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
           {row.map((item) => {
             const on = item.key === active;

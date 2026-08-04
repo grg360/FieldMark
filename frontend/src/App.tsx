@@ -54,6 +54,7 @@ import InstitutionRoute from "./components/InstitutionRoute";
 import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
 import BriefPage from "./components/BriefPage/BriefPage";
 import HomePage from "./components/HomePage/HomePage";
+import TrialsPage from "./components/Trials/TrialsPage";
 import TheWeekPage from "./components/TheWeek/TheWeekPage";
 import ProfileScreen from "./components/ProfileScreen";
 import FieldInsightsScreen from "./components/FieldInsightsScreen";
@@ -1185,6 +1186,7 @@ export default function App() {
       <Routes>
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/pulse" element={<PulsePage />} />
+      <Route path="/trials" element={<TrialsPage />} />
       <Route path="/pulse/:ta" element={<PulsePage />} />
       <Route path="/join/:code" element={<SignupScreen />} />
       <Route path="/join" element={<SignupScreen />} />
