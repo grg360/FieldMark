@@ -6,7 +6,28 @@ interface Props {
   hcpName: string;
   signals: WebSignal[];
   loading: boolean;
+  /** "ledger" renders the academic-brief register (teal trace links, mono eyebrows,
+   * serif values) and suppresses the internal "Contact & Access" title, since the
+   * brief's section head already labels the block. Omit for the original
+   * DetailScreen right-rail register. Same treatment FieldInsights got. */
+  variant?: "ledger";
 }
+
+// Ledger-register tokens, mirroring HcpProfileBrief's local `P` palette (that const
+// is module-private, so its values are inlined here as FieldInsights does). Applied
+// only when variant === "ledger"; the default register is unchanged.
+const LP = {
+  line: "rgba(255,255,255,.06)",
+  teal: "#7FB3BB",
+  ink0: "#EDEEEF",
+  ink1: "#E7E8E9",
+  ink3: "#A8AEB3",
+  ink4: "#8F959A",
+  ink5: "#7C8288",
+  ink6: "#63696E",
+} as const;
+const mono = (s: number, w = 400): CSSProperties => ({ font: `${w} ${s}px 'IBM Plex Mono',ui-monospace,monospace` });
+const serif = (s: number, w = 400): CSSProperties => ({ font: `${w} ${s}px 'Source Serif 4',Georgia,serif` });
 
 const SUBSECTION_HEADER_STYLE: CSSProperties = {
   fontSize: 10,
@@ -16,9 +37,25 @@ const SUBSECTION_HEADER_STYLE: CSSProperties = {
   marginBottom: 6,
 };
 
+const LEDGER_SUBSECTION_HEADER_STYLE: CSSProperties = {
+  ...mono(9, 500),
+  color: LP.ink6,
+  textTransform: "uppercase",
+  letterSpacing: "0.14em",
+  marginBottom: 6,
+};
+
 const LINK_STYLE: CSSProperties = {
   fontSize: 13,
   color: "#5C7CE8",
+  textDecoration: "none",
+  marginBottom: 4,
+  display: "block",
+};
+
+const LEDGER_LINK_STYLE: CSSProperties = {
+  ...serif(13),
+  color: LP.teal,
   textDecoration: "none",
   marginBottom: 4,
   display: "block",
@@ -45,13 +82,13 @@ function linkLabel(signal: WebSignal, fallback: string): string {
   return title || fallback;
 }
 
-function ExternalLinkRow({ href, label }: { href: string; label: string }) {
+function ExternalLinkRow({ href, label, ledger }: { href: string; label: string; ledger: boolean }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      style={LINK_STYLE}
+      style={ledger ? LEDGER_LINK_STYLE : LINK_STYLE}
       onMouseEnter={(e) => {
         e.currentTarget.style.textDecoration = "underline";
       }}
@@ -59,23 +96,25 @@ function ExternalLinkRow({ href, label }: { href: string; label: string }) {
         e.currentTarget.style.textDecoration = "none";
       }}
     >
-      {"\u2197"} {label}
+      {"↗"} {label}
     </a>
   );
 }
 
-function LoadingSkeleton() {
+function LoadingSkeleton({ ledger }: { ledger: boolean }) {
+  const style = ledger ? { ...SKELETON_STYLE, backgroundColor: LP.line, borderRadius: 2 } : SKELETON_STYLE;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ ...SKELETON_STYLE, width: "70%", height: 16 }} />
-      <div style={{ ...SKELETON_STYLE, width: "55%" }} />
-      <div style={{ ...SKELETON_STYLE, width: "80%" }} />
-      <div style={{ ...SKELETON_STYLE, width: "45%" }} />
+      <div style={{ ...style, width: "70%", height: 16 }} />
+      <div style={{ ...style, width: "55%" }} />
+      <div style={{ ...style, width: "80%" }} />
+      <div style={{ ...style, width: "45%" }} />
     </div>
   );
 }
 
-export default function ContactAccessCard({ hcpName, signals, loading }: Props) {
+export default function ContactAccessCard({ hcpName, signals, loading, variant }: Props) {
+  const ledger = variant === "ledger";
   const displaySignals = signals.filter((s) => s.signal_type !== "no_signals_found");
   const grouped = groupByType(displaySignals);
   const single = (key: string) => grouped[key]?.[0]?.signal_value ?? null;
@@ -112,14 +151,17 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
     Boolean(institution) ||
     Boolean(locationLine);
 
+  const subHeaderStyle = ledger ? LEDGER_SUBSECTION_HEADER_STYLE : SUBSECTION_HEADER_STYLE;
+  const linkStyle = ledger ? LEDGER_LINK_STYLE : LINK_STYLE;
+
   return (
     <div>
-      <div style={RIGHT_RAIL_HEADER_STYLE}>Contact & Access</div>
+      {!ledger && <div style={RIGHT_RAIL_HEADER_STYLE}>Contact & Access</div>}
 
       {loading ? (
-        <LoadingSkeleton />
+        <LoadingSkeleton ledger={ledger} />
       ) : displaySignals.length === 0 ? (
-        <p style={{ fontSize: 12, color: "#6B6A65", margin: 0 }}>
+        <p style={ledger ? { ...serif(13), color: LP.ink4, margin: 0 } : { fontSize: 12, color: "#6B6A65", margin: 0 }}>
           No public contact information available yet.
         </p>
       ) : (
@@ -127,31 +169,32 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
           {hasIdentityContent && (
             <div style={{ marginBottom: 16 }}>
               {hcpName ? (
-                <div style={{ fontSize: 14, color: "#E8E6DF", fontWeight: 600 }}>{hcpName}</div>
+                <div style={ledger ? { ...serif(14, 600), color: LP.ink0 } : { fontSize: 14, color: "#E8E6DF", fontWeight: 600 }}>{hcpName}</div>
               ) : null}
               {academicTitle ? (
-                <div style={{ fontSize: 13, color: "#9B9892" }}>{academicTitle}</div>
+                <div style={ledger ? { ...serif(13), color: LP.ink3 } : { fontSize: 13, color: "#9B9892" }}>{academicTitle}</div>
               ) : null}
               {department ? (
-                <div style={{ fontSize: 13, color: "#9B9892" }}>{department}</div>
+                <div style={ledger ? { ...serif(13), color: LP.ink3 } : { fontSize: 13, color: "#9B9892" }}>{department}</div>
               ) : null}
               {institution ? (
-                <div style={{ fontSize: 13, color: "#9B9892" }}>{institution}</div>
+                <div style={ledger ? { ...serif(13), color: LP.ink3 } : { fontSize: 13, color: "#9B9892" }}>{institution}</div>
               ) : null}
               {locationLine ? (
-                <div style={{ fontSize: 13, color: "#6B6A65", fontStyle: "italic" }}>{locationLine}</div>
+                <div style={ledger ? { ...serif(13), color: LP.ink5, fontStyle: "italic" } : { fontSize: 13, color: "#6B6A65", fontStyle: "italic" }}>{locationLine}</div>
               ) : null}
             </div>
           )}
 
           {hasLinks && (
             <div style={{ marginBottom: 16 }}>
-              <div style={SUBSECTION_HEADER_STYLE}>Links</div>
+              <div style={subHeaderStyle}>Links</div>
               {facultyProfiles.map((signal, idx) => (
                 <ExternalLinkRow
                   key={`faculty-${idx}-${signal.signal_value}`}
                   href={signal.signal_value}
                   label={linkLabel(signal, "Faculty Profile")}
+                  ledger={ledger}
                 />
               ))}
               {labUrls.map((signal, idx) => (
@@ -159,6 +202,7 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
                   key={`lab-${idx}-${signal.signal_value}`}
                   href={signal.signal_value}
                   label={linkLabel(signal, "Lab Website")}
+                  ledger={ledger}
                 />
               ))}
               {scholarUrls.map((signal, idx) => (
@@ -166,6 +210,7 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
                   key={`scholar-${idx}-${signal.signal_value}`}
                   href={signal.signal_value}
                   label="Google Scholar"
+                  ledger={ledger}
                 />
               ))}
               {linkedinUrls.map((signal, idx) => (
@@ -173,6 +218,7 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
                   key={`linkedin-${idx}-${signal.signal_value}`}
                   href={signal.signal_value}
                   label="LinkedIn"
+                  ledger={ledger}
                 />
               ))}
             </div>
@@ -180,12 +226,12 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
 
           {hasContact && (
             <div style={{ marginBottom: 16 }}>
-              <div style={SUBSECTION_HEADER_STYLE}>Contact</div>
+              <div style={subHeaderStyle}>Contact</div>
               {emails.map((signal, idx) => (
                 <a
                   key={`email-${idx}-${signal.signal_value}`}
                   href={`mailto:${signal.signal_value}`}
-                  style={LINK_STYLE}
+                  style={linkStyle}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.textDecoration = "underline";
                   }}
@@ -193,15 +239,15 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
                     e.currentTarget.style.textDecoration = "none";
                   }}
                 >
-                  {"\u2709"} {signal.signal_value}
+                  {"✉"} {signal.signal_value}
                 </a>
               ))}
               {phones.map((signal, idx) => (
                 <div
                   key={`phone-${idx}-${signal.signal_value}`}
-                  style={{ fontSize: 13, color: "#E8E6DF", marginBottom: 4 }}
+                  style={ledger ? { ...serif(13), color: LP.ink1, marginBottom: 4 } : { fontSize: 13, color: "#E8E6DF", marginBottom: 4 }}
                 >
-                  {"\u260E"} {signal.signal_value}
+                  {"☎"} {signal.signal_value}
                 </div>
               ))}
             </div>
@@ -209,14 +255,14 @@ export default function ContactAccessCard({ hcpName, signals, loading }: Props) 
 
           {hasIdentifiers && (
             <div>
-              <div style={SUBSECTION_HEADER_STYLE}>Identifiers</div>
+              <div style={subHeaderStyle}>Identifiers</div>
               {orcidSignals.map((signal, idx) => (
                 <a
                   key={`orcid-${idx}-${signal.signal_value}`}
                   href={`https://orcid.org/${signal.signal_value}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={LINK_STYLE}
+                  style={linkStyle}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.textDecoration = "underline";
                   }}

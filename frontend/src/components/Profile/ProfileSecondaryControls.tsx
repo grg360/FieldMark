@@ -74,7 +74,7 @@ export default function ProfileSecondaryControls({ hcpId, hcpName, specialty }: 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Contact & Access — live read, honest empty state built in */}
-      <ContactAccessCard hcpName={hcpName} signals={signals} loading={webLoading} />
+      <ContactAccessCard hcpName={hcpName} signals={signals} loading={webLoading} variant="ledger" />
 
       {/* control bar */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>

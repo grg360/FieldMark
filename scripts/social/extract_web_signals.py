@@ -23,12 +23,22 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+# HCP names/institutions carry non-cp1252 characters (e.g. U+2010 hyphen, accented
+# letters). On Windows the default console/redirect encoding is cp1252, so printing
+# them raises UnicodeEncodeError. Force UTF-8 with replacement, as the other pipeline
+# scripts do.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import anthropic
 import httpx
@@ -190,6 +200,39 @@ WHERE h.id = %s
   AND r.us_rank IS NOT NULL
 LIMIT 1
 """
+
+# Established cohort: US NSCLC established top-200 (hcp_established_ranks_v3, region
+# scope US). us_rank is aliased from e.rank so downstream display/ordering is uniform
+# with the rising path.
+ESTABLISHED_HCPS_SQL = """
+SELECT h.id, h.first_name, h.last_name, h.institution_normalized, e.rank AS us_rank
+FROM hcps_v2 h
+JOIN hcp_established_ranks_v3 e ON e.hcp_id = h.id
+JOIN therapeutic_areas ta ON ta.id = e.therapeutic_area_id
+WHERE ta.name = 'NSCLC'
+  AND e.scope_type = 'region'
+  AND e.scope_value = 'US'
+  AND e.rank <= 200
+ORDER BY e.rank ASC
+"""
+
+ESTABLISHED_HCP_BY_ID_SQL = """
+SELECT h.id, h.first_name, h.last_name, h.institution_normalized, e.rank AS us_rank
+FROM hcps_v2 h
+JOIN hcp_established_ranks_v3 e ON e.hcp_id = h.id
+JOIN therapeutic_areas ta ON ta.id = e.therapeutic_area_id
+WHERE h.id = %s
+  AND ta.name = 'NSCLC'
+  AND e.scope_type = 'region'
+  AND e.scope_value = 'US'
+  AND e.rank <= 200
+LIMIT 1
+"""
+
+# Cohort dispatch: rising stays the default so the existing invocation is unchanged.
+COHORT_TARGET_SQL = {"rising": TARGET_HCPS_SQL, "established": ESTABLISHED_HCPS_SQL}
+COHORT_BY_ID_SQL = {"rising": TARGET_HCP_BY_ID_SQL, "established": ESTABLISHED_HCP_BY_ID_SQL}
+COHORTS = tuple(COHORT_TARGET_SQL.keys())
 
 COUNT_SIGNALS_SQL = """
 SELECT COUNT(*) AS cnt
@@ -524,15 +567,17 @@ def call_claude(
     raise RuntimeError(f"Claude API failed after retries: {last_error}")
 
 
-def fetch_target_hcps(conn: psycopg.Connection) -> List[Dict[str, Any]]:
+def fetch_target_hcps(conn: psycopg.Connection, cohort: str) -> List[Dict[str, Any]]:
     with conn.cursor() as cur:
-        cur.execute(TARGET_HCPS_SQL)
+        cur.execute(COHORT_TARGET_SQL[cohort])
         return list(cur.fetchall())
 
 
-def fetch_hcp_by_id(conn: psycopg.Connection, hcp_id: str) -> Optional[Dict[str, Any]]:
+def fetch_hcp_by_id(
+    conn: psycopg.Connection, hcp_id: str, cohort: str
+) -> Optional[Dict[str, Any]]:
     with conn.cursor() as cur:
-        cur.execute(TARGET_HCP_BY_ID_SQL, (hcp_id,))
+        cur.execute(COHORT_BY_ID_SQL[cohort], (hcp_id,))
         row = cur.fetchone()
     return dict(row) if row else None
 
@@ -680,7 +725,22 @@ def parse_args() -> argparse.Namespace:
         metavar="UUID",
         help="Process a single HCP by ID (smoke test).",
     )
+    parser.add_argument(
+        "--cohort",
+        choices=COHORTS,
+        default="rising",
+        help="Which NSCLC US cohort to target (default: rising). Each cohort "
+        "uses its own checkpoint file so runs never cross-skip.",
+    )
     return parser.parse_args()
+
+
+def checkpoint_path_for(cohort: str) -> str:
+    # Rising keeps the historical path (its checkpoint already lives there); other
+    # cohorts get a suffixed file so the rising run's processed_hcp_ids can never
+    # mark an established HCP as done. Cross-cohort overlaps are still skipped, but
+    # via the per-HCP DB check (signals_exist), which is the correct reason.
+    return CHECKPOINT_PATH if cohort == "rising" else f"extract_web_signals_checkpoint_{cohort}.json"
 
 
 def resolve_hcp_limit(dry_run: bool, limit: Optional[int]) -> Optional[int]:
@@ -705,8 +765,10 @@ def main() -> int:
     args = parse_args()
     dry_run = bool(args.dry_run)
     force = bool(args.force)
+    cohort = args.cohort
     hcp_limit = resolve_hcp_limit(dry_run, args.limit)
     single_hcp_id = (args.hcp_id or "").strip() or None
+    checkpoint_path = checkpoint_path_for(cohort)
 
     database_url = get_required_env("DATABASE_URL")
     anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
@@ -714,7 +776,7 @@ def main() -> int:
     client = anthropic.Anthropic(api_key=anthropic_api_key, timeout=180.0)
 
     if force and not dry_run:
-        delete_checkpoint(CHECKPOINT_PATH)
+        delete_checkpoint(checkpoint_path)
         extraction_run_id = str(uuid.uuid4())
         checkpoint_state: Optional[Dict[str, Any]] = None
         print("Force mode: starting fresh extraction run.", flush=True)
@@ -722,7 +784,7 @@ def main() -> int:
         extraction_run_id = str(uuid.uuid4())
         checkpoint_state = None
     else:
-        checkpoint_state = load_checkpoint(CHECKPOINT_PATH)
+        checkpoint_state = load_checkpoint(checkpoint_path)
         if checkpoint_state and checkpoint_state.get("extraction_run_id"):
             extraction_run_id = str(checkpoint_state["extraction_run_id"])
         else:
@@ -736,15 +798,15 @@ def main() -> int:
         conn.autocommit = False
 
         if single_hcp_id:
-            print(f"Loading single HCP {single_hcp_id}...", flush=True)
-            hcp_row = fetch_hcp_by_id(conn, single_hcp_id)
+            print(f"Loading single HCP {single_hcp_id} (cohort={cohort})...", flush=True)
+            hcp_row = fetch_hcp_by_id(conn, single_hcp_id, cohort)
             if not hcp_row:
-                print(f"HCP {single_hcp_id} not found in target cohort.", flush=True)
+                print(f"HCP {single_hcp_id} not found in {cohort} target cohort.", flush=True)
                 return 1
             hcps = [hcp_row]
         else:
-            print("Loading target US NSCLC Rising Star HCPs...", flush=True)
-            hcps = fetch_target_hcps(conn)
+            print(f"Loading target US NSCLC {cohort} HCPs...", flush=True)
+            hcps = fetch_target_hcps(conn, cohort)
             print(f"Loaded {len(hcps)} HCPs.", flush=True)
 
             processed_ids = get_processed_ids(checkpoint_state)
@@ -777,8 +839,8 @@ def main() -> int:
         if force:
             mode_label += ", force"
         print(
-            f"Run ID: {extraction_run_id} | phase: {PHASE} | mode: {mode_label} | "
-            f"HCPs in queue: {total}",
+            f"Run ID: {extraction_run_id} | cohort: {cohort} | phase: {PHASE} | "
+            f"mode: {mode_label} | HCPs in queue: {total}",
             flush=True,
         )
 
@@ -808,7 +870,7 @@ def main() -> int:
                         processed_ids.add(hcp_id)
                         checkpoint_state["processed_hcp_ids"] = sorted(processed_ids)
                         checkpoint_state["processed_count"] = len(processed_ids)
-                        save_checkpoint(CHECKPOINT_PATH, checkpoint_state)
+                        save_checkpoint(checkpoint_path, checkpoint_state)
                     stats.per_hcp_durations.append(time.monotonic() - hcp_start)
                     print_progress(idx, total, start_time, stats)
                     continue
@@ -891,7 +953,7 @@ def main() -> int:
                     processed_ids.add(hcp_id)
                     checkpoint_state["processed_hcp_ids"] = sorted(processed_ids)
                     checkpoint_state["processed_count"] = len(processed_ids)
-                    save_checkpoint(CHECKPOINT_PATH, checkpoint_state)
+                    save_checkpoint(checkpoint_path, checkpoint_state)
 
             except (APITimeoutError, APIConnectionError, httpx.TimeoutException) as exc:
                 print(
