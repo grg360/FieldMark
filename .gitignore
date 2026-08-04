@@ -74,3 +74,4 @@ frontend/public/_frame/
 
 # Generated NPI enrichment worklists — regenerate as coverage changes
 scripts/enrich/nppes_backfill_ids*.txt
+check_*.py
