@@ -37,6 +37,8 @@ pd AS (  -- Part D oral oncology, grade already resolved per program_year in the
     count(*)                                                     AS pd_rows,
     count(*) FILTER (WHERE anchor_grade = 'strict')              AS strict_rows,
     count(DISTINCT program_year) FILTER (WHERE anchor_grade = 'strict') AS years_anchored,
+    array_agg(DISTINCT program_year ORDER BY program_year) FILTER (WHERE anchor_grade = 'strict') AS anchor_years,
+    array_agg(DISTINCT drug_stem ORDER BY drug_stem)       FILTER (WHERE anchor_grade = 'strict') AS anchor_stems,
     count(*) FILTER (WHERE anchor_grade = 'dominant')            AS dominant_rows,
     count(*) FILTER (WHERE anchor_grade = 'cross_indication')    AS cross_rows,
     count(*) FILTER (WHERE anchor_grade = 'supporting')          AS supporting_grade_rows,
@@ -73,6 +75,13 @@ recent_oral AS (  -- lung_share in the most recent year with any oral oncology r
   FROM pd_year
   WHERE total_fills IS NOT NULL
   ORDER BY hcp_id, program_year DESC
+),
+anchor AS (  -- representative anchor stem: most years covered, alphabetical tiebreak
+  SELECT DISTINCT ON (hcp_id) hcp_id, drug_stem AS anchor_stem
+  FROM hcp_part_d_oncology_v1
+  WHERE anchor_grade = 'strict'
+  GROUP BY hcp_id, drug_stem
+  ORDER BY hcp_id, count(DISTINCT program_year) DESC, drug_stem
 )
 SELECT
   co.hcp_id,
@@ -83,6 +92,11 @@ SELECT
   CASE WHEN t.tier = 'anchored'
        THEN CASE WHEN coalesce(pd.years_anchored, 0) >= 2 THEN 'recurs' ELSE 'single_year' END
   END AS recurrence_band,
+  -- anchor drug detail (NULL for other tiers): representative stem for the chip,
+  -- the full stem array + year array for the profile line
+  CASE WHEN t.tier = 'anchored' THEN a.anchor_stem  END AS anchor_stem,
+  CASE WHEN t.tier = 'anchored' THEN pd.anchor_stems END AS anchor_stems,
+  CASE WHEN t.tier = 'anchored' THEN pd.anchor_years END AS anchor_years,
   -- supported evidence (NULL for other tiers); rank 1 strongest .. 5 weakest
   CASE WHEN t.tier = 'supported' THEN t.supported_rank END AS supported_evidence_rank,
   CASE WHEN t.tier = 'supported' THEN (ARRAY[
@@ -105,6 +119,7 @@ LEFT JOIN pd        ON pd.hcp_id = co.hcp_id
 LEFT JOIN pb        ON pb.hcp_id = co.hcp_id
 LEFT JOIN heme_flag hf ON hf.hcp_id = co.hcp_id
 LEFT JOIN recent_oral ro ON ro.hcp_id = co.hcp_id
+LEFT JOIN anchor    a  ON a.hcp_id = co.hcp_id
 CROSS JOIN LATERAL (
   SELECT
     CASE

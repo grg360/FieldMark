@@ -44,7 +44,8 @@ AS $function$
            h.nppes_practice_city as city, h.nppes_practice_state as state,
            coalesce(h.nppes_career_stage_years, c.career_years::int) as years,
            e.tier, e.recurrence_band, e.supported_evidence,
-           e.supported_evidence_rank, e.lung_weighted
+           e.supported_evidence_rank, e.lung_weighted,
+           e.anchor_stem, e.anchor_stems, e.anchor_years
     from hcp_community_scores_v2 c
     join hcps_v2 h on h.id = c.hcp_id
     join hcp_nsclc_evidence_tier_v1 e on e.hcp_id = c.hcp_id
@@ -72,6 +73,7 @@ AS $function$
   select json_build_object(
     'cohort_total',   (select count(*) from base),
     'filtered_total', (select count(*) from filtered),
+    'tier_counts',    (select json_object_agg(tier, cnt) from (select tier, count(*) cnt from base group by tier) g),
     'tiers',          (select tiers from sel),
     'rows', (
       select coalesce(json_agg(row_to_json(t) order by t.rank), '[]'::json) from (
@@ -83,6 +85,7 @@ AS $function$
                top.years, top.idx, top.hcp_id,
                top.tier, top.recurrence_band, top.supported_evidence,
                top.supported_evidence_rank, top.lung_weighted,
+               top.anchor_stem, top.anchor_stems, top.anchor_years,
                (select n.narrative_text from hcp_narratives_v2 n
                  where n.hcp_id = top.hcp_id and n.therapeutic_area_slug = 'nsclc'
                  limit 1) as summary
