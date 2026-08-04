@@ -65,6 +65,42 @@ export async function loadCommunityProfile(hcpId: string): Promise<CommunityProf
   return data as CommunityProfile;
 }
 
+// NSCLC evidence tier for a single HCP (hcp_nsclc_evidence_tier_v1). Cheap per-hcp
+// lookup (~0.4ms; the hcp_id predicate pushes through the view's aggregates into PK
+// indexes). Drives the profile evidence line. Reasoning:
+// docs/design/NSCLC_COHORT_EVIDENCE_TIERS.md.
+export type EvidenceTierName = "anchored" | "supported" | "candidate" | "heme_dominant" | "unresolved";
+export interface NsclcEvidenceTier {
+  tier: EvidenceTierName;
+  years_anchored: number | null;
+  recurrence_band: "recurs" | "single_year" | null;
+  anchor_stem: string | null;
+  anchor_stems: string[] | null;
+  anchor_years: number[] | null;
+  supported_evidence: string | null;
+  supported_evidence_rank: number | null;
+  lung_share: number | null;
+  oral_denominator: number | null;
+  oral_recent_year: number | null;
+  lung_weighted: boolean;
+}
+
+export async function loadEvidenceTier(hcpId: string): Promise<NsclcEvidenceTier | null> {
+  const { data, error } = await supabase
+    .from("hcp_nsclc_evidence_tier_v1")
+    .select(
+      "tier, years_anchored, recurrence_band, anchor_stem, anchor_stems, anchor_years, " +
+        "supported_evidence, supported_evidence_rank, lung_share, oral_denominator, oral_recent_year, lung_weighted",
+    )
+    .eq("hcp_id", hcpId)
+    .maybeSingle();
+  if (error) {
+    console.warn("loadEvidenceTier: supabase error", error.message);
+    return null;
+  }
+  return (data as NsclcEvidenceTier | null) ?? null;
+}
+
 export async function loadProfileSpine(hcpId: string): Promise<"academic" | "community"> {
   const { data, error } = await supabase.rpc("hcp_profile_spine", { p_hcp_id: hcpId });
   if (error || !data) return "community"; // safe fallback: the spine that renders without publications

@@ -11,7 +11,7 @@
 // there. Not in stage 2: tags, relationship-state column, per-row controls
 // (track/attachments), mobile — stages 3–4.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import NavBar from "../NavBar";
@@ -35,6 +35,11 @@ import {
   layout,
   why,
   trace,
+  evidenceChip,
+  LEDGER_PAGE_SIZE,
+  COM_TIER_FILTERS,
+  COM_ALL_TIERS,
+  COM_DEFAULT_TIERS,
   type CohortConfig,
   type LedgerMeta,
   type LedgerRow,
@@ -174,6 +179,50 @@ function Bookmark({ on }: { on: boolean }) {
   );
 }
 
+// Evidence chip (COM) — frame 1a/2a. Tier word first (same vocabulary as the filter
+// chips, so filter↔row is stated), then the evidence segments: anchored = LUNG-ONLY
+// ORAL · drug · years; supported = the view's verbatim string (group 5 stays
+// "cross-indication targeted therapy observed"). Other tiers carry the tier word alone,
+// dashed. LUNG-WEIGHTED ORAL MIX marker below when flagged. No percentage in v1.
+function EvidenceChipView({ row, mobile = false }: { row: LedgerRow; mobile?: boolean }) {
+  const chip = evidenceChip(row);
+  if (!chip) return null;
+  const dashed = chip.strength === "other";
+  const border = chip.strength === "anchored" ? "#4A3618" : chip.strength === "supported" ? P.lineStrong : P.lineMed;
+  const bg = chip.strength === "anchored" ? "rgba(224,167,94,.05)" : "transparent";
+  const tierColor = chip.strength === "anchored" ? P.amber : chip.strength === "supported" ? "#B99A68" : P.ink4;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 3 }}>
+      <span style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", flexWrap: "wrap", gap: 8, border: `1px ${dashed ? "dashed" : "solid"} ${border}`, background: bg, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em" }}>
+        <span style={{ color: tierColor }}>{chip.tierWord}</span>
+        {chip.segments.map((seg, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "#7A5520" }}>·</span>
+            <span style={{ color: chip.strength === "anchored" && i === 1 ? "#C98D33" : P.ink4 }}>{seg}</span>
+          </span>
+        ))}
+      </span>
+      {chip.lungWeighted ? (
+        <span style={{ ...mono(mobile ? 8.5 : 9), letterSpacing: ".1em", color: P.ink5 }}>LUNG-WEIGHTED ORAL MIX</span>
+      ) : null}
+    </div>
+  );
+}
+
+// Filter chip (COM tier chips + ALL) — selected reads amber, unselected dim.
+function chipStyle(on: boolean): CSSProperties {
+  return {
+    ...mono(9.5),
+    letterSpacing: ".1em",
+    color: on ? "#E0A94A" : P.ink6,
+    background: on ? "rgba(224,167,94,.08)" : "transparent",
+    border: `1px solid ${on ? "rgba(224,167,94,.5)" : P.lineMed}`,
+    padding: "5px 9px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+}
+
 function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
   const head = (label: string, sub: string, w: number, align: "left" | "right" | "center" = "right") => (
     <div style={{ width: w, textAlign: align, ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
@@ -265,6 +314,7 @@ function Row({
               </span>
             ))}
           </div>
+          {row.tier ? <EvidenceChipView row={row} /> : null}
           {row.summary ? (
             <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, maxWidth: "104ch", textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
@@ -437,6 +487,9 @@ function MobileRow({
             ))}
           </div>
         ) : null}
+
+        {/* evidence chip (COM) */}
+        {row.tier ? <EvidenceChipView row={row} mobile /> : null}
 
         {/* summary */}
         {row.summary ? <div style={{ ...serif(13), lineHeight: 1.5, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div> : null}
@@ -622,6 +675,11 @@ export default function CohortLedger() {
   const [hasMore, setHasMore] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const loadingMore = useRef(false); // guards concurrent page fetches
+  // Community evidence-tier filter (COM only). Default = anchored + supported.
+  const [selectedTiers, setSelectedTiers] = useState<string[]>(COM_DEFAULT_TIERS);
+  const [filteredTotal, setFilteredTotal] = useState(0);
+  const [rpcCohortTotal, setRpcCohortTotal] = useState(0);
+  const [tierCounts, setTierCounts] = useState<Record<string, number> | null>(null);
 
   // cohort change → reset and load meta + the first rank page in parallel
   useEffect(() => {
@@ -633,11 +691,17 @@ export default function CohortLedger() {
     setHasMore(false);
     setOpen(null);
     loadingMore.current = true;
-    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0)])
+    // COM re-loads page 0 when the tier filter changes (a different population → a fresh
+    // contiguous ranking); EST/RS ignore selectedTiers.
+    const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
+    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0, LEDGER_PAGE_SIZE, tiersArg)])
       .then(([m, page]) => {
         if (!alive) return;
         setMeta(m);
         setRows(page.rows);
+        setFilteredTotal(page.filteredTotal);
+        setRpcCohortTotal(page.cohortTotal);
+        setTierCounts(page.tierCounts);
         setHasMore(page.hasMore);
         setFailed(page.rows.length === 0);
         setLoading(false);
@@ -652,13 +716,14 @@ export default function CohortLedger() {
     return () => {
       alive = false;
     };
-  }, [cfg]);
+  }, [cfg, selectedTiers]);
 
   const loadMore = useCallback(() => {
     if (loadingMore.current || !hasMore) return;
     loadingMore.current = true;
     const afterRank = rows.length ? rows[rows.length - 1].rank : 0;
-    loadLedgerPage(cfg, afterRank)
+    const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
+    loadLedgerPage(cfg, afterRank, LEDGER_PAGE_SIZE, tiersArg)
       .then((page) => {
         setRows((prev) => [...prev, ...page.rows]);
         setHasMore(page.hasMore);
@@ -667,12 +732,17 @@ export default function CohortLedger() {
       .catch(() => {
         loadingMore.current = false;
       });
-  }, [cfg, hasMore, rows]);
+  }, [cfg, hasMore, rows, selectedTiers]);
 
   const th = meta ? thresholds(cfg, meta.ceilings) : {};
-  const { headBands, tailRows } = layout(cfg, rows);
-  const cohortTotal = meta?.cohortTotal ?? rows.length;
-  const metaLine = meta ? cfg.meta.replace("{total}", cohortTotal.toLocaleString()) : "";
+  const isCom = cfg.tag === "COM";
+  // COM is tier-sorted, not index-sorted, so the ceiling-saturation "treat as tied"
+  // bands do not apply — render one flat ranked list. EST/RS keep the band device.
+  const { headBands, tailRows } = isCom ? { headBands: [] as Band[], tailRows: rows } : layout(cfg, rows);
+  const cohortTotal = isCom ? rpcCohortTotal : (meta?.cohortTotal ?? rows.length);
+  const metaLine = isCom
+    ? `${filteredTotal.toLocaleString()} OF ${cohortTotal.toLocaleString()} HCP · PART D + PART B DERIVED · EVIDENCE TIERS`
+    : (meta ? cfg.meta.replace("{total}", cohortTotal.toLocaleString()) : "");
 
   const toggle = useCallback((id: string) => setOpen((o) => (o === id ? null : id)), []);
   const isMobile = useIsMobile();
@@ -720,6 +790,40 @@ export default function CohortLedger() {
               <span style={{ ...mono(10.5), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
             </div>
 
+            {/* COM evidence-tier filter chips (default anchored + supported). Counts are
+                read from the RPC (tier_counts), never hardcoded. Selecting narrows/widens
+                the ranked population; the header states filtered-of-cohort above. */}
+            {isCom ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "11px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
+                {(() => {
+                  const allOn = COM_ALL_TIERS.every((t) => selectedTiers.includes(t));
+                  return (
+                    <button onClick={() => setSelectedTiers(allOn ? COM_DEFAULT_TIERS : COM_ALL_TIERS)} style={chipStyle(allOn)}>
+                      ALL{rpcCohortTotal ? ` ${rpcCohortTotal.toLocaleString()}` : ""}
+                    </button>
+                  );
+                })()}
+                {COM_TIER_FILTERS.map((t) => {
+                  const on = selectedTiers.includes(t.key);
+                  const n = tierCounts?.[t.key];
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() =>
+                        setSelectedTiers((prev) => {
+                          const next = prev.includes(t.key) ? prev.filter((x) => x !== t.key) : [...prev, t.key];
+                          return next.length ? next : COM_DEFAULT_TIERS; // never empty
+                        })
+                      }
+                      style={chipStyle(on)}
+                    >
+                      {t.label}{n != null ? ` ${n.toLocaleString()}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
             {/* column heads are a desktop device; on mobile each card carries its own labels */}
             {isMobile ? null : <ColumnHeads cfg={cfg} />}
 
@@ -739,13 +843,15 @@ export default function CohortLedger() {
                 {/* below the head the index separates people — a plain, virtualised ranked list */}
                 {tailRows.length > 0 ? (
                   <>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 20px 7px 23px", background: P.band, borderBottom: `1px solid ${P.line}` }}>
-                      <span style={{ ...mono(9.5, 500), letterSpacing: ".16em", color: P.ink4 }}>RANKED</span>
-                      <span style={{ flex: 1, height: 1, background: P.lineMed }} />
-                      <span style={{ ...mono(9.5), letterSpacing: ".1em", color: "#767C81" }}>
-                        BELOW THE TIED HEAD · THE INDEX SEPARATES EACH ROW
-                      </span>
-                    </div>
+                    {!isCom ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 20px 7px 23px", background: P.band, borderBottom: `1px solid ${P.line}` }}>
+                        <span style={{ ...mono(9.5, 500), letterSpacing: ".16em", color: P.ink4 }}>RANKED</span>
+                        <span style={{ flex: 1, height: 1, background: P.lineMed }} />
+                        <span style={{ ...mono(9.5), letterSpacing: ".1em", color: "#767C81" }}>
+                          BELOW THE TIED HEAD · THE INDEX SEPARATES EACH ROW
+                        </span>
+                      </div>
+                    ) : null}
                     <VirtualTail
                       cfg={cfg}
                       rows={tailRows}
@@ -758,7 +864,7 @@ export default function CohortLedger() {
                     />
                     {hasMore ? (
                       <div style={{ padding: "12px 23px", ...mono(10), color: P.ink5, letterSpacing: ".08em", borderTop: `1px solid ${P.line}` }}>
-                        Loading more of the cohort… {rows.length.toLocaleString()} of {cohortTotal.toLocaleString()}
+                        Loading more of the cohort… {rows.length.toLocaleString()} of {(isCom ? filteredTotal : cohortTotal).toLocaleString()}
                       </div>
                     ) : null}
                   </>

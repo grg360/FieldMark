@@ -149,11 +149,67 @@ export interface LedgerRow {
   scores: Record<string, number | null>; // keyed by col.key
   idx: number; // composite index
   summary: string | null; // generated narrative headline (plain prose)
+  // Community evidence-tier fields (COM only; from hcp_nsclc_evidence_tier_v1 via the RPC).
+  // Absent on EST/RS rows. Never composed client-side — the RPC returns the strings.
+  tier?: string | null;
+  recurrenceBand?: string | null;
+  anchorStem?: string | null; // representative lung-only oral for the chip
+  anchorStems?: string[] | null; // every distinct strict stem, for the profile
+  anchorYears?: number[] | null;
+  supportedEvidence?: string | null; // verbatim from the view (group 5 stays "cross-indication targeted therapy observed")
+  supportedEvidenceRank?: number | null;
+  lungWeighted?: boolean;
 }
 
 export interface LedgerData {
-  cohortTotal: number;
+  cohortTotal: number; // full cohort (pre-filter)
+  filteredTotal: number; // rows under the active tier filter (== cohortTotal for EST/RS)
+  tierCounts: Record<string, number> | null; // COM: full-cohort count per tier (for the filter chips); null for EST/RS
   rows: LedgerRow[];
+}
+
+// ── Community evidence tiers (COM only) ──────────────────────────────────────
+// Tier vocabulary is shared between the filter chips and the row chip so filter↔row
+// is stated, not inferred. Default ledger = anchored + supported (the frame's 1,068).
+export const COM_TIER_LABEL: Record<string, string> = {
+  anchored: "ANCHORED",
+  supported: "SUPPORTED",
+  candidate: "CANDIDATE",
+  heme_dominant: "HEME-DOMINANT",
+  unresolved: "NO MEDICARE EVIDENCE",
+};
+export const COM_TIER_FILTERS: { key: string; label: string }[] = [
+  { key: "anchored", label: "ANCHORED" },
+  { key: "supported", label: "SUPPORTED" },
+  { key: "candidate", label: "CANDIDATES" },
+  { key: "unresolved", label: "NO MEDICARE EVIDENCE" },
+  { key: "heme_dominant", label: "HEME-DOMINANT" },
+];
+export const COM_ALL_TIERS: string[] = COM_TIER_FILTERS.map((t) => t.key);
+export const COM_DEFAULT_TIERS: string[] = ["anchored", "supported"];
+
+export interface EvidenceChip {
+  tierWord: string; // ANCHORED / SUPPORTED / …
+  strength: "anchored" | "supported" | "other";
+  segments: string[]; // e.g. ["LUNG-ONLY ORAL", "osimertinib", "2022 2023 2024"] or ["pemetrexed (Part B)"]
+  lungWeighted: boolean;
+}
+
+/** The row evidence chip content (COM). Anchored names the representative drug and the
+ *  actual years; supported uses the view's verbatim evidence string; other tiers carry
+ *  the tier word alone. Returns null for non-COM rows. */
+export function evidenceChip(row: LedgerRow): EvidenceChip | null {
+  if (!row.tier) return null;
+  const tierWord = COM_TIER_LABEL[row.tier] ?? row.tier.toUpperCase();
+  const lungWeighted = !!row.lungWeighted;
+  if (row.tier === "anchored") {
+    const years = (row.anchorYears ?? []).join(" ");
+    return { tierWord, strength: "anchored", lungWeighted, segments: ["LUNG-ONLY ORAL", row.anchorStem ?? "", years].filter(Boolean) };
+  }
+  if (row.tier === "supported") {
+    return { tierWord, strength: "supported", lungWeighted, segments: [row.supportedEvidence ?? ""].filter(Boolean) };
+  }
+  return { tierWord, strength: "other", lungWeighted, segments: [] };
 }
 
 /** Cohort-level facts, fetched once via ledger_meta (a cheap max() aggregate over the
@@ -391,7 +447,7 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     chips = [S(r.state), inst].filter(Boolean);
   }
 
-  return {
+  const base: LedgerRow = {
     rank: Number(r.rank),
     globalRank: r.global_rank == null ? null : Number(r.global_rank),
     hcpId: S(r.hcp_id),
@@ -402,6 +458,18 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     idx: Number(r.idx),
     summary: (r.summary as string) ?? null,
   };
+
+  if (cfg.tag === "COM") {
+    base.tier = (r.tier as string) ?? null;
+    base.recurrenceBand = (r.recurrence_band as string) ?? null;
+    base.anchorStem = (r.anchor_stem as string) ?? null;
+    base.anchorStems = (r.anchor_stems as string[] | null) ?? null;
+    base.anchorYears = (r.anchor_years as number[] | null) ?? null;
+    base.supportedEvidence = (r.supported_evidence as string) ?? null;
+    base.supportedEvidenceRank = r.supported_evidence_rank == null ? null : Number(r.supported_evidence_rank);
+    base.lungWeighted = !!r.lung_weighted;
+  }
+  return base;
 }
 
 /** Fetch the cohort-level ceilings + total once per cohort load. This is the cheap
@@ -426,13 +494,21 @@ export async function loadLedgerPage(
   cfg: CohortConfig,
   afterRank = 0,
   limit = LEDGER_PAGE_SIZE,
+  tiers?: string[],
 ): Promise<LedgerData & { hasMore: boolean }> {
-  const { data, error } = await supabase.rpc(cfg.rpc, { p_limit: limit, p_after_rank: afterRank });
+  // COM's tiered RPC takes p_tiers (default anchored+supported when omitted) and returns
+  // filtered_total alongside cohort_total. EST/RS RPCs take neither, so only pass p_tiers
+  // for COM — an unknown named arg would make the RPC unresolvable.
+  const args: Record<string, unknown> = { p_limit: limit, p_after_rank: afterRank };
+  if (cfg.tag === "COM" && tiers && tiers.length) args.p_tiers = tiers;
+  const { data, error } = await supabase.rpc(cfg.rpc, args);
   if (error) {
     console.error(`${cfg.rpc} failed:`, error.message);
-    return { cohortTotal: 0, rows: [], hasMore: false };
+    return { cohortTotal: 0, filteredTotal: 0, tierCounts: null, rows: [], hasMore: false };
   }
-  const d = (data as { cohort_total?: number; rows?: unknown[] }) ?? {};
+  const d = (data as { cohort_total?: number; filtered_total?: number; tier_counts?: Record<string, number> | null; rows?: unknown[] }) ?? {};
   const rows: LedgerRow[] = ((d.rows ?? []) as Record<string, unknown>[]).map((r) => mapRow(cfg, r));
-  return { cohortTotal: Number(d.cohort_total) || rows.length, rows, hasMore: rows.length === limit };
+  const cohortTotal = Number(d.cohort_total) || rows.length;
+  const filteredTotal = d.filtered_total != null ? Number(d.filtered_total) : cohortTotal;
+  return { cohortTotal, filteredTotal, tierCounts: d.tier_counts ?? null, rows, hasMore: rows.length === limit };
 }

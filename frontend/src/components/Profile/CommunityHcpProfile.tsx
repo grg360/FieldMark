@@ -24,11 +24,13 @@ import { FiChip, FiModal, FiToast } from "../FieldIntelligenceShared";
 import { profileHcp } from "./ProfileRelationshipControls";
 import {
   loadCommunityProfile,
+  loadEvidenceTier,
   money,
   moneyCompact,
   titleCase,
   MATERIALITY_USD,
   type CommunityProfile,
+  type NsclcEvidenceTier,
   type Product,
 } from "../../lib/communityProfile";
 
@@ -101,12 +103,72 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Evidence line — frame 1d. Directly under the name, one slot, every state. Absence
+// states its cause and never renders empty or as a zero. Prose is composed from the
+// view's fields; the supported string is used verbatim (group 5 must read
+// "cross-indication targeted therapy observed", never "NSCLC prescribing observed").
+// Never renders a patient count or any tumour-type-attributed volume.
+function EvidenceLine({ ev }: { ev: NsclcEvidenceTier | null }) {
+  if (!ev) return null;
+  const yrs = ev.anchor_years ?? [];
+  const consecutive = yrs.length >= 2 && yrs[yrs.length - 1] - yrs[0] === yrs.length - 1;
+  const stems = ev.anchor_stems ?? (ev.anchor_stem ? [ev.anchor_stem] : []);
+  const stemPhrase = stems.length > 1 ? `${stems.slice(0, -1).join(", ")} and ${stems[stems.length - 1]}` : stems[0] ?? "a lung-only oral";
+  const oralNoun = stems.length > 1 ? "orals indicated only for non-small cell lung cancer" : "an oral indicated only for non-small cell lung cancer";
+
+  let accent: string = P.ink6; // dim by default (absence / other)
+  let label = "EVIDENCE";
+  let lead = "";
+  let caveat = "";
+  if (ev.tier === "anchored") {
+    accent = P.amber;
+    label = "EVIDENCE · MEDICARE PART D";
+    const yearList = yrs.length ? yrs.join(", ") : "the observed period";
+    lead = `Prescribed ${stemPhrase} — ${oralNoun} — in ${yearList}.`;
+    caveat =
+      (ev.years_anchored ?? yrs.length) >= 2
+        ? `${ev.years_anchored ?? yrs.length}${consecutive ? " consecutive" : ""} years of prescribing is a materially stronger claim than one. Claims and prescribing carry no diagnosis.`
+        : `A single year of prescribing. Claims and prescribing carry no diagnosis.`;
+  } else if (ev.tier === "supported") {
+    accent = "#B99A68";
+    label = "EVIDENCE · SUPPORTING";
+    lead = ev.supported_evidence ? `${ev.supported_evidence}.` : "Supporting evidence observed.";
+    caveat = "Supporting evidence, not a lung-specific anchor. Claims and prescribing carry no diagnosis.";
+  } else if (ev.tier === "candidate") {
+    label = "EVIDENCE · SOLID-TUMOUR ORAL";
+    lead = "Solid-tumour oral oncology prescribing, with no lung-specific evidence observed 2022–2024.";
+    caveat = "Not disqualifying. A lung panel with no targetable mutation prescribes no oral therapy at all, so absence of a lung oral is never disproof of lung practice.";
+  } else if (ev.tier === "heme_dominant") {
+    label = "EVIDENCE · ORAL MIX";
+    lead = "Oral oncology prescribing is predominantly haematology agents — over 70% of fills 2022–2024. No lung-only oral was prescribed in that period.";
+    caveat = "A description of practice, not a disqualification. Reachable from the ledger by filter and searchable throughout.";
+  } else {
+    label = "EVIDENCE · NOT OBSERVED";
+    lead = "No Medicare drug evidence was observed 2022–2024 — no Part D prescribing and no Part B drug billing. The likely reason is billing path: prescribing under an organisational NPI, or a panel weighted to Medicare Advantage.";
+    caveat = "This is not evidence of inactivity. A lung panel with no targetable mutation prescribes no oral therapy at all, so absence of a lung oral is never disproof of lung practice.";
+  }
+
+  return (
+    <div style={{ borderLeft: `2px solid ${accent}`, padding: "2px 0 2px 14px", marginTop: 4, display: "flex", flexDirection: "column", gap: 8 }}>
+      <span style={{ ...mono(9, 500), letterSpacing: ".11em", color: ev.tier === "anchored" ? P.amber : P.ink4 }}>{label}</span>
+      <p style={{ margin: 0, ...serif(13.5), lineHeight: 1.55, color: P.ink2, textWrap: "pretty" }}>{lead}</p>
+      <p style={{ margin: 0, ...serif(12.5), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{caveat}</p>
+      {ev.lung_weighted ? (
+        <span style={{ alignSelf: "flex-start", ...mono(9), letterSpacing: ".1em", color: P.ink4, border: `1px solid ${P.lineStrong}`, padding: "4px 8px" }}>
+          LUNG-WEIGHTED ORAL MIX
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export default function CommunityHcpProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const rel = useRelationships();
   const [p, setP] = useState<CommunityProfile | null>(null);
   const [notes, setNotes] = useState<FieldNote[]>([]);
+  const [evidence, setEvidence] = useState<NsclcEvidenceTier | null>(null);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"recency" | "amount">("recency");
 
@@ -114,9 +176,9 @@ export default function CommunityHcpProfile() {
     if (!id) return;
     let alive = true;
     setLoading(true);
-    Promise.all([loadCommunityProfile(id), loadFieldPresence(id)]).then(([prof, fn]) => {
+    Promise.all([loadCommunityProfile(id), loadFieldPresence(id), loadEvidenceTier(id)]).then(([prof, fn, ev]) => {
       if (!alive) return;
-      setP(prof); setNotes(fn); setLoading(false);
+      setP(prof); setNotes(fn); setEvidence(ev); setLoading(false);
     }).catch(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [id]);
@@ -190,6 +252,7 @@ export default function CommunityHcpProfile() {
               {loc ? ` · ${loc}` : ""}
               {p.hcp.npi ? ` · NPI ${p.hcp.npi}` : ""}
             </span>
+            <EvidenceLine ev={evidence} />
             <HeaderActions hcpId={p.hcp.id} npi={p.hcp.npi} onBrief={() => navigate(`/hcp/${p.hcp.id}/brief`)} />
           </div>
           {/* practice shape — frame: its own 300px cell, label-left / value-right rows */}
@@ -444,7 +507,6 @@ export default function CommunityHcpProfile() {
           const pct = (v: number | null) => ((v ?? 0) / mixTotal) * 100;
           const topCat = rows[0];
           const topEnt = p.entities?.[0];
-          const lifetime = eng.lifetime_total ?? mixTotal;
           const restCompanies = (eng.distinct_companies ?? 0) - 1;
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
