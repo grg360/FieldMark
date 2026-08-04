@@ -49,8 +49,9 @@ INSERT_BATCH = 1000
 INSERT_SQL = """
     INSERT INTO hcp_hcpcs_detail
       (hcp_id, npi, program_year, hcpcs_code, hcpcs_desc, hcpcs_drug_indicator,
-       place_of_service, tot_benes, tot_srvcs, avg_mdcr_pymt_per_srvc)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+       place_of_service, tot_benes, tot_srvcs, avg_mdcr_pymt_per_srvc,
+       total_bene_day_services)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (hcp_id, program_year, hcpcs_code, place_of_service) DO NOTHING
 """
 
@@ -104,11 +105,29 @@ def fetch_claim_rows(medicare_dir: str, npis: List[str]) -> List[Tuple[Any, ...]
                upper(trim(m.place_of_service)) AS place_of_service,
                m.total_beneficiaries,
                m.total_services,
-               m.avg_medicare_payment
+               m.avg_medicare_payment,
+               CASE WHEN m.total_bene_day_services > m.total_services THEN NULL
+                    ELSE CAST(m.total_bene_day_services AS INTEGER)
+               END                             AS total_bene_day_services
         FROM ({union}) m
         JOIN target_npis t ON t.npi = m.npi
         """
     ).fetchall()
+
+    # BDS funnel (visible in the stage log): among the rows we are about to write,
+    # how many carry a total_bene_day_services value vs. how many the violation rule
+    # (bds > total_services) nulls out at read time -- same rule the backfill uses.
+    bds_with_value, bds_nulled = con.execute(
+        f"""
+        SELECT count(*) FILTER (WHERE m.total_bene_day_services IS NOT NULL
+                                  AND m.total_bene_day_services <= m.total_services),
+               count(*) FILTER (WHERE m.total_bene_day_services > m.total_services)
+        FROM ({union}) m
+        JOIN target_npis t ON t.npi = m.npi
+        """
+    ).fetchone()
+    print(f"[BDS] total_bene_day_services: {bds_with_value:,} rows carry a value; "
+          f"{bds_nulled:,} nulled by violation rule (bds > total_services)")
     con.close()
     return rows
 
@@ -192,8 +211,8 @@ def main() -> int:
         inserted = 0
         with conn.cursor() as cur:
             batch: List[Tuple[Any, ...]] = []
-            for npi, year, code, desc, drug_ind, pos, benes, srvcs, avg_pymt in claim_rows:
-                batch.append((targets[npi], npi, year, code, desc, drug_ind, pos, benes, srvcs, avg_pymt))
+            for npi, year, code, desc, drug_ind, pos, benes, srvcs, avg_pymt, bds in claim_rows:
+                batch.append((targets[npi], npi, year, code, desc, drug_ind, pos, benes, srvcs, avg_pymt, bds))
                 if len(batch) >= INSERT_BATCH:
                     cur.executemany(INSERT_SQL, batch)
                     inserted += cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
@@ -201,6 +220,32 @@ def main() -> int:
             if batch:
                 cur.executemany(INSERT_SQL, batch)
                 inserted += cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+
+            # POST-WRITE CHECK (same transaction, so it sees the rows just inserted):
+            # count drug rows we wrote that SHOULD carry a total_bene_day_services
+            # value (source had one, violation rule did not null it) but landed NULL.
+            # A run that inserts the rows but not this column must not read clean, so a
+            # non-zero count is recorded in metrics and logged as a WARN below.
+            bds_written_with_value = sum(1 for r in claim_rows if r[9] is not None)
+            expected_keys = {
+                (npi, year, code, pos)
+                for npi, year, code, desc, drug_ind, pos, benes, srvcs, avg_pymt, bds in claim_rows
+                if drug_ind == "Y" and bds is not None
+            }
+            bds_missing = 0
+            if expected_keys:
+                cur.execute(
+                    """
+                    SELECT npi, program_year, hcpcs_code, place_of_service
+                    FROM hcp_hcpcs_detail
+                    WHERE npi = ANY(%s)
+                      AND hcpcs_drug_indicator = 'Y'
+                      AND total_bene_day_services IS NULL
+                    """,
+                    (list(targets.keys()),),
+                )
+                db_null = {(r[0], int(r[1]), r[2], r[3]) for r in cur.fetchall()}
+                bds_missing = len(expected_keys & db_null)
 
             log_pipeline_run(
                 cur, run_id, started_at, "success",
@@ -211,10 +256,16 @@ def main() -> int:
                     "rows_by_year": {str(k): v for k, v in sorted(by_year.items())},
                     "medicare_dir": str(args.medicare_dir),
                     "dry_run": False,
+                    "bds_written_with_value": bds_written_with_value,
+                    "bds_missing_after_write": bds_missing,
                 },
                 triggered_by=args.triggered_by,
             )
         conn.commit()
+        if bds_missing:
+            print(f"[WARN] {bds_missing:,} drug rows written this run have "
+                  f"total_bene_day_services NULL despite a source value -- the column "
+                  f"did not populate; stage is NOT clean.")
         print(f"[DONE] inserted {inserted:,} of {len(claim_rows):,} candidate rows "
               f"(difference = already present, skipped by ON CONFLICT). pipeline_runs id={run_id}")
     return 0
