@@ -54,6 +54,16 @@ const RED = "#b5705c", GREEN = "#9dbfa4", STEEL = "#93a9ad";
 const SERIF = "'Spectral', Georgia, serif";
 const MONO = "'IBM Plex Mono', ui-monospace, monospace";
 
+// Cohort chip border colors — the platform's canonical cohort markers, taken from
+// the cohort ledger's COH map (cohortLedger.ts, "confirmed against the frame's own
+// COH map"); Established also matches HcpProfileBrief's P.sage cohort marker.
+// Unknown/null cohort falls back to the neutral chip border.
+const COHORT_BORDER: Record<string, string> = {
+  established: "#6E8F76", // deep sage
+  rising_star: "#9A8CC8", // purple
+  community: "#B0848F", // rose
+};
+
 const mono = (size: number, weight = 400, color = MID, ls = ".12em") => ({ font: `${weight} ${size}px/1 ${MONO}`, letterSpacing: ls, color });
 const serif = (size: number, weight = 400, color = INK2, lh = 1.2) => ({ font: `${weight} ${size}px/${lh} ${SERIF}`, color });
 const num = (n: number) => n.toLocaleString("en-US");
@@ -408,28 +418,22 @@ export default function HomePage() {
                     </div>
                     {portfolioChips.length > 0 ? (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {portfolioChips.map((chip) => {
-                          const cohortColor = chip.cohort === "rising_star" ? "#9B6DFF"
-                            : chip.cohort === "established" ? "#E8A020"
-                            : chip.cohort === "community" ? "#4A90E2"
-                            : "#6B6A65";
-                          const cohortBg = chip.cohort === "rising_star" ? "rgba(155,109,255,0.15)"
-                            : chip.cohort === "established" ? "rgba(232,160,32,0.15)"
-                            : chip.cohort === "community" ? "rgba(74,144,226,0.15)"
-                            : "rgba(107,106,101,0.15)";
-                          return (
-                            <span
-                              key={chip.hcp_id}
-                              onClick={() => navigate(`/hcp/${chip.hcp_id}`)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", backgroundColor: cohortBg, color: cohortColor, border: `1px solid ${cohortColor}`, borderRadius: 3, fontSize: 11, fontWeight: 500, fontFamily: "system-ui, -apple-system, sans-serif", whiteSpace: "nowrap", cursor: "pointer" }}
-                            >
-                              <span>{chip.name}</span>
-                              {chip.cohort_rank !== null ? (
-                                <span style={{ fontSize: 10, opacity: 0.85 }}>#{chip.cohort_rank}</span>
-                              ) : null}
-                            </span>
-                          );
-                        })}
+                        {/* register: bordered mono chips, no fill. Border carries the cohort
+                            (estGreen / indigo / info); text stays neutral; rank stays an inline
+                            gold #figure per the platform's "amber for rank only" rule. Link +
+                            population are unchanged. */}
+                        {portfolioChips.map((chip) => (
+                          <span
+                            key={chip.hcp_id}
+                            onClick={() => navigate(`/hcp/${chip.hcp_id}`)}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 7px", border: `1px solid ${(chip.cohort ? COHORT_BORDER[chip.cohort] : undefined) ?? BORDER}`, ...mono(11, 400, INK3, "0"), whiteSpace: "nowrap", cursor: "pointer" }}
+                          >
+                            <span>{chip.name}</span>
+                            {chip.cohort_rank !== null ? (
+                              <span style={mono(11, 400, GOLD, "0")}>#{chip.cohort_rank}</span>
+                            ) : null}
+                          </span>
+                        ))}
                       </div>
                     ) : null}
                   </div>
@@ -552,7 +556,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
             <span>INDEX {fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)} SINCE 8 JUN</span>
           </div>
           <div style={{ borderLeft: `2px solid ${GOLD}`, background: CARD }}>
-            <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "88px 1fr 300px" : "1fr", gap: isDesktop ? 26 : 14, padding: isDesktop ? "26px 28px 22px" : "18px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "88px 1fr 190px" : "1fr", gap: isDesktop ? 26 : 14, padding: isDesktop ? "26px 28px 16px" : "18px 16px 10px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {/* current position only — rank deltas are compositionally inflated by cohort attrition */}
                 <span style={{ font: `400 34px/1 ${MONO}`, color: GOLD }}>#{moved.bandA.nowRank}<span style={{ fontSize: 13, color: MID, letterSpacing: ".1em" }}> US</span></span>
@@ -567,11 +571,6 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
                 <p style={{ margin: 0, ...serif(16, 300, INK3, 1.6) }}>
                   Rising-star index <span style={{ color: INK1, fontWeight: 500 }}>{fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)}</span> since 8 Jun 2026 — currently #{moved.bandA.nowRank} US.
                 </p>
-                {/* actions rendered non-interactive — Home performs no writes */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 2 }}>
-                  <span style={{ ...mono(10, 500, "#0c0c0b", ".14em"), background: GOLD2, padding: "11px 15px" }}>GENERATE BRIEF</span>
-                  <span style={{ ...mono(10, 500, GOLD_LINK, ".14em"), border: `1px solid #4a4438`, padding: "10px 15px" }}>TRACK INVESTIGATOR</span>
-                </div>
               </div>
               {isDesktop ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, borderLeft: `1px solid ${BORDER}`, paddingLeft: 26 }}>
@@ -583,10 +582,15 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
                     <span>SCI VISIBILITY</span><span style={{ color: INK2 }}>{fmtIdx(moved.bandA.sciVisibility)}</span>
                     <span>NET VISIBILITY</span><span style={{ color: INK2 }}>{fmtIdx(moved.bandA.netVisibility)}</span>
                   </div>
-                  <div style={{ height: 1, background: BORDER, marginTop: 2 }} />
-                  <span style={mono(10, 400, DIM, ".06em")}>PERCENTILES FROM hcp_rising_star_ranks_v3 · US RISING-STAR COHORT</span>
                 </div>
               ) : null}
+              {/* actions — non-interactive (Home performs no writes). A grid row spanning
+                  the two left columns (rank + name), centered within that left region,
+                  clear of the TRACE column and its divider. */}
+              <div style={{ gridColumn: isDesktop ? "1 / 3" : "auto", display: "flex", justifyContent: "center", alignItems: "center", gap: 10, flexWrap: "wrap", paddingTop: 4 }}>
+                <span style={{ ...mono(10, 500, "#0c0c0b", ".14em"), background: GOLD2, padding: "11px 15px", whiteSpace: "nowrap" }}>GENERATE AI BRIEF</span>
+                <span style={{ ...mono(10, 500, GOLD_LINK, ".14em"), border: `1px solid #4a4438`, padding: "10px 15px", whiteSpace: "nowrap" }}>TRACK INVESTIGATOR</span>
+              </div>
             </div>
           </div>
 

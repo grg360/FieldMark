@@ -1274,6 +1274,27 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       }
     }
 
+    // Established rank: hcp_rising_star_ranks_v3 carries none, which is why the
+    // established chips showed no #rank. Pull the US-region established rank (the
+    // same figure the profile shows); keep the best (lowest) if an HCP is ranked
+    // in more than one TA.
+    type EstRankRow = { hcp_id: string; rank: number | null };
+    const estRanksByHcpId = new Map<string, number>();
+    for (let i = 0; i < hcpIdsInTerritory.length; i += CHUNK_SIZE) {
+      const chunk = hcpIdsInTerritory.slice(i, i + CHUNK_SIZE);
+      const { data } = await supabase
+        .from("hcp_established_ranks_v3")
+        .select("hcp_id, rank")
+        .eq("scope_type", "region")
+        .eq("scope_value", "US")
+        .in("hcp_id", chunk);
+      for (const row of (data ?? []) as EstRankRow[]) {
+        if (row.rank == null) continue;
+        const existing = estRanksByHcpId.get(row.hcp_id);
+        if (existing == null || row.rank < existing) estRanksByHcpId.set(row.hcp_id, row.rank);
+      }
+    }
+
     const chips: TrackedHcpChip[] = allHcps.map((h) => {
       const cohortLower = (h.cohort_classification ?? "").toLowerCase();
       let cohort: TrackedHcpChip["cohort"] = null;
@@ -1285,7 +1306,10 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
         hcp_id: h.id,
         name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
         cohort,
-        cohort_rank: cohort === "rising_star" ? (ranksByHcpId.get(h.id) ?? null) : null,
+        cohort_rank:
+          cohort === "rising_star" ? (ranksByHcpId.get(h.id) ?? null)
+          : cohort === "established" ? (estRanksByHcpId.get(h.id) ?? null)
+          : null,
       };
     });
 

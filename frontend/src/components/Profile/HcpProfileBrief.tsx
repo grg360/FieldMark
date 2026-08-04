@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import NavBar from "../NavBar";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
+import { useIsDesktop } from "../../lib/useIsDesktop";
 import { floorFixed } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { fetchHcpThemes, getEstablishedScoreBreakdown, type TopCollaborator } from "../../lib/api";
@@ -210,6 +211,8 @@ export default function HcpProfileBrief() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, location.hash]);
 
+  const isDesktop = useIsDesktop();
+
   if (loading) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>Loading profile…</div></Shell>;
   if (!p || !p.hcp?.name) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>This profile could not be loaded.</div></Shell>;
 
@@ -301,19 +304,24 @@ export default function HcpProfileBrief() {
           )}
         </div>
 
-        {/* ── RELATIONSHIP ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SectionHead id="relationship" tag="RELATIONSHIP" count="TRACK · STATUS · FOLLOW-UPS" sub="SYNCS WITH THE LEDGER" />
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
-            <ProfileRelationshipControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
+        {/* ── RELATIONSHIP + CONTACT & CONTROLS — paired workspace controls (frame:
+            two equal columns, RELATIONSHIP left, stretched to identical height;
+            stacks to one column on mobile) ── */}
+        <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr", gap: 20, alignItems: "stretch" }}>
+          {/* ── RELATIONSHIP ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <SectionHead id="relationship" tag="RELATIONSHIP" count="TRACK · STATUS · FOLLOW-UPS" sub="SYNCS WITH THE LEDGER" />
+            <div style={{ flex: 1, border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
+              <ProfileRelationshipControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
+            </div>
           </div>
-        </div>
 
-        {/* ── CONTACT & CONTROLS ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SectionHead id="contact" tag="CONTACT & CONTROLS" sub="ACCESS · FIELD REVIEW · REPORT · OPT-OUT" />
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
-            <ProfileSecondaryControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
+          {/* ── CONTACT & CONTROLS ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <SectionHead id="contact" tag="CONTACT & CONTROLS" sub="ACCESS · FIELD REVIEW · REPORT · OPT-OUT" />
+            <div style={{ flex: 1, border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
+              <ProfileSecondaryControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
+            </div>
           </div>
         </div>
 
