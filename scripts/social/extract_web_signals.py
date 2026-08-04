@@ -229,9 +229,37 @@ WHERE h.id = %s
 LIMIT 1
 """
 
+# Community cohort: top-200 by rank in hcp_community_ranks_v2 (NSCLC, region/US scope).
+# The ranks table carries identity inline (first/last/institution), so no hcps_v2 join.
+# NOTE: community HCPs are practice-based physicians, mostly with a NULL institution — the
+# institution-scoped queries + the published-faculty-page rule yield far less than the
+# established run; see the pre-run yield sample.
+COMMUNITY_HCPS_SQL = """
+SELECT c.hcp_id AS id, c.first_name, c.last_name, c.institution_normalized, c.rank AS us_rank
+FROM hcp_community_ranks_v2 c
+JOIN therapeutic_areas ta ON ta.id = c.therapeutic_area_id
+WHERE ta.name = 'NSCLC'
+  AND c.scope_type = 'region'
+  AND c.scope_value = 'US'
+  AND c.rank <= 200
+ORDER BY c.rank ASC
+"""
+
+COMMUNITY_HCP_BY_ID_SQL = """
+SELECT c.hcp_id AS id, c.first_name, c.last_name, c.institution_normalized, c.rank AS us_rank
+FROM hcp_community_ranks_v2 c
+JOIN therapeutic_areas ta ON ta.id = c.therapeutic_area_id
+WHERE c.hcp_id = %s
+  AND ta.name = 'NSCLC'
+  AND c.scope_type = 'region'
+  AND c.scope_value = 'US'
+  AND c.rank <= 200
+LIMIT 1
+"""
+
 # Cohort dispatch: rising stays the default so the existing invocation is unchanged.
-COHORT_TARGET_SQL = {"rising": TARGET_HCPS_SQL, "established": ESTABLISHED_HCPS_SQL}
-COHORT_BY_ID_SQL = {"rising": TARGET_HCP_BY_ID_SQL, "established": ESTABLISHED_HCP_BY_ID_SQL}
+COHORT_TARGET_SQL = {"rising": TARGET_HCPS_SQL, "established": ESTABLISHED_HCPS_SQL, "community": COMMUNITY_HCPS_SQL}
+COHORT_BY_ID_SQL = {"rising": TARGET_HCP_BY_ID_SQL, "established": ESTABLISHED_HCP_BY_ID_SQL, "community": COMMUNITY_HCP_BY_ID_SQL}
 COHORTS = tuple(COHORT_TARGET_SQL.keys())
 
 COUNT_SIGNALS_SQL = """

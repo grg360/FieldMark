@@ -276,3 +276,112 @@ export default function TrialsPage() {
     </AppLayout>
   );
 }
+
+// ── Mobile board — condensed single-column layout ────────────────────────────
+function MobileBoard({ surface, listed, rosterChips, tracked, region, setRegion, coverage, navigate, loading }: {
+  surface: TrialsSurface;
+  listed: Trial[];
+  rosterChips: { hcp_id: string; name: string; state: string | null; n: number }[];
+  tracked: Set<string>;
+  region: Region | null;
+  setRegion: (r: Region | null) => void;
+  coverage: string;
+  navigate: (to: string) => void;
+  loading: boolean;
+}) {
+  return (
+    <div style={{ background: P.board, border: `1px solid ${P.line}`, marginTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 16px", borderBottom: `1px solid ${P.line}` }}>
+        <span style={{ ...mono(10, 600, ".22em"), color: P.amber }}>FIELDMARK</span>
+        <span style={{ ...mono(9, 400, ".16em"), color: P.ink0, borderBottom: `1px solid ${P.amber}`, paddingBottom: 2 }}>TRIALS</span>
+      </div>
+
+      <div style={{ padding: "18px 16px 0", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ ...serif(24, 600), color: P.ink0, lineHeight: 1.05 }}>Trials</div>
+        <div style={{ ...mono(8.5, 400, ".14em"), color: P.amberDim, lineHeight: 1.6 }}>{loading ? "…" : `${surface.openCount} OPEN · ${surface.industryCount} INDUSTRY · ${surface.rosterAssetsOnTrial} OF ${surface.rosterAssetsTotal} ROSTER ASSETS`}</div>
+        <div style={{ ...mono(8, 400, ".12em"), color: P.ink6, lineHeight: 1.7 }}>SET AS OF CRAWL {CRAWL} · STATUS AS OF {REFRESH}</div>
+      </div>
+
+      <div style={{ margin: "16px 16px 0", border: `1px solid ${P.line3}`, background: P.panel }}>
+        <div style={{ display: "flex", gap: 6, padding: "9px 10px", overflowX: "auto", alignItems: "center" }}>
+          <span style={{ ...mono(8, 400, ".18em"), color: P.amberDim, flex: "none" }}>TERR</span>
+          {surface.territories.map((t) => {
+            const active = t.key === "ALL US" ? region === null : t.key === region;
+            return (
+              <span key={t.key} onClick={() => setRegion(t.key === "ALL US" ? null : (t.key as Region))}
+                style={{ flex: "none", cursor: "pointer", display: "inline-flex", gap: 6, alignItems: "baseline", padding: "4px 8px", border: `1px solid ${active ? "#7a5a1f" : P.line2}`, background: active ? "#191309" : "transparent", whiteSpace: "nowrap" }}>
+                <span style={{ ...mono(8.5, active ? 600 : 400, ".1em"), color: active ? P.amberHi : P.ink2 }}>{t.key}</span>
+                <span style={{ ...mono(8.5), color: active ? P.amberDim : P.ink6 }}>{t.count}</span>
+              </span>
+            );
+          })}
+        </div>
+        <div style={{ padding: "9px 12px 10px", borderTop: `1px solid ${P.line2}`, ...mono(8.5, 400, "0"), color: P.ink4, lineHeight: 1.7 }}>{coverage}</div>
+      </div>
+
+      {rosterChips.length > 0 && (
+        <div style={{ margin: "14px 16px 0", border: `1px solid ${P.line2}`, padding: "10px 12px" }}>
+          <div style={{ ...mono(8, 400, ".16em"), color: P.amberDim, marginBottom: 8 }}>ON YOUR ROSTER · {rosterChips.length}</div>
+          <div style={{ display: "flex", gap: 6, rowGap: 6, flexWrap: "wrap" }}>
+            {rosterChips.map((r) => (
+              <a key={r.hcp_id} onClick={() => navigate(`/hcp/${r.hcp_id}`)} style={{ ...serif(13), color: P.link, cursor: "pointer" }}>{r.name}{r.state ? ` · ${r.state}` : ""}</a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ margin: "14px 16px 0", ...mono(8.5, 400, ".1em"), color: P.ink4, lineHeight: 1.9 }}>{surface.phaseDist.map((p) => `${p.label} ${p.n}`).join("  ·  ")}</div>
+      <div style={{ margin: "4px 16px 0", ...mono(8.5, 400, ".1em"), color: P.ink4, lineHeight: 1.9 }}>{surface.statusDist.map((s) => `${s.n} ${s.label}`).join("  ·  ")}</div>
+
+      <div style={{ margin: "14px 16px 6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ ...mono(8.5, 600, ".13em"), color: P.amberHi, border: `1px solid #4a3a1c`, padding: "4px 8px" }}>RECRUITING FIRST</span>
+        <span style={{ ...mono(8.5, 400, ".13em"), color: P.ink6 }}>{listed.length} SHOWN</span>
+      </div>
+
+      {loading ? <div style={{ padding: "30px 16px", ...mono(10), color: P.ink4 }}>Loading…</div> : listed.map((t) => (
+        <div key={t.raw.trial_id} style={{ margin: "0 16px", borderTop: `1px solid #16140f`, borderLeft: `2px solid #4e3a16`, padding: "12px 0 13px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ border: `1px solid ${P.line3}`, padding: "2px 6px", ...mono(8.5, 600, ".12em"), color: P.ink1 }}>{t.phaseLabel}</span>
+            <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}>
+              <span style={{ color: t.recruiting ? P.amber : P.line3, fontSize: 7 }}>●</span>
+              <span style={{ ...mono(8, 400, ".12em"), color: t.recruiting ? P.amberDim : P.ink5 }}>{t.statusLabel}</span>
+            </span>
+            <span style={{ flex: 1 }} />
+            <a href={`https://clinicaltrials.gov/study/${t.nctId}`} target="_blank" rel="noopener noreferrer" style={{ ...mono(8, 400, ".05em"), color: P.ink6 }}>{t.nctId} ↗</a>
+          </div>
+          <a href={`https://clinicaltrials.gov/study/${t.nctId}`} target="_blank" rel="noopener noreferrer" style={{ ...serif(14, 600), color: "#e2ddcd", lineHeight: 1.35 }}>{t.title}</a>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
+            <span style={{ ...mono(9, 400, "0"), color: P.ink2 }}>{t.sponsor}</span>
+            <span style={{ ...mono(7.5, 400, ".13em"), color: P.ink5, border: `1px solid ${P.line2}`, padding: "1px 4px" }}>{t.sponsorClassLabel}</span>
+          </div>
+          <span style={{ ...mono(8.5, 400, "0"), color: P.ink5 }}>{t.dates}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 2 }}>
+            <span style={{ ...mono(7.5, 400, ".16em"), color: P.ink6 }}>INVESTIGATORS</span>
+            {t.investigators.map((iv) => (
+              <span key={iv.hcp_id} style={{ display: "inline-flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
+                {tracked.has(iv.hcp_id) && <span style={{ color: P.amber, fontSize: 7 }}>◆</span>}
+                <a onClick={() => navigate(`/hcp/${iv.hcp_id}`)} style={{ ...serif(12.5), color: P.link, cursor: "pointer" }}>{iv.name}</a>
+                <span style={{ ...mono(7.5, 400, "0"), color: P.ink6 }}>{iv.cohort === "established" ? "EST" : "RS"}{iv.rank != null ? ` · ${iv.rank}` : ""}</span>
+                {iv.state ? <span style={{ ...mono(9, 400, "0"), color: P.ink4 }}>{iv.state}</span> : <span style={{ ...mono(9, 400, "0"), color: P.ink6, fontStyle: "italic" }}>state unresolved</span>}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+            {t.interventions.map((iv, i) => iv.roster && iv.slug
+              ? <a key={i} onClick={() => navigate(`/assets/${iv.slug}`)} style={{ ...mono(9, 400, "0"), color: P.rosterLink, cursor: "pointer" }}>{iv.name}</a>
+              : <span key={i} style={{ ...mono(9, 400, "0"), color: P.ink5 }}>{iv.name}</span>)}
+          </div>
+        </div>
+      ))}
+
+      <div style={{ margin: "18px 16px 0", paddingTop: 14, borderTop: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 10, paddingBottom: 18 }}>
+        {DISCLOSURES.map(([k, v]) => (
+          <div key={k} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span style={{ ...mono(7.5, 400, ".16em"), color: P.ink6 }}>{k}</span>
+            <span style={{ ...mono(8.5, 400, "0"), color: P.ink5, lineHeight: 1.8 }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
