@@ -201,14 +201,19 @@ export default function CommunityHcpProfile() {
                   patient_volume figure is no longer displayed. */}
               {(p.nsclc?.spend_3yr ?? 0) > 0 ? (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ ...mono(10.5), color: P.ink4 }}>NSCLC-rel. therapy spend</span>
+                  <span style={{ ...mono(10.5), color: P.ink4 }}>Selected oncology therapy spend</span>
                   <span style={{ ...mono(12), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{moneyCompact(p.nsclc!.spend_3yr)}<span style={{ ...mono(9), color: P.ink6 }}> / 3yr</span></span>
                 </div>
               ) : null}
               {(p.nsclc?.volume_2023_est ?? 0) > 0 ? (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ ...mono(10.5), color: P.ink4 }}>NSCLC-rel. therapy vol.</span>
+                  <span style={{ ...mono(10.5), color: P.ink4 }}>Largest single-agent patient count</span>
                   <span style={{ ...mono(12), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>≈{Math.round(p.nsclc!.volume_2023_est!)}<span style={{ ...mono(9), color: P.ink6 }}> est. · 2023</span></span>
+                </div>
+              ) : null}
+              {((p.nsclc?.spend_3yr ?? 0) > 0 || (p.nsclc?.volume_2023_est ?? 0) > 0) ? (
+                <div style={{ ...mono(9), color: P.ink6, lineHeight: 1.5 }}>
+                  Selected administered oncology agents. Claims carry no indication; these are not NSCLC-specific.
                 </div>
               ) : null}
               {p.medicare_paid_corrected != null ? (
@@ -264,7 +269,7 @@ export default function CommunityHcpProfile() {
                     component, shown separately (never blended into one opaque number) */}
                 {p.nsclc?.spend_signal != null && p.nsclc?.volume_signal != null ? (
                   <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".02em", paddingTop: 2 }}>
-                    NSCLC-rel. signals (0–100 in cohort): spend {p.nsclc.spend_signal.toFixed(1)} · est. volume {p.nsclc.volume_signal.toFixed(1)}
+                    Oncology therapy signals (0–100 in cohort): spend {p.nsclc.spend_signal.toFixed(1)} · est. volume {p.nsclc.volume_signal.toFixed(1)}
                   </span>
                 ) : null}
                 {/* one-line note per the frame — methodology detail lives in the scoring

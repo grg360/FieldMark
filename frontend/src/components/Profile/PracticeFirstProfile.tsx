@@ -215,10 +215,15 @@ export default function PracticeFirstProfile() {
             {/* data-gated NSCLC therapy signals (2026-07-30 re-score). Proxies — drugs
                 cross indications — so "NSCLC-relevant", never "NSCLC patients". */}
             {(p.nsclc?.spend_3yr ?? 0) > 0 ? (
-              <ShapeRow l="NSCLC-rel. therapy spend" v={moneyCompact(p.nsclc!.spend_3yr)} u=" / 3yr" />
+              <ShapeRow l="Selected oncology therapy spend" v={moneyCompact(p.nsclc!.spend_3yr)} u=" / 3yr" />
             ) : null}
             {(p.nsclc?.volume_2023_est ?? 0) > 0 ? (
-              <ShapeRow l="NSCLC-rel. therapy vol." v={`≈${Math.round(p.nsclc!.volume_2023_est!)}`} u=" est. · 2023" />
+              <ShapeRow l="Largest single-agent patient count" v={`≈${Math.round(p.nsclc!.volume_2023_est!)}`} u=" est. · 2023" />
+            ) : null}
+            {((p.nsclc?.spend_3yr ?? 0) > 0 || (p.nsclc?.volume_2023_est ?? 0) > 0) ? (
+              <div style={{ ...mono(9), color: F.faint, lineHeight: 1.5 }}>
+                Selected administered oncology agents. Claims carry no indication; these are not NSCLC-specific.
+              </div>
             ) : null}
             <ShapeRow l="Services" v={med?.services_3yr != null ? (med.services_3yr >= 1e6 ? `${(med.services_3yr / 1e6).toFixed(2)}M` : fmtInt(med.services_3yr)) : "—"} u=" line items" />
             {med?.medicare_paid_corrected != null ? (
@@ -257,7 +262,7 @@ export default function PracticeFirstProfile() {
               {/* the two stored signals behind the 40% activity component — traceable */}
               {p.nsclc?.spend_signal != null && p.nsclc?.volume_signal != null ? (
                 <div style={{ ...mono(9.5), color: F.ghost, lineHeight: 1.6, marginTop: 10 }}>
-                  NSCLC-rel. signals (0–100 in cohort): spend {p.nsclc.spend_signal.toFixed(1)} · est. volume {p.nsclc.volume_signal.toFixed(1)}
+                  Oncology therapy signals (0–100 in cohort): spend {p.nsclc.spend_signal.toFixed(1)} · est. volume {p.nsclc.volume_signal.toFixed(1)}
                 </div>
               ) : null}
               {(sc.total_career_pubs ?? 0) === 0 ? (
