@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NavBar from "../NavBar";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { FONT, GROUND, GOLD as GOLD_T } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, COOL, GOLD as GOLD_T } from "../../lib/designTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { ASSETS, DEPLOYMENT_ASSETS, BACKBONE_ASSETS } from "../../lib/assetConfig";
 import {
@@ -23,21 +23,23 @@ import {
   type IndexAssetRow,
 } from "../../lib/assetIndex";
 
-// ── palette (from the frame) ──────────────────────────────────────────────────
-// Register migration 2026-08-05: only the font stacks matched tokens exactly.
-// This palette is WARM-tinted throughout — BG/PANEL/H1–H4 vs the cool SCALE,
-// GOLD #c9903c / GOLD_DIM #7d6234 / GOLD_FAINT #6f5629 vs GOLD.gold #be914d /
-// goldMuted #7a6136 / goldDeep #6b542f, and the INK/MUT/DIM ramps vs INK.* —
-// all near-twins, none byte-identical, so all stay local. Converging them is a
-// visible change reserved for its own commit. (Local GOLD name shadows nothing:
-// only FONT is imported from designTokens here.)
-const BG = GROUND.g0, PANEL = "#0e0d0c", PANEL2 = "#111010"; // BG absorbed 2026-08-05 (was #0a0a09, one byte)
+// ── palette (from the frame, re-pointed cool) ─────────────────────────────────
+// Two Ramps consolidation 2026-08-05, completed same day: the Drugs index is a
+// SCANNING surface in the applied table, so the warm-tinted frame palette
+// re-points fully cool by nearest value. Folds this creates: INK/INK2 → ui
+// (their Δ was inside the dead zone), H1/H4 → l0 and H2/H3 → l1, and MUT3 →
+// faint / DIM2 → floor put live micro-text on non-text steps — flagged, same
+// pattern as Trials ink4/ink5 and the rising footer. DIM3 → LINE.l2 is a
+// glyph, not text. The
+// gold-tinted active-chip values (#151310 / #e8dcc4 / #6e6558) are semantics
+// and stay local.
+const BG = GROUND.g0, PANEL = GROUND.g1, PANEL2 = GROUND.g2;
 // Gold convergence 2026-08-05: #c9903c folds into GOLD.gold; #7d6234 AND
 // #6f5629 both fold into GOLD.dim — the faint/dim distinction retires.
 const GOLD = GOLD_T.gold, GOLD_DIM = GOLD_T.dim, GOLD_FAINT = GOLD_T.dim;
-const INK = "#f0ebe1", INK2 = "#e6e1d8", INK3 = "#cfc9be";
-const MUT = "#a9a399", MUT2 = "#8a8378", MUT3 = "#6b665e", DIM = "#544f49", DIM2 = "#413d38", DIM3 = "#302d29";
-const H1 = "#1c1b18", H2 = "#201f1c", H3 = "#232120", H4 = "#191816";
+const INK = COOL.ui, INK2 = COOL.ui, INK3 = COOL.prose;
+const MUT = COOL.muted, MUT2 = COOL.chrome, MUT3 = COOL.faint, DIM = COOL.floor, DIM2 = COOL.floor, DIM3 = LINE.l2;
+const H1 = LINE.l0, H2 = LINE.l1, H3 = LINE.l1, H4 = LINE.l0;
 const SERIF = FONT.serif;
 const MONO = FONT.mono;
 

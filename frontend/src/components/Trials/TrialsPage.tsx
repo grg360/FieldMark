@@ -15,24 +15,25 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getTrackedHcpIds } from "../../lib/watchlists";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { fetchTrials, buildSurface, type Trial, type Region, type TrialsSurface } from "../../lib/trials";
-import { FONT, GROUND, LINE, COOL, WARM, GOLD } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, COOL, GOLD } from "../../lib/designTokens";
 
-// Two Ramps consolidation 2026-08-05: the frame retired this file's warm board
-// (#0b0a09, one byte from ground) and its three warm lines into the cool
-// GROUND/LINE families — a warm-ink surface carries cool rules. ink0 #e9e5d7
-// is the EXTRACTED source of WARM.prose (byte-identical); ink6 #4c483e failed
-// live-text contrast and retired into cool chrome (COOL.floor). panel/well and
-// the mid warm inks (ink1–ink5) have no step in the three-step WARM ramp and
-// stay local until Design widens or re-inks them. Golds converge in the
-// gold-convergence commit.
+// Two Ramps consolidation 2026-08-05, completed same day: Trials is a SCANNING
+// surface in the applied table, so the whole palette is cool — grounds, rules
+// and every ink step. ink0, briefly WARM.prose (its extracted source), is
+// COOL.ui here; the warm value now ships only on the asset monograph. The four
+// sub-muted warm greys collapse into the ramp's chrome steps by nearest value:
+// ink4 → faint and ink5 → floor carry live micro-text on non-text steps —
+// flagged for Design with the same pattern on the rising footer and DIM2 on
+// the Drugs index. link and the amber-tinted active-chip values (#4a3a1c) are
+// semantics, not ramp members.
 const P = {
-  board: GROUND.g0, panel: "#0f0e0c", well: "#0d0c0a",
+  board: GROUND.g0, panel: GROUND.g2, well: GROUND.g1,
   line: LINE.l0, line2: LINE.l1, line3: LINE.l2,
   // Gold convergence 2026-08-05: amber #c8892e and rosterLink #b9762c both fold
   // into GOLD.gold; amberHi #e0a544 into GOLD.bright; amberDim #8a6a2c into GOLD.dim.
   amber: GOLD.gold, amberHi: GOLD.bright, amberDim: GOLD.dim, rosterLink: GOLD.gold,
-  ink0: WARM.prose, ink1: "#c3bcac", ink2: "#8d8778", ink3: "#7e786b",
-  ink4: "#6a6558", ink5: "#57534a", ink6: COOL.floor, link: "#a9bfc7",
+  ink0: COOL.ui, ink1: COOL.prose, ink2: COOL.chrome, ink3: COOL.label,
+  ink4: COOL.faint, ink5: COOL.floor, ink6: COOL.floor, link: "#a9bfc7",
 };
 const MONO = FONT.mono;
 const SERIF = FONT.serif;
