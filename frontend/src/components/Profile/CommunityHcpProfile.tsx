@@ -8,8 +8,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import NavBar from "../NavBar";
-import { CONTENT_WIDTH, FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
+import AppLayout from "../AppLayout";
+import { FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -100,12 +100,11 @@ function SectionHead({ id, glyph, tag, count, sub }: { id?: string; glyph: strin
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ background: P.page, minHeight: "100vh" }}>
-      <NavBar />
-      <div style={{ maxWidth: CONTENT_WIDTH.wide, margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+    <AppLayout width="wide">
+      <div style={{ width: "100%", boxSizing: "border-box", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
         {children}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 

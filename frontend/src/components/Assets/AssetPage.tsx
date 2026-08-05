@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import NavBar from "../NavBar";
+import AppLayout from "../AppLayout";
 import CompositionChart from "./CompositionChart";
 import LandingNow from "./LandingNow";
 import { AuthorsPanel, CongressPanel, ForumPanel } from "./RightRail";
@@ -34,10 +34,9 @@ const metaMono = { fontFamily: FONT.mono, fontSize: 11, color: COOL.label } as c
 // (2026-07-31) and must not sit inside a narrower content container.
 function shell(children: React.ReactNode) {
   return (
-    <div style={{ backgroundColor: GROUND.g0, minHeight: "100vh", fontFamily: FONT.sans }}>
-      <NavBar />
-      {children}
-    </div>
+    <AppLayout width="wide">
+      <div style={{ fontFamily: FONT.sans }}>{children}</div>
+    </AppLayout>
   );
 }
 

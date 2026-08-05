@@ -34,8 +34,7 @@ import { getCurrentUser } from "../lib/authHelpers";
 import { supabase } from "../lib/supabase";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { FONT, GOLD } from "../lib/designTokens";
-import NavBar from "./NavBar";
-import GlobalFooter from "./GlobalFooter";
+import AppLayout from "./AppLayout";
 import InstitutionResearchThemesPanel from "./InstitutionResearchThemesPanel";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
 import InstitutionExternalPartnersPanel from "./InstitutionExternalPartnersPanel";
@@ -227,17 +226,15 @@ export default function InstitutionRoute() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: C.bg }}>
-        <NavBar />
+      <AppLayout width="wide">
         <div style={{ padding: "48px 28px", ...mono(11, { color: C.ink4 }) }}>RESOLVING REGISTRY RECORD…</div>
-      </div>
+      </AppLayout>
     );
   }
   if (notFound || !record) {
     return (
-      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-        <NavBar />
-        <div style={{ flex: 1, padding: isMobile ? "32px 16px" : "48px 28px", maxWidth: 1440, margin: "0 auto", width: "100%" }}>
+      <AppLayout width="wide">
+        <div style={{ padding: isMobile ? "32px 16px" : "48px 28px", width: "100%", boxSizing: "border-box" }}>
           <div style={{ fontFamily: FONT.serif, fontSize: 20, color: C.ink1, marginBottom: 10 }}>
             No registry record resolves from this address.
           </div>
@@ -249,8 +246,7 @@ export default function InstitutionRoute() {
             « INSTITUTIONS / {taUpper}
           </Link>
         </div>
-        <GlobalFooter />
-      </div>
+      </AppLayout>
     );
   }
 
@@ -433,9 +429,8 @@ export default function InstitutionRoute() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <NavBar />
-      <div style={{ flex: 1, width: "100%", maxWidth: 1440, margin: "0 auto" }}>
+    <AppLayout width="wide">
+      <div style={{ width: "100%", boxSizing: "border-box" }}>
         <div style={{ padding: `12px ${pad}`, borderBottom: `1px solid ${C.hair}`, ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>
           «{" "}
           <Link to={`/institutions/${taSlug}`} style={{ color: C.link }}>
@@ -559,7 +554,6 @@ export default function InstitutionRoute() {
           </span>
         </div>
       </div>
-      <GlobalFooter />
-    </div>
+    </AppLayout>
   );
 }

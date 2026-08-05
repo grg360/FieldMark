@@ -39,7 +39,7 @@ interface NavSearch {
   onSearchSelect: (hcpId: string, taId: string) => void;
 }
 
-type NavKey = "people" | "drugs" | "trials" | "congresses" | "institutions" | "field-intelligence" | "social" | "pulse" | "skyview";
+type NavKey = "home" | "people" | "drugs" | "trials" | "congresses" | "institutions" | "field-intelligence" | "social" | "pulse" | "skyview";
 
 interface NavItem {
   key: NavKey;
@@ -59,6 +59,11 @@ interface NavItem {
 // Intelligence · Social · Pulse · SkyView. Nine items — fits the 1120 bar once
 // search left it for its own row below (see DesktopBar / the search row).
 const NAV_ITEMS: NavItem[] = [
+  // HOME label added 2026-08-05 (chrome consolidation): the wordmark still
+  // routes to /me as well; the explicit label ends the wordmark-only affordance
+  // on desktop. Mobile's cell grid EXCLUDES home (see GRID_ITEMS) — the strip
+  // wordmark is home there, and a tenth cell would break the exact 3×3.
+  { key: "home", label: "Home", to: "/me" },
   // PEOPLE → the cohort ledger; the card feed stays routed at "/" but unlinked.
   { key: "people", label: "People", to: "/cohorts/ledger" },
   { key: "drugs", label: "Drugs", to: "/assets" },
@@ -93,8 +98,10 @@ function activeKey(pathname: string): NavKey | null {
   if (p.startsWith("/hcp") || p.startsWith("/landscape")) return "people";
   if (/\/(established|rising-stars|community)(\/|$)/.test(p)) return "people";
   if (p === "/") return "people"; // feed root resolves the default cohort feed
-  // Unmarked: /me (home is the wordmark, not a label), the telescope track, and
-  // the retained-but-unlinked FI feed track (/:ta/field-intelligence).
+  // HOME lights for /me and the personal surfaces under it (week, settings,
+  // watchlists, follow-ups, insights).
+  if (p === "/me" || p.startsWith("/me/")) return "home";
+  // Unmarked: the telescope track and the retained-but-unlinked FI feed track.
   return null;
 }
 
@@ -291,8 +298,13 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
       </div>
       {/* 3-over-3-over-3 cell grid (2026-08-03) — nine items divide evenly into
           three rows of three; wider cells than the old 4-wide, so long labels wrap
-          less. minHeight 53 absorbs any two-line label. */}
-      {[NAV_ITEMS.slice(0, 3), NAV_ITEMS.slice(3, 6), NAV_ITEMS.slice(6, 9)].map((row, ri) => (
+          less. minHeight 53 absorbs any two-line label. HOME is excluded here
+          (2026-08-05): the strip wordmark is the mobile home affordance, and a
+          tenth cell would break the exact grid. */}
+      {(() => {
+        const GRID_ITEMS = NAV_ITEMS.filter((i) => i.key !== "home");
+        return [GRID_ITEMS.slice(0, 3), GRID_ITEMS.slice(3, 6), GRID_ITEMS.slice(6, 9)];
+      })().map((row, ri) => (
         <div key={ri} style={{ display: "flex", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
           {row.map((item) => {
             const on = item.key === active;

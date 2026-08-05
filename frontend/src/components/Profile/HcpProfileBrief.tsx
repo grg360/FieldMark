@@ -8,8 +8,8 @@
 
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
-import NavBar from "../NavBar";
-import { CONTENT_WIDTH, FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
+import AppLayout from "../AppLayout";
+import { FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { floorFixed } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
@@ -526,12 +526,11 @@ function ThemeRow({ t }: { t: ResearchTheme }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ background: P.page, minHeight: "100vh" }}>
-      <NavBar />
-      <div style={{ maxWidth: CONTENT_WIDTH.wide, margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+    <AppLayout width="wide">
+      <div style={{ width: "100%", boxSizing: "border-box", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
         {children}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 

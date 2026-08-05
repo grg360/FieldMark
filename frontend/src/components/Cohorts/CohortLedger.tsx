@@ -14,10 +14,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import NavBar from "../NavBar";
+import AppLayout from "../AppLayout";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
-import { CONTENT_WIDTH, FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
+import { FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -757,9 +757,8 @@ export default function CohortLedger() {
   };
 
   return (
-    <div style={{ background: P.page, minHeight: "100vh" }}>
-      <NavBar />
-      <div style={{ maxWidth: CONTENT_WIDTH.wide, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+    <AppLayout width="wide">
+      <div style={{ width: "100%", boxSizing: "border-box" }}>
         {/* search — parity with the feed header (the strip carries no search). NSCLC TA id
             because the ledger RPCs are NSCLC-locked. */}
         {nsclcTaId ? (
@@ -884,6 +883,6 @@ export default function CohortLedger() {
           </div>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

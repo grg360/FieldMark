@@ -15,7 +15,6 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { CONTENT_WIDTH } from "./lib/designTokens";
 import { useMediaQuery } from "./lib/useMediaQuery";
 import {
   Navigate,
@@ -32,7 +31,7 @@ import SignupScreen from "./components/SignupScreen";
 import AuthWrapper from "./components/AuthWrapper";
 import { RelationshipsProvider } from "./contexts/RelationshipsContext";
 import WelcomeWizard from "./components/WelcomeWizard";
-import NavBar from "./components/NavBar";
+import AppLayout from "./components/AppLayout";
 import PeopleNavStrip from "./components/PeopleNavStrip";
 import SearchBar from "./components/SearchBar";
 import HCPCard from "./components/HCPCard";
@@ -64,9 +63,7 @@ import HcpPairPublicationsPage from "./components/PublicationsListPage/HcpPairPu
 import HcpPositionsPage from "./components/HcpPositionsPage";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialPage from "./components/SocialPage";
-import GlobalFooter from "./components/GlobalFooter";
 import InstitutionsInTerritoryPanel from "./components/InstitutionsInTerritoryPanel";
-import { FiToast } from "./components/FieldIntelligenceShared";
 import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
 } from "./components/ScoringExplainedModal";
@@ -277,7 +274,6 @@ function FeedLayout({
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
-  const [fiToast, setFiToast] = useState<string | null>(null);
   const [telescopeSelectedHcp, setTelescopeSelectedHcp] = useState<{
     id: string;
     name: string;
@@ -323,10 +319,6 @@ function FeedLayout({
     return `Updated ${mins} mins ago`;
   }
 
-  function showFiToast(message: string) {
-    setFiToast(message);
-    window.setTimeout(() => setFiToast(null), 3000);
-  }
 
   function formatSectionHeaderLabel(): string {
     const taLabel =
@@ -529,35 +521,21 @@ function FeedLayout({
 
   return (
     <>
+      {/* Chrome consolidation 2026-08-05: the feed rides AppLayout like every other
+          authenticated surface — NavBar mounts ABOVE the width column (ending the
+          avatar clip: the bar's 1120 content row was clipped inside this 880
+          overflowX:hidden column), GlobalFooter comes from the layout, and the
+          translucent SkyView bar is AppLayout's navTranslucent pass-through. */}
+      <AppLayout width="reading" navTranslucent={telescopeImmersive}>
       <div
         className="fm-screen"
         style={{
           // Immersive Telescope: transparent so the fixed full-bleed sky shows through.
-          backgroundColor: telescopeImmersive ? "transparent" : "#0A0A0B",
-          minHeight: "100dvh",
-          maxWidth: CONTENT_WIDTH.reading,
-          margin: "0 auto",
+          backgroundColor: telescopeImmersive ? "transparent" : undefined,
           fontFamily: "system-ui, -apple-system, sans-serif",
           overflowX: "hidden",
         }}
       >
-      {/* Chrome. In the immersive Telescope view this whole block floats translucent
-          OVER the full-bleed sky (positioned above the fixed canvas, z-index 6); the
-          NavBar goes translucent and the fade-out gradient lets the sky show through.
-          Otherwise it stacks normally at the top of the feed. */}
-      <div
-        style={
-          telescopeImmersive
-            ? {
-                position: "relative",
-                zIndex: 6,
-                background:
-                  "linear-gradient(180deg, rgba(2,3,10,0.62) 0%, rgba(2,3,10,0.16) 72%, rgba(2,3,10,0) 100%)",
-              }
-            : undefined
-        }
-      >
-      <NavBar translucent={telescopeImmersive} />
       {/* Search left the bar (NAV-BUILD-01) — the feed keeps it in its own header,
           absent when no TA id resolves. Skyview carries its own "Fly to a researcher"
           search, so the feed search is dropped in the immersive view. */}
@@ -583,7 +561,6 @@ function FeedLayout({
           showSubjectLine={!telescopeImmersive}
         />
       )}
-      </div>
 
       {/* DOL hero — cohort-feed data panel. Updated-label, subject title, and the
           Filters / territory / Landscape controls now live in PeopleNavStrip above. */}
@@ -775,8 +752,8 @@ function FeedLayout({
           onAddNote={handleAddNoteFromTray}
         />
 
-        <GlobalFooter onToast={showFiToast} />
       </div>
+      </AppLayout>
 
       {showBackToTop && !trayOpen && (
         <button
@@ -819,7 +796,6 @@ function FeedLayout({
         }}
         scrollToSection={scoringExplainedScroll ?? undefined}
       />
-      <FiToast message={fiToast} />
     </>
   );
 }

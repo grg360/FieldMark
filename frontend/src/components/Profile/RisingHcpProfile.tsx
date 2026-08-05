@@ -8,9 +8,9 @@
 // Absence vocabulary: never a bare em-dash, never a blank — every missing
 // value renders as a named state with its mechanism.
 
+import AppLayout from "../AppLayout";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import NavBar from "../NavBar";
 import ProfileRelationshipControls from "./ProfileRelationshipControls";
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
 import {
@@ -27,7 +27,6 @@ import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
 // cohort greens (#8fb8a6/#7fb3a4 — cohort marker, same class as the profile
 // family's sage/rose/teal), the visibility-axis blue, the archetype color
 // vocabulary, and the window-warning tinted well (#141008/#2a2519).
-const PAGE = GROUND.g0;
 const CARD = GROUND.g2;
 const CARD_EDGE = LINE.l1;
 const RULE = LINE.l0;
@@ -138,16 +137,16 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
   if (p === undefined) {
     return (
-      <div style={{ background: PAGE, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
+      <AppLayout width="wide"><div style={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
         Loading rising profile…
-      </div>
+      </div></AppLayout>
     );
   }
   if (p === null) {
     return (
-      <div style={{ background: PAGE, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
+      <AppLayout width="wide"><div style={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
         Not on the rising board — this route should not have dispatched here.
-      </div>
+      </div></AppLayout>
     );
   }
 
@@ -235,9 +234,8 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
   const label = (t: string) => <div style={mono(8, DIM, 0.14)}>{t}</div>;
 
   return (
-    <div style={{ background: PAGE, minHeight: "100vh", fontFamily: MONO, color: INK1, paddingBottom: 80 }}>
-      <NavBar />
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 22px" }}>
+    <AppLayout width="wide">
+      <div style={{ fontFamily: MONO, color: INK1, paddingBottom: 40 }}>
 
         {/* breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 14px", flexWrap: "wrap" }}>
@@ -636,13 +634,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         </div>
 
         {/* footer */}
-        <div style={{ marginTop: 44, paddingTop: 20, borderTop: `1px solid ${RULE_SOFT}`, display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ font: `600 10px/1 ${MONO}`, letterSpacing: ".3em", color: GOLD_DEEP }}>FIELDMARK</div>
-          <div style={mono(8, COOL.floor, 0.11)}>RISING COHORT · NSCLC · 1,583 PROFILES · WEEKLY BUILD</div>
-          <div style={{ flex: 1 }} />
-          <div style={mono(8, COOL.floor, 0.11)}>FOR VERIFIED MSL USE · NOT AFFILIATED WITH MENTIONED RESEARCHERS</div>
-        </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

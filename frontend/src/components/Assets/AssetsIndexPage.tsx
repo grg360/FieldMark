@@ -10,8 +10,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import NavBar from "../NavBar";
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import AppLayout from "../AppLayout";
 import { FONT, GROUND, LINE, COOL, GOLD as GOLD_T } from "../../lib/designTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { ASSETS, DEPLOYMENT_ASSETS, BACKBONE_ASSETS } from "../../lib/assetConfig";
@@ -33,7 +33,7 @@ import {
 // glyph, not text. The
 // gold-tinted active-chip values (#151310 / #e8dcc4 / #6e6558) are semantics
 // and stay local.
-const BG = GROUND.g0, PANEL = GROUND.g1, PANEL2 = GROUND.g2;
+const PANEL = GROUND.g1, PANEL2 = GROUND.g2; // page ground comes from AppLayout
 // Gold convergence 2026-08-05: #c9903c folds into GOLD.gold; #7d6234 AND
 // #6f5629 both fold into GOLD.dim — the faint/dim distinction retires.
 const GOLD = GOLD_T.gold, GOLD_DIM = GOLD_T.dim, GOLD_FAINT = GOLD_T.dim;
@@ -67,17 +67,18 @@ export default function AssetsIndexPage() {
   }, []);
 
   return (
-    <div style={{ background: BG, minHeight: "100vh", fontFamily: SERIF, color: INK2 }}>
-      <style>{"@keyframes fmIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}"}</style>
-      <NavBar />
-      {loading ? (
-        <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 12, color: MUT3 }}>Loading the index…</div>
-      ) : failed || !model ? (
-        <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 12, color: MUT3 }}>The drug index could not be loaded.</div>
-      ) : (
-        <Index model={model} isMobile={isMobile} />
-      )}
-    </div>
+    <AppLayout width="wide">
+      <div style={{ fontFamily: SERIF, color: INK2 }}>
+        <style>{"@keyframes fmIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}"}</style>
+        {loading ? (
+          <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 12, color: MUT3 }}>Loading the index…</div>
+        ) : failed || !model ? (
+          <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 12, color: MUT3 }}>The drug index could not be loaded.</div>
+        ) : (
+          <Index model={model} isMobile={isMobile} />
+        )}
+      </div>
+    </AppLayout>
   );
 }
 
@@ -185,7 +186,7 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
   });
 
   return (
-    <div style={{ minWidth: isMobile ? undefined : 1120, paddingBottom: 0 }}>
+    <div style={{ paddingBottom: 0 }}>
       {/* header */}
       <div style={{ padding: isMobile ? "22px 16px 0" : "30px 34px 0", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 470px", gap: isMobile ? 22 : 56, alignItems: "start" }}>
         <div>

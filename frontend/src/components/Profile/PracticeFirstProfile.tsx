@@ -14,8 +14,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import NavBar from "../NavBar";
-import { CONTENT_WIDTH } from "../../lib/designTokens";
+import AppLayout from "../AppLayout";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { getCurrentUser } from "../../lib/authHelpers";
@@ -789,12 +788,11 @@ export default function PracticeFirstProfile() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ background: F.page, minHeight: "100vh" }}>
-      <NavBar />
-      <div style={{ maxWidth: CONTENT_WIDTH.wide, margin: "0 auto", width: "100%", boxSizing: "border-box", color: F.body, fontFamily: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace", fontSize: 12, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" }}>
+    <AppLayout width="wide">
+      <div style={{ width: "100%", boxSizing: "border-box", color: F.body, fontFamily: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace", fontSize: 12, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" }}>
         {children}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 

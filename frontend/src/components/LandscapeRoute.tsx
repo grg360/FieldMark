@@ -7,9 +7,8 @@ import {
   type LandscapePoint,
 } from "../lib/api";
 import { indicationSlugToLabel } from "../lib/routeSlugs";
-import { COLOR, CONTENT_WIDTH } from "../lib/designTokens";
-import NavBar from "./NavBar";
-import GlobalFooter from "./GlobalFooter";
+import { COLOR } from "../lib/designTokens";
+import AppLayout from "./AppLayout";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
 import LandscapeQuadrantChart from "./LandscapeQuadrantChart";
 
@@ -48,17 +47,14 @@ export default function LandscapeRoute() {
   }
 
   return (
-    <div style={{ backgroundColor: COLOR.ground, minHeight: "100dvh" }}>
+    <AppLayout width="wide">
     <div
       className="fm-screen"
       style={{
-        maxWidth: CONTENT_WIDTH.wide,
-        margin: "0 auto",
         fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         overflowX: "hidden",
       }}
     >
-      <NavBar />
       <div style={{ padding: "16px 16px 8px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         <button
           type="button"
@@ -136,8 +132,7 @@ export default function LandscapeRoute() {
         )}
       </div>
 
-      <GlobalFooter />
     </div>
-    </div>
+    </AppLayout>
   );
 }

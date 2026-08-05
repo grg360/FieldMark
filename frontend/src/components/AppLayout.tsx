@@ -19,6 +19,9 @@ interface Props {
   // renders the SearchBar. Pages that omit them are unchanged.
   currentTaId?: string;
   onSearchSelect?: (hcpId: string, taId: string) => void;
+  // Immersive surfaces (SkyView) float the bar over a full-bleed fixed canvas:
+  // translucent backdrop, and the bar lifted above the canvas's z-index.
+  navTranslucent?: boolean;
 }
 
 export default function AppLayout({
@@ -27,6 +30,7 @@ export default function AppLayout({
   width = "standard",
   currentTaId,
   onSearchSelect,
+  navTranslucent = false,
 }: Props) {
   const maxWidth = CONTENT_WIDTH[width];
   const navigate = useNavigate();
@@ -45,7 +49,13 @@ export default function AppLayout({
           the per-page maxWidth would clamp it (the double-wrap problem). */}
       {/* Search rides in the bar (right-aligned), forwarded from the page's TA id
           + select handler; absent where no TA. */}
-      <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} />
+      {navTranslucent ? (
+        <div style={{ position: "relative", zIndex: 6 }}>
+          <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} translucent />
+        </div>
+      ) : (
+        <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} />
+      )}
       <div
         style={{
           maxWidth,

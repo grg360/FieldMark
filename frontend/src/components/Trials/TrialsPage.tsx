@@ -102,7 +102,6 @@ export default function TrialsPage() {
     return [...byHcp.entries()].map(([hcp_id, v]) => ({ hcp_id, ...v })).sort((a, b) => b.n - a.n);
   }, [surface.trials, tracked]);
 
-  const cell = { fontFamily: MONO } as const;
   const coverage = region
     ? `${surface.openCount} trials name an investigator whose practice state is in ${region}. Trials whose matched investigators have no resolved state are not counted here — read the count as a floor.`
     : `${surface.resolvedTrials} of the ${surface.openCount} open trials name at least one investigator whose practice state resolves to a US region. ${surface.unresolvedTrials} resolve to no state and appear in no region view — read every region count as a floor.`;
@@ -279,10 +278,6 @@ export default function TrialsPage() {
               <span style={{ ...mono(9, 400, "0"), color: P.ink5, lineHeight: 1.8 }}>{v}</span>
             </div>
           ))}
-        </div>
-        <div style={{ margin: "22px 0 0", padding: "12px 28px", borderTop: `1px solid ${P.line}`, display: "flex", justifyContent: "space-between", ...cell }}>
-          <span style={{ ...mono(8.5, 400, ".16em"), color: P.line3 }}>FIELDMARK / TRIALS</span>
-          <span style={{ ...mono(8.5, 400, ".16em"), color: P.line3 }}>SOURCE: CLINICALTRIALS.GOV</span>
         </div>
       </div>
     </AppLayout>

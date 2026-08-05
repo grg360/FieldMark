@@ -8,14 +8,13 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import NavBar from "../NavBar";
 import { getRisingBoard, archetypeColor, type RisingBoard } from "../../lib/risingProfile";
+import AppLayout from "../AppLayout";
 import { FONT, GROUND, LINE, COOL, GOLD } from "../../lib/designTokens";
 
 // Register tokens (2026-08-05): fresh surface, consumes the register — see the
 // palette note in Profile/RisingHcpProfile.tsx. Cohort greens + archetype
 // vocabulary stay local as semantics with no token counterpart.
-const PAGE = GROUND.g0;
 const CARD = GROUND.g2;
 const CARD_EDGE = LINE.l1;
 const RULE = LINE.l0;
@@ -34,7 +33,6 @@ const DIM = COOL.floor;
 const DIM2 = COOL.floor;
 const FAINT = COOL.floor;
 // Gold convergence 2026-08-05: deep and muted both fold into GOLD.dim.
-const GOLD_DEEP = GOLD.dim;
 const GOLD_MUTED = GOLD.dim;
 const GREEN = "#8fb8a6"; // rising cohort marker — semantic, no token counterpart
 const GREEN_DK = "#7fb3a4";
@@ -212,16 +210,15 @@ export default function RisingLedger() {
 
   if (!board) {
     return (
-      <div style={{ background: PAGE, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
+      <AppLayout width="wide"><div style={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
         Loading rising ledger…
-      </div>
+      </div></AppLayout>
     );
   }
 
   return (
-    <div style={{ background: PAGE, minHeight: "100vh", fontFamily: MONO, color: INK1, paddingBottom: 80 }}>
-      <NavBar />
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 22px" }}>
+    <AppLayout width="wide">
+      <div style={{ fontFamily: MONO, color: INK1, paddingBottom: 40 }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 14px", flexWrap: "wrap" }}>
           <div style={{ padding: "2px 5px", background: "#1c2a26", font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>RIS</div>
@@ -482,13 +479,7 @@ export default function RisingLedger() {
           </>
         )}
 
-        <div style={{ marginTop: 44, paddingTop: 20, borderTop: `1px solid ${RULE_SOFT}`, display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ font: `600 10px/1 ${MONO}`, letterSpacing: ".3em", color: GOLD_DEEP }}>FIELDMARK</div>
-          <div style={mono(8, COOL.floor, 0.11)}>RISING COHORT · NSCLC · {total.toLocaleString("en-US")} PROFILES · WEEKLY BUILD</div>
-          <div style={{ flex: 1 }} />
-          <div style={mono(8, COOL.floor, 0.11)}>FOR VERIFIED MSL USE · NOT AFFILIATED WITH MENTIONED RESEARCHERS</div>
-        </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

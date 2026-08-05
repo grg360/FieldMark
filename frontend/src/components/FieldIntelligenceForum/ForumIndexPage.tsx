@@ -590,36 +590,9 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-// ── Footer — KEEP the "for verified MSL use only" line ───────────────────────
-function ForumFooter({ narrow }: { narrow: boolean }) {
-  if (narrow) {
-    return (
-      <div style={{ margin: "20px 22px 0", paddingTop: 16, borderTop: `1px solid ${C.borderSoft}` }}>
-        <div style={mono(11, C.orange, 0.2, 500)}>FIELDMARK</div>
-        <p style={{ ...serif(12, C.muted2, 1.5), marginTop: 10 }}>For verified MSL use only. Content not affiliated with mentioned researchers.</p>
-      </div>
-    );
-  }
-  return (
-    <>
-      <div style={{ margin: "44px 40px 0", height: 1, background: C.borderSoft }} />
-      <div style={{ padding: "26px 40px 44px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div style={mono(12, C.orange, 0.22, 500)}>FIELDMARK</div>
-          <p style={{ ...serif(12.5, C.muted2, 1.5), marginTop: 12 }}>For verified MSL use only. Content not affiliated with mentioned researchers.</p>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ display: "flex", gap: 18, justifyContent: "flex-end", ...mono(11, C.muted, 0.12) }}>
-            <span>ABOUT</span>
-            <span>METHODOLOGY</span>
-            <span>PRIVACY</span>
-          </div>
-          <p style={{ ...serif(12.5, C.muted2, 1), marginTop: 13 }}>© 2026 Bessel Analytics, Inc.</p>
-        </div>
-      </div>
-    </>
-  );
-}
+// ForumFooter removed 2026-08-05 (chrome consolidation): it duplicated
+// GlobalFooter — same MSL-use line, same utility links, same copyright —
+// producing a double footer under AppLayout. GlobalFooter is the footer.
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function ForumIndexPage() {
@@ -775,7 +748,6 @@ export default function ForumIndexPage() {
               </>
             )}
 
-            <ForumFooter narrow={narrow} />
           </>
         )}
       </div>

@@ -9,8 +9,7 @@ import {
   type MslProfile,
 } from "../lib/authHelpers";
 import { COLOR, CONTENT_WIDTH } from "../lib/designTokens";
-import NavBar from "./NavBar";
-import GlobalFooter from "./GlobalFooter";
+import AppLayout from "./AppLayout";
 
 const ChevronRight = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -259,13 +258,10 @@ export default function ProfileScreen() {
   }
 
   return (
-    <div style={{ backgroundColor: COLOR.ground, minHeight: "100vh", fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif" }}>
-      {/* Chrome lives INSIDE .fm-screen so TopBar/footer share the container width
-          (the .fm-screen class sizes it to 880px at >=600), matching the other
-          standalone pages. Rendering them outside made them full-bleed vs the
-          inset content. */}
-      <NavBar />
-      <div className="fm-screen" style={{ maxWidth: CONTENT_WIDTH.reading, margin: "0 auto", boxSizing: "border-box" }}>
+    // reading width, not the migration default wide: a single-column settings
+    // form at 1440 is unusable line lengths — reported as a width exception.
+    <AppLayout width="reading">
+      <div style={{ fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif", boxSizing: "border-box" }}>
       {/* Settings sub-bar — the Save action; global home nav lives in the TopBar above. */}
       <div
         className="fm-nav"
@@ -542,8 +538,7 @@ export default function ProfileScreen() {
           </button>
         </div>
       </div>
-      <GlobalFooter />
       </div>
-    </div>
+    </AppLayout>
   );
 }

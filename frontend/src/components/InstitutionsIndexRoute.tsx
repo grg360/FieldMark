@@ -22,8 +22,7 @@ import {
 } from "../lib/institutionRegistry";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { FONT, GOLD } from "../lib/designTokens";
-import NavBar from "./NavBar";
-import GlobalFooter from "./GlobalFooter";
+import AppLayout from "./AppLayout";
 
 const C = {
   bg: "#0a0a0b",
@@ -466,9 +465,8 @@ export default function InstitutionsIndexRoute() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <NavBar />
-      <div style={{ flex: 1, width: "100%", maxWidth: 1440, margin: "0 auto" }}>
+    <AppLayout width="wide">
+      <div style={{ width: "100%", boxSizing: "border-box" }}>
         {/* Header block */}
         <div style={{ padding: isMobile ? "18px 16px 14px" : "26px 28px 0" }}>
           <div
@@ -590,7 +588,6 @@ export default function InstitutionsIndexRoute() {
           </div>
         ) : null}
       </div>
-      <GlobalFooter />
-    </div>
+    </AppLayout>
   );
 }
