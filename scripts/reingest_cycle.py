@@ -69,6 +69,13 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       DERIVES its target set (anti-join vs hcp_hcpcs_detail) from local parquets; no-ops when
                       clean. TA-agnostic. Logs to pipeline_runs as hcpcs_detail_topup.
                       NON-BLOCKING: failure -> WARN (not FAILED), never gates the cycle.
+ 13 narratives        generate_narratives_v2.py --cohort rising_star|established --*-top 200 --target-version v2
+                      --force --yes --workers 6 --ta <slug>  (13a rising, 13b established)
+                      Narrative regen COUPLED to the stage-9 scoring recompute; stamps
+                      hcp_narratives_v2.source_enrichment_run_id from hcp_scientific_momentum_v1 so staleness
+                      is detectable. Community deliberately excluded (rank cut vs evidence-tier ledger --
+                      open decision). BILLED (Anthropic API, ~$2.20/cycle).
+                      NON-BLOCKING: failure -> WARN (not FAILED), never gates the cycle.
 
 SNAPSHOT-DATE: captured ONCE at cycle start and passed identically to 8b and 8c (they must match
 or 8c reads zero rows - a real past bug).
@@ -122,6 +129,7 @@ SCRIPTS: Dict[str, str] = {
     "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
     "trials_status_refresh": "scripts/ingest/trials_pipeline.py",     # 11: weekly trial-fact refresh (--refresh-status)
     "hcpcs_topup": "scripts/ingest/hcpcs_detail_topup.py",            # 12: Medicare claims top-up for newly-NPI'd HCPs
+    "narratives": "scripts/narrative/generate_narratives_v2.py",      # 13: narrative regen coupled to the scoring recompute
 }
 
 # Stage 10 ASSET MATCHES: rebuild asset_publication_v1 from config/assets.json (the Drug
@@ -179,6 +187,7 @@ STAGE_ORDER: List[Tuple[int, str]] = [
     (10, "asset_matches"),
     (11, "trials_status"),
     (12, "hcpcs_topup"),
+    (13, "narratives"),
 ]
 STAGE_NAME_TO_NUM = {name: n for n, name in STAGE_ORDER}
 MAX_STAGE = STAGE_ORDER[-1][0]
@@ -370,6 +379,27 @@ def cmd_hcpcs_topup() -> List[str]:
     # 12: Medicare claims top-up. Derives its own target set (NPI'd HCPs with no
     # hcp_hcpcs_detail rows) and no-ops when clean -- TA-agnostic, local parquets only.
     return py("hcpcs_topup") + ["--execute", "--triggered-by", "reingest_cycle"]
+
+
+def cmd_narratives(slug: str, cohort: str, top_flag: str) -> List[str]:
+    # 13: narrative regeneration, coupled to the scoring recompute (stage 9).
+    # Manual generation decoupled from scoring was the staleness mechanism the
+    # 2026-08-05 audit quantified (96.7% of narratives quoted a superseded
+    # snapshot). Runs AFTER stage 9 so it reads the freshly-stamped
+    # enrichment_run_id from hcp_scientific_momentum_v1 (written into
+    # hcp_narratives_v2.source_enrichment_run_id).
+    # Scope: rising_star + established, top 200 US each. Community is
+    # DELIBERATELY not regenerated here -- its generation cut follows rank while
+    # the community ledger now sorts by evidence tier; regenerating on the rank
+    # cut would entrench a selection the product no longer uses (open decision).
+    # --force: prompt v4.0/v3.0 forbid rank/percentile prose; existing rows must
+    # be overwritten, not skipped. --yes: unattended (stdin=DEVNULL). --workers 6:
+    # parallel API calls; generate_narratives_v2 retries 429/529 with backoff.
+    return py("narratives") + [
+        "--cohort", cohort, top_flag, "200",
+        "--target-version", "v2", "--force", "--yes", "--workers", "6",
+        "--ta", slug,
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -845,6 +875,28 @@ def run_cycle(
                 print(f"\n[reingest_cycle] WARN: stage 12 hcpcs_topup failed ({he}); "
                       f"cycle still SUCCESS (non-blocking). Claims detail left at prior load.",
                       file=sys.stderr)
+
+        # 13 NARRATIVES -- NON-BLOCKING. Regenerates rising_star + established narratives
+        # (top 200 US each) AFTER the scoring recompute (stage 9), stamping each row with
+        # the momentum snapshot's enrichment_run_id. This closes the staleness loop the
+        # 2026-08-05 audit quantified: narratives were generated manually, decoupled from
+        # the recompute, so 96.7% quoted a snapshot that no longer existed. Community is
+        # deliberately excluded (rank-cut selection vs evidence-tier ledger -- open
+        # decision). BILLED (Anthropic API, ~$2.20/cycle at 400 calls); failure is
+        # isolated (WARN not FAILED): a stale narrative must never gate the data cycle.
+        if running(13):
+            for sub_name, cohort, top_flag in (
+                ("narratives_rising(13a)", "rising_star", "--rising-top"),
+                ("narratives_established(13b)", "established", "--established-top"),
+            ):
+                try:
+                    run_stage(13, sub_name, cmd_narratives(slug, cohort, top_flag))
+                    note(13, sub_name, "OK")
+                except Exception as ne:  # non-blocking: log + continue (StageFailure incl.)
+                    note(13, sub_name, f"WARN({type(ne).__name__})")
+                    print(f"\n[reingest_cycle] WARN: stage 13 {sub_name} failed ({ne}); "
+                          f"cycle still SUCCESS (non-blocking). Narratives left at prior generation.",
+                          file=sys.stderr)
 
     except StageFailure as f:
         note(f.stage_no, f.name, f"FAILED(exit={f.returncode})")
