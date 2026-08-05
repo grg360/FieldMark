@@ -296,15 +296,11 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
           <AvatarMenu menu={menu} mobile />
         </div>
       </div>
-      {/* 3-over-3-over-3 cell grid (2026-08-03) — nine items divide evenly into
-          three rows of three; wider cells than the old 4-wide, so long labels wrap
-          less. minHeight 53 absorbs any two-line label. HOME is excluded here
-          (2026-08-05): the strip wordmark is the mobile home affordance, and a
-          tenth cell would break the exact grid. */}
-      {(() => {
-        const GRID_ITEMS = NAV_ITEMS.filter((i) => i.key !== "home");
-        return [GRID_ITEMS.slice(0, 3), GRID_ITEMS.slice(3, 6), GRID_ITEMS.slice(6, 9)];
-      })().map((row, ri) => (
+      {/* 4-over-3-over-3 cell grid (2026-08-05) — ten items with HOME leading.
+          Uneven on purpose: the wordmark's tappability is not discoverable, and
+          HOME exists because people cannot find their way back — an invisible
+          route would repeat the problem. minHeight 53 absorbs two-line labels. */}
+      {[NAV_ITEMS.slice(0, 4), NAV_ITEMS.slice(4, 7), NAV_ITEMS.slice(7, 10)].map((row, ri) => (
         <div key={ri} style={{ display: "flex", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
           {row.map((item) => {
             const on = item.key === active;
