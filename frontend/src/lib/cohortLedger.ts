@@ -203,8 +203,12 @@ export function evidenceChip(row: LedgerRow): EvidenceChip | null {
   const tierWord = COM_TIER_LABEL[row.tier] ?? row.tier.toUpperCase();
   const lungWeighted = !!row.lungWeighted;
   if (row.tier === "anchored") {
+    // Up to two stems, then "+N" for the rest. anchorStems is alphabetical from the view;
+    // anchorStem is the fallback if the array is somehow absent. Order is not changed here.
+    const stems = row.anchorStems ?? (row.anchorStem ? [row.anchorStem] : []);
+    const drug = stems.length <= 2 ? stems.join(", ") : `${stems.slice(0, 2).join(", ")} +${stems.length - 2}`;
     const years = (row.anchorYears ?? []).join(" ");
-    return { tierWord, strength: "anchored", lungWeighted, segments: ["LUNG-ONLY ORAL", row.anchorStem ?? "", years].filter(Boolean) };
+    return { tierWord, strength: "anchored", lungWeighted, segments: ["LUNG-ONLY ORAL", drug, years].filter(Boolean) };
   }
   if (row.tier === "supported") {
     return { tierWord, strength: "supported", lungWeighted, segments: [row.supportedEvidence ?? ""].filter(Boolean) };

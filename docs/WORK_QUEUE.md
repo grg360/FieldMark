@@ -128,3 +128,26 @@ CASE, synthesis partition, and the card/drawer labels (`Contributing
 Author` / `Contributed to` with framing gloss) — is in
 `docs/design/middle-author-attribution-proposal.md` (pieces 1-4 plus a
 new UI section).
+
+---
+
+## Deferred: evidence-tier follow-ups (2026-08-04)
+
+Logged during the community evidence-tier build. Not for tonight.
+
+1. **Narrative coverage gap under evidence tiers.** 5,868 of the 6,480
+   community cohort (91%) have no `hcp_narratives_v2` row for `nsclc`.
+   `generate_narratives_v2.py` selects top-N **by rank**, which was fine
+   when the ledger ranked by score and nobody scrolled far. With evidence
+   tiers, an ANCHORED physician at rank ~900 is now a legitimate
+   destination and has no narrative. The generation cut may need to follow
+   **tier** rather than rank (e.g. all anchored + supported, then top-N of
+   the rest). The profile renders a coverage-fact absence in the WHY THIS
+   PRACTITIONER slot in the meantime.
+
+2. **Same crash on the other cohort profiles?** The community profile
+   dereferenced `p.narrative` unguarded (fixed 2026-08-04; the type was
+   declared non-null, which hid it). The established and rising profiles
+   presumably have their own narrative dependency — check whether they
+   guard it, and whether their `*Profile`/RPC types honestly mark the
+   narrative object nullable.

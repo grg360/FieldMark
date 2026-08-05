@@ -470,20 +470,27 @@ export default function CommunityHcpProfile() {
           </div>
         </div>
 
-        {/* ◆ WHY THIS PRACTITIONER */}
-        {n.why_this ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <SectionHead glyph="◆" tag="WHY THIS PRACTITIONER" />
+        {/* ◆ WHY THIS PRACTITIONER — the narrative, or its absence in the same slot under
+            the same heading. ~91% of the community cohort has no narrative row (generated
+            for top-ranked HCPs only); the absence states the coverage fact, never blank. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SectionHead glyph="◆" tag="WHY THIS PRACTITIONER" />
+          {n?.why_this ? (
             <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty" }}>{n.why_this}</div>
-          </div>
-        ) : null}
+          ) : (
+            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ ...mono(12, 600), letterSpacing: ".1em", color: P.ink4 }}>NO GENERATED SUMMARY</span>
+              <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5, textWrap: "pretty" }}>Narrative synthesis runs for the top-ranked HCPs in each cohort and this practitioner ranks below that cut. A coverage fact, not a judgment about the practice.</span>
+            </div>
+          )}
+        </div>
 
         {/* ◆ SIGNAL SUMMARY — MACHINE-DERIVED */}
-        {(n.signal_strength || n.why_now || n.engagement_angle || n.caution) ? (
+        {(n?.signal_strength || n?.why_now || n?.engagement_angle || n?.caution) ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <SectionHead glyph="◆" tag="SIGNAL SUMMARY" sub="MACHINE-DERIVED" />
             <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {[["CONFIDENCE", n.signal_strength], ["WHY NOW", n.why_now], ["ENGAGEMENT ANGLE", n.engagement_angle], ["CAUTION", n.caution]].map(([l, v]) => v ? (
+              {[["CONFIDENCE", n?.signal_strength], ["WHY NOW", n?.why_now], ["ENGAGEMENT ANGLE", n?.engagement_angle], ["CAUTION", n?.caution]].map(([l, v]) => v ? (
                 <div key={l as string} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>{l}</span>
                   <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty" }}>{v}</span>

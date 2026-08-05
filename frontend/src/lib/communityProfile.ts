@@ -53,7 +53,10 @@ export interface CommunityProfile {
   mix: { label: string; amount: number | null }[] | null;
   entities: { name: string; amount: number; payments: number; most_recent: string | null; rank: number | null }[] | null;
   timeline: { year: number; total: number | null }[] | null;
-  narrative: { why_this: string | null; signal_strength: string | null; why_now: string | null; engagement_angle: string | null; caution: string | null };
+  // NULLABLE: the community_hcp_profile RPC returns null here when the HCP has no
+  // hcp_narratives_v2 row (narratives are generated for top-ranked HCPs only — ~91% of
+  // the community cohort has none). Was typed non-null, which hid an unguarded deref.
+  narrative: { why_this: string | null; signal_strength: string | null; why_now: string | null; engagement_angle: string | null; caution: string | null } | null;
 }
 
 export async function loadCommunityProfile(hcpId: string): Promise<CommunityProfile | null> {
