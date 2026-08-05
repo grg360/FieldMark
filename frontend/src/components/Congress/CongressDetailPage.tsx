@@ -19,6 +19,7 @@ import {
   type CongressVoice,
 } from "../../lib/congressSocial";
 import { classifyVoice, type VoiceProfile } from "../../lib/voiceClassification";
+import PageHero from "../PageHero";
 
 const TA_SLUG = "nsclc";
 const TA_LABEL = "Oncology";
@@ -309,16 +310,17 @@ export default function CongressDetailPage() {
           <span style={{ color: COLOR.ink1 }}>{congress.short_name}</span>
         </div>
 
-        {/* header */}
+        {/* header — full H1 (PageHero, Commit B follow-up 2026-08-05): serif
+            title; the LIVE state rides the eyebrow, dates ride the meta slot.
+            The stat tiles directly below stay the surface's cluster — they are
+            richer than a hero cluster and already adjoin the hero. */}
         <div>
-          {st === "live" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLOR.amber }} />
-              <div style={eyebrow(COLOR.amber)}>LIVE{d ? ` · DAY ${d.day} OF ${d.of}` : ""}</div>
-            </div>
-          )}
-          <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1 }}>{congress.short_name}</div>
-          <div style={{ fontFamily: FONT.serif, fontSize: 16, color: COLOR.ink3, marginTop: 8 }}>{congress.society_full}</div>
+          <PageHero
+            eyebrow={st === "live" ? `LIVE${d ? ` · DAY ${d.day} OF ${d.of}` : ""}` : "Fieldmark · Congress"}
+            meta={fmtDates(congress)}
+            title={congress.short_name}
+            dek={congress.society_full}
+          />
           <div style={{ display: "flex", gap: 26, ...mono(11, COLOR.ink3), marginTop: 14, flexWrap: "wrap" }}>
             <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.12em", marginBottom: 5 }}>DATES</div>{fmtDates(congress)}</div>
             <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.12em", marginBottom: 5 }}>LOCATION</div>{congress.venue ? `${congress.venue} · ` : ""}{congress.city}{congress.state ? `, ${congress.state}` : `, ${congress.country}`}</div>

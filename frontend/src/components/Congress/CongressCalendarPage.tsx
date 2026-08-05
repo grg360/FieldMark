@@ -4,6 +4,7 @@ import AppLayout from "../AppLayout";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { COLOR, FONT } from "../../lib/designTokens";
 import { supabase } from "../../lib/supabase";
+import PageHero from "../PageHero";
 import {
   CONGRESSES,
   congressState,
@@ -205,11 +206,25 @@ export default function CongressCalendarPage() {
       <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 20, display: "flex", flexDirection: "column", gap: 24 }}>
         {/* header */}
         <div>
-          <div style={{ ...mono(11, COLOR.amber), letterSpacing: "0.22em", fontWeight: 600 }}>FIELDMARK · CONGRESS CALENDAR</div>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 10 }}>
-            <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>{TA_LABEL}</div>
-            <div style={mono(11, COLOR.ink4)}>{nowLabel}</div>
-          </div>
+          {/* Full H1 (PageHero, Commit B follow-up 2026-08-05): serif title +
+              cluster from figures the surface already computes. */}
+          <PageHero
+            eyebrow="Fieldmark · Congress calendar"
+            meta={nowLabel}
+            title={TA_LABEL}
+            stats={(() => {
+              const upcoming = CONGRESSES.filter((c) => ["upcoming", "imminent", "live"].includes(congressState(c, now))).length;
+              const featured = liveCongress ?? mostRecentCongress;
+              const posts = featured ? socialBySlug[featured.slug]?.total_posts ?? null : null;
+              return [
+                { value: String(CONGRESSES.length), label: "CONGRESSES" },
+                { value: String(upcoming), label: "UPCOMING" },
+                ...(featured && posts != null
+                  ? [{ value: INT.format(posts), label: `POSTS · ${featured.short_name.toUpperCase()}`, gold: true }]
+                  : []),
+              ];
+            })()}
+          />
         </div>
 
         {/* ── featured congress — LIVE while a meeting is on (always outranks);

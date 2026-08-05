@@ -191,7 +191,7 @@ export default function PracticeFirstProfile() {
             <span style={{ ...mono(9), letterSpacing: "0.16em", color: F.amber, border: `1px solid ${F.amberBorder}`, borderRadius: 2, padding: "3px 8px" }}>{STATUS_LABEL[status].toUpperCase()}</span>
             <span style={{ ...mono(9), letterSpacing: "0.16em", color: F.ghost2 }}>NO PUBLICATION RECORD</span>
           </div>
-          <div style={{ ...serif(30), lineHeight: 1.12, color: F.bright, letterSpacing: "-0.01em", marginBottom: 12 }}>{p.hcp.name}</div> // H3 title normalized 2026-08-05: all four profile spines at serif 30/400
+          <div style={{ ...serif(30), lineHeight: 1.12, color: F.bright, letterSpacing: "-0.01em", marginBottom: 12 }}>{p.hcp.name}</div>
           <div style={{ ...mono(11), letterSpacing: "0.06em", color: F.faint, display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
             {p.hcp.specialty ? <span>{p.hcp.specialty}</span> : null}
             {loc ? <><span style={{ color: "#3a403c" }}>·</span><span>{loc}</span></> : null}

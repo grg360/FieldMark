@@ -256,7 +256,7 @@ export default function HcpProfileBrief() {
               <span style={{ ...mono(34, 500), color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s?.index != null ? floorFixed(s.index, 1) : "—"}</span>
               <span style={{ ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>INDEX · RANK {s?.rank ?? "—"} US · #{s?.global_rank ?? "—"} GLOBAL</span>
             </div>
-            <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4 }}>{p.hcp.name}</span> // H3 title normalized 2026-08-05: all four profile spines at serif 30/400
+            <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4 }}>{p.hcp.name}</span>
             <span style={{ ...mono(11), color: P.ink4, letterSpacing: ".02em" }}>
               {p.hcp.institution ? (
                 <a href={`/institution/${institutionToSlug(p.hcp.institution)}`}
