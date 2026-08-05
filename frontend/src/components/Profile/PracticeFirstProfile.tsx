@@ -682,8 +682,9 @@ export default function PracticeFirstProfile() {
           </div>
           )}
 
-          {/* WHY THIS PRACTITIONER */}
-          {p.narrative.why_this ? (
+          {/* WHY THIS PRACTITIONER — narrative is null for ~91% of the cohort (generated
+              for top-ranked HCPs only), so guard the deref. Section hides when absent. */}
+          {p.narrative?.why_this ? (
             <div style={{ padding: "22px 28px 26px" }}>
               <div style={{ marginBottom: 12 }}><SectionTag tag="WHY THIS PRACTITIONER" /></div>
               <div style={{ ...serif(15), lineHeight: 1.65, color: F.body, maxWidth: "96ch", paddingLeft: 14, borderLeft: `1px solid ${F.border2}`, textWrap: "pretty" }}>{p.narrative.why_this}</div>

@@ -16,6 +16,7 @@ import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { getOrCreateRelationship, type RelationshipStatus } from "../../lib/relationships";
 import FieldInsights from "../FieldInsights/FieldInsights";
+import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
 import RelationshipSection from "../RelationshipSection/RelationshipSection";
 import AddToWatchlistPopover from "../AddToWatchlistPopover";
 import ContextualizeHCPForm from "../ContextualizeHCPForm";
@@ -457,6 +458,10 @@ export default function CommunityHcpProfile() {
             </div>
           )}
         </div>
+
+        {/* ◆ MEDICARE ADMINISTERED THERAPY — infused-oncology footprint (self-contained
+            header + card). Below the engagement record, above field insights. */}
+        <AdministeredVolumeBlock hcpId={p.hcp.id} />
 
         {/* ◆ FIELD INSIGHTS — SECOND SPINE */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

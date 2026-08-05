@@ -147,7 +147,9 @@ Logged during the community evidence-tier build. Not for tonight.
 
 2. **Same crash on the other cohort profiles?** The community profile
    dereferenced `p.narrative` unguarded (fixed 2026-08-04; the type was
-   declared non-null, which hid it). The established and rising profiles
-   presumably have their own narrative dependency — check whether they
-   guard it, and whether their `*Profile`/RPC types honestly mark the
-   narrative object nullable.
+   declared non-null, which hid it). Community practice-first
+   (`PracticeFirstProfile`) had the identical deref — surfaced by the
+   now-honest nullable type and fixed 2026-08-04 with the same `?.` guard.
+   STILL OPEN: the established/academic profile (`HcpProfileBrief`) and any
+   rising profile — not yet verified for the same narrative dependency or
+   for honestly marking the narrative object nullable.
