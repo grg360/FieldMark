@@ -41,7 +41,9 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -70,8 +72,15 @@ PROMPT_VERSION = "v1.0"
 # from established cohort_score on 2026-08-02 for being 36%-populated and
 # rewarding absence — a signal already judged unfit for ranking must not
 # characterise physicians in prose either.
-ESTABLISHED_PROMPT_VERSION = "established_v2.0"
-RISING_STAR_PROMPT_VERSION = "rising_star_v3.4"
+# v3.0 / v4.0 (2026-08-05): rank/percentile figures are FORBIDDEN in narrative
+# prose — the surfaces render rank, US rank, global rank and every percentile
+# live from the tables beside the narrative, and the staleness audit showed rank
+# is the least durable figure a narrative can quote (0 of 99 global-rank claims
+# still exact). Narratives now cite only durable facts: two-window publication
+# counts with years, collaborator expansion, citation growth, therapeutic focus,
+# and authorship trajectory as a direction, not a percentage.
+ESTABLISHED_PROMPT_VERSION = "established_v3.0"
+RISING_STAR_PROMPT_VERSION = "rising_star_v4.0"
 ANTHROPIC_VERSION = "2023-06-01"
 
 # Pricing (per million tokens) — Sonnet 4.6
@@ -469,6 +478,7 @@ def fetch_rising_star_v3_context_rows(
             sm.authorship_progression_delta,
             sm.early_senior_author_pct,
             sm.recent_senior_author_pct,
+            sm.enrichment_run_id,
             nm.early_collaborator_count,
             nm.recent_collaborator_count
         FROM hcp_rising_star_ranks_v3 r
@@ -600,7 +610,8 @@ def fetch_established_v3_context_rows(
             scientific_influence_pctile,
             network_influence_pctile,
             pharma_engagement_pctile,
-            computed_at
+            computed_at,
+            enrichment_run_id
         FROM hcp_established_ranks_v3
         WHERE therapeutic_area_id = ANY(%s::uuid[])
           AND hcp_id = ANY(%s::uuid[])
@@ -637,8 +648,11 @@ def fetch_established_v3_context_rows(
                             "global_rank": None,
                             "us_rank": None,
                             "computed_at": None,
+                            "enrichment_run_id": None,
                         },
                     )
+                    if entry["enrichment_run_id"] is None and row.get("enrichment_run_id") is not None:
+                        entry["enrichment_run_id"] = str(row["enrichment_run_id"])
                     if entry["scientific_influence_pctile"] is None and sci_pctile is not None:
                         entry["scientific_influence_pctile"] = float(sci_pctile)
                     if entry["network_influence_pctile"] is None and net_pctile is not None:
@@ -1403,16 +1417,10 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
         f"Cohort: Established (recognized expert tier within TA)",
     ]
 
-    global_rank = v3.get("global_rank")
-    us_rank = v3.get("us_rank")
-    rank_parts = []
-    if global_rank is not None:
-        rank_parts.append(f"global rank {global_rank}")
-    if us_rank is not None:
-        rank_parts.append(f"US rank {us_rank}")
-    if rank_parts:
-        lines.append("Standing: " + "; ".join(rank_parts) + " within the Established TA cohort")
-
+    # v3.0 (2026-08-05): ranks and percentiles are deliberately NOT in the facts
+    # — the profile header renders them live from hcp_established_ranks_v3, and
+    # prose that repeats them goes stale on every recompute. Only durable,
+    # windowed facts (senior-author counts, guideline counts, positions) are fed.
     senior_pub_count = v3.get("senior_pub_count")
     senior_recent = v3.get("senior_pub_recent_5yr")
     leadership_pct = v3.get("leadership_percentile_rank")
@@ -1428,11 +1436,6 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
         lines.append(
             f"Senior-Author Publications, last 5 years ({ta_label}): {senior_recent}"
         )
-    if leadership_pct is not None:
-        lines.append(
-            f"Publication Leadership Percentile ({ta_label} Established cohort): "
-            f"{leadership_pct:.0f}th percentile"
-        )
     if guideline_count is not None and guideline_count > 0:
         lines.append(f"Guideline Publications ({ta_label}): {guideline_count}")
 
@@ -1440,19 +1443,8 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
         career_years = datetime.now(timezone.utc).year - ctx.first_pub_year
         lines.append(f"Career Length: ~{career_years} years (first publication {ctx.first_pub_year})")
 
-    sci = v3.get("scientific_influence_pctile")
-    net = v3.get("network_influence_pctile")
-
-    if sci is not None:
-        lines.append(
-            f"Scientific Influence: {sci:.0f}th percentile within Established cohort "
-            "(publication leadership and citation impact)"
-        )
-    if net is not None:
-        lines.append(
-            f"Network Influence: {net:.0f}th percentile within Established cohort "
-            "(co-authorship graph centrality)"
-        )
+    # Scientific / Network Influence percentiles DELIBERATELY ABSENT as of
+    # established_v3.0 — see the rank/percentile note at the top of this function.
     # Pharma Engagement is DELIBERATELY ABSENT (established_v2.0). No industry /
     # Open Payments / commercial fact is provided to the model — this narrative
     # is a scientific summary of stance and output only.
@@ -1690,10 +1682,54 @@ Output ONLY the JSON object. No code fences. No commentary.
 """
 
 
+def _authorship_direction(v3: Dict[str, Any]) -> str:
+    """Authorship trajectory as a DIRECTION, never a percentage.
+
+    early/recent_senior_author_pct are 0-1 fractions. The old prompt rendered
+    them through format_display_int, which floored small fractions to 0 and
+    produced false "0% senior share" claims in prose (the Aditi Singh case:
+    3.85% rendered as 0%). Direction words are both durable and honest.
+    """
+    early = safe_float(v3.get("early_senior_author_pct"))
+    recent = safe_float(v3.get("recent_senior_author_pct"))
+    if recent is None:
+        return "unknown"
+    if recent == 0:
+        return "no senior-authored output yet"
+    if early is None or early == 0:
+        return "first senior-authored output has appeared in the recent window"
+    if recent - early > 0.02:
+        return "moving toward senior authorship"
+    if early - recent > 0.02:
+        return "senior-author share receding"
+    return "senior-author share steady"
+
+
+def _rising_signal_tier(v3: Dict[str, Any]) -> str:
+    """signal_strength tier, computed in code so the percentile never enters the prompt."""
+    p = safe_float(v3.get("rising_star_percentile"))
+    if p is None:
+        return "early"
+    if p >= 95:
+        return "high"
+    if p >= 85:
+        return "moderate"
+    return "early"
+
+
 def build_prompt_rising_star(ctx: HCPContext) -> str:
-    """Prompt for Rising Star cohort -- v3 momentum/visibility methodology."""
-    # AD forks to the Emergence/Network composite prompt; all other TAs use the
-    # frozen v3 momentum/visibility/archetype prompt below (byte-unchanged).
+    """Prompt for Rising Star cohort -- v4 durable-facts revision.
+
+    v4.0 (2026-08-05, supersedes the frozen v3.4 text): ranks and percentiles
+    are REMOVED from the data block and FORBIDDEN in prose. The profile header
+    renders rank / US rank / global rank / composite percentile / momentum and
+    visibility components live from hcp_rising_star_ranks_v3; a narrative that
+    repeats them goes stale on the next scoring recompute (audit 2026-08-05:
+    0 of 99 quoted global ranks still exact). signal_strength is computed in
+    code from the percentile, so the model never sees a rankable number.
+    """
+    # AD forks to the Emergence/Network composite prompt (untouched pending the
+    # community/evidence-tier decision); all other TAs use v4 below.
     if str(ctx.therapeutic_area_id) == AD_TA_ID:
         return build_prompt_rising_star_composite(ctx)
     v3 = ctx.rising_star_v3 or {}
@@ -1701,37 +1737,33 @@ def build_prompt_rising_star(ctx: HCPContext) -> str:
     if ctx.first_pub_year is not None:
         career_years = str(datetime.now(timezone.utc).year - ctx.first_pub_year)
 
-    us_rank = safe_int(v3.get("us_rank"))
-    us_rank_clause = f"Rank {us_rank} US" if us_rank is not None else "Global cohort only"
+    signal_tier = _rising_signal_tier(v3)
+    authorship_dir = _authorship_direction(v3)
 
     return f"""You are writing a structured narrative for an MSL describing why a
 Healthcare Professional is classified as a Rising Star in the
 {ctx.therapeutic_area_name} therapeutic area.
+
+The narrative renders NEXT TO a live data header that already shows this
+person's rank, US rank, global rank, composite percentile and momentum /
+visibility components, always current. Your prose must therefore NEVER cite
+a rank, a percentile, a composite score, or a momentum/visibility component
+value — those figures go stale the moment scores are recomputed, while the
+narrative persists. FORBIDDEN in every field: "ranked Nth", "top N%",
+"percentile", "composite", any standing-within-cohort number. Durable facts
+below are what you may cite.
 
 HCP: {ctx.first_name or ''} {ctx.last_name or ''}
 Institution: {ctx.institution or 'Unknown'}
 Career years: {career_years}
 Archetype: {v3.get('archetype') or 'Emerging Leader'}
 
-Rising Star composite percentile: {format_percentile_one_decimal(v3.get('rising_star_percentile'))}
-  (Rank {format_display_int(v3.get('rank'))} global; {us_rank_clause})
-Momentum component: {format_display_int(v3.get('momentum_component'))}
-Visibility component: {format_display_int(v3.get('visibility_component'))}
-
-Scientific Momentum percentile: {format_display_int(v3.get('scientific_momentum_percentile'))}
-  Publications {format_display_int(v3.get('early_total_pubs'))} (2016-2020) -> {format_display_int(v3.get('recent_total_pubs'))}
-    (2021-2025)
-  Senior-author publication delta: {format_signed_int(v3.get('pub_velocity_delta'))}
+DURABLE FACTS (two fixed windows; these do not change between recomputes):
+  Publications: {format_display_int(v3.get('early_total_pubs'))} (2016-2020) -> {format_display_int(v3.get('recent_total_pubs'))} (2021-2025)
+  Publication velocity delta: {format_signed_int(v3.get('pub_velocity_delta'))}
   Citation volume growth: {format_signed_int(v3.get('citation_velocity_delta'))}
-  Senior-author share: {format_display_int(v3.get('early_senior_author_pct'))} ->
-    {format_display_int(v3.get('recent_senior_author_pct'))}
-
-Network Momentum percentile: {format_display_int(v3.get('network_momentum_percentile'))}
-  Collaborators {format_display_int(v3.get('early_collaborator_count'))} (2016-2020) ->
-    {format_display_int(v3.get('recent_collaborator_count'))} (2021-2025)
-
-Scientific Visibility percentile: {format_display_int(v3.get('scientific_visibility_percentile'))}
-Network Visibility percentile: {format_display_int(v3.get('network_visibility_percentile'))}
+  Authorship trajectory: {authorship_dir}
+  Collaborators: {format_display_int(v3.get('early_collaborator_count'))} (2016-2020) -> {format_display_int(v3.get('recent_collaborator_count'))} (2021-2025)
 
 Return STRICT JSON with exactly these fields, no additional fields,
 no preamble, no markdown fences:
@@ -1739,7 +1771,7 @@ no preamble, no markdown fences:
 {{
   "narrative": "...",
   "why_now": "...",
-  "signal_strength": "high" | "moderate" | "early",
+  "signal_strength": "{signal_tier}",
   "caution_flags": "..." | null,
   "engagement_angle": "..."
 }}
@@ -1748,40 +1780,41 @@ Field instructions:
 
 narrative: 3-5 sentences, max 110 words. Plain professional English
 for an MSL audience. Anchor every claim in a specific number from
-the data above. Where a growth ratio is striking
-(>=3x), describe it proportionally as well as in raw counts
-(e.g., "publication output increased more than eight-fold, from
-6 to 49 papers" rather than only "from 6 to 49"). Reference the
-archetype EXPLICITLY at least once in the narrative -- either in
-the opening identification ("X is a Scientific Accelerator in
-NSCLC...") or in the interpretation ("This profile is
-characteristic of a Balanced Rising Star..."). Do NOT use
+the DURABLE FACTS above — publication counts with their window
+years, collaborator counts, citation growth. Where a growth ratio
+is striking (>=3x), describe it proportionally as well as in raw
+counts (e.g., "publication output increased more than eight-fold,
+from 6 to 49 papers" rather than only "from 6 to 49"). Describe
+authorship as the direction given above, never as a percentage.
+Reference the archetype EXPLICITLY at least once in the narrative
+-- either in the opening identification ("X is a Scientific
+Accelerator in NSCLC...") or in the interpretation ("This profile
+is characteristic of a Balanced Rising Star..."). Do NOT use
 marketing words ("trajectory," "ascent," "leadership in the
-making," "exceptional," "monster"). End with a MILESTONE-FOCUSED forward-looking statement that
-names a specific observable event rather than predicting an
-outcome. Use constructions like "A transition into X would
-represent the next milestone..." or "First evidence of X would
-mark a meaningful inflection..." Avoid outcome-prediction
-phrasing like "influence could follow," "is likely to," "is a
-reasonable expectation." When one signal clearly dominates the profile (e.g., network
-momentum percentile >= 95 while scientific momentum is moderate,
-or vice versa), give it its own sentence with a short framing
-opener ("The defining feature of the profile is..." or "The
-strongest signal is..."), then state the numbers in the
+making," "exceptional," "monster"). End with a MILESTONE-FOCUSED
+forward-looking statement that names a specific observable event
+rather than predicting an outcome. Use constructions like "A
+transition into X would represent the next milestone..." or "First
+evidence of X would mark a meaningful inflection..." Avoid
+outcome-prediction phrasing like "influence could follow," "is
+likely to," "is a reasonable expectation." When one signal clearly
+dominates the profile (publication growth far outpacing network
+growth, or vice versa), give it its own sentence with a short
+framing opener ("The defining feature of the profile is..." or
+"The strongest signal is..."), then state the numbers in the
 following sentence. Avoid compound sentences that combine the
 framing and the data into one long clause.
 
 why_now: One sentence, max 20 words. The single strongest signal
-driving this person's Rising Star status right now. Numbers required.
+driving this person's Rising Star status right now, grounded in the
+durable facts (counts and growth), never in rank or percentile.
 
-signal_strength: One of "high", "moderate", "early".
-  high = rising_star_percentile >= 95
-  moderate = rising_star_percentile 85-94
-  early = rising_star_percentile < 85
+signal_strength: MUST be exactly "{signal_tier}" — it is precomputed;
+copy it verbatim.
 
 caution_flags: One sentence, max 25 words, identifying the most
-important caveat to the profile (e.g., senior-author share = 0,
-geographic concentration, collaboration count outlier, etc.).
+important caveat to the profile (e.g., no senior-authored output
+yet, geographic concentration, collaboration count outlier, etc.).
 Return null if no meaningful caution applies.
 
 engagement_angle: One sentence, max 20 words. A concrete MSL
@@ -1806,9 +1839,8 @@ def build_prompt_established(ctx: HCPContext) -> str:
         "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about a recognized scientific expert in their therapeutic area. This is a SCIENTIFIC summary: what this expert argues and works on. It is NOT a commercial profile.\n\n"
         "Methodology context (do not restate verbatim, but use to interpret the data):\n"
         "- This HCP sits within the Established cohort of their TA — the recognized-expert tier (separate from Rising Stars and Community).\n"
-        "- All percentiles below are computed within the Established cohort in this TA, so a 70th percentile here means top 30 percent among recognized experts, not among all HCPs.\n"
         "- 'Sourced Positions' in the facts are stances extracted from this expert's own publications, each traceable to one paper with an evidence excerpt. They are the strongest evidence you hold of what this person actually argues.\n"
-        "- Percentile phrasing (all five JSON fields): if a percentile is >= 99.5, do NOT write '99th'/'100th percentile'; describe as 'at the top of the Established [TA] cohort'. Below 99.5, cite as 'Nth percentile'.\n\n"
+        "- RANK AND PERCENTILE ARE FORBIDDEN (all five JSON fields): this brief renders next to a live data header that already shows the expert's rank, US rank, global rank and cohort percentiles, always current. Prose that repeats those figures goes stale on every scoring recompute. NEVER write 'ranked Nth', 'Nth percentile', 'top N percent', a cohort score, or any standing-within-cohort number. Cite only the durable facts provided: senior-author counts, guideline counts, career length, and sourced positions.\n\n"
         "Return ONLY valid JSON with exactly these five fields:\n"
         "{\n"
         '  "narrative": "string (exactly 3 sentences)",\n'
@@ -1981,14 +2013,27 @@ def generate_narrative(ctx: HCPContext, anthropic_api_key: str) -> Dict[str, Opt
         "messages": [{"role": "user", "content": prompt}],
     }
 
-    try:
-        response = requests.post(ANTHROPIC_API_URL, headers=headers, json=body, timeout=60)
-        response.raise_for_status()
-        payload = response.json()
-    except requests.RequestException as exc:
-        raise RuntimeError(f"Anthropic API request failed: {exc}") from exc
-    except ValueError as exc:
-        raise RuntimeError(f"Failed parsing Anthropic API JSON response: {exc}") from exc
+    # Retry 429/529/5xx with backoff so parallel workers degrade gracefully
+    # under rate limits instead of failing the HCP outright.
+    payload = None
+    last_exc: Optional[Exception] = None
+    for attempt in range(4):
+        try:
+            response = requests.post(ANTHROPIC_API_URL, headers=headers, json=body, timeout=60)
+            if response.status_code in (429, 500, 529):
+                retry_after = response.headers.get("retry-after")
+                delay = float(retry_after) if retry_after else 2.0 * (attempt + 1)
+                last_exc = RuntimeError(f"Anthropic API {response.status_code}; retrying in {delay:.0f}s")
+                time.sleep(delay)
+                continue
+            response.raise_for_status()
+            payload = response.json()
+            break
+        except requests.RequestException as exc:
+            last_exc = exc
+            time.sleep(2.0 * (attempt + 1))
+    if payload is None:
+        raise RuntimeError(f"Anthropic API request failed after retries: {last_exc}") from last_exc
 
     text = extract_text_response(payload)
     parsed = parse_json_object(text)
@@ -2033,6 +2078,21 @@ def upsert_narrative(
     else:
         prompt_version = PROMPT_VERSION
     if target_version == "v2":
+        # Provenance stamp (2026-08-05): record which scoring snapshot this
+        # narrative read. Source rows are overwritten in place on recompute, so
+        # this is the only durable link between prose and the data it described.
+        # Rising: hcp_scientific_momentum_v1.enrichment_run_id. Established:
+        # hcp_established_ranks_v3.enrichment_run_id (minted per recompute since
+        # the 2026-08-05 patch; NULL for rows predating it). Migrations:
+        # 2026_08_05_hcp_narratives_v2_source_run_id.sql,
+        # 2026_08_05_established_ranks_enrichment_run_id.sql
+        source_run_id = None
+        if ctx.cohort_classification == "rising_star" and ctx.rising_star_v3:
+            raw = ctx.rising_star_v3.get("enrichment_run_id")
+            source_run_id = str(raw) if raw else None
+        elif ctx.cohort_classification == "established" and ctx.established_v3:
+            raw = ctx.established_v3.get("enrichment_run_id")
+            source_run_id = str(raw) if raw else None
         row = {
             "hcp_id": ctx.hcp_id,
             "therapeutic_area_slug": ctx.therapeutic_area_slug,
@@ -2044,6 +2104,7 @@ def upsert_narrative(
             "generated_at": generated_at,
             "model_used": ANTHROPIC_MODEL,
             "prompt_version": prompt_version,
+            "source_enrichment_run_id": source_run_id,
         }
         narratives_table = "hcp_narratives_v2"
         on_conflict = "hcp_id,therapeutic_area_slug"
@@ -2090,6 +2151,8 @@ def run_pipeline(
     target_version: str = "v1",
     single_hcp_id: Optional[str] = None,
     ta_slug: Optional[str] = None,
+    assume_yes: bool = False,
+    workers: int = 1,
 ) -> None:
     load_dotenv()
     supabase = init_supabase()
@@ -2244,8 +2307,10 @@ def run_pipeline(
         print(f"  {cohort}: {count}")
     print()
 
-    # Confirm before consuming budget (skip for single-HCP targeted regen)
-    if not single_hcp_id:
+    # Confirm before consuming budget (skip for single-HCP targeted regen and
+    # for unattended runs: --yes, required when this runs as reingest stage 13 —
+    # the orchestrator gives children stdin=DEVNULL, so input() would block/EOF).
+    if not single_hcp_id and not assume_yes:
         if len(target_cohorts) > 1:
             confirm = input("Proceed with generation? Type 'yes' to continue: ")
         else:
@@ -2259,24 +2324,44 @@ def run_pipeline(
     anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
     success = 0
     failed = 0
+    done = 0
     start_time = time.time()
+    progress_lock = threading.Lock()
 
-    for idx, ctx in enumerate(contexts, start=1):
+    def _process(ctx: HCPContext) -> None:
+        nonlocal success, failed, done
         try:
             output = generate_narrative(ctx, anthropic_api_key)
             upsert_narrative(supabase, ctx, output, target_version=target_version)
-            success += 1
+            with progress_lock:
+                success += 1
         except Exception as exc:
-            failed += 1
+            with progress_lock:
+                failed += 1
             print(f"  Failed: hcp_id={ctx.hcp_id} ta={ctx.therapeutic_area_name}: {exc}")
-
+        with progress_lock:
+            done += 1
+            idx = done
         if idx % PROGRESS_EVERY == 0:
             elapsed = time.time() - start_time
             rate = idx / elapsed if elapsed > 0 else 0
             eta_seconds = (len(contexts) - idx) / rate if rate > 0 else 0
             print(f"Progress: {idx}/{len(contexts)} | success={success} failed={failed} | rate={rate:.1f}/sec | ETA={eta_seconds/60:.1f} min")
 
-        time.sleep(API_SLEEP_SECONDS)
+    # Order-independent generation: each HCP's narrative is generated and
+    # upserted in isolation (unique on hcp_id+TA), so the only cost of the old
+    # sequential 0.5s-sleep loop was wall time. workers=1 preserves the legacy
+    # pacing exactly; workers>1 fans out over a thread pool (generate_narrative
+    # retries 429/529 with backoff, so a burst degrades gracefully).
+    if workers <= 1:
+        for ctx in contexts:
+            _process(ctx)
+            time.sleep(API_SLEEP_SECONDS)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(_process, ctx) for ctx in contexts]
+            for f in as_completed(futures):
+                f.result()
 
     elapsed = time.time() - start_time
     print()
@@ -2342,6 +2427,17 @@ def main() -> int:
         default=None,
         help="Restrict the run to a single TA by slug; default = all visible TAs.",
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the interactive cost confirmation (required for unattended runs, e.g. reingest stage 13).",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Concurrent API workers. 1 = legacy sequential pacing with sleep; 6-8 recommended for batch regens.",
+    )
     args = parser.parse_args()
 
     if args.hcp_id and args.cohort == "all":
@@ -2368,6 +2464,8 @@ def main() -> int:
             target_version=args.target_version,
             single_hcp_id=args.hcp_id,
             ta_slug=args.ta,
+            assume_yes=args.yes,
+            workers=args.workers,
         )
         return 0
     except Exception as exc:

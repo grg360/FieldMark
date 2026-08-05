@@ -48,6 +48,7 @@ Required environment variables (.env):
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 
 import click
 import psycopg2
@@ -216,7 +217,11 @@ def compute_percentiles_in_scope(values_dict):
     return out
 
 
-def upsert_ranks(conn, ta_id, rows):
+def upsert_ranks(conn, ta_id, rows, run_id):
+    # run_id: one uuid4 minted per invocation (main), written to every row —
+    # the same provenance pattern scientific_momentum_scoring.py uses. Narrative
+    # generation reads it into hcp_narratives_v2.source_enrichment_run_id so a
+    # narrative's snapshot is identifiable after this table is overwritten.
     if not rows:
         return 0
     values = [
@@ -230,6 +235,7 @@ def upsert_ranks(conn, ta_id, rows):
             float(r["scientific_pctile"]),
             float(r["network_pctile"]),
             float(r["pharma_pctile"]),
+            run_id,
         )
         for r in rows
     ]
@@ -242,7 +248,7 @@ def upsert_ranks(conn, ta_id, rows):
                   (hcp_id, therapeutic_area_id, scope_type, scope_value,
                    rank, cohort_score,
                    scientific_influence_pctile, network_influence_pctile,
-                   pharma_engagement_pctile)
+                   pharma_engagement_pctile, enrichment_run_id)
                 VALUES %s
                 ON CONFLICT (hcp_id, therapeutic_area_id, scope_type, scope_value)
                 DO UPDATE SET
@@ -251,7 +257,8 @@ def upsert_ranks(conn, ta_id, rows):
                   scientific_influence_pctile = EXCLUDED.scientific_influence_pctile,
                   network_influence_pctile = EXCLUDED.network_influence_pctile,
                   pharma_engagement_pctile = EXCLUDED.pharma_engagement_pctile,
-                  computed_at = now()
+                  computed_at = now(),
+                  enrichment_run_id = EXCLUDED.enrichment_run_id
                 """,
                 values,
             )
@@ -398,8 +405,10 @@ def main(
     if dry_run:
         print(f"\n[dry-run] would have written {len(all_results)} rows")
     else:
-        n = upsert_ranks(conn, ta_id, all_results)
+        run_id = str(uuid4())
+        n = upsert_ranks(conn, ta_id, all_results, run_id)
         print(f"\nWrote {n} rows to hcp_established_ranks_v3")
+        print(f"Run ID: {run_id}")
 
     conn.close()
 
