@@ -7,6 +7,7 @@ import {
 } from "../../lib/relationships";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import FollowUpItem from "./FollowUpItem";
+import { COOL, FONT, GOLD, GROUND, LINE } from "../../lib/designTokens";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -75,17 +76,17 @@ function completedWithin7Days(iso: string): boolean {
 
 function priorityPillStyle(priority: Priority, selected: boolean): CSSProperties {
   if (!selected) {
-    return { backgroundColor: "#1E1E22", color: "#6B6A65" };
+    return { backgroundColor: GROUND.g2, color: COOL.label, border: `1px solid ${LINE.l1}` };
   }
   switch (priority) {
     case "high":
-      return { backgroundColor: "#E8A020", color: "#0A0A0B", fontWeight: 500 };
+      return { backgroundColor: GOLD.gold, color: GROUND.g0, fontWeight: 600, border: `1px solid ${GOLD.gold}` };
     case "normal":
-      return { backgroundColor: "#2A2A30", color: "#9B9892" };
+      return { backgroundColor: LINE.l2, color: COOL.ui, border: `1px solid ${LINE.l2}` };
     case "low":
-      return { backgroundColor: "#1E1E22", color: "#6B6A65" };
+      return { backgroundColor: GROUND.g2, color: COOL.muted, border: `1px solid ${LINE.l1}` };
     default:
-      return { backgroundColor: "#1E1E22", color: "#6B6A65" };
+      return { backgroundColor: GROUND.g2, color: COOL.label, border: `1px solid ${LINE.l1}` };
   }
 }
 
@@ -172,17 +173,17 @@ export default function FollowUpsList({
     completedWithin7Days(lastCompletedAction.completed_at);
 
   const pillBase: CSSProperties = {
-    padding: "4px 8px",
-    borderRadius: 3,
-    fontSize: 10,
+    padding: "4px 9px",
+    borderRadius: 2,
+    fontSize: 9.5,
+    letterSpacing: "0.1em",
     textTransform: "uppercase",
-    border: "none",
     cursor: "pointer",
-    fontFamily: "system-ui, -apple-system, sans-serif",
+    fontFamily: FONT.mono,
   };
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ fontFamily: FONT.mono }}>
       <div
         style={{
           display: "flex",
@@ -193,7 +194,7 @@ export default function FollowUpsList({
       >
         <style>{`
           .fm-followup-composer-input::placeholder {
-            color: #9B9892;
+            color: ${COOL.label};
             opacity: 1;
           }
         `}</style>
@@ -210,14 +211,14 @@ export default function FollowUpsList({
             width: "100%",
             boxSizing: "border-box",
             display: "block",
-            backgroundColor: "#0D0D10",
-            border: "1px solid #1E1E22",
-            borderRadius: 4,
-            color: "#E8E6DF",
-            fontSize: 13,
-            lineHeight: 1.4,
-            padding: "6px 10px",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            backgroundColor: GROUND.g2,
+            border: `1px solid ${LINE.l1}`,
+            borderRadius: 2,
+            color: COOL.ui,
+            fontSize: 13.5,
+            lineHeight: 1.5,
+            padding: "7px 10px",
+            fontFamily: FONT.serif,
             outline: "none",
             resize: "none",
             overflow: "hidden",
@@ -261,13 +262,15 @@ export default function FollowUpsList({
             aria-expanded={showComposerDatePicker}
             style={{
               padding: "6px 10px",
-              borderRadius: 4,
-              fontSize: 12,
-              color: "#9B9892",
+              borderRadius: 2,
+              fontSize: 10,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: COOL.muted,
               backgroundColor: "transparent",
-              border: "1px solid #1E1E22",
+              border: `1px solid ${LINE.l1}`,
               cursor: composerPending ? "default" : "pointer",
-              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontFamily: FONT.mono,
               whiteSpace: "nowrap",
             }}
           >
@@ -282,17 +285,17 @@ export default function FollowUpsList({
                 left: "50%",
                 transform: "translateX(-50%)",
                 maxWidth: "calc(100vw - 32px)",
-                backgroundColor: "#0D0D10",
-                border: "1px solid #1E1E22",
-                borderRadius: 6,
+                backgroundColor: GROUND.g2,
+                border: `1px solid ${LINE.l1}`,
+                borderRadius: 2,
                 padding: 8,
                 zIndex: 50,
                 marginTop: 6,
                 // @ts-expect-error CSS custom properties for react-day-picker
-                "--rdp-accent-color": "#E8A020",
-                "--rdp-background-color": "#0D0D10",
-                "--rdp-day-color": "#E8E6DF",
-                "--rdp-day-hover-background": "#1E1E22",
+                "--rdp-accent-color": GOLD.gold,
+                "--rdp-background-color": GROUND.g2,
+                "--rdp-day-color": COOL.ui,
+                "--rdp-day-hover-background": LINE.l0,
               }}
             >
               <DayPicker
@@ -300,10 +303,10 @@ export default function FollowUpsList({
                 selected={composerDueAt ? new Date(composerDueAt) : undefined}
                 onSelect={handleComposerDateSelect}
                 styles={{
-                  caption: { color: "#E8E6DF", fontSize: 13 },
-                  day: { color: "#E8E6DF", fontSize: 13, fontFamily: "system-ui, -apple-system, sans-serif" },
-                  head_cell: { color: "#9B9892" },
-                  nav_button: { color: "#9B9892" },
+                  caption: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
+                  day: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
+                  head_cell: { color: COOL.muted },
+                  nav_button: { color: COOL.muted },
                 }}
               />
             </div>
@@ -317,18 +320,18 @@ export default function FollowUpsList({
           disabled={composerPending || composerBody.trim().length === 0}
           style={{
             width: "100%",
-            backgroundColor: "#E8A020",
-            color: "#0A0A0B",
+            backgroundColor: GOLD.gold,
+            color: GROUND.g0,
             padding: "8px 0",
-            borderRadius: 4,
+            borderRadius: 2,
             fontSize: 10,
             fontWeight: 600,
             textTransform: "uppercase",
-            letterSpacing: "0.05em",
+            letterSpacing: "0.12em",
             lineHeight: 1.2,
             border: "none",
             cursor: composerPending || composerBody.trim().length === 0 ? "default" : "pointer",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontFamily: FONT.mono,
             opacity: composerBody.trim().length === 0 ? 0.5 : 1,
           }}
         >
@@ -345,7 +348,7 @@ export default function FollowUpsList({
       ) : null}
 
       {showCompletedLine && lastCompletedAction?.completed_at ? (
-        <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 8 }}>
+        <div style={{ fontFamily: FONT.mono, fontSize: 10.5, letterSpacing: "0.04em", color: COOL.label, marginTop: 8 }}>
           {String.fromCharCode(0x2713)} Done {formatRelativeShort(lastCompletedAction.completed_at)}{" "}
           {String.fromCharCode(0x2014)} {lastCompletedAction.body}
         </div>

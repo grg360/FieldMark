@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { HCP } from "../../data/hcpData";
 import { getCurrentUser } from "../../lib/authHelpers";
-import { FONT } from "../../lib/designTokens";
+import { COOL, FONT, LINE } from "../../lib/designTokens";
 import {
   getNextActionHistoryForRelationship,
   getOpenNextActionsForRelationship,
@@ -113,19 +113,20 @@ export default function RelationshipSection({ hcp }: Props) {
     <div
       style={{
         padding: "16px",
-        borderBottom: "1px solid #1E1E22",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        borderBottom: `1px solid ${LINE.l1}`,
+        fontFamily: FONT.mono,
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div
             style={{
-              fontSize: 11,
-              color: "#6B6A65",
+              fontFamily: FONT.mono,
+              fontSize: 10,
+              color: COOL.label,
               textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              fontWeight: 500,
+              letterSpacing: "0.14em",
+              fontWeight: 600,
               flexShrink: 0,
             }}
           >
@@ -141,12 +142,12 @@ export default function RelationshipSection({ hcp }: Props) {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div
             style={{
-              fontFamily: FONT.sans,
-              fontSize: 11,
+              fontFamily: FONT.mono,
+              fontSize: 10,
               fontWeight: 600,
-              color: "#8f8b83",
+              color: COOL.label,
               textTransform: "uppercase",
-              letterSpacing: "0.18em",
+              letterSpacing: "0.14em",
             }}
           >
             Follow-Ups

@@ -7,6 +7,7 @@ import {
   type Priority,
 } from "../../lib/relationships";
 import { useRelationships } from "../../contexts/RelationshipsContext";
+import { COOL, FONT, GOLD, GROUND, LINE } from "../../lib/designTokens";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -215,14 +216,14 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
   function renderPriorityGlyph(priority: Priority, size = 12): ReactNode {
     if (priority === "high") {
       return (
-        <span style={{ color: "#E8A020", fontSize: size, lineHeight: 1 }}>
+        <span style={{ color: GOLD.gold, fontSize: size, lineHeight: 1 }}>
           {String.fromCharCode(0x25B2)}
         </span>
       );
     }
     if (priority === "low") {
       return (
-        <span style={{ color: "#6B6A65", fontSize: size, lineHeight: 1 }}>
+        <span style={{ color: COOL.label, fontSize: size, lineHeight: 1 }}>
           {String.fromCharCode(0x2193)}
         </span>
       );
@@ -240,13 +241,13 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
   }
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ fontFamily: FONT.mono }}>
       <div
         style={{
-          backgroundColor: "#0D0D10",
-          border: "1px solid #1E1E22",
-          borderLeft: overdue ? "3px solid #E8A020" : "1px solid #1E1E22",
-          borderRadius: 4,
+          backgroundColor: GROUND.g2,
+          border: `1px solid ${LINE.l1}`,
+          borderLeft: overdue ? `2px solid ${GOLD.gold}` : `1px solid ${LINE.l1}`,
+          borderRadius: 2,
           padding: "10px 12px",
           opacity: pending ? 0.6 : 1,
         }}
@@ -282,11 +283,11 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   top: "100%",
                   left: 0,
                   marginTop: 4,
-                  backgroundColor: "#0D0D10",
-                  border: "1px solid #1E1E22",
-                  borderRadius: 4,
+                  backgroundColor: GROUND.g2,
+                  border: `1px solid ${LINE.l1}`,
+                  borderRadius: 2,
                   zIndex: 10,
-                  minWidth: 140,
+                  minWidth: 150,
                   boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
                 }}
               >
@@ -303,10 +304,12 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                       padding: "10px 14px",
                       background: "none",
                       border: "none",
-                      fontSize: 13,
-                      color: priority === item.priority ? "#E8A020" : "#E8E6DF",
+                      fontSize: 11,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: priority === item.priority ? GOLD.gold : COOL.prose,
                       cursor: "pointer",
-                      fontFamily: "system-ui, -apple-system, sans-serif",
+                      fontFamily: FONT.mono,
                       listStyle: "none",
                       appearance: "none",
                       WebkitAppearance: "none",
@@ -341,13 +344,13 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                 style={{
                   width: "100%",
                   boxSizing: "border-box",
-                  backgroundColor: "#0D0D10",
-                  border: "1px solid #1E1E22",
-                  borderRadius: 4,
-                  color: "#E8E6DF",
-                  fontSize: 13,
+                  backgroundColor: GROUND.g1,
+                  border: `1px solid ${LINE.l2}`,
+                  borderRadius: 2,
+                  color: COOL.ui,
+                  fontSize: 13.5,
                   padding: "4px 8px",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  fontFamily: FONT.serif,
                   outline: "none",
                 }}
               />
@@ -360,10 +363,11 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   if (e.key === "Enter" || e.key === " ") setEditingBody(true);
                 }}
                 style={{
-                  fontSize: 13,
-                  color: "#E8E6DF",
+                  fontFamily: FONT.serif,
+                  fontSize: 13.5,
+                  color: COOL.ui,
                   cursor: "pointer",
-                  lineHeight: 1.4,
+                  lineHeight: 1.45,
                   overflowWrap: "anywhere",
                 }}
               >
@@ -381,13 +385,15 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
               aria-expanded={showDatePicker}
               style={{
                 padding: "3px 8px",
-                borderRadius: 3,
-                fontSize: 11,
-                color: overdue ? "#E8A020" : "#9B9892",
+                borderRadius: 2,
+                fontSize: 9.5,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: overdue ? GOLD.gold : COOL.muted,
                 backgroundColor: "transparent",
-                border: "1px solid #1E1E22",
+                border: `1px solid ${overdue ? GOLD.dim : LINE.l1}`,
                 cursor: pending ? "default" : "pointer",
-                fontFamily: "system-ui, -apple-system, sans-serif",
+                fontFamily: FONT.mono,
               }}
             >
               {dueChipLabel()}
@@ -399,17 +405,17 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   position: "absolute",
                   top: "100%",
                   left: 0,
-                  backgroundColor: "#0D0D10",
-                  border: "1px solid #1E1E22",
-                  borderRadius: 6,
+                  backgroundColor: GROUND.g2,
+                  border: `1px solid ${LINE.l1}`,
+                  borderRadius: 2,
                   padding: 8,
                   zIndex: 50,
                   marginTop: 6,
                   // @ts-expect-error CSS custom properties for react-day-picker
-                  "--rdp-accent-color": "#E8A020",
-                  "--rdp-background-color": "#0D0D10",
-                  "--rdp-day-color": "#E8E6DF",
-                  "--rdp-day-hover-background": "#1E1E22",
+                  "--rdp-accent-color": GOLD.gold,
+                  "--rdp-background-color": GROUND.g2,
+                  "--rdp-day-color": COOL.ui,
+                  "--rdp-day-hover-background": LINE.l0,
                 }}
               >
                 <DayPicker
@@ -417,10 +423,10 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   selected={item.due_at ? new Date(item.due_at) : undefined}
                   onSelect={(date) => void handleDateSelect(date)}
                   styles={{
-                    caption: { color: "#E8E6DF", fontSize: 13 },
-                    day: { color: "#E8E6DF", fontSize: 13, fontFamily: "system-ui, -apple-system, sans-serif" },
-                    head_cell: { color: "#9B9892" },
-                    nav_button: { color: "#9B9892" },
+                    caption: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
+                    day: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
+                    head_cell: { color: COOL.muted },
+                    nav_button: { color: COOL.muted },
                   }}
                 />
               </div>
@@ -432,18 +438,20 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
             onClick={() => void handleMarkComplete()}
             disabled={pending}
             style={{
-              backgroundColor: "#3FB8AF",
-              color: "#0A0A0B",
-              padding: "4px 8px",
-              borderRadius: 4,
-              fontSize: 11,
-              fontWeight: 500,
-              border: "none",
+              backgroundColor: "transparent",
+              color: COOL.prose,
+              padding: "4px 9px",
+              borderRadius: 2,
+              fontSize: 9.5,
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              border: `1px solid ${LINE.l2}`,
               cursor: pending ? "default" : "pointer",
-              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontFamily: FONT.mono,
             }}
           >
-            Mark Complete
+            {String.fromCharCode(0x2713)} Complete
           </button>
 
           <button
@@ -451,13 +459,15 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
             onClick={() => setConfirmDelete(true)}
             disabled={pending}
             style={{
-              color: "#6B6A65",
-              fontSize: 11,
+              color: COOL.label,
+              fontSize: 9.5,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
               background: "none",
               border: "none",
               cursor: pending ? "default" : "pointer",
               padding: 0,
-              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontFamily: FONT.mono,
             }}
           >
             Delete
@@ -469,8 +479,9 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
         <div
           style={{
             marginTop: 8,
-            fontSize: 13,
-            color: "#9B9892",
+            fontFamily: FONT.mono,
+            fontSize: 11,
+            color: COOL.muted,
             display: "flex",
             alignItems: "center",
             gap: 12,
@@ -485,9 +496,9 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
             style={{
               background: "none",
               border: "none",
-              color: "#E8A020",
-              fontSize: 13,
-              fontWeight: 500,
+              color: GOLD.gold,
+              fontSize: 11,
+              fontWeight: 600,
               cursor: pending ? "default" : "pointer",
               padding: 0,
             }}
@@ -500,8 +511,8 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
             style={{
               background: "none",
               border: "none",
-              color: "#6B6A65",
-              fontSize: 13,
+              color: COOL.label,
+              fontSize: 11,
               cursor: "pointer",
               padding: 0,
             }}

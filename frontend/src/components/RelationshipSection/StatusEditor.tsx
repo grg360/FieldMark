@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { RelationshipStatus } from "../../lib/relationships";
+import { COOL, FONT, GOLD, GROUND, LINE } from "../../lib/designTokens";
 
 const STATUS_VALUES: RelationshipStatus[] = [
   "not_engaged",
@@ -27,20 +28,24 @@ function statusLabel(status: RelationshipStatus): string {
   }
 }
 
+// Register rebuild 2026-08-05: the ladder reads as a PROGRESSION OF NEUTRAL
+// STEPS with gold reserved for the top state — no purple, no teal (the ledger's
+// StateLadder set the precedent: state is read by weight, not hue). Paused is
+// the gold outline it always was.
 function statusColor(status: RelationshipStatus): { bg: string; fg: string; border?: string } {
   switch (status) {
     case "not_engaged":
-      return { bg: "transparent", fg: "#6B6A65", border: "1px solid #1E1E22" };
+      return { bg: "transparent", fg: COOL.label, border: `1px solid ${LINE.l1}` };
     case "targeted":
-      return { bg: "#1E1E22", fg: "#9B9892" };
+      return { bg: GROUND.g2, fg: COOL.muted, border: `1px solid ${LINE.l1}` };
     case "contacted":
-      return { bg: "#9B6DFF", fg: "#FFFFFF" };
+      return { bg: LINE.l0, fg: COOL.prose, border: `1px solid ${LINE.l2}` };
     case "engaged":
-      return { bg: "#3FB8AF", fg: "#0A0A0B" };
+      return { bg: LINE.l2, fg: COOL.ui };
     case "active_relationship":
-      return { bg: "#E8A020", fg: "#0A0A0B" };
+      return { bg: GOLD.gold, fg: GROUND.g0 };
     case "paused":
-      return { bg: "transparent", fg: "#E8A020", border: "1px solid #E8A020" };
+      return { bg: "transparent", fg: GOLD.gold, border: `1px solid ${GOLD.gold}` };
   }
 }
 
@@ -77,7 +82,7 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
         // baseline — keeps it vertically centered against the STATUS label.
         display: "inline-flex",
         alignItems: "center",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: FONT.mono,
       }}
     >
       <button
@@ -90,15 +95,15 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
         aria-label={`Change relationship status. Current: ${statusLabel(currentStatus)}`}
         aria-expanded={menuOpen}
         style={{
-          padding: "3px 8px",
-          borderRadius: 3,
-          fontSize: 10,
+          padding: "4px 9px",
+          borderRadius: 2,
+          fontSize: 9.5,
           fontWeight: 600,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
+          letterSpacing: "0.1em",
           lineHeight: 1.2,
           cursor: pending ? "default" : "pointer",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: FONT.mono,
           backgroundColor: currentColors.bg,
           color: currentColors.fg,
           border: currentColors.border ?? "none",
@@ -119,11 +124,11 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
             top: "100%",
             left: 0,
             marginTop: 4,
-            backgroundColor: "#0D0D10",
-            border: "1px solid #1E1E22",
-            borderRadius: 4,
+            backgroundColor: GROUND.g2,
+            border: `1px solid ${LINE.l1}`,
+            borderRadius: 2,
             zIndex: 10,
-            minWidth: 180,
+            minWidth: 200,
             boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
           }}
         >
@@ -134,7 +139,7 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
               ? {
                   width: 8,
                   height: 8,
-                  borderRadius: "50%",
+                  borderRadius: 0,
                   backgroundColor: "transparent",
                   border: `1px solid ${colors.fg}`,
                   boxSizing: "border-box",
@@ -144,7 +149,7 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
               : {
                   width: 8,
                   height: 8,
-                  borderRadius: "50%",
+                  borderRadius: 0,
                   backgroundColor: colors.bg,
                   marginRight: 8,
                   flexShrink: 0,
@@ -165,11 +170,13 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
                   padding: "10px 14px",
                   background: "none",
                   border: "none",
-                  fontSize: 13,
-                  color: "#E8E6DF",
+                  fontSize: 11,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: status === currentStatus ? COOL.ui : COOL.prose,
                   fontWeight: status === currentStatus ? 600 : 400,
                   cursor: "pointer",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  fontFamily: FONT.mono,
                   listStyle: "none",
                   appearance: "none",
                   WebkitAppearance: "none",
