@@ -58,9 +58,22 @@ def fetch_edges(
     window_years: int | None = None,
     start_year: int | None = None,
     end_year: int | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> list[tuple[str, str, int]]:
     """Returns list of (hcp_a, hcp_b, weight) tuples."""
-    if start_year is not None and end_year is not None:
+    if start_date is not None and end_date is not None:
+        # Rolling month-boundary window (2026-08-05). Real pub_date decides
+        # membership; Jan-1 placeholder rows (year-only precision, ~12.5% of
+        # the corpus) fall back to pub_year via a July-1 effective date —
+        # the majority-of-year rule, deterministic and window-exclusive.
+        year_filter = (
+            "(CASE WHEN EXTRACT(MONTH FROM p.pub_date) = 1 AND EXTRACT(DAY FROM p.pub_date) = 1 "
+            "THEN make_date(p.pub_year, 7, 1) "
+            "ELSE COALESCE(p.pub_date, make_date(p.pub_year, 7, 1)) END) BETWEEN %s AND %s"
+        )
+        year_params = (start_date, end_date)
+    elif start_year is not None and end_year is not None:
         year_filter = "p.pub_year BETWEEN %s AND %s"
         year_params = (start_year, end_year)
     else:
@@ -131,6 +144,8 @@ def upsert_results(
     window_type: str,
     results: list[dict],
     run_id: str,
+    window_start=None,
+    window_end=None,
 ) -> int:
     if not results:
         return 0
@@ -139,6 +154,7 @@ def upsert_results(
             r["hcp_id"],
             ta_id,
             window_type,
+            window_start, window_end,
             r["degree_centrality_weighted"],
             r["eigenvector_centrality"],
             r["betweenness_centrality"],
@@ -158,13 +174,15 @@ def upsert_results(
                 cur,
                 """
                 INSERT INTO hcp_network_centrality_v2
-                  (hcp_id, therapeutic_area_id, window_type,
+                  (hcp_id, therapeutic_area_id, window_type, window_start, window_end,
                    degree_centrality_weighted, eigenvector_centrality, betweenness_centrality,
                    degree_percentile, eigenvector_percentile, betweenness_percentile,
                    network_influence_score, collaborator_count, total_collaboration_weight,
                    enrichment_run_id)
                 VALUES %s
                 ON CONFLICT (hcp_id, therapeutic_area_id, window_type) DO UPDATE SET
+                  window_start = EXCLUDED.window_start,
+                  window_end = EXCLUDED.window_end,
                   degree_centrality_weighted = EXCLUDED.degree_centrality_weighted,
                   eigenvector_centrality = EXCLUDED.eigenvector_centrality,
                   betweenness_centrality = EXCLUDED.betweenness_centrality,
@@ -201,6 +219,8 @@ def upsert_results(
     type=int,
     help="End of publication window (inclusive). If set, overrides --window-years.",
 )
+@click.option("--start-date", default=None, help="Rolling window start (YYYY-MM-DD, month boundary). Overrides year args.")
+@click.option("--end-date", default=None, help="Rolling window end (YYYY-MM-DD, inclusive).")
 @click.option("--window-type", default="10yr", help="Label stored in hcp_network_centrality_v2.window_type")
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=20, type=int, help="Print top N by network_influence_score")
@@ -215,11 +235,17 @@ def main(
     window_years: int,
     start_year: int | None,
     end_year: int | None,
+    start_date: str | None,
+    end_date: str | None,
     window_type: str,
     dry_run: bool,
     debug_top: int,
     min_edge_weight: int,
 ) -> None:
+    if (start_date is None) != (end_date is None):
+        raise click.UsageError("--start-date and --end-date must be provided together.")
+    if start_date is not None and window_type in ("10yr", "5yr"):
+        raise click.UsageError("When using --start-date/--end-date, specify a rolling --window-type (e.g. early_roll / recent_roll).")
     if (start_year is None) != (end_year is None):
         raise click.UsageError("--start-year and --end-year must be provided together.")
     if start_year is not None and end_year is not None:
@@ -234,7 +260,21 @@ def main(
     conn = get_conn()
     ta_id = resolve_ta_id(conn, ta)
 
-    if start_year is not None:
+    # Recorded window range: date-mode uses the dates verbatim; year-mode uses
+    # calendar bounds; the trailing '10yr'/'5yr' style windows record nothing.
+    if start_date is not None:
+        win_start, win_end = start_date, end_date
+    elif start_year is not None:
+        win_start, win_end = f"{start_year}-01-01", f"{end_year}-12-31"
+    else:
+        win_start = win_end = None
+
+    if start_date is not None:
+        print(
+            f"Computing network centrality for TA={ta} "
+            f"window={start_date}..{end_date} (label={window_type})"
+        )
+    elif start_year is not None:
         print(
             f"Computing network centrality for TA={ta} "
             f"window={start_year}-{end_year} (label={window_type})"
@@ -248,9 +288,11 @@ def main(
     edges_raw = fetch_edges(
         conn,
         ta_id,
-        window_years=window_years if start_year is None else None,
+        window_years=window_years if (start_year is None and start_date is None) else None,
         start_year=start_year,
         end_year=end_year,
+        start_date=start_date,
+        end_date=end_date,
     )
     print(f"Found {len(edges_raw)} co-authorship pairs")
 
@@ -366,7 +408,7 @@ def main(
         print(f"\n[dry-run] would have written {len(results)} rows")
     else:
         run_id = str(uuid4())
-        written = upsert_results(conn, ta_id, window_type, results, run_id)
+        written = upsert_results(conn, ta_id, window_type, results, run_id, window_start=win_start, window_end=win_end)
         print(f"\nWrote {written} rows to hcp_network_centrality_v2")
         print(f"Run ID: {run_id}")
 

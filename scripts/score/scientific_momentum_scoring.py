@@ -21,7 +21,7 @@ Dependencies:
 """
 
 from __future__ import annotations
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import os
 from collections import defaultdict
@@ -76,7 +76,8 @@ def fetch_publication_rows(
                 pa.hcp_id,
                 p.pub_year,
                 pa.is_senior_author,
-                p.citation_count
+                p.citation_count,
+                p.pub_date
             FROM publication_authors_v2 pa
             JOIN publications_v2 p ON p.id = pa.publication_id
             JOIN publication_therapeutic_areas_v2 pta ON pta.publication_id = p.id
@@ -97,6 +98,7 @@ def fetch_publication_rows(
                 "pub_year": int(row[1]),
                 "is_senior_author": bool(row[2]),
                 "citation_count": int(row[3]),
+                "pub_date": row[4],
             }
             for row in cur.fetchall()
         ]
@@ -131,12 +133,24 @@ def compute_percentile_ranks(hcp_ids: list[str], values: dict[str, float]) -> di
     }
 
 
+def effective_pub_date(p: dict) -> date:
+    """Membership date for rolling windows. Jan-1 rows are year-only
+    placeholders (~12.5% of the corpus): fall back to pub_year via a July-1
+    effective date — the majority-of-year rule, deterministic and
+    window-exclusive. Null dates get the same fallback."""
+    d = p.get("pub_date")
+    if d is None or (d.month == 1 and d.day == 1):
+        return date(p["pub_year"], 7, 1)
+    return d
+
+
 def build_eligible_results(
     rows: list[dict],
     early_start_year: int,
     early_end_year: int,
     recent_start_year: int,
     recent_end_year: int,
+    date_windows: tuple[date, date, date, date] | None = None,
 ) -> list[dict]:
     hcp_papers: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
@@ -144,12 +158,21 @@ def build_eligible_results(
 
     eligible: list[dict] = []
     for hcp_id, papers in hcp_papers.items():
-        early_papers = [
-            p for p in papers if early_start_year <= p["pub_year"] <= early_end_year
-        ]
-        recent_papers = [
-            p for p in papers if recent_start_year <= p["pub_year"] <= recent_end_year
-        ]
+        if date_windows is not None:
+            e_start, e_end, r_start, r_end = date_windows
+            early_papers = [
+                p for p in papers if e_start <= effective_pub_date(p) <= e_end
+            ]
+            recent_papers = [
+                p for p in papers if r_start <= effective_pub_date(p) <= r_end
+            ]
+        else:
+            early_papers = [
+                p for p in papers if early_start_year <= p["pub_year"] <= early_end_year
+            ]
+            recent_papers = [
+                p for p in papers if recent_start_year <= p["pub_year"] <= recent_end_year
+            ]
 
         if len(early_papers) < MIN_PUBS_PER_WINDOW or len(recent_papers) < MIN_PUBS_PER_WINDOW:
             continue
@@ -245,6 +268,7 @@ def upsert_results(
     early_end_year: int,
     recent_start_year: int,
     recent_end_year: int,
+    window_dates=(None, None, None, None),
 ) -> int:
     if not results:
         return 0
@@ -253,6 +277,7 @@ def upsert_results(
         (
             r["hcp_id"],
             ta_id,
+            window_dates[0], window_dates[1], window_dates[2], window_dates[3],
             int(early_start_year),
             int(early_end_year),
             int(recent_start_year),
@@ -281,6 +306,7 @@ def upsert_results(
     sql = """
         INSERT INTO hcp_scientific_momentum_v1
           (hcp_id, therapeutic_area_id,
+           early_window_start, early_window_end, recent_window_start, recent_window_end,
            early_start_year, early_end_year, recent_start_year, recent_end_year,
            early_total_pubs, early_senior_pubs, early_senior_author_pct, early_citation_rate,
            recent_total_pubs, recent_senior_pubs, recent_senior_author_pct, recent_citation_rate,
@@ -290,6 +316,10 @@ def upsert_results(
            enrichment_run_id)
         VALUES %s
         ON CONFLICT (hcp_id, therapeutic_area_id) DO UPDATE SET
+          early_window_start = EXCLUDED.early_window_start,
+          early_window_end = EXCLUDED.early_window_end,
+          recent_window_start = EXCLUDED.recent_window_start,
+          recent_window_end = EXCLUDED.recent_window_end,
           early_start_year = EXCLUDED.early_start_year,
           early_end_year = EXCLUDED.early_end_year,
           recent_start_year = EXCLUDED.recent_start_year,
@@ -314,6 +344,36 @@ def upsert_results(
           enrichment_run_id = EXCLUDED.enrichment_run_id
     """
 
+    # DE-LIST (2026-08-05, rolling windows): rows for this TA whose hcp_id is
+
+    # not in the new result set are removed — an upsert-only recompute leaves
+
+    # members who no longer clear the thresholds holding stale window rows,
+
+    # which the ranks join then scores from mixed vintages (the 142/62-row
+
+    # contamination found on the first rolling run). Empty result sets delete
+
+    # nothing (guarded at function entry).
+
+    keep_ids = sorted({r["hcp_id"] for r in results})
+
+    with conn.cursor() as _cur:
+
+        _cur.execute(
+
+            "DELETE FROM hcp_scientific_momentum_v1 "
+
+            "WHERE therapeutic_area_id = %s AND NOT (hcp_id = ANY(%s::uuid[]))",
+
+            (ta_id, keep_ids),
+
+        )
+
+        if _cur.rowcount:
+
+            print(f"[upsert] de-listed {_cur.rowcount} stale row(s) not in the new result set")
+
     try:
         with conn.cursor() as cur:
             for start in range(0, len(values), UPSERT_BATCH_SIZE):
@@ -331,6 +391,10 @@ def upsert_results(
 @click.option("--early-end-year", default=2020, type=int, help="Early window end (inclusive)")
 @click.option("--recent-start-year", default=2021, type=int, help="Recent window start (inclusive)")
 @click.option("--recent-end-year", default=2025, type=int, help="Recent window end (inclusive)")
+@click.option("--early-start-date", default=None, help="Rolling early window start (YYYY-MM-DD). All four date args together switch to date mode.")
+@click.option("--early-end-date", default=None)
+@click.option("--recent-start-date", default=None)
+@click.option("--recent-end-date", default=None)
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=20, type=int, help="Print top N by scientific_momentum_percentile")
 def main(
@@ -339,9 +403,24 @@ def main(
     early_end_year: int,
     recent_start_year: int,
     recent_end_year: int,
+    early_start_date: str | None,
+    early_end_date: str | None,
+    recent_start_date: str | None,
+    recent_end_date: str | None,
     dry_run: bool,
     debug_top: int,
 ) -> None:
+    date_args = [early_start_date, early_end_date, recent_start_date, recent_end_date]
+    if any(date_args) and not all(date_args):
+        raise click.UsageError("Provide all four --*-date args together, or none.")
+    date_windows = None
+    if all(date_args):
+        date_windows = tuple(date.fromisoformat(d) for d in date_args)
+        # keep the legacy year columns coherent with the rolling ranges
+        early_start_year = date_windows[0].year
+        early_end_year = date_windows[1].year
+        recent_start_year = date_windows[2].year
+        recent_end_year = date_windows[3].year
     if early_start_year > early_end_year:
         raise click.UsageError("--early-start-year must be <= --early-end-year")
     if recent_start_year > recent_end_year:
@@ -367,6 +446,7 @@ def main(
         early_end_year,
         recent_start_year,
         recent_end_year,
+        date_windows=date_windows,
     )
     print(f"Eligible HCPs: {len(results):,}")
 
@@ -418,6 +498,7 @@ def main(
             early_end_year,
             recent_start_year,
             recent_end_year,
+            window_dates=(date_windows or (None, None, None, None)),
         )
         print(f"\nWrote {written:,} rows to hcp_scientific_momentum_v1")
         print(f"Run ID: {run_id}")

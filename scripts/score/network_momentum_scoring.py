@@ -232,6 +232,7 @@ def upsert_results(
     run_id: str,
     early_window_type: str,
     recent_window_type: str,
+    window_dates=(None, None, None, None),
 ) -> int:
     if not results:
         return 0
@@ -240,6 +241,7 @@ def upsert_results(
         (
             r["hcp_id"],
             ta_id,
+            window_dates[0], window_dates[1], window_dates[2], window_dates[3],
             early_window_type,
             recent_window_type,
             int(r["early_collaborator_count"]),
@@ -266,6 +268,7 @@ def upsert_results(
     sql = """
         INSERT INTO hcp_network_momentum_v1
           (hcp_id, therapeutic_area_id,
+           early_window_start, early_window_end, recent_window_start, recent_window_end,
            early_window_type, recent_window_type,
            early_collaborator_count, recent_collaborator_count,
            early_degree_percentile, recent_degree_percentile, degree_delta,
@@ -276,6 +279,10 @@ def upsert_results(
            enrichment_run_id)
         VALUES %s
         ON CONFLICT (hcp_id, therapeutic_area_id) DO UPDATE SET
+          early_window_start = EXCLUDED.early_window_start,
+          early_window_end = EXCLUDED.early_window_end,
+          recent_window_start = EXCLUDED.recent_window_start,
+          recent_window_end = EXCLUDED.recent_window_end,
           early_window_type = EXCLUDED.early_window_type,
           recent_window_type = EXCLUDED.recent_window_type,
           early_collaborator_count = EXCLUDED.early_collaborator_count,
@@ -297,6 +304,36 @@ def upsert_results(
           computed_at = now(),
           enrichment_run_id = EXCLUDED.enrichment_run_id
     """
+
+    # DE-LIST (2026-08-05, rolling windows): rows for this TA whose hcp_id is
+
+    # not in the new result set are removed — an upsert-only recompute leaves
+
+    # members who no longer clear the thresholds holding stale window rows,
+
+    # which the ranks join then scores from mixed vintages (the 142/62-row
+
+    # contamination found on the first rolling run). Empty result sets delete
+
+    # nothing (guarded at function entry).
+
+    keep_ids = sorted({r["hcp_id"] for r in results})
+
+    with conn.cursor() as _cur:
+
+        _cur.execute(
+
+            "DELETE FROM hcp_network_momentum_v1 "
+
+            "WHERE therapeutic_area_id = %s AND NOT (hcp_id = ANY(%s::uuid[]))",
+
+            (ta_id, keep_ids),
+
+        )
+
+        if _cur.rowcount:
+
+            print(f"[upsert] de-listed {_cur.rowcount} stale row(s) not in the new result set")
 
     try:
         with conn.cursor() as cur:
@@ -322,6 +359,10 @@ def upsert_results(
     help="Recent centrality window_type label in hcp_network_centrality_v2",
 )
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
+@click.option("--early-start-date", default=None, help="Rolling early window start (YYYY-MM-DD) — recorded on rows")
+@click.option("--early-end-date", default=None)
+@click.option("--recent-start-date", default=None)
+@click.option("--recent-end-date", default=None)
 @click.option("--debug-top", default=20, type=int, help="Print top N by network_momentum_percentile")
 def main(
     ta: str,
@@ -329,6 +370,10 @@ def main(
     recent_window_type: str,
     dry_run: bool,
     debug_top: int,
+    early_start_date: str | None,
+    early_end_date: str | None,
+    recent_start_date: str | None,
+    recent_end_date: str | None,
 ) -> None:
     run_id = str(uuid4())
     conn = get_conn()
@@ -392,6 +437,7 @@ def main(
             run_id,
             early_window_type,
             recent_window_type,
+            window_dates=(early_start_date, early_end_date, recent_start_date, recent_end_date),
         )
         print(f"\nWrote {written:,} rows to hcp_network_momentum_v1")
         print(f"Run ID: {run_id}")

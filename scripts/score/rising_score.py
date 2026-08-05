@@ -30,6 +30,7 @@ FLAG-CONVENTION NOTE (why the dispatcher translates its mode per chain):
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import os
 import subprocess
 import sys
@@ -63,15 +64,47 @@ MODEL_OUTPUT_TABLE: Dict[str, str] = {
 
 # Step chains. Each step = (script_filename, model-specific extra args). The mode flags
 # (--dry-run / --execute / --debug-top) are appended by build_command() per the convention.
-MOMENTUM_STEPS: List[Tuple[str, List[str]]] = [
-    ("network_centrality_scoring.py",
-     ["--window-type", "hist_2016_2020", "--start-year", "2016", "--end-year", "2020"]),
-    ("network_centrality_scoring.py",
-     ["--window-type", "recent_2021_2025", "--start-year", "2021", "--end-year", "2025"]),
-    ("scientific_momentum_scoring.py", []),
-    ("network_momentum_scoring.py", []),
-    ("rising_star_scoring.py", []),
-]
+# ROLLING WINDOWS (2026-08-05): the two comparison windows are computed at run
+# time on whole-month boundaries — recent = trailing 60 complete months ending
+# with the last finished month, early = the 60 months before that. This makes
+# the weekly recompute measure current trajectory (a 2026 paper counts the week
+# it is indexed) and removes both the January cliff and the year-on-year drift
+# of the old fixed 2016-2020 / 2021-2025 constants. Window ranges are recorded
+# on every row (window_start/window_end columns); labels are the stable keys
+# 'early_roll' / 'recent_roll'.
+def rolling_windows(today: _dt.date | None = None) -> Tuple[str, str, str, str]:
+    """(early_start, early_end, recent_start, recent_end) as ISO dates."""
+    today = today or _dt.date.today()
+    recent_end_month = _dt.date(today.year, today.month, 1) - _dt.timedelta(days=1)
+    # first day of the month 60 months before the month after recent_end
+    def months_back(d: _dt.date, n: int) -> _dt.date:
+        y, m = divmod((d.year * 12 + (d.month - 1)) - n, 12)
+        return _dt.date(y, m + 1, 1)
+    recent_start = months_back(_dt.date(recent_end_month.year, recent_end_month.month, 1), 59)
+    early_end = recent_start - _dt.timedelta(days=1)
+    early_start = months_back(_dt.date(early_end.year, early_end.month, 1), 59)
+    return (early_start.isoformat(), early_end.isoformat(), recent_start.isoformat(), recent_end_month.isoformat())
+
+
+def momentum_steps() -> List[Tuple[str, List[str]]]:
+    e_start, e_end, r_start, r_end = rolling_windows()
+    return [
+        ("network_centrality_scoring.py",
+         ["--window-type", "early_roll", "--start-date", e_start, "--end-date", e_end]),
+        ("network_centrality_scoring.py",
+         ["--window-type", "recent_roll", "--start-date", r_start, "--end-date", r_end]),
+        ("scientific_momentum_scoring.py",
+         ["--early-start-date", e_start, "--early-end-date", e_end,
+          "--recent-start-date", r_start, "--recent-end-date", r_end]),
+        ("network_momentum_scoring.py",
+         ["--early-window-type", "early_roll", "--recent-window-type", "recent_roll",
+          "--early-start-date", e_start, "--early-end-date", e_end,
+          "--recent-start-date", r_start, "--recent-end-date", r_end]),
+        ("rising_star_scoring.py", ["--vis-window", "recent_roll"]),
+    ]
+
+
+MOMENTUM_STEPS: List[Tuple[str, List[str]]] = momentum_steps()
 EMERGENCE_STEPS: List[Tuple[str, List[str]]] = [
     ("emergence_scoring.py", []),
     ("rising_composite_scoring.py", []),

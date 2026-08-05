@@ -166,8 +166,21 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
   const dual = p.established_us != null;
   const residualBand = rank > 600;
 
-  const ew = m ? `${m.early_start_year ?? 2016}–${m.early_end_year ?? 2020}` : "2016–2020";
-  const rw = m ? `${m.recent_start_year ?? 2021}–${m.recent_end_year ?? 2025}` : "2021–2025";
+  // Rolling windows (2026-08-05): ranges come from the momentum row's
+  // window_start/window_end date columns — never hardcoded. Month precision
+  // when the pipeline ran in date mode; year fallback for legacy rows.
+  const fmtWin = (start?: string | null, end?: string | null, ys?: number | null, ye?: number | null) => {
+    if (start && end) {
+      const f = (iso: string) => {
+        const d = new Date(iso + "T00:00:00Z");
+        return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase();
+      };
+      return `${f(start)}–${f(end)}`;
+    }
+    return ys != null && ye != null ? `${ys}–${ye}` : "WINDOW NOT ON RECORD";
+  };
+  const ew = fmtWin(m?.early_window_start, m?.early_window_end, m?.early_start_year, m?.early_end_year);
+  const rw = fmtWin(m?.recent_window_start, m?.recent_window_end, m?.recent_start_year, m?.recent_end_year);
   const seniorParsed = p.leadership != null || (m?.recent_senior_author_pct != null && m?.early_senior_author_pct != null);
   const pctStr = (v: number | null | undefined) => (v == null ? null : `${(v * 100).toFixed(2)}%`);
 
@@ -513,13 +526,13 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         {/* established neighbourhood */}
         <SectionHead title="THE ESTABLISHED NEIGHBOURHOOD"
           sub={`TOP COLLABORATORS · ${p.collaborators.length} OF ${nw?.recent_collaborator_count ?? p.collaborator_rows_10yr ?? "N"}`}
-          right="TEN-YEAR TOTALS · NOT THE 2021–2025 DELTA WINDOW USED ABOVE" tick={GOLD_MUTED} />
+          right={`TEN-YEAR TOTALS · NOT THE ${rw} DELTA WINDOW USED ABOVE`} tick={GOLD_MUTED} />
         <Card style={{ padding: "20px 22px" }}>
           {p.collaborators.length > 0 ? (
             <>
               <div style={{ padding: "10px 12px", border: "1px solid #2a2519", background: "#141008", ...mono(8.5, GOLD_SOFT, 0.11), lineHeight: 1.6, maxWidth: 880 }}>
                 WINDOW · TEN-YEAR COLLABORATION TOTALS. THE COLLABORATOR TABLE CARRIES A TEN-YEAR ROW ONLY — BOARD-WIDE,
-                THERE IS NO RECENT-WINDOW VARIANT — SO THESE COUNTS DO NOT MATCH THE 2021–2025 DELTAS ABOVE AND MUST NOT
+                THERE IS NO RECENT-WINDOW VARIANT — SO THESE COUNTS DO NOT MATCH THE {rw} DELTAS ABOVE AND MUST NOT
                 BE READ AGAINST THEM.
               </div>
               <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "210px 1fr 180px 1fr 150px", padding: "0 0 9px", borderBottom: `1px solid ${RULE}` }}>

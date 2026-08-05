@@ -48,6 +48,10 @@ export interface RisingProfile {
   momentum: {
     early_total_pubs: number | null;
     recent_total_pubs: number | null;
+    early_window_start: string | null;
+    early_window_end: string | null;
+    recent_window_start: string | null;
+    recent_window_end: string | null;
     early_start_year: number | null;
     early_end_year: number | null;
     recent_start_year: number | null;

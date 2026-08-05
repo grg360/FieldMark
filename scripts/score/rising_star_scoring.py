@@ -60,7 +60,7 @@ def resolve_ta_id(conn, slug: str) -> str:
         return str(row[0])
 
 
-def fetch_input_signals(conn, ta_id: str) -> list[dict]:
+def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_2021_2025') -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -79,12 +79,12 @@ def fetch_input_signals(conn, ta_id: str) -> list[dict]:
             LEFT JOIN hcp_network_centrality_v2 nc
               ON nc.hcp_id = sm.hcp_id
               AND nc.therapeutic_area_id = sm.therapeutic_area_id
-              AND nc.window_type = 'recent_2021_2025'
+              AND nc.window_type = %(vis_window)s
             JOIN hcps_v2 h ON h.id = sm.hcp_id
-            WHERE sm.therapeutic_area_id = %s
+            WHERE sm.therapeutic_area_id = %(ta_id)s
               AND h.cohort_classification = 'rising_star'
             """,
-            (ta_id,),
+            {"ta_id": ta_id, "vis_window": vis_window},
         )
         return [
             {
@@ -295,17 +295,18 @@ def upsert_results(conn, ta_id: str, results: list[dict], run_id: str) -> int:
 
 
 @click.command()
+@click.option("--vis-window", default="recent_2021_2025", help="hcp_network_centrality_v2.window_type used for network visibility")
 @click.option("--ta", default="nsclc", help="Therapeutic area slug")
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=20, type=int, help="Print top N by rising_star_percentile")
-def main(ta: str, dry_run: bool, debug_top: int) -> None:
+def main(ta: str, dry_run: bool, debug_top: int, vis_window: str) -> None:
     run_id = str(uuid4())
     conn = get_conn()
     ta_id = resolve_ta_id(conn, ta)
 
     print(f"Computing Rising Star composite for TA={ta}")
     print("Fetching input signals...")
-    rows = fetch_input_signals(conn, ta_id)
+    rows = fetch_input_signals(conn, ta_id, vis_window=vis_window)
     print(f"Loaded {len(rows):,} eligible HCPs")
 
     print("Computing composite scores and archetypes...")
