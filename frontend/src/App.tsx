@@ -18,7 +18,6 @@ import { useEffect, useMemo, useState } from "react";
 import { CONTENT_WIDTH } from "./lib/designTokens";
 import { useMediaQuery } from "./lib/useMediaQuery";
 import {
-  Link,
   Navigate,
   Route,
   Routes,
@@ -39,16 +38,12 @@ import SearchBar from "./components/SearchBar";
 import HCPCard from "./components/HCPCard";
 import CommunityExplorer from "./components/CommunityExplorer";
 import ActionTray from "./components/ActionTray";
-import DetailScreen from "./components/DetailScreen";
-import NoteEntryScreen from "./components/NoteEntryScreen";
-import BibliographyScreen from "./components/BibliographyScreen";
 import AssetsIndexPage from "./components/Assets/AssetsIndexPage";
 import AssetPage from "./components/Assets/AssetPage";
 import CohortLedger from "./components/Cohorts/CohortLedger";
 import HcpProfileBrief from "./components/Profile/HcpProfileBrief";
 import ProfileDispatch from "./components/Profile/ProfileDispatch";
 import PracticeFirstProfile from "./components/Profile/PracticeFirstProfile";
-import LandscapeScreen from "./components/LandscapeScreen";
 import LandscapeRoute from "./components/LandscapeRoute";
 import InstitutionRoute from "./components/InstitutionRoute";
 import InstitutionsIndexRoute from "./components/InstitutionsIndexRoute";
@@ -66,7 +61,6 @@ import PublicationsListPage from "./components/PublicationsListPage/Publications
 import HcpPublicationsPage from "./components/PublicationsListPage/HcpPublicationsPage";
 import HcpPairPublicationsPage from "./components/PublicationsListPage/HcpPairPublicationsPage";
 import HcpPositionsPage from "./components/HcpPositionsPage";
-import CityFeedScreen from "./components/CityFeedScreen";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialPage from "./components/SocialPage";
 import GlobalFooter from "./components/GlobalFooter";
@@ -77,13 +71,10 @@ import ScoringExplainedModal, {
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
 import {
-  apiSlugForTaId,
   getCommunity,
   getEstablished,
-  getHCPDetail,
   getRisingStars,
   getTAIdForLabel,
-  resolvePrimaryTaId,
 } from "./lib/api";
 import ActiveFilterPills from "./components/ActiveFilterPills";
 import FilterDrawer from "./components/FilterDrawer";
@@ -98,7 +89,7 @@ import {
   taLabelToApiSlug,
   taSlugToLabel,
 } from "./lib/routeSlugs";
-import type { CohortFeedResult, HCPDetailResponse, RisingStar } from "./lib/types";
+import type { CohortFeedResult, RisingStar } from "./lib/types";
 import DemoPage from "./pages/DemoPage";
 import PulsePage from "./components/Pulse/PulsePage";
 import CongressCalendarPage from "./components/Congress/CongressCalendarPage";
@@ -142,35 +133,6 @@ function isTelescopeAvailable(ta: string, indication: string): boolean {
   return false;
 }
 
-const EMPTY_HCP: AppHCP = {
-  id: "",
-  name: "",
-  institution: "",
-  specialty: "",
-  score: 0,
-  normalizedScore: 0,
-  firstPubYear: 0,
-  explanation: "",
-  pubVel: "--",
-  citTraj: null,
-  trialScore: null,
-  medicareVolume: null,
-  distinctCompanies: null,
-  careerYears: null,
-  totalCareerPubs: null,
-  openPaymentsLifetime: null,
-  cohortScore: null,
-  institutionShort: null,
-  nppesPracticeCity: null,
-  nppesPracticeState: null,
-  nppesPracticeSetting: null,
-  nppesPracticeAddress: null,
-  nppesPracticeZip: null,
-  institutionFull: null,
-  npiNumber: null,
-  npiSpecialty: null,
-};
-
 function formatPublicationVelocity(value: number): string {
   if (!Number.isFinite(value)) return "--";
   return `${value.toFixed(1)}`;
@@ -183,107 +145,6 @@ function formatTherapeuticAreaLabel(value: string | null | undefined): string {
   if (v === "hepatology") return "Hepatology";
   if (v === "oncology") return "Oncology";
   return value ?? "";
-}
-
-function parseOptionalNumber(v: unknown): number | null {
-  if (v == null || v === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function optionalString(v: unknown): string | null {
-  if (v == null || String(v).trim() === "") return null;
-  return String(v);
-}
-
-function detailResponseToRisingStar(detail: HCPDetailResponse): RisingStar {
-  const hcp = detail.hcp;
-  const score = detail.score ?? {};
-  const rank = detail.rank ?? {};
-  const medicare = detail.medicare;
-  const pay = detail.openPayments;
-  const metrics = detail.authorMetrics;
-
-  const id = String(hcp.id ?? "");
-  const py2022 = parseOptionalNumber(pay?.py2022_total);
-  const py2023 = parseOptionalNumber(pay?.py2023_total);
-  const py2024 = parseOptionalNumber(pay?.py2024_total);
-  const y2021 = parseOptionalNumber(medicare?.beneficiaries_2021);
-  const y2022 = parseOptionalNumber(medicare?.beneficiaries_2022);
-  const y2023 = parseOptionalNumber(medicare?.beneficiaries_2023);
-  const engagementMix = pay
-    ? {
-        speakerBureau: parseOptionalNumber(pay.speaker_bureau_3yr),
-        consulting: parseOptionalNumber(pay.consulting_3yr),
-        honoraria: parseOptionalNumber(pay.honoraria_3yr),
-        education: parseOptionalNumber(pay.education_3yr),
-        royalty: parseOptionalNumber(pay.royalty_3yr),
-        foodBeverage: parseOptionalNumber(pay.food_beverage_3yr),
-        travelLodging: parseOptionalNumber(pay.travel_lodging_3yr),
-      }
-    : null;
-  const hasEngagementMix =
-    engagementMix != null &&
-    Object.values(engagementMix).some((v) => v != null && v > 0);
-
-  return {
-    id,
-    hcp_id: id,
-    first_name: String(hcp.first_name ?? ""),
-    last_name: String(hcp.last_name ?? ""),
-    institution: String(hcp.institution_normalized ?? hcp.institution_raw ?? ""),
-    institution_normalized: optionalString(hcp.institution_normalized),
-    nppes_practice_city: optionalString(hcp.nppes_practice_city),
-    nppes_practice_state: optionalString(hcp.nppes_practice_state),
-    nppes_practice_setting: optionalString(hcp.nppes_practice_setting),
-    nppes_practice_zip: optionalString(hcp.nppes_practice_zip),
-    institution_full: optionalString(hcp.institution_full),
-    npi_number: optionalString(hcp.npi_number),
-    npi_specialty: optionalString(hcp.npi_specialty),
-    country: String(hcp.country ?? ""),
-    therapeutic_area: detail.therapeuticArea,
-    narrative: detail.narrative?.narrative_text ?? null,
-    why_now: detail.narrative?.why_now ?? null,
-    engagement_angle: detail.narrative?.engagement_angle ?? null,
-    caution_flags: detail.narrative?.caution_flags ?? null,
-    signal_strength: detail.narrative?.signal_strength ?? null,
-    tier: score.tier != null ? String(score.tier) : null,
-    cohort_classification: optionalString(hcp.cohort_classification),
-    cohort_score: parseOptionalNumber(hcp.cohort_score),
-    composite_score: Number(score.composite_score ?? 0),
-    normalized_score: Number(score.normalized_score ?? 0),
-    pub_velocity: Number(score.pub_velocity_score ?? 0),
-    citation_trajectory: Number(score.citation_trajectory_score ?? 0),
-    trial_score: Number(score.trial_investigator_score ?? 0),
-    citTraj: parseOptionalNumber(score.citation_trajectory_score),
-    trialScore: parseOptionalNumber(score.trial_investigator_score),
-    career_multiplier: 1,
-    first_pub_year: Number(hcp.career_first_pub_year ?? 0),
-    stored_pubs: Number(hcp.total_career_pubs ?? 0),
-    medicare_volume: parseOptionalNumber(medicare?.total_beneficiaries_3yr_unique_est),
-    distinct_companies: parseOptionalNumber(pay?.distinct_companies_lifetime),
-    open_payments_lifetime: parseOptionalNumber(pay?.total_payments_lifetime),
-    career_years: parseOptionalNumber(hcp.nppes_career_stage_years),
-    total_career_pubs: parseOptionalNumber(hcp.total_career_pubs),
-    citedByCount: parseOptionalNumber(metrics?.cited_by_count),
-    hIndex: parseOptionalNumber(metrics?.h_index),
-    worksCount: parseOptionalNumber(metrics?.works_count),
-    total_citations: parseOptionalNumber(metrics?.cited_by_count),
-    h_index: parseOptionalNumber(metrics?.h_index),
-    works_count: parseOptionalNumber(metrics?.works_count),
-    paymentsByYear:
-      py2022 == null && py2023 == null && py2024 == null
-        ? null
-        : { py2022, py2023, py2024 },
-    beneficiariesByYear:
-      y2021 == null && y2022 == null && y2023 == null
-        ? null
-        : { y2021, y2022, y2023 },
-    engagementMix: hasEngagementMix ? engagementMix : null,
-    rank: rank.rank != null ? Number(rank.rank) : undefined,
-    percentile: rank.percentile != null ? Number(rank.percentile) : undefined,
-    scope_size: rank.scope_size != null ? Number(rank.scope_size) : undefined,
-  };
 }
 
 function mapRisingStarToHCP(item: RisingStar): AppHCP {
@@ -353,8 +214,6 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
 
 const HOME_INDICATION_COUNT = 287;
 
-type FeedOverlay = "landscape" | "city-feed" | null;
-
 function LandingRoute() {
   const navigate = useNavigate();
   return <LinkedInAuthScreen onAuth={() => navigate("/me")} />;
@@ -404,12 +263,8 @@ function FeedLayout({
   );
   // Immersive Skyview is a desktop treatment; mobile keeps the stacked list under the nav.
   const isNarrow = useMediaQuery("(max-width: 767px)");
-  const [feedOverlay, setFeedOverlay] = useState<FeedOverlay>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [activeHCP, setActiveHCP] = useState<AppHCP | null>(null);
-  const [bibYear, setBibYear] = useState<number>(2024);
-  const [cityFeedCity, setCityFeedCity] = useState<string>("Chicago, IL");
-  const [cityFeedTA, setCityFeedTA] = useState<string>("Rare Disease");
   const [hcpList, setHcpList] = useState<AppHCP[]>([]);
   const [feedOffset, setFeedOffset] = useState(0);
   const [feedTotal, setFeedTotal] = useState(0);
@@ -656,39 +511,6 @@ function FeedLayout({
 
   async function handleSearchSelect(hcpId: string, _taId: string) {
     navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
-  }
-
-  if (feedOverlay === "landscape") {
-    return (
-      <LandscapeScreen
-        ta={selectedTA}
-        indication={selectedIndication}
-        onBack={() => setFeedOverlay(null)}
-        onCityPress={(city, ta) => {
-          setCityFeedCity(city);
-          setCityFeedTA(ta);
-          setFeedOverlay("city-feed");
-        }}
-      />
-    );
-  }
-
-  if (feedOverlay === "city-feed") {
-    return (
-      <CityFeedScreen
-        city={cityFeedCity}
-        ta={cityFeedTA}
-        onBack={() => setFeedOverlay("landscape")}
-        onDetailHCPChange={(hcp) => {
-          const row = hcp as unknown as AppHCP;
-          const id = row.hcp_id ?? row.id;
-          if (id) navigate(buildHcpDetailPath(String(id)), { state: { taLabel: selectedTA } });
-        }}
-        onNavigateTo={() => {}}
-        bibYear={bibYear}
-        onBibYearChange={setBibYear}
-      />
-    );
   }
 
   const showInactiveIndicationEmpty =
@@ -1001,184 +823,6 @@ function FeedLayout({
   );
 }
 
-type HcpDetailSubScreen = "detail" | "note" | "bibliography";
-
-function HCPDetailRoute() {
-  const { hcpId } = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { region } = useFilterContext();
-  const navState = location.state as { taLabel?: string; taId?: string } | null;
-  const [resolvedTaId, setResolvedTaId] = useState<string | undefined>(navState?.taId);
-  const [taResolving, setTaResolving] = useState<boolean>(!navState?.taId);
-  const detailTaSlug = resolvedTaId ? apiSlugForTaId(resolvedTaId) : undefined;
-  const [subScreen, setSubScreen] = useState<HcpDetailSubScreen>("detail");
-  const [hcp, setHcp] = useState<AppHCP>(EMPTY_HCP);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [bibYear, setBibYear] = useState(2024);
-  const [trayOpen, setTrayOpen] = useState(false);
-
-  // Re-derive the HCP's TA when the caller carried none (refresh, bookmark,
-  // deep-link, back-nav). navState.taId always wins when present so in-app
-  // context + dual-TA intent are preserved. No silent default to NSCLC.
-  useEffect(() => {
-    if (navState?.taId) {
-      setResolvedTaId(navState.taId);
-      setTaResolving(false);
-      return;
-    }
-    if (!hcpId) {
-      setTaResolving(false);
-      return;
-    }
-    let cancelled = false;
-    setTaResolving(true);
-    void (async () => {
-      const primary = await resolvePrimaryTaId(hcpId);
-      if (cancelled) return;
-      setResolvedTaId(primary ?? undefined);
-      setTaResolving(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [hcpId, navState?.taId]);
-
-  useEffect(() => {
-    if (!hcpId) {
-      setNotFound(true);
-      setLoading(false);
-      return;
-    }
-    if (taResolving) return; // wait for TA re-derivation before fetching
-    if (!resolvedTaId || !detailTaSlug) {
-      // HCP has no TA membership → honest not-found instead of a wrong TA.
-      setNotFound(true);
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setNotFound(false);
-
-    void (async () => {
-      const { data, error } = await getHCPDetail(hcpId, {
-        therapeuticArea: detailTaSlug,
-        region,
-        taId: resolvedTaId,
-      });
-      if (cancelled) return;
-      if (error || !data) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-      setHcp(mapRisingStarToHCP(detailResponseToRisingStar(data)));
-      setLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hcpId, region, resolvedTaId, taResolving]);
-
-  function handleBack() {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/");
-    }
-  }
-
-  if (loading) {
-    return (
-      <div
-        className="fm-screen"
-        style={{
-          backgroundColor: "#0A0A0B",
-          minHeight: "100dvh",
-          maxWidth: CONTENT_WIDTH.reading,
-          margin: "0 auto",
-          color: "#6B6A65",
-          padding: 24,
-        }}
-      >
-        Loading profile...
-      </div>
-    );
-  }
-
-  if (notFound || !hcpId) {
-    return (
-      <div
-        className="fm-screen"
-        style={{
-          backgroundColor: "#0A0A0B",
-          minHeight: "100dvh",
-          maxWidth: CONTENT_WIDTH.reading,
-          margin: "0 auto",
-          padding: 24,
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
-        <p style={{ color: "#E8E6DF", fontSize: 16, marginBottom: 12 }}>HCP not found</p>
-        <p style={{ color: "#6B6A65", fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>
-          We could not load a profile for this link. The HCP may have been removed or the URL may
-          be incorrect.
-        </p>
-        <Link to="/" style={{ color: "#E8A020", fontSize: 14 }}>
-          Return to home
-        </Link>
-      </div>
-    );
-  }
-
-  if (subScreen === "note") {
-    return (
-      <NoteEntryScreen
-        hcp={hcp as unknown as UIHCP}
-        onBack={() => setSubScreen("detail")}
-      />
-    );
-  }
-
-  if (subScreen === "bibliography") {
-    return (
-      <BibliographyScreen
-        hcp={hcp as unknown as UIHCP}
-        year={bibYear}
-        onBack={() => setSubScreen("detail")}
-      />
-    );
-  }
-
-  return (
-    <>
-      <DetailScreen
-        hcp={hcp as unknown as UIHCP}
-        onBack={handleBack}
-        onAddNote={() => setSubScreen("note")}
-        onYearPress={(year) => {
-          setBibYear(year);
-          setSubScreen("bibliography");
-        }}
-        taSlug={detailTaSlug as string}
-      />
-      <ActionTray
-        open={trayOpen}
-        onClose={() => setTrayOpen(false)}
-        hcpName={hcp.name}
-        onAddNote={() => {
-          setTrayOpen(false);
-          setSubScreen("note");
-        }}
-      />
-    </>
-  );
-}
-
 export default function App() {
   return (
     <TrackProvider>
@@ -1239,7 +883,8 @@ export default function App() {
           {/* CUTOVER (stage 4): the primary HCP surface is now the two-spine profile.
               /hcp/:id renders ProfileDispatch; /hcp/:id/profile also resolves to it (kept
               so existing /profile links + bookmarks work). DetailScreen / HCPDetailRoute
-              are DISCONNECTED — retained in the codebase, unrouted, for recovery. */}
+              were deleted 2026-08-05 (dead-code sweep, docs/design/DESIGN_SYSTEM_AUDIT.md
+              §5.16) — recover from git history if ever needed. */}
           <Route path="/hcp/:id" element={<ProfileDispatch />} />
           {/* FI feed track routes removed 2026-07-31 — the forum (/field-intelligence)
               is the one FI system. Old /:ta/field-intelligence URLs fall through the
