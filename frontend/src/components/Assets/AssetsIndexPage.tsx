@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NavBar from "../NavBar";
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { FONT } from "../../lib/designTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { ASSETS, DEPLOYMENT_ASSETS, BACKBONE_ASSETS } from "../../lib/assetConfig";
 import {
@@ -23,13 +24,20 @@ import {
 } from "../../lib/assetIndex";
 
 // ── palette (from the frame) ──────────────────────────────────────────────────
+// Register migration 2026-08-05: only the font stacks matched tokens exactly.
+// This palette is WARM-tinted throughout — BG/PANEL/H1–H4 vs the cool SCALE,
+// GOLD #c9903c / GOLD_DIM #7d6234 / GOLD_FAINT #6f5629 vs GOLD.gold #be914d /
+// goldMuted #7a6136 / goldDeep #6b542f, and the INK/MUT/DIM ramps vs INK.* —
+// all near-twins, none byte-identical, so all stay local. Converging them is a
+// visible change reserved for its own commit. (Local GOLD name shadows nothing:
+// only FONT is imported from designTokens here.)
 const BG = "#0a0a09", PANEL = "#0e0d0c", PANEL2 = "#111010";
 const GOLD = "#c9903c", GOLD_DIM = "#7d6234", GOLD_FAINT = "#6f5629";
 const INK = "#f0ebe1", INK2 = "#e6e1d8", INK3 = "#cfc9be";
 const MUT = "#a9a399", MUT2 = "#8a8378", MUT3 = "#6b665e", DIM = "#544f49", DIM2 = "#413d38", DIM3 = "#302d29";
 const H1 = "#1c1b18", H2 = "#201f1c", H3 = "#232120", H4 = "#191816";
-const SERIF = "'Source Serif 4', Georgia, serif";
-const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+const SERIF = FONT.serif;
+const MONO = FONT.mono;
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 

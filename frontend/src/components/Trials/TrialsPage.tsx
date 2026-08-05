@@ -15,7 +15,13 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getTrackedHcpIds } from "../../lib/watchlists";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { fetchTrials, buildSurface, type Trial, type Region, type TrialsSurface } from "../../lib/trials";
+import { FONT } from "../../lib/designTokens";
 
+// Register migration 2026-08-05: only the font stacks matched tokens exactly.
+// The entire color palette is WARM-tinted (board through inks) — every value is
+// a near-twin of the cool SCALE/GOLD/INK ramps, none byte-identical, so all
+// stay local. Converging Trials onto the cool register (esp. amber #c8892e →
+// GOLD.gold #be914d) is a visible change reserved for its own commit.
 const P = {
   board: "#0b0a09", panel: "#0f0e0c", well: "#0d0c0a",
   line: "#1c1a15", line2: "#221f19", line3: "#2a251c",
@@ -23,8 +29,8 @@ const P = {
   ink0: "#e9e5d7", ink1: "#c3bcac", ink2: "#8d8778", ink3: "#7e786b",
   ink4: "#6a6558", ink5: "#57534a", ink6: "#4c483e", link: "#a9bfc7",
 };
-const MONO = "'IBM Plex Mono', ui-monospace, monospace";
-const SERIF = "'Source Serif 4', Georgia, serif";
+const MONO = FONT.mono;
+const SERIF = FONT.serif;
 const mono = (s: number, w = 400, ls = ".13em") => ({ fontFamily: MONO, fontSize: s, fontWeight: w, letterSpacing: ls });
 const serif = (s: number, w = 400) => ({ fontFamily: SERIF, fontSize: s, fontWeight: w });
 

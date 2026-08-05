@@ -17,7 +17,7 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import NavBar from "../NavBar";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
-import { CONTENT_WIDTH } from "../../lib/designTokens";
+import { CONTENT_WIDTH, FONT, SCALE, GOLD } from "../../lib/designTokens";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -60,30 +60,33 @@ function useIsMobile(): boolean {
   return mobile;
 }
 
-// Frame palette (self-contained; the ledger's visual system per the Build Reference)
+// Frame palette (self-contained; the ledger's visual system per the Build Reference).
+// Register tokens substituted 2026-08-05 for exact value matches only; every
+// remaining literal is a near-twin of a token (one digit off) or a cohort
+// semantic — converging those is a visible change, deferred on purpose.
 const P = {
-  page: "#08090A",
-  card: "#0E1013",
-  head: "#0B0D10",
-  rowHover: "#131619",
-  drawer: "#0A0C0F",
-  band: "#0A0C0E",
-  line: "rgba(255,255,255,.06)",
+  page: "#08090A", // near-twin of SCALE.ground #0a0a0a — NOT converged
+  card: SCALE.panel, // #0e1013, exact
+  head: "#0B0D10", // near-twin of SCALE.well — NOT converged
+  rowHover: "#131619", // near-twin of SCALE.raised — NOT converged
+  drawer: "#0A0C0F", // near-twin of SCALE.well (one digit from P.band) — NOT converged
+  band: SCALE.well, // #0a0c0e, exact
+  line: "rgba(255,255,255,.06)", // alpha hairlines; register rules are opaque — NOT converged
   lineMed: "rgba(255,255,255,.09)",
   lineStrong: "rgba(255,255,255,.14)",
-  amber: "#E0A75E", // rank, platform-wide
-  ink0: "#EDEEEF",
+  amber: GOLD.goldBright, // #e0a75e — this file is the token's source
+  ink0: "#EDEEEF", // cool-white ink ramp, no token equal (INK.* is warm) — local
   ink1: "#E7E8E9",
   ink2: "#C6CACD",
   ink3: "#A8AEB3",
-  ink4: "#8F959A",
-  ink5: "#7C8288",
-  ink6: "#63696E",
-  dash: "#71787E",
+  ink4: "#8F959A", // near-twin of GREY.grey2 — NOT converged
+  ink5: "#7C8288", // near-twin of GREY.grey3 (1 RGB point) — NOT converged
+  ink6: "#63696E", // near-twin of GREY.grey5 — NOT converged
+  dash: "#71787E", // between GREY.grey3/grey4 — NOT converged
 } as const;
 
-const mono = (s: number, w = 400) => ({ font: `${w} ${s}px 'IBM Plex Mono',ui-monospace,monospace` } as const);
-const serif = (s: number, w = 400) => ({ font: `${w} ${s}px 'Source Serif 4',Georgia,serif` } as const);
+const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
+const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.serif}` } as const);
 
 // The in-page cohort tab toggle (CohortTabs) was removed 2026-07-31 when the ledger
 // became the PEOPLE destination: the PeopleNavStrip's cohort row is the single cohort
