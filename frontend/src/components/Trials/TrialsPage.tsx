@@ -15,7 +15,7 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getTrackedHcpIds } from "../../lib/watchlists";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { fetchTrials, buildSurface, type Trial, type Region, type TrialsSurface } from "../../lib/trials";
-import { FONT, GROUND, LINE, COOL, WARM } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, COOL, WARM, GOLD } from "../../lib/designTokens";
 
 // Two Ramps consolidation 2026-08-05: the frame retired this file's warm board
 // (#0b0a09, one byte from ground) and its three warm lines into the cool
@@ -28,7 +28,9 @@ import { FONT, GROUND, LINE, COOL, WARM } from "../../lib/designTokens";
 const P = {
   board: GROUND.g0, panel: "#0f0e0c", well: "#0d0c0a",
   line: LINE.l0, line2: LINE.l1, line3: LINE.l2,
-  amber: "#c8892e", amberHi: "#e0a544", amberDim: "#8a6a2c", rosterLink: "#b9762c",
+  // Gold convergence 2026-08-05: amber #c8892e and rosterLink #b9762c both fold
+  // into GOLD.gold; amberHi #e0a544 into GOLD.bright; amberDim #8a6a2c into GOLD.dim.
+  amber: GOLD.gold, amberHi: GOLD.bright, amberDim: GOLD.dim, rosterLink: GOLD.gold,
   ink0: WARM.prose, ink1: "#c3bcac", ink2: "#8d8778", ink3: "#7e786b",
   ink4: "#6a6558", ink5: "#57534a", ink6: COOL.floor, link: "#a9bfc7",
 };

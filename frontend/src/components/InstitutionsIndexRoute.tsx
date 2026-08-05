@@ -21,7 +21,7 @@ import {
   type InstitutionAgg,
 } from "../lib/institutionRegistry";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT } from "../lib/designTokens";
+import { FONT, GOLD } from "../lib/designTokens";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 
@@ -36,7 +36,7 @@ const C = {
   ink4: "#6a6862",
   ink5: "#575651",
   ink6: "#4e4d49",
-  amber: "#c9a35c",
+  amber: GOLD.bright, // was #c9a35c — gold convergence 2026-08-05
   chipBorder: "#2b2b30",
   link: "#8fa3ab",
   toggleBg: "#1d1d20",

@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT, COOL } from "../../lib/designTokens";
+import { FONT, COOL, GOLD } from "../../lib/designTokens";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import {
   getForumIndex,
@@ -40,7 +40,7 @@ const C = {
   hair: "#141719",
   borderMed: "#22272d",
   frameBorder: "#1e2228",
-  gold: "#c9973f",
+  gold: GOLD.gold, // was #c9973f — gold convergence 2026-08-05
   goldDim: "#b08b4e",
   goldDark: "#8a6c3a",
   goldBright: "#e0b063",

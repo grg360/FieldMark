@@ -201,7 +201,7 @@ function EvidenceChipView({ row, mobile = false }: { row: LedgerRow; mobile?: bo
         {chip.segments.map((seg, i) => (
           <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: "#7A5520" }}>·</span>
-            <span style={{ color: chip.strength === "anchored" && i === 1 ? "#C98D33" : P.ink4 }}>{seg}</span>
+            <span style={{ color: chip.strength === "anchored" && i === 1 ? GOLD.gold : P.ink4 }}>{seg}</span>
           </span>
         ))}
       </span>

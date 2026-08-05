@@ -5,7 +5,7 @@
 // hidden — with no "coming soon" badge (messaged separately).
 
 import type { CSSProperties, ReactNode } from "react";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, GOLD } from "../../lib/designTokens";
 import type { ComplianceState } from "../../lib/fieldIntelligence";
 
 export const mono = (size: number, color: string = COLOR.ink3): CSSProperties => ({
@@ -40,7 +40,7 @@ export function SimulatedChip({ size = 9 }: { size?: number }) {
   return (
     <span
       style={{
-        ...mono(size, "#b98f45"),
+        ...mono(size, GOLD.gold),
         letterSpacing: "0.12em",
         fontWeight: 600,
         background: "rgba(232,160,32,0.06)",
@@ -64,7 +64,7 @@ export function ProvenanceChip({ seed, size = 9 }: { seed: boolean; size?: numbe
     return (
       <span
         style={{
-          ...mono(size, "#b98f45"),
+          ...mono(size, GOLD.gold),
           letterSpacing: "0.12em",
           fontWeight: 600,
           background: "rgba(232,160,32,0.06)",

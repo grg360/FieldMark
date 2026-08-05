@@ -33,11 +33,14 @@ import {
   type TrialEvent,
   type CongressEvent,
 } from "../../lib/theWeek";
+import { GOLD as GOLD_T } from "../../lib/designTokens";
 
 // ── palette + type (from the frame) ──
 const PAGE = "#0B0A09", CARD2 = "#171613";
 const BORDER = "#2B2823", BORDER2 = "#26241F", HAIR = "#23211D";
-const GOLD = "#C9A45E", GOLD2 = "#E6C588", GOLD_EDGE = "#4A422C";
+// #C9A45E (soft-gold quartet) folded into GOLD.bright 2026-08-05; GOLD2 and
+// GOLD_EDGE are per-surface values outside the convergence ledger.
+const GOLD = GOLD_T.bright, GOLD2 = "#E6C588", GOLD_EDGE = "#4A422C";
 const INK1 = "#EDE8DD", INK2 = "#C4BEB0", INK3 = "#B4AE9F", MID = "#8F8A7C";
 const MID2 = "#7E7869", DIM = "#6E6A60";
 const SERIF = "Newsreader, Georgia, serif";

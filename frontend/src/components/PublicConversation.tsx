@@ -37,10 +37,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { classifyVoice } from "../lib/voiceClassification";
+import { GOLD as GOLD_T } from "../lib/designTokens";
 
 const BG = "#0f0e0d", BG2 = "#0c0b0a", BAND = "#131110", CARD = "#151311";
 const HAIR = "rgba(255,255,255,0.07)", HAIR2 = "rgba(255,255,255,0.09)", HAIR3 = "rgba(255,255,255,0.14)";
-const GOLD = "#d8a949", AMBER = "#c9962f", BRONZE = "#a07f34";
+// AMBER #c9962f folded into GOLD.gold 2026-08-05; the #d8a949 mid-gold and
+// bronze are per-surface assignments outside the convergence ledger.
+const GOLD = "#d8a949", AMBER = GOLD_T.gold, BRONZE = "#a07f34";
 const INK = "#f0e9dc", INK2 = "#e8e3d9", INK3 = "#c4bdaf", MID = "#a49c8e", MID2 = "#9d968a", DIM = "#8d8578", FAINT = "#6f6961", FAINT2 = "#5f5a52";
 const SERIF = "'Spectral', Georgia, serif";
 const MONO = "'IBM Plex Mono', ui-monospace, monospace";

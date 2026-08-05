@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NavBar from "../NavBar";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { FONT, GROUND } from "../../lib/designTokens";
+import { FONT, GROUND, GOLD as GOLD_T } from "../../lib/designTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { ASSETS, DEPLOYMENT_ASSETS, BACKBONE_ASSETS } from "../../lib/assetConfig";
 import {
@@ -32,7 +32,9 @@ import {
 // visible change reserved for its own commit. (Local GOLD name shadows nothing:
 // only FONT is imported from designTokens here.)
 const BG = GROUND.g0, PANEL = "#0e0d0c", PANEL2 = "#111010"; // BG absorbed 2026-08-05 (was #0a0a09, one byte)
-const GOLD = "#c9903c", GOLD_DIM = "#7d6234", GOLD_FAINT = "#6f5629";
+// Gold convergence 2026-08-05: #c9903c folds into GOLD.gold; #7d6234 AND
+// #6f5629 both fold into GOLD.dim — the faint/dim distinction retires.
+const GOLD = GOLD_T.gold, GOLD_DIM = GOLD_T.dim, GOLD_FAINT = GOLD_T.dim;
 const INK = "#f0ebe1", INK2 = "#e6e1d8", INK3 = "#cfc9be";
 const MUT = "#a9a399", MUT2 = "#8a8378", MUT3 = "#6b665e", DIM = "#544f49", DIM2 = "#413d38", DIM3 = "#302d29";
 const H1 = "#1c1b18", H2 = "#201f1c", H3 = "#232120", H4 = "#191816";

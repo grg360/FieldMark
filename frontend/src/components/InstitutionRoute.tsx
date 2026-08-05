@@ -33,7 +33,7 @@ import {
 import { getCurrentUser } from "../lib/authHelpers";
 import { supabase } from "../lib/supabase";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT } from "../lib/designTokens";
+import { FONT, GOLD } from "../lib/designTokens";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import InstitutionResearchThemesPanel from "./InstitutionResearchThemesPanel";
@@ -50,7 +50,7 @@ const C = {
   ink3: "#8b887f",
   ink4: "#6a6862",
   ink5: "#575651",
-  amber: "#c9a35c",
+  amber: GOLD.bright, // was #c9a35c — gold convergence 2026-08-05
   link: "#8fa3ab",
 };
 

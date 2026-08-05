@@ -44,10 +44,13 @@ import {
   type TrackedHcpChip,
 } from "../../lib/home";
 import AppLayout from "../AppLayout";
+import { GOLD as GOLD_T } from "../../lib/designTokens";
 
 // ── palette (from the frame) ──────────────────────────────────────────────────
 const PAGE = "#0c0c0b", CARD = "#111110", BORDER = "#232321", HAIR = "#1b1b19";
-const GOLD = "#c9a25f", GOLD2 = "#e0aa4a", GOLD_LINK = "#e0c08a";
+// #c9a25f (soft-gold quartet) folded into GOLD.bright 2026-08-05; GOLD2 and
+// GOLD_LINK are per-surface mid-golds outside the convergence ledger.
+const GOLD = GOLD_T.bright, GOLD2 = "#e0aa4a", GOLD_LINK = "#e0c08a";
 const INK1 = "#f0ebe1", INK2 = "#e8e3d9", INK3 = "#c8c3ba";
 const MID = "#8a8681", MID2 = "#a5a097", DIM = "#5d5a54", DIM2 = "#3a3833";
 const RED = "#b5705c", GREEN = "#9dbfa4", STEEL = "#93a9ad";
