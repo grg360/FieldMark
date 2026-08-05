@@ -112,6 +112,23 @@ export const INK = {
   //   #a5a097, #a09a90)
 } as const;
 
+// ── INK_COOL — cool-white ink ramp (the ledger family's text system) ────────
+// Byte-identical (modulo hex case) across CohortLedger, CommunityHcpProfile
+// and HcpProfileBrief; also carried by ContactAccessCard,
+// ProfileRelationshipControls, ProfileSecondaryControls and (partially)
+// FieldInsights/InsightCard. Key names keep the frame's own indices — they are
+// already the shared vocabulary. Warm counterpart: INK (Pulse). Both families
+// are register; a surface picks one voice, never mixes within a block.
+// NEXT CONVERGENCE CANDIDATE (after the warm/cool decision): a cool PROSE step
+// — CohortLedger's #CDD1D4 and ForumIndex's #c9d0d8 are four points apart,
+// a family forming but not a token yet. Converging them is a visible change.
+export const INK_COOL = {
+  ink0: "#edeeef", // brightest — titles, primary values
+  ink1: "#e7e8e9", // primary text
+  ink2: "#c6cacd", // secondary text, control labels
+  ink3: "#a8aeb3", // tertiary text
+} as const;
+
 // ── GREY — cool label/data ramp, six steps ──────────────────────────────────
 // Pulse-born but platform-wide by copy-paste: ForumIndex (#98a0a8, #79818b,
 // #6b747e, #5a636d, #4f5862), CohortLedger/profiles (#8f959a, #7c8288 — one

@@ -17,7 +17,7 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import NavBar from "../NavBar";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
-import { CONTENT_WIDTH, FONT, SCALE, GOLD } from "../../lib/designTokens";
+import { CONTENT_WIDTH, FONT, SCALE, GOLD, INK_COOL } from "../../lib/designTokens";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -75,10 +75,10 @@ const P = {
   lineMed: "rgba(255,255,255,.09)",
   lineStrong: "rgba(255,255,255,.14)",
   amber: GOLD.goldBright, // #e0a75e — this file is the token's source
-  ink0: "#EDEEEF", // cool-white ink ramp, no token equal (INK.* is warm) — local
-  ink1: "#E7E8E9",
-  ink2: "#C6CACD",
-  ink3: "#A8AEB3",
+  ink0: INK_COOL.ink0, // cool-white ink ramp — this family is the token's source
+  ink1: INK_COOL.ink1,
+  ink2: INK_COOL.ink2,
+  ink3: INK_COOL.ink3,
   ink4: "#8F959A", // near-twin of GREY.grey2 — NOT converged
   ink5: "#7C8288", // near-twin of GREY.grey3 (1 RGB point) — NOT converged
   ink6: "#63696E", // near-twin of GREY.grey5 — NOT converged

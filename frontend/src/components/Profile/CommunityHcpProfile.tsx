@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import NavBar from "../NavBar";
-import { CONTENT_WIDTH, FONT, SCALE, GOLD } from "../../lib/designTokens";
+import { CONTENT_WIDTH, FONT, SCALE, GOLD, INK_COOL } from "../../lib/designTokens";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -36,15 +36,14 @@ import {
 } from "../../lib/communityProfile";
 
 // Register tokens substituted 2026-08-05 for exact value matches only (card,
-// band, amber). page/head/drawer and the ink4–6/dash greys are near-twins of
-// SCALE/GREY (one digit off) — converging them is a visible change, deferred.
-// ink0–3 are the ledger family's cool-white ramp (no token equal; INK.* is
-// warm); rose/teal are cohort semantics; alpha hairlines stay per frame.
+// band, amber, ink0–3 → INK_COOL). page/head/drawer and the ink4–6/dash greys
+// are near-twins of SCALE/GREY (one digit off) — converging them is a visible
+// change, deferred. rose/teal are cohort semantics; alpha hairlines stay per frame.
 const P = {
   page: "#08090A", card: SCALE.panel, head: "#0B0D10", band: SCALE.well, drawer: "#0A0C0F",
   line: "rgba(255,255,255,.06)", lineMed: "rgba(255,255,255,.09)", lineStrong: "rgba(255,255,255,.14)",
   amber: GOLD.goldBright, rose: "#B0848F", // Community cohort marker (ledger)
-  ink0: "#EDEEEF", ink1: "#E7E8E9", ink2: "#C6CACD", ink3: "#A8AEB3", ink4: "#8F959A",
+  ink0: INK_COOL.ink0, ink1: INK_COOL.ink1, ink2: INK_COOL.ink2, ink3: INK_COOL.ink3, ink4: "#8F959A",
   ink5: "#7C8288", ink6: "#63696E", dash: "#71787E", teal: "#7FB3BB",
 } as const;
 const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
