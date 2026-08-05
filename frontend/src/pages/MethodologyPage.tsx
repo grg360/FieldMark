@@ -1,4 +1,5 @@
 import AppLayout from "../components/AppLayout";
+import PageHero from "../components/PageHero";
 
 const COHORT_COLOR_ESTABLISHED = "#FFD700";
 const COHORT_COLOR_RISING_STAR = "#9B6DFF";
@@ -53,24 +54,7 @@ const archetypeListStyle = {
   marginBottom: 14,
 };
 
-const pageHeadingStyle = {
-  fontSize: 32,
-  fontWeight: 600,
-  letterSpacing: "-0.02em",
-  color: "#F4F2EC",
-  marginTop: 8,
-  marginBottom: 8,
-  fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
-};
 
-const ledeStyle = {
-  fontSize: 16,
-  color: "#9B9892",
-  lineHeight: 1.65,
-  marginTop: 0,
-  marginBottom: 32,
-  fontStyle: "italic" as const,
-};
 
 export default function MethodologyPage() {
   const breadcrumbs = [
@@ -80,10 +64,16 @@ export default function MethodologyPage() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs} width="reading">
-      <h1 style={pageHeadingStyle}>How FieldMark Works</h1>
-      <p style={ledeStyle}>
-        FieldMark identifies and ranks Healthcare Professionals (HCPs) in specific therapeutic areas using public scientific and administrative data. This page explains how that works - what we measure, why, and the boundaries of what the platform can and cannot tell you.
-      </p>
+      {/* Reduced H1 (PageHero, Commit B 2026-08-05): same eyebrow + serif title
+          family as the register mastheads, smaller, no stats cluster. */}
+      <div style={{ marginBottom: 24 }}>
+        <PageHero
+          reduced
+          eyebrow="Fieldmark · Methodology"
+          title="How FieldMark Works"
+          dek="FieldMark identifies and ranks Healthcare Professionals (HCPs) in specific therapeutic areas using public scientific and administrative data. This page explains how that works - what we measure, why, and the boundaries of what the platform can and cannot tell you."
+        />
+      </div>
 
       <h2 style={sectionHeadingStyle}>The cohort model</h2>
       <p style={bodyStyle}>

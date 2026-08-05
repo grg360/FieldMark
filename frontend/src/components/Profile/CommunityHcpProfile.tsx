@@ -243,7 +243,7 @@ export default function CommunityHcpProfile() {
               <span style={{ color: P.amber, border: `1px solid rgba(224,167,94,.35)`, borderRadius: 3, padding: "3px 7px" }}>{STATUS_LABEL[status].toUpperCase()}</span>
               <span style={{ color: P.ink6 }}>NO PUBLICATION RECORD</span>
             </div>
-            <span style={{ ...serif(31, 400), color: P.ink0, letterSpacing: "-.01em" }}>{p.hcp.name}</span>
+            <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em" }}>{p.hcp.name}</span> // H3 title normalized 2026-08-05: all four profile spines at serif 30/400
             <span style={{ ...mono(10.5), color: P.ink4, letterSpacing: ".02em" }}>
               {p.hcp.specialty ? `${p.hcp.specialty}` : ""}
               {p.hcp.institution ? (

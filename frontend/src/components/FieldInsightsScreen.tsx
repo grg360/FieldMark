@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getFieldInsightsForCurrentUser, formatHcpDisplayName, formatInsightDate, type FieldInsight } from "../lib/fieldInsights";
 import { CATEGORY_LABELS, getCategoryColors, type InsightCategory, type InsightStrength } from "../lib/insightCategories";
 import AppLayout from "./AppLayout";
+import PageHero from "./PageHero";
 
 function buildEmailBody(insights: FieldInsight[]): string {
   if (insights.length === 0) {
@@ -137,28 +138,15 @@ export default function FieldInsightsScreen() {
   return (
     <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <div style={{ marginBottom: 24 }}>
-        <div style={{ marginBottom: 4 }}>
-          <span
-            style={{
-              fontSize: 11,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: IG_ACCENT,
-              fontWeight: 600,
-            }}
-          >
-            Insight Gen
-          </span>
-        </div>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#E8E6DF", margin: "0 0 8px", lineHeight: 1.2 }}>
-              Field Insights
-            </h1>
-            <p style={{ fontSize: 14, color: "#9B9892", margin: 0, maxWidth: 640, lineHeight: 1.5 }}>
-              Structured field intelligence from your HCP interactions. Each insight ties published beliefs to current
-              beliefs across your territory. Share this view with your manager to surface emerging themes and patterns.
-            </p>
+            {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
+            <PageHero
+              reduced
+              eyebrow="Insight Gen"
+              title="Field Insights"
+              dek="Structured field intelligence from your HCP interactions. Each insight ties published beliefs to current beliefs across your territory. Share this view with your manager to surface emerging themes and patterns."
+            />
           </div>
           <button
             type="button"

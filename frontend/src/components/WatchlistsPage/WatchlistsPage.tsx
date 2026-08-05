@@ -19,6 +19,7 @@ import TrackedHcpsFilterBar from "./TrackedHcpsFilterBar";
 import WatchlistDetailHeader from "./WatchlistDetailHeader";
 import CreateWatchlistModal from "./CreateWatchlistModal";
 import EditWatchlistModal from "./EditWatchlistModal";
+import PageHero from "../PageHero";
 
 export default function WatchlistsPage() {
   const { watchlistId } = useParams<{ watchlistId?: string }>();
@@ -121,9 +122,10 @@ export default function WatchlistsPage() {
   return (
     <>
       <AppLayout breadcrumbs={buildBreadcrumbs()}>
-        <h1 style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "#F4F2EC", margin: "0 0 16px 0" }}>
-          Watchlists
-        </h1>
+        {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
+        <div style={{ margin: "0 0 16px 0" }}>
+          <PageHero reduced eyebrow="Fieldmark · Watchlists" title="Watchlists" />
+        </div>
 
         {loading ? (
           <div style={{ fontSize: 14, color: "#6B6A65", padding: "48px 0", textAlign: "center" }}>

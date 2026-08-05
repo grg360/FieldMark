@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getRisingBoard, archetypeColor, type RisingBoard } from "../../lib/risingProfile";
 import AppLayout from "../AppLayout";
+import PageHero from "../PageHero";
 import { FONT, GROUND, LINE, COOL, GOLD } from "../../lib/designTokens";
 
 // Register tokens (2026-08-05): fresh surface, consumes the register — see the
@@ -220,11 +221,22 @@ export default function RisingLedger() {
     <AppLayout width="wide">
       <div style={{ fontFamily: MONO, color: INK1, paddingBottom: 40 }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 14px", flexWrap: "wrap" }}>
+        <div style={{ padding: "14px 0 18px" }}>
+          <PageHero
+            eyebrow="RIS · Rising ledger"
+            meta="ONE BOARD · TWO MODES · WEEKLY BUILD"
+            title="Rising Ledger / NSCLC"
+            stats={[
+              { value: scoped.length.toLocaleString("en-US"), label: "IN VIEW" },
+              { value: String(usCount), label: "US" },
+              { value: String(euCount), label: "EU" },
+              { value: total.toLocaleString("en-US"), label: "TOTAL BOARD", gold: true },
+            ]}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 0 14px", flexWrap: "wrap" }}>
           <div style={{ padding: "2px 5px", background: "#1c2a26", font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>RIS</div>
-          <div style={mono(9, MUT2, 0.12)}>RISING LEDGER / NSCLC</div>
           <div style={{ flex: 1 }} />
-          <div style={mono(8, DIM2, 0.11)}>ONE BOARD · TWO MODES</div>
           <div style={{ display: "flex", gap: 2 }}>
             <div onClick={() => setMode("table")} style={{ cursor: "pointer", padding: "5px 10px", ...chip(mode === "table"), font: `500 8.5px/1.3 ${MONO}`, letterSpacing: ".11em" }}>▤ REGISTER</div>
             <div onClick={() => setMode("quadrant")} style={{ cursor: "pointer", padding: "5px 10px", ...chip(mode === "quadrant"), font: `500 8.5px/1.3 ${MONO}`, letterSpacing: ".11em" }}>◱ QUADRANT</div>
@@ -232,16 +244,10 @@ export default function RisingLedger() {
         </div>
 
         <Card style={{ padding: "18px 20px" }}>
+          {/* counts moved to the PageHero cluster (Commit B); the card keeps the
+              scope note + region controls */}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 26, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ font: `500 22px/1 ${MONO}`, color: INK0 }}>{scoped.length.toLocaleString("en-US")}</div>
-              <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13) }}>IN VIEW · {scopeLabel}</div>
-            </div>
-            <div style={{ width: 1, height: 34, background: LINE.l2 }} />
-            <div>
-              <div style={{ font: `400 13px/1.5 ${MONO}`, color: MUT }}>{usCount} US · {euCount} EU</div>
-              <div style={{ marginTop: 5, ...mono(8, MUT2, 0.13) }}>DEFAULT SCOPE · {(usCount + euCount).toLocaleString("en-US")} OF {total.toLocaleString("en-US")}</div>
-            </div>
+            <div style={{ ...mono(8, MUT2, 0.13) }}>IN VIEW · {scopeLabel}</div>
             <div style={{ flex: 1, minWidth: 160 }} />
             <div style={{ maxWidth: 400, ...serif(11, MUT3) }}>
               The remaining {(total - usCount - euCount).toLocaleString("en-US")} are real and stay reachable. The default

@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
+import PageHero from "../PageHero";
 import { supabase } from "../../lib/supabase";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { taIdForApiSlug } from "../../lib/api";
@@ -201,17 +202,22 @@ function WeekBody({
         {/* MAIN COLUMN */}
         <div style={{ display: "flex", flexDirection: "column", gap: 30, minWidth: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
-            {/* Honest window label — a fortnight of new links, plus a dated rank
-                comparison. Not "the seven days just closed". */}
-            <div style={mono(11, MID2, ".18em")}>THE FORTNIGHT · {week.window_label} · + RANK SINCE {fmtSnapshot(RANK_SNAPSHOT_DATE)}</div>
-            <h1 style={{ margin: 0, font: `400 ${isDesktop ? 40 : 28}px/1.12 ${SERIF}`, letterSpacing: "-.015em", color: INK1, maxWidth: "24ch" }}>
-              {headline}
-            </h1>
-            {week.state === "quiet" ? (
-              <div style={{ ...serif(isDesktop ? 19 : 16, INK3, 1.6, 300), maxWidth: "62ch" }}>
-                Fourteen days, {week.tracked_total} people. {ABSENCE.publications} {ABSENCE.trials} {ABSENCE.congress}
-              </div>
-            ) : (
+            {/* Hero — canonical H1 (PageHero, Commit B). The honest window label
+                rides the meta slot; the fortnight counters become the cluster. */}
+            <PageHero
+              narrow={!isDesktop}
+              eyebrow="The Fortnight"
+              meta={`${week.window_label} · + RANK SINCE ${fmtSnapshot(RANK_SNAPSHOT_DATE)}`}
+              title={headline}
+              maxTitleCh={24}
+              dek={week.state === "quiet" ? `Fourteen days, ${week.tracked_total} people. ${ABSENCE.publications} ${ABSENCE.trials} ${ABSENCE.congress}` : undefined}
+              stats={[
+                { value: String(week.tracked_total), label: "TRACKED" },
+                { value: String(eventCount), label: "EVENTS · 14D" },
+                { value: String(week.rank_movement.movers.length), label: "RANK MOVERS", gold: week.rank_movement.movers.length > 0 },
+              ]}
+            />
+            {week.state === "quiet" ? null : (
               <div style={{ ...mono(11, DIM, ".12em"), lineHeight: 1.7, maxWidth: "80ch" }}>
                 PUBLICATIONS: NEW LINKS OVER THE LAST 14 DAYS, ORDERED BY AUTHOR POSITION, THEN YOUR THERAPEUTIC AREA, THEN DATE. RANK: INDEX MOVEMENT SINCE {week.rank_movement.snapshot_date}. NOT A SCORE.
               </div>

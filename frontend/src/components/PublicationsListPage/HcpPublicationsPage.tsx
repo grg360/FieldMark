@@ -6,10 +6,11 @@ import {
   type PublicationListRow,
   type PublicationYearLedgerRow,
 } from "../../lib/publicationsList";
-import { COLOR, TYPE } from "../../lib/designTokens";
+import { COLOR } from "../../lib/designTokens";
 import AppLayout from "../AppLayout";
 import PublicationsSurface from "./PublicationsSurface";
 import FullCareerView from "./FullCareerView";
+import PageHero from "../PageHero";
 
 // The redesigned per-HCP publications surface. Two modes off the same route:
 //   • year-scoped (a year in nav-state or ?year=) → the dense/sparse band view.
@@ -69,11 +70,15 @@ export default function HcpPublicationsPage() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs} width="wide">
-      <h1 style={{ ...TYPE.display, fontSize: 22, margin: 0, marginBottom: 4 }}>
-        {hcpName ? `${hcpName} — Publications` : "Publications"}
-      </h1>
-      <div style={{ fontSize: 12, color: COLOR.ink3, marginBottom: 22, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: ".04em" }}>
-        {year != null ? `PUBLICATION YEAR ${year}` : "FULL PUBLISHED RECORD · ROLE IS THE STRUCTURE"}
+      {/* Reduced H1 (PageHero, Commit B 2026-08-05); the mono record label
+          rides the meta slot. */}
+      <div style={{ marginBottom: 22 }}>
+        <PageHero
+          reduced
+          eyebrow="Fieldmark · Publications"
+          meta={year != null ? `PUBLICATION YEAR ${year}` : "FULL PUBLISHED RECORD · ROLE IS THE STRUCTURE"}
+          title={hcpName ? `${hcpName} — Publications` : "Publications"}
+        />
       </div>
 
       {loading ? (

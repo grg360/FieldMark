@@ -44,6 +44,7 @@ import {
   type TrackedHcpChip,
 } from "../../lib/home";
 import AppLayout from "../AppLayout";
+import PageHero from "../PageHero";
 import { GOLD as GOLD_T } from "../../lib/designTokens";
 
 // ── palette (from the frame) ──────────────────────────────────────────────────
@@ -225,21 +226,22 @@ export default function HomePage() {
             <span className="fmhome-link" onClick={go.ledger} style={{ ...mono(10, 400, GOLD_LINK) }}>OPEN THE LEDGER ↗</span>
           </div>
 
-          {/* greeting + masthead metrics */}
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 40, padding: isDesktop ? "34px 30px 22px" : "20px 16px 14px", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              <div style={{ ...mono(10, 400, MID, ".16em") }}>{dateLine} · SESSION OPENED</div>
-              <h2 style={{ margin: 0, font: `300 ${isDesktop ? 44 : 30}px/1.05 ${SERIF}`, color: INK1, letterSpacing: "-.01em" }}>{greeting}, {firstName}</h2>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: isDesktop ? 46 : 24, flexWrap: "wrap" }}>
-              <Metric label="FOLLOW-UPS" sub="OVERDUE" value={String(stats.overdue)} color={RED} />
-              <Metric label="FOLLOW-UPS" sub="OPEN" value={String(stats.total)} color={INK2} />
-              {/* portfolio figure links to the watchlists surface (was orphaned — no live inbound nav) */}
-              <div className="fmhome-link" onClick={go.watchlists} style={{ cursor: "pointer" }}>
-                <Metric label="PORTFOLIO" sub="TRACKED" value={String(trackedCount)} color={INK2} />
-              </div>
-              <Metric label="RISING STARS" sub="COVERED" value={`${coverage?.coverage_percentage ?? 0}%`} color={GOLD} foot={coverage ? `${coverage.tracked_count} OF ${coverage.total_rising_stars_in_territory}` : undefined} />
-            </div>
+          {/* Hero — canonical H1 masthead (PageHero, Commit B 2026-08-05). The
+              old Metric row maps onto the stats cluster; overdue keeps its
+              alert red via valueColor, coverage keeps gold + its OF-foot. */}
+          <div style={{ padding: isDesktop ? "30px 30px 22px" : "18px 16px 14px" }}>
+            <PageHero
+              narrow={!isDesktop}
+              eyebrow="Fieldmark · Home"
+              meta={`${dateLine} · SESSION OPENED`}
+              title={`${greeting}, ${firstName}`}
+              stats={[
+                { value: String(stats.overdue), label: "FOLLOW-UPS OVERDUE", valueColor: RED },
+                { value: String(stats.total), label: "FOLLOW-UPS OPEN" },
+                { value: String(trackedCount), label: "PORTFOLIO TRACKED", onClick: go.watchlists },
+                { value: `${coverage?.coverage_percentage ?? 0}%`, label: "RISING COVERED", gold: true, foot: coverage ? `${coverage.tracked_count} OF ${coverage.total_rising_stars_in_territory}` : undefined },
+              ]}
+            />
           </div>
 
           {/* ledger strip */}
@@ -494,16 +496,6 @@ export default function HomePage() {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-function Metric({ label, sub, value, color, foot }: { label: string; sub: string; value: string; color: string; foot?: string }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
-      <span style={mono(9, 400, MID, ".14em")}>{label}</span>
-      <span style={mono(9, 400, DIM, ".14em")}>{sub}</span>
-      <span style={{ font: `400 30px/1 ${MONO}`, color, paddingTop: 3 }}>{value}</span>
-      {foot ? <span style={mono(9, 400, DIM, ".1em")}>{foot}</span> : null}
-    </div>
-  );
-}
 
 function SectionHead({ label, note, link, right }: { label: string; note?: string; link?: { text: string; onClick: () => void }; right?: React.ReactNode }) {
   return (

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import AppLayout from "../AppLayout";
+import PageHero from "../PageHero";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
 import { FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
@@ -780,14 +781,24 @@ export default function CohortLedger() {
           onPickCohort={(key) => navigate(`/cohorts/ledger/${key}`)}
         />
         <div style={{ padding: "24px 20px 96px", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+          {/* Hero — canonical H1 (PageHero, Commit B 2026-08-05): the ledger's
+              title leaves the card header for a page hero; the header row keeps
+              the cohort tick + the meta line at card scale. */}
+          <div style={{ padding: "6px 0 22px" }}>
+            <PageHero
+              narrow={isMobile}
+              eyebrow={`${cfg.tag} · Cohort ledger`}
+              title={cfg.title}
+              stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT" }] : undefined}
+            />
+          </div>
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
 
-            {/* header — title + meta stack on mobile so the long meta line doesn't crush */}
+            {/* header — cohort tick + meta line (title moved to the page hero) */}
             <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 6 : 0, justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
               <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <span style={{ width: 3, height: 14, background: cfg.markerColor }} />
                 <span style={{ ...mono(9.5, 600), color: cfg.markerColor, letterSpacing: ".14em" }}>{cfg.tag}</span>
-                <span style={{ ...mono(13, 500), color: P.ink1, letterSpacing: ".02em" }}>{cfg.title}</span>
               </span>
               <span style={{ ...mono(10.5), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
             </div>

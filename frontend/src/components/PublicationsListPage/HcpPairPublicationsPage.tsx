@@ -8,6 +8,7 @@ import {
 import { COLOR } from "../../lib/designTokens";
 import AppLayout from "../AppLayout";
 import PublicationList from "./PublicationList";
+import PageHero from "../PageHero";
 
 async function fetchHcpName(hcpId: string): Promise<string> {
   const { data } = await supabase
@@ -68,15 +69,9 @@ export default function HcpPairPublicationsPage() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs} width="reading">
+      {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 22, color: COLOR.ink1, fontWeight: 600, marginBottom: 4 }}>
-          {headerTitle}
-        </div>
-        {headerSubtitle && (
-          <div style={{ fontSize: 13, color: COLOR.ink3 }}>
-            {headerSubtitle}
-          </div>
-        )}
+        <PageHero reduced eyebrow="Fieldmark · Co-authorship" title={headerTitle} dek={headerSubtitle || undefined} />
       </div>
       {loading ? (
         <div style={{ fontSize: 13, color: COLOR.ink4 }}>Loading publications...</div>

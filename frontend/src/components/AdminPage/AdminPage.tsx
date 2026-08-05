@@ -17,6 +17,7 @@ import AdminKillSwitch from "./AdminKillSwitch";
 import AdminReferrals from "./AdminReferrals";
 import AdminUsers from "./AdminUsers";
 import { PALETTE, buttonStyle } from "./adminUi";
+import PageHero from "../PageHero";
 
 /**
  * The Garrett-only admin page. Replaces hand-SQL invite management.
@@ -98,11 +99,15 @@ export default function AdminPage() {
           flexWrap: "wrap",
         }}
       >
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 500, color: PALETTE.text, margin: 0 }}>Admin</h1>
-          <p style={{ fontSize: 12, color: PALETTE.dim, margin: "6px 0 0" }}>
-            Invite system control. Every action here runs through an is_admin-gated server RPC.
-          </p>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          {/* Reduced H1 (PageHero, Commit B) — quieter by design: /admin is a
+              functional view reached from a link, not a destination. */}
+          <PageHero
+            reduced
+            eyebrow="Fieldmark · Admin"
+            title="Admin"
+            dek="Invite system control. Every action here runs through an is_admin-gated server RPC."
+          />
         </div>
         <button
           type="button"

@@ -10,6 +10,7 @@ import { resolvePrimaryTaId, taDisplayNameForId } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { COLOR, ELEVATION, TYPE } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
+import PageHero from "./PageHero";
 
 const POLARITY_OPTIONS: { value: PositionType | "all"; label: string; color: string }[] = [
   { value: "all", label: "All", color: "#9B9892" },
@@ -121,13 +122,16 @@ export default function HcpPositionsPage() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
-      <h1 style={{ ...TYPE.display, fontSize: 22, margin: 0, marginBottom: 6 }}>
-        All Scientific Positions
-      </h1>
-      <div style={{ fontSize: 13, color: COLOR.ink3, marginBottom: 24 }}>
-        {hcpName
-          ? `All extracted scientific positions for ${hcpName}${taId ? ` (${taDisplayNameForId(taId)})` : ""}`
-          : `All extracted scientific positions for this investigator${taId ? ` (${taDisplayNameForId(taId)})` : ""}`}
+      {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
+      <div style={{ marginBottom: 24 }}>
+        <PageHero
+          reduced
+          eyebrow="Fieldmark · Positions"
+          title="All Scientific Positions"
+          dek={hcpName
+            ? `All extracted scientific positions for ${hcpName}${taId ? ` (${taDisplayNameForId(taId)})` : ""}`
+            : `All extracted scientific positions for this investigator${taId ? ` (${taDisplayNameForId(taId)})` : ""}`}
+        />
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>

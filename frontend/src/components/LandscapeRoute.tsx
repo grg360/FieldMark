@@ -9,6 +9,7 @@ import {
 import { indicationSlugToLabel } from "../lib/routeSlugs";
 import { COLOR } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
+import PageHero from "./PageHero";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
 import LandscapeQuadrantChart from "./LandscapeQuadrantChart";
 
@@ -70,11 +71,16 @@ export default function LandscapeRoute() {
         >
           {"\u2190"} Home
         </button>
-        <h1 style={{ fontSize: 22, color: COLOR.ink1, margin: "8px 0 4px", fontWeight: 600 }}>
-          {taLabel} Landscape
-        </h1>
-        <div style={{ fontSize: 13, color: COLOR.ink4 }}>
-          Top 100 US Rising Stars {"\u00b7"} momentum vs visibility
+        <div style={{ margin: "10px 0 4px" }}>
+          <PageHero
+            eyebrow={"Fieldmark · Landscape"}
+            title={`${taLabel} Landscape`}
+            dek={"Top 100 US Rising Stars · momentum vs visibility"}
+            stats={[
+              { value: String(points.length || 100), label: "PLOTTED" },
+              { value: "MOM × VIS", label: "AXES" },
+            ]}
+          />
         </div>
       </div>
 

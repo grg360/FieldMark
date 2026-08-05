@@ -10,6 +10,7 @@ import { institutionToSlug } from "../../lib/institutionUtils";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import AppLayout from "../AppLayout";
 import PublicationList from "./PublicationList";
+import PageHero from "../PageHero";
 
 export default function PublicationsListPage() {
   const [searchParams] = useSearchParams();
@@ -96,12 +97,8 @@ export default function PublicationsListPage() {
   return (
     <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, color: "#E8E6DF", margin: 0 }}>
-          {headerInfo.title}
-        </h1>
-        <div style={{ fontSize: 13, color: "#9B9892", marginTop: 6 }}>
-          {headerInfo.subtitle}
-        </div>
+        {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
+        <PageHero reduced eyebrow="Fieldmark · Publications" title={headerInfo.title} dek={headerInfo.subtitle} />
         {!loading && pubs.length > 0 ? (
           <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 8 }}>
             Showing {visiblePubs.length} of {pubs.length}{" "}

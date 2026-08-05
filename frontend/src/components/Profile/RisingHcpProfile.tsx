@@ -298,7 +298,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 </div>
               </div>
 
-              <div style={{ marginTop: 22, font: `400 27px/1.15 ${SERIF}`, color: INK0 }}>{name}</div>
+              <div style={{ marginTop: 22, font: `400 30px/1.12 ${SERIF}`, color: INK0, letterSpacing: "-.01em" }}>{name}</div> // H3 title normalized 2026-08-05: all four profile spines at serif 30/400
               <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                 <span style={serif(12, "#7fb3a4", 1.4)}>{p.hcp.institution_normalized ?? "INSTITUTION NOT ON RECORD"}</span>
                 <span style={{ color: DIM2, fontSize: 10 }}>·</span>

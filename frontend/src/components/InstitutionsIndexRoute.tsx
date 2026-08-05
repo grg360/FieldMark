@@ -23,6 +23,7 @@ import {
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { FONT, GOLD } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
+import PageHero from "./PageHero";
 
 const C = {
   bg: "#0a0a0b",
@@ -467,40 +468,20 @@ export default function InstitutionsIndexRoute() {
   return (
     <AppLayout width="wide">
       <div style={{ width: "100%", boxSizing: "border-box" }}>
-        {/* Header block */}
+        {/* Hero — canonical H1 (PageHero, Commit B 2026-08-05). The amber-edge
+            mono header becomes eyebrow/serif title/dek; the right meta lines
+            fold into the meta slot and the REPRESENTED count into the cluster. */}
         <div style={{ padding: isMobile ? "18px 16px 14px" : "26px 28px 0" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "space-between",
-              borderLeft: `2px solid ${C.amber}`,
-              paddingLeft: 14,
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ ...mono(11, { color: C.amber, ls: "0.16em", weight: 500 }) }}>INST</span>
-                <span style={{ ...mono(15, { color: C.ink1, ls: "0.1em", weight: 500 }) }}>INSTITUTIONS / {taUpper}</span>
-              </div>
-              <div style={{ fontFamily: FONT.serif, fontSize: 13, lineHeight: 1.5, fontWeight: 300, color: C.ink2 }}>
-                {loading
-                  ? "Resolving the registry…"
-                  : `${aggs.length} registry institutions carry at least one ranked ${taUpper} HCP. Registry institutions carrying none in this cohort are not listed.`}
-              </div>
-            </div>
-            {!isMobile ? (
-              <div style={{ textAlign: "right", ...mono(10, { lh: 1.7, color: C.ink4 }) }}>
-                <div>{aggs.length} REPRESENTED · PRIMARY LINK ONLY · SECONDARY LINKS ON THE RECORD</div>
-                <div style={{ color: C.ink6 }}>ORDERED BY RANKED-HCP COUNT · NOT A RANKING OF INSTITUTIONS</div>
-              </div>
-            ) : null}
-          </div>
-          {isMobile ? (
-            <div style={{ marginTop: 10, ...mono(9, { lh: 1.6, color: C.ink6 }) }}>
-              ORDERED BY RANKED-HCP COUNT · NOT A RANKING OF INSTITUTIONS
-            </div>
-          ) : null}
+          <PageHero
+            narrow={isMobile}
+            eyebrow="Inst"
+            meta={"PRIMARY LINK ONLY · ORDERED BY RANKED-HCP COUNT · NOT A RANKING"}
+            title={`Institutions / ${taUpper}`}
+            dek={loading
+              ? "Resolving the registry…"
+              : `${aggs.length} registry institutions carry at least one ranked ${taUpper} HCP. Registry institutions carrying none in this cohort are not listed.`}
+            stats={[{ value: String(aggs.length), label: "REPRESENTED" }]}
+          />
         </div>
 
         {/* Grouping toggle */}
