@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, GROUND, LINE } from "../../lib/designTokens";
 import { supabase } from "../../lib/supabase";
 import PageHero from "../PageHero";
 import {
@@ -203,7 +203,8 @@ export default function CongressCalendarPage() {
 
   return (
     <AppLayout>
-      <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 20, display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
+      <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, margin: "8px 0 24px", padding: "28px 32px 36px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, display: "flex", flexDirection: "column", gap: 24 }}>
         {/* header */}
         <div>
           {/* Full H1 (PageHero, Commit B follow-up 2026-08-05): serif title +

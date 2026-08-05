@@ -37,9 +37,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { classifyVoice } from "../lib/voiceClassification";
-import { GOLD as GOLD_T } from "../lib/designTokens";
+import { GOLD as GOLD_T, GROUND, LINE } from "../lib/designTokens";
 
-const BG = "#0f0e0d", BG2 = "#0c0b0a", BAND = "#131110", CARD = "#151311";
+// Commit C 2026-08-05: the conversation box joins the Pulse board scheme —
+// g2 board, g1 band/cards. Warm text/accents stay the frame's own.
+const BG = GROUND.g2, BG2 = GROUND.g1, BAND = GROUND.g1, CARD = GROUND.g1;
 const HAIR = "rgba(255,255,255,0.07)", HAIR2 = "rgba(255,255,255,0.09)", HAIR3 = "rgba(255,255,255,0.14)";
 // AMBER #c9962f folded into GOLD.gold 2026-08-05; the #d8a949 mid-gold and
 // bronze are per-surface assignments outside the convergence ledger.
@@ -151,7 +153,7 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
   const groupBRows = rows.slice(0, shown).filter((r) => r.resp < BOUNDARY);
 
   return (
-    <div style={{ background: BG, border: `1px solid ${HAIR2}`, fontFamily: MONO }}>
+    <div style={{ background: BG, border: `1px solid ${LINE.l1}`, margin: "8px 0 24px", fontFamily: MONO }}>
       {/* title band */}
       <div style={{ display: "flex", alignItems: narrow ? "flex-start" : "center", flexDirection: narrow ? "column" : "row", gap: narrow ? 8 : 14, justifyContent: "space-between", padding: narrow ? "14px 18px" : "15px 28px", background: CARD, borderBottom: `1px solid ${HAIR}` }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>

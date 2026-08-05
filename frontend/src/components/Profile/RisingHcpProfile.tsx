@@ -27,7 +27,7 @@ import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
 // cohort greens (#8fb8a6/#7fb3a4 — cohort marker, same class as the profile
 // family's sage/rose/teal), the visibility-axis blue, the archetype color
 // vocabulary, and the window-warning tinted well (#141008/#2a2519).
-const CARD = GROUND.g2;
+const CARD = GROUND.g1; // g1 well inside the g2 board (Commit C)
 const CARD_EDGE = LINE.l1;
 const RULE = LINE.l0;
 const RULE_SOFT = LINE.l0;
@@ -235,7 +235,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
   return (
     <AppLayout width="wide">
-      <div style={{ fontFamily: MONO, color: INK1, paddingBottom: 40 }}>
+      <div style={{ fontFamily: MONO, color: INK1, margin: "8px 0 24px", padding: "28px 36px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}` }}>
 
         {/* breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 14px", flexWrap: "wrap" }}>

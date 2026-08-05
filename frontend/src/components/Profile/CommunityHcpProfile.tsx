@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -41,7 +41,8 @@ import {
 // change, deferred. rose/teal are cohort semantics; alpha hairlines stay per frame.
 // ink1 carries COOL.ui since the 2026-08-05 consolidation (#e7e8e9 retired, Δ1.02).
 const P = {
-  page: "#08090A", card: GROUND.g2, head: "#0B0D10", band: GROUND.g1, drawer: "#0A0C0F",
+  // card is a g1 well inside the g2 board (Commit C 2026-08-05)
+  page: "#08090A", card: GROUND.g1, head: "#0B0D10", band: GROUND.g1, drawer: "#0A0C0F",
   line: "rgba(255,255,255,.06)", lineMed: "rgba(255,255,255,.09)", lineStrong: "rgba(255,255,255,.14)",
   amber: GOLD.rank, rose: "#B0848F", // Community cohort marker (ledger)
   ink0: COOL.ui, ink1: COOL.ui, ink2: COOL.prose, ink3: COOL.muted, ink4: "#8F959A",
@@ -101,7 +102,9 @@ function SectionHead({ id, glyph, tag, count, sub }: { id?: string; glyph: strin
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout width="wide">
-      <div style={{ width: "100%", boxSizing: "border-box", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+      {/* Commit C 2026-08-05: g2 board per the Pulse scheme; interior cards
+          are g1 wells. */}
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
         {children}
       </div>
     </AppLayout>

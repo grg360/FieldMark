@@ -34,11 +34,13 @@ import {
   type TrialEvent,
   type CongressEvent,
 } from "../../lib/theWeek";
-import { GOLD as GOLD_T } from "../../lib/designTokens";
+import { GOLD as GOLD_T, GROUND, LINE } from "../../lib/designTokens";
 
 // ── palette + type (from the frame) ──
-const PAGE = "#0B0A09", CARD2 = "#171613";
-const BORDER = "#2B2823", BORDER2 = "#26241F", HAIR = "#23211D";
+// Commit C 2026-08-05: warm board joins the Pulse scheme — g2 board, g1
+// wells, l1 edges, l0 interior rules.
+const PAGE = GROUND.g2, CARD2 = GROUND.g1;
+const BORDER = LINE.l1, BORDER2 = LINE.l0, HAIR = LINE.l0;
 // #C9A45E (soft-gold quartet) folded into GOLD.bright 2026-08-05; GOLD2 and
 // GOLD_EDGE are per-surface values outside the convergence ledger.
 const GOLD = GOLD_T.bright, GOLD2 = "#E6C588", GOLD_EDGE = "#4A422C";

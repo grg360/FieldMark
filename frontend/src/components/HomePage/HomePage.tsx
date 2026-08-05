@@ -45,10 +45,12 @@ import {
 } from "../../lib/home";
 import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
-import { GOLD as GOLD_T } from "../../lib/designTokens";
+import { GOLD as GOLD_T, GROUND, LINE } from "../../lib/designTokens";
 
 // ── palette (from the frame) ──────────────────────────────────────────────────
-const PAGE = "#0c0c0b", CARD = "#111110", BORDER = "#232321", HAIR = "#1b1b19";
+// Commit C 2026-08-05: the bespoke warm panel joins the Pulse board scheme —
+// g2 board, g1 wells, l1 edges, l0 interior rules.
+const PAGE = GROUND.g2, CARD = GROUND.g1, BORDER = LINE.l1, HAIR = LINE.l0;
 // #c9a25f (soft-gold quartet) folded into GOLD.bright 2026-08-05; GOLD2 and
 // GOLD_LINK are per-surface mid-golds outside the convergence ledger.
 const GOLD = GOLD_T.bright, GOLD2 = "#e0aa4a", GOLD_LINK = "#e0c08a";

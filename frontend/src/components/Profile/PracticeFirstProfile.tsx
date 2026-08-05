@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
+import { GROUND, LINE } from "../../lib/designTokens";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { getCurrentUser } from "../../lib/authHelpers";
@@ -39,8 +40,10 @@ import {
 
 // Frame palette — literals from the .dc.html.
 const F = {
-  page: "#0a0b0b", alt: "#0b0c0c", card: "#0d0e0e", hover: "#121414", well: "#101212",
-  line: "#1c1e1e", lineSub: "#141616", lineFaint: "#171919", border2: "#232626",
+  // Commit C 2026-08-05: surfaces/edges join the board scheme (g1 wells,
+  // l0/l1 rules); text + semantic accents stay the frame’s own.
+  page: "#0a0b0b", alt: "#0b0c0c", card: GROUND.g1, hover: "#121414", well: GROUND.g1,
+  line: LINE.l1, lineSub: LINE.l0, lineFaint: LINE.l0, border2: LINE.l2,
   bright: "#e6e2d8", body: "#cfcbc0", mid: "#b6b2a8", gray: "#9a9f9b", dim: "#8a8f8c",
   faint: "#7f857f", subtle: "#6b716e", ghost: "#5c625f", ghost2: "#4d534f",
   amber: "#d69a3c", amberBorder: "#493a20", blue: "#5b8dd9", blueBorder: "#2c3f5c",
@@ -789,7 +792,8 @@ export default function PracticeFirstProfile() {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout width="wide">
-      <div style={{ width: "100%", boxSizing: "border-box", color: F.body, fontFamily: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace", fontSize: 12, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" }}>
+      {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, color: F.body, fontFamily: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace", fontSize: 12, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" }}>
         {children}
       </div>
     </AppLayout>

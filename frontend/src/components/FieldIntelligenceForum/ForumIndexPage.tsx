@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT, COOL, GOLD } from "../../lib/designTokens";
+import { FONT, COOL, GOLD, GROUND, LINE } from "../../lib/designTokens";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import {
   getForumIndex,
@@ -30,15 +30,17 @@ const SCALE_THRESHOLD = 24;
 const INT = new Intl.NumberFormat("en-US");
 
 // ── Frame palette (terminal / near-black, muted gold; matched to Scientific Pulse) ──
+// Commit C 2026-08-05: box/cards/edges join the Pulse board scheme (g2 board,
+// g1 wells, l0/l1 rules); golds/inks stay the frame's own pending their pass.
 const C = {
-  surface: "#0a0c0e",
-  card: "#0e1114",
-  cardDark: "#0b0e11",
-  cardAlt: "#0c0f13",
-  border: "#16191e",
-  borderSoft: "#171a1f",
-  hair: "#141719",
-  borderMed: "#22272d",
+  surface: GROUND.g2,
+  card: GROUND.g1,
+  cardDark: GROUND.g1,
+  cardAlt: GROUND.g1,
+  border: LINE.l1,
+  borderSoft: LINE.l0,
+  hair: LINE.l0,
+  borderMed: LINE.l2,
   frameBorder: "#1e2228",
   gold: GOLD.gold, // was #c9973f — gold convergence 2026-08-05
   goldDim: "#b08b4e",
@@ -669,7 +671,7 @@ export default function ForumIndexPage() {
 
   return (
     <AppLayout width="wide">
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink, fontFamily: SERIF, overflow: "hidden", paddingBottom: narrow ? 24 : 0, borderRadius: narrow ? 0 : undefined }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink, margin: "8px 0 24px", fontFamily: SERIF, overflow: "hidden", paddingBottom: narrow ? 24 : 0 }}>
         <DisclosureBand narrow={narrow} tail={empty ? "APPLIES WHETHER OR NOT THREADS EXIST" : "APPLIES TO EVERY THREAD BELOW"} />
 
         {!loaded ? (

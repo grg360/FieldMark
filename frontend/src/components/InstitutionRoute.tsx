@@ -33,7 +33,7 @@ import {
 import { getCurrentUser } from "../lib/authHelpers";
 import { supabase } from "../lib/supabase";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT, GOLD } from "../lib/designTokens";
+import { FONT, GOLD, GROUND, LINE } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
 import InstitutionResearchThemesPanel from "./InstitutionResearchThemesPanel";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
@@ -430,7 +430,8 @@ export default function InstitutionRoute() {
 
   return (
     <AppLayout width="wide">
-      <div style={{ width: "100%", boxSizing: "border-box" }}>
+      {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", background: GROUND.g2, border: `1px solid ${LINE.l1}` }}>
         <div style={{ padding: `12px ${pad}`, borderBottom: `1px solid ${C.hair}`, ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>
           «{" "}
           <Link to={`/institutions/${taSlug}`} style={{ color: C.link }}>

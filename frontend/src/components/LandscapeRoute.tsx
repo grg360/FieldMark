@@ -7,7 +7,7 @@ import {
   type LandscapePoint,
 } from "../lib/api";
 import { indicationSlugToLabel } from "../lib/routeSlugs";
-import { COLOR } from "../lib/designTokens";
+import { COLOR, GROUND, LINE } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
@@ -54,6 +54,10 @@ export default function LandscapeRoute() {
       style={{
         fontFamily: "'IBM Plex Sans', system-ui, -apple-system, sans-serif",
         overflowX: "hidden",
+        // Commit C 2026-08-05: g2 board per the Pulse scheme.
+        margin: "8px 0 24px",
+        background: GROUND.g2,
+        border: `1px solid ${LINE.l1}`,
       }}
     >
       <div style={{ padding: "16px 16px 8px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>

@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { floorFixed } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
@@ -43,7 +43,7 @@ import {
 // ink1 carries COOL.ui since the 2026-08-05 consolidation (#e7e8e9 retired, Δ1.02).
 const P = {
   page: "#08090A",
-  card: GROUND.g2,
+  card: GROUND.g1, // g1 well inside the g2 board (Commit C)
   head: "#0B0D10",
   band: GROUND.g1,
   drawer: "#0A0C0F",
@@ -527,7 +527,9 @@ function ThemeRow({ t }: { t: ResearchTheme }) {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout width="wide">
-      <div style={{ width: "100%", boxSizing: "border-box", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+      {/* Commit C 2026-08-05: g2 board per the Pulse scheme; interior cards
+          are g1 wells. */}
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
         {children}
       </div>
     </AppLayout>

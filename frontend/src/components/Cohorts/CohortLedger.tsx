@@ -18,7 +18,7 @@ import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
-import { FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -67,7 +67,7 @@ function useIsMobile(): boolean {
 // semantic — converging those is a visible change, deferred on purpose.
 const P = {
   page: "#08090A", // near-twin of GROUND.g0 #0a0a0a — NOT converged
-  card: GROUND.g2, // #0e1013, exact
+  card: GROUND.g1, // g1 well inside the g2 board (Commit C)
   head: "#0B0D10", // near-twin of GROUND.g1 — NOT converged
   rowHover: "#131619", // near-twin of LINE.l0's value — NOT converged
   drawer: "#0A0C0F", // near-twin of GROUND.g1 (one digit from P.band) — NOT converged
@@ -780,7 +780,9 @@ export default function CohortLedger() {
           showScopeChips={false}
           onPickCohort={(key) => navigate(`/cohorts/ledger/${key}`)}
         />
-        <div style={{ padding: "24px 20px 96px", fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+        {/* Commit C 2026-08-05: g2 board per the Pulse scheme; the ledger card
+            inside is a g1 well with an l1 edge. */}
+        <div style={{ padding: "24px 20px 48px", margin: "8px 0 24px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
           {/* Hero — canonical H1 (PageHero, Commit B 2026-08-05): the ledger's
               title leaves the card header for a page hero; the header row keeps
               the cohort tick + the meta line at card scale. */}
@@ -792,7 +794,7 @@ export default function CohortLedger() {
               stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT" }] : undefined}
             />
           </div>
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
+          <div style={{ border: `1px solid ${LINE.l1}`, background: P.card }}>
 
             {/* header — cohort tick + meta line (title moved to the page hero) */}
             <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 6 : 0, justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>

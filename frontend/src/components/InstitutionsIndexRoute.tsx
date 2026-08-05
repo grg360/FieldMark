@@ -21,7 +21,7 @@ import {
   type InstitutionAgg,
 } from "../lib/institutionRegistry";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT, GOLD } from "../lib/designTokens";
+import { FONT, GOLD, GROUND, LINE } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
 
@@ -467,7 +467,8 @@ export default function InstitutionsIndexRoute() {
 
   return (
     <AppLayout width="wide">
-      <div style={{ width: "100%", boxSizing: "border-box" }}>
+      {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", background: GROUND.g2, border: `1px solid ${LINE.l1}` }}>
         {/* Hero — canonical H1 (PageHero, Commit B 2026-08-05). The amber-edge
             mono header becomes eyebrow/serif title/dek; the right meta lines
             fold into the meta slot and the REPRESENTED count into the cluster. */}

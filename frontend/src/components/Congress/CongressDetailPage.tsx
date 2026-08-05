@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, GROUND, LINE } from "../../lib/designTokens";
 import { supabase } from "../../lib/supabase";
 import {
   CONGRESSES,
@@ -303,7 +303,8 @@ export default function CongressDetailPage() {
 
   return (
     <AppLayout>
-      <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, paddingTop: 16, display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
+      <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, margin: "8px 0 24px", padding: "24px 32px 36px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, display: "flex", flexDirection: "column", gap: 20 }}>
         {/* breadcrumb */}
         <div style={{ ...mono(11, COLOR.ink5), display: "flex", gap: 8 }}>
           <Link to="/congress" style={{ color: COLOR.ink3 }}>Congress Calendar</Link><span>/</span>

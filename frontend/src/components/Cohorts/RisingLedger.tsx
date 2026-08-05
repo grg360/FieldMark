@@ -16,7 +16,7 @@ import { FONT, GROUND, LINE, COOL, GOLD } from "../../lib/designTokens";
 // Register tokens (2026-08-05): fresh surface, consumes the register — see the
 // palette note in Profile/RisingHcpProfile.tsx. Cohort greens + archetype
 // vocabulary stay local as semantics with no token counterpart.
-const CARD = GROUND.g2;
+const CARD = GROUND.g1; // g1 well inside the g2 board (Commit C)
 const CARD_EDGE = LINE.l1;
 const RULE = LINE.l0;
 const RULE_SOFT = LINE.l0;
@@ -219,7 +219,7 @@ export default function RisingLedger() {
 
   return (
     <AppLayout width="wide">
-      <div style={{ fontFamily: MONO, color: INK1, paddingBottom: 40 }}>
+      <div style={{ fontFamily: MONO, color: INK1, margin: "8px 0 24px", padding: "28px 36px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}` }}>
 
         <div style={{ padding: "14px 0 18px" }}>
           <PageHero
