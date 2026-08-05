@@ -68,9 +68,13 @@ export default function PageHero({
           display: "flex",
           alignItems: narrow ? "stretch" : "flex-end",
           flexDirection: narrow ? "column" : "row",
+          // Wrap, never clip: title length is content-dependent (greetings,
+          // headlines), so when the row is tight the cluster drops below the
+          // title instead of overflowing the column edge.
+          flexWrap: "wrap",
           justifyContent: "space-between",
           marginTop: reduced ? 14 : 20,
-          gap: narrow ? 22 : 60,
+          gap: narrow ? 22 : "24px 60px",
         }}
       >
         <div>
