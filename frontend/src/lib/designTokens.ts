@@ -8,10 +8,15 @@
 
 import type { CSSProperties } from "react";
 
-// ── Typefaces (IBM Plex superfamily; loaded in index.html) ──────────────────
+// ── Typefaces (loaded in index.html) ────────────────────────────────────────
+// serif changed 2026-08-05: 'IBM Plex Serif' → 'Source Serif 4', the register
+// serif already rendered by 6 of 9 top-level surfaces (Pulse is the reference).
+// Approved knowing it re-fonts the remaining FONT.serif consumers (Institutions,
+// Congress, ThreadPage/forum chrome, HCPCard, Assets panels, PublicationCard) —
+// all on the reconcile/rebuild list. See docs/design/DESIGN_SYSTEM_AUDIT.md §6.
 export const FONT = {
   sans: "'IBM Plex Sans', system-ui, sans-serif",
-  serif: "'IBM Plex Serif', Georgia, serif",
+  serif: "'Source Serif 4', Georgia, serif",
   mono: "'IBM Plex Mono', ui-monospace, monospace",
 } as const;
 
@@ -48,8 +53,96 @@ export const COLOR = {
   danger: "#E8704E", // Sign Out / destructive actions
 
   // Hairlines — containment only, never separation
+  // DEPRECATED for register surfaces: the register draws opaque rules from the
+  // SCALE ramp (line / lineStrong) instead of white-alpha hairlines.
   hair: "rgba(255,255,255,0.045)",
   hairStrong: "rgba(255,255,255,0.10)",
+} as const;
+// NOTE on COLOR: surfaceWell/surfaceCard/surfaceRaised (warm blacks) and
+// ink1–ink5 (warm parchment ramp) remain untouched for their 100+ existing
+// consumers, but are DEPRECATED for register work — use SCALE / INK / GREY
+// below. The two vocabularies stay separate on purpose until migration is done.
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE REGISTER — extracted 2026-08-05 from the current visual register, with
+// Pulse (components/Pulse/PulsePage.tsx frame palette) as the reference
+// implementation. Full derivation, variant mapping and file counts:
+// docs/design/DESIGN_SYSTEM_AUDIT.md + the token proposal it produced.
+// Rule: pick one surface's value verbatim, never average near-twins.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── SCALE — cool near-black, six steps ──────────────────────────────────────
+// One ramp serves surfaces AND rules: steps 1–3 are grounds/panels, steps 4–6
+// are raised surfaces and borders. panel/well were already exact-shared by
+// copy-paste across Pulse, CohortLedger, both profile spines and ForumIndex.
+// 129 of the 141 near-blacks in the tree (440 of 458 uses) map within ~13 RGB
+// points of a step; the exceptions are semantic tinted wells (amber/green),
+// which become rgba tints of their semantic color at migration, not steps.
+export const SCALE = {
+  ground: "#0a0a0a", // page ground (= COLOR.ground; absorbs #0a0a0b, #08090a…)
+  well: "#0a0c0e", // recessed panel (PulsePage panelDark; absorbs #0d0d10)
+  panel: "#0e1013", // default panel (PulsePage panel; absorbs #111113)
+  raised: "#14181d", // raised surface / soft rule (PulsePage borderSoft)
+  line: "#1c2026", // default rule (PulsePage border; absorbs legacy #1e1e22)
+  lineStrong: "#2a2f36", // emphasized rule (PulsePage borderMed; absorbs #2a2a30)
+} as const;
+
+// ── GOLD — the register's muted editorial gold family ───────────────────────
+// COLOR.amber (#E8A020) is NOT superseded: it stays the bright interactive /
+// score accent both generations share. These are the frame golds. The one-use
+// per-surface golds (#c9903c, #c8892e, #c98d33, #c9962f, #c9973f, #b98f45,
+// the #c9a2xx quartet, #6f5629, #7d6234) collapse into these at migration;
+// mid-golds (#d8a9xx, #d69a3c/#d99a3c, #e0a544) get assigned per-surface.
+export const GOLD = {
+  gold: "#be914d", // eyebrows, section ticks, kickers (PulsePage gold)
+  goldSoft: "#c9a55f", // caveat text, light accents (PulsePage goldCaveat)
+  goldBright: "#e0a75e", // score/index numerals (CohortLedger — already
+  //   exact-shared with HcpProfileBrief + CommunityHcpProfile)
+  goldMuted: "#7a6136", // gated/secondary numerals (PulsePage goldRank)
+  goldDeep: "#6b542f", // dimmest legible gold (PulsePage goldDim)
+} as const;
+
+// ── INK — warm parchment text on dark (register) ────────────────────────────
+export const INK = {
+  ink: "#e9e6df", // titles, primary text (PulsePage ink; shared w/ ForumIndex;
+  //   absorbs legacy #e8e6df, #f0ebe1, #ede8dd, #e6e3dc/dd at migration)
+  inkProse: "#c5bfb2", // serif body prose (PulsePage proseInk; absorbs
+  //   #c4beb0, #c3bcac, #b6b2a8/aa)
+  inkMuted: "#a9a396", // secondary text (PulsePage ink2; absorbs #a9a399,
+  //   #a5a097, #a09a90)
+} as const;
+
+// ── GREY — cool label/data ramp, six steps ──────────────────────────────────
+// Pulse-born but platform-wide by copy-paste: ForumIndex (#98a0a8, #79818b,
+// #6b747e, #5a636d, #4f5862), CohortLedger/profiles (#8f959a, #7c8288 — one
+// RGB point from grey3 —, #767c81, #71787e, #63696e) and Institutions
+// (#8fa3ab) all carry near-twins. All six values verbatim from PulsePage —
+// head2 and muted kept deliberately; the reference draws those distinctions.
+export const GREY = {
+  grey1: "#9aa0a8", // column heads, strong labels (PulsePage head)
+  grey2: "#8d939c", // sub-heads (PulsePage head2)
+  grey3: "#7b8189", // secondary labels (PulsePage muted3)
+  grey4: "#6d747d", // muted labels (PulsePage muted)
+  grey5: "#5f6670", // muted data, chart fills (PulsePage muted2)
+  grey6: "#4d545d", // faintest legible (PulsePage faint)
+} as const;
+
+// ── TRACK — canonical letter-spacing spellings ──────────────────────────────
+// One spelling per value ends the ".14em" / "0.14em" split: migrate both to
+// TRACK.t14 and the drift is gone mechanically. Value-named on purpose — these
+// are the register's observed steps, not yet a blessed ladder.
+export const TRACK = {
+  display: "-0.01em",
+  t04: "0.04em",
+  t06: "0.06em",
+  t08: "0.08em",
+  t10: "0.1em",
+  t12: "0.12em",
+  t14: "0.14em",
+  t16: "0.16em",
+  t18: "0.18em",
+  t20: "0.2em",
+  t22: "0.22em",
 } as const;
 
 // ── Type scale — nine roles (§Type scale) ───────────────────────────────────
