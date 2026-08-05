@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import NavBar from "../NavBar";
-import { CONTENT_WIDTH, FONT, SCALE, GOLD, INK_COOL } from "../../lib/designTokens";
+import { CONTENT_WIDTH, FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { floorFixed } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
@@ -37,24 +37,25 @@ import {
 
 // Ledger palette, verbatim (self-contained visual system per the Build Reference).
 // Register tokens substituted 2026-08-05 for exact value matches only (card,
-// band, amber, ink0–3 → INK_COOL). page/head/drawer and the ink4–6/dash greys
-// are near-twins of SCALE/GREY (one digit off) — converging them is a visible
+// band, amber, ink0–3 → COOL). page/head/drawer and the ink4–6/dash greys
+// are near-twins of GROUND/COOL (one digit off) — converging them is a visible
 // change, deferred. sage/teal are cohort semantics; alpha hairlines stay per frame.
+// ink1 carries COOL.ui since the 2026-08-05 consolidation (#e7e8e9 retired, Δ1.02).
 const P = {
   page: "#08090A",
-  card: SCALE.panel,
+  card: GROUND.g2,
   head: "#0B0D10",
-  band: SCALE.well,
+  band: GROUND.g1,
   drawer: "#0A0C0F",
   line: "rgba(255,255,255,.06)",
   lineMed: "rgba(255,255,255,.09)",
   lineStrong: "rgba(255,255,255,.14)",
-  amber: GOLD.goldBright,
+  amber: GOLD.rank,
   sage: "#6E8F76", // Established cohort marker
-  ink0: INK_COOL.ink0,
-  ink1: INK_COOL.ink1,
-  ink2: INK_COOL.ink2,
-  ink3: INK_COOL.ink3,
+  ink0: COOL.ui,
+  ink1: COOL.ui,
+  ink2: COOL.prose,
+  ink3: COOL.muted,
   ink4: "#8F959A",
   ink5: "#7C8288",
   ink6: "#63696E",

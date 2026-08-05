@@ -60,88 +60,82 @@ export const COLOR = {
 } as const;
 // NOTE on COLOR: surfaceWell/surfaceCard/surfaceRaised (warm blacks) and
 // ink1–ink5 (warm parchment ramp) remain untouched for their 100+ existing
-// consumers, but are DEPRECATED for register work — use SCALE / INK / GREY
-// below. The two vocabularies stay separate on purpose until migration is done.
+// consumers, but are DEPRECATED for register work — use GROUND / LINE / COOL /
+// WARM below. The two vocabularies stay separate until migration is done.
 
 // ════════════════════════════════════════════════════════════════════════════
-// THE REGISTER — extracted 2026-08-05 from the current visual register, with
-// Pulse (components/Pulse/PulsePage.tsx frame palette) as the reference
-// implementation. Full derivation, variant mapping and file counts:
-// docs/design/DESIGN_SYSTEM_AUDIT.md + the token proposal it produced.
-// Rule: pick one surface's value verbatim, never average near-twins.
+// THE REGISTER — consolidated 2026-08-05 per docs/design/Token Set - Two
+// Ramps.dc.html. One cool ground family shared by every surface; one minted
+// gold with derived states; two ink ramps split by READING MODE, not surface
+// type: scanning surfaces take COOL ink, long-dwell surfaces take WARM ink.
+// Ground, line, chrome and gold are cool everywhere, without exception.
+// Rule: pick one value verbatim, never average near-twins. Rule: a step below
+// a ramp's published text floor never carries live text.
 // ════════════════════════════════════════════════════════════════════════════
 
-// ── SCALE — cool near-black, six steps ──────────────────────────────────────
-// One ramp serves surfaces AND rules: steps 1–3 are grounds/panels, steps 4–6
-// are raised surfaces and borders. panel/well were already exact-shared by
-// copy-paste across Pulse, CohortLedger, both profile spines and ForumIndex.
-// 129 of the 141 near-blacks in the tree (440 of 458 uses) map within ~13 RGB
-// points of a step; the exceptions are semantic tinted wells (amber/green),
-// which become rgba tints of their semantic color at migration, not steps.
-export const SCALE = {
-  ground: "#0a0a0a", // page ground (= COLOR.ground; absorbs #0a0a0b, #08090a…)
-  well: "#0a0c0e", // recessed panel (PulsePage panelDark; absorbs #0d0d10)
-  panel: "#0e1013", // default panel (PulsePage panel; absorbs #111113)
-  raised: "#14181d", // raised surface / soft rule (PulsePage borderSoft)
-  line: "#1c2026", // default rule (PulsePage border; absorbs legacy #1e1e22)
-  lineStrong: "#2a2f36", // emphasized rule (PulsePage borderMed; absorbs #2a2a30)
+// ── GROUND — cool near-black, three steps (shared by every surface) ─────────
+// Values carried over byte-identical from SCALE.ground/well/panel. The warm
+// board #0b0a09 (Trials) sat one byte from ground.0 and retired into it.
+export const GROUND = {
+  g0: "#0a0a0a", // page field, deepest (absorbs #0a0a09, #0b0a09, #08090a…)
+  g1: "#0a0c0e", // panels, cards, rails (was SCALE.well)
+  g2: "#0e1013", // raised — headers, callouts (was SCALE.panel)
 } as const;
 
-// ── GOLD — the register's muted editorial gold family ───────────────────────
-// COLOR.amber (#E8A020) is NOT superseded: it stays the bright interactive /
-// score accent both generations share. These are the frame golds. The one-use
-// per-surface golds (#c9903c, #c8892e, #c98d33, #c9962f, #c9973f, #b98f45,
-// the #c9a2xx quartet, #6f5629, #7d6234) collapse into these at migration;
-// mid-golds (#d8a9xx, #d69a3c/#d99a3c, #e0a544) get assigned per-surface.
+// ── LINE — cool rules, three steps ──────────────────────────────────────────
+// Byte-identical carries of SCALE.raised/line/lineStrong, re-roled: #14181d is
+// a RULE now, not a surface (its raised-surface uses keep the value; only the
+// name changed). The warm lines #1c1a15/#221f19/#2a251c (Trials) retired into
+// l0/l1/l2 — a warm-ink surface carries cool rules.
+export const LINE = {
+  l0: "#14181d", // interior rules, row dividers, chart tracks
+  l1: "#1c2026", // default border
+  l2: "#2a2f36", // emphasis border, focus
+} as const;
+
+// ── GOLD — one minted accent, states derived and exported ───────────────────
+// States are exported rather than left to be re-minted at the call site — that
+// omission is what produced twenty-four golds in the first place. COLOR.amber
+// (#E8A020) is NOT superseded: bright interactive/score accent, both
+// generations. `rank` (#e0a75e, CohortLedger-born score numerals, shipping
+// exact across ledger + both profile spines + rising) is OUTSIDE the frame's
+// one-gold set — kept as an honest fourth member pending Design's call on
+// whether rank numerals converge to `bright`.
 export const GOLD = {
-  gold: "#be914d", // eyebrows, section ticks, kickers (PulsePage gold)
-  goldSoft: "#c9a55f", // caveat text, light accents (PulsePage goldCaveat)
-  goldBright: "#e0a75e", // score/index numerals (CohortLedger — already
-  //   exact-shared with HcpProfileBrief + CommunityHcpProfile)
-  goldMuted: "#7a6136", // gated/secondary numerals (PulsePage goldRank)
-  goldDeep: "#6b542f", // dimmest legible gold (PulsePage goldDim)
+  gold: "#be914d", // minted — eyebrows, kickers, links, section ticks
+  bright: "#d4a862", // derived — hover, focus
+  dim: "#8f6d3a", // derived — pressed, visited, dim accents
+  rank: "#e0a75e", // extracted, pre-dates this set — score/index numerals
 } as const;
 
-// ── INK — warm parchment text on dark (register) ────────────────────────────
-export const INK = {
-  ink: "#e9e6df", // titles, primary text (PulsePage ink; shared w/ ForumIndex;
-  //   absorbs legacy #e8e6df, #f0ebe1, #ede8dd, #e6e3dc/dd at migration)
-  inkProse: "#c5bfb2", // serif body prose (PulsePage proseInk; absorbs
-  //   #c4beb0, #c3bcac, #b6b2a8/aa)
-  inkMuted: "#a9a396", // secondary text (PulsePage ink2; absorbs #a9a399,
-  //   #a5a097, #a09a90)
+// ── COOL — one continuous ink+chrome ramp, nine steps, split by role ────────
+// Steps 1–4 and 9 extracted from what ships; 5–8 interpolated (verified
+// legible/distinct at real sizes, 2026-08-05 gate render). Live text stops at
+// `label` (the floor — last step ≥4.5:1 on g1); `faint`/`disabled`/`floor` are
+// non-text chrome only. #e7e8e9 (old INK_COOL.ink1) retired into `ui` —
+// Δ1.02, a distinction without a difference. The prose mints #CDD1D4
+// (CohortLedger) and #c9d0d8 (ForumIndex) retired into `prose`.
+export const COOL = {
+  ui: "#edeeef", // ink.ui — headings, active labels, sans body
+  prose: "#c6cacd", // ink.prose — serif long-form
+  muted: "#a8aeb3", // ink.muted — column labels, secondary copy
+  chromeStrong: "#9aa0a8", // meta, icons, timestamps
+  chrome: "#878e96", // default chrome, inactive tabs
+  label: "#757c84", // column headers, step numbers — TEXT FLOOR
+  faint: "#646b73", // non-text only: marks, inactive glyphs
+  disabled: "#585f68", // disabled controls only
+  floor: "#4d545d", // hairlines, lowest non-text chrome (= old GREY.grey6)
 } as const;
 
-// ── INK_COOL — cool-white ink ramp (the ledger family's text system) ────────
-// Byte-identical (modulo hex case) across CohortLedger, CommunityHcpProfile
-// and HcpProfileBrief; also carried by ContactAccessCard,
-// ProfileRelationshipControls, ProfileSecondaryControls and (partially)
-// FieldInsights/InsightCard. Key names keep the frame's own indices — they are
-// already the shared vocabulary. Warm counterpart: INK (Pulse). Both families
-// are register; a surface picks one voice, never mixes within a block.
-// NEXT CONVERGENCE CANDIDATE (after the warm/cool decision): a cool PROSE step
-// — CohortLedger's #CDD1D4 and ForumIndex's #c9d0d8 are four points apart,
-// a family forming but not a token yet. Converging them is a visible change.
-export const INK_COOL = {
-  ink0: "#edeeef", // brightest — titles, primary values
-  ink1: "#e7e8e9", // primary text
-  ink2: "#c6cacd", // secondary text, control labels
-  ink3: "#a8aeb3", // tertiary text
-} as const;
-
-// ── GREY — cool label/data ramp, six steps ──────────────────────────────────
-// Pulse-born but platform-wide by copy-paste: ForumIndex (#98a0a8, #79818b,
-// #6b747e, #5a636d, #4f5862), CohortLedger/profiles (#8f959a, #7c8288 — one
-// RGB point from grey3 —, #767c81, #71787e, #63696e) and Institutions
-// (#8fa3ab) all carry near-twins. All six values verbatim from PulsePage —
-// head2 and muted kept deliberately; the reference draws those distinctions.
-export const GREY = {
-  grey1: "#9aa0a8", // column heads, strong labels (PulsePage head)
-  grey2: "#8d939c", // sub-heads (PulsePage head2)
-  grey3: "#7b8189", // secondary labels (PulsePage muted3)
-  grey4: "#6d747d", // muted labels (PulsePage muted)
-  grey5: "#5f6670", // muted data, chart fills (PulsePage muted2)
-  grey6: "#4d545d", // faintest legible (PulsePage faint)
+// ── WARM — ink only, three steps ────────────────────────────────────────────
+// Warm holds only the ink half of the old fold: no ground, no line, no chrome,
+// no gold, and no step that cannot carry text. prose extracted from Trials
+// ink0; body/muted interpolated. Long-dwell surfaces only (asset monograph;
+// Trials/Drugs-index re-classified scanning → cool at their migration).
+export const WARM = {
+  prose: "#e9e5d7", // ink.prose.warm — serif body and headings
+  body: "#d8d3c2", // ink.body.warm — sans body inside prose panels
+  muted: "#b8b2a0", // ink.muted.warm — captions, chart labels; text floor
 } as const;
 
 // ── TRACK — canonical letter-spacing spellings ──────────────────────────────

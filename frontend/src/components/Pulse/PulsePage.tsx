@@ -5,7 +5,7 @@ import { PUBLICATION_GATE, formatWindowDate } from "../../lib/pulse";
 import { buildPulseLedger } from "../../lib/pulseLedger";
 import type { LedgerRow, PulseLedger } from "../../lib/pulseLedger";
 import type { PulsePayload } from "../../lib/pulse";
-import { FONT, SCALE, GOLD, INK, GREY, TRACK } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, GOLD, COOL, TRACK } from "../../lib/designTokens";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import AppLayout from "../AppLayout";
 
@@ -16,32 +16,35 @@ import AppLayout from "../AppLayout";
 // chrome (NavBar, footer) comes from AppLayout — the frame's own nav/footer are
 // not duplicated.
 
-// ── Frame palette — register tokens; this page was their reference, so every
-// mapping is an exact value match (designTokens.ts SCALE/GOLD/INK/GREY were
-// extracted from these entries verbatim). The six entries that stay literal
-// are chart plumbing: one file, one purpose, deliberately not tokens.
+// ── Frame palette — Pulse is the FROZEN VISUAL REFERENCE (Two Ramps applied
+// table: "0 changes"), so this map re-points only the entries whose values
+// survived the 2026-08-05 ramp consolidation byte-identical. Entries whose
+// token retired (warm INK trio, gold states, four of the six greys) revert to
+// surface-local literals rather than moving to a nearest-token value — the
+// reference keeps its exact pixels until Design re-judges it against the
+// consolidated set. The chart-plumbing literals were never tokens.
 const C = {
-  panel: SCALE.panel,
-  panelDark: SCALE.well,
-  border: SCALE.line,
-  borderSoft: SCALE.raised,
-  borderMed: SCALE.lineStrong,
+  panel: GROUND.g2,
+  panelDark: GROUND.g1,
+  border: LINE.l1,
+  borderSoft: LINE.l0,
+  borderMed: LINE.l2,
   bracket: "#3d444d", // chart bracket — surface-local
   gold: GOLD.gold,
-  goldDim: GOLD.goldDeep,
-  goldRank: GOLD.goldMuted,
-  goldCaveat: GOLD.goldSoft,
-  ink: INK.ink,
-  ink2: INK.inkMuted,
-  proseInk: INK.inkProse,
-  head: GREY.grey1,
-  head2: GREY.grey2,
-  muted: GREY.grey4,
-  muted2: GREY.grey5,
-  muted3: GREY.grey3,
-  faint: GREY.grey6,
+  goldDim: "#6b542f", // was GOLD.goldDeep — token retired, value frozen
+  goldRank: "#7a6136", // was GOLD.goldMuted — token retired, value frozen
+  goldCaveat: "#c9a55f", // was GOLD.goldSoft — token retired, value frozen
+  ink: "#e9e6df", // was INK.ink — warm INK retired (WARM.prose ≠ this), frozen
+  ink2: "#a9a396", // was INK.inkMuted — frozen
+  proseInk: "#c5bfb2", // was INK.inkProse — frozen
+  head: COOL.chromeStrong,
+  head2: "#8d939c", // was GREY.grey2 — no surviving step (COOL.chrome is interp #878e96), frozen
+  muted: "#6d747d", // was GREY.grey4 — retired between label/faint, frozen
+  muted2: "#5f6670", // was GREY.grey5 — retired (below text floor), frozen
+  muted3: "#7b8189", // was GREY.grey3 — near COOL.label but not equal, frozen
+  faint: COOL.floor,
   faint2: "#4a4436", // warm-tinted faint — not a scale member
-  seriesFill: GREY.grey5, // literal equal of the token; the one chart value tokenised
+  seriesFill: "#5f6670", // chart fill — same frozen value as muted2
   seriesEdge: "#383d44", // chart plumbing, surface-local from here down
   shareTrack: "#181c21",
   shareFill: "#6e6552",

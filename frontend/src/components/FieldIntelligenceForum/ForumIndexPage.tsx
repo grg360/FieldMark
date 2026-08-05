@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT } from "../../lib/designTokens";
+import { FONT, COOL } from "../../lib/designTokens";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import {
   getForumIndex,
@@ -49,7 +49,7 @@ const C = {
   ink2: "#ded9d0",
   ink3: "#9aa1a9",
   ink4: "#79818b",
-  ink5: "#c9d0d8",
+  ink5: COOL.prose, // prose mint #c9d0d8 retired into COOL.prose 2026-08-05 (Two Ramps)
   muted: "#6b747e",
   muted2: "#5a636d",
   faint: "#4f5862",

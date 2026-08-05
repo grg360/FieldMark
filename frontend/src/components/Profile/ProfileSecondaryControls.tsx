@@ -16,7 +16,7 @@
 // genuinely-live read here.
 
 import { useEffect, useState } from "react";
-import { INK_COOL } from "../../lib/designTokens";
+import { COOL } from "../../lib/designTokens";
 import { getHcpWebSignals, type WebSignal } from "../../lib/api";
 import ContactAccessCard from "../ContactAccessCard";
 import ContextualizeHCPForm from "../ContextualizeHCPForm";
@@ -42,7 +42,7 @@ const FI_FIELDS = [
 
 const btn = {
   padding: "8px 14px", background: "none", border: "1px solid rgba(255,255,255,.14)", cursor: "pointer",
-  font: "500 10px 'IBM Plex Mono',monospace", letterSpacing: ".08em", color: INK_COOL.ink2, borderRadius: 2,
+  font: "500 10px 'IBM Plex Mono',monospace", letterSpacing: ".08em", color: COOL.prose, borderRadius: 2,
 } as const;
 
 export default function ProfileSecondaryControls({ hcpId, hcpName, specialty }: {

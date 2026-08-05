@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { softDeleteNote, type InteractionType, type InsightStrength, type Note } from "../../lib/relationships";
 import { formatOccurredAt, formatRelative } from "./dateFormat";
-import { COLOR, FONT, INK_COOL } from "../../lib/designTokens";
+import { COLOR, FONT, COOL } from "../../lib/designTokens";
 import InsightComposer from "./InsightComposer";
 
 function interactionTypeLabel(type: InteractionType): string {
@@ -235,7 +235,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                   style={
                     ledger
                       ? { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none",
-                          color: INK_COOL.ink2, cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
+                          color: COOL.prose, cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
                       : { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "#E8E6DF", fontSize: 13, cursor: "pointer" }
                   }
                 >
@@ -250,7 +250,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                   style={
                     ledger
                       ? { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none",
-                          color: INK_COOL.ink2, cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
+                          color: COOL.prose, cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
                       : { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "#E8E6DF", fontSize: 13, cursor: "pointer" }
                   }
                 >

@@ -7,7 +7,7 @@
 // and the reason — never a two-bar line inviting a reading it cannot support.
 
 import { useState } from "react";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, GROUND, LINE, COOL, WARM } from "../../lib/designTokens";
 import {
   trajectory,
   designBadge,
@@ -23,16 +23,16 @@ const eyebrow = {
   fontWeight: 500,
   letterSpacing: "0.16em",
   textTransform: "uppercase" as const,
-  color: COLOR.ink3,
+  color: COOL.label,
 };
-const metaMono = { fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink4 } as const;
+const metaMono = { fontFamily: FONT.mono, fontSize: 10, color: COOL.label } as const;
 
 function CitationSpark({ paper }: { paper: LandingPaper }) {
   const traj = trajectory(paper.citation_counts_by_year, paper.pub_year);
   if (traj.verdict === "none") {
     return (
       <div style={{ flex: "none", width: 96, display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-end", gap: 7 }}>
-        <span style={{ fontFamily: FONT.mono, fontSize: 9, lineHeight: 1.4, letterSpacing: "0.04em", color: COLOR.ink5, textAlign: "right" }}>
+        <span style={{ fontFamily: FONT.mono, fontSize: 9, lineHeight: 1.4, letterSpacing: "0.04em", color: COOL.label, textAlign: "right" }}>
           NO TRAJECTORY
           <br />
           {(traj.reason ?? "").toUpperCase()}
@@ -72,18 +72,18 @@ function PaperCard({ paper }: { paper: LandingPaper }) {
   const badge = designBadge(paper.publication_types);
   const oa = oaLink(paper.open_access, paper.doi);
   return (
-    <div style={{ background: COLOR.surfaceCard, border: `1px solid ${COLOR.hairStrong}`, padding: "16px 18px" }}>
+    <div style={{ background: GROUND.g2, border: `1px solid ${LINE.l1}`, padding: "16px 18px" }}>
       <div style={{ display: "flex", gap: 14 }}>
-        <div style={{ fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.5, color: COLOR.ink4, width: 34, flex: "none" }}>
+        <div style={{ fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.5, color: COOL.label, width: 34, flex: "none" }}>
           {paper.pub_year}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: FONT.sans, fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: COLOR.ink1 }}>
+          <div style={{ fontFamily: FONT.sans, fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: WARM.prose }}>
             {paper.title}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, flexWrap: "wrap", ...metaMono }}>
             {badge ? (
-              <span style={{ padding: "4px 6px", border: `1px solid ${COLOR.hairStrong}` }}>{badge}</span>
+              <span style={{ padding: "4px 6px", border: `1px solid ${LINE.l1}` }}>{badge}</span>
             ) : null}
             {paper.short_name ? (
               <span style={{ padding: "4px 6px", border: `1px solid ${COLOR.indigo}`, color: COLOR.indigoLink }}>
@@ -92,14 +92,14 @@ function PaperCard({ paper }: { paper: LandingPaper }) {
             ) : null}
             {paper.journal ? <span>{paper.journal}</span> : null}
             {paper.citation_count != null ? (
-              <span style={{ color: COLOR.ink2 }}>{paper.citation_count.toLocaleString()} citations</span>
+              <span style={{ color: WARM.body }}>{paper.citation_count.toLocaleString()} citations</span>
             ) : null}
             {oa.url ? (
               <a href={oa.url} target="_blank" rel="noreferrer noopener" style={{ color: COLOR.indigoLink }}>
                 {oa.label}
               </a>
             ) : (
-              <span style={{ color: COLOR.ink5 }}>{oa.label}</span>
+              <span style={{ color: COOL.label }}>{oa.label}</span>
             )}
           </div>
         </div>
@@ -112,8 +112,8 @@ function PaperCard({ paper }: { paper: LandingPaper }) {
 function CompactCard({ paper }: { paper: LandingPaper }) {
   const traj = trajectory(paper.citation_counts_by_year, paper.pub_year);
   return (
-    <div style={{ padding: "14px 0", borderBottom: `1px solid ${COLOR.hair}` }}>
-      <div style={{ fontFamily: FONT.sans, fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: COLOR.ink1 }}>
+    <div style={{ padding: "14px 0", borderBottom: `1px solid ${LINE.l0}` }}>
+      <div style={{ fontFamily: FONT.sans, fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: WARM.prose }}>
         {paper.title}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap", ...metaMono }}>
@@ -122,7 +122,7 @@ function CompactCard({ paper }: { paper: LandingPaper }) {
           {paper.journal ? ` · ${paper.journal.toUpperCase()}` : ""}
         </span>
         {paper.citation_count != null ? (
-          <span style={{ color: COLOR.ink2 }}>{paper.citation_count.toLocaleString()} CIT</span>
+          <span style={{ color: WARM.body }}>{paper.citation_count.toLocaleString()} CIT</span>
         ) : null}
         <span style={{ color: verdictColor(traj.verdict) }}>
           {traj.verdict === "none" ? "NO TRAJECTORY" : VERDICT_LABEL[traj.verdict]}
@@ -140,11 +140,11 @@ function MobileLanding({ landing }: { landing: LandingPayload }) {
   return (
     <div>
       <div style={{ ...eyebrow, marginBottom: 6 }}>What is landing now</div>
-      <div style={{ fontFamily: FONT.serif, fontSize: 13, fontStyle: "italic", lineHeight: 1.5, color: COLOR.ink3, marginBottom: 14 }}>
+      <div style={{ fontFamily: FONT.serif, fontSize: 13, fontStyle: "italic", lineHeight: 1.5, color: WARM.body, marginBottom: 14 }}>
         By 12-month accrual, not lifetime total.
       </div>
       {papers.length === 0 ? (
-        <div style={{ fontFamily: FONT.serif, fontSize: 13, lineHeight: 1.55, color: COLOR.ink3 }}>
+        <div style={{ fontFamily: FONT.serif, fontSize: 13, lineHeight: 1.55, color: WARM.body }}>
           No paper yet carries a readable citation trajectory.
         </div>
       ) : (
@@ -186,12 +186,12 @@ export default function LandingNow({
           {papers.length} of {landing.total_pubs.toLocaleString()}
         </span>
       </div>
-      <div style={{ fontFamily: FONT.serif, fontSize: 14, fontStyle: "italic", lineHeight: 1.5, color: COLOR.ink3, marginBottom: 20 }}>
+      <div style={{ fontFamily: FONT.serif, fontSize: 14, fontStyle: "italic", lineHeight: 1.5, color: WARM.body, marginBottom: 20 }}>
         Ranked by citation accrual over the last twelve months, not lifetime total.
       </div>
 
       {papers.length === 0 ? (
-        <div style={{ fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.55, color: COLOR.ink3 }}>
+        <div style={{ fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.55, color: WARM.body }}>
           No paper yet carries a readable citation trajectory — every record here is under two years
           old. {landing.no_trajectory_count} papers are waiting on a first full year of citations.
         </div>

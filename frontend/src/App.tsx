@@ -41,6 +41,7 @@ import ActionTray from "./components/ActionTray";
 import AssetsIndexPage from "./components/Assets/AssetsIndexPage";
 import AssetPage from "./components/Assets/AssetPage";
 import CohortLedger from "./components/Cohorts/CohortLedger";
+import RisingLedger from "./components/Cohorts/RisingLedger";
 import HcpProfileBrief from "./components/Profile/HcpProfileBrief";
 import ProfileDispatch from "./components/Profile/ProfileDispatch";
 import PracticeFirstProfile from "./components/Profile/PracticeFirstProfile";
@@ -859,6 +860,11 @@ export default function App() {
           <Route path="/social" element={<SocialPage />} />
           <Route path="/social/:ta" element={<SocialPage />} />
           <Route path="/assets" element={<AssetsIndexPage />} />
+          {/* Rising ledger (register + quadrant modes) — the rising surface's own
+              board, docs/design/Rising Surface.dc.html. Runs ALONGSIDE the cohort
+              ledger's rising view for now; repointing /cohorts/ledger/rising-stars
+              here is an open decision. */}
+          <Route path="/rising" element={<RisingLedger />} />
           <Route path="/cohorts/ledger" element={<CohortLedger />} />
           {/* Addressable cohort (2026-07-31): established | rising-stars | community.
               Bare /cohorts/ledger stays routed as the Established default. */}

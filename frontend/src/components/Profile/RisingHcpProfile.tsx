@@ -1,0 +1,648 @@
+// Rising star profile — the third profile surface, keyed on rising board
+// membership (ProfileDispatch: rising board → academic spine → community).
+// Layout authority: docs/design/Rising Surface.dc.html (three profile states:
+// covered top-of-board, deep-board absence case, dual-board). Data:
+// hcp_rising_profile RPC, one call. The header renders rank/percentile/
+// components LIVE from hcp_rising_star_ranks_v3 — the narrative (prompt
+// rising_star_v4.0) is forbidden from citing them, so the two never compete.
+// Absence vocabulary: never a bare em-dash, never a blank — every missing
+// value renders as a named state with its mechanism.
+
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import NavBar from "../NavBar";
+import ProfileRelationshipControls from "./ProfileRelationshipControls";
+import ProfileSecondaryControls from "./ProfileSecondaryControls";
+import {
+  getRisingProfile, archetypeColor, careerYears, collabStanding, fmtPctl,
+  type RisingProfile,
+} from "../../lib/risingProfile";
+import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
+
+// Register tokens (2026-08-05): this surface was written fresh, so unlike the
+// migrated frames it CONSUMES the register rather than preserving frame bytes —
+// FONT.serif (Source Serif 4, not the frame's Spectral), FONT.mono, and the
+// SCALE/GOLD/INK/INK_COOL/GREY ramps, nearest-token where the frame value had
+// no exact equal. Kept local as semantics with no token counterpart: the rising
+// cohort greens (#8fb8a6/#7fb3a4 — cohort marker, same class as the profile
+// family's sage/rose/teal), the visibility-axis blue, the archetype color
+// vocabulary, and the window-warning tinted well (#141008/#2a2519).
+const PAGE = GROUND.g0;
+const CARD = GROUND.g2;
+const CARD_EDGE = LINE.l1;
+const RULE = LINE.l0;
+const RULE_SOFT = LINE.l0;
+// Warm-INK and mid-grey tokens retired in the 2026-08-05 Two Ramps
+// consolidation with no equal-value survivor. Values FROZEN as locals —
+// this is a scanning surface, so its re-ink to COOL awaits a Design pass
+// (the applied table does not cover the rising surface yet).
+const INK0 = "#e9e6df"; // was INK.ink (warm)
+const INK1 = COOL.prose;
+const INK2 = "#a9a396"; // was INK.inkMuted (warm)
+const SERIF_INK = "#c5bfb2"; // was INK.inkProse (warm)
+const MUT = "#8d939c"; // was GREY.grey2
+const MUT3 = "#7b8189"; // was GREY.grey3
+const MUT2 = "#5f6670"; // was GREY.grey5 — below the COOL text floor; flagged
+const DIM = COOL.floor;
+const DIM2 = COOL.floor;
+const FAINT = COOL.floor;
+// Gold states retired the same day (GOLD is now gold/bright/dim/rank); the
+// deep/muted/soft trio freezes here pending the gold-convergence pass.
+// Gold convergence 2026-08-05: deep and muted both fold into GOLD.dim (the
+// two-step dark-gold distinction retires); soft folds into GOLD.bright.
+const GOLD_DEEP = GOLD.dim;
+const GOLD_MUTED = GOLD.dim;
+const GOLD_SOFT = GOLD.bright;
+const GREEN = "#8fb8a6"; // rising cohort marker — semantic, no token counterpart
+const GREEN_DK = "#7fb3a4";
+const BLUE = "#6f8fa8"; // visibility axis — semantic pair with momentum green
+const RANK_GOLD = GOLD.rank;
+const MONO = FONT.mono;
+const SERIF = FONT.serif;
+
+const mono = (size: number, color: string, ls = 0.12, weight = 400): CSSProperties => ({
+  font: `${weight} ${size}px/1.5 ${MONO}`, letterSpacing: `${ls}em`, color,
+});
+const serif = (size: number, color: string, lh = 1.72): CSSProperties => ({
+  font: `400 ${size}px/${lh} ${SERIF}`, color,
+});
+
+function SectionHead({ title, sub, right, tick = GREEN_DK }: {
+  title: string; sub: string; right: string; tick?: string;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 14, margin: "34px 0 10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 2, height: 11, background: tick }} />
+        <div style={{ ...mono(10, INK0, 0.14, 600), whiteSpace: "nowrap" }}>{title}</div>
+      </div>
+      <div style={mono(9, MUT2, 0.1)}>{sub}</div>
+      <div style={{ flex: 1 }} />
+      <div style={{ ...mono(8, DIM2, 0.11), textAlign: "right" }}>{right}</div>
+    </div>
+  );
+}
+
+function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  return <div style={{ border: `1px solid ${CARD_EDGE}`, background: CARD, ...style }}>{children}</div>;
+}
+
+function PctlCell({ value, bar, evidence }: { value: number | null; bar: string; evidence: string }) {
+  return (
+    <div style={{ padding: "18px 16px", borderLeft: `1px solid ${RULE}` }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <div style={{ font: `500 26px/1 ${MONO}`, color: INK0 }}>
+          {value != null ? value.toFixed(2) : "NOT COMPUTED"}
+        </div>
+        {value != null && <div style={mono(8, DIM)}>PCTL</div>}
+      </div>
+      <div style={{ marginTop: 9, height: 4, background: RULE }}>
+        <div style={{ height: 4, background: bar, width: `${Math.max(0, Math.min(100, value ?? 0))}%` }} />
+      </div>
+      <div style={{ marginTop: 10, ...serif(10.5, INK2, 1.6) }}>{evidence}</div>
+    </div>
+  );
+}
+
+function quadrantOf(mom: number | null, vis: number | null): { name: string; color: string } {
+  if (mom == null || vis == null) return { name: "NOT PLACED", color: MUT3 };
+  const hiM = mom >= 80, hiV = vis >= 80;
+  if (hiM && hiV) return { name: "FUTURE KOLS", color: GREEN };
+  if (hiM) return { name: "EMERGING SPECIALISTS", color: RANK_GOLD };
+  if (hiV) return { name: "ESTABLISHED VISIBILITY", color: "#7f93ad" };
+  return { name: "EARLY DEVELOPMENT", color: MUT3 };
+}
+
+function archProse(archetype: string | null, sci: string, net: string): string {
+  switch (archetype) {
+    case "Balanced Rising Star":
+      return `Both engines are live: scientific momentum at ${sci} and network momentum at ${net}. Neither one is carrying the rank alone.`;
+    case "Scientific Accelerator":
+      return `Scientific momentum, at ${sci}, carries this rank ahead of the network side at ${net}.`;
+    case "Network Accelerator":
+      return `Network momentum, at ${net}, carries this rank ahead of the scientific side at ${sci}.`;
+    default:
+      return "Carried as a band fact, not a signal. In the deep bands most of the board classifies here — the label is the residual bucket, and it should not be read as a finding.";
+  }
+}
+
+export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
+  const navigate = useNavigate();
+  const [p, setP] = useState<RisingProfile | null | undefined>(undefined);
+
+  useEffect(() => {
+    let alive = true;
+    getRisingProfile(hcpId).then((d) => alive && setP(d)).catch(() => alive && setP(null));
+    return () => { alive = false; };
+  }, [hcpId]);
+
+  if (p === undefined) {
+    return (
+      <div style={{ background: PAGE, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
+        Loading rising profile…
+      </div>
+    );
+  }
+  if (p === null) {
+    return (
+      <div style={{ background: PAGE, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", ...mono(11, COOL.muted, 0.06) }}>
+        Not on the rising board — this route should not have dispatched here.
+      </div>
+    );
+  }
+
+  const name = p.hcp.preferred_display_name
+    || [p.hcp.first_name, p.hcp.last_name].filter(Boolean).join(" ")
+    || "Name not on record";
+  const rank = p.rising.rank;
+  const usRank = p.rising.us_rank;
+  const arch = p.rising.archetype;
+  const aColor = archetypeColor(arch, rank);
+  const composite = p.rising.rising_star_percentile;
+  const career = careerYears(p.hcp.career_first_pub_year);
+  const geo = p.hcp.nppes_practice_state || p.hcp.country || "GEOGRAPHY NOT ON RECORD";
+  const m = p.momentum;
+  const nw = p.network;
+  const insideWindow = usRank != null && usRank <= 100;
+  const dual = p.established_us != null;
+  const residualBand = rank > 600;
+
+  const ew = m ? `${m.early_start_year ?? 2016}–${m.early_end_year ?? 2020}` : "2016–2020";
+  const rw = m ? `${m.recent_start_year ?? 2021}–${m.recent_end_year ?? 2025}` : "2021–2025";
+  const seniorParsed = p.leadership != null || (m?.recent_senior_author_pct != null && m?.early_senior_author_pct != null);
+  const pctStr = (v: number | null | undefined) => (v == null ? null : `${(v * 100).toFixed(2)}%`);
+
+  const quad = quadrantOf(p.rising.momentum_component, p.rising.visibility_component);
+
+  const bandLabel = rank <= 100 ? "TOP 100" : rank <= 300 ? "101–300" : rank <= 600 ? "301–600" : "600+";
+  const bandNote = residualBand
+    ? "RESIDUAL BAND · 600+ · CLASSIFIER DEGENERATE · DE-EMPHASISED BY DESIGN"
+    : `CLASSIFYING BAND · ${bandLabel}${p.band_same_archetype != null && p.band_total != null ? ` · ${p.band_same_archetype} OF ${p.band_total} ${String(arch ?? "").toUpperCase()}` : ""}`;
+
+  const metaLine: string[] = [
+    m?.recent_total_pubs != null ? `${m.recent_total_pubs} PUBLICATIONS ${rw}` : "PUBLICATION WINDOWS NOT COMPUTED",
+    seniorParsed && m?.recent_senior_author_pct != null
+      ? `${pctStr(m.recent_senior_author_pct)} SENIOR-AUTHOR SHARE`
+      : "AUTHOR POSITION NOT PARSED",
+    nw?.recent_collaborator_count != null ? `${nw.recent_collaborator_count} COLLABORATORS` : "COLLABORATOR COUNT NOT COMPUTED",
+    (p.positions?.total ?? 0) > 0 ? `${p.positions!.total} EXTRACTED POSITIONS` : "OUTSIDE THE EXTRACTION WINDOW",
+    "NETWORK CENTRALITY PRESENT",
+    residualBand ? "ARCHETYPE RESIDUAL" : "ARCHETYPE CLASSIFIED",
+  ];
+
+  const deltas = [
+    {
+      label: "PUBLICATIONS",
+      prior: m?.early_total_pubs != null ? String(m.early_total_pubs) : "NOT COMPUTED",
+      current: m?.recent_total_pubs != null ? String(m.recent_total_pubs) : "NOT COMPUTED",
+      note: `${ew} → ${rw} · SOURCE TABLE`, color: INK0,
+    },
+    {
+      label: "COLLABORATORS",
+      prior: nw?.early_collaborator_count != null ? String(nw.early_collaborator_count) : "NOT COMPUTED",
+      current: nw?.recent_collaborator_count != null ? String(nw.recent_collaborator_count) : "NOT COMPUTED",
+      note: "DISTINCT CO-AUTHORS", color: INK0,
+    },
+    {
+      label: "CITATIONS",
+      prior: "BASE WINDOW",
+      current: m?.citation_velocity_delta != null
+        ? `${m.citation_velocity_delta >= 0 ? "+" : "−"}${Math.abs(m.citation_velocity_delta).toLocaleString("en-US")}`
+        : "NOT COMPUTED",
+      note: "GROWTH ACROSS THE WINDOW", color: m && (m.citation_velocity_delta ?? 0) >= 0 ? GREEN : INK2,
+    },
+    seniorParsed && m?.recent_senior_author_pct != null
+      ? {
+          label: "SENIOR-AUTHOR SHARE",
+          prior: pctStr(m.early_senior_author_pct) ?? "0%",
+          current: pctStr(m.recent_senior_author_pct)!,
+          note: "SOURCE TABLE", color: GREEN,
+        }
+      : {
+          label: "AUTHOR POSITION",
+          prior: "NOT PARSED",
+          current: "NOT PARSED",
+          note: "NOT PARSED ON THIS RECORD", color: MUT2,
+        },
+  ];
+
+  const posStates = [
+    { n: "1", label: "OUTSIDE THE EXTRACTION WINDOW", mech: "Never eligible; the window covers the top 100 US only.", applies: !insideWindow },
+    { n: "2", label: "ELIGIBLE, NO QUALIFYING PAPER", mech: "No recent first- or senior-authored paper with a full abstract.", applies: insideWindow && (p.positions?.total ?? 0) === 0 },
+    { n: "3", label: "EXTRACTION RAN, YIELDED NOTHING", mech: "Papers qualified; no position cleared the confidence floor.", applies: insideWindow && (p.positions?.total ?? 0) === 0 },
+  ];
+
+  const label = (t: string) => <div style={mono(8, DIM, 0.14)}>{t}</div>;
+
+  return (
+    <div style={{ background: PAGE, minHeight: "100vh", fontFamily: MONO, color: INK1, paddingBottom: 80 }}>
+      <NavBar />
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 22px" }}>
+
+        {/* breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 14px", flexWrap: "wrap" }}>
+          <div style={{ padding: "2px 5px", background: "#1c2a26", font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>RIS</div>
+          <div style={mono(9, MUT2)}>RISING / NSCLC</div>
+          <div style={{ color: LINE.l2, fontSize: 9 }}>›</div>
+          <div style={mono(9, MUT2)}>
+            {usRank != null ? `RANK #${usRank} US` : `RANK #${rank.toLocaleString("en-US")} GLOBAL`}
+            {dual ? ` · EST #${p.established_us!.rank} US` : ""}
+          </div>
+          <div style={{ color: LINE.l2, fontSize: 9 }}>›</div>
+          <div onClick={() => navigate("/rising")} style={{ cursor: "pointer", ...mono(9, GREEN_DK) }}>↑ BACK TO RISING LEDGER</div>
+        </div>
+
+        {/* hero */}
+        <Card>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 300px" }}>
+            <div style={{ padding: "20px 22px 16px", borderRight: `1px solid ${RULE}`, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", columnGap: 24, rowGap: 18 }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <div style={{ font: `600 40px/1 ${MONO}`, letterSpacing: "-.02em", color: RANK_GOLD }}>
+                      #{(usRank ?? rank).toLocaleString("en-US")}
+                    </div>
+                    <div style={{ font: `500 13px/1 ${MONO}`, letterSpacing: ".06em", color: MUT }}>
+                      {usRank != null ? "US" : "GLOBAL"}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13) }}>
+                    {usRank != null ? "RISING RANK · 208-PERSON US BOARD" : "RISING RANK · 1,583-PERSON BOARD"}
+                  </div>
+                </div>
+                <div style={{ flex: "0 0 auto", borderLeft: `1px solid ${LINE.l2}`, paddingLeft: 24 }}>
+                  {dual ? (
+                    <>
+                      <div style={{ font: `500 18px/1 ${MONO}`, color: INK1, whiteSpace: "nowrap" }}>EST #{p.established_us!.rank} US</div>
+                      <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>ALSO ON THE ESTABLISHED BOARD</div>
+                    </>
+                  ) : usRank != null ? (
+                    <>
+                      <div style={{ font: `500 22px/1 ${MONO}`, color: INK1, whiteSpace: "nowrap" }}>#{rank.toLocaleString("en-US")}</div>
+                      <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>GLOBAL · 1,583 RISING</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ font: `500 13px/1 ${MONO}`, color: INK1, whiteSpace: "nowrap" }}>NO US RANK</div>
+                      <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>OUTSIDE THE US BOARD</div>
+                    </>
+                  )}
+                </div>
+                <div style={{ flex: "0 1 auto", minWidth: 190, maxWidth: 230 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+                    <div style={{ font: `500 22px/1 ${MONO}`, color: INK1 }}>{fmtPctl(composite)}</div>
+                    {composite != null && <div style={mono(9, MUT2, 0.1)}>PCTL</div>}
+                  </div>
+                  <div style={{ marginTop: 6, height: 3, background: LINE.l0 }}>
+                    <div style={{ height: 3, background: GREEN, width: `${composite ?? 0}%` }} />
+                  </div>
+                  <div style={{ marginTop: 6, ...mono(8, MUT2, 0.13) }}>COMPOSITE PERCENTILE · IN COHORT</div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 22, font: `400 27px/1.15 ${SERIF}`, color: INK0 }}>{name}</div>
+              <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                <span style={serif(12, "#7fb3a4", 1.4)}>{p.hcp.institution_normalized ?? "INSTITUTION NOT ON RECORD"}</span>
+                <span style={{ color: DIM2, fontSize: 10 }}>·</span>
+                <span style={mono(10, MUT, 0.08)}>{geo}</span>
+                <span style={{ color: DIM2, fontSize: 10 }}>·</span>
+                <span style={mono(9, MUT2, 0.1)}>
+                  {career != null ? `${career} YR CAREER AGE` : "CAREER AGE NOT ON RECORD"}
+                </span>
+              </div>
+              <div style={{ marginTop: 5, ...mono(8, DIM2, 0.13) }}>
+                · {p.hcp.npi_number ? "VERIFIED NPI REGISTRY" : "NPI NOT ON RECORD"}
+              </div>
+
+              <div style={{ marginTop: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Link to={`/hcp/${hcpId}/brief`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${GOLD_DEEP}`, color: RANK_GOLD, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>+ GENERATE BRIEF</Link>
+                <Link to={`/hcp/${hcpId}/publications`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${LINE.l2}`, color: INK2, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>ALL PUBLICATIONS ↗</Link>
+              </div>
+            </div>
+
+            <div style={{ padding: "20px 20px 16px", display: "flex", flexDirection: "column" }}>
+              {label("ARCHETYPE")}
+              <div style={{ marginTop: 9, font: `500 15px/1.25 ${MONO}`, letterSpacing: ".02em", color: aColor }}>
+                {(arch ?? "NOT CLASSIFIED").toUpperCase()}
+              </div>
+              <div style={{ marginTop: 10, height: 1, background: LINE.l0 }} />
+              <div style={{ marginTop: 10, ...serif(11.5, residualBand ? MUT3 : SERIF_INK, 1.6) }}>
+                {archProse(arch, fmtPctl(p.rising.scientific_momentum_percentile), fmtPctl(p.rising.network_momentum_percentile))}
+              </div>
+              <div style={{ flex: 1, minHeight: 14 }} />
+              <div style={mono(8, DIM2, 0.11)}>{bandNote}</div>
+            </div>
+          </div>
+          <div style={{ borderTop: `1px solid ${RULE}`, padding: "10px 22px", display: "flex", gap: 14, flexWrap: "wrap" }}>
+            {metaLine.map((t) => (
+              <div key={t} style={mono(8, COOL.floor, 0.12)}>{t}</div>
+            ))}
+          </div>
+        </Card>
+
+        {/* momentum & visibility */}
+        <SectionHead title="MOMENTUM & VISIBILITY" sub="FOUR COMPONENTS · TWO ENGINES"
+          right="PERCENTILES WITHIN THE RISING COHORT · NEVER AGAINST ESTABLISHED" />
+        <Card>
+          <div style={{ display: "grid", gridTemplateColumns: "104px 1fr 1fr" }}>
+            <div style={{ padding: "12px 14px", borderBottom: `1px solid ${RULE}` }} />
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${RULE}`, borderLeft: `1px solid ${RULE}`, ...mono(9, MUT, 0.14, 600) }}>SCIENTIFIC</div>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${RULE}`, borderLeft: `1px solid ${RULE}`, ...mono(9, MUT, 0.14, 600) }}>NETWORK</div>
+
+            <div style={{ padding: "18px 14px", borderBottom: `1px solid ${RULE}` }}>
+              <div style={mono(9, INK0, 0.14, 600)}>MOMENTUM</div>
+            </div>
+            <div style={{ borderBottom: `1px solid ${RULE}` }}>
+              <PctlCell value={p.rising.scientific_momentum_percentile} bar={GREEN}
+                evidence={m?.early_total_pubs != null && m?.recent_total_pubs != null
+                  ? `${m.early_total_pubs} papers ${ew} → ${m.recent_total_pubs} papers ${rw}.`
+                  : "Window counts not computed for this record."} />
+            </div>
+            <div style={{ borderBottom: `1px solid ${RULE}` }}>
+              <PctlCell value={p.rising.network_momentum_percentile} bar={GREEN}
+                evidence={nw?.early_collaborator_count != null && nw?.recent_collaborator_count != null
+                  ? `${nw.early_collaborator_count} → ${nw.recent_collaborator_count} distinct collaborators across the two windows.`
+                  : "Collaborator windows not computed for this record."} />
+            </div>
+
+            <div style={{ padding: "18px 14px" }}>
+              <div style={mono(9, INK0, 0.14, 600)}>VISIBILITY</div>
+            </div>
+            <PctlCell value={p.rising.scientific_visibility_percentile} bar={BLUE}
+              evidence={m?.citation_velocity_delta != null
+                ? `Citation volume ${m.citation_velocity_delta >= 0 ? "grew" : "moved"} by ${m.citation_velocity_delta.toLocaleString("en-US")} over the same period — reception of the output, not its size.`
+                : "Citation window not computed for this record."} />
+            <PctlCell value={p.rising.network_visibility_percentile} bar={BLUE}
+              evidence="Position in the co-authorship graph. Present for 100% of the rising board." />
+          </div>
+
+          <div style={{ borderTop: `1px solid ${RULE}`, background: GROUND.g1, padding: "14px 18px", display: "flex", alignItems: "center", gap: 26, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={mono(8, DIM, 0.13)}>MOMENTUM COMPONENT</div>
+              <div style={{ font: `500 14px/1 ${MONO}`, color: INK1 }}>{fmtPctl(p.rising.momentum_component)}</div>
+            </div>
+            <div style={{ width: 1, height: 16, background: LINE.l2 }} />
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={mono(8, DIM, 0.13)}>VISIBILITY COMPONENT</div>
+              <div style={{ font: `500 14px/1 ${MONO}`, color: INK1 }}>{fmtPctl(p.rising.visibility_component)}</div>
+            </div>
+            <div style={{ width: 1, height: 16, background: LINE.l2 }} />
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={mono(8, DIM, 0.13)}>COMPOSITE</div>
+              <div style={{ font: `500 14px/1 ${MONO}`, color: RANK_GOLD }}>{fmtPctl(composite)}</div>
+            </div>
+            <div style={{ width: 1, height: 16, background: LINE.l2 }} />
+            <div onClick={() => navigate("/rising?mode=quadrant")} style={{ display: "flex", alignItems: "baseline", gap: 8, cursor: "pointer" }}>
+              <div style={mono(8, DIM, 0.13)}>QUADRANT</div>
+              <div style={{ font: `500 10px/1 ${MONO}`, letterSpacing: ".11em", color: quad.color }}>{quad.name}</div>
+              <div style={mono(8, GREEN_DK, 0.11)}>SEE POSITION ↗</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 120 }} />
+            <div style={{ ...mono(8, DIM2, 0.1), maxWidth: 400, lineHeight: 1.7 }}>
+              EACH COMPONENT IS THE MEAN OF ITS TWO PERCENTILES · COMPOSITE IS THE RANK-NORMALISED BLEND · COVERAGE 100% ACROSS THE RISING BOARD
+            </div>
+          </div>
+        </Card>
+
+        {/* established standing */}
+        <SectionHead title="ESTABLISHED STANDING"
+          sub="122 OF 208 US RISING STARS CARRY AN ESTABLISHED RANK IN NSCLC"
+          right="RISING WINS THE ROUTE · ESTABLISHED RANK IS A SECTION, NOT A COMPETING SURFACE" />
+        {dual ? (
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", columnGap: 26, rowGap: 18 }}>
+              <div style={{ flex: "0 0 auto" }}>
+                <div style={{ font: `600 30px/1 ${MONO}`, letterSpacing: "-.02em", color: RANK_GOLD, whiteSpace: "nowrap" }}>
+                  #{(usRank ?? rank).toLocaleString("en-US")} {usRank != null ? "US" : "GLOBAL"}
+                </div>
+                <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>RISING RANK · TRAJECTORY MEASURED</div>
+              </div>
+              <div style={{ flex: "0 0 auto", paddingBottom: 10, ...mono(11, FAINT, 0.14) }}>ALREADY INSIDE →</div>
+              <div style={{ flex: "0 0 auto", borderLeft: `1px solid ${LINE.l2}`, paddingLeft: 26 }}>
+                <div style={{ font: `600 30px/1 ${MONO}`, letterSpacing: "-.02em", color: GREEN, whiteSpace: "nowrap" }}>
+                  #{p.established_us!.rank.toLocaleString("en-US")} US
+                </div>
+                <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>ESTABLISHED RANK · DESTINATION REACHED IN PART</div>
+              </div>
+            </div>
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${RULE}`, ...serif(13, SERIF_INK), maxWidth: 880 }}>
+              US established rank {p.established_us!.rank.toLocaleString("en-US")} says this physician is already inside the
+              destination the rising board measures trajectory toward. That is a stronger claim than either number alone,
+              and it is why rising wins the route: the established rank belongs on this surface as a section rather than
+              as a competing profile.
+            </div>
+            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={mono(8, MUT2, 0.11)}>
+                US ESTABLISHED RANK IN NSCLC · SCORE {Number(p.established_us!.cohort_score).toFixed(2)}
+                {p.established_global ? ` · GLOBAL ESTABLISHED RANK ${p.established_global.rank.toLocaleString("en-US")}` : ""}
+              </div>
+              <div style={{ flex: 1 }} />
+              <Link to={`/hcp/${hcpId}/brief`} style={{ textDecoration: "none", padding: "6px 11px", border: `1px solid ${LINE.l2}`, font: `500 8px/1.3 ${MONO}`, letterSpacing: ".11em", color: MUT }}>ESTABLISHED BRIEF ↗</Link>
+            </div>
+          </Card>
+        ) : (
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+              <div style={mono(12, MUT, 0.14, 500)}>NOT ON THE ESTABLISHED BOARD</div>
+              <div style={{ padding: "3px 7px", border: `1px solid ${LINE.l2}`, ...mono(8, MUT, 0.11, 500) }}>RISING-ONLY · 86 OF 208 US</div>
+            </div>
+            <div style={{ marginTop: 14, ...serif(13, INK2), maxWidth: 860 }}>
+              {p.established_global
+                ? `Ranked on the global established board (rank ${p.established_global.rank.toLocaleString("en-US")}) but not US-scoped. The rising surface is the primary record for this profile.`
+                : "No established rank in NSCLC. For rising-only physicians this surface is the whole record — nothing is routed elsewhere and no established section renders."}
+            </div>
+          </Card>
+        )}
+
+        {/* signal summary */}
+        <SectionHead title="SIGNAL SUMMARY" sub="WHO IS THIS, AND WHAT IS MOVING"
+          right="GENERATED SYNTHESIS · STAMPED WITH THE DATA RUN IT READ" />
+        {p.narrative?.narrative_text ? (
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={{ ...serif(13.5, SERIF_INK), textWrap: "pretty", maxWidth: 900 } as CSSProperties}>
+              {p.narrative.narrative_text}
+            </div>
+            <div style={{ marginTop: 16, ...mono(8, FAINT, 0.12), lineHeight: 1.6 }}>
+              READS DATA RUN {p.narrative.generated_at ? new Date(p.narrative.generated_at).toISOString().slice(0, 10) : "UNSTAMPED"}
+              {" · "}NO RANK OR PERCENTILE BY PROMPT — THE HEADER RENDERS THOSE LIVE
+              {" · "}{p.narrative_current === false ? "DATA HAS MOVED SINCE — REGENERATES AT THE NEXT WEEKLY BUILD" : "CURRENT AGAINST THE LATEST DATA RUN"}
+              {" · "}REVIEW BEFORE USE · NO CLINICAL CLAIM · PROMPT {(p.narrative.prompt_version ?? "UNVERSIONED").toUpperCase()}
+            </div>
+          </Card>
+        ) : (
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={mono(12, MUT, 0.14, 500)}>NO NARRATIVE GENERATED AT THIS RANK</div>
+            <div style={{ marginTop: 14, ...serif(13, INK2), maxWidth: 820 }}>
+              Narrative generation follows the weekly build's cut — the top 200 of the US board. This profile is outside
+              that cut, so no narrative exists and no stale text is held for it. The four components above are the
+              complete rising signal for this HCP, and they are fully covered. Nothing is being withheld.
+            </div>
+            <div style={{ marginTop: 16, ...mono(8, FAINT, 0.12), lineHeight: 1.6 }}>
+              GENERATION CUT · TOP 200 US · RE-EVALUATED EACH WEEKLY BUILD · NO STALE TEXT IS HELD FOR THIS PROFILE
+            </div>
+          </Card>
+        )}
+
+        {/* the record */}
+        <SectionHead title="THE RECORD" sub="TWO SOURCE TABLES · FOUR PARALLEL DELTAS"
+          right="MOMENTUM IS A DELTA · THE RECORD IS SHOWN AS A DELTA" />
+        <Card>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)" }}>
+            {deltas.map((d) => (
+              <div key={d.label} style={{ padding: 18, borderRight: `1px solid ${RULE}`, borderBottom: `1px solid ${RULE}` }}>
+                <div style={mono(8, DIM, 0.14)}>{d.label}</div>
+                <div style={{ marginTop: 11, display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+                  <div style={{ font: `400 15px/1 ${MONO}`, color: MUT2 }}>{d.prior}</div>
+                  <div style={{ font: `400 11px/1 ${MONO}`, color: FAINT }}>→</div>
+                  <div style={{ font: `500 ${d.current.length > 12 ? 13 : 24}px/1 ${MONO}`, color: d.color }}>{d.current}</div>
+                </div>
+                <div style={{ marginTop: 10, ...mono(8, DIM2, 0.11), lineHeight: 1.6 }}>{d.note}</div>
+              </div>
+            ))}
+          </div>
+          {!seniorParsed && (
+            <div style={{ padding: 18 }}>
+              <div style={mono(11, MUT, 0.14, 500)}>AUTHORSHIP POSITION NOT PARSED ON THIS RECORD</div>
+              <div style={{ marginTop: 12, ...serif(12.5, INK2, 1.7), maxWidth: 820 }}>
+                Publication leadership — first, senior and middle-author share — is parsed for 60% of the rising board.
+                It is not parsed here, so this surface does not show an authorship split rather than showing a zero.
+                Counts, collaborators and both momentum components are unaffected; they do not depend on author position.
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* established neighbourhood */}
+        <SectionHead title="THE ESTABLISHED NEIGHBOURHOOD"
+          sub={`TOP COLLABORATORS · ${p.collaborators.length} OF ${nw?.recent_collaborator_count ?? p.collaborator_rows_10yr ?? "N"}`}
+          right="TEN-YEAR TOTALS · NOT THE 2021–2025 DELTA WINDOW USED ABOVE" tick={GOLD_MUTED} />
+        <Card style={{ padding: "20px 22px" }}>
+          {p.collaborators.length > 0 ? (
+            <>
+              <div style={{ padding: "10px 12px", border: "1px solid #2a2519", background: "#141008", ...mono(8.5, GOLD_SOFT, 0.11), lineHeight: 1.6, maxWidth: 880 }}>
+                WINDOW · TEN-YEAR COLLABORATION TOTALS. THE COLLABORATOR TABLE CARRIES A TEN-YEAR ROW ONLY — BOARD-WIDE,
+                THERE IS NO RECENT-WINDOW VARIANT — SO THESE COUNTS DO NOT MATCH THE 2021–2025 DELTAS ABOVE AND MUST NOT
+                BE READ AGAINST THEM.
+              </div>
+              <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "210px 1fr 180px 1fr 150px", padding: "0 0 9px", borderBottom: `1px solid ${RULE}` }}>
+                <div style={mono(8, DIM, 0.13, 600)}>STANDING</div>
+                <div style={mono(8, DIM, 0.13, 600)}>COLLABORATOR</div>
+                <div style={mono(8, DIM, 0.13, 600)}>INSTITUTION</div>
+                <div style={mono(8, DIM, 0.13, 600)}>SHARED PAPERS · 10 YR</div>
+                <div style={{ ...mono(8, DIM, 0.13, 600), textAlign: "right" }}>SHARED RECORD</div>
+              </div>
+              {p.collaborators.map((c) => {
+                const s = collabStanding(c);
+                const maxShared = Math.max(...p.collaborators.map((x) => x.shared_publications));
+                return (
+                  <div key={c.hcp_id} style={{ display: "grid", gridTemplateColumns: "210px 1fr 180px 1fr 150px", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${RULE_SOFT}` }}>
+                    <div>
+                      <div style={{ font: `500 9.5px/1 ${MONO}`, letterSpacing: ".13em", color: s.color }}>{s.state}</div>
+                      <div style={{ marginTop: 6, ...mono(9, MUT, 0.06), whiteSpace: "nowrap" }}>{s.detail}</div>
+                    </div>
+                    <div style={{ font: `400 12.5px/1.35 ${SERIF}`, color: INK0 }}>{c.name}</div>
+                    <div style={{ font: `400 10.5px/1.35 ${SERIF}`, color: MUT3 }}>{c.institution ?? "INSTITUTION NOT ON RECORD"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 104, height: 4, background: RULE }}>
+                        <div style={{ height: 4, background: GREEN, width: `${(c.shared_publications / maxShared) * 100}%` }} />
+                      </div>
+                      <div style={{ font: `500 11px/1 ${MONO}`, color: INK1 }}>{c.shared_publications}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <Link to={`/hcp/${hcpId}/publications-with/${c.hcp_id}`} style={{ ...mono(9, GREEN_DK, 0.08), whiteSpace: "nowrap" }}>shared record ↗</Link>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 16, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 600 }}>
+                RANKED BY SHARED PAPER COUNT · STANDING IS THE COLLABORATOR'S OWN POSITION, NEVER A JUDGEMENT ON THIS PROFILE
+              </div>
+            </>
+          ) : (
+            <div style={{ ...serif(13, SERIF_INK), maxWidth: 880 }}>
+              {nw?.recent_collaborator_count != null
+                ? `${nw.recent_collaborator_count} distinct co-authors are recorded across the two windows, and the count is what carries the network momentum percentile above. The top-collaborator identities are not joined for this record, so this section reports the count rather than naming a neighbourhood it cannot see.`
+                : "No collaborator rows are recorded for this profile — the count itself is the absent value, and it renders as this sentence rather than a blank."}
+            </div>
+          )}
+        </Card>
+
+        {/* scientific positions */}
+        <SectionHead title="SCIENTIFIC POSITIONS"
+          sub={(p.positions?.total ?? 0) > 0 ? `COVERED · ${p.positions!.first_basis} FIRST · ${p.positions!.senior_basis} SENIOR` : "ABSENCE STATE · COVERAGE, NOT AUTHORSHIP"}
+          right="EXTRACTION WINDOW · TOP 100 US RISING STARS · 100 OF 1,583" tick={GOLD_MUTED} />
+        {(p.positions?.total ?? 0) > 0 ? (
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={mono(13, SERIF_INK, 0.14, 500)}>{p.positions!.total} EXTRACTED POSITIONS — INSIDE THE EXTRACTION WINDOW</div>
+            <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 880 }}>
+              Positions are extracted for the top 100 US rising stars. At US rank {usRank} this profile is inside that
+              window and fully covered. The extractor accepts first authors as well as senior authors
+              {p.positions!.first_basis > 0 ? `, which matters here: ${p.positions!.first_basis} of the ${p.positions!.total} positions rest on first-authored work.` : "."}
+            </div>
+            <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderTop: `1px solid ${RULE}` }}>
+              {[["EXTRACTED", p.positions!.total], ["FIRST-AUTHORED BASIS", p.positions!.first_basis], ["SENIOR-AUTHORED BASIS", p.positions!.senior_basis]].map(([lbl, v], i) => (
+                <div key={String(lbl)} style={{ padding: i === 0 ? "14px 22px 0 0" : i === 1 ? "14px 22px 0" : "14px 0 0 22px", borderLeft: i > 0 ? `1px solid ${RULE}` : "none" }}>
+                  <div style={mono(8, DIM, 0.14)}>{lbl}</div>
+                  <div style={{ marginTop: 9, font: `500 22px/1 ${MONO}`, color: INK0 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${RULE}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={mono(8, FAINT, 0.11)}>STATEMENTS, BASIS AND EVIDENCE RENDER IN THE BELIEF-PROFILE PATTERN</div>
+              <div style={{ flex: 1 }} />
+              <Link to={`/hcp/${hcpId}/positions`} style={{ textDecoration: "none", padding: "6px 11px", border: `1px solid ${LINE.l2}`, font: `500 8px/1.3 ${MONO}`, letterSpacing: ".11em", color: MUT }}>ALL POSITIONS ↗</Link>
+            </div>
+          </Card>
+        ) : (
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+              <div style={mono(13, SERIF_INK, 0.14, 500)}>
+                {insideWindow ? "INSIDE THE WINDOW · NO POSITIONS ON FILE" : "OUTSIDE THE EXTRACTION WINDOW"}
+              </div>
+              <div style={{ padding: "3px 7px", border: `1px solid ${LINE.l2}`, ...mono(8, MUT, 0.11, 500) }}>
+                {insideWindow ? "RARE STATE · ~19 OF THE 100" : "RENDERS FOR 1,483 OF 1,583 · 94% OF THE BOARD"}
+              </div>
+            </div>
+            <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 880 }}>
+              {insideWindow
+                ? "This profile is inside the extraction window, but no position is on file: either no recent first- or senior-authored paper carried a full abstract, or extraction ran and no position cleared the confidence floor. That is a fact about the pipeline's inputs, not about the physician."
+                : "Positions are extracted for the top 100 US rising stars only. This profile is not in that set, so extraction has not been attempted. That is a coverage fact about the pipeline, not a fact about the physician — nothing here indicates an absence of scientific positions, and no inference about authorship or career stage should be read into it."}
+            </div>
+            <div style={{ marginTop: 20, ...mono(8, DIM, 0.14) }}>THREE DISTINCT STATES · THIS SURFACE NAMES WHICH ONE APPLIES</div>
+            <div style={{ marginTop: 10, borderTop: `1px solid ${RULE}` }}>
+              {posStates.map((s) => (
+                <div key={s.n} style={{ display: "grid", gridTemplateColumns: "20px 1fr 190px 130px", alignItems: "baseline", gap: 12, padding: "12px 0", borderBottom: `1px solid ${RULE_SOFT}` }}>
+                  <div style={mono(9, FAINT, 0)}>{s.n}</div>
+                  <div style={{ font: `500 11.5px/1.5 ${MONO}`, letterSpacing: ".1em", color: s.applies ? INK1 : MUT2 }}>{s.label}</div>
+                  <div style={{ font: `400 11px/1.5 ${SERIF}`, color: MUT3 }}>{s.mech}</div>
+                  <div style={{ textAlign: "right", ...mono(9, s.applies ? RANK_GOLD : MUT2, 0.09) }}>
+                    {s.applies ? "APPLIES HERE" : "DOES NOT APPLY"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* relationship */}
+        <SectionHead title="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS" right="SYNCS WITH THE RISING LEDGER" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <Card style={{ padding: 18 }}>
+            <ProfileRelationshipControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
+          </Card>
+          <Card style={{ padding: 18 }}>
+            <ProfileSecondaryControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
+          </Card>
+        </div>
+
+        {/* footer */}
+        <div style={{ marginTop: 44, paddingTop: 20, borderTop: `1px solid ${RULE_SOFT}`, display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ font: `600 10px/1 ${MONO}`, letterSpacing: ".3em", color: GOLD_DEEP }}>FIELDMARK</div>
+          <div style={mono(8, COOL.floor, 0.11)}>RISING COHORT · NSCLC · 1,583 PROFILES · WEEKLY BUILD</div>
+          <div style={{ flex: 1 }} />
+          <div style={mono(8, COOL.floor, 0.11)}>FOR VERIFIED MSL USE · NOT AFFILIATED WITH MENTIONED RESEARCHERS</div>
+        </div>
+      </div>
+    </div>
+  );
+}

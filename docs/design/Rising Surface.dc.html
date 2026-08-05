@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin:0; padding:0; background:#08080a; }
+  * { box-sizing:border-box; }
+  a { color:#7fb3a4; text-decoration:none; border-bottom:1px solid rgba(127,179,164,.35); }
+  a:hover { color:#a2cbbf; border-bottom-color:rgba(162,203,191,.6); }
+  input { font-family:'IBM Plex Mono',monospace; }
+</style>
+</helmet>
+<div style="background:#08080a;min-height:100vh;font-family:'IBM Plex Mono',monospace;color:#c9c8c3;padding-bottom:80px">
+
+  <div style="display:flex;align-items:center;gap:18px;padding:9px 22px;background:#0d0d0f;border-bottom:1px solid #1b1b1e">
+    <div style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.18em;color:#55555a">RISING SURFACE · DESIGN REVIEW</div>
+    <div style="display:flex;gap:2px">
+      <div onClick="{{ goProfile1 }}" style="cursor:pointer;padding:5px 10px;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;border:1px solid {{ tab1Border }};color:{{ tab1Color }};background:{{ tab1Bg }}">01 · PROFILE · RANK 1 US</div>
+      <div onClick="{{ goProfile2 }}" style="cursor:pointer;padding:5px 10px;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;border:1px solid {{ tab2Border }};color:{{ tab2Color }};background:{{ tab2Bg }}">02 · PROFILE · ABSENCE CASE · 1,483 OF 1,583</div>
+      <div onClick="{{ goProfile3 }}" style="cursor:pointer;padding:5px 10px;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;border:1px solid {{ tab4Border }};color:{{ tab4Color }};background:{{ tab4Bg }}">03 · PROFILE · DUAL BOARD · 97 OF 208</div>
+      <div onClick="{{ goLedger }}" style="cursor:pointer;padding:5px 10px;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;border:1px solid {{ tab3Border }};color:{{ tab3Color }};background:{{ tab3Bg }}">04 · RISING LEDGER</div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:26px;padding:0 22px;height:44px;background:#0a0a0c;border-bottom:1px solid #1b1b1e">
+    <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.34em;color:#d8a24a">FIELDMARK</div>
+    <div style="display:flex;gap:18px;align-items:center">
+      <div style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#e6e5e0;border-bottom:1px solid #d8a24a;padding-bottom:3px">PEOPLE</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">DRUGS</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">TRIALS</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">CONGRESSES</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">INSTITUTIONS</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">INTELLIGENCE</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">SOCIAL</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">PULSE</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">SKYVIEW</div>
+    </div>
+    <div style="flex:1"></div>
+    <div style="width:22px;height:22px;border-radius:50%;border:1px solid #d8a24a;display:flex;align-items:center;justify-content:center;font:500 8px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#d8a24a">AC</div>
+  </div>
+
+  <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ true }}">
+  <div data-screen-label="Rising profile" style="max-width:1180px;margin:0 auto;padding:0 22px">
+
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 0 14px;flex-wrap:wrap">
+      <div style="padding:2px 5px;background:#1c2a26;font:600 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#8fb8a6">RIS</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6a6a6e">RISING / NSCLC</div>
+      <div style="color:#3a3a3e;font-size:9px">›</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6a6a6e">{{ p.rankCrumb }}</div>
+      <div style="color:#3a3a3e;font-size:9px">›</div>
+      <div onClick="{{ goLedger }}" style="cursor:pointer;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#7fb3a4">↑ BACK TO RISING LEDGER</div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:14px">
+        <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#4e4e52">ARCHETYPE</div>
+        <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#4e4e52">MOMENTUM</div>
+        <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#4e4e52">SIGNAL</div>
+        <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#4e4e52">RECORD</div>
+        <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#4e4e52">POSITIONS</div>
+        <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#4e4e52">RELATIONSHIP</div>
+      </div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11">
+      <div style="display:grid;grid-template-columns:1fr 300px">
+        <div style="padding:20px 22px 16px;border-right:1px solid #1a1a1d;min-width:0">
+          <div style="display:flex;align-items:flex-end;flex-wrap:wrap;column-gap:24px;row-gap:18px">
+            <div>
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <div style="font:600 40px/1 'IBM Plex Mono',monospace;letter-spacing:-.02em;color:#d8a24a">{{ p.rankBig }}</div>
+                <div style="font:500 13px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#8a8a8e">{{ p.rankSuffix }}</div>
+              </div>
+              <div style="margin-top:7px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#5c5c60">{{ p.rankLabel }}</div>
+            </div>
+            <div style="flex:0 0 auto;border-left:1px solid #232326;padding-left:24px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-weight:500;line-height:1;color:#c9c8c3;white-space:nowrap;font-size:{{ p.cell2Size }}">{{ p.cell2 }}</div>
+              <div style="margin-top:7px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#5c5c60;white-space:nowrap">{{ p.cell2Label }}</div>
+            </div>
+            <div style="flex:0 1 auto;min-width:190px;max-width:230px">
+              <div style="display:flex;align-items:baseline;gap:7px">
+                <div style="font:500 22px/1 'IBM Plex Mono',monospace;color:#c9c8c3">{{ p.composite }}</div>
+                <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5c5c60">PCTL</div>
+              </div>
+              <div style="margin-top:6px;height:3px;background:#1c1c1f">
+                <div style="height:3px;background:#8fb8a6;width:{{ p.compositePct }}%"></div>
+              </div>
+              <div style="margin-top:6px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#5c5c60">COMPOSITE PERCENTILE · IN COHORT</div>
+            </div>
+          </div>
+
+          <div style="margin-top:22px;font:400 27px/1.15 Spectral,Georgia,serif;color:#eceae4">{{ p.name }}</div>
+          <div style="margin-top:7px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+            <a href="#0" style="font:400 12px/1.4 Spectral,Georgia,serif">{{ p.inst }}</a>
+            <span style="color:#4e4e52;font-size:10px">·</span>
+            <span style="font:400 10px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8a8a8e">{{ p.geo }}</span>
+            <span style="color:#4e4e52;font-size:10px">·</span>
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5c5c60">{{ p.careerAge }} CAREER AGE</span>
+          </div>
+          <div style="margin-top:5px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#4e4e52">· {{ p.registry }}</div>
+
+          <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap">
+            <div style="padding:7px 11px;border:1px solid #6e5423;color:#d8a24a;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;cursor:pointer" style-hover="background:#1c1608">+ GENERATE BRIEF</div>
+            <div style="padding:7px 11px;border:1px solid #2a2a2e;color:#a9a8a3;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;cursor:pointer" style-hover="border-color:#3a3a3e">ALL PUBLICATIONS ↗</div>
+            <div style="padding:7px 11px;border:1px solid #2a2a2e;color:#a9a8a3;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;cursor:pointer" style-hover="border-color:#3a3a3e">⚑ TRACK</div>
+            <div style="padding:7px 11px;border:1px solid #2a2a2e;color:#a9a8a3;font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;cursor:pointer" style-hover="border-color:#3a3a3e">+ ADD TO LIST</div>
+          </div>
+        </div>
+
+        <div style="padding:20px 20px 16px;display:flex;flex-direction:column">
+          <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e4e52">ARCHETYPE</div>
+          <div style="margin-top:9px;font:500 15px/1.25 'IBM Plex Mono',monospace;letter-spacing:.02em;color:{{ p.archColor }}">{{ p.archLabel }}</div>
+          <div style="margin-top:10px;height:1px;background:#1e1e21"></div>
+          <div style="margin-top:10px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:{{ p.archProseColor }}">{{ p.archProse }}</div>
+          <div style="flex:1;min-height:14px"></div>
+          <div style="font:400 8px/1.7 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">{{ p.archBandNote }}</div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #1a1a1d;padding:10px 22px;display:flex;gap:14px;flex-wrap:wrap">
+        <sc-for list="{{ p.metaLine }}" as="m" hint-placeholder-count="5">
+          <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#57575b">{{ m }}</div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:34px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">MOMENTUM &amp; VISIBILITY</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">FOUR COMPONENTS · TWO ENGINES</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52;text-align:right">PERCENTILES WITHIN THE RISING COHORT · NEVER AGAINST ESTABLISHED</div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11">
+      <div style="display:grid;grid-template-columns:104px 1fr 1fr">
+        <div style="padding:12px 14px;border-bottom:1px solid #1a1a1d"></div>
+        <div style="padding:12px 16px;border-bottom:1px solid #1a1a1d;border-left:1px solid #1a1a1d;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8a8a8e">SCIENTIFIC</div>
+        <div style="padding:12px 16px;border-bottom:1px solid #1a1a1d;border-left:1px solid #1a1a1d;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8a8a8e">NETWORK</div>
+
+        <div style="padding:18px 14px;border-bottom:1px solid #1a1a1d;display:flex;align-items:flex-start">
+          <div style="font:600 9px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">MOMENTUM</div>
+        </div>
+        <div style="padding:18px 16px;border-bottom:1px solid #1a1a1d;border-left:1px solid #1a1a1d">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font:500 26px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ p.sciMom }}</div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#57575b">PCTL</div>
+          </div>
+          <div style="margin-top:9px;height:4px;background:#1a1a1d">
+            <div style="height:4px;background:#8fb8a6;width:{{ p.sciMomPct }}%"></div>
+          </div>
+          <div style="margin-top:10px;font:400 10.5px/1.6 Spectral,Georgia,serif;color:#98978f">{{ p.sciMomEv }}</div>
+        </div>
+        <div style="padding:18px 16px;border-bottom:1px solid #1a1a1d;border-left:1px solid #1a1a1d">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font:500 26px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ p.netMom }}</div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#57575b">PCTL</div>
+          </div>
+          <div style="margin-top:9px;height:4px;background:#1a1a1d">
+            <div style="height:4px;background:#8fb8a6;width:{{ p.netMomPct }}%"></div>
+          </div>
+          <div style="margin-top:10px;font:400 10.5px/1.6 Spectral,Georgia,serif;color:#98978f">{{ p.netMomEv }}</div>
+        </div>
+
+        <div style="padding:18px 14px;display:flex;align-items:flex-start">
+          <div style="font:600 9px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">VISIBILITY</div>
+        </div>
+        <div style="padding:18px 16px;border-left:1px solid #1a1a1d">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font:500 26px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ p.sciVis }}</div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#57575b">PCTL</div>
+          </div>
+          <div style="margin-top:9px;height:4px;background:#1a1a1d">
+            <div style="height:4px;background:#6f8fa8;width:{{ p.sciVisPct }}%"></div>
+          </div>
+          <div style="margin-top:10px;font:400 10.5px/1.6 Spectral,Georgia,serif;color:#98978f">{{ p.sciVisEv }}</div>
+        </div>
+        <div style="padding:18px 16px;border-left:1px solid #1a1a1d">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font:500 26px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ p.netVis }}</div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#57575b">PCTL</div>
+          </div>
+          <div style="margin-top:9px;height:4px;background:#1a1a1d">
+            <div style="height:4px;background:#6f8fa8;width:{{ p.netVisPct }}%"></div>
+          </div>
+          <div style="margin-top:10px;font:400 10.5px/1.6 Spectral,Georgia,serif;color:#98978f">{{ p.netVisEv }}</div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #1a1a1d;background:#0c0c0e;padding:14px 18px;display:flex;align-items:center;gap:26px;flex-wrap:wrap">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">MOMENTUM COMPONENT</div>
+          <div style="font:500 14px/1 'IBM Plex Mono',monospace;color:#c9c8c3">{{ p.momComp }}</div>
+        </div>
+        <div style="width:1px;height:16px;background:#232326"></div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">VISIBILITY COMPONENT</div>
+          <div style="font:500 14px/1 'IBM Plex Mono',monospace;color:#c9c8c3">{{ p.visComp }}</div>
+        </div>
+        <div style="width:1px;height:16px;background:#232326"></div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">COMPOSITE</div>
+          <div style="font:500 14px/1 'IBM Plex Mono',monospace;color:#d8a24a">{{ p.composite }}</div>
+        </div>
+        <div style="width:1px;height:16px;background:#232326"></div>
+        <div onClick="{{ goQuadrant }}" style="display:flex;align-items:baseline;gap:8px;cursor:pointer">
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">QUADRANT</div>
+          <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:{{ p.quadColor }}">{{ p.quadName }}</div>
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#7fb3a4">SEE POSITION ↗</div>
+        </div>
+        <div style="flex:1;min-width:120px"></div>
+        <div style="font:400 8px/1.7 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#4e4e52;max-width:400px">EACH COMPONENT IS THE MEAN OF ITS TWO PERCENTILES · COMPOSITE IS THE RANK-NORMALISED BLEND · COVERAGE 100% ACROSS THE RISING BOARD</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:34px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px;flex:0 0 auto">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0;white-space:nowrap">ESTABLISHED STANDING</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b;white-space:nowrap">122 OF 208 CARRY AN ESTABLISHED RANK IN NSCLC · 86 RISING-ONLY</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">RISING WINS THE ROUTE · ESTABLISHED RANK IS A SECTION, NOT A COMPETING SURFACE</div>
+    </div>
+
+    <sc-if value="{{ p.dualPresent }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+        <div style="display:flex;align-items:flex-end;flex-wrap:wrap;column-gap:26px;row-gap:18px">
+          <div style="flex:0 0 auto">
+            <div style="font:600 30px/1 'IBM Plex Mono',monospace;letter-spacing:-.02em;color:#d8a24a;white-space:nowrap">{{ p.rankBig }} {{ p.rankSuffix }}</div>
+            <div style="margin-top:7px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#5c5c60;white-space:nowrap">RISING RANK · TRAJECTORY MEASURED</div>
+          </div>
+          <div style="flex:0 0 auto;padding-bottom:10px;font:400 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#46464a">ALREADY INSIDE →</div>
+          <div style="flex:0 0 auto;border-left:1px solid #232326;padding-left:26px">
+            <div style="font:600 30px/1 'IBM Plex Mono',monospace;letter-spacing:-.02em;color:#8fb8a6;white-space:nowrap">{{ p.estRank }} US</div>
+            <div style="margin-top:7px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#5c5c60;white-space:nowrap">ESTABLISHED RANK · DESTINATION REACHED IN PART</div>
+          </div>
+        </div>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1a1a1d;font:400 13px/1.72 Spectral,Georgia,serif;color:#b6b4ad;max-width:880px;text-wrap:pretty">{{ p.dualLine }}</div>
+        <div style="margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1a1a1d">
+          <div style="padding:14px 22px 0 0">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">WHY THIS SURFACE WINS</div>
+            <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">No dual-board HCP is established-dominant. The best established rank in the set is this one, at 34, against a rising rank of 8.</div>
+          </div>
+          <div style="padding:14px 22px 0;border-left:1px solid #1a1a1d">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">CLOSEST TO EVEN</div>
+            <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">Jarushka Naidoo and Sarah Goldberg. Both still read as accelerating rather than arrived — send me their pairs in rising/established order and they render here.</div>
+          </div>
+          <div style="padding:14px 0 0 22px;border-left:1px solid #1a1a1d">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">WHAT DOES NOT HAPPEN</div>
+            <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">No second profile, no branch on the spine test, no established brief with rising narrative text in it.</div>
+          </div>
+        </div>
+        <div style="margin-top:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#6a6a6e">{{ p.estRankScope }}</div>
+          <div style="flex:1"></div>
+          <div style="padding:6px 11px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a8a8e;cursor:pointer" style-hover="border-color:#3a3a3e">ESTABLISHED BRIEF ↗</div>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ p.dualAbsent }}" hint-placeholder-val="{{ true }}">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+          <div style="font:500 12px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8a8a8e">NOT ON THE ESTABLISHED BOARD</div>
+          <div style="padding:3px 7px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a8a8e">RISING-ONLY · 86 OF 208 US</div>
+        </div>
+        <div style="margin-top:14px;font:400 13px/1.72 Spectral,Georgia,serif;color:#a9a8a1;max-width:860px;text-wrap:pretty">{{ p.dualLine }}</div>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:34px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">SIGNAL SUMMARY</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">WHO IS THIS, AND WHAT IS MOVING</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">GENERATED SYNTHESIS · STAMPED WITH THE DATA RUN IT READ</div>
+    </div>
+
+    <sc-if value="{{ p.hasNarrative }}" hint-placeholder-val="{{ true }}">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+        <div style="font:400 13.5px/1.72 Spectral,Georgia,serif;color:#cfcdc6;text-wrap:pretty;max-width:900px">Aditi P. Singh is a Balanced Rising Star in NSCLC at the University of Pennsylvania, now nine years into her career. The strongest signal is publication output. Her papers grew from 7 (2016–2020) to 26 (2021–2025), nearly a four-fold increase, accompanied by a citation volume growth of 2,842 and a publication velocity delta of +1. Her collaborator network expanded from 39 to 159 individuals across the same windows, reflecting broad and deepening scientific engagement. First evidence of sustained independent grant leadership or a second consecutive senior-authored paper would mark a meaningful inflection in her independent scientific identity.</div>
+        <div style="margin-top:16px;font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#46464a">READS DATA RUN 2026-08-05 · NO RANK OR PERCENTILE BY PROMPT — THE HEADER RENDERS THOSE LIVE · REVIEW BEFORE USE · NO CLINICAL CLAIM · PROMPT RISING_STAR_V4</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ p.narrativeDemo }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+        <div style="font:500 12px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8a8a8e">NARRATIVE PRESENT FOR THIS PROFILE · TEXT NOT LOADED IN THIS FRAME</div>
+        <div style="margin-top:14px;font:400 13px/1.72 Spectral,Georgia,serif;color:#a9a8a1;max-width:820px;text-wrap:pretty">At rank 8 this profile sits well above the generation cut, so a narrative exists and would render here with its data-run stamp. This frame carries the routing and the dual-board treatment, not the prose.</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ p.noNarrative }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+        <div style="font:500 12px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8a8a8e">NO NARRATIVE GENERATED AT THIS RANK</div>
+        <div style="margin-top:14px;font:400 13px/1.72 Spectral,Georgia,serif;color:#a9a8a1;max-width:820px;text-wrap:pretty">Narrative generation follows rank. The cut currently sits at global rank 317 — the top 20% of the 1,583-person board — and this profile is ranked 742. The four components above are the complete rising signal for this HCP, and they are fully covered. Nothing is being withheld.</div>
+        <div style="margin-top:16px;font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#46464a">GENERATION CUT · RANK 317 OF 1,583 · RE-EVALUATED EACH WEEKLY BUILD · NO STALE TEXT IS HELD FOR THIS PROFILE</div>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:34px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">THE RECORD</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">{{ p.sources }} SOURCES · FOUR PARALLEL DELTAS</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">MOMENTUM IS A DELTA · THE RECORD IS SHOWN AS A DELTA</div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+        <sc-for list="{{ p.deltas }}" as="d" hint-placeholder-count="4">
+          <div style="padding:18px 18px;border-right:1px solid #1a1a1d;border-bottom:1px solid #1a1a1d">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">{{ d.label }}</div>
+            <div style="margin-top:11px;display:flex;align-items:baseline;gap:9px">
+              <div style="font:400 15px/1 'IBM Plex Mono',monospace;color:#66666a">{{ d.prior }}</div>
+              <div style="font:400 11px/1 'IBM Plex Mono',monospace;color:#46464a">→</div>
+              <div style="font:500 24px/1 'IBM Plex Mono',monospace;color:{{ d.color }}">{{ d.current }}</div>
+            </div>
+            <div style="margin-top:10px;font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">{{ d.note }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ p.noPubLeadership }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:18px">
+          <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8a8a8e">AUTHORSHIP POSITION NOT PARSED ON THIS RECORD</div>
+          <div style="margin-top:12px;font:400 12.5px/1.7 Spectral,Georgia,serif;color:#a9a8a1;max-width:820px;text-wrap:pretty">Publication leadership — first, senior and middle-author share — is parsed for 60% of the rising board. It is not parsed here, so this surface does not show an authorship split rather than showing a zero. Counts, collaborators and both momentum components are unaffected; they do not depend on author position.</div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:34px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">THE ESTABLISHED NEIGHBOURHOOD</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">{{ p.collabHeader }}</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a7a52">TEN-YEAR TOTALS · NOT THE 2021–2025 DELTA WINDOW USED ABOVE</div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+      <div style="font:400 13px/1.72 Spectral,Georgia,serif;color:#b6b4ad;max-width:880px;text-wrap:pretty">{{ p.neighbourhoodLine }}</div>
+      <sc-if value="{{ p.hasPubLeadership }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:16px;padding:10px 12px;border:1px solid #2a2519;background:#141008;font:400 8.5px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#a89056;max-width:880px">WINDOW · TEN-YEAR COLLABORATION TOTALS. THE COLLABORATOR TABLE CARRIES A TEN-YEAR ROW ONLY — BOARD-WIDE, THERE IS NO RECENT-WINDOW VARIANT — SO THESE COUNTS DO NOT MATCH THE 2021–2025 DELTAS ABOVE AND MUST NOT BE READ AGAINST THEM.</div>
+        <div style="margin-top:18px;display:grid;grid-template-columns:210px 1fr 180px 1fr 150px;padding:0 0 9px;border-bottom:1px solid #1a1a1d">
+          <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">STANDING</div>
+          <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">COLLABORATOR</div>
+          <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">INSTITUTION</div>
+          <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">SHARED PAPERS · 10 YR</div>
+          <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b;text-align:right">SHARED RECORD</div>
+        </div>
+        <sc-for list="{{ p.collabs }}" as="c" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:210px 1fr 180px 1fr 150px;align-items:center;padding:12px 0;border-bottom:1px solid #17171a">
+            <div>
+              <div style="font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:{{ c.estColor }}">{{ c.state }}</div>
+              <div style="margin-top:6px;font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#8a8a8e;white-space:nowrap">{{ c.est }}</div>
+            </div>
+            <div style="font:400 12.5px/1.35 Spectral,Georgia,serif;color:#e4e2dc">{{ c.name }}</div>
+            <div style="font:400 10.5px/1.35 Spectral,Georgia,serif;color:#8a8a84">{{ c.inst }}</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:104px;height:4px;background:#1a1a1d">
+                <div style="height:4px;background:#8fb8a6;width:{{ c.bar }}%"></div>
+              </div>
+              <div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#c9c8c3">{{ c.papers }}</div>
+            </div>
+            <div style="text-align:right"><a href="#0" style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;white-space:nowrap">shared record ↗</a></div>
+          </div>
+        </sc-for>
+        <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font:400 8.5px/1.7 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#6a6a6e;max-width:600px">RANKED BY SHARED PAPER COUNT · STANDING IS THE COLLABORATOR'S OWN POSITION, NEVER A JUDGEMENT ON THIS PROFILE</div>
+          <div style="flex:1"></div>
+          <div style="padding:6px 11px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a8a8e;cursor:pointer" style-hover="border-color:#3a3a3e">ALL {{ p.collabTotal }} COLLABORATORS ↗</div>
+        </div>
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1a1a1d">
+          <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">STANDING · THREE STATES, ONE OF THEM SPLIT</div>
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a">MEASURED ACROSS 1,000 COLLABORATOR SLOTS · TOP 200 US RISING STARS</div>
+          </div>
+          <div style="margin-top:12px">
+            <sc-for list="{{ standingStates }}" as="s" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:210px 1fr 190px;align-items:baseline;gap:12px;padding:10px 0;border-bottom:1px solid #17171a">
+                <div style="font:500 9.5px/1.3 'IBM Plex Mono',monospace;letter-spacing:.13em;color:{{ s.color }};padding-left:{{ s.pad }}">{{ s.label }}</div>
+                <div style="font:400 11px/1.55 Spectral,Georgia,serif;color:#8a8a84">{{ s.scope }}</div>
+                <div style="text-align:right;font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.09em;color:#8a8a8e">{{ s.count }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:10px;font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#6a6a6e">748 + 56 + 196 = 1,000 SLOTS · THE TWO INDENTED STATES PARTITION THE 146 DISTINCT PEOPLE INSIDE THE 196</div>
+          <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:22px">
+            <div style="font:400 11.5px/1.7 Spectral,Georgia,serif;color:#a9a8a1;text-wrap:pretty">A missing established row is not an edge case: 252 of 1,000 slots have none, spread across 137 of 200 profiles, and 196 are unranked at any scope across 124 profiles. Something other than a score has to render on roughly two-thirds of this cohort's collaborator tables.</div>
+            <div style="font:400 11.5px/1.7 Spectral,Georgia,serif;color:#a9a8a1;text-wrap:pretty">And the modal unranked collaborator is not an unknown. Of 146 distinct unranked people, 129 are rising-eligible and 48 sit on the rising board themselves; only 9 are community. Marmarelis is the exemplar — Penn, rising-eligible, no established row. Exactly who a rising star should be co-authoring with.</div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ p.noPubLeadership }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1a1a1d;font:400 8.5px/1.7 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#6a6a6e;max-width:760px">{{ p.collabNote }}</div>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:34px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7a6a3c"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">SCIENTIFIC POSITIONS</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">{{ p.posSectionNote }}</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">EXTRACTION WINDOW · TOP 100 US RISING STARS · 100 OF 1,583</div>
+    </div>
+
+    <sc-if value="{{ p.positionsCovered }}" hint-placeholder-val="{{ true }}">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+        <div style="font:500 13px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#b9b8b2">{{ p.posTotal }} EXTRACTED POSITIONS — INSIDE THE EXTRACTION WINDOW</div>
+        <div style="margin-top:14px;font:400 13px/1.72 Spectral,Georgia,serif;color:#b6b4ad;max-width:880px;text-wrap:pretty">{{ p.posLine }}</div>
+        <div style="margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1a1a1d">
+          <div style="padding:14px 22px 0 0">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">EXTRACTED</div>
+            <div style="margin-top:9px;font:500 22px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ p.posTotal }}</div>
+          </div>
+          <div style="padding:14px 22px 0;border-left:1px solid #1a1a1d">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">FIRST-AUTHORED BASIS</div>
+            <div style="margin-top:9px;font:500 22px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ p.posFirst }}</div>
+          </div>
+          <div style="padding:14px 0 0 22px;border-left:1px solid #1a1a1d">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">SENIOR-AUTHORED BASIS</div>
+            <div style="margin-top:9px;font:500 22px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ p.posSenior }}</div>
+          </div>
+        </div>
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid #1a1a1d;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a">STATEMENTS, BASIS AND EVIDENCE RENDER IN THE BELIEF-PROFILE PATTERN · NOT DUPLICATED IN THIS FRAME</div>
+          <div style="flex:1"></div>
+          <div style="padding:6px 11px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a8a8e;cursor:pointer" style-hover="border-color:#3a3a3e">ALL POSITIONS ↗</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ p.positionsAbsent }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:20px 22px">
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+          <div style="font:500 13px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#b9b8b2">OUTSIDE THE EXTRACTION WINDOW</div>
+          <div style="padding:3px 7px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a8a8e">RENDERS FOR 1,483 OF 1,583 · 94% OF THE BOARD</div>
+        </div>
+        <div style="margin-top:14px;font:400 13px/1.72 Spectral,Georgia,serif;color:#b6b4ad;max-width:880px;text-wrap:pretty">Positions are extracted for the top 100 US rising stars only. This profile is not in that set, so extraction has not been attempted. That is a coverage fact about the pipeline, not a fact about the physician — nothing here indicates an absence of scientific positions, and no inference about authorship or career stage should be read into it.</div>
+        <div style="margin-top:20px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">THREE DISTINCT STATES · THIS SURFACE NAMES WHICH ONE APPLIES</div>
+        <div style="margin-top:10px;border-top:1px solid #1a1a1d">
+          <sc-for list="{{ posStates }}" as="s" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:20px 1fr 190px 118px;align-items:baseline;gap:12px;padding:12px 0;border-bottom:1px solid #17171a">
+              <div style="font:400 9px/1.4 'IBM Plex Mono',monospace;color:#46464a">{{ s.n }}</div>
+              <div style="font:500 11.5px/1.5 'IBM Plex Mono',monospace;letter-spacing:.1em;color:{{ s.color }}">{{ s.label }}</div>
+              <div style="font:400 11px/1.5 Spectral,Georgia,serif;color:#8a8a84">{{ s.mech }}</div>
+              <div style="text-align:right;font:400 9px/1.4 'IBM Plex Mono',monospace;letter-spacing:.09em;color:{{ s.color }}">{{ s.count }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1a1a1d">
+          <div style="padding:14px 22px 0 0">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">WHAT WOULD CHANGE THIS</div>
+            <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">A US rank inside the top 100 at a future weekly build, or an extension of the window itself.</div>
+          </div>
+          <div style="padding:14px 22px 0;border-left:1px solid #1a1a1d">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">WHAT IS PRESENT INSTEAD</div>
+            <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">Rank, composite percentile, all four components and network centrality — covered for 100% of the board.</div>
+          </div>
+          <div style="padding:14px 0 0 22px;border-left:1px solid #1a1a1d">
+            <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">WHAT THIS IS NOT</div>
+            <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">Not a practice clinician. Not a withheld score. Not a failed extraction.</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:34px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">RELATIONSHIP</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">TRACK · STATUS · FOLLOW-UPS</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">SYNCS WITH THE RISING LEDGER</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:18px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">STATUS</div>
+          <div style="padding:3px 7px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#a9a8a3">{{ p.status }}</div>
+        </div>
+        <div style="margin-top:16px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">FOLLOW-UPS</div>
+        <input placeholder="Add a follow-up…" style="margin-top:9px;width:100%;background:#0b0b0d;border:1px solid #232326;color:#c9c8c3;font-size:11px;padding:9px 10px;outline:none" />
+        <div style="margin-top:10px;display:flex;gap:6px">
+          <div style="padding:5px 9px;border:1px solid #232326;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#66666a;cursor:pointer">LOW</div>
+          <div style="padding:5px 9px;border:1px solid #3a3a3e;background:#17171a;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#c9c8c3;cursor:pointer">NORMAL</div>
+          <div style="padding:5px 9px;border:1px solid #232326;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#66666a;cursor:pointer">HIGH</div>
+          <div style="flex:1"></div>
+          <div style="padding:5px 11px;background:#6e5423;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#f0e2c4;cursor:pointer">SAVE</div>
+        </div>
+      </div>
+      <div style="border:1px solid #1f1f22;background:#0f0f11;padding:18px">
+        <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">CONTACT &amp; CONTROLS</div>
+        <div style="margin-top:12px;font:500 12px/1.5 Spectral,Georgia,serif;color:#dedcd6">{{ p.name }}</div>
+        <div style="font:400 11.5px/1.6 Spectral,Georgia,serif;color:#a9a8a1">{{ p.title }}</div>
+        <div style="font:400 11.5px/1.6 Spectral,Georgia,serif;color:#a9a8a1">{{ p.inst }}</div>
+        <div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap">
+          <div style="padding:7px 10px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#a9a8a3;cursor:pointer" style-hover="border-color:#3a3a3e">SUBMIT FIELD REVIEW</div>
+          <div style="padding:7px 10px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#a9a8a3;cursor:pointer" style-hover="border-color:#3a3a3e">+ ADD CONTEXT</div>
+          <div style="padding:7px 10px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#a9a8a3;cursor:pointer" style-hover="border-color:#3a3a3e">REPORT DATA ISSUE</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isLedger }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Rising ledger" style="max-width:1180px;margin:0 auto;padding:0 22px">
+
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 0 14px;flex-wrap:wrap">
+      <div style="padding:2px 5px;background:#1c2a26;font:600 8px/1.4 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#8fb8a6">RIS</div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6a6a6e">RISING LEDGER / NSCLC</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">ONE BOARD · TWO MODES</div>
+      <div style="display:flex;gap:2px">
+        <div onClick="{{ setTable }}" style="cursor:pointer;padding:5px 10px;border:1px solid {{ tableBtn.border }};background:{{ tableBtn.bg }};font:500 8.5px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:{{ tableBtn.color }}">▤ REGISTER</div>
+        <div onClick="{{ setQuadrant }}" style="cursor:pointer;padding:5px 10px;border:1px solid {{ quadBtn.border }};background:{{ quadBtn.bg }};font:500 8.5px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:{{ quadBtn.color }}">◱ QUADRANT</div>
+      </div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11;padding:18px 20px">
+      <div style="display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap">
+        <div>
+          <div style="font:500 22px/1 'IBM Plex Mono',monospace;color:#eceae4">{{ scopeCount }}</div>
+          <div style="margin-top:7px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#5c5c60">IN VIEW · {{ scopeLabel }}</div>
+        </div>
+        <div style="width:1px;height:34px;background:#232326"></div>
+        <div>
+          <div style="font:400 13px/1.5 'IBM Plex Mono',monospace;color:#8a8a8e">208 US · 397 EU</div>
+          <div style="margin-top:5px;font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#5c5c60">DEFAULT SCOPE · 605 OF 1,583</div>
+        </div>
+        <div style="flex:1;min-width:160px"></div>
+        <div style="max-width:400px;font:400 11px/1.65 Spectral,Georgia,serif;color:#8a8a84">The remaining 978 are real and stay reachable. The default is what a field team can act on this quarter.</div>
+      </div>
+
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid #1a1a1d;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b;margin-right:4px">REGION</div>
+        <sc-for list="{{ regions }}" as="r" hint-placeholder-count="4">
+          <div onClick="{{ r.onClick }}" style="cursor:pointer;padding:6px 11px;border:1px solid {{ r.border }};background:{{ r.bg }};font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:{{ r.color }}">{{ r.label }}</div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b;margin-right:6px">{{ geoFilterLabel }}</div>
+        <sc-for list="{{ geoChips }}" as="g" hint-placeholder-count="7">
+          <div onClick="{{ g.onClick }}" style="cursor:pointer;padding:5px 9px;border:1px solid {{ g.border }};background:{{ g.bg }};font:500 8.5px/1.3 'IBM Plex Mono',monospace;letter-spacing:.1em;color:{{ g.color }}">{{ g.label }}</div>
+        </sc-for>
+      </div>
+      <div style="margin-top:10px;font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a">{{ coverageNote }}</div>
+    </div>
+
+    <sc-if value="{{ quadrantMode }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:baseline;gap:14px;margin:30px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">MOMENTUM × VISIBILITY</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">TOP 100 · {{ scopeLabel }}</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">ON A ROW AN ARCHETYPE IS A LABEL · HERE IT IS A LOCATION</div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11;display:grid;grid-template-columns:1fr 300px">
+      <div style="padding:20px 20px 16px;border-right:1px solid #1a1a1d">
+        <div style="display:flex;gap:12px">
+          <div style="width:14px;display:flex;align-items:center;justify-content:center">
+            <div style="transform:rotate(180deg);writing-mode:vertical-rl;font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#57575b">MOMENTUM COMPOSITE →</div>
+          </div>
+          <div style="flex:1">
+            <div style="position:relative;height:470px;border:1px solid #1a1a1d;background:#0b0b0d">
+              <div style="position:absolute;left:0;bottom:{{ splitPct }}%;top:0;width:{{ splitPct }}%;background:rgba(216,162,74,.028)"></div>
+              <div style="position:absolute;right:0;bottom:{{ splitPct }}%;top:0;left:{{ splitPct }}%;background:rgba(143,184,166,.045)"></div>
+              <div style="position:absolute;left:0;bottom:0;height:{{ splitPct }}%;width:{{ splitPct }}%;background:rgba(255,255,255,.008)"></div>
+              <div style="position:absolute;right:0;bottom:0;height:{{ splitPct }}%;left:{{ splitPct }}%;background:rgba(138,162,196,.035)"></div>
+              <div style="position:absolute;left:{{ splitPct }}%;top:0;bottom:0;width:1px;background:#232326"></div>
+              <div style="position:absolute;bottom:{{ splitPct }}%;left:0;right:0;height:1px;background:#232326"></div>
+
+              <div style="position:absolute;left:12px;top:10px;font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.15em;color:#8a7a52">EMERGING SPECIALISTS</div>
+              <div style="position:absolute;right:12px;top:10px;font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.15em;color:#8fb8a6">FUTURE KOLS</div>
+              <div style="position:absolute;left:12px;bottom:10px;font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.15em;color:#57575b">EARLY DEVELOPMENT</div>
+              <div style="position:absolute;right:12px;bottom:10px;font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.15em;color:#7f93ad">ESTABLISHED VISIBILITY</div>
+
+              <sc-for list="{{ points }}" as="pt" hint-placeholder-count="40">
+                <div style="position:absolute;left:{{ pt.left }}%;bottom:{{ pt.bottom }}%;width:{{ pt.size }};height:{{ pt.size }};margin-left:-3px;margin-bottom:-3px;border-radius:50%;background:{{ pt.color }};opacity:.72"></div>
+              </sc-for>
+              <div onClick="{{ singh.onClick }}" style="position:absolute;left:{{ singh.left }}%;bottom:{{ singh.bottom }}%;width:10px;height:10px;margin-left:-5px;margin-bottom:-5px;border-radius:50%;background:{{ singh.color }};box-shadow:{{ singh.ring }};cursor:pointer;z-index:3"></div>
+              <div onClick="{{ singh.onClick }}" style="position:absolute;left:{{ singh.left }}%;bottom:{{ singh.bottom }}%;transform:translateX(-100%);margin-left:-12px;margin-bottom:-38px;white-space:nowrap;text-align:right;cursor:pointer;z-index:3;background:#0b0b0d;border:1px solid #232326;padding:5px 8px">
+                <div style="font:500 10.5px/1.3 Spectral,Georgia,serif;color:#eceae4;white-space:nowrap">Aditi P. Singh <span style="font:400 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8a8a8e">#1 US</span></div>
+                <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7fb3a4;white-space:nowrap">VIS 94.70 · MOM 95.52 · OPEN PROFILE ↗</div>
+              </div>
+            </div>
+            <div style="margin-top:9px;display:flex;align-items:center">
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">40</div>
+              <div style="flex:1;text-align:center;font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#57575b">VISIBILITY COMPOSITE →</div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">100</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1a1a1d;display:flex;gap:18px;flex-wrap:wrap">
+          <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:7px">
+              <div style="width:7px;height:7px;border-radius:50%;background:{{ l.color }}"></div>
+              <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#7a7a7e">{{ l.label }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top:12px;font:400 8.5px/1.7 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#6a6a6e;max-width:640px">TOP-100 ARCHETYPE MIX IS REAL · 46 BALANCED · 34 EMERGING · 18 SCIENTIFIC · 2 NETWORK. SINGH IS PLOTTED FROM HER ACTUAL COMPONENTS. THE REMAINING 99 COORDINATES ARE PLACEHOLDER GEOMETRY UNTIL THE HCP_RISING_STAR_RANKS_V3 JOIN LANDS.</div>
+      </div>
+
+      <div style="padding:20px">
+        <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#4e4e52">THE FOUR QUADRANTS</div>
+        <div style="margin-top:4px;font:400 11px/1.65 Spectral,Georgia,serif;color:#8a8a84">The naming is the thesis. Position carries what a label cannot.</div>
+        <sc-for list="{{ quadrants }}" as="q" hint-placeholder-count="4">
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1a1a1d">
+            <div style="display:flex;align-items:center;gap:7px">
+              <div style="width:6px;height:6px;border-radius:50%;background:{{ q.color }}"></div>
+              <div style="font:600 9px/1.3 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#d6d5d0">{{ q.name }}</div>
+            </div>
+            <div style="margin-top:6px;font:400 7.5px/1.5 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#57575b">{{ q.pos }}</div>
+            <div style="margin-top:7px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#a9a8a1">{{ q.thesis }}</div>
+            <div style="margin-top:6px;font:400 7.5px/1.5 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a">{{ q.clusters }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;border:1px solid #1f1f22;background:#0c0c0e;padding:18px 20px">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <div style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#8a8a8e">FIVE LEADERBOARDS RETIRED</div>
+        <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">TOP RISING · FASTEST SCIENTIFIC · FASTEST NETWORK · MOST BALANCED · MOMENTUM-FORWARD</div>
+      </div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:22px">
+        <div style="font:400 12px/1.7 Spectral,Georgia,serif;color:#a9a8a1;text-wrap:pretty">They re-sort correlated columns of one table, so the same people surface repeatedly — Rami Manochakian appears in four of the five. Five panels, one signal, and no way to tell which reading is the operative one.</div>
+        <div style="font:400 12px/1.7 Spectral,Georgia,serif;color:#a9a8a1;text-wrap:pretty">The quadrant already answers all five questions in one frame: rank is position toward the top-right, scientific and network momentum are the axes' inputs, and balance is proximity to the diagonal. The register mode handles anything that needs a sort.</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ tableMode }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:baseline;gap:14px;margin:30px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">ARCHETYPE BY RANK BAND</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">BOARD-WIDE · 1,583</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">A TOP-OF-BOARD SIGNAL THAT DEGENERATES BELOW 600</div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11;padding:18px 20px">
+      <sc-for list="{{ bandMix }}" as="b" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:16px;padding:9px 0">
+          <div style="min-width:82px;font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:{{ b.labelColor }}">{{ b.band }}</div>
+          <div style="flex:1;display:flex;height:9px;background:#141417">
+            <sc-for list="{{ b.segs }}" as="s" hint-placeholder-count="4">
+              <div style="height:9px;background:{{ s.color }};width:{{ s.w }}%"></div>
+            </sc-for>
+          </div>
+          <div style="min-width:330px;text-align:right;font:400 8.5px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;color:{{ b.noteColor }}">{{ b.note }}</div>
+        </div>
+      </sc-for>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #1a1a1d;display:flex;gap:18px;flex-wrap:wrap">
+        <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="width:8px;height:8px;background:{{ l.color }}"></div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#7a7a7e">{{ l.label }}</div>
+          </div>
+        </sc-for>
+        <div style="flex:1;min-width:120px"></div>
+        <div style="max-width:520px;font:400 11px/1.65 Spectral,Georgia,serif;color:#8a8a84;text-wrap:pretty">The band is the unit of this ledger, not the row. A flat rank list would carry archetype as one column that means four things at the top and one thing at the bottom.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:baseline;gap:14px;margin:30px 0 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:2px;height:11px;background:#7fb3a4"></div>
+        <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#d6d5d0">BOARD</div>
+      </div>
+      <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#67676b">{{ scopeLabel }} · SORTED BY REGIONAL RANK</div>
+      <div style="flex:1"></div>
+      <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#4e4e52">COMPOSITE PERCENTILE IS IN-COHORT</div>
+    </div>
+
+    <div style="border:1px solid #1f1f22;background:#0f0f11">
+      <div style="display:grid;grid-template-columns:52px 1fr 200px 96px 168px 132px 64px;padding:11px 16px;border-bottom:1px solid #1a1a1d;background:#0c0c0e">
+        <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">RANK</div>
+        <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">NAME</div>
+        <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">INSTITUTION</div>
+        <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">{{ geoColLabel }}</div>
+        <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">ARCHETYPE</div>
+        <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b">COMPOSITE PCTL</div>
+        <div style="font:600 8px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#57575b;text-align:right">CAREER</div>
+      </div>
+
+      <sc-for list="{{ bands }}" as="b" hint-placeholder-count="2">
+        <div>
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 16px;background:#0b0b0d;border-bottom:1px solid #17171a">
+            <div style="font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#8fb8a6">{{ b.label }}</div>
+            <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#57575b">{{ b.note }}</div>
+          </div>
+          <sc-for list="{{ b.rows }}" as="row" hint-placeholder-count="4">
+            <div onClick="{{ row.onClick }}" style="display:grid;grid-template-columns:52px 1fr 200px 96px 168px 132px 64px;align-items:center;padding:{{ rowPad }} 16px;border-bottom:1px solid #17171a;cursor:pointer;background:{{ row.bg }}" style-hover="background:#141417">
+              <div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#8a8a8e">{{ row.rank }}</div>
+              <div style="font:400 12.5px/1.3 Spectral,Georgia,serif;color:#e4e2dc">{{ row.name }}</div>
+              <div style="font:400 10.5px/1.35 Spectral,Georgia,serif;color:#8a8a84">{{ row.inst }}</div>
+              <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#8a8a8e">{{ row.geo }}</div>
+              <div style="font:500 8.5px/1.3 'IBM Plex Mono',monospace;letter-spacing:.1em;color:{{ row.archColor }}">{{ row.archLabel }}</div>
+              <div style="display:flex;align-items:center;gap:9px">
+                <div style="width:56px;height:3px;background:#1c1c1f">
+                  <div style="height:3px;background:#8fb8a6;width:{{ row.pctBar }}%"></div>
+                </div>
+                <div style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#c9c8c3">{{ row.composite }}</div>
+              </div>
+              <div style="font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7a7a7e;text-align:right">{{ row.career }}</div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ b.empty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:14px 16px;border-bottom:1px solid #17171a;font:400 9px/1.6 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#46464a">{{ b.emptyNote }}</div>
+          </sc-if>
+        </div>
+      </sc-for>
+
+      <sc-if value="{{ absenceMode }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:22px">
+          <div style="font:500 12px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#b9b8b2">22 US PROFILES HAVE NO STATE IN THE REGISTRY</div>
+          <div style="margin-top:14px;font:400 13px/1.72 Spectral,Georgia,serif;color:#b6b4ad;max-width:860px;text-wrap:pretty">These are 22 of the 208 US rising HCPs whose NPI record carries no state. Rank, composite percentile, all four components and archetype are covered for every one of them — the gap is a registry field, not the signal. They are excluded from any state filter and included in every US total, which is why the US count reads 208 rather than 186.</div>
+          <div style="margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1a1a1d">
+            <div style="padding:14px 22px 0 0">
+              <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">STATE COVERAGE</div>
+              <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">186 of 208 (89%). Country coverage on the EU board is complete.</div>
+            </div>
+            <div style="padding:14px 22px 0;border-left:1px solid #1a1a1d">
+              <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">HOW THEY STAY REACHABLE</div>
+              <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">This chip is the route. They also appear in every unfiltered US and US + EU view.</div>
+            </div>
+            <div style="padding:14px 0 0 22px;border-left:1px solid #1a1a1d">
+              <div style="font:400 8px/1.5 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#57575b">WHAT WOULD CHANGE THIS</div>
+              <div style="margin-top:8px;font:400 11.5px/1.6 Spectral,Georgia,serif;color:#98978f">A state on the NPI record, or an affiliation match against the institution registry.</div>
+            </div>
+          </div>
+          <div style="margin-top:20px;padding-top:14px;border-top:1px solid #1a1a1d;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a">ROWS RENDER WITH THE STATE CELL READING — · NEVER BLANK</div>
+            <div style="flex:1"></div>
+            <div onClick="{{ clearGeo }}" style="padding:6px 11px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a8a8e;cursor:pointer" style-hover="border-color:#3a3a3e">← BACK TO ALL STATES</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ boardMode }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:16px;background:#0b0b0d">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font:600 8.5px/1 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6a6a6e">BAND 600+ · 983 BOARD-WIDE</div>
+          <div style="font:400 8px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a">967 EMERGING LEADER · 10 NETWORK · 6 SCIENTIFIC</div>
+          <div style="flex:1"></div>
+          <div style="padding:6px 11px;border:1px solid #2a2a2e;font:500 8px/1.3 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#8a8a8e;cursor:pointer" style-hover="border-color:#3a3a3e">CONTINUE ↓</div>
+        </div>
+        <div style="margin-top:12px;max-width:760px;font:400 11.5px/1.7 Spectral,Georgia,serif;color:#8a8a84;text-wrap:pretty">Below rank 600 the classifier has one live bucket. The archetype column continues to render, in its residual treatment, because hiding it would imply the data is missing — it is present, and it stops discriminating. Rank, composite percentile and all four components remain fully covered to the end of the board.</div>
+      </div>
+      </sc-if>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:22px;flex-wrap:wrap;padding:0 2px">
+      <div style="font:400 8px/1.7 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a;max-width:340px">NARRATIVE IS PRESENT ON 20% OF THE BOARD — THE CUT FOLLOWS RANK, SO EVERY ROW IN BAND 1–100 HAS ONE. NOT A COLUMN.</div>
+      <div style="font:400 8px/1.7 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a;max-width:340px">EXTRACTED POSITIONS COVER THE TOP 100 US ONLY — A WINDOW ON THE PIPELINE, NOT A PROPERTY OF THE PHYSICIAN. NOT A LEDGER COLUMN.</div>
+      <div style="font:400 8px/1.7 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#46464a;max-width:340px">NETWORK CENTRALITY IS PRESENT ON 100% — IT IS THE ENTRY CONDITION FOR THE BOARD, SO IT SORTS NOTHING.</div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <div style="max-width:1180px;margin:44px auto 0;padding:20px 22px 0;border-top:1px solid #17171a;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+    <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.3em;color:#6e5423">FIELDMARK</div>
+    <div style="font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#3e3e42">RISING COHORT · NSCLC · 1,583 PROFILES · WEEKLY BUILD</div>
+    <div style="flex:1"></div>
+    <div style="font:400 8px/1.6 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#3e3e42">FOR VERIFIED MSL USE · NOT AFFILIATED WITH MENTIONED RESEARCHERS</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1240,&quot;height&quot;:1600},&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;profile1&quot;,&quot;profile2&quot;,&quot;ledger&quot;],&quot;default&quot;:&quot;profile1&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Surface&quot;},&quot;defaultRegion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;US&quot;,&quot;EU&quot;,&quot;BOTH&quot;],&quot;default&quot;:&quot;US&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Ledger&quot;},&quot;archetypeAccents&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Surface&quot;},&quot;compactRows&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Ledger&quot;}}">
+const ARCH = {
+  bal: { label: 'BALANCED RISING STAR', color: '#8fb8a6' },
+  sci: { label: 'SCIENTIFIC ACCELERATOR', color: '#d8a24a' },
+  net: { label: 'NETWORK ACCELERATOR', color: '#8aa2c4' },
+  emg: { label: 'EMERGING LEADER', color: '#9a9a9e' }
+};
+
+const US_ROWS = [
+  { rank: 1, name: 'Aditi P. Singh', inst: 'University of Pennsylvania', geo: 'PA', arch: 'bal', composite: '98.86', career: '10 yr', self: true },
+  { rank: 2, name: 'Sally C. M. Lau', inst: 'NYU Langone Health', geo: 'NY', arch: 'bal', composite: '98.48', career: '9 yr' },
+  { rank: 3, name: 'Rachel E. Sanborn', inst: 'Providence Cancer Institute', geo: 'OR', arch: 'emg', composite: '98.36', career: '16 yr' },
+  { rank: 6, name: 'Saumil Gandhi', inst: 'MD Anderson Cancer Center', geo: 'TX', arch: 'emg', composite: '97.03', career: '8 yr' },
+  { rank: 8, name: 'Xiuning Le', inst: 'MD Anderson Cancer Center', geo: 'TX', arch: 'sci', composite: '96.18', career: '12 yr' },
+  { rank: 14, name: 'Adam J. Schoenfeld', inst: 'Memorial Sloan Kettering', geo: 'NY', arch: 'sci', composite: '93.74', career: '8 yr' }
+];
+
+const EU_ROWS = [
+  { rank: 5, name: 'Lorenzo Belluomini', inst: 'University of Verona', geo: 'Italy', arch: 'bal', composite: '99.75', career: '12 yr' },
+  { rank: 10, name: 'Diego Kauffmann-Guerrero', inst: 'German Center for Lung Research', geo: 'Germany', arch: 'bal', composite: '99.43', career: '10 yr' },
+  { rank: 18, name: 'Sophie Cousin', inst: 'Institut Bergonié', geo: 'France', arch: 'bal', composite: '98.93', career: '15 yr' },
+  { rank: 88, name: 'Petros Christopoulos', inst: 'Thoraxklinik Heidelberg', geo: 'Germany', arch: 'sci', composite: '94.50', career: '16 yr' },
+  { rank: 113, name: 'Antonio Passaro', inst: 'European Institute of Oncology', geo: 'Italy', arch: 'sci', composite: '92.92', career: '16 yr' }
+];
+
+const BAND_MIX = [
+  { band: 'TOP 100', counts: [46, 34, 18, 2], note: '46 BALANCED · 34 EMERGING · 18 SCIENTIFIC · 2 NETWORK', live: true },
+  { band: '101–300', counts: [20, 124, 37, 19], note: '124 EMERGING · 37 SCIENTIFIC · 20 BALANCED · 19 NETWORK', live: true },
+  { band: '301–600', counts: [1, 253, 17, 29], note: '253 EMERGING · 29 NETWORK · 17 SCIENTIFIC · 1 BALANCED', live: true },
+  { band: '600+', counts: [0, 967, 6, 10], note: 'RESIDUAL BUCKET · 967 OF 983 EMERGING LEADER', live: false }
+];
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// Top-100 archetype mix is real: 46 balanced · 34 emerging · 18 scientific · 2 network.
+// Coordinates are placeholder geometry pending the v3 join; Singh's are her real components.
+function buildCloud() {
+  const r = mulberry32(41);
+  const groups = [
+    { key: 'bal', n: 46, vx: [82, 99], vy: [83, 99] },
+    { key: 'emg', n: 26, vx: [45, 78], vy: [45, 78] },
+    { key: 'emg', n: 8, vx: [83, 98], vy: [50, 77] },
+    { key: 'sci', n: 18, vx: [48, 77], vy: [82, 99] },
+    { key: 'net', n: 2, vx: [86, 97], vy: [56, 72] }
+  ];
+  const pts = [];
+  groups.forEach(g => {
+    for (let i = 0; i < g.n; i++) {
+      const x = g.vx[0] + r() * (g.vx[1] - g.vx[0]);
+      const y = g.vy[0] + r() * (g.vy[1] - g.vy[0]);
+      pts.push({ key: g.key, x: x, y: y });
+    }
+  });
+  return pts;
+}
+
+class Component extends DCLogic {
+  state = { view: null, region: null, geo: 'ALL', mode: 'table' };
+  cloud = buildCloud();
+
+  get view() { return this.state.view || this.props.startView || 'profile1'; }
+  get region() { return this.state.region || this.props.defaultRegion || 'US'; }
+  get accents() { return this.props.archetypeAccents !== false; }
+
+  arch(key, rank) {
+    const a = ARCH[key];
+    const residual = rank !== undefined && rank > 600 && key === 'emg';
+    const color = residual ? '#5c5c60' : (this.accents ? a.color : '#c9c8c3');
+    return { label: a.label, color: color };
+  }
+
+  chip(active) {
+    return active
+      ? { border: '#3f5f54', bg: '#16201c', color: '#a2cbbf' }
+      : { border: '#232326', bg: 'transparent', color: '#7a7a7e' };
+  }
+
+  profileSingh() {
+    const a = this.arch('bal', 1);
+    return {
+      name: 'Aditi P. Singh', shortName: 'Dr. Singh',
+      title: 'Assistant Professor, Division of Hematology/Oncology',
+      inst: 'University of Pennsylvania', geo: 'PA', registry: 'VERIFIED NPI REGISTRY',
+      rankBig: '#1', rankSuffix: 'US', rankLabel: 'RISING RANK · 208-PERSON US BOARD',
+      cell2: '#19', cell2Size: '22px', cell2Label: 'GLOBAL · 1,583 RISING', rankCrumb: 'RANK #1 US',
+      composite: '98.86', compositePct: 98.86, careerAge: '10 YR',
+      archLabel: a.label, archColor: a.color, archProseColor: '#b6b4ad',
+      archProse: 'Both engines are live: scientific momentum at 98.69 and network momentum at 92.35, inside seven points of each other. Neither one is carrying the rank alone.',
+      archBandNote: 'CLASSIFYING BAND · TOP 100 · 46 OF 100 BALANCED · MIXED AT THE TOP',
+      status: 'TARGETED',
+      metaLine: ['26 PUBLICATIONS 2021–2025', '3.85% SENIOR-AUTHOR SHARE', '159 COLLABORATORS', '10 EXTRACTED POSITIONS', 'NETWORK CENTRALITY PRESENT', 'ARCHETYPE CLASSIFIED'],
+      sciMom: '98.69', sciMomPct: 98.69, sciMomEv: '7 papers 2016–2020 → 26 papers 2021–2025. Output is the strongest scientific input at this career stage.',
+      netMom: '92.35', netMomPct: 92.35, netMomEv: '39 → 159 distinct collaborators across the two windows. Fourfold expansion of the co-authorship footprint.',
+      sciVis: '90.36', sciVisPct: 90.36, sciVisEv: 'Citation volume grew by 2,842 over the same period — reception of the output, not its size.',
+      netVis: '99.05', netVisPct: 99.05, netVisEv: 'Position in the co-authorship graph. Present for 100% of the rising board; this is near the ceiling of it.',
+      momComp: '95.52', visComp: '94.70', sources: '35', quadName: 'FUTURE KOLS', quadColor: this.accents ? '#8fb8a6' : '#c9c8c3',
+      deltas: [
+        { label: 'PUBLICATIONS', prior: '7', current: '26', note: '2016–2020 → 2021–2025 · SOURCE TABLE', color: '#eceae4' },
+        { label: 'COLLABORATORS', prior: '39', current: '159', note: 'DISTINCT CO-AUTHORS', color: '#eceae4' },
+        { label: 'CITATIONS', prior: '—', current: '+2,842', note: 'GROWTH ACROSS THE WINDOW', color: '#8fb8a6' },
+        { label: 'SENIOR-AUTHOR SHARE', prior: '0%', current: '3.85%', note: '1 OF 26 · SOURCE TABLE', color: '#8fb8a6' }
+      ],
+      hasNarrative: true, noNarrative: false, narrativeDemo: false,
+      hasPubLeadership: true, noPubLeadership: false, collabNote: '',
+      dualPresent: false, dualAbsent: true,
+      dualLine: 'No established rank in NSCLC. 86 of the 208 US rising stars are rising-only, and for them this surface is the whole record — nothing is routed elsewhere and no established section renders.',
+      positionsCovered: true, positionsAbsent: false, posSectionNote: 'COVERED · 5 FIRST · 5 SENIOR',
+      posTotal: '10', posFirst: '5', posSenior: '5',
+      posLine: 'Positions are extracted for the top 100 US rising stars. At US rank 1 this profile is inside that window and fully covered. The extractor accepts first authors as well as senior authors, which matters here: five of the ten positions rest on first-authored work.',
+      collabHeader: 'TOP COLLABORATORS · 5 OF 159',
+      collabTotal: '159', collabShown: '5',
+      neighbourhoodLine: 'Two of her five strongest ties are top-60 established figures — Charu Aggarwal at established rank 61 and Corey Langer at 58 — and all five are at her own institution, the strongest carrying 24 shared papers. The other three sit mid-board or on no board yet. The column reports where each collaborator stands rather than asserting a single percentile for the group.',
+      collabs: [
+        { name: 'Charu Aggarwal', state: 'ESTABLISHED', est: '97.92 · EST RANK 61', estColor: '#8fb8a6', inst: 'University of Pennsylvania', papers: '24', bar: 100 },
+        { name: 'Corey J. Langer', state: 'ESTABLISHED', est: '97.99 · EST RANK 58', estColor: '#8fb8a6', inst: 'University of Pennsylvania', papers: '24', bar: 100 },
+        { name: 'Roger B. Cohen', state: 'ESTABLISHED', est: '52.19 · EST RANK 1,345', estColor: '#8fb8a6', inst: 'University of Pennsylvania', papers: '23', bar: 96 },
+        { name: 'Melina E. Marmarelis', state: 'EARLIER', est: 'RISING-ELIGIBLE · NO BOARD ROW YET', estColor: '#a9a8a3', inst: 'University of Pennsylvania', papers: '20', bar: 83 },
+        { name: 'Christine Ciunci', state: 'ESTABLISHED', est: '52.03 · EST RANK 1,354', estColor: '#8fb8a6', inst: 'University of Pennsylvania', papers: '16', bar: 67 }
+      ]
+    };
+  }
+
+  profileDeep() {
+    const a = this.arch('emg', 742);
+    return {
+      name: 'M. R. Ellinghaus', shortName: 'This HCP',
+      title: 'Assistant Professor, Medical Oncology',
+      inst: 'University of Cincinnati', geo: 'OH', registry: 'SYNTHETIC RECORD · DEEP-BOARD STATE',
+      rankBig: '#742', rankSuffix: 'GLOBAL', rankLabel: 'RISING RANK · 1,583-PERSON BOARD',
+      cell2: 'NO US RANK', cell2Size: '13px', cell2Label: 'OUTSIDE THE US BOARD · 1,375 OF 1,583', rankCrumb: 'RANK #742 GLOBAL',
+      composite: '53.20', compositePct: 53.2, careerAge: '7 YR',
+      archLabel: 'EMERGING LEADER', archColor: a.color, archProseColor: '#8a8a84',
+      archProse: 'Carried as a band fact, not a signal. In band 600+, 967 of 983 profiles classify here — the label is the residual bucket, and it should not be read as a finding.',
+      archBandNote: 'RESIDUAL BAND · 600+ · CLASSIFIER DEGENERATE · DE-EMPHASISED BY DESIGN',
+      status: 'NOT TRACKED',
+      metaLine: ['9 PUBLICATIONS 2021–2025', 'AUTHOR POSITION NOT PARSED', '27 COLLABORATORS', 'OUTSIDE THE EXTRACTION WINDOW', 'NETWORK CENTRALITY PRESENT', 'ARCHETYPE RESIDUAL'],
+      sciMom: '44.10', sciMomPct: 44.1, sciMomEv: '4 papers 2016–2020 → 9 papers 2021–2025. Real growth, mid-cohort against a board where everyone is growing.',
+      netMom: '61.80', netMomPct: 61.8, netMomEv: '12 → 27 distinct collaborators across the two windows.',
+      sciVis: '38.60', sciVisPct: 38.6, sciVisEv: 'Citation volume grew by 118 over the same period.',
+      netVis: '66.20', netVisPct: 66.2, netVisEv: 'Position in the co-authorship graph. Present, mid-board, and the strongest of the four here.',
+      momComp: '52.95', visComp: '51.40', sources: '11', quadName: 'EARLY DEVELOPMENT', quadColor: '#7a7a7e',
+      deltas: [
+        { label: 'PUBLICATIONS', prior: '4', current: '9', note: '2016–2020 → 2021–2025', color: '#eceae4' },
+        { label: 'COLLABORATORS', prior: '12', current: '27', note: 'DISTINCT CO-AUTHORS', color: '#eceae4' },
+        { label: 'CITATIONS', prior: '—', current: '+118', note: 'GROWTH ACROSS THE WINDOW', color: '#8fb8a6' },
+        { label: 'AUTHOR POSITION', prior: '—', current: '—', note: 'NOT PARSED ON THIS RECORD', color: '#5c5c60' }
+      ],
+      hasNarrative: false, noNarrative: true, narrativeDemo: false,
+      hasPubLeadership: false, noPubLeadership: true,
+      collabNote: 'COLLABORATOR IDENTITIES AND STANDING ARE JOINED FOR THE TOP 100 US ONLY · THE COUNT IS COVERED FOR THE WHOLE BOARD · SAME WINDOW AS THE POSITIONS EXTRACTOR, SAME COVERAGE FACT',
+      dualPresent: false, dualAbsent: true,
+      dualLine: 'No established row, and none expected at this rank. The rising surface is the whole record for this profile.',
+      positionsCovered: false, positionsAbsent: true, posSectionNote: 'ABSENCE STATE 1 OF 3 · COVERAGE, NOT AUTHORSHIP',
+      posTotal: '—', posFirst: '—', posSenior: '—',
+      posLine: '', collabHeader: 'COLLABORATOR COUNT · 27 · IDENTITIES NOT JOINED',
+      collabTotal: '27', collabShown: '0',
+      neighbourhoodLine: '27 distinct co-authors are recorded across the two windows, and the count is what carries the network momentum percentile above. The identities and their established ranks are not joined for profiles outside the top 100 US, so this section reports the count rather than naming a neighbourhood it cannot see.',
+      collabs: []
+    };
+  }
+
+  profileLe() {
+    const a = this.arch('sci', 8);
+    return {
+      name: 'Xiuning Le', shortName: 'Dr. Le',
+      title: 'Associate Professor, Thoracic/Head and Neck Medical Oncology',
+      inst: 'MD Anderson Cancer Center', geo: 'TX',
+      registry: 'VERIFIED NPI REGISTRY · COMPONENT VALUES SYNTHETIC IN THIS FRAME',
+      rankBig: '#8', rankSuffix: 'US', rankLabel: 'RISING RANK · 208-PERSON US BOARD',
+      cell2: 'EST #34 US', cell2Size: '18px', cell2Label: 'ALSO ON THE ESTABLISHED BOARD',
+      rankCrumb: 'RANK #8 US · EST #34 US',
+      composite: '96.18', compositePct: 96.18, careerAge: '12 YR',
+      archLabel: a.label, archColor: a.color, archProseColor: '#b6b4ad',
+      archProse: 'Scientific momentum carries this rank ahead of the network side. The classification holds at rank 8, where the top band is genuinely mixed.',
+      archBandNote: 'CLASSIFYING BAND · TOP 100 · 18 OF 100 SCIENTIFIC',
+      status: 'TARGETED',
+      metaLine: ['DUAL BOARD · RISING 8 US · ESTABLISHED 34 US', 'INSIDE THE POSITIONS WINDOW', 'NETWORK CENTRALITY PRESENT', 'ARCHETYPE CLASSIFIED', 'COMPONENTS SYNTHETIC IN THIS FRAME'],
+      sciMom: '97.40', sciMomPct: 97.4, sciMomEv: 'Synthetic in this frame. The real value reads from the same source table as the rank above.',
+      netMom: '88.60', netMomPct: 88.6, netMomEv: 'Synthetic in this frame.',
+      sciVis: '95.30', sciVisPct: 95.3, sciVisEv: 'Synthetic in this frame.',
+      netVis: '90.10', netVisPct: 90.1, netVisEv: 'Synthetic in this frame.',
+      momComp: '93.00', visComp: '92.70', sources: '—',
+      quadName: 'FUTURE KOLS', quadColor: this.accents ? '#8fb8a6' : '#c9c8c3',
+      deltas: [
+        { label: 'PUBLICATIONS', prior: '—', current: '—', note: 'NOT LOADED IN THIS FRAME', color: '#5c5c60' },
+        { label: 'COLLABORATORS', prior: '—', current: '—', note: 'NOT LOADED IN THIS FRAME', color: '#5c5c60' },
+        { label: 'CITATIONS', prior: '—', current: '—', note: 'NOT LOADED IN THIS FRAME', color: '#5c5c60' },
+        { label: 'SENIOR-AUTHOR SHARE', prior: '—', current: '—', note: 'NOT LOADED IN THIS FRAME', color: '#5c5c60' }
+      ],
+      hasNarrative: false, noNarrative: false, narrativeDemo: true,
+      hasPubLeadership: false, noPubLeadership: true,
+      collabTotal: '—', collabShown: '0',
+      neighbourhoodLine: 'This profile is inside the extraction window, so the collaborator join runs and standing renders for all five ties. The rows are not loaded in this demo frame — and the RISING state has still never been seen rendered, because none of Singh\'s five carries it.',
+      collabNote: 'TO DRAW THE RISING STATE: JULIA ROTOW, DANA-FARBER · 4F968065-CBFF-4955-8362-3A414A0F8D84 · THREE OF HER TOP FIVE SIT ON THE RISING BOARD · SEND THOSE FIVE ROWS AND THE STATE RENDERS',
+      dualPresent: true, dualAbsent: false,
+      estRank: '#34', estRankScope: 'US ESTABLISHED RANK IN NSCLC · VERIFIED AT GLOBAL, US AND NSCLC-SCOPED COUNTS · 122 OF THE 208 US RISING STARS ARE DUAL-BOARD',
+      dualLine: 'US established rank 34 says she is already inside the destination the rising board measures trajectory toward. That is a stronger claim than either number alone, and it is why rising wins the route: nobody on both boards is established-dominant, so the established rank belongs on this surface as a section rather than as a competing profile.',
+      positionsCovered: true, positionsAbsent: false, posSectionNote: 'COVERED · COUNTS NOT LOADED IN THIS FRAME',
+      posTotal: '—', posFirst: '—', posSenior: '—',
+      posLine: 'Positions are extracted for the top 100 US rising stars. At US rank 8 this profile is inside that window, so extraction has run and the section renders in its covered state. The counts and statements are not loaded in this frame.',
+      collabHeader: 'TOP COLLABORATORS · ROWS NOT LOADED',
+      collabs: []
+    };
+  }
+
+  ledgerVals() {
+    const region = this.region;
+    const geo = this.state.geo;
+    let rows = region === 'EU' ? EU_ROWS : region === 'BOTH' ? US_ROWS.concat(EU_ROWS) : US_ROWS;
+    const geoValues = [];
+    rows.forEach(r => { if (geoValues.indexOf(r.geo) < 0) geoValues.push(r.geo); });
+    const filtered = geo === 'ALL' ? rows : rows.filter(r => r.geo === geo);
+    const sorted = filtered.slice().sort((x, y) => x.rank - y.rank);
+
+    const mk = r => ({
+      rank: r.rank, name: r.name, inst: r.inst, geo: r.geo,
+      composite: r.composite, career: r.career, pctBar: parseFloat(r.composite),
+      archLabel: this.arch(r.arch, r.rank).label, archColor: this.arch(r.arch, r.rank).color,
+      bg: r.self ? '#111214' : 'transparent',
+      onClick: r.self ? () => this.setState({ view: 'profile1' }) : () => {}
+    });
+
+    const b1 = sorted.filter(r => r.rank <= 100).map(mk);
+    const b2 = sorted.filter(r => r.rank > 100 && r.rank <= 300).map(mk);
+
+    const geoChips = [{ key: 'ALL', label: region === 'EU' ? 'ALL COUNTRIES' : 'ALL STATES' }]
+      .concat(geoValues.map(v => ({ key: v, label: String(v).toUpperCase() })));
+    if (region !== 'EU') geoChips.push({ key: '__ABSENT', label: 'STATE NOT IN REGISTRY · 22' });
+
+    return {
+      scopeCount: region === 'EU' ? '397' : region === 'BOTH' ? '605' : '208',
+      scopeLabel: region === 'EU' ? 'EU' : region === 'BOTH' ? 'US + EU' : 'US',
+      geoColLabel: region === 'EU' ? 'COUNTRY' : region === 'BOTH' ? 'STATE / COUNTRY' : 'STATE',
+      geoFilterLabel: region === 'EU' ? 'COUNTRY' : 'STATE',
+      coverageNote: region === 'EU'
+        ? 'COUNTRY COVERAGE COMPLETE · 397 OF 397'
+        : 'STATE COVERAGE 186 OF 208 (89%) · THE 22 WITHOUT ONE FILTER TO AN EXPLICIT ABSENCE STATE, NOT TO AN EMPTY CELL',
+      regions: ['US', 'EU', 'BOTH'].map(k => {
+        const c = this.chip(region === k);
+        return {
+          label: k === 'BOTH' ? 'US + EU · 605' : k === 'US' ? 'US · 208' : 'EU · 397',
+          border: c.border, bg: c.bg, color: c.color,
+          onClick: () => this.setState({ region: k, geo: 'ALL' })
+        };
+      }).concat([(() => {
+        const c = this.chip(false);
+        return { label: 'ALL 1,583 ↗', border: c.border, bg: c.bg, color: c.color, onClick: () => {} };
+      })()]),
+      geoChips: geoChips.map(g => {
+        const c = this.chip(geo === g.key);
+        return { label: g.label, border: c.border, bg: c.bg, color: c.color, onClick: () => this.setState({ geo: g.key }) };
+      }),
+      bandMix: BAND_MIX.map(b => {
+        const total = b.counts.reduce((s, n) => s + n, 0);
+        const cols = this.accents
+          ? ['#8fb8a6', '#9a9a9e', '#d8a24a', '#8aa2c4']
+          : ['#c9c8c3', '#4e4e52', '#9a9a9e', '#7a7a7e'];
+        return {
+          band: b.band, note: b.note,
+          labelColor: b.live ? '#d6d5d0' : '#5c5c60',
+          noteColor: b.live ? '#7a7a7e' : '#4e4e52',
+          segs: b.counts.map((n, i) => ({ color: b.live ? cols[i] : (i === 1 ? '#2a2a2e' : cols[i]), w: (n / total) * 100 }))
+        };
+      }),
+      legend: [
+        { label: 'BALANCED RISING STAR', color: this.accents ? '#8fb8a6' : '#c9c8c3' },
+        { label: 'EMERGING LEADER', color: this.accents ? '#9a9a9e' : '#4e4e52' },
+        { label: 'SCIENTIFIC ACCELERATOR', color: this.accents ? '#d8a24a' : '#9a9a9e' },
+        { label: 'NETWORK ACCELERATOR', color: this.accents ? '#8aa2c4' : '#7a7a7e' }
+      ],
+      absenceMode: geo === '__ABSENT',
+      boardMode: geo !== '__ABSENT',
+      bands: geo === '__ABSENT' ? [] : [
+        { label: 'BAND 1–100', note: 'ARCHETYPE IS A SIGNAL HERE · GENUINELY MIXED', rows: b1, empty: b1.length === 0,
+          emptyNote: geo === 'ALL' ? 'NO ROWS IN THIS BAND UNDER THE CURRENT SCOPE' : 'NO ROWS IN THIS BAND FOR ' + String(geo).toUpperCase() },
+        { label: 'BAND 101–300', note: 'STILL CLASSIFYING · EMERGING LEADER BEGINS TO ABSORB', rows: b2, empty: b2.length === 0,
+          emptyNote: geo === 'ALL' ? 'NO ROWS IN THIS BAND UNDER THE CURRENT SCOPE' : 'NO ROWS IN THIS BAND FOR ' + String(geo).toUpperCase() }
+      ],
+      rowPad: this.props.compactRows ? '9px' : '13px',
+      clearGeo: () => this.setState({ geo: 'ALL' })
+    };
+  }
+
+  // Rail counts are derived from the plotted points, so the claim can never drift from the picture.
+  quadMix(rightHalf, topHalf) {
+    const NAMES = { bal: 'BALANCED', emg: 'EMERGING', sci: 'SCIENTIFIC', net: 'NETWORK' };
+    const tally = {};
+    this.cloud.forEach(p => {
+      if ((p.x >= 80) !== rightHalf) return;
+      if ((p.y >= 80) !== topHalf) return;
+      tally[p.key] = (tally[p.key] || 0) + 1;
+    });
+    const parts = Object.keys(tally).sort((a, b) => tally[b] - tally[a]).map(k => tally[k] + ' ' + NAMES[k]);
+    return parts.length ? parts.join(' · ') : 'NO PLOTTED POINTS';
+  }
+
+  quadrantVals() {
+    const mode = this.state.mode;
+    const AX_MIN = 40, AX_SPAN = 60, SPLIT = 80;
+    const col = k => this.arch(k, 1).color;
+    const place = p => ({
+      left: ((p.x - AX_MIN) / AX_SPAN) * 100,
+      bottom: ((p.y - AX_MIN) / AX_SPAN) * 100,
+      color: col(p.key)
+    });
+    const points = this.cloud.map(p => Object.assign(place(p), { size: '6px', ring: 'none', z: 1, cursor: 'default', onClick: () => {} }));
+    const singh = Object.assign(place({ x: 94.7, y: 95.52, key: 'bal' }), {
+      size: '10px', ring: '0 0 0 4px rgba(143,184,166,.16)', z: 3, cursor: 'pointer',
+      onClick: () => this.setState({ view: 'profile1' })
+    });
+    const splitPct = ((SPLIT - AX_MIN) / AX_SPAN) * 100;
+    const modeBtn = k => this.chip(mode === k);
+    return {
+      quadrantMode: mode === 'quadrant', tableMode: mode !== 'quadrant',
+      setTable: () => this.setState({ mode: 'table' }),
+      setQuadrant: () => this.setState({ mode: 'quadrant' }),
+      tableBtn: modeBtn('table'), quadBtn: modeBtn('quadrant'),
+      points: points, singh: singh, splitPct: splitPct,
+      quadrants: [
+        { name: 'EMERGING SPECIALISTS', pos: 'HIGH MOMENTUM · LOW VISIBILITY', thesis: 'Moving fast, not yet read. The cohort a field team reaches before anyone else does.', clusters: this.quadMix(false, true), color: col('sci') },
+        { name: 'FUTURE KOLS', pos: 'HIGH MOMENTUM · HIGH VISIBILITY', thesis: 'Both engines live and already received. The top of the board sits in this corner.', clusters: this.quadMix(true, true), color: col('bal') },
+        { name: 'EARLY DEVELOPMENT', pos: 'LOW MOMENTUM · LOW VISIBILITY', thesis: 'On the board because the footprint exists, not because it is moving yet. Watch, do not work.', clusters: this.quadMix(false, false), color: col('emg') },
+        { name: 'ESTABLISHED VISIBILITY', pos: 'LOW MOMENTUM · HIGH VISIBILITY', thesis: 'Read widely, growth flattening. The exit lane toward the established cohort.', clusters: this.quadMix(true, false), color: col('net') }
+      ]
+    };
+  }
+
+  renderVals() {
+    const view = this.view;
+    const tab = k => view === k
+      ? { border: '#6e5423', color: '#d8a24a', bg: '#141008' }
+      : { border: '#232326', color: '#7a7a7e', bg: 'transparent' };
+    const t1 = tab('profile1'), t2 = tab('profile2'), t4 = tab('profile3'), t3 = tab('ledger');
+    const base = {
+      isProfile: view !== 'ledger', isLedger: view === 'ledger',
+      tab4Border: t4.border, tab4Color: t4.color, tab4Bg: t4.bg,
+      goProfile3: () => this.setState({ view: 'profile3' }),
+      goProfile1: () => this.setState({ view: 'profile1' }),
+      goProfile2: () => this.setState({ view: 'profile2' }),
+      goLedger: () => this.setState({ view: 'ledger' }),
+      goQuadrant: () => this.setState({ view: 'ledger', mode: 'quadrant' }),
+      tab1Border: t1.border, tab1Color: t1.color, tab1Bg: t1.bg,
+      tab2Border: t2.border, tab2Color: t2.color, tab2Bg: t2.bg,
+      tab3Border: t3.border, tab3Color: t3.color, tab3Bg: t3.bg,
+      p: view === 'profile2' ? this.profileDeep() : view === 'profile3' ? this.profileLe() : this.profileSingh(),
+      standingStates: [
+        { label: 'ESTABLISHED', scope: 'US-SCOPED COHORT SCORE AND RANK', count: '748 SLOTS', color: '#8fb8a6', pad: '0' },
+        { label: 'ESTABLISHED · GLOBAL', scope: 'RANKED GLOBALLY, NOT US-SCOPED · SHOWN AS GLOBAL, NEVER AS BLANK', count: '56 SLOTS', color: '#7f93ad', pad: '0' },
+        { label: 'NO ROW AT ANY SCOPE', scope: 'SPLITS INTO TWO STATES, BELOW · 146 DISTINCT PEOPLE', count: '196 SLOTS · 20%', color: '#8a8a8e', pad: '0' },
+        { label: 'RISING', scope: 'ON THE RISING BOARD THEMSELVES · THEIR RISING RANK IS THE FACT', count: '48 OF THE 146', color: '#d8a24a', pad: '18px' },
+        { label: 'EARLIER', scope: 'NEITHER BOARD YET · CAREER STAGE, NOT ABSENT SIGNAL · INCLUDES THE 9 COMMUNITY', count: '98 OF THE 146', color: '#a9a8a3', pad: '18px' }
+      ],
+      posStates: [
+        { n: '1', label: 'OUTSIDE THE EXTRACTION WINDOW', mech: 'Never eligible; the window covers the top 100 US only.', count: '1,483 · APPLIES HERE', color: '#c9c8c3' },
+        { n: '2', label: 'ELIGIBLE, NO QUALIFYING PAPER', mech: 'No recent first- or senior-authored paper with a full abstract.', count: '~10 OF THE 100', color: '#6a6a6e' },
+        { n: '3', label: 'EXTRACTION RAN, YIELDED NOTHING', mech: 'Papers qualified; no position cleared the confidence floor.', count: '9 OF THE 100', color: '#6a6a6e' }
+      ]
+    };
+    return Object.assign(base, this.ledgerVals(), this.quadrantVals());
+  }
+}
+</script>
+</body>
+</html>

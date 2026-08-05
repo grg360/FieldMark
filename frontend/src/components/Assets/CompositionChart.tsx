@@ -9,7 +9,7 @@
 // failing counts — never "insufficient data" alone.
 
 import { useState } from "react";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, GROUND, LINE, COOL, WARM } from "../../lib/designTokens";
 import {
   HIGHLIGHT,
   THEMED_PERIOD_GATE,
@@ -25,13 +25,13 @@ const eyebrow = {
   fontWeight: 500,
   letterSpacing: "0.16em",
   textTransform: "uppercase" as const,
-  color: COLOR.ink3,
+  color: COOL.label,
 };
 const note = {
   fontFamily: FONT.mono,
   fontSize: 10,
   lineHeight: 1.7,
-  color: COLOR.ink4,
+  color: COOL.label,
 };
 
 function pct(x: number): string {
@@ -53,8 +53,8 @@ function modeBtn(active: boolean): React.CSSProperties {
     padding: "8px 12px",
     cursor: "pointer",
     background: active ? COLOR.amberSoft : "transparent",
-    border: `1px solid ${active ? COLOR.amber : COLOR.hairStrong}`,
-    color: active ? COLOR.amber : COLOR.ink3,
+    border: `1px solid ${active ? COLOR.amber : LINE.l1}`,
+    color: active ? COLOR.amber : COOL.chrome,
   };
 }
 
@@ -124,7 +124,7 @@ export default function CompositionChart({
             gap: 40,
             paddingBottom: 22,
             marginBottom: 4,
-            borderBottom: `1px solid ${COLOR.hairStrong}`,
+            borderBottom: `1px solid ${LINE.l1}`,
             flexWrap: "wrap",
           }}
         >
@@ -132,10 +132,10 @@ export default function CompositionChart({
             <div style={{ ...eyebrow, marginBottom: 12 }}>
               {assetName ? `${assetName} · ` : ""}theme composition
             </div>
-            <h2 style={{ margin: "0 0 12px", fontFamily: FONT.sans, fontSize: 27, fontWeight: 500, letterSpacing: "-0.01em", color: COLOR.ink1 }}>
+            <h2 style={{ margin: "0 0 12px", fontFamily: FONT.sans, fontSize: 27, fontWeight: 500, letterSpacing: "-0.01em", color: WARM.prose }}>
               What this literature is about, and how that changed
             </h2>
-            <div style={{ fontFamily: FONT.serif, fontSize: 16, lineHeight: 1.55, color: COLOR.ink2, maxWidth: 700 }}>
+            <div style={{ fontFamily: FONT.serif, fontSize: 16, lineHeight: 1.55, color: WARM.body, maxWidth: 700 }}>
               Each column is one publication year, divided by canonical theme. Volume moved from{" "}
               {firstCol.corpus} papers in {firstCol.year} to {lastFull.corpus} in {lastFull.year}.
               Both are observations about publishing, not statements about the therapy.
@@ -222,7 +222,7 @@ export default function CompositionChart({
               gap: full ? 16 : 12,
               marginTop: 10,
               paddingTop: full ? 11 : 0,
-              borderTop: full ? `1px solid ${COLOR.hairStrong}` : "none",
+              borderTop: full ? `1px solid ${LINE.l1}` : "none",
             }}
           >
             {composition.columns.map((col) => (
@@ -231,16 +231,16 @@ export default function CompositionChart({
                   style={{
                     fontFamily: FONT.mono,
                     fontSize: full ? 13 : 11,
-                    color: col.isPartial ? COLOR.ink4 : COLOR.ink2,
+                    color: col.isPartial ? COOL.label : WARM.body,
                   }}
                 >
                   {col.year}
                 </div>
-                <div style={{ fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink5, marginTop: 5 }}>
+                <div style={{ fontFamily: FONT.mono, fontSize: 10, color: WARM.muted, marginTop: 5 }}>
                   {col.corpus}
                 </div>
                 {full ? (
-                  <div style={{ fontFamily: FONT.mono, fontSize: 9, color: COLOR.ink5, marginTop: 4 }}>
+                  <div style={{ fontFamily: FONT.mono, fontSize: 9, color: WARM.muted, marginTop: 4 }}>
                     {col.themed} themed
                   </div>
                 ) : null}
@@ -253,13 +253,13 @@ export default function CompositionChart({
             style={{
               marginTop: 16,
               padding: full ? "14px 16px" : "12px 0 0",
-              borderTop: full ? "none" : `1px solid ${COLOR.hair}`,
-              border: full ? `1px solid ${COLOR.hairStrong}` : "none",
-              background: full ? COLOR.surfaceWell : "transparent",
+              borderTop: full ? "none" : `1px solid ${LINE.l0}`,
+              border: full ? `1px solid ${LINE.l1}` : "none",
+              background: full ? GROUND.g1 : "transparent",
               fontFamily: FONT.mono,
               fontSize: full ? 13 : 11,
               lineHeight: 1.5,
-              color: COLOR.ink2,
+              color: WARM.body,
               minHeight: 17,
             }}
           >
@@ -268,7 +268,7 @@ export default function CompositionChart({
         </div>
 
         {/* Theme table */}
-        <div style={{ borderLeft: `1px solid ${COLOR.hairStrong}`, paddingLeft: 22, minWidth: 0 }}>
+        <div style={{ borderLeft: `1px solid ${LINE.l1}`, paddingLeft: 22, minWidth: 0 }}>
           <div
             style={{
               display: "grid",
@@ -277,9 +277,9 @@ export default function CompositionChart({
               fontSize: 9,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: COLOR.ink4,
+              color: COOL.label,
               paddingBottom: 9,
-              borderBottom: `1px solid ${COLOR.hair}`,
+              borderBottom: `1px solid ${LINE.l0}`,
             }}
           >
             <span>Theme</span>
@@ -296,7 +296,7 @@ export default function CompositionChart({
                 onMouseEnter={() => setHover({ key: band.key, readout: bandReadout(band) })}
                 onMouseLeave={() => setHover({ key: null, readout: null })}
                 onClick={() => setHeld((k) => (k === band.key ? null : band.key))}
-                style={{ padding: "10px 0", borderBottom: `1px solid ${COLOR.hair}`, cursor: "pointer", opacity: dim ? 0.42 : 1 }}
+                style={{ padding: "10px 0", borderBottom: `1px solid ${LINE.l0}`, cursor: "pointer", opacity: dim ? 0.42 : 1 }}
               >
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 44px 44px 44px", alignItems: "center" }}>
                   <span
@@ -307,19 +307,19 @@ export default function CompositionChart({
                       fontFamily: FONT.sans,
                       fontSize: 12,
                       lineHeight: 1.3,
-                      color: COLOR.ink1,
+                      color: WARM.prose,
                     }}
                   >
                     <span style={{ width: 9, height: 9, flex: "none", background: isFocus ? HIGHLIGHT : band.color }} />
                     {band.label}
                   </span>
-                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink3 }}>
+                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.muted }}>
                     {pct(band.openingShare)}
                   </span>
-                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink1 }}>
+                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.prose }}>
                     {pct(band.closingShare)}
                   </span>
-                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink3 }}>
+                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.muted }}>
                     {signedPp(band.deltaPp)}
                   </span>
                 </div>
@@ -383,10 +383,10 @@ function MobileComposition({ composition }: { composition: Composition }) {
         </div>
         <div style={{ marginTop: 14 }}>
           {topBands.map((b) => (
-            <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${COLOR.hair}`, minHeight: 44, boxSizing: "border-box" }}>
+            <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${LINE.l0}`, minHeight: 44, boxSizing: "border-box" }}>
               <span style={{ width: 9, height: 9, flex: "none", background: b.color }} />
-              <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: COLOR.ink1 }}>{b.label}</span>
-              <span style={{ fontFamily: FONT.mono, fontSize: 12, color: COLOR.ink1 }}>{pct(b.pooledShare)}</span>
+              <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: WARM.prose }}>{b.label}</span>
+              <span style={{ fontFamily: FONT.mono, fontSize: 12, color: WARM.prose }}>{pct(b.pooledShare)}</span>
             </div>
           ))}
         </div>
@@ -411,18 +411,18 @@ function MobileComposition({ composition }: { composition: Composition }) {
       </div>
       <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
         {composition.columns.map((col) => (
-          <div key={col.year} style={{ flex: 1, textAlign: "center", fontFamily: FONT.mono, fontSize: 9, color: COLOR.ink5 }}>
+          <div key={col.year} style={{ flex: 1, textAlign: "center", fontFamily: FONT.mono, fontSize: 9, color: WARM.muted }}>
             {`'${String(col.year).slice(2)}`}
           </div>
         ))}
       </div>
       <div style={{ marginTop: 16 }}>
         {topBands.map((b) => (
-          <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${COLOR.hair}`, minHeight: 44, boxSizing: "border-box" }}>
+          <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${LINE.l0}`, minHeight: 44, boxSizing: "border-box" }}>
             <span style={{ width: 9, height: 9, flex: "none", background: b.color }} />
-            <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: COLOR.ink1 }}>{b.label}</span>
-            <span style={{ fontFamily: FONT.mono, fontSize: 12, color: COLOR.ink1 }}>{pct(b.closingShare)}</span>
-            <span style={{ width: 44, textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink3 }}>
+            <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: WARM.prose }}>{b.label}</span>
+            <span style={{ fontFamily: FONT.mono, fontSize: 12, color: WARM.prose }}>{pct(b.closingShare)}</span>
+            <span style={{ width: 44, textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.muted }}>
               {signedPp(b.deltaPp)}
             </span>
           </div>
@@ -465,12 +465,12 @@ function GatedComposition({ composition }: { composition: Composition }) {
           GATED
         </span>
         <div>
-          <div style={{ fontFamily: FONT.serif, fontSize: 15, lineHeight: 1.55, color: COLOR.ink1 }}>
+          <div style={{ fontFamily: FONT.serif, fontSize: 15, lineHeight: 1.55, color: WARM.prose }}>
             Year-over-year composition is not shown for this asset. The shifting mix needs at least{" "}
             {THEMED_PERIOD_GATE} themed papers per year to be read as movement rather than noise;{" "}
             {yearRange} carry {countList}.
           </div>
-          <div style={{ ...note, marginTop: 9, fontSize: 11, color: COLOR.ink3 }}>
+          <div style={{ ...note, marginTop: 9, fontSize: 11, color: WARM.muted }}>
             Pooled mix across all {composition.themedTotal} themed papers is shown instead. It answers
             what this literature is about — not how it is moving.
           </div>
@@ -500,13 +500,13 @@ function GatedComposition({ composition }: { composition: Composition }) {
                 alignItems: "center",
                 gap: 9,
                 paddingBottom: 8,
-                borderBottom: `1px solid ${COLOR.hair}`,
+                borderBottom: `1px solid ${LINE.l0}`,
               }}
             >
               <span style={{ width: 9, height: 9, flex: "none", background: band.color }} />
-              <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 12, color: COLOR.ink1 }}>{band.label}</span>
-              <span style={{ fontFamily: FONT.mono, fontSize: 11, color: COLOR.ink1 }}>{pct(band.pooledShare)}</span>
-              <span style={{ width: 34, textAlign: "right", fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink4 }}>
+              <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 12, color: WARM.prose }}>{band.label}</span>
+              <span style={{ fontFamily: FONT.mono, fontSize: 11, color: WARM.prose }}>{pct(band.pooledShare)}</span>
+              <span style={{ width: 34, textAlign: "right", fontFamily: FONT.mono, fontSize: 10, color: COOL.label }}>
                 {band.pooledN}
               </span>
             </div>

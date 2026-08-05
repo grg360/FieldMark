@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { WebSignal } from "../lib/api";
 import { RIGHT_RAIL_HEADER_STYLE } from "./rightRailStyles";
-import { INK_COOL } from "../lib/designTokens";
+import { COOL } from "../lib/designTokens";
 
 interface Props {
   hcpName: string;
@@ -20,9 +20,9 @@ interface Props {
 const LP = {
   line: "rgba(255,255,255,.06)",
   teal: "#7FB3BB",
-  ink0: INK_COOL.ink0,
-  ink1: INK_COOL.ink1,
-  ink3: INK_COOL.ink3,
+  ink0: COOL.ui,
+  ink1: COOL.ui, // was INK_COOL.ink1 #e7e8e9 — retired into ui (Δ1.02)
+  ink3: COOL.muted,
   ink4: "#8F959A",
   ink5: "#7C8288",
   ink6: "#63696E",

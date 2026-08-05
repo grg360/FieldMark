@@ -9,7 +9,7 @@
 // Behaviour is identical to DetailScreen because these are the same components.
 
 import { useEffect, useRef, useState } from "react";
-import { INK_COOL } from "../../lib/designTokens";
+import { COOL } from "../../lib/designTokens";
 import type { HCP } from "../../data/hcpData";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { getOrCreateRelationship } from "../../lib/relationships";
@@ -27,7 +27,7 @@ export function profileHcp(hcpId: string, name: string, specialty?: string | nul
 function Bookmark({ on }: { on: boolean }) {
   return (
     <svg width="13" height="16" viewBox="0 0 12 15" aria-hidden>
-      <path d="M1 1.5h10v12l-5-3.2-5 3.2z" fill={on ? INK_COOL.ink0 : "none"} stroke={on ? INK_COOL.ink0 : "#7C8288"} strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M1 1.5h10v12l-5-3.2-5 3.2z" fill={on ? COOL.ui : "none"} stroke={on ? COOL.ui : "#7C8288"} strokeWidth="1.2" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -35,7 +35,7 @@ function Bookmark({ on }: { on: boolean }) {
 const btn = {
   display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px",
   background: "none", border: "1px solid rgba(255,255,255,.14)", cursor: "pointer",
-  font: "500 10px 'IBM Plex Mono',monospace", letterSpacing: ".08em", color: INK_COOL.ink2,
+  font: "500 10px 'IBM Plex Mono',monospace", letterSpacing: ".08em", color: COOL.prose,
   borderRadius: 2, minHeight: 0,
 } as const;
 
@@ -75,7 +75,7 @@ export default function ProfileRelationshipControls({ hcpId, hcpName, specialty 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button
           onClick={() => void toggleSave(hcpId, "hcp_profile")}
-          style={{ ...btn, color: tracked ? INK_COOL.ink0 : INK_COOL.ink2, borderColor: tracked ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.14)" }}
+          style={{ ...btn, color: tracked ? COOL.ui : COOL.prose, borderColor: tracked ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.14)" }}
           title={tracked ? "Tracked — click to untrack" : "Track this HCP"}
         >
           <Bookmark on={tracked} /> {tracked ? "TRACKED" : "TRACK"}

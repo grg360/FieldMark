@@ -15,19 +15,22 @@ import { getCurrentUser } from "../../lib/authHelpers";
 import { getTrackedHcpIds } from "../../lib/watchlists";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { fetchTrials, buildSurface, type Trial, type Region, type TrialsSurface } from "../../lib/trials";
-import { FONT } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, COOL, WARM } from "../../lib/designTokens";
 
-// Register migration 2026-08-05: only the font stacks matched tokens exactly.
-// The entire color palette is WARM-tinted (board through inks) — every value is
-// a near-twin of the cool SCALE/GOLD/INK ramps, none byte-identical, so all
-// stay local. Converging Trials onto the cool register (esp. amber #c8892e →
-// GOLD.gold #be914d) is a visible change reserved for its own commit.
+// Two Ramps consolidation 2026-08-05: the frame retired this file's warm board
+// (#0b0a09, one byte from ground) and its three warm lines into the cool
+// GROUND/LINE families — a warm-ink surface carries cool rules. ink0 #e9e5d7
+// is the EXTRACTED source of WARM.prose (byte-identical); ink6 #4c483e failed
+// live-text contrast and retired into cool chrome (COOL.floor). panel/well and
+// the mid warm inks (ink1–ink5) have no step in the three-step WARM ramp and
+// stay local until Design widens or re-inks them. Golds converge in the
+// gold-convergence commit.
 const P = {
-  board: "#0b0a09", panel: "#0f0e0c", well: "#0d0c0a",
-  line: "#1c1a15", line2: "#221f19", line3: "#2a251c",
+  board: GROUND.g0, panel: "#0f0e0c", well: "#0d0c0a",
+  line: LINE.l0, line2: LINE.l1, line3: LINE.l2,
   amber: "#c8892e", amberHi: "#e0a544", amberDim: "#8a6a2c", rosterLink: "#b9762c",
-  ink0: "#e9e5d7", ink1: "#c3bcac", ink2: "#8d8778", ink3: "#7e786b",
-  ink4: "#6a6558", ink5: "#57534a", ink6: "#4c483e", link: "#a9bfc7",
+  ink0: WARM.prose, ink1: "#c3bcac", ink2: "#8d8778", ink3: "#7e786b",
+  ink4: "#6a6558", ink5: "#57534a", ink6: COOL.floor, link: "#a9bfc7",
 };
 const MONO = FONT.mono;
 const SERIF = FONT.serif;

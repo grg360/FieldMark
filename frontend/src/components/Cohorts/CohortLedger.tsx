@@ -17,7 +17,7 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import NavBar from "../NavBar";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
-import { CONTENT_WIDTH, FONT, SCALE, GOLD, INK_COOL } from "../../lib/designTokens";
+import { CONTENT_WIDTH, FONT, GROUND, GOLD, COOL } from "../../lib/designTokens";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -65,24 +65,24 @@ function useIsMobile(): boolean {
 // remaining literal is a near-twin of a token (one digit off) or a cohort
 // semantic — converging those is a visible change, deferred on purpose.
 const P = {
-  page: "#08090A", // near-twin of SCALE.ground #0a0a0a — NOT converged
-  card: SCALE.panel, // #0e1013, exact
-  head: "#0B0D10", // near-twin of SCALE.well — NOT converged
-  rowHover: "#131619", // near-twin of SCALE.raised — NOT converged
-  drawer: "#0A0C0F", // near-twin of SCALE.well (one digit from P.band) — NOT converged
-  band: SCALE.well, // #0a0c0e, exact
+  page: "#08090A", // near-twin of GROUND.g0 #0a0a0a — NOT converged
+  card: GROUND.g2, // #0e1013, exact
+  head: "#0B0D10", // near-twin of GROUND.g1 — NOT converged
+  rowHover: "#131619", // near-twin of LINE.l0's value — NOT converged
+  drawer: "#0A0C0F", // near-twin of GROUND.g1 (one digit from P.band) — NOT converged
+  band: GROUND.g1, // #0a0c0e, exact
   line: "rgba(255,255,255,.06)", // alpha hairlines; register rules are opaque — NOT converged
   lineMed: "rgba(255,255,255,.09)",
   lineStrong: "rgba(255,255,255,.14)",
-  amber: GOLD.goldBright, // #e0a75e — this file is the token's source
-  ink0: INK_COOL.ink0, // cool-white ink ramp — this family is the token's source
-  ink1: INK_COOL.ink1,
-  ink2: INK_COOL.ink2,
-  ink3: INK_COOL.ink3,
-  ink4: "#8F959A", // near-twin of GREY.grey2 — NOT converged
-  ink5: "#7C8288", // near-twin of GREY.grey3 (1 RGB point) — NOT converged
-  ink6: "#63696E", // near-twin of GREY.grey5 — NOT converged
-  dash: "#71787E", // between GREY.grey3/grey4 — NOT converged
+  amber: GOLD.rank, // #e0a75e — this file is the token's source
+  ink0: COOL.ui, // cool ramp — this family fed the COOL ink steps
+  ink1: COOL.ui, // was INK_COOL.ink1 #e7e8e9 — retired into ui (Δ1.02, invisible)
+  ink2: COOL.prose,
+  ink3: COOL.muted,
+  ink4: "#8F959A", // near-twin of retired grey2 — NOT converged
+  ink5: "#7C8288", // near-twin of COOL.label (not equal) — NOT converged
+  ink6: "#63696E", // near-twin of COOL.faint — NOT converged
+  dash: "#71787E", // between COOL.label and retired grey4 — NOT converged
 } as const;
 
 const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
@@ -400,7 +400,7 @@ function Row({
         <div style={{ display: "flex", gap: 48, padding: "6px 20px 22px 127px", background: P.drawer, borderTop: `1px solid ${P.line}` }}>
           <div style={{ flex: 1, maxWidth: 540, display: "flex", flexDirection: "column", gap: 9, paddingTop: 14 }}>
             <div style={{ ...mono(9, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
-            <div style={{ ...serif(13.5), lineHeight: 1.6, color: "#CDD1D4", textWrap: "pretty" }}>{why(cfg, row, th)}</div>
+            <div style={{ ...serif(13.5), lineHeight: 1.6, color: COOL.prose, textWrap: "pretty" }}>{why(cfg, row, th)}</div>
             <div style={{ ...mono(10), lineHeight: 1.6, color: "#767C81", letterSpacing: ".04em", paddingTop: 2 }}>
               THE SUMMARY LINE ABOVE IS MODEL SYNTHESIS OVER THE SOURCES AT RIGHT · REVIEW BEFORE USE · NO CLINICAL CLAIM
             </div>
@@ -539,7 +539,7 @@ function MobileRow({
         <div style={{ padding: "4px 16px 18px 19px", background: P.drawer, borderTop: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 10 }}>
             <div style={{ ...mono(8.5, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
-            <div style={{ ...serif(13), lineHeight: 1.55, color: "#CDD1D4", textWrap: "pretty" }}>{why(cfg, row, th)}</div>
+            <div style={{ ...serif(13), lineHeight: 1.55, color: COOL.prose, textWrap: "pretty" }}>{why(cfg, row, th)}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ ...mono(8.5, 500), letterSpacing: ".18em", color: P.ink5, paddingBottom: 7 }}>TRACE</div>

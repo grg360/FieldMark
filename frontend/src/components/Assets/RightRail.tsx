@@ -5,7 +5,7 @@
 // a section is dropped only because the data is, never padded to look fuller.
 
 import { Link } from "react-router-dom";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { COLOR, FONT, LINE, COOL, WARM } from "../../lib/designTokens";
 import { authorInitialName, authorRankLabel } from "../../lib/assetLogic";
 import type { AuthorsPayload, CongressPresenter, ForumThread } from "../../lib/assetPage";
 
@@ -15,10 +15,10 @@ const eyebrow = {
   fontWeight: 500,
   letterSpacing: "0.16em",
   textTransform: "uppercase" as const,
-  color: COLOR.ink3,
+  color: COOL.label,
 } as const;
-const metaMono = { fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink4, lineHeight: 1.6 } as const;
-const emptyProse = { fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.55, color: COLOR.ink3 } as const;
+const metaMono = { fontFamily: FONT.mono, fontSize: 10, color: COOL.label, lineHeight: 1.6 } as const;
+const emptyProse = { fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.55, color: WARM.body } as const;
 
 function prettyCongress(slug: string): string {
   return slug.replace(/-/g, " ").toUpperCase();
@@ -28,26 +28,26 @@ export function AuthorsPanel({ authors }: { authors: AuthorsPayload }) {
   const rows = authors.authors;
   const max = Math.max(1, ...rows.map((r) => r.c));
   return (
-    <div style={{ padding: "26px 26px 24px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+    <div style={{ padding: "26px 26px 24px", borderBottom: `1px solid ${LINE.l1}` }}>
       <div style={{ ...eyebrow, marginBottom: 14 }}>Who publishes on this asset</div>
       {rows.length === 0 ? (
         <div style={emptyProse}>No authorship on this asset has resolved to the HCP graph yet.</div>
       ) : (
         <div>
           {rows.map((r) => (
-            <div key={r.hcp_id} style={{ padding: "11px 0", borderBottom: `1px solid ${COLOR.hair}` }}>
+            <div key={r.hcp_id} style={{ padding: "11px 0", borderBottom: `1px solid ${LINE.l0}` }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
                 <Link
                   to={`/hcp/${r.hcp_id}`}
-                  style={{ fontFamily: FONT.sans, fontSize: 13, fontWeight: 500, color: COLOR.ink1, textDecoration: "none" }}
+                  style={{ fontFamily: FONT.sans, fontSize: 13, fontWeight: 500, color: WARM.prose, textDecoration: "none" }}
                 >
                   {authorInitialName(r.first_name, r.last_name)}
                 </Link>
-                <span style={{ fontFamily: FONT.mono, fontSize: 12, color: r.c === max ? COLOR.amber : COLOR.ink1, flex: "none" }}>
+                <span style={{ fontFamily: FONT.mono, fontSize: 12, color: r.c === max ? COLOR.amber : WARM.prose, flex: "none" }}>
                   {r.c}
                 </span>
               </div>
-              <div style={{ height: 3, background: COLOR.hairStrong, margin: "8px 0 7px", borderRadius: 2 }}>
+              <div style={{ height: 3, background: LINE.l0, margin: "8px 0 7px", borderRadius: 2 }}>
                 <div style={{ height: 3, width: `${((r.c / max) * 100).toFixed(0)}%`, background: COLOR.indigo, borderRadius: 2 }} />
               </div>
               <div style={metaMono}>{authorRankLabel(r.board_rank, r.scope_type, r.scope_value)}</div>
@@ -65,7 +65,7 @@ export function AuthorsPanel({ authors }: { authors: AuthorsPayload }) {
 
 export function CongressPanel({ presenters }: { presenters: CongressPresenter[] }) {
   return (
-    <div style={{ padding: "24px 26px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+    <div style={{ padding: "24px 26px", borderBottom: `1px solid ${LINE.l1}` }}>
       <div style={{ ...eyebrow, marginBottom: 14 }}>Congress presence</div>
       {presenters.length === 0 ? (
         <div style={emptyProse}>
@@ -82,13 +82,13 @@ export function CongressPanel({ presenters }: { presenters: CongressPresenter[] 
                   justifyContent: "space-between",
                   gap: 12,
                   paddingBottom: 9,
-                  borderBottom: i < presenters.length - 1 ? `1px solid ${COLOR.hair}` : "none",
+                  borderBottom: i < presenters.length - 1 ? `1px solid ${LINE.l0}` : "none",
                 }}
               >
                 <div>
                   <Link
                     to={`/hcp/${p.hcp_id}`}
-                    style={{ fontFamily: FONT.sans, fontSize: 12, fontWeight: 500, color: COLOR.ink1, textDecoration: "none" }}
+                    style={{ fontFamily: FONT.sans, fontSize: 12, fontWeight: 500, color: WARM.prose, textDecoration: "none" }}
                   >
                     {p.name}
                   </Link>
@@ -96,7 +96,7 @@ export function CongressPanel({ presenters }: { presenters: CongressPresenter[] 
                     {p.established_rank != null ? `NSCLC ESTABLISHED #${p.established_rank}` : "CONFIRMED PRESENTER"}
                   </div>
                 </div>
-                <div style={{ fontFamily: FONT.mono, fontSize: 10, color: COLOR.ink3, textAlign: "right", flex: "none" }}>
+                <div style={{ fontFamily: FONT.mono, fontSize: 10, color: COOL.label, textAlign: "right", flex: "none" }}>
                   {prettyCongress(p.congress)}
                 </div>
               </div>
@@ -124,12 +124,12 @@ export function ForumPanel({ threads }: { threads: ForumThread[] }) {
               key={t.id}
               style={{
                 paddingBottom: i < threads.length - 1 ? 12 : 0,
-                borderBottom: i < threads.length - 1 ? `1px solid ${COLOR.hair}` : "none",
+                borderBottom: i < threads.length - 1 ? `1px solid ${LINE.l0}` : "none",
               }}
             >
               <Link
                 to={`/field-intelligence/thread/${t.id}`}
-                style={{ fontFamily: FONT.sans, fontSize: 12, fontWeight: 500, lineHeight: 1.4, color: COLOR.ink1, textDecoration: "none" }}
+                style={{ fontFamily: FONT.sans, fontSize: 12, fontWeight: 500, lineHeight: 1.4, color: WARM.prose, textDecoration: "none" }}
               >
                 {t.title}
               </Link>
