@@ -276,7 +276,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                     </div>
                   </div>
                   <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13) }}>
-                    {usRank != null ? "RISING RANK · 208-PERSON US BOARD" : "RISING RANK · 1,583-PERSON BOARD"}
+                    {usRank != null ? "RISING RANK · US BOARD" : "RISING RANK · GLOBAL BOARD"}
                   </div>
                 </div>
                 <div style={{ flex: "0 0 auto", borderLeft: `1px solid ${LINE.l2}`, paddingLeft: 24 }}>
@@ -288,7 +288,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                   ) : usRank != null ? (
                     <>
                       <div style={{ font: `500 22px/1 ${MONO}`, color: INK1, whiteSpace: "nowrap" }}>#{rank.toLocaleString("en-US")}</div>
-                      <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>GLOBAL · 1,583 RISING</div>
+                      <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>GLOBAL RISING RANK</div>
                     </>
                   ) : (
                     <>
@@ -440,7 +440,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
         {/* established standing */}
         <SectionHead title="ESTABLISHED STANDING"
-          sub="122 OF 208 US RISING STARS CARRY AN ESTABLISHED RANK IN NSCLC"
+          sub="DUAL-BOARD MEMBERS CARRY AN ESTABLISHED RANK IN NSCLC"
           right="RISING WINS THE ROUTE · ESTABLISHED RANK IS A SECTION, NOT A COMPETING SURFACE" />
         {dual ? (
           <Card style={{ padding: "20px 22px" }}>
@@ -478,7 +478,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           <Card style={{ padding: "20px 22px" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
               <div style={mono(12, MUT, 0.14, 500)}>NOT ON THE ESTABLISHED BOARD</div>
-              <div style={{ padding: "3px 7px", border: `1px solid ${LINE.l2}`, ...mono(8, MUT, 0.11, 500) }}>RISING-ONLY · 86 OF 208 US</div>
+              <div style={{ padding: "3px 7px", border: `1px solid ${LINE.l2}`, ...mono(8, MUT, 0.11, 500) }}>RISING-ONLY · NO ESTABLISHED RANK</div>
             </div>
             <div style={{ marginTop: 14, ...serif(13, INK2), maxWidth: 860 }}>
               {p.established_global
@@ -604,7 +604,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         {/* scientific positions */}
         <SectionHead title="SCIENTIFIC POSITIONS"
           sub={(p.positions?.total ?? 0) > 0 ? `COVERED · ${p.positions!.first_basis} FIRST · ${p.positions!.senior_basis} SENIOR` : "ABSENCE STATE · COVERAGE, NOT AUTHORSHIP"}
-          right="EXTRACTION WINDOW · TOP 100 US RISING STARS · 100 OF 1,583" tick={GOLD_MUTED} />
+          right="EXTRACTION WINDOW · TOP 100 US RISING STARS" tick={GOLD_MUTED} />
         {(p.positions?.total ?? 0) > 0 ? (
           <Card style={{ padding: "20px 22px" }}>
             <div style={mono(13, SERIF_INK, 0.14, 500)}>{p.positions!.total} EXTRACTED POSITIONS — INSIDE THE EXTRACTION WINDOW</div>
@@ -634,7 +634,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 {insideWindow ? "INSIDE THE WINDOW · NO POSITIONS ON FILE" : "OUTSIDE THE EXTRACTION WINDOW"}
               </div>
               <div style={{ padding: "3px 7px", border: `1px solid ${LINE.l2}`, ...mono(8, MUT, 0.11, 500) }}>
-                {insideWindow ? "RARE STATE · ~19 OF THE 100" : "RENDERS FOR 1,483 OF 1,583 · 94% OF THE BOARD"}
+                {insideWindow ? "INSIDE THE EXTRACTION WINDOW" : "OUTSIDE THE EXTRACTION WINDOW · MOST OF THE BOARD"}
               </div>
             </div>
             <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 880 }}>

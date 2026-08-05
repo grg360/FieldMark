@@ -1,6 +1,6 @@
 // Rising ledger — one board, two modes (register / quadrant). Layout authority:
 // docs/design/Rising Surface.dc.html (ledger tab). Data: rising_board() RPC —
-// the full 1,583-row board with components, so the quadrant plots REAL
+// the full board with components, so the quadrant plots REAL
 // coordinates (this folds the Landscape quadrant's job into the rising
 // surface, per the 2026-08-05 decision). Absence discipline: the 22 US rows
 // without a registry state filter to an explicit absence panel, never to an
