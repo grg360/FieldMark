@@ -5,7 +5,7 @@ import { PUBLICATION_GATE, formatWindowDate } from "../../lib/pulse";
 import { buildPulseLedger } from "../../lib/pulseLedger";
 import type { LedgerRow, PulseLedger } from "../../lib/pulseLedger";
 import type { PulsePayload } from "../../lib/pulse";
-import { FONT } from "../../lib/designTokens";
+import { FONT, SCALE, GOLD, INK, GREY, TRACK } from "../../lib/designTokens";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import AppLayout from "../AppLayout";
 
@@ -16,30 +16,33 @@ import AppLayout from "../AppLayout";
 // chrome (NavBar, footer) comes from AppLayout — the frame's own nav/footer are
 // not duplicated.
 
-// ── Frame palette (terminal / near-black, muted gold) ───────────────────────
+// ── Frame palette — register tokens; this page was their reference, so every
+// mapping is an exact value match (designTokens.ts SCALE/GOLD/INK/GREY were
+// extracted from these entries verbatim). The six entries that stay literal
+// are chart plumbing: one file, one purpose, deliberately not tokens.
 const C = {
-  panel: "#0e1013",
-  panelDark: "#0a0c0e",
-  border: "#1c2026",
-  borderSoft: "#14181d",
-  borderMed: "#2a2f36",
-  bracket: "#3d444d",
-  gold: "#be914d",
-  goldDim: "#6b542f",
-  goldRank: "#7a6136",
-  goldCaveat: "#c9a55f",
-  ink: "#e9e6df",
-  ink2: "#a9a396",
-  proseInk: "#c5bfb2",
-  head: "#9aa0a8",
-  head2: "#8d939c",
-  muted: "#6d747d",
-  muted2: "#5f6670",
-  muted3: "#7b8189",
-  faint: "#4d545d",
-  faint2: "#4a4436",
-  seriesFill: "#5f6670",
-  seriesEdge: "#383d44",
+  panel: SCALE.panel,
+  panelDark: SCALE.well,
+  border: SCALE.line,
+  borderSoft: SCALE.raised,
+  borderMed: SCALE.lineStrong,
+  bracket: "#3d444d", // chart bracket — surface-local
+  gold: GOLD.gold,
+  goldDim: GOLD.goldDeep,
+  goldRank: GOLD.goldMuted,
+  goldCaveat: GOLD.goldSoft,
+  ink: INK.ink,
+  ink2: INK.inkMuted,
+  proseInk: INK.inkProse,
+  head: GREY.grey1,
+  head2: GREY.grey2,
+  muted: GREY.grey4,
+  muted2: GREY.grey5,
+  muted3: GREY.grey3,
+  faint: GREY.grey6,
+  faint2: "#4a4436", // warm-tinted faint — not a scale member
+  seriesFill: GREY.grey5, // literal equal of the token; the one chart value tokenised
+  seriesEdge: "#383d44", // chart plumbing, surface-local from here down
   shareTrack: "#181c21",
   shareFill: "#6e6552",
   shareFillGated: "#4e4839",
@@ -48,13 +51,13 @@ const C = {
 } as const;
 
 const MONO = FONT.mono;
-const SERIF = "'Source Serif 4', Georgia, serif";
-const MOBILE_BP = "(max-width: 900px)";
+const SERIF = FONT.serif;
+const MOBILE_BP = "(max-width: 900px)"; // platform norm is 767 — separate decision
 
-const mono = (size: number, color: string, spacing = 0.14): CSSProperties => ({
+const mono = (size: number, color: string, spacing: number | string = TRACK.t14): CSSProperties => ({
   fontFamily: MONO,
   fontSize: size,
-  letterSpacing: `${spacing}em`,
+  letterSpacing: typeof spacing === "number" ? `${spacing}em` : spacing,
   color,
 });
 
