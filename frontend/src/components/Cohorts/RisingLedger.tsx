@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getRisingBoard, archetypeColor, type RisingBoard } from "../../lib/risingProfile";
+import { getRisingBoard, getRisingFlags, type RisingBoard, type RisingFlags } from "../../lib/risingProfile";
 import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import { FONT, GROUND, LINE, COOL, GOLD } from "../../lib/designTokens";
@@ -50,13 +50,8 @@ const serif = (size: number, color: string, lh = 1.65): CSSProperties => ({
 type Region = "US" | "EU" | "BOTH" | "ALL";
 type Mode = "table" | "quadrant";
 
-const ARCH_ORDER = ["Balanced Rising Star", "Emerging Leader", "Scientific Accelerator", "Network Accelerator"];
-const ARCH_SEG_COLOR: Record<string, string> = {
-  "Balanced Rising Star": "#8fb8a6",
-  "Emerging Leader": "#9a9a9e",
-  "Scientific Accelerator": "#d8a24a",
-  "Network Accelerator": "#8aa2c4",
-};
+// Archetype taxonomy retired 2026-08-05 — rows carry the RECENT SENIOR
+// AUTHORSHIP event badge and the open-trial flag instead (rising_board_flags).
 
 function chip(active: boolean): CSSProperties {
   return active
@@ -91,9 +86,14 @@ export default function RisingLedger() {
   const [mode, setMode] = useState<Mode>(params.get("mode") === "quadrant" ? "quadrant" : "table");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  const [flags, setFlags] = useState<Map<string, RisingFlags>>(new Map());
   useEffect(() => {
     let alive = true;
-    getRisingBoard().then((b) => alive && setBoard(b)).catch(() => alive && setBoard({ rows: [], band_mix: [] }));
+    getRisingBoard().then((b) => {
+      if (!alive) return;
+      setBoard(b);
+      getRisingFlags(b.rows.map((r) => r.hcp_id)).then((f) => alive && setFlags(f));
+    }).catch(() => alive && setBoard({ rows: [], band_mix: [] }));
     return () => { alive = false; };
   }, []);
 
@@ -135,7 +135,7 @@ export default function RisingLedger() {
 
   const bands = useMemo(() => {
     const defs = [
-      { key: "1-100", label: "BAND 1–100", note: "ARCHETYPE IS A SIGNAL HERE · GENUINELY MIXED", lo: 1, hi: 100, open: true },
+      { key: "1-100", label: "BAND 1–100", note: "TOP OF BOARD · DENSEST SIGNAL", lo: 1, hi: 100, open: true },
       { key: "101-300", label: "BAND 101–300", note: "STILL CLASSIFYING · EMERGING LEADER BEGINS TO ABSORB", lo: 101, hi: 300, open: true },
       { key: "301-600", label: "BAND 301–600", note: "CLASSIFIER THINNING", lo: 301, hi: 600, open: false },
       { key: "600+", label: "BAND 600+", note: "RESIDUAL BUCKET", lo: 601, hi: Infinity, open: false },
@@ -147,31 +147,15 @@ export default function RisingLedger() {
 
   const bandMix = useMemo(() => {
     if (!board) return [];
-    const byBand: Record<string, Record<string, number>> = {};
-    for (const e of board.band_mix) {
-      byBand[e.band] = byBand[e.band] || {};
-      byBand[e.band][e.archetype ?? "Emerging Leader"] = e.n;
-    }
-    return ["1-100", "101-300", "301-600", "600+"].map((band) => {
-      const mix = byBand[band] || {};
-      const totalN = Object.values(mix).reduce((s, n) => s + n, 0);
-      const live = band !== "600+";
-      const note = ARCH_ORDER
-        .map((a) => ({ a, n: mix[a] ?? 0 }))
-        .filter((x) => x.n > 0)
-        .sort((x, y) => y.n - x.n)
-        .map((x) => `${x.n} ${x.a.split(" ")[0].toUpperCase()}`)
-        .join(" · ");
-      return {
-        band: band === "1-100" ? "TOP 100" : band,
-        live, totalN,
-        note: live ? note : `RESIDUAL BUCKET · ${mix["Emerging Leader"] ?? 0} OF ${totalN} EMERGING LEADER`,
-        segs: ARCH_ORDER.map((a) => ({
-          color: live ? ARCH_SEG_COLOR[a] : a === "Emerging Leader" ? LINE.l2 : ARCH_SEG_COLOR[a],
-          w: totalN ? ((mix[a] ?? 0) / totalN) * 100 : 0,
-        })),
-      };
-    });
+    const byBand: Record<string, number> = {};
+    for (const e of board.band_mix) byBand[e.band] = (byBand[e.band] ?? 0) + e.n;
+    const totalAll = Object.values(byBand).reduce((a, b) => a + b, 0) || 1;
+    return ["1-100", "101-300", "301-600", "600+"].map((band) => ({
+      band: band === "1-100" ? "TOP 100" : band,
+      live: band !== "600+",
+      totalN: byBand[band] ?? 0,
+      w: ((byBand[band] ?? 0) / totalAll) * 100,
+    }));
   }, [board]);
 
   // quadrant: top 100 of the current scope, plotted from REAL components
@@ -182,21 +166,19 @@ export default function RisingLedger() {
       row: r,
       left: Math.max(0, Math.min(100, ((r.vis! - AX_MIN) / AX_SPAN) * 100)),
       bottom: Math.max(0, Math.min(100, ((r.mom! - AX_MIN) / AX_SPAN) * 100)),
-      color: archetypeColor(r.archetype, r.rank),
+      color: GREEN,
     }));
   }, [sorted]);
   const SPLIT_PCT = ((80 - 40) / 60) * 100;
 
   const quadCount = (right: boolean, top: boolean) => {
-    const tally: Record<string, number> = {};
+    let n = 0;
     for (const pt of quadPoints) {
       if (((pt.row.vis ?? 0) >= 80) !== right) continue;
       if (((pt.row.mom ?? 0) >= 80) !== top) continue;
-      const k = pt.row.archetype ?? "Emerging Leader";
-      tally[k] = (tally[k] ?? 0) + 1;
+      n += 1;
     }
-    const parts = Object.entries(tally).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k.split(" ")[0].toUpperCase()}`);
-    return parts.length ? parts.join(" · ") : "NO PLOTTED POINTS";
+    return n ? `${n} PLOTTED` : "NO PLOTTED POINTS";
   };
 
   const quadrants = [
@@ -289,7 +271,7 @@ export default function RisingLedger() {
         {mode === "quadrant" && (
           <>
             <SectionHead title="MOMENTUM × VISIBILITY" sub={`TOP 100 · ${scopeLabel}`}
-              right="ON A ROW AN ARCHETYPE IS A LABEL · HERE IT IS A LOCATION" />
+              right="A LOCATION ON THE TWO COMPONENTS · NOT A TYPE" />
             <Card style={{ display: "grid", gridTemplateColumns: "1fr 300px" }}>
               <div style={{ padding: "20px 20px 16px", borderRight: `1px solid ${RULE}` }}>
                 <div style={{ display: "flex", gap: 12 }}>
@@ -321,13 +303,8 @@ export default function RisingLedger() {
                     </div>
                   </div>
                 </div>
-                <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${RULE}`, display: "flex", gap: 18, flexWrap: "wrap" }}>
-                  {ARCH_ORDER.map((a) => (
-                    <div key={a} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: ARCH_SEG_COLOR[a] }} />
-                      <div style={mono(8, MUT3, 0.11)}>{a.toUpperCase()}</div>
-                    </div>
-                  ))}
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${RULE}`, ...mono(8, MUT3, 0.11), lineHeight: 1.7 }}>
+                  ONE COHORT, ONE COLOR — POSITION CARRIES THE MEANING. REGION NAMES DESCRIBE LOCATIONS, NOT TYPES.
                 </div>
                 <div style={{ marginTop: 12, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 640 }}>
                   EVERY POINT IS PLOTTED FROM ITS ACTUAL MOMENTUM AND VISIBILITY COMPONENTS · HOVER FOR NAME AND VALUES · CLICK TO OPEN THE PROFILE
@@ -354,31 +331,23 @@ export default function RisingLedger() {
 
         {mode === "table" && (
           <>
-            <SectionHead title="ARCHETYPE BY RANK BAND" sub={`BOARD-WIDE · ${total.toLocaleString("en-US")}`}
-              right="A TOP-OF-BOARD SIGNAL THAT DEGENERATES BELOW 600" />
+            <SectionHead title="BOARD BY RANK BAND" sub={`BOARD-WIDE · ${total.toLocaleString("en-US")}`}
+              right="BAND SIZES ONLY · ARCHETYPES RETIRED 2026-08-05" />
             <Card style={{ padding: "18px 20px" }}>
               {bandMix.map((b) => (
                 <div key={b.band} style={{ display: "flex", alignItems: "center", gap: 16, padding: "9px 0" }}>
                   <div style={{ minWidth: 82, font: `500 9.5px/1 ${MONO}`, letterSpacing: ".11em", color: b.live ? INK0 : MUT2 }}>{b.band}</div>
                   <div style={{ flex: 1, display: "flex", height: 9, background: LINE.l0 }}>
-                    {b.segs.map((s, i) => (
-                      <div key={i} style={{ height: 9, background: s.color, width: `${s.w}%` }} />
-                    ))}
+                    <div style={{ height: 9, background: b.live ? GREEN_DK : LINE.l2, width: `${b.w}%` }} />
                   </div>
-                  <div style={{ minWidth: 330, textAlign: "right", ...mono(8.5, b.live ? MUT3 : DIM2, 0.08) }}>{b.note}</div>
+                  <div style={{ minWidth: 330, textAlign: "right", ...mono(8.5, b.live ? MUT3 : DIM2, 0.08) }}>{b.totalN.toLocaleString("en-US")} MEMBERS</div>
                 </div>
               ))}
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${RULE}`, display: "flex", gap: 18, flexWrap: "wrap" }}>
-                {ARCH_ORDER.map((a) => (
-                  <div key={a} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <div style={{ width: 8, height: 8, background: ARCH_SEG_COLOR[a] }} />
-                    <div style={mono(8, MUT3, 0.11)}>{a.toUpperCase()}</div>
-                  </div>
-                ))}
-                <div style={{ flex: 1, minWidth: 120 }} />
-                <div style={{ maxWidth: 520, ...serif(11, MUT3) }}>
-                  The band is the unit of this ledger, not the row. A flat rank list would carry archetype as one column
-                  that means four things at the top and one thing at the bottom.
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${RULE}` }}>
+                <div style={{ maxWidth: 640, ...serif(11, MUT3) }}>
+                  The band is the unit of this ledger, not the row. The four archetype labels were retired
+                  2026-08-05 — the residual bucket held nine in ten members, and the one label that survived
+                  testing (recent senior authorship) rides the rows as an event badge instead.
                 </div>
               </div>
             </Card>
@@ -387,7 +356,7 @@ export default function RisingLedger() {
               right="COMPOSITE PERCENTILE IS IN-COHORT" />
             <Card>
               <div style={{ display: "grid", gridTemplateColumns: "52px 1fr 200px 96px 168px 132px 64px", padding: "11px 16px", borderBottom: `1px solid ${RULE}`, background: GROUND.g1 }}>
-                {["RANK", "NAME", "INSTITUTION", geoColLabel, "ARCHETYPE", "COMPOSITE PCTL", "CAREER"].map((h, i) => (
+                {["RANK", "NAME", "INSTITUTION", geoColLabel, "BADGES", "COMPOSITE PCTL", "CAREER"].map((h, i) => (
                   <div key={h} style={{ ...mono(8, DIM, 0.13, 600), textAlign: i === 6 ? "right" : "left" }}>{h}</div>
                 ))}
               </div>
@@ -397,7 +366,7 @@ export default function RisingLedger() {
                   <div style={mono(12, SERIF_INK, 0.14, 500)}>{noStateCount} US PROFILES HAVE NO STATE IN THE REGISTRY</div>
                   <div style={{ marginTop: 14, ...serif(13, SERIF_INK, 1.72), maxWidth: 860 }}>
                     These are {noStateCount} of the {usCount} US rising HCPs whose NPI record carries no state. Rank,
-                    composite percentile, all four components and archetype are covered for every one of them — the gap
+                    composite percentile and all four components are covered for every one of them — the gap
                     is a registry field, not the signal. They are excluded from any state filter and included in every US
                     total, which is why the US count reads {usCount} rather than {usCount - noStateCount}.
                   </div>
@@ -409,7 +378,17 @@ export default function RisingLedger() {
                         <div style={{ font: `400 12.5px/1.3 ${SERIF}`, color: INK0 }}>{r.name}</div>
                         <div style={{ font: `400 10.5px/1.35 ${SERIF}`, color: MUT3 }}>{r.institution ?? "INSTITUTION NOT ON RECORD"}</div>
                         <div style={mono(9, DIM, 0.08)}>NOT IN REGISTRY</div>
-                        <div style={{ font: `500 8.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: archetypeColor(r.archetype, r.rank) }}>{(r.archetype ?? "NOT CLASSIFIED").toUpperCase()}</div>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          {flags.get(r.hcp_id)?.senior_transition ? (
+                            <span title={`0 senior-authored papers in the early window, ${flags.get(r.hcp_id)?.recent_senior_pubs} in the recent`} style={{ padding: "2px 6px", border: `1px solid ${GREEN_DK}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: GREEN }}>RECENT SENIOR</span>
+                          ) : null}
+                          {flags.get(r.hcp_id)?.on_open_trial ? (
+                            <span title="Named investigator on >= 1 rendered open trial (gated view; registry labels every site lead PI)" style={{ padding: "2px 6px", border: `1px solid ${LINE.l2}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: INK1 }}>OPEN TRIAL</span>
+                          ) : null}
+                          {!flags.get(r.hcp_id)?.senior_transition && !flags.get(r.hcp_id)?.on_open_trial ? (
+                            <span style={mono(8, DIM2, 0.1)}>—</span>
+                          ) : null}
+                        </div>
                         <div style={{ font: `500 10.5px/1 ${MONO}`, color: INK1 }}>{r.pctl?.toFixed(2) ?? "NOT COMPUTED"}</div>
                         <div style={{ ...mono(9, MUT3, 0.06), textAlign: "right" }}>
                           {r.career_first_pub_year ? `${new Date().getFullYear() - r.career_first_pub_year} yr` : "NOT ON RECORD"}
@@ -448,7 +427,17 @@ export default function RisingLedger() {
                           <div style={mono(9, r.state || r.country ? MUT : DIM, 0.08)}>
                             {region === "EU" ? (r.country ?? "NOT IN REGISTRY") : (r.state ?? r.country ?? "NOT IN REGISTRY")}
                           </div>
-                          <div style={{ font: `500 8.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: archetypeColor(r.archetype, r.rank) }}>{(r.archetype ?? "NOT CLASSIFIED").toUpperCase()}</div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          {flags.get(r.hcp_id)?.senior_transition ? (
+                            <span title={`0 senior-authored papers in the early window, ${flags.get(r.hcp_id)?.recent_senior_pubs} in the recent`} style={{ padding: "2px 6px", border: `1px solid ${GREEN_DK}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: GREEN }}>RECENT SENIOR</span>
+                          ) : null}
+                          {flags.get(r.hcp_id)?.on_open_trial ? (
+                            <span title="Named investigator on >= 1 rendered open trial (gated view; registry labels every site lead PI)" style={{ padding: "2px 6px", border: `1px solid ${LINE.l2}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: INK1 }}>OPEN TRIAL</span>
+                          ) : null}
+                          {!flags.get(r.hcp_id)?.senior_transition && !flags.get(r.hcp_id)?.on_open_trial ? (
+                            <span style={mono(8, DIM2, 0.1)}>—</span>
+                          ) : null}
+                        </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                             <div style={{ width: 56, height: 3, background: LINE.l0 }}>
                               <div style={{ height: 3, background: GREEN, width: `${r.pctl ?? 0}%` }} />

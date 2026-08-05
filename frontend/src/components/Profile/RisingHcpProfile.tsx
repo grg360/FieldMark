@@ -14,7 +14,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ProfileRelationshipControls from "./ProfileRelationshipControls";
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
 import {
-  getRisingProfile, archetypeColor, careerYears, collabStanding, fmtPctl,
+  getRisingProfile, careerYears, collabStanding, fmtPctl, getRisingFlags, type RisingFlags,
   type RisingProfile,
 } from "../../lib/risingProfile";
 import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
@@ -112,26 +112,26 @@ function quadrantOf(mom: number | null, vis: number | null): { name: string; col
   return { name: "EARLY DEVELOPMENT", color: MUT3 };
 }
 
-function archProse(archetype: string | null, sci: string, net: string): string {
-  switch (archetype) {
-    case "Balanced Rising Star":
-      return `Both engines are live: scientific momentum at ${sci} and network momentum at ${net}. Neither one is carrying the rank alone.`;
-    case "Scientific Accelerator":
-      return `Scientific momentum, at ${sci}, carries this rank ahead of the network side at ${net}.`;
-    case "Network Accelerator":
-      return `Network momentum, at ${net}, carries this rank ahead of the scientific side at ${sci}.`;
-    default:
-      return "Carried as a band fact, not a signal. In the deep bands most of the board classifies here — the label is the residual bucket, and it should not be read as a finding.";
-  }
+// Archetypes retired 2026-08-05: the panel states quadrant position — a
+// location on the two components — never a type. The one label that survived
+// testing is the RECENT SENIOR AUTHORSHIP event badge, rendered in the hero.
+function quadrantProse(sci: string, net: string): string {
+  return `Position, not a type: scientific momentum at ${sci}, network momentum at ${net}. The region name describes where this profile sits on the two engines this week.`;
 }
 
 export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
   const navigate = useNavigate();
   const [p, setP] = useState<RisingProfile | null | undefined>(undefined);
+  const [flags, setFlags] = useState<RisingFlags | null>(null);
 
   useEffect(() => {
     let alive = true;
     getRisingProfile(hcpId).then((d) => alive && setP(d)).catch(() => alive && setP(null));
+    return () => { alive = false; };
+  }, [hcpId]);
+  useEffect(() => {
+    let alive = true;
+    getRisingFlags([hcpId]).then((f) => alive && setFlags(f.get(hcpId) ?? null));
     return () => { alive = false; };
   }, [hcpId]);
 
@@ -155,8 +155,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
     || "Name not on record";
   const rank = p.rising.rank;
   const usRank = p.rising.us_rank;
-  const arch = p.rising.archetype;
-  const aColor = archetypeColor(arch, rank);
+
   const composite = p.rising.rising_star_percentile;
   const career = careerYears(p.hcp.career_first_pub_year);
   const geo = p.hcp.nppes_practice_state || p.hcp.country || "GEOGRAPHY NOT ON RECORD";
@@ -189,7 +188,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
   const bandLabel = rank <= 100 ? "TOP 100" : rank <= 300 ? "101–300" : rank <= 600 ? "301–600" : "600+";
   const bandNote = residualBand
     ? "RESIDUAL BAND · 600+ · CLASSIFIER DEGENERATE · DE-EMPHASISED BY DESIGN"
-    : `CLASSIFYING BAND · ${bandLabel}${p.band_same_archetype != null && p.band_total != null ? ` · ${p.band_same_archetype} OF ${p.band_total} ${String(arch ?? "").toUpperCase()}` : ""}`;
+    : `CLASSIFYING BAND · ${bandLabel}`;
 
   const metaLine: string[] = [
     m?.recent_total_pubs != null ? `${m.recent_total_pubs} PUBLICATIONS ${rw}` : "PUBLICATION WINDOWS NOT COMPUTED",
@@ -199,7 +198,6 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
     nw?.recent_collaborator_count != null ? `${nw.recent_collaborator_count} COLLABORATORS` : "COLLABORATOR COUNT NOT COMPUTED",
     (p.positions?.total ?? 0) > 0 ? `${p.positions!.total} EXTRACTED POSITIONS` : "OUTSIDE THE EXTRACTION WINDOW",
     "NETWORK CENTRALITY PRESENT",
-    residualBand ? "ARCHETYPE RESIDUAL" : "ARCHETYPE CLASSIFIED",
   ];
 
   const deltas = [
@@ -312,6 +310,27 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               </div>
 
               <div style={{ marginTop: 22, font: `400 30px/1.12 ${SERIF}`, color: INK0, letterSpacing: "-.01em" }}>{name}</div>
+              {/* Event badge + trial flag (2026-08-05). RECENT SENIOR AUTHORSHIP
+                  is a claim about the two rolling windows, not the whole career,
+                  and it explains the momentum score rather than adding a signal
+                  — that caveat is user-facing copy, below. */}
+              {(m && m.early_senior_pubs === 0 && (m.recent_senior_pubs ?? 0) >= 3) || flags?.on_open_trial ? (
+                <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {m && m.early_senior_pubs === 0 && (m.recent_senior_pubs ?? 0) >= 3 ? (
+                    <span style={{ padding: "3px 8px", border: `1px solid ${GREEN_DK}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>
+                      RECENT SENIOR AUTHORSHIP · 0 → {m.recent_senior_pubs} SENIOR PAPERS · {ew} → {rw}
+                    </span>
+                  ) : null}
+                  {flags?.on_open_trial ? (
+                    <span title="Named investigator on at least one rendered open trial. Gated view; the registry labels every site lead PI, so no lead claim is made." style={{ padding: "3px 8px", border: `1px solid ${LINE.l2}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: INK1 }}>
+                      OPEN-TRIAL INVESTIGATOR
+                    </span>
+                  ) : null}
+                  {m && m.early_senior_pubs === 0 && (m.recent_senior_pubs ?? 0) >= 3 ? (
+                    <span style={{ ...serif(10.5, MUT3, 1.4) }}>Names why the momentum score is high — not a separate signal. Senior papers before {ew.split("–")[0]} sit outside both windows.</span>
+                  ) : null}
+                </div>
+              ) : null}
               <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                 <span style={serif(12, "#7fb3a4", 1.4)}>{p.hcp.institution_normalized ?? "INSTITUTION NOT ON RECORD"}</span>
                 <span style={{ color: DIM2, fontSize: 10 }}>·</span>
@@ -332,13 +351,17 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
 
             <div style={{ padding: "20px 20px 16px", display: "flex", flexDirection: "column" }}>
-              {label("ARCHETYPE")}
-              <div style={{ marginTop: 9, font: `500 15px/1.25 ${MONO}`, letterSpacing: ".02em", color: aColor }}>
-                {(arch ?? "NOT CLASSIFIED").toUpperCase()}
+              {label("QUADRANT POSITION")}
+              <div style={{ marginTop: 9, font: `500 15px/1.25 ${MONO}`, letterSpacing: ".02em", color: quad.color }}>
+                {quad.name}
+              </div>
+              <div style={{ marginTop: 8, display: "flex", gap: 18 }}>
+                <div style={mono(9, INK1, 0.08)}>MOM {fmtPctl(p.rising.momentum_component)}</div>
+                <div style={mono(9, INK1, 0.08)}>VIS {fmtPctl(p.rising.visibility_component)}</div>
               </div>
               <div style={{ marginTop: 10, height: 1, background: LINE.l0 }} />
-              <div style={{ marginTop: 10, ...serif(11.5, residualBand ? MUT3 : SERIF_INK, 1.6) }}>
-                {archProse(arch, fmtPctl(p.rising.scientific_momentum_percentile), fmtPctl(p.rising.network_momentum_percentile))}
+              <div style={{ marginTop: 10, ...serif(11.5, SERIF_INK, 1.6) }}>
+                {quadrantProse(fmtPctl(p.rising.scientific_momentum_percentile), fmtPctl(p.rising.network_momentum_percentile))}
               </div>
               <div style={{ flex: 1, minHeight: 14 }} />
               <div style={mono(8, DIM2, 0.11)}>{bandNote}</div>

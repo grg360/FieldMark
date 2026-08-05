@@ -81,8 +81,23 @@ def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_2021_2025') 
               AND nc.therapeutic_area_id = sm.therapeutic_area_id
               AND nc.window_type = %(vis_window)s
             JOIN hcps_v2 h ON h.id = sm.hcp_id
+            -- GATE (2026-08-05): the maintained v2 taxonomy replaces the stale
+            -- hcps_v2.cohort_classification column (73.6%% null, unmaintained,
+            -- froze the board). OR-15: rising_eligible, or established within
+            -- the momentum pipeline's own 15-year career cap — the two
+            -- taxonomies draw their boundary at ~10 vs 15 years by design.
+            JOIN hcp_cohort_classification_v2 cc
+              ON cc.hcp_id = sm.hcp_id
+              AND cc.therapeutic_area_id = sm.therapeutic_area_id
             WHERE sm.therapeutic_area_id = %(ta_id)s
-              AND h.cohort_classification = 'rising_star'
+              AND (cc.cohort = 'rising_eligible'
+                   OR (cc.cohort = 'established' AND cc.career_age <= 15))
+              -- MOMENTUM FLOOR (2026-08-05): a board defined by trajectory
+              -- excludes members whose senior-author output shrank. One
+              -- condition on the thing the cohort claims to measure; degree
+              -- can fall for reasons unrelated to trajectory, so it is not
+              -- part of the floor.
+              AND sm.pub_velocity_delta > 0
             """,
             {"ta_id": ta_id, "vis_window": vis_window},
         )
@@ -114,14 +129,14 @@ def compute_percentile_ranks(hcp_ids: list[str], values: dict[str, float]) -> di
     }
 
 
-def classify_archetype(sci_mom: float, net_mom: float) -> str:
-    if sci_mom >= 85 and net_mom >= 85:
-        return "Balanced Rising Star"
-    if sci_mom >= 90 and net_mom < 75:
-        return "Scientific Accelerator"
-    if net_mom >= 90 and sci_mom < 75:
-        return "Network Accelerator"
-    return "Emerging Leader"
+# classify_archetype removed 2026-08-05: the four threshold archetypes were a
+# top-down taxonomy whose residual bucket held 88.8%% of the board, and the
+# both-high corner tested at chance rate (no data-defined class). The one
+# surviving label is the RECENT SENIOR AUTHORSHIP event badge (zero senior
+# papers in the early window, >= 3 in the recent — a claim about the windows,
+# not the whole career), computed by the profile/board RPCs — an event anchor
+# that survived the fixed->rolling window change at 89%% vs the corner's 42%%.
+# The archetype column stays in the table (NULL) and is no longer read.
 
 
 def build_results(rows: list[dict]) -> list[dict]:
@@ -174,7 +189,7 @@ def build_results(rows: list[dict]) -> list[dict]:
                 "momentum_component": round(momentum_component, 2),
                 "visibility_component": round(visibility_component, 2),
                 "rising_star_raw": round(rising_star_raw, 2),
-                "archetype": classify_archetype(sci_mom, net_mom),
+                "archetype": None,
             }
         )
 
@@ -345,7 +360,7 @@ def main(ta: str, dry_run: bool, debug_top: int, vis_window: str) -> None:
             f"{row['network_momentum_percentile']:<7.1f} "
             f"{row['scientific_visibility_percentile']:<7.1f} "
             f"{row['network_visibility_percentile']:<7.1f} "
-            f"{row['archetype'][:21]:<22}"
+            f"{(row['archetype'] or '-')[:21]:<22}"
         )
 
     if dry_run:

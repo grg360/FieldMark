@@ -48,6 +48,8 @@ export interface RisingProfile {
   momentum: {
     early_total_pubs: number | null;
     recent_total_pubs: number | null;
+    early_senior_pubs: number | null;
+    recent_senior_pubs: number | null;
     early_window_start: string | null;
     early_window_end: string | null;
     recent_window_start: string | null;
@@ -128,17 +130,22 @@ export async function isOnRisingBoard(hcpId: string): Promise<boolean> {
 }
 
 // ── Archetype vocabulary (frame ARCH map) ───────────────────────────────────
-export const ARCHETYPE_COLOR: Record<string, string> = {
-  "Balanced Rising Star": "#8fb8a6",
-  "Scientific Accelerator": "#d8a24a",
-  "Network Accelerator": "#8aa2c4",
-  "Emerging Leader": "#9a9a9e",
-};
 
-export function archetypeColor(archetype: string | null, rank: number): string {
-  // Below rank 600 Emerging Leader is the residual bucket — de-emphasised by design.
-  if (rank > 600 && archetype === "Emerging Leader") return "#5c5c60";
-  return ARCHETYPE_COLOR[archetype ?? ""] ?? "#9a9a9e";
+// Archetype taxonomy retired 2026-08-05 (the four threshold labels tested as
+// chance-rate / residual). Surfaces render quadrant position and the RECENT
+// SENIOR AUTHORSHIP event badge via rising_board_flags().
+export interface RisingFlags {
+  hcp_id: string;
+  senior_transition: boolean;
+  recent_senior_pubs: number | null;
+  on_open_trial: boolean;
+}
+
+export async function getRisingFlags(ids: string[]): Promise<Map<string, RisingFlags>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase.rpc("rising_board_flags", { p_hcp_ids: ids });
+  if (error || !data) return new Map();
+  return new Map((data as RisingFlags[]).map((f) => [f.hcp_id, f]));
 }
 
 export function fmtPctl(v: number | null | undefined): string {
