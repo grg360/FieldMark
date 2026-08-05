@@ -21,6 +21,7 @@ Dependencies:
 """
 
 from __future__ import annotations
+from datetime import datetime, timezone
 
 import os
 from collections import defaultdict
@@ -36,7 +37,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-CURRENT_YEAR = 2026
+CURRENT_YEAR = datetime.now(timezone.utc).year  # was frozen at 2026; career-age arithmetic must track the clock
 MIN_PUBS_PER_WINDOW = 5
 MAX_CAREER_YEARS = 15
 

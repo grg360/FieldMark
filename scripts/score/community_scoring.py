@@ -29,7 +29,7 @@ from score_ranking import compute_and_write_ranks
 
 READ_PAGE_SIZE = 1000
 WRITE_BATCH_SIZE = 500
-CURRENT_YEAR = 2026
+CURRENT_YEAR = datetime.now(timezone.utc).year  # was frozen at 2026; career-age arithmetic must track the clock
 
 WEIGHTS = {
     "patient_volume": 0.40,

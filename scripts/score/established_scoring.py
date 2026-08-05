@@ -37,7 +37,7 @@ NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
 TARGET_TA_IDS = [HEP_TA_ID, NSCLC_TA_ID]
 
 CAREER_AGE_CAP = 50
-CURRENT_YEAR = 2026
+CURRENT_YEAR = datetime.now(timezone.utc).year  # was frozen at 2026; career-age arithmetic must track the clock
 RECENT_PUB_WINDOW = 3
 CONCEPT_SCORE_THRESHOLD = 0.4
 

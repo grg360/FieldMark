@@ -53,7 +53,7 @@ SCHEMA_DDL_COMMENTS = """
 """
 
 NPPES_API_URL = "https://npiregistry.cms.hhs.gov/api/?version=2.1&number={npi}"
-CURRENT_YEAR = 2026
+CURRENT_YEAR = datetime.now(timezone.utc).year  # was frozen at 2026; career-age arithmetic must track the clock
 READ_PAGE_SIZE = 1000
 REQUEST_TIMEOUT_SECONDS = 20
 THROTTLE_SECONDS = 0.15

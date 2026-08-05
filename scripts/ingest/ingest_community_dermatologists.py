@@ -20,7 +20,7 @@ import argparse
 import os
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 
 PARQUET_PATH = r"C:\Users\garre\Desktop\FieldMark\NPPES\nppes_individual_providers.parquet"
-CURRENT_YEAR = 2026
+CURRENT_YEAR = datetime.now(timezone.utc).year  # was frozen at 2026; career-age arithmetic must track the clock
 SOURCE = "nppes_community"
 UPSERT_BATCH_SIZE = 500
 NPI_PAGE_SIZE = 1000
