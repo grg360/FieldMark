@@ -478,7 +478,7 @@ export default function CommunityHcpProfile() {
           </div>
           {/* functional capture (composer + list) ported from DetailScreen; msl_hcp_notes */}
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
-            <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} />
+            <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" />
           </div>
         </div>
 

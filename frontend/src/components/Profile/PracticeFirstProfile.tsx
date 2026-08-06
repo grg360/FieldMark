@@ -620,7 +620,7 @@ export default function PracticeFirstProfile() {
               </Link>
             ) : null}
             <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>
-              <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} />
+              <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" />
             </div>
           </div>
 
