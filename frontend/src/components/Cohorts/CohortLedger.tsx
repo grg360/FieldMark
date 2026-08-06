@@ -20,6 +20,7 @@ import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
 import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
+import { getRisingFlags, type RisingFlags } from "../../lib/risingProfile";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -189,6 +190,32 @@ function Bookmark({ on }: { on: boolean }) {
 // ORAL · drug · years; supported = the view's verbatim string (group 5 stays
 // "cross-indication targeted therapy observed"). Other tiers carry the tier word alone,
 // dashed. LUNG-WEIGHTED ORAL MIX marker below when flagged. No percentage in v1.
+// Rising evidence chip (2026-08-05): the /rising badges (RECENT SENIOR
+// AUTHORSHIP, OPEN TRIAL) in the community ledger's chip slot — same component
+// family, cohort-specific content. Both facts come from rising_board_flags,
+// already computed for the rising surface.
+function RisingChipView({ flag, mobile = false }: { flag: RisingFlags; mobile?: boolean }) {
+  const senior = flag.senior_transition;
+  const trial = flag.on_open_trial;
+  if (!senior && !trial) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
+      {senior ? (
+        <span title="Senior-authored years within the FieldMark corpus — we see only what is ingested." style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${P.lineStrong}`, background: "transparent", padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em" }}>
+          <span style={{ color: "#8fb8a6" }}>SENIOR AUTHORSHIP SINCE {flag.first_senior_year ?? "—"}</span>
+          <span style={{ color: "#7A5520" }}>·</span>
+          <span style={{ color: P.ink4 }}>{flag.recent_senior_pubs ?? "—"} PAPERS</span>
+        </span>
+      ) : null}
+      {trial ? (
+        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ display: "inline-flex", alignItems: "center", border: `1px solid ${P.lineMed}`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em", color: P.ink3 }}>
+          OPEN TRIAL
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function EvidenceChipView({ row, mobile = false }: { row: LedgerRow; mobile?: boolean }) {
   const chip = evidenceChip(row);
   if (!chip) return null;
@@ -266,6 +293,7 @@ function Row({
   th,
   open,
   onToggle,
+  flag,
 }: {
   cfg: CohortConfig;
   row: LedgerRow;
@@ -273,6 +301,7 @@ function Row({
   th: Record<string, number | null>;
   open: boolean;
   onToggle: () => void;
+  flag?: RisingFlags;
 }) {
   const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -319,7 +348,7 @@ function Row({
               </span>
             ))}
           </div>
-          {row.tier ? <EvidenceChipView row={row} /> : null}
+          {flag ? <RisingChipView flag={flag} /> : row.tier ? <EvidenceChipView row={row} /> : null}
           {row.summary ? (
             <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, maxWidth: "104ch", textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
@@ -440,6 +469,7 @@ function MobileRow({
   th,
   open,
   onToggle,
+  flag,
 }: {
   cfg: CohortConfig;
   row: LedgerRow;
@@ -447,6 +477,7 @@ function MobileRow({
   th: Record<string, number | null>;
   open: boolean;
   onToggle: () => void;
+  flag?: RisingFlags;
 }) {
   const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -494,7 +525,7 @@ function MobileRow({
         ) : null}
 
         {/* evidence chip (COM) */}
-        {row.tier ? <EvidenceChipView row={row} mobile /> : null}
+        {flag ? <RisingChipView flag={flag} mobile /> : row.tier ? <EvidenceChipView row={row} mobile /> : null}
 
         {/* summary */}
         {row.summary ? <div style={{ ...serif(13), lineHeight: 1.5, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div> : null}
@@ -583,6 +614,7 @@ function VirtualTail({
   onToggle,
   onNearEnd,
   isMobile,
+  flags,
 }: {
   cfg: CohortConfig;
   rows: LedgerRow[];
@@ -592,6 +624,7 @@ function VirtualTail({
   onToggle: (id: string) => void;
   onNearEnd: () => void;
   isMobile: boolean;
+  flags?: Map<string, RisingFlags>;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -639,7 +672,7 @@ function VirtualTail({
             ref={virtualizer.measureElement}
             style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start - scrollMargin}px)` }}
           >
-            <RowComp cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} />
+            <RowComp cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} flag={flags?.get(row.hcpId)} />
           </div>
         );
       })}
@@ -675,6 +708,7 @@ export default function CohortLedger() {
   });
   const nsclcTaId = taIdForApiSlug("nsclc");
   const [rows, setRows] = useState<LedgerRow[]>([]);
+  const [risingFlags, setRisingFlags] = useState<Map<string, RisingFlags>>(new Map());
   const [meta, setMeta] = useState<LedgerMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -742,6 +776,13 @@ export default function CohortLedger() {
 
   const th = meta ? thresholds(cfg, meta.ceilings) : {};
   const isCom = cfg.tag === "COM";
+  const isRising = cfg.tag === "RS";
+  useEffect(() => {
+    if (!isRising || rows.length === 0) { setRisingFlags(new Map()); return; }
+    let alive = true;
+    getRisingFlags(rows.map((r) => r.hcpId)).then((f) => { if (alive) setRisingFlags(f); });
+    return () => { alive = false; };
+  }, [isRising, rows]);
   // COM is tier-sorted, not index-sorted, so the ceiling-saturation "treat as tied"
   // bands do not apply — render one flat ranked list. EST/RS keep the band device.
   const { headBands, tailRows } = isCom ? { headBands: [] as Band[], tailRows: rows } : layout(cfg, rows);
@@ -756,7 +797,7 @@ export default function CohortLedger() {
 
   const renderRow = (row: LedgerRow) => {
     const id = `${cfg.tag}-${row.rank}`;
-    return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} />;
+    return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} flag={isRising ? risingFlags.get(row.hcpId) : undefined} />;
   };
 
   return (
@@ -879,7 +920,7 @@ export default function CohortLedger() {
                       onToggle={toggle}
                       onNearEnd={loadMore}
                       isMobile={isMobile}
-                    />
+                     flags={isRising ? risingFlags : undefined} />
                     {hasMore ? (
                       <div style={{ padding: "12px 23px", ...mono(10), color: P.ink5, letterSpacing: ".08em", borderTop: `1px solid ${P.line}` }}>
                         Loading more of the cohort… {rows.length.toLocaleString()} of {(isCom ? filteredTotal : cohortTotal).toLocaleString()}
