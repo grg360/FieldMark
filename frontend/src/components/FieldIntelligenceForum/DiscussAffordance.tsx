@@ -101,7 +101,7 @@ export default function DiscussAffordance({
         style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", border: `1px dashed ${COLOR.hairStrong}`, borderRadius: 4, ...mono(10.5, canWrite ? COLOR.indigoLink : COLOR.ink4), whiteSpace: "nowrap", cursor: canWrite ? "pointer" : "not-allowed", opacity: canWrite ? 1 : 0.7 }}
       >
         <SpeechGlyph color={canWrite ? COLOR.indigoLink : COLOR.ink5} />
-        Discuss <span style={{ color: COLOR.ink5 }}>· ask the first question</span>
+        Discuss <span style={{ color: COLOR.ink5 }}>· starts a public thread visible to verified MSLs</span>
       </span>
     );
     return (<>{empty}{composer}</>);
@@ -125,7 +125,7 @@ export default function DiscussAffordance({
   return (
     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, padding: 12, border: `1px dashed ${COLOR.hairStrong}`, borderRadius: 4 }}>
       <span style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.14em" }}>FIELD INTELLIGENCE</span>
-      <span style={{ fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.45, color: COLOR.ink3 }}>No discussion yet. Ask the first question.</span>
+      <span style={{ fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.45, color: COLOR.ink3 }}>No discussion yet. Your question opens a public thread on this paper, visible to other verified MSLs.</span>
       {canWrite && pmid ? (
         <button type="button" onClick={() => setComposing(true)} style={{ ...mono(10, COLOR.indigoLink), letterSpacing: "0.08em", background: "rgba(85,102,232,0.08)", border: "1px solid rgba(85,102,232,0.3)", borderRadius: 3, padding: "6px 10px", cursor: "pointer", textAlign: "left" }}>DISCUSS THIS PAPER</button>
       ) : (

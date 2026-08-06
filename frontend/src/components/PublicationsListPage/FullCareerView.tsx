@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import type { PublicationListRow, PublicationYearLedgerRow } from "../../lib/publicationsList";
+import DiscussAffordance from "../FieldIntelligenceForum/DiscussAffordance";
 
 const C = {
   bg: "#08080a", gold: "#d8a34a", ink: "#e6e3dd", ink2: "#c6c2bb", mid: "#6f6d68",
@@ -33,6 +34,11 @@ function SeniorRow({ r }: { r: PublicationListRow }) {
           {r.journal ? <><span style={{ color: C.faint2 }}>·</span><span>{r.journal.replace(/\s*\([^)]*\)\s*/g, "").slice(0, 40)}</span></> : null}
           {r.pub_year ? <><span style={{ color: C.faint2 }}>·</span><span>{r.pub_year}</span></> : null}
         </div>
+        {/* Create-capable discuss affordance on senior rows (2026-08-06) — same
+            component/composer/route as the year view; founder-gated inside. */}
+        {r.pmid ? (
+          <DiscussAffordance pmid={r.pmid} journalAbbrev={r.journal} title={r.title} compact />
+        ) : null}
       </div>
       <div style={{ textAlign: "right" }}>
         {r.fullTextIsOa && r.fullTextUrl

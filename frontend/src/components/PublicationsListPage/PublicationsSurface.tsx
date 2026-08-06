@@ -17,6 +17,7 @@
 
 import { useMemo, useState } from "react";
 import type { PublicationListRow } from "../../lib/publicationsList";
+import DiscussAffordance from "../FieldIntelligenceForum/DiscussAffordance";
 
 // Below this many papers in a year, counts read as noise (a "2" looks like an error),
 // so absences become sentences and per-band totals are dropped. CHOSEN, not computed —
@@ -132,9 +133,14 @@ function Row({ r, surname, density }: { r: PublicationListRow; surname: string; 
         <div style={{ font: `${senior ? 500 : 400} ${senior ? 16 : 14}px/1.4 ${SERIF}`, color: senior ? C.ink : C.ink2, textWrap: "pretty" }}>{r.title}</div>
         {density === "detail" ? <Byline r={r} surname={surname} /> : null}
         <ProvenanceLine r={r} />
-        {/* discussion affordance ONLY where a thread exists — never on a threadless row */}
-        {r.hasThread && r.pmid ? (
-          <a href="/field-intelligence" style={{ font: `600 9px/1 ${MONO}`, letterSpacing: ".12em", color: C.gold }}>◇ OPEN DISCUSSION ↗</a>
+        {/* Create-capable discuss affordance (2026-08-06): the redesign had gated
+            this to existing-threads-only as a sort/clutter decision (Publications
+            List.dc.html) — not compliance — which silently removed the documented
+            demo path (bibliography → paper → create thread). Restored via the shared
+            component, which deep-links to primary_thread_id where a thread exists and
+            opens the anchor-prefilled composer where none does. Founder-gated inside. */}
+        {r.pmid ? (
+          <DiscussAffordance pmid={r.pmid} journalAbbrev={r.journal} title={r.title} compact />
         ) : null}
       </div>
       {/* full-text access */}
