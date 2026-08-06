@@ -1,5 +1,6 @@
 import AppLayout from "../components/AppLayout";
 import PageHero from "../components/PageHero";
+import { useScoringDate, formatScoringDate } from "../lib/scoringMeta";
 
 const COHORT_COLOR_ESTABLISHED = "#FFD700";
 const COHORT_COLOR_RISING_STAR = "#9B6DFF";
@@ -57,6 +58,7 @@ const archetypeListStyle = {
 
 
 export default function MethodologyPage() {
+  const scoredAt = useScoringDate();
   const breadcrumbs = [
     { label: "Home", path: "/me" },
     { label: "Methodology" },
@@ -70,6 +72,7 @@ export default function MethodologyPage() {
         <PageHero
           reduced
           eyebrow="Fieldmark · Methodology"
+          meta={`CURRENT AS OF ${formatScoringDate(scoredAt)}`}
           title="How FieldMark Works"
           dek="FieldMark identifies and ranks Healthcare Professionals (HCPs) in specific therapeutic areas using public scientific and administrative data. This page explains how that works - what we measure, why, and the boundaries of what the platform can and cannot tell you."
         />

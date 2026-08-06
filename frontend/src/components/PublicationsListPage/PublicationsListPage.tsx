@@ -98,7 +98,7 @@ export default function PublicationsListPage() {
     <AppLayout breadcrumbs={breadcrumbs} width="reading">
       <div style={{ marginBottom: 24 }}>
         {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
-        <PageHero reduced eyebrow="Fieldmark · Publications" title={headerInfo.title} dek={headerInfo.subtitle} />
+        <PageHero reduced eyebrow="Fieldmark · Publications" meta={`${pubs.length} PUBLICATION${pubs.length === 1 ? "" : "S"}`} title={headerInfo.title} dek={headerInfo.subtitle} />
         {!loading && pubs.length > 0 ? (
           <div style={{ fontSize: 12, color: "#6B6A65", marginTop: 8 }}>
             Showing {visiblePubs.length} of {pubs.length}{" "}

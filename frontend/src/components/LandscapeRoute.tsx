@@ -10,10 +10,12 @@ import { indicationSlugToLabel } from "../lib/routeSlugs";
 import { COLOR, GROUND, LINE } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
+import { useScoringDate, formatScoringDate } from "../lib/scoringMeta";
 import LandscapeLeaderboard from "./LandscapeLeaderboard";
 import LandscapeQuadrantChart from "./LandscapeQuadrantChart";
 
 export default function LandscapeRoute() {
+  const scoredAt = useScoringDate();
   const { ta } = useParams<{ ta: string }>();
   const navigate = useNavigate();
   const taSlug = ta ?? "nsclc";
@@ -78,6 +80,7 @@ export default function LandscapeRoute() {
         <div style={{ margin: "10px 0 4px" }}>
           <PageHero
             eyebrow={"Fieldmark · Landscape"}
+            meta={`RANKS AS OF ${formatScoringDate(scoredAt)}`}
             title={`${taLabel} Landscape`}
             dek={"Top 100 US Rising Stars · momentum vs visibility"}
             stats={[

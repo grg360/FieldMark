@@ -16,6 +16,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
+import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
 import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
@@ -647,6 +648,7 @@ function VirtualTail({
 }
 
 export default function CohortLedger() {
+  const scoredAt = useScoringDate();
   // Cohort from the URL (/cohorts/ledger/:cohort); bare /cohorts/ledger = Established.
   const params = useParams<{ cohort?: string }>();
   const navigate = useNavigate();
@@ -790,6 +792,7 @@ export default function CohortLedger() {
             <PageHero
               narrow={isMobile}
               eyebrow={`${cfg.tag} · Cohort ledger`}
+              meta={`WEEKLY BUILD · AS OF ${formatScoringDate(scoredAt)}`}
               title={cfg.title}
               stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT" }] : undefined}
             />

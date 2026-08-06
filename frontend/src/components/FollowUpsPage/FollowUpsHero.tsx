@@ -20,7 +20,7 @@ export default function FollowUpsHero({ stats }: Props) {
   ];
   return (
     <div style={{ padding: "10px 0 24px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-      <PageHero eyebrow="Fieldmark · Follow-ups" title="Follow-Ups" stats={cluster} />
+      <PageHero eyebrow="Fieldmark · Follow-ups" meta={stats ? `${stats.completion_rate_30d}% CLOSED · 30D` : undefined} title="Follow-Ups" stats={cluster} />
       {stats && (stats.completed_this_month > 0 || stats.completion_rate_30d > 0) ? (
         <div style={{ marginTop: 14, fontFamily: FONT.mono, fontSize: 11, color: COOL.label, display: "flex", gap: 14, flexWrap: "wrap" }}>
           <span>Completed: {stats.completed_this_month} this month</span>

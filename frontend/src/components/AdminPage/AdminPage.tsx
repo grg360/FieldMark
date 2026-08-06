@@ -18,6 +18,7 @@ import AdminReferrals from "./AdminReferrals";
 import AdminUsers from "./AdminUsers";
 import { PALETTE, buttonStyle } from "./adminUi";
 import PageHero from "../PageHero";
+import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 
 /**
  * The Garrett-only admin page. Replaces hand-SQL invite management.
@@ -38,6 +39,7 @@ type Loadable<T> = { data: T; loading: boolean; error: string | null };
 const initial = <T,>(data: T): Loadable<T> => ({ data, loading: true, error: null });
 
 export default function AdminPage() {
+  const scoredAt = useScoringDate();
   const { state: gate } = useIsAdmin();
 
   const [config, setConfig] = useState<Loadable<AppConfig | null>>(initial(null));
@@ -105,6 +107,7 @@ export default function AdminPage() {
           <PageHero
             reduced
             eyebrow="Fieldmark · Admin"
+            meta={`SCORING CURRENT AS OF ${formatScoringDate(scoredAt)}`}
             title="Admin"
             dek="Invite system control. Every action here runs through an is_admin-gated server RPC."
           />

@@ -57,9 +57,6 @@ export default function HcpPairPublicationsPage() {
   const headerTitle = hcpName && partnerName
     ? `${hcpName} ${arrow} ${partnerName}`
     : "Co-Authored Papers";
-  const headerSubtitle = pubs.length > 0
-    ? `${pubs.length} Co-Authored Paper${pubs.length === 1 ? "" : "s"}`
-    : "";
 
   const breadcrumbs = [
     { label: "Home", path: "/me" },
@@ -71,7 +68,7 @@ export default function HcpPairPublicationsPage() {
     <AppLayout breadcrumbs={breadcrumbs} width="reading">
       {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
       <div style={{ marginBottom: 24 }}>
-        <PageHero reduced eyebrow="Fieldmark · Co-authorship" title={headerTitle} dek={headerSubtitle || undefined} />
+        <PageHero reduced eyebrow="Fieldmark · Co-authorship" meta={`${pubs.length} CO-AUTHORED PAPER${pubs.length === 1 ? "" : "S"}`} title={headerTitle} />
       </div>
       {loading ? (
         <div style={{ fontSize: 13, color: COLOR.ink4 }}>Loading publications...</div>

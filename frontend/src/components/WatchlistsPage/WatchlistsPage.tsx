@@ -124,7 +124,7 @@ export default function WatchlistsPage() {
       <AppLayout breadcrumbs={buildBreadcrumbs()}>
         {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
         <div style={{ margin: "0 0 16px 0" }}>
-          <PageHero reduced eyebrow="Fieldmark · Watchlists" title="Watchlists" />
+          <PageHero reduced eyebrow="Fieldmark · Watchlists" meta={`${watchlists.length} LIST${watchlists.length === 1 ? "" : "S"} · ${trackedHcps.length} TRACKED`} title="Watchlists" />
         </div>
 
         {loading ? (
