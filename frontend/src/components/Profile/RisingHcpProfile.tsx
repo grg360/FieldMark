@@ -35,10 +35,17 @@ const RULE_SOFT = LINE.l0;
 // consolidation with no equal-value survivor. Values FROZEN as locals —
 // this is a scanning surface, so its re-ink to COOL awaits a Design pass
 // (the applied table does not cover the rising surface yet).
-const INK0 = "#e9e6df"; // was INK.ink (warm)
+// Ink follows reading mode at the BLOCK level (2026-08-06): the rising profile's
+// blocks — SIGNAL SUMMARY, Established Neighbourhood, positions rows — are scanned
+// as units alongside cool mono labels, so they take the COOL ramp, matching the
+// academic and community spines (already cool serif). These three were the last
+// warm-neutral inks here; swapped to their luminance-matched cool steps so the
+// temperature flips without moving the hierarchy. A warm ink adjacent to a cool
+// one inside one block is what read blue.
+const INK0 = COOL.ui; // was warm #e9e6df
 const INK1 = COOL.prose;
-const INK2 = "#a9a396"; // was INK.inkMuted (warm)
-const SERIF_INK = "#c5bfb2"; // was INK.inkProse (warm)
+const INK2 = COOL.muted; // was warm #a9a396
+const SERIF_INK = COOL.prose; // was warm #c5bfb2
 const MUT = "#8d939c"; // was GREY.grey2
 const MUT3 = "#7b8189"; // was GREY.grey3
 const MUT2 = "#5f6670"; // was GREY.grey5 — below the COOL text floor; flagged

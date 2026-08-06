@@ -358,11 +358,11 @@ function EmptyState({ hcpName, taLabel, coverage, hcpId }: { hcpName: string; ta
         {coverage ? (
           <div style={{ display: "flex", gap: 40, marginTop: 6, paddingTop: 18, borderTop: `1px solid ${LINE.l1}` }}>
             <div>
-              <div style={{ font: `300 26px/1 ${SERIF}`, color: WARM.body }}>{fmt(coverage.estWith)}<span style={{ color: COOL.chrome }}> / {fmt(coverage.estTotal)}</span></div>
+              <div style={{ font: `300 26px/1 ${SERIF}`, color: WARM.body }}>{fmt(coverage.estWith)}<span style={{ color: WARM.muted }}> / {fmt(coverage.estTotal)}</span></div>
               <div style={{ marginTop: 8, ...mono(9.5, COOL.label, 0.16) }}>ESTABLISHED WITH POSITIONS{estPct != null ? ` · ${estPct}%` : ""}</div>
             </div>
             <div style={{ borderLeft: `1px solid ${LINE.l1}`, paddingLeft: 40 }}>
-              <div style={{ font: `300 26px/1 ${SERIF}`, color: WARM.body }}>{fmt(coverage.risWith)}<span style={{ color: COOL.chrome }}> / {fmt(coverage.risTotal)}</span></div>
+              <div style={{ font: `300 26px/1 ${SERIF}`, color: WARM.body }}>{fmt(coverage.risWith)}<span style={{ color: WARM.muted }}> / {fmt(coverage.risTotal)}</span></div>
               <div style={{ marginTop: 8, ...mono(9.5, COOL.label, 0.16) }}>RISING WITH POSITIONS{risPct != null ? ` · ${risPct}%` : ""}</div>
             </div>
           </div>

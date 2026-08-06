@@ -21,7 +21,15 @@ import {
   type AgentRow,
   type AgentBadge,
 } from "../../lib/administeredVolume";
+import { COOL } from "../../lib/designTokens";
 
+// Ink follows reading mode at the BLOCK level (2026-08-06): this is a data table
+// scanned as a unit, so it is one temperature — the COOL ramp throughout. The
+// serif agent names render in cool ink (COOL.ui), exactly as the Trials
+// reclassification did; the former warm-neutral `ink` (#e8e6e1) and the separate
+// cool-blue `blue` (#9aa7b8) — which read blue where they sat adjacent — are
+// retired into steps of the one cool ramp. Gold and the volume bar are accents,
+// cool-safe, and unchanged.
 const C = {
   bg: "#08090a",
   card: "#0e0f11",
@@ -30,10 +38,10 @@ const C = {
   gold: "#c9a227",
   goldSoft: "rgba(201,162,39,.35)",
   goldFill: "rgba(201,162,39,.05)",
-  ink: "#e8e6e1",
-  blue: "#9aa7b8",
-  dim: "#5d6166",
-  faint: "#4e5257",
+  ink: COOL.ui, // bright cool ink — agent names + recent figures (was warm #e8e6e1)
+  blue: COOL.chromeStrong, // dimmer cool step — older figures / yearsReported (was #9aa7b8)
+  dim: COOL.label,
+  faint: COOL.faint,
   bar: "#8fa88c",
   barTrack: "#16181a",
 } as const;
