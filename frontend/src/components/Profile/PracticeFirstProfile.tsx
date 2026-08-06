@@ -613,6 +613,12 @@ export default function PracticeFirstProfile() {
             <div style={{ ...mono(10.5), color: F.subtle, lineHeight: 1.7, marginBottom: 14, maxWidth: "92ch", textWrap: "pretty" }}>
               Everything above this line is machine-derived from claims and payments. Everything in this section was written by a person who was in the room. The second kind is scarce and load-bearing here.
             </div>
+            {/* Deep-link into the full Field Insights surface, scoped to this HCP. */}
+            {notes.length > 0 ? (
+              <Link to={`/me/insights?hcp=${p.hcp.id}`} style={{ display: "inline-block", marginBottom: 14, ...mono(9.5), letterSpacing: ".12em", color: F.subtle, textDecoration: "none", borderBottom: `1px solid ${F.line}` }}>
+                ALL FIELD INSIGHTS ON {p.hcp.name.toUpperCase()} ↗
+              </Link>
+            ) : null}
             <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>
               <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} />
             </div>

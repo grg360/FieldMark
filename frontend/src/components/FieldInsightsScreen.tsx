@@ -15,7 +15,7 @@
 //   • Empty until an MSL logs something — absence states the fact, never blank.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getFieldInsightsForCurrentUser, formatHcpDisplayName, formatInsightDate, type FieldInsight } from "../lib/fieldInsights";
 import { CATEGORY_LABELS, type InsightCategory } from "../lib/insightCategories";
 import { FONT, GROUND, LINE, COOL, WARM, GOLD } from "../lib/designTokens";
@@ -66,17 +66,30 @@ interface Group { key: string; title: string; meta: string; items: FieldInsight[
 
 export default function FieldInsightsScreen() {
   const navigate = useNavigate();
-  const [insights, setInsights] = useState<FieldInsight[]>([]);
+  const [searchParams] = useSearchParams();
+  const [allInsights, setAllInsights] = useState<FieldInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const [groupBy, setGroupBy] = useState<GroupBy>("hcp");
   const [filter, setFilter] = useState<InsightCategory | null>(null);
+
+  // Optional ?hcp=<id> scoping — a profile's FIELD INSIGHTS section deep-links
+  // here filtered to that HCP. Everything downstream reads the scoped set, so
+  // counts, groups and the hero all reflect the filter.
+  const hcpParam = searchParams.get("hcp");
+  const insights = useMemo(
+    () => (hcpParam ? allInsights.filter((i) => String(i.hcp_id) === hcpParam) : allInsights),
+    [allInsights, hcpParam],
+  );
+  const scopedHcpName = hcpParam
+    ? (insights[0] ? formatHcpDisplayName(insights[0]) : null)
+    : null;
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     getFieldInsightsForCurrentUser()
-      .then((data) => { if (!cancelled) setInsights(data); })
-      .catch((err) => { console.warn("FieldInsightsScreen: load error", err); if (!cancelled) setInsights([]); })
+      .then((data) => { if (!cancelled) setAllInsights(data); })
+      .catch((err) => { console.warn("FieldInsightsScreen: load error", err); if (!cancelled) setAllInsights([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -178,6 +191,15 @@ export default function FieldInsightsScreen() {
                   })}
                 </div>
               </section>
+            ) : null}
+
+            {/* Active HCP scope (from ?hcp=) — states the filter and clears it. */}
+            {hcpParam ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <span style={mono(9.5, COOL.label, 0.14)}>FILTERED TO</span>
+                <span style={mono(10.5, COOL.ui, 0.06, 500)}>{scopedHcpName ?? "THIS HCP"}</span>
+                <Link to="/me/insights" style={{ ...mono(9.5, GOLD.gold, 0.12), textDecoration: "none", borderBottom: `1px solid ${GOLD.dim}` }}>CLEAR ↗</Link>
+              </div>
             ) : null}
 
             {/* Ledger header + group toggle */}
