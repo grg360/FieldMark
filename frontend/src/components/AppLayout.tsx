@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
-import { COLOR, FONT, SPACE, CONTENT_WIDTH, type ContentWidth } from "../lib/designTokens";
+import { COLOR, FONT, SPACE, CONTENT_WIDTH, COOL, LINE, type ContentWidth } from "../lib/designTokens";
 
 export interface BreadcrumbItem {
   label: string;
@@ -67,14 +67,23 @@ export default function AppLayout({
         <div style={{ padding: SPACE.lg }}>
 
         {breadcrumbs && breadcrumbs.length > 0 ? (
+          // Register breadcrumb (2026-08-05): mono uppercase with slash
+          // separators — a breadcrumb is structure, and the register's
+          // structural vocabulary is mono caps everywhere (eyebrows, column
+          // heads, section labels). Replaces the old sans + chevron, the last
+          // old-generation element in AppLayout; propagates to every surface
+          // that passes the prop.
           <nav
             aria-label="Breadcrumb"
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              fontSize: 12,
-              color: COLOR.ink3,
+              gap: 10,
+              fontFamily: FONT.mono,
+              fontSize: 10.5,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: COOL.label,
               marginTop: 16,
               marginBottom: 16,
               flexWrap: "wrap",
@@ -83,7 +92,7 @@ export default function AppLayout({
             {breadcrumbs.map((crumb, index) => (
               <span
                 key={`${crumb.label}-${index}`}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
               >
                 {crumb.path ? (
                   <button
@@ -94,26 +103,27 @@ export default function AppLayout({
                       background: "none",
                       border: "none",
                       padding: 0,
-                      fontSize: 12,
-                      color: COLOR.ink3,
+                      font: "inherit",
+                      letterSpacing: "inherit",
+                      textTransform: "inherit",
+                      color: COOL.muted,
                       cursor: "pointer",
-                      fontFamily: "inherit",
                       textDecoration: "none",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.color = COLOR.ink1;
+                      e.currentTarget.style.color = COOL.ui;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.color = COLOR.ink3;
+                      e.currentTarget.style.color = COOL.muted;
                     }}
                   >
                     {crumb.label}
                   </button>
                 ) : (
-                  <span style={{ color: COLOR.ink1 }}>{crumb.label}</span>
+                  <span style={{ color: COOL.muted }}>{crumb.label}</span>
                 )}
                 {index < breadcrumbs.length - 1 ? (
-                  <span style={{ color: COLOR.ink5 }}>{String.fromCharCode(0x203a)}</span>
+                  <span style={{ color: LINE.l2 }}>/</span>
                 ) : null}
               </span>
             ))}

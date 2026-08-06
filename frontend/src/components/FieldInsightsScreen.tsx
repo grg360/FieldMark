@@ -1,128 +1,113 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+// Field Insights — register rebuild (2026-08-05).
+// Layout authority: docs/design/Field Insights.dc.html.
+//
+// Old-generation rebuild against the register, not a reconciliation:
+//   • Cool ground/panels, warm ink for the observation body (WARM.*) — the
+//     reading-mode two-ramp rule's third application. The MSL analysis, the
+//     taxonomy and all chrome stay cool; the gold field-border marks analysis
+//     as interpretation, not observation.
+//   • Two-column split: the observed body LEFT at a reading measure, the MSL's
+//     "why it matters" analysis RIGHT in a gold-edged field.
+//   • Taxonomy reads by WEIGHT, not hue — categories order by action weight,
+//     and a filled/half/outline glyph marks the tier. The old category colours
+//     go.
+//   • Group toggle: HCP / CATEGORY / DATE.
+//   • Empty until an MSL logs something — absence states the fact, never blank.
+
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFieldInsightsForCurrentUser, formatHcpDisplayName, formatInsightDate, type FieldInsight } from "../lib/fieldInsights";
-import { CATEGORY_LABELS, getCategoryColors, type InsightCategory, type InsightStrength } from "../lib/insightCategories";
+import { CATEGORY_LABELS, type InsightCategory } from "../lib/insightCategories";
+import { FONT, GROUND, LINE, COOL, WARM, GOLD } from "../lib/designTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
 
-function buildEmailBody(insights: FieldInsight[]): string {
-  if (insights.length === 0) {
-    return "No field insights captured yet.";
-  }
-  const lines: string[] = [];
-  lines.push("FIELD INSIGHTS - WEEKLY DIGEST");
-  lines.push("");
-  lines.push(`${insights.length} insight${insights.length === 1 ? "" : "s"} captured.`);
-  lines.push("");
-  lines.push("-----");
-  lines.push("");
-  for (const ins of insights) {
-    const hcpName = formatHcpDisplayName(ins.hcp_first_name, ins.hcp_last_name);
-    const categoryLabel = ins.insight_category
-      ? CATEGORY_LABELS[ins.insight_category as InsightCategory] ?? ins.insight_category
-      : "Uncategorized";
-    const dateStr = formatInsightDate(ins.occurred_at);
-    lines.push(`${hcpName} - ${categoryLabel} - ${dateStr}`);
-    lines.push("");
-    lines.push(ins.body);
-    if (ins.why_it_matters) {
-      lines.push("");
-      lines.push(`Why it matters: ${ins.why_it_matters}`);
-    }
-    lines.push("");
-    lines.push("-----");
-    lines.push("");
-  }
-  return lines.join("\n");
+const MONO = FONT.mono;
+const SERIF = FONT.serif;
+const mono = (size: number, color: string, ls = 0.14, weight = 400) =>
+  ({ font: `${weight} ${size}px/1 ${MONO}`, letterSpacing: `${ls}em`, color }) as const;
+
+// Action weight — most actionable first; the tier sets the glyph and ink.
+// Taxonomy reads by weight, never by hue.
+const CATEGORY_WEIGHT: Record<InsightCategory, number> = {
+  message_challenge: 0,
+  evidence_gap: 1,
+  competitor_signal: 2,
+  safety_observation: 3,
+  access_reimbursement: 4,
+  message_reinforcement: 5,
+  patient_selection: 6,
+  clinical_practice_trend: 7,
+  other: 8,
+};
+// Three visual tiers by weight: filled (obligates), half (feeds work), outline
+// (accumulates). Ink brightens with weight rank.
+function tierOf(cat: InsightCategory | null): 0 | 1 | 2 {
+  const w = cat ? CATEGORY_WEIGHT[cat] : 8;
+  return w <= 1 ? 0 : w <= 4 ? 1 : 2;
+}
+function tierInk(tier: 0 | 1 | 2): string {
+  return tier === 0 ? COOL.ui : tier === 1 ? COOL.muted : COOL.chrome;
+}
+function Glyph({ tier }: { tier: 0 | 1 | 2 }) {
+  const ink = tierInk(tier);
+  if (tier === 0) return <span style={{ width: 9, height: 9, background: ink, display: "block", flex: "none" }} />;
+  if (tier === 1) return <span style={{ width: 9, height: 9, border: `1px solid ${ink}`, boxSizing: "border-box", background: `linear-gradient(90deg, ${ink} 50%, transparent 50%)`, display: "block", flex: "none" }} />;
+  return <span style={{ width: 9, height: 9, border: `1px solid ${ink}`, boxSizing: "border-box", display: "block", flex: "none" }} />;
 }
 
-function ShareIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <path
-        d="M14 3h7v7"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10 14L21 3"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+const catLabel = (c: InsightCategory | null) =>
+  (c ? CATEGORY_LABELS[c] : "Other").toUpperCase();
 
-type InsightTab = "by_hcp" | "by_category" | "by_date";
+type GroupBy = "hcp" | "category" | "date";
+const MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
-const TABS: Array<{ id: InsightTab; label: string }> = [
-  { id: "by_hcp", label: "By HCP" },
-  { id: "by_category", label: "By Category" },
-  { id: "by_date", label: "By Date" },
-];
-
-const IG_ACCENT = "#1D9E75";
-const IG_ACCENT_BG = "rgba(29, 158, 117, 0.10)";
-const IG_ACCENT_BORDER = "rgba(29, 158, 117, 0.30)";
-
-const STRENGTH_LABELS: Record<InsightStrength, string> = {
-  high: "High signal",
-  medium: "Medium signal",
-  observation: "Observation",
-};
-
-const INTERACTION_LABELS: Record<string, string> = {
-  one_on_one: "1:1",
-  advisory_board: "Advisory Board",
-  congress: "Congress",
-  tumor_board: "Tumor Board",
-  other: "Other",
-};
-
-const BackArrow = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <path d="M12 3l-6 6 6 6" stroke="#6B6A65" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+interface Group { key: string; title: string; meta: string; items: FieldInsight[]; }
 
 export default function FieldInsightsScreen() {
   const navigate = useNavigate();
   const [insights, setInsights] = useState<FieldInsight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<InsightTab>("by_hcp");
+  const [groupBy, setGroupBy] = useState<GroupBy>("hcp");
+  const [filter, setFilter] = useState<InsightCategory | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     getFieldInsightsForCurrentUser()
-      .then((data) => {
-        if (cancelled) return;
-        setInsights(data);
-      })
-      .catch((err) => {
-        console.warn("FieldInsightsScreen: load error", err);
-        if (!cancelled) setInsights([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((data) => { if (!cancelled) setInsights(data); })
+      .catch((err) => { console.warn("FieldInsightsScreen: load error", err); if (!cancelled) setInsights([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  const isEmpty = !loading && insights.length === 0;
+  const filtered = useMemo(
+    () => insights.filter((i) => !filter || i.insight_category === filter),
+    [insights, filter],
+  );
+
+  const categoriesPresent = useMemo(() => {
+    const counts = new Map<InsightCategory, number>();
+    for (const i of insights) {
+      const c = (i.insight_category ?? "other") as InsightCategory;
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => CATEGORY_WEIGHT[a[0]] - CATEGORY_WEIGHT[b[0]]);
+  }, [insights]);
+
+  const groups = useMemo<Group[]>(() => buildGroups(filtered, groupBy), [filtered, groupBy]);
+
+  const heroStats = useMemo(() => {
+    const hcps = new Set(insights.map((i) => i.hcp_id)).size;
+    const cats = new Set(insights.map((i) => i.insight_category ?? "other")).size;
+    const profiles = new Set(insights.map((i) => i.belief_claim_key).filter(Boolean)).size;
+    return [
+      { value: String(insights.length), label: "INSIGHTS" },
+      { value: String(hcps), label: "HCPS" },
+      { value: String(cats), label: "CATEGORIES" },
+      { value: String(profiles), label: "LINKED PROFILES", gold: profiles > 0 },
+    ];
+  }, [insights]);
 
   const handleShare = () => {
     const subject = encodeURIComponent("Field Insights - Weekly Digest");
@@ -130,513 +115,234 @@ export default function FieldInsightsScreen() {
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
-  const breadcrumbs = [
-    { label: "Home", path: "/me" },
-    { label: "Field Insights" },
-  ];
+  const latest = insights[0] ? formatInsightDate(insights[0].occurred_at).toUpperCase() : null;
+  const breadcrumbs = [{ label: "Home", path: "/me" }, { label: "Field Insights" }];
+  const empty = !loading && insights.length === 0;
+
+  const ledgerMeta = `${insights.length} INSIGHT${insights.length === 1 ? "" : "S"} · ${new Set(filtered.map((i) => i.hcp_id)).size} HCP${new Set(filtered.map((i) => i.hcp_id)).size === 1 ? "" : "S"} · ${categoriesPresent.length} CATEGOR${categoriesPresent.length === 1 ? "Y" : "IES"}${filter ? " · FILTERED" : ""}`;
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs} width="reading">
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Reduced H1 (PageHero, Commit B 2026-08-05) */}
-            <PageHero
-              reduced
-              eyebrow="Insight Gen"
-              title="Field Insights"
-              dek="Structured field intelligence from your HCP interactions. Each insight ties published beliefs to current beliefs across your territory. Share this view with your manager to surface emerging themes and patterns."
-            />
-          </div>
+    <AppLayout breadcrumbs={breadcrumbs} width="standard">
+      <div style={{ fontFamily: SERIF, color: WARM.prose, paddingBottom: 40 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
           <button
             type="button"
             onClick={handleShare}
-            disabled={insights.length === 0}
-            aria-label="Share field insights via email"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: IG_ACCENT_BG,
-              border: `1px solid ${IG_ACCENT_BORDER}`,
-              color: IG_ACCENT,
-              padding: "8px 12px",
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              cursor: insights.length === 0 ? "default" : "pointer",
-              opacity: insights.length === 0 ? 0.5 : 1,
-              fontFamily: "inherit",
-              flexShrink: 0,
-              marginTop: 4,
-            }}
+            disabled={empty}
+            style={{ ...mono(10, empty ? COOL.label : COOL.muted, 0.16), border: `1px solid ${LINE.l2}`, background: "transparent", padding: "8px 14px", cursor: empty ? "default" : "pointer", opacity: empty ? 0.5 : 1 }}
           >
-            <ShareIcon />
-            Share
+            SHARE VIEW ↗
           </button>
         </div>
-      </div>
 
-      <div
-        style={{
-          borderBottom: "1px solid #1E1E22",
-          marginBottom: 24,
-        }}
-      >
-        <div style={{ display: "flex", gap: 4 }}>
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  ...tabButtonStyle,
-                  color: isActive ? "#E8E6DF" : "#6B6A65",
-                  borderBottomColor: isActive ? IG_ACCENT : "transparent",
-                  fontWeight: isActive ? 600 : 500,
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        <PageHero
+          eyebrow="Insight Gen"
+          meta={latest ? `UPDATED THROUGH ${latest}` : "MSL-CAPTURED FIELD INTELLIGENCE"}
+          title="Field Insights"
+          dek="Structured field intelligence from your HCP interactions. Each insight ties published beliefs to current beliefs across your territory. Share this view with your manager to surface emerging themes and patterns."
+          stats={empty ? undefined : heroStats}
+        />
 
-      <div>
         {loading ? (
-          <LoadingState />
-        ) : isEmpty ? (
+          <div style={{ ...mono(11, COOL.label), padding: "40px 0" }}>LOADING INSIGHTS…</div>
+        ) : empty ? (
           <EmptyState />
         ) : (
-          <TabContent tab={activeTab} insights={insights} navigate={navigate} />
+          <>
+            {/* Taxonomy — categories present, ordered by action weight, glyph by tier */}
+            {categoriesPresent.length > 0 ? (
+              <section style={{ marginTop: 8, border: `1px solid ${LINE.l1}`, background: GROUND.g2, marginBottom: 40 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 11, padding: "12px 20px", borderBottom: `1px solid ${LINE.l0}` }}>
+                  <span style={mono(11, GOLD.gold, 0)}>|</span>
+                  <span style={mono(10, COOL.prose, 0.18, 500)}>TAXONOMY</span>
+                  <span style={mono(10, COOL.label, 0.14)}>ORDERED BY ACTION WEIGHT · SELECT TO FILTER</span>
+                  <span style={{ flex: 1 }} />
+                  {filter ? <button type="button" onClick={() => setFilter(null)} style={{ ...mono(10, GOLD.gold, 0.14), border: "none", background: "transparent", cursor: "pointer" }}>CLEAR FILTER ×</button> : null}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(3, categoriesPresent.length)}, 1fr)` }}>
+                  {categoriesPresent.map(([cat, n], i) => {
+                    const tier = tierOf(cat);
+                    const on = filter === cat;
+                    return (
+                      <div key={cat} onClick={() => setFilter(on ? null : cat)}
+                        style={{ padding: "16px 20px 18px", borderRight: (i + 1) % 3 === 0 ? "none" : `1px solid ${LINE.l0}`, borderTop: i >= 3 ? `1px solid ${LINE.l0}` : "none", cursor: "pointer" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                          <Glyph tier={tier} />
+                          <span style={mono(10, tierInk(tier), 0.18, tier === 0 ? 700 : 500)}>{catLabel(cat)}</span>
+                          <span style={{ flex: 1 }} />
+                          <span style={{ font: `400 15px/1 ${SERIF}`, color: COOL.muted }}>{n}</span>
+                        </div>
+                        {on ? <div style={{ height: 2, background: GOLD.gold }} /> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            {/* Ledger header + group toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: 11, paddingBottom: 11, borderBottom: `1px solid ${LINE.l1}`, marginBottom: 26, flexWrap: "wrap" }}>
+              <span style={mono(11, GOLD.gold, 0)}>|</span>
+              <span style={mono(10, COOL.prose, 0.18, 500)}>INSIGHT LEDGER</span>
+              <span style={mono(10, COOL.label, 0.14)}>{ledgerMeta}</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ ...mono(9, COOL.label, 0.16), marginRight: 3 }}>GROUPED BY</span>
+              {(["hcp", "category", "date"] as GroupBy[]).map((g) => (
+                <button key={g} type="button" onClick={() => setGroupBy(g)}
+                  style={{ ...mono(10, groupBy === g ? COOL.ui : COOL.chrome, 0.14, groupBy === g ? 500 : 400), border: `1px solid ${groupBy === g ? GOLD.dim : LINE.l1}`, background: groupBy === g ? GROUND.g2 : "transparent", padding: "7px 12px", cursor: "pointer" }}>
+                  {g.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {groups.map((g) => (
+              <section key={g.key} style={{ marginBottom: 46 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 16, paddingBottom: 10, borderBottom: `1px solid ${LINE.l0}`, marginBottom: 16 }}>
+                  <span style={{ font: `400 21px/1.15 ${SERIF}`, color: WARM.prose }}>{g.title}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={mono(10, COOL.label, 0.14)}>{g.meta}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {g.items.map((it) => <InsightCard key={it.id} it={it} navigate={navigate} />)}
+                </div>
+              </section>
+            ))}
+
+            <div style={{ paddingTop: 12, borderTop: `1px solid ${LINE.l0}`, ...mono(9, COOL.floor, 0.14), lineHeight: 1.7 }}>
+              MSL-CAPTURED FIELD INTELLIGENCE · UNVERIFIED OBSERVATION PLUS ANALYST INTERPRETATION · NOT A CLINICAL CLAIM · INTERNAL USE ONLY
+            </div>
+          </>
         )}
       </div>
     </AppLayout>
   );
 }
 
-function TabContent({
-  tab,
-  insights,
-  navigate,
-}: {
-  tab: InsightTab;
-  insights: FieldInsight[];
-  navigate: ReturnType<typeof useNavigate>;
-}) {
-  if (tab === "by_date") {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {insights.map((insight) => (
-          <InsightCard key={insight.id} insight={insight} navigate={navigate} />
-        ))}
-      </div>
-    );
-  }
-
-  if (tab === "by_hcp") {
-    const grouped = groupByHcp(insights);
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        {grouped.map((group) => (
-          <div key={group.hcp_id}>
-            <GroupHeader
-              title={group.hcp_display_name}
-              count={group.insights.length}
-              onClick={() => navigate(`/hcp/${group.hcp_id}`)}
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {group.insights.map((insight) => (
-                <InsightCard key={insight.id} insight={insight} navigate={navigate} hideHcp />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  const grouped = groupByCategory(insights);
+function InsightCard({ it, navigate }: { it: FieldInsight; navigate: (p: string) => void }) {
+  const tier = tierOf(it.insight_category);
+  const setting = (it.interaction_type ?? "").toUpperCase() || "OTHER";
+  const hcpName = formatHcpDisplayName(it);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {grouped.map((group) => {
-        const colors = getCategoryColors(group.category);
-        return (
-          <div key={group.category ?? "uncategorized"}>
-            <GroupHeader title={group.label} count={group.insights.length} accentColor={colors.fg} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {group.insights.map((insight) => (
-                <InsightCard key={insight.id} insight={insight} navigate={navigate} hideCategory />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function GroupHeader({
-  title,
-  count,
-  accentColor,
-  onClick,
-}: {
-  title: string;
-  count: number;
-  accentColor?: string;
-  onClick?: () => void;
-}) {
-  const isClickable = typeof onClick === "function";
-  const content = (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "baseline",
-        gap: 8,
-        marginBottom: 10,
-        paddingBottom: 8,
-        borderBottom: "1px solid #1E1E22",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 15,
-          fontWeight: 600,
-          color: accentColor ?? "#E8E6DF",
-          letterSpacing: 0.2,
-        }}
-      >
-        {title}
+    <article style={{ border: `1px solid ${LINE.l1}`, background: GROUND.g2 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 28, padding: "14px 22px", borderBottom: `1px solid ${LINE.l0}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 12 }}>
+          <Glyph tier={tier} />
+          <span style={mono(10, tierInk(tier), 0.2, tier === 0 ? 700 : 500)}>{catLabel(it.insight_category)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+          <span style={mono(10, COOL.label, 0.14)}>{setting}</span>
+          <span style={{ width: 1, height: 9, background: LINE.l2, display: "block" }} />
+          <span style={mono(10, COOL.muted, 0.14)}>{formatInsightDate(it.occurred_at).toUpperCase()}</span>
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: "#6B6A65" }}>
-        {count} insight{count === 1 ? "" : "s"}
-      </div>
-    </div>
-  );
-  if (isClickable) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        style={{
-          background: "transparent",
-          border: "none",
-          padding: 0,
-          width: "100%",
-          textAlign: "left",
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
-      >
-        {content}
-      </button>
-    );
-  }
-  return content;
-}
 
-function InsightCard({
-  insight,
-  navigate,
-  hideHcp,
-  hideCategory,
-}: {
-  insight: FieldInsight;
-  navigate: ReturnType<typeof useNavigate>;
-  hideHcp?: boolean;
-  hideCategory?: boolean;
-}) {
-  const colors = getCategoryColors(insight.insight_category);
-  const categoryLabel = insight.insight_category ? CATEGORY_LABELS[insight.insight_category] : "Uncategorized";
-  const interactionLabel = insight.interaction_type ? INTERACTION_LABELS[insight.interaction_type] ?? "Other" : "Other";
-  const strengthLabel = insight.insight_strength ? STRENGTH_LABELS[insight.insight_strength] : null;
-
-  return (
-    <div
-      style={{
-        backgroundColor: "#0D0D10",
-        border: "1px solid #1E1E22",
-        borderRadius: 10,
-        padding: "18px 20px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 16,
-          marginBottom: 12,
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
-          {!hideHcp ? (
-            <button
-              type="button"
-              onClick={() => navigate(`/hcp/${insight.hcp_id}`)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                color: "#E8E6DF",
-                fontSize: 15,
-                fontWeight: 600,
-                textAlign: "left",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              {formatHcpDisplayName(insight)}
-            </button>
-          ) : null}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {!hideCategory ? (
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 336px" }}>
+        {/* observed body — warm reading prose */}
+        <div style={{ padding: "24px 30px 22px 22px" }}>
+          <p style={{ margin: 0, font: `400 17px/1.64 ${SERIF}`, color: WARM.body, textWrap: "pretty" }}>{it.body}</p>
+          {it.belief_claim_title ? (
+            <div style={{ marginTop: 22, display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+              <span style={mono(9, COOL.label, 0.16)}>LINKED BELIEF PROFILE</span>
               <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: 0.3,
-                  color: colors.fg,
-                  backgroundColor: colors.bg,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 999,
-                  padding: "3px 10px",
-                }}
-              >
-                {categoryLabel}
+                onClick={() => navigate(`/hcp/${it.hcp_id}`)}
+                style={{ font: `400 15px/1.3 ${SERIF}`, color: WARM.body, borderBottom: `1px solid ${LINE.l2}`, paddingBottom: 1, cursor: "pointer" }}>
+                {it.belief_claim_title} <span style={{ color: GOLD.gold }}>→</span>
               </span>
-            ) : null}
-            {strengthLabel ? (
-              <span style={{ fontSize: 11, color: "#9B9892", letterSpacing: 0.2 }}>
-                {strengthLabel}
-              </span>
-            ) : null}
+            </div>
+          ) : null}
+        </div>
+        {/* MSL analysis — cool field, gold left edge = interpretation, not observation */}
+        <div style={{ borderLeft: `1px solid ${GOLD.gold}`, padding: "24px 22px 22px 21px", background: GROUND.g1 }}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ ...mono(10, GOLD.gold, 0.2, 500), marginBottom: 6 }}>WHY IT MATTERS</div>
+            <div style={mono(9, COOL.label, 0.14)}>MSL ANALYSIS · NOT OBSERVED</div>
+          </div>
+          {it.why_it_matters ? (
+            <p style={{ margin: 0, font: `400 14.5px/1.6 ${SERIF}`, color: COOL.prose, textWrap: "pretty" }}>{it.why_it_matters}</p>
+          ) : (
+            <p style={{ margin: 0, ...mono(10, COOL.label, 0.1), lineHeight: 1.6 }}>NO ANALYSIS LOGGED FOR THIS OBSERVATION.</p>
+          )}
+          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ width: 17, height: 17, borderRadius: "50%", border: `1px solid ${GOLD.dim}`, display: "flex", alignItems: "center", justifyContent: "center", ...mono(7, GOLD.gold, 0) }}>{it.author_initials}</span>
+            <span style={mono(9, COOL.label, 0.16)}>LOGGED BY {hcpName ? "TEAM MSL" : "TEAM MSL"}</span>
           </div>
         </div>
-        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
-          <div style={{ fontSize: 12, color: "#9B9892" }}>{formatInsightDate(insight.occurred_at)}</div>
-          <div style={{ fontSize: 11, color: "#6B6A65" }}>{interactionLabel}</div>
-        </div>
       </div>
-
-      <div style={{ fontSize: 14, color: "#C8C5BE", lineHeight: 1.55, marginBottom: insight.why_it_matters ? 12 : 12 }}>
-        {insight.body}
-      </div>
-
-      {insight.why_it_matters ? (
-        <div
-          style={{
-            backgroundColor: "rgba(29, 158, 117, 0.06)",
-            border: "1px solid rgba(29, 158, 117, 0.20)",
-            borderRadius: 8,
-            padding: "10px 12px",
-            marginBottom: 12,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: IG_ACCENT,
-              marginBottom: 6,
-            }}
-          >
-            Why it matters
-          </div>
-          <div style={{ fontSize: 13, color: "#C8C5BE", lineHeight: 1.5 }}>
-            {insight.why_it_matters}
-          </div>
-        </div>
-      ) : null}
-
-      {insight.belief_claim_title ? (
-        <button
-          type="button"
-          onClick={() => navigate(`/hcp/${insight.hcp_id}#belief-profile`)}
-          aria-label={`View linked Belief Profile: ${insight.belief_claim_title}`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "rgba(155, 109, 255, 0.08)",
-            border: "1px solid rgba(155, 109, 255, 0.30)",
-            color: "#B89BFF",
-            padding: "6px 10px",
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            marginBottom: 12,
-            transition: "background-color 120ms ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.14)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.08)";
-          }}
-        >
-          <span style={{ color: "#9B9892", fontWeight: 400 }}>Linked Belief Profile:</span>
-          <span>{insight.belief_claim_title}</span>
-          <span aria-hidden style={{ color: "#9B9892", marginLeft: 2 }}>{String.fromCharCode(0x2192)}</span>
-        </button>
-      ) : null}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          paddingTop: 10,
-          borderTop: "1px solid #1E1E22",
-        }}
-      >
-        <div
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: "50%",
-            backgroundColor: "transparent",
-            border: `1.5px solid ${IG_ACCENT}`,
-            color: IG_ACCENT,
-            fontSize: 10,
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          {insight.author_initials}
-        </div>
-        <div style={{ fontSize: 11, color: "#6B6A65" }}>Logged by team MSL</div>
-      </div>
-    </div>
-  );
-}
-
-interface HcpGroup {
-  hcp_id: string;
-  hcp_display_name: string;
-  insights: FieldInsight[];
-}
-
-function groupByHcp(insights: FieldInsight[]): HcpGroup[] {
-  const map = new Map<string, HcpGroup>();
-  for (const insight of insights) {
-    const existing = map.get(insight.hcp_id);
-    if (existing) {
-      existing.insights.push(insight);
-    } else {
-      map.set(insight.hcp_id, {
-        hcp_id: insight.hcp_id,
-        hcp_display_name: formatHcpDisplayName(insight),
-        insights: [insight],
-      });
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => b.insights.length - a.insights.length);
-}
-
-interface CategoryGroup {
-  category: InsightCategory | null;
-  label: string;
-  insights: FieldInsight[];
-}
-
-function groupByCategory(insights: FieldInsight[]): CategoryGroup[] {
-  const map = new Map<string, CategoryGroup>();
-  for (const insight of insights) {
-    const key = insight.insight_category ?? "uncategorized";
-    const existing = map.get(key);
-    if (existing) {
-      existing.insights.push(insight);
-    } else {
-      map.set(key, {
-        category: insight.insight_category,
-        label: insight.insight_category ? CATEGORY_LABELS[insight.insight_category] : "Uncategorized",
-        insights: [insight],
-      });
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => b.insights.length - a.insights.length);
-}
-
-function LoadingState() {
-  return (
-    <div style={{ padding: "40px 0", display: "flex", flexDirection: "column", gap: 12 }}>
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          style={{
-            height: 96,
-            backgroundColor: "#15131A",
-            border: "1px solid #1E1E22",
-            borderRadius: 10,
-          }}
-        />
-      ))}
-    </div>
+    </article>
   );
 }
 
 function EmptyState() {
   return (
-    <div
-      style={{
-        padding: "64px 24px",
-        textAlign: "center",
-        backgroundColor: "#0D0D10",
-        border: "1px solid #1E1E22",
-        borderRadius: 12,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: "50%",
-          backgroundColor: IG_ACCENT_BG,
-          border: `1px solid ${IG_ACCENT_BORDER}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: IG_ACCENT,
-          fontSize: 20,
-          fontWeight: 600,
-        }}
-      >
-        +
+    <div style={{ marginTop: 8, border: `1px solid ${LINE.l1}`, background: GROUND.g2 }}>
+      <div style={{ padding: "14px 26px", background: GROUND.g1, borderBottom: `1px solid ${LINE.l1}`, ...mono(10, COOL.muted, 0.18, 500) }}>
+        NO INSIGHTS LOGGED
       </div>
-      <div style={{ fontSize: 16, color: "#E8E6DF", fontWeight: 500 }}>No field insights yet</div>
-      <div style={{ fontSize: 13, color: "#9B9892", maxWidth: 440, lineHeight: 1.5 }}>
-        Field insights captured after HCP interactions appear here. Each insight is tagged with a category, strength,
-        and optionally tied to a Belief Profile claim. Capture flow is coming soon.
+      <div style={{ padding: "30px 26px 32px", display: "grid", gap: 16, maxWidth: "74ch" }}>
+        <p style={{ margin: 0, font: `400 20px/1.55 ${SERIF}`, color: WARM.body, textWrap: "pretty" }}>
+          Field insights are captured by MSLs from their own HCP interactions. This ledger fills as your team logs observations from advisory boards, tumor boards, and congress conversations — each tied to the belief profile it touches.
+        </p>
+        <p style={{ margin: 0, font: `300 16px/1.6 ${SERIF}`, color: COOL.muted, textWrap: "pretty" }}>
+          Absence here is a fact about capture, not about the field. Nothing has been logged yet — the surface stays empty rather than showing an estimate. Log an insight from any HCP profile and it appears here.
+        </p>
+      </div>
+      <div style={{ padding: "14px 26px", borderTop: `1px solid ${LINE.l1}`, ...mono(9.5, COOL.label, 0.14) }}>
+        MSL-CAPTURED · TIED TO A BELIEF PROFILE · UNVERIFIED OBSERVATION PLUS ANALYST INTERPRETATION
       </div>
     </div>
   );
 }
 
-const tabButtonStyle: CSSProperties = {
-  background: "transparent",
-  border: "none",
-  borderBottom: "2px solid transparent",
-  padding: "12px 16px",
-  fontSize: 14,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  transition: "color 120ms, border-color 120ms",
-  marginBottom: -1,
-};
+function buildGroups(items: FieldInsight[], gb: GroupBy): Group[] {
+  const sorted = [...items].sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
+  if (gb === "category") {
+    const m = new Map<InsightCategory, FieldInsight[]>();
+    for (const i of sorted) {
+      const c = (i.insight_category ?? "other") as InsightCategory;
+      (m.get(c) ?? m.set(c, []).get(c)!).push(i);
+    }
+    return [...m.entries()]
+      .sort((a, b) => CATEGORY_WEIGHT[a[0]] - CATEGORY_WEIGHT[b[0]])
+      .map(([c, v]) => ({ key: c, title: CATEGORY_LABELS[c] ?? "Other", meta: metaLine(v), items: v }));
+  }
+  if (gb === "date") {
+    const m = new Map<string, FieldInsight[]>();
+    for (const i of sorted) {
+      const d = new Date(i.occurred_at);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()).padStart(2, "0")}`;
+      (m.get(key) ?? m.set(key, []).get(key)!).push(i);
+    }
+    return [...m.entries()]
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([k, v]) => {
+        const [y, mo] = k.split("-");
+        return { key: k, title: `${MONTHS[Number(mo)][0]}${MONTHS[Number(mo)].slice(1).toLowerCase()} ${y}`, meta: metaLine(v), items: v };
+      });
+  }
+  const m = new Map<string, FieldInsight[]>();
+  for (const i of sorted) {
+    const name = formatHcpDisplayName(i);
+    (m.get(name) ?? m.set(name, []).get(name)!).push(i);
+  }
+  return [...m.entries()]
+    .map(([name, v]) => ({ key: name, title: name, meta: `${v.length} INSIGHT${v.length === 1 ? "" : "S"} · LATEST ${formatInsightDate(v[0].occurred_at).toUpperCase()}`, items: v }))
+    .sort((a, b) => b.items.length - a.items.length);
+}
+
+function metaLine(v: FieldInsight[]): string {
+  const hcps = new Set(v.map((i) => i.hcp_id)).size;
+  return `${v.length} INSIGHT${v.length === 1 ? "" : "S"} · ${hcps} HCP${hcps === 1 ? "" : "S"}`;
+}
+
+function buildEmailBody(insights: FieldInsight[]): string {
+  if (insights.length === 0) return "No field insights captured yet.";
+  const lines = ["FIELD INSIGHTS - WEEKLY DIGEST", "", `${insights.length} insight${insights.length === 1 ? "" : "s"} captured.`, "", "-----", ""];
+  for (const ins of insights) {
+    const hcpName = formatHcpDisplayName(ins);
+    const cat = ins.insight_category ? CATEGORY_LABELS[ins.insight_category] : "Uncategorized";
+    lines.push(`${hcpName} - ${cat} - ${formatInsightDate(ins.occurred_at)}`, "", ins.body);
+    if (ins.why_it_matters) lines.push("", `Why it matters: ${ins.why_it_matters}`);
+    lines.push("", "-----", "");
+  }
+  return lines.join("\n");
+}
