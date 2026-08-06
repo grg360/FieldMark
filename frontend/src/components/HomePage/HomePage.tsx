@@ -45,6 +45,7 @@ import {
 } from "../../lib/home";
 import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
+import { institutionToSlug } from "../../lib/institutionUtils";
 import { GOLD as GOLD_T, GROUND, LINE } from "../../lib/designTokens";
 
 // ── palette (from the frame) ──────────────────────────────────────────────────
@@ -401,7 +402,7 @@ export default function HomePage() {
                     {institutions.length === 0 ? <div style={{ padding: "12px 18px", ...serif(14, 300, MID) }}>No pinned institutions.</div> : institutions.map((inst, i) => (
                       <div key={inst.name}>
                         {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 18px" }} /> : null}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, padding: "12px 18px", alignItems: "baseline" }}>
+                        <div className="fmhome-link" onClick={() => navigate(`/institution/${institutionToSlug(inst.name)}`)} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, padding: "12px 18px", alignItems: "baseline", cursor: "pointer" }}>
                           <span style={serif(15, 400, INK2, 1.3)}>{inst.name}</span>
                           <span style={mono(11, 400, MID)}>{inst.hcp != null ? num(inst.hcp) : "—"} · <span style={{ color: inst.rising ? GOLD : DIM }}>{inst.rising != null ? inst.rising : "—"}</span></span>
                         </div>
@@ -436,9 +437,14 @@ export default function HomePage() {
                             style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 7px", border: `1px solid ${(chip.cohort ? COHORT_BORDER[chip.cohort] : undefined) ?? BORDER}`, ...mono(11, 400, INK3, "0"), whiteSpace: "nowrap", cursor: "pointer" }}
                           >
                             <span>{chip.name}</span>
+                            {chip.ladder !== null && chip.cohort_rank !== null ? (
+                              <span style={mono(9, 400, MID, ".04em")}>{chip.ladder}</span>
+                            ) : null}
                             {chip.cohort_rank !== null ? (
                               <span style={mono(11, 400, GOLD, "0")}>#{chip.cohort_rank}</span>
-                            ) : null}
+                            ) : (
+                              <span style={mono(9, 400, DIM, ".06em")}>UNRANKED</span>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -453,7 +459,7 @@ export default function HomePage() {
                     {briefs.length === 0 ? <div style={{ padding: "14px 20px", ...serif(14, 300, MID) }}>No briefs yet.</div> : briefs.map((b, i) => (
                       <div key={b.id}>
                         {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 20px" }} /> : null}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14, padding: "14px 20px", alignItems: "baseline" }}>
+                        <div className="fmhome-link" onClick={() => navigate(`/hcp/${b.hcp_id}/brief`)} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14, padding: "14px 20px", alignItems: "baseline", cursor: "pointer" }}>
                           <span style={serif(16, 400, INK2)}>{b.hcp_name}</span>
                           <span style={mono(10, 400, DIM)}>{fmtDue(b.generated_at)}</span>
                         </div>

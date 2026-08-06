@@ -122,6 +122,10 @@ export interface TrackedHcpChip {
   name: string;
   cohort: "rising_star" | "established" | "community" | null;
   cohort_rank: number | null;
+  // Which ladder the rank came from (2026-08-05): three bare numbers from
+  // three ranking systems were ambiguous, and community/global-established
+  // HCPs fell through entirely. null ladder => render UNRANKED, never blank.
+  ladder: "RS" | "EST" | "EST GLOBAL" | "COM" | null;
 }
 
 export interface TerritoryCoverageStats {
@@ -1295,6 +1299,34 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       }
     }
 
+    // Global-established fallback (2026-08-05): HCPs like Solange Peters carry
+    // only a global-scope established rank and fell through the US-region query.
+    const globalEstByHcpId = new Map<string, number>();
+    for (let i = 0; i < hcpIdsInTerritory.length; i += CHUNK_SIZE) {
+      const chunk = hcpIdsInTerritory.slice(i, i + CHUNK_SIZE);
+      const { data } = await supabase
+        .from("hcp_established_ranks_v3")
+        .select("hcp_id, rank")
+        .eq("scope_type", "global")
+        .in("hcp_id", chunk);
+      for (const row of (data ?? []) as EstRankRow[]) {
+        if (row.rank == null) continue;
+        const existing = globalEstByHcpId.get(row.hcp_id);
+        if (existing == null || row.rank < existing) globalEstByHcpId.set(row.hcp_id, row.rank);
+      }
+    }
+
+    // Community tiered rank (2026-08-05): the SAME number the community ledger
+    // shows (tier-ordered, anchored+supported), via community_tiered_ranks —
+    // never the raw score rank, so one person never carries two numbers.
+    const comRankByHcpId = new Map<string, number>();
+    {
+      const { data } = await supabase.rpc("community_tiered_ranks", { p_hcp_ids: hcpIdsInTerritory });
+      for (const row of (data ?? []) as { hcp_id: string; tiered_rank: number }[]) {
+        comRankByHcpId.set(row.hcp_id, row.tiered_rank);
+      }
+    }
+
     const chips: TrackedHcpChip[] = allHcps.map((h) => {
       const cohortLower = (h.cohort_classification ?? "").toLowerCase();
       let cohort: TrackedHcpChip["cohort"] = null;
@@ -1302,14 +1334,26 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       else if (cohortLower === "established") cohort = "established";
       else if (cohortLower === "community" || cohortLower === "workhorse") cohort = "community";
 
+      // Ladder resolution order: rising US -> established US -> established
+      // global -> community tiered. The tag names the ladder the number came
+      // from; the stale cohort_classification column no longer decides.
+      const rs = ranksByHcpId.get(h.id) ?? null;
+      const est = estRanksByHcpId.get(h.id) ?? null;
+      const estGlobal = globalEstByHcpId.get(h.id) ?? null;
+      const com = comRankByHcpId.get(h.id) ?? null;
+      let ladder: TrackedHcpChip["ladder"] = null;
+      let cohort_rank: number | null = null;
+      if (rs != null) { ladder = "RS"; cohort_rank = rs; cohort = "rising_star"; }
+      else if (est != null) { ladder = "EST"; cohort_rank = est; cohort = "established"; }
+      else if (estGlobal != null) { ladder = "EST GLOBAL"; cohort_rank = estGlobal; cohort = "established"; }
+      else if (com != null) { ladder = "COM"; cohort_rank = com; cohort = "community"; }
+
       return {
         hcp_id: h.id,
         name: `${h.first_name ?? ""} ${h.last_name ?? ""}`.trim() || "Unknown",
         cohort,
-        cohort_rank:
-          cohort === "rising_star" ? (ranksByHcpId.get(h.id) ?? null)
-          : cohort === "established" ? (estRanksByHcpId.get(h.id) ?? null)
-          : null,
+        cohort_rank,
+        ladder,
       };
     });
 
