@@ -291,6 +291,16 @@ def parse_args() -> argparse.Namespace:
         help="Skip HCPs that already have any position for this TA (only "
         "process not-yet-covered HCPs, e.g. the established rank 101-200 tail).",
     )
+    parser.add_argument(
+        "--allow-belief-relink-break",
+        action="store_true",
+        help="Override the belief-link safety guard. Re-extraction DELETEs and "
+        "re-INSERTs positions with fresh gen_random_uuid() ids, so every "
+        "hcp_scientific_positions_v1.id changes — which silently orphans every "
+        "msl_hcp_notes.belief_claim_key (the key is sha256 over those ids). "
+        "Pass this ONLY together with a re-key backfill of the affected notes "
+        "(see docs/BELIEF_CLAIM_LINK_STABILITY.md). Ignored on --dry-run.",
+    )
     return parser.parse_args()
 
 
@@ -521,6 +531,39 @@ def main() -> int:
 
     conn = get_db_connection()
     conn.autocommit = False
+
+    # Belief-link safety guard. This script DELETEs and re-INSERTs each processed
+    # HCP's positions (idempotency, below), and the INSERT does not supply id, so
+    # every hcp_scientific_positions_v1.id is regenerated (gen_random_uuid). The
+    # field-insight → belief-position link keys on those ids
+    # (msl_hcp_notes.belief_claim_key = sha256 over them), so a re-extraction
+    # SILENTLY orphans every belief link — including the 75 seeded links on the
+    # demo path. Refuse unless explicitly overridden. --dry-run writes nothing, so
+    # it is exempt; --skip-existing only processes not-yet-covered HCPs and never
+    # DELETEs an existing (keyed) HCP's positions, so it is exempt too.
+    if not args.dry_run and not args.skip_existing and not args.allow_belief_relink_break:
+        with conn.cursor() as _cur:
+            _cur.execute(
+                "SELECT count(*) FROM msl_hcp_notes "
+                "WHERE belief_claim_key IS NOT NULL AND deleted_at IS NULL"
+            )
+            keyed = int(_cur.fetchone()[0] or 0)
+        if keyed > 0:
+            print(
+                f"[GUARD] Refusing to run: {keyed} field insight(s) carry a "
+                "belief_claim_key that hashes hcp_scientific_positions_v1.id. A full "
+                "re-extraction regenerates those ids and SILENTLY breaks every one "
+                "of those links (the demo path included).\n"
+                "  • To EXTEND coverage without touching existing positions, use "
+                "--skip-existing (safe, exempt).\n"
+                "  • To re-extract anyway, pass --allow-belief-relink-break AND run "
+                "a re-key backfill of the affected notes afterward "
+                "(docs/BELIEF_CLAIM_LINK_STABILITY.md).\n"
+                "  • --dry-run is always safe (no writes).",
+                file=sys.stderr,
+            )
+            conn.close()
+            return 1
 
     stats = {
         "hcps_processed": 0,
