@@ -14,6 +14,15 @@
 // Every slot except eyebrow+title is optional; a surface passes what it has
 // and nothing renders for what it doesn't. Pulse itself keeps its local
 // masthead (frozen reference, "0 changes" in the Two Ramps applied table).
+//
+// THE HERO RULE (Design, 2026-08-05 — closes the width audit):
+//   1. The hairline spans the container, ALWAYS. It is structure, not text.
+//   2. The dek stays at its 620px measure and is NEVER stretched to meet it.
+//   3. The right field takes a structural counterweight: a date/coverage
+//      stamp on the eyebrow row (meta) and a stat cluster opposite the dek.
+//   4. A surface with genuinely nothing to put there leaves it empty — the
+//      rule still spans. An empty right field is a content decision, not a
+//      defect in this component.
 
 import type { ReactNode } from "react";
 import { FONT, GOLD, COOL, LINE } from "../lib/designTokens";
