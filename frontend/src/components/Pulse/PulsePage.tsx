@@ -34,9 +34,14 @@ const C = {
   goldDim: "#6b542f", // was GOLD.goldDeep — token retired, value frozen
   goldRank: "#7a6136", // was GOLD.goldMuted — token retired, value frozen
   goldCaveat: "#c9a55f", // was GOLD.goldSoft — token retired, value frozen
-  ink: "#e9e6df", // was INK.ink — warm INK retired (WARM.prose ≠ this), frozen
-  ink2: "#a9a396", // was INK.inkMuted — frozen
-  proseInk: "#c5bfb2", // was INK.inkProse — frozen
+  // Cool ramp (2026-08-06): Pulse is a scanning feed — figures, deltas, movement —
+  // so it is one cool temperature at the block level, like the rising profile's
+  // remap. These three frozen warm-neutral inks were the last straggler in the
+  // ink census; swapped to luminance-matched cool steps so serif and mono no
+  // longer render one warm ink beside cool chrome.
+  ink: COOL.ui, // was warm #e9e6df
+  ink2: COOL.muted, // was warm #a9a396
+  proseInk: COOL.prose, // was warm #c5bfb2
   head: COOL.chromeStrong,
   head2: "#8d939c", // was GREY.grey2 — no surviving step (COOL.chrome is interp #878e96), frozen
   muted: "#6d747d", // was GREY.grey4 — retired between label/faint, frozen
