@@ -148,3 +148,130 @@ ledger) and the true blocker is NPI coverage upstream, not the freeze. But the
 surfacing before Friday. A one-off `--execute` run with the gate pointed at
 the v2 taxonomy would surface them today at $0 and ~20 min; making it a weekly
 stage should wait on the gate fix + snapshot discipline above.
+
+---
+
+## Executed 2026-08-06 — gate moved, NSCLC-scoped rescore run
+
+`community_scoring.py` gate moved off the dead column to
+`hcp_cohort_classification_v2` (cohort='community', per-(hcp, TA)) in the same
+change; a `--ta` flag was added and the run was `--execute --ta nsclc` (49,914
+pairs) to keep AD community rows out of tables no AD surface reads. **Not added
+to the weekly cycle** — deferred behind snapshot discipline (the script
+re-normalises 0-100 each run; a weekly baseline spanning a methodology change
+would misread as movement, per the rising un-freeze). Results below.
+
+### Results (measured live post-run)
+
+| | before | after | Δ |
+|---|---|---|---|
+| NSCLC score rows | 6,435 | 49,914 | +43,479 |
+| **full ledger board** | 6,480 | **13,017** | +6,537 |
+| anchored | 980 | 1,002 | +22 |
+| supported | 88 | 97 | +9 |
+| candidate | 2,597 | 2,799 | +202 |
+| heme_dominant | 598 | 629 | +31 |
+| unresolved | 2,217 | 8,490 | **+6,273** |
+| **default ledger (anchored+supported)** | 1,068 | **1,099** | **+31** |
+
+**Does a new entrant land in the top 50? No — zero of the top 50 are new.**
+All 31 genuinely new anchored/supported members rank #51 or lower. The named
+high-volume treaters land mid-pack, not at the head:
+
+| entrant | NSCLC benef. | new default rank |
+|---|---|---|
+| Toby Campbell | 610 | #291 |
+| Joseph McLaughlin | 1,922 | #513 |
+| Rohit Bishnoi | 729 | #523 |
+| Shetal Patel | 379 | #524 |
+| Sendhilnathan Ramalingam | 1,153 | #993 |
+| Anthony Conley | 614 | #996 |
+
+They rank mid-board because the composite is 40% volume + 30% pharma + 15%
+setting + 10% career + 5% pub (min-max normalised), and the anchored tier
+orders by recurrence band before score — raw volume alone does not float a name
+to the head.
+
+**The head reshuffled from renormalisation, not new blood.** Uyeki went #1 →
+#26, still anchored, with *no new entrant above him* — the 25 names now ahead
+were already on the board. Baseline top-5 all moved (Tauer #4, Storey-Rojas #8,
+Zafar #14, Tang #34); the new #1, Hussein, was a pre-existing member. Cause:
+each signal is min-max normalised across the scored population, so growing that
+population 6,435 → 49,914 rescaled every existing member's normalised signals
+and reordered the composite. **This is exactly the snapshot-drift the weekly-
+cycle deferral guards against** — the methodology did not change, only the
+denominator, and a weekly baseline spanning this run would read the reshuffle
+as movement. As a one-off it is defensible (the ranking is now computed over
+the true community population rather than the frozen 13% sample), but it is why
+this stays off the cycle until snapshotted.
+
+**Interpretation.** The freeze fix is correct and the board is now honest, but
+the demo-facing upside is small: +31 on the default ledger, none in the top 50,
+and the full-board growth is +6,273 `unresolved` — the NPI-less/claims-less
+tail that tiers as "no Medicare evidence." The community Marmarelis exists
+(McLaughlin et al. are now on the board) but the CMS composite ranks them
+mid-pack, so they do not surface where a demo looks.
+
+### Follow-ups logged (not done)
+
+1. **Stale rows.** The upsert-only recompute left **45** NSCLC score rows for
+   HCPs no longer community in the taxonomy (scored 2026-07-30); they still
+   render on the ledger. `community_scoring.py` needs a de-list step for rows
+   absent from the new result set — the same fix the rising/network momentum
+   scripts already carry (commit 9e87336). 45 rows, low urgency, not
+   hand-deleted pending that fix.
+2. **Weekly stage + snapshot discipline** (deferred, per the note above).
+
+### Stale-row de-listing (done)
+
+`community_scoring.py` now de-lists score rows for (hcp, TA) pairs absent from
+the new community set (scoped to the TAs scored this run) — the same fix the
+momentum scripts carry. The re-run removed the **45** stale NSCLC rows; the
+board is 49,914 clean rows.
+
+### Reshuffle stability — confirmed deterministic
+
+The min-max renormalisation over the 7.7× population did **not** expose any
+nondeterminism:
+
+- `community_ledger` called twice on the same scores → identical top-50 hash
+  (`3e7310fb0830e12a`).
+- Two independent full scoring runs (before and after the de-list) → **byte-
+  identical top-50** (same hash). The scoring is deterministic; the reshuffle
+  vs the frozen baseline is a real, reproducible consequence of the larger
+  normalisation denominator, not a flaky artifact.
+
+### New default-ledger top 20 (all anchored · recurs)
+
+| rk | name | Part B agents | Part D lung stems | anchor stems |
+|---|---|---|---|---|
+| 1 | Hussein | 39 | 26 | osimertinib |
+| 2 | Dy | 44 | 22 | alectinib, osimertinib |
+| 3 | Lobo | 54 | 19 | osimertinib |
+| 4 | Tauer | 58 | 11 | osimertinib |
+| 5 | Newman | 41 | 25 | capmatinib, osimertinib |
+| 6 | Young | 39 | 23 | osimertinib |
+| 7 | Rubin | 42 | 22 | osimertinib, sotorasib |
+| 8 | Storey-Rojas | 51 | 25 | afatinib, alectinib |
+| 9 | Al-Hazzouri | 40 | 28 | brigatinib, osimertinib |
+| 10 | Kosloff | 45 | 19 | osimertinib |
+| 11–20 | Wang, Hamarneh, Dalal, Zafar, Patel, Kayali, Prakash, Maun, Bhatia, Cultrera | 28–47 | 13–26 | osimertinib-led |
+
+Every top-20 name is anchored/recurring with a deep administered-therapy
+record — the reshuffled head is genuine high-treatment community oncologists,
+not noise.
+
+**Hussein (new #1) profile completeness** — as complete as Uyeki's demo
+profile: Administered Therapy block present (283 HCPCS rows, 91 drug rows),
+evidence chip present (anchored · osimertinib · recurs), and a community
+narrative present (prompt v1.0 — renders, though a `--cohort community` regen
+would refresh it to the current prompt). Maen Hussein, Medical Oncology, FL.
+
+### After-demo revisit (logged, not changed)
+
+The composite (40% volume / 30% pharma / 15% setting / 10% career / 5% pub)
+ranks **McLaughlin #513 despite 1,922 NSCLC beneficiaries and an anchored
+tier**. The evidence tier (treatment reality) and the composite (CMS-payment +
+demographic proxies) disagree about who matters; worth revisiting whether the
+default ledger should order by tier + volume rather than the composite.
+
