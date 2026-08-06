@@ -138,6 +138,8 @@ export interface RisingFlags {
   hcp_id: string;
   senior_transition: boolean;
   recent_senior_pubs: number | null;
+  first_senior_year: number | null;
+  latest_senior_year: number | null;
   on_open_trial: boolean;
 }
 

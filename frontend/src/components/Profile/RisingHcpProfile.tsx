@@ -310,15 +310,15 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               </div>
 
               <div style={{ marginTop: 22, font: `400 30px/1.12 ${SERIF}`, color: INK0, letterSpacing: "-.01em" }}>{name}</div>
-              {/* Event badge + trial flag (2026-08-05). RECENT SENIOR AUTHORSHIP
-                  is a claim about the two rolling windows, not the whole career,
-                  and it explains the momentum score rather than adding a signal
-                  — that caveat is user-facing copy, below. */}
-              {(m && m.early_senior_pubs === 0 && (m.recent_senior_pubs ?? 0) >= 3) || flags?.on_open_trial ? (
+              {/* Event badge + trial flag (2026-08-05). Selector is window-based
+                  (rising_board_flags: zero early-window seniors, >= 3 recent,
+                  active within 24 months); the DISPLAY is career-anchored so it
+                  does not shift as the windows roll. */}
+              {flags?.senior_transition || flags?.on_open_trial ? (
                 <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  {m && m.early_senior_pubs === 0 && (m.recent_senior_pubs ?? 0) >= 3 ? (
-                    <span style={{ padding: "3px 8px", border: `1px solid ${GREEN_DK}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>
-                      RECENT SENIOR AUTHORSHIP · 0 → {m.recent_senior_pubs} SENIOR PAPERS · {ew} → {rw}
+                  {flags?.senior_transition ? (
+                    <span title="Senior-authored years within the FieldMark corpus — we see only what is ingested." style={{ padding: "3px 8px", border: `1px solid ${GREEN_DK}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>
+                      SENIOR AUTHORSHIP SINCE {flags.first_senior_year ?? "—"} · {flags.recent_senior_pubs ?? "—"} PAPERS · LATEST {flags.latest_senior_year ?? "—"}
                     </span>
                   ) : null}
                   {flags?.on_open_trial ? (
@@ -326,8 +326,8 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                       OPEN-TRIAL INVESTIGATOR
                     </span>
                   ) : null}
-                  {m && m.early_senior_pubs === 0 && (m.recent_senior_pubs ?? 0) >= 3 ? (
-                    <span style={{ ...serif(10.5, MUT3, 1.4) }}>Names why the momentum score is high — not a separate signal. Senior papers before {ew.split("–")[0]} sit outside both windows.</span>
+                  {flags?.senior_transition ? (
+                    <span style={{ ...serif(10.5, MUT3, 1.4) }}>Names why the momentum score is high — not a separate signal.</span>
                   ) : null}
                 </div>
               ) : null}
@@ -352,12 +352,36 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
             <div style={{ padding: "20px 20px 16px", display: "flex", flexDirection: "column" }}>
               {label("QUADRANT POSITION")}
-              <div style={{ marginTop: 9, font: `500 15px/1.25 ${MONO}`, letterSpacing: ".02em", color: quad.color }}>
-                {quad.name}
-              </div>
-              <div style={{ marginTop: 8, display: "flex", gap: 18 }}>
-                <div style={mono(9, INK1, 0.08)}>MOM {fmtPctl(p.rising.momentum_component)}</div>
-                <div style={mono(9, INK1, 0.08)}>VIS {fmtPctl(p.rising.visibility_component)}</div>
+              {/* Mini-quadrant glyph: the ledger's quadrant restated at profile
+                  scale — four cells at the ledger's tints, one dot at this
+                  profile's true coordinates. No new colors, no new vocabulary. */}
+              <div style={{ marginTop: 9, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                {(() => {
+                  const mom = p.rising.momentum_component ?? 40;
+                  const vis = p.rising.visibility_component ?? 40;
+                  const cx = Math.max(4, Math.min(96, ((vis - 40) / 60) * 100));
+                  const cy = Math.max(4, Math.min(96, ((mom - 40) / 60) * 100));
+                  const SPLIT = ((80 - 40) / 60) * 100;
+                  return (
+                    <div style={{ position: "relative", width: 56, height: 56, flex: "none", border: `1px solid ${RULE}`, background: GROUND.g1 }}>
+                      <div style={{ position: "absolute", left: 0, bottom: `${SPLIT}%`, top: 0, width: `${SPLIT}%`, background: "rgba(216,162,74,.05)" }} />
+                      <div style={{ position: "absolute", right: 0, bottom: `${SPLIT}%`, top: 0, left: `${SPLIT}%`, background: "rgba(143,184,166,.08)" }} />
+                      <div style={{ position: "absolute", right: 0, bottom: 0, height: `${SPLIT}%`, left: `${SPLIT}%`, background: "rgba(138,162,196,.06)" }} />
+                      <div style={{ position: "absolute", left: `${SPLIT}%`, top: 0, bottom: 0, width: 1, background: LINE.l2 }} />
+                      <div style={{ position: "absolute", bottom: `${SPLIT}%`, left: 0, right: 0, height: 1, background: LINE.l2 }} />
+                      <div style={{ position: "absolute", left: `${cx}%`, bottom: `${cy}%`, width: 5, height: 5, marginLeft: -2.5, marginBottom: -2.5, borderRadius: "50%", background: quad.color }} />
+                    </div>
+                  );
+                })()}
+                <div>
+                  <div style={{ font: `500 15px/1.25 ${MONO}`, letterSpacing: ".02em", color: quad.color }}>
+                    {quad.name}
+                  </div>
+                  <div style={{ marginTop: 8, display: "flex", gap: 18 }}>
+                    <div style={mono(9, INK1, 0.08)}>MOM {fmtPctl(p.rising.momentum_component)}</div>
+                    <div style={mono(9, INK1, 0.08)}>VIS {fmtPctl(p.rising.visibility_component)}</div>
+                  </div>
+                </div>
               </div>
               <div style={{ marginTop: 10, height: 1, background: LINE.l0 }} />
               <div style={{ marginTop: 10, ...serif(11.5, SERIF_INK, 1.6) }}>
