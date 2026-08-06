@@ -119,32 +119,45 @@ function bylineOf(r: PublicationListRow): string {
   return `${names.slice(0, 6).join(", ")}, … ${names[names.length - 1]}`;
 }
 
+// Shared row grid — the column header and every row use it (frame: 84 | 1fr | 210).
+const GRID = "84px 1fr 210px";
+
 function Row({ r, surname, density }: { r: PublicationListRow; surname: string; density: Density }) {
   const senior = !!r.is_senior_author;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "68px 1fr 150px", gap: 20, padding: "13px 0", borderTop: `1px solid ${C.line}`, alignItems: "baseline" }}>
-      {/* citation figure column — gold for senior, quiet for co-author */}
-      <div style={{ textAlign: "right", font: `600 ${senior ? 17 : 14}px/1 ${MONO}`, color: senior ? C.gold : C.mid, fontVariantNumeric: "tabular-nums" }}>
+    <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 24, padding: "15px 0", borderTop: `1px solid ${C.line}`, alignItems: "flex-start" }}>
+      {/* citation figure column — gold + larger for senior, quiet for co-author */}
+      <div style={{ textAlign: "right", font: `400 ${senior ? 23 : 15}px/1 ${MONO}`, color: senior ? C.gold : C.mid, letterSpacing: "-.02em", fontVariantNumeric: "tabular-nums", paddingTop: senior ? 2 : 5 }}>
         {citeN(r).toLocaleString()}
-        <div style={{ font: `400 8px/1.4 ${MONO}`, letterSpacing: ".1em", color: C.faint2, marginTop: 4 }}>CITED</div>
       </div>
-      {/* title + provenance (+ byline in DETAIL) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 7, minWidth: 0 }}>
-        <div style={{ font: `${senior ? 500 : 400} ${senior ? 16 : 14}px/1.4 ${SERIF}`, color: senior ? C.ink : C.ink2, textWrap: "pretty" }}>{r.title}</div>
-        {density === "detail" ? <Byline r={r} surname={surname} /> : null}
-        <ProvenanceLine r={r} />
-        {/* Create-capable discuss affordance (2026-08-06): the redesign had gated
-            this to existing-threads-only as a sort/clutter decision (Publications
-            List.dc.html) — not compliance — which silently removed the documented
-            demo path (bibliography → paper → create thread). Restored via the shared
-            component, which deep-links to primary_thread_id where a thread exists and
-            opens the anchor-prefilled composer where none does. Founder-gated inside. */}
+      {/* role → title → provenance (+ byline in DETAIL) → discuss. Senior rows carry
+          a gold left-rule, so role reads as structure without a chip. */}
+      <div style={{ display: "flex", gap: 16, minWidth: 0 }}>
+        {senior ? <div style={{ width: 2, background: "#8a6a24", flex: "none", marginTop: 2 }} /> : null}
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, minWidth: 0 }}>
+          <div style={{ font: `500 9.5px/1 ${MONO}`, letterSpacing: ".2em", color: senior ? C.gold : C.mid }}>
+            {senior ? "SENIOR AUTHOR" : "CO-AUTHOR"}
+          </div>
+          <div style={{ font: `${senior ? 500 : 400} ${senior ? 21 : 16.5}px/1.28 ${SERIF}`, color: senior ? "#f2efe9" : C.ink2, letterSpacing: senior ? "-.005em" : 0, textWrap: "pretty" }}>{r.title}</div>
+          {density === "detail" ? <Byline r={r} surname={surname} /> : null}
+          <ProvenanceLine r={r} />
+          {/* Create-capable discuss affordance (2026-08-06): restored to the redesign
+              (the frame gated it to existing-only as a sort/clutter call, not
+              compliance, which removed the documented demo path). Shared component
+              deep-links to primary_thread_id where a thread exists, opens the
+              anchor-prefilled composer where none does. Founder-gated inside. */}
+          {r.pmid ? (
+            <DiscussAffordance pmid={r.pmid} journalAbbrev={r.journal} title={r.title} compact />
+          ) : null}
+        </div>
+      </div>
+      {/* access & actions */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+        <FullText r={r} />
         {r.pmid ? (
-          <DiscussAffordance pmid={r.pmid} journalAbbrev={r.journal} title={r.title} compact />
+          <a href={`https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`} target="_blank" rel="noreferrer" style={{ font: `500 10px/1 ${MONO}`, letterSpacing: ".12em", color: C.ink2 }}>ABSTRACT ↗</a>
         ) : null}
       </div>
-      {/* full-text access */}
-      <div style={{ textAlign: "right" }}><FullText r={r} /></div>
     </div>
   );
 }
@@ -167,8 +180,10 @@ export default function PublicationsSurface({
 
   const nTotal = rows.length;
   const nSenior = rows.filter((r) => r.is_senior_author).length;
+  const nCo = nTotal - nSenior;
   const nOa = rows.filter((r) => r.fullTextIsOa).length;
   const nThread = rows.filter((r) => r.hasThread).length;
+  const totalCites = rows.reduce((s, r) => s + citeN(r), 0);
   const sparse = nTotal > 0 && nTotal < SPARSE_THRESHOLD;
 
   const filtered = useMemo(() => {
@@ -205,8 +220,25 @@ export default function PublicationsSurface({
     border: `1px solid ${active ? C.gold : C.line2}`, color: active ? C.gold : C.mid, background: active ? C.goldBg : "transparent",
   });
 
+  const Stat = ({ n, label, color }: { n: string; label: string; color: string }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <div style={{ font: `400 22px/1 ${MONO}`, letterSpacing: "-.02em", color, fontVariantNumeric: "tabular-nums" }}>{n}</div>
+      <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".14em", color: C.dim }}>{label}</div>
+    </div>
+  );
+
   return (
     <div style={{ background: C.bg, color: C.ink, fontFamily: MONO, display: "flex", flexDirection: "column", gap: 22 }}>
+      {/* Header stat row (frame 1a/1c): the four figures that summarise the scope —
+          senior-author leads in gold, open access in green. */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 34, flexWrap: "wrap", paddingBottom: 4 }}>
+        <Stat n={String(nSenior)} label="SENIOR AUTHOR" color={C.gold} />
+        <Stat n={String(nCo)} label="CO-AUTHOR" color={C.ink2} />
+        <div style={{ width: 1, alignSelf: "stretch", background: C.line2 }} />
+        <Stat n={totalCites.toLocaleString()} label={year != null ? "CITATIONS · THIS YEAR" : "CITATIONS · ALL YEARS"} color={C.ink2} />
+        <Stat n={String(nOa)} label="OPEN ACCESS · FULL TEXT" color="#7ba36f" />
+      </div>
+
       {/* controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", borderBottom: `1px solid ${C.line}`, paddingBottom: 14 }}>
         <div style={{ display: "flex", gap: 2 }}>
@@ -222,6 +254,13 @@ export default function PublicationsSurface({
           <div onClick={() => setOaOnly((v) => !v)} style={filt(oaOnly)}>OPEN ACCESS · {nOa}</div>
           <div onClick={() => setThreadOnly((v) => !v)} style={filt(threadOnly)}>HAS A DISCUSSION THREAD · {nThread}</div>
         </div>
+      </div>
+
+      {/* column header (frame): the row grid, labelled once */}
+      <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 24, paddingBottom: 9, borderBottom: `1px solid ${C.line}`, font: `500 9px/1 ${MONO}`, letterSpacing: ".15em", color: C.faint }}>
+        <div style={{ textAlign: "right" }}>CITATIONS</div>
+        <div>CONTRIBUTION · TITLE · SOURCE</div>
+        <div>ACCESS &amp; ACTIONS</div>
       </div>
 
       {/* bands */}
