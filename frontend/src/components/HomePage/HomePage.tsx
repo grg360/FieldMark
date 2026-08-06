@@ -14,7 +14,7 @@
 // getTrackedHcpsInTerritory — the shipped home's tracking-chip reader.
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { useTA } from "../../lib/TAContext";
 import { taIdForApiSlug } from "../../lib/api";
@@ -300,7 +300,7 @@ export default function HomePage() {
                         {isDesktop ? <span style={{ ...mono(22, 400, DIM2), lineHeight: 1.1 }}>{String(i + 1).padStart(2, "0")}</span> : null}
                         <div style={{ display: "flex", flexDirection: "column", gap: 7, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                            <span style={serif(19, 500, INK1)}>{a.hcp.name}</span>
+                            <Link to={`/hcp/${a.hcp.hcp_id}`} style={{ ...serif(19, 500, INK1), textDecoration: "none", borderBottom: `1px solid ${HAIR}` }}>{a.hcp.name}</Link>
                             {a.hcp.institution ? <span style={mono(11, 400, STEEL, ".04em")}>{a.hcp.institution}</span> : null}
                           </div>
                           {/* body VERBATIM; the frame's "why now" line has no stored source and is omitted */}
@@ -333,7 +333,7 @@ export default function HomePage() {
                     <div key={f.id}>
                       {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 26px" }} /> : null}
                       <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "210px 1fr 84px" : "1fr auto", gap: isDesktop ? 20 : 12, padding: "14px 26px", alignItems: "baseline" }}>
-                        <span style={serif(16, 400, INK2)}>{f.hcp.name}</span>
+                        <Link to={`/hcp/${f.hcp.hcp_id}`} style={{ ...serif(16, 400, INK2), justifySelf: "start", textDecoration: "none", borderBottom: `1px solid ${HAIR}` }}>{f.hcp.name}</Link>
                         {isDesktop ? <span style={serif(14, 300, MID, 1.45)}>{f.body}</span> : null}
                         <span style={{ ...mono(11, 400, RED), textAlign: "right" }}>{fmtDue(f.due_at)}</span>
                       </div>
@@ -568,7 +568,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                  <span style={serif(26, 500, INK1, 1.2)}>{moved.bandA.name}</span>
+                  <Link to={`/hcp/${moved.bandA.hcpId}`} style={{ ...serif(26, 500, INK1, 1.2), textDecoration: "none", borderBottom: `1px solid ${HAIR}` }}>{moved.bandA.name}</Link>
                   <span style={mono(12, 400, STEEL, ".04em")}>{moved.bandA.institution ?? "—"}{moved.bandA.state ? ` · ${moved.bandA.state}` : ""}</span>
                 </div>
                 {/* movement stated factually; no model-synthesis prose is fabricated */}
@@ -616,7 +616,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 7, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                          <span style={serif(19, 500, INK1)}>{m.name}</span>
+                          <Link to={`/hcp/${m.hcpId}`} style={{ ...serif(19, 500, INK1), textDecoration: "none", borderBottom: `1px solid ${HAIR}` }}>{m.name}</Link>
                           <span style={mono(11, 400, STEEL)}>{m.institution ?? "—"}{m.state ? ` · ${m.state}` : ""}</span>
                         </div>
                         <p style={{ margin: 0, ...serif(15, 300, MID2, 1.55) }}>Index {fmtIdx(m.idxWas)} → {fmtIdx(m.idxNow)} since 8 Jun.</p>

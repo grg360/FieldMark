@@ -232,12 +232,18 @@ async function enrichAndMapCohortRows(
     signal_strength: string | null;
   }>();
 
+  // Cohort-keyed narratives (2026-08-06): a dual-board member holds one row per
+  // cohort, so the card feed reads the row for the cohort it is rendering.
+  // "rising_composite" is the AD rising model — its narratives are rising rows.
+  const narrativeCohort = cohort === "rising_composite" ? "rising_star" : cohort;
+
   if (narrativeIds.length > 0) {
     const { data: taNarratives, error: taNarrError } = await supabase
       .from("hcp_narratives_v2")
       .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, therapeutic_area_slug")
       .in("hcp_id", narrativeIds)
-      .eq("therapeutic_area_slug", taSlug);
+      .eq("therapeutic_area_slug", taSlug)
+      .eq("cohort", narrativeCohort);
 
     if (taNarrError) {
       return { rows: [], error: `Narrative query failed: ${taNarrError.message}` };
@@ -258,6 +264,7 @@ async function enrichAndMapCohortRows(
         .from("hcp_narratives_v2")
         .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at")
         .in("hcp_id", missingIds)
+        .eq("cohort", narrativeCohort)
         .order("generated_at", { ascending: false });
 
       if (fbError) {
@@ -1099,11 +1106,16 @@ export async function getHCPNarrative(
     const taSlug = resolveTASlug(therapeuticArea);
 
     if (taSlug) {
+      // Cohort-keyed table (2026-08-06): a dual-board member holds one row per
+      // cohort, so this generic reader takes the newest — maybeSingle() on
+      // (hcp, slug) alone would error on multi-row.
       const { data, error } = await supabase
         .from("hcp_narratives_v2")
         .select("narrative_text")
         .eq("hcp_id", hcpId)
         .eq("therapeutic_area_slug", taSlug)
+        .order("generated_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) {
@@ -1645,6 +1657,10 @@ export async function getHCPDetail(
       .select("narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug")
       .eq("hcp_id", hcpId)
       .eq("therapeutic_area_slug", narrativeTaSlug)
+      // Cohort-keyed table (2026-08-06): newest row wins in this generic
+      // reader; maybeSingle() alone would error on a dual-board member.
+      .order("generated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     const medicarePromise = supabase

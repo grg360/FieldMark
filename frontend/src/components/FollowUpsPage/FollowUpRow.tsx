@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { FollowUpRow as FollowUpRowType } from "../../lib/home";
 import type { Priority } from "../../lib/relationships";
 import { formatRelative } from "../FieldInsights/dateFormat";
@@ -146,9 +147,12 @@ export default function FollowUpRow({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: sourceConfig ? 8 : 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", lineHeight: 1.3 }}>
+          <Link
+            to={`/hcp/${row.hcp.hcp_id}`}
+            style={{ display: "inline-block", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "#F2F0EA", lineHeight: 1.3, textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.14)" }}
+          >
             {row.hcp.name}
-          </div>
+          </Link>
           {row.hcp.institution ? (
             <div style={{ fontSize: 12, color: "#9B9892", marginTop: 2 }}>
               {row.hcp.institution}

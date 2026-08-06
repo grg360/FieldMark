@@ -522,7 +522,7 @@ def merge_record_into_survivor(
         # --- Moved from tables_simple: composite-key uniques on the hcp_id FK
         #     column caused UniqueViolation on plain re-point (crash on merge). ---
         ("publication_authors_v2", "hcp_id", ["publication_id"]),
-        ("hcp_narratives_v2", "hcp_id", ["therapeutic_area_slug"]),
+        ("hcp_narratives_v2", "hcp_id", ["therapeutic_area_slug", "cohort"]),
         ("hcp_openalex_authors_v2", "hcp_id", ["openalex_author_id"]),
         ("dol_matches_v2", "hcp_id", ["social_user_id"]),
         ("hcp_affiliation_profile_v2", "hcp_id", []),  # hcp_id-alone unique

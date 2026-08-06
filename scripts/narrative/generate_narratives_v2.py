@@ -80,7 +80,12 @@ PROMPT_VERSION = "v1.0"
 # counts with years, collaborator expansion, citation growth, therapeutic focus,
 # and authorship trajectory as a direction, not a percentage.
 ESTABLISHED_PROMPT_VERSION = "established_v3.0"
-RISING_STAR_PROMPT_VERSION = "rising_star_v4.0"
+# v4.1 (2026-08-06): archetype vocabulary removed (retired with the board
+# rebuild — the ranks column is NULL for every row, and v4.0's 'Emerging
+# Leader' fallback fabricated a label for all 619); window labels read the
+# recorded rolling ranges instead of the fixed 2016-2020/2021-2025 constants;
+# authorship direction reworded as window claims, not career claims.
+RISING_STAR_PROMPT_VERSION = "rising_star_v4.1"
 ANTHROPIC_VERSION = "2023-06-01"
 
 # Pricing (per million tokens) — Sonnet 4.6
@@ -478,6 +483,10 @@ def fetch_rising_star_v3_context_rows(
             sm.authorship_progression_delta,
             sm.early_senior_author_pct,
             sm.recent_senior_author_pct,
+            sm.early_window_start,
+            sm.early_window_end,
+            sm.recent_window_start,
+            sm.recent_window_end,
             sm.enrichment_run_id,
             nm.early_collaborator_count,
             nm.recent_collaborator_count
@@ -1287,14 +1296,18 @@ def freshness_filter(
         ta_id = ctx.therapeutic_area_id
         ta_slug = ta_slug_from_name(ta_name_map.get(ta_id))
         try:
-            narr_resp = (
+            narr_query = (
                 supabase.table(narratives_table)
                 .select("generated_at")
                 .eq("hcp_id", ctx.hcp_id)
                 .eq("therapeutic_area_slug", ta_slug)
-                .limit(1)
-                .execute()
             )
+            if target_version == "v2":
+                # Cohort key (2026-08-06): freshness is judged against the SAME
+                # cohort's narrative — a dual-board member's fresh rising row
+                # must not suppress regeneration of their established row.
+                narr_query = narr_query.eq("cohort", ctx.cohort_classification)
+            narr_resp = narr_query.limit(1).execute()
             narr_rows = narr_resp.data or []
             if not narr_rows:
                 kept.append(ctx)
@@ -1683,26 +1696,52 @@ Output ONLY the JSON object. No code fences. No commentary.
 
 
 def _authorship_direction(v3: Dict[str, Any]) -> str:
-    """Authorship trajectory as a DIRECTION, never a percentage.
+    """Authorship trajectory as a DIRECTION between the two windows — never a
+    percentage, never a career claim.
 
     early/recent_senior_author_pct are 0-1 fractions. The old prompt rendered
     them through format_display_int, which floored small fractions to 0 and
     produced false "0% senior share" claims in prose (the Aditi Singh case:
     3.85% rendered as 0%). Direction words are both durable and honest.
+
+    Window claims, not career claims (2026-08-06): under the rolling regime
+    the windows cover only the trailing 120 months, so "no senior-authored
+    output yet" and "first senior-authored output has appeared" asserted
+    career facts the data cannot support — an HCP may have senior papers
+    before the early window opens. Every phrase now claims only what the two
+    windows show, matching the rebuilt board's badge wording (zero early /
+    >= 3 recent, "worded as a window claim, not a career claim").
     """
     early = safe_float(v3.get("early_senior_author_pct"))
     recent = safe_float(v3.get("recent_senior_author_pct"))
     if recent is None:
         return "unknown"
     if recent == 0:
-        return "no senior-authored output yet"
+        if early is not None and early > 0:
+            return "senior-authored output in the early window has not continued into the recent window"
+        return "no senior-authored output in either window"
     if early is None or early == 0:
-        return "first senior-authored output has appeared in the recent window"
+        return "senior-authored output appears in the recent window but not the early window"
     if recent - early > 0.02:
-        return "moving toward senior authorship"
+        return "senior-author share rising between the two windows"
     if early - recent > 0.02:
-        return "senior-author share receding"
-    return "senior-author share steady"
+        return "senior-author share lower in the recent window than the early"
+    return "senior-author share steady across the two windows"
+
+
+def _window_label(start: Any, end: Any, fallback: str) -> str:
+    """Render a recorded rolling-window range as 'Aug 2016 – Jul 2021'.
+
+    The rolling regime (2026-08-05) records each run's actual month-boundary
+    ranges on hcp_scientific_momentum_v1; rows predating it carry NULLs and
+    fall back to a plain window name rather than a fabricated year span.
+    """
+    try:
+        if start and end:
+            return f"{start.strftime('%b %Y')} – {end.strftime('%b %Y')}"
+    except AttributeError:
+        pass
+    return fallback
 
 
 def _rising_signal_tier(v3: Dict[str, Any]) -> str:
@@ -1718,7 +1757,7 @@ def _rising_signal_tier(v3: Dict[str, Any]) -> str:
 
 
 def build_prompt_rising_star(ctx: HCPContext) -> str:
-    """Prompt for Rising Star cohort -- v4 durable-facts revision.
+    """Prompt for Rising Star cohort -- v4.1 rolling-window revision.
 
     v4.0 (2026-08-05, supersedes the frozen v3.4 text): ranks and percentiles
     are REMOVED from the data block and FORBIDDEN in prose. The profile header
@@ -1727,6 +1766,15 @@ def build_prompt_rising_star(ctx: HCPContext) -> str:
     repeats them goes stale on the next scoring recompute (audit 2026-08-05:
     0 of 99 quoted global ranks still exact). signal_strength is computed in
     code from the percentile, so the model never sees a rankable number.
+
+    v4.1 (2026-08-06): archetypes were retired with the board rebuild
+    (ba84d41) — the column is NULL for all 619 rows, so the old prompt's
+    `or 'Emerging Leader'` fallback stamped a fabricated label on every
+    narrative and instructed the model to cite it. The archetype line and its
+    instruction are gone. Window labels now come from the recorded rolling
+    ranges (early/recent_window_* on hcp_scientific_momentum_v1) instead of
+    the hardcoded 2016-2020 / 2021-2025 constants the rolling regime replaced,
+    and the authorship direction speaks in window claims, not career claims.
     """
     # AD forks to the Emergence/Network composite prompt (untouched pending the
     # community/evidence-tier decision); all other TAs use v4 below.
@@ -1739,6 +1787,12 @@ def build_prompt_rising_star(ctx: HCPContext) -> str:
 
     signal_tier = _rising_signal_tier(v3)
     authorship_dir = _authorship_direction(v3)
+    early_win = _window_label(
+        v3.get("early_window_start"), v3.get("early_window_end"), "early five-year window"
+    )
+    recent_win = _window_label(
+        v3.get("recent_window_start"), v3.get("recent_window_end"), "recent five-year window"
+    )
 
     return f"""You are writing a structured narrative for an MSL describing why a
 Healthcare Professional is classified as a Rising Star in the
@@ -1756,14 +1810,15 @@ below are what you may cite.
 HCP: {ctx.first_name or ''} {ctx.last_name or ''}
 Institution: {ctx.institution or 'Unknown'}
 Career years: {career_years}
-Archetype: {v3.get('archetype') or 'Emerging Leader'}
 
-DURABLE FACTS (two fixed windows; these do not change between recomputes):
-  Publications: {format_display_int(v3.get('early_total_pubs'))} (2016-2020) -> {format_display_int(v3.get('recent_total_pubs'))} (2021-2025)
+DURABLE FACTS (two rolling five-year comparison windows; always cite these
+figures WITH their window dates, so the claim stays true after the windows
+roll forward):
+  Publications: {format_display_int(v3.get('early_total_pubs'))} ({early_win}) -> {format_display_int(v3.get('recent_total_pubs'))} ({recent_win})
   Publication velocity delta: {format_signed_int(v3.get('pub_velocity_delta'))}
   Citation volume growth: {format_signed_int(v3.get('citation_velocity_delta'))}
   Authorship trajectory: {authorship_dir}
-  Collaborators: {format_display_int(v3.get('early_collaborator_count'))} (2016-2020) -> {format_display_int(v3.get('recent_collaborator_count'))} (2021-2025)
+  Collaborators: {format_display_int(v3.get('early_collaborator_count'))} ({early_win}) -> {format_display_int(v3.get('recent_collaborator_count'))} ({recent_win})
 
 Return STRICT JSON with exactly these fields, no additional fields,
 no preamble, no markdown fences:
@@ -1781,17 +1836,17 @@ Field instructions:
 narrative: 3-5 sentences, max 110 words. Plain professional English
 for an MSL audience. Anchor every claim in a specific number from
 the DURABLE FACTS above — publication counts with their window
-years, collaborator counts, citation growth. Where a growth ratio
+dates, collaborator counts, citation growth. Where a growth ratio
 is striking (>=3x), describe it proportionally as well as in raw
 counts (e.g., "publication output increased more than eight-fold,
 from 6 to 49 papers" rather than only "from 6 to 49"). Describe
-authorship as the direction given above, never as a percentage.
-Reference the archetype EXPLICITLY at least once in the narrative
--- either in the opening identification ("X is a Scientific
-Accelerator in NSCLC...") or in the interpretation ("This profile
-is characteristic of a Balanced Rising Star..."). Do NOT use
-marketing words ("trajectory," "ascent," "leadership in the
-making," "exceptional," "monster"). End with a MILESTONE-FOCUSED
+authorship as the direction given above, never as a percentage —
+and keep it a claim about the two windows, never a career-total
+claim. Open by identifying the person as a rising
+{ctx.therapeutic_area_name} investigator; never use "established",
+"recognized authority," or any label not present in the facts
+above. Do NOT use marketing words ("trajectory," "ascent,"
+"leadership in the making," "exceptional," "monster"). End with a MILESTONE-FOCUSED
 forward-looking statement that names a specific observable event
 rather than predicting an outcome. Use constructions like "A
 transition into X would represent the next milestone..." or "First
@@ -2096,6 +2151,12 @@ def upsert_narrative(
         row = {
             "hcp_id": ctx.hcp_id,
             "therapeutic_area_slug": ctx.therapeutic_area_slug,
+            # Cohort key (2026-08-06): cohort is part of the unique key, so a
+            # dual-board member holds BOTH a rising and an established narrative
+            # — a rising run can no longer overwrite established prose (78
+            # NSCLC dual-board members lost theirs to the 2026-08-06 batch).
+            # Each reader RPC selects by the spine it renders.
+            "cohort": ctx.cohort_classification,
             "narrative_text": output["narrative"],
             "why_now": output.get("why_now"),
             "engagement_angle": output.get("engagement_angle"),
@@ -2107,7 +2168,7 @@ def upsert_narrative(
             "source_enrichment_run_id": source_run_id,
         }
         narratives_table = "hcp_narratives_v2"
-        on_conflict = "hcp_id,therapeutic_area_slug"
+        on_conflict = "hcp_id,therapeutic_area_slug,cohort"
     else:
         row = {
             "hcp_id": ctx.hcp_id,

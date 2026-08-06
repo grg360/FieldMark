@@ -15,7 +15,7 @@
 //   • Empty until an MSL logs something — absence states the fact, never blank.
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getFieldInsightsForCurrentUser, formatHcpDisplayName, formatInsightDate, type FieldInsight } from "../lib/fieldInsights";
 import { CATEGORY_LABELS, type InsightCategory } from "../lib/insightCategories";
 import { FONT, GROUND, LINE, COOL, WARM, GOLD } from "../lib/designTokens";
@@ -62,7 +62,7 @@ const catLabel = (c: InsightCategory | null) =>
 type GroupBy = "hcp" | "category" | "date";
 const MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
-interface Group { key: string; title: string; meta: string; items: FieldInsight[]; }
+interface Group { key: string; title: string; meta: string; items: FieldInsight[]; hcpId?: string; }
 
 export default function FieldInsightsScreen() {
   const navigate = useNavigate();
@@ -198,7 +198,13 @@ export default function FieldInsightsScreen() {
             {groups.map((g) => (
               <section key={g.key} style={{ marginBottom: 46 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 16, paddingBottom: 10, borderBottom: `1px solid ${LINE.l0}`, marginBottom: 16 }}>
-                  <span style={{ font: `400 21px/1.15 ${SERIF}`, color: WARM.prose }}>{g.title}</span>
+                  {/* HCP-grouped section titles link to the profile; category/date
+                      groupings have no hcp_id and stay plain text. */}
+                  {g.hcpId ? (
+                    <Link to={`/hcp/${g.hcpId}`} style={{ font: `400 21px/1.15 ${SERIF}`, color: WARM.prose, textDecoration: "none", borderBottom: `1px solid ${LINE.l2}` }}>{g.title}</Link>
+                  ) : (
+                    <span style={{ font: `400 21px/1.15 ${SERIF}`, color: WARM.prose }}>{g.title}</span>
+                  )}
                   <span style={{ flex: 1 }} />
                   <span style={mono(10, COOL.label, 0.14)}>{g.meta}</span>
                 </div>
@@ -325,7 +331,7 @@ function buildGroups(items: FieldInsight[], gb: GroupBy): Group[] {
     (m.get(name) ?? m.set(name, []).get(name)!).push(i);
   }
   return [...m.entries()]
-    .map(([name, v]) => ({ key: name, title: name, meta: `${v.length} INSIGHT${v.length === 1 ? "" : "S"} · LATEST ${formatInsightDate(v[0].occurred_at).toUpperCase()}`, items: v }))
+    .map(([name, v]) => ({ key: name, title: name, meta: `${v.length} INSIGHT${v.length === 1 ? "" : "S"} · LATEST ${formatInsightDate(v[0].occurred_at).toUpperCase()}`, items: v, hcpId: v[0].hcp_id ? String(v[0].hcp_id) : undefined }))
     .sort((a, b) => b.items.length - a.items.length);
 }
 

@@ -21,6 +21,7 @@ from typing import Dict, List
 from dotenv import load_dotenv
 
 from generate_narratives_v2 import (
+    ESTABLISHED_PROMPT_VERSION,
     HCPContext,
     build_prompt_established,
     fetch_established_v3_context_rows,
@@ -147,18 +148,22 @@ def main() -> None:
                 upsert_payload = {
                     "hcp_id": hcp_id,
                     "therapeutic_area_slug": ctx.therapeutic_area_slug or "nsclc",
+                    # Cohort key (2026-08-06): this script generates Established
+                    # narratives; stamp the row so it lands on the established
+                    # slot instead of clobbering another cohort's prose.
+                    "cohort": "established",
                     "narrative_text": result.get("narrative"),
                     "why_now": result.get("why_now"),
                     "engagement_angle": result.get("engagement_angle"),
                     "signal_strength": result.get("signal_strength"),
                     "caution_flags": caution_payload,
-                    "prompt_version": "v1.0",
+                    "prompt_version": ESTABLISHED_PROMPT_VERSION,
                     "model_used": "claude-sonnet-4-6",
                     "generated_at": "now()",
                 }
                 upsert_resp = supabase.table("hcp_narratives_v2").upsert(
                     upsert_payload,
-                    on_conflict="hcp_id,therapeutic_area_slug",
+                    on_conflict="hcp_id,therapeutic_area_slug,cohort",
                 ).execute()
                 if getattr(upsert_resp, "data", None):
                     print(f"  [WROTE narrative for {hcp_id}]")

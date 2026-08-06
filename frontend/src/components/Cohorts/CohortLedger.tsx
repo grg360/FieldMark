@@ -335,7 +335,15 @@ function Row({
         {/* name + chips + summary */}
         <div style={{ flex: 1, minWidth: 300, paddingRight: 24, display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-            <span style={{ ...serif(17, 500), color: P.ink0, letterSpacing: "-.005em" }}>{row.name}</span>
+            {/* Name links to the profile; the row's own onClick toggles the drawer,
+                so stop propagation here. The row also keeps its OPEN ↗ affordance. */}
+            <Link
+              to={`/hcp/${row.hcpId}`}
+              onClick={stop}
+              style={{ ...serif(17, 500), color: P.ink0, letterSpacing: "-.005em", textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}` }}
+            >
+              {row.name}
+            </Link>
             {/* archetype chip — Rising Star only, a physician attribute inline with the name */}
             {row.archetype ? (
               <span style={{ ...mono(9, 500), color: P.ink3, letterSpacing: ".1em", padding: "1px 6px", border: `1px solid ${P.lineStrong}`, borderRadius: 2, alignSelf: "center" }}>
@@ -511,7 +519,7 @@ function MobileRow({
 
         {/* name + archetype + meta */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ ...serif(16, 500), color: P.ink0 }}>{row.name}</span>
+          <Link to={`/hcp/${row.hcpId}`} onClick={stop} style={{ ...serif(16, 500), color: P.ink0, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}` }}>{row.name}</Link>
           {row.archetype ? (
             <span style={{ ...mono(8.5, 500), color: P.ink3, letterSpacing: ".08em", padding: "1px 5px", border: `1px solid ${P.lineStrong}`, borderRadius: 2 }}>{row.archetype.toUpperCase()}</span>
           ) : null}

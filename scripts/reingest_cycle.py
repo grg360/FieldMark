@@ -392,8 +392,10 @@ def cmd_narratives(slug: str, cohort: str, top_flag: str) -> List[str]:
     # DELIBERATELY not regenerated here -- its generation cut follows rank while
     # the community ledger now sorts by evidence tier; regenerating on the rank
     # cut would entrench a selection the product no longer uses (open decision).
-    # --force: prompt v4.0/v3.0 forbid rank/percentile prose; existing rows must
-    # be overwritten, not skipped. --yes: unattended (stdin=DEVNULL). --workers 6:
+    # --force: prompt v4.1/v3.0 forbid rank/percentile prose; existing rows must
+    # be overwritten, not skipped. Since the 2026-08-06 cohort key, 13a and 13b
+    # write to separate (hcp, slug, cohort) rows — a dual-board member keeps
+    # both narratives. --yes: unattended (stdin=DEVNULL). --workers 6:
     # parallel API calls; generate_narratives_v2 retries 429/529 with backoff.
     return py("narratives") + [
         "--cohort", cohort, top_flag, "200",

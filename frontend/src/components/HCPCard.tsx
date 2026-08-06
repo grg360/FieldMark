@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { HCP } from "../data/hcpData";
 import { useRelationships } from "../contexts/RelationshipsContext";
@@ -802,7 +802,13 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap", minWidth: 0 }}>
-            <span
+            {/* Name is a real anchor to the profile — the whole card also navigates
+                there, but the anchor adds open-in-new-tab, keyboard focus and
+                middle-click. Same destination, so stop propagation to avoid a
+                double navigation. Visually identical to the prior span. */}
+            <Link
+              to={hcpId ? `/hcp/${hcpId}` : "#"}
+              onClick={(e) => e.stopPropagation()}
               style={{
                 fontSize: 21,
                 fontWeight: 600,
@@ -815,10 +821,11 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                textDecoration: "none",
               }}
             >
               {hcp.name}
-            </span>
+            </Link>
             {countryCode && (
               // Flag emoji per the List mockup (it shows 🇺🇸, not a mono country code).
               <img
