@@ -5,9 +5,11 @@ import { track } from "../../lib/analytics";
 import {
   createNote,
   updateNote,
+  getBeliefClaims,
   type InteractionType,
   type InsightStrength,
   type Note,
+  type BeliefClaimOption,
 } from "../../lib/relationships";
 import {
   INSIGHT_CATEGORIES,
@@ -162,6 +164,12 @@ export default function InsightComposer({
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Belief-claim link: the HCP's sourced positions to anchor this insight to.
+  // Empty for most HCPs (community/practice have none) — the picker states that.
+  const [beliefClaims, setBeliefClaims] = useState<BeliefClaimOption[] | null>(null);
+  const [selectedClaimKey, setSelectedClaimKey] = useState<string | null>(
+    editingNote?.belief_claim_key ?? null,
+  );
   const handlersRef = useRef<{ save: () => Promise<void>; cancel: () => void }>({
     save: async () => {},
     cancel: () => {},
@@ -177,6 +185,15 @@ export default function InsightComposer({
   useEffect(() => {
     if (forceExpanded) setExpanded(true);
   }, [forceExpanded]);
+
+  // Load the HCP's belief claims once the form is open (deferred so the collapsed
+  // capture line stays cheap). Fetched per HCP; [] when there are no positions.
+  useEffect(() => {
+    if (!showForm || beliefClaims !== null) return;
+    let cancelled = false;
+    getBeliefClaims(hcpId).then((c) => { if (!cancelled) setBeliefClaims(c); });
+    return () => { cancelled = true; };
+  }, [showForm, hcpId, beliefClaims]);
 
   useEffect(() => {
     autoGrowTextarea(bodyRef.current);
@@ -278,6 +295,7 @@ export default function InsightComposer({
           interactionTypeOtherLabel: interactionType === "other" && trimmedInteractionOther.length > 0 ? trimmedInteractionOther : null,
         });
       } else {
+        const linkedClaim = beliefClaims?.find((c) => c.claimKey === selectedClaimKey) ?? null;
         await createNote(userId, {
           hcpId,
           body: trimmed,
@@ -289,6 +307,8 @@ export default function InsightComposer({
           insightCategoryOtherLabel: insightCategory === "other" ? trimmedCategoryOther : null,
           whyItMatters: trimmedWhy.length > 0 ? trimmedWhy : null,
           interactionTypeOtherLabel: interactionType === "other" && trimmedInteractionOther.length > 0 ? trimmedInteractionOther : null,
+          beliefClaimKey: linkedClaim?.claimKey ?? null,
+          beliefClaimTitle: linkedClaim?.theme ?? null,
         });
         // Fires only on a successful NEW insight (createNote resolved). Enums only —
         // never the note body or the free-text "other" labels.
@@ -306,6 +326,7 @@ export default function InsightComposer({
       setInteractionType("general");
       setInteractionTypeOtherLabel("");
       setInsightStrength("routine");
+      setSelectedClaimKey(null);
       setDateValue(toDateInputValue(new Date().toISOString()));
       setShowDatePicker(false);
       setExpanded(false);
@@ -453,6 +474,49 @@ export default function InsightComposer({
           }}
         />
       </div>
+
+      {/* Link a sourced position — anchors this insight to a belief claim on the
+          profile. Writes belief_claim_key (matching the rendered claim-<key>
+          target). Empty for HCPs with no positions, stated honestly. */}
+      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
+        Link a position <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+      </div>
+      {beliefClaims === null ? (
+        <div style={{ fontSize: 12, color: "#6B6A65" }}>Loading positions…</div>
+      ) : beliefClaims.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#6B6A65", lineHeight: 1.45 }}>
+          No sourced positions on file — this insight won't link to a belief.
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8, lineHeight: 1.4 }}>
+            If the conversation related to one of this HCP's published positions, link it — the insight will point at that position on the belief profile.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {beliefClaims.map((claim) => {
+              const selected = selectedClaimKey === claim.claimKey;
+              return (
+                <button
+                  key={claim.claimKey}
+                  type="button"
+                  onClick={() => setSelectedClaimKey(selected ? null : claim.claimKey)}
+                  title={claim.summary ?? undefined}
+                  style={{
+                    ...pillBase,
+                    textTransform: "none",
+                    backgroundColor: selected ? "rgba(155,109,255,0.16)" : "#1E1E22",
+                    color: selected ? "#B89BFF" : "#9B9892",
+                    border: selected ? "1px solid rgba(155,109,255,0.5)" : "1px solid transparent",
+                    fontWeight: selected ? 600 : 400,
+                  }}
+                >
+                  {claim.theme}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
         Category <span style={{ color: "#E8704E" }}>*</span>

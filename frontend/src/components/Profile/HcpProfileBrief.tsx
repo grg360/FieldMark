@@ -153,7 +153,13 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
   const fullPapers = pos.paper_count ?? railPubs;
   const basisN = railPubs || fullPapers;
   return (
-    <div style={{ borderTop: `1px solid ${P.line}`, padding: "14px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+    <div
+      // Scroll anchor a field insight's belief_claim_key deep-links to
+      // (InsightCard's goToClaim → getElementById(`claim-<key>`)). scrollMarginTop
+      // keeps the landed claim clear of the sticky chrome.
+      id={pos.claim_key ? `claim-${pos.claim_key}` : undefined}
+      style={{ borderTop: `1px solid ${P.line}`, padding: "14px 0", display: "flex", flexDirection: "column", gap: 8, scrollMarginTop: 96 }}
+    >
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <span style={{ ...serif(16, 600), color: P.ink0 }}>{pos.theme}</span>
         {single ? <span style={{ ...mono(8, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span> : null}
@@ -335,6 +341,13 @@ export default function HcpProfileBrief() {
             by the shared component; community passes no variant so it is unchanged. ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead id="field" tag="FIELD INSIGHTS" count={`${notes.length} CAPTURED · MSL-ENTERED`} sub="TEAM OBSERVATION · NEVER A SCORED POSITION" />
+          {/* Deep-link into the full Field Insights surface, scoped to this HCP —
+              the surface is otherwise reachable only from a below-the-fold Home link. */}
+          {notes.length > 0 ? (
+            <Link to={`/me/insights?hcp=${p.hcp.id}`} style={{ ...mono(9.5, 500), letterSpacing: ".12em", color: P.ink4, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}`, alignSelf: "flex-start" }}>
+              ALL FIELD INSIGHTS ON {p.hcp.name.toUpperCase()} ↗
+            </Link>
+          ) : null}
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
             <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" hideHeader />
           </div>
@@ -413,6 +426,15 @@ export default function HcpProfileBrief() {
               for Heymach). The true distinct-publication footprint is record_depth.papers
               (10). Relabel to PUBLICATIONS so the header agrees with the per-card BASIS. */}
           <SectionHead id="belief-profile" tag="BELIEF PROFILE" count={`${nPos} POSITION${nPos === 1 ? "" : "S"} · ${p.record_depth.papers} PUBLICATION${p.record_depth.papers === 1 ? "" : "S"} · ALL PUBLISHED`} sub="POSITIONS DESCRIBE THE PUBLISHED WORK · NOT THE PERSON" />
+          {/* A section that shows a subset offers the full set — same principle as
+              FIELD INSIGHTS → /me/insights. The header ALL POSITIONS button and this
+              are both routes to the full positions page; the section-level link is the
+              one a reader in the positions finds. */}
+          {nPos > 0 ? (
+            <Link to={`/hcp/${p.hcp.id}/positions`} style={{ ...mono(9.5, 500), letterSpacing: ".12em", color: P.ink4, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}`, alignSelf: "flex-start" }}>
+              ALL {nPos} POSITION{nPos === 1 ? "" : "S"} ↗
+            </Link>
+          ) : null}
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
             {/* synthesis paragraph or its withheld state */}
             {hasSynthPara ? (

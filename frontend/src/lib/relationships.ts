@@ -713,6 +713,36 @@ export interface CreateNoteParams {
   insightCategoryOtherLabel?: string | null;
   whyItMatters?: string | null;
   interactionTypeOtherLabel?: string | null;
+  // Optional belief-claim link: when the MSL anchors the insight to one of the
+  // HCP's sourced positions in the composer, both come from hcp_belief_claims
+  // (key computed server-side, so it matches the profile's claim-<key> target).
+  beliefClaimKey?: string | null;
+  beliefClaimTitle?: string | null;
+}
+
+/** A belief claim available to link an insight to (from hcp_belief_claims).
+ *  Empty for HCPs with no sourced positions — most of them. */
+export interface BeliefClaimOption {
+  theme: string;
+  summary: string | null;
+  claimKey: string;
+  paperCount: number | null;
+  positionCount: number | null;
+}
+
+export async function getBeliefClaims(hcpId: string): Promise<BeliefClaimOption[]> {
+  const { data, error } = await supabase.rpc("hcp_belief_claims", { p_hcp_id: hcpId });
+  if (error || !data) {
+    if (error) console.warn("getBeliefClaims failed", error);
+    return [];
+  }
+  return (data as Array<Record<string, unknown>>).map((c) => ({
+    theme: String(c.theme ?? ""),
+    summary: c.summary == null ? null : String(c.summary),
+    claimKey: String(c.claim_key ?? ""),
+    paperCount: c.paper_count == null ? null : Number(c.paper_count),
+    positionCount: c.position_count == null ? null : Number(c.position_count),
+  })).filter((c) => c.claimKey.length > 0);
 }
 
 export interface UpdateNoteParams {
@@ -751,6 +781,8 @@ export async function createNote(userId: string, params: CreateNoteParams): Prom
       insight_category_other_label?: string | null;
       why_it_matters?: string | null;
       interaction_type_other_label?: string | null;
+      belief_claim_key?: string | null;
+      belief_claim_title?: string | null;
     } = {
       relationship_id: relationship.id,
       user_id: userId,
@@ -777,6 +809,12 @@ export async function createNote(userId: string, params: CreateNoteParams): Prom
     }
     if (params.interactionTypeOtherLabel !== undefined) {
       insertPayload.interaction_type_other_label = params.interactionTypeOtherLabel;
+    }
+    // Belief-claim link (both or neither): the key must match a rendered
+    // claim-<key> target, so only set it alongside the title from the picker.
+    if (params.beliefClaimKey) {
+      insertPayload.belief_claim_key = params.beliefClaimKey;
+      insertPayload.belief_claim_title = params.beliefClaimTitle ?? null;
     }
 
     const { data, error } = await supabase

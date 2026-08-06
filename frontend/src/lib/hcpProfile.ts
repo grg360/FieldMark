@@ -34,6 +34,9 @@ export interface ProfilePosition {
   paper_count: number | null; // supporting_paper_count — 1 ⇒ SINGLE SOURCE
   confidence: number | null;
   categories: string[] | null;
+  // Belief-claim key (sha256 over hcp_id + representative position ids), the
+  // scroll-anchor id a field insight's belief_claim_key points at.
+  claim_key: string | null;
   sources: ProfileSource[] | null; // real citation rows (distinct papers)
 }
 
