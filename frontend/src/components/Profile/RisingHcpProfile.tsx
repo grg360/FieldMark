@@ -258,7 +258,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             {dual ? ` · EST #${p.established_us!.rank} US` : ""}
           </div>
           <div style={{ color: LINE.l2, fontSize: 9 }}>›</div>
-          <div onClick={() => navigate("/rising")} style={{ cursor: "pointer", ...mono(9, GREEN_DK) }}>↑ BACK TO RISING LEDGER</div>
+          <div onClick={() => navigate("/cohorts/ledger/rising-stars")} style={{ cursor: "pointer", ...mono(9, GREEN_DK) }}>↑ BACK TO RISING LEDGER</div>
         </div>
 
         {/* hero */}
