@@ -242,7 +242,9 @@ export default function HomePage() {
                 { value: String(stats.overdue), label: "FOLLOW-UPS OVERDUE", valueColor: RED },
                 { value: String(stats.total), label: "FOLLOW-UPS OPEN" },
                 { value: String(trackedCount), label: "PORTFOLIO TRACKED", onClick: go.watchlists },
-                { value: `${coverage?.coverage_percentage ?? 0}%`, label: "RISING COVERED", gold: true, foot: coverage ? `${coverage.tracked_count} OF ${coverage.total_rising_stars_in_territory}` : undefined },
+                // A fact, not an achievement metric (2026-08-05): the old
+                // percentage moved 25 points when the board was re-gated.
+                { value: coverage ? `${coverage.tracked_count} OF ${coverage.total_rising_stars_in_territory}` : "0 OF 0", label: "TERRITORY RISING TRACKED" },
               ]}
             />
           </div>
@@ -383,10 +385,9 @@ export default function HomePage() {
                     <span style={mono(36, 400, INK1)}>{coverage?.tracked_count ?? 0}</span>
                     <span style={serif(14, 300, MID, 1.3)}>of {coverage?.total_rising_stars_in_territory ?? 0} rising stars tracked</span>
                   </div>
-                  <div style={{ height: 3, background: BORDER }}><div style={{ width: `${coverage?.coverage_percentage ?? 0}%`, height: 3, background: GOLD }} /></div>
+
                   <div style={{ display: "flex", justifyContent: "space-between", ...mono(10, 400, DIM, ".1em") }}>
-                    <span>COVERAGE {coverage?.coverage_percentage ?? 0}%</span>
-                    <span>{Math.max(0, (coverage?.total_rising_stars_in_territory ?? 0) - (coverage?.tracked_count ?? 0))} OPPORTUNITIES REMAINING</span>
+                    <span>{Math.max(0, (coverage?.total_rising_stars_in_territory ?? 0) - (coverage?.tracked_count ?? 0))} IN TERRITORY UNTRACKED</span>
                   </div>
                 </div>
 

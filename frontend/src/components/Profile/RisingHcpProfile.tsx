@@ -456,7 +456,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               <div style={mono(8, GREEN_DK, 0.11)}>SEE POSITION ↗</div>
             </div>
             <div style={{ flex: 1, minWidth: 120 }} />
-            <div style={{ ...mono(8, DIM2, 0.1), maxWidth: 400, lineHeight: 1.7 }}>
+            <div style={{ ...mono(8, DIM2, 0.1), maxWidth: 480, lineHeight: 1.7 }}>
               EACH COMPONENT IS THE MEAN OF ITS TWO PERCENTILES · COMPOSITE IS THE RANK-NORMALISED BLEND · COVERAGE 100% ACROSS THE RISING BOARD
             </div>
           </div>
@@ -483,7 +483,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 <div style={{ marginTop: 7, ...mono(8, MUT2, 0.13), whiteSpace: "nowrap" }}>ESTABLISHED RANK · DESTINATION REACHED IN PART</div>
               </div>
             </div>
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${RULE}`, ...serif(13, SERIF_INK), maxWidth: 880 }}>
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${RULE}`, ...serif(13, SERIF_INK), maxWidth: 1040 }}>
               US established rank {p.established_us!.rank.toLocaleString("en-US")} says this physician is already inside the
               destination the rising board measures trajectory toward. That is a stronger claim than either number alone,
               and it is why rising wins the route: the established rank belongs on this surface as a section rather than
@@ -504,7 +504,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               <div style={mono(12, MUT, 0.14, 500)}>NOT ON THE ESTABLISHED BOARD</div>
               <div style={{ padding: "3px 7px", border: `1px solid ${LINE.l2}`, ...mono(8, MUT, 0.11, 500) }}>RISING-ONLY · NO ESTABLISHED RANK</div>
             </div>
-            <div style={{ marginTop: 14, ...serif(13, INK2), maxWidth: 860 }}>
+            <div style={{ marginTop: 14, ...serif(13, INK2), maxWidth: 1020 }}>
               {p.established_global
                 ? `Ranked on the global established board (rank ${p.established_global.rank.toLocaleString("en-US")}) but not US-scoped. The rising surface is the primary record for this profile.`
                 : "No established rank in NSCLC. For rising-only physicians this surface is the whole record — nothing is routed elsewhere and no established section renders."}
@@ -517,7 +517,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           right="GENERATED SYNTHESIS · STAMPED WITH THE DATA RUN IT READ" />
         {p.narrative?.narrative_text ? (
           <Card style={{ padding: "20px 22px" }}>
-            <div style={{ ...serif(13.5, SERIF_INK), textWrap: "pretty", maxWidth: 900 } as CSSProperties}>
+            <div style={{ ...serif(13.5, SERIF_INK), textWrap: "pretty", maxWidth: 1060 } as CSSProperties}>
               {p.narrative.narrative_text}
             </div>
             <div style={{ marginTop: 16, ...mono(8, FAINT, 0.12), lineHeight: 1.6 }}>
@@ -530,7 +530,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         ) : (
           <Card style={{ padding: "20px 22px" }}>
             <div style={mono(12, MUT, 0.14, 500)}>NO NARRATIVE GENERATED AT THIS RANK</div>
-            <div style={{ marginTop: 14, ...serif(13, INK2), maxWidth: 820 }}>
+            <div style={{ marginTop: 14, ...serif(13, INK2), maxWidth: 980 }}>
               Narrative generation follows the weekly build's cut — the top 200 of the US board. This profile is outside
               that cut, so no narrative exists and no stale text is held for it. The four components above are the
               complete rising signal for this HCP, and they are fully covered. Nothing is being withheld.
@@ -561,7 +561,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           {!seniorParsed && (
             <div style={{ padding: 18 }}>
               <div style={mono(11, MUT, 0.14, 500)}>AUTHORSHIP POSITION NOT PARSED ON THIS RECORD</div>
-              <div style={{ marginTop: 12, ...serif(12.5, INK2, 1.7), maxWidth: 820 }}>
+              <div style={{ marginTop: 12, ...serif(12.5, INK2, 1.7), maxWidth: 980 }}>
                 Publication leadership — first, senior and middle-author share — is parsed for 60% of the rising board.
                 It is not parsed here, so this surface does not show an authorship split rather than showing a zero.
                 Counts, collaborators and both momentum components are unaffected; they do not depend on author position.
@@ -577,7 +577,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         <Card style={{ padding: "20px 22px" }}>
           {p.collaborators.length > 0 ? (
             <>
-              <div style={{ padding: "10px 12px", border: "1px solid #2a2519", background: "#141008", ...mono(8.5, GOLD_SOFT, 0.11), lineHeight: 1.6, maxWidth: 880 }}>
+              <div style={{ padding: "10px 12px", border: "1px solid #2a2519", background: "#141008", ...mono(8.5, GOLD_SOFT, 0.11), lineHeight: 1.6, maxWidth: 1040 }}>
                 WINDOW · TEN-YEAR COLLABORATION TOTALS. THE COLLABORATOR TABLE CARRIES A TEN-YEAR ROW ONLY — BOARD-WIDE,
                 THERE IS NO RECENT-WINDOW VARIANT — SO THESE COUNTS DO NOT MATCH THE {rw} DELTAS ABOVE AND MUST NOT
                 BE READ AGAINST THEM.
@@ -612,12 +612,12 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                   </div>
                 );
               })}
-              <div style={{ marginTop: 16, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 600 }}>
+              <div style={{ marginTop: 16, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 720 }}>
                 RANKED BY SHARED PAPER COUNT · STANDING IS THE COLLABORATOR'S OWN POSITION, NEVER A JUDGEMENT ON THIS PROFILE
               </div>
             </>
           ) : (
-            <div style={{ ...serif(13, SERIF_INK), maxWidth: 880 }}>
+            <div style={{ ...serif(13, SERIF_INK), maxWidth: 1040 }}>
               {nw?.recent_collaborator_count != null
                 ? `${nw.recent_collaborator_count} distinct co-authors are recorded across the two windows, and the count is what carries the network momentum percentile above. The top-collaborator identities are not joined for this record, so this section reports the count rather than naming a neighbourhood it cannot see.`
                 : "No collaborator rows are recorded for this profile — the count itself is the absent value, and it renders as this sentence rather than a blank."}
@@ -632,7 +632,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         {(p.positions?.total ?? 0) > 0 ? (
           <Card style={{ padding: "20px 22px" }}>
             <div style={mono(13, SERIF_INK, 0.14, 500)}>{p.positions!.total} EXTRACTED POSITIONS — INSIDE THE EXTRACTION WINDOW</div>
-            <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 880 }}>
+            <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 1040 }}>
               Positions are extracted for the top 100 US rising stars. At US rank {usRank} this profile is inside that
               window and fully covered. The extractor accepts first authors as well as senior authors
               {p.positions!.first_basis > 0 ? `, which matters here: ${p.positions!.first_basis} of the ${p.positions!.total} positions rest on first-authored work.` : "."}
@@ -661,7 +661,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 {insideWindow ? "INSIDE THE EXTRACTION WINDOW" : "OUTSIDE THE EXTRACTION WINDOW · MOST OF THE BOARD"}
               </div>
             </div>
-            <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 880 }}>
+            <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 1040 }}>
               {insideWindow
                 ? "This profile is inside the extraction window, but no position is on file: either no recent first- or senior-authored paper carried a full abstract, or extraction ran and no position cleared the confidence floor. That is a fact about the pipeline's inputs, not about the physician."
                 : "Positions are extracted for the top 100 US rising stars only. This profile is not in that set, so extraction has not been attempted. That is a coverage fact about the pipeline, not a fact about the physician — nothing here indicates an absence of scientific positions, and no inference about authorship or career stage should be read into it."}

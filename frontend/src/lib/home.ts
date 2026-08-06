@@ -862,7 +862,9 @@ export async function getTerritoryCoverageStats(
         .from("hcps_v2")
         .select("id")
         .in("id", chunk)
-        .eq("cohort_classification", "rising_star")
+        // Stale-column filter removed 2026-08-05: board membership is already
+        // gate-correct (v2 taxonomy); the extra cohort_classification filter
+        // hid 10 current board members in this territory.
         .in("nppes_practice_state", context.states);
       if (hcpError) {
         console.warn("getTerritoryCoverageStats: hcps chunk error", hcpError);

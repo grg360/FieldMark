@@ -159,7 +159,7 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
         {single ? <span style={{ ...mono(8, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span> : null}
         {pos.confidence != null ? <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink5 }}>CONF {pos.confidence.toFixed(2)}</span> : null}
       </div>
-      <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty" }}>{pos.summary}</span>
+      <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty", maxWidth: "100ch", display: "block" }}>{pos.summary}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>
         <span>BASIS {basisN} PUBLICATION{basisN === 1 ? "" : "S"}{fullPapers > basisN && basisN > 0 ? ` · SAMPLE OF ${fullPapers}` : ""}</span>
         {yr ? <span>SOURCED {yr}</span> : null}
@@ -301,7 +301,7 @@ export default function HcpProfileBrief() {
           <SectionHead id="signal" tag="SIGNAL SUMMARY" count="WHO IS THIS" sub="GENERATED SYNTHESIS" />
           {p.signal_summary ? (
             <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
-              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty" }}>{p.signal_summary}</span>
+              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", maxWidth: "100ch", display: "block" }}>{p.signal_summary}</span>
               <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink6 }}>MODEL SYNTHESIS OVER THE SOURCED AUDIT · REVIEW BEFORE USE · NO CLINICAL CLAIM · {p.signal_summary_version ? `PROMPT ${p.signal_summary_version.toUpperCase()}` : "PROMPT VERSION UNRECORDED"}</span>
             </div>
           ) : (
@@ -416,11 +416,11 @@ export default function HcpProfileBrief() {
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
             {/* synthesis paragraph or its withheld state */}
             {hasSynthPara ? (
-              <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6 }}>{p.belief.headline}</div>
+              <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6, maxWidth: "100ch" }}>{p.belief.headline}</div>
             ) : nPos > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 10 }}>
                 <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SYNTHESIS AT THIS DEPTH</span>
-                <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>The one-paragraph characterisation is generated from the shape of a record — the tiers, the recurrences, the throughline. {nPos} position{nPos === 1 ? "" : "s"} {nPos === 1 ? "has" : "have"} no shape. The positions themselves are below, unsummarised.</span>
+                <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", maxWidth: "100ch", display: "block" }}>The one-paragraph characterisation is generated from the shape of a record — the tiers, the recurrences, the throughline. {nPos} position{nPos === 1 ? "" : "s"} {nPos === 1 ? "has" : "have"} no shape. The positions themselves are below, unsummarised.</span>
               </div>
             ) : null}
 

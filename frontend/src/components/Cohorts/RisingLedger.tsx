@@ -231,7 +231,7 @@ export default function RisingLedger() {
           <div style={{ display: "flex", alignItems: "flex-end", gap: 26, flexWrap: "wrap" }}>
             <div style={{ ...mono(8, MUT2, 0.13) }}>IN VIEW · {scopeLabel}</div>
             <div style={{ flex: 1, minWidth: 160 }} />
-            <div style={{ maxWidth: 400, ...serif(11, MUT3) }}>
+            <div style={{ maxWidth: 480, ...serif(11, MUT3) }}>
               The remaining {(total - usCount - euCount).toLocaleString("en-US")} are real and stay reachable. The default
               is what a field team can act on this quarter.
             </div>
@@ -306,7 +306,7 @@ export default function RisingLedger() {
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${RULE}`, ...mono(8, MUT3, 0.11), lineHeight: 1.7 }}>
                   ONE COHORT, ONE COLOR — POSITION CARRIES THE MEANING. REGION NAMES DESCRIBE LOCATIONS, NOT TYPES.
                 </div>
-                <div style={{ marginTop: 12, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 640 }}>
+                <div style={{ marginTop: 12, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 760 }}>
                   EVERY POINT IS PLOTTED FROM ITS ACTUAL MOMENTUM AND VISIBILITY COMPONENTS · HOVER FOR NAME AND VALUES · CLICK TO OPEN THE PROFILE
                 </div>
               </div>
@@ -344,7 +344,7 @@ export default function RisingLedger() {
                 </div>
               ))}
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${RULE}` }}>
-                <div style={{ maxWidth: 640, ...serif(11, MUT3) }}>
+                <div style={{ maxWidth: 760, ...serif(11, MUT3) }}>
                   The band is the unit of this ledger, not the row. The four archetype labels were retired
                   2026-08-05 — the residual bucket held nine in ten members, and the one label that survived
                   testing (recent senior authorship) rides the rows as an event badge instead.
@@ -364,7 +364,7 @@ export default function RisingLedger() {
               {absenceMode ? (
                 <div style={{ padding: 22 }}>
                   <div style={mono(12, SERIF_INK, 0.14, 500)}>{noStateCount} US PROFILES HAVE NO STATE IN THE REGISTRY</div>
-                  <div style={{ marginTop: 14, ...serif(13, SERIF_INK, 1.72), maxWidth: 860 }}>
+                  <div style={{ marginTop: 14, ...serif(13, SERIF_INK, 1.72), maxWidth: 1020 }}>
                     These are {noStateCount} of the {usCount} US rising HCPs whose NPI record carries no state. Rank,
                     composite percentile and all four components are covered for every one of them — the gap
                     is a registry field, not the signal. They are excluded from any state filter and included in every US
@@ -461,13 +461,13 @@ export default function RisingLedger() {
             </Card>
 
             <div style={{ marginTop: 14, display: "flex", gap: 22, flexWrap: "wrap", padding: "0 2px" }}>
-              <div style={{ ...mono(8, FAINT, 0.11), lineHeight: 1.7, maxWidth: 340 }}>
+              <div style={{ ...mono(8, FAINT, 0.11), lineHeight: 1.7, maxWidth: 400 }}>
                 NARRATIVE IS PRESENT ON THE TOP 200 US — THE CUT FOLLOWS RANK, RE-EVALUATED EACH WEEKLY BUILD. NOT A COLUMN.
               </div>
-              <div style={{ ...mono(8, FAINT, 0.11), lineHeight: 1.7, maxWidth: 340 }}>
+              <div style={{ ...mono(8, FAINT, 0.11), lineHeight: 1.7, maxWidth: 400 }}>
                 EXTRACTED POSITIONS COVER THE TOP 100 US ONLY — A WINDOW ON THE PIPELINE, NOT A PROPERTY OF THE PHYSICIAN. NOT A LEDGER COLUMN.
               </div>
-              <div style={{ ...mono(8, FAINT, 0.11), lineHeight: 1.7, maxWidth: 340 }}>
+              <div style={{ ...mono(8, FAINT, 0.11), lineHeight: 1.7, maxWidth: 400 }}>
                 NETWORK CENTRALITY IS PRESENT ON 100% — IT IS THE ENTRY CONDITION FOR THE BOARD, SO IT SORTS NOTHING.
               </div>
             </div>
