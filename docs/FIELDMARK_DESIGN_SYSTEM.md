@@ -383,3 +383,37 @@ not refused, it is unreachable. Appears in the year bibliography, co-authored
 publications and institution partner publications; congress abstracts pending a
 decision on whether an abstract anchors strongly enough. Compliance state is
 never shown on this block.
+
+---
+
+## Ink temperature follows reading mode — at the block level
+
+Two ink ramps: **COOL** (`COOL.*`, nine steps) for scanning surfaces and
+**WARM** (`WARM.*`, three steps: prose/body/muted) for long-dwell reading.
+Ground, line, chrome and gold are cool **everywhere, without exception**.
+
+**The rule: ink temperature is chosen per block, not per page — and a block is
+whatever the eye scans as one thing** (a table row, a card, a stat cluster, a
+summary panel). Within one block, ink is a single temperature. A warm ink set
+adjacent to a cool ink inside the same block makes the cool one read blue — that
+is the failure this rule prevents (it read blue on Administered Therapy and on
+Trials before their fixes).
+
+Consequences:
+- A **scanned data block** (figures, rows, a board) is cool throughout — its
+  serif elements render in cool ink (`COOL.ui`/`COOL.prose`), not warm. This is
+  what the Trials and Administered-Therapy reclassifications did: remap the
+  local ink ramp onto `COOL.*`, serif included.
+- A **long-dwell reading block** (an asset monograph, a position statement you
+  read as prose) is warm throughout; its surrounding chrome (labels, rules,
+  timestamps) stays cool, because chrome is cool everywhere — a warm reading
+  body beside cool chrome is the two-ramp working, not an adjacency fault.
+- A **deliberate two-column split** (Field Insights: warm observation left, cool
+  analysis right) is two blocks, so two temperatures — each column is internally
+  one temperature.
+- Summary/narrative blocks are read consistently across the profile spines:
+  the academic, community and rising signal summaries all render cool serif.
+
+Do not fix an adjacency by nudging one hue a step (the pre-rule habit). Decide
+what the eye scans as one unit, classify that unit read-vs-scan, and set the
+whole unit to one ramp.
