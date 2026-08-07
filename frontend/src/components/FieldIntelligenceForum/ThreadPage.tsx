@@ -74,7 +74,7 @@ function RemovedPlaceholder({ post, record }: { post: ForumPost; record?: Modera
       </div>
       <span style={{ fontSize: 13, lineHeight: 1.6, color: COLOR.ink2 }}>
         {record?.clause_text ??
-          "Removed under Scope 3.2 — clinical recommendation. The reply advised a treatment sequence and described directing prescriber behaviour, neither of which is a discussion of what the anchored publication reports."}
+          "Removed under Scope 3.2 — clinical recommendation. The reply advised a treatment sequence and described directing prescriber behavior, neither of which is a discussion of what the anchored publication reports."}
       </span>
       <span style={mono(9.5, COLOR.ink5)}>
         {record?.notification_state ?? "Author notified with the clause cited"}

@@ -550,7 +550,7 @@ export default function CommunityHcpProfile() {
                 {/* synthesis — computed from the real mix + entity rows, no mock figures */}
                 {topCat && topEnt ? (
                   <div style={{ marginTop: 11, ...mono(9), lineHeight: 1.55, color: P.ink6 }}>
-                    {topCat.label} leads the mix ({Math.round(pct(topCat.amount))}% of the 3-yr categorised record). The largest single relationship is {titleCase(topEnt.name)} — {money(topEnt.amount)} across {topEnt.payments} payments{restCompanies > 0 ? `; the remainder spreads across ${restCompanies} further companies` : ""}.
+                    {topCat.label} leads the mix ({Math.round(pct(topCat.amount))}% of the 3-yr categorized record). The largest single relationship is {titleCase(topEnt.name)} — {money(topEnt.amount)} across {topEnt.payments} payments{restCompanies > 0 ? `; the remainder spreads across ${restCompanies} further companies` : ""}.
                   </div>
                 ) : null}
               </div>

@@ -232,7 +232,7 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: DIM }} />
             <span style={mono(9.5, MID)}>NOT MATCHED, OR MATCHED WITHOUT CONFIRMATION · {num(d.scatter.plotted - d.scatter.gold)}</span>
           </span>
-          {narrow ? null : <span style={mono(9.5, FAINT)}>COLOUR CARRIES ONE STORED FACT · IT IS NOT A CLASSIFICATION OF PEOPLE</span>}
+          {narrow ? null : <span style={mono(9.5, FAINT)}>COLOR CARRIES ONE STORED FACT · IT IS NOT A CLASSIFICATION OF PEOPLE</span>}
         </div>
 
         {/* plot */}

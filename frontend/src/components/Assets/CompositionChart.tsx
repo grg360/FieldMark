@@ -93,7 +93,7 @@ export default function CompositionChart({
   const lastFull = [...composition.columns].reverse().find((c) => !c.isPartial) ?? firstCol;
   const modeNote =
     mode === "share"
-      ? "Columns normalised to 100%. Reads the mix; hides how volume changed."
+      ? "Columns normalized to 100%. Reads the mix; hides how volume changed."
       : "Column height is publications that year. Reads growth; small shares get hard to see.";
 
   const readout =

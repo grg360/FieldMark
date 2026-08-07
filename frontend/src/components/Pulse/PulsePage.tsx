@@ -658,7 +658,7 @@ const METHODOLOGY: { n: string; head: string; body: string; gold?: boolean }[] =
     n: "02",
     head: "WHY JANUARY AND JUNE ARE EXCLUDED",
     body:
-      "January is the tail of an ingest hole and under-counts. June is a backfill recovery month and over-counts. Both would register as attention movement when they are ingest artefacts. June remains in the headline window, where a total is still meaningful.",
+      "January is the tail of an ingest hole and under-counts. June is a backfill recovery month and over-counts. Both would register as attention movement when they are ingest artifacts. June remains in the headline window, where a total is still meaningful.",
   },
   {
     n: "03",

@@ -182,8 +182,8 @@ export default function RisingLedger() {
   };
 
   const quadrants = [
-    { name: "EMERGING SPECIALISTS", pos: "HIGH MOMENTUM · LOW VISIBILITY", thesis: "Moving fast, not yet read. The cohort a field team reaches before anyone else does.", clusters: quadCount(false, true), color: "#d8a24a" },
-    { name: "FUTURE KOLS", pos: "HIGH MOMENTUM · HIGH VISIBILITY", thesis: "Both engines live and already received. The top of the board sits in this corner.", clusters: quadCount(true, true), color: "#8fb8a6" },
+    { name: "Emerging Specialist", pos: "HIGH MOMENTUM · LOW VISIBILITY", thesis: "Moving fast, not yet read. The cohort a field team reaches before anyone else does.", clusters: quadCount(false, true), color: "#d8a24a" },
+    { name: "Future KOL", pos: "HIGH MOMENTUM · HIGH VISIBILITY", thesis: "Both engines live and already received. The top of the board sits in this corner.", clusters: quadCount(true, true), color: "#8fb8a6" },
     { name: "EARLY DEVELOPMENT", pos: "LOW MOMENTUM · LOW VISIBILITY", thesis: "On the board because the footprint exists, not because it is moving yet. Watch, do not work.", clusters: quadCount(false, false), color: "#9a9a9e" },
     { name: "ESTABLISHED VISIBILITY", pos: "LOW MOMENTUM · HIGH VISIBILITY", thesis: "Read widely, growth flattening. The exit lane toward the established cohort.", clusters: quadCount(true, false), color: "#8aa2c4" },
   ];
@@ -285,8 +285,8 @@ export default function RisingLedger() {
                       <div style={{ position: "absolute", right: 0, bottom: 0, height: `${SPLIT_PCT}%`, left: `${SPLIT_PCT}%`, background: "rgba(138,162,196,.035)" }} />
                       <div style={{ position: "absolute", left: `${SPLIT_PCT}%`, top: 0, bottom: 0, width: 1, background: LINE.l2 }} />
                       <div style={{ position: "absolute", bottom: `${SPLIT_PCT}%`, left: 0, right: 0, height: 1, background: LINE.l2 }} />
-                      <div style={{ position: "absolute", left: 12, top: 10, font: `600 8.5px/1 ${MONO}`, letterSpacing: ".15em", color: GOLD_MUTED }}>EMERGING SPECIALISTS</div>
-                      <div style={{ position: "absolute", right: 12, top: 10, font: `600 8.5px/1 ${MONO}`, letterSpacing: ".15em", color: GREEN }}>FUTURE KOLS</div>
+                      <div style={{ position: "absolute", left: 12, top: 10, font: `600 8.5px/1 ${MONO}`, letterSpacing: ".15em", color: GOLD_MUTED }}>Emerging Specialist</div>
+                      <div style={{ position: "absolute", right: 12, top: 10, font: `600 8.5px/1 ${MONO}`, letterSpacing: ".15em", color: GREEN }}>Future KOL</div>
                       <div style={{ position: "absolute", left: 12, bottom: 10, font: `600 8.5px/1 ${MONO}`, letterSpacing: ".15em", color: DIM }}>EARLY DEVELOPMENT</div>
                       <div style={{ position: "absolute", right: 12, bottom: 10, font: `600 8.5px/1 ${MONO}`, letterSpacing: ".15em", color: "#7f93ad" }}>ESTABLISHED VISIBILITY</div>
                       {quadPoints.map((pt) => (

@@ -342,7 +342,7 @@ export default function CongressDetailPage() {
             ) : (
               <>
                 <div>Everything below is derived from public posts captured under <span style={{ color: COLOR.amber }}>{congress.hashtags[0]}</span>. It is a picture of the conversation, not a picture of the meeting. We have no session schedule, no abstracts, and no registration data.</div>
-                <div>Where we say an expert is <span style={{ color: COLOR.ink1 }}>likely connected</span>, that is an inference from their own posts and their published themes, and it is labelled as one everywhere it appears.</div>
+                <div>Where we say an expert is <span style={{ color: COLOR.ink1 }}>likely connected</span>, that is an inference from their own posts and their published themes, and it is labeled as one everywhere it appears.</div>
                 <div style={{ color: COLOR.ink1, fontWeight: 600 }}>We&rsquo;re showing you our work, including the parts that aren&rsquo;t finished. That&rsquo;s the deal.</div>
               </>
             )}

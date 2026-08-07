@@ -725,7 +725,7 @@ export default function PracticeFirstProfile() {
               </div>
               {mixRows[0] && companies[0] ? (
                 <div style={{ ...mono(10), color: F.ghost, lineHeight: 1.65, marginTop: 12, textWrap: "pretty" }}>
-                  {mixRows[0].label} leads the mix ({Math.round(((mixRows[0].amount ?? 0) / mixTotal) * 100)}% of the 3-yr categorised record). The largest single relationship is {titleCase(companies[0].name)} — {money(companies[0].amount)} across {companies[0].payments} payments.
+                  {mixRows[0].label} leads the mix ({Math.round(((mixRows[0].amount ?? 0) / mixTotal) * 100)}% of the 3-yr categorized record). The largest single relationship is {titleCase(companies[0].name)} — {money(companies[0].amount)} across {companies[0].payments} payments.
                 </div>
               ) : null}
             </div>

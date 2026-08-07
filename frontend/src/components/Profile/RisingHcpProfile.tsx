@@ -116,8 +116,8 @@ function PctlCell({ value, bar, evidence }: { value: number | null; bar: string;
 function quadrantOf(mom: number | null, vis: number | null): { name: string; color: string } {
   if (mom == null || vis == null) return { name: "NOT PLACED", color: MUT3 };
   const hiM = mom >= 80, hiV = vis >= 80;
-  if (hiM && hiV) return { name: "FUTURE KOLS", color: GREEN };
-  if (hiM) return { name: "EMERGING SPECIALISTS", color: RANK_GOLD };
+  if (hiM && hiV) return { name: "Future KOL", color: GREEN };
+  if (hiM) return { name: "Emerging Specialist", color: RANK_GOLD };
   if (hiV) return { name: "ESTABLISHED VISIBILITY", color: "#7f93ad" };
   return { name: "EARLY DEVELOPMENT", color: MUT3 };
 }
@@ -261,7 +261,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
   const bandLabel = rank <= 100 ? "TOP 100" : rank <= 300 ? "101–300" : rank <= 600 ? "301–600" : "600+";
   const bandNote = residualBand
-    ? "RESIDUAL BAND · 600+ · CLASSIFIER DEGENERATE · DE-EMPHASISED BY DESIGN"
+    ? "RESIDUAL BAND · 600+ · CLASSIFIER DEGENERATE · DE-EMPHASIZED BY DESIGN"
     : `CLASSIFYING BAND · ${bandLabel}`;
 
   const metaLine: string[] = [
@@ -421,6 +421,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               <div style={{ marginTop: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <Link to={`/hcp/${hcpId}/brief`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${GOLD_DEEP}`, color: RANK_GOLD, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>+ GENERATE BRIEF</Link>
                 <Link to={`/hcp/${hcpId}/publications`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${LINE.l2}`, color: INK2, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>ALL PUBLICATIONS ↗</Link>
+                <Link to={`/hcp/${hcpId}/positions`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${LINE.l2}`, color: INK2, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>ALL POSITIONS ↗</Link>
               </div>
             </div>
 
@@ -539,7 +540,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
             <div style={{ flex: 1, minWidth: 120 }} />
             <div style={{ ...mono(8, DIM2, 0.1), maxWidth: 480, lineHeight: 1.7 }}>
-              EACH COMPONENT IS THE MEAN OF ITS TWO PERCENTILES · COMPOSITE IS THE RANK-NORMALISED BLEND · COVERAGE 100% ACROSS THE RISING BOARD
+              EACH COMPONENT IS THE MEAN OF ITS TWO PERCENTILES · COMPOSITE IS THE RANK-NORMALIZED BLEND · COVERAGE 100% ACROSS THE RISING BOARD
             </div>
           </div>
         </Card>
@@ -575,6 +576,19 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           )}
         </Card>
         </div>
+        </div>
+
+        {/* relationship + contact — directly under the score row, matching the
+            established spine's sequence (signal block, then the workspace
+            controls); contact must not sit at the bottom of the profile */}
+        <SectionHead title="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS" right="SYNCS WITH THE RISING LEDGER" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <Card style={{ padding: 18 }}>
+            <ProfileRelationshipControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
+          </Card>
+          <Card style={{ padding: 18 }}>
+            <ProfileSecondaryControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
+          </Card>
         </div>
 
         {/* established standing */}
@@ -665,7 +679,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         )}
 
         {/* established neighbourhood — header is conditional on the claim being true */}
-        <SectionHead title={inEstNeighbourhood ? "THE ESTABLISHED NEIGHBOURHOOD" : "TOP COLLABORATORS"}
+        <SectionHead title={inEstNeighbourhood ? "THE ESTABLISHED NEIGHBORHOOD" : "TOP COLLABORATORS"}
           sub={inEstNeighbourhood
             ? `TOP COLLABORATORS · ${p.collaborators.length} OF ${nw?.recent_collaborator_count ?? p.collaborator_rows_10yr ?? "N"}`
             : `NO ESTABLISHED RANK IN THE TOP FIVE · ${p.collaborators.length} OF ${nw?.recent_collaborator_count ?? p.collaborator_rows_10yr ?? "N"}`}
@@ -713,13 +727,13 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               <div style={{ marginTop: 16, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 720 }}>
                 {inEstNeighbourhood
                   ? "RANKED BY SHARED PAPER COUNT · STANDING IS THE COLLABORATOR'S OWN POSITION, NEVER A JUDGEMENT ON THIS PROFILE"
-                  : "NONE OF THE TOP FIVE HOLDS AN ESTABLISHED RANK — THIS IS A COLLABORATOR LIST, NOT AN ESTABLISHED NEIGHBOURHOOD · STANDING IS THE COLLABORATOR'S OWN POSITION"}
+                  : "NONE OF THE TOP FIVE HOLDS AN ESTABLISHED RANK — THIS IS A COLLABORATOR LIST, NOT AN ESTABLISHED NEIGHBORHOOD · STANDING IS THE COLLABORATOR'S OWN POSITION"}
               </div>
             </>
           ) : (
             <div style={{ ...serif(13, SERIF_INK), maxWidth: 1040 }}>
               {nw?.recent_collaborator_count != null
-                ? `${nw.recent_collaborator_count} distinct co-authors are recorded across the two windows, and the count is what carries the network momentum percentile above. The top-collaborator identities are not joined for this record, so this section reports the count rather than naming a neighbourhood it cannot see.`
+                ? `${nw.recent_collaborator_count} distinct co-authors are recorded across the two windows, and the count is what carries the network momentum percentile above. The top-collaborator identities are not joined for this record, so this section reports the count rather than naming a neighborhood it cannot see.`
                 : "No collaborator rows are recorded for this profile — the count itself is the absent value, and it renders as this sentence rather than a blank."}
             </div>
           )}
@@ -798,17 +812,6 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         <SectionHead title="FIELD INTELLIGENCE" sub="PEER VALIDATION · THREE QUESTIONS"
           right="SUBMISSION PATH NOT YET WIRED · STATED ON SUBMIT" />
         <FieldIntelligencePanel />
-
-        {/* relationship */}
-        <SectionHead title="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS" right="SYNCS WITH THE RISING LEDGER" />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Card style={{ padding: 18 }}>
-            <ProfileRelationshipControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
-          </Card>
-          <Card style={{ padding: 18 }}>
-            <ProfileSecondaryControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
-          </Card>
-        </div>
 
         {/* footer */}
       </div>
