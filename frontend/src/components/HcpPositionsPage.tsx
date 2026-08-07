@@ -321,7 +321,7 @@ function PositionRow({ pos }: { pos: EvidencePosition }) {
           ))}
         </div>
         {/* the position — warm reading prose */}
-        <p style={{ margin: 0, font: `400 20px/1.5 ${SERIF}`, color: WARM.body, maxWidth: "64ch", textWrap: "pretty" }}>
+        <p style={{ margin: 0, font: `400 20px/1.5 ${SERIF}`, color: WARM.body, textWrap: "pretty" }}>
           {pos.position_text}
         </p>
       </div>
@@ -346,7 +346,7 @@ function EmptyState({ hcpName, taLabel, coverage, hcpId }: { hcpName: string; ta
       <div style={{ padding: "14px 26px", background: GROUND.g1, borderBottom: `1px solid ${LINE.l1}`, ...mono(10, COOL.muted, 0.18, 500) }}>
         NO POSITIONS EXTRACTED
       </div>
-      <div style={{ padding: "30px 26px 32px", display: "grid", gap: 16, maxWidth: "74ch" }}>
+      <div style={{ padding: "30px 26px 32px", display: "grid", gap: 16 }}>
         <p style={{ margin: 0, font: `400 20px/1.55 ${SERIF}`, color: WARM.body, textWrap: "pretty" }}>
           Position extraction runs only on the top 200 established and top 100 rising US physicians in each therapeutic area.
           {hcpName ? ` ${hcpName} sits` : " This profile sits"} outside that window, so no positions have been extracted for it.

@@ -1,4 +1,5 @@
 import { CSSProperties } from "react";
+import { FONT } from "../lib/designTokens";
 
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
@@ -26,32 +27,35 @@ const textBlockStyle: CSSProperties = {
 };
 
 const wordmarkStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 700,
-  letterSpacing: "0.18em",
+  fontFamily: FONT.mono,
+  fontSize: 12,
+  fontWeight: 500,
+  letterSpacing: "0.22em",
   color: "#E8A020",
   textTransform: "uppercase",
   textAlign: "center",
-  marginBottom: 8,
+  marginBottom: 10,
 };
 
 const headlineStyle: CSSProperties = {
+  fontFamily: FONT.serif,
   fontSize: 44,
-  fontWeight: 700,
+  fontWeight: 600,
   lineHeight: 1.15,
   textAlign: "center",
   color: "#E8E6DF",
   margin: 0,
-  letterSpacing: "-0.02em",
+  letterSpacing: "-0.01em",
 };
 
 const subheadStyle: CSSProperties = {
+  fontFamily: FONT.serif,
   fontSize: 18,
   color: "#9B9892",
   textAlign: "center",
   marginTop: 12,
   marginBottom: 0,
-  fontWeight: 400,
+  fontWeight: 300,
 };
 
 const videoFrameStyle: CSSProperties = {
@@ -78,6 +82,7 @@ const iframeStyle: CSSProperties = {
 };
 
 const paragraphStyle: CSSProperties = {
+  fontFamily: FONT.serif,
   fontSize: 16,
   lineHeight: 1.7,
   color: "#C8C5BE",
@@ -108,17 +113,19 @@ const statStyle: CSSProperties = {
 };
 
 const statValueStyle: CSSProperties = {
+  fontFamily: FONT.mono,
   fontSize: 22,
-  fontWeight: 600,
+  fontWeight: 500,
   color: "#E8E6DF",
-  fontFeatureSettings: '"tnum"',
+  fontVariantNumeric: "tabular-nums",
 };
 
 const statLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontFamily: FONT.mono,
+  fontSize: 10,
   color: "#6B6A65",
   textTransform: "uppercase",
-  letterSpacing: "0.08em",
+  letterSpacing: "0.14em",
 };
 
 const ctaWrapStyle: CSSProperties = {
@@ -173,7 +180,7 @@ export default function DemoPage() {
         <div style={videoFrameStyle}>
           <div style={videoAspectStyle}>
             <iframe
-              src="https://customer-vnv0tydawqbi5840.cloudflarestream.com/71551adadac81f3593c5f0558894199d/iframe?poster=https%3A%2F%2Fcustomer-vnv0tydawqbi5840.cloudflarestream.com%2F71551adadac81f3593c5f0558894199d%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+              src="https://customer-vnv0tydawqbi5840.cloudflarestream.com/a3b5fdd78c301782e334eaed1d76de12/iframe?poster=https%3A%2F%2Fcustomer-vnv0tydawqbi5840.cloudflarestream.com%2Fa3b5fdd78c301782e334eaed1d76de12%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
               loading="lazy"
               style={iframeStyle}
               allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
