@@ -16,6 +16,8 @@ import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { getOrCreateRelationship, type RelationshipStatus } from "../../lib/relationships";
 import FieldInsights from "../FieldInsights/FieldInsights";
+import ContactAccessCard from "../ContactAccessCard";
+import { getHcpWebSignals, type WebSignal } from "../../lib/api";
 import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
 import RelationshipSection from "../RelationshipSection/RelationshipSection";
 import AddToWatchlistPopover from "../AddToWatchlistPopover";
@@ -450,7 +452,8 @@ export default function CommunityHcpProfile() {
                   {companies.map((c) => (
                     <div key={c.name} style={{ display: "flex", alignItems: "center", padding: "8px 20px", borderBottom: `1px solid ${P.line}` }}>
                       <span style={{ width: 26, ...mono(9.5), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{c.rank ?? "—"}</span>
-                      <span style={{ flex: "1 1 140px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...mono(10.5), color: P.ink2, paddingRight: 10 }}>{titleCase(c.name)}</span>
+                      {/* one treatment (2026-08-07): company names serif Title Case, drug names mono */}
+                      <span style={{ flex: "1 1 140px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...serif(12.5), color: P.ink2, paddingRight: 10 }}>{titleCase(c.name)}</span>
                       <span style={{ width: 96, paddingRight: 10, boxSizing: "border-box" }}>
                         <ShapeBars amount={c.amount} payments={c.payments} maxAmount={maxCoAmount} maxPayments={maxCoPayments} />
                       </span>
@@ -558,7 +561,7 @@ export default function CommunityHcpProfile() {
                 {/* synthesis — computed from the real mix + entity rows, no mock figures */}
                 {topCat && topEnt ? (
                   <div style={{ marginTop: 11, ...mono(9), lineHeight: 1.55, color: P.ink6 }}>
-                    {topCat.label} leads the mix ({Math.round(pct(topCat.amount))}% of the 3-yr categorized record). The largest single relationship is {titleCase(topEnt.name)} — {money(topEnt.amount)} across {topEnt.payments} payments{restCompanies > 0 ? `; the remainder spreads across ${restCompanies} further companies` : ""}.
+                    {topCat.label} leads the mix ({Math.round(pct(topCat.amount))}% of the 3-yr categorized record). The largest single relationship is <span style={{ ...serif(11), color: P.ink4 }}>{titleCase(topEnt.name)}</span> — {money(topEnt.amount)} across {topEnt.payments} payments{restCompanies > 0 ? `; the remainder spreads across ${restCompanies} further companies` : ""}.
                   </div>
                 ) : null}
               </div>
@@ -580,6 +583,13 @@ export default function CommunityHcpProfile() {
             </div>
           </div>
         ) : null}
+
+        {/* ◆ CONTACT & ACCESS — parity with the other two spines (2026-08-07).
+            The profile payload carries practice location + NPI for 100% of the
+            cohort (CMS-derived), so the section is never empty; the web-signals
+            overlay (LinkedIn / email / phone) renders where the enrichment holds
+            rows (~11% of the head today) with its own honest empty state. */}
+        <CommunityContactAccess hcp={p.hcp} />
 
         {/* ◆ FIELD INTELLIGENCE — frame right-rail treatment: three segmented validation
             questions rendered INLINE with a Submit control (not display-only chips). The
@@ -618,8 +628,10 @@ function ProductRow({ d }: { d: Product }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-start", padding: "9px 20px", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ flex: "2 1 150px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        {/* one treatment (2026-08-07): drug names mono, company names serif Title Case
+            (was uppercase mono — the third face the survey flagged) */}
         <span style={{ ...mono(11, 500), color: P.ink1, letterSpacing: ".02em" }}>{d.drug}</span>
-        <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.entity ? d.entity.toUpperCase() : "—"}</span>
+        <span style={{ ...serif(11), color: P.ink5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.entity ? titleCase(d.entity) : "—"}</span>
       </div>
       <span style={{ width: 70, textAlign: "right", ...mono(11.5), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
       <span style={{ width: 62, textAlign: "right", ...mono(10.5), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"}</span>
@@ -676,6 +688,46 @@ function HeaderActions({ hcpId, npi, onBrief }: { hcpId: string; npi: string | n
         <AddToWatchlistPopover userId={userId} relationshipId={relationshipId} anchorRect={wlAnchor}
           onClose={() => { setWlAnchor(null); void refreshTracked(); }} />
       ) : null}
+    </div>
+  );
+}
+
+// Contact & Access for the community spine (2026-08-07): practice location + NPI
+// from the profile payload (100% coverage — the cohort is CMS-derived), then the
+// shared ContactAccessCard for web signals where the enrichment holds them.
+function CommunityContactAccess({ hcp }: { hcp: CommunityProfile["hcp"] }) {
+  const [signals, setSignals] = useState<WebSignal[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getHcpWebSignals(hcp.id).then((s) => { if (alive) { setSignals(s); setLoading(false); } }).catch(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [hcp.id]);
+  const loc = [titleCase(hcp.city ?? ""), hcp.state ?? ""].filter(Boolean).join(", ");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <SectionHead glyph="◆" tag="CONTACT & ACCESS" />
+      <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>PRACTICE LOCATION</span>
+          <span style={{ ...serif(13), color: P.ink2 }}>{loc || "Location not in the registry"}</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>NPI</span>
+          {hcp.npi ? (
+            <a href={`https://npiregistry.cms.hhs.gov/provider-view/${hcp.npi}`} target="_blank" rel="noopener noreferrer"
+              style={{ ...mono(11.5), color: P.teal, textDecoration: "none", fontVariantNumeric: "tabular-nums" }}>
+              {hcp.npi} · NPI REGISTRY →
+            </a>
+          ) : (
+            <span style={{ ...mono(10), color: P.ink5 }}>Not on record</span>
+          )}
+        </div>
+        <div style={{ borderTop: `1px solid ${P.line}`, paddingTop: 10 }}>
+          <ContactAccessCard hcpName={hcp.name} signals={signals} loading={loading} variant="ledger" />
+        </div>
+      </div>
     </div>
   );
 }

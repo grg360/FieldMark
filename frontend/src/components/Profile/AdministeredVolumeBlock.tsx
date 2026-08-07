@@ -88,7 +88,9 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
       {/* agent + badge + multi-product note */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-          <span style={{ ...serif(15.5, 400), color: C.ink }}>{row.molecule}</span>
+          {/* one treatment (2026-08-07): drug names render mono everywhere — this was
+              the one serif drug face; companies get the serif instead */}
+          <span style={{ ...mono(13, 500), letterSpacing: ".02em", color: C.ink }}>{row.molecule}</span>
           {row.badge ? (
             <span style={{ ...mono(8.5, 500), letterSpacing: ".1em", color: row.badge === "nsclc_anchored" ? C.gold : C.blue, border: `1px solid ${row.badge === "nsclc_anchored" ? C.goldSoft : "#2a2e32"}`, padding: "2px 6px" }}>
               {BADGE_LABEL[row.badge]}
