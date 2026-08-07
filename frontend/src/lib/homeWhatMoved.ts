@@ -11,7 +11,16 @@
 
 import { supabase } from "./supabase";
 
-export const WHAT_MOVED_SNAPSHOT_DATE = "2026-06-08";
+// DEMO SEED (2026-08-07): the 2026-06-22 snapshot is ILLUSTRATIVE — 4 backdated
+// rows with invented pre-rescore percentiles, inserted for the demo because no
+// real cross-regime comparison yields risers (06-08 is pre-rescore/all fallers,
+// 08-05 is the current board/zero delta). The surface carries a mandatory
+// "ILLUSTRATIVE · BACKDATED SNAPSHOT" chip while WHAT_MOVED_SEEDED is true —
+// same provenance discipline as the forum's SEEDED marker.
+// REVERT: set date back to "2026-06-08", flag to false, and run
+//   DELETE FROM hcp_rising_star_snapshots WHERE snapshot_date = '2026-06-22';
+export const WHAT_MOVED_SNAPSHOT_DATE = "2026-06-22";
+export const WHAT_MOVED_SEEDED = true;
 
 export interface Mover {
   hcpId: string;
@@ -31,7 +40,7 @@ export interface Mover {
 }
 
 export interface WhatMoved {
-  comparedAgainst: string; // always "2026-06-08"
+  comparedAgainst: string; // always WHAT_MOVED_SNAPSHOT_DATE
   bandA: Mover | null;     // primary — top index riser, in-territory + untracked when available
   bandB: Mover[];          // up to 2 secondary movers
 }

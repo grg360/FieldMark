@@ -5,8 +5,9 @@
 // /me/insights, /me/watchlists (portfolio figure + rail header + mobile record row,
 // wired 2026-07-31 — the surface was orphaned), and portfolio chips → /hcp/:id (the
 // exception covers affordances with NO route, e.g. Skyview / All briefs); every other
-// affordance is non-interactive; the session date is the live clock. DATA RULES: WHAT MOVED = 8-Jun snapshot vs current ranks_v3 ("compared against 8 Jun
-// 2026"); no dispersion/tied/confidence anywhere; follow-ups ordered by priority then due;
+// affordance is non-interactive; the session date is the live clock. DATA RULES: WHAT MOVED = WHAT_MOVED_SNAPSHOT_DATE snapshot vs current ranks_v3 — currently
+// the SEEDED 22-Jun illustrative snapshot (see homeWhatMoved.ts header for provenance + revert);
+// no dispersion/tied/confidence anywhere; follow-ups ordered by priority then due;
 // insight bodies rendered VERBATIM; tracked = getTrackedHcpIds; institutions = national pins.
 // Where the frame implies data that does not exist (per-institution "tracked" count,
 // per-HCP "why now" line, publications-90d / trials / peers), it is omitted rather than
@@ -24,7 +25,7 @@ import { useIsDesktop } from "../../lib/useIsDesktop";
 import { getTrackedHcpIds } from "../../lib/watchlists";
 import { getFieldInsightsForCurrentUser, type FieldInsight } from "../../lib/fieldInsights";
 import { getPinnedInstitutionsForUser, getInstitutionsByNames } from "../../lib/institutionPins";
-import { getWhatMoved, type WhatMoved, type Mover } from "../../lib/homeWhatMoved";
+import { getWhatMoved, WHAT_MOVED_SEEDED, type WhatMoved, type Mover } from "../../lib/homeWhatMoved";
 import { loadTheWeekTeaser, type WeekTeaser } from "../../lib/theWeek";
 import {
   getNextActionsForUser,
@@ -239,12 +240,12 @@ export default function HomePage() {
               meta={`${dateLine} · SESSION OPENED`}
               title={`${greeting}, ${firstName}`}
               stats={[
-                { value: String(stats.overdue), label: "FOLLOW-UPS OVERDUE", valueColor: RED },
-                { value: String(stats.total), label: "FOLLOW-UPS OPEN" },
-                { value: String(trackedCount), label: "PORTFOLIO TRACKED", onClick: go.watchlists },
+                { value: String(stats.overdue), label: "FOLLOW-UPS OVERDUE", valueColor: RED, center: true },
+                { value: String(stats.total), label: "FOLLOW-UPS OPEN", center: true },
+                { value: String(trackedCount), label: "PORTFOLIO TRACKED", onClick: go.watchlists, center: true },
                 // A fact, not an achievement metric (2026-08-05): the old
                 // percentage moved 25 points when the board was re-gated.
-                { value: coverage ? `${coverage.tracked_count} OF ${coverage.total_rising_stars_in_territory}` : "0 OF 0", label: "TERRITORY RISING TRACKED" },
+                { value: coverage ? `${coverage.tracked_count} of ${coverage.total_rising_stars_in_territory}` : "0 of 0", label: "TERRITORY RISING TRACKED", center: true },
               ]}
             />
           </div>
@@ -543,21 +544,32 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
         <span style={mono(11, 400, INK2, ".16em")}>WHAT MOVED</span>
         <span style={{ display: "flex", alignItems: "center", gap: 8, ...mono(10, 400, MID) }}>
           <span>COMPARED AGAINST</span>
-          <span style={{ color: INK3, border: `1px solid #2f2c27`, padding: "4px 7px" }}>8 JUN 2026</span>
+          <span style={{ color: INK3, border: `1px solid #2f2c27`, padding: "4px 7px" }}>22 JUN 2026</span>
         </span>
+        {WHAT_MOVED_SEEDED ? (
+          // Provenance marker — same dashed-amber discipline as the forum's
+          // SEEDED chip (fiUi ProvenanceChip): the comparison snapshot is
+          // fabricated demo data, not a live measurement.
+          <span style={{ ...mono(9, 600, GOLD, ".12em"), background: "rgba(232,160,32,0.06)", border: "1px dashed rgba(232,160,32,0.42)", padding: "3px 7px", whiteSpace: "nowrap" }}>
+            ILLUSTRATIVE · BACKDATED SNAPSHOT
+          </span>
+        ) : null}
         <span style={{ flex: 1, height: 1, background: BORDER }} />
       </div>
 
       {!moved || !moved.bandA ? (
-        <div style={{ border: `1px dashed #33322e`, background: CARD, padding: "26px 28px", ...serif(15, 300, MID, 1.6), fontStyle: "italic" }}>
-          No qualifying movement against the 8 June 2026 snapshot for this scope.
+        <div style={{ border: `1px dashed #33322e`, background: CARD, padding: "26px 28px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <span style={mono(10, 400, GOLD, ".14em")}>BOARD RE-SCORED 5 AUG 2026 · MOVEMENT TRACKING RESET</span>
+          <span style={{ ...serif(15, 300, MID, 1.6), fontStyle: "italic" }}>
+            Deltas resume with the next weekly snapshot. Ranks before and after the re-score are not comparable, so no movement is shown across it.
+          </span>
         </div>
       ) : (
         <>
           {/* BAND A — primary */}
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "8px 0 10px", borderBottom: `1px solid ${BORDER}`, ...mono(9, 400, DIM, ".14em"), flexWrap: "wrap", gap: 6 }}>
             <span>BAND A · {moved.bandA.tracked ? "TRACKED" : "UNTRACKED"}{moved.bandA.inTerritory ? " · INSIDE YOUR TERRITORY" : ""}</span>
-            <span>INDEX {fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)} SINCE 8 JUN</span>
+            <span>INDEX {fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)} SINCE 22 JUN</span>
           </div>
           <div style={{ borderLeft: `2px solid ${GOLD}`, background: CARD }}>
             <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "88px 1fr 190px" : "1fr", gap: isDesktop ? 26 : 14, padding: isDesktop ? "26px 28px 16px" : "18px 16px 10px" }}>
@@ -573,7 +585,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
                 </div>
                 {/* movement stated factually; no model-synthesis prose is fabricated */}
                 <p style={{ margin: 0, ...serif(16, 300, INK3, 1.6) }}>
-                  Rising-star index <span style={{ color: INK1, fontWeight: 500 }}>{fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)}</span> since 8 Jun 2026 — currently #{moved.bandA.nowRank} US.
+                  Rising-star index <span style={{ color: INK1, fontWeight: 500 }}>{fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)}</span> since 22 Jun 2026 — currently #{moved.bandA.nowRank} US.
                 </p>
               </div>
               {isDesktop ? (
@@ -603,7 +615,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
             <>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "16px 0 10px", borderBottom: `1px solid ${BORDER}`, ...mono(9, 400, DIM, ".14em") }}>
                 <span>BAND B · SECONDARY MOVEMENT</span>
-                <span>{moved.bandB.length} MORE SINCE 8 JUN</span>
+                <span>{moved.bandB.length} MORE SINCE 22 JUN</span>
               </div>
               <div style={{ background: CARD, borderLeft: `2px solid #2f2c25` }}>
                 {moved.bandB.map((m: Mover, i: number) => (
