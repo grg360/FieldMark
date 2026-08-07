@@ -11,8 +11,11 @@
 import AppLayout from "../AppLayout";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import ProfileRelationshipControls from "./ProfileRelationshipControls";
+import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
+import FieldInsights from "../FieldInsights/FieldInsights";
+import { FiToast } from "../FieldIntelligenceShared";
+import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
 import {
   getRisingProfile, careerYears, collabStanding, fmtPctl, getRisingFlags, type RisingFlags,
   type RisingProfile,
@@ -126,10 +129,66 @@ function quadrantProse(sci: string, net: string): string {
   return `Position, not a type: scientific momentum at ${sci}, network momentum at ${net}. The region name describes where this profile sits on the two engines this week.`;
 }
 
+// ── FIELD INTELLIGENCE — ported from the community spine (2026-08-06) ────────
+// Same three validation questions, same segmented inline options, same honest
+// unwired submit (field_intel_* tables are SELECT-only — see KNOWN_ISSUES).
+// Only the register changes: rising Card + mono ramp instead of the community P palette.
+const FI_QUESTIONS = [
+  { key: "confidence", label: "Signal record matches field reality", options: ["Confirms", "Partial", "Disputes"] },
+  { key: "access", label: "Access in practice", options: ["Open", "Gated", "Closed"] },
+  { key: "referral", label: "Referral influence in region", options: ["High", "Moderate", "Low"] },
+] as const;
+
+function FieldIntelligencePanel() {
+  const [answers, setAnswers] = useState<Record<string, string | null>>({ confidence: null, access: null, referral: null });
+  const [toast, setToast] = useState<string | null>(null);
+  const complete = FI_QUESTIONS.every((q) => answers[q.key]);
+  const showToast = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 3200); };
+
+  return (
+    <Card style={{ padding: "18px 22px", maxWidth: 680, display: "flex", flexDirection: "column", gap: 14 }}>
+      <span style={mono(10, MUT2, 0.06)}>Validation pending — 0 MSLs have reviewed this profile.</span>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <span style={mono(9, RANK_GOLD, 0.14, 600)}>COMMUNITY CONFIDENCE</span>
+          <span style={mono(9, DIM2, 0.06)}>0 MSLs</span>
+        </div>
+        <div style={{ height: 3, background: RULE }} />
+      </div>
+      {FI_QUESTIONS.map((q) => (
+        <div key={q.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={mono(10, MUT3, 0.04)}>{q.label}</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {q.options.map((opt) => {
+              const on = answers[q.key] === opt;
+              return (
+                <button key={opt} onClick={() => setAnswers((a) => ({ ...a, [q.key]: a[q.key] === opt ? null : opt }))}
+                  style={{ flex: 1, textAlign: "center", padding: "7px 0", background: on ? "rgba(255,255,255,.07)" : "none", cursor: "pointer",
+                    border: `1px solid ${on ? "rgba(255,255,255,.28)" : LINE.l2}`, borderRadius: 3, font: `${on ? 600 : 400} 10px/1.4 ${MONO}`, color: on ? INK0 : INK1, minHeight: 0 }}>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <button disabled={!complete}
+        onClick={() => { if (!complete) return; showToast("Field review recorded — the submission path (field-intel write) is not yet wired; stored locally only."); }}
+        style={{ textAlign: "center", padding: "10px 0", background: "none", border: `1px solid ${LINE.l2}`, borderRadius: 3,
+          font: `500 10.5px/1.4 ${MONO}`, color: complete ? INK1 : MUT2, cursor: complete ? "pointer" : "not-allowed", opacity: complete ? 1 : 0.6, minHeight: 0 }}>
+        Submit validation
+      </button>
+      <span style={{ textAlign: "center", ...mono(8.5, DIM2, 0.04), marginTop: -6 }}>Your identity is never shared. Contributor UUID only.</span>
+      <FiToast message={toast} />
+    </Card>
+  );
+}
+
 export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
   const navigate = useNavigate();
   const [p, setP] = useState<RisingProfile | null | undefined>(undefined);
   const [flags, setFlags] = useState<RisingFlags | null>(null);
+  const [notes, setNotes] = useState<FieldNote[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -139,6 +198,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
   useEffect(() => {
     let alive = true;
     getRisingFlags([hcpId]).then((f) => alive && setFlags(f.get(hcpId) ?? null));
+    loadFieldPresence(hcpId).then((fn) => alive && setNotes(fn)).catch(() => {});
     return () => { alive = false; };
   }, [hcpId]);
 
@@ -171,6 +231,13 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
   const insideWindow = usRank != null && usRank <= 100;
   const dual = p.established_us != null;
   const residualBand = rank > 600;
+
+  // Conditional neighbourhood header (2026-08-06): the section may only assert
+  // "working inside an established neighbourhood" when at least one of the top
+  // five carries an established standing (US or global row — the same two states
+  // collabStanding renders as ESTABLISHED). Otherwise it is a collaborator list
+  // and says so. Board-wide today the fallback fires for ~1 of 123 US members.
+  const inEstNeighbourhood = p.collaborators.some((c) => c.est_us_rank != null || c.est_global_rank != null);
 
   // Rolling windows (2026-08-05): ranges come from the momentum row's
   // window_start/window_end date columns — never hardcoded. Month precision
@@ -405,9 +472,17 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           </div>
         </Card>
 
-        {/* momentum & visibility */}
+        {/* momentum & visibility + the record — paired on one row (2026-08-06).
+            The pairing first proposed (M&V beside ESTABLISHED STANDING) was
+            rejected on the data: 78 of the 123 US rising stars are dual-board,
+            so the standing card renders the full two-rank comparison — not the
+            one-line absence — and the pair would compress both. THE RECORD is
+            the natural partner: momentum is a delta and the record is shown as
+            a delta, so the row reads as one claim with its evidence. */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+        <div style={{ minWidth: 0 }}>
         <SectionHead title="MOMENTUM & VISIBILITY" sub="FOUR COMPONENTS · TWO ENGINES"
-          right="PERCENTILES WITHIN THE RISING COHORT · NEVER AGAINST ESTABLISHED" />
+          right="PERCENTILES WITHIN THE RISING COHORT" />
         <Card>
           <div style={{ display: "grid", gridTemplateColumns: "104px 1fr 1fr" }}>
             <div style={{ padding: "12px 14px", borderBottom: `1px solid ${RULE}` }} />
@@ -468,6 +543,39 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
           </div>
         </Card>
+        </div>
+
+        {/* the record — paired column; deltas 2×2 at half width */}
+        <div style={{ minWidth: 0 }}>
+        <SectionHead title="THE RECORD" sub="TWO SOURCE TABLES · FOUR PARALLEL DELTAS"
+          right="MOMENTUM IS A DELTA · THE RECORD IS SHOWN AS A DELTA" />
+        <Card>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)" }}>
+            {deltas.map((d) => (
+              <div key={d.label} style={{ padding: 18, borderRight: `1px solid ${RULE}`, borderBottom: `1px solid ${RULE}` }}>
+                <div style={mono(8, DIM, 0.14)}>{d.label}</div>
+                <div style={{ marginTop: 11, display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+                  <div style={{ font: `400 15px/1 ${MONO}`, color: MUT2 }}>{d.prior}</div>
+                  <div style={{ font: `400 11px/1 ${MONO}`, color: FAINT }}>→</div>
+                  <div style={{ font: `500 ${d.current.length > 12 ? 13 : 24}px/1 ${MONO}`, color: d.color }}>{d.current}</div>
+                </div>
+                <div style={{ marginTop: 10, ...mono(8, DIM2, 0.11), lineHeight: 1.6 }}>{d.note}</div>
+              </div>
+            ))}
+          </div>
+          {!seniorParsed && (
+            <div style={{ padding: 18 }}>
+              <div style={mono(11, MUT, 0.14, 500)}>AUTHORSHIP POSITION NOT PARSED ON THIS RECORD</div>
+              <div style={{ marginTop: 12, ...serif(12.5, INK2, 1.7), maxWidth: 980 }}>
+                Publication leadership — first, senior and middle-author share — is parsed for 60% of the rising board.
+                It is not parsed here, so this surface does not show an authorship split rather than showing a zero.
+                Counts, collaborators and both momentum components are unaffected; they do not depend on author position.
+              </div>
+            </div>
+          )}
+        </Card>
+        </div>
+        </div>
 
         {/* established standing */}
         <SectionHead title="ESTABLISHED STANDING"
@@ -556,38 +664,11 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           </Card>
         )}
 
-        {/* the record */}
-        <SectionHead title="THE RECORD" sub="TWO SOURCE TABLES · FOUR PARALLEL DELTAS"
-          right="MOMENTUM IS A DELTA · THE RECORD IS SHOWN AS A DELTA" />
-        <Card>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)" }}>
-            {deltas.map((d) => (
-              <div key={d.label} style={{ padding: 18, borderRight: `1px solid ${RULE}`, borderBottom: `1px solid ${RULE}` }}>
-                <div style={mono(8, DIM, 0.14)}>{d.label}</div>
-                <div style={{ marginTop: 11, display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                  <div style={{ font: `400 15px/1 ${MONO}`, color: MUT2 }}>{d.prior}</div>
-                  <div style={{ font: `400 11px/1 ${MONO}`, color: FAINT }}>→</div>
-                  <div style={{ font: `500 ${d.current.length > 12 ? 13 : 24}px/1 ${MONO}`, color: d.color }}>{d.current}</div>
-                </div>
-                <div style={{ marginTop: 10, ...mono(8, DIM2, 0.11), lineHeight: 1.6 }}>{d.note}</div>
-              </div>
-            ))}
-          </div>
-          {!seniorParsed && (
-            <div style={{ padding: 18 }}>
-              <div style={mono(11, MUT, 0.14, 500)}>AUTHORSHIP POSITION NOT PARSED ON THIS RECORD</div>
-              <div style={{ marginTop: 12, ...serif(12.5, INK2, 1.7), maxWidth: 980 }}>
-                Publication leadership — first, senior and middle-author share — is parsed for 60% of the rising board.
-                It is not parsed here, so this surface does not show an authorship split rather than showing a zero.
-                Counts, collaborators and both momentum components are unaffected; they do not depend on author position.
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {/* established neighbourhood */}
-        <SectionHead title="THE ESTABLISHED NEIGHBOURHOOD"
-          sub={`TOP COLLABORATORS · ${p.collaborators.length} OF ${nw?.recent_collaborator_count ?? p.collaborator_rows_10yr ?? "N"}`}
+        {/* established neighbourhood — header is conditional on the claim being true */}
+        <SectionHead title={inEstNeighbourhood ? "THE ESTABLISHED NEIGHBOURHOOD" : "TOP COLLABORATORS"}
+          sub={inEstNeighbourhood
+            ? `TOP COLLABORATORS · ${p.collaborators.length} OF ${nw?.recent_collaborator_count ?? p.collaborator_rows_10yr ?? "N"}`
+            : `NO ESTABLISHED RANK IN THE TOP FIVE · ${p.collaborators.length} OF ${nw?.recent_collaborator_count ?? p.collaborator_rows_10yr ?? "N"}`}
           right={`TEN-YEAR TOTALS · NOT THE ${rw} DELTA WINDOW USED ABOVE`} tick={GOLD_MUTED} />
         <Card style={{ padding: "20px 22px" }}>
           {p.collaborators.length > 0 ? (
@@ -630,7 +711,9 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 );
               })}
               <div style={{ marginTop: 16, ...mono(8.5, MUT2, 0.11), lineHeight: 1.7, maxWidth: 720 }}>
-                RANKED BY SHARED PAPER COUNT · STANDING IS THE COLLABORATOR'S OWN POSITION, NEVER A JUDGEMENT ON THIS PROFILE
+                {inEstNeighbourhood
+                  ? "RANKED BY SHARED PAPER COUNT · STANDING IS THE COLLABORATOR'S OWN POSITION, NEVER A JUDGEMENT ON THIS PROFILE"
+                  : "NONE OF THE TOP FIVE HOLDS AN ESTABLISHED RANK — THIS IS A COLLABORATOR LIST, NOT AN ESTABLISHED NEIGHBOURHOOD · STANDING IS THE COLLABORATOR'S OWN POSITION"}
               </div>
             </>
           ) : (
@@ -698,6 +781,23 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
           </Card>
         )}
+
+        {/* field insights — ported from the community spine (2026-08-06): the
+            composer + captured list (msl_hcp_notes write path). Rising was the
+            one spine an MSL could not log an insight on — and with 59% positions
+            coverage it is where the belief-link mechanism has the most claims
+            to link to. */}
+        <SectionHead title="FIELD INSIGHTS" sub={`${notes.length} CAPTURED · MSL-CAPTURED · YOUR TEAM ONLY`}
+          right="COMPOSER + BELIEF LINKS · SAME WRITE PATH AS THE OTHER SPINES" />
+        <Card style={{ padding: "18px 22px" }}>
+          <FieldInsights hcp={profileHcp(hcpId, name, "NSCLC")} variant="ledger" />
+        </Card>
+
+        {/* field intelligence — ported from the community spine: the peer
+            validation panel. Submit path unwired there too; states so honestly. */}
+        <SectionHead title="FIELD INTELLIGENCE" sub="PEER VALIDATION · THREE QUESTIONS"
+          right="SUBMISSION PATH NOT YET WIRED · STATED ON SUBMIT" />
+        <FieldIntelligencePanel />
 
         {/* relationship */}
         <SectionHead title="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS" right="SYNCS WITH THE RISING LEDGER" />

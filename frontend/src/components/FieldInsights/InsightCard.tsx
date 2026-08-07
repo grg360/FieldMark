@@ -282,7 +282,10 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
               if (claimEl) { claimEl.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
               const sectionEl = document.getElementById("belief-profile");
               if (sectionEl) { sectionEl.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
-              navigate(`/hcp/${hcpId}#belief-profile`);
+              // No local belief profile (e.g. the rising spine) — the brief route
+              // carries it for every cohort; /hcp/:id would dispatch straight back
+              // to the spine we're on and drop the hash.
+              navigate(`/hcp/${hcpId}/brief#belief-profile`);
             };
             if (ledger) {
               return (
