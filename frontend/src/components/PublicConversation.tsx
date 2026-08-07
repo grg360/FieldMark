@@ -58,7 +58,7 @@ const serif = (s: number, c: string = INK3, lh = 1.6) => ({ fontFamily: SERIF, f
 const num = (n: number) => n.toLocaleString("en-US");
 
 interface Pt { h: string; name: string | null; f: number; resp: number; n: number; cap: number; verified: boolean; pos: number; bio: string | null; url: string | null }
-interface Row { pos: number; h: string; name: string | null; bio: string | null; url: string | null; f: number; resp: number; n: number; cap: number; orig: number; reply: number; likes: number; replies: number; reposts: number; quotes: number; verified: boolean; via: string | null; top_post: { text: string; at: string; id: string; likes: number; replies: number; reposts: number; quotes: number } | null }
+interface Row { pos: number; tier: "confirmed" | "matched" | "unmatched"; h: string; name: string | null; bio: string | null; url: string | null; f: number; resp: number; n: number; cap: number; orig: number; reply: number; likes: number; replies: number; reposts: number; quotes: number; verified: boolean; via: string | null; top_post: { text: string; at: string; id: string; likes: number; replies: number; reposts: number; quotes: number } | null }
 interface Payload {
   ta_slug: string; window: { start: string; end: string };
   posts_captured: number; posts_included: number; accounts_in_window: number;
@@ -127,7 +127,8 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
 
   // group boundary: re-derived on the 15-day window. 2,000 raw responses holds
   // against the real distribution (a natural gap sits under the 2,2xx cluster).
-  const BOUNDARY = 2000;
+  // Match-tier grouping (2026-08-07): the response BOUNDARY device retired with
+  // the tiered sort — a response threshold band under a tiered order misstates.
 
   const active = pinned ?? hovered; // the readout slot shows hover; click pins
   const activeRowIdx = useMemo(() => (active ? rows.slice(0, shown).findIndex((r) => r.h === active.h) : -1), [active, rows, shown]);
@@ -152,8 +153,9 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
     );
   }
 
-  const groupARows = rows.slice(0, shown).filter((r) => r.resp >= BOUNDARY);
-  const groupBRows = rows.slice(0, shown).filter((r) => r.resp < BOUNDARY);
+  const confirmedRows = rows.slice(0, shown).filter((r) => r.tier === "confirmed");
+  const matchedRows = rows.slice(0, shown).filter((r) => r.tier === "matched");
+  const unmatchedRows = rows.slice(0, shown).filter((r) => r.tier === "unmatched");
 
   return (
     <div style={{ background: BG, border: `1px solid ${LINE.l1}`, margin: "8px 0 24px", fontFamily: MONO }}>
@@ -166,7 +168,7 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
           <span style={{ ...serif(19, INK, 1.2) }}>The Public Conversation <span style={{ color: FAINT }}>/</span> {taLabel}</span>
         </div>
         <div style={{ ...mono(narrow ? 9.5 : 10.5, DIM, "0.11em"), lineHeight: 1.7 }}>
-          {num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED · {num(d.posts_included)} INCLUDED{narrow ? <br /> : " · "}POSTS 20 MAY — 03 JUN 2026 · ORDERED BY RESPONSE RECEIVED
+          {num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED · {num(d.posts_included)} INCLUDED{narrow ? <br /> : " · "}POSTS 20 MAY — 03 JUN 2026 · CONFIRMED MATCHES FIRST · RESPONSE ORDERS WITHIN EACH GROUP
         </div>
       </div>
 
@@ -175,10 +177,10 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
         <div style={{ padding: narrow ? "18px 18px 18px 20px" : "24px 28px 26px 28px", borderLeft: `2px solid ${BRONZE}`, marginLeft: narrow ? 16 : 26 }}>
           <div style={{ ...mono(9.5, BRONZE, "0.2em"), marginBottom: 10 }}>WHAT THIS SURFACE IS</div>
           <div style={{ ...serif(narrow ? 14.5 : 16, INK3, 1.62), maxWidth: 880, textWrap: "pretty" as const }}>
-            Public posts, read as written. These accounts were not drawn from the corpus and are not asserted to be clinicians — they range from people who see patients to people who have been patients, and the surface exists to find the conversation that has not reached the literature. Everything stated about a person below is either their own profile text or a count of their own posts.
+            Public posts, read as written. The list leads with the accounts a person has confirmed against our physician database; everyone else follows below, unmatched and not asserted to be clinicians — they range from people who see patients to people who have been patients, and the surface exists to find the conversation that has not reached the literature. Everything stated about a person below is either their own profile text or a count of their own posts.
           </div>
           <div style={{ ...serif(narrow ? 14 : 16, MID, 1.62), maxWidth: 880, marginTop: 14, textWrap: "pretty" as const }}>
-            {num(d.corpus.matched)} of these {num(d.corpus.accounts_total)} accounts — {Math.round((d.corpus.matched / d.corpus.accounts_total) * 100)}% — match a physician in our database, and {d.corpus.confirmed} of those matches were confirmed by hand. The rest we have not matched to anyone, and we have not tried to.
+            {num(d.corpus.matched)} of these {num(d.corpus.accounts_total)} accounts — {Math.round((d.corpus.matched / d.corpus.accounts_total) * 100)}% — match a physician in our database, and {d.corpus.confirmed} of those matches were confirmed by hand — those confirmed accounts are the first group below. The rest we have not matched to anyone, and we have not tried to; they order by response within their own group.
           </div>
           {d.corpus.untagged_posts > 0 ? (
             <div style={{ ...serif(narrow ? 14 : 16, MID, 1.62), maxWidth: 880, marginTop: 14, textWrap: "pretty" as const }}>
@@ -191,7 +193,7 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
             ["CORPUS CHIP SHOWN WHEN", `A HUMAN CONFIRMED THE MATCH · ${d.corpus.confirmed} OF ${d.corpus.matched}`, MID],
             ["NOT SHOWN", `${d.corpus.medium} MEDIUM-CONFIDENCE · ${d.corpus.held} HELD IN REVIEW`, MID],
             ["ROLE", "READ FROM THE BIO · NOT A STORED FIELD", MID],
-            ["ORDER", "RESPONSE RECEIVED · RAW, UNCORRECTED", MID],
+            ["ORDER", "CONFIRMED → MATCHED → UNMATCHED · RESPONSE WITHIN EACH", MID],
             ["FOLLOWER COUNT", "READ ONCE · DATE NOT RECORDED", AMBER],
             ["CAPTURE", "PAUSED 03 JUN · RESUMED 21 JUL", AMBER],
           ] as [string, string, string][]).map(([k, v, c], i, arr) => (
@@ -366,16 +368,22 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
       </div>
 
       {/* groups + rows */}
-      {groupARows.length > 0 ? (
+      {confirmedRows.length > 0 ? (
         <>
-          <GroupHead label={`GROUP A · RESPONSE RECEIVED ABOVE ${num(BOUNDARY)}`} note="ORDER DESCRIBES RESPONSE TO INCLUDED POSTS · IT IS NOT A JUDGEMENT OF STANDING" narrow={narrow} />
-          {groupARows.map((r, i) => <AccountRow key={r.h} r={r} total={d.accounts_in_window} marked={active?.h === r.h} narrow={narrow} groupA idx={i} />)}
+          <GroupHead label={`CONFIRMED CORPUS MATCH · CLINICIANS WE CAN IDENTIFY`} note={`A PERSON CONFIRMED EACH MATCH · ${num(d.corpus.confirmed)} CONFIRMED OF ${num(d.corpus.matched)} MATCHED CORPUS-WIDE · RESPONSE ORDERS WITHIN THIS GROUP`} narrow={narrow} />
+          {confirmedRows.map((r, i) => <AccountRow key={r.h} r={r} total={d.accounts_in_window} marked={active?.h === r.h} narrow={narrow} idx={i} />)}
         </>
       ) : null}
-      {groupBRows.length > 0 ? (
+      {matchedRows.length > 0 ? (
         <>
-          <GroupHead label={`GROUP B · RESPONSE RECEIVED BELOW ${num(BOUNDARY)}`} note="ONE STRONG POST HERE CARRIES MORE THAN THE GAPS BETWEEN THESE ROWS — TREAT AS TIED" narrow={narrow} />
-          {groupBRows.map((r, i) => <AccountRow key={r.h} r={r} total={d.accounts_in_window} marked={active?.h === r.h} narrow={narrow} groupA={false} idx={i} />)}
+          <GroupHead label={`MATCHED · NOT HAND-CONFIRMED`} note="A DATABASE MATCH EXISTS BUT NO PERSON HAS CONFIRMED IT · RESPONSE ORDERS WITHIN THIS GROUP" narrow={narrow} />
+          {matchedRows.map((r, i) => <AccountRow key={r.h} r={r} total={d.accounts_in_window} marked={active?.h === r.h} narrow={narrow} idx={i} />)}
+        </>
+      ) : null}
+      {unmatchedRows.length > 0 ? (
+        <>
+          <GroupHead label={`EVERYONE ELSE · NOT MATCHED TO OUR DATABASE`} note="NOT ASSERTED TO BE CLINICIANS · RESPONSE ORDERS WITHIN THIS GROUP · ONE STRONG POST CARRIES MORE THAN THE GAPS BETWEEN ROWS" narrow={narrow} />
+          {unmatchedRows.map((r, i) => <AccountRow key={r.h} r={r} total={d.accounts_in_window} marked={active?.h === r.h} narrow={narrow} idx={i} />)}
         </>
       ) : null}
 
@@ -401,15 +409,16 @@ function GroupHead({ label, note, narrow }: { label: string; note: string; narro
 //   org account (shipped classifyVoice) → no quote (an institution's writing is
 //   not a person's voice); all included posts are replies → no quote (a reply
 //   lifted from its thread misrepresents what was said).
-function AccountRow({ r, total, marked, narrow, groupA, idx }: { r: Row; total: number; marked: boolean; narrow: boolean; groupA: boolean; idx: number }) {
+function AccountRow({ r, total, marked, narrow, idx }: { r: Row; total: number; marked: boolean; narrow: boolean; idx: number }) {
+  const confirmedTier = r.tier === "confirmed";
   const org = isOrg(r);
   const allReplies = r.orig === 0;
-  const why = buildWhy(r, org, idx, groupA);
+  const why = buildWhy(r, org, idx, r.tier);
   const postUrl = r.top_post ? `https://x.com/${r.h}/status/${r.top_post.id}` : null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "150px 1fr 340px", borderBottom: `1px solid rgba(255,255,255,0.06)`, borderLeft: groupA ? `2px solid rgba(160,127,52,0.5)` : "none", background: marked ? "rgba(216,169,73,0.05)" : "transparent", outline: marked ? `1px solid rgba(216,169,73,0.4)` : "none", outlineOffset: -1 }}>
+    <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "150px 1fr 340px", borderBottom: `1px solid rgba(255,255,255,0.06)`, borderLeft: confirmedTier ? `2px solid rgba(160,127,52,0.5)` : "none", background: marked ? "rgba(216,169,73,0.05)" : "transparent", outline: marked ? `1px solid rgba(216,169,73,0.4)` : "none", outlineOffset: -1 }}>
       <div style={{ padding: narrow ? "18px 18px 0" : "26px 0 26px 26px", display: narrow ? "flex" : "block", gap: 14, alignItems: "baseline" }}>
-        <span style={{ fontFamily: SERIF, fontSize: narrow ? 26 : 38, lineHeight: 1, color: groupA ? GOLD : "#b08c39" }}>{r.pos}</span>
+        <span style={{ fontFamily: SERIF, fontSize: narrow ? 26 : 38, lineHeight: 1, color: confirmedTier ? GOLD : "#b08c39" }}>{r.pos}</span>
         <div style={{ ...mono(9, FAINT, "0.1em"), marginTop: narrow ? 0 : 8 }}>OF {num(total)}</div>
         <div style={{ color: AMBER, fontSize: 13, letterSpacing: "0.04em", marginTop: narrow ? 0 : 16 }}>{num(r.resp)}</div>
         <div style={{ ...mono(9, FAINT, "0.1em"), marginTop: narrow ? 0 : 4 }}>FROM {r.n} POST{r.n === 1 ? "" : "S"}</div>
@@ -476,9 +485,9 @@ function AccountRow({ r, total, marked, narrow, groupA, idx }: { r: Row; total: 
 }
 
 // Factual, count-only narratives — no synthesis, no judgement words.
-function buildWhy(r: Row, org: boolean, idx: number, groupA: boolean): string {
+function buildWhy(r: Row, org: boolean, idx: number, tier: Row["tier"]): string {
   const bits: string[] = [];
-  bits.push(`${cap(spell(r.n))} included post${r.n === 1 ? "" : "s"} drew ${r.resp.toLocaleString()} responses${groupA && idx === 0 ? ", the highest total in the window" : ""}.`);
+  bits.push(`${cap(spell(r.n))} included post${r.n === 1 ? "" : "s"} drew ${r.resp.toLocaleString()} responses${tier === "confirmed" && idx === 0 ? ", the highest total among confirmed corpus matches" : ""}.`);
   if (r.reply > 0 && r.orig > 0) bits.push(`${cap(spell(r.reply))} of those posts were replies to other people.`);
   if (r.orig === 0 && r.reply > 0) bits.push(`Answering other people is the whole of this account's activity, and the whole of what we can see about it.`);
   if (org) bits.push(`Whether an organisational account belongs on this list at all is open in the audit.`);
