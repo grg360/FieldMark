@@ -65,7 +65,7 @@ export default function LandscapeRoute() {
       <div style={{ padding: "16px 16px 8px", borderBottom: `1px solid ${COLOR.hairStrong}` }}>
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/me")}
           style={{
             padding: 0,
             border: "none",

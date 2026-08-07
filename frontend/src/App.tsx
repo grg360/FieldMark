@@ -849,7 +849,11 @@ export default function App() {
           <Route path="/field-intelligence" element={<ForumIndexPage />} />
           <Route path="/field-intelligence/thread/:id" element={<ThreadPage />} />
           <Route path="/field-intelligence/moderation" element={<ModerationPage />} />
-          <Route path="/" element={<FeedLayout />} />
+          {/* Root → workspace (2026-08-07): every "Home" affordance already means /me;
+              the browse feed keeps its real routes (/:ta, /:ta/:dashboard). The old
+              root feed was the last old-generation surface in the landing slot —
+              FeedLayout/HCPCard rebuild remains on the §7 list. */}
+          <Route path="/" element={<Navigate to="/me" replace />} />
           <Route path="/landscape/:ta" element={<LandscapeRoute />} />
           <Route path="/institutions/:ta" element={<InstitutionsIndexRoute />} />
           <Route path="/institution/:slug/publications" element={<PublicationsListPage />} />

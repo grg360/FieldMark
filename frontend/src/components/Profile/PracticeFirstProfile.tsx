@@ -181,7 +181,7 @@ export default function PracticeFirstProfile() {
     <Shell>
       {/* breadcrumb */}
       <div style={{ display: "flex", gap: 8, padding: "10px 28px", ...mono(10), letterSpacing: "0.1em", color: F.ghost2, borderBottom: `1px solid ${F.lineSub}` }}>
-        <Link to="/" style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Home</Link><span>/</span>
+        <Link to="/me" style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Home</Link><span>/</span>
         <Link to="/cohorts/ledger/community" style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Community</Link><span>/</span>
         <span style={{ color: F.gray }}>{p.hcp.name}</span>
       </div>
