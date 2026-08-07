@@ -46,7 +46,8 @@ const HALO: Record<string, string> = { established: "rgba(255,196,120,0.78)", ri
 // NO claim about the person's ranking (that lives in srcCohort/rank).
 const ROLE: Record<string, string> = { established: "Established", rising: "Rising Star", community: "Community", other: "Outside this sky" };
 const LINE = "#7e93c6";
-const WW = 3400, WH = 1900;
+// World enlarged 2026-08-07 for the 613-node field (was 3400x1900 for ~130).
+const WW = 4800, WH = 2600;
 // Dust extends SKY_PAD px beyond the node field on every side; the camera clamps
 // to this padded box so the viewport can never leave the starfield (item 6).
 const SKY_PAD = 200;
@@ -55,14 +56,14 @@ const SKY_PAD = 200;
 // 12px span, scrambled by the ellipse — a meaningless distance that looked
 // meaningful. Removed.)
 const OFFFIELD_RADIUS = 200;
-const RIS_BUDGET = 80; // working rising set (established seed is always all shown)
+const RIS_BUDGET = 200; // full US rising board fits (123); est seed always all shown
 const LEADERS = 24;    // "Leaders" density = the brightest this many
 
 const hash = (a: number, b: number) => { let s = (((a + 1) * 73856093) ^ ((b + 1) * 19349663)) >>> 0; s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
 const rngFrom = (seed: number) => { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-interface Field { nodes: FNode[]; edges: { a: number; b: number; w: number }[]; adj: Map<number, number>[]; idx: Map<string, number>; leaders: Set<number> }
+interface Field { nodes: FNode[]; edges: { a: number; b: number; w: number }[]; adj: Map<number, number>[]; idx: Map<string, number>; leaders: Set<number>; minW: number }
 
 function buildField(rawNodes: RawNode[], rawEdges: RawEdge[]): Field {
   const degAll = new Map<string, number>();
@@ -89,7 +90,7 @@ function buildField(rawNodes: RawNode[], rawEdges: RawEdge[]): Field {
     const need = spread + 210 + members.length * 16;
     let best: { x: number; y: number } | null = null, bestScore = -1;
     for (let t = 0; t < 400; t++) {
-      const x = 230 + rand() * (WW - 460), y = 200 + rand() * (WH - 400);
+      const x = 120 + rand() * (WW - 240), y = 120 + rand() * (WH - 240);
       let nearest = placed.length ? 1e9 : 9999;
       placed.forEach((p) => { nearest = Math.min(nearest, Math.hypot(x - p.x, (y - p.y) * 1.4)); });
       if (nearest > need) { best = { x, y }; break; }
@@ -123,7 +124,13 @@ function buildField(rawNodes: RawNode[], rawEdges: RawEdge[]): Field {
   const rareCut = risingDegs.length ? risingDegs[Math.floor(risingDegs.length * 0.34)] : 0;
   raw.forEach((n) => { n.rare = n.cohort === "rising" && n.deg <= rareCut; });
   const leaders = new Set(raw.slice().sort((a, b) => b.deg - a.deg).slice(0, LEADERS).map((n) => n.i));
-  return { nodes: raw, edges, adj, idx, leaders };
+  // Adaptive ambient-edge floor (2026-08-07): render at most ~EDGE_BUDGET ambient
+  // lines so the graph reads as structure at any export size. The floor is the
+  // weight of the EDGE_BUDGET-th heaviest edge, never below 12 shared pubs.
+  const EDGE_BUDGET = 1400;
+  const ws = edges.map((e) => e.w).sort((a, b) => b - a);
+  const minW = Math.max(12, ws.length > EDGE_BUDGET ? ws[EDGE_BUDGET] : 12);
+  return { nodes: raw, edges, adj, idx, leaders, minW };
 }
 
 // Real orbit for node i: its baked top-5 focus_collaborators. inField ⇢ collaborator is a
@@ -194,6 +201,7 @@ class Sky extends Component<Props, State> {
   _targets: { key: string; t: "f" | "o"; i?: number; p?: number; k?: number; x: number; y: number }[] = [];
   _raf: number | null = null; _st: ReturnType<typeof setTimeout> | null = null; _zt: ReturnType<typeof setTimeout> | null = null;
   _ro: ResizeObserver | null = null;
+  _wheelNative: ((ev: WheelEvent) => void) | null = null;
 
   constructor(props: Props) {
     super(props);
@@ -208,11 +216,25 @@ class Sky extends Component<Props, State> {
   isMobile() { return this.state.box.w < 760; }
   field(): Field { if (!this._f) this._f = buildField(this.props.taId === AD_TA_ID ? (adNodes as unknown as RawNode[]) : (nsclcNodes as unknown as RawNode[]), this.props.taId === AD_TA_ID ? (adEdges as unknown as RawEdge[]) : (nsclcEdges as unknown as RawEdge[])); return this._f; }
   orbit(i: number): OrbNode[] { if (!this._oc[i]) this._oc[i] = buildOrbit(this.field(), i); return this._oc[i]; }
-  dustFar() { if (!this._df) this._df = dust(5501, 380, WW, WH, 0.4, 1.5, 0.06, 0.42, false, SKY_PAD); return this._df; }
-  dustMid() { if (!this._dm) this._dm = dust(7717, 148, WW, WH, 0.9, 2.3, 0.12, 0.5, true, SKY_PAD); return this._dm; }
+  // Dust decision (2026-08-07): with 613 real stars filling the canvas, the
+  // MID layer is gone — its particles rendered brighter (<=0.5) than the faint
+  // real tier and were indistinguishable from data. One FAR layer stays for
+  // depth, capped at 0.16 opacity: strictly dimmer than the faintest ranked
+  // star (0.34), and the legend now states it is decorative.
+  dustFar() { if (!this._df) this._df = dust(5501, 320, WW, WH, 0.4, 1.4, 0.04, 0.16, false, SKY_PAD); return this._df; }
+  dustMid() { if (!this._dm) this._dm = [] as DustDot[]; return this._dm; }
 
   componentDidMount() {
     const el = this.hostRef.current;
+    // Native NON-PASSIVE wheel listener (2026-08-07): React root wheel handlers
+    // are passive, so the onWheel prop could never preventDefault - every zoom
+    // tick ALSO scrolled the page, walking the (in-flow) nav bar off the top of
+    // the viewport. "The nav is invisible" was the page scrolled under the
+    // fixed sky. Zoom now consumes the wheel entirely over the sky.
+    if (el) {
+      this._wheelNative = (ev: WheelEvent) => { ev.preventDefault(); };
+      el.addEventListener("wheel", this._wheelNative, { passive: false });
+    }
     if (el && typeof ResizeObserver !== "undefined") {
       this._ro = new ResizeObserver(() => {
         const r = el.getBoundingClientRect();
@@ -229,7 +251,7 @@ class Sky extends Component<Props, State> {
     this.paint();
   }
   componentDidUpdate() { this.paint(); }
-  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); if (this._ro) this._ro.disconnect(); if (this._st) clearTimeout(this._st); if (this._zt) clearTimeout(this._zt); }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); if (this._ro) this._ro.disconnect(); if (this._st) clearTimeout(this._st); if (this._zt) clearTimeout(this._zt); if (this.hostRef.current && this._wheelNative) this.hostRef.current.removeEventListener("wheel", this._wheelNative); }
 
   // Top safe-area inset: floating app chrome height + a gap. The Skyview title/search sit
   // just under it, and camera framing keeps interactive stars out of this band.
@@ -399,7 +421,7 @@ class Sky extends Component<Props, State> {
     const g = this.field();
     const { focus, near, cohort, density, query, qOpen } = this.state;
     const cam = this._camT;
-    const minW = 11;
+    const minW = g.minW;
     const focusIdx = focus && focus.t === "f" ? focus.i : null;
     const orbHost = focus ? (focus.t === "f" ? focus.i : focus.p) : null;
     const orb = orbHost != null ? this.orbit(orbHost) : null;
@@ -426,14 +448,17 @@ class Sky extends Component<Props, State> {
       const isSel = focusIdx === i, inOrb = orbFieldIdx.has(i), isNear = nearIdx === i, adjHover = !!hoverAdj && hoverAdj.has(i);
       let op: number;
       if (focus) op = isSel ? 1 : inOrb ? 1 : g.leaders.has(i) ? 0.22 : 0.14;
-      else op = inCohort(n) ? (isLeader(n) ? (n.cohort === "established" ? 1 : 0.88) : 0.26) : 0.07;
+      else op = inCohort(n) ? (isLeader(n) ? (n.cohort === "established" ? 1 : 0.88) : 0.34) : 0.07;
       if (adjHover) op = Math.max(op, 0.7);
       const base = (n.cohort === "established" ? 2.6 + n.deg * 0.12 : 1.9 + n.deg * 0.09) * (isLeader(n) || focus ? 1 : 0.8);
       let r = base, blur = (n.cohort === "established" ? 11 : 7) + n.deg * 0.28;
       if (isSel) { r = base * 2.3; blur *= 2.1; } else if (isNear) { r = base * 1.95; blur *= 1.7; } else if (inOrb) { r = base * 1.5; blur *= 1.4; }
       r = Math.min(r, 24); const c = TINT[n.cohort]; rad[i] = r;
       if (op > 0.12) targets.push({ key: "f" + i, t: "f", i, x: n.x, y: n.y });
-      const live = op > 0.3;
+      // At 613 stars, infinite animations are budgeted to the tier the eye reads:
+      // leaders + anything focused/hovered/orbiting. The faint field is static.
+      const live = op > 0.3 && (g.leaders.has(i) || isSel || isNear || inOrb || adjHover);
+      const halo = n.cohort === "established" ? "url(#svHaloEst)" : n.cohort === "rising" ? "url(#svHaloRis)" : "url(#svHaloOth)";
       // pulse timing — deterministic hash (NOT momentum, which we don't have)
       const period = (4.4 + hash(i, 61) * 4.2) * (isNear || isSel ? 0.5 : 1);
       const risePulse = n.cohort === "rising" && live && op > 0.3;
@@ -442,9 +467,9 @@ class Sky extends Component<Props, State> {
           <g style={live ? { animation: `sv-drift ${n.dr.toFixed(1)}s ease-in-out ${n.drd.toFixed(1)}s infinite` } : undefined}>
             {risePulse && <circle cx={0} cy={0} r={(r * 2.05).toFixed(2)} style={{ fill: "none", stroke: c, strokeWidth: 0.85, transformBox: "fill-box", transformOrigin: "center", animation: `sv-rise ${period.toFixed(2)}s cubic-bezier(.15,.7,.35,1) ${(-hash(i, 61) * period).toFixed(2)}s infinite` }} />}
             {n.rare && live && <circle cx={0} cy={0} r={(r * 2.9).toFixed(2)} style={{ fill: "none", stroke: PURP, strokeOpacity: 0.4, strokeWidth: 0.6, strokeDasharray: "1.5 4", animation: `sv-breathe 6s ease-in-out infinite` }} />}
+            <circle cx={0} cy={0} r={(r + blur * 0.85).toFixed(1)} style={{ fill: halo }} />
             <circle cx={0} cy={0} r={r.toFixed(2)} style={{
               fill: isSel ? "#fffaf0" : c,
-              filter: `drop-shadow(0 0 ${(blur * 0.4).toFixed(1)}px ${c}) drop-shadow(0 0 ${blur.toFixed(1)}px ${HALO[n.cohort]})`,
               transition: "r 260ms cubic-bezier(.2,.9,.3,1)",
               ...(live && !isSel ? { animation: n.cohort === "rising" ? `sv-swell ${(period * 0.5).toFixed(2)}s ease-in-out ${n.twd.toFixed(2)}s infinite` : `sv-tw ${n.tw.toFixed(2)}s ease-in-out ${n.twd.toFixed(2)}s infinite` } : {}),
             }} />
@@ -476,11 +501,11 @@ class Sky extends Component<Props, State> {
       const A = g.nodes[e.a], B = g.nodes[e.b];
       let op = 0, col = LINE; const hov = !!hoverAdj && (e.a === nearIdx || e.b === nearIdx);
       if (focus) { if (e.w >= 22 && !orbFieldIdx.has(e.a) && !orbFieldIdx.has(e.b) && e.a !== focusIdx && e.b !== focusIdx) op = 0.032; }
-      else if (e.w >= minW && inCohort(A) && inCohort(B)) op = (isLeader(A) && isLeader(B)) ? 0.04 + Math.min(0.2, e.w * 0.0055) : 0.028;
+      else if (e.w >= minW && inCohort(A) && inCohort(B)) op = (isLeader(A) && isLeader(B)) ? 0.03 + Math.min(0.12, e.w * 0.003) : 0.02;
       if (hov) { op = Math.max(op, 0.16 + Math.min(0.34, e.w * 0.007)); col = "#e8c79a"; }
       if (op <= 0) return;
       const s = seg(A.x, A.y, B.x, B.y, rad[e.a] + 3, rad[e.b] + 3);
-      edges.push({ key: "e" + i, op, el: <line key={"e" + i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} style={{ stroke: col, strokeOpacity: op, strokeWidth: 0.22 + e.w * 0.0072, strokeLinecap: "round", transition: "stroke-opacity 420ms ease" }} /> });
+      edges.push({ key: "e" + i, op, el: <line key={"e" + i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} style={{ stroke: col, strokeOpacity: op, strokeWidth: Math.min(0.7, 0.1 + e.w * 0.004), strokeLinecap: "round", transition: "stroke-opacity 420ms ease" }} /> });
     });
     edges.sort((a, b) => a.op - b.op);
     if (orb) { const host = g.nodes[orbHost!]; const hostR = rad[orbHost!] + 5;
@@ -587,7 +612,7 @@ class Sky extends Component<Props, State> {
     const quiet = (active: boolean): CSSProperties => ({ font: `${active ? 400 : 300} 11px/1 Jost,sans-serif`, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", paddingBottom: 6, transition: "color 240ms ease,border-color 240ms ease", borderBottom: `1px solid ${active ? "rgba(255,216,155,0.6)" : "transparent"}`, color: active ? "#ffd89b" : "#4d5468" });
     const cohortTabs: [State["cohort"], string][] = [["all", "All"], ["established", "Established"], ["rising", "Rising Star"]];
     const densityTabs: [State["density"], string][] = [["leaders", "Leaders"], ["full", "Full field"]];
-    const densityNote = density === "leaders" ? `The brightest ${LEADERS}. Fainter researchers are still out there — let your eyes adjust, or close in on them.` : "The full working sky is risen. Co-authorship lines thicken with shared publications.";
+    const densityNote = density === "leaders" ? `The brightest ${LEADERS} of ${g.nodes.length}. Fainter researchers are still out there — let your eyes adjust, or close in on them.` : `The full working sky is risen — ${g.nodes.length} ranked researchers. Co-authorship lines thicken with shared publications.`;
 
     const q = query.trim().toLowerCase();
     const matches = g.nodes.filter((n) => !q || n.name.toLowerCase().includes(q) || n.inst.toLowerCase().includes(q)).sort((a, b) => b.deg - a.deg).slice(0, 8);
@@ -597,6 +622,7 @@ class Sky extends Component<Props, State> {
       ["Rising Star — subtle pulse", `width:5px;height:5px;border-radius:50%;background:${PURP};box-shadow:0 0 11px rgba(160,116,255,0.8);outline:1px solid rgba(195,169,255,0.34);outline-offset:4px`],
       ["Outside this sky", `width:5px;height:5px;border-radius:50%;background:${OTHER};box-shadow:0 0 11px rgba(140,178,228,0.7);outline:1px dashed rgba(168,189,216,0.55);outline-offset:3px`],
       ["Shared publications", "width:28px;height:1px;background:linear-gradient(90deg,rgba(126,147,198,0.12),rgba(126,147,198,0.8))"],
+      ["Background dust — decorative, no data", "width:3px;height:3px;border-radius:50%;background:#dce6ff;opacity:0.35"],
     ];
     // Reset control: appears whenever the view has left its initial framing —
     // focus, zoom, OR a pure pan (the old check missed pan, stranding the camera).
@@ -618,6 +644,12 @@ class Sky extends Component<Props, State> {
             <linearGradient id="svTrail" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" /><stop offset="60%" stopColor="#cfe0ff" stopOpacity="0.18" /><stop offset="100%" stopColor="#cfe0ff" stopOpacity="0" /></linearGradient>
             <linearGradient id="svTrail2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#ffffff" stopOpacity="0.75" /><stop offset="70%" stopColor="#e6d4ff" stopOpacity="0.12" /><stop offset="100%" stopColor="#e6d4ff" stopOpacity="0" /></linearGradient>
             <linearGradient id="svTrail3" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#fff4e0" stopOpacity="0.95" /><stop offset="55%" stopColor="#ffd89b" stopOpacity="0.2" /><stop offset="100%" stopColor="#ffd89b" stopOpacity="0" /></linearGradient>
+            {/* Shared halo sprites (2026-08-07): one radial gradient per cohort
+                replaces the two per-star drop-shadow FILTERS — the filters were
+                the frame-rate budget past ~300 nodes; gradients rasterize once. */}
+            <radialGradient id="svHaloEst"><stop offset="0%" stopColor="rgba(255,196,120,0.5)" /><stop offset="42%" stopColor="rgba(255,196,120,0.16)" /><stop offset="100%" stopColor="rgba(255,196,120,0)" /></radialGradient>
+            <radialGradient id="svHaloRis"><stop offset="0%" stopColor="rgba(160,116,255,0.46)" /><stop offset="42%" stopColor="rgba(160,116,255,0.15)" /><stop offset="100%" stopColor="rgba(160,116,255,0)" /></radialGradient>
+            <radialGradient id="svHaloOth"><stop offset="0%" stopColor="rgba(140,178,228,0.42)" /><stop offset="42%" stopColor="rgba(140,178,228,0.13)" /><stop offset="100%" stopColor="rgba(140,178,228,0)" /></radialGradient>
           </defs>
           <g ref={this.farRef}>{this.dustFar().map((d) => <circle key={d.key} cx={d.cx} cy={d.cy} r={d.r} style={sx(d.style)} />)}</g>
           <g ref={this.midRef}>{this.dustMid().map((d) => <circle key={d.key} cx={d.cx} cy={d.cy} r={d.r} style={sx(d.style)} />)}</g>

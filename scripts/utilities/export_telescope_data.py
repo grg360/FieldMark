@@ -28,7 +28,7 @@ from supabase import Client, create_client
 
 NODES_PATH = Path("frontend/src/data/telescope_nsclc_nodes.json")
 EDGES_PATH = Path("frontend/src/data/telescope_nsclc_edges.json")
-STATEMENT_TIMEOUT_MS = 300_000  # 5 minutes
+STATEMENT_TIMEOUT_MS = 900_000  # 15 minutes (613-node export)
 
 # The ESTABLISHED seed reads hcp_established_ranks_v3 — the per-TA-classified table.
 # It previously read hcp_score_ranks_v2, whose established slice is the output of
@@ -61,7 +61,7 @@ WITH top_established AS (
     AND h.country = 'US'
     AND ta.name = 'NSCLC'
   ORDER BY hsr.rank
-  LIMIT 50
+  LIMIT 490
 ),
 network_hcps AS (
   SELECT
@@ -106,7 +106,7 @@ WITH top_established AS (
     AND h.country = 'US'
     AND ta.name = 'NSCLC'
   ORDER BY hsr.rank
-  LIMIT 50
+  LIMIT 490
 ),
 network_hcp_ids AS (
   SELECT hcp_id FROM top_established
@@ -123,17 +123,21 @@ network_hcp_ids AS (
     AND rs.therapeutic_area_id = te.therapeutic_area_id
     AND rs.us_rank IS NOT NULL
 )
+-- publication-first self-join (2026-08-07): at 613 members the old
+-- member-pair-first shape (188k pairs each probing publications) timed out;
+-- joining co-author rows per publication and filtering both ends to the
+-- member set is the linear-in-authorships shape.
 SELECT
-  LEAST(pa1.hcp_id, pa2.hcp_id)::text AS source,
-  GREATEST(pa1.hcp_id, pa2.hcp_id)::text AS target,
+  pa1.hcp_id::text AS source,
+  pa2.hcp_id::text AS target,
   count(DISTINCT pa1.publication_id) AS weight
-FROM network_hcp_ids nh1
-JOIN network_hcp_ids nh2 ON nh1.hcp_id < nh2.hcp_id
-JOIN publication_authors_v2 pa1 ON pa1.hcp_id = nh1.hcp_id
+FROM publication_authors_v2 pa1
 JOIN publication_authors_v2 pa2
   ON pa2.publication_id = pa1.publication_id
-  AND pa2.hcp_id = nh2.hcp_id
-GROUP BY LEAST(pa1.hcp_id, pa2.hcp_id), GREATEST(pa1.hcp_id, pa2.hcp_id);
+  AND pa1.hcp_id < pa2.hcp_id
+WHERE pa1.hcp_id IN (SELECT hcp_id FROM network_hcp_ids)
+  AND pa2.hcp_id IN (SELECT hcp_id FROM network_hcp_ids)
+GROUP BY pa1.hcp_id, pa2.hcp_id;
 """
 
 # ---------------------------------------------------------------------------
@@ -219,17 +223,21 @@ network_hcp_ids AS (
     AND rc.scope_type = 'global'
     AND rc.therapeutic_area_id = te.therapeutic_area_id
 )
+-- publication-first self-join (2026-08-07): at 613 members the old
+-- member-pair-first shape (188k pairs each probing publications) timed out;
+-- joining co-author rows per publication and filtering both ends to the
+-- member set is the linear-in-authorships shape.
 SELECT
-  LEAST(pa1.hcp_id, pa2.hcp_id)::text AS source,
-  GREATEST(pa1.hcp_id, pa2.hcp_id)::text AS target,
+  pa1.hcp_id::text AS source,
+  pa2.hcp_id::text AS target,
   count(DISTINCT pa1.publication_id) AS weight
-FROM network_hcp_ids nh1
-JOIN network_hcp_ids nh2 ON nh1.hcp_id < nh2.hcp_id
-JOIN publication_authors_v2 pa1 ON pa1.hcp_id = nh1.hcp_id
+FROM publication_authors_v2 pa1
 JOIN publication_authors_v2 pa2
   ON pa2.publication_id = pa1.publication_id
-  AND pa2.hcp_id = nh2.hcp_id
-GROUP BY LEAST(pa1.hcp_id, pa2.hcp_id), GREATEST(pa1.hcp_id, pa2.hcp_id);
+  AND pa1.hcp_id < pa2.hcp_id
+WHERE pa1.hcp_id IN (SELECT hcp_id FROM network_hcp_ids)
+  AND pa2.hcp_id IN (SELECT hcp_id FROM network_hcp_ids)
+GROUP BY pa1.hcp_id, pa2.hcp_id;
 """
 
 # TA registry — --ta selects which SQL + output paths to use. NSCLC entry uses the
@@ -260,14 +268,7 @@ WITH seed AS (SELECT DISTINCT unnest(%(ids)s::uuid[]) AS hcp_id)  -- DISTINCT: t
 -- undeduped seed would fan the join out and duplicate that node's collaborators.
 SELECT tc.hcp_id::text AS seed_id, tc.rank, tc.shared_publications,
        tc.collaborator_hcp_id::text AS collab_id,
-       trim(coalesce(h.first_name,'') || ' ' || coalesce(h.last_name,'')) AS collab_name,
-       (SELECT min(er.rank) FROM hcp_established_ranks_v3 er
-          WHERE er.hcp_id = tc.collaborator_hcp_id
-            AND er.therapeutic_area_id = %(ta)s AND er.scope_type = 'global') AS est_rank,
-       ({rising_rank}) AS rising_rank,
-       (SELECT min(cr.rank) FROM hcp_community_ranks_v2 cr
-          WHERE cr.hcp_id = tc.collaborator_hcp_id
-            AND cr.therapeutic_area_id = %(ta)s) AS community_rank
+       trim(coalesce(h.first_name,'') || ' ' || coalesce(h.last_name,'')) AS collab_name
 FROM hcp_top_collaborators_v2 tc
 JOIN seed s ON s.hcp_id = tc.hcp_id
 JOIN hcps_v2 h ON h.id = tc.collaborator_hcp_id
@@ -278,14 +279,14 @@ ORDER BY tc.hcp_id, tc.rank
 # Per-TA rising RANK scalar + the cohort's population size (for the percentile
 # comparison). NSCLC → hcp_rising_star_ranks_v3 (US-scoped via us_rank); AD →
 # hcp_rising_composite_v1 (global). Kept consistent with the rising node layer.
-NSCLC_RISING_RANK = """SELECT min(sr.us_rank) FROM hcp_rising_star_ranks_v3 sr
-              WHERE sr.hcp_id = tc.collaborator_hcp_id
-                AND sr.therapeutic_area_id = %(ta)s AND sr.us_rank IS NOT NULL"""
+NSCLC_RISING_RANK = """SELECT hcp_id::text AS id, min(us_rank) AS r FROM hcp_rising_star_ranks_v3
+              WHERE therapeutic_area_id = %(ta)s AND us_rank IS NOT NULL
+                AND hcp_id = ANY(%(ids)s::uuid[]) GROUP BY 1"""
 NSCLC_RISING_SIZE = """SELECT count(*) AS c FROM hcp_rising_star_ranks_v3
               WHERE therapeutic_area_id = %(ta)s AND us_rank IS NOT NULL"""
-AD_RISING_RANK = """SELECT min(sr.rank) FROM hcp_rising_composite_v1 sr
-              WHERE sr.hcp_id = tc.collaborator_hcp_id
-                AND sr.therapeutic_area_id = %(ta)s AND sr.scope_type = 'global'"""
+AD_RISING_RANK = """SELECT hcp_id::text AS id, min(rank) AS r FROM hcp_rising_composite_v1
+              WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global'
+                AND hcp_id = ANY(%(ids)s::uuid[]) GROUP BY 1"""
 AD_RISING_SIZE = """SELECT count(*) AS c FROM hcp_rising_composite_v1
               WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global'"""
 
@@ -379,8 +380,24 @@ def enrich_focus(nodes: List[Dict[str, Any]], ta_id: str, rising_rank: str, risi
     when the collaborator is genuinely unranked in all three cohorts.
     """
     ids = [n["id"] for n in nodes]
-    sql = FOCUS_SQL_TEMPLATE.format(rising_rank=rising_rank)
+    sql = FOCUS_SQL_TEMPLATE
     rows = run_query(sql, {"ids": ids, "ta": ta_id})
+    # Batched rank lookups (2026-08-07): the old correlated per-row subqueries
+    # were quadratic at 613 seeds and timed out; three set queries replace them.
+    collab_ids = sorted({r["collab_id"] for r in rows})
+    est_map = {r["id"]: r["r"] for r in run_query(
+        "SELECT hcp_id::text AS id, min(rank) AS r FROM hcp_established_ranks_v3 "
+        "WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global' "
+        "AND hcp_id = ANY(%(ids)s::uuid[]) GROUP BY 1", {"ta": ta_id, "ids": collab_ids})}
+    ris_map = {r["id"]: r["r"] for r in run_query(rising_rank, {"ta": ta_id, "ids": collab_ids})}
+    com_map = {r["id"]: r["r"] for r in run_query(
+        "SELECT hcp_id::text AS id, min(rank) AS r FROM hcp_community_ranks_v2 "
+        "WHERE therapeutic_area_id = %(ta)s AND hcp_id = ANY(%(ids)s::uuid[]) GROUP BY 1",
+        {"ta": ta_id, "ids": collab_ids})}
+    for r in rows:
+        r["est_rank"] = est_map.get(r["collab_id"])
+        r["rising_rank"] = ris_map.get(r["collab_id"])
+        r["community_rank"] = com_map.get(r["collab_id"])
     est_size = (run_query(
         "SELECT count(*) AS c FROM hcp_established_ranks_v3 "
         "WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global'", {"ta": ta_id})[0]["c"]) or 1
