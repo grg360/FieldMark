@@ -24,15 +24,19 @@ function resolveHcpId(hcp: HCP): string {
   return String(hcp.hcp_id ?? hcp.id ?? "");
 }
 
-function resolveFirstName(hcp: HCP): string {
+// The capture prompts address the physician formally — Dr. <surname>, never
+// Dr. <first name> (the "Dr. Suresh" bug, fixed 2026-08-07). The prop keeps its
+// historical name downstream; the VALUE is the surname.
+function resolveSurname(hcp: HCP): string {
   const name = (hcp.name ?? "").trim();
   if (!name) return "this HCP";
-  return name.split(/\s+/)[0] ?? "this HCP";
+  const parts = name.split(/\s+/);
+  return (parts[parts.length - 1] ?? "this HCP").replace(/[.,]+$/, "") || "this HCP";
 }
 
 export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
   const hcpId = resolveHcpId(hcp);
-  const firstName = resolveFirstName(hcp);
+  const firstName = resolveSurname(hcp);
   const isMobile = useMediaQuery("(max-width: 768px)");
   const { refreshInsightCounts } = useRelationships();
 

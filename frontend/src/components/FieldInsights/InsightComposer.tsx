@@ -14,10 +14,42 @@ import {
 import {
   INSIGHT_CATEGORIES,
   CATEGORY_LABELS,
-  CATEGORY_COLORS,
   type InsightCategory,
 } from "../../lib/insightCategories";
 import { formatOccurredAt } from "./dateFormat";
+import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
+
+// ── Register kit (2026-08-07 conversion — Beat 8 surface) ────────────────────
+// Chip treatment shared with the profile rails; the category glyph is the
+// /me/insights action-weight vocabulary (filled = obligates, half = feeds
+// work, outline = accumulates) — taxonomy reads by weight, never by hue.
+const monoLabel: CSSProperties = { fontFamily: FONT.mono, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: COOL.label };
+const CATEGORY_WEIGHT: Record<InsightCategory, number> = {
+  message_challenge: 0, evidence_gap: 1, competitor_signal: 2, safety_observation: 3,
+  access_reimbursement: 4, message_reinforcement: 5, patient_selection: 6,
+  clinical_practice_trend: 7, other: 8,
+};
+function tierOf(cat: InsightCategory): 0 | 1 | 2 {
+  const w = CATEGORY_WEIGHT[cat];
+  return w <= 1 ? 0 : w <= 4 ? 1 : 2;
+}
+function TierGlyph({ cat, dim }: { cat: InsightCategory; dim: boolean }) {
+  const tier = tierOf(cat);
+  const ink = dim ? COOL.faint : tier === 0 ? COOL.ui : tier === 1 ? COOL.muted : COOL.chrome;
+  if (tier === 0) return <span style={{ width: 8, height: 8, background: ink, display: "inline-block", flex: "none" }} />;
+  if (tier === 1) return <span style={{ width: 8, height: 8, border: `1px solid ${ink}`, boxSizing: "border-box", background: `linear-gradient(90deg, ${ink} 50%, transparent 50%)`, display: "inline-block", flex: "none" }} />;
+  return <span style={{ width: 8, height: 8, border: `1px solid ${ink}`, boxSizing: "border-box", display: "inline-block", flex: "none" }} />;
+}
+function regChip(selected: boolean): CSSProperties {
+  return {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    fontFamily: FONT.mono, fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase",
+    padding: "5px 9px", borderRadius: 0, cursor: "pointer", minHeight: 0,
+    background: selected ? "rgba(255,255,255,0.07)" : "transparent",
+    border: `1px solid ${selected ? "rgba(255,255,255,0.28)" : LINE.l2}`,
+    color: selected ? COOL.ui : COOL.chrome, fontWeight: selected ? 600 : 400,
+  };
+}
 
 const INTERACTION_TYPES: InteractionType[] = [
   "general",
@@ -39,47 +71,6 @@ function interactionTypeLabel(type: InteractionType): string {
   if (type === "advisory_board") return "ADVISORY BOARD";
   if (type === "tumor_board") return "TUMOR BOARD";
   return type.toUpperCase();
-}
-
-function interactionChipStyle(type: InteractionType): CSSProperties {
-  switch (type) {
-    case "meeting":
-      return { backgroundColor: "#E8A020", color: "#0A0A0B" };
-    case "email":
-      return { backgroundColor: "#4A90E2", color: "#FFFFFF" };
-    case "phone":
-      return { backgroundColor: "#5A9B7F", color: "#FFFFFF" };
-    case "other":
-      return { backgroundColor: "#7B7B9C", color: "#FFFFFF" };
-    case "conference":
-      return { backgroundColor: "#9B6DFF", color: "#FFFFFF" };
-    case "publication_review":
-      return { backgroundColor: "#3FB8AF", color: "#0A0A0B" };
-    case "internal":
-      return { border: "1px solid #6B6A65", color: "#6B6A65", backgroundColor: "transparent" };
-    case "advisory_board":
-      return { backgroundColor: "#D0AF6E", color: "#0A0A0B" };
-    case "tumor_board":
-      return { backgroundColor: "#E8704E", color: "#FFFFFF" };
-    default:
-      return { backgroundColor: "#2A2A30", color: "#9B9892" };
-  }
-}
-
-function strengthPillStyle(strength: InsightStrength, selected: boolean): CSSProperties {
-  if (!selected) {
-    return { backgroundColor: "#1E1E22", color: "#6B6A65" };
-  }
-  switch (strength) {
-    case "routine":
-      return { backgroundColor: "#2A2A30", color: "#9B9892" };
-    case "notable":
-      return { border: "1px solid #E8A020", color: "#E8A020", backgroundColor: "transparent" };
-    case "strategic":
-      return { backgroundColor: "#E8A020", color: "#0A0A0B", fontWeight: 600 };
-    default:
-      return { backgroundColor: "#1E1E22", color: "#6B6A65" };
-  }
 }
 
 function strengthLabel(strength: InsightStrength): string {
@@ -338,16 +329,6 @@ export default function InsightComposer({
     }
   }
 
-  const pillBase: CSSProperties = {
-    padding: "4px 8px",
-    borderRadius: 3,
-    fontSize: 11,
-    textTransform: "uppercase",
-    border: "none",
-    cursor: "pointer",
-    fontFamily: "system-ui, -apple-system, sans-serif",
-  };
-
   if (isInline && !showForm) {
     // Ledger register (academic profile): the frame's "+ CAPTURE" bar — a gold
     // marker, a serif prompt and the SOURCE · TAG · LINK affordance — rather than a
@@ -406,7 +387,7 @@ export default function InsightComposer({
   }
 
   return (
-    <div style={{ opacity: saving ? 0.6 : 1, marginBottom: 12, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ opacity: saving ? 0.6 : 1, padding: "16px 18px 18px", fontFamily: FONT.mono }}>
       <style>{`
         .fm-insight-composer-textarea::placeholder {
           color: #9B9892;
@@ -427,26 +408,26 @@ export default function InsightComposer({
         style={{
           width: "100%",
           minHeight: 80,
-          borderRadius: 4,
-          backgroundColor: "#0D0D10",
-          border: "1px solid #1E1E22",
-          color: "#E8E6DF",
-          fontSize: 14,
+          borderRadius: 0,
+          backgroundColor: GROUND.g2,
+          border: `1px solid ${LINE.l1}`,
+          color: COOL.ui,
+          fontSize: 14.5,
           padding: 12,
-          lineHeight: 1.5,
+          lineHeight: 1.55,
           resize: "none",
           overflow: "hidden",
           outline: "none",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: FONT.serif,
           boxSizing: "border-box",
         }}
       />
 
       <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 11, color: "#E8E6DF", fontWeight: 600, marginBottom: 4 }}>
+        <div style={{ ...monoLabel, marginBottom: 4 }}>
           Why it matters
         </div>
-        <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8, lineHeight: 1.4 }}>
+        <div style={{ fontFamily: FONT.serif, fontSize: 12.5, color: COOL.muted, marginBottom: 8, lineHeight: 1.45 }}>
           What's the strategic implication of this insight? This is what your manager will see in their weekly brief.
         </div>
         <textarea
@@ -459,17 +440,17 @@ export default function InsightComposer({
           style={{
             width: "100%",
             minHeight: 60,
-            borderRadius: 4,
-            backgroundColor: "#0D0D10",
-            border: "1px solid rgba(29, 158, 117, 0.30)",
-            color: "#E8E6DF",
-            fontSize: 13,
+            borderRadius: 0,
+            backgroundColor: GROUND.g2,
+            border: `1px solid ${LINE.l1}`,
+            color: COOL.ui,
+            fontSize: 13.5,
             padding: 12,
-            lineHeight: 1.5,
+            lineHeight: 1.55,
             resize: "none",
             overflow: "hidden",
             outline: "none",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontFamily: FONT.serif,
             boxSizing: "border-box",
           }}
         />
@@ -478,8 +459,8 @@ export default function InsightComposer({
       {/* Link a sourced position — anchors this insight to a belief claim on the
           profile. Writes belief_claim_key (matching the rendered claim-<key>
           target). Empty for HCPs with no positions, stated honestly. */}
-      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
-        Link a position <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+      <div style={{ ...monoLabel, marginBottom: 6, marginTop: 14 }}>
+        Link a position <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>(optional)</span>
       </div>
       {beliefClaims === null ? (
         <div style={{ fontSize: 12, color: "#6B6A65" }}>Loading positions…</div>
@@ -489,7 +470,7 @@ export default function InsightComposer({
         </div>
       ) : (
         <>
-          <div style={{ fontSize: 11, color: "#6B6A65", marginBottom: 8, lineHeight: 1.4 }}>
+          <div style={{ fontFamily: FONT.serif, fontSize: 12.5, color: COOL.muted, marginBottom: 8, lineHeight: 1.45 }}>
             If the conversation related to one of this HCP's published positions, link it — the insight will point at that position on the belief profile.
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -502,12 +483,9 @@ export default function InsightComposer({
                   onClick={() => setSelectedClaimKey(selected ? null : claim.claimKey)}
                   title={claim.summary ?? undefined}
                   style={{
-                    ...pillBase,
+                    ...regChip(selected),
                     textTransform: "none",
-                    backgroundColor: selected ? "rgba(155,109,255,0.16)" : "#1E1E22",
-                    color: selected ? "#B89BFF" : "#9B9892",
-                    border: selected ? "1px solid rgba(155,109,255,0.5)" : "1px solid transparent",
-                    fontWeight: selected ? 600 : 400,
+                    ...(selected ? { color: GOLD.gold, border: `1px solid ${GOLD.dim}`, background: "transparent" } : null),
                   }}
                 >
                   {claim.theme}
@@ -518,26 +496,20 @@ export default function InsightComposer({
         </>
       )}
 
-      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
+      <div style={{ ...monoLabel, marginBottom: 6, marginTop: 14 }}>
         Category <span style={{ color: "#E8704E" }}>*</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {INSIGHT_CATEGORIES.map((category) => {
           const selected = insightCategory === category;
-          const colors = CATEGORY_COLORS[category];
           return (
             <button
               key={category}
               type="button"
               onClick={() => setInsightCategory(category)}
-              style={{
-                ...pillBase,
-                backgroundColor: selected ? colors.bg : "#1E1E22",
-                color: selected ? colors.fg : "#6B6A65",
-                border: selected ? `1px solid ${colors.border}` : "none",
-                fontWeight: selected ? 600 : 400,
-              }}
+              style={regChip(selected)}
             >
+              <TierGlyph cat={category} dim={!selected} />
               {CATEGORY_LABELS[category].toUpperCase()}
             </button>
           );
@@ -555,19 +527,19 @@ export default function InsightComposer({
             width: "100%",
             height: 36,
             marginTop: 8,
-            borderRadius: 4,
-            backgroundColor: "#0D0D10",
-            border: "1px solid #1E1E22",
-            color: "#E8E6DF",
-            fontSize: 13,
+            borderRadius: 0,
+            backgroundColor: GROUND.g2,
+            border: `1px solid ${LINE.l1}`,
+            color: COOL.ui,
+            fontSize: 12.5,
             padding: "0 12px",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontFamily: FONT.mono,
             outline: "none",
           }}
         />
       ) : null}
 
-      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
+      <div style={{ ...monoLabel, marginBottom: 6, marginTop: 14 }}>
         Type
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -578,11 +550,7 @@ export default function InsightComposer({
               key={type}
               type="button"
               onClick={() => setInteractionType(type)}
-              style={{
-                ...pillBase,
-                ...(selected ? interactionChipStyle(type) : { backgroundColor: "#1E1E22", color: "#6B6A65" }),
-                border: selected ? "1px solid #E8E6DF" : "none",
-              }}
+              style={regChip(selected)}
             >
               {interactionTypeLabel(type)}
             </button>
@@ -601,19 +569,19 @@ export default function InsightComposer({
             width: "100%",
             height: 36,
             marginTop: 8,
-            borderRadius: 4,
-            backgroundColor: "#0D0D10",
-            border: "1px solid #1E1E22",
-            color: "#E8E6DF",
-            fontSize: 13,
+            borderRadius: 0,
+            backgroundColor: GROUND.g2,
+            border: `1px solid ${LINE.l1}`,
+            color: COOL.ui,
+            fontSize: 12.5,
             padding: "0 12px",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontFamily: FONT.mono,
             outline: "none",
           }}
         />
       ) : null}
 
-      <div style={{ fontSize: 10, color: "#6B6A65", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, marginTop: 14 }}>
+      <div style={{ ...monoLabel, marginBottom: 6, marginTop: 14 }}>
         Strength
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -625,9 +593,8 @@ export default function InsightComposer({
               type="button"
               onClick={() => setInsightStrength(strength)}
               style={{
-                ...pillBase,
-                ...strengthPillStyle(strength, selected),
-                border: selected ? "1px solid #E8E6DF" : "none",
+                ...regChip(selected),
+                ...(selected && strength === "strategic" ? { color: GOLD.gold, border: `1px solid ${GOLD.dim}`, background: "transparent" } : null),
               }}
             >
               {strengthLabel(strength)}
@@ -646,8 +613,10 @@ export default function InsightComposer({
             style={{
               background: "none",
               border: "none",
-              color: "#9B9892",
-              fontSize: 12,
+              color: COOL.chrome,
+              fontFamily: FONT.mono,
+              fontSize: 11,
+              letterSpacing: "0.06em",
               cursor: "pointer",
               padding: 0,
             }}
@@ -701,8 +670,11 @@ export default function InsightComposer({
           style={{
             background: "none",
             border: "none",
-            color: "#6B6A65",
-            fontSize: 12,
+            color: COOL.label,
+            fontFamily: FONT.mono,
+            fontSize: 10.5,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
             cursor: "pointer",
             padding: 0,
           }}
@@ -717,15 +689,18 @@ export default function InsightComposer({
               onClick={() => void handleSave()}
               disabled={!validation.saveEnabled || saving}
               style={{
-                backgroundColor: "#E8A020",
-                color: "#0A0A0B",
-                padding: "6px 14px",
-                fontWeight: 500,
-                fontSize: 13,
-                borderRadius: 4,
-                border: "none",
+                backgroundColor: "transparent",
+                color: validation.saveEnabled ? GOLD.gold : COOL.label,
+                padding: "7px 15px",
+                fontWeight: 600,
+                fontFamily: FONT.mono,
+                fontSize: 10.5,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                borderRadius: 0,
+                border: `1px solid ${validation.saveEnabled ? GOLD.dim : LINE.l2}`,
                 cursor: validation.saveEnabled && !saving ? "pointer" : "default",
-                opacity: validation.saveEnabled ? 1 : 0.5,
+                opacity: validation.saveEnabled ? 1 : 0.6,
               }}
             >
               {validation.buttonLabel}
