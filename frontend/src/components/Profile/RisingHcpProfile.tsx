@@ -129,6 +129,122 @@ function quadrantProse(sci: string, net: string): string {
   return `Position, not a type: scientific momentum at ${sci}, network momentum at ${net}. The region name describes where this profile sits on the two engines this week.`;
 }
 
+// ── THE RECORD — Design frame "The Record.dc.html" option 1A, paired windows ─
+// (2026-08-06, replaces the four-cell arrow deltas.) Every row is two stacked
+// windows; the bar is the movement; bars scale within their own row ONLY
+// (early fill = early/recent of the track, recent bar full). Frame bytes kept
+// for the semantic bar colors — the citation copper is deliberately distinct
+// from the count-row gold because accrual is not a window count, and the
+// senior green marks filled squares. Above TICK_CAP recent-window papers the
+// senior squares become proportion bars — BOTH windows switch together so the
+// pair stays comparable.
+const REC = {
+  track: "#161618", // bar track
+  earlyBar: "#3d3a35", // early-window fill — dim, the baseline
+  countBar: "#c9762e", // recent-window fill on the two COUNT rows
+  citeBar: "#8a5a2a", // citation accrual — distinct copper, never the count gold
+  seniorFill: "#5aa07a", // senior-authored square / proportion fill
+  hollow: "#2e2e31", // hollow square + proportion outline
+  dash: "#2b2b2e", // NO STOCK dashed rule
+} as const;
+const REC_TICK_CAP = 60; // above this many recent-window papers, squares → proportion bars
+
+function RecRow({ label, sub, children, right, last = false }: {
+  label: string; sub: string; children: ReactNode; right: ReactNode; last?: boolean;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "190px 1fr 168px", gap: 28, padding: last ? "22px 22px 24px" : "22px 22px 20px", borderBottom: last ? "none" : `1px solid ${RULE}` }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <div style={mono(11, INK0, 0.16)}>{label}</div>
+        <div style={{ ...mono(10, MUT2, 0.1), lineHeight: 1.5, whiteSpace: "pre-line" }}>{sub}</div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{children}</div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-end", gap: 3 }}>{right}</div>
+    </div>
+  );
+}
+
+function RecWindow({ label, bar, value, recent = false }: {
+  label: string; bar: ReactNode; value: ReactNode; recent?: boolean;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "132px 1fr 74px", alignItems: "center", gap: 16 }}>
+      <div style={mono(10, recent ? MUT : MUT2, 0.09)}>{label}</div>
+      <div>{bar}</div>
+      <div style={{ textAlign: "right" }}>{value}</div>
+    </div>
+  );
+}
+
+// ×(recent/early) — one decimal below 10, whole above; a zero or absent early
+// window cannot be a ratio and says so instead of rendering ×Infinity.
+function recMult(early: number | null | undefined, recent: number | null | undefined): string | null {
+  if (early == null || recent == null || early <= 0) return null;
+  const r = recent / early;
+  return `×${r >= 10 ? r.toFixed(0) : r.toFixed(1)}`;
+}
+
+function RecCountRow({ label, sub, caption, early, recent, ew, rw, absent }: {
+  label: string; sub: string; caption: string;
+  early: number | null | undefined; recent: number | null | undefined;
+  ew: string; rw: string; absent: string;
+}) {
+  if (early == null || recent == null) {
+    return (
+      <RecRow label={label} sub={sub} right={null}>
+        <div style={{ ...serif(12.5, INK2, 1.6), maxWidth: 640 }}>{absent}</div>
+      </RecRow>
+    );
+  }
+  const mult = recMult(early, recent);
+  const span = Math.max(recent, early, 1);
+  return (
+    <RecRow label={label} sub={sub}
+      right={mult != null ? (
+        <>
+          <div style={{ font: `400 26px/1 ${SERIF}`, color: INK0 }}>{mult}</div>
+          <div style={mono(10, MUT2, 0.1)}>{caption}</div>
+        </>
+      ) : (
+        <div style={{ ...mono(10, MUT2, 0.1), textAlign: "right", lineHeight: 1.6 }}>FROM ZERO —<br />NOT A RATIO</div>
+      )}>
+      <RecWindow label={ew}
+        bar={<div style={{ display: "flex", height: 9, background: REC.track }}>
+          <div style={{ flex: early, background: REC.earlyBar, minWidth: early ? 3 : 0 }} />
+          <div style={{ flex: span - early }} />
+        </div>}
+        value={<div style={{ font: `300 22px/1 ${SERIF}`, color: MUT3, fontVariantNumeric: "tabular-nums" }}>{early.toLocaleString("en-US")}</div>} />
+      <RecWindow label={rw} recent
+        bar={<div style={{ display: "flex", height: 16, background: REC.track }}><div style={{ flex: 1, background: REC.countBar }} /></div>}
+        value={<div style={{ font: `400 40px/0.9 ${SERIF}`, color: INK0, fontVariantNumeric: "tabular-nums" }}>{recent.toLocaleString("en-US")}</div>} />
+    </RecRow>
+  );
+}
+
+// One square per paper, filled where senior-authored; above REC_TICK_CAP recent
+// papers both windows switch to a proportion bar together.
+function RecSeniorWindow({ seniorN, totalN, ticks, height }: {
+  seniorN: number; totalN: number; ticks: boolean; height: number;
+}) {
+  if (ticks) {
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
+        {Array.from({ length: totalN }, (_, i) => i < seniorN ? (
+          <div key={i} style={{ width: 9, height: 9, background: REC.seniorFill }} />
+        ) : (
+          <div key={i} style={{ width: 9, height: 9, border: `1px solid ${REC.hollow}`, boxSizing: "border-box" }} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", height, border: `1px solid ${REC.hollow}` }}>
+      <div style={{ flex: seniorN, background: REC.seniorFill, minWidth: seniorN ? 3 : 0 }} />
+      <div style={{ flex: Math.max(totalN - seniorN, 0) }} />
+    </div>
+  );
+}
+
 // ── FIELD INTELLIGENCE — ported from the community spine (2026-08-06) ────────
 // Same three validation questions, same segmented inline options, same honest
 // unwired submit (field_intel_* tables are SELECT-only — see KNOWN_ISSUES).
@@ -272,42 +388,6 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
     nw?.recent_collaborator_count != null ? `${nw.recent_collaborator_count} COLLABORATORS` : "COLLABORATOR COUNT NOT COMPUTED",
     (p.positions?.total ?? 0) > 0 ? `${p.positions!.total} EXTRACTED POSITIONS` : "OUTSIDE THE EXTRACTION WINDOW",
     "NETWORK CENTRALITY PRESENT",
-  ];
-
-  const deltas = [
-    {
-      label: "PUBLICATIONS",
-      prior: m?.early_total_pubs != null ? String(m.early_total_pubs) : "NOT COMPUTED",
-      current: m?.recent_total_pubs != null ? String(m.recent_total_pubs) : "NOT COMPUTED",
-      note: `${ew} → ${rw} · SOURCE TABLE`, color: INK0,
-    },
-    {
-      label: "COLLABORATORS",
-      prior: nw?.early_collaborator_count != null ? String(nw.early_collaborator_count) : "NOT COMPUTED",
-      current: nw?.recent_collaborator_count != null ? String(nw.recent_collaborator_count) : "NOT COMPUTED",
-      note: "DISTINCT CO-AUTHORS", color: INK0,
-    },
-    {
-      label: "CITATIONS",
-      prior: "BASE WINDOW",
-      current: m?.citation_velocity_delta != null
-        ? `${m.citation_velocity_delta >= 0 ? "+" : "−"}${Math.abs(m.citation_velocity_delta).toLocaleString("en-US")}`
-        : "NOT COMPUTED",
-      note: "GROWTH ACROSS THE WINDOW", color: m && (m.citation_velocity_delta ?? 0) >= 0 ? GREEN : INK2,
-    },
-    seniorParsed && m?.recent_senior_author_pct != null
-      ? {
-          label: "SENIOR-AUTHOR SHARE",
-          prior: pctStr(m.early_senior_author_pct) ?? "0%",
-          current: pctStr(m.recent_senior_author_pct)!,
-          note: "SOURCE TABLE", color: GREEN,
-        }
-      : {
-          label: "AUTHOR POSITION",
-          prior: "NOT PARSED",
-          current: "NOT PARSED",
-          note: "NOT PARSED ON THIS RECORD", color: MUT2,
-        },
   ];
 
   const posStates = [
@@ -473,17 +553,13 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           </div>
         </Card>
 
-        {/* momentum & visibility + the record — paired on one row (2026-08-06).
-            The pairing first proposed (M&V beside ESTABLISHED STANDING) was
-            rejected on the data: 78 of the 123 US rising stars are dual-board,
-            so the standing card renders the full two-rank comparison — not the
-            one-line absence — and the pair would compress both. THE RECORD is
-            the natural partner: momentum is a delta and the record is shown as
-            a delta, so the row reads as one claim with its evidence. */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
-        <div style={{ minWidth: 0 }}>
+        {/* momentum & visibility — full width again (2026-08-06): THE RECORD's
+            Design frame (option 1A, paired windows) is a 1180px full-bleed
+            composition whose fixed columns do not survive a half column, so the
+            earlier M&V + RECORD pairing is dissolved; THE RECORD renders
+            full-bleed below the relationship row. */}
         <SectionHead title="MOMENTUM & VISIBILITY" sub="FOUR COMPONENTS · TWO ENGINES"
-          right="PERCENTILES WITHIN THE RISING COHORT" />
+          right="PERCENTILES WITHIN THE RISING COHORT · NEVER AGAINST ESTABLISHED" />
         <Card>
           <div style={{ display: "grid", gridTemplateColumns: "104px 1fr 1fr" }}>
             <div style={{ padding: "12px 14px", borderBottom: `1px solid ${RULE}` }} />
@@ -544,39 +620,6 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
           </div>
         </Card>
-        </div>
-
-        {/* the record — paired column; deltas 2×2 at half width */}
-        <div style={{ minWidth: 0 }}>
-        <SectionHead title="THE RECORD" sub="TWO SOURCE TABLES · FOUR PARALLEL DELTAS"
-          right="MOMENTUM IS A DELTA · THE RECORD IS SHOWN AS A DELTA" />
-        <Card>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)" }}>
-            {deltas.map((d) => (
-              <div key={d.label} style={{ padding: 18, borderRight: `1px solid ${RULE}`, borderBottom: `1px solid ${RULE}` }}>
-                <div style={mono(8, DIM, 0.14)}>{d.label}</div>
-                <div style={{ marginTop: 11, display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                  <div style={{ font: `400 15px/1 ${MONO}`, color: MUT2 }}>{d.prior}</div>
-                  <div style={{ font: `400 11px/1 ${MONO}`, color: FAINT }}>→</div>
-                  <div style={{ font: `500 ${d.current.length > 12 ? 13 : 24}px/1 ${MONO}`, color: d.color }}>{d.current}</div>
-                </div>
-                <div style={{ marginTop: 10, ...mono(8, DIM2, 0.11), lineHeight: 1.6 }}>{d.note}</div>
-              </div>
-            ))}
-          </div>
-          {!seniorParsed && (
-            <div style={{ padding: 18 }}>
-              <div style={mono(11, MUT, 0.14, 500)}>AUTHORSHIP POSITION NOT PARSED ON THIS RECORD</div>
-              <div style={{ marginTop: 12, ...serif(12.5, INK2, 1.7), maxWidth: 980 }}>
-                Publication leadership — first, senior and middle-author share — is parsed for 60% of the rising board.
-                It is not parsed here, so this surface does not show an authorship split rather than showing a zero.
-                Counts, collaborators and both momentum components are unaffected; they do not depend on author position.
-              </div>
-            </div>
-          )}
-        </Card>
-        </div>
-        </div>
 
         {/* relationship + contact — directly under the score row, matching the
             established spine's sequence (signal block, then the workspace
@@ -589,6 +632,72 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           <Card style={{ padding: 18 }}>
             <ProfileSecondaryControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
           </Card>
+        </div>
+
+        {/* the record — frame 1A, paired windows (see the REC note above) */}
+        <SectionHead title="THE RECORD" sub="TWO FIVE-YEAR WINDOWS · FOUR MEASURES"
+          right="BARS SCALE WITHIN THEIR OWN ROW ONLY" />
+        <Card>
+          <RecCountRow label="PUBLICATIONS" sub={"COUNT OF PAPERS\nIN EACH WINDOW"} caption="AS MANY PAPERS"
+            early={m?.early_total_pubs} recent={m?.recent_total_pubs} ew={ew} rw={rw}
+            absent="Window counts are not computed for this record — the momentum table holds no row, so no bar is drawn and no movement is claimed." />
+          <RecCountRow label="COLLABORATORS" sub={"DISTINCT CO-AUTHORS\nIN EACH WINDOW"} caption="AS MANY PEOPLE"
+            early={nw?.early_collaborator_count} recent={nw?.recent_collaborator_count} ew={ew} rw={rw}
+            absent="Collaborator windows are not computed for this record — no bar is drawn and no movement is claimed." />
+
+          {/* CITATIONS — accrual, not a window count: no early stock exists to
+              compare, so the early row is a dashed empty rule reading NO STOCK
+              and the recent bar takes the distinct copper, never the count gold. */}
+          <RecRow label="CITATIONS" sub={"VOLUME ACCRUED\nNOT A WINDOW COUNT"}
+            right={<div style={{ ...mono(11, MUT, 0.1), textAlign: "right", lineHeight: 1.5 }}>ADDED ACROSS<br />THE WINDOW</div>}>
+            <RecWindow label={ew}
+              bar={<div style={{ height: 9, borderBottom: `1px dashed ${REC.dash}` }} />}
+              value={<div style={mono(10, DIM, 0.08)}>NO STOCK</div>} />
+            <RecWindow label={rw} recent
+              bar={<div style={{ display: "flex", height: 16, background: REC.track }}><div style={{ flex: 1, background: REC.citeBar }} /></div>}
+              value={m?.citation_velocity_delta != null ? (
+                <div style={{ font: `400 40px/0.9 ${SERIF}`, color: INK0, fontVariantNumeric: "tabular-nums" }}>
+                  {`${m.citation_velocity_delta >= 0 ? "+" : "−"}${Math.abs(m.citation_velocity_delta).toLocaleString("en-US")}`}
+                </div>
+              ) : (
+                <div style={mono(10, DIM, 0.08)}>NOT COMPUTED</div>
+              )} />
+          </RecRow>
+
+          {/* SENIOR AUTHORSHIP — one square per paper, filled for senior-authored;
+              both windows switch to proportion bars together above REC_TICK_CAP. */}
+          {seniorParsed && m?.early_senior_pubs != null && m?.recent_senior_pubs != null
+            && m?.early_total_pubs != null && m?.recent_total_pubs != null ? (() => {
+            const ticks = m.recent_total_pubs! <= REC_TICK_CAP;
+            return (
+              <RecRow label="SENIOR AUTHORSHIP" sub={"SHARE OF EACH\nWINDOW'S PAPERS"} last
+                right={m.recent_senior_author_pct != null ? (
+                  <>
+                    <div style={{ font: `400 26px/1 ${SERIF}`, color: REC.seniorFill }}>{pctStr(m.recent_senior_author_pct)}</div>
+                    <div style={mono(10, MUT2, 0.1)}>OF RECENT PAPERS</div>
+                  </>
+                ) : null}>
+                <RecWindow label={ew}
+                  bar={<RecSeniorWindow seniorN={m.early_senior_pubs!} totalN={m.early_total_pubs!} ticks={ticks} height={9} />}
+                  value={<div style={{ ...mono(11, MUT3, 0.02), whiteSpace: "nowrap" }}>{m.early_senior_pubs} of {m.early_total_pubs}</div>} />
+                <RecWindow label={rw} recent
+                  bar={<RecSeniorWindow seniorN={m.recent_senior_pubs!} totalN={m.recent_total_pubs!} ticks={ticks} height={14} />}
+                  value={<div style={{ ...mono(11, INK0, 0.02), whiteSpace: "nowrap" }}>{m.recent_senior_pubs} of {m.recent_total_pubs}</div>} />
+              </RecRow>
+            );
+          })() : (
+            <div style={{ padding: "20px 22px 24px" }}>
+              <div style={mono(11, MUT, 0.14, 500)}>AUTHORSHIP POSITION NOT PARSED ON THIS RECORD</div>
+              <div style={{ marginTop: 12, ...serif(12.5, INK2, 1.7), maxWidth: 980 }}>
+                Publication leadership — first, senior and middle-author share — is parsed for 60% of the rising board.
+                It is not parsed here, so this surface does not show an authorship split rather than showing a zero.
+                Counts, collaborators and both momentum components are unaffected; they do not depend on author position.
+              </div>
+            </div>
+          )}
+        </Card>
+        <div style={{ marginTop: 8, ...mono(10, DIM2, 0.1) }}>
+          SOURCE TABLES · WINDOW COUNTS AND CITATION ACCRUAL ARE SEPARATE MEASURES AND ARE NOT COMPARED TO EACH OTHER
         </div>
 
         {/* established standing */}
