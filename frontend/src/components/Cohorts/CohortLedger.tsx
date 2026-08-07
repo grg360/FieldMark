@@ -220,7 +220,10 @@ function RisingChipView({ flag, hcpId, mobile = false }: { flag: RisingFlags; hc
         </Link>
       ) : null}
       {trial ? (
-        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ display: "inline-flex", alignItems: "center", border: `1px solid ${P.lineMed}`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em", color: P.ink3 }}>
+        // Register restyle 2026-08-07 (approved): COOL.ui ink at 600 on a strong
+        // border — pure-ink emphasis, same no-hue discipline as the state ladder.
+        // Never the cohort violet: that is a semantic marker, not a data accent.
+        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ display: "inline-flex", alignItems: "center", border: `1px solid ${P.lineStrong}`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: P.ink0 }}>
           OPEN TRIAL
         </span>
       ) : null}

@@ -476,7 +476,8 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                     </span>
                   ) : null}
                   {flags?.on_open_trial ? (
-                    <span title="Named investigator on at least one rendered open trial. Gated view; the registry labels every site lead PI, so no lead claim is made." style={{ padding: "3px 8px", border: `1px solid ${LINE.l2}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: INK1 }}>
+                    // Same restyle as the ledger badge (2026-08-07): full ink, strong border.
+                    <span title="Named investigator on at least one rendered open trial. Gated view; the registry labels every site lead PI, so no lead claim is made." style={{ padding: "3px 8px", border: `1px solid ${LINE.l2}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: INK0 }}>
                       OPEN-TRIAL INVESTIGATOR
                     </span>
                   ) : null}
@@ -853,25 +854,39 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           sub={(p.positions?.total ?? 0) > 0 ? `COVERED · ${p.positions!.first_basis} FIRST · ${p.positions!.senior_basis} SENIOR` : "ABSENCE STATE · COVERAGE, NOT AUTHORSHIP"}
           right="EXTRACTION WINDOW · TOP 100 US RISING STARS" tick={GOLD_MUTED} />
         {(p.positions?.total ?? 0) > 0 ? (
-          <Card style={{ padding: "20px 22px" }}>
-            <div style={mono(13, SERIF_INK, 0.14, 500)}>{p.positions!.total} EXTRACTED POSITIONS — INSIDE THE EXTRACTION WINDOW</div>
-            <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: 1040 }}>
-              Positions are extracted for the top 100 US rising stars. At US rank {usRank} this profile is inside that
-              window and fully covered. The extractor accepts first authors as well as senior authors
-              {p.positions!.first_basis > 0 ? `, which matters here: ${p.positions!.first_basis} of the ${p.positions!.total} positions rest on first-authored work.` : "."}
+          /* Right-field counterweight (2026-08-07, approved): the extraction stamp —
+             window, rank-inside, basis split — mirrors the SIGNAL SUMMARY stamp so the
+             two generated sections compose identically. Every figure is already loaded. */
+          <Card style={{ padding: "20px 22px", display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <div style={{ flex: 1, minWidth: 300 }}>
+              <div style={mono(13, SERIF_INK, 0.14, 500)}>{p.positions!.total} EXTRACTED POSITIONS — INSIDE THE EXTRACTION WINDOW</div>
+              <div style={{ marginTop: 14, ...serif(13, SERIF_INK), maxWidth: "74ch" }}>
+                Positions are extracted for the top 100 US rising stars. At US rank {usRank} this profile is inside that
+                window and fully covered. The extractor accepts first authors as well as senior authors
+                {p.positions!.first_basis > 0 ? `, which matters here: ${p.positions!.first_basis} of the ${p.positions!.total} positions rest on first-authored work.` : "."}
+              </div>
+              <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderTop: `1px solid ${RULE}` }}>
+                {[["EXTRACTED", p.positions!.total], ["FIRST-AUTHORED BASIS", p.positions!.first_basis], ["SENIOR-AUTHORED BASIS", p.positions!.senior_basis]].map(([lbl, v], i) => (
+                  <div key={String(lbl)} style={{ padding: i === 0 ? "14px 22px 0 0" : i === 1 ? "14px 22px 0" : "14px 0 0 22px", borderLeft: i > 0 ? `1px solid ${RULE}` : "none" }}>
+                    <div style={mono(8, DIM, 0.14)}>{lbl}</div>
+                    <div style={{ marginTop: 9, font: `500 22px/1 ${MONO}`, color: INK0 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${RULE}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={mono(8, FAINT, 0.11)}>STATEMENTS, BASIS AND EVIDENCE RENDER IN THE BELIEF-PROFILE PATTERN</div>
+                <div style={{ flex: 1 }} />
+                <Link to={`/hcp/${hcpId}/positions`} style={{ textDecoration: "none", padding: "6px 11px", border: `1px solid ${LINE.l2}`, font: `500 8px/1.3 ${MONO}`, letterSpacing: ".11em", color: MUT }}>ALL POSITIONS ↗</Link>
+              </div>
             </div>
-            <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderTop: `1px solid ${RULE}` }}>
-              {[["EXTRACTED", p.positions!.total], ["FIRST-AUTHORED BASIS", p.positions!.first_basis], ["SENIOR-AUTHORED BASIS", p.positions!.senior_basis]].map(([lbl, v], i) => (
-                <div key={String(lbl)} style={{ padding: i === 0 ? "14px 22px 0 0" : i === 1 ? "14px 22px 0" : "14px 0 0 22px", borderLeft: i > 0 ? `1px solid ${RULE}` : "none" }}>
-                  <div style={mono(8, DIM, 0.14)}>{lbl}</div>
-                  <div style={{ marginTop: 9, font: `500 22px/1 ${MONO}`, color: INK0 }}>{v}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${RULE}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={mono(8, FAINT, 0.11)}>STATEMENTS, BASIS AND EVIDENCE RENDER IN THE BELIEF-PROFILE PATTERN</div>
-              <div style={{ flex: 1 }} />
-              <Link to={`/hcp/${hcpId}/positions`} style={{ textDecoration: "none", padding: "6px 11px", border: `1px solid ${LINE.l2}`, font: `500 8px/1.3 ${MONO}`, letterSpacing: ".11em", color: MUT }}>ALL POSITIONS ↗</Link>
+            <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={mono(9, INK2, 0.16, 600)}>EXTRACTION STAMP</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={mono(9, FAINT, 0.1)}>WINDOW · TOP 100 US RISING</span>
+                <span style={mono(9, FAINT, 0.1)}>AT US RANK #{usRank} — INSIDE</span>
+                <span style={mono(9, FAINT, 0.1)}>BASIS · {p.positions!.first_basis} FIRST · {p.positions!.senior_basis} SENIOR</span>
+              </div>
+              <span style={{ ...mono(8.5, FAINT, 0.06), lineHeight: 1.55 }}>EXTRACTED FROM FIRST- AND SENIOR-AUTHORED ABSTRACTS · CONFIDENCE-FLOORED · REVIEW BEFORE USE · NO CLINICAL CLAIM</span>
             </div>
           </Card>
         ) : (

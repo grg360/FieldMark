@@ -383,7 +383,7 @@ export default function RisingLedger() {
                             <span title="Senior-authored years within the FieldMark corpus — we see only what is ingested." style={{ padding: "2px 6px", border: `1px solid ${GREEN_DK}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: GREEN }}>SENIOR SINCE {flags.get(r.hcp_id)?.first_senior_year ?? "—"}</span>
                           ) : null}
                           {flags.get(r.hcp_id)?.on_open_trial ? (
-                            <span title="Named investigator on >= 1 rendered open trial (gated view; registry labels every site lead PI)" style={{ padding: "2px 6px", border: `1px solid ${LINE.l2}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: INK1 }}>OPEN TRIAL</span>
+                            <span title="Named investigator on >= 1 rendered open trial (gated view; registry labels every site lead PI)" style={{ padding: "2px 6px", border: `1px solid ${LINE.l2}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: INK0 }}>OPEN TRIAL</span>
                           ) : null}
                           {!flags.get(r.hcp_id)?.senior_transition && !flags.get(r.hcp_id)?.on_open_trial ? (
                             <span style={mono(8, DIM2, 0.1)}>—</span>
@@ -432,7 +432,7 @@ export default function RisingLedger() {
                             <span title="Senior-authored years within the FieldMark corpus — we see only what is ingested." style={{ padding: "2px 6px", border: `1px solid ${GREEN_DK}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: GREEN }}>SENIOR SINCE {flags.get(r.hcp_id)?.first_senior_year ?? "—"}</span>
                           ) : null}
                           {flags.get(r.hcp_id)?.on_open_trial ? (
-                            <span title="Named investigator on >= 1 rendered open trial (gated view; registry labels every site lead PI)" style={{ padding: "2px 6px", border: `1px solid ${LINE.l2}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: INK1 }}>OPEN TRIAL</span>
+                            <span title="Named investigator on >= 1 rendered open trial (gated view; registry labels every site lead PI)" style={{ padding: "2px 6px", border: `1px solid ${LINE.l2}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: INK0 }}>OPEN TRIAL</span>
                           ) : null}
                           {!flags.get(r.hcp_id)?.senior_transition && !flags.get(r.hcp_id)?.on_open_trial ? (
                             <span style={mono(8, DIM2, 0.1)}>—</span>
