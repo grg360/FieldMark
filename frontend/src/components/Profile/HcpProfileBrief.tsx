@@ -165,7 +165,7 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
         {single ? <span style={{ ...mono(8, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span> : null}
         {pos.confidence != null ? <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink5 }}>CONF {pos.confidence.toFixed(2)}</span> : null}
       </div>
-      <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty", maxWidth: "100ch", display: "block" }}>{pos.summary}</span>
+      <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty", display: "block" }}>{pos.summary}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>
         <span>BASIS {basisN} PUBLICATION{basisN === 1 ? "" : "S"}{fullPapers > basisN && basisN > 0 ? ` · SAMPLE OF ${fullPapers}` : ""}</span>
         {yr ? <span>SOURCED {yr}</span> : null}
