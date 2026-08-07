@@ -90,7 +90,7 @@ export default function HcpPublicationsPage() {
       ) : seniorRows.length === 0 && coAuthorTotal === 0 ? (
         <div style={{ fontSize: 13, color: COLOR.ink4, padding: "24px 0" }}>No publications held for this investigator.</div>
       ) : (
-        <FullCareerView seniorRows={seniorRows} coAuthorTotal={coAuthorTotal} ledger={ledger} hcpName={hcpName} />
+        <FullCareerView hcpId={hcpId ?? ""} seniorRows={seniorRows} coAuthorTotal={coAuthorTotal} ledger={ledger} hcpName={hcpName} />
       )}
     </AppLayout>
   );

@@ -9,6 +9,7 @@
 // safe to wire behind the route; no per-co-author-row enrichment is done.
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { PublicationListRow, PublicationYearLedgerRow } from "../../lib/publicationsList";
 import DiscussAffordance from "../FieldIntelligenceForum/DiscussAffordance";
 
@@ -49,25 +50,51 @@ function SeniorRow({ r }: { r: PublicationListRow }) {
   );
 }
 
-function YearLedgerRow({ y }: { y: PublicationYearLedgerRow }) {
+// Abbreviate a journal for the narrow column: drop parentheticals, take the
+// first clause, cap length — full names wrapped to 5–6 lines and blew out row
+// height (the whitespace in the page's bottom half).
+function abbrevJournal(j: string): string {
+  const clean = j.replace(/\s*\([^)]*\)\s*/g, "").replace(/[.:].*$/, "").trim();
+  return clean.length > 26 ? clean.slice(0, 25).trimEnd() + "…" : clean;
+}
+
+function YearLedgerRow({ y, hcpId, maxCite }: { y: PublicationYearLedgerRow; hcpId: string; maxCite: number }) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const ticks = Math.min(y.paper_count, 40);
+  // Bar is a MEASURE: width ∝ the year's citation weight against the heaviest
+  // year, so 1,533 and 150 no longer render the same length. OA rides as a
+  // brighter leading segment (its share of the year's papers).
+  const weight = maxCite > 0 ? y.citation_total / maxCite : 0;
+  const oaShare = y.paper_count > 0 ? y.open_access_count / y.paper_count : 0;
+  const journals = y.leading_journals.slice(0, 2).map(abbrevJournal).join(" · ");
   return (
     <div style={{ borderTop: `1px solid ${C.line}` }}>
-      <div onClick={() => setOpen((v) => !v)} style={{ display: "grid", gridTemplateColumns: "80px 90px 1fr 120px 90px", gap: 16, padding: "12px 0", alignItems: "center", cursor: "pointer" }}>
-        <span style={{ font: `600 15px/1 ${MONO}`, color: C.ink2 }}>{y.year}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "72px 84px 1fr 150px 118px", gap: 16, padding: "11px 0", alignItems: "center" }}>
+        {/* year → that year's full publication view (senior + co-author), where an
+            individual paper — e.g. a mid-cited senior paper past the top five — is
+            reachable and carries the Discuss affordance. */}
+        <button
+          type="button"
+          onClick={() => navigate(`/hcp/${hcpId}/publications?year=${y.year}`)}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", font: `600 15px/1 ${MONO}`, color: C.ink2, borderBottom: `1px solid ${C.line2}`, justifySelf: "start" }}
+        >
+          {y.year}
+        </button>
         <span style={{ font: `600 14px/1 ${MONO}`, color: C.mid, fontVariantNumeric: "tabular-nums" }}>{y.citation_total.toLocaleString()}<span style={{ font: `400 8px/1 ${MONO}`, color: C.faint2 }}> CIT</span></span>
-        <span style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-          {Array.from({ length: ticks }).map((_, i) => (
-            <span key={i} style={{ width: 5, height: 12, background: i < y.open_access_count ? C.tickOn : C.tick, flex: "none" }} />
-          ))}
+        {/* citation-weight bar */}
+        <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span style={{ position: "relative", height: 10, flex: 1, background: C.tick, minWidth: 40 }}>
+            <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(weight * 100, 1.5)}%`, background: C.tickOn }} />
+            {oaShare > 0 ? <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(weight * oaShare * 100, 1)}%`, background: C.gold }} /> : null}
+          </span>
+          <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: C.faint, flex: "none" }}>{y.open_access_count} OA</span>
         </span>
-        <span style={{ font: `400 10px/1.4 ${MONO}`, letterSpacing: ".04em", color: C.dim, textAlign: "right" }}>{y.leading_journals.join(" · ") || "—"}</span>
-        <span style={{ font: `400 10px/1 ${MONO}`, letterSpacing: ".08em", color: C.mid, textAlign: "right" }}>{y.paper_count} PAPER{y.paper_count === 1 ? "" : "S"}</span>
+        <span style={{ font: `400 10px/1.4 ${MONO}`, letterSpacing: ".04em", color: C.dim, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{journals || "—"}</span>
+        <span onClick={() => setOpen((v) => !v)} style={{ font: `400 10px/1 ${MONO}`, letterSpacing: ".08em", color: C.mid, textAlign: "right", cursor: "pointer" }}>{y.paper_count} PAPER{y.paper_count === 1 ? "" : "S"} {open ? "▾" : "▸"}</span>
       </div>
       {open ? (
-        <div style={{ padding: "0 0 12px 96px", font: `400 11px/1.6 ${MONO}`, color: C.dim }}>
-          {y.paper_count} co-authored · {y.open_access_count} open access · {y.citation_total.toLocaleString()} citations{y.leading_journals.length ? ` · led by ${y.leading_journals.join(", ")}` : ""}.
+        <div style={{ padding: "0 0 12px 88px", font: `400 11px/1.6 ${MONO}`, color: C.dim }}>
+          {y.paper_count} co-authored · {y.open_access_count} open access · {y.citation_total.toLocaleString()} citations{y.leading_journals.length ? ` · led by ${y.leading_journals.slice(0, 3).map(abbrevJournal).join(", ")}` : ""}. <button type="button" onClick={() => navigate(`/hcp/${hcpId}/publications?year=${y.year}`)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", color: C.gold }}>Open {y.year} →</button>
         </div>
       ) : null}
     </div>
@@ -75,11 +102,13 @@ function YearLedgerRow({ y }: { y: PublicationYearLedgerRow }) {
 }
 
 export default function FullCareerView({
+  hcpId,
   seniorRows,
   coAuthorTotal,
   ledger,
   hcpName,
 }: {
+  hcpId: string;
   seniorRows: PublicationListRow[];
   coAuthorTotal: number;
   ledger: PublicationYearLedgerRow[];
@@ -90,9 +119,30 @@ export default function FullCareerView({
   const shownSenior = showAllSenior ? senior : senior.slice(0, 5);
   const ledgerYears = ledger.length;
   const grandTotal = senior.length + coAuthorTotal;
+  const maxCite = Math.max(1, ...ledger.map((y) => y.citation_total));
+  // Header stat row (frame 1c): the four figures the frame leads with, over the
+  // whole record. Citations = senior rows + co-author year totals; OA likewise.
+  const totalCites = senior.reduce((s, r) => s + citeN(r), 0) + ledger.reduce((s, y) => s + y.citation_total, 0);
+  const totalOa = senior.filter((r) => r.fullTextIsOa).length + ledger.reduce((s, y) => s + y.open_access_count, 0);
+
+  const Stat = ({ n, label, color }: { n: string; label: string; color: string }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <div style={{ font: `400 22px/1 ${MONO}`, letterSpacing: "-.02em", color, fontVariantNumeric: "tabular-nums" }}>{n}</div>
+      <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".14em", color: C.dim }}>{label}</div>
+    </div>
+  );
 
   return (
     <div style={{ background: C.bg, color: C.ink, fontFamily: MONO, display: "flex", flexDirection: "column", gap: 26 }}>
+      {/* header stat row (frame 1c) */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 34, flexWrap: "wrap", paddingBottom: 2 }}>
+        <Stat n={senior.length.toLocaleString()} label="SENIOR AUTHOR" color={C.gold} />
+        <Stat n={coAuthorTotal.toLocaleString()} label="CO-AUTHOR" color={C.ink2} />
+        <div style={{ width: 1, alignSelf: "stretch", background: C.line2 }} />
+        <Stat n={totalCites.toLocaleString()} label="CITATIONS · ALL YEARS" color={C.ink2} />
+        <Stat n={totalOa.toLocaleString()} label="OPEN ACCESS · FULL TEXT" color="#7ba36f" />
+      </div>
+
       {/* SENIOR AUTHOR — five most cited, expandable to all */}
       <section>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, paddingBottom: 6 }}>
@@ -117,10 +167,10 @@ export default function FullCareerView({
           <span style={{ marginLeft: "auto", font: `400 9.5px/1 ${MONO}`, letterSpacing: ".11em", color: C.dim }}>{coAuthorTotal} PAPERS · {ledgerYears} YEARS · CLICK A YEAR</span>
         </div>
         <div style={{ height: 2, background: C.line2 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "80px 90px 1fr 120px 90px", gap: 16, padding: "9px 0", font: `400 8px/1 ${MONO}`, letterSpacing: ".14em", color: C.faint2 }}>
-          <span>YEAR</span><span>CITED</span><span>OPEN ACCESS · TICK PER PAPER</span><span style={{ textAlign: "right" }}>LEADING JOURNALS</span><span style={{ textAlign: "right" }}>PAPERS HELD</span>
+        <div style={{ display: "grid", gridTemplateColumns: "72px 84px 1fr 150px 118px", gap: 16, padding: "9px 0", font: `400 8px/1 ${MONO}`, letterSpacing: ".14em", color: C.faint2 }}>
+          <span>YEAR</span><span>CITED</span><span>CITATION WEIGHT · OA</span><span style={{ textAlign: "right" }}>LEADING JOURNALS</span><span style={{ textAlign: "right" }}>PAPERS HELD</span>
         </div>
-        {ledger.map((y) => <YearLedgerRow key={y.year} y={y} />)}
+        {ledger.map((y) => <YearLedgerRow key={y.year} y={y} hcpId={hcpId} maxCite={maxCite} />)}
       </section>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 16, borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
