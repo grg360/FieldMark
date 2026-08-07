@@ -364,7 +364,7 @@ export default function RisingLedger() {
               {absenceMode ? (
                 <div style={{ padding: 22 }}>
                   <div style={mono(12, SERIF_INK, 0.14, 500)}>{noStateCount} US PROFILES HAVE NO STATE IN THE REGISTRY</div>
-                  <div style={{ marginTop: 14, ...serif(13, SERIF_INK, 1.72), maxWidth: 1020 }}>
+                  <div style={{ marginTop: 14, ...serif(13, SERIF_INK, 1.72) }}>
                     These are {noStateCount} of the {usCount} US rising HCPs whose NPI record carries no state. Rank,
                     composite percentile and all four components are covered for every one of them — the gap
                     is a registry field, not the signal. They are excluded from any state filter and included in every US

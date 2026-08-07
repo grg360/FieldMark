@@ -438,7 +438,7 @@ export default function PracticeFirstProfile() {
           <span style={{ color: F.amber, fontSize: 8, lineHeight: 2.2 }}>◆</span>
           <div>
             <div style={{ ...mono(9), letterSpacing: "0.18em", color: F.amber, marginBottom: 6 }}>WHAT TO DO WITH THIS</div>
-            <div style={{ ...serif(14.5), lineHeight: 1.55, color: F.body, maxWidth: "98ch", textWrap: "pretty" }}>
+            <div style={{ ...serif(14.5), lineHeight: 1.55, color: F.body, textWrap: "pretty" }}>
               The relationship record describes a {oral.length >= injectable.length ? "targeted-and-oral-therapy prescriber" : "prescriber"}. The claims describe an infusion practice{genericNames.length ? ` led by ${genericNames[0]}` : ""}. Both are true — the orals simply do not appear in Part B. Do not treat the gap as disengagement; treat it as a question about where the injectables went.{sharpest ? ` ${sharpest.product.drug} is the sharpest one: a relationship through ${fmtMonth(sharpest.product.most_recent)}, an ${sharpest.ref?.route ?? "injectable"} agent, and no administration in his top codes through 2023.` : ""}
             </div>
           </div>
@@ -587,7 +587,7 @@ export default function PracticeFirstProfile() {
             {pr.admin_codes.map((c) => <AdminRow key={c.code} c={c} aligned={aligned} />)}
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 24, marginTop: 10, ...mono(10), color: F.ghost, lineHeight: 1.65, flexWrap: "wrap" }}>
-            <div style={{ maxWidth: "96ch", textWrap: "pretty" }}>
+            <div style={{ textWrap: "pretty" }}>
               {pr.admin_codes.length - adminMapped.length} codes carry claims rank with no agent name — HCPCS→agent mapping is {cov?.hcpcs_named ?? "—"}% complete across the top-200 cohort's held codes; the unmapped tail is supportive-care, unclassified and NOC codes, which resolve only by pairing with NDC-level data. Named here as a gap rather than dropped. Per-code beneficiary, service and dollar volumes are not retained in the summary — those columns await a claims-detail rebuild.
             </div>
           </div>
@@ -695,7 +695,7 @@ export default function PracticeFirstProfile() {
           {p.narrative?.why_this ? (
             <div style={{ padding: "22px 28px 26px" }}>
               <div style={{ marginBottom: 12 }}><SectionTag tag="WHY THIS PRACTITIONER" /></div>
-              <div style={{ ...serif(15), lineHeight: 1.65, color: F.body, maxWidth: "96ch", paddingLeft: 14, borderLeft: `1px solid ${F.border2}`, textWrap: "pretty" }}>{p.narrative.why_this}</div>
+              <div style={{ ...serif(15), lineHeight: 1.65, color: F.body, paddingLeft: 14, borderLeft: `1px solid ${F.border2}`, textWrap: "pretty" }}>{p.narrative.why_this}</div>
             </div>
           ) : null}
         </div>

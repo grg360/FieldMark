@@ -459,11 +459,11 @@ export default function HcpProfileBrief() {
             <div style={{ display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
               <div style={{ flex: 1, minWidth: 300 }}>
                 {hasSynthPara ? (
-                  <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6, maxWidth: "74ch" }}>{p.belief.headline}</div>
+                  <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6 }}>{p.belief.headline}</div>
                 ) : nPos > 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 10 }}>
                     <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SYNTHESIS AT THIS DEPTH</span>
-                    <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", maxWidth: "74ch", display: "block" }}>The one-paragraph characterisation is generated from the shape of a record — the tiers, the recurrences, the throughline. {nPos} position{nPos === 1 ? "" : "s"} {nPos === 1 ? "has" : "have"} no shape. The positions themselves are below, unsummarised.</span>
+                    <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", display: "block" }}>The one-paragraph characterisation is generated from the shape of a record — the tiers, the recurrences, the throughline. {nPos} position{nPos === 1 ? "" : "s"} {nPos === 1 ? "has" : "have"} no shape. The positions themselves are below, unsummarised.</span>
                   </div>
                 ) : null}
               </div>
