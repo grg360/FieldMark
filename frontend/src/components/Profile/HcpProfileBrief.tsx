@@ -317,20 +317,14 @@ export default function HcpProfileBrief() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead id="signal" tag="SIGNAL SUMMARY" count="WHO IS THIS" sub="GENERATED SYNTHESIS" />
           {p.signal_summary ? (
-            /* Prose at a measure (left), provenance stamp as the counterweight in
-               the right field — the empty field read as broken at 100% zoom. The
-               stamp says why to trust the sentence (what data run, how many
-               sources, which prompt), not a figure the header already carries. */
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
-              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", maxWidth: "74ch", flex: 1, minWidth: 300, display: "block" }}>{p.signal_summary}</span>
-              <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-                <span style={{ ...mono(9, 600), letterSpacing: ".16em", color: P.ink5 }}>GENERATED SYNTHESIS</span>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>
-                  <span>DATA RUN {p.signal_summary_generated_at ? p.signal_summary_generated_at.slice(0, 10) : "UNSTAMPED"}</span>
-                  <span>READS {p.record_depth.sources ?? 0} SOURCE{p.record_depth.sources === 1 ? "" : "S"} · {p.record_depth.papers ?? 0} PAPER{p.record_depth.papers === 1 ? "" : "S"}</span>
-                  <span>PROMPT {p.signal_summary_version ? p.signal_summary_version.toUpperCase() : "UNVERSIONED"}</span>
-                </div>
-                <span style={{ ...mono(8.5, 500), letterSpacing: ".06em", color: P.ink6, lineHeight: 1.55 }}>MODEL SYNTHESIS OVER THE SOURCED AUDIT · REVIEW BEFORE USE · NO CLINICAL CLAIM</span>
+            /* Single column (2026-08-07): the 74ch prose + 216px stamp left ~500px
+               of dead field between them and read as broken. Prose runs the
+               container at a 90ch measure; the provenance stamp folds to one mono
+               caveat line beneath, the way caveat lines render everywhere else. */
+            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
+              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", maxWidth: "90ch", display: "block" }}>{p.signal_summary}</span>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${P.line}`, ...mono(9, 500), letterSpacing: ".08em", color: P.ink6, lineHeight: 1.7 }}>
+                GENERATED SYNTHESIS · DATA RUN {p.signal_summary_generated_at ? p.signal_summary_generated_at.slice(0, 10) : "UNSTAMPED"} · READS {p.record_depth.sources ?? 0} SOURCE{p.record_depth.sources === 1 ? "" : "S"} · {p.record_depth.papers ?? 0} PAPER{p.record_depth.papers === 1 ? "" : "S"} · PROMPT {p.signal_summary_version ? p.signal_summary_version.toUpperCase() : "UNVERSIONED"} · REVIEW BEFORE USE · NO CLINICAL CLAIM
               </div>
             </div>
           ) : (
