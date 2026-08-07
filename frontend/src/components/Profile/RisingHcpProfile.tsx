@@ -764,7 +764,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
              brief — full-width prose at a 90ch measure, provenance stamp folded
              to one mono caveat line beneath. */
           <Card style={{ padding: "20px 22px" }}>
-            <div style={{ ...serif(13.5, SERIF_INK), textWrap: "pretty", maxWidth: "90ch" } as CSSProperties}>
+            <div style={{ ...serif(13.5, SERIF_INK), textWrap: "pretty" } as CSSProperties}>
               {p.narrative.narrative_text}
             </div>
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${RULE}`, ...mono(9, FAINT, 0.08), lineHeight: 1.7 }}>

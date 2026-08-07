@@ -322,7 +322,7 @@ export default function HcpProfileBrief() {
                container at a 90ch measure; the provenance stamp folds to one mono
                caveat line beneath, the way caveat lines render everywhere else. */
             <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
-              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", maxWidth: "90ch", display: "block" }}>{p.signal_summary}</span>
+              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", display: "block" }}>{p.signal_summary}</span>
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${P.line}`, ...mono(9, 500), letterSpacing: ".08em", color: P.ink6, lineHeight: 1.7 }}>
                 GENERATED SYNTHESIS · DATA RUN {p.signal_summary_generated_at ? p.signal_summary_generated_at.slice(0, 10) : "UNSTAMPED"} · READS {p.record_depth.sources ?? 0} SOURCE{p.record_depth.sources === 1 ? "" : "S"} · {p.record_depth.papers ?? 0} PAPER{p.record_depth.papers === 1 ? "" : "S"} · PROMPT {p.signal_summary_version ? p.signal_summary_version.toUpperCase() : "UNVERSIONED"} · REVIEW BEFORE USE · NO CLINICAL CLAIM
               </div>
