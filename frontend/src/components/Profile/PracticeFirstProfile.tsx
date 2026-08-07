@@ -453,11 +453,11 @@ export default function PracticeFirstProfile() {
         </div>
         {/* slope framing: QUESTION — locked by the brief */}
         {med && slope != null && slope < -20 ? (
-          <div style={{ ...serif(19), lineHeight: 1.4, color: F.bright, marginBottom: 18, maxWidth: "110ch", textWrap: "pretty" }}>
+          <div style={{ ...serif(19), lineHeight: 1.4, color: F.bright, marginBottom: 18, textWrap: "pretty" }}>
             His panel fell {Math.abs(Math.round(slope))}% in three years. Ask him what moved — a partner's retirement, a site, a payer, a referral pattern. The claims record the shape of it and nothing about the reason.
           </div>
         ) : med ? (
-          <div style={{ ...serif(19), lineHeight: 1.4, color: F.bright, marginBottom: 18, maxWidth: "110ch", textWrap: "pretty" }}>
+          <div style={{ ...serif(19), lineHeight: 1.4, color: F.bright, marginBottom: 18, textWrap: "pretty" }}>
             Beneficiary counts moved {fmtInt(y21)} → {fmtInt(y23)} across 2021–2023.
           </div>
         ) : null}
@@ -577,7 +577,7 @@ export default function PracticeFirstProfile() {
             <SectionTag tag="WHAT HE ADMINISTERS" sub="— TOP HCPCS · 3-YR RECORD · RANK ORDER" />
             <div style={{ ...mono(10), color: F.ghost }}>top {pr.admin_codes.length} of {fmtInt(med?.distinct_codes_3yr)} distinct codes held</div>
           </div>
-          <div style={{ ...serif(19), lineHeight: 1.4, color: F.bright, marginBottom: 16, maxWidth: "110ch", textWrap: "pretty" }}>
+          <div style={{ ...serif(19), lineHeight: 1.4, color: F.bright, marginBottom: 16, textWrap: "pretty" }}>
             {adminMapped.length} of his top {pr.admin_codes.length} codes map to a named agent — {genericNames.join(", ")}. The rest are supportive-care and unclassified codes outside the NSCLC reference, held as gaps with their rank intact.
           </div>
           <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>

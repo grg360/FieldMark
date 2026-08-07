@@ -380,7 +380,7 @@ function Row({
           </div>
           {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} /> : row.tier ? <EvidenceChipView row={row} /> : null}
           {row.summary ? (
-            <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, maxWidth: "104ch", textWrap: "pretty" }}>{row.summary}</div>
+            <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
         </div>
         {/* cohort score */}
