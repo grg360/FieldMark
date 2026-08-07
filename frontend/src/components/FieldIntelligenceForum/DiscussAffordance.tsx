@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { COLOR, FONT } from "../../lib/designTokens";
+import { FONT, GOLD, COOL, LINE } from "../../lib/designTokens";
 import type { DiscussAffordance as Affordance } from "../../lib/fieldIntelligence";
 import { invalidateAffordance, useDiscussAffordance } from "./useDiscussAffordance";
 import { useForumWriter } from "./useForumWriter";
@@ -82,9 +82,9 @@ export default function DiscussAffordance({
         <button
           type="button"
           onClick={() => navigate(target)}
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", background: "rgba(85,102,232,0.1)", border: "1px solid rgba(85,102,232,0.3)", borderRadius: 4, cursor: "pointer", ...mono(10.5, COLOR.indigoLink), whiteSpace: "nowrap" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", background: "transparent", border: `1px solid ${GOLD.dim}`, borderRadius: 0, cursor: "pointer", ...mono(10.5, GOLD.gold), whiteSpace: "nowrap" }}
         >
-          <SpeechGlyph color={COLOR.indigoLink} />
+          <SpeechGlyph color={GOLD.gold} />
           {affordance.reply_count} {affordance.reply_count === 1 ? "reply" : "replies"}
           {affordance.recency_label ? ` · ${affordance.recency_label}` : ""}
         </button>
@@ -98,10 +98,10 @@ export default function DiscussAffordance({
         onClick={canWrite && pmid ? () => setComposing(true) : undefined}
         aria-disabled={canWrite ? undefined : "true"}
         role="button"
-        style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", border: `1px dashed ${COLOR.hairStrong}`, borderRadius: 4, ...mono(10.5, canWrite ? COLOR.indigoLink : COLOR.ink4), whiteSpace: "nowrap", cursor: canWrite ? "pointer" : "not-allowed", opacity: canWrite ? 1 : 0.7 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", border: `1px dashed ${LINE.l1}`, borderRadius: 4, ...mono(10.5, canWrite ? GOLD.gold : COOL.chrome), whiteSpace: "nowrap", cursor: canWrite ? "pointer" : "not-allowed", opacity: canWrite ? 1 : 0.7 }}
       >
-        <SpeechGlyph color={canWrite ? COLOR.indigoLink : COLOR.ink5} />
-        Discuss <span style={{ color: COLOR.ink5 }}>· starts a public thread visible to verified MSLs</span>
+        <SpeechGlyph color={canWrite ? GOLD.gold : COOL.label} />
+        Discuss <span style={{ color: COOL.label }}>· starts a public thread visible to verified MSLs</span>
       </span>
     );
     return (<>{empty}{composer}</>);
@@ -111,25 +111,25 @@ export default function DiscussAffordance({
   if (affordance) {
     const target = affordance.primary_thread_id ? `/field-intelligence/thread/${affordance.primary_thread_id}` : "/field-intelligence";
     return (
-      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, padding: 12, background: "rgba(85,102,232,0.05)", border: "1px solid rgba(85,102,232,0.22)", borderRadius: 4 }}>
-        <span style={{ ...mono(9, COLOR.indigoLink), letterSpacing: "0.14em" }}>FIELD INTELLIGENCE</span>
-        <button type="button" onClick={() => navigate(target)} style={{ textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT.serif, fontSize: 14.5, lineHeight: 1.4, color: COLOR.ink1 }}>
+      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, padding: 12, background: "transparent", border: `1px solid ${LINE.l1}`, borderRadius: 0 }}>
+        <span style={{ ...mono(9, GOLD.gold), letterSpacing: "0.14em", fontWeight: 600 }}>FIELD INTELLIGENCE</span>
+        <button type="button" onClick={() => navigate(target)} style={{ textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT.serif, fontSize: 14.5, lineHeight: 1.4, color: COOL.ui }}>
           {affordance.reply_count} {affordance.reply_count === 1 ? "reply" : "replies"}{affordance.thread_count > 1 ? ` across ${affordance.thread_count} threads` : ""}
         </button>
-        {affordance.recency_label && <span style={mono(9.5, COLOR.ink4)}>last reply {affordance.recency_label}</span>}
-        <button type="button" onClick={() => navigate(target)} style={{ ...mono(10, COLOR.indigoLink), letterSpacing: "0.08em", background: "rgba(85,102,232,0.08)", border: "1px solid rgba(85,102,232,0.3)", borderRadius: 3, padding: "6px 10px", cursor: "pointer", textAlign: "left" }}>OPEN DISCUSSION →</button>
+        {affordance.recency_label && <span style={mono(9.5, COOL.chrome)}>last reply {affordance.recency_label}</span>}
+        <button type="button" onClick={() => navigate(target)} style={{ ...mono(10, GOLD.gold), letterSpacing: "0.08em", background: "transparent", border: `1px solid ${GOLD.dim}`, borderRadius: 0, padding: "6px 10px", cursor: "pointer", textAlign: "left" }}>OPEN DISCUSSION →</button>
       </div>
     );
   }
   if (existingOnly) return null;
   return (
-    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, padding: 12, border: `1px dashed ${COLOR.hairStrong}`, borderRadius: 4 }}>
-      <span style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.14em" }}>FIELD INTELLIGENCE</span>
-      <span style={{ fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.45, color: COLOR.ink3 }}>No discussion yet. Your question opens a public thread on this paper, visible to other verified MSLs.</span>
+    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, padding: 12, border: `1px dashed ${LINE.l1}`, borderRadius: 4 }}>
+      <span style={{ ...mono(9, COOL.label), letterSpacing: "0.14em" }}>FIELD INTELLIGENCE</span>
+      <span style={{ fontFamily: FONT.serif, fontSize: 14, lineHeight: 1.45, color: COOL.muted }}>No discussion yet. Your question opens a public thread on this paper, visible to other verified MSLs.</span>
       {canWrite && pmid ? (
-        <button type="button" onClick={() => setComposing(true)} style={{ ...mono(10, COLOR.indigoLink), letterSpacing: "0.08em", background: "rgba(85,102,232,0.08)", border: "1px solid rgba(85,102,232,0.3)", borderRadius: 3, padding: "6px 10px", cursor: "pointer", textAlign: "left" }}>DISCUSS THIS PAPER</button>
+        <button type="button" onClick={() => setComposing(true)} style={{ ...mono(10, GOLD.gold), letterSpacing: "0.08em", background: "transparent", border: `1px solid ${GOLD.dim}`, borderRadius: 0, padding: "6px 10px", cursor: "pointer", textAlign: "left" }}>DISCUSS THIS PAPER</button>
       ) : (
-        <span aria-disabled="true" role="button" style={{ ...mono(10, COLOR.ink4), letterSpacing: "0.08em", border: `1px solid ${COLOR.hairStrong}`, borderRadius: 3, padding: "6px 10px", opacity: 0.45, cursor: "not-allowed", userSelect: "none" }}>DISCUSS THIS PAPER</span>
+        <span aria-disabled="true" role="button" style={{ ...mono(10, COOL.chrome), letterSpacing: "0.08em", border: `1px solid ${LINE.l1}`, borderRadius: 3, padding: "6px 10px", opacity: 0.45, cursor: "not-allowed", userSelect: "none" }}>DISCUSS THIS PAPER</span>
       )}
       {composer}
     </div>

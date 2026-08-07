@@ -128,8 +128,9 @@ function DisclosureBand({ tail, narrow }: { tail: string; narrow: boolean }) {
 
 // ── Masthead with the four computed header counts (item 1) ───────────────────
 function Stat({ value, label, gold }: { value: string; label: string; gold?: boolean }) {
+  // centred over the label (2026-08-07 — same treatment as the ledger heroes)
   return (
-    <div style={{ padding: "0 24px", textAlign: "right" }}>
+    <div style={{ padding: "0 24px", textAlign: "center" }}>
       <div style={serif(25, gold ? C.gold : C.ink, 1)}>{value}</div>
       <div style={{ ...mono(9.5, gold ? C.goldDark : C.faint, 0.16), marginTop: 8 }}>{label}</div>
     </div>

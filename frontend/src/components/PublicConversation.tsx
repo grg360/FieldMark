@@ -37,7 +37,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { classifyVoice } from "../lib/voiceClassification";
-import { GOLD as GOLD_T, GROUND, LINE } from "../lib/designTokens";
+import { GOLD as GOLD_T, GROUND, LINE, FONT, COOL } from "../lib/designTokens";
 
 // Commit C 2026-08-05: the conversation box joins the Pulse board scheme —
 // g2 board, g1 band/cards. Warm text/accents stay the frame's own.
@@ -45,13 +45,16 @@ const BG = GROUND.g2, BG2 = GROUND.g1, BAND = GROUND.g1, CARD = GROUND.g1;
 const HAIR = "rgba(255,255,255,0.07)", HAIR2 = "rgba(255,255,255,0.09)", HAIR3 = "rgba(255,255,255,0.14)";
 // AMBER #c9962f folded into GOLD.gold 2026-08-05; the #d8a949 mid-gold and
 // bronze are per-surface assignments outside the convergence ledger.
+// Register pass 2026-08-07: the warm parchment ink ramp and Spectral serif
+// retired — this is a scanning surface, so it takes the COOL ramp and the
+// register serif (Source Serif 4), matching the profile spines and ledgers.
 const GOLD = "#d8a949", AMBER = GOLD_T.gold, BRONZE = "#a07f34";
-const INK = "#f0e9dc", INK2 = "#e8e3d9", INK3 = "#c4bdaf", MID = "#a49c8e", MID2 = "#9d968a", DIM = "#8d8578", FAINT = "#6f6961", FAINT2 = "#5f5a52";
-const SERIF = "'Spectral', Georgia, serif";
-const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+const INK = COOL.ui, INK2 = COOL.ui, INK3 = COOL.prose, MID = COOL.muted, MID2 = COOL.muted, DIM = COOL.chromeStrong, FAINT = COOL.label, FAINT2 = COOL.faint;
+const SERIF = FONT.serif;
+const MONO = FONT.mono;
 
-const mono = (s: number, c = DIM, ls = "0.13em") => ({ fontFamily: MONO, fontSize: s, letterSpacing: ls, color: c });
-const serif = (s: number, c = INK3, lh = 1.6) => ({ fontFamily: SERIF, fontSize: s, lineHeight: lh, color: c });
+const mono = (s: number, c: string = DIM, ls = "0.13em") => ({ fontFamily: MONO, fontSize: s, letterSpacing: ls, color: c });
+const serif = (s: number, c: string = INK3, lh = 1.6) => ({ fontFamily: SERIF, fontSize: s, lineHeight: lh, color: c });
 const num = (n: number) => n.toLocaleString("en-US");
 
 interface Pt { h: string; name: string | null; f: number; resp: number; n: number; cap: number; verified: boolean; pos: number; bio: string | null; url: string | null }
@@ -157,8 +160,10 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
       {/* title band */}
       <div style={{ display: "flex", alignItems: narrow ? "flex-start" : "center", flexDirection: narrow ? "column" : "row", gap: narrow ? 8 : 14, justifyContent: "space-between", padding: narrow ? "14px 18px" : "15px 28px", background: CARD, borderBottom: `1px solid ${HAIR}` }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-          <span style={{ color: BG, background: GOLD, fontSize: 9, letterSpacing: "0.16em", padding: "3px 6px" }}>PUB</span>
-          <span style={{ ...serif(19, INK, 1.2) }}>The public conversation <span style={{ color: FAINT }}>/</span> {taLabel}</span>
+          {/* the filled PUB tag removed 2026-08-07 — it clipped to "PUS" beside
+              the title and a filled gold chip is off-register; the eyebrow-less
+              title carries the surface name alone */}
+          <span style={{ ...serif(19, INK, 1.2) }}>The Public Conversation <span style={{ color: FAINT }}>/</span> {taLabel}</span>
         </div>
         <div style={{ ...mono(narrow ? 9.5 : 10.5, DIM, "0.11em"), lineHeight: 1.7 }}>
           {num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED · {num(d.posts_included)} INCLUDED{narrow ? <br /> : " · "}POSTS 20 MAY — 03 JUN 2026 · ORDERED BY RESPONSE RECEIVED

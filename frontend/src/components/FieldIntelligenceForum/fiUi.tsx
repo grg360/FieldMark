@@ -5,7 +5,7 @@
 // hidden — with no "coming soon" badge (messaged separately).
 
 import type { CSSProperties, ReactNode } from "react";
-import { COLOR, FONT, GOLD } from "../../lib/designTokens";
+import { COLOR, FONT, GOLD, COOL, LINE } from "../../lib/designTokens";
 import type { ComplianceState } from "../../lib/fieldIntelligence";
 
 export const mono = (size: number, color: string = COLOR.ink3): CSSProperties => ({
@@ -21,15 +21,18 @@ export const serif = (size: number, color: string = COLOR.ink2): CSSProperties =
   lineHeight: 1.6,
 });
 
-// Compliance-state palette — one chip per post, never a bare colour.
-// on_anchor muted green · under_review amber · context_note indigo · removed red.
+// Compliance-state palette — one chip per post, never a bare color.
+// Register pass 2026-08-07: the indigo CONTEXT NOTE folds to cool chrome —
+// a context note is a neutral annotation, not an accent class. Green (on
+// anchor), amber (under review) and red (removed) stay: semantic states, the
+// same discipline as the ledgers. Gold is the surface's only accent.
 export const STATE_STYLE: Record<
   ComplianceState,
   { fg: string; bg: string; border: string; label: string }
 > = {
   on_anchor: { fg: "#7fb094", bg: "rgba(95,169,126,0.08)", border: "rgba(95,169,126,0.24)", label: "ON ANCHOR" },
   under_review: { fg: COLOR.amber, bg: "rgba(232,160,32,0.10)", border: "rgba(232,160,32,0.32)", label: "UNDER REVIEW" },
-  context_note: { fg: COLOR.indigoLink, bg: "rgba(85,102,232,0.10)", border: "rgba(85,102,232,0.30)", label: "CONTEXT NOTE" },
+  context_note: { fg: COOL.chromeStrong, bg: "rgba(255,255,255,0.04)", border: LINE.l2, label: "CONTEXT NOTE" },
   removed: { fg: COLOR.danger, bg: "rgba(232,112,78,0.10)", border: "rgba(232,112,78,0.30)", label: "REMOVED" },
 };
 
@@ -159,14 +162,15 @@ export function ComplianceChip({
   );
 }
 
-// MSL-VERIFIED byline badge (existing pattern on the surface).
+// MSL-VERIFIED byline badge — register: cool chrome on an emphasis border
+// (identity assurance is structure, not an accent).
 export function VerifiedBadge({ small = false }: { small?: boolean }) {
   return (
     <span
       style={{
-        ...mono(small ? 9 : 9.5, COLOR.indigoLink),
+        ...mono(small ? 9 : 9.5, COOL.chromeStrong),
         letterSpacing: "0.1em",
-        border: `1px solid rgba(85,102,232,0.3)`,
+        border: `1px solid ${LINE.l2}`,
         padding: small ? "1px 5px" : "2px 6px",
         whiteSpace: "nowrap",
       }}
@@ -200,10 +204,13 @@ export function DisabledControl({
     alignItems: "center",
     gap: 6,
   };
+  // Register pass 2026-08-07: outline buttons only — the filled amber leaves
+  // (it was the platform's last filled button) and indigo folds to the gold
+  // outline. Variant names kept so call sites stay untouched.
   const variants: Record<string, CSSProperties> = {
-    ghost: { border: `1px solid ${COLOR.hairStrong}`, background: "transparent", color: COLOR.ink3 },
-    primary: { border: `1px solid rgba(85,102,232,0.4)`, background: "rgba(85,102,232,0.08)", color: COLOR.indigoLink },
-    "solid-amber": { border: "1px solid rgba(232,160,32,0.5)", background: "rgba(232,160,32,0.5)", color: "#0a0a0a" },
+    ghost: { border: `1px solid ${LINE.l2}`, background: "transparent", color: COOL.prose },
+    primary: { border: `1px solid ${GOLD.dim}`, background: "transparent", color: GOLD.gold },
+    "solid-amber": { border: `1px solid ${GOLD.dim}`, background: "transparent", color: GOLD.gold },
   };
   return (
     <span aria-disabled="true" role="button" title={title} style={{ ...base, ...variants[variant] }}>
@@ -221,7 +228,7 @@ export function HandleAvatar({ handle, size = 26 }: { handle: string; size?: num
         width: size,
         height: size,
         borderRadius: "50%",
-        background: "#26231d",
+        background: LINE.l1,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",

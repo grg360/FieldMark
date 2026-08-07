@@ -481,7 +481,7 @@ export default function InstitutionsIndexRoute() {
             dek={loading
               ? "Resolving the registry…"
               : `${aggs.length} registry institutions carry at least one ranked ${taUpper} HCP. Registry institutions carrying none in this cohort are not listed.`}
-            stats={[{ value: String(aggs.length), label: "REPRESENTED" }]}
+            stats={[{ value: String(aggs.length), label: "REPRESENTED", center: true }]}
           />
         </div>
 
