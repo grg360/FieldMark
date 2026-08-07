@@ -230,6 +230,17 @@ export default function HcpProfileBrief() {
   const s = p.scores;
   const nPos = positionCount(p);
   const hasSynthPara = renderSynthesis(p);
+  // Belief-profile counterweight: the position mix by category — the shape the
+  // prose can't show at a glance ("what kind of expert"), genuinely new next to
+  // the count already in the section head. Aggregated from the synthesis tiers,
+  // falling back to the raw single-source positions on the thin path.
+  const catMix = (() => {
+    const counts = new Map<string, number>();
+    const add = (c?: string | null) => { const k = (c ?? "").trim(); if (k) counts.set(k, (counts.get(k) ?? 0) + 1); };
+    for (const t of p.belief.tiers ?? []) for (const pos of t.positions ?? []) for (const c of pos.categories ?? []) add(c);
+    if (counts.size === 0) for (const rp of p.belief.raw_positions ?? []) add(rp.category);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  })();
   const loc = [p.hcp.city, p.hcp.state].filter(Boolean).join(", ");
 
   return (
@@ -306,9 +317,21 @@ export default function HcpProfileBrief() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead id="signal" tag="SIGNAL SUMMARY" count="WHO IS THIS" sub="GENERATED SYNTHESIS" />
           {p.signal_summary ? (
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
-              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", maxWidth: "100ch", display: "block" }}>{p.signal_summary}</span>
-              <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink6 }}>MODEL SYNTHESIS OVER THE SOURCED AUDIT · REVIEW BEFORE USE · NO CLINICAL CLAIM · {p.signal_summary_version ? `PROMPT ${p.signal_summary_version.toUpperCase()}` : "PROMPT VERSION UNRECORDED"}</span>
+            /* Prose at a measure (left), provenance stamp as the counterweight in
+               the right field — the empty field read as broken at 100% zoom. The
+               stamp says why to trust the sentence (what data run, how many
+               sources, which prompt), not a figure the header already carries. */
+            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", maxWidth: "74ch", flex: 1, minWidth: 300, display: "block" }}>{p.signal_summary}</span>
+              <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                <span style={{ ...mono(9, 600), letterSpacing: ".16em", color: P.ink5 }}>GENERATED SYNTHESIS</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>
+                  <span>DATA RUN {p.signal_summary_generated_at ? p.signal_summary_generated_at.slice(0, 10) : "UNSTAMPED"}</span>
+                  <span>READS {p.record_depth.sources ?? 0} SOURCE{p.record_depth.sources === 1 ? "" : "S"} · {p.record_depth.papers ?? 0} PAPER{p.record_depth.papers === 1 ? "" : "S"}</span>
+                  <span>PROMPT {p.signal_summary_version ? p.signal_summary_version.toUpperCase() : "UNVERSIONED"}</span>
+                </div>
+                <span style={{ ...mono(8.5, 500), letterSpacing: ".06em", color: P.ink6, lineHeight: 1.55 }}>MODEL SYNTHESIS OVER THE SOURCED AUDIT · REVIEW BEFORE USE · NO CLINICAL CLAIM</span>
+              </div>
             </div>
           ) : (
             <Withheld head="SIGNAL SUMMARY · WITHHELD" title="No generated synthesis for this HCP yet." body="The synthesis is generated over the sourced record. None is on file for this HCP in NSCLC." />
@@ -436,15 +459,37 @@ export default function HcpProfileBrief() {
             </Link>
           ) : null}
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
-            {/* synthesis paragraph or its withheld state */}
-            {hasSynthPara ? (
-              <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6, maxWidth: "100ch" }}>{p.belief.headline}</div>
-            ) : nPos > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 10 }}>
-                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SYNTHESIS AT THIS DEPTH</span>
-                <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", maxWidth: "100ch", display: "block" }}>The one-paragraph characterisation is generated from the shape of a record — the tiers, the recurrences, the throughline. {nPos} position{nPos === 1 ? "" : "s"} {nPos === 1 ? "has" : "have"} no shape. The positions themselves are below, unsummarised.</span>
+            {/* synthesis paragraph (or withheld state) at a measure, with the
+                category mix as the right-field counterweight — the shape the prose
+                can't show at a glance. Only rendered when positions exist. */}
+            <div style={{ display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div style={{ flex: 1, minWidth: 300 }}>
+                {hasSynthPara ? (
+                  <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6, maxWidth: "74ch" }}>{p.belief.headline}</div>
+                ) : nPos > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 10 }}>
+                    <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SYNTHESIS AT THIS DEPTH</span>
+                    <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", maxWidth: "74ch", display: "block" }}>The one-paragraph characterisation is generated from the shape of a record — the tiers, the recurrences, the throughline. {nPos} position{nPos === 1 ? "" : "s"} {nPos === 1 ? "has" : "have"} no shape. The positions themselves are below, unsummarised.</span>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+              {catMix.length ? (
+                <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 7 }}>
+                  <span style={{ ...mono(9, 600), letterSpacing: ".16em", color: P.ink5 }}>BY CATEGORY</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {catMix.map(([cat, n]) => (
+                      <div key={cat} style={{ display: "flex", justifyContent: "space-between", gap: 12, ...mono(9.5, 500), letterSpacing: ".08em", color: P.ink4 }}>
+                        <span>{cat.replace(/_/g, " ").toUpperCase()}</span>
+                        <span style={{ color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{n}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink6, paddingTop: 2 }}>
+                    {p.record_depth.papers ?? 0} PUBLICATION{p.record_depth.papers === 1 ? "" : "S"}{p.record_depth.oldest && p.record_depth.newest ? ` · ${p.record_depth.oldest}–${p.record_depth.newest}` : ""}
+                  </span>
+                </div>
+              ) : null}
+            </div>
 
             {/* positions: synthesized tiers, else raw single-source cards, else empty */}
             {p.belief.tiers && p.belief.tiers.some((t) => t.positions && t.positions.length) ? (

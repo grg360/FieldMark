@@ -103,6 +103,7 @@ export interface HcpProfile {
   };
   signal_summary: string | null;
   signal_summary_version: string | null; // hcp_narratives_v2.prompt_version — footer label reads this, not a literal
+  signal_summary_generated_at: string | null; // data-run date, for the provenance-stamp counterweight
 }
 
 export interface FieldNote {
