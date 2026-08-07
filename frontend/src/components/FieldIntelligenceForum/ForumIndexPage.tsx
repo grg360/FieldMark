@@ -32,11 +32,15 @@ const INT = new Intl.NumberFormat("en-US");
 // ── Frame palette (terminal / near-black, muted gold; matched to Scientific Pulse) ──
 // Commit C 2026-08-05: box/cards/edges join the Pulse board scheme (g2 board,
 // g1 wells, l0/l1 rules); golds/inks stay the frame's own pending their pass.
+// Grounds un-reversed 2026-08-07: the FIELD (surface — the box interior and
+// the grid gaps) is the darker step and the CONTAINERS (cards, bands, rows)
+// are the lighter charcoal raised on it — matching the thread page, where
+// g2 containers sit on the dark page ground.
 const C = {
-  surface: GROUND.g2,
-  card: GROUND.g1,
+  surface: GROUND.g1,
+  card: GROUND.g2,
   cardDark: GROUND.g1,
-  cardAlt: GROUND.g1,
+  cardAlt: GROUND.g2,
   border: LINE.l1,
   borderSoft: LINE.l0,
   hair: LINE.l0,
