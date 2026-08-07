@@ -274,7 +274,13 @@ class Sky extends Component<Props, State> {
     g.nodes.forEach((n) => { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); });
     const E = this.edge();
     // insets: chrome band on top, legend + cam-controls band on bottom, edges on the sides.
-    return this.camForBox(x0, y0, x1, y1, E + 40, E + 40, this.safeTop() + 44, E + 64, 0.24, 0.95);
+    // zMin 0.42 (was 0.24, 2026-08-07): at the 613-node world the whole-field fit
+    // zoom fell to ~0.30, where the pan clamp leaves near-zero travel — drag moved
+    // an inch and then had nowhere to go, reading as broken until a refresh reset
+    // the camera. The LANDING now frames the field's central mass with real drag
+    // range in every direction; the wheel's own zoom-out floor (zFloor in onWheel)
+    // still reaches the genuine everything-in-frame view.
+    return this.camForBox(x0, y0, x1, y1, E + 40, E + 40, this.safeTop() + 44, E + 64, 0.42, 0.95);
   }
 
   paint = () => {
