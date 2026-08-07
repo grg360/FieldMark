@@ -521,17 +521,25 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
         {/* signal summary */}
         <SectionHead title="SIGNAL SUMMARY" sub="WHO IS THIS, AND WHAT IS MOVING"
-          right="GENERATED SYNTHESIS · STAMPED WITH THE DATA RUN IT READ" />
+          right="GENERATED SYNTHESIS" />
+        {/* Prose at the same 74ch measure as the established spine, provenance
+            stamp as the right-field counterweight — the two spines now compose
+            identically (a demo reads Marmarelis/Aditi beside an established HCP
+            and sees one pattern). The stamp keeps the rising-only lines the
+            footer carried: the freshness verdict and the no-rank-by-prompt note. */}
         {p.narrative?.narrative_text ? (
-          <Card style={{ padding: "20px 22px" }}>
-            <div style={{ ...serif(13.5, SERIF_INK), textWrap: "pretty", maxWidth: 1060 } as CSSProperties}>
+          <Card style={{ padding: "20px 22px", display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <div style={{ ...serif(13.5, SERIF_INK), textWrap: "pretty", maxWidth: "74ch", flex: 1, minWidth: 300 } as CSSProperties}>
               {p.narrative.narrative_text}
             </div>
-            <div style={{ marginTop: 16, ...mono(8, FAINT, 0.12), lineHeight: 1.6 }}>
-              READS DATA RUN {p.narrative.generated_at ? new Date(p.narrative.generated_at).toISOString().slice(0, 10) : "UNSTAMPED"}
-              {" · "}NO RANK OR PERCENTILE BY PROMPT — THE HEADER RENDERS THOSE LIVE
-              {" · "}{p.narrative_current === false ? "DATA HAS MOVED SINCE — REGENERATES AT THE NEXT WEEKLY BUILD" : "CURRENT AGAINST THE LATEST DATA RUN"}
-              {" · "}REVIEW BEFORE USE · NO CLINICAL CLAIM · PROMPT {(p.narrative.prompt_version ?? "UNVERSIONED").toUpperCase()}
+            <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={mono(9, INK2, 0.16, 600)}>GENERATED SYNTHESIS</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={mono(9, FAINT, 0.1)}>DATA RUN {p.narrative.generated_at ? new Date(p.narrative.generated_at).toISOString().slice(0, 10) : "UNSTAMPED"}</span>
+                <span style={mono(9, FAINT, 0.1)}>PROMPT {(p.narrative.prompt_version ?? "UNVERSIONED").toUpperCase()}</span>
+                <span style={mono(9, FAINT, 0.1)}>{p.narrative_current === false ? "DATA HAS MOVED SINCE" : "CURRENT VS LATEST RUN"}</span>
+              </div>
+              <span style={{ ...mono(8.5, FAINT, 0.06), lineHeight: 1.55 }}>NO RANK OR PERCENTILE BY PROMPT — THE HEADER RENDERS THOSE LIVE · REVIEW BEFORE USE · NO CLINICAL CLAIM</span>
             </div>
           </Card>
         ) : (
