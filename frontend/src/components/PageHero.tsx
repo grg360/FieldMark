@@ -32,6 +32,9 @@ export interface HeroStat {
   label: string;
   // Second caption line under the label (Home's "n OF m" coverage foot).
   foot?: string;
+  // Centre value + captions in the cell (ledger single-stat cluster, where a
+  // short value over a longer label reads off-axis left-aligned). Default left.
+  center?: boolean;
   gold?: boolean;
   // Escape hatch for semantic value colors (e.g. overdue red). Wins over gold.
   valueColor?: string;
@@ -125,6 +128,7 @@ export default function PageHero({
                   borderRight: i < cluster.length - 1 ? `1px solid ${LINE.l1}` : "none",
                   flex: narrow ? 1 : "none",
                   cursor: s.onClick ? "pointer" : undefined,
+                  textAlign: s.center ? "center" : undefined,
                 }}
               >
                 <div

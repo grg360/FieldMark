@@ -143,8 +143,9 @@ export default function FullCareerView({
         <Stat n={totalOa.toLocaleString()} label="OPEN ACCESS · FULL TEXT" color="#7ba36f" />
       </div>
 
-      {/* SENIOR AUTHOR — five most cited, expandable to all */}
-      <section>
+      {/* SENIOR AUTHOR — five most cited, expandable to all. The id is the landing
+          target for #senior-author deep links (ledger SENIOR AUTHORSHIP badge). */}
+      <section id="senior-author">
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, paddingBottom: 6 }}>
           <span style={{ font: `600 10.5px/1 ${MONO}`, letterSpacing: ".2em", color: C.ink }}>SENIOR AUTHOR</span>
           <span style={{ marginLeft: "auto", font: `400 9.5px/1 ${MONO}`, letterSpacing: ".11em", color: C.dim }}>

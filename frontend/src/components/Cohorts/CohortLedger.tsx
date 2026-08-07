@@ -107,9 +107,10 @@ const TAG_TO_TRACK: Record<string, Track> = {
   COM: "community",
 };
 
-// ── Our-side controls (stage 3) — INSIGHT · TRACK · STATE, columned right ──────
-// Widths shared by the header and the rows so the columns line up.
-const OURS = { insight: 62, track: 44, state: 108 } as const;
+// ── Our-side controls (stage 3) — INSIGHTS · TRACKED · RELATIONSHIP, columned right ──
+// Widths shared by the header and the rows so the columns line up. track widened
+// 44→52 for the single-line TRACKED head (2026-08-06 label pass).
+const OURS = { insight: 62, track: 52, state: 108 } as const;
 
 // The six-state relationship ladder Design designed: read by FILL COUNT, not hue (no new
 // colour enters the row — amber stays with rank). Not Engaged 0 · Targeted 1 · Contacted
@@ -140,6 +141,10 @@ const STATUS_FILL: Record<RelationshipStatus, number> = {
   paused: -1, // off-ladder
 };
 const LADDER_SEGMENTS = 4;
+
+// Boards at or under this row count render without the window virtualiser —
+// see the note at the tail render (stale-measure padding under the last rank).
+const VIRTUAL_MIN = 300;
 
 // Four-segment fill ladder. Filled segments read the state; Paused shows all outlined
 // with a diagonal strike. Ink only — no hue.
@@ -194,18 +199,25 @@ function Bookmark({ on }: { on: boolean }) {
 // AUTHORSHIP, OPEN TRIAL) in the community ledger's chip slot — same component
 // family, cohort-specific content. Both facts come from rising_board_flags,
 // already computed for the rising surface.
-function RisingChipView({ flag, mobile = false }: { flag: RisingFlags; mobile?: boolean }) {
+function RisingChipView({ flag, hcpId, mobile = false }: { flag: RisingFlags; hcpId: string; mobile?: boolean }) {
   const senior = flag.senior_transition;
   const trial = flag.on_open_trial;
   if (!senior && !trial) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
       {senior ? (
-        <span title="Senior-authored years within the FieldMark corpus — we see only what is ingested." style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${P.lineStrong}`, background: "transparent", padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em" }}>
+        // Links to the publications surface, landing on the SENIOR AUTHOR band —
+        // the badge's evidence. stopPropagation so the row's drawer stays closed.
+        <Link
+          to={`/hcp/${hcpId}/publications#senior-author`}
+          onClick={(e) => e.stopPropagation()}
+          title="Senior-authored years within the FieldMark corpus — we see only what is ingested. Opens the senior-author publications."
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${P.lineStrong}`, background: "transparent", padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em", textDecoration: "none", cursor: "pointer" }}
+        >
           <span style={{ color: "#8fb8a6" }}>SENIOR AUTHORSHIP SINCE {flag.first_senior_year ?? "—"}</span>
           <span style={{ color: "#7A5520" }}>·</span>
           <span style={{ color: P.ink4 }}>{flag.recent_senior_pubs ?? "—"} PAPERS</span>
-        </span>
+        </Link>
       ) : null}
       {trial ? (
         <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ display: "inline-flex", alignItems: "center", border: `1px solid ${P.lineMed}`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em", color: P.ink3 }}>
@@ -255,33 +267,35 @@ function chipStyle(on: boolean): CSSProperties {
   };
 }
 
+// Label pass 2026-08-06: labels are centred over their columns; renamed heads are
+// single-line except the score columns, whose display heads (col.head/headSub —
+// e.g. SCIENTIFIC over MOMENTUM) stack in two lines. RANK keeps its two-line
+// left-aligned amber treatment. col.label/col.sub still feed trace() unchanged.
 function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
-  const head = (label: string, sub: string, w: number, align: "left" | "right" | "center" = "right") => (
-    <div style={{ width: w, textAlign: align, ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-      {label}<br /><span style={{ color: P.ink5 }}>{sub}</span>
-    </div>
+  const head = (label: string, w: number) => (
+    <div style={{ width: w, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>{label}</div>
   );
   return (
     <div style={{ display: "flex", alignItems: "flex-end", padding: "10px 20px 8px 23px", borderBottom: `1px solid ${P.lineStrong}`, background: P.head }}>
       <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.amber }}>
         RANK<br /><span style={{ color: P.ink5 }}>US · GLOBAL</span>
       </div>
-      <div style={{ flex: 1, minWidth: 300, ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-        PHYSICIAN<br /><span style={{ color: P.ink5 }}>{cfg.nameSub}</span>
+      <div style={{ flex: 1, minWidth: 300, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+        PHYSICIAN · {cfg.nameSub}
       </div>
-      <div style={{ width: 88, textAlign: "right", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-        INDEX<br /><span style={{ color: P.ink5 }}>IN COHORT</span>
+      <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+        COHORT SCORE
       </div>
       {cfg.cols.map((c) => (
-        <div key={c.key} style={{ width: c.w, textAlign: "right", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-          {c.label}<br /><span style={{ color: P.ink5 }}>{c.sub}</span>
+        <div key={c.key} style={{ width: c.w, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+          {c.head ?? c.label}<br /><span style={{ color: P.ink5 }}>{c.headSub ?? c.sub}</span>
         </div>
       ))}
       {/* our-side controls — universal across cohorts */}
       <div style={{ width: 14 }} />
-      {head("INSIGHT", "CAPTURED", OURS.insight)}
-      {head("TRK", "MINE", OURS.track, "center")}
-      {head("STATE", "OUR CONTACT", OURS.state, "left")}
+      {head("INSIGHTS", OURS.insight)}
+      {head("TRACKED", OURS.track)}
+      {head("RELATIONSHIP", OURS.state)}
     </div>
   );
 }
@@ -316,9 +330,12 @@ function Row({
       {open ? <div style={{ position: "absolute", left: 3, top: 0, bottom: 0, width: 2, background: P.amber }} /> : null}
       {/* right track edge lights up when this row is tracked — legible down the list */}
       {tracked ? <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 3, background: P.ink2 }} /> : null}
+      {/* alignItems center (2026-08-06): cells vertically centre against the tallest
+          cell (usually name+summary) — the old flex-start + per-cell paddingTop nudges
+          are gone with it. */}
       <div
         onClick={onToggle}
-        style={{ display: "flex", alignItems: "flex-start", padding: "13px 20px 13px 23px", cursor: "pointer" }}
+        style={{ display: "flex", alignItems: "center", padding: "13px 20px 13px 23px", cursor: "pointer" }}
         onMouseEnter={(e) => (e.currentTarget.style.background = P.rowHover)}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
@@ -356,13 +373,13 @@ function Row({
               </span>
             ))}
           </div>
-          {flag ? <RisingChipView flag={flag} /> : row.tier ? <EvidenceChipView row={row} /> : null}
+          {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} /> : row.tier ? <EvidenceChipView row={row} /> : null}
           {row.summary ? (
             <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, maxWidth: "104ch", textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
         </div>
-        {/* index */}
-        <div style={{ width: 88, textAlign: "right", paddingTop: 5, ...mono(18, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
+        {/* cohort score */}
+        <div style={{ width: 88, textAlign: "right", ...mono(18, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
           {floorFixed(row.idx, cfg.idxDecimals)}
         </div>
         {/* score cells */}
@@ -370,14 +387,14 @@ function Row({
           const d = cellDisplay(row, col, th);
           if (d.kind === "absent") {
             return (
-              <div key={col.key} style={{ width: col.w, textAlign: "right", paddingTop: 10 }}>
+              <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
                 <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>{d.text}</span>
               </div>
             );
           }
           const color = d.kind === "dash" ? P.dash : col.noRank ? P.ink4 : P.ink0;
           return (
-            <div key={col.key} style={{ width: col.w, textAlign: "right", paddingTop: 10 }}>
+            <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
               <span style={{ ...mono(13), color, fontVariantNumeric: "tabular-nums" }}>{d.text}</span>
             </div>
           );
@@ -385,14 +402,17 @@ function Row({
 
         {/* ── our-side controls (stage 3) ─────────────────────────────────── */}
         <div style={{ width: 14 }} />
-        {/* INSIGHT — count of captured field insights; blank where none */}
-        <div style={{ width: OURS.insight, textAlign: "right", paddingTop: 10 }}>
+        {/* INSIGHTS — count of captured field insights; a dash where none, so an
+            empty cell reads as measured-zero rather than not-rendered */}
+        <div style={{ width: OURS.insight, textAlign: "center" }}>
           {insight > 0 ? (
             <span style={{ ...mono(13), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
-          ) : null}
+          ) : (
+            <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>—</span>
+          )}
         </div>
-        {/* TRACK — bookmark toggle (does not open the drawer) */}
-        <div style={{ width: OURS.track, display: "flex", justifyContent: "center", paddingTop: 8 }}>
+        {/* TRACKED — bookmark toggle (does not open the drawer) */}
+        <div style={{ width: OURS.track, display: "flex", justifyContent: "center" }}>
           <button
             onClick={(e) => { stop(e); void toggleSave(row.hcpId, "cohort_ledger"); }}
             title={tracked ? "Tracked — click to untrack" : "Track this HCP"}
@@ -401,15 +421,17 @@ function Row({
             <Bookmark on={tracked} />
           </button>
         </div>
-        {/* STATE — six-state fill ladder + menu */}
-        <div style={{ width: OURS.state, paddingTop: 8, position: "relative" }}>
+        {/* RELATIONSHIP — six-state fill ladder + menu */}
+        <div style={{ width: OURS.state, position: "relative" }}>
           <button
             onClick={(e) => { stop(e); setMenuOpen((o) => !o); }}
             title={STATUS_LABEL[status]}
-            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0 }}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0, textAlign: "left" }}
           >
             <StateLadder status={status} />
-            <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em", whiteSpace: "nowrap" }}>
+            {/* wraps at the word break (ACTIVE / RELATIONSHIP) instead of overflowing
+                the 108px column — nowrap removed 2026-08-06 */}
+            <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em", lineHeight: 1.35 }}>
               {STATUS_LABEL[status].toUpperCase()}
             </span>
           </button>
@@ -533,7 +555,7 @@ function MobileRow({
         ) : null}
 
         {/* evidence chip (COM) */}
-        {flag ? <RisingChipView flag={flag} mobile /> : row.tier ? <EvidenceChipView row={row} mobile /> : null}
+        {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} mobile /> : row.tier ? <EvidenceChipView row={row} mobile /> : null}
 
         {/* summary */}
         {row.summary ? <div style={{ ...serif(13), lineHeight: 1.5, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div> : null}
@@ -843,7 +865,7 @@ export default function CohortLedger() {
               eyebrow={`${cfg.tag} · Cohort ledger`}
               meta={`WEEKLY BUILD · AS OF ${formatScoringDate(scoredAt)}`}
               title={cfg.title}
-              stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT" }] : undefined}
+              stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT", center: true }] : undefined}
             />
           </div>
           <div style={{ border: `1px solid ${LINE.l1}`, background: P.card }}>
@@ -907,7 +929,13 @@ export default function CohortLedger() {
                     {band.rows.map(renderRow)}
                   </div>
                 ))}
-                {/* below the head the index separates people — a plain, virtualised ranked list */}
+                {/* below the head the index separates people — a plain ranked list,
+                    virtualised only past VIRTUAL_MIN rows. Small boards (Rising: 123)
+                    render statically: the window virtualiser's dynamic-measure cache can
+                    hold a stale height for an unmounted row (e.g. measured with its
+                    drawer open, or before the rising badges loaded), which pads the
+                    scroll container past the real last row — visible as dead space under
+                    the final rank on the one cohort whose bottom users actually reach. */}
                 {tailRows.length > 0 ? (
                   <>
                     {!isCom ? (
@@ -919,16 +947,21 @@ export default function CohortLedger() {
                         </span>
                       </div>
                     ) : null}
-                    <VirtualTail
-                      cfg={cfg}
-                      rows={tailRows}
-                      th={th}
-                      cohortTotal={cohortTotal}
-                      open={open}
-                      onToggle={toggle}
-                      onNearEnd={loadMore}
-                      isMobile={isMobile}
-                     flags={isRising ? risingFlags : undefined} />
+                    {tailRows.length > VIRTUAL_MIN ? (
+                      <VirtualTail
+                        cfg={cfg}
+                        rows={tailRows}
+                        th={th}
+                        cohortTotal={cohortTotal}
+                        open={open}
+                        onToggle={toggle}
+                        onNearEnd={loadMore}
+                        isMobile={isMobile}
+                        flags={isRising ? risingFlags : undefined}
+                      />
+                    ) : (
+                      tailRows.map(renderRow)
+                    )}
                     {hasMore ? (
                       <div style={{ padding: "12px 23px", ...mono(10), color: P.ink5, letterSpacing: ".08em", borderTop: `1px solid ${P.line}` }}>
                         Loading more of the cohort… {rows.length.toLocaleString()} of {(isCom ? filteredTotal : cohortTotal).toLocaleString()}

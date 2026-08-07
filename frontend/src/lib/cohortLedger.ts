@@ -25,6 +25,11 @@ export interface ScoreCol {
   key: string;
   label: string; // SCI / SCI MOM / ENGAGEMENT
   sub: string; // CEILING / PCTILE / CMS · NOT RANKED
+  // Display-only header override (2026-08-06 label pass): the two lines the column
+  // head renders (e.g. SCIENTIFIC over MOMENTUM). label/sub keep feeding trace()
+  // and why(), where the short forms stay unambiguous in running text.
+  head?: string;
+  headSub?: string;
   w: number;
   kind: ColKind;
   noRank?: boolean; // informational, never ranks, never suppresses (Pharma, Engagement)
@@ -90,10 +95,10 @@ export const RS_CONFIG: CohortConfig = {
   nameSub: "INSTITUTION · GENERATED SUMMARY",
   meta: "{total} HCP · FOUR METRICS · ALL FOUR DISCRIMINATE, SO ALL FOUR PRINT",
   cols: [
-    { key: "scimom", label: "SCI MOM", sub: "PCTILE", w: 74, kind: "pct" },
-    { key: "netmom", label: "NET MOM", sub: "PCTILE", w: 74, kind: "pct" },
-    { key: "scivis", label: "SCI VIS", sub: "PCTILE", w: 74, kind: "pct" },
-    { key: "netvis", label: "NET VIS", sub: "PCTILE", w: 74, kind: "pct" },
+    { key: "scimom", label: "SCI MOM", sub: "PCTILE", head: "SCIENTIFIC", headSub: "MOMENTUM", w: 78, kind: "pct" },
+    { key: "netmom", label: "NET MOM", sub: "PCTILE", head: "NETWORK", headSub: "MOMENTUM", w: 78, kind: "pct" },
+    { key: "scivis", label: "SCI VIS", sub: "PCTILE", head: "SCIENTIFIC", headSub: "VISIBILITY", w: 78, kind: "pct" },
+    { key: "netvis", label: "NET VIS", sub: "PCTILE", head: "NETWORK", headSub: "VISIBILITY", w: 78, kind: "pct" },
   ],
   // four columns don't fit 390, so they pair by family rather than drop
   mobilePairs: [

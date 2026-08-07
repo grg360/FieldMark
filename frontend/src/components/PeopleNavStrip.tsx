@@ -182,7 +182,9 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
           <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: FAINT, paddingBottom: 4 }}>{moreMeta}</span>
         </div>
 
-        {/* views */}
+        {/* views — suppressed on the ledger mount (2026-08-06): SkyView is a NavBar
+            destination; linking it from the ledger duplicated the bar */}
+        {ledgerMount ? null : (
         <div style={{ display: "flex", alignItems: "stretch", gap: 20, padding: "0 16px", overflowX: "auto", scrollbarWidth: "none", borderBottom: `1px solid ${HAIR_STRONG}` }}>
           {VIEWS.map((v) => {
             const on = viewActive(v.key);
@@ -195,6 +197,7 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
             );
           })}
         </div>
+        )}
 
         {/* cohort */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 0" }}>
@@ -329,8 +332,11 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
 
       {/* VIEWS (what) + SCOPE (who / where) */}
       <div style={{ display: "flex", alignItems: "stretch", justifyContent: "space-between", gap: 32, padding: "0 20px", borderBottom: `1px solid ${HAIR_STRONG}`, flexWrap: "wrap" }}>
+        {/* views — suppressed on the ledger mount (2026-08-06): SkyView is a NavBar
+            destination; linking it from the ledger duplicated the bar. The empty div
+            keeps space-between pinning the scope group right. */}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 18, flex: "none" }}>
-          {VIEWS.map((v) => {
+          {ledgerMount ? null : VIEWS.map((v) => {
             const on = viewActive(v.key);
             return (
               <div key={v.key} onClick={() => pickView(v.key)} style={{ position: "relative", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, padding: "17px 0 15px", fontFamily: MONO, fontSize: 10, letterSpacing: ".15em", textTransform: "uppercase", whiteSpace: "nowrap", color: on ? GOLD : MID }}>

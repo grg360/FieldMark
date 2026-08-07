@@ -61,6 +61,14 @@ export default function HcpPublicationsPage() {
     return () => { cancelled = true; };
   }, [hcpId, year]);
 
+  // Deep-link landing (#senior-author from the ledger badge): scroll once the
+  // record has rendered — same pattern as HcpProfileBrief's section hashes.
+  useEffect(() => {
+    if (loading || !location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, location.hash]);
+
   const surname = hcpName.trim().split(/\s+/).pop() ?? "";
   const breadcrumbs = [
     { label: "Home", path: "/me" },
