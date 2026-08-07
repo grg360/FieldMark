@@ -288,7 +288,9 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
       </div>
       {cfg.cols.map((c) => (
         <div key={c.key} style={{ width: c.w, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-          {c.head ?? c.label}<br /><span style={{ color: P.ink5 }}>{c.headSub ?? c.sub}</span>
+          {c.head ?? c.label}
+          {/* headSub === "" is the explicit single-line head (PHARMA ENGAGEMENT) */}
+          {(c.headSub ?? c.sub) ? <><br /><span style={{ color: P.ink5 }}>{c.headSub ?? c.sub}</span></> : null}
         </div>
       ))}
       {/* our-side controls — universal across cohorts */}

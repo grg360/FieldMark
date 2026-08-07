@@ -913,7 +913,8 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         <SectionHead title="FIELD INSIGHTS" sub={`${notes.length} CAPTURED · MSL-CAPTURED · YOUR TEAM ONLY`}
           right="COMPOSER + BELIEF LINKS · SAME WRITE PATH AS THE OTHER SPINES" />
         <Card style={{ padding: "18px 22px" }}>
-          <FieldInsights hcp={profileHcp(hcpId, name, "NSCLC")} variant="ledger" />
+          {/* hideHeader: the SectionHead above is the one header (same fix as community) */}
+          <FieldInsights hcp={profileHcp(hcpId, name, "NSCLC")} variant="ledger" hideHeader />
         </Card>
 
         {/* field intelligence — ported from the community spine: the peer

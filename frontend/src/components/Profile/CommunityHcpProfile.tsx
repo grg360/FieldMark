@@ -365,8 +365,45 @@ export default function CommunityHcpProfile() {
         {/* ─────────── MAIN (left) ─────────── */}
         <div style={{ flex: "1 1 520px", minWidth: 0, display: "flex", flexDirection: "column", gap: 24 }}>
 
-        {/* ◆ INDUSTRY ENGAGEMENT RECORD — PRIMARY (the spine) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* ◆ WHY THIS PRACTITIONER — moved above the engagement record (2026-08-07):
+            orientation before evidence. The narrative, or its absence in the same
+            slot under the same heading — now in a panel like everything else,
+            never floating on the page ground. ~91% of the community cohort has no
+            narrative row; the absence states the coverage fact, never blank. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SectionHead glyph="◆" tag="WHY THIS PRACTITIONER" />
+          {n?.why_this ? (
+            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
+              <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty" }}>{n.why_this}</div>
+            </div>
+          ) : (
+            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ ...mono(12, 600), letterSpacing: ".1em", color: P.ink4 }}>NO GENERATED SUMMARY</span>
+              <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5, textWrap: "pretty" }}>Narrative synthesis runs for the top-ranked HCPs in each cohort and this practitioner ranks below that cut. A coverage fact, not a judgment about the practice.</span>
+            </div>
+          )}
+        </div>
+
+        {/* ◆ SIGNAL SUMMARY — MACHINE-DERIVED (moved up with WHY, above the record) */}
+        {(n?.signal_strength || n?.why_now || n?.engagement_angle || n?.caution) ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <SectionHead glyph="◆" tag="SIGNAL SUMMARY" sub="MACHINE-DERIVED" />
+            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+              {[["CONFIDENCE", n?.signal_strength], ["WHY NOW", n?.why_now], ["ENGAGEMENT ANGLE", n?.engagement_angle], ["CAUTION", n?.caution]].map(([l, v]) => v ? (
+                <div key={l as string} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>{l}</span>
+                  <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty" }}>{v}</span>
+                </div>
+              ) : null)}
+              <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink6 }}>MODEL SYNTHESIS OVER THE RECORD BELOW · REVIEW BEFORE USE · NO CLINICAL CLAIM</span>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ◆ INDUSTRY ENGAGEMENT RECORD — PRIMARY (the spine). gap matches the
+            other sections (10) — it sat at 12 and read as extra space under the
+            header (2026-08-07). */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="INDUSTRY ENGAGEMENT RECORD" sub="PRIMARY" />
           {eng.has_record && (companies.length || shown.length) ? (
             <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
@@ -476,42 +513,13 @@ export default function CommunityHcpProfile() {
           <div style={{ ...mono(10.5), color: P.ink4, lineHeight: 1.7, letterSpacing: ".01em", textWrap: "pretty" }}>
             This practitioner has no published record. Everything below the engagement data is either machine-derived from claims and payments, or written by a person who was in the room. The second kind is scarce and load-bearing here.
           </div>
-          {/* functional capture (composer + list) ported from DetailScreen; msl_hcp_notes */}
+          {/* functional capture (composer + list) ported from DetailScreen; msl_hcp_notes.
+              hideHeader: the SectionHead above is the one header — the component's own
+              zero-padding inner header doubled it (2026-08-07). */}
           <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
-            <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" />
+            <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" hideHeader />
           </div>
         </div>
-
-        {/* ◆ WHY THIS PRACTITIONER — the narrative, or its absence in the same slot under
-            the same heading. ~91% of the community cohort has no narrative row (generated
-            for top-ranked HCPs only); the absence states the coverage fact, never blank. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SectionHead glyph="◆" tag="WHY THIS PRACTITIONER" />
-          {n?.why_this ? (
-            <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty" }}>{n.why_this}</div>
-          ) : (
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
-              <span style={{ ...mono(12, 600), letterSpacing: ".1em", color: P.ink4 }}>NO GENERATED SUMMARY</span>
-              <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5, textWrap: "pretty" }}>Narrative synthesis runs for the top-ranked HCPs in each cohort and this practitioner ranks below that cut. A coverage fact, not a judgment about the practice.</span>
-            </div>
-          )}
-        </div>
-
-        {/* ◆ SIGNAL SUMMARY — MACHINE-DERIVED */}
-        {(n?.signal_strength || n?.why_now || n?.engagement_angle || n?.caution) ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <SectionHead glyph="◆" tag="SIGNAL SUMMARY" sub="MACHINE-DERIVED" />
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {[["CONFIDENCE", n?.signal_strength], ["WHY NOW", n?.why_now], ["ENGAGEMENT ANGLE", n?.engagement_angle], ["CAUTION", n?.caution]].map(([l, v]) => v ? (
-                <div key={l as string} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>{l}</span>
-                  <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty" }}>{v}</span>
-                </div>
-              ) : null)}
-              <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink6 }}>MODEL SYNTHESIS OVER THE RECORD ABOVE · REVIEW BEFORE USE · NO CLINICAL CLAIM</span>
-            </div>
-          </div>
-        ) : null}
 
         </div>{/* ─────────── /MAIN ─────────── */}
 

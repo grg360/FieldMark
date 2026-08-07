@@ -126,7 +126,11 @@ export const COM_CONFIG: CohortConfig = {
   meta: "{total} HCP · CMS-DERIVED · VOLUME 40% · ENGAGEMENT 30% · SETTING 15% · CAREER 10% · PUBLICATION 5%",
   cols: [
     { key: "eng", label: "ENGAGEMENT", sub: "CMS · NOT RANKED", w: 122, kind: "money", noRank: true, absent: "NONE RECORDED", prov: "Open Payments" },
-    { key: "companies", label: "COMPANIES", sub: "DISTINCT", w: 86, kind: "count", unit: "distinct companies", prov: "Open Payments" },
+    // Head renamed PHARMA ENGAGEMENT 2026-08-07 (single line — headSub "" on
+    // purpose). This is the distinct-company COUNT column; the CMS payment
+    // total to its left keeps ENGAGEMENT / CMS · NOT RANKED. label/sub still
+    // feed trace() unchanged.
+    { key: "companies", label: "COMPANIES", sub: "DISTINCT", head: "PHARMA ENGAGEMENT", headSub: "", w: 126, kind: "count", unit: "distinct companies", prov: "Open Payments" },
     { key: "years", label: "YEARS", sub: "IN PRACTICE", w: 74, kind: "count", unit: "years", prov: "NPPES" },
   ],
   bandResolution: 1.0,
