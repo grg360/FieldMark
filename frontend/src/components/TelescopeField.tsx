@@ -20,6 +20,7 @@
 import { Component, createRef, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as RPointerEvent, WheelEvent as RWheelEvent } from "react";
 import { useMediaQuery } from "../lib/useMediaQuery";
+import { FONT } from "../lib/designTokens";
 import nsclcNodes from "../data/telescope_nsclc_nodes.json";
 import nsclcEdges from "../data/telescope_nsclc_edges.json";
 import adNodes from "../data/telescope_ad_nodes.json";
@@ -518,17 +519,17 @@ class Sky extends Component<Props, State> {
       if (hov) { op = Math.max(op, 0.16 + Math.min(0.34, e.w * 0.007)); col = "#e8c79a"; }
       if (op <= 0) return;
       const s = seg(A.x, A.y, B.x, B.y, rad[e.a] + 3, rad[e.b] + 3);
-      edges.push({ key: "e" + i, op, el: <line key={"e" + i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} style={{ stroke: col, strokeOpacity: op, strokeWidth: Math.min(0.7, 0.1 + e.w * 0.004), strokeLinecap: "round", transition: "stroke-opacity 420ms ease" }} /> });
+      edges.push({ key: "e" + i, op, el: <line key={"e" + i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} style={{ stroke: col, strokeOpacity: op, strokeWidth: Math.min(0.32, 0.06 + e.w * 0.0016), strokeLinecap: "round", transition: "stroke-opacity 420ms ease" }} /> });
     });
     edges.sort((a, b) => a.op - b.op);
     if (orb) { const host = g.nodes[orbHost!]; const hostR = rad[orbHost!] + 5;
       orb.forEach((c, k) => {
         const endR = c.fieldIndex >= 0 ? rad[c.fieldIndex] + 5 : (offRad[k] || 16) + 5;
         const s = seg(host.x, host.y, c.x, c.y, hostR, endR);
-        // Shared-publication weight legible as THICKNESS (item 5): width spans
-        // ~2.4→8px and opacity ~0.42→0.95 across the weight range, vs the old
-        // near-flat 0.44–0.49px / 0.31–0.33.
-        const owWidth = Math.min(8, 0.8 + Math.min(c.w, 50) * 0.16);
+        // Shared-publication weight stays legible as THICKNESS, with the whole
+        // ramp compressed (2026-08-07): the 0.8→8px orbit lines read as cables
+        // over the starfield; 0.5→3px keeps the ordering readable as threads.
+        const owWidth = Math.min(3, 0.5 + Math.min(c.w, 50) * 0.05);
         const owOpacity = Math.min(0.95, 0.35 + Math.min(c.w, 50) * 0.014);
         edges.push({ key: "oe" + k, op: 1, el: <line key={"oe" + k} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} style={{ stroke: c.inField ? "#ffd89b" : OTHER, strokeOpacity: owOpacity, strokeWidth: owWidth, strokeLinecap: "round", ...(c.inField ? {} : { strokeDasharray: "3.5 6" }), transition: "stroke-opacity 520ms ease" }} /> });
       });
@@ -550,11 +551,15 @@ class Sky extends Component<Props, State> {
       if (avoidPanel && box.x < PANEL.x1 && PANEL.x0 < box.x + box.w && box.y < PANEL.y1 && PANEL.y0 < box.y + box.h) return;
       if (rects.some((r) => box.x < r.x + r.w + 10 && r.x < box.x + box.w + 10 && box.y < r.y + r.h + 6 && r.y < box.y + box.h + 6)) return;
       rects.push(box);
-      labels.push(<div key={"l" + labels.length} data-wx={wx.toFixed(1)} data-wy={wy.toFixed(1)} data-side={right ? "r" : "l"} style={{ position: "absolute", left: sxp.toFixed(1) + "px", top: syp.toFixed(1) + "px", transform: `translate(${right ? off + "px" : "calc(-100% - " + off + "px)"},-50%)`, whiteSpace: "nowrap", font: `300 ${fs}px/1 Jost,sans-serif`, letterSpacing: track || "0.05em", color, transition: "opacity 400ms ease" }}>{label}</div>);
+      // Researcher names render in the register serif (token, not hardcoded);
+      // chrome (header/legend/filters) keeps its letter-spaced Jost. The dark
+      // multi-layer text halo keeps names legible over glow sprites and dust.
+      labels.push(<div key={"l" + labels.length} data-wx={wx.toFixed(1)} data-wy={wy.toFixed(1)} data-side={right ? "r" : "l"} style={{ position: "absolute", left: sxp.toFixed(1) + "px", top: syp.toFixed(1) + "px", transform: `translate(${right ? off + "px" : "calc(-100% - " + off + "px)"},-50%)`, whiteSpace: "nowrap", font: `400 ${fs}px/1.15 ${FONT.serif}`, letterSpacing: "0.015em", color, textShadow: "0 0 4px rgba(4,6,13,0.95), 0 0 9px rgba(4,6,13,0.8), 0 1px 14px rgba(4,6,13,0.6)", transition: "opacity 400ms ease" }}>{label}</div>);
     };
     if (focus) {
       const hostN = g.nodes[orbHost!];
-      const hostR = (hostN.cohort === "established" ? 2.6 + hostN.deg * 0.12 : 1.9 + hostN.deg * 0.09) * 2.3 * cam.z + 14;
+      const hostBlur = ((hostN.cohort === "established" ? 11 : 7) + hostN.deg * 0.28) * 2.1;
+      const hostR = ((hostN.cohort === "established" ? 2.6 + hostN.deg * 0.12 : 1.9 + hostN.deg * 0.09) * 2.3 + hostBlur * 0.85) * cam.z + 10;
       if (focus.t === "f") chip(hostN.x, hostN.y, hostN.name, 19, "#f6f2e8", null, "0.03em", hostR, 0, false);
       else chip(hostN.x, hostN.y, hostN.name, 14, "rgba(226,223,214,0.62)", null, "0.05em", 0, 0, false);
       orb!.forEach((c, k) => {
@@ -564,13 +569,27 @@ class Sky extends Component<Props, State> {
         chip(c.x, c.y, c.name, sel ? 19 : 13, sel ? "#f2f7ff" : c.inField ? "#cdcac1" : "#a8bdd8", sel ? null : String(c.w), sel ? "0.03em" : "0.06em", clear, side, false);
       });
     }
+    // Consistent glow clearance (2026-08-07): every label offsets past its own
+    // node's halo-sprite radius (core r + blur*0.85, projected to screen px) —
+    // the fixed 16px floor let big-degree glows (Heymach) run under the name.
+    const glowClear = (i: number) => {
+      const n = g.nodes[i];
+      const blur = (n.cohort === "established" ? 11 : 7) + n.deg * 0.28;
+      return (rad[i] + blur * 0.85) * cam.z + 8;
+    };
     const zoomedIn = cam.z > 1.05;
+    // Hover chip places FIRST and the hovered star's own ambient label is
+    // suppressed (2026-08-07): leaders carry an always-on label, and the
+    // hover chip — placed last — lost the collision check to it and was
+    // culled. Exactly the biggest stars (Heymach, Wistuba, Ramalingam) never
+    // visibly responded to hover while unlabelled mid-tier stars lit up.
+    if (nearIdx != null) chip(g.nodes[nearIdx].x, g.nodes[nearIdx].y, g.nodes[nearIdx].name, 15, "#f6f2e8", null, "0.03em", glowClear(nearIdx), 0, false);
     const pool = g.nodes.filter((n) => inCohort(n) && (zoomedIn || isLeader(n))).slice().sort((a, b) => b.deg - a.deg);
     pool.slice(0, zoomedIn ? 40 : density === "full" ? 22 : 14).forEach((n) => {
+      if (n.i === nearIdx) return;
       if (focus && (n.i === focusIdx || orbFieldIdx.has(n.i))) return;
-      chip(n.x, n.y, n.name, 12.5, focus ? "rgba(226,223,214,0.3)" : "rgba(226,223,214,0.5)", null, "0.05em", 0, 0, !!focus);
+      chip(n.x, n.y, n.name, 12.5, focus ? "rgba(226,223,214,0.3)" : "rgba(226,223,214,0.5)", null, "0.05em", glowClear(n.i), 0, !!focus);
     });
-    if (nearIdx != null) chip(g.nodes[nearIdx].x, g.nodes[nearIdx].y, g.nodes[nearIdx].name, 15, "#f6f2e8", null, "0.03em", 0, 0, false);
 
     // panel content
     let selName = "", selInst = "", selRole = "", selRoleColor = GOLD, selConn = "", selShared = "", selRank = "", banner = "", collabs: JSX.Element[] = [], hasStats = false;
@@ -671,13 +690,20 @@ class Sky extends Component<Props, State> {
                 they share the field's parallax (travel with it on pan) and a star
                 can pass in front of a meteor rather than the meteor always over it. */}
             <g>
-              <g style={{ transform: "translate(1120px,110px)", animation: "sv-shoot 27s linear infinite" }}><line x1="0" y1="0" x2="150" y2="-67" stroke="url(#svTrail)" strokeWidth="1.4" strokeLinecap="round" /></g>
-              <g style={{ transform: "translate(150px,170px)", animation: "sv-shoot2 38s linear infinite" }}><line x1="0" y1="0" x2="-124" y2="-64" stroke="url(#svTrail2)" strokeWidth="1.2" strokeLinecap="round" /></g>
-              <g style={{ transform: "translate(880px,55px)", animation: "sv-shoot3 31s linear -6s infinite" }}><line x1="0" y1="0" x2="108" y2="-59" stroke="url(#svTrail)" strokeWidth="1.1" strokeLinecap="round" /></g>
-              <g style={{ transform: "translate(1180px,430px)", animation: "sv-shoot4 44s linear -17s infinite" }}><line x1="0" y1="0" x2="132" y2="-46" stroke="url(#svTrail2)" strokeWidth="1.15" strokeLinecap="round" /></g>
-              <g style={{ transform: "translate(1210px,-30px)", animation: "sv-shoot5 63s linear -29s infinite" }}><line x1="0" y1="0" x2="210" y2="-94" stroke="url(#svTrail3)" strokeWidth="1.7" strokeLinecap="round" /></g>
-              <g style={{ transform: "translate(340px,780px)", animation: "sv-shoot6 34s linear -11s infinite" }}><line x1="0" y1="0" x2="-72" y2="-45" stroke="url(#svTrail2)" strokeWidth="0.8" strokeLinecap="round" /></g>
-              <g style={{ transform: "translate(770px,280px)", animation: "sv-shoot7 41s linear -23s infinite" }}><line x1="0" y1="0" x2="84" y2="-70" stroke="url(#svTrail)" strokeWidth="0.75" strokeLinecap="round" /></g>
+              {/* Meteors rebuilt 2026-08-07: the seven old ones sat at OLD-world
+                  top-left coordinates with short hops — the enlarged world's
+                  landing camera never framed one. Three long streaks now cross
+                  the THICK of the field (start points from WW/WH, travel ~2000
+                  world px through the central band), each on a 75s cycle
+                  staggered by 25s: one shooting star every ~25 seconds. */}
+              {/* Tail lines are ANTIPARALLEL to each travel vector (the streak
+                  trails behind the head, as the originals did) — a tail off-axis
+                  reads as a bar sliding sideways, not a shooting star. All three
+                  travel on shallow DOWNWARD diagonals like the old set, dimmer
+                  and thinner for subtlety. */}
+              <g style={{ transform: `translate(${Math.round(WW * 0.18)}px,${Math.round(WH * 0.14)}px)`, animation: "sv-shoot 75s linear infinite" }}><line x1="0" y1="0" x2="-265" y2="-120" stroke="url(#svTrail)" strokeWidth="1.1" strokeLinecap="round" /></g>
+              <g style={{ transform: `translate(${Math.round(WW * 0.85)}px,${Math.round(WH * 0.20)}px)`, animation: "sv-shoot2 75s linear -25s infinite" }}><line x1="0" y1="0" x2="250" y2="-114" stroke="url(#svTrail2)" strokeWidth="1.0" strokeLinecap="round" /></g>
+              <g style={{ transform: `translate(${Math.round(WW * 0.45)}px,${Math.round(WH * 0.10)}px)`, animation: "sv-shoot3 75s linear -50s infinite" }}><line x1="0" y1="0" x2="-230" y2="-146" stroke="url(#svTrail3)" strokeWidth="1.1" strokeLinecap="round" /></g>
             </g>
             <g>{edges.map((e) => e.el)}</g>
             <g>{rings}</g>
@@ -695,8 +721,8 @@ class Sky extends Component<Props, State> {
           </div>
           {!focus && !this.state.trail.length ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 14, pointerEvents: "none" }}>
-              <div style={{ font: "200 34px/1.24 Jost,sans-serif", letterSpacing: "0.008em", color: "#e6e3da", textWrap: "pretty" } as CSSProperties}>The constellation of the recognized and emerging field</div>
-              <div style={{ font: "300 15px/1.72 Jost,sans-serif", color: "#7c839a", maxWidth: 400, textWrap: "pretty" } as CSSProperties}>A curated subgraph — the researchers already recognized as established or rising stars in {this.props.taId === AD_TA_ID ? "AD" : "NSCLC"}, and the co-authorship among them. Not every researcher, and not anyone's complete network.</div>
+              <div style={{ font: `400 34px/1.22 ${FONT.serif}`, letterSpacing: "-0.005em", color: "#e6e3da", textWrap: "pretty" } as CSSProperties}>The constellation of the recognized and emerging field</div>
+              <div style={{ font: `400 15px/1.7 ${FONT.serif}`, color: "#7c839a", maxWidth: 400, textWrap: "pretty" } as CSSProperties}>A curated subgraph — the researchers already recognized as established or rising stars in {this.props.taId === AD_TA_ID ? "AD" : "NSCLC"}, and the co-authorship among them. Not every researcher, and not anyone's complete network.</div>
               <div style={{ font: "300 13px/1.7 Jost,sans-serif", letterSpacing: "0.02em", color: "#4d5468", maxWidth: 390, textWrap: "pretty" } as CSSProperties}>Drag to look around. Scroll to move closer. Settle on a star to see its real orbit — then travel from there.</div>
             </div>
           ) : null}
@@ -950,11 +976,7 @@ const SKY_KEYFRAMES = `
 @keyframes sv-breathe { 0%,100% { opacity:0.42 } 50% { opacity:0.8 } }
 @keyframes sv-rise { 0% { transform:scale(0.3); opacity:0 } 14% { opacity:0.32 } 100% { transform:scale(3.1); opacity:0 } }
 @keyframes sv-swell { 0%,100% { opacity:0.82 } 46% { opacity:1 } }
-@keyframes sv-shoot { 0%{opacity:0;transform:translate(0,0)} 1.4%{opacity:0} 2.2%{opacity:.85} 4.6%{opacity:.85} 6.4%{opacity:0;transform:translate(-760px,340px)} 100%{opacity:0;transform:translate(-760px,340px)} }
-@keyframes sv-shoot2 { 0%{opacity:0;transform:translate(0,0)} 41%{opacity:0} 42.4%{opacity:.7} 44.6%{opacity:.7} 46.6%{opacity:0;transform:translate(560px,290px)} 100%{opacity:0;transform:translate(560px,290px)} }
-@keyframes sv-shoot3 { 0%{opacity:0;transform:translate(0,0)} 18%{opacity:0} 19.2%{opacity:.55} 21.8%{opacity:.55} 24%{opacity:0;transform:translate(-430px,236px)} 100%{opacity:0;transform:translate(-430px,236px)} }
-@keyframes sv-shoot4 { 0%{opacity:0;transform:translate(0,0)} 63%{opacity:0} 64.2%{opacity:.62} 66.4%{opacity:.62} 68.6%{opacity:0;transform:translate(-520px,180px)} 100%{opacity:0;transform:translate(-520px,180px)} }
-@keyframes sv-shoot5 { 0%{opacity:0;transform:translate(0,0)} 8%{opacity:0} 9.4%{opacity:.9} 12.6%{opacity:.9} 15.4%{opacity:0;transform:translate(-920px,414px)} 100%{opacity:0;transform:translate(-920px,414px)} }
-@keyframes sv-shoot6 { 0%{opacity:0;transform:translate(0,0)} 77%{opacity:0} 78%{opacity:.42} 79.8%{opacity:.42} 81.4%{opacity:0;transform:translate(330px,208px)} 100%{opacity:0;transform:translate(330px,208px)} }
-@keyframes sv-shoot7 { 0%{opacity:0;transform:translate(0,0)} 33%{opacity:0} 34%{opacity:.48} 35.9%{opacity:.48} 37.6%{opacity:0;transform:translate(-360px,300px)} 100%{opacity:0;transform:translate(-360px,300px)} }
+@keyframes sv-shoot { 0%{opacity:0;transform:translate(0,0)} 0.5%{opacity:.55} 2.7%{opacity:.55;transform:translate(1500px,680px)} 3.4%{opacity:0;transform:translate(1800px,816px)} 100%{opacity:0;transform:translate(1800px,816px)} }
+@keyframes sv-shoot2 { 0%{opacity:0;transform:translate(0,0)} 0.5%{opacity:.5} 2.7%{opacity:.5;transform:translate(-1400px,640px)} 3.4%{opacity:0;transform:translate(-1680px,768px)} 100%{opacity:0;transform:translate(-1680px,768px)} }
+@keyframes sv-shoot3 { 0%{opacity:0;transform:translate(0,0)} 0.5%{opacity:.6} 2.7%{opacity:.6;transform:translate(1200px,760px)} 3.4%{opacity:0;transform:translate(1440px,912px)} 100%{opacity:0;transform:translate(1440px,912px)} }
 `;
