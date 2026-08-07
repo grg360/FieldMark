@@ -136,7 +136,7 @@ export default function Composer({
               onClick={submit}
               style={{ ...mono(10.5, canSubmit ? GOLD.gold : COOL.faint), letterSpacing: "0.12em", background: "transparent", border: `1px solid ${canSubmit ? GOLD.dim : LINE.l2}`, borderRadius: 0, padding: "8px 14px", cursor: canSubmit ? "pointer" : "not-allowed", fontWeight: 600 }}
             >
-              {busy ? "CHECKING…" : isThread ? "CHECK & OPEN THREAD" : "CHECK & POST"}
+              {busy ? "CHECKING…" : isThread ? "CHECK & OPEN THREAD" : "CHECK & POST REPLY"}
             </button>
           </div>
         </div>

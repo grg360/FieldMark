@@ -211,8 +211,11 @@ export interface WriteResult {
   post_id?: string;
 }
 
-// The demo write handle (pseudonymous, per the surface's anonymous-to-peers model).
-export const FORUM_WRITE_HANDLE = "@demo_msl";
+// The write handle (pseudonymous to peers, per the surface's model). Hardcoded
+// by design for now: the write path is founder-gated (fi_can_write on
+// auth.uid()), so exactly one account can post and this constant IS that
+// account's handle. A per-user handle field is the multi-writer version.
+export const FORUM_WRITE_HANDLE = "@ggroesbeck";
 
 export async function canWriteForum(): Promise<boolean> {
   const { data, error } = await supabase.rpc("fi_can_write");

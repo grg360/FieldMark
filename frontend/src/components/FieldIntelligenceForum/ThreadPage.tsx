@@ -352,10 +352,10 @@ export default function ThreadPage() {
                 onClick={() => setReplyTarget({ parentPostId: null })}
                 style={{ ...mono(10.5, GOLD.gold), letterSpacing: "0.12em", background: "transparent", border: `1px solid ${GOLD.dim}`, borderRadius: 0, padding: "8px 14px", cursor: "pointer", fontWeight: 600 }}
               >
-                CHECK &amp; POST
+                CHECK &amp; POST REPLY
               </button>
             ) : (
-              <DisabledControl variant="solid-amber">CHECK &amp; POST</DisabledControl>
+              <DisabledControl variant="solid-amber">CHECK &amp; POST REPLY</DisabledControl>
             )}
           </div>
         </div>
