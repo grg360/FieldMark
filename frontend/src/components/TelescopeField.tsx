@@ -274,13 +274,20 @@ class Sky extends Component<Props, State> {
     g.nodes.forEach((n) => { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); });
     const E = this.edge();
     // insets: chrome band on top, legend + cam-controls band on bottom, edges on the sides.
-    // zMin 0.42 (was 0.24, 2026-08-07): at the 613-node world the whole-field fit
-    // zoom fell to ~0.30, where the pan clamp leaves near-zero travel — drag moved
-    // an inch and then had nowhere to go, reading as broken until a refresh reset
-    // the camera. The LANDING now frames the field's central mass with real drag
-    // range in every direction; the wheel's own zoom-out floor (zFloor in onWheel)
-    // still reaches the genuine everything-in-frame view.
-    return this.camForBox(x0, y0, x1, y1, E + 40, E + 40, this.safeTop() + 44, E + 64, 0.42, 0.95);
+    // Viewport-aware landing zoom (2026-08-07, second pass): a FIXED floor
+    // still saturated the pan clamp on large monitors — at the whole-field fit
+    // the world barely overflows the viewport, so horizontal travel was ~one
+    // drag and vertical rounded to zero on tall windows ("left-right only, far
+    // side goes dead"). The landing now guarantees the world overflows the
+    // viewport by >=60% on BOTH axes: travel of at least 0.6x the viewport in
+    // every direction, on any monitor. The wheel's own zoom-out floor still
+    // reaches the true everything-in-frame view — where pan saturating is the
+    // comprehensible consequence of having pulled all the way back.
+    const zTravel = Math.min(0.95, Math.max(
+      1.6 * this.vw() / (WW + 2 * SKY_PAD),
+      1.6 * this.vh() / (WH + 2 * SKY_PAD),
+    ));
+    return this.camForBox(x0, y0, x1, y1, E + 40, E + 40, this.safeTop() + 44, E + 64, zTravel, 0.95);
   }
 
   paint = () => {
