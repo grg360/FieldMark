@@ -442,6 +442,10 @@ def upsert_social_posts(client: Client, rows: List[Dict[str, Any]], dry_run: boo
     if dry_run:
         return len(rows)
     # Supabase python maps to UPSERT with conflict target.
+    # captured_at is deliberately absent from the payload: DB DEFAULT now()
+    # stamps it server-side on insert (migration 2026_08_07). If this ever
+    # switches to ignore_duplicates=False (merge mode), set captured_at
+    # explicitly here — DEFAULT only fires on INSERT, never on UPDATE.
     with_supabase_retry(
         lambda c: c.table("social_posts_v2")
         .upsert(rows, on_conflict="platform,platform_post_id", ignore_duplicates=True)
@@ -534,7 +538,15 @@ def map_profile_to_social_users_row(profile: Dict[str, Any], discovery_source: s
 
 
 def upsert_social_user(client: Client, row: Dict[str, Any], dry_run: bool) -> bool:
-    """Insert social user with ON CONFLICT(platform, handle) DO NOTHING."""
+    """Insert social user with ON CONFLICT(platform, handle) DO NOTHING.
+
+    profile_fetched_at (DB DEFAULT now(), migration 2026_08_07) therefore
+    stamps FIRST-SEEN at handle discovery, NOT freshness — profiles are never
+    re-fetched, and this DO NOTHING upsert never revisits existing rows. No
+    surface may render it as "last refreshed" (re-fetch gap: KNOWN_ISSUES.md).
+    If this ever switches to ignore_duplicates=False (merge mode), set
+    profile_fetched_at explicitly here — DEFAULT only fires on INSERT.
+    """
     _ = client
     if not row.get("handle"):
         return False

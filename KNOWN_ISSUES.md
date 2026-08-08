@@ -324,3 +324,13 @@ Both exhibit **both** wrong-states:
 **The problem.** The Monday 2026-07-27 03:00 reingest slot **never fired**: `WakeToRun` was False, the desktop was asleep, and `StartWhenAvailable` did not catch up. A missed slot leaves no trace except a stale last-run timestamp — nothing alerts, nothing records the absence (same observability hole as the non-blocking-stages entry above).
 
 **The residual fragility.** Scheduled infrastructure on a desktop under a desk is the underlying problem: wake timers mitigate sleep but not power cuts, reboots pending login, or the machine simply being off. The runner now logs the HEAD sha per run and pulls `--ff-only` before executing (2026-08-02), so *when* it runs is traceable and current; *whether* it ran still requires someone to look.
+
+## Social profiles are fetched once at discovery and never re-fetched
+
+**Status:** flagged 2026-08-07, not fixed. Companion to the `profile_fetched_at` wiring (migration `2026_08_07_social_capture_timestamps.sql`).
+
+**The problem.** `twitter_capture.py` fetches a social profile exactly once — when a handle is first discovered — and upserts it with `ON CONFLICT (platform, handle) DO NOTHING`. Existing rows are never revisited, so bio, follower_count, display_name and verified are frozen at discovery time. All 6,233 profiles carry whatever was true the day they were first seen; some are 10+ weeks stale. There is no refresh path anywhere in the pipeline (`bluesky_capture.py` is a stub; the enrichment scripts write `hcps`, not `social_users_v2`).
+
+**The naming trap.** `profile_fetched_at` (now stamped by DB DEFAULT on insert) therefore means **first-captured, not last-refreshed** — despite its name. The column comment, the writer docstring, and this entry all say so; no surface may render it as freshness. NULL means discovered before 2026-08-07 (capture time not recorded).
+
+**The fix shape.** A periodic profile re-fetch pass (staleness-ordered, rate-limit-aware) that switches the upsert to merge mode — at which point the writer MUST set `profile_fetched_at` explicitly, because the DEFAULT only fires on INSERT. Follower-count history would need its own table if trajectory ever matters; overwriting in place loses it.
