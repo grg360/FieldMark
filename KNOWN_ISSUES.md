@@ -334,3 +334,13 @@ Both exhibit **both** wrong-states:
 **The naming trap.** `profile_fetched_at` (now stamped by DB DEFAULT on insert) therefore means **first-captured, not last-refreshed** — despite its name. The column comment, the writer docstring, and this entry all say so; no surface may render it as freshness. NULL means discovered before 2026-08-07 (capture time not recorded).
 
 **The fix shape.** A periodic profile re-fetch pass (staleness-ordered, rate-limit-aware) that switches the upsert to merge mode — at which point the writer MUST set `profile_fetched_at` explicitly, because the DEFAULT only fires on INSERT. Follower-count history would need its own table if trajectory ever matters; overwriting in place loses it.
+
+## DOL matching re-scans its residual pool every run — deferred as cheap at weekly cadence
+
+**Status:** flagged 2026-08-07, deliberately deferred. Matching is now scheduled weekly (Mon 07:30, post-capture) and logs to `pipeline_runs`.
+
+**The behavior.** `dol_matching.py` is incremental by *social user*: it skips users already present in `dol_matches_v2`. But users whose display name fails to parse or who find no HCP candidate get **no row written**, so the same residual pool (~5,700+ of the 6,233 users after the 2026-06-03 run) is re-evaluated on every run — one candidate query per parseable name, ~20–30 min per pass.
+
+**Why deferred.** At weekly cadence the re-scan is cheap, and re-evaluating is mildly *useful* while the corpus grows: a user unmatched last week can match this week if a new HCP row or better display_name arrives. Not worth complexity now.
+
+**Revisit when.** Cadence tightens below weekly, or the pool grows materially (watch `rows_processed` vs `rows_succeeded` in `pipeline_runs` — a widening gap is the pool growing). **The named fix:** persist `rejected` rows in `dol_matches_v2` so the skip-list covers them, with a periodic amnesty pass to re-try old rejects.

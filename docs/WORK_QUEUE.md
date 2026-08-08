@@ -153,3 +153,62 @@ Logged during the community evidence-tier build. Not for tonight.
    STILL OPEN: the established/academic profile (`HcpProfileBrief`) and any
    rising profile — not yet verified for the same narrative dependency or
    for honestly marking the narrative object nullable.
+
+
+## Community rank: the definitional fork (Part D scoring)
+
+STATUS: Queued — scoping session, not a build. Not urgent (demo done,
+nothing ships on this). Do NOT start as a code task.
+
+THE FORK — one unmade decision under two symptoms:
+The platform runs two rank systems that disagree, both honest:
+- Tier-first order (ledger + community_tiered_ranks RPC): orders by
+  evidence tier (anchored → supported → …) → recurrence → evidence
+  rank. Composite score is only a tiebreak here.
+- Part-B composite (hcp_community_ranks_v2): patient_volume =
+  ta_beneficiaries_3yr_total @ 0.40, pharma 0.30, setting 0.15,
+  career 0.10, pubs 0.05. Zero Part D input, ever (grep-confirmed
+  Aug 7: community_scoring.py has no tier/part_d/anchor reference).
+They answer different questions — "evidence of NSCLC practice" vs
+"measured volume of it" — and both got labelled "rank." The scoping
+session's FIRST job is to pick what community rank means. The code
+falls out of the answer; it cannot be tuned into existence.
+
+EVIDENCE ON THE TABLE (from Aug 7 audit — start here, don't re-derive):
+- 176 community HCPs: anchored oral practice, patient_volume = 0,
+  parked ~#2,000s composite.
+- Score plateau ~38.45: with volume zeroed, the 176 compress into an
+  undifferentiated band. Mohamed (432 lung fills) and Weinhold (12
+  fills) land ~same score — composite flattens a 40× real difference
+  to noise.
+- Uyeki is NOT the exemplar. #62, 5,394 Part B beneficiaries — orals
+  ON TOP of a large infusion practice. System sees him every way. The
+  gap's real victims are Mohamed-shaped: oral-only, Part-B-invisible.
+- McLaughlin discrepancy (logged post-demo-prep) is this fork
+  surfacing, not a standalone bug.
+
+THE GOVERNING CONSTRAINT:
+~70% of the US community board has zero Part D by construction. Folding
+Part D volume into the composite naively re-ranks the whole cohort
+around a signal most structurally lack — the Open-Payments trap
+(ranking a cohort on a signal 7% have), which we've caught before. The
+tier system already dodges this by keeping Part D parallel, not folded.
+Candidate resolution to test, not assume: promote the tier to
+authoritative, make the composite the tiebreak it already functionally
+is, relabel both surfaces so they stop implying one rank exists. May be
+small in code, large in decision. Do not scope a month of work before
+confirming the answer isn't "declare one system authoritative + name
+them honestly."
+
+WHAT THE SESSION MUST DECIDE (in order):
+1. What does community rank mean — evidence, or measured volume?
+2. Given (1), do the two systems reconcile into one, or stay
+   deliberately separate and get relabelled?
+3. Only if volume: how does a Part-D-native signal enter without
+   capsizing the 70% who lack it — parallel layer, or weighted with
+   an absence-honest floor?
+
+CONSTRAINTS: schema-first. Absence vocabulary — zero Part D is
+suppressed / no-Part-D-patients / unmatched, three different facts,
+never a bare zero. Report before any build. This entry is the problem
+statement; the session starts from here.

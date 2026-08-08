@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+from pipeline_log import start_run, finish_run
+
 
 PAGE_SIZE = 1000
 
@@ -548,17 +550,40 @@ def main() -> None:
         default="rejected",
         help="Only insert matches at this confidence tier or higher.",
     )
+    parser.add_argument(
+        "--triggered-by",
+        default="manual",
+        help="Recorded in pipeline_runs.triggered_by (scheduler passes task_scheduler).",
+    )
     args = parser.parse_args()
 
     t0 = time.time()
     client = init_supabase()
     platform_filter = args.platform if args.platform != "both" else None
-    stats = run_matching(
-        client,
-        platform_filter=platform_filter,
-        dry_run=args.dry_run,
-        confidence_floor=args.confidence_floor,
+    run_id = None if args.dry_run else start_run(
+        "dol_matching", triggered_by=args.triggered_by,
+        metrics={"platform": args.platform, "confidence_floor": args.confidence_floor},
     )
+    try:
+        stats = run_matching(
+            client,
+            platform_filter=platform_filter,
+            dry_run=args.dry_run,
+            confidence_floor=args.confidence_floor,
+        )
+    except Exception as exc:
+        finish_run(run_id, "failed", error_message=str(exc)[:500])
+        raise
+    # Counters are USER-level: matching never scans posts (posts inherit DOL
+    # visibility through their author's match). rows_processed = users
+    # evaluated this run; rows_succeeded = dol_matches rows written. Parse-fail
+    # and no-candidate users leave no row and are re-evaluated every run — if
+    # the weekly re-scan cost ever matters, persist 'rejected' rows to shrink
+    # the pool (KNOWN_ISSUES: DOL matching residual pool).
+    finish_run(run_id, "success",
+               rows_processed=stats.get("social_users_processed", 0),
+               rows_succeeded=stats.get("inserted_matches", 0),
+               metrics=dict(stats))
     print_summary(stats)
     elapsed = time.time() - t0
     print(f"Time elapsed: {elapsed:.2f}s")

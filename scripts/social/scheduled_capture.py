@@ -37,6 +37,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+from pipeline_log import start_run, finish_run
+
 SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 CONFIG_PATH = SCRIPT_DIR / "social_capture_config.json"
@@ -104,11 +106,20 @@ def main() -> int:
 
     mode = "weekly baseline" if weekly else "daily check"
     print(f"[scheduled_capture] {today.isoformat()} ({mode}): {len(selected)} tag(s) selected", flush=True)
+    run_id = None if args.dry_run else start_run(
+        "social_capture", triggered_by="task_scheduler",
+        metrics={"mode": mode, "tags_selected": [v for _, v, _ in selected]},
+    )
     if not selected:
         print("[scheduled_capture] Nothing in a daily window and not the weekly day. Done.", flush=True)
+        # A recorded no-op is the difference between "nothing to do" and
+        # "never fired" — log it as a completed run.
+        finish_run(run_id, "success", rows_processed=0,
+                   metrics={"mode": mode, "noop": True})
         return 0
 
     failures = 0
+    per_tag_exit: Dict[str, int] = {}
     for mode, value, reason in selected:
         print(f"[scheduled_capture] Capturing {value} ({reason})", flush=True)
         flag = "--tag" if mode == "tag" else "--topic-query"
@@ -116,6 +127,7 @@ def main() -> int:
         if args.dry_run:
             cmd.append("--dry-run")
         rc = subprocess.run(cmd, cwd=str(SCRIPT_DIR)).returncode
+        per_tag_exit[value] = rc
         if rc != 0:
             failures += 1
             print(f"[scheduled_capture] {value} FAILED with exit code {rc}", flush=True)
@@ -131,6 +143,14 @@ def main() -> int:
         f"refresh exit={refresh_rc}",
         flush=True,
     )
+    ok = len(selected) - failures
+    status = "success" if not failures and refresh_rc == 0 else ("partial" if ok else "failed")
+    finish_run(run_id, status,
+               rows_processed=len(selected), rows_succeeded=ok, rows_failed=failures,
+               # per-tag EXIT CODES only — row counts live in twitter_capture's
+               # stdout (the file log); lift them here only if twitter_capture
+               # ever emits a machine-readable stats line.
+               metrics={"per_tag_exit": per_tag_exit, "refresh_exit": refresh_rc})
     return 1 if (failures or refresh_rc) else 0
 
 

@@ -35,6 +35,7 @@
 //     and their readout carries the true figures.
 
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { classifyVoice } from "../lib/voiceClassification";
 import { GOLD as GOLD_T, GROUND, LINE, FONT, COOL } from "../lib/designTokens";
@@ -425,8 +426,23 @@ function AccountRow({ r, total, marked, narrow, idx }: { r: Row; total: number; 
       </div>
       <div style={{ padding: narrow ? "12px 18px 18px" : "24px 34px 26px 0", display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
-          <span style={{ ...serif(narrow ? 18 : 22, INK, 1.25) }}>{r.name || `@${r.h}`}</span>
-          {r.name ? <span style={{ color: BRONZE, fontSize: 12 }}>@{r.h}</span> : <span style={mono(11, FAINT, "0.12em")}>NO DISPLAY NAME SET</span>}
+          {/* Voice identity → per-voice stream (2026-08-07). The identity is the
+              internal link; the representative post's VIEW ON SOURCE stays
+              outbound. Inline <a> with a hairline underline — no reflow. State
+              carries rank + the person-confirmed corpus flag (anon-dead on the
+              voice page's own reads). */}
+          <Link
+            to={`/social/voice/${encodeURIComponent(r.h)}`}
+            state={{ rank: r.pos, rankOf: total, corpusConfirmed: r.verified }}
+            style={{ ...serif(narrow ? 18 : 22, INK, 1.25), textDecoration: "none", borderBottom: `1px solid ${HAIR3}` }}
+          >{r.name || `@${r.h}`}</Link>
+          {r.name ? (
+            <Link
+              to={`/social/voice/${encodeURIComponent(r.h)}`}
+              state={{ rank: r.pos, rankOf: total, corpusConfirmed: r.verified }}
+              style={{ color: BRONZE, fontSize: 12, textDecoration: "none" }}
+            >@{r.h}</Link>
+          ) : <span style={mono(11, FAINT, "0.12em")}>NO DISPLAY NAME SET</span>}
           {!r.bio ? <span style={{ border: `1px dashed rgba(255,255,255,0.16)`, color: FAINT, fontSize: 9, letterSpacing: "0.14em", padding: "3px 7px" }}>PROFILE SAYS NOTHING</span> : null}
           {r.verified ? <span style={{ border: `1px solid rgba(216,169,73,0.35)`, color: AMBER, fontSize: 9, letterSpacing: "0.14em", padding: "3px 7px" }}>MATCHED TO CORPUS · CONFIRMED BY A PERSON</span> : null}
         </div>

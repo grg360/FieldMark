@@ -63,6 +63,7 @@ import HcpPairPublicationsPage from "./components/PublicationsListPage/HcpPairPu
 import HcpPositionsPage from "./components/HcpPositionsPage";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialPage from "./components/SocialPage";
+import SocialVoicePage from "./components/SocialVoicePage";
 import InstitutionsInTerritoryPanel from "./components/InstitutionsInTerritoryPanel";
 import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
@@ -834,6 +835,10 @@ export default function App() {
               Placeholder surface until the Public Conversation build lands. The old
               /:ta/social/:indication feed track is retired (slug mapping removed). */}
           <Route path="/social" element={<SocialPage />} />
+          {/* Per-voice stream — keyed on handle; platform implicit ('twitter')
+              until bluesky capture ships, then the route grows a platform
+              segment. MUST precede /social/:ta or "voice" parses as a TA slug. */}
+          <Route path="/social/voice/:handle" element={<SocialVoicePage />} />
           <Route path="/social/:ta" element={<SocialPage />} />
           <Route path="/assets" element={<AssetsIndexPage />} />
           {/* Rising ledger (register + quadrant modes) — the rising surface's own
