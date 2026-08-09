@@ -5,9 +5,13 @@ Reorders HCPs qualified as Established via hcp_cohort_classification_v2
 (cohort='established') using:
 
   cohort_score =
-    0.59 * scientific_influence_pctile
-    + 0.41 * network_influence_pctile (re-derived within scope)
+    0.60 * scientific_influence_pctile
+    + 0.40 * network_influence_pctile (re-derived within scope)
     + 0.00 * pharma_engagement_pctile   (excluded from ranking — see below)
+
+WEIGHTS ROUNDED TO 60/40 (2026-08-09, Garrett's ruling): the previous
+0.59/0.41 was a pharma-renormalization artifact (0.50/0.35 rescaled over
+0.85) that nobody rounded, not a chosen weight.
 
 PHARMA WEIGHT IS ZERO (2026-08-02). pharma_engagement_pctile stays populated
 on the row and stays displayed on the ledger — it is excluded from RANKING,
@@ -273,8 +277,8 @@ def upsert_ranks(conn, ta_id, rows, run_id):
 @click.option("--ta", default="nsclc", help="Therapeutic area slug")
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=30, type=int, help="Print top N for region/US scope")
-@click.option("--w-scientific", default=0.59, type=float)
-@click.option("--w-network", default=0.41, type=float)
+@click.option("--w-scientific", default=0.60, type=float)
+@click.option("--w-network", default=0.40, type=float)
 @click.option("--w-pharma", default=0.0, type=float)
 def main(
     ta: str,

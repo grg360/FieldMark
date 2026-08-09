@@ -362,3 +362,13 @@ Both exhibit **both** wrong-states:
 **Why deferred.** Nearly became collateral damage of a documentation rewrite twice over (first "cut the clause — zero weight" on a false premise, then "zero the weights to simplify the doc" — both would have been wrong: the first plants a falsehood on the trust page, the second changes live rankings to fit prose). The held Methodology rewrite names the proxy AS a proxy (pending line-by-line review); the scoring question stands on its own.
 
 **Revisit when.** Someone asks "is this proxy sound?" — a title regex catching "recommendation"/"position statement" drives real rank movement at 15.0/unit, so precision of the regex (false positives: opinion pieces, replies titled "response to..."; false negatives: guideline papers titled without the keywords) deserves a measured review with board-impact numbers before any weight change.
+
+## Established v3 recompute never evicts — departed HCPs persist on the board
+
+**Status:** flagged 2026-08-09 during the 60/40 weight-change impact check, not fixed. Its own task, post-recompute. Pre-existing — the weight change did not cause it and the re-run will not clear it.
+
+**The behavior.** `recompute_established_ranks_v3.py` writes `hcp_established_ranks_v3` via upsert (`ON CONFLICT … DO UPDATE`) with no delete pass. An HCP who leaves the cohort — reclassified in `hcp_cohort_classification_v2`, or dropped by the ACADEMIC / NCI-NIH industry gate — keeps their last-written rows forever: the recompute re-scores current members, it never evicts departed ones. Currently 8 stale US NSCLC rows (2,990 in the table vs 2,982 in the live cohort), all at the tail. Same class as the frozen-column bugs: uncorrected stale membership presented as current.
+
+**Scope.** Every TA this script serves, not just NSCLC — atopic-dermatitis holds 4,743 rows in the same table. Both scope row types leak (global and region:<country>). Note the rank-collision hazard: stale rows keep their old `rank` values while fresh rows are renumbered 1..N per scope, so a scope can carry duplicate rank numbers and any reader ordering by rank inherits phantom entries.
+
+**The fix shape.** A reconciliation pass in the same invocation: after the upsert, delete rows for this (TA, scope) whose `hcp_id` is not in the freshly computed membership. The in-repo precedent is the momentum chain's de-list pass (`scientific_momentum_scoring.py`, 2026-08-05, rolling-windows change), including its guard: an EMPTY freshly-computed membership must write nothing and delete nothing, never mass-evict. Cheap detection until built: table row count vs live cohort count per (TA, scope).
