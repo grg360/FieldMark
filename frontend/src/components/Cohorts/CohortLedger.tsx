@@ -19,7 +19,7 @@ import PageHero from "../PageHero";
 import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
-import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
+import { FONT, GROUND, LINE, GOLD, COOL, WARM } from "../../lib/designTokens";
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
 import { getDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
 import TrialsPopup from "./TrialsPopup";
@@ -149,7 +149,9 @@ const LADDER_SEGMENTS = 4;
 const VIRTUAL_MIN = 300;
 
 // Four-segment fill ladder. Filled segments read the state; Paused shows all outlined
-// with a diagonal strike. Ink only — no hue.
+// with a diagonal strike. Ink only — no hue. MENU-ONLY since 2026-08-09: the
+// in-row instances were cut (meter-for-categorical read as noise on the row
+// edge); it survives as reinforcement beside each label in the status menu.
 function StateLadder({ status }: { status: RelationshipStatus }) {
   const fill = STATUS_FILL[status];
   const paused = fill < 0;
@@ -178,13 +180,15 @@ function StateLadder({ status }: { status: RelationshipStatus }) {
 }
 
 // Bookmark glyph — filled when tracked, outlined when not. Legible down a long list.
+// Tracked state amber (2026-08-09, Garrett): P.amber (= GOLD.rank #e0a75e, the
+// EXISTING rank/score-rule amber — no new shade). Untracked outline stays dim ink.
 function Bookmark({ on }: { on: boolean }) {
   return (
     <svg width="12" height="15" viewBox="0 0 12 15" aria-hidden>
       <path
         d="M1 1.5h10v12l-5-3.2-5 3.2z"
-        fill={on ? P.ink0 : "none"}
-        stroke={on ? P.ink0 : P.ink5}
+        fill={on ? P.amber : "none"}
+        stroke={on ? P.amber : P.ink5}
         strokeWidth="1.2"
         strokeLinejoin="round"
       />
@@ -310,6 +314,20 @@ function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }:
 //                  absent state is "empty, not contradicted", verbatim
 const SEP_INK = "#ddd6cb"; // a neighbour that separates
 const NOSEP_INK = "#6b6660"; // "does not separate here"
+// Belief-position quotes take SEP_INK too (2026-08-09 ruling): the quoted
+// claims are long-dwell reading, so the register's warm-for-long-dwell rule
+// would put them on the WARM ramp (they shipped at #c6bfb4) — but inside the
+// drawer, consistency with the surrounding prose wins. Drawer-consistency
+// overrides warm-for-long-dwell here on purpose; not a missed conversion.
+// The drawer's owning rule — ONE value for the left edge AND the bottom
+// separator (2026-08-09 bottom-edge ownership), in the COHORT MARKER hue.
+// Colour corrected same day: the first pass "matched the left border", but
+// the left border was amber — amber belongs to rank, not to cohort
+// ownership. Both edges now take cfg.markerColor (EST sage #6E8F76, RS
+// violet #9A8CC8), solid like the row's own cohort marker. Shared derivation
+// so the two edges can't drift; same element + same colour = clean mitred
+// corner where left meets bottom.
+const drawerRule = (cfg: CohortConfig) => `2px solid ${cfg.markerColor}`;
 // Coverage sublabels, measured 2026-08-08 (EST/US n=2,990; RS/US n=123):
 // canonical-labeled pubs 97% / 99%; extracted positions 8% / 80%.
 const COVERAGE = {
@@ -523,7 +541,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortC
   const bl = beliefLayer(subj, nbrData);
 
   return (
-    <div style={{ background: P.drawer, borderTop: `1px solid ${P.line}`, borderLeft: `2px solid rgba(216,162,74,.5)` }}>
+    <div style={{ background: P.drawer, borderTop: `1px solid ${P.line}`, borderLeft: drawerRule(cfg), borderBottom: drawerRule(cfg) }}>
       <DrawerSection label={cfg.tag === "RS" ? "SCORE · WHAT IS ACCELERATING" : "SCORE · WHICH ENGINE"} sub="ALWAYS PRESENT" mobile={mobile}>
         <div style={{ ...serif(16), lineHeight: 1.62, color: SEP_INK, textWrap: "pretty" as const }}>{spine.text}</div>
         <NeighbourLines lines={spine.lines} />
@@ -563,7 +581,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortC
             {bl.claims.length ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16, paddingLeft: 16, borderLeft: "1px solid rgba(216,162,74,.28)" }}>
                 {bl.claims.map((c, i) => (
-                  <div key={i} style={{ ...serif(15), lineHeight: 1.55, color: "#c6bfb4", fontStyle: "italic", textWrap: "pretty" as const }}>{c}</div>
+                  <div key={i} style={{ ...serif(15), lineHeight: 1.55, color: SEP_INK, fontStyle: "italic", textWrap: "pretty" as const }}>{c}</div>
                 ))}
                 {bl.more > 0 ? <div style={{ ...mono(9.5), letterSpacing: ".1em", color: P.ink5 }}>+ {bl.more} MORE ON THE PROFILE</div> : null}
               </div>
@@ -578,10 +596,13 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortC
           the profile affordance now; row-click expansion is untouched, this
           renders only inside the open drawer). File-folder treatment: square
           where it meets the drawer body, rounded outer (bottom) corners,
-          flush against the drawer's bottom edge. TRUE protrusion below the
-          row is off the table — the virtualized tail rows are stacking
-          contexts (see TrialsPopup), so anything poking past the row edge
-          would paint UNDER the next row; flush-to-edge is the honest fake. */}
+          standing on the drawer's own closing rule (drawerRule — cohort hue,
+          2026-08-09 bottom-edge ownership) at the BOTTOM-RIGHT corner — INSIDE
+          the bounded block, anchored to the drawer above it, never floating
+          at the seam between two rows. TRUE
+          protrusion below the row stays off the table — the virtualized tail
+          rows are stacking contexts (see TrialsPopup), so anything poking
+          past the row edge would paint UNDER the next row. */}
       <div style={{ position: "relative", padding: mobile ? "14px 14px 20px" : "16px 22px 22px" }}>
         <div style={{ ...mono(9), letterSpacing: ".1em", color: "#4f4a44", lineHeight: 1.7, paddingRight: mobile ? 130 : 160 }}>
           EVERY LAYER IS COMPUTED AGAINST BOTH ADJACENT RANKS; A NEIGHBOUR THAT DOES NOT SEPARATE SAYS SO.
@@ -592,10 +613,10 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortC
           onClick={(e) => e.stopPropagation()}
           title={`${row.name} — profile`}
           style={{
-            // The filing tab, STANDING ON the drawer's bottom edge at the
+            // The filing tab, STANDING ON the drawer's closing rule at the
             // bottom-right corner (2026-08-09 reposition — the hang-from-rule
             // variant read as chrome and was scanned past): square base
-            // merging with the row's bottom border, rounded top corners.
+            // resting on the cohort-hue closing rule, rounded top corners.
             // Cohort hue per Garrett's call: cfg.markerColor (row-edge cohort
             // marker — semantic use). EST green, RS violet; COM inherits.
             position: "absolute", right: mobile ? 14 : 22, bottom: 0,
@@ -722,8 +743,9 @@ function Row({
     <div style={{ position: "relative", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: cfg.markerColor }} />
       {open ? <div style={{ position: "absolute", left: 3, top: 0, bottom: 0, width: 2, background: P.amber }} /> : null}
-      {/* right track edge lights up when this row is tracked — legible down the list */}
-      {tracked ? <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 3, background: P.ink2 }} /> : null}
+      {/* tracked right-edge strip removed 2026-08-09: the amber bookmark is the
+          one tracked indicator — the whitish edge strip was a redundant second
+          signal reading as unfinished chrome. */}
       {/* alignItems center (2026-08-06): cells vertically centre against the tallest
           cell (usually name+summary) — the old flex-start + per-cell paddingTop nudges
           are gone with it. */}
@@ -777,10 +799,34 @@ function Row({
             <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
         </div>
-        {/* cohort score */}
-        <div style={{ width: 88, textAlign: "right", ...mono(18, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
-          {floorFixed(row.idx, cfg.idxDecimals)}
-        </div>
+        {/* cohort score — 2A numeric treatment (frame: Ledger Numeric Typography
+            .dc.html, "1B at density", imported 2026-08-09 SCORES ONLY — no copy,
+            layout or description drift came with it): serif score with stepped
+            decimal (integer full-size, decimal smaller but full-value) over a
+            short amber anchoring rule. 56px in the frame; 44px here per the
+            frame's own at-density note ("score down to ~44px" for the build) —
+            the live row is far denser than the mockup's 26px padding. Numerals
+            in WARM ink per Garrett's ruling (no icy cast); the rule takes
+            P.amber, the ledger's one amber — the frame's #c9922e is not
+            imported. EST only; RS/COM keep the mono cell until their own pass. */}
+        {cfg.tag === "EST" ? (
+          (() => {
+            const [ipart, dpart = ""] = floorFixed(row.idx, cfg.idxDecimals).split(".");
+            return (
+              <div style={{ width: 88, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 7 }}>
+                <div style={{ width: 44, height: 2, background: P.amber }} />
+                <div style={{ display: "flex", alignItems: "baseline", letterSpacing: "-.012em" }}>
+                  <span style={{ ...serif(44, 600), lineHeight: 0.92, color: WARM.prose }}>{ipart}</span>
+                  {dpart ? <span style={{ ...serif(30), lineHeight: 0.92, color: WARM.body }}>.{dpart}</span> : null}
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <div style={{ width: 88, textAlign: "right", ...mono(18, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
+            {floorFixed(row.idx, cfg.idxDecimals)}
+          </div>
+        )}
         {/* score cells */}
         {cfg.cols.map((col) => {
           const d = cellDisplay(row, col, th);
@@ -788,6 +834,22 @@ function Row({
             return (
               <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
                 <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>{d.text}</span>
+              </div>
+            );
+          }
+          // EST rides the 2A ramp below the score: SCI/NET supporting serif,
+          // pharma faded a step further (frame literals #A8A29A/#43434A — warm
+          // support, chrome-dark fade; near-twins of no register token, NOT
+          // converged). Dash/absent cells keep their treatment — the ramp is
+          // for numerals only. RS/COM keep the mono cells.
+          if (cfg.tag === "EST" && d.kind !== "dash") {
+            return (
+              <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
+                {col.noRank ? (
+                  <span style={{ ...serif(15), color: "#43434A" }}>{d.text}</span>
+                ) : (
+                  <span style={{ ...serif(22, 500), color: "#A8A29A" }}>{d.text}</span>
+                )}
               </div>
             );
           }
@@ -805,7 +867,8 @@ function Row({
             empty cell reads as measured-zero rather than not-rendered */}
         <div style={{ width: OURS.insight, textAlign: "center" }}>
           {insight > 0 ? (
-            <span style={{ ...mono(13), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
+            // EST: bottom of the 2A ramp — insights minor (frame literal #5F5F66)
+            <span style={{ ...mono(cfg.tag === "EST" ? 12 : 13), color: cfg.tag === "EST" ? "#5F5F66" : P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
           ) : (
             <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>—</span>
           )}
@@ -820,14 +883,16 @@ function Row({
             <Bookmark on={tracked} />
           </button>
         </div>
-        {/* RELATIONSHIP — six-state fill ladder + menu */}
+        {/* RELATIONSHIP — state label (click → menu). The in-row fill ladder was
+            removed 2026-08-09: a categorical state rendered as a meter read as a
+            random white band on the row edge and competed with the score numerals.
+            The ladder still renders inside the status menu below. */}
         <div style={{ width: OURS.state, position: "relative" }}>
           <button
             onClick={(e) => { stop(e); setMenuOpen((o) => !o); }}
             title={STATUS_LABEL[status]}
             style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0, textAlign: "left" }}
           >
-            <StateLadder status={status} />
             {/* wraps at the word break (ACTIVE / RELATIONSHIP) instead of overflowing
                 the 108px column — nowrap removed 2026-08-06 */}
             <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em", lineHeight: 1.35 }}>
@@ -931,7 +996,7 @@ function MobileRow({
     <div style={{ position: "relative", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: cfg.markerColor }} />
       {open ? <div style={{ position: "absolute", left: 3, top: 0, bottom: 0, width: 2, background: P.amber }} /> : null}
-      {tracked ? <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 3, background: P.ink2 }} /> : null}
+      {/* tracked edge strip removed 2026-08-09 — amber bookmark is the one signal */}
 
       <div onClick={onToggle} style={{ padding: "13px 16px 14px 19px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 7 }}>
         {/* rank + track/index */}
@@ -980,10 +1045,10 @@ function MobileRow({
           ))}
         </div>
 
-        {/* stage-3 controls row: state ladder (tap → menu) + insight */}
+        {/* stage-3 controls row: state label (tap → menu) + insight. In-row fill
+            ladder removed 2026-08-09, same call as desktop — menu keeps it. */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, paddingTop: 2, position: "relative" }}>
           <button onClick={(e) => { stop(e); setMenuOpen((o) => !o); }} title={STATUS_LABEL[status]} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "2px 0", cursor: "pointer", minHeight: 0 }}>
-            <StateLadder status={status} />
             <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>{STATUS_LABEL[status].toUpperCase()}</span>
           </button>
           {insight > 0 ? (
