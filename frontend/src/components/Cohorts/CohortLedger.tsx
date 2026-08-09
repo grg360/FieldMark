@@ -11,7 +11,7 @@
 // there. Not in stage 2: tags, relationship-state column, per-row controls
 // (track/attachments), mobile — stages 3–4.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import AppLayout from "../AppLayout";
@@ -21,6 +21,8 @@ import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
 import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
+import { getDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
+import TrialsPopup from "./TrialsPopup";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -199,9 +201,13 @@ function Bookmark({ on }: { on: boolean }) {
 // AUTHORSHIP, OPEN TRIAL) in the community ledger's chip slot — same component
 // family, cohort-specific content. Both facts come from rising_board_flags,
 // already computed for the rising surface.
-function RisingChipView({ flag, hcpId, mobile = false }: { flag: RisingFlags; hcpId: string; mobile?: boolean }) {
+function RisingChipView({ flag, hcpId, hcpName = "", mobile = false }: { flag: RisingFlags; hcpId: string; hcpName?: string; mobile?: boolean }) {
   const senior = flag.senior_transition;
   const trial = flag.on_open_trial;
+  // Trials pop-up (2026-08-08, frame e672bf7a) — portaled, anchored to the
+  // badge ref (the virtual rows are stacking contexts; see TrialsPopup).
+  const [trialsOpen, setTrialsOpen] = useState(false);
+  const trialBadgeRef = useRef<HTMLSpanElement>(null);
   if (!senior && !trial) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
@@ -225,8 +231,18 @@ function RisingChipView({ flag, hcpId, mobile = false }: { flag: RisingFlags; hc
         // action-relevant fact; teal is unclaimed in the register (gold = rank/
         // anchored, violet = cohort marker, sage = authorship). #3FB8AF family,
         // text + toned border. Still never the cohort violet.
-        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ display: "inline-flex", alignItems: "center", border: `1px solid rgba(63,184,175,0.45)`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: "#3FB8AF" }}>
-          OPEN TRIAL
+        // Click opens the trials pop-up (frame e672bf7a) — stopPropagation so
+        // the row's drawer stays closed.
+        <span style={{ position: "relative", display: "inline-flex" }}>
+          <span
+            ref={trialBadgeRef}
+            title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI). Click for the trials."
+            onClick={(e) => { e.stopPropagation(); setTrialsOpen((o) => !o); }}
+            style={{ display: "inline-flex", alignItems: "center", border: `1px solid rgba(63,184,175,0.45)`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: "#3FB8AF", cursor: "pointer" }}
+          >
+            OPEN TRIAL
+          </span>
+          {trialsOpen ? <TrialsPopup hcpId={hcpId} hcpName={hcpName} badgeRef={trialBadgeRef} onClose={() => setTrialsOpen(false)} /> : null}
         </span>
       ) : null}
     </div>
@@ -243,14 +259,26 @@ function RisingChipView({ flag, hcpId, mobile = false }: { flag: RisingFlags; hc
 //                    gold-adjacent to rank on the same row
 // Overlap at ship time: 808 rows one chip, 189 two, 13 all three — one wrap
 // row absorbs the max stack on desktop; mobile wraps to a second line.
-function EstablishedChipView({ openTrial, est, mobile = false }: { openTrial?: OpenTrialFlag; est?: EstablishedFlags; mobile?: boolean }) {
-  if (openTrial) void openTrial.trialIds; // carried for the future trials link — not rendered yet
+function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }: { openTrial?: OpenTrialFlag; est?: EstablishedFlags; hcpId: string; hcpName: string; mobile?: boolean }) {
+  // Trials pop-up (2026-08-08, frame e672bf7a) — portaled, anchored to the
+  // badge ref; the pop-up refetches by hcp_id (board_open_trials + details),
+  // so trialIds on the flag stay unused here.
+  const [trialsOpen, setTrialsOpen] = useState(false);
+  const trialBadgeRef = useRef<HTMLSpanElement>(null);
   const chipBase = { display: "inline-flex", alignItems: "center", padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em" } as const;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
       {openTrial ? (
-        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ ...chipBase, border: `1px solid rgba(63,184,175,0.45)`, color: "#3FB8AF" }}>
-          OPEN TRIAL
+        <span style={{ position: "relative", display: "inline-flex" }}>
+          <span
+            ref={trialBadgeRef}
+            title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI). Click for the trials."
+            onClick={(e) => { e.stopPropagation(); setTrialsOpen((o) => !o); }}
+            style={{ ...chipBase, border: `1px solid rgba(63,184,175,0.45)`, color: "#3FB8AF", cursor: "pointer" }}
+          >
+            OPEN TRIAL
+          </span>
+          {trialsOpen ? <TrialsPopup hcpId={hcpId} hcpName={hcpName} badgeRef={trialBadgeRef} onClose={() => setTrialsOpen(false)} /> : null}
         </span>
       ) : null}
       {est?.senior_recent ? (
@@ -263,6 +291,325 @@ function EstablishedChipView({ openTrial, est, mobile = false }: { openTrial?: O
           VERIFIED SOCIAL
         </span>
       ) : null}
+    </div>
+  );
+}
+
+// ── Ledger drawer (2026-08-08 redesign — frame: Ledger Drawer.dc.html,
+// project 022f071a). Replaces WHAT PLACED THIS ROW HERE + TRACE on EST/RS;
+// COM keeps the old drawer until its own pass. Three layers, each computed
+// against BOTH adjacent ranks (uniform neighbour rule): a neighbour that does
+// not separate says so; rank 1 is down-only, the last loaded rank up-only.
+// Profile link replaces TRACE.
+//   SCORE spine  — universal, from row data already loaded (EST: which engine,
+//                  sci vs net ceiling; RS: which of the four metrics leads)
+//   PRACTICE     — hcp_canonical_topic_share_v1: dominant 1–2 canonical
+//                  classes BY NAME (no axis abstraction), "n of m labeled
+//                  publications" never a pie, floor on total_labeled_pubs
+//   BELIEF       — extracted positions: divergence as a corpus fact; the
+//                  absent state is "empty, not contradicted", verbatim
+const SEP_INK = "#ddd6cb"; // a neighbour that separates
+const NOSEP_INK = "#6b6660"; // "does not separate here"
+// Coverage sublabels, measured 2026-08-08 (EST/US n=2,990; RS/US n=123):
+// canonical-labeled pubs 97% / 99%; extracted positions 8% / 80%.
+const COVERAGE = {
+  EST: { practice: "97% OF COHORT", belief: "8% OF COHORT" },
+  RS: { practice: "99% OF COHORT", belief: "80% OF COHORT" },
+} as const;
+
+const fmt1 = (v: number | null | undefined) => (v == null ? "—" : v.toFixed(1));
+
+function estEngine(s: Record<string, number | null>): "network-led" | "scientific-led" | "balanced" | null {
+  const sci = s.sci, net = s.net;
+  if (sci == null || net == null) return null;
+  return net > sci ? "network-led" : sci > net ? "scientific-led" : "balanced";
+}
+
+const RS_METRICS: Array<[string, string]> = [
+  ["scimom", "scientific momentum"], ["netmom", "network momentum"],
+  ["scivis", "scientific visibility"], ["netvis", "network visibility"],
+];
+function rsLead(s: Record<string, number | null>): [string, string] | null {
+  let best: [string, string] | null = null;
+  for (const m of RS_METRICS) {
+    const v = s[m[0]];
+    if (v == null) continue;
+    if (!best || v > (s[best[0]] ?? -1)) best = m;
+  }
+  return best;
+}
+const rsNums = (s: Record<string, number | null>) =>
+  `(${RS_METRICS.map(([k]) => (s[k] == null ? "—" : s[k])).join(" / ")})`;
+
+interface NeighbourLine { rank: string; text: string; color: string }
+
+function spineLayer(cfg: CohortConfig, row: LedgerRow, nbrs: LedgerRow[]): { text: string; lines: NeighbourLine[] } {
+  if (cfg.tag === "RS") {
+    const lead = rsLead(row.scores);
+    const text = lead
+      ? `Rising-star percentile ${fmt1(row.idx)}, led by ${lead[1]} (${row.scores[lead[0]]}) — the four metrics read ${rsNums(row.scores)}.`
+      : `Rising-star percentile ${fmt1(row.idx)} — component metrics incomplete on this row.`;
+    return {
+      text,
+      lines: nbrs.map((n) => {
+        const nl = rsLead(n.scores);
+        if (!lead || !nl) return { rank: `#${n.rank}`, text: "metrics incomplete on this side — not compared.", color: NOSEP_INK };
+        return nl[0] === lead[0]
+          ? { rank: `#${n.rank}`, text: `also led by ${nl[1]} ${rsNums(n.scores)} — does not separate here.`, color: NOSEP_INK }
+          : { rank: `#${n.rank}`, text: `led by ${nl[1]} ${rsNums(n.scores)} — a different acceleration.`, color: SEP_INK };
+      }),
+    };
+  }
+  const eng = estEngine(row.scores);
+  const sci = row.scores.sci, net = row.scores.net;
+  const text = eng === "network-led"
+    ? `Network is their ceiling — ${fmt1(net)} against ${fmt1(sci)} scientific. Network-led: the composite score hides which engine carries each person.`
+    : eng === "scientific-led"
+      ? `Scientific is their ceiling — ${fmt1(sci)} against ${fmt1(net)} network. Scientific-led: the composite score hides which engine carries each person.`
+      : eng === "balanced"
+        ? `Scientific and network ceilings tie at ${fmt1(sci)} — neither engine leads.`
+        : "Engine ceilings incomplete on this row.";
+  return {
+    text,
+    lines: nbrs.map((n) => {
+      const ne = estEngine(n.scores);
+      if (!eng || !ne) return { rank: `#${n.rank}`, text: "ceilings incomplete on this side — not compared.", color: NOSEP_INK };
+      const nums = `(${fmt1(n.scores.sci)} sci / ${fmt1(n.scores.net)} net)`;
+      return ne === eng
+        ? { rank: `#${n.rank}`, text: `${ne} on the same ordering ${nums} — does not separate here.`, color: NOSEP_INK }
+        : { rank: `#${n.rank}`, text: `${ne} ${nums} — the inverse engine.`, color: SEP_INK };
+    }),
+  };
+}
+
+function practiceLayer(
+  subject: DrawerLayerData,
+  nbrs: Array<{ rank: number; d: DrawerLayerData }>,
+): { text: string; color: string; classes: Array<{ count: string; name: string; primary: string }>; lines: NeighbourLine[] } {
+  const total = subject.topicTotal;
+  if (total < PRACTICE_FLOOR) {
+    return {
+      text: `Too few labeled publications to characterize focus — ${total} of this HCP’s publications carry a canonical label, below the floor of ${PRACTICE_FLOOR}. Focus is not asserted here rather than inferred thinly.`,
+      color: "#8b8479", classes: [],
+      lines: nbrs.map((n) => ({ rank: `#${n.rank}`, text: "not compared — the floor is not met on this side of the layer.", color: NOSEP_INK })),
+    };
+  }
+  const dom = dominantClasses(subject);
+  const nbrLine = (n: { rank: number; d: DrawerLayerData }, domNames: string[]): NeighbourLine => {
+    if (n.d.topicTotal < PRACTICE_FLOOR) return { rank: `#${n.rank}`, text: "below the labeling floor — not compared on this side.", color: NOSEP_INK };
+    const nd = dominantClasses(n.d)[0] ?? n.d.topicClasses[0];
+    if (!nd) return { rank: `#${n.rank}`, text: "no labeled publications on this side — not compared.", color: NOSEP_INK };
+    const same = domNames.includes(nd.name);
+    return same
+      ? { rank: `#${n.rank}`, text: `also leads on ${nd.name} (${nd.labeled} of ${n.d.topicTotal}) — does not separate here.`, color: NOSEP_INK }
+      : { rank: `#${n.rank}`, text: `leads on ${nd.name} (${nd.labeled} of ${n.d.topicTotal}).`, color: SEP_INK };
+  };
+
+  if (dom.length === 0) {
+    return {
+      text: `Spans multiple canonical classes with no dominant focus — across ${total} labeled publications no class clears a margin over the rest.`,
+      color: SEP_INK, classes: [],
+      lines: nbrs.map((n) => {
+        if (n.d.topicTotal < PRACTICE_FLOOR) return { rank: `#${n.rank}`, text: "below the labeling floor — not compared on this side.", color: NOSEP_INK };
+        const nd = dominantClasses(n.d)[0];
+        return nd
+          ? { rank: `#${n.rank}`, text: `leads on ${nd.name} (${nd.labeled} of ${n.d.topicTotal}) — concentration itself is the separation.`, color: SEP_INK }
+          : { rank: `#${n.rank}`, text: "no dominant focus either — does not separate here.", color: NOSEP_INK };
+      }),
+    };
+  }
+
+  const domNames = dom.map((c) => c.name);
+  const shared = nbrs.find((n) => {
+    const nd = dominantClasses(n.d)[0] ?? n.d.topicClasses[0];
+    return nd && domNames.includes(nd.name) && n.d.topicTotal >= PRACTICE_FLOOR;
+  });
+  const word = dom.length === 2 ? "Two classes clear the field" : "One class clears the field";
+  let text: string;
+  if (shared) {
+    const shTop = (dominantClasses(shared.d)[0] ?? shared.d.topicClasses[0]).name;
+    const next = domNames.find((c) => c !== shTop);
+    text = next
+      ? `${word} across ${total} labeled publications. #${shared.rank} shares ${shTop}; separation here is ${next}.`
+      : `${word} across ${total} labeled publications. #${shared.rank} shares ${shTop} — this layer does not separate that side.`;
+  } else {
+    text = `${word} across ${total} labeled publications — no adjacent rank leads on ${domNames.join(" or ")}.`;
+  }
+  return {
+    text, color: SEP_INK,
+    classes: dom.map((c) => ({ count: `${c.labeled} of ${total}`, name: c.name, primary: `${c.primary} primary` })),
+    lines: nbrs.map((n) => nbrLine(n, domNames)),
+  };
+}
+
+function beliefLayer(
+  subject: DrawerLayerData,
+  nbrs: Array<{ rank: number; d: DrawerLayerData }>,
+): { text: string; color: string; claims: string[]; more: number; lines: NeighbourLine[] } {
+  const n = subject.beliefCount;
+  if (n === 0) {
+    return {
+      text: "No extracted belief positions for this HCP yet. Nothing has been surfaced from this record — the layer is empty, not contradicted.",
+      color: "#8b8479", claims: [], more: 0,
+      lines: nbrs.map((x) => ({
+        rank: `#${x.rank}`,
+        text: x.d.beliefCount
+          ? `${x.d.beliefCount} positions on record — nothing here to contrast them against.`
+          : "no extracted positions either — does not separate here.",
+        color: x.d.beliefCount ? SEP_INK : NOSEP_INK,
+      })),
+    };
+  }
+  const nbrNames = nbrs.map((x) => `#${x.rank}’s`).join(" or ");
+  return {
+    text: `${n} positions in this HCP’s record are not present in ${nbrNames}:`,
+    color: SEP_INK, claims: subject.beliefTexts, more: Math.max(0, n - subject.beliefTexts.length),
+    lines: nbrs.map((x) => ({
+      rank: `#${x.rank}`,
+      text: x.d.beliefCount
+        ? `${x.d.beliefCount} positions on record, none matching these.`
+        : "no extracted positions — does not separate here.",
+      color: x.d.beliefCount ? SEP_INK : NOSEP_INK,
+    })),
+  };
+}
+
+function DrawerSection({ label, sub, mobile, children }: { label: string; sub: string; mobile: boolean; children: React.ReactNode }) {
+  return (
+    <div style={{ display: mobile ? "flex" : "grid", flexDirection: "column", gridTemplateColumns: "210px 1fr", gap: mobile ? 10 : 32, padding: mobile ? "16px 14px" : "22px", borderBottom: `1px solid ${P.line}` }}>
+      <div style={{ ...mono(10, 500), letterSpacing: ".14em", lineHeight: 1.7 }}>
+        <div style={{ color: "#8b8479" }}>{label}</div>
+        <div style={{ marginTop: 4, color: "#4f4a44" }}>{sub}</div>
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function NeighbourLines({ lines }: { lines: NeighbourLine[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
+      {lines.map((l) => (
+        <div key={l.rank} style={{ display: "grid", gridTemplateColumns: "52px 1fr", gap: 16, alignItems: "baseline" }}>
+          <span style={{ ...mono(12), color: "#7d766c", textAlign: "right" }}>{l.rank}</span>
+          <span style={{ ...serif(15), lineHeight: 1.55, textWrap: "pretty" as const, color: l.color }}>{l.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortConfig; row: LedgerRow; up?: LedgerRow; down?: LedgerRow; mobile?: boolean }) {
+  const [layers, setLayers] = useState<Map<string, DrawerLayerData> | null>(null);
+  const nbrRows = [up, down].filter((r): r is LedgerRow => !!r); // rank 1 down-only; last loaded rank up-only
+  const taId = taIdForApiSlug("nsclc");
+  const nbrKey = nbrRows.map((r) => r.hcpId).join(",");
+
+  useEffect(() => {
+    if (!taId) return; // slug map miss — layers stay in their loading state rather than fetching unscoped
+    let alive = true;
+    setLayers(null);
+    void getDrawerLayerData([row.hcpId, ...nbrRows.map((r) => r.hcpId)], taId).then((m) => { if (alive) setLayers(m); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.hcpId, nbrKey, taId]);
+
+  const cov = cfg.tag === "RS" ? COVERAGE.RS : COVERAGE.EST;
+  const spine = spineLayer(cfg, row, nbrRows);
+  const empty: DrawerLayerData = { topicTotal: 0, topicClasses: [], beliefCount: 0, beliefTexts: [] };
+  const subj = layers?.get(row.hcpId) ?? empty;
+  const nbrData = nbrRows.map((r) => ({ rank: r.rank, d: layers?.get(r.hcpId) ?? empty }));
+  const pr = practiceLayer(subj, nbrData);
+  const bl = beliefLayer(subj, nbrData);
+
+  return (
+    <div style={{ background: P.drawer, borderTop: `1px solid ${P.line}`, borderLeft: `2px solid rgba(216,162,74,.5)` }}>
+      <DrawerSection label={cfg.tag === "RS" ? "SCORE · WHAT IS ACCELERATING" : "SCORE · WHICH ENGINE"} sub="ALWAYS PRESENT" mobile={mobile}>
+        <div style={{ ...serif(16), lineHeight: 1.62, color: SEP_INK, textWrap: "pretty" as const }}>{spine.text}</div>
+        <NeighbourLines lines={spine.lines} />
+      </DrawerSection>
+
+      <DrawerSection label="PRACTICE · CANONICAL FOCUS" sub={cov.practice} mobile={mobile}>
+        {layers == null ? (
+          <div style={{ ...mono(10), color: P.ink5, letterSpacing: ".1em" }}>READING THE LABELED CORPUS…</div>
+        ) : (
+          <>
+            <div style={{ ...serif(16), lineHeight: 1.62, color: pr.color, textWrap: "pretty" as const }}>{pr.text}</div>
+            {pr.classes.length ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
+                {pr.classes.map((k) => (
+                  <div key={k.name} style={{ display: "grid", gridTemplateColumns: mobile ? "84px 1fr" : "112px 1fr auto", gap: 16, alignItems: "baseline" }}>
+                    <span style={{ ...mono(14), color: P.amber, textAlign: "right" }}>{k.count}</span>
+                    <span style={{ ...serif(15), color: SEP_INK }}>{k.name}</span>
+                    {mobile ? null : <span style={{ ...mono(10), letterSpacing: ".1em", color: "#5d5851" }}>{k.primary.toUpperCase()}</span>}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <NeighbourLines lines={pr.lines} />
+            <div style={{ ...mono(9), letterSpacing: ".1em", color: "#4f4a44", lineHeight: 1.7, marginTop: 16 }}>
+              A PUBLICATION CAN CARRY SEVERAL CANONICAL LABELS — COUNTS OVERLAP AND DO NOT SUM TO THE LABELED TOTAL.
+            </div>
+          </>
+        )}
+      </DrawerSection>
+
+      <DrawerSection label="BELIEF · EXTRACTED POSITIONS" sub={cov.belief} mobile={mobile}>
+        {layers == null ? (
+          <div style={{ ...mono(10), color: P.ink5, letterSpacing: ".1em" }}>READING THE POSITION RECORD…</div>
+        ) : (
+          <>
+            <div style={{ ...serif(16), lineHeight: 1.62, color: bl.color, textWrap: "pretty" as const }}>{bl.text}</div>
+            {bl.claims.length ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16, paddingLeft: 16, borderLeft: "1px solid rgba(216,162,74,.28)" }}>
+                {bl.claims.map((c, i) => (
+                  <div key={i} style={{ ...serif(15), lineHeight: 1.55, color: "#c6bfb4", fontStyle: "italic", textWrap: "pretty" as const }}>{c}</div>
+                ))}
+                {bl.more > 0 ? <div style={{ ...mono(9.5), letterSpacing: ".1em", color: P.ink5 }}>+ {bl.more} MORE ON THE PROFILE</div> : null}
+              </div>
+            ) : null}
+            <NeighbourLines lines={bl.lines} />
+          </>
+        )}
+      </DrawerSection>
+
+      {/* Footer — rule text left; the PROFILE filing tab bottom-right
+          (2026-08-09, replaces the "{NAME} PROFILE ↗" text link — the tab IS
+          the profile affordance now; row-click expansion is untouched, this
+          renders only inside the open drawer). File-folder treatment: square
+          where it meets the drawer body, rounded outer (bottom) corners,
+          flush against the drawer's bottom edge. TRUE protrusion below the
+          row is off the table — the virtualized tail rows are stacking
+          contexts (see TrialsPopup), so anything poking past the row edge
+          would paint UNDER the next row; flush-to-edge is the honest fake. */}
+      <div style={{ position: "relative", padding: mobile ? "14px 14px 20px" : "16px 22px 22px" }}>
+        <div style={{ ...mono(9), letterSpacing: ".1em", color: "#4f4a44", lineHeight: 1.7, paddingRight: mobile ? 130 : 160 }}>
+          EVERY LAYER IS COMPUTED AGAINST BOTH ADJACENT RANKS; A NEIGHBOUR THAT DOES NOT SEPARATE SAYS SO.
+          PERCENTILES, METHODOLOGY VERSION AND SOURCE RECORDS LIVE ON THE PROFILE.
+        </div>
+        <Link
+          to={`/hcp/${row.hcpId}`}
+          onClick={(e) => e.stopPropagation()}
+          title={`${row.name} — profile`}
+          style={{
+            // The filing tab, STANDING ON the drawer's bottom edge at the
+            // bottom-right corner (2026-08-09 reposition — the hang-from-rule
+            // variant read as chrome and was scanned past): square base
+            // merging with the row's bottom border, rounded top corners.
+            // Cohort hue per Garrett's call: cfg.markerColor (row-edge cohort
+            // marker — semantic use). EST green, RS violet; COM inherits.
+            position: "absolute", right: mobile ? 14 : 22, bottom: 0,
+            ...mono(10.5, 600), letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
+            background: `${cfg.markerColor}1A`, border: `1px solid ${cfg.markerColor}8C`, borderBottom: "none",
+            borderRadius: "8px 8px 0 0", padding: "10px 26px 11px", whiteSpace: "nowrap",
+            boxShadow: "0 -4px 14px rgba(0,0,0,.35)",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${cfg.markerColor}30`; e.currentTarget.style.borderColor = cfg.markerColor; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = `${cfg.markerColor}1A`; e.currentTarget.style.borderColor = `${cfg.markerColor}8C`; }}
+        >
+          PROFILE
+        </Link>
+      </div>
     </div>
   );
 }
@@ -351,6 +698,7 @@ function Row({
   flag,
   openTrial,
   estFlag,
+  rowByRank,
 }: {
   cfg: CohortConfig;
   row: LedgerRow;
@@ -361,6 +709,7 @@ function Row({
   flag?: RisingFlags;
   openTrial?: OpenTrialFlag;
   estFlag?: EstablishedFlags;
+  rowByRank?: Map<number, LedgerRow>;
 }) {
   const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -423,7 +772,7 @@ function Row({
               not be suppressed by it. NOTE for the community extension: COM is
               all-tiered, so this chain would hide the badges on every COM row —
               reconsider the slot before badging community. */}
-          {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} /> : (openTrial || estFlag?.senior_recent || estFlag?.verified_social) ? <EstablishedChipView openTrial={openTrial} est={estFlag} /> : row.tier ? <EvidenceChipView row={row} /> : null}
+          {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} hcpName={row.name} /> : (openTrial || estFlag?.senior_recent || estFlag?.verified_social) ? <EstablishedChipView openTrial={openTrial} est={estFlag} hcpId={row.hcpId} hcpName={row.name} /> : row.tier ? <EvidenceChipView row={row} /> : null}
           {row.summary ? (
             <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
@@ -507,7 +856,12 @@ function Row({
         </div>
       </div>
 
-      {open ? (
+      {/* drawer (2026-08-08): EST/RS take the three-layer redesign; COM keeps
+          the old why/trace until its own pass. */}
+      {open && cfg.tag !== "COM" ? (
+        <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} />
+      ) : null}
+      {open && cfg.tag === "COM" ? (
         <div style={{ display: "flex", gap: 48, padding: "6px 20px 22px 127px", background: P.drawer, borderTop: `1px solid ${P.line}` }}>
           <div style={{ flex: 1, maxWidth: 540, display: "flex", flexDirection: "column", gap: 9, paddingTop: 14 }}>
             <div style={{ ...mono(9, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
@@ -552,6 +906,7 @@ function MobileRow({
   flag,
   openTrial,
   estFlag,
+  rowByRank,
 }: {
   cfg: CohortConfig;
   row: LedgerRow;
@@ -562,6 +917,7 @@ function MobileRow({
   flag?: RisingFlags;
   openTrial?: OpenTrialFlag;
   estFlag?: EstablishedFlags;
+  rowByRank?: Map<number, LedgerRow>;
 }) {
   const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -609,7 +965,7 @@ function MobileRow({
         ) : null}
 
         {/* evidence chip (COM) */}
-        {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} mobile /> : (openTrial || estFlag?.senior_recent || estFlag?.verified_social) ? <EstablishedChipView openTrial={openTrial} est={estFlag} mobile /> : row.tier ? <EvidenceChipView row={row} mobile /> : null}
+        {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} hcpName={row.name} mobile /> : (openTrial || estFlag?.senior_recent || estFlag?.verified_social) ? <EstablishedChipView openTrial={openTrial} est={estFlag} hcpId={row.hcpId} hcpName={row.name} mobile /> : row.tier ? <EvidenceChipView row={row} mobile /> : null}
 
         {/* summary */}
         {row.summary ? <div style={{ ...serif(13), lineHeight: 1.5, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div> : null}
@@ -651,8 +1007,12 @@ function MobileRow({
         </div>
       </div>
 
-      {/* drawer — why over trace, stacked */}
-      {open ? (
+      {/* drawer (2026-08-08): EST/RS take the stacked three-layer redesign;
+          COM keeps why-over-trace until its own pass. */}
+      {open && cfg.tag !== "COM" ? (
+        <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} mobile />
+      ) : null}
+      {open && cfg.tag === "COM" ? (
         <div style={{ padding: "4px 16px 18px 19px", background: P.drawer, borderTop: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 10 }}>
             <div style={{ ...mono(8.5, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
@@ -701,6 +1061,7 @@ function VirtualTail({
   flags,
   openTrials,
   estFlags,
+  rowByRank,
 }: {
   cfg: CohortConfig;
   rows: LedgerRow[];
@@ -713,6 +1074,7 @@ function VirtualTail({
   flags?: Map<string, RisingFlags>;
   openTrials?: Map<string, OpenTrialFlag>;
   estFlags?: Map<string, EstablishedFlags>;
+  rowByRank?: Map<number, LedgerRow>;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -760,7 +1122,7 @@ function VirtualTail({
             ref={virtualizer.measureElement}
             style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start - scrollMargin}px)` }}
           >
-            <RowComp cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} flag={flags?.get(row.hcpId)} openTrial={openTrials?.get(row.hcpId)} estFlag={estFlags?.get(row.hcpId)} />
+            <RowComp cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} flag={flags?.get(row.hcpId)} openTrial={openTrials?.get(row.hcpId)} estFlag={estFlags?.get(row.hcpId)} rowByRank={rowByRank} />
           </div>
         );
       })}
@@ -897,10 +1259,13 @@ export default function CohortLedger() {
   const toggle = useCallback((id: string) => setOpen((o) => (o === id ? null : id)), []);
   const isMobile = useIsMobile();
   const RowComp = isMobile ? MobileRow : Row;
+  // Neighbour lookup for the drawer's uniform neighbour rule — the full loaded
+  // row set by rank, spanning band/tail boundaries.
+  const rowByRank = useMemo(() => new Map(rows.map((r) => [r.rank, r])), [rows]);
 
   const renderRow = (row: LedgerRow) => {
     const id = `${cfg.tag}-${row.rank}`;
-    return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} flag={isRising ? risingFlags.get(row.hcpId) : undefined} openTrial={isEst ? openTrials.get(row.hcpId) : undefined} estFlag={isEst ? estFlags.get(row.hcpId) : undefined} />;
+    return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} flag={isRising ? risingFlags.get(row.hcpId) : undefined} openTrial={isEst ? openTrials.get(row.hcpId) : undefined} estFlag={isEst ? estFlags.get(row.hcpId) : undefined} rowByRank={rowByRank} />;
   };
 
   return (
@@ -1033,6 +1398,7 @@ export default function CohortLedger() {
                         flags={isRising ? risingFlags : undefined}
                         openTrials={isEst ? openTrials : undefined}
                         estFlags={isEst ? estFlags : undefined}
+                        rowByRank={rowByRank}
                       />
                     ) : (
                       tailRows.map(renderRow)

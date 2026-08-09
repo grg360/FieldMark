@@ -352,3 +352,13 @@ Both exhibit **both** wrong-states:
 **The behavior.** `social_post_search` uses `websearch_to_tsquery('english', …)` over `post_text`. The English stemmer was built for prose, not clinical vocabulary: gene names, trial acronyms, and drug names don't stem intuitively (e.g. it happily stems ordinary words — "dosing" matches "dose" — but `KRAS`/`LITESPARK`/`TALAPRO` are opaque tokens that must match whole, and partial tokens never match: "osimert" finds nothing, `PD-L1` tokenizes into pieces). Hashtags lose their `#` at tokenization, so bare-word searches find tagged posts, but searching literally `#lcsm` and `lcsm` are the same query.
 
 **If it bites:** options in rough order — `simple` config (no stemming, exact words) for a second tsvector column; `pg_trgm` for substring/typo tolerance; or an ILIKE fallback arm in the RPC when FTS returns zero. None built; pick by the actual complaint, not preemptively.
+
+## Guideline title-regex proxy carries the largest per-unit weight in Established Scientific Influence
+
+**Status:** flagged 2026-08-09 during the Methodology rewrite grounding, deliberately NOT acted on. Scoring untouched.
+
+**The behavior.** `publication_leadership_scoring.py` identifies "guideline" publications by title regex (`guideline|consensus|recommendation|expert panel|position statement|provisional clinical opinion`) — there is no curated guideline registry anywhere in the platform — and weights them `W_GUIDELINE = 8.0`, `W_GUIDELINE_FIRST = 12.0`, `W_GUIDELINE_SENIOR = 15.0`. That last is the single largest per-unit weight in the leadership raw score, which becomes `scientific_influence_pctile` — 59% of the Established cohort score.
+
+**Why deferred.** Nearly became collateral damage of a documentation rewrite twice over (first "cut the clause — zero weight" on a false premise, then "zero the weights to simplify the doc" — both would have been wrong: the first plants a falsehood on the trust page, the second changes live rankings to fit prose). The held Methodology rewrite names the proxy AS a proxy (pending line-by-line review); the scoring question stands on its own.
+
+**Revisit when.** Someone asks "is this proxy sound?" — a title regex catching "recommendation"/"position statement" drives real rank movement at 15.0/unit, so precision of the regex (false positives: opinion pieces, replies titled "response to..."; false negatives: guideline papers titled without the keywords) deserves a measured review with board-impact numbers before any weight change.
