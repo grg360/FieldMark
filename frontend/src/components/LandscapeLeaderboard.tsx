@@ -19,31 +19,36 @@ export default function LandscapeLeaderboard({
   accentColor = "#E8A020",
   showRanks = true,
 }: Props) {
+  // Uniform panel (frame 370428e2, reconciled 2026-08-09): ALL FOUR landscape
+  // panels are the same kind of object — one ranked list each — so they share
+  // ONE chrome: #161617 on a #232326 hairline, no rounding, no shadow, rows
+  // separated by #1f1f22 top-borders. Grouping is a caption's job, not a box's.
   return (
     <div
       style={{
-        padding: 16,
-        border: "1px solid #1E1E22",
-        borderRadius: 6,
-        backgroundColor: COLOR.ground,
+        padding: "18px 18px 22px",
+        border: "1px solid #232326",
+        backgroundColor: "#161617",
       }}
     >
       <div
         style={{
-          fontSize: 13,
-          color: COLOR.ink1,
+          fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+          fontSize: 11,
+          color: "#ece9e4",
           textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          fontWeight: 500,
+          letterSpacing: "0.13em",
         }}
       >
         {title}
       </div>
       {subtitle ? (
-        <div style={{ fontSize: 10, color: COLOR.ink4, marginTop: 4 }}>{subtitle}</div>
-      ) : null}
+        <div style={{ fontSize: 11, color: "#6e6b66", marginTop: 4, paddingBottom: 8 }}>{subtitle}</div>
+      ) : (
+        <div style={{ paddingBottom: 8 }} />
+      )}
 
-      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", flexDirection: "column" }}>
         {entries.map((entry) => (
           <button
             key={entry.hcp_id}
@@ -55,10 +60,10 @@ export default function LandscapeLeaderboard({
               justifyContent: "space-between",
               gap: 12,
               width: "100%",
-              padding: "8px 10px",
+              padding: "9px 4px",
               margin: 0,
               border: "none",
-              borderRadius: 4,
+              borderTop: "1px solid #1f1f22",
               backgroundColor: "transparent",
               cursor: "pointer",
               textAlign: "left",

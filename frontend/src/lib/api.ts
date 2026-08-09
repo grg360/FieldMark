@@ -3422,12 +3422,9 @@ export interface LandscapePoint {
   visibility_composite: number;
   momentum_display: number;
   visibility_display: number;
-  archetype:
-    | "Balanced Rising Star"
-    | "Scientific Accelerator"
-    | "Network Accelerator"
-    | "Emerging Leader"
-    | null;
+  // Archetype retired 2026-08-05 (classifier deleted, column NULL) and stripped
+  // from this path 2026-08-09. The one per-dot mark is the live windows-claim:
+  senior_transition: boolean; // rising_board_flags — same badge as the ledgers
 }
 
 export interface LeaderboardEntry {
@@ -3443,8 +3440,15 @@ export interface LandscapeLeaderboards {
   top_rising_stars: LeaderboardEntry[];
   fastest_scientific_momentum: LeaderboardEntry[];
   fastest_network_momentum: LeaderboardEntry[];
-  most_balanced: LeaderboardEntry[];
   momentum_forward: LeaderboardEntry[];
+  // MOST BALANCED removed 2026-08-09 ON MERIT, not as a corpse: it was a live
+  // calc (smallest |sciMom − netMom| delta) but percentile-DELTA is
+  // magnitude-blind — equally-mediocre and equally-strong rank identically —
+  // and "balanced" was the last conceptual residue of the retired archetype
+  // bucket. (Ruling 2026-08-09; the "reads a dead field" premise was wrong.)
+  // Live overlap between the two momentum boards' entries, so the surface can
+  // state their separation from data instead of hardcoding it:
+  momentum_overlap: number;
 }
 
 function landscapeTaSlugToName(taSlug: string): string {
@@ -3518,17 +3522,6 @@ function rescaleToPercentile(
   return result;
 }
 
-function toLandscapeArchetype(
-  value: unknown,
-): LandscapePoint["archetype"] {
-  const archetype = String(value ?? "");
-  if (archetype === "Balanced Rising Star") return "Balanced Rising Star";
-  if (archetype === "Scientific Accelerator") return "Scientific Accelerator";
-  if (archetype === "Network Accelerator") return "Network Accelerator";
-  if (archetype === "Emerging Leader") return "Emerging Leader";
-  return null;
-}
-
 export async function getLandscapePoints(
   taSlug: string,
   limit: number = 100,
@@ -3541,7 +3534,7 @@ export async function getLandscapePoints(
     .select(
       "hcp_id, us_rank, rising_star_percentile, " +
         "scientific_momentum_percentile, network_momentum_percentile, " +
-        "scientific_visibility_percentile, network_visibility_percentile, archetype",
+        "scientific_visibility_percentile, network_visibility_percentile",
     )
     .eq("therapeutic_area_id", taId)
     .not("us_rank", "is", null)
@@ -3552,7 +3545,17 @@ export async function getLandscapePoints(
 
   const rows = data as unknown as Array<Record<string, unknown>>;
   const hcpIds = rows.map((r) => String(r.hcp_id));
-  const hcpMap = await fetchHcpNameMap(hcpIds);
+  // Name map + the senior-authorship mark (rising_board_flags — the same
+  // windows-claim badge the ledgers ship) in parallel; one RPC for ≤100 ids.
+  const [hcpMap, flagRows] = await Promise.all([
+    fetchHcpNameMap(hcpIds),
+    supabase.rpc("rising_board_flags", { p_hcp_ids: hcpIds }),
+  ]);
+  const seniorById = new Set(
+    ((flagRows.data ?? []) as Array<{ hcp_id: string; senior_transition: boolean }>)
+      .filter((f) => f.senior_transition)
+      .map((f) => f.hcp_id),
+  );
 
   const points: LandscapePoint[] = rows.map((r) => {
     const hcpId = String(r.hcp_id);
@@ -3571,7 +3574,7 @@ export async function getLandscapePoints(
       visibility_composite: (sciVis + netVis) / 2,
       momentum_display: 0,
       visibility_display: 0,
-      archetype: toLandscapeArchetype(r.archetype),
+      senior_transition: seniorById.has(hcpId),
     };
   });
 
@@ -3616,8 +3619,8 @@ export async function getLandscapeLeaderboards(
     top_rising_stars: [],
     fastest_scientific_momentum: [],
     fastest_network_momentum: [],
-    most_balanced: [],
     momentum_forward: [],
+    momentum_overlap: 0,
   };
 
   const taId = await resolveLandscapeTaId(taSlug);
@@ -3627,7 +3630,6 @@ export async function getLandscapeLeaderboards(
     risingStarsResult,
     sciMomResult,
     netMomResult,
-    balancedResult,
     momForwardResult,
   ] = await Promise.all([
     supabase
@@ -3651,14 +3653,6 @@ export async function getLandscapeLeaderboards(
       .not("us_rank", "is", null)
       .order("network_momentum_percentile", { ascending: false })
       .limit(limit),
-    supabase
-      .from("hcp_rising_star_ranks_v3")
-      .select(
-        "hcp_id, us_rank, rising_star_percentile, scientific_momentum_percentile, network_momentum_percentile",
-      )
-      .eq("therapeutic_area_id", taId)
-      .not("us_rank", "is", null)
-      .limit(100),
     supabase
       .from("hcp_rising_star_ranks_v3")
       .select(
@@ -3687,31 +3681,20 @@ export async function getLandscapeLeaderboards(
     .sort((a, b) => b.momentum - a.momentum)
     .slice(0, limit);
 
-  const balancedRows = [
-    ...((balancedResult.data ?? []) as unknown as Array<Record<string, unknown>>),
-  ]
-    .sort((a, b) => {
-      const deltaA = Math.abs(
-        Number(a.scientific_momentum_percentile ?? 0) - Number(a.network_momentum_percentile ?? 0),
-      );
-      const deltaB = Math.abs(
-        Number(b.scientific_momentum_percentile ?? 0) - Number(b.network_momentum_percentile ?? 0),
-      );
-      if (deltaA !== deltaB) return deltaA - deltaB;
-      return Number(b.rising_star_percentile ?? 0) - Number(a.rising_star_percentile ?? 0);
-    })
-    .slice(0, limit);
-
   const allIds = new Set<string>();
   for (const row of [
     ...(risingStarsResult.data ?? []),
     ...(sciMomResult.data ?? []),
     ...(netMomResult.data ?? []),
-    ...balancedRows,
     ...momForwardFiltered.map((x) => x.row),
   ]) {
     allIds.add(String(row.hcp_id));
   }
+
+  // Live separation fact: how many names the two momentum boards share.
+  // Computed, never hardcoded — the caption reads from this so it cannot rot.
+  const netIds = new Set((netMomResult.data ?? []).map((r) => String(r.hcp_id)));
+  const momentumOverlap = (sciMomResult.data ?? []).filter((r) => netIds.has(String(r.hcp_id))).length;
 
   const hcpMap = await fetchHcpNameMap([...allIds]);
 
@@ -3731,17 +3714,7 @@ export async function getLandscapeLeaderboards(
       valueKey: "network_momentum_percentile",
       labelFn: (row) => String(Math.round(Number(row.network_momentum_percentile ?? 0))),
     }),
-    most_balanced: balancedRows.map((row) => {
-      const hcpId = String(row.hcp_id);
-      return {
-        hcp_id: hcpId,
-        name: hcpMap.get(hcpId)?.name ?? "Unknown",
-        institution: hcpMap.get(hcpId)?.institution ?? null,
-        rank: Number(row.us_rank ?? 0),
-        primary_value: Number(row.rising_star_percentile ?? 0),
-        primary_label: String(Math.round(Number(row.rising_star_percentile ?? 0))),
-      };
-    }),
+    momentum_overlap: momentumOverlap,
     momentum_forward: momForwardFiltered.map((entry) => {
       const row = entry.row;
       const hcpId = String(row.hcp_id);

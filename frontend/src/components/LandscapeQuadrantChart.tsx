@@ -23,19 +23,12 @@ type ChartPoint = LandscapePoint & {
   y: number;
 };
 
-function archetypeColor(archetype: LandscapePoint["archetype"]): string {
-  switch (archetype) {
-    case "Balanced Rising Star":
-      return "#9B6DFF";
-    case "Scientific Accelerator":
-      return "#3FB8AF";
-    case "Network Accelerator":
-      return "#E8A04E";
-    case "Emerging Leader":
-    default:
-      return "#6B6A65";
-  }
-}
+// Archetype machinery removed 2026-08-09 (classifier retired 2026-08-05,
+// column NULL corpus-wide; frame 370428e2). ONE gray population; the only
+// per-dot mark is the live senior-authorship windows-claim, in gold — the
+// same badge the ledgers ship via rising_board_flags.
+const DOT_INK = "#9b9892";
+const SENIOR_GOLD = "#c8932f";
 
 function percentileRadius(percentile: number): number {
   const clamped = Math.min(100, Math.max(0, Number(percentile) || 0));
@@ -68,16 +61,9 @@ function CustomTooltip({
       <div style={{ color: "#6B6A65", marginBottom: 6 }}>
         {point.institution ?? "Unknown institution"}
       </div>
-      {point.archetype && point.archetype !== "Emerging Leader" && (
-        <div
-          style={{
-            fontSize: 11,
-            color: archetypeColor(point.archetype),
-            marginTop: 4,
-            fontStyle: "italic",
-          }}
-        >
-          {point.archetype}
+      {point.senior_transition && (
+        <div style={{ fontSize: 11, color: SENIOR_GOLD, marginTop: 4, letterSpacing: "0.08em" }}>
+          RECENT SENIOR AUTHORSHIP
         </div>
       )}
       <div>Momentum: {formatScoreFloor1(point.momentum_composite)}</div>
@@ -95,13 +81,15 @@ function renderDot(props: {
   const { cx, cy, payload } = props;
   if (cx == null || cy == null || !payload) return null;
 
+  // Radius stays LIVE (rising_star_percentile) — the frame's uniform dots are
+  // mock placeholders; radius encodes real rank. Endorsed 2026-08-09.
   const r = percentileRadius(payload.rising_star_percentile);
   return (
     <circle
       cx={cx}
       cy={cy}
       r={r}
-      fill={archetypeColor(payload.archetype)}
+      fill={payload.senior_transition ? SENIOR_GOLD : DOT_INK}
       fillOpacity={0.85}
       stroke="#111113"
       strokeWidth={1}
@@ -119,44 +107,23 @@ const LABEL_TEXT_STYLE: CSSProperties = {
   pointerEvents: "none",
 };
 
-const ARCHETYPE_LEGEND = [
-  { color: "#9B6DFF", label: "Balanced" },
-  { color: "#3FB8AF", label: "Scientific Accelerator" },
-  { color: "#E8A04E", label: "Network Accelerator" },
-  { color: "#6B6A65", label: "Rising Star" },
-] as const;
-
-function ArchetypeLegend() {
+// Center caption (frame): one population, one honest sentence — replaces the
+// four-swatch archetype legend that described a NULL field.
+function PopulationCaption({ count }: { count: number }) {
   return (
     <div
       style={{
         display: "flex",
-        flexWrap: "wrap",
         justifyContent: "center",
-        gap: 16,
-        fontSize: 11,
-        color: "#9B9892",
-        padding: 0,
         marginTop: 16,
         marginBottom: 32,
+        fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+        fontSize: 10,
+        letterSpacing: "0.13em",
+        color: "#6e6b66",
       }}
     >
-      {ARCHETYPE_LEGEND.map((item) => (
-        <div key={item.label} style={{ display: "flex", alignItems: "center" }}>
-          <span
-            style={{
-              width: 9,
-              height: 9,
-              borderRadius: "50%",
-              backgroundColor: item.color,
-              display: "inline-block",
-              marginRight: 6,
-              flexShrink: 0,
-            }}
-          />
-          {item.label}
-        </div>
-      ))}
+      ONE POPULATION · {count} RESEARCHERS · QUADRANT IS A POSITION, NOT A TYPE
     </div>
   );
 }
@@ -218,10 +185,9 @@ export default function LandscapeQuadrantChart({ points, onPointClick, loading }
         <span style={LABEL_TEXT_STYLE}>Future KOLs</span>
       </div>
 
-      <div style={{ width: "100%", height: 440 }}>
+      <div style={{ position: "relative", width: "100%", height: 440 }}>
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
-          <CartesianGrid stroke="#1E1E22" strokeDasharray="3 3" />
           <XAxis
             type="number"
             dataKey="x"
@@ -240,10 +206,12 @@ export default function LandscapeQuadrantChart({ points, onPointClick, loading }
             axisLine={{ stroke: "#2A2A2E" }}
             width={0}
           />
-          <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="#3FB8AF" fillOpacity={0.07} stroke="none" />
-          <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#9B6DFF" fillOpacity={0.07} stroke="none" />
-          <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="#6B6A65" fillOpacity={0.05} stroke="none" />
-          <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="#E8A04E" fillOpacity={0.07} stroke="none" />
+          {/* Quadrant tints recolored off the archetype palette onto the
+              frame's neutral darks (2026-08-09); grid renders above them. */}
+          <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="#10201c" fillOpacity={1} stroke="none" />
+          <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#1c1a2b" fillOpacity={1} stroke="none" />
+          <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="#211b13" fillOpacity={1} stroke="none" />
+          <CartesianGrid stroke="#1E1E22" strokeDasharray="3 3" />
           <Tooltip
             content={<CustomTooltip />}
             cursor={{ strokeDasharray: "3 3" }}
@@ -253,7 +221,7 @@ export default function LandscapeQuadrantChart({ points, onPointClick, loading }
             data={chartData}
             shape={renderDot}
             onClick={(entry) => {
-              const payload = (entry as { payload?: ChartPoint }).payload ?? (entry as ChartPoint);
+              const payload = (entry as { payload?: ChartPoint }).payload ?? (entry as unknown as ChartPoint);
               if (payload?.hcp_id) {
                 onPointClick(String(payload.hcp_id));
               }
@@ -261,6 +229,21 @@ export default function LandscapeQuadrantChart({ points, onPointClick, loading }
           />
           </ScatterChart>
         </ResponsiveContainer>
+        {/* In-plot legend for the ONE real per-dot mark (built 2026-08-09
+            alongside the encoding — a legend must describe a rendered mark). */}
+        <div
+          style={{
+            position: "absolute", right: 12, bottom: 12,
+            display: "flex", alignItems: "center", gap: 7,
+            background: "rgba(14,14,15,0.82)", border: "1px solid #2a2a2d",
+            padding: "5px 9px", pointerEvents: "none",
+          }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: SENIOR_GOLD }} />
+          <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 9, letterSpacing: "0.14em", color: "#b9b5ae" }}>
+            RECENT SENIOR AUTHORSHIP
+          </span>
+        </div>
       </div>
 
       <div
@@ -275,7 +258,7 @@ export default function LandscapeQuadrantChart({ points, onPointClick, loading }
         <span style={LABEL_TEXT_STYLE}>Established Visibility</span>
       </div>
 
-      <ArchetypeLegend />
+      <PopulationCaption count={points.length} />
     </div>
   );
 }

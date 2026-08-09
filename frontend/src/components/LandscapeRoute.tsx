@@ -85,10 +85,23 @@ export default function LandscapeRoute() {
             dek={"Top 100 US Rising Stars · momentum vs visibility"}
             stats={[
               { value: String(points.length || 100), label: "PLOTTED" },
-              { value: "MOM × VIS", label: "AXES" },
             ]}
           />
         </div>
+      </div>
+
+      {/* Axis definitions (frame 370428e2 + ruling 2026-08-09): the suffix
+          states the hidden transform — axis position is the composite
+          re-ranked WITHIN the plotted set, so 50 means "median of these
+          {n}", not "50th percentile composite". */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, padding: "0 16px 4px" }}>
+        {([["Y", "MOMENTUM"], ["X", "VISIBILITY"]] as const).map(([axis, name]) => (
+          <div key={axis} style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 9, letterSpacing: "0.16em", color: "#6e6b66", width: 18 }}>{axis}</span>
+            <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12, letterSpacing: "0.1em", color: "#ece9e4" }}>{name}</span>
+            <span style={{ fontSize: 12, color: "#6e6b66" }}>percentile composite · ranked within the plotted {points.length || 100}</span>
+          </div>
+        ))}
       </div>
 
       <div style={{ padding: 16 }}>
@@ -99,51 +112,64 @@ export default function LandscapeRoute() {
         />
       </div>
 
-      <div
-        style={{
-          padding: "0 16px 16px",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: 16,
-        }}
-      >
-        {boards && (
-          <>
+      {/* Boards (frame 370428e2, option 1b, ruled 2026-08-09):
+          MOST BALANCED removed ON MERIT — a live |sci−net| delta calc, but
+          magnitude-blind (equally-mediocre ranks like equally-strong) and the
+          last conceptual residue of the retired "Balanced" archetype bucket.
+          Board accents converge on register gold — teal/violet were the
+          retired archetype palette. The two momentum boards stay, paired,
+          with their separation stated from LIVE data so it cannot rot. */}
+      {/* Four UNIFORM panels, two rows of 1fr 1fr (frame 370428e2, reconciled
+          2026-08-09). PRINCIPLE: panel chrome carries no meaning here — a
+          container border means "different kind of object", and these four are
+          the same kind, one ranked list each. The momentum pair is grouped by
+          a CAPTION ROW, not a box; the grid gap is the divider. Overlap stays
+          computed from the live intersection, never hardcoded. */}
+      {boards && (
+        <div style={{ padding: "0 16px 16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
             <LandscapeLeaderboard
               title="Top Rising Stars"
+              subtitle="Overall composite rank"
               entries={boards.top_rising_stars}
               onEntryClick={handleHcpClick}
               accentColor="#E8A020"
-            />
-            <LandscapeLeaderboard
-              title="Fastest Scientific Momentum"
-              entries={boards.fastest_scientific_momentum}
-              onEntryClick={handleHcpClick}
-              accentColor="#3FB8AF"
-            />
-            <LandscapeLeaderboard
-              title="Fastest Network Momentum"
-              entries={boards.fastest_network_momentum}
-              onEntryClick={handleHcpClick}
-              accentColor="#9B6DFF"
-            />
-            <LandscapeLeaderboard
-              title="Most Balanced"
-              subtitle="Rising on both axes"
-              entries={boards.most_balanced}
-              onEntryClick={handleHcpClick}
-              accentColor="#9B6DFF"
             />
             <LandscapeLeaderboard
               title="Momentum-Forward"
               subtitle="Strong momentum, building visibility"
               entries={boards.momentum_forward}
               onEntryClick={handleHcpClick}
-              accentColor="#9B6DFF"
+              accentColor="#E8A020"
             />
-          </>
-        )}
-      </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap", padding: "30px 0 12px" }}>
+            <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 11, letterSpacing: "0.13em", color: "#ece9e4" }}>
+              MOMENTUM · THE TWO LIVE AXES, RANKED SEPARATELY
+            </span>
+            <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 10, letterSpacing: "0.11em", color: "#c8932f" }}>
+              {`OVERLAP ${boards.momentum_overlap} OF ${boards.fastest_scientific_momentum.length}`}
+              {boards.momentum_overlap <= 2 ? " · DISTINCT POPULATIONS" : " · SUBSTANTIALLY SHARED"}
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <LandscapeLeaderboard
+              title="Fastest Scientific Momentum"
+              subtitle="Scientific momentum percentile"
+              entries={boards.fastest_scientific_momentum}
+              onEntryClick={handleHcpClick}
+              accentColor="#E8A020"
+            />
+            <LandscapeLeaderboard
+              title="Fastest Network Momentum"
+              subtitle="Network momentum percentile"
+              entries={boards.fastest_network_momentum}
+              onEntryClick={handleHcpClick}
+              accentColor="#E8A020"
+            />
+          </div>
+        </div>
+      )}
 
     </div>
     </AppLayout>
