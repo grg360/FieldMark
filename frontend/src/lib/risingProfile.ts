@@ -150,6 +150,52 @@ export async function getRisingFlags(ids: string[]): Promise<Map<string, RisingF
   return new Map((data as RisingFlags[]).map((f) => [f.hcp_id, f]));
 }
 
+// Established board flags (established_board_flags, migration 2026-08-08):
+// the two badges picked from the signal inventory — 24-month senior
+// authorship (same claim-type as Rising's badge, Established-scale coverage)
+// and the human-confirmed social match (same gate as Social's gold).
+export interface EstablishedFlags {
+  hcp_id: string;
+  senior_recent: boolean;
+  senior_pubs_24mo: number;
+  latest_senior_year: number | null;
+  verified_social: boolean;
+}
+
+export async function getEstablishedFlags(ids: string[]): Promise<Map<string, EstablishedFlags>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase.rpc("established_board_flags", { p_hcp_ids: ids });
+  if (error || !data) {
+    if (error) console.warn("established_board_flags:", error);
+    return new Map();
+  }
+  return new Map((data as EstablishedFlags[]).map((f) => [f.hcp_id, f]));
+}
+
+// Cohort-agnostic open-trial read (board_open_trials, migration 2026-08-08):
+// keyed on hcp_id, no momentum spine — serves the Established ledger, where
+// rising_board_flags covers only ~6% of the board. Returns count + trial_ids
+// so the future per-HCP trials link/pop-up needs no rebuild of this read.
+export interface OpenTrialFlag {
+  count: number;
+  trialIds: string[];
+}
+
+export async function getBoardOpenTrials(ids: string[]): Promise<Map<string, OpenTrialFlag>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase.rpc("board_open_trials", { p_hcp_ids: ids });
+  if (error || !data) {
+    if (error) console.warn("board_open_trials:", error);
+    return new Map();
+  }
+  return new Map(
+    (data as Array<{ hcp_id: string; open_trial_count: number; trial_ids: string[] }>).map((r) => [
+      r.hcp_id,
+      { count: r.open_trial_count, trialIds: r.trial_ids ?? [] },
+    ]),
+  );
+}
+
 export function fmtPctl(v: number | null | undefined): string {
   if (v == null) return "NOT COMPUTED";
   return v.toFixed(2);

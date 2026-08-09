@@ -20,7 +20,7 @@ import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
 import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
-import { getRisingFlags, type RisingFlags } from "../../lib/risingProfile";
+import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -220,11 +220,47 @@ function RisingChipView({ flag, hcpId, mobile = false }: { flag: RisingFlags; hc
         </Link>
       ) : null}
       {trial ? (
-        // Register restyle 2026-08-07 (approved): COOL.ui ink at 600 on a strong
-        // border — pure-ink emphasis, same no-hue discipline as the state ladder.
-        // Never the cohort violet: that is a semantic marker, not a data accent.
-        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ display: "inline-flex", alignItems: "center", border: `1px solid ${P.lineStrong}`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: P.ink0 }}>
+        // Teal 2026-08-08 (deliberate — REVERSES the 2026-08-07 pure-ink pass,
+        // decided, not drift): open-trial earns hue as the row's most
+        // action-relevant fact; teal is unclaimed in the register (gold = rank/
+        // anchored, violet = cohort marker, sage = authorship). #3FB8AF family,
+        // text + toned border. Still never the cohort violet.
+        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ display: "inline-flex", alignItems: "center", border: `1px solid rgba(63,184,175,0.45)`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: "#3FB8AF" }}>
           OPEN TRIAL
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// Established badge shelf (2026-08-08): all present flags in ONE flex-wrap row,
+// the RisingChipView pattern. Chips and their ruled colors:
+//   OPEN TRIAL       teal #3FB8AF  — board_open_trials (status-gated, cohort-
+//                    agnostic; count/trialIds carried for the future pop-up)
+//   SENIOR AUTHORSHIP sage #8fb8a6 — same hue as Rising's authorship badge:
+//                    same claim-type, cross-ledger consistency
+//   VERIFIED SOCIAL  PURE INK      — deliberately not amber: amber sits
+//                    gold-adjacent to rank on the same row
+// Overlap at ship time: 808 rows one chip, 189 two, 13 all three — one wrap
+// row absorbs the max stack on desktop; mobile wraps to a second line.
+function EstablishedChipView({ openTrial, est, mobile = false }: { openTrial?: OpenTrialFlag; est?: EstablishedFlags; mobile?: boolean }) {
+  if (openTrial) void openTrial.trialIds; // carried for the future trials link — not rendered yet
+  const chipBase = { display: "inline-flex", alignItems: "center", padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em" } as const;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
+      {openTrial ? (
+        <span title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI)." style={{ ...chipBase, border: `1px solid rgba(63,184,175,0.45)`, color: "#3FB8AF" }}>
+          OPEN TRIAL
+        </span>
+      ) : null}
+      {est?.senior_recent ? (
+        <span title={`>= 1 senior-authored publication in the last 24 months — ${est.senior_pubs_24mo} in window${est.latest_senior_year ? `, latest ${est.latest_senior_year}` : ""}. Within the FieldMark corpus — we see only what is ingested.`} style={{ ...chipBase, border: `1px solid rgba(143,184,166,0.45)`, color: "#8fb8a6" }}>
+          SENIOR AUTHORSHIP · {est.senior_pubs_24mo} IN 24 MO
+        </span>
+      ) : null}
+      {est?.verified_social ? (
+        <span title="Social account matched to our corpus and confirmed by a person — the same gate as the Social surface's gold. Never asserted from a database match alone." style={{ ...chipBase, border: `1px solid ${P.lineStrong}`, color: P.ink0 }}>
+          VERIFIED SOCIAL
         </span>
       ) : null}
     </div>
@@ -313,6 +349,8 @@ function Row({
   open,
   onToggle,
   flag,
+  openTrial,
+  estFlag,
 }: {
   cfg: CohortConfig;
   row: LedgerRow;
@@ -321,6 +359,8 @@ function Row({
   open: boolean;
   onToggle: () => void;
   flag?: RisingFlags;
+  openTrial?: OpenTrialFlag;
+  estFlag?: EstablishedFlags;
 }) {
   const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -378,7 +418,12 @@ function Row({
               </span>
             ))}
           </div>
-          {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} /> : row.tier ? <EvidenceChipView row={row} /> : null}
+          {/* Priority (ruled 2026-08-08): EST badges BEFORE tier — on EST the tier
+              branch is vestigial (1-in-720 boundary artifact) and badges must
+              not be suppressed by it. NOTE for the community extension: COM is
+              all-tiered, so this chain would hide the badges on every COM row —
+              reconsider the slot before badging community. */}
+          {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} /> : (openTrial || estFlag?.senior_recent || estFlag?.verified_social) ? <EstablishedChipView openTrial={openTrial} est={estFlag} /> : row.tier ? <EvidenceChipView row={row} /> : null}
           {row.summary ? (
             <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
@@ -505,6 +550,8 @@ function MobileRow({
   open,
   onToggle,
   flag,
+  openTrial,
+  estFlag,
 }: {
   cfg: CohortConfig;
   row: LedgerRow;
@@ -513,6 +560,8 @@ function MobileRow({
   open: boolean;
   onToggle: () => void;
   flag?: RisingFlags;
+  openTrial?: OpenTrialFlag;
+  estFlag?: EstablishedFlags;
 }) {
   const { isTracked, toggleSave, getStatus, setStatus, getInsightCount } = useRelationships();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -560,7 +609,7 @@ function MobileRow({
         ) : null}
 
         {/* evidence chip (COM) */}
-        {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} mobile /> : row.tier ? <EvidenceChipView row={row} mobile /> : null}
+        {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} mobile /> : (openTrial || estFlag?.senior_recent || estFlag?.verified_social) ? <EstablishedChipView openTrial={openTrial} est={estFlag} mobile /> : row.tier ? <EvidenceChipView row={row} mobile /> : null}
 
         {/* summary */}
         {row.summary ? <div style={{ ...serif(13), lineHeight: 1.5, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div> : null}
@@ -650,6 +699,8 @@ function VirtualTail({
   onNearEnd,
   isMobile,
   flags,
+  openTrials,
+  estFlags,
 }: {
   cfg: CohortConfig;
   rows: LedgerRow[];
@@ -660,6 +711,8 @@ function VirtualTail({
   onNearEnd: () => void;
   isMobile: boolean;
   flags?: Map<string, RisingFlags>;
+  openTrials?: Map<string, OpenTrialFlag>;
+  estFlags?: Map<string, EstablishedFlags>;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -707,7 +760,7 @@ function VirtualTail({
             ref={virtualizer.measureElement}
             style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start - scrollMargin}px)` }}
           >
-            <RowComp cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} flag={flags?.get(row.hcpId)} />
+            <RowComp cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => onToggle(id)} flag={flags?.get(row.hcpId)} openTrial={openTrials?.get(row.hcpId)} estFlag={estFlags?.get(row.hcpId)} />
           </div>
         );
       })}
@@ -744,6 +797,8 @@ export default function CohortLedger() {
   const nsclcTaId = taIdForApiSlug("nsclc");
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [risingFlags, setRisingFlags] = useState<Map<string, RisingFlags>>(new Map());
+  const [openTrials, setOpenTrials] = useState<Map<string, OpenTrialFlag>>(new Map());
+  const [estFlags, setEstFlags] = useState<Map<string, EstablishedFlags>>(new Map());
   const [meta, setMeta] = useState<LedgerMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -812,12 +867,25 @@ export default function CohortLedger() {
   const th = meta ? thresholds(cfg, meta.ceilings) : {};
   const isCom = cfg.tag === "COM";
   const isRising = cfg.tag === "RS";
+  const isEst = !isCom && !isRising;
   useEffect(() => {
     if (!isRising || rows.length === 0) { setRisingFlags(new Map()); return; }
     let alive = true;
     getRisingFlags(rows.map((r) => r.hcpId)).then((f) => { if (alive) setRisingFlags(f); });
     return () => { alive = false; };
   }, [isRising, rows]);
+  // Established badges (2026-08-08): board_open_trials (open-trial, status-gated,
+  // 460 of 2,990) + established_board_flags (24-mo senior authorship 727,
+  // verified social 38). Two reads in parallel, both keyed on hcp_id — rising
+  // keeps rising_board_flags (its senior badge needs the momentum spine).
+  useEffect(() => {
+    if (!isEst || rows.length === 0) { setOpenTrials(new Map()); setEstFlags(new Map()); return; }
+    let alive = true;
+    const ids = rows.map((r) => r.hcpId);
+    getBoardOpenTrials(ids).then((f) => { if (alive) setOpenTrials(f); });
+    getEstablishedFlags(ids).then((f) => { if (alive) setEstFlags(f); });
+    return () => { alive = false; };
+  }, [isEst, rows]);
   // COM is tier-sorted, not index-sorted, so the ceiling-saturation "treat as tied"
   // bands do not apply — render one flat ranked list. EST/RS keep the band device.
   const { headBands, tailRows } = isCom ? { headBands: [] as Band[], tailRows: rows } : layout(cfg, rows);
@@ -832,7 +900,7 @@ export default function CohortLedger() {
 
   const renderRow = (row: LedgerRow) => {
     const id = `${cfg.tag}-${row.rank}`;
-    return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} flag={isRising ? risingFlags.get(row.hcpId) : undefined} />;
+    return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} flag={isRising ? risingFlags.get(row.hcpId) : undefined} openTrial={isEst ? openTrials.get(row.hcpId) : undefined} estFlag={isEst ? estFlags.get(row.hcpId) : undefined} />;
   };
 
   return (
@@ -963,6 +1031,8 @@ export default function CohortLedger() {
                         onNearEnd={loadMore}
                         isMobile={isMobile}
                         flags={isRising ? risingFlags : undefined}
+                        openTrials={isEst ? openTrials : undefined}
+                        estFlags={isEst ? estFlags : undefined}
                       />
                     ) : (
                       tailRows.map(renderRow)

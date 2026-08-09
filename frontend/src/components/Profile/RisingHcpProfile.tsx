@@ -476,8 +476,11 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                     </span>
                   ) : null}
                   {flags?.on_open_trial ? (
-                    // Same restyle as the ledger badge (2026-08-07): full ink, strong border.
-                    <span title="Named investigator on at least one rendered open trial. Gated view; the registry labels every site lead PI, so no lead claim is made." style={{ padding: "3px 8px", border: `1px solid ${LINE.l2}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: INK0 }}>
+                    // Teal 2026-08-08, matching the ledger badges (deliberate
+                    // reversal of the 08-07 pure-ink pass — open-trial earns hue
+                    // as the most action-relevant fact; teal unclaimed in the
+                    // register).
+                    <span title="Named investigator on at least one rendered open trial. Gated view; the registry labels every site lead PI, so no lead claim is made." style={{ padding: "3px 8px", border: `1px solid rgba(63,184,175,0.45)`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: "#3FB8AF" }}>
                       OPEN-TRIAL INVESTIGATOR
                     </span>
                   ) : null}
