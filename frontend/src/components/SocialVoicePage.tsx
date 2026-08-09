@@ -27,6 +27,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import AppLayout from "./AppLayout";
+// Shared null-honest engagement renderer (extracted 2026-08-08): null is an
+// absence and says so; 0 is a captured fact and shows 0.
+import { EngagementMeta } from "./SocialPostRow";
 import { FONT, GOLD as GOLD_T, GROUND, LINE, COOL } from "../lib/designTokens";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { getVoiceStream, type VoiceStream, type VoicePost } from "../lib/socialVoice";
@@ -59,30 +62,6 @@ function total(posts: VoicePost[], pick: (p: VoicePost) => number | null): { lab
   const sum = present.reduce((a, b) => a + b, 0);
   const partial = present.length < vals.length;
   return { label: `${partial ? "≥ " : ""}${num(sum)}`, partial };
-}
-
-function EngagementMeta({ p }: { p: VoicePost }) {
-  const metrics: Array<[string, string, number | null]> = [
-    ["LIKE", "LIKES", p.likes],
-    ["REPLY", "REPLIES", p.replies],
-    ["REPOST", "REPOSTS", p.reposts],
-    ["QUOTE", "QUOTES", p.quotes],
-  ];
-  if (metrics.every(([, , v]) => v == null)) {
-    return <span style={{ color: FAINT }}>ENGAGEMENT NOT CAPTURED</span>;
-  }
-  return (
-    <>
-      {metrics.map(([one, many, v]) => (
-        <span key={many} style={{ display: "inline-flex", gap: 8 }}>
-          <span style={{ color: v == null ? FAINT2 : MID }}>
-            {v == null ? `${many} —` : `${num(v)} ${v === 1 ? one : many}`}
-          </span>
-          <span style={{ color: FAINT2 }}>·</span>
-        </span>
-      ))}
-    </>
-  );
 }
 
 export default function SocialVoicePage() {
@@ -268,7 +247,7 @@ export default function SocialVoicePage() {
                     <span>@{handle}</span><span>·</span>
                     <span>POSTED {fmtDay(p.postedAt)}</span><span>·</span>
                     {p.isReply ? (<><span style={{ color: FAINT }}>REPLY</span><span>·</span></>) : null}
-                    <EngagementMeta p={p} />
+                    <EngagementMeta post={p} />
                     {carried.length ? (<><span style={{ color: GOLD }}>CARRIES {carried.join(" ")}</span><span>·</span></>) : null}
                     <span>QUOTED IN FULL, UNEDITED</span>
                     <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ ...mono(8.5, BRONZE, "0.14em"), textDecoration: "none", marginLeft: "auto" }}>VIEW ON SOURCE ↗</a>

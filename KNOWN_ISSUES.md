@@ -344,3 +344,11 @@ Both exhibit **both** wrong-states:
 **Why deferred.** At weekly cadence the re-scan is cheap, and re-evaluating is mildly *useful* while the corpus grows: a user unmatched last week can match this week if a new HCP row or better display_name arrives. Not worth complexity now.
 
 **Revisit when.** Cadence tightens below weekly, or the pool grows materially (watch `rows_processed` vs `rows_succeeded` in `pipeline_runs` — a widening gap is the pool growing). **The named fix:** persist `rejected` rows in `dol_matches_v2` so the skip-list covers them, with a periodic amnesty pass to re-try old rejects.
+
+## Social search — English FTS stemming may surprise on clinical vocabulary
+
+**Status:** logged 2026-08-08 at build time, not a defect. First suspect when "search feels off."
+
+**The behavior.** `social_post_search` uses `websearch_to_tsquery('english', …)` over `post_text`. The English stemmer was built for prose, not clinical vocabulary: gene names, trial acronyms, and drug names don't stem intuitively (e.g. it happily stems ordinary words — "dosing" matches "dose" — but `KRAS`/`LITESPARK`/`TALAPRO` are opaque tokens that must match whole, and partial tokens never match: "osimert" finds nothing, `PD-L1` tokenizes into pieces). Hashtags lose their `#` at tokenization, so bare-word searches find tagged posts, but searching literally `#lcsm` and `lcsm` are the same query.
+
+**If it bites:** options in rough order — `simple` config (no stemming, exact words) for a second tsvector column; `pg_trgm` for substring/typo tolerance; or an ILIKE fallback arm in the RPC when FTS returns zero. None built; pick by the actual complaint, not preemptively.

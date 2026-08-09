@@ -10,9 +10,11 @@
 // 2026-07-31) — other TAs get the honest empty state, matching the Pulse
 // no-cycle pattern. SocialTrackEmpty is superseded here (retained in-tree).
 
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import AppLayout from "./AppLayout";
 import PublicConversation from "./PublicConversation";
+import SocialSearch from "./SocialSearch";
 import { COLOR, FONT } from "../lib/designTokens";
 import { taSlugToLabel } from "../lib/routeSlugs";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -27,6 +29,7 @@ export default function SocialPage() {
   const narrow = useMediaQuery("(max-width: 767px)");
   const taSlug = (params.ta ?? "oncology").toLowerCase();
   const taLabel = taSlugToLabel(taSlug);
+  const [searchActive, setSearchActive] = useState(false);
 
   if (!SOCIAL_CAPTURE_TAS.has(taSlug)) {
     return (
@@ -57,7 +60,18 @@ export default function SocialPage() {
 
   return (
     <AppLayout width="wide">
-      <PublicConversation taSlug={taSlug} taLabel={SURFACE_LABEL[taSlug] ?? taLabel} narrow={narrow} />
+      {/* Search in the surface header (platform pattern) — owned here so the
+          frozen v4 PublicConversation stays untouched. An active query swaps
+          the conversation out for the results panel; CLEAR restores it. */}
+      <SocialSearch
+        taSlug={taSlug}
+        taLabel={SURFACE_LABEL[taSlug] ?? taLabel}
+        narrow={narrow}
+        onActiveChange={setSearchActive}
+      />
+      {searchActive ? null : (
+        <PublicConversation taSlug={taSlug} taLabel={SURFACE_LABEL[taSlug] ?? taLabel} narrow={narrow} />
+      )}
     </AppLayout>
   );
 }

@@ -38,6 +38,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { classifyVoice } from "../lib/voiceClassification";
+import { getLatestCaptured, type LatestStream } from "../lib/socialLatest";
+import SocialPostRow from "./SocialPostRow";
 import { GOLD as GOLD_T, GROUND, LINE, FONT, COOL } from "../lib/designTokens";
 
 // Commit C 2026-08-05: the conversation box joins the Pulse board scheme —
@@ -104,6 +106,11 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<Pt | null>(null);
   const [pinned, setPinned] = useState<Pt | null>(null);
+  // CONVERSATION ↔ LATEST (2026-08-08). LATEST is the raw newest-first captured
+  // stream — not windowed, not ranked. Loaded lazily on first switch.
+  const [mode, setMode] = useState<"conversation" | "latest">("conversation");
+  const [latest, setLatest] = useState<LatestStream | null>(null);
+  const [latestLoading, setLatestLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -124,6 +131,21 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
     const more = ((data as Payload | null)?.rows ?? []);
     setRows((r) => [...r, ...more]);
     setShown(shown + step);
+  };
+
+  const switchMode = (m: "conversation" | "latest") => {
+    setMode(m);
+    if (m === "latest" && latest == null && !latestLoading) {
+      setLatestLoading(true);
+      void getLatestCaptured(taSlug, 50, 0).then((s) => { setLatest(s); setLatestLoading(false); });
+    }
+  };
+  const loadMoreLatest = async () => {
+    if (!latest) return;
+    setLatestLoading(true);
+    const next = await getLatestCaptured(taSlug, 50, latest.posts.length);
+    setLatest((cur) => cur ? { ...next, posts: [...cur.posts, ...next.posts] } : next);
+    setLatestLoading(false);
   };
 
   // group boundary: re-derived on the 15-day window. 2,000 raw responses holds
@@ -169,11 +191,20 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
           <span style={{ ...serif(19, INK, 1.2) }}>The Public Conversation <span style={{ color: FAINT }}>/</span> {taLabel}</span>
         </div>
         <div style={{ ...mono(narrow ? 9.5 : 10.5, DIM, "0.11em"), lineHeight: 1.7 }}>
-          {num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED · {num(d.posts_included)} INCLUDED{narrow ? <br /> : " · "}POSTS 20 MAY — 03 JUN 2026 · CONFIRMED MATCHES FIRST · RESPONSE ORDERS WITHIN EACH GROUP
+          {mode === "conversation" ? (
+            <>{num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED · {num(d.posts_included)} INCLUDED{narrow ? <br /> : " · "}POSTS 20 MAY — 03 JUN 2026 · CONFIRMED MATCHES FIRST · RESPONSE ORDERS WITHIN EACH GROUP</>
+          ) : (
+            // LATEST owns no window: the caption must not carry the
+            // conversation's 20 May – 3 Jun line above an August stream.
+            <>{num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED{narrow ? <br /> : " · "}NEWEST FIRST BY POSTED_AT · NOT RANKED · NOT WINDOWED</>
+          )}
         </div>
       </div>
 
-      {/* honesty panel */}
+      {/* honesty panel — CONVERSATION furniture (group order, window, match
+          counts); hidden in LATEST along with the scatter (windowed
+          response-per-follower analysis — it does not describe the raw stream) */}
+      {mode === "conversation" ? (<>
       <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "1fr 480px", borderBottom: `1px solid ${HAIR}` }}>
         <div style={{ padding: narrow ? "18px 18px 18px 20px" : "24px 28px 26px 28px", borderLeft: `2px solid ${BRONZE}`, marginLeft: narrow ? 16 : 26 }}>
           <div style={{ ...mono(9.5, BRONZE, "0.2em"), marginBottom: 10 }}>WHAT THIS SURFACE IS</div>
@@ -331,7 +362,10 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
         </div>
       </div>
 
-      {/* hashtag strip */}
+      {/* hashtag strip — CONVERSATION-only (review 2026-08-08): its own label
+          says SHARE OF INCLUDED POSTS — windowed over 20 May–3 Jun like the
+          scatter, and a windowed strip above a non-windowed stream reads as
+          describing the stream. */}
       <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr 1fr" : `340px repeat(${d.hashtags.top.length}, 1fr) 200px`, borderBottom: `1px solid ${HAIR}`, background: BG2 }}>
         <div style={{ padding: narrow ? "14px 18px" : "16px 24px", borderRight: `1px solid rgba(255,255,255,0.05)`, gridColumn: narrow ? "1 / -1" : "auto" }}>
           <div style={{ ...mono(9, "#7a7367", "0.18em"), marginBottom: 10 }}>HASHTAGS CARRIED · SHARE OF INCLUDED POSTS</div>
@@ -352,7 +386,60 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
           <div style={{ height: 2, background: HAIR }}><div style={{ height: 2, width: `${d.hashtags.none_pct}%`, background: "#4d4a44" }} /></div>
         </div>
       </div>
+      </>) : null}
 
+      {/* CONVERSATION ↔ LATEST toggle (2026-08-08). The band carries ONLY the
+          toggle-relevant distinction — the window fact is owned by the
+          conversation chrome below (one altitude) and by LATEST's honesty
+          header (the other), never stated here. */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", padding: `12px ${narrow ? 18 : 28}px`, background: BAND, borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+        {(["conversation", "latest"] as const).map((m) => (
+          <span key={m} onClick={() => switchMode(m)}
+            style={{ cursor: "pointer", ...mono(9.5, mode === m ? GOLD : FAINT, "0.16em"), border: `1px solid ${mode === m ? "rgba(216,169,73,0.4)" : "transparent"}`, padding: "5px 12px" }}>
+            {m.toUpperCase()}
+          </span>
+        ))}
+        <span style={{ ...mono(8.5, FAINT2, "0.12em"), marginLeft: 6 }}>
+          {mode === "conversation" ? "RANKED BY RESPONSE" : "EVERY CAPTURED POST · NEWEST FIRST"}
+        </span>
+      </div>
+
+      {mode === "latest" ? (
+        <div style={{ padding: `0 ${narrow ? 18 : 28}px` }}>
+          {/* LATEST honesty header (NON-NEGOTIABLE copy, review 2026-08-08):
+              newest-captured not newest-posted; the capture reality; the
+              posted_at-is-trustworthy / capture-is-separate line kept
+              verbatim; capture-time absence stated at stream level, exactly
+              as the voice page does — never a fabricated recency. */}
+          <div style={{ borderBottom: `1px solid ${HAIR2}`, padding: "14px 2px", ...mono(9.5, DIM, "0.16em"), lineHeight: 1.7 }}>
+            {latestLoading && !latest
+              ? "LOADING THE CAPTURED STREAM…"
+              : `${num(latest?.total ?? 0)} CAPTURED ${taLabel.toUpperCase()} POSTS · NEWEST FIRST BY POSTED_AT · THE NEWEST WE HOLD — NOT A LIVE TIMELINE`}
+          </div>
+          {latest ? (
+            <div style={{ padding: "16px 2px 6px", ...serif(narrow ? 13.5 : 15, MID, 1.65), maxWidth: 980, textWrap: "pretty" as const }}>
+              Capture is query-driven and paused 3 June – 21 July: a topic absent from this stream wasn&rsquo;t caught
+              by our queries — it didn&rsquo;t necessarily go quiet. Posts are ordered by their own timestamps, which
+              are trustworthy; when we read them is a separate fact, recorded only since{" "}
+              {latest.captureBoundary
+                ? new Date(latest.captureBoundary).toLocaleString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+                : "the first stamped capture run (none yet)"}{" "}
+              and never backfilled — older reads carry no capture time, and none is invented.
+              Posts our pipeline hasn&rsquo;t TA-tagged ({num(latest.untaggedTotal)} corpus-wide) don&rsquo;t appear in a
+              TA-scoped stream.
+            </div>
+          ) : null}
+          {latest?.posts.map((p) => <SocialPostRow key={p.id} post={p} narrow={narrow} />)}
+          {latest && latest.posts.length < latest.total ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <span onClick={() => void loadMoreLatest()} style={{ cursor: "pointer", ...mono(9.5, BRONZE, "0.16em") }}>
+                {latestLoading ? "LOADING…" : `LOAD NEXT ${Math.min(50, latest.total - latest.posts.length)} ↓`}
+              </span>
+            </div>
+          ) : null}
+          {latest ? <div style={{ height: 24 }} /> : null}
+        </div>
+      ) : (<>
       {/* column head (desktop) */}
       {narrow ? null : (
         <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 340px", borderBottom: `1px solid ${HAIR2}`, background: BG2 }}>
@@ -393,6 +480,7 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
         <span style={mono(9.5, FAINT, "0.14em")}>SHOWING {Math.min(shown, rows.length)} OF {num(d.accounts_in_window)} ACCOUNTS WITH AN INCLUDED POST · {num(d.posts_captured - d.posts_included)} CAPTURED POSTS SIT OUTSIDE THE WINDOW · NO HISTORY IS KEPT, SO THIS ORDER CANNOT BE COMPARED WITH LAST MONTH&rsquo;S</span>
         <span onClick={() => void loadMore()} style={{ ...mono(9.5, BRONZE, "0.14em"), cursor: "pointer", whiteSpace: "nowrap" }}>LOAD NEXT {narrow ? 10 : 25} ↓</span>
       </div>
+      </>)}
     </div>
   );
 }
