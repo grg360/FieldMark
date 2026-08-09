@@ -9,6 +9,9 @@ interface SearchBarProps {
   onClose?: () => void;
   onSelect: (hcpId: string, taId: string) => void;
   variant?: "overlay" | "inline";
+  // inline only: fill the parent instead of the default 480px self-cap —
+  // for containers that own their width (the nav's click-to-reveal band).
+  fluid?: boolean;
 }
 
 const COHORT_BADGE: Record<
@@ -141,6 +144,7 @@ export default function SearchBar({
   onClose,
   onSelect,
   variant = "overlay",
+  fluid = false,
 }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -285,8 +289,10 @@ export default function SearchBar({
           position: "relative",
           flex: 1,
           minWidth: 0,
-          maxWidth: 480,
-          margin: "0 16px",
+          // fluid: the parent owns the width (nav reveal band) — no self-cap,
+          // no side margins, so the field centers with its container.
+          maxWidth: fluid ? "none" : 480,
+          margin: fluid ? 0 : "0 16px",
         }}
       >
         <div style={{ position: "relative" }}>

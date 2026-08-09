@@ -17,9 +17,12 @@
 //
 // The avatar menu is five rows — Settings, Methodology, Invite (self-hiding at 0),
 // Admin (isAdmin only), Sign out — as a desktop dropdown and a full-width mobile
-// sheet. Search is NOT in the bar; it lives in surface headers (see the feed/home
-// headers). Invite lives here, not in the bar. Bibliography is intentionally absent
-// pending its routing fix.
+// sheet. HCP search (2026-08-08, global): a magnifier in the desktop right rail
+// (left of the avatar, rendered only where a TA is supplied) toggles a centered
+// bar under the nav — 2/3 nav width, in normal flow, so content drops while it
+// is open. The old always-visible row below the bar is retired. Surface-header
+// searches (feed/ledger) are unaffected. Invite lives here, not in the bar.
+// Bibliography is intentionally absent pending its routing fix.
 
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -28,6 +31,7 @@ import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/
 import { useIsAdmin } from "../lib/useIsAdmin";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { getMyInvites, primaryInvite, type MyInvite } from "../lib/invites";
+import { useTA } from "../lib/TAContext";
 import SearchBar from "./SearchBar";
 import InviteShareCard from "./HomePage/InviteShareCard";
 import InviteEmailForm from "./HomePage/InviteEmailForm";
@@ -124,8 +128,10 @@ export default function NavBar({
   translucent?: boolean;
 } = {}) {
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 767px)");
   const active = activeKey(location.pathname);
+  const { indicationTaId } = useTA();
 
   const [profile, setProfile] = useState<MslProfile | null>(null);
   const [email, setEmail] = useState<string>("");
@@ -158,8 +164,16 @@ export default function NavBar({
     initials: initialsOf(profile),
   };
 
+  // Platform-wide search (2026-08-08): surfaces that pass explicit wiring keep
+  // it; everywhere else the bar falls back to the ambient TA (TAContext defaults
+  // to Oncology/NSCLC) and plain profile navigation — so the magnifier renders
+  // on EVERY NavBar mount, not just Home/The Week.
   const search: NavSearch | null =
-    currentTaId && onSearchSelect ? { currentTaId, onSearchSelect } : null;
+    currentTaId && onSearchSelect
+      ? { currentTaId, onSearchSelect }
+      : indicationTaId
+        ? { currentTaId: indicationTaId, onSearchSelect: (hcpId) => navigate(`/hcp/${hcpId}`) }
+        : null;
 
   return isMobile ? (
     <MobileBar active={active} menu={menu} search={search} translucent={translucent} />
@@ -182,9 +196,37 @@ interface MenuData {
 // every mount. Mount sites must NOT wrap it in a narrower width container —
 // AppLayout and the NavBar-direct pages mount it above their content wrappers.
 function DesktopBar({ active, menu, search, translucent }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean }) {
+  // Click-to-reveal search (2026-08-08, global): the always-visible row below
+  // the bar retired. A magnifier in the right rail (left of the avatar) toggles
+  // a bar in normal flow — 2/3 nav width, centered, pushing content down while
+  // open (same-day revision from the overlay treatment: dropping reads better
+  // than floating). Esc / click-away / re-click close; select closes then fires.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchBtnRef = useRef<HTMLButtonElement>(null);
+  const searchPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    function onDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (searchPanelRef.current?.contains(t) || searchBtnRef.current?.contains(t)) return;
+      setSearchOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSearchOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [searchOpen]);
+
   return (
     <nav
       style={{
+        position: "relative",
         borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : COLOR.hairStrong}`,
         background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground,
         ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
@@ -249,22 +291,55 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
           labels at gap 18 and search at 232 the rail lands exactly on the padded
           column edge with ~9px true slack — verified against the padded edge,
           not scrollWidth (the old bar overflowed its padding by 21.8px). */}
-      {/* Search left the bar (2026-08-03): nine labels need the width, so search
-          moved to its own row below. Right rail is the avatar only. */}
+      {/* Search left the bar (2026-08-03): nine labels need the width. Right rail
+          (2026-08-08): magnifier toggle (where a TA is supplied) + avatar. */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginLeft: "auto" }}>
+        {search ? (
+          <button
+            ref={searchBtnRef}
+            type="button"
+            onClick={() => setSearchOpen((o) => !o)}
+            aria-label="Search HCPs"
+            aria-expanded={searchOpen}
+            className="fm-pill-button"
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", minHeight: 0 }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = searchOpen ? "1" : "0.85"; }}
+          >
+            {/* same magnifier as the mobile utility strip — nav chrome, not an afterthought */}
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+              <circle cx="7.5" cy="7.5" r="5.5" stroke={searchOpen ? COLOR.ink1 : COLOR.ink3} strokeWidth="1.5" />
+              <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={searchOpen ? COLOR.ink1 : COLOR.ink3} strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        ) : null}
         <AvatarMenu menu={menu} mobile={false} />
       </div>
     </div>
-    {search ? (
-      // Search row: its own band below the bar, left-aligned at input width so it
-      // does not stretch thin. Only renders where a TA is supplied (Home, The Week);
-      // the feed and ledger keep their own search rows and pass no TA to NavBar.
-      <div style={{ borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : SEAM}`, background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground, ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}) }}>
-        <div style={{ maxWidth: CONTENT_WIDTH.standard, margin: "0 auto", padding: "10px 18px", boxSizing: "border-box" }}>
-          <div style={{ width: 360, maxWidth: "100%" }}>
-            <SearchBar variant="inline" currentTaId={search.currentTaId} onSelect={search.onSearchSelect} />
-          </div>
-        </div>
+    {search && searchOpen ? (
+      // Revealed search — in normal flow (2026-08-08 revision: pushes content
+      // down rather than overlaying it). A full-bleed band under the bar with
+      // the input at 2/3 nav width, centered. Same SearchBar, same placeholder,
+      // same results.
+      <div
+        ref={searchPanelRef}
+        style={{
+          width: "66.666%",
+          margin: "0 auto",
+          boxSizing: "border-box",
+          padding: "10px 18px",
+          borderTop: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : SEAM}`,
+        }}
+      >
+        <SearchBar
+          variant="inline"
+          fluid
+          currentTaId={search.currentTaId}
+          onSelect={(hcpId, taId) => {
+            setSearchOpen(false);
+            search.onSearchSelect(hcpId, taId);
+          }}
+        />
       </div>
     ) : null}
     </nav>
