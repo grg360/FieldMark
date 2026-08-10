@@ -339,6 +339,15 @@ const NOSEP_INK = "#6b6660"; // "does not separate here"
 // of the grid, not a heavier panel frame. (The 3px row cohort MARKER is a
 // block, not a rule — not part of the line system.)
 const drawerRule = (cfg: CohortConfig) => `1px solid ${cfg.markerColor}`;
+// OUTER PERIMETER (2026-08-09 FINAL, reference corrected): matches THE LINE
+// RUNNING DOWN THE LEDGER'S LEFT EDGE — the row cohort marker, width 3,
+// background cfg.markerColor, full opacity (see the Row/MobileRow marker
+// divs). NOT the white hairlines; the earlier hairline readings were the
+// wrong reference and each pass thinned this border further from the target.
+// Perimeter = 3px solid cfg.markerColor, identical value to that marker,
+// all four sides. It is the ONLY line in the drawer — interior section
+// dividers were removed the same day (sections separate by spacing alone).
+const drawerPerimeter = (cfg: CohortConfig) => `3px solid ${cfg.markerColor}`;
 // Coverage sublabels, measured 2026-08-08 (EST/US n=2,990; RS/US n=123):
 // canonical-labeled pubs 97% / 99%; extracted positions 8% / 80%.
 const COVERAGE = {
@@ -505,7 +514,9 @@ function beliefLayer(
 
 function DrawerSection({ label, sub, mobile, rightInset, children }: { label: string; sub: string; mobile: boolean; rightInset?: number; children: React.ReactNode }) {
   return (
-    <div style={{ display: mobile ? "flex" : "grid", flexDirection: "column", gridTemplateColumns: "210px 1fr", gap: mobile ? 10 : 32, padding: mobile ? "16px 14px" : "22px", borderBottom: `1px solid ${P.line}` }}>
+    // NO divider (2026-08-09 final): sections separate by spacing alone —
+    // the drawer's outer perimeter is its only line.
+    <div style={{ display: mobile ? "flex" : "grid", flexDirection: "column", gridTemplateColumns: "210px 1fr", gap: mobile ? 10 : 32, padding: mobile ? "20px 14px" : "26px 22px" }}>
       <div style={{ ...mono(10, 500), letterSpacing: ".14em", lineHeight: 1.7 }}>
         <div style={{ color: "#8b8479" }}>{label}</div>
         <div style={{ marginTop: 4, color: "#4f4a44" }}>{sub}</div>
@@ -542,7 +553,8 @@ function NeighbourLines({ lines }: { lines: NeighbourLine[] }) {
 // over the next row (the stacking-context constraint that rules out true
 // protrusion). 420ms decelerating open per the frame; close stays an instant
 // unmount — exit animation would need delayed unmount the virtualised list
-// doesn't carry. EST desktop only per the ruling; RS/mobile keep the flat drawer.
+// doesn't carry. EST + RS desktop (RS joined 2026-08-09 with the cohort-tinted
+// rails); mobile keeps the flat drawer.
 const DRAWER_EASE = "cubic-bezier(.22,.68,.24,1)";
 function DrawerOverhang({ children }: { children: ReactNode }) {
   const [entered, setEntered] = useState(false);
@@ -562,17 +574,27 @@ function DrawerOverhang({ children }: { children: ReactNode }) {
         transition: `max-height .42s ${DRAWER_EASE}, padding-bottom .42s ${DRAWER_EASE}, opacity .3s ease`,
       }}
     >
+      {/* ONE LINE SYSTEM (2026-08-09 mechanism unification): this box draws NO
+          cohort border and NO edge ring — it carries DEPTH ONLY (gradient
+          surface, cast drop shadow, and the lip as an inset highlight sitting
+          just inside the perimeter). The cohort outline is the inner drawer's
+          drawerRule — the same 1px solid border mechanism as the interior
+          section dividers — so perimeter and interior lines match by
+          construction. The old 0 0 0 1px black ring is gone with the alpha-
+          ramped rails: both were edge mechanisms that made the perimeter
+          render unlike a border. Raised survives the swap — the depth cue is
+          the top-lit surface + cast shadow + lip highlight, not the edge
+          technique. */}
       <div
         style={{
           position: "relative",
           zIndex: 2,
-          border: "1px solid rgba(255,255,255,.06)",
-          borderTopColor: "rgba(255,255,255,.13)", // the lip
-          borderLeftColor: "rgba(255,255,255,.09)", // lit side rails
-          borderRightColor: "rgba(255,255,255,.09)",
           background: "linear-gradient(180deg,#15151a 0%,#111114 30%,#0e0e11 100%)",
           margin: entered ? "0 -5px" : "0 0px", // the 5px overhang
-          boxShadow: entered ? "0 22px 40px -20px rgba(0,0,0,.92), 0 0 0 1px rgba(0,0,0,.45)" : "0 0 0 rgba(0,0,0,0)",
+          // depth from surface + cast shadow ONLY (2026-08-09 round 4): the
+          // inset lip was an edge shadow — removed so the outer LINE is purely
+          // the real hairline border on the drawer element.
+          boxShadow: entered ? "0 22px 40px -20px rgba(0,0,0,.92)" : "0 0 0 rgba(0,0,0,0)",
           transition: `margin .42s ${DRAWER_EASE}, box-shadow .42s ease`,
         }}
       >
@@ -606,14 +628,14 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
   const bl = beliefLayer(subj, nbrData);
 
   return (
-    // Full sage enclosure (2026-08-09, supersedes left+bottom): the cohort rule
-    // runs all four sides — a drawer is enclosed, and full 1px enclosure reads
-    // as a bounded physical object (the emboss direction). The bottom-edge-
-    // ownership intent survives with the whole perimeter owning it. Wrapped in
-    // DrawerOverhang, the box supplies surface (gradient), lip and rails
-    // outside this perimeter; unwrapped (RS, mobile) the flat ground stands.
-    // position:relative anchors the top-edge PROFILE tab.
-    <div style={{ position: "relative", background: overhang ? "transparent" : P.drawer, border: drawerRule(cfg) }}>
+    // Full cohort enclosure, ONE mechanism (2026-08-09 unification): the
+    // perimeter is drawerRule — a real 1px solid cfg.markerColor border —
+    // rendered UNCONDITIONALLY, wrapped or not, and the interior section
+    // dividers use the identical value, so every cohort line in the drawer is
+    // the same 1px solid border and matches by construction. The overhang box
+    // above carries depth only (gradient, cast shadow, inset lip) and draws no
+    // edge of its own. position:relative anchors the top-edge PROFILE tab.
+    <div style={{ position: "relative", background: overhang ? "transparent" : P.drawer, border: drawerPerimeter(cfg) }}>
       {/* The filing tab, TOP-RIGHT (2026-08-09 reversal — a filing-cabinet tab
           sits at the top of the folder): hangs INSIDE the drawer from the sage
           top rule — square where it meets the top edge, rounded bottom corners,
@@ -625,13 +647,17 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
         title={`${row.name} — profile`}
         style={{
           position: "absolute", right: mobile ? 14 : 22, top: 0, zIndex: 3,
-          ...mono(10.5, 700), letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
-          background: `${cfg.markerColor}1A`, border: `1px solid ${cfg.markerColor}8C`, borderTop: "none",
+          // Plex SANS 700 (2026-08-09): Plex Mono's 700 is stroke-light by
+          // design and invisible at 10.5px — the mono face was the blocker,
+          // not the weight. Sans bolds visibly at this size. Size and
+          // letter-spacing unchanged.
+          font: `700 10.5px ${FONT.sans}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
+          background: `${cfg.markerColor}1A`, border: drawerRule(cfg), borderTop: "none",
           borderRadius: "0 0 8px 8px", padding: "11px 26px 10px", whiteSpace: "nowrap",
           boxShadow: "0 4px 14px rgba(0,0,0,.35)",
         }}
         onMouseEnter={(e) => { e.currentTarget.style.background = `${cfg.markerColor}30`; e.currentTarget.style.borderColor = cfg.markerColor; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = `${cfg.markerColor}1A`; e.currentTarget.style.borderColor = `${cfg.markerColor}8C`; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = `${cfg.markerColor}1A`; e.currentTarget.style.borderColor = cfg.markerColor; }}
       >
         PROFILE
       </Link>
@@ -1007,15 +1033,13 @@ function Row({
       </div>
 
       {/* drawer (2026-08-08): EST/RS take the three-layer redesign; COM keeps
-          the old why/trace until its own pass. EST additionally takes the 5px
-          overhang treatment (2026-08-09) — see DrawerOverhang. */}
-      {open && cfg.tag === "EST" ? (
+          the old why/trace until its own pass. Both EST and RS take the 5px
+          overhang treatment (2026-08-09; extended to RS same day with the
+          cohort-tinted rails — sage/violet from cfg) — see DrawerOverhang. */}
+      {open && cfg.tag !== "COM" ? (
         <DrawerOverhang>
           <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} overhang />
         </DrawerOverhang>
-      ) : null}
-      {open && cfg.tag === "RS" ? (
-        <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} />
       ) : null}
       {open && cfg.tag === "COM" ? (
         <div style={{ display: "flex", gap: 48, padding: "6px 20px 22px 127px", background: P.drawer, borderTop: `1px solid ${P.line}` }}>

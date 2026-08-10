@@ -40,10 +40,38 @@ export function roleLabel(role: string | null): string | null {
   return ROLE_LABEL[role] ?? role.replace(/_/g, " ").toLowerCase();
 }
 
-export async function getOpenTrialsDetail(hcpId: string): Promise<OpenTrialDetail[]> {
+// Request cache (2026-08-09 — same medicine as the ledger drawer's layer
+// fetch): the detail chain is an RPC round-trip FOLLOWED by two parallel
+// reads — two sequential network legs — so the pop-up mounted showing
+// LOADING… and filled in a beat later, the same two-step the drawer had.
+// The badge PREFETCHES through this cache on hover, so a click usually opens
+// with the list already in hand, and re-opens are instant. Failed runs are
+// evicted rather than cached as [] — the pop-up's empty state is a truth
+// claim ("the trials closed since the badge was computed") and must never be
+// manufactured by a network error.
+const detailCache = new Map<string, Promise<OpenTrialDetail[]>>();
+
+export function getOpenTrialsDetail(hcpId: string): Promise<OpenTrialDetail[]> {
+  const hit = detailCache.get(hcpId);
+  if (hit) return hit;
+  if (detailCache.size > 300) detailCache.clear(); // bound a long scanning session
+  const p = fetchOpenTrialsDetail(hcpId, () => detailCache.delete(hcpId));
+  detailCache.set(hcpId, p);
+  return p;
+}
+
+/** Fire-and-forget badge-hover prefetch — same cache, same promise as the pop-up's fetch. */
+export function prefetchOpenTrialsDetail(hcpId: string): void {
+  void getOpenTrialsDetail(hcpId);
+}
+
+async function fetchOpenTrialsDetail(hcpId: string, onError: () => void): Promise<OpenTrialDetail[]> {
   const { data: flagRows, error: flagErr } = await supabase.rpc("board_open_trials", { p_hcp_ids: [hcpId] });
   if (flagErr || !flagRows?.length) {
-    if (flagErr) console.warn("getOpenTrialsDetail: board_open_trials", flagErr);
+    if (flagErr) {
+      console.warn("getOpenTrialsDetail: board_open_trials", flagErr);
+      onError();
+    }
     return [];
   }
   const trialIds: string[] = flagRows[0].trial_ids ?? [];
@@ -62,6 +90,8 @@ export async function getOpenTrialsDetail(hcpId: string): Promise<OpenTrialDetai
       .in("trial_id", trialIds),
   ]);
   if (trialsRes.error) console.warn("getOpenTrialsDetail: trials", trialsRes.error);
+  if (rolesRes.error) console.warn("getOpenTrialsDetail: roles", rolesRes.error);
+  if (trialsRes.error || rolesRes.error) onError(); // degraded result — don't cache it
   const roleByTrial = new Map(((rolesRes.data ?? []) as Array<{ trial_id: string; role: string | null }>).map((r) => [r.trial_id, r.role]));
 
   return ((trialsRes.data ?? []) as Array<Record<string, unknown>>)
