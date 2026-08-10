@@ -19,8 +19,10 @@ import {
   type InstitutionCollaboration,
 } from "../lib/api";
 import { getInstitutionResearchThemes, type InstitutionResearchTheme } from "../lib/institutionThemes";
+import InstitutionEnvironmentPanel from "./InstitutionEnvironmentPanel";
 import {
   aggregateInstitutions,
+  BAND_LABEL,
   countUnresolvedForRecord,
   fetchRecordGeo,
   fetchTaRoster,
@@ -92,6 +94,7 @@ export default function InstitutionRoute() {
   const isMobile = useMediaQuery("(max-width: 767px)");
 
   const [record, setRecord] = useState<InstitutionAgg | null>(null);
+  const [taIdState, setTaIdState] = useState<string | null>(null); // kept for the environment panel
   const [rosterRows, setRosterRows] = useState<RosterRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -122,6 +125,7 @@ export default function InstitutionRoute() {
         }
         return;
       }
+      setTaIdState(taId);
       const all = await fetchTaRoster(taId);
       if (cancelled) return;
       const aggs = aggregateInstitutions(all);
@@ -521,6 +525,19 @@ export default function InstitutionRoute() {
         ) : null}
 
         {COHORT_ORDER.map((cohort) => cohortBand(cohort))}
+
+        {/* Institutional Environment — four displayed signals (2026-08-10,
+            frame 805df654), sibling to the panel group below. None of the four
+            feeds any ordering; bands + member counts remain the only ranking. */}
+        {taIdState ? (
+          <div style={{ padding: `26px ${pad} 30px` }}>
+            <InstitutionEnvironmentPanel
+              referenceInstitutionId={record.id}
+              taId={taIdState}
+              kol={{ established: record.est, rising: record.ris, bestUsRank: record.bestUsRank, bandLabel: BAND_LABEL[record.band] }}
+            />
+          </div>
+        ) : null}
 
         {/* Themes + collaboration — below the roster per design note 03. The
             panels are string-keyed (legacy surface); they render their own
