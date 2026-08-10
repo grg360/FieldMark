@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../lib/useMediaQuery";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { buildHcpDetailPath } from "../lib/routeSlugs";
@@ -13,6 +14,7 @@ export default function MiniCollaboratorNetwork({
   hcpId,
   collaborators,
 }: MiniCollaboratorNetworkProps) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 collaborator rows stack: name keeps priority width
   const navigate = useNavigate();
 
   if (!collaborators || collaborators.length === 0) return null;
@@ -28,7 +30,8 @@ export default function MiniCollaboratorNetwork({
           onClick={() => navigate(buildHcpDetailPath(c.hcp_id))}
           style={{
             display: "flex",
-            alignItems: "center",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
             justifyContent: "space-between",
             background: "transparent",
             border: "none",
@@ -106,7 +109,9 @@ export default function MiniCollaboratorNetwork({
               // Link → indigo (§5). The shared-paper count is mono (data rule).
               color: hcpId ? "#8B93F2" : "#9B9892",
               flexShrink: 0,
-              marginLeft: 8,
+              marginLeft: isMobile ? 0 : 8,
+              marginTop: isMobile ? 3 : 0,
+              alignSelf: isMobile ? "flex-start" : undefined,
               cursor: hcpId ? "pointer" : "default",
               textDecoration: hcpId ? "underline" : "none",
               textUnderlineOffset: 2,

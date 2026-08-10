@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
@@ -132,6 +133,7 @@ export default function InsightComposer({
   onSave,
   onCancel,
 }: Props) {
+  const isMobileCapture = useMediaQuery("(max-width: 767px)"); // 2026-08-10 capture-bar reflow
   const [expanded, setExpanded] = useState(Boolean(editingNote) || forceExpanded || !isInline);
   const [body, setBody] = useState(editingNote?.body ?? "");
   const [whyItMatters, setWhyItMatters] = useState(editingNote?.why_it_matters ?? "");
@@ -334,6 +336,26 @@ export default function InsightComposer({
     // marker, a serif prompt and the SOURCE · TAG · LINK affordance — rather than a
     // boxed sans input. The wrapping row (in FieldInsights) supplies the bar chrome.
     if (variant === "ledger") {
+      // Mobile reflow (2026-08-10, Garrett's shape): the serif prompt on top,
+      // + CAPTURE with the affordance line below — the single row crammed at 393px.
+      if (isMobileCapture) {
+        return (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setExpanded(true)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setExpanded(true); }}
+            aria-label={`Add an insight about Dr. ${firstName}`}
+            style={{ display: "flex", flexDirection: "column", gap: 8, padding: "13px 16px", cursor: "text" }}
+          >
+            <span style={{ fontFamily: "'Source Serif 4',Georgia,serif", fontSize: 13.5, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
+            <span style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
+              <span style={{ font: "400 8px/1.5 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
+            </span>
+          </div>
+        );
+      }
       return (
         <div
           role="button"

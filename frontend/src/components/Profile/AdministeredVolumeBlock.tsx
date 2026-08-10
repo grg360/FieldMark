@@ -83,10 +83,59 @@ function Bar({ days, max }: { days: number; max: number }) {
 }
 
 function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYears: number[]; maxDays: number }) {
-  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint
   const recentYear = windowYears[windowYears.length - 1];
+  // MOBILE (2026-08-10): table-to-CARD. The desktop table's column headers
+  // (year, bar, coverage) don't travel when columns collapse, leaving naked
+  // number pairs — so each drug becomes a card whose every figure carries its
+  // own label: year rows ("2021 · 37 BENES · 154 DAYS"), a labeled admin-days
+  // bar, a labeled coverage line. The per-year under-floor absence keeps its
+  // year label too. Desktop table unchanged.
+  if (isMobile) {
+    return (
+      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.lineSoft}`, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+          <span style={{ ...mono(13, 500), letterSpacing: ".02em", color: C.ink }}>{row.molecule}</span>
+          {row.badge ? (
+            <span style={{ ...mono(8.5, 500), letterSpacing: ".1em", color: row.badge === "nsclc_anchored" ? C.gold : C.blue, border: `1px solid ${row.badge === "nsclc_anchored" ? C.goldSoft : "#2a2e32"}`, padding: "2px 6px" }}>
+              {BADGE_LABEL[row.badge]}
+            </span>
+          ) : null}
+        </div>
+        {row.multiProduct ? (
+          <span style={{ ...mono(9), color: C.faint, letterSpacing: ".04em" }}>one molecule, {row.codes.length} products across the window</span>
+        ) : null}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {row.cells.map((cell) => {
+            const isRecent = cell.year === recentYear;
+            return (
+              <div key={cell.year} style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+                <span style={{ ...mono(9.5, isRecent ? 600 : 400), color: isRecent ? C.ink : C.dim, fontVariantNumeric: "tabular-nums" }}>{cell.year}</span>
+                {cell.benes == null ? (
+                  <span style={{ ...serif(11.5, 400), fontStyle: "italic", color: C.faint }}>under floor — fewer than {REPORTING_FLOOR} benes</span>
+                ) : (
+                  <>
+                    <span style={{ ...mono(12, isRecent ? 600 : 400), color: isRecent ? C.ink : C.blue, fontVariantNumeric: "tabular-nums" }}>{int(cell.benes)} benes</span>
+                    <span style={{ ...mono(9.5), color: C.dim, fontVariantNumeric: "tabular-nums" }}>· {int(cell.days)} days</span>
+                    {row.multiProduct && cell.products.length ? (
+                      <span style={{ ...mono(8.5), color: C.faint, letterSpacing: ".03em" }}>{cell.products.join(" · ")}</span>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ ...mono(8.5, 500), letterSpacing: ".12em", color: C.dim, textTransform: "uppercase" }}>Admin days · most recent year</span>
+          <Bar days={row.recentDays} max={maxDays} />
+        </div>
+        <span style={{ ...mono(9.5), color: C.blue, fontVariantNumeric: "tabular-nums" }}>REPORTED {row.yearsReported} OF {windowYears.length} YEARS</span>
+      </div>
+    );
+  }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : gridCols(windowYears.length), columnGap: 16, rowGap: isMobile ? 8 : 0, alignItems: "start", padding: "14px 20px", borderBottom: `1px solid ${C.lineSoft}` }}>
+    <div style={{ display: "grid", gridTemplateColumns: gridCols(windowYears.length), columnGap: 16, alignItems: "start", padding: "14px 20px", borderBottom: `1px solid ${C.lineSoft}` }}>
       {/* agent + badge + multi-product note */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
@@ -193,6 +242,35 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
   }, [hcpId]);
 
   if (loading || !t) return null;
+
+  // ── No-NPI absence state (2026-08-10) — record-linkage absence, not a claims
+  // fact. Mechanism claim only, never a prevalence claim (Garrett's ruling):
+  // institution billing exists and doesn't reach individual records; how many
+  // physicians it affects is not asserted. ──
+  if (t.state === "no_npi") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Header subtitle="office-administered oncology agents" />
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
+          <p style={{ margin: 0, ...serif(14), color: C.ink, lineHeight: 1.5 }}>
+            Medicare Part B cannot be read for this record — no NPI is matched to it.
+          </p>
+          <p style={{ margin: 0, ...serif(13), color: C.blue, lineHeight: 1.6, textWrap: "pretty" }}>
+            Part B claims are keyed by NPI, so an unmatched NPI makes the claims record unreadable from here — a fact
+            about record linkage, not about practice. Administered therapy in academic and hospital-based settings is
+            frequently billed by the institution rather than the individual, so it may not reach a personal Medicare
+            record even when it occurs.
+          </p>
+          <p style={{ margin: 0, ...mono(9.5), color: C.dim, lineHeight: 1.6, letterSpacing: ".02em" }}>
+            Absence here means no NPI match — never that no therapy is administered. When an NPI is matched, this section fills from the same code set.
+          </p>
+        </div>
+        <div style={{ background: C.card, border: `1px solid ${C.line}` }}>
+          <ReservedAndSource />
+        </div>
+      </div>
+    );
+  }
 
   // ── No-claims absence state (~90% of the roster, including every academic HCP) ──
   if (t.state === "no_claims") {

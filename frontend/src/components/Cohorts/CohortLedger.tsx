@@ -646,15 +646,20 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
         onClick={(e) => e.stopPropagation()}
         title={`${row.name} — profile`}
         style={{
-          position: "absolute", right: mobile ? 14 : 22, top: 0, zIndex: 3,
+          // MOBILE (2026-08-10): in-flow compact chip, top-right — the absolute
+          // tab rendered OVER the section content at 393px (the desktop
+          // clearance inset is desktop-only). In flow, collision is impossible.
+          ...(mobile
+            ? { display: "block", width: "fit-content", marginLeft: "auto", margin: "10px 14px 0 auto", borderRadius: 6 }
+            : { position: "absolute" as const, right: 22, top: 0, zIndex: 3, borderRadius: "0 0 8px 8px" }),
           // Plex SANS 700 (2026-08-09): Plex Mono's 700 is stroke-light by
           // design and invisible at 10.5px — the mono face was the blocker,
           // not the weight. Sans bolds visibly at this size. Size and
           // letter-spacing unchanged.
-          font: `700 10.5px ${FONT.sans}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
-          background: `${cfg.markerColor}1A`, border: drawerRule(cfg), borderTop: "none",
-          borderRadius: "0 0 8px 8px", padding: "11px 26px 10px", whiteSpace: "nowrap",
-          boxShadow: "0 4px 14px rgba(0,0,0,.35)",
+          font: `700 ${mobile ? "9.5px" : "10.5px"} ${FONT.sans}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
+          background: `${cfg.markerColor}1A`, border: drawerRule(cfg), borderTop: mobile ? drawerRule(cfg) : "none",
+          padding: mobile ? "7px 14px" : "11px 26px 10px", whiteSpace: "nowrap",
+          boxShadow: mobile ? "none" : "0 4px 14px rgba(0,0,0,.35)",
         }}
         onMouseEnter={(e) => { e.currentTarget.style.background = `${cfg.markerColor}30`; e.currentTarget.style.borderColor = cfg.markerColor; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = `${cfg.markerColor}1A`; e.currentTarget.style.borderColor = cfg.markerColor; }}

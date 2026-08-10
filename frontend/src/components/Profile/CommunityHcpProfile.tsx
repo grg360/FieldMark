@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Community HCP profile — direction 1a "two spines", stage 1. Reached via /hcp/:id/brief
 // when the HCP has no sourced positions (dispatched in ProfileDispatch). Community HCPs
 // don't publish, so there is no belief profile: the spine is the INDUSTRY ENGAGEMENT
@@ -91,6 +92,20 @@ function ShapeBars({ amount, payments, maxAmount, maxPayments }: { amount: numbe
 }
 
 function SectionHead({ id, glyph, tag, count, sub }: { id?: string; glyph: string; tag: string; count?: string; sub?: string }) {
+  // Mobile (2026-08-10): descriptor drops below as a full-width line.
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  if (isMobile) {
+    return (
+      <div id={id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "0 0 12px", scrollMarginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.rose }}>{glyph}</span>
+          <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.ink1 }}>{tag}</span>
+          {count ? <span style={{ ...mono(10, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
+        </div>
+        {sub ? <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: P.ink6, lineHeight: 1.6 }}>{sub}</span> : null}
+      </div>
+    );
+  }
   return (
     <div id={id} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "0 0 12px", scrollMarginTop: 16, flexWrap: "wrap" }}>
       <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.rose }}>{glyph}</span>
@@ -173,6 +188,7 @@ function EvidenceLine({ ev }: { ev: NsclcEvidenceTier | null }) {
 }
 
 export default function CommunityHcpProfile() {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 community mobile pass
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const rel = useRelationships();
@@ -228,7 +244,7 @@ export default function CommunityHcpProfile() {
 
   return (
     <Shell>
-      <div style={{ padding: "20px 24px 120px", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ padding: "20px 24px 48px", display: "flex", flexDirection: "column", gap: 24 }}>
         {/* breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>
           <span style={{ width: 3, height: 12, background: P.rose }} />
@@ -362,11 +378,21 @@ export default function CommunityHcpProfile() {
           </div>
         </div>
 
-        {/* two-column body per the frame: main content left, right rail right */}
-        <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
-        {/* ─────────── MAIN (left) ─────────── */}
-        <div style={{ flex: "1 1 520px", minWidth: 0, display: "flex", flexDirection: "column", gap: 24 }}>
-
+        {/* two-column body per the frame: main content left, right rail right.
+            COMMUNITY IA REORDER (2026-08-10, Garrett-confirmed): stacked mobile
+            columns buried contact/relationship at the bottom of a profile whose
+            value is “what do I do with this person”. Mobile renders ONE column in
+            the confirmed tier order — identity/signal → CONTACT & ACCESS →
+            RELATIONSHIP → FIELD INSIGHTS (team-captured, rides with the our-stuff
+            tier) → practice/evidence (engagement record, administered therapy,
+            mix, timeline). FIELD INTELLIGENCE (peer validation) sits at the BOTTOM
+            of both breakpoints (2026-08-10 cross-profile consistency: it is the
+            bottom panel on all three profiles). Desktop keeps
+            the frame's two-column layout untouched. Community only —
+            Established/Rising order untouched. */}
+        {(() => {
+          const secWhy = (
+            <>
         {/* ◆ WHY THIS PRACTITIONER — moved above the engagement record (2026-08-07):
             orientation before evidence. The narrative, or its absence in the same
             slot under the same heading — now in a panel like everything else,
@@ -385,7 +411,10 @@ export default function CommunityHcpProfile() {
             </div>
           )}
         </div>
-
+            </>
+          );
+          const secSignal = (
+            <>
         {/* ◆ SIGNAL SUMMARY — MACHINE-DERIVED (moved up with WHY, above the record) */}
         {(n?.signal_strength || n?.why_now || n?.engagement_angle || n?.caution) ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -401,7 +430,10 @@ export default function CommunityHcpProfile() {
             </div>
           </div>
         ) : null}
-
+            </>
+          );
+          const secEngagement = (
+            <>
         {/* ◆ INDUSTRY ENGAGEMENT RECORD — PRIMARY (the spine). gap matches the
             other sections (10) — it sat at 12 and read as extra space under the
             header (2026-08-07). */}
@@ -441,7 +473,7 @@ export default function CommunityHcpProfile() {
                       <span style={{ display: "inline-block", width: 14, height: 3, background: P.ink6, borderRadius: 1, margin: "0 5px 0 12px", verticalAlign: "middle" }} />payments · scaled to the top row
                     </span>
                   </div>
-                  <div style={{ display: "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6 }}>
+                  <div style={{ display: isMobile ? "none" : "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6 }}>
                     <span style={{ width: 26 }}>#</span>
                     <span style={{ flex: "1 1 140px" }}>COMPANY</span>
                     <span style={{ width: 96 }} aria-hidden />
@@ -449,7 +481,22 @@ export default function CommunityHcpProfile() {
                     <span style={{ width: 62, textAlign: "right" }}>PAYMENTS</span>
                     <span style={{ width: 68, textAlign: "right" }}>LAST</span>
                   </div>
-                  {companies.map((c) => (
+                  {companies.map((c) => isMobile ? (
+                    /* mobile (2026-08-10): company on its own line so names stop
+                       truncating ("Ipsen B…"); the numbers stack below with their
+                       labels inlined (the column header row is hidden here). */
+                    <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "9px 16px", borderBottom: `1px solid ${P.line}` }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <span style={{ ...mono(9.5), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{c.rank ?? "—"}</span>
+                        <span style={{ ...serif(12.5), color: P.ink2 }}>{titleCase(c.name)}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ ...mono(11.5), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(c.amount)}</span>
+                        <span style={{ ...mono(9.5), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{c.payments} PAYMENTS</span>
+                        <span style={{ ...mono(9.5), color: P.ink5 }}>LAST {fmtMonth(c.most_recent)}</span>
+                      </div>
+                    </div>
+                  ) : (
                     <div key={c.name} style={{ display: "flex", alignItems: "center", padding: "8px 20px", borderBottom: `1px solid ${P.line}` }}>
                       <span style={{ width: 26, ...mono(9.5), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{c.rank ?? "—"}</span>
                       {/* one treatment (2026-08-07): company names serif Title Case, drug names mono */}
@@ -483,7 +530,7 @@ export default function CommunityHcpProfile() {
                       ))}
                     </span>
                   </div>
-                  <div style={{ display: "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6 }}>
+                  <div style={{ display: isMobile ? "none" : "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6 }}>
                     <span style={{ flex: "2 1 150px" }}>PRODUCT · REPORTING ENTITY</span>
                     <span style={{ width: 70, textAlign: "right" }}>AMOUNT</span>
                     <span style={{ width: 62, textAlign: "right" }}>PAYMENTS</span>
@@ -505,11 +552,17 @@ export default function CommunityHcpProfile() {
             </div>
           )}
         </div>
-
+            </>
+          );
+          const secTherapy = (
+            <>
         {/* ◆ MEDICARE ADMINISTERED THERAPY — infused-oncology footprint (self-contained
             header + card). Below the engagement record, above field insights. */}
         <AdministeredVolumeBlock hcpId={p.hcp.id} />
-
+            </>
+          );
+          const secInsights = (
+            <>
         {/* ◆ FIELD INSIGHTS — SECOND SPINE */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="FIELD INSIGHTS" count={`(${notes.length})`} sub="SECOND SPINE · MSL-CAPTURED · YOUR TEAM ONLY" />
@@ -523,12 +576,10 @@ export default function CommunityHcpProfile() {
             <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" hideHeader />
           </div>
         </div>
-
-        </div>{/* ─────────── /MAIN ─────────── */}
-
-        {/* ─────────── RIGHT RAIL ─────────── */}
-        <div style={{ flex: "1 1 320px", maxWidth: 380, display: "flex", flexDirection: "column", gap: 24 }}>
-
+            </>
+          );
+          const secMix = (
+            <>
         {/* ◆ ENGAGEMENT MIX — frame treatment: proportional stacked bar, color-swatched
             rows, computed synthesis line beneath. Category colors are the frame's own
             (same convention as the trajectory palette). */}
@@ -572,7 +623,10 @@ export default function CommunityHcpProfile() {
         {/* REPORTING ENTITIES rail panel removed — the redesigned engagement record's
             BY COMPANY table carries the same rows with richer treatment (rank, shape
             bars, recency); a duplicate list in the rail would just repeat it. */}
-
+            </>
+          );
+          const secTimeline = (
+            <>
         {/* ◆ ENGAGEMENT TIMELINE */}
         {p.timeline && p.timeline.some((t) => (t.total ?? 0) > 0) ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -583,20 +637,29 @@ export default function CommunityHcpProfile() {
             </div>
           </div>
         ) : null}
-
+            </>
+          );
+          const secContact = (
+            <>
         {/* ◆ CONTACT & ACCESS — parity with the other two spines (2026-08-07).
             The profile payload carries practice location + NPI for 100% of the
             cohort (CMS-derived), so the section is never empty; the web-signals
             overlay (LinkedIn / email / phone) renders where the enrichment holds
             rows (~11% of the head today) with its own honest empty state. */}
         <CommunityContactAccess hcp={p.hcp} />
-
+            </>
+          );
+          const secFieldIntel = (
+            <>
         {/* ◆ FIELD INTELLIGENCE — frame right-rail treatment: three segmented validation
             questions rendered INLINE with a Submit control (not display-only chips). The
             submission path is still unwired (field_intel_* tables are SELECT-only — see
             KNOWN_ISSUES); submit says so honestly rather than faking success. */}
         <FieldIntelligencePanel />
-
+            </>
+          );
+          const secRelationship = (
+            <>
         {/* ◆ RELATIONSHIP — frame order: status + follow-ups, field notes, then
             add-context / report-issue and the opt-out line. Track/+List moved to the
             header action row per the frame; status writes stay on RelationshipSection
@@ -616,15 +679,69 @@ export default function CommunityHcpProfile() {
             <RailControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} lastName={p.hcp.last_name} />
           </div>
         </div>
-
-        </div>{/* ─────────── /RIGHT RAIL ─────────── */}
-        </div>{/* ─────────── /two-column body ─────────── */}
+            </>
+          );
+          return isMobile ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {secWhy}
+              {secSignal}
+              {secContact}
+              {secRelationship}
+              {secInsights}
+              {secEngagement}
+              {secTherapy}
+              {secMix}
+              {secTimeline}
+              {secFieldIntel}
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+              {/* DESKTOP TIER RECONCILE (2026-08-10, Option A — reorder within
+                  columns, no column swap, no section restyled): above the fold
+                  reads orientation left (WHY/SIGNAL) beside action right
+                  (CONTACT/RELATIONSHIP); FIELD INSIGHTS rises above the
+                  evidence in the main column; all public evidence sits below
+                  the our-stuff tier in both columns; FIELD INTELLIGENCE stays
+                  the bottom panel (cross-profile rule). */}
+              <div style={{ flex: "1 1 520px", minWidth: 0, display: "flex", flexDirection: "column", gap: 24 }}>
+                {secWhy}
+                {secSignal}
+                {secInsights}
+                {secEngagement}
+                {secTherapy}
+              </div>
+              <div style={{ flex: "1 1 320px", maxWidth: 380, display: "flex", flexDirection: "column", gap: 24 }}>
+                {secContact}
+                {secRelationship}
+                {secMix}
+                {secTimeline}
+                {secFieldIntel}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </Shell>
   );
 }
 
 function ProductRow({ d }: { d: Product }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // 2026-08-10: name line 1, numbers line 2
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "9px 16px", borderBottom: `1px solid ${P.line}` }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ ...mono(11, 500), color: P.ink1, letterSpacing: ".02em" }}>{d.drug}</span>
+          <span style={{ ...serif(11), color: P.ink5 }}>{d.entity ? titleCase(d.entity) : "—"}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ ...mono(11.5), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
+          <span style={{ ...mono(9.5), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"} PAYMENTS</span>
+          <span style={{ ...mono(9.5), color: P.ink5 }}>LAST {fmtMonth(d.most_recent)}</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", alignItems: "flex-start", padding: "9px 20px", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ flex: "2 1 150px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -644,6 +761,7 @@ function ProductRow({ d }: { d: Product }) {
  *  Track + watchlist reuse the exact write paths ProfileRelationshipControls used
  *  (toggleSave / AddToWatchlistPopover), only the placement moved to the header. */
 function HeaderActions({ hcpId, npi, onBrief }: { hcpId: string; npi: string | null; onBrief: () => void }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 community mobile pass
   const { isTracked, toggleSave, refreshTracked } = useRelationships();
   const [userId, setUserId] = useState<string | null>(null);
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
@@ -673,7 +791,7 @@ function HeaderActions({ hcpId, npi, onBrief }: { hcpId: string; npi: string | n
   }
 
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10 }}>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10, justifyContent: isMobile ? "center" : "flex-start" }}>
       <button onClick={onBrief} title="Generate a pre-meeting brief" style={act}>✦ BRIEF</button>
       <button ref={addRef} onClick={() => void openWatchlist()} title="Add to a watchlist" style={act}>+ LIST</button>
       <button onClick={() => void toggleSave(hcpId, "hcp_profile")} title={tracked ? "Tracked — click to untrack" : "Track this HCP"}
@@ -870,10 +988,13 @@ function Timeline({ data }: { data: { year: number; total: number | null }[] }) 
           <div key={d.year} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
             <span style={{ ...mono(9), color: P.ink4 }}>{money(d.total)}</span>
             <div title={`${d.year}: ${money(d.total)}`} style={{ width: "100%", height: `${((d.total ?? 0) / max) * 100}%`, minHeight: (d.total ?? 0) > 0 ? 3 : 1, background: d.year === 2024 ? "rgba(176,132,143,.5)" : P.rose }} />
-            <span style={{ ...mono(9), color: P.ink6 }}>{d.year}{d.year === 2024 ? " ·partial" : ""}</span>
+            <span style={{ ...mono(9), color: P.ink6 }}>{d.year}</span>
           </div>
         ))}
       </div>
+      {data.some((d) => d.year === 2024) ? (
+        <div style={{ paddingTop: 6, ...mono(8.5), color: P.ink6, letterSpacing: ".06em" }}>2024 · PARTIAL — CMS PUBLISHES THROUGH JUNE</div>
+      ) : null}
     </div>
   );
 }

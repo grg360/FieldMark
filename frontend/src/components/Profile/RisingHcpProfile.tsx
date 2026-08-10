@@ -81,6 +81,23 @@ const serif = (size: number, color: string, lh = 1.72): CSSProperties => ({
 function SectionHead({ title, sub, right, tick = GREEN_DK }: {
   title: string; sub: string; right: string; tick?: string;
 }) {
+  // Mobile (2026-08-10): the right descriptor drops below as a full-width
+  // line instead of squeezing into a narrow right column.
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, margin: "34px 0 10px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 2, height: 11, background: tick }} />
+            <div style={{ ...mono(10, INK0, 0.14, 600), whiteSpace: "nowrap" }}>{title}</div>
+          </div>
+          <div style={mono(9, MUT2, 0.1)}>{sub}</div>
+        </div>
+        <div style={{ ...mono(8, DIM2, 0.11), lineHeight: 1.6 }}>{right}</div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 14, margin: "34px 0 10px", flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -170,8 +187,9 @@ function RecRow({ label, sub, children, right, last = false }: {
 function RecWindow({ label, bar, value, recent = false }: {
   label: string; bar: ReactNode; value: ReactNode; recent?: boolean;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // 2026-08-10: stack so the paper tally gets full width
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "132px 1fr 74px", alignItems: "center", gap: 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "132px 1fr 74px", alignItems: "center", gap: isMobile ? 8 : 16 }}>
       <div style={mono(10, recent ? MUT : MUT2, 0.09)}>{label}</div>
       <div>{bar}</div>
       <div style={{ textAlign: "right" }}>{value}</div>
@@ -422,10 +440,15 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         {/* hero */}
         <Card>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px" }}>
-            <div style={{ padding: "20px 22px 16px", borderRight: `1px solid ${RULE}`, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", columnGap: 24, rowGap: 18 }}>
+            <div style={{ padding: "20px 22px 16px", borderRight: `1px solid ${RULE}`, minWidth: 0, ...(isMobile ? { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" as const } : {}) }}>
+              {/* wrapped flex lines pack to flex-start — every wrapping row in
+                  this hero needs its own justifyContent on mobile or the stack
+                  reads left-aligned despite the centered column (2026-08-10). */}
+              <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", columnGap: 24, rowGap: 18, justifyContent: isMobile ? "center" : "flex-start" }}>
                 <div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  {/* cell interiors are their own flex rows — they pack left over
+                      the wider label beneath unless centered too (2026-08-10) */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, justifyContent: isMobile ? "center" : "flex-start" }}>
                     <div style={{ font: `600 40px/1 ${MONO}`, letterSpacing: "-.02em", color: RANK_GOLD }}>
                       #{(usRank ?? rank).toLocaleString("en-US")}
                     </div>
@@ -437,7 +460,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                     {usRank != null ? "RISING RANK · US BOARD" : "RISING RANK · GLOBAL BOARD"}
                   </div>
                 </div>
-                <div style={{ flex: "0 0 auto", borderLeft: `1px solid ${LINE.l2}`, paddingLeft: 24 }}>
+                <div style={{ flex: "0 0 auto", borderLeft: isMobile ? "none" : `1px solid ${LINE.l2}`, paddingLeft: isMobile ? 0 : 24 }}>
                   {dual ? (
                     <>
                       <div style={{ font: `500 18px/1 ${MONO}`, color: INK1, whiteSpace: "nowrap" }}>EST #{p.established_us!.rank} US</div>
@@ -455,8 +478,8 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                     </>
                   )}
                 </div>
-                <div style={{ flex: "0 1 auto", minWidth: 190, maxWidth: 230 }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+                <div style={{ flex: "0 1 auto", minWidth: "min(190px, 100%)", maxWidth: 230 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 7, justifyContent: isMobile ? "center" : "flex-start" }}>
                     <div style={{ font: `500 22px/1 ${MONO}`, color: INK1 }}>{fmtPctl(composite)}</div>
                     {composite != null && <div style={mono(9, MUT2, 0.1)}>PCTL</div>}
                   </div>
@@ -473,7 +496,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                   active within 24 months); the DISPLAY is career-anchored so it
                   does not shift as the windows roll. */}
               {flags?.senior_transition || flags?.on_open_trial ? (
-                <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start" }}>
                   {flags?.senior_transition ? (
                     <span title="Senior-authored years within the FieldMark corpus — we see only what is ingested." style={{ padding: "3px 8px", border: `1px solid ${GREEN_DK}`, font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>
                       SENIOR AUTHORSHIP SINCE {flags.first_senior_year ?? "—"} · {flags.recent_senior_pubs ?? "—"} PAPERS · LATEST {flags.latest_senior_year ?? "—"}
@@ -493,7 +516,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                   ) : null}
                 </div>
               ) : null}
-              <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+              <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start" }}>
                 <span style={serif(12, "#7fb3a4", 1.4)}>{p.hcp.institution_normalized ?? "INSTITUTION NOT ON RECORD"}</span>
                 <span style={{ color: DIM2, fontSize: 10 }}>·</span>
                 <span style={mono(10, MUT, 0.08)}>{geo}</span>
@@ -506,19 +529,19 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 · {p.hcp.npi_number ? "VERIFIED NPI REGISTRY" : "NPI NOT ON RECORD"}
               </div>
 
-              <div style={{ marginTop: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ marginTop: 18, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start" }}>
                 <Link to={`/hcp/${hcpId}/brief`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${GOLD_DEEP}`, color: RANK_GOLD, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>+ GENERATE BRIEF</Link>
                 <Link to={`/hcp/${hcpId}/publications`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${LINE.l2}`, color: INK2, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>ALL PUBLICATIONS ↗</Link>
                 <Link to={`/hcp/${hcpId}/positions`} style={{ textDecoration: "none", padding: "7px 11px", border: `1px solid ${LINE.l2}`, color: INK2, font: `500 9px/1 ${MONO}`, letterSpacing: ".12em" }}>ALL POSITIONS ↗</Link>
               </div>
             </div>
 
-            <div style={{ padding: "20px 20px 16px", display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "20px 20px 16px", display: "flex", flexDirection: "column", ...(isMobile ? { alignItems: "center", textAlign: "center" as const } : {}) }}>
               {label("QUADRANT POSITION")}
               {/* Mini-quadrant glyph: the ledger's quadrant restated at profile
                   scale — four cells at the ledger's tints, one dot at this
                   profile's true coordinates. No new colors, no new vocabulary. */}
-              <div style={{ marginTop: 9, display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ marginTop: 9, display: "flex", gap: 12, alignItems: isMobile ? "center" : "flex-start", justifyContent: isMobile ? "center" : "flex-start" }}>
                 {(() => {
                   const mom = p.rising.momentum_component ?? 40;
                   const vis = p.rising.visibility_component ?? 40;
@@ -536,17 +559,29 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                     </div>
                   );
                 })()}
-                <div>
+                {/* Mobile centers glyph+name as a true pair, with MOM/VIS moved
+                    to its own centered line below — centering the desktop block
+                    instead makes the wider MOM/VIS line push the visible
+                    glyph+name strip off-axis (2026-08-10). */}
+                <div style={{ textAlign: "left" as const }}>
                   <div style={{ font: `500 15px/1.25 ${MONO}`, letterSpacing: ".02em", color: quad.color }}>
                     {quad.name}
                   </div>
-                  <div style={{ marginTop: 8, display: "flex", gap: 18 }}>
-                    <div style={mono(9, INK1, 0.08)}>MOM {fmtPctl(p.rising.momentum_component)}</div>
-                    <div style={mono(9, INK1, 0.08)}>VIS {fmtPctl(p.rising.visibility_component)}</div>
-                  </div>
+                  {!isMobile && (
+                    <div style={{ marginTop: 8, display: "flex", gap: 18 }}>
+                      <div style={mono(9, INK1, 0.08)}>MOM {fmtPctl(p.rising.momentum_component)}</div>
+                      <div style={mono(9, INK1, 0.08)}>VIS {fmtPctl(p.rising.visibility_component)}</div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div style={{ marginTop: 10, height: 1, background: LINE.l0 }} />
+              {isMobile && (
+                <div style={{ marginTop: 8, display: "flex", gap: 18, justifyContent: "center" }}>
+                  <div style={mono(9, INK1, 0.08)}>MOM {fmtPctl(p.rising.momentum_component)}</div>
+                  <div style={mono(9, INK1, 0.08)}>VIS {fmtPctl(p.rising.visibility_component)}</div>
+                </div>
+              )}
+              <div style={{ marginTop: 10, height: 1, background: LINE.l0, alignSelf: "stretch" }} />
               <div style={{ marginTop: 10, ...serif(11.5, SERIF_INK, 1.6) }}>
                 {quadrantProse(fmtPctl(p.rising.scientific_momentum_percentile), fmtPctl(p.rising.network_momentum_percentile))}
               </div>
@@ -554,7 +589,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               <div style={mono(8, DIM2, 0.11)}>{bandNote}</div>
             </div>
           </div>
-          <div style={{ borderTop: `1px solid ${RULE}`, padding: "10px 22px", display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ borderTop: `1px solid ${RULE}`, padding: "10px 22px", display: "flex", gap: 14, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start" }}>
             {metaLine.map((t) => (
               <div key={t} style={mono(8, COOL.floor, 0.12)}>{t}</div>
             ))}
@@ -569,7 +604,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         <SectionHead title="MOMENTUM & VISIBILITY" sub="FOUR COMPONENTS · TWO ENGINES"
           right="PERCENTILES WITHIN THE RISING COHORT · NEVER AGAINST ESTABLISHED" />
         <Card>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "104px 1fr 1fr" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "104px 1fr 1fr", textAlign: isMobile ? ("center" as const) : undefined }}>
             <div style={{ padding: "12px 14px", borderBottom: `1px solid ${RULE}` }} />
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${RULE}`, borderLeft: `1px solid ${RULE}`, ...mono(9, MUT, 0.14, 600) }}>SCIENTIFIC</div>
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${RULE}`, borderLeft: `1px solid ${RULE}`, ...mono(9, MUT, 0.14, 600) }}>NETWORK</div>
@@ -870,7 +905,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
              window, rank-inside, basis split — mirrors the SIGNAL SUMMARY stamp so the
              two generated sections compose identically. Every figure is already loaded. */
           <Card style={{ padding: "20px 22px", display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
-            <div style={{ flex: 1, minWidth: 300 }}>
+            <div style={{ flex: 1, minWidth: "min(300px, 100%)" }}>
               <div style={mono(13, SERIF_INK, 0.14, 500)}>{p.positions!.total} EXTRACTED POSITIONS — INSIDE THE EXTRACTION WINDOW</div>
               <div style={{ marginTop: 14, ...serif(13, SERIF_INK) }}>
                 Positions are extracted for the top 100 US rising stars. At US rank {usRank} this profile is inside that
@@ -879,7 +914,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               </div>
               <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", borderTop: `1px solid ${RULE}` }}>
                 {[["EXTRACTED", p.positions!.total], ["FIRST-AUTHORED BASIS", p.positions!.first_basis], ["SENIOR-AUTHORED BASIS", p.positions!.senior_basis]].map(([lbl, v], i) => (
-                  <div key={String(lbl)} style={{ padding: i === 0 ? "14px 22px 0 0" : i === 1 ? "14px 22px 0" : "14px 0 0 22px", borderLeft: i > 0 ? `1px solid ${RULE}` : "none" }}>
+                  <div key={String(lbl)} style={{ padding: isMobile ? "14px 0 0" : i === 0 ? "14px 22px 0 0" : i === 1 ? "14px 22px 0" : "14px 0 0 22px", borderLeft: !isMobile && i > 0 ? `1px solid ${RULE}` : "none", textAlign: isMobile ? ("center" as const) : undefined }}>
                     <div style={mono(8, DIM, 0.14)}>{lbl}</div>
                     <div style={{ marginTop: 9, font: `500 22px/1 ${MONO}`, color: INK0 }}>{v}</div>
                   </div>
@@ -891,7 +926,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 <Link to={`/hcp/${hcpId}/positions`} style={{ textDecoration: "none", padding: "6px 11px", border: `1px solid ${LINE.l2}`, font: `500 8px/1.3 ${MONO}`, letterSpacing: ".11em", color: MUT }}>ALL POSITIONS ↗</Link>
               </div>
             </div>
-            <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ width: 216, maxWidth: "100%", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
               <span style={mono(9, INK2, 0.16, 600)}>EXTRACTION STAMP</span>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span style={mono(9, FAINT, 0.1)}>WINDOW · TOP 100 US RISING</span>

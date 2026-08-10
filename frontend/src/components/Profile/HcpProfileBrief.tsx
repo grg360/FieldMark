@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // HCP Profile redesign — direction 1a "Brief", stage 1. Route: /hcp/:id/brief (alongside
 // the existing DetailScreen, not replacing it). Source of form: Design "HCP Profile Build
 // Reference" 1a. Source of fact: live data only (hcpProfile.ts / hcp_profile_brief RPC).
@@ -35,6 +36,7 @@ import {
   type ProfileSource,
 } from "../../lib/hcpProfile";
 import FederalFundingSection from "./FederalFundingSection";
+import { FiToast } from "../FieldIntelligenceShared";
 
 // Ledger palette, verbatim (self-contained visual system per the Build Reference).
 // Register tokens substituted 2026-08-05 for exact value matches only (card,
@@ -68,6 +70,21 @@ const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as co
 const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.serif}` } as const);
 
 function SectionHead({ id, tag, count, sub }: { id: string; tag: string; count?: string; sub?: string }) {
+  // Mobile (2026-08-10): the descriptor drops BELOW the label as a full-width
+  // line — as a right column at 390px it squeezed into a 3-4 row sliver.
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  if (isMobile) {
+    return (
+      <div id={id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "0 0 12px", scrollMarginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ width: 3, height: 13, background: P.sage, flexShrink: 0 }} />
+          <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.ink1 }}>{tag}</span>
+          {count ? <span style={{ ...mono(10, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
+        </div>
+        {sub ? <span style={{ ...mono(9, 500), letterSpacing: ".12em", color: P.ink6, lineHeight: 1.6 }}>{sub}</span> : null}
+      </div>
+    );
+  }
   return (
     <div id={id} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "0 0 12px", scrollMarginTop: 16 }}>
       <span style={{ width: 3, height: 13, background: P.sage }} />
@@ -121,16 +138,30 @@ function EvidenceRail({ sources, count }: { sources: ProfileSource[] | null; cou
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {sources.slice(0, 4).map((s, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span style={{ ...mono(9.5, 500), letterSpacing: ".06em", color: P.ink3 }}>{journalShort(s.journal)} {s.pub_year ?? ""}</span>
-          {s.author_role ? <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink5 }}>{roleLabel(s.author_role)}</span> : null}
-          {s.citation_count != null ? <span style={{ ...mono(8.5), color: P.ink6 }}>{s.citation_count} CIT</span> : null}
-          {s.doi ? (
-            <a href={`https://doi.org/${s.doi}`} target="_blank" rel="noreferrer" style={{ ...mono(8.5, 500), letterSpacing: ".06em", color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>OPEN ↗</a>
-          ) : null}
-        </div>
-      ))}
+      {/* The ROW is the link (2026-08-10): the old trailing "OPEN ↗" was the
+          only affordance and floated to a different x per row (ragged arrows).
+          The journal·year carries the teal underline as the visible affordance;
+          rows without a DOI render inert, exactly as before. RULED (Garrett,
+          same day): the full-row click target STAYS — a generous tap target,
+          especially on mobile; the desktop pointer-over-empty-space is a
+          trivial cosmetic cost and nothing else in the row competes for the
+          click. Do not confine the link to the title text. */}
+      {sources.slice(0, 4).map((s, i) => {
+        const inner = (
+          <>
+            <span style={{ ...mono(9.5, 500), letterSpacing: ".06em", color: s.doi ? P.teal : P.ink3, borderBottom: s.doi ? `1px solid rgba(127,179,187,.3)` : "none" }}>{journalShort(s.journal)} {s.pub_year ?? ""}</span>
+            {s.author_role ? <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink5 }}>{roleLabel(s.author_role)}</span> : null}
+            {s.citation_count != null ? <span style={{ ...mono(8.5), color: P.ink6 }}>{s.citation_count} CIT</span> : null}
+          </>
+        );
+        return s.doi ? (
+          <a key={i} href={`https://doi.org/${s.doi}`} target="_blank" rel="noreferrer" title="Open the source (DOI)" style={{ display: "flex", alignItems: "baseline", gap: 8, textDecoration: "none" }}>
+            {inner}
+          </a>
+        ) : (
+          <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>{inner}</div>
+        );
+      })}
       {sources.length > 4 ? <span style={{ ...mono(8.5), color: P.ink6 }}>+ {sources.length - 4} MORE</span> : null}
     </div>
   );
@@ -182,6 +213,7 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
 }
 
 export default function HcpProfileBrief() {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 profile mobile pass
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -246,7 +278,7 @@ export default function HcpProfileBrief() {
 
   return (
     <Shell>
-      <div style={{ padding: "20px 24px 120px", display: "flex", flexDirection: "column", gap: 26 }}>
+      <div style={{ padding: "20px 24px 48px", display: "flex", flexDirection: "column", gap: 26 }}>
         {/* breadcrumb + section spine */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>
@@ -269,8 +301,8 @@ export default function HcpProfileBrief() {
         {/* header + score band (ledger treatment) */}
         <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, position: "relative" }}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: P.sage }} />
-          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 4, borderBottom: `1px solid ${P.line}` }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 4, borderBottom: `1px solid ${P.line}`, ...(isMobile ? { alignItems: "center", textAlign: "center" as const } : {}) }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start" }}>
               <span style={{ ...mono(34, 500), color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s?.index != null ? floorFixed(s.index, 1) : "—"}</span>
               <span style={{ ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>INDEX · RANK {s?.rank ?? "—"} US · #{s?.global_rank ?? "—"} GLOBAL</span>
             </div>
@@ -290,7 +322,7 @@ export default function HcpProfileBrief() {
               ) : null}{p.hcp.specialty ? ` · ${p.hcp.specialty.toUpperCase()}` : ""} · VERIFIED NPI REGISTRY
             </span>
             {/* nav parity — Generate Brief + full-page publications / positions */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 8 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 8, justifyContent: isMobile ? "center" : "flex-start" }}>
               <button onClick={() => navigate(`/hcp/${p.hcp.id}/brief`)} title="Generate a pre-meeting brief"
                 style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", background: "none", border: `1px solid rgba(224,167,94,.5)`, cursor: "pointer", ...mono(10, 600), letterSpacing: ".08em", color: P.amber, borderRadius: 2 }}>✦ GENERATE BRIEF</button>
               <button onClick={() => navigate(`/hcp/${p.hcp.id}/publications`, { state: { taId: undefined } })} title="All publications"
@@ -299,7 +331,7 @@ export default function HcpProfileBrief() {
                 style={{ padding: "7px 13px", background: "none", border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(10, 500), letterSpacing: ".08em", color: P.ink3, borderRadius: 2 }}>ALL POSITIONS ↗</button>
             </div>
           </div>
-          <div style={{ padding: "16px 24px", display: "flex", gap: 36, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <div style={{ padding: "16px 24px", display: "flex", gap: isMobile ? "16px 28px" : 36, flexWrap: "wrap", alignItems: "flex-start", justifyContent: isMobile ? "center" : "flex-start", textAlign: isMobile ? ("center" as const) : undefined }}>
             <ScoreCell label="INDEX" sub="IN COHORT" value={s?.index ?? null} decimals={1} basis={s?.vs_cohort_mean != null ? `${s.vs_cohort_mean > 0 ? "+" : ""}${s.vs_cohort_mean} VS COHORT MEAN` : ""} />
             <ScoreCell label="SCI" sub="CEILING" value={s?.sci ?? null} decimals={1} basis={s?.basis_senior != null ? `${s.basis_senior} SENIOR PUBS` : ""} />
             <ScoreCell label="NET" sub="CEILING" value={s?.net ?? null} decimals={1} basis={s?.basis_papers != null ? `${s.basis_papers} PAPERS` : ""} />
@@ -309,7 +341,7 @@ export default function HcpProfileBrief() {
               field insights — the record's real footprint. The old line counted
               "SOURCES" as raw position-statements (mislabeled); publications is the
               honest depth figure. THIN when the distinct-publication basis is small. */}
-          <div style={{ padding: "0 24px 14px", ...mono(9, 500), letterSpacing: ".08em", color: P.ink6 }}>
+          <div style={{ padding: "0 24px 14px", ...mono(9, 500), letterSpacing: ".08em", color: P.ink6, textAlign: isMobile ? ("center" as const) : undefined }}>
             {p.record.publications_total ?? "—"} PUBLICATION{p.record.publications_total === 1 ? "" : "S"}{p.record_depth.papers < 12 ? " · THIN SOURCED RECORD" : ""} · {nPos} POSITION{nPos === 1 ? "" : "S"} · {themes.length} THEME{themes.length === 1 ? "" : "S"} · {notes.length} FIELD INSIGHT{notes.length === 1 ? "" : "S"}{p.record_depth.oldest ? ` · OLDEST SOURCE ${p.record_depth.oldest}` : ""}
           </div>
         </div>
@@ -461,7 +493,7 @@ export default function HcpProfileBrief() {
                 category mix as the right-field counterweight — the shape the prose
                 can't show at a glance. Only rendered when positions exist. */}
             <div style={{ display: "flex", gap: 30, flexWrap: "wrap", alignItems: "flex-start" }}>
-              <div style={{ flex: 1, minWidth: 300 }}>
+              <div style={{ flex: 1, minWidth: "min(300px, 100%)" }}>
                 {hasSynthPara ? (
                   <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6 }}>{p.belief.headline}</div>
                 ) : nPos > 0 ? (
@@ -472,7 +504,7 @@ export default function HcpProfileBrief() {
                 ) : null}
               </div>
               {catMix.length ? (
-                <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 7 }}>
+                <div style={{ width: 216, maxWidth: "100%", flexShrink: 0, display: "flex", flexDirection: "column", gap: 7 }}>
                   <span style={{ ...mono(9, 600), letterSpacing: ".16em", color: P.ink5 }}>BY CATEGORY</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {catMix.map(([cat, n]) => (
@@ -511,7 +543,8 @@ export default function HcpProfileBrief() {
                     {r.excerpt ? <span style={{ ...serif(12.5), color: P.ink4, lineHeight: 1.5, textWrap: "pretty" }}>{r.excerpt}</span> : null}
                     <div style={{ display: "flex", alignItems: "baseline", gap: 12, ...mono(9), letterSpacing: ".06em", color: P.ink5 }}>
                       <span>{roleLabel(r.role)}</span><span>{r.year}</span>
-                      {r.source?.doi ? <a href={`https://doi.org/${r.source.doi}`} target="_blank" rel="noreferrer" style={{ color: P.teal, textDecoration: "none" }}>{journalShort(r.source.journal)} {r.source.year} OPEN ↗</a> : null}
+                      {/* journal·year IS the link — the "OPEN ↗" suffix dropped 2026-08-10 (row-alignment pass) */}
+                      {r.source?.doi ? <a href={`https://doi.org/${r.source.doi}`} target="_blank" rel="noreferrer" title="Open the source (DOI)" style={{ color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>{journalShort(r.source.journal)} {r.source.year}</a> : null}
                     </div>
                   </div>
                 ))}
@@ -549,6 +582,9 @@ export default function HcpProfileBrief() {
           </div>
         ) : null}
 
+        {/* FIELD INTELLIGENCE — bottom panel, cross-profile consistency (2026-08-10) */}
+        <FieldIntelligencePanel />
+
       </div>
     </Shell>
   );
@@ -559,6 +595,67 @@ export default function HcpProfileBrief() {
 // (field_intel_* tables are SELECT-only). It was a literal, not data. FIELD
 // INSIGHTS — the MSL-captured notes with linked belief positions — is a different
 // block and stays.
+
+// FIELD INTELLIGENCE — restored 2026-08-10 as the NEW three-question inline
+// panel (the Rising/Community treatment), NOT the four-dimension grid removed
+// 2026-08-03. The removal's reason — fake "0%" literals and a submit that
+// silently pretended to work — is addressed the way the other two profiles
+// address it: "Validation pending — 0 MSLs" is a true statement while the
+// field_intel_* tables are SELECT-only, and submit SAYS the path is unwired
+// rather than faking success. Bottom panel on all three profiles.
+const FI_QUESTIONS = [
+  { key: "confidence", label: "Engagement record matches field reality", options: ["Confirms", "Partial", "Disputes"] },
+  { key: "access", label: "Access in practice", options: ["Open", "Gated", "Closed"] },
+  { key: "referral", label: "Referral influence in region", options: ["High", "Moderate", "Low"] },
+] as const;
+
+function FieldIntelligencePanel() {
+  const [answers, setAnswers] = useState<Record<string, string | null>>({ confidence: null, access: null, referral: null });
+  const [toast, setToast] = useState<string | null>(null);
+  const complete = FI_QUESTIONS.every((q) => answers[q.key]);
+  const showToast = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 3200); };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <SectionHead id="field-intel" tag="FIELD INTELLIGENCE" sub="PEER VALIDATION · THREE QUESTIONS" />
+      <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <span style={{ ...mono(10), color: P.ink5 }}>Validation pending — 0 MSLs have reviewed this profile.</span>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+            <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.amber }}>COMMUNITY CONFIDENCE</span>
+            <span style={{ ...mono(9), color: P.ink6 }}>0 MSLs</span>
+          </div>
+          <div style={{ height: 3, background: P.line }} />
+        </div>
+        {FI_QUESTIONS.map((q) => (
+          <div key={q.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ ...mono(10), color: P.ink4 }}>{q.label}</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              {q.options.map((opt) => {
+                const on = answers[q.key] === opt;
+                return (
+                  <button key={opt} onClick={() => setAnswers((a) => ({ ...a, [q.key]: a[q.key] === opt ? null : opt }))}
+                    style={{ flex: 1, textAlign: "center", padding: "7px 0", background: on ? "rgba(255,255,255,.07)" : "none", cursor: "pointer",
+                      border: `1px solid ${on ? "rgba(255,255,255,.28)" : P.lineStrong}`, borderRadius: 3, ...mono(10, on ? 600 : 400), color: on ? P.ink0 : P.ink2, minHeight: 0 }}>
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <button disabled={!complete}
+          onClick={() => { if (!complete) return; showToast("Field review recorded — the submission path (field-intel write) is not yet wired; stored locally only."); }}
+          style={{ textAlign: "center", padding: "10px 0", background: "none", border: `1px solid ${P.lineStrong}`, borderRadius: 3,
+            ...mono(10.5, 500), color: complete ? P.ink2 : P.ink6, cursor: complete ? "pointer" : "not-allowed", opacity: complete ? 1 : 0.6, minHeight: 0 }}>
+          Submit validation
+        </button>
+        <span style={{ textAlign: "center", ...mono(8.5), color: P.ink6, marginTop: -6 }}>Your identity is never shared. Contributor UUID only.</span>
+      </div>
+      <FiToast message={toast} />
+    </div>
+  );
+}
 
 // Centrality is the theme's strength grade (core / supporting / peripheral) — rendered
 // as a graded chip, ledger register. Involvement language only.

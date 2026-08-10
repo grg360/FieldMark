@@ -484,7 +484,10 @@ export default function HomePage() {
               </aside>
             ) : null}
 
-            {/* THE RECORD — mobile compact list (Exc.9: FU/Inst/Insights link; others inert) */}
+            {/* THE RECORD — mobile compact list (Exc.9: FU/Inst link; others inert).
+                Insights left this list 2026-08-10: the count-row compression hid
+                the section's actual content on mobile — it now renders in full
+                below, same treatment as desktop (verbatim bodies, never clamped). */}
             {!isDesktop ? (
               <section>
                 <div style={{ ...mono(10, 400, INK2, ".16em"), paddingBottom: 10 }}>THE RECORD</div>
@@ -492,9 +495,36 @@ export default function HomePage() {
                   <RecordRow label="Follow-ups" right={<span><span style={{ color: RED }}>{stats.overdue}</span> OVERDUE ↗</span>} onClick={go.followUps} />
                   <RecordRow label="Portfolio" right={`${trackedCount} PINNED ↗`} onClick={go.watchlists} />
                   <RecordRow label="Institutions" right={`${institutions.length ? institutions.length : ""} ↗`} onClick={go.institutions} />
-                  <RecordRow label="Insights" right={<span>{insights.length} LOGGED ↗</span>} onClick={go.insights} />
                   <RecordRow label="Briefs" right={briefs.length ? `${briefs.length} RECENT` : "NONE"} />
                   <RecordRow label="Relationship activity" right={activity.length ? "RECENT" : "NONE"} last />
+                </div>
+              </section>
+            ) : null}
+
+            {/* RECENT INSIGHTS — mobile, full treatment (parity with desktop) */}
+            {!isDesktop ? (
+              <section>
+                {/* same header-to-content gap as THE RECORD's mobile header (paddingBottom 10) */}
+                <div style={{ paddingBottom: 10 }}>
+                  <RowCap left="RECENT INSIGHTS" right={`${insights.length} LOGGED`} />
+                </div>
+                <div style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+                  {insights.slice(0, 3).map((n, i) => (
+                    <div key={n.id}>
+                      {i > 0 ? <div style={{ height: 1, background: HAIR, margin: "0 20px" }} /> : null}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 20px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+                          {n.interaction_type ? <span style={{ ...mono(9, 400, MID, ".14em"), border: `1px solid ${DIM2}`, padding: "4px 6px" }}>{n.interaction_type.replace(/_/g, " ").toUpperCase()}</span> : null}
+                          <span style={serif(16, 400, INK2)}>{`${n.hcp_first_name ?? ""} ${n.hcp_last_name ?? ""}`.trim()}</span>
+                          <span style={mono(10, 400, DIM)}>{fmtDue(n.occurred_at)}</span>
+                        </div>
+                        {/* body VERBATIM from msl_hcp_notes (test rows render as stored) */}
+                        <div style={serif(14, 300, MID, 1.5)}>{n.body}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ height: 1, background: HAIR, margin: "0 20px" }} />
+                  <div style={{ padding: "13px 20px" }}><span className="fmhome-link" onClick={go.insights} style={mono(10, 400, GOLD_LINK)}>ALL INSIGHTS ↗</span></div>
                 </div>
               </section>
             ) : null}

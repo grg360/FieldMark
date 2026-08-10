@@ -42,7 +42,11 @@ export interface AgentRow {
 }
 
 export interface AdministeredTherapy {
-  state: "reported" | "no_claims";
+  // no_npi (2026-08-10): the record has no matched NPI, so Part B cannot be
+  // read AT ALL — a different absence from no_claims (NPI present, nothing
+  // reportable). Conflating them made the no_claims copy assert facts about
+  // "this NPI" for HCPs who have none.
+  state: "reported" | "no_claims" | "no_npi";
   windowYears: number[]; // filled min..max, e.g. [2021, 2022, 2023]
   productCount: number; // distinct HCPCS codes reported
   agentRowCount: number; // distinct molecules
@@ -104,6 +108,12 @@ export async function loadAdministeredTherapy(hcpId: string): Promise<Administer
   const empty: AdministeredTherapy = {
     state: "no_claims", windowYears: [], productCount: 0, agentRowCount: 0, cellCount: 0, maxRecentDays: 0, rows: [],
   };
+  // NPI presence decides which absence is true (hcps_v2 is public-read).
+  const npiRes = await supabase.from("hcps_v2").select("npi_number").eq("id", hcpId).maybeSingle();
+  const npiKnown = !npiRes.error && !!(npiRes.data as { npi_number?: string | null } | null)?.npi_number;
+  if (!npiRes.error && !npiKnown) {
+    return { ...empty, state: "no_npi" };
+  }
   const { data, error } = await supabase.rpc("hcp_administered_therapy", { p_hcp_id: hcpId });
   if (error) {
     console.warn("hcp_administered_therapy failed:", error.message);

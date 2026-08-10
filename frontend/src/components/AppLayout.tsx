@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
+import FloatingBackToTop from "./FloatingBackToTop";
 import { COLOR, FONT, SPACE, CONTENT_WIDTH, COOL, LINE, type ContentWidth } from "../lib/designTokens";
 
 export interface BreadcrumbItem {
@@ -131,6 +132,8 @@ export default function AppLayout({
         ) : null}
 
         {children}
+        {/* mobile back-to-top — one mount covers every AppLayout surface */}
+        <FloatingBackToTop />
 
           <GlobalFooter />
         </div>
