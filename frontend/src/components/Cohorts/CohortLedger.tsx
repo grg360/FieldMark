@@ -1453,8 +1453,11 @@ export default function CohortLedger() {
     <AppLayout width="wide">
       <div style={{ width: "100%", boxSizing: "border-box" }}>
         {/* search — parity with the feed header (the strip carries no search). NSCLC TA id
-            because the ledger RPCs are NSCLC-locked. */}
-        {nsclcTaId ? (
+            because the ledger RPCs are NSCLC-locked. DESKTOP ONLY (2026-08-10):
+            on mobile the nav magnifier's overlay is THE one search — this same
+            SearchBar component in its overlay variant, hidden until revealed.
+            Rendering the inline bar too put two searches on screen at once. */}
+        {nsclcTaId && !isMobile ? (
           <div style={{ padding: "8px 16px 0" }}>
             <SearchBar variant="inline" currentTaId={nsclcTaId} onSelect={(hcpId) => navigate(`/hcp/${hcpId}`)} />
           </div>

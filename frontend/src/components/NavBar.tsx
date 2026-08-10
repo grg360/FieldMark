@@ -267,6 +267,7 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
                 fontSize: 12,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
+                textAlign: "center", // 2026-08-10: labels centered within their blocks
                 color: on ? COLOR.ink1 : COLOR.ink3,
                 fontWeight: on ? 500 : 400,
                 textDecoration: "none",
@@ -347,109 +348,155 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
 }
 
 // ── Mobile ───────────────────────────────────────────────────────────────────
+// MobileBar (2026-08-10 rebuild): the 4-over-3-over-3 cell grid consumed
+// ~198px of stacked nav blocks above the content on EVERY surface and its
+// cells clipped at true device widths — replaced with a compact 44px bar +
+// hamburger DRAWER. All ten destinations live in the drawer (mono, charcoal,
+// hairline seams, gold inset for the active route); the drawer closes on
+// select, Esc, and click-away. HOME stays a listed destination — the
+// wordmark's tappability is not discoverable (2026-08-05 note carried over).
 function MobileBar({ active, menu, search, translucent }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean }) {
+  const [open, setOpen] = useState(false);
+  // Search state lives on the bar (2026-08-10): the revealed field renders IN
+  // FLOW below the strip and pushes content down — the same "dropping reads
+  // better than floating" ruling the desktop reveal band carries. Opening one
+  // of menu/search closes the other.
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open && !searchOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, searchOpen]);
+
+  const activeLabel = NAV_ITEMS.find((i) => i.key === active)?.label ?? null;
+
   return (
-    <nav aria-label="Primary">
-      {/* 36px utility strip */}
+    <nav aria-label="Primary" style={{ position: "relative" }}>
+      {/* 44px utility bar — the whole permanent nav footprint on mobile */}
       <div
         style={{
-          height: 36,
+          height: 44,
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          gap: 10,
           padding: "0 12px",
           borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : COLOR.hairStrong}`,
           background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground,
           ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
         }}
       >
+        <button
+          type="button"
+          onClick={() => { setOpen((o) => !o); setSearchOpen(false); }}
+          aria-label={open ? "Close menu" : "Open menu"}
+          aria-expanded={open}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 8, margin: -8, marginRight: -2, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}
+        >
+          {[0, 1, 2].map((i) => (
+            <span key={i} style={{ display: "block", width: 16, height: 1.5, background: open ? COLOR.amber : COLOR.ink2 }} />
+          ))}
+        </button>
         <Link to="/me" style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", color: COLOR.amber, textDecoration: "none" }}>
           FIELDMARK
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {search ? <MobileSearchButton search={search} /> : null}
+        {/* current surface, so the bar orients without the grid */}
+        {activeLabel ? (
+          <span style={{ fontFamily: FONT.mono, fontSize: 9.5, letterSpacing: "0.12em", color: COLOR.ink3, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+            / {activeLabel}
+          </span>
+        ) : null}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+          {search ? (
+            <button
+              type="button"
+              onClick={() => { setSearchOpen((o) => !o); setOpen(false); }}
+              aria-label={searchOpen ? "Close search" : "Search"}
+              aria-expanded={searchOpen}
+              className="fm-pill-button"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", minHeight: 0 }}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                <circle cx="7.5" cy="7.5" r="5.5" stroke={searchOpen ? COLOR.amber : COLOR.ink3} strokeWidth="1.5" />
+                <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={searchOpen ? COLOR.amber : COLOR.ink3} strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : null}
           <AvatarMenu menu={menu} mobile />
         </div>
       </div>
-      {/* 4-over-3-over-3 cell grid (2026-08-05) — ten items with HOME leading.
-          Uneven on purpose: the wordmark's tappability is not discoverable, and
-          HOME exists because people cannot find their way back — an invisible
-          route would repeat the problem. minHeight 53 absorbs two-line labels. */}
-      {[NAV_ITEMS.slice(0, 4), NAV_ITEMS.slice(4, 7), NAV_ITEMS.slice(7, 10)].map((row, ri) => (
-        <div key={ri} style={{ display: "flex", gap: 1, background: SEAM, borderBottom: `1px solid ${SEAM}` }}>
-          {row.map((item) => {
-            const on = item.key === active;
-            return (
-              <Link
-                key={item.key}
-                to={item.to}
-                aria-current={on ? "page" : undefined}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  minHeight: 53,
-                  padding: "0 11px",
-                  background: on ? COLOR.surfaceRaised : COLOR.ground,
-                  boxShadow: on ? `inset 0 2px 0 ${COLOR.amber}` : "none",
-                  textDecoration: "none",
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: FONT.mono,
-                    fontSize: 11.5,
-                    lineHeight: 1.2,
-                    letterSpacing: "0.07em",
-                    textTransform: "uppercase",
-                    color: on ? COLOR.ink1 : COLOR.ink3,
-                    fontWeight: on ? 500 : 400,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      ))}
-    </nav>
-  );
-}
 
-// Mobile search — a magnifier in the utility strip (not a seventh cell) that opens
-// the overlay search panel, the old TopBar mobile affordance. Rendered only when a
-// TA exists.
-function MobileSearchButton({ search }: { search: NavSearch }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Search"
-        className="fm-pill-button"
-        style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", minHeight: 0 }}
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-          <circle cx="7.5" cy="7.5" r="5.5" stroke={COLOR.ink3} strokeWidth="1.5" />
-          <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={COLOR.ink3} strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      </button>
-      {open ? (
+      {/* revealed search — NORMAL FLOW below the strip, pushing content down
+          (not an overlay; parity with the desktop reveal band's ruling) */}
+      {searchOpen && search ? (
         <SearchBar
           isOpen
           currentTaId={search.currentTaId}
-          onClose={() => setOpen(false)}
+          onClose={() => setSearchOpen(false)}
           onSelect={(hcpId, taId) => {
-            setOpen(false);
+            setSearchOpen(false);
             search.onSearchSelect(hcpId, taId);
           }}
         />
       ) : null}
-    </>
+
+      {/* drawer — overlays content, consumes no layout height when closed */}
+      {open ? (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, top: 44, background: "rgba(0,0,0,0.55)", zIndex: 60 }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              zIndex: 61,
+              background: COLOR.ground,
+              borderBottom: `1px solid ${COLOR.hairStrong}`,
+              boxShadow: "0 18px 40px rgba(0,0,0,0.6)",
+              maxHeight: "calc(100vh - 44px)",
+              overflowY: "auto",
+            }}
+          >
+            {NAV_ITEMS.map((item) => {
+              const on = item.key === active;
+              return (
+                <Link
+                  key={item.key}
+                  to={item.to}
+                  onClick={() => setOpen(false)}
+                  aria-current={on ? "page" : undefined}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    minHeight: 46,
+                    padding: "0 16px",
+                    borderBottom: `1px solid ${SEAM}`,
+                    background: on ? COLOR.surfaceRaised : "transparent",
+                    boxShadow: on ? `inset 2px 0 0 ${COLOR.amber}` : "none",
+                    textDecoration: "none",
+                    fontFamily: FONT.mono,
+                    fontSize: 12,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: on ? COLOR.ink1 : COLOR.ink3,
+                    fontWeight: on ? 500 : 400,
+                  }}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+    </nav>
   );
 }
 
