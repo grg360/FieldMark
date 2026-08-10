@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Rising star profile — the third profile surface, keyed on rising board
 // membership (ProfileDispatch: rising board → academic spine → community).
 // Layout authority: docs/design/Rising Surface.dc.html (three profile states:
@@ -153,8 +154,9 @@ const REC_TICK_CAP = 60; // above this many recent-window papers, squares → pr
 function RecRow({ label, sub, children, right, last = false }: {
   label: string; sub: string; children: ReactNode; right: ReactNode; last?: boolean;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "190px 1fr 168px", gap: 28, padding: last ? "22px 22px 24px" : "22px 22px 20px", borderBottom: last ? "none" : `1px solid ${RULE}` }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "190px 1fr 168px", gap: isMobile ? 12 : 28, padding: last ? "22px 22px 24px" : "22px 22px 20px", borderBottom: last ? "none" : `1px solid ${RULE}` }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
         <div style={mono(11, INK0, 0.16)}>{label}</div>
         <div style={{ ...mono(10, MUT2, 0.1), lineHeight: 1.5, whiteSpace: "pre-line" }}>{sub}</div>
@@ -302,6 +304,7 @@ function FieldIntelligencePanel() {
 }
 
 export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const navigate = useNavigate();
   const [p, setP] = useState<RisingProfile | null | undefined>(undefined);
   const [flags, setFlags] = useState<RisingFlags | null>(null);
@@ -418,7 +421,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
         {/* hero */}
         <Card>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 300px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px" }}>
             <div style={{ padding: "20px 22px 16px", borderRight: `1px solid ${RULE}`, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", columnGap: 24, rowGap: 18 }}>
                 <div>
@@ -566,7 +569,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         <SectionHead title="MOMENTUM & VISIBILITY" sub="FOUR COMPONENTS · TWO ENGINES"
           right="PERCENTILES WITHIN THE RISING COHORT · NEVER AGAINST ESTABLISHED" />
         <Card>
-          <div style={{ display: "grid", gridTemplateColumns: "104px 1fr 1fr" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "104px 1fr 1fr" }}>
             <div style={{ padding: "12px 14px", borderBottom: `1px solid ${RULE}` }} />
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${RULE}`, borderLeft: `1px solid ${RULE}`, ...mono(9, MUT, 0.14, 600) }}>SCIENTIFIC</div>
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${RULE}`, borderLeft: `1px solid ${RULE}`, ...mono(9, MUT, 0.14, 600) }}>NETWORK</div>
@@ -630,7 +633,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             established spine's sequence (signal block, then the workspace
             controls); contact must not sit at the bottom of the profile */}
         <SectionHead title="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS" right="SYNCS WITH THE RISING LEDGER" />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
           <Card style={{ padding: 18 }}>
             <ProfileRelationshipControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
           </Card>
@@ -811,7 +814,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 THERE IS NO RECENT-WINDOW VARIANT — SO THESE COUNTS DO NOT MATCH THE {rw} DELTAS ABOVE AND MUST NOT
                 BE READ AGAINST THEM.
               </div>
-              <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "210px 1fr 180px 1fr 150px", padding: "0 0 9px", borderBottom: `1px solid ${RULE}` }}>
+              <div style={{ marginTop: 18, display: isMobile ? "none" : "grid", gridTemplateColumns: "210px 1fr 180px 1fr 150px", padding: "0 0 9px", borderBottom: `1px solid ${RULE}` }}>
                 <div style={mono(8, DIM, 0.13, 600)}>STANDING</div>
                 <div style={mono(8, DIM, 0.13, 600)}>COLLABORATOR</div>
                 <div style={mono(8, DIM, 0.13, 600)}>INSTITUTION</div>
@@ -822,7 +825,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 const s = collabStanding(c);
                 const maxShared = Math.max(...p.collaborators.map((x) => x.shared_publications));
                 return (
-                  <div key={c.hcp_id} style={{ display: "grid", gridTemplateColumns: "210px 1fr 180px 1fr 150px", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${RULE_SOFT}` }}>
+                  <div key={c.hcp_id} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "210px 1fr 180px 1fr 150px", alignItems: "center", padding: "12px 0", gap: isMobile ? 4 : 0, borderBottom: `1px solid ${RULE_SOFT}` }}>
                     <div>
                       <div style={{ font: `500 9.5px/1 ${MONO}`, letterSpacing: ".13em", color: s.color }}>{s.state}</div>
                       <div style={{ marginTop: 6, ...mono(9, MUT, 0.06), whiteSpace: "nowrap" }}>{s.detail}</div>
@@ -874,7 +877,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 window and fully covered. The extractor accepts first authors as well as senior authors
                 {p.positions!.first_basis > 0 ? `, which matters here: ${p.positions!.first_basis} of the ${p.positions!.total} positions rest on first-authored work.` : "."}
               </div>
-              <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderTop: `1px solid ${RULE}` }}>
+              <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", borderTop: `1px solid ${RULE}` }}>
                 {[["EXTRACTED", p.positions!.total], ["FIRST-AUTHORED BASIS", p.positions!.first_basis], ["SENIOR-AUTHORED BASIS", p.positions!.senior_basis]].map(([lbl, v], i) => (
                   <div key={String(lbl)} style={{ padding: i === 0 ? "14px 22px 0 0" : i === 1 ? "14px 22px 0" : "14px 0 0 22px", borderLeft: i > 0 ? `1px solid ${RULE}` : "none" }}>
                     <div style={mono(8, DIM, 0.14)}>{lbl}</div>
@@ -916,7 +919,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             <div style={{ marginTop: 20, ...mono(8, DIM, 0.14) }}>THREE DISTINCT STATES · THIS SURFACE NAMES WHICH ONE APPLIES</div>
             <div style={{ marginTop: 10, borderTop: `1px solid ${RULE}` }}>
               {posStates.map((s) => (
-                <div key={s.n} style={{ display: "grid", gridTemplateColumns: "20px 1fr 190px 130px", alignItems: "baseline", gap: 12, padding: "12px 0", borderBottom: `1px solid ${RULE_SOFT}` }}>
+                <div key={s.n} style={{ display: "grid", gridTemplateColumns: isMobile ? "20px 1fr" : "20px 1fr 190px 130px", alignItems: "baseline", gap: 12, padding: "12px 0", borderBottom: `1px solid ${RULE_SOFT}` }}>
                   <div style={mono(9, FAINT, 0)}>{s.n}</div>
                   <div style={{ font: `500 11.5px/1.5 ${MONO}`, letterSpacing: ".1em", color: s.applies ? INK1 : MUT2 }}>{s.label}</div>
                   <div style={{ font: `400 11px/1.5 ${SERIF}`, color: MUT3 }}>{s.mech}</div>

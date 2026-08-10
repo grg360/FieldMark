@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Rising ledger — one board, two modes (register / quadrant). Layout authority:
 // docs/design/Rising Surface.dc.html (ledger tab). Data: rising_board() RPC —
 // the full board with components, so the quadrant plots REAL
@@ -78,6 +79,7 @@ function Card({ children, style }: { children: ReactNode; style?: CSSProperties 
 }
 
 export default function RisingLedger() {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [board, setBoard] = useState<RisingBoard | null>(null);
@@ -272,7 +274,7 @@ export default function RisingLedger() {
           <>
             <SectionHead title="MOMENTUM × VISIBILITY" sub={`TOP 100 · ${scopeLabel}`}
               right="A LOCATION ON THE TWO COMPONENTS · NOT A TYPE" />
-            <Card style={{ display: "grid", gridTemplateColumns: "1fr 300px" }}>
+            <Card style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px" }}>
               <div style={{ padding: "20px 20px 16px", borderRight: `1px solid ${RULE}` }}>
                 <div style={{ display: "flex", gap: 12 }}>
                   <div style={{ width: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -340,7 +342,7 @@ export default function RisingLedger() {
                   <div style={{ flex: 1, display: "flex", height: 9, background: LINE.l0 }}>
                     <div style={{ height: 9, background: b.live ? GREEN_DK : LINE.l2, width: `${b.w}%` }} />
                   </div>
-                  <div style={{ minWidth: 330, textAlign: "right", ...mono(8.5, b.live ? MUT3 : DIM2, 0.08) }}>{b.totalN.toLocaleString("en-US")} MEMBERS</div>
+                  <div style={{ minWidth: isMobile ? 0 : 330, textAlign: "right", ...mono(8.5, b.live ? MUT3 : DIM2, 0.08) }}>{b.totalN.toLocaleString("en-US")} MEMBERS</div>
                 </div>
               ))}
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${RULE}` }}>
@@ -355,7 +357,7 @@ export default function RisingLedger() {
             <SectionHead title="BOARD" sub={`${scopeLabel} · SORTED BY ${region === "ALL" || region === "BOTH" ? "GLOBAL" : "REGIONAL"} RANK`}
               right="COMPOSITE PERCENTILE IS IN-COHORT" />
             <Card>
-              <div style={{ display: "grid", gridTemplateColumns: "52px 1fr 200px 96px 168px 132px 64px", padding: "11px 16px", borderBottom: `1px solid ${RULE}`, background: GROUND.g1 }}>
+              <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "52px 1fr 200px 96px 168px 132px 64px", padding: "11px 16px", borderBottom: `1px solid ${RULE}`, background: GROUND.g1 }}>
                 {["RANK", "NAME", "INSTITUTION", geoColLabel, "BADGES", "COMPOSITE PCTL", "CAREER"].map((h, i) => (
                   <div key={h} style={{ ...mono(8, DIM, 0.13, 600), textAlign: i === 6 ? "right" : "left" }}>{h}</div>
                 ))}
@@ -373,7 +375,7 @@ export default function RisingLedger() {
                   <div style={{ marginTop: 16 }}>
                     {scoped.filter((r) => !r.state).map((r) => (
                       <div key={r.hcp_id} onClick={() => navigate(`/hcp/${r.hcp_id}`)}
-                        style={{ display: "grid", gridTemplateColumns: "52px 1fr 200px 96px 168px 132px 64px", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${RULE_SOFT}`, cursor: "pointer" }}>
+                        style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "52px 1fr 200px 96px 168px 132px 64px", alignItems: "center", padding: isMobile ? "12px 8px" : "10px 0", gap: isMobile ? 4 : 0, borderBottom: `1px solid ${RULE_SOFT}`, cursor: "pointer" }}>
                         <div style={{ font: `500 11px/1 ${MONO}`, color: MUT }}>{r.drank}</div>
                         <div style={{ font: `400 12.5px/1.3 ${SERIF}`, color: INK0 }}>{r.name}</div>
                         <div style={{ font: `400 10.5px/1.35 ${SERIF}`, color: MUT3 }}>{r.institution ?? "INSTITUTION NOT ON RECORD"}</div>
@@ -420,7 +422,7 @@ export default function RisingLedger() {
                       </div>
                       {open && b.rows.map((r) => (
                         <div key={r.hcp_id} onClick={() => navigate(`/hcp/${r.hcp_id}`)}
-                          style={{ display: "grid", gridTemplateColumns: "52px 1fr 200px 96px 168px 132px 64px", alignItems: "center", padding: "13px 16px", borderBottom: `1px solid ${RULE_SOFT}`, cursor: "pointer" }}>
+                          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "52px 1fr 200px 96px 168px 132px 64px", alignItems: "center", padding: isMobile ? "12px 8px" : "13px 16px", gap: isMobile ? 4 : 0, borderBottom: `1px solid ${RULE_SOFT}`, cursor: "pointer" }}>
                           <div style={{ font: `500 11px/1 ${MONO}`, color: MUT }}>{r.drank}</div>
                           <div style={{ font: `400 12.5px/1.3 ${SERIF}`, color: INK0 }}>{r.name}</div>
                           <div style={{ font: `400 10.5px/1.35 ${SERIF}`, color: MUT3 }}>{r.institution ?? "INSTITUTION NOT ON RECORD"}</div>

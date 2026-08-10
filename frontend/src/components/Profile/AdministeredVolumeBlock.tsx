@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Medicare Administered Therapy block. Rewrite (2026-08-04) of the former "Administered
 // volume — NSCLC" block, which was built on an NSCLC attribution the data cannot support.
 // Register per docs/design/Administered Volume Block.dc.html (Spectral + IBM Plex Mono,
@@ -82,9 +83,10 @@ function Bar({ days, max }: { days: number; max: number }) {
 }
 
 function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYears: number[]; maxDays: number }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const recentYear = windowYears[windowYears.length - 1];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: gridCols(windowYears.length), columnGap: 16, alignItems: "start", padding: "14px 20px", borderBottom: `1px solid ${C.lineSoft}` }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : gridCols(windowYears.length), columnGap: 16, rowGap: isMobile ? 8 : 0, alignItems: "start", padding: "14px 20px", borderBottom: `1px solid ${C.lineSoft}` }}>
       {/* agent + badge + multi-product note */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
@@ -133,9 +135,10 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
 }
 
 function ColumnHeads({ windowYears }: { windowYears: number[] }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const recentYear = windowYears[windowYears.length - 1];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: gridCols(windowYears.length), columnGap: 16, padding: "10px 20px", borderBottom: `1px solid ${C.line}`, ...mono(9), letterSpacing: ".1em", textTransform: "uppercase", color: C.faint }}>
+    <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: gridCols(windowYears.length), columnGap: 16, padding: "10px 20px", borderBottom: `1px solid ${C.line}`, ...mono(9), letterSpacing: ".1em", textTransform: "uppercase", color: C.faint }}>
       <div>Agent</div>
       {windowYears.map((y) => (
         <div key={y} style={{ textAlign: "right", color: y === recentYear ? C.dim : C.faint }}>

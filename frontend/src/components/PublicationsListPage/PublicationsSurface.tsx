@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Per-HCP publications surface — redesign. Layout authority: docs/design/
 // Publications List.dc.html (project 15adc915). Role becomes STRUCTURE, not a chip:
 // two bands (SENIOR AUTHOR / CO-AUTHOR), a left-hand citation figure column, and no
@@ -123,9 +124,10 @@ function bylineOf(r: PublicationListRow): string {
 const GRID = "84px 1fr 210px";
 
 function Row({ r, surname, density }: { r: PublicationListRow; surname: string; density: Density }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const senior = !!r.is_senior_author;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 24, padding: "15px 0", borderTop: `1px solid ${C.line}`, alignItems: "flex-start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : GRID, gap: isMobile ? 10 : 24, padding: "15px 0", borderTop: `1px solid ${C.line}`, alignItems: "flex-start" }}>
       {/* citation figure column — gold + larger for senior, quiet for co-author */}
       <div style={{ textAlign: "right", font: `400 ${senior ? 23 : 15}px/1 ${MONO}`, color: senior ? C.gold : C.mid, letterSpacing: "-.02em", fontVariantNumeric: "tabular-nums", paddingTop: senior ? 2 : 5 }}>
         {citeN(r).toLocaleString()}
@@ -173,6 +175,7 @@ export default function PublicationsSurface({
   year?: number; // year-scoped view; absent → whole record
   hcpName?: string;
 }) {
+  const isMobileHead = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const [order, setOrder] = useState<Order>("contribution");
   const [density, setDensity] = useState<Density>("ledger");
   const [oaOnly, setOaOnly] = useState(false);
@@ -257,7 +260,7 @@ export default function PublicationsSurface({
       </div>
 
       {/* column header (frame): the row grid, labelled once */}
-      <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 24, paddingBottom: 9, borderBottom: `1px solid ${C.line}`, font: `500 9px/1 ${MONO}`, letterSpacing: ".15em", color: C.faint }}>
+      <div style={{ display: isMobileHead ? "none" : "grid", gridTemplateColumns: GRID, gap: 24, paddingBottom: 9, borderBottom: `1px solid ${C.line}`, font: `500 9px/1 ${MONO}`, letterSpacing: ".15em", color: C.faint }}>
         <div style={{ textAlign: "right" }}>CITATIONS</div>
         <div>CONTRIBUTION · TITLE · SOURCE</div>
         <div>ACCESS &amp; ACTIONS</div>

@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Discuss affordance (Design frame 1 / pattern 06). A block on a publication card
 // with two states:
 //  - No discussion: dashed, unfilled, the word "Discuss" plus the invitation.
@@ -52,6 +53,7 @@ export default function DiscussAffordance({
   // it: thread creation belongs on the bibliography/forum path, not on every list row.
   existingOnly?: boolean;
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const navigate = useNavigate();
   const canWrite = useForumWriter();
   const hookValue = useDiscussAffordance(provided === undefined ? pmid : null);
@@ -82,7 +84,7 @@ export default function DiscussAffordance({
         <button
           type="button"
           onClick={() => navigate(target)}
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", background: "transparent", border: `1px solid ${GOLD.dim}`, borderRadius: 0, cursor: "pointer", ...mono(10.5, GOLD.gold), whiteSpace: "nowrap" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", background: "transparent", border: `1px solid ${GOLD.dim}`, borderRadius: 0, cursor: "pointer", ...mono(10.5, GOLD.gold), whiteSpace: isMobile ? "normal" : "nowrap" }}
         >
           <SpeechGlyph color={GOLD.gold} />
           {affordance.reply_count} {affordance.reply_count === 1 ? "reply" : "replies"}
@@ -98,7 +100,7 @@ export default function DiscussAffordance({
         onClick={canWrite && pmid ? () => setComposing(true) : undefined}
         aria-disabled={canWrite ? undefined : "true"}
         role="button"
-        style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", border: `1px dashed ${LINE.l1}`, borderRadius: 4, ...mono(10.5, canWrite ? GOLD.gold : COOL.chrome), whiteSpace: "nowrap", cursor: canWrite ? "pointer" : "not-allowed", opacity: canWrite ? 1 : 0.7 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", border: `1px dashed ${LINE.l1}`, borderRadius: 4, ...mono(10.5, canWrite ? GOLD.gold : COOL.chrome), whiteSpace: isMobile ? "normal" : "nowrap", cursor: canWrite ? "pointer" : "not-allowed", opacity: canWrite ? 1 : 0.7 }}
       >
         <SpeechGlyph color={canWrite ? GOLD.gold : COOL.label} />
         Discuss <span style={{ color: COOL.label }}>· starts a public thread visible to verified MSLs</span>

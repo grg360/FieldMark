@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Full-career publications view (frame 1c). Senior-author papers ranked by citation,
 // five deep with an "ALL N SENIOR-AUTHOR PAPERS →" expander; then co-authored papers
 // collapse into a YEAR LEDGER — one row per year (citation total, paper count, leading
@@ -22,8 +23,9 @@ const SERIF = "'Source Serif 4',Georgia,serif";
 const citeN = (r: PublicationListRow) => r.citation_count ?? 0;
 
 function SeniorRow({ r }: { r: PublicationListRow }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "68px 1fr 150px", gap: 20, padding: "13px 0", borderTop: `1px solid ${C.line}`, alignItems: "baseline" }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "68px 1fr 150px", gap: isMobile ? 6 : 20, padding: "13px 0", borderTop: `1px solid ${C.line}`, alignItems: "baseline" }}>
       <div style={{ textAlign: "right", font: `600 17px/1 ${MONO}`, color: C.gold, fontVariantNumeric: "tabular-nums" }}>
         {citeN(r).toLocaleString()}
         <div style={{ font: `400 8px/1.4 ${MONO}`, letterSpacing: ".1em", color: C.faint2, marginTop: 4 }}>CITED</div>
@@ -59,6 +61,7 @@ function abbrevJournal(j: string): string {
 }
 
 function YearLedgerRow({ y, hcpId, maxCite }: { y: PublicationYearLedgerRow; hcpId: string; maxCite: number }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   // Bar is a MEASURE: width ∝ the year's citation weight against the heaviest
@@ -69,7 +72,7 @@ function YearLedgerRow({ y, hcpId, maxCite }: { y: PublicationYearLedgerRow; hcp
   const journals = y.leading_journals.slice(0, 2).map(abbrevJournal).join(" · ");
   return (
     <div style={{ borderTop: `1px solid ${C.line}` }}>
-      <div style={{ display: "grid", gridTemplateColumns: "72px 84px 1fr 150px 118px", gap: 16, padding: "11px 0", alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "72px 84px 1fr" : "72px 84px 1fr 150px 118px", gap: isMobile ? 8 : 16, padding: "11px 0", alignItems: "center" }}>
         {/* year → that year's full publication view (senior + co-author), where an
             individual paper — e.g. a mid-cited senior paper past the top five — is
             reachable and carries the Discuss affordance. */}
@@ -114,6 +117,7 @@ export default function FullCareerView({
   ledger: PublicationYearLedgerRow[];
   hcpName?: string;
 }) {
+  const isMobileHead = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   const [showAllSenior, setShowAllSenior] = useState(false);
   const senior = seniorRows.slice().sort((a, b) => citeN(b) - citeN(a));
   const shownSenior = showAllSenior ? senior : senior.slice(0, 5);
@@ -168,8 +172,8 @@ export default function FullCareerView({
           <span style={{ marginLeft: "auto", font: `400 9.5px/1 ${MONO}`, letterSpacing: ".11em", color: C.dim }}>{coAuthorTotal} PAPERS · {ledgerYears} YEARS · CLICK A YEAR</span>
         </div>
         <div style={{ height: 2, background: C.line2 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "72px 84px 1fr 150px 118px", gap: 16, padding: "9px 0", font: `400 8px/1 ${MONO}`, letterSpacing: ".14em", color: C.faint2 }}>
-          <span>YEAR</span><span>CITED</span><span>CITATION WEIGHT · OA</span><span style={{ textAlign: "right" }}>LEADING JOURNALS</span><span style={{ textAlign: "right" }}>PAPERS HELD</span>
+        <div style={{ display: "grid", gridTemplateColumns: isMobileHead ? "72px 84px 1fr" : "72px 84px 1fr 150px 118px", gap: isMobileHead ? 8 : 16, padding: "9px 0", font: `400 8px/1 ${MONO}`, letterSpacing: ".14em", color: C.faint2 }}>
+          <span>YEAR</span><span>CITED</span><span>CITATION WEIGHT · OA</span>{isMobileHead ? null : <><span style={{ textAlign: "right" }}>LEADING JOURNALS</span><span style={{ textAlign: "right" }}>PAPERS HELD</span></>}
         </div>
         {ledger.map((y) => <YearLedgerRow key={y.year} y={y} hcpId={hcpId} maxCite={maxCite} />)}
       </section>

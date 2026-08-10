@@ -113,6 +113,7 @@ export default function PageHero({
           <div
             style={{
               display: "flex",
+              flexWrap: "wrap", // 2026-08-10 mobile audit: the cluster overflowed 393px heroes
               gap: 0,
               borderLeft: narrow ? "none" : `1px solid ${LINE.l1}`,
               borderTop: narrow ? `1px solid ${LINE.l1}` : "none",

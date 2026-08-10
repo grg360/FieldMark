@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../lib/useMediaQuery";
 // Methodology — direction 1B "Weight Ledger" (frame: Methodology Directions
 // .dc.html, project 0512b0fa, built 2026-08-09). Presentation layer ONLY: the
 // content shipped in commit 4808893 is LOCKED — every number, weight, formula
@@ -91,6 +92,7 @@ function Seg({ pct, bg, num, label, dark }: { pct: number; bg: string; num: stri
 }
 
 export default function MethodologyPage() {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const scoredAt = useScoringDate();
   const breadcrumbs = [
     { label: "Home", path: "/me" },
@@ -193,7 +195,7 @@ export default function MethodologyPage() {
         </p>
         <p style={bodyStyle}>The Rising Star score is built from four signals, organized into two composites:</p>
         {/* rollup diagram — every width is the actual weight (50/50 rows, 70/30 rollup) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 40px 280px", gap: 0, alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 40px 280px", gap: isMobile ? 14 : 0, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ display: "flex", height: 40 }}>
               <Seg pct={50} bg={`${RS}D9`} num="0.50" label="SCIENTIFIC MOMENTUM (35%)" dark />
@@ -204,10 +206,12 @@ export default function MethodologyPage() {
               <Seg pct={50} bg={`${RS}2E`} num="0.50" label="NETWORK VISIBILITY (15%)" />
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24, color: COOL.faint, ...mono(14) }}>
-            <span>→</span>
-            <span>→</span>
-          </div>
+          {isMobile ? null : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24, color: COOL.faint, ...mono(14) }}>
+              <span>→</span>
+              <span>→</span>
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ height: 40, background: `${RS}B3`, display: "flex", alignItems: "center", padding: "0 16px", justifyContent: "space-between" }}>
               <span style={{ ...mono(11, 600), letterSpacing: ".1em", color: "#0B0D10" }}>MOMENTUM</span>
@@ -312,10 +316,14 @@ export default function MethodologyPage() {
       <div style={sectionStyle}>
         <SectionHead title="Data sources" color={INK_HEAD} note="PUBLIC SOURCES · INVENTORY" />
         <p style={bodyStyle}>FieldMark draws from the following public data sources:</p>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(170px, 220px) 1fr minmax(120px, 160px)", borderTop: `1px solid rgba(255,255,255,.14)`, fontSize: 13.5 }}>
-          <div style={{ padding: "10px 14px 10px 0", borderBottom: `1px solid ${LINE_HAIR}`, ...chromeStyle }}>Source</div>
-          <div style={{ padding: "10px 14px", borderBottom: `1px solid ${LINE_HAIR}`, ...chromeStyle }}>Contributes</div>
-          <div style={{ padding: "10px 0 10px 14px", borderBottom: `1px solid ${LINE_HAIR}`, ...chromeStyle }}>Layer</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(170px, 220px) 1fr minmax(120px, 160px)", borderTop: `1px solid rgba(255,255,255,.14)`, fontSize: 13.5 }}>
+          {isMobile ? null : (
+            <>
+              <div style={{ padding: "10px 14px 10px 0", borderBottom: `1px solid ${LINE_HAIR}`, ...chromeStyle }}>Source</div>
+              <div style={{ padding: "10px 14px", borderBottom: `1px solid ${LINE_HAIR}`, ...chromeStyle }}>Contributes</div>
+              <div style={{ padding: "10px 0 10px 14px", borderBottom: `1px solid ${LINE_HAIR}`, ...chromeStyle }}>Layer</div>
+            </>
+          )}
           {(
             [
               ["PubMed and OpenAlex", "publication records, authorship attribution, citation activity, and the co-authorship edges that underlie the network influence calculations.", "scientific record", GOLD.rank],

@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../../lib/useMediaQuery";
 // Practice-first community HCP profile. Frame authority:
 // docs/design/Community HCP Profile Practice First.dc.html — layout, section order,
 // treatments and palette are the frame's; every number is a live binding. Composed
@@ -93,6 +94,7 @@ const CLAIMS_TAG: Record<string, { text: (c: ClassifiedProduct) => string; color
 };
 
 export default function PracticeFirstProfile() {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const rel = useRelationships();
@@ -463,11 +465,11 @@ export default function PracticeFirstProfile() {
         ) : null}
 
         {med ? (
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(300px,1fr) minmax(280px,400px)", gap: 1, background: F.line, border: `1px solid ${F.line}`, borderRadius: 2 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(300px,1fr) minmax(280px,400px)", gap: 1, background: F.line, border: `1px solid ${F.line}`, borderRadius: 2 }}>
             <div style={{ background: F.card, padding: "20px 24px 18px" }}>
               {/* frame (current rev): compact 334px slope + values row + −57% callout,
                   with the trend well and HOW TO READ IT beside it — not full-width bars */}
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(240px,334px) 1fr", gap: 28, alignItems: "start" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(240px,334px) 1fr", gap: 28, alignItems: "start" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
                     <span style={{ ...mono(9), letterSpacing: "0.16em", color: F.ghost }}>BENEFICIARIES / YR</span>
@@ -581,7 +583,7 @@ export default function PracticeFirstProfile() {
             {adminMapped.length} of his top {pr.admin_codes.length} codes map to a named agent — {genericNames.join(", ")}. The rest are supportive-care and unclassified codes outside the NSCLC reference, held as gaps with their rank intact.
           </div>
           <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>
-            <div style={{ display: "grid", gridTemplateColumns: "44px 78px 1.6fr 1fr 120px", gap: 12, padding: "10px 16px", borderBottom: `1px solid ${F.line}`, ...mono(9), letterSpacing: "0.14em", color: F.ghost }}>
+            <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "44px 78px 1.6fr 1fr 120px", gap: 12, padding: "10px 16px", borderBottom: `1px solid ${F.line}`, ...mono(9), letterSpacing: "0.14em", color: F.ghost }}>
               <span>RANK</span><span>CODE</span><span>AGENT</span><span>CLASS</span><span style={{ textAlign: "right" }}>ENGAGEMENT</span>
             </div>
             {pr.admin_codes.map((c) => <AdminRow key={c.code} c={c} aligned={aligned} />)}
@@ -658,11 +660,11 @@ export default function PracticeFirstProfile() {
             {engRows.length ? (
             <>
             <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1.5fr 80px 74px 84px 1fr", gap: 12, padding: "10px 14px", borderBottom: `1px solid ${F.line}`, ...mono(9), letterSpacing: "0.14em", color: F.ghost }}>
+              <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "1.1fr 1.5fr 80px 74px 84px 1fr", gap: 12, padding: "10px 14px", borderBottom: `1px solid ${F.line}`, ...mono(9), letterSpacing: "0.14em", color: F.ghost }}>
                 <span>PRODUCT</span><span>REPORTING ENTITY</span><span style={{ textAlign: "right" }}>TRANSFERS</span><span style={{ textAlign: "right" }}>PAYMENTS</span><span>LAST</span><span>IN HIS CLAIMS</span>
               </div>
               {engRows.map((c) => (
-                <div key={c.product.drug} style={{ display: "grid", gridTemplateColumns: "1.1fr 1.5fr 80px 74px 84px 1fr", gap: 12, padding: "9px 14px", borderBottom: `1px solid ${F.lineSub}`, alignItems: "baseline" }}>
+                <div key={c.product.drug} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.1fr 1.5fr 80px 74px 84px 1fr", gap: isMobile ? 4 : 12, padding: "9px 14px", borderBottom: `1px solid ${F.lineSub}`, alignItems: "baseline" }}>
                   <span style={{ ...mono(12), color: F.bright, letterSpacing: "0.03em" }}>{c.product.drug}</span>
                   <span style={{ ...mono(11), color: F.dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.product.entity ?? "—"}</span>
                   <span style={{ ...mono(12), color: F.body, textAlign: "right" }}>{money(c.product.amount)}</span>
@@ -825,10 +827,11 @@ function ScaleRow({ l, v, big }: { l: string; v: string; big?: boolean }) {
 }
 
 function AdminRow({ c, aligned }: { c: AdminCode; aligned: ClassifiedProduct[] }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   const engagedBy = aligned.find((a) => a.matchedCode?.code === c.code) ?? null;
   const gap = !c.name;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "44px 78px 1.6fr 1fr 120px", gap: 12, padding: "9px 16px", borderBottom: `1px solid ${F.lineSub}`, alignItems: "center", background: gap ? F.alt : "transparent", borderLeft: engagedBy ? `2px solid ${F.amber}` : "2px solid transparent" }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "44px 78px 1.6fr 1fr 120px", gap: isMobile ? 4 : 12, padding: "9px 16px", borderBottom: `1px solid ${F.lineSub}`, alignItems: "center", background: gap ? F.alt : "transparent", borderLeft: engagedBy ? `2px solid ${F.amber}` : "2px solid transparent" }}>
       <span style={{ ...mono(11), color: F.ghost }}>#{c.ord}</span>
       <span style={{ ...mono(11), color: gap ? F.ghost : F.faint }}>{c.code}</span>
       {gap ? (

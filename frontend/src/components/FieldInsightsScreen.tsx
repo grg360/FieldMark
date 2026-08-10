@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../lib/useMediaQuery";
 // Field Insights — register rebuild (2026-08-05).
 // Layout authority: docs/design/Field Insights.dc.html.
 //
@@ -65,6 +66,7 @@ const MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", 
 interface Group { key: string; title: string; meta: string; items: FieldInsight[]; hcpId?: string; }
 
 export default function FieldInsightsScreen() {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [allInsights, setAllInsights] = useState<FieldInsight[]>([]);
@@ -172,7 +174,7 @@ export default function FieldInsightsScreen() {
                   <span style={{ flex: 1 }} />
                   {filter ? <button type="button" onClick={() => setFilter(null)} style={{ ...mono(10, GOLD.gold, 0.14), border: "none", background: "transparent", cursor: "pointer" }}>CLEAR FILTER ×</button> : null}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(3, categoriesPresent.length)}, 1fr)` }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : `repeat(${Math.min(3, categoriesPresent.length)}, 1fr)` }}>
                   {categoriesPresent.map(([cat, n], i) => {
                     const tier = tierOf(cat);
                     const on = filter === cat;
@@ -247,6 +249,7 @@ export default function FieldInsightsScreen() {
 }
 
 function InsightCard({ it, navigate }: { it: FieldInsight; navigate: (p: string) => void }) {
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const tier = tierOf(it.insight_category);
   const setting = (it.interaction_type ?? "").toUpperCase() || "OTHER";
   const hcpName = formatHcpDisplayName(it);
@@ -264,7 +267,7 @@ function InsightCard({ it, navigate }: { it: FieldInsight; navigate: (p: string)
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 336px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 336px" }}>
         {/* observed body — warm reading prose */}
         <div style={{ padding: "24px 30px 22px 22px" }}>
           <p style={{ margin: 0, font: `400 17px/1.64 ${SERIF}`, color: WARM.body, textWrap: "pretty" }}>{it.body}</p>
