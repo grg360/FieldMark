@@ -38,9 +38,37 @@ export function dominantClasses(d: DrawerLayerData): TopicClass[] {
   return d.topicClasses.filter((c) => c.share >= DOMINANT_SHARE).slice(0, 2);
 }
 
-export async function getDrawerLayerData(
+// Request cache (2026-08-09): the query pair measures ~330-560ms round-trip
+// from a real client, and the drawer opens in 420ms — fetched on mount, values
+// landed mid-animation as a visible second beat. The ledger now PREFETCHES on
+// row hover (≥120ms dwell), and this cache lets the hover fetch and the
+// mount fetch share one in-flight promise, so a hovered row usually opens with
+// data already in hand. Data is stable within a scoring run, so hits never
+// revalidate; failed pairs are evicted rather than cached empty.
+const layerCache = new Map<string, Promise<Map<string, DrawerLayerData>>>();
+
+export function getDrawerLayerData(
   hcpIds: string[],
   taId: string,
+): Promise<Map<string, DrawerLayerData>> {
+  const key = `${taId}:${[...hcpIds].sort().join(",")}`;
+  const hit = layerCache.get(key);
+  if (hit) return hit;
+  if (layerCache.size > 300) layerCache.clear(); // bound a long scanning session
+  const p = fetchDrawerLayerData(hcpIds, taId, () => layerCache.delete(key));
+  layerCache.set(key, p);
+  return p;
+}
+
+/** Fire-and-forget hover prefetch — same cache, same promise as the mount fetch. */
+export function prefetchDrawerLayerData(hcpIds: string[], taId: string): void {
+  void getDrawerLayerData(hcpIds, taId);
+}
+
+async function fetchDrawerLayerData(
+  hcpIds: string[],
+  taId: string,
+  onError: () => void,
 ): Promise<Map<string, DrawerLayerData>> {
   const out = new Map<string, DrawerLayerData>();
   for (const id of hcpIds) {
@@ -63,6 +91,7 @@ export async function getDrawerLayerData(
   ]);
   if (topicRes.error) console.warn("getDrawerLayerData: topics", topicRes.error);
   if (beliefRes.error) console.warn("getDrawerLayerData: beliefs", beliefRes.error);
+  if (topicRes.error || beliefRes.error) onError(); // don't cache a failed pair
 
   for (const r of (topicRes.data ?? []) as Array<Record<string, unknown>>) {
     const d = out.get(String(r.hcp_id));

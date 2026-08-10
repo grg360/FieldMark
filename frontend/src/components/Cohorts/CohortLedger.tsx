@@ -11,7 +11,7 @@
 // there. Not in stage 2: tags, relationship-state column, per-row controls
 // (track/attachments), mobile — stages 3–4.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import AppLayout from "../AppLayout";
@@ -21,7 +21,8 @@ import PeopleNavStrip from "../PeopleNavStrip";
 import SearchBar from "../SearchBar";
 import { FONT, GROUND, LINE, GOLD, COOL, WARM } from "../../lib/designTokens";
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
-import { getDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
+import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
+import { getDrawerLayerData, prefetchDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
 import TrialsPopup from "./TrialsPopup";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
@@ -242,6 +243,10 @@ function RisingChipView({ flag, hcpId, hcpName = "", mobile = false }: { flag: R
             ref={trialBadgeRef}
             title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI). Click for the trials."
             onClick={(e) => { e.stopPropagation(); setTrialsOpen((o) => !o); }}
+            // hover prefetch (2026-08-09): the detail chain is two sequential
+            // network legs — warming it on badge hover kills the pop-up's
+            // frame-then-content two-step. Small deliberate target, no dwell timer.
+            onMouseEnter={() => prefetchOpenTrialsDetail(hcpId)}
             style={{ display: "inline-flex", alignItems: "center", border: `1px solid rgba(63,184,175,0.45)`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: "#3FB8AF", cursor: "pointer" }}
           >
             OPEN TRIAL
@@ -278,6 +283,8 @@ function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }:
             ref={trialBadgeRef}
             title="Named investigator on >= 1 rendered open trial (gated view; the registry labels every site lead PI). Click for the trials."
             onClick={(e) => { e.stopPropagation(); setTrialsOpen((o) => !o); }}
+            // hover prefetch — see RisingChipView's badge note
+            onMouseEnter={() => prefetchOpenTrialsDetail(hcpId)}
             style={{ ...chipBase, border: `1px solid rgba(63,184,175,0.45)`, color: "#3FB8AF", cursor: "pointer" }}
           >
             OPEN TRIAL
@@ -326,8 +333,12 @@ const NOSEP_INK = "#6b6660"; // "does not separate here"
 // ownership. Both edges now take cfg.markerColor (EST sage #6E8F76, RS
 // violet #9A8CC8), solid like the row's own cohort marker. Shared derivation
 // so the two edges can't drift; same element + same colour = clean mitred
-// corner where left meets bottom.
-const drawerRule = (cfg: CohortConfig) => `2px solid ${cfg.markerColor}`;
+// corner where left meets bottom. 1px (2026-08-09 weight match): the ledger's
+// line system is 1px everywhere — row separators (P.line), header underline
+// (P.lineStrong) — so the drawer's rules take the same weight and read as part
+// of the grid, not a heavier panel frame. (The 3px row cohort MARKER is a
+// block, not a rule — not part of the line system.)
+const drawerRule = (cfg: CohortConfig) => `1px solid ${cfg.markerColor}`;
 // Coverage sublabels, measured 2026-08-08 (EST/US n=2,990; RS/US n=123):
 // canonical-labeled pubs 97% / 99%; extracted positions 8% / 80%.
 const COVERAGE = {
@@ -492,14 +503,15 @@ function beliefLayer(
   };
 }
 
-function DrawerSection({ label, sub, mobile, children }: { label: string; sub: string; mobile: boolean; children: React.ReactNode }) {
+function DrawerSection({ label, sub, mobile, rightInset, children }: { label: string; sub: string; mobile: boolean; rightInset?: number; children: React.ReactNode }) {
   return (
     <div style={{ display: mobile ? "flex" : "grid", flexDirection: "column", gridTemplateColumns: "210px 1fr", gap: mobile ? 10 : 32, padding: mobile ? "16px 14px" : "22px", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ ...mono(10, 500), letterSpacing: ".14em", lineHeight: 1.7 }}>
         <div style={{ color: "#8b8479" }}>{label}</div>
         <div style={{ marginTop: 4, color: "#4f4a44" }}>{sub}</div>
       </div>
-      <div>{children}</div>
+      {/* rightInset clears the top-edge PROFILE tab on the first section (desktop) */}
+      <div style={rightInset && !mobile ? { paddingRight: rightInset } : undefined}>{children}</div>
     </div>
   );
 }
@@ -517,7 +529,60 @@ function NeighbourLines({ lines }: { lines: NeighbourLine[] }) {
   );
 }
 
-function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortConfig; row: LedgerRow; up?: LedgerRow; down?: LedgerRow; mobile?: boolean }) {
+// ── Drawer overhang (2026-08-09 — frame: Drawer Overhang Test.dc.html, project
+// 022f071a, the 5PX HYBRID toggle state, NOT the 15px one). The open drawer
+// overhangs the ledger 5px each side with lit side rails (border sides at
+// rgba(255,255,255,.09)), a brighter top lip (.13), a gradient surface and a
+// cast shadow — depth from light, not distance; 15px broke grid alignment with
+// two drawers open. The wrapper carries the frame's padding approach: 44px
+// side/bottom padding with matching negative side margins, so overhang, rails
+// and shadow paint OUTSIDE the ledger edge instead of clipping at the
+// overflow:hidden that animates the reveal. All painted area stays inside the
+// row element, so the virtualiser's measured height covers it — nothing paints
+// over the next row (the stacking-context constraint that rules out true
+// protrusion). 420ms decelerating open per the frame; close stays an instant
+// unmount — exit animation would need delayed unmount the virtualised list
+// doesn't carry. EST desktop only per the ruling; RS/mobile keep the flat drawer.
+const DRAWER_EASE = "cubic-bezier(.22,.68,.24,1)";
+function DrawerOverhang({ children }: { children: ReactNode }) {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return (
+    <div
+      style={{
+        overflow: "hidden",
+        boxSizing: "border-box",
+        padding: entered ? "0 44px 44px" : "0 44px 0",
+        margin: "0 -44px",
+        maxHeight: entered ? 1400 : 0,
+        opacity: entered ? 1 : 0,
+        transition: `max-height .42s ${DRAWER_EASE}, padding-bottom .42s ${DRAWER_EASE}, opacity .3s ease`,
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          border: "1px solid rgba(255,255,255,.06)",
+          borderTopColor: "rgba(255,255,255,.13)", // the lip
+          borderLeftColor: "rgba(255,255,255,.09)", // lit side rails
+          borderRightColor: "rgba(255,255,255,.09)",
+          background: "linear-gradient(180deg,#15151a 0%,#111114 30%,#0e0e11 100%)",
+          margin: entered ? "0 -5px" : "0 0px", // the 5px overhang
+          boxShadow: entered ? "0 22px 40px -20px rgba(0,0,0,.92), 0 0 0 1px rgba(0,0,0,.45)" : "0 0 0 rgba(0,0,0,0)",
+          transition: `margin .42s ${DRAWER_EASE}, box-shadow .42s ease`,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false }: { cfg: CohortConfig; row: LedgerRow; up?: LedgerRow; down?: LedgerRow; mobile?: boolean; overhang?: boolean }) {
   const [layers, setLayers] = useState<Map<string, DrawerLayerData> | null>(null);
   const nbrRows = [up, down].filter((r): r is LedgerRow => !!r); // rank 1 down-only; last loaded rank up-only
   const taId = taIdForApiSlug("nsclc");
@@ -541,8 +606,36 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortC
   const bl = beliefLayer(subj, nbrData);
 
   return (
-    <div style={{ background: P.drawer, borderTop: `1px solid ${P.line}`, borderLeft: drawerRule(cfg), borderBottom: drawerRule(cfg) }}>
-      <DrawerSection label={cfg.tag === "RS" ? "SCORE · WHAT IS ACCELERATING" : "SCORE · WHICH ENGINE"} sub="ALWAYS PRESENT" mobile={mobile}>
+    // Full sage enclosure (2026-08-09, supersedes left+bottom): the cohort rule
+    // runs all four sides — a drawer is enclosed, and full 1px enclosure reads
+    // as a bounded physical object (the emboss direction). The bottom-edge-
+    // ownership intent survives with the whole perimeter owning it. Wrapped in
+    // DrawerOverhang, the box supplies surface (gradient), lip and rails
+    // outside this perimeter; unwrapped (RS, mobile) the flat ground stands.
+    // position:relative anchors the top-edge PROFILE tab.
+    <div style={{ position: "relative", background: overhang ? "transparent" : P.drawer, border: drawerRule(cfg) }}>
+      {/* The filing tab, TOP-RIGHT (2026-08-09 reversal — a filing-cabinet tab
+          sits at the top of the folder): hangs INSIDE the drawer from the sage
+          top rule — square where it meets the top edge, rounded bottom corners,
+          shadow cast downward, label bold. Cohort hue per Garrett's call
+          (cfg.markerColor, semantic use). */}
+      <Link
+        to={`/hcp/${row.hcpId}`}
+        onClick={(e) => e.stopPropagation()}
+        title={`${row.name} — profile`}
+        style={{
+          position: "absolute", right: mobile ? 14 : 22, top: 0, zIndex: 3,
+          ...mono(10.5, 700), letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
+          background: `${cfg.markerColor}1A`, border: `1px solid ${cfg.markerColor}8C`, borderTop: "none",
+          borderRadius: "0 0 8px 8px", padding: "11px 26px 10px", whiteSpace: "nowrap",
+          boxShadow: "0 4px 14px rgba(0,0,0,.35)",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = `${cfg.markerColor}30`; e.currentTarget.style.borderColor = cfg.markerColor; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = `${cfg.markerColor}1A`; e.currentTarget.style.borderColor = `${cfg.markerColor}8C`; }}
+      >
+        PROFILE
+      </Link>
+      <DrawerSection label={cfg.tag === "RS" ? "SCORE · WHAT IS ACCELERATING" : "SCORE · WHICH ENGINE"} sub="ALWAYS PRESENT" mobile={mobile} rightInset={160}>
         <div style={{ ...serif(16), lineHeight: 1.62, color: SEP_INK, textWrap: "pretty" as const }}>{spine.text}</div>
         <NeighbourLines lines={spine.lines} />
       </DrawerSection>
@@ -591,45 +684,15 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false }: { cfg: CohortC
         )}
       </DrawerSection>
 
-      {/* Footer — rule text left; the PROFILE filing tab bottom-right
-          (2026-08-09, replaces the "{NAME} PROFILE ↗" text link — the tab IS
-          the profile affordance now; row-click expansion is untouched, this
-          renders only inside the open drawer). File-folder treatment: square
-          where it meets the drawer body, rounded outer (bottom) corners,
-          standing on the drawer's own closing rule (drawerRule — cohort hue,
-          2026-08-09 bottom-edge ownership) at the BOTTOM-RIGHT corner — INSIDE
-          the bounded block, anchored to the drawer above it, never floating
-          at the seam between two rows. TRUE
-          protrusion below the row stays off the table — the virtualized tail
-          rows are stacking contexts (see TrialsPopup), so anything poking
-          past the row edge would paint UNDER the next row. */}
-      <div style={{ position: "relative", padding: mobile ? "14px 14px 20px" : "16px 22px 22px" }}>
-        <div style={{ ...mono(9), letterSpacing: ".1em", color: "#4f4a44", lineHeight: 1.7, paddingRight: mobile ? 130 : 160 }}>
+      {/* Footer — the rule text alone, full width. The PROFILE filing tab moved
+          to the drawer's TOP-RIGHT 2026-08-09 (filing-cabinet reversal: the tab
+          sits at the top of the folder) — see the container's first child. The
+          tab remains the one profile affordance; row-click expansion untouched. */}
+      <div style={{ padding: mobile ? "14px 14px 20px" : "16px 22px 22px" }}>
+        <div style={{ ...mono(9), letterSpacing: ".1em", color: "#4f4a44", lineHeight: 1.7 }}>
           EVERY LAYER IS COMPUTED AGAINST BOTH ADJACENT RANKS; A NEIGHBOUR THAT DOES NOT SEPARATE SAYS SO.
           PERCENTILES, METHODOLOGY VERSION AND SOURCE RECORDS LIVE ON THE PROFILE.
         </div>
-        <Link
-          to={`/hcp/${row.hcpId}`}
-          onClick={(e) => e.stopPropagation()}
-          title={`${row.name} — profile`}
-          style={{
-            // The filing tab, STANDING ON the drawer's closing rule at the
-            // bottom-right corner (2026-08-09 reposition — the hang-from-rule
-            // variant read as chrome and was scanned past): square base
-            // resting on the cohort-hue closing rule, rounded top corners.
-            // Cohort hue per Garrett's call: cfg.markerColor (row-edge cohort
-            // marker — semantic use). EST green, RS violet; COM inherits.
-            position: "absolute", right: mobile ? 14 : 22, bottom: 0,
-            ...mono(10.5, 600), letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
-            background: `${cfg.markerColor}1A`, border: `1px solid ${cfg.markerColor}8C`, borderBottom: "none",
-            borderRadius: "8px 8px 0 0", padding: "10px 26px 11px", whiteSpace: "nowrap",
-            boxShadow: "0 -4px 14px rgba(0,0,0,.35)",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = `${cfg.markerColor}30`; e.currentTarget.style.borderColor = cfg.markerColor; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = `${cfg.markerColor}1A`; e.currentTarget.style.borderColor = `${cfg.markerColor}8C`; }}
-        >
-          PROFILE
-        </Link>
       </div>
     </div>
   );
@@ -739,10 +802,32 @@ function Row({
   const insight = getInsightCount(row.hcpId);
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
+  // Hover prefetch (2026-08-09): the drawer's layer pair measures ~330-560ms
+  // while the open animates in 420ms — fetched on click, values landed as a
+  // second beat mid-animation. Prefetching on a 120ms hover dwell (cleared on
+  // leave, so sweeping the pointer down the list fires nothing) means the
+  // click usually opens with data already cached; the open never waits either
+  // way — the drawer's scaffolding covers the cold-click case.
+  const prefetchTimer = useRef<number | null>(null);
+  const startPrefetch = () => {
+    if (cfg.tag === "COM") return; // COM's old drawer reads no layer data
+    prefetchTimer.current = window.setTimeout(() => {
+      const taId = taIdForApiSlug("nsclc");
+      if (!taId) return;
+      const nbrs = [rowByRank?.get(row.rank - 1), rowByRank?.get(row.rank + 1)].filter((r): r is LedgerRow => !!r);
+      prefetchDrawerLayerData([row.hcpId, ...nbrs.map((r) => r.hcpId)], taId);
+    }, 120);
+  };
+  const cancelPrefetch = () => {
+    if (prefetchTimer.current != null) window.clearTimeout(prefetchTimer.current);
+  };
+
   return (
     <div style={{ position: "relative", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: cfg.markerColor }} />
-      {open ? <div style={{ position: "absolute", left: 3, top: 0, bottom: 0, width: 2, background: P.amber }} /> : null}
+      {/* amber open-indicator strip removed 2026-08-09: it ran the row's FULL
+          height, so beside the open drawer's sage border it read as a second,
+          parallel gold line. The open drawer itself is the open indicator. */}
       {/* tracked right-edge strip removed 2026-08-09: the amber bookmark is the
           one tracked indicator — the whitish edge strip was a redundant second
           signal reading as unfinished chrome. */}
@@ -752,8 +837,8 @@ function Row({
       <div
         onClick={onToggle}
         style={{ display: "flex", alignItems: "center", padding: "13px 20px 13px 23px", cursor: "pointer" }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = P.rowHover)}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+        onMouseEnter={(e) => { e.currentTarget.style.background = P.rowHover; startPrefetch(); }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; cancelPrefetch(); }}
       >
         {/* rank */}
         <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", gap: 1 }}>
@@ -922,8 +1007,14 @@ function Row({
       </div>
 
       {/* drawer (2026-08-08): EST/RS take the three-layer redesign; COM keeps
-          the old why/trace until its own pass. */}
-      {open && cfg.tag !== "COM" ? (
+          the old why/trace until its own pass. EST additionally takes the 5px
+          overhang treatment (2026-08-09) — see DrawerOverhang. */}
+      {open && cfg.tag === "EST" ? (
+        <DrawerOverhang>
+          <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} overhang />
+        </DrawerOverhang>
+      ) : null}
+      {open && cfg.tag === "RS" ? (
         <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} />
       ) : null}
       {open && cfg.tag === "COM" ? (
@@ -995,8 +1086,9 @@ function MobileRow({
   return (
     <div style={{ position: "relative", borderBottom: `1px solid ${P.line}` }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: cfg.markerColor }} />
-      {open ? <div style={{ position: "absolute", left: 3, top: 0, bottom: 0, width: 2, background: P.amber }} /> : null}
-      {/* tracked edge strip removed 2026-08-09 — amber bookmark is the one signal */}
+      {/* amber open-indicator strip removed 2026-08-09 (double-line vs the sage
+          drawer border); tracked edge strip removed same day — amber bookmark is
+          the one tracked signal */}
 
       <div onClick={onToggle} style={{ padding: "13px 16px 14px 19px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 7 }}>
         {/* rank + track/index */}
