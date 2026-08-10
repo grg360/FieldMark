@@ -34,6 +34,7 @@ import {
   type ProfilePosition,
   type ProfileSource,
 } from "../../lib/hcpProfile";
+import FederalFundingSection from "./FederalFundingSection";
 
 // Ledger palette, verbatim (self-contained visual system per the Build Reference).
 // Register tokens substituted 2026-08-05 for exact value matches only (card,
@@ -407,6 +408,9 @@ export default function HcpProfileBrief() {
                 <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.5 }}>No disclosed payments in the record. This is an absence in the open-payments record. It is not evidence that no relationship exists.</span>
               )}
             </div>
+            {/* federal funding — NIH RePORTER display facts (Phase 1, 2026-08-10);
+                displayed, never ranked — sits beside pharma, same discipline */}
+            <FederalFundingSection hcpId={p.hcp.id} />
             {/* engagement mix */}
             {p.record.engagement_mix ? <EngagementMix mix={p.record.engagement_mix} /> : null}
             {/* collaborators */}

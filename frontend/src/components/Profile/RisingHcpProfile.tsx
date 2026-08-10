@@ -13,6 +13,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
+import FederalFundingSection from "./FederalFundingSection";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import { FiToast } from "../FieldIntelligenceShared";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -753,6 +754,14 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
           </Card>
         )}
+
+        {/* federal funding — NIH RePORTER display facts (Phase 1, 2026-08-10);
+            displayed, never ranked — record-adjacent, after established standing */}
+        <SectionHead title="FEDERAL FUNDING" sub="NIH REPORTER · MATCHED RECORD"
+          right="DISPLAYED, NOT RANKED" />
+        <Card style={{ padding: "18px 22px" }}>
+          <FederalFundingSection hcpId={hcpId} />
+        </Card>
 
         {/* signal summary */}
         <SectionHead title="SIGNAL SUMMARY" sub="WHO IS THIS, AND WHAT IS MOVING"
