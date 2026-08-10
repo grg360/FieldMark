@@ -225,6 +225,12 @@ function TwoWindows({ ledger, narrow }: { ledger: PulseLedger; narrow: boolean }
     <Panel style={{ marginTop: 40 }}>
       <PanelHeader label="THE TWO WINDOWS ON THIS PAGE" right="MONTHLY PUBLICATION TOTALS · PUBMED INGEST" />
       <div style={{ padding: "22px 20px 20px" }}>
+        {/* Narrow: the strip scrolls horizontally as ONE unit — tiles and window
+            brackets share column geometry, so wrapping/stacking would detach the
+            brackets from the months they annotate. Horizontal scroll is the
+            timeline-preserving mobile pattern here (2026-08-10). */}
+        <div style={narrow ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : undefined}>
+        <div style={narrow ? { minWidth: 560 } : undefined}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 2 }}>
           {ledger.corpusMonthly.map((m) => {
             const s = stateLabel(m.state);
@@ -299,6 +305,8 @@ function TwoWindows({ ledger, narrow }: { ledger: PulseLedger; narrow: boolean }
               PERCENTAGE POINTS
             </div>
           </div>
+        </div>
+        </div>
         </div>
       </div>
     </Panel>
@@ -600,7 +608,11 @@ function Events({ payload }: { payload: PulsePayload }) {
 }
 
 function Evidence({ ledger }: { ledger: PulseLedger }) {
-  const cols = "1fr 88px 132px";
+  const narrow = useMediaQuery(MOBILE_BP);
+  // Narrow: fixed number/status columns shrink and the name column gets
+  // minmax(0,·) so the table's min-content can't push the panel past its track
+  // (the desktop cols set a ~367px floor that overflowed the phone column).
+  const cols = narrow ? "minmax(0,1fr) 56px 110px" : "1fr 88px 132px";
   const facet = (name: string, count: number) => (
     <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "baseline", padding: "4px 0" }}>
       <div style={{ fontFamily: SERIF, fontSize: 14, color: C.ink2 }}>{name}</div>
@@ -743,7 +755,7 @@ export default function PulsePage() {
           <TwoWindows ledger={ledger} narrow={narrow} />
           <Synthesis payload={payload} />
           {narrow ? <MobileLedger ledger={ledger} /> : <DesktopLedger ledger={ledger} />}
-          <div style={{ marginTop: 40, display: "grid", gridTemplateColumns: narrow ? "1fr" : "1fr 1fr", gap: 28, alignItems: "start" }}>
+          <div style={{ marginTop: 40, display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "1fr 1fr", gap: 28, alignItems: "start" }}>
             <Events payload={payload} />
             <Evidence ledger={ledger} />
           </div>

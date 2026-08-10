@@ -29,11 +29,12 @@ function VolumeSparks({ daily, color, width = 110, height = 22 }: {
 }) {
   const max = Math.max(1, ...daily.map((p) => p.n));
   const gap = 1.5;
-  const bw = daily.length ? (width - gap * (daily.length - 1)) / daily.length : width;
+  // `width` is a cap, not a fixed size: bars flex so the row fits any narrower
+  // container (the featured card's 300px row overflowed its ~250px mobile column).
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap, height, width }}>
+    <div style={{ display: "flex", alignItems: "flex-end", gap, height, width: `min(${width}px, 100%)` }}>
       {daily.map((p) => (
-        <div key={p.d} title={`${p.d}: ${p.n}`} style={{ width: bw, background: color, height: Math.max(1, (p.n / max) * height), borderRadius: 1 }} />
+        <div key={p.d} title={`${p.d}: ${p.n}`} style={{ flex: "1 1 0", minWidth: 0, background: color, height: Math.max(1, (p.n / max) * height), borderRadius: 1 }} />
       ))}
     </div>
   );
@@ -137,7 +138,7 @@ function useRail(now: Date) {
 
 export default function CongressCalendarPage() {
   const navigate = useNavigate();
-  const isMobile = useMediaQuery("(max-width: 640px)");
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint (was 640; standardized 2026-08-10)
   const [params] = useSearchParams();
   // Dev-only reference-date override so the LIVE / IMMINENT treatments can be
   // exercised before a congress is actually live (e.g. /congress?now=2026-05-31).

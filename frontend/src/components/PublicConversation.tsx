@@ -563,8 +563,10 @@ function AccountRow({ r, total, marked, narrow, idx }: { r: Row; total: number; 
             </div>
           </div>
         )}
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", paddingTop: 4 }}>
-          <span style={{ border: `1px solid rgba(201,150,47,0.4)`, color: AMBER, fontSize: 9, letterSpacing: "0.14em", padding: "3px 7px", whiteSpace: "nowrap" }}>WHY HERE · PROVISIONAL</span>
+        {/* Narrow: chip above, prose below at full width — side-by-side leaves the
+            prose a squeezed column beside the nowrap chip (2026-08-10) */}
+        <div style={{ display: "flex", flexDirection: narrow ? "column" : "row", gap: narrow ? 8 : 14, alignItems: "flex-start", paddingTop: 4 }}>
+          <span style={{ border: `1px solid rgba(201,150,47,0.4)`, color: AMBER, fontSize: 9, letterSpacing: "0.14em", padding: "3px 7px", whiteSpace: "nowrap", flex: "none" }}>WHY HERE · PROVISIONAL</span>
           <span style={{ ...serif(narrow ? 13.5 : 15, MID2, 1.55), maxWidth: 700 }}>{why}</span>
         </div>
       </div>

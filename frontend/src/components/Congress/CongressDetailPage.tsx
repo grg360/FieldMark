@@ -145,7 +145,7 @@ function VolumeChart({ c, s }: { c: Congress; s: CongressSocial }) {
       </div>
       <div style={{ position: "relative", paddingTop: 28 }}>
         {/* peak annotation */}
-        <div style={{ position: "absolute", top: 0, left: `${pctOf(peakIdx)}%`, transform: `translateX(${clampX(pctOf(peakIdx))})`, whiteSpace: "nowrap", ...mono(9.5, COLOR.amber), letterSpacing: "0.1em", fontWeight: 600 }}>
+        <div style={{ position: "absolute", top: 0, left: `clamp(0px, calc(${pctOf(peakIdx)}% - 60px), calc(100% - 120px))`, whiteSpace: "nowrap", ...mono(9.5, COLOR.amber), letterSpacing: "0.1em", fontWeight: 600 }}>
           PEAK {INT.format(peak.n)} · {fmtShortDay(peak.d)}
         </div>
         <div style={{ position: "absolute", top: 15, left: `${pctOf(peakIdx)}%`, width: 1, height: 10, background: COLOR.amber }} />
@@ -211,7 +211,7 @@ function PresenterCard({ p }: { p: ConfirmedPresenter }) {
 
 export default function CongressDetailPage() {
   const { slug } = useParams();
-  const isMobile = useMediaQuery("(max-width: 640px)");
+  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint (was 640; standardized 2026-08-10)
   const [params] = useSearchParams();
   const now = useMemo(() => {
     const o = import.meta.env.DEV ? params.get("now") : null;

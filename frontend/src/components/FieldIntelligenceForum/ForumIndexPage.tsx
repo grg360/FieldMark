@@ -301,16 +301,21 @@ function ViewToggle({ view, onView, right, narrow }: { view: "pub" | "question";
 
 // ── Anchor card (state 01) — uniform heights via fixed question windows ──────
 function QuestionWindow({ t, moderated }: { t: ForumThread; moderated: boolean }) {
+  // Narrow: the fixed 98px window exists to align cards across the desktop
+  // two-column grid; in the single mobile column it only clips — moderation
+  // badges ran past the card edge and were cut mid-chip. The window goes
+  // natural-height and the badge row wraps (2026-08-10).
+  const narrow = useMediaQuery("(max-width: 900px)");
   return (
-    <Link to={`/field-intelligence/thread/${t.id}`} style={{ display: "block", height: 98, overflow: "hidden", textDecoration: "none" }}>
+    <Link to={`/field-intelligence/thread/${t.id}`} style={{ display: "block", height: narrow ? "auto" : 98, minHeight: 98, overflow: "hidden", textDecoration: "none" }}>
       <p style={{ ...serif(15, C.ink2, 1.45), height: 44, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
         {t.question_title}
       </p>
-      <div style={{ ...mono(10, C.faint, 0.12), marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ ...mono(10, C.faint, 0.12), marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <ProvenanceChip seed={t.is_seed} />
         <span>{t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"} · {t.recency_label.toUpperCase()}</span>
       </div>
-      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 7, height: 19 }}>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", minHeight: 19 }}>
         <Moderation t={t} moderated={moderated} />
       </div>
     </Link>
@@ -728,7 +733,10 @@ export default function ForumIndexPage() {
                 ) : atScale ? (
                   <Ledger flat={flat} moderatedIds={moderatedIds} narrow={narrow} />
                 ) : (
-                  <div style={{ margin: narrow ? "16px 22px 0" : "16px 40px 0", display: "grid", gridTemplateColumns: narrow ? "1fr" : "1fr 1fr", gap: 1, background: C.surface }}>
+                  // minmax(0,·): a bare 1fr track floors at the card's min-content —
+                  // the clamped anchor title reports full one-line width and pushed
+                  // the whole column past the phone viewport (2026-08-10)
+                  <div style={{ margin: narrow ? "16px 22px 0" : "16px 40px 0", display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "repeat(2, minmax(0,1fr))", gap: 1, background: C.surface }}>
                     {orderedAnchors.map((a) => (
                       <AnchorCard key={a.id} anchor={a} moderatedIds={moderatedIds} />
                     ))}

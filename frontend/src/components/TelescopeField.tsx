@@ -183,7 +183,7 @@ function sx(s: string): CSSProperties {
 // the viewport. The sky PIXELS run full-bleed behind it (dust/meteors/haze), but the
 // interactive layer — camera framing + the Skyview title/search chrome — insets below it so
 // no clickable star renders under the nav.
-interface Props { taId?: string; onOpenProfile?: (id: string) => void; safeTop?: number }
+interface Props { taId?: string; onOpenProfile?: (id: string) => void; safeTop?: number; forceMobile?: boolean }
 interface State { box: { w: number; h: number }; focus: Focus | null; near: Focus | null; cohort: "all" | "established" | "rising"; density: "leaders" | "full"; query: string; qOpen: boolean; trail: { name: string; focus: Focus }[]; mTab: "established" | "rising"; mOpen: number | null }
 type Cam = { x: number; y: number; z: number };
 
@@ -214,7 +214,12 @@ class Sky extends Component<Props, State> {
 
   vw() { return this.state.box.w; }
   vh() { return this.state.box.h; }
-  isMobile() { return this.state.box.w < 760; }
+  // forceMobile comes from the wrapper's viewport media query. The measured-box
+  // fallback alone is a dead end on phones: the desktop sky's host is height:100%
+  // of an unheighted in-flow parent, so it measures W×0, the ResizeObserver bails
+  // on zero height, and `box` never leaves its 1440×760 default — the mobile list
+  // was unreachable and SkyView rendered a 0-height desktop sky (2026-08-10).
+  isMobile() { return this.props.forceMobile === true || this.state.box.w < 760; }
   field(): Field { if (!this._f) this._f = buildField(this.props.taId === AD_TA_ID ? (adNodes as unknown as RawNode[]) : (nsclcNodes as unknown as RawNode[]), this.props.taId === AD_TA_ID ? (adEdges as unknown as RawEdge[]) : (nsclcEdges as unknown as RawEdge[])); return this._f; }
   orbit(i: number): OrbNode[] { if (!this._oc[i]) this._oc[i] = buildOrbit(this.field(), i); return this._oc[i]; }
   // Dust decision (2026-08-07): with 613 real stars filling the canvas, the
@@ -951,7 +956,7 @@ export default function TelescopeField({ taId, onOpenProfile }: Props) {
     return (
       <>
         <style>{SKY_KEYFRAMES}</style>
-        <Sky key={taId} taId={taId} onOpenProfile={onOpenProfile} safeTop={0} />
+        <Sky key={taId} taId={taId} onOpenProfile={onOpenProfile} safeTop={0} forceMobile />
       </>
     );
   }

@@ -540,7 +540,9 @@ function FeedLayout({
       {/* Search left the bar (NAV-BUILD-01) — the feed keeps it in its own header,
           absent when no TA id resolves. Skyview carries its own "Fly to a researcher"
           search, so the feed search is dropped in the immersive view. */}
-      {!telescopeImmersive && getTAIdForLabel(selectedTA) ? (
+      {/* Mobile SkyView drops the inline bar too: the NavBar magnifier is the one
+          search (platform pattern), and Sky's mobile list opens with it on-screen. */}
+      {!telescopeImmersive && !(isNarrow && onSkyview) && getTAIdForLabel(selectedTA) ? (
         <div style={{ padding: "8px 16px 0" }}>
           <SearchBar
             variant="inline"
