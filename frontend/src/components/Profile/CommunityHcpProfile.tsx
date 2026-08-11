@@ -285,26 +285,14 @@ export default function CommunityHcpProfile() {
           <div style={{ flex: "1 1 260px", maxWidth: 320, padding: "22px 24px 20px", borderLeft: `1px solid ${P.line}`, display: "flex", flexDirection: "column" }}>
             <span style={{ ...mono(9, 600), letterSpacing: ".18em", color: P.ink6, paddingBottom: 14 }}>PRACTICE SHAPE</span>
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-              {/* data-gated NSCLC therapy signals (2026-07-30 re-score) — proxies, labeled
-                  "NSCLC-relevant", never "NSCLC patients". The legacy untraceable
-                  patient_volume figure is no longer displayed. */}
-              {(p.nsclc?.spend_3yr ?? 0) > 0 ? (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ ...mono(10.5), color: P.ink4 }}>Selected oncology therapy spend</span>
-                  <span style={{ ...mono(12), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{moneyCompact(p.nsclc!.spend_3yr)}<span style={{ ...mono(9), color: P.ink6 }}> / 3yr</span></span>
-                </div>
-              ) : null}
-              {(p.nsclc?.volume_2023_est ?? 0) > 0 ? (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ ...mono(10.5), color: P.ink4 }}>Largest single-agent patient count</span>
-                  <span style={{ ...mono(12), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>≈{Math.round(p.nsclc!.volume_2023_est!)}<span style={{ ...mono(9), color: P.ink6 }}> est. · 2023</span></span>
-                </div>
-              ) : null}
-              {((p.nsclc?.spend_3yr ?? 0) > 0 || (p.nsclc?.volume_2023_est ?? 0) > 0) ? (
-                <div style={{ ...mono(9), color: P.ink6, lineHeight: 1.5 }}>
-                  Selected administered oncology agents. Claims carry no indication; these are not NSCLC-specific.
-                </div>
-              ) : null}
+              {/* July-30 rescore residue (nsclc_spend_3yr / nsclc_volume_2023_est)
+                  REMOVED from display 2026-08-11: those columns are a snapshot of an
+                  abandoned scoring run that the 2026-08-06 rescore overwrote — the
+                  figures no longer participate in the rank shown beside them.
+                  Honest per-drug administered-therapy facts render live in the
+                  MEDICARE ADMINISTERED THERAPY section below; practice-spend/volume
+                  header facts return with the community fork rebuild, sourced from
+                  live data. */}
               {p.medicare_paid_corrected != null ? (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                   <span style={{ ...mono(10.5), color: P.ink4 }}>Medicare paid</span>
@@ -341,10 +329,13 @@ export default function CommunityHcpProfile() {
                 </div>
                 <span style={{ ...mono(9.5), color: P.ink5, letterSpacing: ".04em" }}>Rank {sc.rank?.toLocaleString()} of {sc.scope_size?.toLocaleString()} · NSCLC community cohort</span>
                 {/* decomposition — weight bars (frame panel treatment). Bars show the real
-                    scoring WEIGHTS (40/30/15/10/5); exact per-component contribution values
-                    are computed in the pipeline and not persisted, so weights are shown. */}
+                    scoring WEIGHTS (40/30/15/10/5) of the LIVE 2026-08-06 formula —
+                    Patient volume is the single 40% component (Part B beneficiaries),
+                    matching community_scoring.py and the Methodology page. The earlier
+                    "Therapy spend 20 / Therapy vol. 20" split described the abandoned
+                    July-30 rescore and never ranked this board (corrected 2026-08-11). */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 8 }}>
-                  {([["Therapy spend", 20], ["Therapy vol. (est.)", 20], ["Engagement", 30], ["Setting", 15], ["Career", 10], ["Publication", 5]] as [string, number][]).map(([l, w]) => (
+                  {([["Patient volume", 40], ["Engagement", 30], ["Setting", 15], ["Career", 10], ["Publication", 5]] as [string, number][]).map(([l, w]) => (
                     <div key={l} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ width: 96, ...mono(9), color: P.ink4, letterSpacing: ".02em" }}>{l}</span>
                       <span style={{ flex: 1, height: 4, background: P.line, borderRadius: 1 }}>
@@ -354,13 +345,10 @@ export default function CommunityHcpProfile() {
                     </div>
                   ))}
                 </div>
-                {/* traceable inputs — the two stored signals behind the 40% activity
-                    component, shown separately (never blended into one opaque number) */}
-                {p.nsclc?.spend_signal != null && p.nsclc?.volume_signal != null ? (
-                  <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".02em", paddingTop: 2 }}>
-                    Oncology therapy signals (0–100 in cohort): spend {p.nsclc.spend_signal.toFixed(1)} · est. volume {p.nsclc.volume_signal.toFixed(1)}
-                  </span>
-                ) : null}
+                {/* "Oncology therapy signals (spend/volume)" caption REMOVED 2026-08-11:
+                    it claimed those two July-30 residue signals were "behind the 40%
+                    component" — false for the live 2026-08-06 formula, whose 40% is
+                    Part B patient volume. */}
                 {/* one-line note per the frame — methodology detail lives in the scoring
                     modal, not on the panel */}
                 {(sc.total_career_pubs ?? 0) === 0 ? (

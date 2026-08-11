@@ -32,7 +32,7 @@ import { FiChip, FiModal, FiToast } from "../FieldIntelligenceShared";
 import { profileHcp } from "./ProfileRelationshipControls";
 import {
   loadCommunityProfile, money, moneyCompact, titleCase, MATERIALITY_USD,
-  type CommunityProfile, type Product,
+  type CommunityProfile,
 } from "../../lib/communityProfile";
 import {
   loadPracticeProfile, classifyProducts, rucaLabel, placeOfServiceLabel,
@@ -216,19 +216,9 @@ export default function PracticeFirstProfile() {
         <div style={{ flex: "1 1 280px", maxWidth: 330, padding: "22px 26px", borderLeft: `1px solid ${F.line}` }}>
           <div style={{ ...mono(9), letterSpacing: "0.2em", color: F.ghost, marginBottom: 16 }}>PRACTICE SHAPE</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {/* data-gated NSCLC therapy signals (2026-07-30 re-score). Proxies — drugs
-                cross indications — so "NSCLC-relevant", never "NSCLC patients". */}
-            {(p.nsclc?.spend_3yr ?? 0) > 0 ? (
-              <ShapeRow l="Selected oncology therapy spend" v={moneyCompact(p.nsclc!.spend_3yr)} u=" / 3yr" />
-            ) : null}
-            {(p.nsclc?.volume_2023_est ?? 0) > 0 ? (
-              <ShapeRow l="Largest single-agent patient count" v={`≈${Math.round(p.nsclc!.volume_2023_est!)}`} u=" est. · 2023" />
-            ) : null}
-            {((p.nsclc?.spend_3yr ?? 0) > 0 || (p.nsclc?.volume_2023_est ?? 0) > 0) ? (
-              <div style={{ ...mono(9), color: F.faint, lineHeight: 1.5 }}>
-                Selected administered oncology agents. Claims carry no indication; these are not NSCLC-specific.
-              </div>
-            ) : null}
+            {/* July-30 rescore residue (spend_3yr / volume_2023_est) REMOVED from
+                display 2026-08-11 — abandoned-run snapshot overwritten by the
+                2026-08-06 rescore; live practice facts return with the fork rebuild. */}
             <ShapeRow l="Services" v={med?.services_3yr != null ? (med.services_3yr >= 1e6 ? `${(med.services_3yr / 1e6).toFixed(2)}M` : fmtInt(med.services_3yr)) : "—"} u=" line items" />
             {med?.medicare_paid_corrected != null ? (
               <ShapeRow l="Medicare paid" v={moneyCompact(med.medicare_paid_corrected)} u=" / 3yr" />
@@ -250,7 +240,10 @@ export default function PracticeFirstProfile() {
               </div>
               <div style={{ ...mono(10), color: F.faint, lineHeight: 1.6, marginBottom: 14 }}>Rank <span style={{ color: F.amber }}>{sc.rank?.toLocaleString()} of {sc.scope_size?.toLocaleString()}</span> · NSCLC community cohort</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {([["Therapy spend · 20", 20], ["Therapy vol (est.) · 20", 20], ["Engagement · 30", 30], ["Setting · 15", 15], ["Career · 10", 10], ["Publication · 5", 5]] as [string, number][]).map(([l, w]) => {
+                {/* LIVE 2026-08-06 formula weights (40/30/15/10/5) — the earlier
+                    "Therapy spend 20 / Therapy vol 20" split described the abandoned
+                    July-30 rescore and never ranked this board (corrected 2026-08-11). */}
+                {([["Patient volume · 40", 40], ["Engagement · 30", 30], ["Setting · 15", 15], ["Career · 10", 10], ["Publication · 5", 5]] as [string, number][]).map(([l, w]) => {
                   const dead = l.startsWith("Publication") && (sc.total_career_pubs ?? 0) === 0;
                   return (
                     <div key={l} style={{ display: "grid", gridTemplateColumns: "118px 1fr 34px", alignItems: "center", gap: 8 }}>
@@ -263,12 +256,8 @@ export default function PracticeFirstProfile() {
                   );
                 })}
               </div>
-              {/* the two stored signals behind the 40% activity component — traceable */}
-              {p.nsclc?.spend_signal != null && p.nsclc?.volume_signal != null ? (
-                <div style={{ ...mono(9.5), color: F.ghost, lineHeight: 1.6, marginTop: 10 }}>
-                  Oncology therapy signals (0–100 in cohort): spend {p.nsclc.spend_signal.toFixed(1)} · est. volume {p.nsclc.volume_signal.toFixed(1)}
-                </div>
-              ) : null}
+              {/* "Oncology therapy signals" caption REMOVED 2026-08-11 — those were
+                  July-30 residue signals, not inputs to the live 40% component. */}
               {(sc.total_career_pubs ?? 0) === 0 ? (
                 <div style={{ ...mono(10), color: F.ghost, lineHeight: 1.65, marginTop: 12 }}>No indexed publications — the 5-point publication component contributes nothing and is not redistributed.</div>
               ) : null}
