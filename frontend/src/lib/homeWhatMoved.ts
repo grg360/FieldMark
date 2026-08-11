@@ -11,16 +11,13 @@
 
 import { supabase } from "./supabase";
 
-// DEMO SEED (2026-08-07): the 2026-06-22 snapshot is ILLUSTRATIVE — 4 backdated
-// rows with invented pre-rescore percentiles, inserted for the demo because no
-// real cross-regime comparison yields risers (06-08 is pre-rescore/all fallers,
-// 08-05 is the current board/zero delta). The surface carries a mandatory
-// "ILLUSTRATIVE · BACKDATED SNAPSHOT" chip while WHAT_MOVED_SEEDED is true —
-// same provenance discipline as the forum's SEEDED marker.
-// REVERT: set date back to "2026-06-08", flag to false, and run
-//   DELETE FROM hcp_rising_star_snapshots WHERE snapshot_date = '2026-06-22';
-export const WHAT_MOVED_SNAPSHOT_DATE = "2026-06-22";
-export const WHAT_MOVED_SEEDED = true;
+// WHAT_MOVED_SEEDED gates the "ILLUSTRATIVE · BACKDATED SNAPSHOT" chip: it must be
+// true whenever the snapshot date points at fabricated rows (as in the 2026-08-07
+// demo seed, since deleted). While false, the comparison is against a real snapshot;
+// 06-08 is pre-rescore, so the honest empty state renders until a post-rescore
+// weekly snapshot yields risers.
+export const WHAT_MOVED_SNAPSHOT_DATE = "2026-06-08";
+export const WHAT_MOVED_SEEDED = false;
 
 export interface Mover {
   hcpId: string;

@@ -574,7 +574,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
         <span style={mono(11, 400, INK2, ".16em")}>WHAT MOVED</span>
         <span style={{ display: "flex", alignItems: "center", gap: 8, ...mono(10, 400, MID) }}>
           <span>COMPARED AGAINST</span>
-          <span style={{ color: INK3, border: `1px solid #2f2c27`, padding: "4px 7px" }}>22 JUN 2026</span>
+          <span style={{ color: INK3, border: `1px solid #2f2c27`, padding: "4px 7px" }}>8 JUN 2026</span>
         </span>
         {WHAT_MOVED_SEEDED ? (
           // Provenance marker — same dashed-amber discipline as the forum's
@@ -599,7 +599,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
           {/* BAND A — primary */}
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "8px 0 10px", borderBottom: `1px solid ${BORDER}`, ...mono(9, 400, DIM, ".14em"), flexWrap: "wrap", gap: 6 }}>
             <span>BAND A · {moved.bandA.tracked ? "TRACKED" : "UNTRACKED"}{moved.bandA.inTerritory ? " · INSIDE YOUR TERRITORY" : ""}</span>
-            <span>INDEX {fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)} SINCE 22 JUN</span>
+            <span>INDEX {fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)} SINCE 8 JUN</span>
           </div>
           <div style={{ borderLeft: `2px solid ${GOLD}`, background: CARD }}>
             <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "88px 1fr 190px" : "1fr", gap: isDesktop ? 26 : 14, padding: isDesktop ? "26px 28px 16px" : "18px 16px 10px" }}>
@@ -615,7 +615,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
                 </div>
                 {/* movement stated factually; no model-synthesis prose is fabricated */}
                 <p style={{ margin: 0, ...serif(16, 300, INK3, 1.6) }}>
-                  Rising-star index <span style={{ color: INK1, fontWeight: 500 }}>{fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)}</span> since 22 Jun 2026 — currently #{moved.bandA.nowRank} US.
+                  Rising-star index <span style={{ color: INK1, fontWeight: 500 }}>{fmtIdx(moved.bandA.idxWas)} → {fmtIdx(moved.bandA.idxNow)}</span> since 8 Jun 2026 — currently #{moved.bandA.nowRank} US.
                 </p>
               </div>
               {isDesktop ? (
@@ -645,7 +645,7 @@ function WhatMovedSection({ moved, isDesktop }: { moved: WhatMoved | null; isDes
             <>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "16px 0 10px", borderBottom: `1px solid ${BORDER}`, ...mono(9, 400, DIM, ".14em") }}>
                 <span>BAND B · SECONDARY MOVEMENT</span>
-                <span>{moved.bandB.length} MORE SINCE 22 JUN</span>
+                <span>{moved.bandB.length} MORE SINCE 8 JUN</span>
               </div>
               <div style={{ background: CARD, borderLeft: `2px solid #2f2c25` }}>
                 {moved.bandB.map((m: Mover, i: number) => (
