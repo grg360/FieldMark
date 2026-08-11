@@ -221,16 +221,75 @@ function TwoWindows({ ledger, narrow }: { ledger: PulseLedger; narrow: boolean }
         ? { text: ["IN HEADLINE ONLY", "BACKFILL RECOVERY"], color: C.goldDim, opacity: 1 }
         : { text: ["CLEAN", " "], color: C.faint, opacity: 1 };
 
+  // Narrow: Design's 1A "Months stack, windows become rails" (Pulse Mobile
+  // Forms, 2026-08-10). Time runs DOWN; PRIOR/RECENT/HEADLINE become vertical
+  // rails in the gutter spanning the months they cover, so every month stays
+  // on screen and the window relationships survive — the fix for the reverted
+  // horizontal-scroll attempt, where brackets pointed at months scrolled
+  // off-screen. Rail rows mirror the same fixed window indices as windowSums
+  // (PRIOR Feb–Mar, RECENT Apr–May, HEADLINE Apr–Jun).
+  if (narrow) {
+    const monthTone = (i: number) =>
+      i === 0
+        ? { label: C.muted, count: C.head2, fill: C.seriesEdge, opacity: 0.7 }
+        : i < 3
+          ? { label: C.head2, count: C.ink2, fill: C.seriesFill, opacity: 1 }
+          : { label: C.proseInk, count: C.ink, fill: C.movementFill, opacity: 1 };
+    const rail = (label: string, border: string, color: string, column: number, row: string) => (
+      <div style={{ gridColumn: column, gridRow: row, writingMode: "vertical-rl" as const, ...mono(8, color, 0.14), borderLeft: `2px solid ${border}`, paddingLeft: 3, display: "flex", alignItems: "center" }}>
+        {label}
+      </div>
+    );
+    return (
+      <Panel style={{ marginTop: 40 }}>
+        <PanelHeader label="THE TWO WINDOWS ON THIS PAGE" right="MONTHLY PUBLICATION TOTALS · PUBMED INGEST" />
+        <div style={{ padding: "20px 18px 22px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "16px 16px 1fr", columnGap: 8, rowGap: 12, alignItems: "stretch" }}>
+            {rail("PRIOR", C.bracket, C.head2, 1, "2 / span 2")}
+            {rail("RECENT", C.movementFill, C.ink2, 1, "4 / span 2")}
+            {rail("HEADLINE", C.goldDim, C.gold, 2, "4 / span 3")}
+            {ledger.corpusMonthly.map((m, i) => {
+              const tone = monthTone(i);
+              return (
+                <div key={m.label} style={{ gridColumn: 3, gridRow: i + 1, display: "flex", alignItems: "center", gap: 10, opacity: tone.opacity }}>
+                  <div style={{ ...mono(10, tone.label, 0.12), width: 30 }}>{m.label}</div>
+                  <div style={{ fontFamily: SERIF, fontSize: 19, color: tone.count, width: 52, textAlign: "right" }}>{m.pubs.toLocaleString()}</div>
+                  <div style={{ flex: 1, height: 7, background: C.shareTrack }}>
+                    <div style={{ width: `${Math.max(2, m.heightPct)}%`, height: "100%", background: tone.fill }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ height: 1, background: C.border, margin: "22px 0 16px" }} />
+
+          <div style={{ ...mono(9.5, C.gold, 0.16), marginBottom: 12 }}>MOVEMENT WINDOW · CHANGE IN SHARE, PERCENTAGE POINTS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 22px 1fr", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, borderLeft: `2px solid ${C.bracket}`, paddingLeft: 9 }}>
+              <div style={mono(9, C.muted, 0.14)}>PRIOR · FEB–MAR</div>
+              <div style={{ fontFamily: SERIF, fontSize: 26, color: C.head2, lineHeight: 1 }}>{ledger.windowSums.prior.toLocaleString()}</div>
+              <div style={mono(9, C.muted2, 0.1)}>PUB</div>
+            </div>
+            <div style={{ fontSize: 13, color: C.gold, textAlign: "center" }}>→</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, borderLeft: `2px solid ${C.movementFill}`, paddingLeft: 9 }}>
+              <div style={mono(9, C.ink2, 0.14)}>RECENT · APR–MAY</div>
+              <div style={{ fontFamily: SERIF, fontSize: 26, color: C.ink, lineHeight: 1 }}>{ledger.windowSums.recent.toLocaleString()}</div>
+              <div style={mono(9, C.muted2, 0.1)}>PUB</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 14, ...mono(10, C.muted, 0.03), lineHeight: 1.7, borderTop: `1px solid ${C.borderSoft}`, paddingTop: 12 }}>
+            Theme +/− below are this window pair: each theme's share of RECENT minus its share of PRIOR, in percentage points. Headline counts and shares are APR–JUN 2026 · {ledger.windowSums.headline.toLocaleString()} pub.
+          </div>
+        </div>
+      </Panel>
+    );
+  }
+
   return (
     <Panel style={{ marginTop: 40 }}>
       <PanelHeader label="THE TWO WINDOWS ON THIS PAGE" right="MONTHLY PUBLICATION TOTALS · PUBMED INGEST" />
       <div style={{ padding: "22px 20px 20px" }}>
-        {/* Narrow: the strip scrolls horizontally as ONE unit — tiles and window
-            brackets share column geometry, so wrapping/stacking would detach the
-            brackets from the months they annotate. Horizontal scroll is the
-            timeline-preserving mobile pattern here (2026-08-10). */}
-        <div style={narrow ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : undefined}>
-        <div style={narrow ? { minWidth: 560 } : undefined}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 2 }}>
           {ledger.corpusMonthly.map((m) => {
             const s = stateLabel(m.state);
@@ -297,7 +356,7 @@ function TwoWindows({ ledger, narrow }: { ledger: PulseLedger; narrow: boolean }
               RECENT · APR–MAY · {ledger.windowSums.recent.toLocaleString()} PUB
             </div>
           </div>
-          <div style={{ gridColumn: "6 / 7", paddingTop: narrow ? 0 : 14 }}>
+          <div style={{ gridColumn: "6 / 7", paddingTop: 14 }}>
             <div style={mono(10, C.head, 0.18)}>MOVEMENT WINDOW</div>
             <div style={{ ...mono(9, C.muted, 0.1), marginTop: 5, lineHeight: 1.6 }}>
               CHANGE IN SHARE
@@ -305,8 +364,6 @@ function TwoWindows({ ledger, narrow }: { ledger: PulseLedger; narrow: boolean }
               PERCENTAGE POINTS
             </div>
           </div>
-        </div>
-        </div>
         </div>
       </div>
     </Panel>
@@ -491,23 +548,33 @@ function DesktopLedger({ ledger }: { ledger: PulseLedger }) {
 }
 
 // ── Themes ledger — mobile (stacked) ────────────────────────────────────────
-function MobileMeasuredRow({ row }: { row: LedgerRow }) {
+// Design's 1D "Where it was, where it is" (Pulse Mobile Forms, 2026-08-10).
+// The bar is the theme's share of the RECENT movement window; the tick marks
+// its share of the PRIOR window; the gap between tick and bar-end IS the pp
+// change — movement shown, not asserted. Shares are the true window shares
+// (nRecent/recentTotal, nPrior/priorTotal), so the stated pair always
+// reconciles with the pp figure. axisMax is the shared scale ceiling computed
+// once across the measured set.
+function MobileMeasuredRow({ row, now, prior, axisMax }: { row: LedgerRow; now: number; prior: number; axisMax: number }) {
+  const d = row.delta ?? 0;
+  const strongGain = d >= 1;
+  const ppColor = row.deltaIsZero ? C.head2 : d > 0 ? (strongGain ? C.gold : C.goldRank) : C.head2;
+  const tickColor = strongGain ? C.gold : C.goldDim;
   return (
-    <div style={{ padding: "13px 0 14px", borderBottom: `1px solid ${C.borderSoft}` }}>
+    <div style={{ padding: "15px 0", borderBottom: `1px solid ${C.borderSoft}` }}>
       <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
         <div style={{ fontFamily: SERIF, fontSize: 15, color: C.goldRank, width: 20, flex: "none" }}>{row.rank}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: SERIF, fontSize: 15, color: C.ink, lineHeight: 1.3 }}>{row.name}</div>
-          <div style={{ ...mono(8.5, C.muted2, 0.1), marginTop: 5 }}>
-            {row.nText} PUB · {row.shareText}
-          </div>
-        </div>
+        <div style={{ flex: 1, fontFamily: SERIF, fontSize: 15, color: C.ink, lineHeight: 1.3 }}>{row.name}</div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 11, paddingLeft: 32 }}>
-        <div style={{ flex: 1 }}>
-          <MovementBar row={row} />
+      <div style={{ position: "relative", height: 16, margin: "11px 0 7px 32px", background: C.shareTrack }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, (now / axisMax) * 100)}%`, background: C.movementFill }} />
+        <div style={{ position: "absolute", left: `${Math.min(100, (prior / axisMax) * 100)}%`, top: -4, bottom: -4, width: 2, background: tickColor }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", paddingLeft: 32, ...mono(10, C.muted, 0.08) }}>
+        <div>
+          {prior.toFixed(1)}% <span style={{ color: C.muted2 }}>→</span> <span style={{ color: C.proseInk }}>{now.toFixed(1)}%</span> SHARE
         </div>
-        <div style={{ ...mono(13, row.deltaIsZero ? C.head2 : C.ink, 0), width: 58, textAlign: "right" }}>{row.deltaText}</div>
+        <div style={{ color: ppColor, fontWeight: 500 }}>{row.deltaText} pp</div>
       </div>
     </div>
   );
@@ -533,6 +600,11 @@ function MobileGatedRow({ row }: { row: LedgerRow }) {
 }
 
 function MobileLedger({ ledger }: { ledger: PulseLedger }) {
+  // True movement-window shares for the 1D meters; one shared scale so bars
+  // are comparable down the list. Ceiling snaps to the next 5% step.
+  const shareNow = (r: LedgerRow) => (ledger.windowSums.recent > 0 ? (r.nRecent / ledger.windowSums.recent) * 100 : 0);
+  const sharePrior = (r: LedgerRow) => (ledger.windowSums.prior > 0 ? (r.nPrior / ledger.windowSums.prior) * 100 : 0);
+  const axisMax = Math.max(5, Math.ceil(Math.max(1, ...ledger.measured.map((r) => Math.max(shareNow(r), sharePrior(r)))) / 5) * 5);
   return (
     <div style={{ marginTop: 28 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, paddingBottom: 12 }}>
@@ -553,12 +625,22 @@ function MobileLedger({ ledger }: { ledger: PulseLedger }) {
         <div style={{ display: "flex", gap: 8, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.borderSoft}` }}>
           <div style={{ width: 2, alignSelf: "stretch", background: C.gold, flex: "none" }} />
           <div style={{ ...mono(8.5, C.goldCaveat, 0.08), lineHeight: 1.65 }}>
-            NOT LOAD-BEARING. UNRELIABLE UNTIL THREE CLEAN INGEST CYCLES HAVE RUN — NOT YET MET. DO NOT CARRY INTO A CONVERSATION AS TREND.
+            NOT LOAD-BEARING. UNRELIABLE UNTIL THREE CLEAN INGEST CYCLES HAVE RUN. DO NOT CARRY INTO A CONVERSATION AS TREND.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 10, paddingTop: 9, borderTop: `1px solid ${C.borderSoft}`, ...mono(9, C.muted, 0.12) }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 14, height: 9, background: C.movementFill }} />
+            SHARE NOW
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 2, height: 13, background: C.gold }} />
+            PRIOR WINDOW
           </div>
         </div>
       </div>
       {ledger.measured.map((r) => (
-        <MobileMeasuredRow key={r.rank} row={r} />
+        <MobileMeasuredRow key={r.rank} row={r} now={shareNow(r)} prior={sharePrior(r)} axisMax={axisMax} />
       ))}
       <div style={{ background: C.panelDark, borderTop: `1px solid ${C.borderMed}`, borderBottom: `1px solid ${C.border}`, padding: "10px 0 11px", marginTop: 8 }}>
         <div style={mono(9, C.head2, 0.18)}>BELOW THE GATE · {ledger.gatedRangeText}</div>
