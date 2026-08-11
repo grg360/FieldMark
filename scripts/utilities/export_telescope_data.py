@@ -257,10 +257,12 @@ NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
 # a rank table would fan a JOIN out and duplicate the collaborator, so membership is tested,
 # never joined. Guarantees exactly one row per (seed, rank) → at most 5 per node.
 #   {rising_exists}: the TA-appropriate rising-membership EXISTS clause.
-# Return the collaborator's RAW rank in each cohort (established / rising /
-# community). enrich_focus() picks the stronger cohort by PERCENTILE and bakes
-# {cohort, rank} — so the frontend can SHOW "Rising #4" / "Established #296"
-# instead of falsely claiming a ranked person is unrecognized. `{rising_rank}` is
+# Return the collaborator's RAW rank in the two ACADEMIC cohorts (established /
+# rising). enrich_focus() picks the stronger academic cohort by PERCENTILE and
+# bakes {cohort, rank} — so the frontend can SHOW "Rising #4" / "Established
+# #296" instead of falsely claiming a ranked person is unrecognized. Community
+# is a membership FACT only (cohort: "community", rank: null) — community is
+# not ranked (Phase 3). `{rising_rank}` is
 # the per-TA rising-rank scalar subquery.
 FOCUS_SQL_TEMPLATE = """
 WITH seed AS (SELECT DISTINCT unnest(%(ids)s::uuid[]) AS hcp_id)  -- DISTINCT: the overview
@@ -390,33 +392,34 @@ def enrich_focus(nodes: List[Dict[str, Any]], ta_id: str, rising_rank: str, risi
         "WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global' "
         "AND hcp_id = ANY(%(ids)s::uuid[]) GROUP BY 1", {"ta": ta_id, "ids": collab_ids})}
     ris_map = {r["id"]: r["r"] for r in run_query(rising_rank, {"ta": ta_id, "ids": collab_ids})}
-    com_map = {r["id"]: r["r"] for r in run_query(
-        "SELECT hcp_id::text AS id, min(rank) AS r FROM hcp_community_ranks_v2 "
-        "WHERE therapeutic_area_id = %(ta)s AND hcp_id = ANY(%(ids)s::uuid[]) GROUP BY 1",
-        {"ta": ta_id, "ids": collab_ids})}
+    # Community membership (Phase 3, 2026-08-11): community is NOT ranked — the
+    # collaborator label survives as a FACT (board membership via qualifies),
+    # but no community rank or rank-percentile is read or baked. This was the
+    # telescope path's last community-rank reader.
+    com_set = {r["id"] for r in run_query(
+        "SELECT hcp_id::text AS id FROM community_board_nsclc_v1 "
+        "WHERE qualifies AND hcp_id = ANY(%(ids)s::uuid[])",
+        {"ids": collab_ids})}
     for r in rows:
         r["est_rank"] = est_map.get(r["collab_id"])
         r["rising_rank"] = ris_map.get(r["collab_id"])
-        r["community_rank"] = com_map.get(r["collab_id"])
+        r["is_community"] = r["collab_id"] in com_set
     est_size = (run_query(
         "SELECT count(*) AS c FROM hcp_established_ranks_v3 "
         "WHERE therapeutic_area_id = %(ta)s AND scope_type = 'global'", {"ta": ta_id})[0]["c"]) or 1
     ris_size = (run_query(rising_size, {"ta": ta_id})[0]["c"]) or 1
-    com_size = (run_query(
-        "SELECT count(*) AS c FROM hcp_community_ranks_v2 "
-        "WHERE therapeutic_area_id = %(ta)s", {"ta": ta_id})[0]["c"]) or 1
 
-    def choose(er, rr, cr):
-        # (percentile, cohort, rank, tiebreak) — lower percentile wins; ties → rising.
+    def choose(er, rr, is_com):
+        # (percentile, cohort, rank, tiebreak) — lower percentile wins; ties →
+        # rising. Community is a membership FACT, never a percentile candidate:
+        # it labels only when no academic rank exists, and carries no rank.
         cands = []
         if er is not None:
             cands.append((er / est_size, "established", er, 1))
         if rr is not None:
             cands.append((rr / ris_size, "rising", rr, 0))
-        if cr is not None:
-            cands.append((cr / com_size, "community", cr, 2))
         if not cands:
-            return ("other", None)
+            return ("community", None) if is_com else ("other", None)
         cands.sort(key=lambda c: (c[0], c[3]))
         return (cands[0][1], cands[0][2])
 
@@ -424,7 +427,7 @@ def enrich_focus(nodes: List[Dict[str, Any]], ta_id: str, rising_rank: str, risi
 
     by_seed: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for r in rows:
-        cohort, rank = choose(r["est_rank"], r["rising_rank"], r["community_rank"])
+        cohort, rank = choose(r["est_rank"], r["rising_rank"], r["is_community"])
         by_seed[r["seed_id"]].append({
             "hcp_id": r["collab_id"],
             "name": r["collab_name"],

@@ -611,7 +611,7 @@ class Sky extends Component<Props, State> {
             <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: TINT[c.cohort], boxShadow: `0 0 9px ${TINT[c.cohort]}`, ...(c.inField ? {} : { outline: "1px dashed rgba(168,189,216,0.6)", outlineOffset: 3 }) }} />
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ font: "300 15px/1.2 Jost,sans-serif", color: "#dcd9d0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-              <div style={{ font: "300 11px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#565d72" : "#7d90ad", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.inField ? c.inst : (c.rank != null && c.srcCohort !== "other" ? ROLE[c.srcCohort] + " #" + c.rank : "Outside this sky")}</div>
+              <div style={{ font: "300 11px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#565d72" : "#7d90ad", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.inField ? c.inst : (c.srcCohort === "community" ? ROLE.community : c.rank != null && c.srcCohort !== "other" ? ROLE[c.srcCohort] + " #" + c.rank : "Outside this sky")}</div>
             </div>
             <div style={{ font: "300 16px/1 Jost,sans-serif", color: "#c9c6bd", flex: "none" }}>{c.w}</div>
             <div style={{ font: "300 15px/1 Jost,sans-serif", color: c.inField ? "#3f4658" : "transparent", flex: "none" }}>→</div>
@@ -623,11 +623,16 @@ class Sky extends Component<Props, State> {
         // The star is "outside the sky" (not drawn among the fifty) — but that is a
         // fact about the DRAWING, not the person. Where the platform ranks them,
         // SHOW the rank; deny a ranking ONLY when there genuinely is none.
-        const ranked = c.rank != null && (c.srcCohort === "established" || c.srcCohort === "rising" || c.srcCohort === "community");
+        // Community (Phase 3): a valid cohort with NO rank — board membership is
+        // the fact; no numeral ever renders for it.
+        const ranked = c.rank != null && (c.srcCohort === "established" || c.srcCohort === "rising");
         selName = c.name; selInst = "";
         if (ranked) {
           selRole = ROLE[c.srcCohort] + " · #" + c.rank; selRoleColor = TINT[c.srcCohort] ?? OTHER;
           banner = ROLE[c.srcCohort] + " #" + c.rank + " in " + ta + ". This star sits outside the fifty drawn in this sky — it is on " + h.name + "'s orbit because they share " + c.w + " publications.";
+        } else if (c.srcCohort === "community") {
+          selRole = ROLE.community; selRoleColor = TINT.community ?? OTHER;
+          banner = "A " + ta + " community board clinician — community is not ranked. It is here because " + h.name + " has " + c.w + " shared publications with them.";
         } else {
           selRole = ROLE.other; selRoleColor = OTHER;
           banner = "Not ranked in " + ta + ". It is here because " + h.name + " has " + c.w + " shared publications with them.";
@@ -884,7 +889,7 @@ class Sky extends Component<Props, State> {
                           <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: TINT[c.cohort], boxShadow: `0 0 9px ${TINT[c.cohort]}`, ...(c.inField ? {} : { outline: "1px dashed rgba(168,189,216,0.6)", outlineOffset: 3 }) }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ font: "300 14px/1.2 Jost,sans-serif", color: "#dcd9d0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
-                            <div style={{ font: "300 10px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#4d5468" : "#7d90ad" }}>{c.inField ? c.inst : (c.rank != null && c.srcCohort !== "other" ? ROLE[c.srcCohort] + " #" + c.rank : "Outside this sky")}</div>
+                            <div style={{ font: "300 10px/1.3 Jost,sans-serif", letterSpacing: "0.03em", color: c.inField ? "#4d5468" : "#7d90ad" }}>{c.inField ? c.inst : (c.srcCohort === "community" ? ROLE.community : c.rank != null && c.srcCohort !== "other" ? ROLE[c.srcCohort] + " #" + c.rank : "Outside this sky")}</div>
                           </div>
                           <div style={{ font: "300 15px/1 Jost,sans-serif", color: "#c9c6bd", flex: "none" }}>{c.w}</div>
                           <div style={{ font: "300 15px/1 Jost,sans-serif", color: c.inField ? "#5a6178" : "transparent", flex: "none", width: 12, textAlign: "right" }}>{c.inField ? "→" : ""}</div>
