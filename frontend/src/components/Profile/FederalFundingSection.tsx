@@ -23,6 +23,7 @@ const INK_BRIGHT = COOL.ui;
 const INK_MID = COOL.muted;
 const INK_DIM = "#7C8288";
 const LINE = "rgba(255,255,255,.06)";
+const LINE_RULE = "rgba(255,255,255,.14)"; // sparse-state left rule (the brief's lineStrong)
 
 function money(v: number): string {
   if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
@@ -41,7 +42,10 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
   }, [hcpId]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    // height 100% + the footer's marginTop:auto pin the provenance to the
+    // bottom of the pair column (frame: margin:auto 0 0), matching the
+    // collaborators column's depth when this section is the shorter one.
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%" }}>
       <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: INK_HEAD }}>
         FEDERAL FUNDING · NIH REPORTER · DISPLAYED, NOT RANKED
       </span>
@@ -61,65 +65,114 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
         </span>
       ) : (
         <>
-          {/* headline (2026-08-10 recency ruling): active INDEPENDENT funding
-              as CONTACT PI leads; the active qualifier is never dropped */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ ...mono(13, 600), color: INK_BRIGHT }}>{facts.activeIndependentAsContactPi}</span>
-            <span style={{ ...mono(9), letterSpacing: ".1em", color: INK_MID }}>
-              ACTIVE INDEPENDENT NIH AWARDS AS CONTACT PI (BY RECORDED PROJECT DATES)
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", ...mono(9), letterSpacing: ".1em" }}>
-            {facts.firstIndependentFy != null ? (
-              <span style={{ color: INK_MID }}>FIRST INDEPENDENT AWARD FY{facts.firstIndependentFy}</span>
-            ) : null}
-            <span style={{ color: INK_DIM }}>
-              {facts.activeByDates} ACTIVE OF {facts.total} MATCHED SINCE FY2012
-              {facts.latestFy != null ? ` · MOST RECENT AWARD FY${facts.latestFy}` : ""}
-            </span>
-          </div>
+          {/* Two-state layout (The Record v2 frame, approved 2026-08-10). The
+              state derives from the HCP's DATA — the frame's SPARSE/RICH pill
+              was a demo control and does not ship. Rich (active independent
+              awards as contact PI > 0): promoted numerals for real figures.
+              Sparse (0 active): one quiet line — no giant zero. The frame's
+              warm demo palette is re-inked to the app's COOL register. */}
+          {facts.activeIndependentAsContactPi > 0 ? (
+            <>
+              {/* RICH — lead cells (label over numeral, THE RECORD's stat
+                  idiom). The active qualifier is never dropped (ruling 1);
+                  NCI apart, never folded into a total (ruling 3). Annual
+                  dollars kept from the four-altitude build — the frame's
+                  demo data simply had none. */}
+              <div style={{ display: "flex", gap: 44, flexWrap: "wrap", paddingTop: 2 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 230 }}>
+                  <span style={{ ...mono(9), letterSpacing: ".1em", color: INK_MID, lineHeight: 1.5 }}>
+                    ACTIVE INDEPENDENT NIH AWARDS AS CONTACT PI (BY RECORDED PROJECT DATES)
+                  </span>
+                  <span style={{ ...mono(20, 500), color: INK_BRIGHT, fontVariantNumeric: "tabular-nums" }}>{facts.activeIndependentAsContactPi}</span>
+                </div>
+                {facts.activeAnnualCost > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 230 }}>
+                    <span style={{ ...mono(9), letterSpacing: ".1em", color: INK_MID, lineHeight: 1.5 }}>
+                      LATEST FISCAL-YEAR COSTS ACROSS ACTIVE GRANTS · ANNUAL FIGURE, NOT A CAREER TOTAL
+                    </span>
+                    <span style={{ ...mono(20, 500), color: INK_BRIGHT, fontVariantNumeric: "tabular-nums" }}>{money(facts.activeAnnualCost)}</span>
+                  </div>
+                ) : null}
+                {(() => {
+                  const nci = facts.institutes.find((i) => i.code === "NCI");
+                  if (!nci) return null;
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <span style={{ ...mono(9), letterSpacing: ".1em", color: INK_MID, lineHeight: 1.5 }}>NCI · MATCHED</span>
+                      <span style={{ ...mono(20, 500), color: INK_BRIGHT, fontVariantNumeric: "tabular-nums" }}>{nci.total}</span>
+                    </div>
+                  );
+                })()}
+              </div>
 
-          {/* institutes — NCI first and apart, never folded into a total */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(10) }}>
-            {facts.institutes.map((i) => (
-              <span key={i.code} style={{ color: i.code === "NCI" ? INK_BRIGHT : INK_DIM, letterSpacing: ".06em" }}>
-                {i.code} {i.active > 0 ? `${i.active} ACTIVE / ` : ""}{i.total}
+              {/* supporting facts — two lines, one visual step down */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(9), letterSpacing: ".1em" }}>
+                  {facts.firstIndependentFy != null ? (
+                    <span style={{ color: INK_MID }}>FIRST INDEPENDENT AWARD FY{facts.firstIndependentFy}</span>
+                  ) : null}
+                  <span style={{ color: INK_DIM }}>
+                    {facts.activeByDates} ACTIVE OF {facts.total} MATCHED SINCE FY2012
+                    {facts.latestFy != null ? ` · MOST RECENT AWARD FY${facts.latestFy}` : ""}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(9.5) }}>
+                  <span style={{ color: INK_MID, letterSpacing: ".06em" }}>
+                    {facts.mechanisms.map((m) => `${m.family} ×${m.count}`).join(" · ")}
+                  </span>
+                  {/* role labels are exact (2026-08-10 blocker resolution): the
+                      match table holds ONLY RePORTER's PI list — contact PI +
+                      genuine MPIs; co-investigators never enter it. */}
+                  <span style={{ color: INK_DIM, letterSpacing: ".08em" }}>
+                    CONTACT PI ON {facts.contactPiCount}{facts.mpiCount > 0 ? ` · MPI ON ${facts.mpiCount}` : ""}
+                  </span>
+                </div>
+                {facts.institutes.some((i) => i.code !== "NCI") ? (
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(10) }}>
+                    {facts.institutes.filter((i) => i.code !== "NCI").map((i) => (
+                      <span key={i.code} style={{ color: INK_DIM, letterSpacing: ".06em" }}>
+                        {i.code} {i.active > 0 ? `${i.active} ACTIVE / ` : ""}{i.total}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {/* K→R01 — high-confidence only; the ambiguous case renders nothing */}
+                {facts.kToR01 ? (
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ ...mono(9), color: INK_BRIGHT }}>▸</span>
+                    <span style={{ ...mono(9), letterSpacing: ".08em", color: INK_MID }}>
+                      K → R01 TRANSITION · K AWARD (FY{facts.kToR01.kFirstFy}) PRECEDED FIRST R01-CLASS AWARD (FY{facts.kToR01.rFirstFy}) · SAME NIH PROFILE, PI ON BOTH
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            /* SPARSE — matched history but nothing currently active as an
+               independent contact-PI award: one quiet left-ruled line and a
+               dim fact row. Never a promoted zero. Phrasing per the approved
+               frame; the parenthetical stays honest when other award types
+               (e.g. a K) are still active by dates. */
+            <div style={{ display: "flex", flexDirection: "column", gap: 9, borderLeft: `1px solid ${LINE_RULE}`, paddingLeft: 14, maxWidth: 560 }}>
+              <span style={{ ...mono(11.5), color: COOL.prose, lineHeight: 1.6, letterSpacing: ".02em" }}>
+                No active independent NIH awards ({facts.total} matched, {facts.activeByDates === 0 ? "none currently active" : `${facts.activeByDates} active by dates, none independent as contact PI`})
+                {facts.latestFy != null ? ` · most recent FY${facts.latestFy}` : ""}
               </span>
-            ))}
-          </div>
-
-          {/* mechanisms + role */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(9.5) }}>
-            <span style={{ color: INK_MID, letterSpacing: ".06em" }}>
-              {facts.mechanisms.map((m) => `${m.family} ×${m.count}`).join(" · ")}
-            </span>
-            {/* role labels are exact (2026-08-10 blocker resolution): the match
-                table holds ONLY RePORTER's PI list — contact PI + genuine MPIs;
-                co-investigators never enter it. "MPI", never "co-PI". */}
-            <span style={{ color: INK_DIM, letterSpacing: ".08em" }}>
-              CONTACT PI ON {facts.contactPiCount}{facts.mpiCount > 0 ? ` · MPI ON ${facts.mpiCount}` : ""}
-            </span>
-          </div>
-
-          {/* dollars — annual figure only, labeled as such */}
-          {facts.activeAnnualCost > 0 ? (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ ...mono(12, 500), color: COOL.prose }}>{money(facts.activeAnnualCost)}</span>
-              <span style={{ ...mono(8.5), letterSpacing: ".1em", color: INK_DIM }}>
-                LATEST FISCAL-YEAR COSTS ACROSS ACTIVE GRANTS · ANNUAL FIGURE, NOT A CAREER TOTAL
-              </span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", ...mono(9.5), letterSpacing: ".06em", color: INK_DIM }}>
+                {facts.firstIndependentFy != null ? <span>FIRST INDEPENDENT AWARD FY{facts.firstIndependentFy}</span> : null}
+                {facts.mechanisms.length ? <span>{facts.mechanisms.map((m) => `${m.family} ×${m.count}`).join(" · ")}</span> : null}
+                <span>CONTACT PI ON {facts.contactPiCount}{facts.mpiCount > 0 ? ` · MPI ON ${facts.mpiCount}` : ""}</span>
+                {(() => {
+                  const nci = facts.institutes.find((i) => i.code === "NCI");
+                  return nci ? <span>NCI · MATCHED {nci.total}</span> : null;
+                })()}
+              </div>
             </div>
-          ) : null}
+          )}
 
-          {/* K->R01 — high-confidence only; the ambiguous case renders nothing */}
-          {facts.kToR01 ? (
-            <div style={{ ...mono(9), letterSpacing: ".08em", color: INK_MID, paddingTop: 2 }}>
-              K → R01 TRANSITION · K AWARD (FY{facts.kToR01.kFirstFy}) PRECEDED FIRST R01-CLASS AWARD (FY{facts.kToR01.rFirstFy}) · SAME NIH PROFILE, PI ON BOTH
-            </div>
-          ) : null}
-
-          <div style={{ ...mono(8.5), letterSpacing: ".08em", color: INK_HEAD, lineHeight: 1.7, borderTop: `1px solid ${LINE}`, paddingTop: 6 }}>
-            MATCHED BY INVESTIGATOR NAME AND INSTITUTION AGAINST NIH REPORTER'S PI LIST (CONTACT PI + MPIS — CO-INVESTIGATORS ARE NOT IN THIS RECORD) · FY2012–2026, CURATED ACTIVITY CODES · INDEPENDENT = NON-K MECHANISM · PROJECT DATES ARE ADMINISTRATIVE RECORDS
+          {/* PROVENANCE — fine print, sentence-cased, smallest and dimmest */}
+          <div style={{ ...mono(8), letterSpacing: ".04em", color: INK_HEAD, lineHeight: 1.7, borderTop: `1px solid ${LINE}`, paddingTop: 6, maxWidth: 560, marginTop: "auto" }}>
+            Matched by investigator name and institution against NIH RePORTER's PI list (contact PI + MPIs — co-investigators are not in this record) · FY2012–2026, curated activity codes · independent = non-K mechanism · project dates are administrative records
           </div>
         </>
       )}

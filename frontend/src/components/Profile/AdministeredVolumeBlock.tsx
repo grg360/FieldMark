@@ -243,6 +243,20 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
 
   if (loading || !t) return null;
 
+  // ── Read-failure state (2026-08-10, Option A) — the read failed, so nothing
+  // is known: no table, no absence copy, no implied answer. One dim line,
+  // the Federal Funding "GRANT RECORD UNAVAILABLE" treatment. ──
+  if (t.state === "unavailable") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Header subtitle="office-administered oncology agents" />
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, padding: "18px 22px" }}>
+          <span style={{ ...mono(9.5), letterSpacing: ".1em", color: C.dim }}>PART B RECORD UNAVAILABLE</span>
+        </div>
+      </div>
+    );
+  }
+
   // ── No-NPI absence state (2026-08-10) — record-linkage absence, not a claims
   // fact. Mechanism claim only, never a prevalence claim (Garrett's ruling):
   // institution billing exists and doesn't reach individual records; how many
