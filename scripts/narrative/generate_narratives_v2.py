@@ -123,12 +123,9 @@ COHORT_SCORE_CONFIG: Dict[str, Dict[str, Any]] = {
     "community": {
         "score_table": "hcp_community_scores_v2",
         "rank_table": "hcp_community_ranks_v2",
-        "score_fields": {
-            "pharma_engagement": "pharma_engagement_score",
-            "engagement_breadth": "engagement_breadth_score",
-            "medicare_volume": "medicare_volume_score",
-            "career_stage": "career_stage_score",
-        },
+        # score_fields removed (Phase 2, 2026-08-11): the four *_score columns
+        # they mapped are 100% NULL — dead reads that fed None into prompts.
+        # Community narrative regen off raw facts is Phase 4.
     },
 }
 
@@ -1126,11 +1123,9 @@ def load_hcp_contexts(
         if not cohort_hcp_ids:
             continue
         score_table = cohort_config["score_table"]
-        score_cols = list(cohort_config["score_fields"].values())
-        scores_select = (
-            "hcp_id,therapeutic_area_id,composite_score,"
-            + ",".join(score_cols)
-            + ",scored_at"
+        score_cols = list(cohort_config.get("score_fields", {}).values())
+        scores_select = ",".join(
+            ["hcp_id", "therapeutic_area_id", "composite_score", *score_cols, "scored_at"]
         )
         print(f"Loading scores from {score_table} for {cohort}...")
         scores = fetch_all_rows(
@@ -1205,7 +1200,7 @@ def load_hcp_contexts(
             cohort_cls = hcp.get("cohort_classification", "unknown")
             percentile_data: Dict[str, int] = {}
             if score_row and config:
-                for field_name, db_column in config["score_fields"].items():
+                for field_name, db_column in config.get("score_fields", {}).items():
                     value = safe_float(score_row.get(db_column))
                     if value is not None:
                         distribution = (

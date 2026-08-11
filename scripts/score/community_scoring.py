@@ -1,5 +1,18 @@
 """
-FieldMark — Score Community HCPs per therapeutic area (v1 methodology).
+FieldMark — Community facts pipeline (Phase 2, 2026-08-11: the composite is DEAD).
+
+Community is NOT ranked. This script writes the five displayed RAW FACTS per
+(hcp, TA) — patient_volume, pharma_engagement, group_practice_signal,
+career_years, publication_signal — and explicitly NULLs composite_score /
+normalized_score on every row it writes. No weighting, no normalization, no
+rank rows. Membership is community_board_nsclc_v1.qualifies (G2); ordering is
+an MSL-chosen sort over facts, never a score.
+
+DO NOT RUN before the Phase 3 reader scrub lands: five read paths still ORDER
+BY normalized_score (hcp_community_ranks_v2, get_community_filtered themed,
+community_ledger, community_tiered_ranks, community_hcp_profile) and a run
+that NULLs scores before they are re-pointed turns their orderings into
+plausible-looking garbage.
 
 Membership source (2026-08-06): hcp_cohort_classification_v2 where cohort =
 'community'. This REPLACES the old gate on hcps_v2.cohort_classification — a
@@ -19,12 +32,10 @@ surfaces every newly-classified member the moment it lands.
 Requires: SUPABASE_URL, SUPABASE_KEY (python-dotenv loads .env).
 hcp_community_scores_v2 must already exist in Supabase (create manually).
 
-NOTE — not yet on the weekly reingest cycle. The composite is min-max
-normalised 0-100 within cohort every run, so ranks drift between runs; before
-this becomes a weekly stage it needs the same snapshot discipline as
-rising/established (take_weekly_snapshot.py), or a baseline that spans a
-methodology change will misread as movement — the lesson from the rising
-un-freeze.
+NOTE — not yet on the weekly reingest cycle. With the composite dead the old
+snapshot-discipline blocker (rank drift between runs) no longer applies, but
+keep it off-cycle until Phase 3's reader scrub removes the last ORDER BY on
+the frozen columns.
 
 Examples:
   python community_scoring.py --dry-run
@@ -42,19 +53,13 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-from score_ranking import compute_and_write_ranks
-
 READ_PAGE_SIZE = 1000
 WRITE_BATCH_SIZE = 500
 CURRENT_YEAR = datetime.now(timezone.utc).year  # was frozen at 2026; career-age arithmetic must track the clock
 
-WEIGHTS = {
-    "patient_volume": 0.40,
-    "pharma_engagement": 0.30,
-    "group_practice_signal": 0.15,
-    "career_years": 0.10,
-    "publication_signal": 0.05,
-}
+# The 40/30/15/10/5 WEIGHTS vector and the composite it fed were removed in
+# Phase 2 (2026-08-11): community is not ranked. The five raw component FACTS
+# are still measured and written below; they are displayed, never summed.
 
 
 def env(name: str) -> str:
@@ -85,17 +90,6 @@ def parse_float(v: Any, default: float = 0.0) -> float:
         return float(v)
     except Exception:
         return default
-
-
-def normalize_0_100(values: Dict[Tuple[str, str], float]) -> Dict[Tuple[str, str], float]:
-    if not values:
-        return {}
-    vals = list(values.values())
-    lo = min(vals)
-    hi = max(vals)
-    if hi == lo:
-        return {k: 50.0 for k in values}
-    return {k: ((v - lo) / (hi - lo)) * 100.0 for k, v in values.items()}
 
 
 def fetch_pages(
@@ -425,45 +419,20 @@ def main() -> None:
     for ta_id, cnt in per_ta_counts.most_common():
         print(f"  {ta_id}: {cnt:,}")
 
-    norm_patient: Dict[Tuple[str, str], float] = {}
-    norm_pharma: Dict[Tuple[str, str], float] = {}
-    norm_group: Dict[Tuple[str, str], float] = {}
-    norm_career: Dict[Tuple[str, str], float] = {}
-    norm_pub: Dict[Tuple[str, str], float] = {}
-
-    ta_ids = sorted({ta for _, ta in raw_patient_volume.keys()})
-    for ta_id in ta_ids:
-        keys = [k for k in raw_patient_volume.keys() if k[1] == ta_id]
-        norm_patient.update(normalize_0_100({k: raw_patient_volume[k] for k in keys}))
-        norm_pharma.update(normalize_0_100({k: raw_pharma[k] for k in keys}))
-        norm_group.update(normalize_0_100({k: raw_group_signal[k] for k in keys}))
-        norm_career.update(normalize_0_100({k: raw_career_years[k] for k in keys}))
-        norm_pub.update(normalize_0_100({k: raw_pub_signal[k] for k in keys}))
-
-    composite_raw: Dict[Tuple[str, str], float] = {}
-    for key in raw_patient_volume.keys():
-        composite_raw[key] = (
-            WEIGHTS["patient_volume"] * norm_patient.get(key, 0.0)
-            + WEIGHTS["pharma_engagement"] * norm_pharma.get(key, 0.0)
-            + WEIGHTS["group_practice_signal"] * norm_group.get(key, 0.0)
-            + WEIGHTS["career_years"] * norm_career.get(key, 0.0)
-            + WEIGHTS["publication_signal"] * norm_pub.get(key, 0.0)
-        )
-
-    normalized_score: Dict[Tuple[str, str], float] = {}
-    for ta_id in ta_ids:
-        ta_map = {k: v for k, v in composite_raw.items() if k[1] == ta_id}
-        normalized_score.update(normalize_0_100(ta_map))
-
+    # Phase 2: no normalization, no weighting, no composite. The two score
+    # columns are written as EXPLICIT NULLs (not omitted): upsert merges only
+    # the provided columns, so omitting them would silently preserve stale
+    # score values on every existing row — a frozen column that looks live,
+    # the residue bug. An explicit NULL makes any stray read obviously dead.
     rows_to_write: List[Dict[str, Any]] = []
-    for key in sorted(composite_raw.keys()):
+    for key in sorted(raw_patient_volume.keys()):
         hid, ta_id = key
         rows_to_write.append(
             {
                 "hcp_id": hid,
                 "therapeutic_area_id": ta_id,
-                "composite_score": round(composite_raw[key], 4),
-                "normalized_score": round(normalized_score.get(key, 0.0), 4),
+                "composite_score": None,
+                "normalized_score": None,
                 "patient_volume": round(raw_patient_volume[key], 4),
                 "pharma_engagement": round(raw_pharma[key], 4),
                 "group_practice_signal": round(raw_group_signal[key], 4),
@@ -491,31 +460,24 @@ def main() -> None:
         removed = delist_stale_scores(client, written_pairs, scored_ta_ids, dry_run=False)
         print(f"De-listed {removed:,} stale rows")
 
-    # Rank computation respects dry_run.
-    print("\nComputing country/region/global ranks for community cohort...")
-    compute_and_write_ranks(
-        client=client,
-        score_rows=rows_to_write,
-        cohort="community",
-        scoring_run_id=scoring_run_id,
-        dry_run=dry_run,
-    )
+    # Phase 2: NO rank computation. The compute_and_write_ranks community call
+    # died with the composite — this script writes no hcp_score_ranks_v2 rows.
+    # The stale community rows already in that table are Phase 3 cleanup.
 
-    print("\nTop 20 per TA by normalized_score:")
+    print("\nFact coverage per TA (no ordering is implied):")
     rows_by_ta: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for r in rows_to_write:
         rows_by_ta[str(r["therapeutic_area_id"])].append(r)
     for ta_id in sorted(rows_by_ta.keys()):
-        print(f"\nTA {ta_id} (pairs={len(rows_by_ta[ta_id]):,})")
-        top = sorted(rows_by_ta[ta_id], key=lambda r: float(r["normalized_score"]), reverse=True)[:20]
-        for r in top:
-            h = hcp_by_id.get(str(r["hcp_id"]), {})
-            name = f"{norm(h.get('first_name'))} {norm(h.get('last_name'))}".strip()
-            print(
-                f"  {name} ({r['hcp_id']}) norm={r['normalized_score']:.2f} comp={r['composite_score']:.2f} "
-                f"patient={r['patient_volume']:.2f} pharma={r['pharma_engagement']:.2f} "
-                f"group={r['group_practice_signal']:.2f} years={r['career_years']:.2f} pubs={r['publication_signal']:.2f}"
-            )
+        ta_rows = rows_by_ta[ta_id]
+        with_vol = sum(1 for r in ta_rows if float(r["patient_volume"]) > 0)
+        with_pharma = sum(1 for r in ta_rows if float(r["pharma_engagement"]) > 0)
+        with_pubs = sum(1 for r in ta_rows if float(r["publication_signal"]) > 0)
+        print(
+            f"  TA {ta_id}: pairs={len(ta_rows):,} "
+            f"patient_volume>0={with_vol:,} pharma_engagement>0={with_pharma:,} "
+            f"publication_signal>0={with_pubs:,}"
+        )
 
     # Membership is now the v2 taxonomy itself, so every scored pair is
     # community by construction. Report the scored-pair total against the

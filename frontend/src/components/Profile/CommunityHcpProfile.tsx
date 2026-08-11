@@ -217,7 +217,6 @@ export default function CommunityHcpProfile() {
   // practice_shape is null when the HCP holds no community rank row (an HCP outside the
   // cohort can still land on this spine) — guard, don't crash; rows data-gate to absent.
   const ps = p.practice_shape ?? { patient_volume: null, setting: null, career_years: null, drug_breadth: null, total_career_pubs: null };
-  const sc = p.score;
   const eng = p.engagement;
 
   // engagement record: split at the materiality threshold, sort per control
@@ -318,51 +317,18 @@ export default function CommunityHcpProfile() {
               </div>
             </div>
           </div>
-          {/* community score / decomposition — the interpretive frame */}
+          {/* Community standing — NOT RANKED (Phase 2, 2026-08-11). The composite
+              and its 40/30/15/10/5 decomposition died with the scoring change;
+              this rail states the frame. The measured facts render in the
+              practice-shape and engagement blocks, not here. */}
           <div style={{ flex: "1 1 260px", maxWidth: 320, padding: "22px 24px 20px", borderLeft: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ ...mono(9, 600), letterSpacing: ".18em", color: P.ink6 }}>COMMUNITY SCORE</span>
-            {p.has_score && sc?.normalized != null ? (
-              <>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  <span style={{ ...mono(30, 500), color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{Math.round(sc.normalized)}</span>
-                  <span style={{ ...mono(11), color: P.ink5 }}>/ 100</span>
-                </div>
-                <span style={{ ...mono(9.5), color: P.ink5, letterSpacing: ".04em" }}>Rank {sc.rank?.toLocaleString()} of {sc.scope_size?.toLocaleString()} · NSCLC community cohort</span>
-                {/* decomposition — weight bars (frame panel treatment). Bars show the real
-                    scoring WEIGHTS (40/30/15/10/5) of the LIVE 2026-08-06 formula —
-                    Patient volume is the single 40% component (Part B beneficiaries),
-                    matching community_scoring.py and the Methodology page. The earlier
-                    "Therapy spend 20 / Therapy vol. 20" split described the abandoned
-                    July-30 rescore and never ranked this board (corrected 2026-08-11). */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 8 }}>
-                  {([["Patient volume", 40], ["Engagement", 30], ["Setting", 15], ["Career", 10], ["Publication", 5]] as [string, number][]).map(([l, w]) => (
-                    <div key={l} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 96, ...mono(9), color: P.ink4, letterSpacing: ".02em" }}>{l}</span>
-                      <span style={{ flex: 1, height: 4, background: P.line, borderRadius: 1 }}>
-                        <span style={{ display: "block", height: 4, width: `${w * 2}%`, background: l === "Publication" && (sc.total_career_pubs ?? 0) === 0 ? P.lineStrong : P.rose, borderRadius: 1 }} />
-                      </span>
-                      <span style={{ width: 30, textAlign: "right", ...mono(9), color: P.ink3, fontVariantNumeric: "tabular-nums" }}>{w}%</span>
-                    </div>
-                  ))}
-                </div>
-                {/* "Oncology therapy signals (spend/volume)" caption REMOVED 2026-08-11:
-                    it claimed those two July-30 residue signals were "behind the 40%
-                    component" — false for the live 2026-08-06 formula, whose 40% is
-                    Part B patient volume. */}
-                {/* one-line note per the frame — methodology detail lives in the scoring
-                    modal, not on the panel */}
-                {(sc.total_career_pubs ?? 0) === 0 ? (
-                  <span style={{ ...mono(9), lineHeight: 1.55, color: P.ink6, letterSpacing: ".02em", paddingTop: 2, borderTop: `1px solid ${P.line}`, marginTop: 2 }}>
-                    No indexed publications — the 5-point publication component contributes nothing and is not redistributed.
-                  </span>
-                ) : null}
-              </>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ ...mono(12, 600), letterSpacing: ".1em", color: P.ink4 }}>SCORE NOT COMPUTABLE</span>
-                <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5 }}>Claims coverage below threshold — no community score. A partial score would be read as a low score, so the numeral is withheld.</span>
-              </div>
-            )}
+            <span style={{ ...mono(9, 600), letterSpacing: ".18em", color: P.ink6 }}>COMMUNITY STANDING</span>
+            <span style={{ ...mono(12, 600), letterSpacing: ".1em", color: P.ink3 }}>NOT RANKED</span>
+            <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.55 }}>
+              Community clinicians are not scored or ordered. CMS claims measure throughput, not influence — this profile
+              shows the measured facts (Medicare reach, Part D presence, engagement history, practice setting) and asserts
+              no ranking among peers.
+            </span>
           </div>
         </div>
 

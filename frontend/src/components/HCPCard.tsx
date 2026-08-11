@@ -309,13 +309,13 @@ interface HCPCardProps {
   hcp: HCPCardHCP;
   onAddPress: (hcp: HCPCardHCP) => void;
   onCardPress: (hcp: HCPCardHCP) => void;
-  /** Opens methodology modal scrolled to Community or Workhorse section. */
-  onScoringExplainedPress?: (section: "community" | "workhorse") => void;
+  /** Opens methodology modal scrolled to the Community section. */
+  onScoringExplainedPress?: (section: "community") => void;
 }
 
 function cohortStatKeys(cohort: string): readonly string[] {
   if (cohort === "established") return ["SCIENTIFIC", "NETWORK", "PHARMA"] as const;
-  if (cohort === "community" || cohort === "workhorse") return ["ENGAGEMENT", "COMPANIES", "YEARS"] as const;
+  if (cohort === "community") return ["ENGAGEMENT", "COMPANIES", "YEARS"] as const;
   if (cohort === "rising_star" || cohort === "dark_horse") {
     return ["MOMENTUM", "VISIBILITY", "ARCHETYPE"] as const;
   }
@@ -331,7 +331,6 @@ function cohortBorderAccentColor(cohortClassification: string): string {
     case "established":
       return "#FFD700";
     case "community":
-    case "workhorse":
       return "#7B9EBD";
     default:
       return "#E8A020";
@@ -345,7 +344,7 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
     if (key === "PHARMA") return formatScoreInt(hcp.pharmaEngagementPctile);
     return "—";
   }
-  if (cohort === "community" || cohort === "workhorse") {
+  if (cohort === "community") {
     if (key === "ENGAGEMENT") return formatEngagementDollar(hcp.openPaymentsLifetime ?? null);
     if (key === "COMPANIES") return formatIntDisplay(hcp.distinctCompanies ?? null);
     if (key === "YEARS") return formatIntDisplay(hcp.careerYears ?? null);
@@ -381,8 +380,6 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
 const COHORT_SCORE_TIP_TEXT = {
   community:
     "Cohort score (0-100). Weighted combination of Medicare patient volume (40%), pharma engagement (30%), group practice signal (15%), career stage (10%), and publication signal (5%). Normalized 0-100 within the Community cohort.",
-  workhorse:
-    "Cohort score (0-100). Weighted combination of Medicare patient volume (60%) and career stage (40%). Identifies high-volume practitioners with low pharma engagement — underleveraged influence.",
 } as const;
 
 type CohortScoreTipVariant = keyof typeof COHORT_SCORE_TIP_TEXT;
@@ -424,7 +421,7 @@ function CohortScoreChipWithTip(props: {
     };
   }, [open, onOpenChange]);
 
-  const borderCol = variant === "community" ? "#E8A020" : "#4ECDC4";
+  const borderCol = "#E8A020";
 
   return (
     <div
@@ -559,13 +556,12 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
       : cohort;
   const scoreTooltipKey =
     effectiveCohort === "established" ? "FIELDMARK_SCORE_ESTABLISHED"
-    : (effectiveCohort === "community" || effectiveCohort === "workhorse") ? "FIELDMARK_SCORE_COMMUNITY"
+    : effectiveCohort === "community" ? "FIELDMARK_SCORE_COMMUNITY"
     : "FIELDMARK_SCORE_RISING";
   const isDarkHorse = cohort === "dark_horse";
-  const isWorkhorse = cohort === "workhorse";
   const isCommunityPlain = cohort === "community";
-  const accentColor = isDarkHorse ? "#9B6DFF" : isWorkhorse ? "#4ECDC4" : "#E8A020";
-  const accentBg = isDarkHorse ? "#0D0A1A" : isWorkhorse ? "#0A1A18" : "#1A1200";
+  const accentColor = isDarkHorse ? "#9B6DFF" : "#E8A020";
+  const accentBg = isDarkHorse ? "#0D0A1A" : "#1A1200";
   const borderAccentColor = cohortBorderAccentColor(effectiveCohort);
   const statPillKeys = cohortStatKeys(effectiveCohort);
   const isRisingCohort = effectiveCohort === "rising_star" || effectiveCohort === "dark_horse";
@@ -631,7 +627,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
       : formatCohortScore(hcp.cohortScore ?? null);
 
   // Score numeral: floor to one decimal for Established (cohort_score) and Rising Star /
-  // Dark Horse (rising_star_percentile) — see formatScoreFloor1. Community/workhorse/unclassified
+  // Dark Horse (rising_star_percentile) — see formatScoreFloor1. Community/unclassified
   // keep integer display. Numeral size stays 28px.
   const numeralScoreRaw = hcp.cohortScore ?? hcp.score ?? null;
   const usesFloorScore =
@@ -692,39 +688,6 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
         >
           {cohortScoreLabel}
         </button>
-      );
-    }
-    if (isWorkhorse) {
-      return (
-        <CohortScoreChipWithTip
-          variant="workhorse"
-          open={cohortScoreTipOpen}
-          onOpenChange={setCohortScoreTipOpen}
-          touchDevice={touchDevice}
-          scoreLabel={cohortScoreLabel}
-          chipButtonStyle={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: 1,
-            fontFamily: "monospace",
-            color: "#4ECDC4",
-            backgroundColor: "#0A1A18",
-            border: "1px solid #4ECDC4",
-            borderRadius: 2,
-            padding: "3px 8px",
-            minHeight: 0,
-            cursor: "pointer",
-            userSelect: "none",
-            lineHeight: 1.1,
-          }}
-          subtitle={
-            <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.85 }}>Workhorse</span>
-          }
-          onMethodologyPress={
-            onScoringExplainedPress ? () => onScoringExplainedPress("workhorse") : undefined
-          }
-        />
       );
     }
     if (cohort === "established") {
@@ -1039,7 +1002,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           </div>
         )}
 
-        {/* Dark Horse / Workhorse cohort badges */}
+        {/* Dark Horse cohort badge */}
         {isDarkHorse && (
           <div style={{ marginTop: 6 }}>
             <span
@@ -1055,24 +1018,6 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
             >
               <span style={{ fontSize: 10, color: "#9B6DFF", lineHeight: 1 }}>♞</span>
               <span style={{ fontSize: 10, color: "#9B6DFF", fontFamily: "system-ui, sans-serif" }}>Dark Horse</span>
-            </span>
-          </div>
-        )}
-        {isWorkhorse && (
-          <div style={{ marginTop: 6 }}>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                backgroundColor: "#0A1A18",
-                border: "1px solid #4ECDC4",
-                borderRadius: 3,
-                padding: "2px 8px",
-              }}
-            >
-              <span style={{ fontSize: 10, color: "#4ECDC4", lineHeight: 1 }}>⚡</span>
-              <span style={{ fontSize: 10, color: "#4ECDC4", fontFamily: "system-ui, sans-serif" }}>Workhorse</span>
             </span>
           </div>
         )}
@@ -1225,7 +1170,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           ))}
         </div>
         ) : (
-          // Established / Community / Workhorse / unclassified: recessed well strip (tier-2),
+          // Established / Community / unclassified: recessed well strip (tier-2),
           // mono values, indigo percentile bar for Established only.
           <div
             style={{

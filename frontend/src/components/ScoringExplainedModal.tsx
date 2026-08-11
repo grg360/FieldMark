@@ -5,7 +5,6 @@ export type ScoringExplainedScrollTarget =
   | "established"
   | "rising_stars"
   | "community"
-  | "workhorse"
   | "data_sources"
   | "refinement"
   | "faq";
@@ -37,18 +36,6 @@ const subStyle: CSSProperties = {
   margin: "0 0 12px",
 };
 
-const monoBlock: CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  fontSize: 12,
-  lineHeight: 1.55,
-  color: "#B8B4AC",
-  backgroundColor: "#0F0F11",
-  border: "1px solid #1E1E22",
-  borderRadius: 4,
-  padding: "10px 12px",
-  marginTop: 12,
-};
-
 const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   {
     q: "Why don't I see a specific HCP in the platform?",
@@ -75,16 +62,12 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
     a: "Established HCPs are field-shaping senior figures with sustained presence — they've consistently published, advised pharma, and led trials over a career. Rising Stars are emerging voices whose recent acceleration in publication velocity, citation trajectory, or trial investigator activity suggests they're on a trajectory toward Established status. Established describes a current state. Rising Stars describes momentum.",
   },
   {
-    q: "What's the difference between Community and Workhorse?",
-    a: "Community describes practicing clinicians who are active in pharma engagement and demonstrate clinical activity. Workhorse is a subset of Community — practitioners with substantial Medicare patient volume but unusually low pharma engagement. Workhorses are 'underleveraged' from a pharma standpoint: they have real clinical impact but haven't been actively engaged by pharma teams. Both cohorts represent legitimate MSL targets, but they suggest different engagement strategies.",
-  },
-  {
     q: "Can I export HCP profiles or data from the platform?",
     a: "Not in v1.0. Planned for v1.1: the ability to email yourself a PDF copy of an HCP profile for offline reference or sharing with teammates. Bulk export of lists or cohort data is being scoped for later releases. Email optout@besselanalytics.com if you have specific export needs you'd like considered for the roadmap.",
   },
   {
     q: "What does the score number mean? How do I interpret 78.3 vs 65.4?",
-    a: "Scores are percentile-rank based within each cohort, normalized to 0-100. A Community HCP with a score of 78 ranks higher than 78% of other Community HCPs on the weighted composite. The score is relative to the cohort, not absolute — a 78 in Community is not directly comparable to a 78 in Workhorse because they use different formulas. Higher scores indicate stronger signal across the weighted components for that cohort.",
+    a: "Established and Rising Star scores are percentile-rank based within each cohort, normalized to 0-100 — an Established HCP with a score of 78 ranks higher than 78% of Established peers on that cohort's components. The score is relative to the cohort, not absolute, so scores are not comparable across cohorts. Community HCPs have no score: community profiles show measured facts (Medicare reach, Part D presence, engagement history, practice setting) and assert no ranking.",
   },
   {
     q: "Why are some HCP cards missing engagement data (showing dashes)?",
@@ -335,46 +318,22 @@ export default function ScoringExplainedModal({ open, onClose, scrollToSection }
 
           <section id="fm-scoring-community">
             <h3 style={headingStyle}>Community</h3>
-            <p style={subStyle}>Practicing clinicians active in pharma engagement</p>
+            <p style={subStyle}>Practicing clinicians with a Medicare claims footprint</p>
             <p style={bodyText}>
-              Community HCPs are practicing clinicians with NPI registration and demonstrated clinical activity (Open Payments
-              engagement OR Medicare patient volume). They are ranked within the cohort by a composite score (0–100):
+              Community HCPs qualify through a claims footprint: recorded NSCLC Part B beneficiaries, or any Part D oncology
+              prescribing. Qualification is a fact about claims, not a judgment about the clinician.
             </p>
-            <div style={monoBlock}>
-              <div>40% — Medicare patient volume (3-year unique beneficiaries)</div>
-              <div style={{ marginTop: 6 }}>30% — Pharma engagement (Open Payments dollars)</div>
-              <div style={{ marginTop: 6 }}>15% — Group practice signal (practice setting)</div>
-              <div style={{ marginTop: 6 }}>10% — Career stage (years since NPI enumeration)</div>
-              <div style={{ marginTop: 6 }}>5% — Publication signal (publication activity)</div>
-            </div>
+            <p style={{ ...bodyText, marginTop: 12, fontWeight: 600, color: "#B8B4AC" }}>Community is not ranked.</p>
+            <p style={bodyText}>
+              CMS observability measures throughput, and throughput is not influence. Established and Rising Star HCPs are
+              ranked because scientific influence is publicly observable; community clinical influence — referral patterns,
+              adoption timing, local practice leadership — requires field knowledge we do not yet have, so no score or
+              ordering among community clinicians is asserted.
+            </p>
             <p style={{ ...bodyText, marginTop: 12 }}>
-              Patient volume is weighted highest because it is the most direct measure of community clinical reach. Pharma
-              engagement is itself a signal of clinical relevance at the community level. Practice setting, career stage, and
-              publication activity provide practice-level grounding.
-            </p>
-            <p style={{ ...bodyText, marginTop: 12, fontWeight: 600, color: "#B8B4AC" }}>WORKHORSE subset:</p>
-            <p style={bodyText}>
-              Community HCPs in the top quartile of Medicare patient volume but the bottom quartile of pharma engagement. These
-              are high-volume practitioners pharma hasn&apos;t engaged — untapped clinical influence.
-            </p>
-          </section>
-
-          <SectionDivider />
-
-          <section id="fm-scoring-workhorse">
-            <h3 style={headingStyle}>Workhorse</h3>
-            <p style={subStyle}>Underleveraged high-volume practitioners</p>
-            <p style={bodyText}>
-              Workhorses use a different composite because their defining trait — low pharma engagement — would penalize them
-              under the Community formula. Workhorse score (0–100):
-            </p>
-            <div style={monoBlock}>
-              <div>60% — Medicare patient volume</div>
-              <div style={{ marginTop: 6 }}>40% — Career stage</div>
-            </div>
-            <p style={{ ...bodyText, marginTop: 12 }}>
-              Higher score indicates a more established practitioner with substantial patient volume. The cohort surfaces HCPs
-              whose practice impact is invisible to pharma engagement metrics.
+              Community profiles and the roster show facts instead of a score: Medicare reach (Part B beneficiaries), Part D
+              oncology presence, engagement history, and practice setting. Facts are displayed and sortable, never averaged
+              into a composite number.
             </p>
           </section>
 
