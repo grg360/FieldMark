@@ -712,16 +712,6 @@ export interface RisingStarScoreBreakdown {
   network_influence_pctile?: number | null;
 }
 
-export interface CommunityScoreBreakdown {
-  hcp_id: string;
-  composite_score: number;
-  rank: number | null;
-  patient_volume_3yr: number | null;
-  lifetime_payments: number | null;
-  distinct_companies: number | null;
-  distinct_drugs: number | null;
-}
-
 export interface WebSignal {
   signal_type: string;
   signal_value: string;
@@ -742,13 +732,6 @@ const TA_ID_MAP: Record<string, string> = {
 const SLUG_BY_TA_ID: Record<string, string> = Object.fromEntries(
   Object.entries(TA_ID_MAP).map(([slug, id]) => [id, slug]),
 );
-
-// Community qualification gate (read layer), NSCLC ONLY — the 500 patient-volume
-// floor was derived from NSCLC's distribution; other TAs stay ungated until their
-// own distributions are examined (rare disease is inherently low-volume). The
-// leading neq branch makes the predicate a no-op for non-NSCLC rows. Mirrors the
-// gate inside the get_community_filtered RPCs (sql/community_qualification_gate.sql).
-const COMMUNITY_GATE_OR = `therapeutic_area_id.neq.${TA_ID_MAP.nsclc},patient_volume.gte.500,pharma_engagement.gt.0`;
 
 export function apiSlugForTaId(taId: string): string | undefined {
   return SLUG_BY_TA_ID[taId];
@@ -1826,7 +1809,7 @@ export async function getHCPDetail(
         return row?.[scoreCol] == null ? null : Number(row[scoreCol]);
       };
 
-      const [estCohort, risingCohort, communityCohort] = await Promise.all([
+      const [estCohort, risingCohort, communityCohort, communityGate] = await Promise.all([
         supabase
           .from("hcp_established_ranks_v3")
           .select("cohort_score, scope_type, scope_value")
@@ -1847,11 +1830,18 @@ export async function getHCPDetail(
           .from("hcp_community_ranks_v2")
           .select("normalized_score, scope_type, scope_value")
           .eq("hcp_id", hcpId)
-          .eq("therapeutic_area_id", taId)
-          // Community qualification gate (read layer, NSCLC only): a rank row
-          // only counts as Community membership with real clinical/engagement
-          // signal. No-op for other TAs via the neq branch.
-          .or(COMMUNITY_GATE_OR),
+          .eq("therapeutic_area_id", taId),
+        // Community membership (G2 cutover): for NSCLC, membership truth is
+        // community_board_nsclc_v1.qualifies — a rank row alone is not
+        // membership. Other TAs stay ungated (resolved truthy below).
+        taId === TA_ID_MAP.nsclc
+          ? supabase
+              .from("community_board_nsclc_v1")
+              .select("hcp_id")
+              .eq("hcp_id", hcpId)
+              .eq("qualifies", true)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
 
       const estData = (estCohort as { data?: Array<Record<string, unknown>> | null }).data ?? [];
@@ -1868,7 +1858,10 @@ export async function getHCPDetail(
           isAdRising ? "rising_composite_score" : "rising_star_percentile",
           isAdRising,
         );
-      } else if (communityData.length > 0) {
+      } else if (
+        communityData.length > 0 &&
+        (taId !== TA_ID_MAP.nsclc || Boolean((communityGate as { data?: unknown }).data))
+      ) {
         cohortClassification = "community";
         cohortScore = scopedScore(communityData, "normalized_score", true);
       } else {
@@ -2397,65 +2390,6 @@ export async function getEstablishedScoreBreakdown(
   return result;
 }
 
-export async function getCommunityScoreBreakdown(
-  hcpId: string,
-  taSlug: string,
-): Promise<CommunityScoreBreakdown | null> {
-  if (!hcpId || !taSlug) return null;
-
-  const { data: taRow } = await supabase
-    .from("therapeutic_areas")
-    .select("id")
-    .eq("slug", taSlug)
-    .single();
-
-  if (!taRow?.id) return null;
-  const taId = taRow.id;
-
-  const [ranksRow, opRow, medRow, drugCountResp] = await Promise.all([
-    supabase
-      .from("hcp_community_ranks_v2")
-      .select("composite_score, rank")
-      .eq("hcp_id", hcpId)
-      .eq("therapeutic_area_id", taId)
-      .eq("scope_type", "global")
-      // Community qualification gate (read layer, NSCLC only): gated-out HCPs
-      // get no Community scorecard (function returns null below).
-      .or(COMMUNITY_GATE_OR)
-      .maybeSingle(),
-    supabase
-      .from("hcp_open_payments_summary_v2")
-      .select("total_payments_lifetime, distinct_companies_lifetime")
-      .eq("hcp_id", hcpId)
-      .maybeSingle(),
-    supabase
-      .from("hcp_medicare_summary_v2")
-      .select("total_beneficiaries_3yr")
-      .eq("hcp_id", hcpId)
-      .maybeSingle(),
-    supabase
-      .from("hcp_open_payments_by_drug_v2")
-      .select("drug_name", { count: "exact", head: true })
-      .eq("hcp_id", hcpId)
-      .not("drug_name", "is", null),
-  ]);
-
-  if (!ranksRow.data) return null;
-
-  return {
-    hcp_id: hcpId,
-    composite_score: Number(ranksRow.data.composite_score ?? 0),
-    rank: ranksRow.data.rank != null ? Number(ranksRow.data.rank) : null,
-    patient_volume_3yr: medRow.data?.total_beneficiaries_3yr ?? null,
-    lifetime_payments:
-      opRow.data?.total_payments_lifetime != null
-        ? Number(opRow.data.total_payments_lifetime)
-        : null,
-    distinct_companies: opRow.data?.distinct_companies_lifetime ?? null,
-    distinct_drugs: drugCountResp.count ?? null,
-  };
-}
-
 export interface HCPSearchResult {
   id: string;
   firstName: string;
@@ -2632,21 +2566,31 @@ export async function searchHCPs(
     }
   }
 
-  // Community qualification gate (read layer, NSCLC only): hcps_v2.
+  // Community membership (read layer, G2 cutover): hcps_v2.
   // cohort_classification is denormalized, so a Community-classified match must
-  // also hold at least one qualifying rank row — any non-NSCLC row, or an NSCLC
-  // row passing the gate. Gated-out HCPs (misclassified academics on the
-  // career-stage floor) are dropped from search results entirely.
+  // also hold real membership — community_board_nsclc_v1.qualifies for NSCLC,
+  // or any non-NSCLC community rank row (other TAs are ungated). Non-members
+  // (misclassified academics, pharma-only qualifiers) are dropped from search
+  // results entirely.
   const communityIds = [...byHcpId.values()]
     .filter((h) => h.cohortClassification === "community")
     .map((h) => h.id);
   if (communityIds.length > 0) {
-    const { data: gateRows } = await supabase
-      .from("hcp_community_ranks_v2")
-      .select("hcp_id")
-      .in("hcp_id", communityIds)
-      .or(COMMUNITY_GATE_OR);
-    const qualified = new Set((gateRows ?? []).map((r) => String(r.hcp_id)));
+    const [{ data: viewRows }, { data: otherTaRows }] = await Promise.all([
+      supabase
+        .from("community_board_nsclc_v1")
+        .select("hcp_id")
+        .in("hcp_id", communityIds)
+        .eq("qualifies", true),
+      supabase
+        .from("hcp_community_ranks_v2")
+        .select("hcp_id")
+        .in("hcp_id", communityIds)
+        .neq("therapeutic_area_id", TA_ID_MAP.nsclc),
+    ]);
+    const qualified = new Set(
+      [...(viewRows ?? []), ...(otherTaRows ?? [])].map((r) => String(r.hcp_id)),
+    );
     for (const id of communityIds) {
       if (!qualified.has(id)) byHcpId.delete(id);
     }

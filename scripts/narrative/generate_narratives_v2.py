@@ -176,16 +176,13 @@ ESTABLISHED_DEFAULT_TOP_N = 100
 # Pipeline behavior
 COMMUNITY_DEFAULT_TOP_N = 500
 
-# Community qualification gate (read layer), NSCLC ONLY — the 500 patient-volume
-# floor was derived from NSCLC's distribution; other TAs stay ungated until their
-# own distributions are examined. The leading therapeutic_area_id.neq branch makes
-# the predicate a no-op for non-NSCLC rows. Mirrors the get_community_filtered
-# RPCs (sql/community_qualification_gate.sql).
+# Community membership (read layer), NSCLC ONLY — G2 cutover (2026-08-11):
+# membership truth lives in community_board_nsclc_v1.qualifies (patient_volume
+# > 0 OR any Part-D oncology row); this script reads the view instead of
+# re-deriving a predicate. Non-NSCLC TAs stay ungated. Mirrors the
+# get_community_filtered RPCs (sql/community_qualification_gate.sql).
 COMMUNITY_GATE_NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
-COMMUNITY_GATE_OR = (
-    f"therapeutic_area_id.neq.{COMMUNITY_GATE_NSCLC_TA_ID},"
-    "patient_volume.gte.500,pharma_engagement.gt.0"
-)
+COMMUNITY_BOARD_VIEW = "community_board_nsclc_v1"
 API_SLEEP_SECONDS = 0.5
 PROGRESS_EVERY = 25
 # 1200, not 600 (2026-08-03): the established_v2.0 prompt adds sourced positions
@@ -342,7 +339,12 @@ def pick_latest_scores(score_rows: List[Dict]) -> Dict[Tuple[str, str], Dict]:
     return latest
 
 
-def collect_top_n_hcp_ids(make_query, top_n: int, page_size: int = 1000) -> List[str]:
+def collect_top_n_hcp_ids(
+    make_query,
+    top_n: int,
+    page_size: int = 1000,
+    allowed_ids: Optional[Set[str]] = None,
+) -> List[str]:
     """Page through an ordered rank query until top_n rows or exhaustion.
 
     PostgREST caps any single response at 1000 rows (server max-rows), so a
@@ -350,21 +352,57 @@ def collect_top_n_hcp_ids(make_query, top_n: int, page_size: int = 1000) -> List
     make_query must return a FRESH ordered query builder on each call (builders
     are single-use). page_size must stay <= the server cap so a short batch
     reliably means exhaustion, not truncation.
+
+    allowed_ids (G2 cutover): when set, only ids in it are collected — the
+    membership filter lives in community_board_nsclc_v1, not in the rank query,
+    so paging continues past filtered-out rows until top_n MEMBERS are found
+    (the unfiltered path keeps its original scan-at-most-top_n-rows behavior).
     """
     ids: List[str] = []
     offset = 0
-    while offset < top_n:
-        upper = min(offset + page_size, top_n) - 1
+    while len(ids) < top_n:
+        if allowed_ids is None:
+            if offset >= top_n:
+                break
+            upper = min(offset + page_size, top_n) - 1
+        else:
+            upper = offset + page_size - 1
         response = make_query().range(offset, upper).execute()
         batch = response.data or []
         for row in batch:
             hcp_id = row.get("hcp_id")
-            if hcp_id:
+            if hcp_id and (allowed_ids is None or str(hcp_id) in allowed_ids):
                 ids.append(str(hcp_id))
+                if len(ids) >= top_n:
+                    break
         if len(batch) < (upper - offset + 1):
             break
         offset += len(batch)
     return ids
+
+
+def fetch_board_qualifying_ids(supabase: Client) -> Set[str]:
+    """Full qualifies=true membership from community_board_nsclc_v1 (~4.9k ids),
+    paginated under the 1000-row server cap."""
+    out: Set[str] = set()
+    offset = 0
+    while True:
+        rows = (
+            supabase.table(COMMUNITY_BOARD_VIEW)
+            .select("hcp_id")
+            .eq("qualifies", True)
+            .range(offset, offset + 999)
+            .execute()
+            .data
+            or []
+        )
+        for r in rows:
+            if r.get("hcp_id"):
+                out.add(str(r["hcp_id"]))
+        if len(rows) < 1000:
+            break
+        offset += len(rows)
+    return out
 
 
 def fetch_top_n_hcp_ids_from_rank_view(
@@ -847,6 +885,12 @@ def fetch_community_top_hcp_ids(
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
         try:
+            # Community membership (G2 cutover): for NSCLC the board view is the
+            # single source of membership — rank stays the ORDERING, the view is
+            # the FILTER. Other TAs remain ungated (allowed_ids=None).
+            allowed: Optional[Set[str]] = None
+            if ta_id == COMMUNITY_GATE_NSCLC_TA_ID:
+                allowed = fetch_board_qualifying_ids(supabase)
             def make_query(ta_id=ta_id):
                 return (
                     supabase.table("hcp_community_ranks_v2")
@@ -854,13 +898,9 @@ def fetch_community_top_hcp_ids(
                     .eq("therapeutic_area_id", ta_id)
                     .eq("scope_type", "region")
                     .eq("scope_value", "US")
-                    # Community qualification gate (read layer, NSCLC only, mirrors
-                    # the board RPCs): no narrative targeting for NSCLC HCPs on the
-                    # career-stage floor alone. No-op for other TAs.
-                    .or_(COMMUNITY_GATE_OR)
                     .order("rank", desc=False)
                 )
-            selected.update(collect_top_n_hcp_ids(make_query, top_n))
+            selected.update(collect_top_n_hcp_ids(make_query, top_n, allowed_ids=allowed))
         except Exception as exc:
             print(f"[load] hcp_community_ranks_v2 query failed for TA {ta_id}: {exc}")
     return selected
@@ -2245,24 +2285,34 @@ def run_pipeline(
             f"{hcp_rows[0].get('first_name') or ''} {hcp_rows[0].get('last_name') or ''}"
         ).strip()
         if expected_cohort == "community":
-            # Community qualification gate (NSCLC only): refuse single-HCP
+            # Community membership (NSCLC only, G2 cutover): refuse single-HCP
             # regeneration for an HCP the board no longer shows. Qualifies via
-            # any non-NSCLC rank row, or an NSCLC row passing the gate — same
-            # read-layer rule as the board RPCs and the batch selector.
+            # community_board_nsclc_v1.qualifies, or any non-NSCLC community
+            # rank row (other TAs are ungated) — same read-layer rule as the
+            # board RPCs and the batch selector.
             gate_resp = (
-                supabase.table("hcp_community_ranks_v2")
+                supabase.table(COMMUNITY_BOARD_VIEW)
                 .select("hcp_id")
                 .eq("hcp_id", single_hcp_id)
-                .or_(COMMUNITY_GATE_OR)
+                .eq("qualifies", True)
                 .limit(1)
                 .execute()
             )
             if not (gate_resp.data or []):
+                gate_resp = (
+                    supabase.table("hcp_community_ranks_v2")
+                    .select("hcp_id")
+                    .eq("hcp_id", single_hcp_id)
+                    .neq("therapeutic_area_id", COMMUNITY_GATE_NSCLC_TA_ID)
+                    .limit(1)
+                    .execute()
+                )
+            if not (gate_resp.data or []):
                 raise ValueError(
-                    f"HCP {single_hcp_id} does not pass the NSCLC Community "
-                    "qualification gate (patient_volume >= 500 OR "
-                    "pharma_engagement > 0) — excluded from the board, no "
-                    "narrative should be generated."
+                    f"HCP {single_hcp_id} is not a Community board member "
+                    "(community_board_nsclc_v1.qualifies = false and no "
+                    "non-NSCLC community rank row) — excluded from the board, "
+                    "no narrative should be generated."
                 )
         print(f"Single-HCP mode: {hcp_name or single_hcp_id} ({single_hcp_id})")
         print(f"Cohort cross-check passed: {expected_cohort}")

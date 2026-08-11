@@ -1,40 +1,38 @@
--- Community qualification gate — read layer only, NSCLC ONLY (2026-07-25).
+-- Community qualification gate — read layer only, NSCLC ONLY.
 --
--- An NSCLC HCP qualifies for the Community board only if:
---     patient_volume >= 500 OR pharma_engagement > 0
---
--- Rationale: ~1,414 NSCLC HCPs have zero patient volume AND zero pharma
--- engagement, ranking onto the board via the career-stage floor alone —
--- misclassified academics (Ozols, Karp, Shanafelt), not community clinicians.
--- The 500 floor also removes the sub-500 volume tail scoring on the same
--- floor. NSCLC: 4,722 of 6,480 qualify.
---
--- TA SCOPING: the 500 floor was derived from NSCLC's patient-volume
--- distribution ONLY. Other TAs are deliberately ungated (rare disease is
--- inherently low-volume — a blanket 500 floor cut its board by 71%). When a TA
--- becomes visible, examine its distribution and set its own floor, extending
--- the predicate per-TA.
---
--- hcp_community_ranks_v2 / hcp_community_scores_v2 are NOT modified — this is
--- a WHERE clause on reads. All FOUR overloads across both RPCs carry the gate:
--- get_community_filtered (legacy 6-param and themed 7-param) and
--- get_community_filtered_count (legacy 4-param and themed 5-param). The line
--- added to each, immediately after the p_states clause, is:
+-- G2 CUTOVER (2026-08-11): membership truth moved to the view
+-- community_board_nsclc_v1 (one row per US-NSCLC-scored HCP; qualifies =
+-- patient_volume > 0 OR any hcp_part_d_oncology_v1 row — 4,913 members).
+-- These RPCs no longer re-derive a predicate; they defer to the view:
 --
 --     AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid
---          OR cr.patient_volume >= 500 OR cr.pharma_engagement > 0)
+--          OR EXISTS (SELECT 1 FROM community_board_nsclc_v1 b
+--                     WHERE b.hcp_id = cr.hcp_id AND b.qualifies))
 --
--- ('c0065b03-…' = NSCLC. The leading <> branch makes the gate a no-op for
--- every other TA's rows.) Functions carrying the gate:
+-- The superseded inline predicate (patient_volume >= 500 OR
+-- pharma_engagement > 0, 2026-07-25, 5,3xx members) double-counted pharma
+-- (gate + scoring weight) and was blind to D-only prescribers; G2 admits 543
+-- claims-footprint joiners and drops 989 pharma-only qualifiers (zero
+-- volume-qualified members leave).
+--
+-- TA SCOPING unchanged: G2 is NSCLC-only ('c0065b03-…' = NSCLC; the leading
+-- <> branch keeps every other TA ungated — rare disease is inherently
+-- low-volume, a blanket floor cut its board by 71%).
+--
+-- hcp_community_ranks_v2 / hcp_community_scores_v2 are NOT modified — this is
+-- a WHERE clause on reads. All FOUR overloads across both RPCs carry the
+-- membership check: get_community_filtered (legacy 6-param and themed
+-- 7-param) and get_community_filtered_count (legacy 4-param and themed
+-- 5-param). Functions carrying it:
 --   * public.get_community_filtered(p_ta_id, p_scope_type, p_scope_values, p_states, p_limit, p_offset)
 --   * public.get_community_filtered(p_ta_id, p_scope_type, p_scope_values, p_states, p_canonical_theme_ids, p_limit, p_offset)
 --   * public.get_community_filtered_count(p_ta_id, p_scope_type, p_scope_values, p_states)
 --   * public.get_community_filtered_count(p_ta_id, p_scope_type, p_scope_values, p_states, p_canonical_theme_ids)
 --
--- Applied to the live DB on 2026-07-25 via CREATE OR REPLACE on each
--- function's pg_get_functiondef output. The full live definitions (captured
--- 2026-07-27 via pg_get_functiondef) follow below with their grants — running
--- this file restores all four functions outright; no hand-editing needed.
+-- STATUS: these G2 definitions are the PROPOSED source of record — NOT yet
+-- applied to the live DB (live functions still carry the 2026-07-25 inline
+-- predicate). On cutover approval, apply by running this file: every
+-- statement is CREATE OR REPLACE + GRANT, idempotent, no hand-editing needed.
 --
 -- The same TA-scoped predicate exists at the app read layer (as the PostgREST
 -- .or() string `therapeutic_area_id.neq.<nsclc-id>,patient_volume.gte.500,
@@ -65,10 +63,10 @@ AS $function$
     AND cr.scope_type = p_scope_type
     AND cr.scope_value = ANY(p_scope_values)
     AND (cardinality(p_states) = 0 OR cr.nppes_practice_state = ANY(p_states))
-    -- Community qualification gate (read-layer), NSCLC ONLY: the 500 floor was
-    -- derived from NSCLC's volume distribution. Other TAs stay ungated until
-    -- their own distributions are examined and given their own floors.
-    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR cr.patient_volume >= 500 OR cr.pharma_engagement > 0)
+    -- Community membership (read-layer), NSCLC ONLY: G2, served by
+    -- community_board_nsclc_v1.qualifies — the single source of membership.
+    -- Other TAs stay ungated (the leading <> branch is their no-op).
+    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR EXISTS (SELECT 1 FROM community_board_nsclc_v1 b WHERE b.hcp_id = cr.hcp_id AND b.qualifies))
   ORDER BY cr.rank
   LIMIT p_limit OFFSET p_offset;
 $function$;
@@ -92,10 +90,10 @@ AS $function$
     AND cr.scope_type = p_scope_type
     AND cr.scope_value = ANY(p_scope_values)
     AND (cardinality(p_states) = 0 OR cr.nppes_practice_state = ANY(p_states))
-    -- Community qualification gate (read-layer), NSCLC ONLY: the 500 floor was
-    -- derived from NSCLC's volume distribution. Other TAs stay ungated until
-    -- their own distributions are examined and given their own floors.
-    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR cr.patient_volume >= 500 OR cr.pharma_engagement > 0)
+    -- Community membership (read-layer), NSCLC ONLY: G2, served by
+    -- community_board_nsclc_v1.qualifies — the single source of membership.
+    -- Other TAs stay ungated (the leading <> branch is their no-op).
+    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR EXISTS (SELECT 1 FROM community_board_nsclc_v1 b WHERE b.hcp_id = cr.hcp_id AND b.qualifies))
     AND (
       cardinality(p_canonical_theme_ids) = 0
       OR EXISTS (
@@ -124,10 +122,10 @@ AS $function$
     AND cr.scope_type = p_scope_type
     AND cr.scope_value = ANY(p_scope_values)
     AND (cardinality(p_states) = 0 OR cr.nppes_practice_state = ANY(p_states))
-    -- Community qualification gate (read-layer), NSCLC ONLY: the 500 floor was
-    -- derived from NSCLC's volume distribution. Other TAs stay ungated until
-    -- their own distributions are examined and given their own floors.
-    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR cr.patient_volume >= 500 OR cr.pharma_engagement > 0);
+    -- Community membership (read-layer), NSCLC ONLY: G2, served by
+    -- community_board_nsclc_v1.qualifies — the single source of membership.
+    -- Other TAs stay ungated (the leading <> branch is their no-op).
+    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR EXISTS (SELECT 1 FROM community_board_nsclc_v1 b WHERE b.hcp_id = cr.hcp_id AND b.qualifies));
 $function$;
 
 CREATE OR REPLACE FUNCTION public.get_community_filtered_count(p_ta_id uuid, p_scope_type text, p_scope_values text[], p_states text[], p_canonical_theme_ids uuid[])
@@ -141,10 +139,10 @@ AS $function$
     AND cr.scope_type = p_scope_type
     AND cr.scope_value = ANY(p_scope_values)
     AND (cardinality(p_states) = 0 OR cr.nppes_practice_state = ANY(p_states))
-    -- Community qualification gate (read-layer), NSCLC ONLY: the 500 floor was
-    -- derived from NSCLC's volume distribution. Other TAs stay ungated until
-    -- their own distributions are examined and given their own floors.
-    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR cr.patient_volume >= 500 OR cr.pharma_engagement > 0)
+    -- Community membership (read-layer), NSCLC ONLY: G2, served by
+    -- community_board_nsclc_v1.qualifies — the single source of membership.
+    -- Other TAs stay ungated (the leading <> branch is their no-op).
+    AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid OR EXISTS (SELECT 1 FROM community_board_nsclc_v1 b WHERE b.hcp_id = cr.hcp_id AND b.qualifies))
     AND (
       cardinality(p_canonical_theme_ids) = 0
       OR EXISTS (
