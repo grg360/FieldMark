@@ -778,14 +778,22 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
   );
   return (
     <div style={{ display: "flex", alignItems: "flex-end", padding: "10px 20px 8px 23px", borderBottom: `1px solid ${P.lineStrong}`, background: P.head }}>
-      <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.amber }}>
-        RANK<br /><span style={{ color: P.ink5 }}>US · GLOBAL</span>
-      </div>
+      {/* Per-cohort rail head (Phase 3): COM is a roster — the leading figure is
+          the Medicare reach FACT, never a rank. EST/RS keep their real rank rail. */}
+      {cfg.tag === "COM" ? (
+        <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.ink4 }}>
+          MEDICARE REACH<br /><span style={{ color: P.ink5 }}>BENES · 3YR</span>
+        </div>
+      ) : (
+        <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.amber }}>
+          RANK<br /><span style={{ color: P.ink5 }}>US · GLOBAL</span>
+        </div>
+      )}
       <div style={{ flex: 1, minWidth: 300, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
         PHYSICIAN · {cfg.nameSub}
       </div>
       <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-        COHORT SCORE
+        {cfg.tag === "COM" ? "PART D" : "COHORT SCORE"}
       </div>
       {cfg.cols.map((c) => (
         <div key={c.key} style={{ width: c.w, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>

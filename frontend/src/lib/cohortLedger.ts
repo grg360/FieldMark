@@ -112,7 +112,7 @@ export const RS_CONFIG: CohortConfig = {
   notes: [
     "NO SUPPRESSION HERE: MOMENTUM AND VISIBILITY RUN WIDE ACROSS THIS COHORT, SO EVERY VALUE CARRIES INFORMATION AND EVERY VALUE PRINTS. THE SAME COMPUTED RULE THAT COLLAPSES ESTABLISHED'S TWO COLUMNS LEAVES ALL FOUR OF THESE STANDING.",
     "MOMENTUM IS MEASURED AGAINST THIS HCP'S OWN FIVE-YEAR BASELINE; VISIBILITY IS A PERCENTILE WITHIN THE RISING STAR COHORT.",
-    "SCORES ARE PERCENTILES WITHIN THE RISING STAR COHORT AND ARE NOT COMPARABLE WITH ESTABLISHED OR COMMUNITY FIGURES.",
+    "SCORES ARE PERCENTILES WITHIN THE RISING STAR COHORT AND ARE NOT COMPARABLE WITH ESTABLISHED FIGURES.",
   ],
   traceFoot:
     "MOMENTUM IS MEASURED AGAINST THIS HCP'S OWN FIVE-YEAR BASELINE; VISIBILITY IS A PERCENTILE WITHIN THE RISING STAR COHORT.",
@@ -124,7 +124,7 @@ export const COM_CONFIG: CohortConfig = {
   markerColor: "#B0848F",
   label: "Community",
   nameSub: "SPECIALTY · LOCATION · GENERATED SUMMARY",
-  meta: "{total} HCP · CMS-DERIVED · VOLUME 40% · ENGAGEMENT 30% · SETTING 15% · CAREER 10% · PUBLICATION 5%",
+  meta: "{total} HCP · CMS-DERIVED · TIER-GROUPED, NOT RANKED · SORTED BY EVIDENCE TIER, THEN MEDICARE REACH",
   cols: [
     { key: "eng", label: "ENGAGEMENT", sub: "CMS · NOT RANKED", w: 122, kind: "money", noRank: true, absent: "NONE RECORDED", prov: "Open Payments" },
     // Head renamed PHARMA ENGAGEMENT 2026-08-07 (single line — headSub "" on
@@ -140,12 +140,12 @@ export const COM_CONFIG: CohortConfig = {
   sortLabel: "BY EVIDENCE TIER, THEN MEDICARE REACH",
   rpc: "community_ledger",
   notes: [
-    "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE, AND NOTHING SORTS ON IT — IT SITS AT THE SAME TERTIARY TIER AS EVERY OTHER FIGURE SO THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
-    "“NONE RECORDED” MEANS CMS HOLDS NO PAYMENT RECORD. NO RELATIONSHIP AND NO RECORD ARE INDISTINGUISHABLE IN THE SOURCE, SO THE ROW SAYS WHAT IS KNOWN AND NOTHING MORE — RANK IS UNAFFECTED, SINCE ENGAGEMENT IS 30% OF A SCORE LED BY PRACTICE VOLUME AND SETTING (55%).",
-    "SCORES ARE MIN-MAX NORMALIZED 0–100 WITHIN THE COMMUNITY COHORT · A COMMUNITY 94 AND AN ESTABLISHED 94 ARE DIFFERENT MEASUREMENTS.",
+    "COMMUNITY IS NOT RANKED. TIER IS THE ONLY ASSERTED EVIDENCE CLAIM; EVERY FIGURE ON A ROW IS A DISPLAYED FACT, AND THE DEFAULT ORDER (TIER, THEN MEDICARE REACH) IS A VIEW-STATE, NOT A JUDGMENT.",
+    "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE — THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
+    "“NONE RECORDED” MEANS CMS HOLDS NO PAYMENT RECORD. NO RELATIONSHIP AND NO RECORD ARE INDISTINGUISHABLE IN THE SOURCE, SO THE ROW SAYS WHAT IS KNOWN AND NOTHING MORE. MISSING MODALITY = UNKNOWN, NEVER ZERO.",
   ],
   traceFoot:
-    "COMMUNITY SCORES ARE CMS-DERIVED AND LED BY PRACTICE VOLUME; MANY HCP IN THIS COHORT HAVE NO PUBLICATIONS AT ALL, WHICH IS EXPECTED AND NOT A GAP.",
+    "COMMUNITY ROWS CARRY CLAIMS-DERIVED FACTS (EVIDENCE TIER, PART B REACH, PART D PRESENCE); MANY HCP IN THIS COHORT HAVE NO PUBLICATIONS AT ALL, WHICH IS EXPECTED AND NOT A GAP.",
 };
 
 // Ordered cohorts for the tab toggle. One ranked ledger displays at a time.
@@ -450,10 +450,27 @@ export function trace(cfg: CohortConfig, row: LedgerRow, cohortTotal: number): T
     if (col.kind === "count") return { label, value: `${Math.round(v)} ${col.unit ?? ""} · ${col.prov ?? ""}`.replace(/\s+·\s*$/, "").trim() };
     return { label, value: `percentile ${floorFixed(v, 1)} within ${cfg.label} · methodology v4.2` };
   });
-  t.push({
-    label: "COHORT RANK",
-    value: `#${row.rank} of ${cohortTotal.toLocaleString()} ${cfg.label}${row.globalRank ? ` · #${row.globalRank} global` : ""}`,
-  });
+  if (cfg.tag === "COM") {
+    // Phase 3 roster: community is not ranked — the trace states the standing
+    // facts (tier + reach), never a position. cohortTotal stays a plain count.
+    t.push({
+      label: "EVIDENCE TIER",
+      value: `${row.tier ?? "unresolved"}${row.recurrenceBand === "recurs" ? " · recurs across years" : ""} · ${cohortTotal.toLocaleString()} qualifying ${cfg.label}`,
+    });
+    t.push({
+      label: "MEDICARE REACH",
+      value:
+        row.patientVolume != null && row.patientVolume > 0
+          ? `${Math.round(row.patientVolume).toLocaleString()} beneficiaries · 3yr Part B`
+          : "no Part B beneficiary record",
+    });
+    t.push({ label: "PART D ONCOLOGY", value: row.partDPresent ? "present" : "not observed" });
+  } else {
+    t.push({
+      label: "COHORT RANK",
+      value: `#${row.rank} of ${cohortTotal.toLocaleString()} ${cfg.label}${row.globalRank ? ` · #${row.globalRank} global` : ""}`,
+    });
+  }
   return t;
 }
 
