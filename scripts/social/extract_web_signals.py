@@ -229,31 +229,33 @@ WHERE h.id = %s
 LIMIT 1
 """
 
-# Community cohort: top-200 by rank in hcp_community_ranks_v2 (NSCLC, region/US scope).
-# The ranks table carries identity inline (first/last/institution), so no hcps_v2 join.
-# NOTE: community HCPs are practice-based physicians, mostly with a NULL institution — the
-# institution-scoped queries + the published-faculty-page rule yield far less than the
-# established run; see the pre-run yield sample.
+# Community cohort (Phase 3 roster, 2026-08-11): community is NOT ranked — the
+# target set is a CRITERION, not a top-N: qualifying board members in the
+# anchored/supported evidence tiers, Northeast territory, ordered by Medicare
+# reach (a fact, for run ordering only). ~138 targets (126 anchored, 12
+# supported). No rank, no normalized_score. us_rank is emitted NULL so the
+# shared row shape/logging survives; community log lines read rank=None.
+# NOTE: community HCPs are practice-based physicians, mostly with a NULL
+# institution — the institution-scoped queries + the published-faculty-page
+# rule yield far less than the established run; see the pre-run yield sample.
 COMMUNITY_HCPS_SQL = """
-SELECT c.hcp_id AS id, c.first_name, c.last_name, c.institution_normalized, c.rank AS us_rank
-FROM hcp_community_ranks_v2 c
-JOIN therapeutic_areas ta ON ta.id = c.therapeutic_area_id
-WHERE ta.name = 'NSCLC'
-  AND c.scope_type = 'region'
-  AND c.scope_value = 'US'
-  AND c.rank <= 200
-ORDER BY c.rank ASC
+SELECT b.hcp_id AS id, h.first_name, h.last_name, h.institution_normalized, NULL::integer AS us_rank
+FROM community_board_nsclc_v1 b
+JOIN hcps_v2 h ON h.id = b.hcp_id
+WHERE b.qualifies
+  AND b.evidence_tier IN ('anchored', 'supported')
+  AND h.nppes_practice_state = ANY(ARRAY['CT','MA','ME','NH','NY','RI','VT','NJ','PA'])
+ORDER BY b.patient_volume DESC, b.hcp_id
 """
 
 COMMUNITY_HCP_BY_ID_SQL = """
-SELECT c.hcp_id AS id, c.first_name, c.last_name, c.institution_normalized, c.rank AS us_rank
-FROM hcp_community_ranks_v2 c
-JOIN therapeutic_areas ta ON ta.id = c.therapeutic_area_id
-WHERE c.hcp_id = %s
-  AND ta.name = 'NSCLC'
-  AND c.scope_type = 'region'
-  AND c.scope_value = 'US'
-  AND c.rank <= 200
+SELECT b.hcp_id AS id, h.first_name, h.last_name, h.institution_normalized, NULL::integer AS us_rank
+FROM community_board_nsclc_v1 b
+JOIN hcps_v2 h ON h.id = b.hcp_id
+WHERE b.hcp_id = %s
+  AND b.qualifies
+  AND b.evidence_tier IN ('anchored', 'supported')
+  AND h.nppes_practice_state = ANY(ARRAY['CT','MA','ME','NH','NY','RI','VT','NJ','PA'])
 LIMIT 1
 """
 
@@ -910,6 +912,17 @@ def main() -> int:
                     last_tavily_at,
                 )
                 stats.total_tavily_credits += credits_used
+
+                # Guard (2026-08-11): if EVERY query came back empty, that is an
+                # infrastructure condition (Tavily degraded/soft-limited), not a
+                # finding about the person. Never spend Claude tokens writing a
+                # "no_signals_found" row from an empty search — fail the HCP so
+                # the checkpoint leaves it resumable.
+                if all(not results for _query, results in query_results):
+                    raise RuntimeError(
+                        "all Tavily queries returned empty results — treating as "
+                        "search-infrastructure failure, not a no-signals finding"
+                    )
 
                 user_prompt = build_user_prompt(hcp, query_results)
                 raw_text, in_tok, out_tok = call_claude(client, user_prompt)
