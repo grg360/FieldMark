@@ -623,7 +623,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
   const spine = spineLayer(cfg, row, nbrRows);
   const empty: DrawerLayerData = { topicTotal: 0, topicClasses: [], beliefCount: 0, beliefTexts: [] };
   const subj = layers?.get(row.hcpId) ?? empty;
-  const nbrData = nbrRows.map((r) => ({ rank: r.rank, d: layers?.get(r.hcpId) ?? empty }));
+  const nbrData = nbrRows.map((r) => ({ rank: r.rank ?? 0, d: layers?.get(r.hcpId) ?? empty }));
   const pr = practiceLayer(subj, nbrData);
   const bl = beliefLayer(subj, nbrData);
 
@@ -845,7 +845,7 @@ function Row({
     prefetchTimer.current = window.setTimeout(() => {
       const taId = taIdForApiSlug("nsclc");
       if (!taId) return;
-      const nbrs = [rowByRank?.get(row.rank - 1), rowByRank?.get(row.rank + 1)].filter((r): r is LedgerRow => !!r);
+      const nbrs = [rowByRank?.get((row.rank ?? 0) - 1), rowByRank?.get((row.rank ?? 0) + 1)].filter((r): r is LedgerRow => !!r);
       prefetchDrawerLayerData([row.hcpId, ...nbrs.map((r) => r.hcpId)], taId);
     }, 120);
   };
@@ -871,16 +871,26 @@ function Row({
         onMouseEnter={(e) => { e.currentTarget.style.background = P.rowHover; startPrefetch(); }}
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; cancelPrefetch(); }}
       >
-        {/* rank */}
-        <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", gap: 1 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-            <span style={{ font: `600 40px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.86, letterSpacing: "-.015em" }}>
-              {row.rank}
-            </span>
-            <span style={{ ...mono(9.5, 500), color: "#A07B45", letterSpacing: ".12em" }}>US</span>
+        {/* Leading cell: EST/RS the rank; COM (Phase 3 roster, not ranked) the
+            reach FACT — Medicare beneficiaries, the within-band sort key. */}
+        {row.rank != null ? (
+          <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", gap: 1 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+              <span style={{ font: `600 40px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.86, letterSpacing: "-.015em" }}>
+                {row.rank}
+              </span>
+              <span style={{ ...mono(9.5, 500), color: "#A07B45", letterSpacing: ".12em" }}>US</span>
+            </div>
+            <span style={{ ...mono(9.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
           </div>
-          <span style={{ ...mono(9.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
-        </div>
+        ) : (
+          <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", gap: 3 }}>
+            <span style={{ font: `500 26px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.ink2, fontVariantNumeric: "tabular-nums", lineHeight: 0.9 }}>
+              {row.patientVolume != null && row.patientVolume > 0 ? Math.round(row.patientVolume).toLocaleString() : "—"}
+            </span>
+            <span style={{ ...mono(8.5), color: P.ink5, letterSpacing: ".1em" }}>MEDICARE BENES · 3YR</span>
+          </div>
+        )}
         {/* name + chips + summary */}
         <div style={{ flex: 1, minWidth: 300, paddingRight: 24, display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
@@ -927,7 +937,7 @@ function Row({
             imported. EST only; RS/COM keep the mono cell until their own pass. */}
         {cfg.tag === "EST" ? (
           (() => {
-            const [ipart, dpart = ""] = floorFixed(row.idx, cfg.idxDecimals).split(".");
+            const [ipart, dpart = ""] = floorFixed(row.idx ?? 0, cfg.idxDecimals).split(".");
             return (
               <div style={{ width: 88, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 7 }}>
                 <div style={{ width: 44, height: 2, background: P.amber }} />
@@ -938,9 +948,14 @@ function Row({
               </div>
             );
           })()
-        ) : (
+        ) : row.idx != null ? (
           <div style={{ width: 88, textAlign: "right", ...mono(18, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
             {floorFixed(row.idx, cfg.idxDecimals)}
+          </div>
+        ) : (
+          // COM roster (Phase 3): no index — the Part-D presence fact takes the slot.
+          <div style={{ width: 88, textAlign: "right", ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }}>
+            {row.partDPresent ? "PART D ✓" : ""}
           </div>
         )}
         {/* score cells */}
@@ -1043,7 +1058,7 @@ function Row({
           cohort-tinted rails — sage/violet from cfg) — see DrawerOverhang. */}
       {open && cfg.tag !== "COM" ? (
         <DrawerOverhang>
-          <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} overhang />
+          <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get((row.rank ?? 0) - 1)} down={rowByRank?.get((row.rank ?? 0) + 1)} overhang />
         </DrawerOverhang>
       ) : null}
       {open && cfg.tag === "COM" ? (
@@ -1122,16 +1137,27 @@ function MobileRow({
       <div onClick={onToggle} style={{ padding: "13px 16px 14px 19px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 7 }}>
         {/* rank + track/index */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span style={{ font: `600 34px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
-            <span style={{ ...mono(8.5, 500), color: "#A07B45", letterSpacing: ".12em" }}>US</span>
-            <span style={{ ...mono(8.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
-          </div>
+          {row.rank != null ? (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ font: `600 34px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
+              <span style={{ ...mono(8.5, 500), color: "#A07B45", letterSpacing: ".12em" }}>US</span>
+              <span style={{ ...mono(8.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ font: `500 24px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.ink2, fontVariantNumeric: "tabular-nums", lineHeight: 0.9 }}>
+                {row.patientVolume != null && row.patientVolume > 0 ? Math.round(row.patientVolume).toLocaleString() : "—"}
+              </span>
+              <span style={{ ...mono(8), color: P.ink5, letterSpacing: ".1em" }}>BENES · 3YR</span>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button onClick={(e) => { stop(e); void toggleSave(row.hcpId, "cohort_ledger"); }} title={tracked ? "Tracked — tap to untrack" : "Track"} style={{ background: "none", border: "none", padding: 4, cursor: "pointer", lineHeight: 0, minHeight: 0 }}>
               <Bookmark on={tracked} />
             </button>
-            <span style={{ ...mono(17, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{floorFixed(row.idx, cfg.idxDecimals)}</span>
+            {row.idx != null ? (
+              <span style={{ ...mono(17, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{floorFixed(row.idx, cfg.idxDecimals)}</span>
+            ) : null}
           </div>
         </div>
 
@@ -1196,7 +1222,7 @@ function MobileRow({
       {/* drawer (2026-08-08): EST/RS take the stacked three-layer redesign;
           COM keeps why-over-trace until its own pass. */}
       {open && cfg.tag !== "COM" ? (
-        <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get(row.rank - 1)} down={rowByRank?.get(row.rank + 1)} mobile />
+        <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get((row.rank ?? 0) - 1)} down={rowByRank?.get((row.rank ?? 0) + 1)} mobile />
       ) : null}
       {open && cfg.tag === "COM" ? (
         <div style={{ padding: "4px 16px 18px 19px", background: P.drawer, borderTop: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1300,7 +1326,7 @@ function VirtualTail({
     <div ref={listRef} style={{ position: "relative", height: virtualizer.getTotalSize(), width: "100%" }}>
       {items.map((vi) => {
         const row = rows[vi.index];
-        const id = `${cfg.tag}-${row.rank}`;
+        const id = `${cfg.tag}-${row.hcpId}`;
         return (
           <div
             key={vi.key}
@@ -1399,9 +1425,17 @@ export default function CohortLedger() {
   const loadMore = useCallback(() => {
     if (loadingMore.current || !hasMore) return;
     loadingMore.current = true;
-    const afterRank = rows.length ? rows[rows.length - 1].rank : 0;
+    // EST/RS keyset on the last rank; COM (Phase 3 roster, no rank) keysets on
+    // the composite (tier_priority, patient_volume, hcp_id) cursor.
+    const lastRow = rows.length ? rows[rows.length - 1] : null;
+    const afterCursor =
+      cfg.tag === "COM"
+        ? lastRow
+          ? { tierPriority: lastRow.tierPriority ?? 5, patientVolume: lastRow.patientVolume ?? 0, hcpId: lastRow.hcpId }
+          : undefined
+        : (lastRow?.rank ?? 0);
     const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
-    loadLedgerPage(cfg, afterRank, LEDGER_PAGE_SIZE, tiersArg)
+    loadLedgerPage(cfg, afterCursor, LEDGER_PAGE_SIZE, tiersArg)
       .then((page) => {
         setRows((prev) => [...prev, ...page.rows]);
         setHasMore(page.hasMore);
@@ -1447,10 +1481,10 @@ export default function CohortLedger() {
   const RowComp = isMobile ? MobileRow : Row;
   // Neighbour lookup for the drawer's uniform neighbour rule — the full loaded
   // row set by rank, spanning band/tail boundaries.
-  const rowByRank = useMemo(() => new Map(rows.map((r) => [r.rank, r])), [rows]);
+  const rowByRank = useMemo(() => new Map(rows.filter((r) => r.rank != null).map((r) => [r.rank as number, r] as const)), [rows]);
 
   const renderRow = (row: LedgerRow) => {
-    const id = `${cfg.tag}-${row.rank}`;
+    const id = `${cfg.tag}-${row.hcpId}`;
     return <RowComp key={id} cfg={cfg} row={row} cohortTotal={cohortTotal} th={th} open={open === id} onToggle={() => toggle(id)} flag={isRising ? risingFlags.get(row.hcpId) : undefined} openTrial={isEst ? openTrials.get(row.hcpId) : undefined} estFlag={isEst ? estFlags.get(row.hcpId) : undefined} rowByRank={rowByRank} />;
   };
 
@@ -1537,6 +1571,11 @@ export default function CohortLedger() {
                     </button>
                   );
                 })}
+                {cfg.sortLabel ? (
+                  <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".1em", alignSelf: "center", marginLeft: "auto" }}>
+                    {cfg.sortLabel}
+                  </span>
+                ) : null}
               </div>
             ) : null}
 

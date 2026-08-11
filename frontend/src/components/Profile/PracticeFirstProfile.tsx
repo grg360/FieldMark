@@ -93,6 +93,15 @@ const CLAIMS_TAG: Record<string, { text: (c: ClassifiedProduct) => string; color
   route_unknown: { text: () => "ROUTE UNKNOWN", color: F.ghost2 },
 };
 
+// Community roster tier vocabulary (Phase 3) — affirmative labels only.
+const COMMUNITY_TIER_LABEL: Record<string, string> = {
+  anchored: "ANCHORED · NSCLC EVIDENCE",
+  supported: "SUPPORTED · NSCLC EVIDENCE",
+  heme_dominant: "HEME-FOCUSED PRACTICE",
+  candidate: "CANDIDATE",
+  unresolved: "NO MEDICARE EVIDENCE",
+};
+
 export default function PracticeFirstProfile() {
   const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   const { id } = useParams<{ id: string }>();
@@ -139,7 +148,7 @@ export default function PracticeFirstProfile() {
 
   const med = pr?.medicare ?? null;
   const cov = pr?.coverage ?? null;
-  const sc = p.score;
+  const st = p.standing;
   const eng = p.engagement;
   const loc = [titleCase(p.hcp.city), p.hcp.state].filter(Boolean).join(", ");
   const org = pr?.nppes?.organization ?? p.hcp.institution ?? null;
@@ -157,7 +166,6 @@ export default function PracticeFirstProfile() {
 
   const { aligned, oral, injectable, unknown, adminMapped, adminNoEng, classified } = overlay;
   const notAdmin = oral.length + injectable.length + unknown.length;
-  const pctile = sc?.rank && sc?.scope_size ? Math.min(99, Math.floor((1 - sc.rank / sc.scope_size) * 100)) : null;
 
   const clsOrder: Record<string, number> = { aligned: 0, injectable_none: 1, oral: 2, route_unknown: 3 };
   const engRows = [...classified].sort((a, b) => {
@@ -230,41 +238,29 @@ export default function PracticeFirstProfile() {
         </div>
 
         <div style={{ flex: "1 1 300px", maxWidth: 360, padding: "22px 26px", borderLeft: `1px solid ${F.line}` }}>
-          <div style={{ ...mono(9), letterSpacing: "0.2em", color: F.ghost, marginBottom: 10 }}>COMMUNITY SCORE</div>
-          {p.has_score && sc?.normalized != null ? (
-            <>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 40, lineHeight: 1, color: F.blue, fontWeight: 500, letterSpacing: "-0.02em", ...mono(40, 500) }}>{Math.round(sc.normalized)}</span>
-                <span style={{ ...mono(12), color: F.ghost }}>/ 100</span>
-                {pctile != null ? <span style={{ ...mono(10), color: F.amber, letterSpacing: "0.1em", marginLeft: 6 }}>{pctile}th pct</span> : null}
+          <div style={{ ...mono(9), letterSpacing: "0.2em", color: F.ghost, marginBottom: 10 }}>COMMUNITY STANDING</div>
+          {/* Phase 3 roster: not ranked — tier + reach facts from the RPC's
+              standing node; no numeral, no rank, no decomposition. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <span style={{ ...mono(11, 600), letterSpacing: "0.1em", color: F.blue }}>
+              {COMMUNITY_TIER_LABEL[st?.evidence_tier ?? ""] ?? "NOT RANKED"}
+            </span>
+            {st?.patient_volume != null && st.patient_volume > 0 ? (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ ...mono(24, 500), color: F.body }}>{Math.round(st.patient_volume).toLocaleString()}</span>
+                <span style={{ ...mono(9), letterSpacing: "0.1em", color: F.ghost }}>MEDICARE BENES · 3YR</span>
               </div>
-              <div style={{ ...mono(10), color: F.faint, lineHeight: 1.6, marginBottom: 14 }}>Rank <span style={{ color: F.amber }}>{sc.rank?.toLocaleString()} of {sc.scope_size?.toLocaleString()}</span> · NSCLC community cohort</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {/* LIVE 2026-08-06 formula weights (40/30/15/10/5) — the earlier
-                    "Therapy spend 20 / Therapy vol 20" split described the abandoned
-                    July-30 rescore and never ranked this board (corrected 2026-08-11). */}
-                {([["Patient volume · 40", 40], ["Engagement · 30", 30], ["Setting · 15", 15], ["Career · 10", 10], ["Publication · 5", 5]] as [string, number][]).map(([l, w]) => {
-                  const dead = l.startsWith("Publication") && (sc.total_career_pubs ?? 0) === 0;
-                  return (
-                    <div key={l} style={{ display: "grid", gridTemplateColumns: "118px 1fr 34px", alignItems: "center", gap: 8 }}>
-                      <span style={{ ...mono(10), color: F.faint }}>{l}</span>
-                      <span style={{ height: 3, background: F.line, display: "block" }}>
-                        <span style={{ display: "block", height: 3, width: dead ? "0%" : `${w * 2}%`, background: F.blue }} />
-                      </span>
-                      <span style={{ ...mono(10), color: dead ? F.ghost : F.body, textAlign: "right" }}>{w}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* "Oncology therapy signals" caption REMOVED 2026-08-11 — those were
-                  July-30 residue signals, not inputs to the live 40% component. */}
-              {(sc.total_career_pubs ?? 0) === 0 ? (
-                <div style={{ ...mono(10), color: F.ghost, lineHeight: 1.65, marginTop: 12 }}>No indexed publications — the 5-point publication component contributes nothing and is not redistributed.</div>
-              ) : null}
-            </>
-          ) : (
-            <div style={{ ...serif(13), color: F.ghost, lineHeight: 1.5 }}>Claims coverage below threshold — no community score. A partial score would be read as a low score, so the numeral is withheld.</div>
-          )}
+            ) : null}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", ...mono(9.5), color: F.faint, letterSpacing: "0.05em" }}>
+              {st?.part_d_present ? <span>PART D ONCOLOGY ✓</span> : null}
+              {st?.recurrence_band === "recurs" ? <span>RECURS ACROSS YEARS</span> : null}
+              {st?.supported_evidence ? <span>{String(st.supported_evidence).toUpperCase()}</span> : null}
+              {st?.anchor_stem ? <span>{String(st.anchor_stem).toUpperCase()}</span> : null}
+            </div>
+            <div style={{ ...serif(12.5), color: F.ghost, lineHeight: 1.55 }}>
+              Community clinicians are not scored or ordered — this panel states the claims-evidence tier and the measured reach facts, and asserts no ranking among peers.
+            </div>
+          </div>
         </div>
       </div>
 

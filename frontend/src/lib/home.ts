@@ -126,6 +126,9 @@ export interface TrackedHcpChip {
   // three ranking systems were ambiguous, and community/global-established
   // HCPs fell through entirely. null ladder => render UNRANKED, never blank.
   ladder: "RS" | "EST" | "EST GLOBAL" | "COM" | null;
+  /** Community (Phase 3 roster): the evidence-tier word — community chips show
+   *  the tier, never a number. */
+  tier: string | null;
 }
 
 export interface TerritoryCoverageStats {
@@ -1318,14 +1321,18 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       }
     }
 
-    // Community tiered rank (2026-08-05): the SAME number the community ledger
-    // shows (tier-ordered, anchored+supported), via community_tiered_ranks —
-    // never the raw score rank, so one person never carries two numbers.
-    const comRankByHcpId = new Map<string, number>();
+    // Community tier (Phase 3 roster): community is not ranked — the chip
+    // wears the evidence-tier word from community_board_nsclc_v1, never a
+    // number. (community_tiered_ranks is retired with this change.)
+    const comTierByHcpId = new Map<string, string>();
     {
-      const { data } = await supabase.rpc("community_tiered_ranks", { p_hcp_ids: hcpIdsInTerritory });
-      for (const row of (data ?? []) as { hcp_id: string; tiered_rank: number }[]) {
-        comRankByHcpId.set(row.hcp_id, row.tiered_rank);
+      const { data } = await supabase
+        .from("community_board_nsclc_v1")
+        .select("hcp_id, evidence_tier")
+        .in("hcp_id", hcpIdsInTerritory)
+        .eq("qualifies", true);
+      for (const row of (data ?? []) as { hcp_id: string; evidence_tier: string | null }[]) {
+        if (row.evidence_tier) comTierByHcpId.set(row.hcp_id, row.evidence_tier);
       }
     }
 
@@ -1342,13 +1349,14 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       const rs = ranksByHcpId.get(h.id) ?? null;
       const est = estRanksByHcpId.get(h.id) ?? null;
       const estGlobal = globalEstByHcpId.get(h.id) ?? null;
-      const com = comRankByHcpId.get(h.id) ?? null;
+      const comTier = comTierByHcpId.get(h.id) ?? null;
       let ladder: TrackedHcpChip["ladder"] = null;
       let cohort_rank: number | null = null;
+      let tier: string | null = null;
       if (rs != null) { ladder = "RS"; cohort_rank = rs; cohort = "rising_star"; }
       else if (est != null) { ladder = "EST"; cohort_rank = est; cohort = "established"; }
       else if (estGlobal != null) { ladder = "EST GLOBAL"; cohort_rank = estGlobal; cohort = "established"; }
-      else if (com != null) { ladder = "COM"; cohort_rank = com; cohort = "community"; }
+      else if (comTier != null) { ladder = "COM"; tier = comTier; cohort = "community"; }
 
       return {
         hcp_id: h.id,
@@ -1356,6 +1364,7 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
         cohort,
         cohort_rank,
         ladder,
+        tier,
       };
     });
 

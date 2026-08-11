@@ -439,11 +439,14 @@ export default function HomePage() {
                             style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 7px", border: `1px solid ${(chip.cohort ? COHORT_BORDER[chip.cohort] : undefined) ?? BORDER}`, ...mono(11, 400, INK3, "0"), whiteSpace: "nowrap", cursor: "pointer" }}
                           >
                             <span>{chip.name}</span>
-                            {chip.ladder !== null && chip.cohort_rank !== null ? (
+                            {chip.ladder !== null && (chip.cohort_rank !== null || chip.tier !== null) ? (
                               <span style={mono(9, 400, MID, ".04em")}>{chip.ladder}</span>
                             ) : null}
                             {chip.cohort_rank !== null ? (
                               <span style={mono(11, 400, GOLD, "0")}>#{chip.cohort_rank}</span>
+                            ) : chip.tier !== null ? (
+                              // Community (Phase 3): the tier word, never a number.
+                              <span style={mono(9, 400, MID, ".06em")}>{chip.tier.replace("_", "-").toUpperCase()}</span>
                             ) : (
                               <span style={mono(9, 400, DIM, ".06em")}>UNRANKED</span>
                             )}

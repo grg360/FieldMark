@@ -41,8 +41,8 @@ export interface CommunityProfile {
   /** Σ total_paid_est all codes — the real Medicare-paid figure (the summary's
    *  total_medicare_payment_3yr is defective; never display it). */
   medicare_paid_corrected: number | null;
-  score: { composite: number | null; normalized: number | null; rank: number | null; scope_size: number | null; publication_signal: number | null; total_career_pubs: number | null } | null;
-  has_score: boolean | null;
+  /** Phase 3 roster: facts only — community is not ranked. */
+  standing: { qualifies: boolean | null; evidence_tier: string | null; patient_volume: number | null; part_d_present: boolean | null; recurrence_band: string | null; anchor_stem: string | null; anchor_stems: string[] | null; anchor_years: number[] | null; supported_evidence: string | null; lung_weighted: boolean | null } | null;
   engagement: {
     has_record: boolean;
     distinct_drugs: number | null;

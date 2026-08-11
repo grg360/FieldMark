@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { HCP } from "../data/hcpData";
 import { useRelationships } from "../contexts/RelationshipsContext";
-import { formatCohortScore, formatEngagementDollar, formatIntDisplay, formatScoreFloor1 } from "../lib/cohort-metrics";
+import { formatEngagementDollar, formatIntDisplay, formatScoreFloor1 } from "../lib/cohort-metrics";
 import { institutionToSlug } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import { buildSubline } from "../lib/subline";
@@ -377,124 +377,16 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
   return "—";
 }
 
-const COHORT_SCORE_TIP_TEXT = {
-  community:
-    "Cohort score (0-100). Weighted combination of Medicare patient volume (40%), pharma engagement (30%), group practice signal (15%), career stage (10%), and publication signal (5%). Normalized 0-100 within the Community cohort.",
-} as const;
+// Community roster tier labels (Phase 3): card chip vocabulary. heme_dominant
+// gets the affirmative different-specialty label, never a deficit one.
+const COMMUNITY_TIER_CARD_LABEL: Record<string, string> = {
+  anchored: "ANCHORED · NSCLC EVIDENCE",
+  supported: "SUPPORTED · NSCLC EVIDENCE",
+  heme_dominant: "HEME-FOCUSED PRACTICE",
+  candidate: "CANDIDATE",
+  unresolved: "NO MEDICARE EVIDENCE",
+};
 
-type CohortScoreTipVariant = keyof typeof COHORT_SCORE_TIP_TEXT;
-
-function CohortScoreChipWithTip(props: {
-  variant: CohortScoreTipVariant;
-  open: boolean;
-  onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
-  touchDevice: boolean;
-  chipButtonStyle: React.CSSProperties;
-  scoreLabel: string;
-  subtitle?: React.ReactNode;
-  onMethodologyPress?: () => void;
-}) {
-  const {
-    variant,
-    open,
-    onOpenChange,
-    touchDevice,
-    chipButtonStyle,
-    scoreLabel,
-    subtitle,
-    onMethodologyPress,
-  } = props;
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (ev: MouseEvent | TouchEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(ev.target as Node)) {
-        onOpenChange(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("touchstart", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("touchstart", close);
-    };
-  }, [open, onOpenChange]);
-
-  const borderCol = "#E8A020";
-
-  return (
-    <div
-      ref={wrapRef}
-      style={{ position: "relative", display: "inline-flex", alignItems: "flex-start" }}
-      onMouseEnter={() => {
-        if (!touchDevice) onOpenChange(true);
-      }}
-      onMouseLeave={() => {
-        if (!touchDevice) onOpenChange(false);
-      }}
-    >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (onMethodologyPress) {
-            onOpenChange(false);
-            onMethodologyPress();
-            return;
-          }
-          if (touchDevice) {
-            e.preventDefault();
-            onOpenChange((v) => !v);
-          }
-        }}
-        style={chipButtonStyle}
-      >
-        <span
-          style={{
-            fontSize: subtitle ? 13 : 12,
-            fontWeight: subtitle ? 600 : undefined,
-            fontFamily: "monospace",
-            display: "block",
-          }}
-        >
-          {scoreLabel}
-        </span>
-        {subtitle}
-      </button>
-      {open ? (
-        <div
-          role="tooltip"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: 8,
-            boxSizing: "border-box",
-            minWidth: 240,
-            maxWidth: 320,
-            width: 280,
-            padding: "10px 14px",
-            backgroundColor: "#111113",
-            border: `1px solid ${borderCol}`,
-            borderRadius: 4,
-            zIndex: 300,
-            fontSize: 12,
-            color: "#9B9892",
-            lineHeight: 1.5,
-            whiteSpace: "normal",
-            wordWrap: "break-word",
-            overflowWrap: "break-word",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.45)",
-          }}
-        >
-          {COHORT_SCORE_TIP_TEXT[variant]}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function cardStatusStyle(status: string): { bg: string; fg: string; border?: string } {
   switch (status) {
@@ -532,7 +424,7 @@ function cardStatusLabel(status: string): string {
   }
 }
 
-export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onScoringExplainedPress }: HCPCardProps) {
+export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: HCPCardProps) {
   const navigate = useNavigate();
   const { isSaved, toggleSave, getInsightCount, getFollowUpInfo, relationshipMap } = useRelationships();
   const [savePending, setSavePending] = useState(false);
@@ -545,10 +437,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
   const status = relationship?.status;
   const showStatus = status && status !== "not_engaged";
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-  const [cohortScoreTipOpen, setCohortScoreTipOpen] = useState(false);
   const [bookmarkHovered, setBookmarkHovered] = useState(false);
-  const touchDevice =
-    typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
   const cohort = (hcp.cohort_classification ?? "").trim();
   const effectiveCohort =
     cohort === ""
@@ -561,12 +450,13 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
   const isDarkHorse = cohort === "dark_horse";
   const isCommunityPlain = cohort === "community";
   const accentColor = isDarkHorse ? "#9B6DFF" : "#E8A020";
-  const accentBg = isDarkHorse ? "#0D0A1A" : "#1A1200";
   const borderAccentColor = cohortBorderAccentColor(effectiveCohort);
   const statPillKeys = cohortStatKeys(effectiveCohort);
   const isRisingCohort = effectiveCohort === "rising_star" || effectiveCohort === "dark_horse";
   const risingScopeLabel = hcp.scope === "US" ? "US" : "GLOBAL";
-  const displayRank = isRisingCohort ? (hcp.scope_rank ?? hcp.rank) : hcp.rank;
+  // Community (Phase 3 roster): not ranked — no #rank, no numeral; the badge
+  // slot carries the evidence tier + Medicare reach fact instead.
+  const displayRank = isRisingCohort ? (hcp.scope_rank ?? hcp.rank) : isCommunityPlain ? null : hcp.rank;
   const countryCode = getCountryCode(hcp.country ?? null);
   const { institution: cardInstitution, state: cardState } = getCardInstitutionAndState(hcp);
   const affiliationLine = formatCardAffiliationLine(hcp);
@@ -608,10 +498,6 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
       setActiveTooltip(null);
       return;
     }
-    if (cohortScoreTipOpen) {
-      setCohortScoreTipOpen(false);
-      return;
-    }
     onCardPress(hcp);
   }
 
@@ -621,10 +507,6 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
     onCardPress(hcp);
   }
 
-  const cohortScoreLabel =
-    effectiveCohort === "established"
-      ? formatScoreInt(hcp.cohortScore ?? null)
-      : formatCohortScore(hcp.cohortScore ?? null);
 
   // Score numeral: floor to one decimal for Established (cohort_score) and Rising Star /
   // Dark Horse (rising_star_percentile) — see formatScoreFloor1. Community/unclassified
@@ -638,105 +520,6 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
     ? formatScoreFloor1(numeralScoreRaw)
     : formatScoreInt(numeralScoreRaw);
 
-  function renderScoreChip() {
-    if (isCommunityPlain) {
-      return (
-        <CohortScoreChipWithTip
-          variant="community"
-          open={cohortScoreTipOpen}
-          onOpenChange={setCohortScoreTipOpen}
-          touchDevice={touchDevice}
-          scoreLabel={cohortScoreLabel}
-          chipButtonStyle={{
-            fontSize: 12,
-            fontFamily: "monospace",
-            color: "#E8A020",
-            backgroundColor: "#1A1200",
-            border: "1px solid #E8A020",
-            borderRadius: 3,
-            padding: "2px 8px",
-            minHeight: 0,
-            cursor: "pointer",
-            userSelect: "none",
-            lineHeight: 1,
-          }}
-          onMethodologyPress={
-            onScoringExplainedPress ? () => onScoringExplainedPress("community") : undefined
-          }
-        />
-      );
-    }
-    if (isDarkHorse) {
-      return (
-        <button
-          type="button"
-          onClick={handleScoreBadgeClick}
-          onTouchEnd={handleScoreBadgeClick}
-          style={{
-            fontSize: 12,
-            fontFamily: "monospace",
-            color: accentColor,
-            backgroundColor: accentBg,
-            border: `1px solid ${accentColor}`,
-            borderRadius: 2,
-            padding: "2px 8px",
-            minHeight: 0,
-            cursor: "pointer",
-            userSelect: "none",
-            lineHeight: 1,
-          }}
-        >
-          {cohortScoreLabel}
-        </button>
-      );
-    }
-    if (cohort === "established") {
-      return (
-        <button
-          type="button"
-          onClick={handleScoreBadgeClick}
-          onTouchEnd={handleScoreBadgeClick}
-          style={{
-            fontSize: 12,
-            fontFamily: "monospace",
-            color: accentColor,
-            backgroundColor: accentBg,
-            border: `1px solid ${accentColor}`,
-            borderRadius: 2,
-            padding: "2px 8px",
-            minHeight: 0,
-            cursor: "pointer",
-            userSelect: "none",
-            lineHeight: 1,
-          }}
-        >
-          {cohortScoreLabel}
-        </button>
-      );
-    }
-    return (
-      <button
-        type="button"
-        onClick={handleScoreBadgeClick}
-        onTouchEnd={handleScoreBadgeClick}
-        style={{
-          fontSize: 12,
-          fontFamily: "monospace",
-          color: accentColor,
-          backgroundColor: accentBg,
-          border: `1px solid ${accentColor}`,
-          borderRadius: 3,
-          padding: "2px 8px",
-          minHeight: 0,
-          cursor: "pointer",
-          userSelect: "none",
-          lineHeight: 1,
-        }}
-      >
-        {cohortScoreLabel}
-      </button>
-    );
-  }
 
   return (
     <>
@@ -899,7 +682,35 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
           </div>
         </div>
 
-        {/* Score — absolute-positioned top-right corner */}
+        {/* Community (Phase 3): tier + reach facts in the badge slot — no score,
+            no rank, no tooltip. heme_dominant wears the AFFIRMATIVE different-
+            specialty label, not a deficit one. */}
+        {isCommunityPlain ? (
+          <div
+            style={{ position: "absolute", top: 12, right: 12, textAlign: "right", zIndex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}
+          >
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                color: "#7B9EBD",
+                backgroundColor: "rgba(123,158,189,0.12)",
+                border: "1px solid rgba(123,158,189,0.4)",
+                borderRadius: 3,
+                padding: "3px 8px",
+              }}
+            >
+              {COMMUNITY_TIER_CARD_LABEL[hcp.evidenceTier ?? ""] ?? "COMMUNITY"}
+            </span>
+            {hcp.patientVolume != null && hcp.patientVolume > 0 ? (
+              <span style={{ fontFamily: "monospace", fontSize: 10.5, color: "#B8B4AC", fontVariantNumeric: "tabular-nums" }}>
+                {Math.round(hcp.patientVolume).toLocaleString()} <span style={{ color: "#77736B" }}>MEDICARE BENES · 3YR</span>
+              </span>
+            ) : null}
+          </div>
+        ) : (
         <button
           type="button"
           onClick={handleScoreBadgeClick}
@@ -974,6 +785,7 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress, onS
             </div>
           )}
         </button>
+        )}
 
         {/* Score tooltip — rendered when activeTooltip matches */}
         {activeTooltip === scoreTooltipKey && (

@@ -459,11 +459,14 @@ async function enrichAndMapCohortRows(
       ];
     }
 
-    const normalizedScore = Number(rr.normalized_score ?? 0);
-    const rank = Number(rr.rank);
-    const scopeSize = Number(rr.scope_size);
+    // Community (Phase 3 roster): the RPC emits no rank/score/scope_size — tier
+    // and reach facts replace them. EST rows keep the real rank/score fields.
+    const isCommunityRow = cohort === "community";
+    const normalizedScore = isCommunityRow ? 0 : Number(rr.normalized_score ?? 0);
+    const rank = isCommunityRow ? null : Number(rr.rank);
+    const scopeSize = isCommunityRow ? 0 : Number(rr.scope_size);
     const percentile =
-      scopeSize > 0 ? 100 - (rank / scopeSize) * 100 : 100;
+      rank != null && scopeSize > 0 ? 100 - (rank / scopeSize) * 100 : null;
 
     const enrichedRow = {
       composite_score: Number(
@@ -550,7 +553,10 @@ async function enrichAndMapCohortRows(
         ...base,
         cohort_classification: "community",
         tier: "community",
-        composite_score: Number(rr.composite_score ?? normalizedScore),
+        // Phase 3 roster facts: tier chip + Medicare reach, never a score.
+        evidence_tier: (rr.evidence_tier as string | null) ?? null,
+        patient_volume: rr.patient_volume != null ? Number(rr.patient_volume) : null,
+        part_d_present: rr.part_d_present != null ? Boolean(rr.part_d_present) : null,
       } as RisingStar,
     ];
   });
@@ -1863,7 +1869,9 @@ export async function getHCPDetail(
         (taId !== TA_ID_MAP.nsclc || Boolean((communityGate as { data?: unknown }).data))
       ) {
         cohortClassification = "community";
-        cohortScore = scopedScore(communityData, "normalized_score", true);
+        // Phase 3: community has no cohortScore — membership is the board view,
+        // and the frozen normalized_score must never resurface as a number.
+        cohortScore = null;
       } else {
         // Not in any per-TA cohort for this TA -> honestly null, NOT the global column.
         cohortClassification = null;

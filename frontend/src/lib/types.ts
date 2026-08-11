@@ -84,10 +84,15 @@ export interface HCPScore {
 }
 
 export interface RisingStar extends HCP, HCPScore {
-  /** Precomputed rank within scope. Set by rank-aware queries. */
-  rank?: number;
-  /** Percentile within scope (0-100). */
-  percentile?: number;
+  /** Precomputed rank within scope. Set by rank-aware queries. NULL for
+   *  community (Phase 3 roster — not ranked). */
+  rank?: number | null;
+  /** Percentile within scope (0-100). NULL for community. */
+  percentile?: number | null;
+  /** Community roster facts (Phase 3): evidence tier + Medicare reach. */
+  evidence_tier?: string | null;
+  patient_volume?: number | null;
+  part_d_present?: boolean | null;
   /** Total HCPs in scope (denominator for "rank #X of Y"). */
   scope_size?: number;
   /** Display label for rank stack (e.g. US, GLOBAL). */

@@ -52,6 +52,7 @@ export interface CohortConfig {
   cols: ScoreCol[];
   bandResolution: number; // index spread that still counts as "tied"
   idxDecimals: number; // decimals on the INDEX figure (EST/RS 1, COM 0)
+  sortLabel?: string; // COM roster: visible default-order label (no rank exists)
   rpc: string; // source RPC
   notes: string[];
   traceFoot: string;
@@ -135,6 +136,8 @@ export const COM_CONFIG: CohortConfig = {
   ],
   bandResolution: 1.0,
   idxDecimals: 0,
+  // Roster default order (Phase 3): the visible, swappable view-state label.
+  sortLabel: "BY EVIDENCE TIER, THEN MEDICARE REACH",
   rpc: "community_ledger",
   notes: [
     "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE, AND NOTHING SORTS ON IT — IT SITS AT THE SAME TERTIARY TIER AS EVERY OTHER FIGURE SO THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
@@ -149,14 +152,22 @@ export const COM_CONFIG: CohortConfig = {
 export const COHORTS: CohortConfig[] = [EST_CONFIG, RS_CONFIG, COM_CONFIG];
 
 export interface LedgerRow {
-  rank: number;
+  // EST/RS: the real cohort rank. COM (Phase 3 roster): null — community is
+  // not ranked; ordinal (array position, stamped by the component) carries
+  // keys/neighbor lookups without ever displaying as a position.
+  rank: number | null;
+  ordinal?: number;
   globalRank: number | null;
+  // COM roster facts (Phase 3): the leading reach fact + keyset cursor fields.
+  tierPriority?: number | null;
+  patientVolume?: number | null;
+  partDPresent?: boolean | null;
   hcpId: string;
   name: string;
   chips: string[]; // small mono chips after the name (state·institution, or specialty·location)
   archetype: string | null; // Rising Star only — physician attribute chip inline with the name
   scores: Record<string, number | null>; // keyed by col.key
-  idx: number; // composite index
+  idx: number | null; // composite index (EST/RS only; COM roster has none)
   summary: string | null; // generated narrative headline (plain prose)
   // Community evidence-tier fields (COM only; from hcp_nsclc_evidence_tier_v1 via the RPC).
   // Absent on EST/RS rows. Never composed client-side — the RPC returns the strings.
@@ -338,12 +349,15 @@ export interface LedgerLayout {
 
 export function layout(cfg: CohortConfig, rows: LedgerRow[]): LedgerLayout {
   if (rows.length === 0) return { headBands: [], tailRows: [], headMaxRank: 0 };
-  const idxCeiling = rows[0].idx; // ranked by index, so the top row carries the ceiling
+  // COM roster (Phase 3): no index, no tied-head banding — tier grouping is the
+  // only structure; every row is a tail row.
+  if (rows[0].idx == null) return { headBands: [], tailRows: rows, headMaxRank: 0 };
+  const idxCeiling = rows[0].idx ?? 0; // ranked by index, so the top row carries the ceiling
   const boundary = idxCeiling - cfg.bandResolution;
 
   // prefix of rows still within resolution of the ceiling = the tied head
   let headEnd = 0;
-  while (headEnd < rows.length && rows[headEnd].idx >= boundary) headEnd++;
+  while (headEnd < rows.length && (rows[headEnd].idx ?? -Infinity) >= boundary) headEnd++;
   const head = rows.slice(0, headEnd);
   const tailRows = rows.slice(headEnd);
 
@@ -353,14 +367,14 @@ export function layout(cfg: CohortConfig, rows: LedgerRow[]): LedgerLayout {
   const d = cfg.idxDecimals;
   while (i < head.length) {
     const start = i;
-    const hi = head[i].idx;
+    const hi = head[i].idx ?? 0;
     i++;
-    while (i < head.length && hi - head[i].idx <= cfg.bandResolution) i++;
+    while (i < head.length && hi - (head[i].idx ?? -Infinity) <= cfg.bandResolution) i++;
     const group = head.slice(start, i);
-    const lo = group[group.length - 1].idx;
+    const lo = group[group.length - 1].idx ?? 0;
     const spread = +(hi - lo).toFixed(2);
-    const r0 = group[0].rank;
-    const r1 = group[group.length - 1].rank;
+    const r0 = group[0].rank ?? 0;
+    const r1 = group[group.length - 1].rank ?? 0;
     headBands.push({
       label: `BAND ${String.fromCharCode(letter)} · RANK ${r0}${r1 > r0 ? `–${r1}` : ""}`,
       note:
@@ -371,7 +385,7 @@ export function layout(cfg: CohortConfig, rows: LedgerRow[]): LedgerLayout {
     });
     letter++;
   }
-  return { headBands, tailRows, headMaxRank: head.length ? head[head.length - 1].rank : 0 };
+  return { headBands, tailRows, headMaxRank: head.length ? (head[head.length - 1].rank ?? 0) : 0 };
 }
 
 // ── Drawer "why" (derived from suppression state + scores) ───────────────────
@@ -464,16 +478,24 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
   }
 
   const base: LedgerRow = {
-    rank: Number(r.rank),
+    // COM (Phase 3 roster): the RPC emits no rank and no idx — community is
+    // not ranked. EST/RS keep both.
+    rank: cfg.tag === "COM" ? null : Number(r.rank),
     globalRank: r.global_rank == null ? null : Number(r.global_rank),
     hcpId: S(r.hcp_id),
     name,
     chips,
     archetype: cfg.tag === "RS" ? ((r.archetype as string) ?? null) : null,
     scores,
-    idx: Number(r.idx),
+    idx: cfg.tag === "COM" ? null : Number(r.idx),
     summary: (r.summary as string) ?? null,
   };
+
+  if (cfg.tag === "COM") {
+    base.tierPriority = N(r.tier_priority);
+    base.patientVolume = N(r.patient_volume);
+    base.partDPresent = r.part_d_present == null ? null : Boolean(r.part_d_present);
+  }
 
   if (cfg.tag === "COM") {
     base.tier = (r.tier as string) ?? null;
@@ -503,19 +525,39 @@ export async function loadLedgerMeta(cfg: CohortConfig): Promise<LedgerMeta> {
 
 export const LEDGER_PAGE_SIZE = 1000; // PostgREST hard cap; also our page size
 
-/** One rank-keyed page. Pass afterRank = the last rank already held (0 for the first
- *  page); the RPC returns rows with rank > afterRank, ordered by rank. No offset, so
+/** COM roster keyset cursor (Phase 3): the last row's raw ordering tuple. The RPC
+ *  negates volume internally so the composite (tier, -volume, hcp_id) compares as
+ *  one ascending tuple. */
+export interface RosterCursor {
+  tierPriority: number;
+  patientVolume: number;
+  hcpId: string;
+}
+
+/** One keyset page. EST/RS pass afterCursor = the last rank already held (0 for the
+ *  first page). COM passes the last row's RosterCursor (undefined for the first page)
+ *  — community has no rank, so the cursor is the ordering tuple itself. No offset, so
  *  no dup/skip. hasMore is true when a full page came back. */
 export async function loadLedgerPage(
   cfg: CohortConfig,
-  afterRank = 0,
+  afterCursor: number | RosterCursor | undefined = 0,
   limit = LEDGER_PAGE_SIZE,
   tiers?: string[],
 ): Promise<LedgerData & { hasMore: boolean }> {
-  // COM's tiered RPC takes p_tiers (default anchored+supported when omitted) and returns
-  // filtered_total alongside cohort_total. EST/RS RPCs take neither, so only pass p_tiers
-  // for COM — an unknown named arg would make the RPC unresolvable.
-  const args: Record<string, unknown> = { p_limit: limit, p_after_rank: afterRank };
+  // COM's roster RPC takes the composite cursor + p_tiers (default anchored+supported
+  // when omitted) and returns filtered_total alongside cohort_total. EST/RS RPCs take
+  // p_after_rank only — an unknown named arg would make the RPC unresolvable.
+  const args: Record<string, unknown> =
+    cfg.tag === "COM"
+      ? typeof afterCursor === "object" && afterCursor != null
+        ? {
+            p_limit: limit,
+            p_after_tier_priority: afterCursor.tierPriority,
+            p_after_patient_volume: afterCursor.patientVolume,
+            p_after_hcp_id: afterCursor.hcpId,
+          }
+        : { p_limit: limit }
+      : { p_limit: limit, p_after_rank: typeof afterCursor === "number" ? afterCursor : 0 };
   if (cfg.tag === "COM" && tiers && tiers.length) args.p_tiers = tiers;
   const { data, error } = await supabase.rpc(cfg.rpc, args);
   if (error) {

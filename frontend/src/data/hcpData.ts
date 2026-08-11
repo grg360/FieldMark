@@ -19,10 +19,14 @@ export interface HCP {
   caution_flags?: string | null;
   signal_strength?: string | null;
   h_index?: number | null;
-  rank?: number;
+  rank?: number | null;
   scope?: string;
   global_rank?: number | null;
   tier?: string | null;
+  /** Community roster facts (Phase 3): evidence tier + Medicare reach. */
+  evidenceTier?: string | null;
+  patientVolume?: number | null;
+  partDPresent?: boolean | null;
   hcp_id?: string;
   cohort_classification?: string | null;
   medicareVolume?: number | null;
