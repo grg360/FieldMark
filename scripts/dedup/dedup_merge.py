@@ -502,6 +502,10 @@ def merge_record_into_survivor(
         ("hcp_medicare_by_ta_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_scores_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_established_scores_v2", "hcp_id", ["therapeutic_area_id"]),
+        # hcp_community_ranks_v2 is intentionally absent from this list: it is a
+        # VIEW over hcp_community_scores_v2 (live row_number ranks), so moving or
+        # stripping the scores row is what moves or removes the rank rows —
+        # there is nothing to write on the view itself.
         ("hcp_community_scores_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_therapeutic_areas_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_institutions_v2", "hcp_id", ["reference_institution_id"]),
@@ -632,6 +636,72 @@ def merge_record_into_survivor(
         else:
             moved[table] = {"updated": move_simple_hcp_fk(cur, table, primary_id, stub_id, hcp_col), "deleted_conflicts": 0}
 
+    # Cohort-collision artifact-strip: when the survivor is an ACADEMIC board
+    # member, the stub's community score must NOT re-point onto it — an academic
+    # survivor carrying a community score lands in the community full-board
+    # unresolved tier (the manual Aditi cleanup, automated). Academic status is
+    # BOARD-MEMBERSHIP ground truth (an established/rising rank row exists), not
+    # hcp_cohort_classification_v2. Runs before the tables_conflict loop so the
+    # loop finds nothing to move; only ever touches the STUB's rows. The stub's
+    # hcp_community_ranks_v2 rows need no delete of their own — that is a view
+    # over hcp_community_scores_v2, so they vanish with the score rows.
+    cur.execute(
+        "SELECT (EXISTS (SELECT 1 FROM hcp_established_ranks_v3 WHERE hcp_id = %s) "
+        "OR EXISTS (SELECT 1 FROM hcp_rising_star_ranks_v3 WHERE hcp_id = %s)) AS is_academic",
+        (survivor_id, survivor_id),
+    )
+    survivor_is_academic = bool(cur.fetchone()["is_academic"])
+    if survivor_is_academic:
+        strip_scores = count_rows_for_hcp(cur, "hcp_community_scores_v2", "hcp_id", stub_id)
+        strip_ranks = count_rows_for_hcp(cur, "hcp_community_ranks_v2", "hcp_id", stub_id)
+        cur.execute(
+            "SELECT COUNT(*) AS c FROM hcp_score_ranks_v2 WHERE hcp_id = %s AND cohort = 'community'",
+            (stub_id,),
+        )
+        strip_score_ranks = int(cur.fetchone()["c"] or 0)
+        print(
+            f"      [COHORT_STRIP] survivor={survivor_id} is academic "
+            f"(established/rising board member); stub community artifacts are stripped, not re-pointed"
+        )
+        print(
+            f"      [COHORT_STRIP] {'would delete' if dry_run else 'deleting'} "
+            f"{strip_scores} hcp_community_scores_v2 row(s) for stub={stub_id}; "
+            f"{strip_ranks} derived hcp_community_ranks_v2 row(s) vanish with them (view); "
+            f"{strip_score_ranks} hcp_score_ranks_v2 cohort='community' row(s)"
+        )
+        if not dry_run:
+            cur.execute("DELETE FROM hcp_community_scores_v2 WHERE hcp_id = %s", (stub_id,))
+            strip_scores = int(cur.rowcount or 0)
+            cur.execute(
+                "DELETE FROM hcp_score_ranks_v2 WHERE hcp_id = %s AND cohort = 'community'",
+                (stub_id,),
+            )
+            strip_score_ranks = int(cur.rowcount or 0)
+        moved["hcp_community_scores_v2 [COHORT_STRIP]"] = {"updated": 0, "deleted_conflicts": strip_scores}
+        moved["hcp_score_ranks_v2 [COHORT_STRIP]"] = {"updated": 0, "deleted_conflicts": strip_score_ranks}
+        # Stripped, not moved: drop both tables from this merge's re-point list
+        # so the dry-run plan and the live run report identical movement. The
+        # stub's NON-community hcp_score_ranks_v2 rows must still re-point, so
+        # that table is handled manually here with the loop's own helper and
+        # key columns; in dry-run its count excludes the stripped rows.
+        tables_conflict = [
+            t for t in tables_conflict if t[0] not in ("hcp_community_scores_v2", "hcp_score_ranks_v2")
+        ]
+        if dry_run:
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM hcp_score_ranks_v2 WHERE hcp_id = %s AND cohort <> 'community'",
+                (stub_id,),
+            )
+            moved["hcp_score_ranks_v2"] = {"updated": int(cur.fetchone()["c"] or 0), "deleted_conflicts": 0}
+        else:
+            moved["hcp_score_ranks_v2"] = move_hcp_fk_with_conflict_delete(
+                cur,
+                "hcp_score_ranks_v2",
+                ["therapeutic_area_id", "cohort", "scope_type", "scope_value"],
+                primary_id,
+                stub_id,
+            )
+
     for table, hcp_col, key_cols in tables_conflict:
         if dry_run:
             moved[table] = {"updated": count_rows_for_hcp(cur, table, hcp_col, stub_id), "deleted_conflicts": 0}
@@ -698,6 +768,22 @@ def merge_record_into_survivor(
         }
     else:
         moved["trial_investigator_match_proposals_v2"] = move_trial_proposals(cur, primary_id, stub_id)
+
+    # hcp_cohort_classification_v2 has NO FK to hcps_v2, so the stub delete
+    # below would strand its per-(hcp, TA) taxonomy rows forever. Sweep them
+    # here, stub-keyed only, in the same transaction as the delete they exist
+    # for. The survivor keeps its own classification rows untouched.
+    if dry_run:
+        moved["hcp_cohort_classification_v2 [ORPHAN_SWEEP]"] = {
+            "updated": 0,
+            "deleted_conflicts": count_rows_for_hcp(cur, "hcp_cohort_classification_v2", "hcp_id", stub_id),
+        }
+    else:
+        cur.execute("DELETE FROM hcp_cohort_classification_v2 WHERE hcp_id = %s", (stub_id,))
+        moved["hcp_cohort_classification_v2 [ORPHAN_SWEEP]"] = {
+            "updated": 0,
+            "deleted_conflicts": int(cur.rowcount or 0),
+        }
 
     if dry_run:
         moved["hcps_v2_stub_delete"] = {"updated": 1, "deleted_conflicts": 0}
