@@ -40,6 +40,13 @@ export interface ScoreCol {
   // Established sets 1 (2026-07-31): at integer precision every top-20 SCI reads "99" and
   // the column carries nothing; at one decimal the 60/40 decomposition is legible.
   decimals?: number;
+  // Single-source horizontal alignment (2026-08-12): when set, BOTH the column
+  // head (ColumnHeads) and the value cell (Row) read this one value, so they
+  // cannot drift apart. Absent = legacy split: head centered, value right —
+  // which is EST/RS's shipped look (their large numerals nearly fill their
+  // cells, so right ≈ center) and must not change. COM's short facts in
+  // header-sized cells set "center" to sit plumb under their two-line heads.
+  align?: "center" | "right";
 }
 
 export interface CohortConfig {
@@ -133,13 +140,14 @@ export const COM_CONFIG: CohortConfig = {
   nameSub: "SPECIALTY · LOCATION · GENERATED SUMMARY",
   meta: "{total} HCP · CMS-DERIVED · TIER-GROUPED, NOT RANKED · SORTED BY EVIDENCE TIER, THEN MEDICARE REACH",
   cols: [
-    { key: "eng", label: "ENGAGEMENT", sub: "CMS · NOT RANKED", w: 122, kind: "money", noRank: true, absent: "NONE RECORDED", prov: "Open Payments" },
-    // Head renamed PHARMA ENGAGEMENT 2026-08-07 (single line — headSub "" on
-    // purpose). This is the distinct-company COUNT column; the CMS payment
-    // total to its left keeps ENGAGEMENT / CMS · NOT RANKED. label/sub still
-    // feed trace() unchanged.
-    { key: "companies", label: "COMPANIES", sub: "DISTINCT", head: "PHARMA ENGAGEMENT", headSub: "", w: 126, kind: "count", unit: "distinct companies", prov: "Open Payments" },
-    { key: "years", label: "YEARS", sub: "IN PRACTICE", w: 74, kind: "count", unit: "years", prov: "NPPES" },
+    // Head relabel 2026-08-12: the dollars column reads PHARMA / PAYMENTS and
+    // the count column COMPANIES / ENGAGED — the pair now names its facts
+    // instead of splitting "engagement" across both. "CMS · NOT RANKED"
+    // dropped from the head: the cohort meta line already states the roster
+    // isn't ranked. label/sub still feed trace() unchanged.
+    { key: "eng", label: "ENGAGEMENT", sub: "CMS · NOT RANKED", head: "PHARMA", headSub: "PAYMENTS", w: 122, kind: "money", noRank: true, absent: "NONE RECORDED", prov: "Open Payments", align: "center" },
+    { key: "companies", label: "COMPANIES", sub: "DISTINCT", head: "COMPANIES", headSub: "ENGAGED", w: 126, kind: "count", unit: "distinct companies", prov: "Open Payments", align: "center" },
+    { key: "years", label: "YEARS", sub: "IN PRACTICE", w: 74, kind: "count", unit: "years", prov: "NPPES", align: "center" },
   ],
   bandResolution: 1.0,
   idxDecimals: 0,
@@ -278,7 +286,7 @@ export interface CellDisplay {
   kind: "num" | "dash" | "absent";
 }
 
-function money(v: number): string {
+export function money(v: number): string {
   return v >= 1000 ? `$${(v / 1000).toFixed(1)}K` : `$${Math.round(v)}`;
 }
 
@@ -485,7 +493,7 @@ export function trace(cfg: CohortConfig, row: LedgerRow, cohortTotal: number): T
 // ── Data ─────────────────────────────────────────────────────────────────────
 const S = (v: unknown): string => (v == null ? "" : String(v));
 const N = (v: unknown): number | null => (v == null ? null : Number(v));
-const titleCase = (s: string): string =>
+export const titleCase = (s: string): string =>
   s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 
 function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {

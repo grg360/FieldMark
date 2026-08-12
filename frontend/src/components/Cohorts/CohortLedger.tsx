@@ -804,8 +804,14 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
       {/* Per-cohort rail head (Phase 3): COM is a roster — the leading figure is
           the Medicare reach FACT, never a rank. EST/RS keep their real rank rail. */}
       {cfg.tag === "COM" ? (
+        // One label (2026-08-12): the header names only the tier word — the
+        // reach value self-labels via the 2A cell's own caption, so a reach
+        // sub-line here double-labeled it and read as a qualifier of the tier.
+        // The invisible second line holds the two-line cell height: the header
+        // row bottom-aligns (alignItems flex-end), so matched height lands
+        // EVIDENCE TIER on the same head line as MEDICARE/PHARMA/COMPANIES.
         <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.ink4 }}>
-          EVIDENCE TIER<br /><span style={{ color: P.ink5 }}>MEDICARE REACH · 3YR</span>
+          EVIDENCE TIER<br /><span style={{ visibility: "hidden" }}>·</span>
         </div>
       ) : (
         <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.amber }}>
@@ -815,11 +821,27 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
       <div style={{ flex: 1, minWidth: 300, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
         PHYSICIAN · {cfg.nameSub}
       </div>
-      <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-        {cfg.tag === "COM" ? "PART D" : "COHORT SCORE"}
-      </div>
+      {/* COM (2026-08-12): the idx slot is the MEDICARE PART D presence fact,
+          paired with a PART B presence column — two-line heads matching the
+          PHARMA PAYMENTS / COMPANIES ENGAGED grammar. EST/RS keep COHORT SCORE. */}
+      {cfg.tag === "COM" ? (
+        <>
+          <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+            MEDICARE<br /><span style={{ color: P.ink5 }}>PART D</span>
+          </div>
+          <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+            MEDICARE<br /><span style={{ color: P.ink5 }}>PART B</span>
+          </div>
+        </>
+      ) : (
+        <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+          COHORT SCORE
+        </div>
+      )}
       {cfg.cols.map((c) => (
-        <div key={c.key} style={{ width: c.w, textAlign: "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
+        // c.align is the single-source alignment shared with the Row value
+        // cell (2026-08-12); absent = legacy centered head over a right value.
+        <div key={c.key} style={{ width: c.w, textAlign: c.align ?? "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
           {c.head ?? c.label}
           {/* headSub === "" is the explicit single-line head (PHARMA ENGAGEMENT) */}
           {(c.headSub ?? c.sub) ? <><br /><span style={{ color: P.ink5 }}>{c.headSub ?? c.sub}</span></> : null}
@@ -917,9 +939,10 @@ function Row({
           // COM rail — Design "Community Rail" 2A · SET IN SERIF (2026-08-11):
           // the tier word joins the editorial voice (serif small-caps, the same
           // family as the physician names), cool slate — never amber, never the
-          // rank-numeral weight. Reach beneath is an abbreviated cool fact
-          // ("9.0K" / "MEDICARE REACH", no BENES, no 3YR per the 2A plate),
-          // centered. Absence is never zero: no Part B benes renders "—".
+          // rank-numeral weight. Reach beneath is an abbreviated cool fact,
+          // centered; its caption carries the 3YR timeframe (2026-08-12 — moved
+          // here from the rail header, which now labels only the tier word).
+          // Absence is never zero: no Part B benes renders "—".
           <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 7, textAlign: "center" }}>
             <span style={{ ...serif(15, 500), color: "#B3C0C9", fontVariant: "small-caps", letterSpacing: "0.02em", lineHeight: 1.15 }}>
               {COM_RAIL_TIER_WORD[row.tier ?? ""] ?? "community"}
@@ -928,7 +951,7 @@ function Row({
             <span style={{ ...mono(12), color: "#6F7D87", letterSpacing: ".05em", fontVariantNumeric: "tabular-nums" }}>
               {fmtReachK(row.patientVolume)}
             </span>
-            <span style={{ ...mono(7.5), color: "#6F7D87", letterSpacing: ".16em" }}>MEDICARE REACH</span>
+            <span style={{ ...mono(7.5), color: "#6F7D87", letterSpacing: ".16em", whiteSpace: "nowrap" }}>REACH · 3YR</span>
           </div>
         )}
         {/* name + chips + summary */}
@@ -994,17 +1017,33 @@ function Row({
             {floorFixed(row.idx, cfg.idxDecimals)}
           </div>
         ) : (
-          // COM roster (Phase 3): no index — the Part-D presence fact takes the slot.
-          <div style={{ width: 88, textAlign: "right", ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }}>
+          // COM roster (Phase 3): no index — the Part-D presence fact takes the
+          // slot (centered under the MEDICARE / PART D head since 2026-08-12).
+          <div style={{ width: 88, textAlign: "center", ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }}>
             {row.partDPresent ? "PART D ✓" : ""}
           </div>
         )}
+        {/* MEDICARE PART B presence (2026-08-12): patient_volume > 0 is the
+            only presence definition the board carries — no part_b_present flag
+            exists, and the ledger RPC coalesces null volume to 0, so absent
+            and zero are one state. Dash for that state, never a "0" and never
+            a ✓ — absence is not a count. The reach NUMBER stays in the rail;
+            this cell is presence only. */}
+        {cfg.tag === "COM" ? (
+          <div style={{ width: 88, textAlign: "center", ...mono(9.5), letterSpacing: ".08em" }}>
+            {row.patientVolume != null && row.patientVolume > 0 ? (
+              <span style={{ color: P.ink5 }}>PART B ✓</span>
+            ) : (
+              <span style={{ color: P.dash, letterSpacing: ".1em" }}>—</span>
+            )}
+          </div>
+        ) : null}
         {/* score cells */}
         {cfg.cols.map((col) => {
           const d = cellDisplay(row, col, th);
           if (d.kind === "absent") {
             return (
-              <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
+              <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
                 <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>{d.text}</span>
               </div>
             );
@@ -1016,7 +1055,7 @@ function Row({
           // for numerals only. COM keeps the mono cells (no ramp on the roster).
           if (cfg.numericRamp && d.kind !== "dash") {
             return (
-              <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
+              <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
                 {col.noRank ? (
                   <span style={{ ...serif(15), color: "#43434A" }}>{d.text}</span>
                 ) : (
@@ -1027,7 +1066,7 @@ function Row({
           }
           const color = d.kind === "dash" ? P.dash : col.noRank ? P.ink4 : P.ink0;
           return (
-            <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
+            <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
               <span style={{ ...mono(13), color, fontVariantNumeric: "tabular-nums" }}>{d.text}</span>
             </div>
           );
