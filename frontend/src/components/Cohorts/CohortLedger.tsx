@@ -1648,10 +1648,16 @@ export default function CohortLedger() {
   const navigate = useNavigate();
   const { setTrack } = useTrack();
   const { userTerritory } = useFilterContext();
+  const tag = COHORT_SLUG_TO_TAG[(params.cohort ?? "").toLowerCase()] ?? "EST";
+  const cfg = COHORTS.find((c) => c.tag === tag) ?? COHORTS[0];
 
-  // Territory scope: EVERY ledger mount defaults to the profile's territory
-  // (Garrett 2026-08-12 — switching cohorts resets; an override lives only
-  // within the current cohort view, never carried across).
+  // Territory scope — default SPLIT by cohort (Garrett 2026-08-12, second
+  // pass): COM is a practice-based roster and opens on the MSL's territory;
+  // EST/RS are NATIONAL ranked leaderboards and open US-wide — a territory
+  // default there hides the actual top ranks (#1 Ramalingam practices in
+  // Georgia; an NE default would bury him). The selector still overrides all
+  // three; switching cohorts resets to the incoming cohort's own default
+  // (override stays view-local, per the morning rule).
   const [myTerritory, setMyTerritory] = useState<LedgerScope | null>(null);
   const [scope, setScope] = useState<LedgerScope | null>(null);
   const [territoryResolved, setTerritoryResolved] = useState(false);
@@ -1666,12 +1672,15 @@ export default function CohortLedger() {
           ? { key: "mine", label: ctx.territoryLabel ?? "My territory", states: ctx.states }
           : null;
       setMyTerritory(mine);
-      setScope(mine ?? { key: "national", label: "National", states: [] });
+      setScope(
+        cfg.tag === "COM" && mine ? mine : { key: "national", label: "National", states: [] },
+      );
       setTerritoryResolved(true);
     })();
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const applyScope = useCallback(
     (key: string) => {
@@ -1687,14 +1696,15 @@ export default function CohortLedger() {
     },
     [myTerritory],
   );
-  const tag = COHORT_SLUG_TO_TAG[(params.cohort ?? "").toLowerCase()] ?? "EST";
-  const cfg = COHORTS.find((c) => c.tag === tag) ?? COHORTS[0];
   // Cohort switches do NOT remount this component (one route component for all
-  // three), so the reset to the profile territory must be explicit: any
-  // override dies with the cohort view it was made in.
+  // three), so the reset to the incoming cohort's default must be explicit:
+  // any override dies with the cohort view it was made in. COM → territory;
+  // EST/RS → national (the default split above).
   useEffect(() => {
     if (!territoryResolved) return;
-    setScope(myTerritory ?? { key: "national", label: "National", states: [] });
+    setScope(
+      cfg.tag === "COM" && myTerritory ? myTerritory : { key: "national", label: "National", states: [] },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg]);
   const cohortTrack: Track = TAG_TO_TRACK[cfg.tag] ?? "established";
