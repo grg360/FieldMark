@@ -27,7 +27,8 @@ import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
 import { resolveFeedRoute, trackToDashboardSlug } from "../../lib/routeSlugs";
-import { taIdForApiSlug } from "../../lib/api";
+import { taIdForApiSlug, getHcpWebSignals, type WebSignal } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
 import type { RelationshipStatus } from "../../lib/relationships";
 import {
   COHORTS,
@@ -38,8 +39,6 @@ import {
   cellDisplay,
   mobileCells,
   layout,
-  why,
-  trace,
   evidenceChip,
   LEDGER_PAGE_SIZE,
   COM_TIER_FILTERS,
@@ -50,6 +49,8 @@ import {
   type LedgerRow,
   type Band,
   LEDGER_REGION_OPTIONS,
+  titleCase,
+  money,
   type LedgerScope,
 } from "../../lib/cohortLedger";
 import { getCurrentUser } from "../../lib/authHelpers";
@@ -836,7 +837,6 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
 function Row({
   cfg,
   row,
-  cohortTotal,
   th,
   open,
   onToggle,
@@ -1093,40 +1093,19 @@ function Row({
         </div>
       </div>
 
-      {/* drawer (2026-08-08): EST/RS take the three-layer redesign; COM keeps
-          the old why/trace until its own pass. Both EST and RS take the 5px
-          overhang treatment (2026-08-09; extended to RS same day with the
-          cohort-tinted rails — sage/violet from cfg) — see DrawerOverhang. */}
+      {/* drawer (2026-08-08): EST/RS take the three-layer redesign; COM takes
+          the 1B call sheet (2026-08-12). All three cohorts take the 5px
+          overhang treatment on desktop (2026-08-09; RS same day with the
+          cohort-tinted rails, COM 2026-08-12) — see DrawerOverhang. */}
       {open && cfg.tag !== "COM" ? (
         <DrawerOverhang>
           <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get((row.rank ?? 0) - 1)} down={rowByRank?.get((row.rank ?? 0) + 1)} overhang />
         </DrawerOverhang>
       ) : null}
       {open && cfg.tag === "COM" ? (
-        <div style={{ display: "flex", gap: 48, padding: "6px 20px 22px 127px", background: P.drawer, borderTop: `1px solid ${P.line}` }}>
-          <div style={{ flex: 1, maxWidth: 540, display: "flex", flexDirection: "column", gap: 9, paddingTop: 14 }}>
-            <div style={{ ...mono(9, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
-            <div style={{ ...serif(13.5), lineHeight: 1.6, color: COOL.prose, textWrap: "pretty" }}>{why(cfg, row, th)}</div>
-            <div style={{ ...mono(10), lineHeight: 1.6, color: "#767C81", letterSpacing: ".04em", paddingTop: 2 }}>
-              THE SUMMARY LINE ABOVE IS MODEL SYNTHESIS OVER THE SOURCES AT RIGHT · REVIEW BEFORE USE · NO CLINICAL CLAIM
-            </div>
-          </div>
-          <div style={{ width: 620, display: "flex", flexDirection: "column", paddingTop: 14 }}>
-            <div style={{ ...mono(9, 500), letterSpacing: ".18em", color: P.ink5, paddingBottom: 9 }}>TRACE</div>
-            {trace(cfg, row, cohortTotal).map((s, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 14, padding: "7px 0", borderTop: `1px solid ${P.line}` }}>
-                <span style={{ width: 176, flexShrink: 0, ...mono(10), letterSpacing: ".1em", color: P.ink5 }}>{s.label}</span>
-                <span style={{ flex: 1, ...mono(11.5), color: P.ink2 }}>{s.value}</span>
-                <Link to={`/hcp/${row.hcpId}`} style={{ ...mono(10), letterSpacing: ".08em", flexShrink: 0, color: "#7FB3BB", textDecoration: "none", borderBottom: "1px solid rgba(127,179,187,.35)" }}>
-                  OPEN ↗
-                </Link>
-              </div>
-            ))}
-            <div style={{ ...mono(10), lineHeight: 1.6, color: "#767C81", letterSpacing: ".06em", paddingTop: 10, borderTop: `1px solid ${P.line}`, marginTop: 2 }}>
-              {cfg.traceFoot}
-            </div>
-          </div>
-        </div>
+        <DrawerOverhang>
+          <CommunityCallSheet cfg={cfg} row={row} overhang />
+        </DrawerOverhang>
       ) : null}
     </div>
   );
@@ -1140,7 +1119,6 @@ function Row({
 function MobileRow({
   cfg,
   row,
-  cohortTotal,
   th,
   open,
   onToggle,
@@ -1264,29 +1242,237 @@ function MobileRow({
       </div>
 
       {/* drawer (2026-08-08): EST/RS take the stacked three-layer redesign;
-          COM keeps why-over-trace until its own pass. */}
+          COM takes the stacked 1B call sheet (2026-08-12). Mobile keeps the
+          flat drawer — no overhang. */}
       {open && cfg.tag !== "COM" ? (
         <LedgerDrawerView cfg={cfg} row={row} up={rowByRank?.get((row.rank ?? 0) - 1)} down={rowByRank?.get((row.rank ?? 0) + 1)} mobile />
       ) : null}
-      {open && cfg.tag === "COM" ? (
-        <div style={{ padding: "4px 16px 18px 19px", background: P.drawer, borderTop: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 10 }}>
-            <div style={{ ...mono(8.5, 500), letterSpacing: ".18em", color: P.ink5 }}>WHAT PLACED THIS ROW HERE</div>
-            <div style={{ ...serif(13), lineHeight: 1.55, color: COOL.prose, textWrap: "pretty" }}>{why(cfg, row, th)}</div>
+      {open && cfg.tag === "COM" ? <CommunityCallSheet cfg={cfg} row={row} mobile /> : null}
+    </div>
+  );
+}
+
+// ── Community drawer — 1B "Call Sheet" (Design frame Community Drawer.dc.html,
+// 2026-08-12): read left, dial right. LEFT is claims/NPPES prose + a fact grid
+// and works for every board member; RIGHT is a fixed mono ACCESS rail fed by
+// web-signals enrichment with three honest states (enriched / not yet
+// gathered / searched-nothing-found) and per-row absence inside the first.
+// The generated summary is an absent-first slot — the drawer is complete
+// without it, and its text is regenerable (Phase 4).
+interface CallSheetFacts {
+  loaded: boolean;
+  signals: WebSignal[];
+  setting: string | null;
+  pubs: number | null;
+  nppesInstitution: string | null;
+}
+
+const CS = {
+  label: "#8b8479",
+  micro: "#5d5851",
+  faint: "#4f4a44",
+  prose: "#ddd6cb",
+  dim: "#6b6660",
+  gold: "#d8a24a",
+  hair: "rgba(255,255,255,.05)",
+};
+
+function csSig(signals: WebSignal[], type: string): WebSignal | null {
+  return signals.find((sg) => sg.signal_type === type && sg.signal_value) ?? null;
+}
+
+function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig; row: LedgerRow; mobile?: boolean; overhang?: boolean }) {
+  const [facts, setFacts] = useState<CallSheetFacts>({ loaded: false, signals: [], setting: null, pubs: null, nppesInstitution: null });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [signals, hcpRes] = await Promise.all([
+        getHcpWebSignals(row.hcpId),
+        supabase.from("hcps_v2").select("nppes_practice_setting, total_career_pubs, institution_normalized").eq("id", row.hcpId).maybeSingle(),
+      ]);
+      if (!alive) return;
+      const h = (hcpRes.data ?? {}) as { nppes_practice_setting?: string | null; total_career_pubs?: number | null; institution_normalized?: string | null };
+      setFacts({
+        loaded: true,
+        signals,
+        setting: h.nppes_practice_setting ?? null,
+        pubs: h.total_career_pubs ?? null,
+        nppesInstitution: h.institution_normalized ?? null,
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [row.hcpId]);
+
+  const real = facts.signals.filter((sg) => sg.signal_type !== "no_signals_found");
+  const searchedNothing = facts.loaded && real.length === 0 && facts.signals.some((sg) => sg.signal_type === "no_signals_found");
+  const enriched = real.length > 0;
+
+  const vol = row.patientVolume != null && row.patientVolume > 0 ? Math.round(row.patientVolume) : null;
+  const tierWord = COM_RAIL_TIER_WORD[row.tier ?? ""] ?? "community";
+  const loc = row.chips[1] ?? "";
+
+  // LEFT prose — factual templates only; every clause is a held fact.
+  const tierSentence = (() => {
+    if (row.tier === "anchored") {
+      const stems = (row.anchorStems ?? (row.anchorStem ? [row.anchorStem] : [])).join(", ");
+      const years = (row.anchorYears ?? []).join(" and ");
+      const recurs = row.recurrenceBand === "recurs" ? ", recurring across years rather than appearing once" : "";
+      return "Anchored on their own prescribing record — " + (stems || "lung-only oral") + " claims" + (years ? " in " + years : "") + recurs + ".";
+    }
+    if (row.tier === "supported") return "Supported by " + (row.supportedEvidence ?? "corroborating NSCLC evidence") + " in the claims record.";
+    if (row.tier === "heme_dominant") return "A heme-focused practice — the oral record concentrates in blood cancers; a different specialty, not a deficit.";
+    if (row.tier === "candidate") return "An oncology claims footprint without NSCLC-specific drug evidence — a candidate on the record so far.";
+    return "No Medicare drug-claims evidence to characterize the treatment mix.";
+  })();
+  const reachSentence = vol != null
+    ? vol.toLocaleString() + " Medicare beneficiaries over three years of Part B."
+    : "No Part B beneficiary record — reach is unmeasured here, not zero.";
+  const practiceBits = [
+    facts.setting ? titleCase(facts.setting) + " practice" : null,
+    row.scores["years"] != null ? String(Math.round(row.scores["years"] as number)) + " years in practice" : null,
+    row.partDPresent ? "oral agents move through their own Part D record" : null,
+  ].filter(Boolean);
+  const practiceSentence = practiceBits.length ? practiceBits.join(" · ") + "." : "";
+
+  const eng = row.scores["eng"];
+  const companies = row.scores["companies"];
+
+  const gridRows: { label: string; value: string; dim?: boolean }[] = [
+    { label: "EVIDENCE TIER", value: titleCase(tierWord) + (row.supportedEvidence ? " · " + row.supportedEvidence : "") },
+    { label: "MEDICARE REACH", value: vol != null ? vol.toLocaleString() + " beneficiaries · 3-year Part B" : "No Part B record — unmeasured, not zero", dim: vol == null },
+    { label: "SETTING", value: [facts.setting ? titleCase(facts.setting) : null, loc || null].filter(Boolean).join(" · ") || "Not on record", dim: !facts.setting && !loc },
+    { label: "PHARMA CONTACT", value: eng != null && eng > 0 ? money(eng) + " lifetime" + (companies ? " across " + Math.round(companies) + " companies" : "") + " — a fact, not a rating" : "None recorded — absence of a record, not of relationships", dim: !(eng != null && eng > 0) },
+    { label: "PUBLICATIONS", value: facts.pubs != null && facts.pubs > 0 ? String(facts.pubs) + " on record" : "None on record — expected in this cohort, not a gap", dim: !(facts.pubs != null && facts.pubs > 0) },
+  ];
+
+  // RIGHT rail — the per-row matrix.
+  const inst = csSig(real, "institution");
+  const dept = csSig(real, "department");
+  const phone = csSig(real, "office_phone");
+  const linkedin = csSig(real, "linkedin_url");
+  const title = csSig(real, "academic_title");
+  const faculty = csSig(real, "faculty_profile_url");
+  const email = csSig(real, "institutional_email");
+  const missingBits = enriched
+    ? [!dept ? "department" : null, !phone ? "office line" : null, !linkedin ? "LinkedIn" : null, !csSig(real, "lab_url") ? "lab page" : null].filter(Boolean)
+    : [];
+
+  const microLabel = (t: string, dim?: boolean) => (
+    <div style={{ ...mono(9), letterSpacing: ".12em", color: dim ? CS.faint : CS.micro, marginBottom: 4 }}>{t}</div>
+  );
+  const railRow = (key: string, body: ReactNode, first?: boolean) => (
+    <div key={key} style={{ borderTop: first ? "none" : `1px solid ${CS.hair}`, paddingTop: first ? 0 : 13 }}>{body}</div>
+  );
+
+  const railRows: ReactNode[] = [];
+  if (enriched) {
+    railRows.push(railRow("practice", (
+      <>
+        {microLabel("PRACTICE GROUP")}
+        <div style={{ ...serif(14), color: CS.prose, lineHeight: 1.5 }}>{inst?.signal_value ?? facts.nppesInstitution ?? "Practice-based · no institutional affiliation"}</div>
+        {inst?.source_url || faculty?.signal_value ? (
+          <a href={inst?.source_url ?? faculty?.signal_value ?? undefined} target="_blank" rel="noreferrer" style={{ ...mono(9.5), letterSpacing: ".1em", color: CS.gold, textDecoration: "none", display: "inline-block", marginTop: 5 }}>PRACTICE PAGE ↗</a>
+        ) : null}
+      </>
+    ), true));
+    if (title) railRows.push(railRow("title", (<>{microLabel("TITLE")}<div style={{ ...serif(14), color: CS.prose }}>{title.signal_value}</div></>)));
+    if (dept) railRows.push(railRow("dept", (<>{microLabel("DEPARTMENT")}<div style={{ ...serif(14), color: CS.prose }}>{dept.signal_value}</div></>)));
+    if (phone) railRows.push(railRow("phone", (<>{microLabel("OFFICE LINE")}<div style={{ ...mono(14, 500), color: CS.gold }}>{phone.signal_value}</div></>)));
+    if (linkedin) railRows.push(railRow("li", (
+      <>
+        {microLabel("LINKEDIN")}
+        <a href={linkedin.signal_value.startsWith("http") ? linkedin.signal_value : "https://" + linkedin.signal_value} target="_blank" rel="noreferrer" style={{ ...mono(9.5), letterSpacing: ".1em", color: CS.gold, textDecoration: "none" }}>OPEN ↗</a>
+      </>
+    )));
+    if (email) railRows.push(railRow("email", (<>{microLabel("EMAIL")}<div style={{ ...mono(11.5), color: CS.prose, overflowWrap: "anywhere" }}>{email.signal_value}</div></>)));
+    if (missingBits.length) railRows.push(railRow("missing", (
+      <>
+        {microLabel("NOT FOUND", true)}
+        <div style={{ ...serif(12.5), color: CS.dim, lineHeight: 1.55 }}>No {missingBits.join(", ")} resolved.</div>
+      </>
+    )));
+  } else {
+    // NPPES facts ARE access information — real content, never blank or an error.
+    railRows.push(railRow("loc", (<>{microLabel("PRACTICE LOCATION")}<div style={{ ...serif(14), color: CS.prose }}>{loc || "Not on record"}</div></>), true));
+    if (row.chips[0]) railRows.push(railRow("spec", (<>{microLabel("SPECIALTY")}<div style={{ ...serif(14), color: CS.prose }}>{row.chips[0]}</div></>)));
+    if (facts.setting) railRows.push(railRow("set", (<>{microLabel("SETTING")}<div style={{ ...serif(14), color: CS.prose }}>{titleCase(facts.setting)}</div></>)));
+    railRows.push(railRow("state", (
+      <div style={{ ...mono(9.5), letterSpacing: ".08em", lineHeight: 1.7, color: CS.dim }}>
+        {searchedNothing ? "SEARCHED — NO PUBLIC WEB PRESENCE FOUND." : facts.loaded ? "CONTACT INTEL NOT YET GATHERED · SEE PROFILE" : ""}
+      </div>
+    )));
+  }
+
+  return (
+    // Same enclosure mechanism as LedgerDrawerView (2026-08-12 parity): the
+    // perimeter is drawerPerimeter — 3px solid cfg.markerColor, rendered
+    // unconditionally — and the overhang wrapper carries depth only.
+    // position:relative anchors the top-edge PROFILE tab.
+    <div style={{ position: "relative", background: overhang ? "transparent" : P.drawer, border: drawerPerimeter(cfg) }}>
+      {/* The filing tab, TOP-RIGHT — copied from LedgerDrawerView so the one
+          profile affordance sits in the identical spot across all three
+          cohort drawers (rose from cfg.markerColor for COM). */}
+      <Link
+        to={`/hcp/${row.hcpId}`}
+        onClick={(e) => e.stopPropagation()}
+        title={`${row.name} — profile`}
+        style={{
+          ...(mobile
+            ? { display: "block", width: "fit-content", marginLeft: "auto", margin: "10px 14px 0 auto", borderRadius: 6 }
+            : { position: "absolute" as const, right: 22, top: 0, zIndex: 3, borderRadius: "0 0 8px 8px" }),
+          font: `700 ${mobile ? "9.5px" : "10.5px"} ${FONT.sans}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
+          background: `${cfg.markerColor}1A`, border: drawerRule(cfg), borderTop: mobile ? drawerRule(cfg) : "none",
+          padding: mobile ? "7px 14px" : "11px 26px 10px", whiteSpace: "nowrap",
+          boxShadow: mobile ? "none" : "0 4px 14px rgba(0,0,0,.35)",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = `${cfg.markerColor}30`; e.currentTarget.style.borderColor = cfg.markerColor; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = `${cfg.markerColor}1A`; e.currentTarget.style.borderColor = cfg.markerColor; }}
+      >
+        PROFILE
+      </Link>
+      <div style={{ display: mobile ? "flex" : "grid", flexDirection: mobile ? "column" : undefined, gridTemplateColumns: mobile ? undefined : "1fr 372px" }}>
+        {/* LEFT — the read. Claims/NPPES only: complete for every board member. */}
+        <div style={{ padding: mobile ? "16px 16px 18px 19px" : "20px 26px 20px 127px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ ...mono(9, 500), letterSpacing: ".18em", color: CS.label }}>THE PRACTICE IN FRONT OF YOU</div>
+          {row.summary ? (
+            // Absent-first summary slot: renders only when the narrative exists;
+            // regenerable text (Phase 4), so no layout depends on it.
+            <div style={{ ...serif(13.5), fontStyle: "italic", lineHeight: 1.6, color: COOL.prose, textWrap: "pretty" }}>{row.summary}</div>
+          ) : null}
+          <div style={{ ...serif(14), lineHeight: 1.65, color: CS.prose, textWrap: "pretty" }}>
+            {tierSentence} {reachSentence} {practiceSentence}
           </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ ...mono(8.5, 500), letterSpacing: ".18em", color: P.ink5, paddingBottom: 7 }}>TRACE</div>
-            {trace(cfg, row, cohortTotal).map((s, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "6px 0", borderTop: `1px solid ${P.line}` }}>
-                <span style={{ flexShrink: 0, ...mono(9), letterSpacing: ".08em", color: P.ink5, width: 118 }}>{s.label}</span>
-                <span style={{ flex: 1, ...mono(10.5), color: P.ink2 }}>{s.value}</span>
-                <Link to={`/hcp/${row.hcpId}`} style={{ ...mono(9), letterSpacing: ".08em", flexShrink: 0, color: "#7FB3BB", textDecoration: "none", borderBottom: "1px solid rgba(127,179,187,.35)" }}>OPEN ↗</Link>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9, paddingTop: 12, borderTop: `1px solid ${CS.hair}` }}>
+            {gridRows.map((g) => (
+              <div key={g.label} style={{ display: "grid", gridTemplateColumns: mobile ? "110px 1fr" : "150px 1fr", gap: 12, alignItems: "baseline" }}>
+                <span style={{ ...mono(9), letterSpacing: ".12em", color: g.dim ? CS.faint : CS.micro }}>{g.label}</span>
+                <span style={{ ...serif(13.5), lineHeight: 1.5, color: g.dim ? CS.dim : CS.prose }}>{g.value}</span>
               </div>
             ))}
-            <div style={{ ...mono(9), lineHeight: 1.55, color: "#767C81", letterSpacing: ".04em", paddingTop: 9, borderTop: `1px solid ${P.line}`, marginTop: 2 }}>{cfg.traceFoot}</div>
           </div>
         </div>
-      ) : null}
+        {/* RIGHT — the fixed ACCESS rail. Mono, never reflows. */}
+        <div style={{ padding: mobile ? "16px 16px 18px 19px" : "20px 24px", borderLeft: mobile ? undefined : `1px solid ${P.line}`, borderTop: mobile ? `1px solid ${P.line}` : undefined }}>
+          {/* rightInset-style clearance (same mechanism as DrawerSection's) so
+              the signal count clears the top-edge PROFILE tab on desktop */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 13, paddingRight: mobile ? 0 : 120 }}>
+            <span style={{ ...mono(9, 500), letterSpacing: ".18em", color: CS.label }}>ACCESS</span>
+            <span style={{ ...mono(9), letterSpacing: ".12em", color: CS.faint }}>
+              {enriched ? `${real.length} SIGNALS` : searchedNothing ? "SEARCHED · NONE FOUND" : facts.loaded ? "NOT YET GATHERED" : ""}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>{railRows}</div>
+        </div>
+      </div>
+      {/* Footer — the rule text alone, full width. The PROFILE affordance is
+          the top-right filing tab (2026-08-12, matching EST/RS). */}
+      <div style={{ padding: mobile ? "10px 16px 14px 19px" : "10px 26px 14px 127px", borderTop: `1px solid ${CS.hair}` }}>
+        <span style={{ ...mono(8.5), letterSpacing: ".1em", lineHeight: 1.7, color: CS.faint }}>
+          CLAIMS-DERIVED FACTS AND RESOLVED WEB SIGNALS · NOTHING HERE IS RANKED · PROVENANCE AND SOURCE RECORDS LIVE ON THE PROFILE
+        </span>
+      </div>
     </div>
   );
 }
