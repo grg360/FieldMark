@@ -378,30 +378,6 @@ def collect_top_n_hcp_ids(
     return ids
 
 
-def fetch_board_qualifying_ids(supabase: Client) -> Set[str]:
-    """Full qualifies=true membership from community_board_nsclc_v1 (~4.9k ids),
-    paginated under the 1000-row server cap."""
-    out: Set[str] = set()
-    offset = 0
-    while True:
-        rows = (
-            supabase.table(COMMUNITY_BOARD_VIEW)
-            .select("hcp_id")
-            .eq("qualifies", True)
-            .range(offset, offset + 999)
-            .execute()
-            .data
-            or []
-        )
-        for r in rows:
-            if r.get("hcp_id"):
-                out.add(str(r["hcp_id"]))
-        if len(rows) < 1000:
-            break
-        offset += len(rows)
-    return out
-
-
 def fetch_top_n_hcp_ids_from_rank_view(
     supabase: Client,
     rank_table: str,
@@ -882,24 +858,37 @@ def fetch_community_top_hcp_ids(
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
         try:
-            # Community membership (G2 cutover): for NSCLC the board view is the
-            # single source of membership — rank stays the ORDERING, the view is
-            # the FILTER. Other TAs remain ungated (allowed_ids=None).
-            allowed: Optional[Set[str]] = None
             if ta_id == COMMUNITY_GATE_NSCLC_TA_ID:
-                allowed = fetch_board_qualifying_ids(supabase)
-            def make_query(ta_id=ta_id):
-                return (
-                    supabase.table("hcp_community_ranks_v2")
-                    .select("hcp_id,rank")
-                    .eq("therapeutic_area_id", ta_id)
-                    .eq("scope_type", "region")
-                    .eq("scope_value", "US")
-                    .order("rank", desc=False)
-                )
-            selected.update(collect_top_n_hcp_ids(make_query, top_n, allowed_ids=allowed))
+                # Phase 3 (pre-freeze fix, 2026-08-11): the board view is
+                # membership AND ordering in one — qualifying members by
+                # Medicare reach (patient_volume DESC, hcp_id tiebreak). No
+                # rank or score is read, so this selector is correct no matter
+                # when it runs relative to the score freeze.
+                def make_query(ta_id=ta_id):
+                    return (
+                        supabase.table(COMMUNITY_BOARD_VIEW)
+                        .select("hcp_id")
+                        .eq("qualifies", True)
+                        .order("patient_volume", desc=True)
+                        .order("hcp_id", desc=False)
+                    )
+                selected.update(collect_top_n_hcp_ids(make_query, top_n))
+            else:
+                # Non-NSCLC TAs: no board view exists; the ungated ranks read
+                # remains (no such TA is currently visible — AD community has
+                # zero rows here).
+                def make_query(ta_id=ta_id):
+                    return (
+                        supabase.table("hcp_community_ranks_v2")
+                        .select("hcp_id,rank")
+                        .eq("therapeutic_area_id", ta_id)
+                        .eq("scope_type", "region")
+                        .eq("scope_value", "US")
+                        .order("rank", desc=False)
+                    )
+                selected.update(collect_top_n_hcp_ids(make_query, top_n))
         except Exception as exc:
-            print(f"[load] hcp_community_ranks_v2 query failed for TA {ta_id}: {exc}")
+            print(f"[load] community selector query failed for TA {ta_id}: {exc}")
     return selected
 
 

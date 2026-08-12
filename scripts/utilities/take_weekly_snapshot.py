@@ -274,7 +274,15 @@ def main():
     try:
         take_rising_star_snapshot(conn, snapshot_date)
         take_established_snapshot(conn, snapshot_date)
-        take_community_snapshot(conn, snapshot_date)
+        # Community snapshots STOPPED (Phase 3, 2026-08-11): community is not
+        # ranked — there is no rank/composite/normalized_score to archive, and
+        # the arm was the script's last reader of the frozen score columns.
+        # take_community_snapshot stays defined for history's sake but must not
+        # run. hcp_community_snapshots (160,712 rows through 2026-08-05) is
+        # retained as the historical record of the ranked era. A future
+        # community WHAT-MOVED (tier transitions + fact changes) needs a NEW
+        # snapshot shape, not this one.
+        # take_community_snapshot(conn, snapshot_date)
         report_history(conn)
     finally:
         conn.close()

@@ -575,7 +575,7 @@ export default function PracticeFirstProfile() {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 24, marginTop: 10, ...mono(10), color: F.ghost, lineHeight: 1.65, flexWrap: "wrap" }}>
             <div style={{ textWrap: "pretty" }}>
-              {pr.admin_codes.length - adminMapped.length} codes carry claims rank with no agent name — HCPCS→agent mapping is {cov?.hcpcs_named ?? "—"}% complete across the top-200 cohort's held codes; the unmapped tail is supportive-care, unclassified and NOC codes, which resolve only by pairing with NDC-level data. Named here as a gap rather than dropped. Per-code beneficiary, service and dollar volumes are not retained in the summary — those columns await a claims-detail rebuild.
+              {pr.admin_codes.length - adminMapped.length} codes carry claims rank with no agent name — HCPCS→agent mapping is {cov?.hcpcs_named ?? "—"}% complete across the held codes of the top-200 community members by Medicare reach; the unmapped tail is supportive-care, unclassified and NOC codes, which resolve only by pairing with NDC-level data. Named here as a gap rather than dropped. Per-code beneficiary, service and dollar volumes are not retained in the summary — those columns await a claims-detail rebuild.
             </div>
           </div>
         </div>
@@ -753,7 +753,7 @@ export default function PracticeFirstProfile() {
                   </div>
                 ))}
               </div>
-              <div style={{ ...mono(10), color: F.ghost, lineHeight: 1.65, marginTop: 12, textWrap: "pretty" }}>Coverage is measured across the top-200 US community cohort, not this record alone. The name-mapping gap is a build task, not a property of the practitioner.</div>
+              <div style={{ ...mono(10), color: F.ghost, lineHeight: 1.65, marginTop: 12, textWrap: "pretty" }}>Coverage is measured across the top-200 US community members by Medicare reach, not this record alone. The name-mapping gap is a build task, not a property of the practitioner.</div>
             </div>
           ) : null}
 
