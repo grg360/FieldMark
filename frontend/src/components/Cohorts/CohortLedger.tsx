@@ -138,6 +138,14 @@ const TAG_TO_TRACK: Record<string, Track> = {
 // 44→52 for the single-line TRACKED head (2026-08-06 label pass).
 const OURS = { insight: 62, track: 52, state: 108 } as const;
 
+// COM fact finish (2026-08-12): EST's strip polish — serif face, size/weight
+// step, tint hierarchy — using EST's ACTUAL inks (#A8A29A primary, #43434A
+// fade, #5F5F66 insights minor), same hex, so the two strips are uniform.
+// The Medicare presence checkmarks take P.amber — the same token as the
+// ramp's anchoring rule. Gated by cfg.factFinish; the stepped-decimal ramp
+// stays numericRamp-only. (A cool-mirror register was tried and scrapped
+// same day — it read colder than EST, not uniform with it.)
+
 // The six-state relationship ladder Design designed: read by FILL COUNT, not hue (no new
 // colour enters the row — amber stays with rank). Not Engaged 0 · Targeted 1 · Contacted
 // 2 · Engaged 3 · Active Relationship 4; Paused is off-ladder (four segments outlined
@@ -1018,9 +1026,11 @@ function Row({
           </div>
         ) : (
           // COM roster (Phase 3): no index — the Part-D presence fact takes the
-          // slot (centered under the MEDICARE / PART D head since 2026-08-12).
-          <div style={{ width: 88, textAlign: "center", ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }}>
-            {row.partDPresent ? "PART D ✓" : ""}
+          // slot (centered under the MEDICARE / PART D head since 2026-08-12;
+          // serif cool finish same day).
+          <div style={{ width: 88, textAlign: "center", ...(cfg.factFinish ? { ...serif(13, 500), color: P.ink0, letterSpacing: ".02em" } : { ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }) }}>
+            {/* white label + rule-amber check (2026-08-12 split) */}
+            {row.partDPresent ? (cfg.factFinish ? <>PART D <span style={{ color: P.amber }}>✓</span></> : "PART D ✓") : ""}
           </div>
         )}
         {/* MEDICARE PART B presence (2026-08-12): patient_volume > 0 is the
@@ -1030,11 +1040,13 @@ function Row({
             a ✓ — absence is not a count. The reach NUMBER stays in the rail;
             this cell is presence only. */}
         {cfg.tag === "COM" ? (
-          <div style={{ width: 88, textAlign: "center", ...mono(9.5), letterSpacing: ".08em" }}>
+          <div style={{ width: 88, textAlign: "center" }}>
             {row.patientVolume != null && row.patientVolume > 0 ? (
-              <span style={{ color: P.ink5 }}>PART B ✓</span>
+              <span style={cfg.factFinish ? { ...serif(13, 500), color: P.ink0, letterSpacing: ".02em" } : { ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }}>
+                {cfg.factFinish ? <>PART B <span style={{ color: P.amber }}>✓</span></> : "PART B ✓"}
+              </span>
             ) : (
-              <span style={{ color: P.dash, letterSpacing: ".1em" }}>—</span>
+              <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>—</span>
             )}
           </div>
         ) : null}
@@ -1064,6 +1076,21 @@ function Row({
               </div>
             );
           }
+          // COM fact finish — the ramp's serif polish with the ramp's own
+          // inks (same hex as the EST branch above), same size/weight/
+          // de-emphasis hierarchy. Dash/absent cells keep their treatment:
+          // the finish is for facts only.
+          if (cfg.factFinish && d.kind !== "dash") {
+            return (
+              <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
+                {col.noRank ? (
+                  <span style={{ ...serif(15), color: "#43434A" }}>{d.text}</span>
+                ) : (
+                  <span style={{ ...serif(22, 500), color: "#A8A29A" }}>{d.text}</span>
+                )}
+              </div>
+            );
+          }
           const color = d.kind === "dash" ? P.dash : col.noRank ? P.ink4 : P.ink0;
           return (
             <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
@@ -1078,8 +1105,9 @@ function Row({
             empty cell reads as measured-zero rather than not-rendered */}
         <div style={{ width: OURS.insight, textAlign: "center" }}>
           {insight > 0 ? (
-            // EST: bottom of the 2A ramp — insights minor (frame literal #5F5F66)
-            <span style={{ ...mono(cfg.numericRamp ? 12 : 13), color: cfg.numericRamp ? "#5F5F66" : P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
+            // EST/RS ramp and COM factFinish share the insights minor tint
+            // (frame literal #5F5F66).
+            <span style={{ ...mono(cfg.numericRamp || cfg.factFinish ? 12 : 13), color: cfg.numericRamp || cfg.factFinish ? "#5F5F66" : P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
           ) : (
             <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>—</span>
           )}
@@ -1098,11 +1126,13 @@ function Row({
             removed 2026-08-09: a categorical state rendered as a meter read as a
             random white band on the row edge and competed with the score numerals.
             The ladder still renders inside the status menu below. */}
-        <div style={{ width: OURS.state, position: "relative" }}>
+        {/* COM centers the label under the centered RELATIONSHIP head (2026-08-12,
+            with the strip's plumb pass); EST/RS keep their shipped left set. */}
+        <div style={{ width: OURS.state, position: "relative", textAlign: cfg.tag === "COM" ? "center" : undefined }}>
           <button
             onClick={(e) => { stop(e); setMenuOpen((o) => !o); }}
             title={STATUS_LABEL[status]}
-            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0, textAlign: "left" }}
+            style={{ display: cfg.tag === "COM" ? "inline-flex" : "flex", justifyContent: cfg.tag === "COM" ? "center" : undefined, alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0, textAlign: cfg.tag === "COM" ? "center" : "left" }}
           >
             {/* wraps at the word break (ACTIVE / RELATIONSHIP) instead of overflowing
                 the 108px column — nowrap removed 2026-08-06 */}

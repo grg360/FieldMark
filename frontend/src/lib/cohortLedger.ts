@@ -64,6 +64,12 @@ export interface CohortConfig {
   // shared row class (EST + RS, 2026-08-11); COM is explicitly off — its idx
   // is NULL post-freeze and the ramp must never render on a roster row.
   numericRamp?: boolean;
+  // Fact finish (2026-08-12): the ramp's (b) POLISH — serif face, size/weight
+  // step, tint hierarchy — without the stepped-decimal. Uses the ramp's own
+  // inks (same hex as EST's score cells) so the strips are uniform; the
+  // Medicare presence checkmarks take P.amber (the anchoring-rule token).
+  // COM only; never combine with numericRamp.
+  factFinish?: boolean;
   sortLabel?: string; // COM roster: visible default-order label (no rank exists)
   rpc: string; // source RPC
   notes: string[];
@@ -152,6 +158,7 @@ export const COM_CONFIG: CohortConfig = {
   bandResolution: 1.0,
   idxDecimals: 0,
   numericRamp: false,
+  factFinish: true,
   // Roster default order (Phase 3): the visible, swappable view-state label.
   sortLabel: "BY EVIDENCE TIER, THEN MEDICARE REACH",
   rpc: "community_ledger",
