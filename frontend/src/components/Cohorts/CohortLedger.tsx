@@ -49,7 +49,12 @@ import {
   type LedgerMeta,
   type LedgerRow,
   type Band,
+  LEDGER_REGION_OPTIONS,
+  type LedgerScope,
 } from "../../lib/cohortLedger";
+import { getCurrentUser } from "../../lib/authHelpers";
+import { getUserTerritoryContext } from "../../lib/home";
+import { statesFromTerritory } from "../../lib/filter-context";
 
 // ≤767px is the mobile treatment (stage 4). Reactive to viewport changes / rotation.
 function useIsMobile(): boolean {
@@ -1388,8 +1393,55 @@ export default function CohortLedger() {
   const navigate = useNavigate();
   const { setTrack } = useTrack();
   const { userTerritory } = useFilterContext();
+
+  // Territory scope: EVERY ledger mount defaults to the profile's territory
+  // (Garrett 2026-08-12 — switching cohorts resets; an override lives only
+  // within the current cohort view, never carried across).
+  const [myTerritory, setMyTerritory] = useState<LedgerScope | null>(null);
+  const [scope, setScope] = useState<LedgerScope | null>(null);
+  const [territoryResolved, setTerritoryResolved] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const user = await getCurrentUser();
+      const ctx = user ? await getUserTerritoryContext(user.id) : null;
+      if (!alive) return;
+      const mine: LedgerScope | null =
+        ctx && ctx.states.length > 0
+          ? { key: "mine", label: ctx.territoryLabel ?? "My territory", states: ctx.states }
+          : null;
+      setMyTerritory(mine);
+      setScope(mine ?? { key: "national", label: "National", states: [] });
+      setTerritoryResolved(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const applyScope = useCallback(
+    (key: string) => {
+      const next: LedgerScope =
+        key === "mine" && myTerritory
+          ? myTerritory
+          : {
+              key,
+              label: LEDGER_REGION_OPTIONS.find((o) => o.key === key)?.label ?? "National",
+              states: statesFromTerritory(key),
+            };
+      setScope(next);
+    },
+    [myTerritory],
+  );
   const tag = COHORT_SLUG_TO_TAG[(params.cohort ?? "").toLowerCase()] ?? "EST";
   const cfg = COHORTS.find((c) => c.tag === tag) ?? COHORTS[0];
+  // Cohort switches do NOT remount this component (one route component for all
+  // three), so the reset to the profile territory must be explicit: any
+  // override dies with the cohort view it was made in.
+  useEffect(() => {
+    if (!territoryResolved) return;
+    setScope(myTerritory ?? { key: "national", label: "National", states: [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg]);
   const cohortTrack: Track = TAG_TO_TRACK[cfg.tag] ?? "established";
 
   // Keep TrackContext in sync so the strip's cohort row marks the active cohort here
@@ -1427,6 +1479,7 @@ export default function CohortLedger() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    if (!scope) return; // territory still resolving — one fetch, no national flash
     setFailed(false);
     setRows([]);
     setMeta(null);
@@ -1436,7 +1489,7 @@ export default function CohortLedger() {
     // COM re-loads page 0 when the tier filter changes (a different population → a fresh
     // contiguous ranking); EST/RS ignore selectedTiers.
     const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
-    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0, LEDGER_PAGE_SIZE, tiersArg)])
+    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0, LEDGER_PAGE_SIZE, tiersArg, scope?.states)])
       .then(([m, page]) => {
         if (!alive) return;
         setMeta(m);
@@ -1458,7 +1511,7 @@ export default function CohortLedger() {
     return () => {
       alive = false;
     };
-  }, [cfg, selectedTiers]);
+  }, [cfg, selectedTiers, scope]);
 
   const loadMore = useCallback(() => {
     if (loadingMore.current || !hasMore) return;
@@ -1473,7 +1526,7 @@ export default function CohortLedger() {
           : undefined
         : (lastRow?.rank ?? 0);
     const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
-    loadLedgerPage(cfg, afterCursor, LEDGER_PAGE_SIZE, tiersArg)
+    loadLedgerPage(cfg, afterCursor, LEDGER_PAGE_SIZE, tiersArg, scope?.states)
       .then((page) => {
         setRows((prev) => [...prev, ...page.rows]);
         setHasMore(page.hasMore);
@@ -1482,7 +1535,7 @@ export default function CohortLedger() {
       .catch(() => {
         loadingMore.current = false;
       });
-  }, [cfg, hasMore, rows, selectedTiers]);
+  }, [cfg, hasMore, rows, selectedTiers, scope]);
 
   const th = meta ? thresholds(cfg, meta.ceilings) : {};
   const isCom = cfg.tag === "COM";
@@ -1535,8 +1588,10 @@ export default function CohortLedger() {
             search appears only when the magnifier is clicked. */}
         {/* PeopleNavStrip (2026-07-31): the ledger is the PEOPLE destination, so it carries
             the shipped strip. Cohort row drives /cohorts/ledger/:cohort (one cohort control —
-            the old in-page CohortTabs toggle is gone). Filters/territory chips are suppressed:
-            the ledger RPCs read no filter state. Telescope/Landscape/TA/indication controls
+            the old in-page CohortTabs toggle is gone). Filters/territory chips stay suppressed:
+            the ledger's own TERRITORY selector (header row) is the scope control
+            now that the RPCs take p_states — the strip chip would be a second,
+            competing control. Telescope/Landscape/TA/indication controls
             navigate to their existing surfaces. */}
         <PeopleNavStrip
           route={stripRoute}
@@ -1574,7 +1629,24 @@ export default function CohortLedger() {
                 <span style={{ width: 3, height: 14, background: cfg.markerColor }} />
                 <span style={{ ...mono(9.5, 600), color: cfg.markerColor, letterSpacing: ".14em" }}>{cfg.tag}</span>
               </span>
-              <span style={{ ...mono(10.5), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ ...mono(10.5), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
+                {/* Territory scope (Commit 2): the selector IS the control and the
+                    label — counts, chips and rows all reslice server-side. */}
+                <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ ...mono(9, 500), color: P.ink4, letterSpacing: ".14em" }}>TERRITORY</span>
+                  <select
+                    value={scope?.key ?? "national"}
+                    onChange={(e) => applyScope(e.target.value)}
+                    style={{ ...mono(10), background: P.card, color: P.ink5, border: `1px solid ${P.lineStrong}`, padding: "4px 6px", letterSpacing: ".08em" }}
+                  >
+                    {myTerritory ? <option value="mine">{myTerritory.label.toUpperCase()}</option> : null}
+                    {LEDGER_REGION_OPTIONS.map((o) => (
+                      <option key={o.key} value={o.key}>{o.label.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </label>
+              </span>
             </div>
 
             {/* COM evidence-tier filter chips (default anchored + supported). Counts are

@@ -626,7 +626,7 @@ export async function recordTeamInviteSignal(
   }
 }
 
-async function getUserTerritoryContext(userId: string): Promise<{
+export async function getUserTerritoryContext(userId: string): Promise<{
   states: string[];
   taUuids: string[];
   territoryLabel: string | null;

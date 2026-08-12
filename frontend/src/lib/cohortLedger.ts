@@ -550,6 +550,26 @@ export async function loadLedgerMeta(cfg: CohortConfig): Promise<LedgerMeta> {
 
 export const LEDGER_PAGE_SIZE = 1000; // PostgREST hard cap; also our page size
 
+// ── Territory scope (Commit 2, 2026-08-12) ─────────────────────────────────
+// One shared scope shape across all three cohort ledgers. Every ledger mount
+// defaults to the user's territory (an override never outlives the current
+// cohort view). key "mine" = the user's
+// msl_profiles territory; region keys match TERRITORY_STATES (lowercase — the
+// selector emits these canonical keys, so statesFromTerritory can never miss
+// on casing); "national" = empty states = the RPCs' DEFAULT behavior.
+export interface LedgerScope {
+  key: string; // "mine" | "northeast" | ... | "national"
+  label: string; // display word (territory_label for mine, region name otherwise)
+  states: string[]; // [] = national
+}
+export const LEDGER_REGION_OPTIONS: { key: string; label: string }[] = [
+  { key: "northeast", label: "Northeast" },
+  { key: "southeast", label: "Southeast" },
+  { key: "midwest", label: "Midwest" },
+  { key: "southwest", label: "Southwest" },
+  { key: "west", label: "West" },
+  { key: "national", label: "National" },
+];
 /** COM roster keyset cursor (Phase 3): the last row's raw ordering tuple. The RPC
  *  negates volume internally so the composite (tier, -volume, hcp_id) compares as
  *  one ascending tuple. */
@@ -568,6 +588,7 @@ export async function loadLedgerPage(
   afterCursor: number | RosterCursor | undefined = 0,
   limit = LEDGER_PAGE_SIZE,
   tiers?: string[],
+  states?: string[],
 ): Promise<LedgerData & { hasMore: boolean }> {
   // COM's roster RPC takes the composite cursor + p_tiers (default anchored+supported
   // when omitted) and returns filtered_total alongside cohort_total. EST/RS RPCs take
@@ -584,6 +605,8 @@ export async function loadLedgerPage(
         : { p_limit: limit }
       : { p_limit: limit, p_after_rank: typeof afterCursor === "number" ? afterCursor : 0 };
   if (cfg.tag === "COM" && tiers && tiers.length) args.p_tiers = tiers;
+  // Territory scope (all three RPCs accept p_states; omitted = DEFAULT '{}' = national).
+  if (states && states.length) args.p_states = states;
   const { data, error } = await supabase.rpc(cfg.rpc, args);
   if (error) {
     console.error(`${cfg.rpc} failed:`, error.message);
