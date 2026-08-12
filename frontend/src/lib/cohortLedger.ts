@@ -52,6 +52,11 @@ export interface CohortConfig {
   cols: ScoreCol[];
   bandResolution: number; // index spread that still counts as "tied"
   idxDecimals: number; // decimals on the INDEX figure (EST/RS 1, COM 0)
+  // 2A numeric ramp (Ledger Numeric Typography frame): serif stepped-decimal
+  // INDEX cell + serif score cells + minor insights tint. The RANKED cohorts'
+  // shared row class (EST + RS, 2026-08-11); COM is explicitly off — its idx
+  // is NULL post-freeze and the ramp must never render on a roster row.
+  numericRamp?: boolean;
   sortLabel?: string; // COM roster: visible default-order label (no rank exists)
   rpc: string; // source RPC
   notes: string[];
@@ -77,6 +82,7 @@ export const EST_CONFIG: CohortConfig = {
   ],
   bandResolution: 0.3,
   idxDecimals: 1,
+  numericRamp: true,
   rpc: "established_ledger",
   notes: [
     "SCI AND NET PRINT AS STORED · THE COHORT COMPRESSES AT THE TOP BY CONSTRUCTION, SO NEAR-IDENTICAL HEAD VALUES ARE THE DATA, NOT A DISPLAY ARTIFACT — THE TIED BANDS ABOVE CARRY THAT.",
@@ -108,6 +114,7 @@ export const RS_CONFIG: CohortConfig = {
   ],
   bandResolution: 2.1,
   idxDecimals: 1,
+  numericRamp: true,
   rpc: "rising_ledger",
   notes: [
     "NO SUPPRESSION HERE: MOMENTUM AND VISIBILITY RUN WIDE ACROSS THIS COHORT, SO EVERY VALUE CARRIES INFORMATION AND EVERY VALUE PRINTS. THE SAME COMPUTED RULE THAT COLLAPSES ESTABLISHED'S TWO COLUMNS LEAVES ALL FOUR OF THESE STANDING.",
@@ -136,6 +143,7 @@ export const COM_CONFIG: CohortConfig = {
   ],
   bandResolution: 1.0,
   idxDecimals: 0,
+  numericRamp: false,
   // Roster default order (Phase 3): the visible, swappable view-state label.
   sortLabel: "BY EVIDENCE TIER, THEN MEDICARE REACH",
   rpc: "community_ledger",

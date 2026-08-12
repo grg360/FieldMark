@@ -18,7 +18,6 @@ import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 import PeopleNavStrip from "../PeopleNavStrip";
-import SearchBar from "../SearchBar";
 import { FONT, GROUND, LINE, GOLD, COOL, WARM } from "../../lib/designTokens";
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
 import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
@@ -93,6 +92,24 @@ const P = {
 
 const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
 const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.serif}` } as const);
+
+// COM rail (Design "Community Rail" 2A, 2026-08-11): tier vocabulary +
+// reach abbreviation. Lowercase words render as true small-caps via
+// font-variant; every row self-labels its own tier (sorts interleave tiers);
+// heme is the affirmative different-specialty word, never a deficit.
+const COM_RAIL_TIER_WORD: Record<string, string> = {
+  anchored: "anchored",
+  supported: "supported",
+  heme_dominant: "heme-focused",
+  candidate: "candidate",
+  unresolved: "no medicare evidence",
+};
+// 9,017 -> "9.0K"; 8,762 -> "8.8K"; sub-1000 plain; absence is never zero.
+function fmtReachK(v: number | null | undefined): string {
+  if (v == null || v <= 0) return "—";
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
+  return String(Math.round(v));
+}
 
 // The in-page cohort tab toggle (CohortTabs) was removed 2026-07-31 when the ledger
 // became the PEOPLE destination: the PeopleNavStrip's cohort row is the single cohort
@@ -782,7 +799,7 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
           the Medicare reach FACT, never a rank. EST/RS keep their real rank rail. */}
       {cfg.tag === "COM" ? (
         <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.ink4 }}>
-          MEDICARE REACH<br /><span style={{ color: P.ink5 }}>BENES · 3YR</span>
+          EVIDENCE TIER<br /><span style={{ color: P.ink5 }}>MEDICARE REACH · 3YR</span>
         </div>
       ) : (
         <div style={{ width: 104, paddingRight: 12, ...mono(9, 500), letterSpacing: ".14em", color: P.amber }}>
@@ -892,11 +909,21 @@ function Row({
             <span style={{ ...mono(9.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
           </div>
         ) : (
-          <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ font: `500 26px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.ink2, fontVariantNumeric: "tabular-nums", lineHeight: 0.9 }}>
-              {row.patientVolume != null && row.patientVolume > 0 ? Math.round(row.patientVolume).toLocaleString() : "—"}
+          // COM rail — Design "Community Rail" 2A · SET IN SERIF (2026-08-11):
+          // the tier word joins the editorial voice (serif small-caps, the same
+          // family as the physician names), cool slate — never amber, never the
+          // rank-numeral weight. Reach beneath is an abbreviated cool fact
+          // ("9.0K" / "MEDICARE REACH", no BENES, no 3YR per the 2A plate),
+          // centered. Absence is never zero: no Part B benes renders "—".
+          <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 7, textAlign: "center" }}>
+            <span style={{ ...serif(15, 500), color: "#B3C0C9", fontVariant: "small-caps", letterSpacing: "0.02em", lineHeight: 1.15 }}>
+              {COM_RAIL_TIER_WORD[row.tier ?? ""] ?? "community"}
             </span>
-            <span style={{ ...mono(8.5), color: P.ink5, letterSpacing: ".1em" }}>MEDICARE BENES · 3YR</span>
+            <span style={{ width: 26, height: 1, background: "#2B3A44" }} />
+            <span style={{ ...mono(12), color: "#6F7D87", letterSpacing: ".05em", fontVariantNumeric: "tabular-nums" }}>
+              {fmtReachK(row.patientVolume)}
+            </span>
+            <span style={{ ...mono(7.5), color: "#6F7D87", letterSpacing: ".16em" }}>MEDICARE REACH</span>
           </div>
         )}
         {/* name + chips + summary */}
@@ -942,8 +969,9 @@ function Row({
             the live row is far denser than the mockup's 26px padding. Numerals
             in WARM ink per Garrett's ruling (no icy cast); the rule takes
             P.amber, the ledger's one amber — the frame's #c9922e is not
-            imported. EST only; RS/COM keep the mono cell until their own pass. */}
-        {cfg.tag === "EST" ? (
+            imported. Gated by cfg.numericRamp (EST + RS, 2026-08-11 — the ranked
+            cohorts' shared row class); COM stays off. */}
+        {cfg.numericRamp && row.idx != null ? (
           (() => {
             const [ipart, dpart = ""] = floorFixed(row.idx ?? 0, cfg.idxDecimals).split(".");
             return (
@@ -976,12 +1004,12 @@ function Row({
               </div>
             );
           }
-          // EST rides the 2A ramp below the score: SCI/NET supporting serif,
+          // Ranked cohorts (cfg.numericRamp) ride the 2A ramp below the score:
           // pharma faded a step further (frame literals #A8A29A/#43434A — warm
           // support, chrome-dark fade; near-twins of no register token, NOT
           // converged). Dash/absent cells keep their treatment — the ramp is
-          // for numerals only. RS/COM keep the mono cells.
-          if (cfg.tag === "EST" && d.kind !== "dash") {
+          // for numerals only. COM keeps the mono cells (no ramp on the roster).
+          if (cfg.numericRamp && d.kind !== "dash") {
             return (
               <div key={col.key} style={{ width: col.w, textAlign: "right" }}>
                 {col.noRank ? (
@@ -1007,7 +1035,7 @@ function Row({
         <div style={{ width: OURS.insight, textAlign: "center" }}>
           {insight > 0 ? (
             // EST: bottom of the 2A ramp — insights minor (frame literal #5F5F66)
-            <span style={{ ...mono(cfg.tag === "EST" ? 12 : 13), color: cfg.tag === "EST" ? "#5F5F66" : P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
+            <span style={{ ...mono(cfg.numericRamp ? 12 : 13), color: cfg.numericRamp ? "#5F5F66" : P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
           ) : (
             <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>—</span>
           )}
@@ -1152,11 +1180,14 @@ function MobileRow({
               <span style={{ ...mono(8.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
             </div>
           ) : (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <span style={{ font: `500 24px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.ink2, fontVariantNumeric: "tabular-nums", lineHeight: 0.9 }}>
-                {row.patientVolume != null && row.patientVolume > 0 ? Math.round(row.patientVolume).toLocaleString() : "—"}
+            // COM mobile rail — 2A adapted inline for 390px: tier word (serif
+            // small-caps) leads, abbreviated reach + label follow; wraps clean.
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ ...serif(13, 500), color: "#B3C0C9", fontVariant: "small-caps", letterSpacing: "0.02em" }}>
+                {COM_RAIL_TIER_WORD[row.tier ?? ""] ?? "community"}
               </span>
-              <span style={{ ...mono(8), color: P.ink5, letterSpacing: ".1em" }}>BENES · 3YR</span>
+              <span style={{ ...mono(10.5), color: "#6F7D87", letterSpacing: ".05em", fontVariantNumeric: "tabular-nums" }}>{fmtReachK(row.patientVolume)}</span>
+              <span style={{ ...mono(7.5), color: "#6F7D87", letterSpacing: ".16em" }}>MEDICARE REACH</span>
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1376,7 +1407,6 @@ export default function CohortLedger() {
     indication: "nsclc",
     isHomePath: false,
   });
-  const nsclcTaId = taIdForApiSlug("nsclc");
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [risingFlags, setRisingFlags] = useState<Map<string, RisingFlags>>(new Map());
   const [openTrials, setOpenTrials] = useState<Map<string, OpenTrialFlag>>(new Map());
@@ -1499,16 +1529,10 @@ export default function CohortLedger() {
   return (
     <AppLayout width="wide">
       <div style={{ width: "100%", boxSizing: "border-box" }}>
-        {/* search — parity with the feed header (the strip carries no search). NSCLC TA id
-            because the ledger RPCs are NSCLC-locked. DESKTOP ONLY (2026-08-10):
-            on mobile the nav magnifier's overlay is THE one search — this same
-            SearchBar component in its overlay variant, hidden until revealed.
-            Rendering the inline bar too put two searches on screen at once. */}
-        {nsclcTaId && !isMobile ? (
-          <div style={{ padding: "8px 16px 0" }}>
-            <SearchBar variant="inline" currentTaId={nsclcTaId} onSelect={(hcpId) => navigate(`/hcp/${hcpId}`)} />
-          </div>
-        ) : null}
+        {/* Search (2026-08-11): no inline bar — the NavBar magnifier is THE
+            search on every breakpoint (it mounts with an ambient-TA fallback,
+            so it renders here too). The default-visible desktop strip is gone;
+            search appears only when the magnifier is clicked. */}
         {/* PeopleNavStrip (2026-07-31): the ledger is the PEOPLE destination, so it carries
             the shipped strip. Cohort row drives /cohorts/ledger/:cohort (one cohort control —
             the old in-page CohortTabs toggle is gone). Filters/territory chips are suppressed:
@@ -1531,9 +1555,14 @@ export default function CohortLedger() {
           <div style={{ padding: "6px 0 22px" }}>
             <PageHero
               narrow={isMobile}
-              eyebrow={`${cfg.tag} · Cohort ledger`}
+              // Header pattern (2026-08-11, all three cohorts): the cohort name
+              // is the bold H1; the TA scope moves to the eyebrow as a
+              // breadcrumb ("TAG · Cohort ledger · NSCLC · Oncology") — scope
+              // qualified, never dropped. Title treatment only: each cohort's
+              // body chrome stays truthful to whether it ranks.
+              eyebrow={`${cfg.tag} · Cohort ledger · NSCLC · Oncology`}
               meta={`WEEKLY BUILD · AS OF ${formatScoringDate(scoredAt)}`}
-              title={cfg.title}
+              title={cfg.title.split(" / ")[0]}
               stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT", center: true }] : undefined}
             />
           </div>
