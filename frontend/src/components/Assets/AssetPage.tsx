@@ -12,21 +12,22 @@ import AppLayout from "../AppLayout";
 import CompositionChart from "./CompositionChart";
 import LandingNow from "./LandingNow";
 import { AuthorsPanel, CongressPanel, ForumPanel } from "./RightRail";
-import { COLOR, FONT, CONTENT_WIDTH, GROUND, LINE, COOL, WARM } from "../../lib/designTokens";
+import { CONTENT_WIDTH } from "../../lib/designTokens";
+import { CANON, FACE } from "../../lib/canonicalTokens";
 import { assetBySlug, identityLine, matchTerms, type AssetConfig } from "../../lib/assetConfig";
 import { NSCLC_CORPUS_TOTAL, formatIndexDate } from "../../lib/assets";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { buildComposition } from "../../lib/assetLogic";
+import { buildComposition, themeColorMap } from "../../lib/assetLogic";
 import { loadAssetPage, type AssetPageData, type AssetOverview } from "../../lib/assetPage";
 
 const eyebrow = {
-  fontFamily: FONT.mono,
-  fontSize: 10,
+  fontFamily: FACE.data,
+  fontSize: 11,
   letterSpacing: "0.16em",
   textTransform: "uppercase" as const,
-  color: COOL.label,
+  color: CANON.INK.MUTE,
 } as const;
-const metaMono = { fontFamily: FONT.mono, fontSize: 11, color: COOL.label } as const;
+const metaMono = { fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE } as const;
 
 // NavBar is mounted INSIDE each content column (below), not here, so the bar aligns
 // to the column width on this surface like every other.
@@ -35,7 +36,7 @@ const metaMono = { fontFamily: FONT.mono, fontSize: 11, color: COOL.label } as c
 function shell(children: React.ReactNode) {
   return (
     <AppLayout width="wide">
-      <div style={{ fontFamily: FONT.sans }}>{children}</div>
+      <div style={{ fontFamily: FACE.ui }}>{children}</div>
     </AppLayout>
   );
 }
@@ -49,19 +50,19 @@ function pctOf(n: number, d: number): string {
 // mobile pages, only resized.
 function Header({ asset, mobile }: { asset: AssetConfig; mobile: boolean }) {
   return (
-    <div style={{ padding: mobile ? "20px 16px 16px" : "26px 32px 22px", borderBottom: `1px solid ${LINE.l1}` }}>
+    <div style={{ padding: mobile ? "20px 16px 16px" : "26px 32px 22px", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 40, flexWrap: "wrap" }}>
         <div>
           <div style={{ ...eyebrow, marginBottom: 12 }}>Drugs</div>
-          <h1 style={{ margin: "0 0 10px", fontFamily: FONT.serif, fontSize: mobile ? 27 : 40, fontWeight: 300, letterSpacing: "-0.012em", lineHeight: 1.1, color: WARM.prose }}>
+          <h1 style={{ margin: "0 0 10px", fontFamily: FACE.value, fontSize: mobile ? 27 : 40, fontWeight: 300, letterSpacing: "-0.012em", lineHeight: 1.1, color: CANON.INK.BODY }}>
             {asset.generic}
           </h1>
-          <div style={{ fontFamily: FONT.mono, fontSize: mobile ? 11 : 12, lineHeight: 1.5, color: COOL.chrome }}>
+          <div style={{ fontFamily: FACE.data, fontSize: mobile ? 11 : 12, lineHeight: 1.5, color: CANON.INK.LABEL }}>
             {identityLine(asset)}
           </div>
         </div>
         {mobile ? null : (
-          <span style={{ padding: "7px 10px", border: `1px solid ${LINE.l1}`, fontFamily: FONT.mono, fontSize: 11, color: COOL.chrome }}>
+          <span style={{ padding: "7px 10px", border: `1px solid ${CANON.LINE.HAIR}`, fontFamily: FACE.data, fontSize: 11, color: CANON.INK.LABEL }}>
             {asset.is_backbone ? "Backbone agent" : "Deployment asset"}
           </span>
         )}
@@ -73,12 +74,12 @@ function Header({ asset, mobile }: { asset: AssetConfig; mobile: boolean }) {
 // ── Stat tiles ───────────────────────────────────────────────────────────────
 function Tile({ label, value, sub, amber }: { label: string; value: string; sub: string; amber?: boolean }) {
   return (
-    <div style={{ padding: "18px 24px", borderRight: `1px solid ${LINE.l1}`, minWidth: 0 }}>
+    <div style={{ padding: "18px 24px", borderRight: `1px solid ${CANON.LINE.HAIR}`, minWidth: 0 }}>
       <div style={{ ...eyebrow, fontSize: 9, marginBottom: 10 }}>{label}</div>
-      <div style={{ fontFamily: FONT.mono, fontSize: 30, fontWeight: 500, lineHeight: 1, color: amber ? COLOR.amber : WARM.prose, fontVariantNumeric: "tabular-nums" }}>
+      <div style={{ fontFamily: FACE.data, fontSize: 30, fontWeight: 500, lineHeight: 1, color: amber ? CANON.GOLD.PRIME : CANON.INK.BODY, fontVariantNumeric: "tabular-nums" }}>
         {value}
       </div>
-      <div style={{ fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.4, color: COOL.label, marginTop: 7 }}>{sub}</div>
+      <div style={{ fontFamily: FACE.data, fontSize: 11, lineHeight: 1.4, color: CANON.INK.MUTE, marginTop: 7 }}>{sub}</div>
     </div>
   );
 }
@@ -88,22 +89,22 @@ function StatTiles({ o, mobile }: { o: AssetOverview; mobile: boolean }) {
     // Two hero tiles; the remaining ratios ride a compact mono line (they also
     // appear in full in "What this page counted").
     return (
-      <div style={{ borderBottom: `1px solid ${LINE.l1}` }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: `1px solid ${LINE.l1}` }}>
-          <div style={{ padding: "14px 16px", borderRight: `1px solid ${LINE.l1}` }}>
+      <div style={{ borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
+          <div style={{ padding: "14px 16px", borderRight: `1px solid ${CANON.LINE.HAIR}` }}>
             <div style={{ ...eyebrow, fontSize: 9, marginBottom: 8 }}>Publications</div>
-            <div style={{ fontFamily: FONT.mono, fontSize: 26, fontWeight: 500, lineHeight: 1, color: COLOR.amber }}>
+            <div style={{ fontFamily: FACE.data, fontSize: 25, fontWeight: 500, lineHeight: 1, color: CANON.GOLD.PRIME }}>
               {o.total_pubs.toLocaleString()}
             </div>
           </div>
           <div style={{ padding: "14px 16px" }}>
             <div style={{ ...eyebrow, fontSize: 9, marginBottom: 8 }}>2026 to date</div>
-            <div style={{ fontFamily: FONT.mono, fontSize: 26, fontWeight: 500, lineHeight: 1, color: COLOR.amber }}>
+            <div style={{ fontFamily: FACE.data, fontSize: 25, fontWeight: 500, lineHeight: 1, color: CANON.GOLD.PRIME }}>
               {o.ytd_2026.toLocaleString()}
             </div>
           </div>
         </div>
-        <div style={{ padding: "12px 16px", fontFamily: FONT.mono, fontSize: 11, color: COOL.label }}>
+        <div style={{ padding: "12px 16px", fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE }}>
           {o.authors_resolved.toLocaleString()} authors · {pctOf(o.open_access, o.total_pubs)} open access ·{" "}
           {pctOf(o.themed, o.total_pubs)} themed
         </div>
@@ -111,7 +112,7 @@ function StatTiles({ o, mobile }: { o: AssetOverview; mobile: boolean }) {
     );
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: `1px solid ${LINE.l1}` }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
       <Tile label="Publications" amber value={o.total_pubs.toLocaleString()} sub={`of ${NSCLC_CORPUS_TOTAL.toLocaleString()} NSCLC corpus`} />
       <Tile label="2026 to date" amber value={o.ytd_2026.toLocaleString()} sub={`through ${formatIndexDate()} · part year`} />
       <Tile label="Authors resolved" value={o.authors_resolved.toLocaleString()} sub={`of ${o.author_strings.toLocaleString()} author strings`} />
@@ -127,7 +128,7 @@ function StatTiles({ o, mobile }: { o: AssetOverview; mobile: boolean }) {
 function MobileSection({ label, count, children }: { label: string; count: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ borderBottom: `1px solid ${LINE.l1}` }}>
+    <div style={{ borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -141,11 +142,11 @@ function MobileSection({ label, count, children }: { label: string; count: strin
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: WARM.prose,
+          color: CANON.INK.BODY,
         }}
       >
-        <span style={{ fontFamily: FONT.sans, fontSize: 14 }}>{label}</span>
-        <span style={{ fontFamily: FONT.mono, fontSize: 11, color: COOL.label }}>
+        <span style={{ fontFamily: FACE.ui, fontSize: 15 }}>{label}</span>
+        <span style={{ fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE }}>
           {count} {open ? "↑" : "→"}
         </span>
       </button>
@@ -158,13 +159,13 @@ function MobileSection({ label, count, children }: { label: string; count: strin
 function WhatCounted({ asset, o, themedPct, mobile }: { asset: AssetConfig; o: AssetOverview; themedPct: number; mobile: boolean }) {
   const terms = matchTerms(asset);
   return (
-    <div style={{ padding: mobile ? "20px 16px 28px" : "20px 32px 24px", borderTop: `1px solid ${LINE.l1}`, background: GROUND.g1 }}>
+    <div style={{ padding: mobile ? "20px 16px 28px" : "20px 32px 24px", borderTop: `1px solid ${CANON.LINE.HAIR}`, background: CANON.GROUND.RAISE }}>
       <div style={{ ...eyebrow, marginBottom: 10 }}>What this page counted</div>
-      <div style={{ fontFamily: FONT.mono, fontSize: 12, lineHeight: 1.7, color: COOL.chrome, maxWidth: 1000 }}>
+      <div style={{ fontFamily: FACE.data, fontSize: 13, lineHeight: 1.7, color: CANON.INK.LABEL, maxWidth: 1000 }}>
         {o.total_pubs.toLocaleString()} records with{" "}
         {terms.map((t, i) => (
           <span key={t}>
-            <span style={{ color: COOL.ui }}>{t}</span>
+            <span style={{ color: CANON.INK.PRIME }}>{t}</span>
             {i < terms.length - 1 ? (i === terms.length - 2 ? " or " : ", ") : ""}
           </span>
         ))}{" "}
@@ -180,7 +181,7 @@ function WhatCounted({ asset, o, themedPct, mobile }: { asset: AssetConfig; o: A
         {asset.match_note ? (
           <>
             {" "}
-            <span style={{ color: COLOR.amber }}>{asset.match_note}</span>
+            <span style={{ color: CANON.GOLD.PRIME }}>{asset.match_note}</span>
           </>
         ) : null}
       </div>
@@ -222,8 +223,8 @@ export default function AssetPage() {
   if (!asset) {
     return shell(
       <div style={{ maxWidth: CONTENT_WIDTH.standard, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-        <div style={{ padding: "60px 24px", fontFamily: FONT.mono, fontSize: 13, color: COOL.chrome }}>
-          No drug matches “{slug}”. <Link to="/assets" style={{ color: COLOR.indigoLink }}>Back to the drug index →</Link>
+        <div style={{ padding: "60px 24px", fontFamily: FACE.data, fontSize: 13, color: CANON.INK.LABEL }}>
+          No drug matches “{slug}”. <Link to="/assets" style={{ color: CANON.ACTION.LINK }}>Back to the drug index →</Link>
         </div>
       </div>,
     );
@@ -231,6 +232,9 @@ export default function AssetPage() {
 
   const o = data?.overview;
   const composition = data ? buildComposition(data.composition) : null;
+  // Theme chips on the landing rows take their band's VIZ slot (rule 2) — built
+  // from the composition that is already on screen, so the two cannot diverge.
+  const themeColors = composition ? themeColorMap(composition) : undefined;
   const themedPct = o && o.total_pubs > 0 ? o.themed / o.total_pubs : 0;
 
   return shell(
@@ -244,11 +248,11 @@ export default function AssetPage() {
       ) : isMobile ? (
         <>
           <StatTiles o={o} mobile />
-          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${LINE.l1}` }}>
+          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
             <CompositionChart composition={composition} mobile />
           </div>
-          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${LINE.l1}` }}>
-            <LandingNow landing={data.landing} mobile />
+          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
+            <LandingNow landing={data.landing} themeColors={themeColors} mobile />
           </div>
           <MobileSection label="Who publishes" count={data.authors.resolved.toLocaleString()}>
             <AuthorsPanel authors={data.authors} />
@@ -265,7 +269,7 @@ export default function AssetPage() {
         <>
           <StatTiles o={o} mobile={false} />
 
-          <div style={{ padding: "28px 32px 30px", borderBottom: `1px solid ${LINE.l1}` }}>
+          <div style={{ padding: "28px 32px 30px", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
             <CompositionChart composition={composition} assetName={asset.generic} full={fullComposition} />
             {!composition.gated ? (
               <button
@@ -277,9 +281,9 @@ export default function AssetPage() {
                   border: "none",
                   padding: 0,
                   cursor: "pointer",
-                  fontFamily: FONT.mono,
+                  fontFamily: FACE.data,
                   fontSize: 11,
-                  color: COLOR.indigoLink,
+                  color: CANON.ACTION.LINK,
                 }}
               >
                 {fullComposition ? "Collapse composition ↑" : "See the full composition view →"}
@@ -288,8 +292,8 @@ export default function AssetPage() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 420px" }}>
-            <div style={{ padding: "26px 32px 30px", borderRight: `1px solid ${LINE.l1}`, minWidth: 0 }}>
-              <LandingNow landing={data.landing} />
+            <div style={{ padding: "26px 32px 30px", borderRight: `1px solid ${CANON.LINE.HAIR}`, minWidth: 0 }}>
+              <LandingNow landing={data.landing} themeColors={themeColors} />
             </div>
             <div style={{ minWidth: 0 }}>
               <AuthorsPanel authors={data.authors} />

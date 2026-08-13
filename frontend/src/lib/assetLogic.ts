@@ -6,21 +6,25 @@
 // verdicts. Mirrors the discipline in pulse.ts. No data access, no React.
 
 import { COLOR } from "./designTokens";
+import { VIZ, VIZ_ROTATION } from "./canonicalTokens";
 
 // ── The theme ramp ───────────────────────────────────────────────────────────
 // Design's one new categorical scale (frame 1f): a fixed cool ramp, lightest band
 // carries the largest opening share. Amber is reserved for the hovered/held band
 // and never appears in the ramp itself; Other is a flat neutral. Everything else
 // on the page (amber, inks, surfaces) comes from the existing tokens.
-export const THEME_RAMP = [
-  "oklch(0.70 0.10 268)",
-  "oklch(0.62 0.12 285)",
-  "oklch(0.55 0.11 300)",
-  "oklch(0.48 0.09 262)",
-  "oklch(0.42 0.08 288)",
-  "oklch(0.36 0.07 250)",
-];
-export const OTHER_COLOR = "oklch(0.32 0.02 70)";
+// VIZ palette 2026-08-13 (approved spec). The previous ramp encoded CATEGORY by
+// LIGHTNESS (L .70 → .36 down one blue/violet lane) — the exact anti-pattern the
+// palette retires: it made band 1 read "louder" than band 6 when they are peers,
+// and it collided with the magnitude ramp's own lightness language. Categories
+// now vary by HUE ONLY at a fixed perceptual lightness, taken BY STACK POSITION
+// from the fixed rotation so touching bands never share a hue neighbourhood.
+export const THEME_RAMP = VIZ_ROTATION;
+// The residual is A COLOUR, NOT A GAP: "Other (n themes)" is real data, so it
+// takes a real hue (PLUM, one lightness step down at a third the chroma). The
+// old value was a dark grey-brown — and grey is now reserved system-wide for
+// no-data / disabled / absence, never a chart series (rule 4).
+export const OTHER_COLOR = VIZ.RESIDUAL;
 export const HIGHLIGHT = COLOR.amber;
 
 // Below this many themed items in a period, the year-over-year movement view is
@@ -79,6 +83,22 @@ export interface Composition {
 }
 
 const OTHER_KEY = "__other__";
+
+/** Theme key → its VIZ categorical hue, taken from the composition that is
+ *  already on screen. Surfaces that badge a theme (the landing rows' chips)
+ *  read THIS rather than re-deriving a colour, so a chip can never disagree
+ *  with the band it names — rule 2, "a category keeps its slot".
+ *
+ *  A theme that is NOT one of the charted bands returns undefined and the
+ *  caller falls back to neutral: it genuinely has no slot on this asset, and
+ *  the residual PLUM is never assigned to a NAMED category (rule 3). */
+export function themeColorMap(composition: Composition): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const b of composition.bands) {
+    if (b.key !== OTHER_KEY) m.set(b.key, b.color);
+  }
+  return m;
+}
 
 /** Build the composition: window, banding, per-year stacks, and the gate. */
 export function buildComposition(payload: CompositionPayload): Composition {

@@ -182,3 +182,56 @@ export const FACE = {
 //     Zero consumers remain.
 //   · 'IBM Plex Serif' — ghost (loaded in index.html, zero renders) → deletes
 //     from the font link at migration.
+
+// ── VIZ — the chart palette (approved 2026-08-13, "FieldMark VIZ palette
+// design"). Held SEPARATE from the semantic set on purpose: semantic accents
+// encode meaning in the INTERFACE, VIZ colours encode categories in DATA, and
+// the two never borrow from each other. Every categorical slot sits at a fixed
+// perceptual lightness (L .70–.76) at near-constant chroma, so no category
+// reads louder than another on charcoal — only the hue changes. Hues sweep
+// 110°→355°; the WARM QUADRANT (40°–100°) is reserved for semantics, which is
+// what stops a chart ever colliding with amber.
+export const VIZ = {
+  C01: "#7C8CF5", // PERIWINKLE  oklch(.72 .14 274)
+  C02: "#46B4D6", // CYAN        oklch(.73 .10 226)
+  C03: "#3EAB9B", // TEAL        oklch(.70 .09 182)
+  C04: "#6FBE7C", // GREEN       oklch(.74 .12 149)
+  C05: "#A9BC5C", // OLIVE       oklch(.76 .13 116)
+  C06: "#AC80EC", // VIOLET      oklch(.71 .15 303)
+  C07: "#D782C4", // ORCHID      oklch(.72 .14 330)
+  C08: "#E7838E", // ROSE        oklch(.72 .14 12)
+  // RESIDUAL. A COLOUR, NOT A GAP: the "Other" bucket is real data, so it takes
+  // a real hue — one lightness step down at a third the chroma, so it recedes
+  // without disappearing. Never assigned to a named category (rule 3).
+  RESIDUAL: "#9A7796", // PLUM   oklch(.60 .05 340)
+} as const;
+
+// Assignment is BY STACK POSITION from this fixed rotation — never by list
+// index, never by hash (rule 1). Consecutive bands take non-adjacent hues so
+// touching segments never share a neighbourhood. A category keeps its slot
+// across every surface (rule 2): EGFR resistance is C01 on Drugs, on
+// Intelligence, on Pulse.
+export const VIZ_ROTATION = [VIZ.C01, VIZ.C06, VIZ.C03, VIZ.C08, VIZ.C04, VIZ.C02, VIZ.C05, VIZ.C07] as const;
+
+// Sequential ramp for MAGNITUDE — sparklines, count bars, density. One ramp,
+// anchored on C01's hue so magnitude and categorical charts read as one family.
+// Steps climb in LIGHTNESS, not hue: SEQ[0] sits just above GROUND.INSET, the
+// top step is the brightest ink in the system after pure text.
+export const SEQ = ["#1B2430", "#27405C", "#345F8E", "#4A8BC0", "#7DB6E4", "#B4D8F5"] as const;
+
+// Pick a categorical slot for stack position `i`; anything past the eighth
+// category collapses into the residual and the legend reads "Other (n …)".
+export const vizSlot = (i: number): string => (i < VIZ_ROTATION.length ? VIZ_ROTATION[i] : VIZ.RESIDUAL);
+// Pick a SEQ step for a 0–1 magnitude. Floors at SEQ-200 so a live value never
+// renders at SEQ-100 (which is a ground, not a series colour).
+export const seqStep = (t: number): string => SEQ[Math.max(1, Math.min(5, 1 + Math.round(t * 3)))];
+
+// The six rules the palette carries (from the approved spec):
+//   1. Categories by stack position, from the fixed rotation.
+//   2. A category keeps its slot across every surface.
+//   3. Past eight categories → RESIDUAL; RESIDUAL is never a named category.
+//   4. GREY NEVER APPEARS IN A CHART SERIES — grey means no-data, disabled or
+//      out-of-window, everywhere in the system.
+//   5. Magnitude never uses categorical hues; category never uses the SEQ ramp.
+//   6. Semantic amber may sit on a chart only as a STATE FLAG or axis-level
+//      annotation — never as a series.

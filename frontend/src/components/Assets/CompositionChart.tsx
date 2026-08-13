@@ -9,9 +9,8 @@
 // failing counts — never "insufficient data" alone.
 
 import { useState } from "react";
-import { COLOR, FONT, GROUND, LINE, COOL, WARM } from "../../lib/designTokens";
+import { CANON, FACE, SEQ } from "../../lib/canonicalTokens";
 import {
-  HIGHLIGHT,
   THEMED_PERIOD_GATE,
   type Composition,
   type ThemeBand,
@@ -20,18 +19,18 @@ import {
 type Mode = "share" | "volume";
 
 const eyebrow = {
-  fontFamily: FONT.mono,
-  fontSize: 10,
+  fontFamily: FACE.data,
+  fontSize: 11,
   fontWeight: 500,
   letterSpacing: "0.16em",
   textTransform: "uppercase" as const,
-  color: COOL.label,
+  color: CANON.INK.MUTE,
 };
 const note = {
-  fontFamily: FONT.mono,
-  fontSize: 10,
+  fontFamily: FACE.data,
+  fontSize: 11,
   lineHeight: 1.7,
-  color: COOL.label,
+  color: CANON.INK.MUTE,
 };
 
 function pct(x: number): string {
@@ -46,15 +45,15 @@ function signedPp(pp: number): string {
 
 function modeBtn(active: boolean): React.CSSProperties {
   return {
-    fontFamily: FONT.mono,
+    fontFamily: FACE.data,
     fontSize: 11,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
     padding: "8px 12px",
     cursor: "pointer",
-    background: active ? COLOR.amberSoft : "transparent",
-    border: `1px solid ${active ? COLOR.amber : LINE.l1}`,
-    color: active ? COLOR.amber : COOL.chrome,
+    background: active ? CANON.GOLD.WASH : "transparent",
+    border: `1px solid ${active ? CANON.GOLD.PRIME : CANON.LINE.HAIR}`,
+    color: active ? CANON.GOLD.PRIME : CANON.INK.LABEL,
   };
 }
 
@@ -88,7 +87,12 @@ export default function CompositionChart({
   }
 
   const maxCorpus = Math.max(1, ...composition.columns.map((c) => c.corpus));
-  const colHeight = full ? 360 : 190;
+  // Raised 190 → 320 (2026-08-13): at 190 a 1% share rendered 1.9px and hit the
+  // minHeight:1 floor, so the thin themes (CNS metastases 1%, EGFR exon 20 5%)
+  // collapsed to hairlines. At 320 a 1% band is 3.2px — a readable slice. Most of
+  // the extra height consumes slack that already existed on the chart side of the
+  // grid (the legend column was the taller of the two).
+  const colHeight = full ? 360 : 320;
   const firstCol = composition.columns[0];
   const lastFull = [...composition.columns].reverse().find((c) => !c.isPartial) ?? firstCol;
   const modeNote =
@@ -124,7 +128,7 @@ export default function CompositionChart({
             gap: 40,
             paddingBottom: 22,
             marginBottom: 4,
-            borderBottom: `1px solid ${LINE.l1}`,
+            borderBottom: `1px solid ${CANON.LINE.HAIR}`,
             flexWrap: "wrap",
           }}
         >
@@ -132,10 +136,10 @@ export default function CompositionChart({
             <div style={{ ...eyebrow, marginBottom: 12 }}>
               {assetName ? `${assetName} · ` : ""}theme composition
             </div>
-            <h2 style={{ margin: "0 0 12px", fontFamily: FONT.sans, fontSize: 27, fontWeight: 500, letterSpacing: "-0.01em", color: WARM.prose }}>
+            <h2 style={{ margin: "0 0 12px", fontFamily: FACE.ui, fontSize: 25, fontWeight: 500, letterSpacing: "-0.01em", color: CANON.INK.BODY }}>
               What this literature is about, and how that changed
             </h2>
-            <div style={{ fontFamily: FONT.serif, fontSize: 16, lineHeight: 1.55, color: WARM.body, maxWidth: 700 }}>
+            <div style={{ fontFamily: FACE.value, fontSize: 17, lineHeight: 1.55, color: CANON.INK.BODY, maxWidth: 700 }}>
               Each column is one publication year, divided by canonical theme. Volume moved from{" "}
               {firstCol.corpus} papers in {firstCol.year} to {lastFull.corpus} in {lastFull.year}.
               Both are observations about publishing, not statements about the therapy.
@@ -201,7 +205,13 @@ export default function CompositionChart({
                           style={{
                             minHeight: 1,
                             height: `${(seg.share * 100).toFixed(2)}%`,
-                            background: isFocus ? HIGHLIGHT : band.color,
+                            // VIZ rule 6 (2026-08-13): amber may enter a chart only
+                            // as a state flag, NEVER as a series — "no amber band in
+                            // a stack". Focus is carried by the dimming of the OTHER
+                            // bands (opacity .2 below); the held band keeps its own
+                            // categorical hue, which also keeps it matched to its
+                            // legend swatch while held.
+                            background: band.color,
                             opacity: dim ? 0.2 : 1,
                             cursor: "pointer",
                             transition: "opacity 0.12s ease",
@@ -222,25 +232,25 @@ export default function CompositionChart({
               gap: full ? 16 : 12,
               marginTop: 10,
               paddingTop: full ? 11 : 0,
-              borderTop: full ? `1px solid ${LINE.l1}` : "none",
+              borderTop: full ? `1px solid ${CANON.LINE.HAIR}` : "none",
             }}
           >
             {composition.columns.map((col) => (
               <div key={col.year} style={{ flex: 1, textAlign: "center" }}>
                 <div
                   style={{
-                    fontFamily: FONT.mono,
+                    fontFamily: FACE.data,
                     fontSize: full ? 13 : 11,
-                    color: col.isPartial ? COOL.label : WARM.body,
+                    color: col.isPartial ? CANON.INK.MUTE : CANON.INK.BODY,
                   }}
                 >
                   {col.year}
                 </div>
-                <div style={{ fontFamily: FONT.mono, fontSize: 10, color: WARM.muted, marginTop: 5 }}>
+                <div style={{ fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE, marginTop: 5 }}>
                   {col.corpus}
                 </div>
                 {full ? (
-                  <div style={{ fontFamily: FONT.mono, fontSize: 9, color: WARM.muted, marginTop: 4 }}>
+                  <div style={{ fontFamily: FACE.data, fontSize: 9, color: CANON.INK.MUTE, marginTop: 4 }}>
                     {col.themed} themed
                   </div>
                 ) : null}
@@ -253,13 +263,13 @@ export default function CompositionChart({
             style={{
               marginTop: 16,
               padding: full ? "14px 16px" : "12px 0 0",
-              borderTop: full ? "none" : `1px solid ${LINE.l0}`,
-              border: full ? `1px solid ${LINE.l1}` : "none",
-              background: full ? GROUND.g1 : "transparent",
-              fontFamily: FONT.mono,
+              borderTop: full ? "none" : `1px solid ${CANON.LINE.HAIR}`,
+              border: full ? `1px solid ${CANON.LINE.HAIR}` : "none",
+              background: full ? CANON.GROUND.RAISE : "transparent",
+              fontFamily: FACE.data,
               fontSize: full ? 13 : 11,
               lineHeight: 1.5,
-              color: WARM.body,
+              color: CANON.INK.BODY,
               minHeight: 17,
             }}
           >
@@ -268,18 +278,18 @@ export default function CompositionChart({
         </div>
 
         {/* Theme table */}
-        <div style={{ borderLeft: `1px solid ${LINE.l1}`, paddingLeft: 22, minWidth: 0 }}>
+        <div style={{ borderLeft: `1px solid ${CANON.LINE.HAIR}`, paddingLeft: 22, minWidth: 0 }}>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 44px 44px 44px",
-              fontFamily: FONT.mono,
+              fontFamily: FACE.data,
               fontSize: 9,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: COOL.label,
+              color: CANON.INK.MUTE,
               paddingBottom: 9,
-              borderBottom: `1px solid ${LINE.l0}`,
+              borderBottom: `1px solid ${CANON.LINE.HAIR}`,
             }}
           >
             <span>Theme</span>
@@ -296,7 +306,7 @@ export default function CompositionChart({
                 onMouseEnter={() => setHover({ key: band.key, readout: bandReadout(band) })}
                 onMouseLeave={() => setHover({ key: null, readout: null })}
                 onClick={() => setHeld((k) => (k === band.key ? null : band.key))}
-                style={{ padding: "10px 0", borderBottom: `1px solid ${LINE.l0}`, cursor: "pointer", opacity: dim ? 0.42 : 1 }}
+                style={{ padding: "10px 0", borderBottom: `1px solid ${CANON.LINE.HAIR}`, cursor: "pointer", opacity: dim ? 0.42 : 1 }}
               >
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 44px 44px 44px", alignItems: "center" }}>
                   <span
@@ -304,22 +314,22 @@ export default function CompositionChart({
                       display: "flex",
                       alignItems: "center",
                       gap: 9,
-                      fontFamily: FONT.sans,
-                      fontSize: 12,
+                      fontFamily: FACE.ui,
+                      fontSize: 13,
                       lineHeight: 1.3,
-                      color: WARM.prose,
+                      color: CANON.INK.BODY,
                     }}
                   >
-                    <span style={{ width: 9, height: 9, flex: "none", background: isFocus ? HIGHLIGHT : band.color }} />
+                    <span style={{ width: 9, height: 9, flex: "none", background: band.color }} />
                     {band.label}
                   </span>
-                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.muted }}>
+                  <span style={{ textAlign: "right", fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE }}>
                     {pct(band.openingShare)}
                   </span>
-                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.prose }}>
+                  <span style={{ textAlign: "right", fontFamily: FACE.data, fontSize: 11, color: CANON.INK.BODY }}>
                     {pct(band.closingShare)}
                   </span>
-                  <span style={{ textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.muted }}>
+                  <span style={{ textAlign: "right", fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE }}>
                     {signedPp(band.deltaPp)}
                   </span>
                 </div>
@@ -334,7 +344,7 @@ export default function CompositionChart({
                             width: 9,
                             minHeight: 1,
                             height: `${((s / maxSpark) * 100).toFixed(1)}%`,
-                            background: isFocus ? HIGHLIGHT : "oklch(0.40 0.05 285)",
+                            background: isFocus ? SEQ[4] : SEQ[2],
                           }}
                         />
                       );
@@ -372,7 +382,7 @@ function MobileComposition({ composition }: { composition: Composition }) {
     return (
       <div>
         <div style={{ ...eyebrow, marginBottom: 12 }}>Theme composition</div>
-        <div style={{ ...note, fontSize: 11, color: COLOR.amber, marginBottom: 10 }}>
+        <div style={{ ...note, fontSize: 11, color: CANON.GOLD.PRIME, marginBottom: 10 }}>
           GATED · pooled across {composition.themedTotal} themed papers — under {THEMED_PERIOD_GATE}/year
           for a year-over-year view.
         </div>
@@ -383,10 +393,10 @@ function MobileComposition({ composition }: { composition: Composition }) {
         </div>
         <div style={{ marginTop: 14 }}>
           {topBands.map((b) => (
-            <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${LINE.l0}`, minHeight: 44, boxSizing: "border-box" }}>
+            <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${CANON.LINE.HAIR}`, minHeight: 44, boxSizing: "border-box" }}>
               <span style={{ width: 9, height: 9, flex: "none", background: b.color }} />
-              <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: WARM.prose }}>{b.label}</span>
-              <span style={{ fontFamily: FONT.mono, fontSize: 12, color: WARM.prose }}>{pct(b.pooledShare)}</span>
+              <span style={{ flex: 1, fontFamily: FACE.ui, fontSize: 13, color: CANON.INK.BODY }}>{b.label}</span>
+              <span style={{ fontFamily: FACE.data, fontSize: 13, color: CANON.INK.BODY }}>{pct(b.pooledShare)}</span>
             </div>
           ))}
         </div>
@@ -411,18 +421,18 @@ function MobileComposition({ composition }: { composition: Composition }) {
       </div>
       <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
         {composition.columns.map((col) => (
-          <div key={col.year} style={{ flex: 1, textAlign: "center", fontFamily: FONT.mono, fontSize: 9, color: WARM.muted }}>
+          <div key={col.year} style={{ flex: 1, textAlign: "center", fontFamily: FACE.data, fontSize: 9, color: CANON.INK.MUTE }}>
             {`'${String(col.year).slice(2)}`}
           </div>
         ))}
       </div>
       <div style={{ marginTop: 16 }}>
         {topBands.map((b) => (
-          <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${LINE.l0}`, minHeight: 44, boxSizing: "border-box" }}>
+          <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 0", borderBottom: `1px solid ${CANON.LINE.HAIR}`, minHeight: 44, boxSizing: "border-box" }}>
             <span style={{ width: 9, height: 9, flex: "none", background: b.color }} />
-            <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 13, color: WARM.prose }}>{b.label}</span>
-            <span style={{ fontFamily: FONT.mono, fontSize: 12, color: WARM.prose }}>{pct(b.closingShare)}</span>
-            <span style={{ width: 44, textAlign: "right", fontFamily: FONT.mono, fontSize: 11, color: WARM.muted }}>
+            <span style={{ flex: 1, fontFamily: FACE.ui, fontSize: 13, color: CANON.INK.BODY }}>{b.label}</span>
+            <span style={{ fontFamily: FACE.data, fontSize: 13, color: CANON.INK.BODY }}>{pct(b.closingShare)}</span>
+            <span style={{ width: 44, textAlign: "right", fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE }}>
               {signedPp(b.deltaPp)}
             </span>
           </div>
@@ -456,21 +466,21 @@ function GatedComposition({ composition }: { composition: Composition }) {
           gap: 14,
           alignItems: "flex-start",
           padding: "16px 18px",
-          border: `1px solid ${COLOR.amber}`,
-          background: COLOR.amberSoft,
+          border: `1px solid ${CANON.GOLD.PRIME}`,
+          background: CANON.GOLD.WASH,
           maxWidth: 900,
         }}
       >
-        <span style={{ fontFamily: FONT.mono, fontSize: 11, lineHeight: 1.5, color: COLOR.amber, flex: "none" }}>
+        <span style={{ fontFamily: FACE.data, fontSize: 11, lineHeight: 1.5, color: CANON.GOLD.PRIME, flex: "none" }}>
           GATED
         </span>
         <div>
-          <div style={{ fontFamily: FONT.serif, fontSize: 15, lineHeight: 1.55, color: WARM.prose }}>
+          <div style={{ fontFamily: FACE.value, fontSize: 15, lineHeight: 1.55, color: CANON.INK.BODY }}>
             Year-over-year composition is not shown for this asset. The shifting mix needs at least{" "}
             {THEMED_PERIOD_GATE} themed papers per year to be read as movement rather than noise;{" "}
             {yearRange} carry {countList}.
           </div>
-          <div style={{ ...note, marginTop: 9, fontSize: 11, color: WARM.muted }}>
+          <div style={{ ...note, marginTop: 9, fontSize: 11, color: CANON.INK.MUTE }}>
             Pooled mix across all {composition.themedTotal} themed papers is shown instead. It answers
             what this literature is about — not how it is moving.
           </div>
@@ -500,13 +510,13 @@ function GatedComposition({ composition }: { composition: Composition }) {
                 alignItems: "center",
                 gap: 9,
                 paddingBottom: 8,
-                borderBottom: `1px solid ${LINE.l0}`,
+                borderBottom: `1px solid ${CANON.LINE.HAIR}`,
               }}
             >
               <span style={{ width: 9, height: 9, flex: "none", background: band.color }} />
-              <span style={{ flex: 1, fontFamily: FONT.sans, fontSize: 12, color: WARM.prose }}>{band.label}</span>
-              <span style={{ fontFamily: FONT.mono, fontSize: 11, color: WARM.prose }}>{pct(band.pooledShare)}</span>
-              <span style={{ width: 34, textAlign: "right", fontFamily: FONT.mono, fontSize: 10, color: COOL.label }}>
+              <span style={{ flex: 1, fontFamily: FACE.ui, fontSize: 13, color: CANON.INK.BODY }}>{band.label}</span>
+              <span style={{ fontFamily: FACE.data, fontSize: 11, color: CANON.INK.BODY }}>{pct(band.pooledShare)}</span>
+              <span style={{ width: 34, textAlign: "right", fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE }}>
                 {band.pooledN}
               </span>
             </div>
