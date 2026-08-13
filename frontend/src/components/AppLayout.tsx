@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import NavBar from "./NavBar";
 import GlobalFooter from "./GlobalFooter";
 import FloatingBackToTop from "./FloatingBackToTop";
-import { COLOR, FONT, SPACE, CONTENT_WIDTH, COOL, LINE, type ContentWidth } from "../lib/designTokens";
+import { FONT, SPACE, CONTENT_WIDTH, COOL, LINE, type ContentWidth } from "../lib/designTokens";
+import { DEPTH } from "../lib/canonicalTokens";
 
 export interface BreadcrumbItem {
   label: string;
@@ -39,7 +40,11 @@ export default function AppLayout({
   return (
     <div
       style={{
-        backgroundColor: COLOR.ground,
+        // RFC-02 pilot #6 (2026-08-12): page ground is the canonical radial over
+        // GROUND.BASE — the app shell is the neutral field every panel sits on.
+        // Replaces the legacy achromatic #0a0a0a (COLOR.ground); the flat BASE
+        // fallback for overscroll lives on body (index.css --ground).
+        ...DEPTH.GROUND,
         minHeight: "100vh",
         fontFamily: FONT.sans,
       }}

@@ -22,33 +22,35 @@ import {
   type AgentRow,
   type AgentBadge,
 } from "../../lib/administeredVolume";
-import { COOL } from "../../lib/designTokens";
+import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 
 // Ink follows reading mode at the BLOCK level (2026-08-06): this is a data table
 // scanned as a unit, so it is one temperature — the COOL ramp throughout. The
-// serif agent names render in cool ink (COOL.ui), exactly as the Trials
+// serif agent names render in cool ink (CANON.INK.PRIME), exactly as the Trials
 // reclassification did; the former warm-neutral `ink` (#e8e6e1) and the separate
 // cool-blue `blue` (#9aa7b8) — which read blue where they sat adjacent — are
 // retired into steps of the one cool ramp. Gold and the volume bar are accents,
 // cool-safe, and unchanged.
 const C = {
-  bg: "#08090a",
-  card: "#0e0f11",
-  line: "#1c1f22",
-  lineSoft: "#16181a",
-  gold: "#c9a227",
+  // bg/card retired 2026-08-12 (composition fix): section containers take
+  // DEPTH.PANEL — a flat BASE card is invisible on the shell's BASE ground.
+  line: CANON.GROUND.RAISE,
+  lineSoft: CANON.GROUND.RAISE,
+  gold: CANON.GOLD.PRIME,
   goldSoft: "rgba(201,162,39,.35)",
   goldFill: "rgba(201,162,39,.05)",
-  ink: COOL.ui, // bright cool ink — agent names + recent figures (was warm #e8e6e1)
-  blue: COOL.chromeStrong, // dimmer cool step — older figures / yearsReported (was #9aa7b8)
-  dim: COOL.label,
-  faint: COOL.faint,
-  bar: "#8fa88c",
-  barTrack: "#16181a",
+  ink: CANON.INK.PRIME, // bright cool ink — agent names + recent figures (was warm #e8e6e1)
+  blue: CANON.INK.LABEL, // dimmer cool step — older figures / yearsReported (was #9aa7b8)
+  dim: CANON.INK.LABEL,
+  faint: CANON.INK.MUTE,
+  bar: CANON.MARK.EST,
+  barTrack: CANON.GROUND.RAISE,
 } as const;
 
-const mono = (s: number, w = 400) => ({ font: `${w} ${s}px 'IBM Plex Mono',ui-monospace,monospace` } as const);
-const serif = (s: number, w = 400) => ({ font: `${w} ${s}px Spectral,Georgia,serif` } as const);
+// Faces via tokens (2026-08-12): the frame's Spectral was a stray — Newsreader
+// is the one value face (RFC-03); the local mono string folds into FACE.data.
+const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 const int = (v: number | null | undefined) => (v == null ? "—" : Math.round(v).toLocaleString());
 
 const BADGE_LABEL: Record<AgentBadge, string> = {
@@ -59,8 +61,8 @@ const BADGE_LABEL: Record<AgentBadge, string> = {
 function Header({ subtitle }: { subtitle: string }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 11, borderBottom: `1px solid ${C.line}`, paddingBottom: 8 }}>
-      <span style={{ color: C.gold, ...mono(12, 500) }}>▌</span>
-      <span style={{ ...mono(10.5, 500), letterSpacing: ".14em", textTransform: "uppercase", color: C.ink }}>Medicare administered therapy</span>
+      <span style={{ color: C.gold, ...mono(13, 500) }}>▌</span>
+      <span style={{ ...mono(11, 500), letterSpacing: ".14em", textTransform: "uppercase", color: C.ink }}>Medicare administered therapy</span>
       <span style={{ marginLeft: "auto", ...mono(9), letterSpacing: ".1em", textTransform: "uppercase", color: C.dim }}>{subtitle}</span>
     </div>
   );
@@ -97,7 +99,7 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
         <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
           <span style={{ ...mono(13, 500), letterSpacing: ".02em", color: C.ink }}>{row.molecule}</span>
           {row.badge ? (
-            <span style={{ ...mono(8.5, 500), letterSpacing: ".1em", color: row.badge === "nsclc_anchored" ? C.gold : C.blue, border: `1px solid ${row.badge === "nsclc_anchored" ? C.goldSoft : "#2a2e32"}`, padding: "2px 6px" }}>
+            <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: row.badge === "nsclc_anchored" ? C.gold : C.blue, border: `1px solid ${row.badge === "nsclc_anchored" ? C.goldSoft : CANON.GROUND.INSET}`, padding: "2px 6px" }}>
               {BADGE_LABEL[row.badge]}
             </span>
           ) : null}
@@ -110,15 +112,15 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
             const isRecent = cell.year === recentYear;
             return (
               <div key={cell.year} style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                <span style={{ ...mono(9.5, isRecent ? 600 : 400), color: isRecent ? C.ink : C.dim, fontVariantNumeric: "tabular-nums" }}>{cell.year}</span>
+                <span style={{ ...mono(9, isRecent ? 600 : 400), color: isRecent ? C.ink : C.dim, fontVariantNumeric: "tabular-nums" }}>{cell.year}</span>
                 {cell.benes == null ? (
-                  <span style={{ ...serif(11.5, 400), fontStyle: "italic", color: C.faint }}>under floor — fewer than {REPORTING_FLOOR} benes</span>
+                  <span style={{ ...serif(11, 400), fontStyle: "italic", color: C.faint }}>under floor — fewer than {REPORTING_FLOOR} benes</span>
                 ) : (
                   <>
-                    <span style={{ ...mono(12, isRecent ? 600 : 400), color: isRecent ? C.ink : C.blue, fontVariantNumeric: "tabular-nums" }}>{int(cell.benes)} benes</span>
-                    <span style={{ ...mono(9.5), color: C.dim, fontVariantNumeric: "tabular-nums" }}>· {int(cell.days)} days</span>
+                    <span style={{ ...mono(13, isRecent ? 600 : 400), color: isRecent ? C.ink : C.blue, fontVariantNumeric: "tabular-nums" }}>{int(cell.benes)} benes</span>
+                    <span style={{ ...mono(9), color: C.dim, fontVariantNumeric: "tabular-nums" }}>· {int(cell.days)} days</span>
                     {row.multiProduct && cell.products.length ? (
-                      <span style={{ ...mono(8.5), color: C.faint, letterSpacing: ".03em" }}>{cell.products.join(" · ")}</span>
+                      <span style={{ ...mono(9), color: C.faint, letterSpacing: ".03em" }}>{cell.products.join(" · ")}</span>
                     ) : null}
                   </>
                 )}
@@ -127,10 +129,10 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
           })}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ ...mono(8.5, 500), letterSpacing: ".12em", color: C.dim, textTransform: "uppercase" }}>Admin days · most recent year</span>
+          <span style={{ ...mono(9, 500), letterSpacing: ".12em", color: C.dim, textTransform: "uppercase" }}>Admin days · most recent year</span>
           <Bar days={row.recentDays} max={maxDays} />
         </div>
-        <span style={{ ...mono(9.5), color: C.blue, fontVariantNumeric: "tabular-nums" }}>REPORTED {row.yearsReported} OF {windowYears.length} YEARS</span>
+        <span style={{ ...mono(9), color: C.blue, fontVariantNumeric: "tabular-nums" }}>REPORTED {row.yearsReported} OF {windowYears.length} YEARS</span>
       </div>
     );
   }
@@ -143,7 +145,7 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
               the one serif drug face; companies get the serif instead */}
           <span style={{ ...mono(13, 500), letterSpacing: ".02em", color: C.ink }}>{row.molecule}</span>
           {row.badge ? (
-            <span style={{ ...mono(8.5, 500), letterSpacing: ".1em", color: row.badge === "nsclc_anchored" ? C.gold : C.blue, border: `1px solid ${row.badge === "nsclc_anchored" ? C.goldSoft : "#2a2e32"}`, padding: "2px 6px" }}>
+            <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: row.badge === "nsclc_anchored" ? C.gold : C.blue, border: `1px solid ${row.badge === "nsclc_anchored" ? C.goldSoft : CANON.GROUND.INSET}`, padding: "2px 6px" }}>
               {BADGE_LABEL[row.badge]}
             </span>
           ) : null}
@@ -158,7 +160,7 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
         const isRecent = cell.year === recentYear;
         if (cell.benes == null) {
           return (
-            <div key={cell.year} style={{ textAlign: "right", ...serif(11.5, 400), fontStyle: "italic", color: C.faint, lineHeight: 1.35 }}>
+            <div key={cell.year} style={{ textAlign: "right", ...serif(11, 400), fontStyle: "italic", color: C.faint, lineHeight: 1.35 }}>
               under floor<br />fewer than {REPORTING_FLOOR} benes
             </div>
           );
@@ -168,7 +170,7 @@ function AgentRowView({ row, windowYears, maxDays }: { row: AgentRow; windowYear
             <span style={{ ...mono(13, isRecent ? 600 : 400), color: isRecent ? C.ink : C.blue, fontVariantNumeric: "tabular-nums" }}>{int(cell.benes)}</span>
             <span style={{ ...mono(9), color: C.dim }}>{int(cell.days)} days</span>
             {row.multiProduct && cell.products.length ? (
-              <span style={{ ...mono(8.5), color: C.faint, letterSpacing: ".03em" }}>{cell.products.join(" · ")}</span>
+              <span style={{ ...mono(9), color: C.faint, letterSpacing: ".03em" }}>{cell.products.join(" · ")}</span>
             ) : null}
           </div>
         );
@@ -226,7 +228,7 @@ function ReservedAndSource() {
     <>
       {/* reserved band — a future cohort-density line lands here, one per profile. Empty. */}
       <div style={{ height: 34, borderTop: `1px solid ${C.lineSoft}` }} aria-hidden />
-      <div style={{ ...mono(9.5), lineHeight: 1.6, color: C.dim, letterSpacing: ".02em", padding: "12px 20px 16px", borderTop: `1px solid ${C.line}` }}>{SOURCE_LINE}</div>
+      <div style={{ ...mono(9), lineHeight: 1.6, color: C.dim, letterSpacing: ".02em", padding: "12px 20px 16px", borderTop: `1px solid ${C.line}` }}>{SOURCE_LINE}</div>
     </>
   );
 }
@@ -250,8 +252,8 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Header subtitle="office-administered oncology agents" />
-        <div style={{ background: C.card, border: `1px solid ${C.line}`, padding: "18px 22px" }}>
-          <span style={{ ...mono(9.5), letterSpacing: ".1em", color: C.dim }}>PART B RECORD UNAVAILABLE</span>
+        <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL, padding: "18px 22px" }}>
+          <span style={{ ...mono(9), letterSpacing: ".1em", color: C.dim }}>PART B RECORD UNAVAILABLE</span>
         </div>
       </div>
     );
@@ -265,8 +267,8 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Header subtitle="office-administered oncology agents" />
-        <div style={{ background: C.card, border: `1px solid ${C.line}`, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
-          <p style={{ margin: 0, ...serif(14), color: C.ink, lineHeight: 1.5 }}>
+        <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
+          <p style={{ margin: 0, ...serif(15), color: C.ink, lineHeight: 1.5 }}>
             Medicare Part B cannot be read for this record — no NPI is matched to it.
           </p>
           <p style={{ margin: 0, ...serif(13), color: C.blue, lineHeight: 1.6, textWrap: "pretty" }}>
@@ -275,11 +277,11 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
             frequently billed by the institution rather than the individual, so it may not reach a personal Medicare
             record even when it occurs.
           </p>
-          <p style={{ margin: 0, ...mono(9.5), color: C.dim, lineHeight: 1.6, letterSpacing: ".02em" }}>
+          <p style={{ margin: 0, ...mono(9), color: C.dim, lineHeight: 1.6, letterSpacing: ".02em" }}>
             Absence here means no NPI match — never that no therapy is administered. When an NPI is matched, this section fills from the same code set.
           </p>
         </div>
-        <div style={{ background: C.card, border: `1px solid ${C.line}` }}>
+        <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL }}>
           <ReservedAndSource />
         </div>
       </div>
@@ -291,8 +293,8 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Header subtitle="office-administered oncology agents" />
-        <div style={{ background: C.card, border: `1px solid ${C.line}`, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
-          <p style={{ margin: 0, ...serif(14), color: C.ink, lineHeight: 1.5 }}>
+        <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
+          <p style={{ margin: 0, ...serif(15), color: C.ink, lineHeight: 1.5 }}>
             No office-administered oncology agents billed under this NPI, 2021–2023.
           </p>
           <p style={{ margin: 0, ...serif(13), color: C.blue, lineHeight: 1.6, textWrap: "pretty" }}>
@@ -300,11 +302,11 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
             department or a facility-owned infusion suite are billed by the institution and never reach an individual
             physician record. {FACILITY_ONLY_HCP_COUNT.toLocaleString()} HCPs have facility billing and no drug rows.
           </p>
-          <p style={{ margin: 0, ...mono(9.5), color: C.dim, lineHeight: 1.6, letterSpacing: ".02em" }}>
+          <p style={{ margin: 0, ...mono(9), color: C.dim, lineHeight: 1.6, letterSpacing: ".02em" }}>
             Absence of a drug means fewer than {REPORTING_FLOOR} Medicare beneficiaries under this NPI that year — never zero.
           </p>
         </div>
-        <div style={{ background: C.card, border: `1px solid ${C.line}` }}>
+        <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL }}>
           <ReservedAndSource />
         </div>
       </div>
@@ -315,7 +317,7 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <Header subtitle="office-administered oncology agents" />
-      <div style={{ background: C.card, border: `1px solid ${C.line}` }}>
+      <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL }}>
         <MetricsBar t={t} />
         <ColumnHeads windowYears={t.windowYears} />
         {t.rows.map((row) => (
@@ -324,11 +326,11 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
 
         {/* captions */}
         <div style={{ display: "flex", flexDirection: "column", gap: 7, padding: "14px 20px 4px" }}>
-          <span style={{ ...mono(9.5), color: C.dim, letterSpacing: ".04em" }}>Ordered by most recent year's reported beneficiaries, descending.</span>
-          <span style={{ ...mono(9.5), color: C.dim, letterSpacing: ".04em" }}>
+          <span style={{ ...mono(9), color: C.dim, letterSpacing: ".04em" }}>Ordered by most recent year's reported beneficiaries, descending.</span>
+          <span style={{ ...mono(9), color: C.dim, letterSpacing: ".04em" }}>
             A blank year is fewer than {REPORTING_FLOOR} reported beneficiaries — never zero. The bar is the most recent year's administration days, scaled to the largest in this set.
           </span>
-          <span style={{ ...mono(9.5), color: C.dim, letterSpacing: ".04em", textWrap: "pretty" }}>
+          <span style={{ ...mono(9), color: C.dim, letterSpacing: ".04em", textWrap: "pretty" }}>
             Badges describe the agent's labelled use, not this physician's case mix. A provider is not a tumour type.
           </span>
         </div>

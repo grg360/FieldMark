@@ -13,15 +13,15 @@
 //     an NIGMS R01 is funding, not oncology relevance.
 // Absence state is verbatim and non-negotiable: "No matched federal funding."
 import { useEffect, useState } from "react";
-import { FONT, COOL } from "../../lib/designTokens";
+import { CANON, FACE } from "../../lib/canonicalTokens";
 import { getHcpGrantFacts, type HcpGrantFacts } from "../../lib/nihGrants";
 
-const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
-const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.serif}` } as const);
-const INK_HEAD = "#63696E"; // section-head grey, the brief's ink6 twin
-const INK_BRIGHT = COOL.ui;
-const INK_MID = COOL.muted;
-const INK_DIM = "#7C8288";
+const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
+const INK_HEAD = CANON.INK.MUTE; // section-head grey, the brief's ink6 twin
+const INK_BRIGHT = CANON.INK.PRIME;
+const INK_MID = CANON.INK.LABEL;
+const INK_DIM = CANON.INK.LABEL;
 const LINE = "rgba(255,255,255,.06)";
 const LINE_RULE = "rgba(255,255,255,.14)"; // sparse-state left rule (the brief's lineStrong)
 
@@ -51,16 +51,16 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
       </span>
 
       {facts === undefined ? (
-        <span style={{ ...mono(9.5), letterSpacing: ".1em", color: INK_DIM }}>READING THE GRANT RECORD…</span>
+        <span style={{ ...mono(9), letterSpacing: ".1em", color: INK_DIM }}>READING THE GRANT RECORD…</span>
       ) : facts === null ? (
         // read failed — say nothing rather than assert a false absence
-        <span style={{ ...mono(9.5), letterSpacing: ".1em", color: INK_DIM }}>GRANT RECORD UNAVAILABLE</span>
+        <span style={{ ...mono(9), letterSpacing: ".1em", color: INK_DIM }}>GRANT RECORD UNAVAILABLE</span>
       ) : facts.total === 0 ? (
         // NEUTRAL absence (2026-08-10 ruling): grant data under-represents
         // clinical trialists and guideline authors — their influence is
         // industry-trial and guideline work, invisible to RePORTER. Absence
         // must never read as a gap or a lower signal.
-        <span style={{ ...serif(13), color: "#8F959A", lineHeight: 1.5 }}>
+        <span style={{ ...serif(13), color: CANON.INK.LABEL, lineHeight: 1.5 }}>
           No matched federal funding. Expected for many clinical leaders - industry-trial leadership and guideline work are funded outside NIH grants and do not appear in RePORTER. An absence here carries no signal about influence.
         </span>
       ) : (
@@ -116,7 +116,7 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
                     {facts.latestFy != null ? ` · MOST RECENT AWARD FY${facts.latestFy}` : ""}
                   </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(9.5) }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(9) }}>
                   <span style={{ color: INK_MID, letterSpacing: ".06em" }}>
                     {facts.mechanisms.map((m) => `${m.family} ×${m.count}`).join(" · ")}
                   </span>
@@ -128,7 +128,7 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
                   </span>
                 </div>
                 {facts.institutes.some((i) => i.code !== "NCI") ? (
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(10) }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", ...mono(11) }}>
                     {facts.institutes.filter((i) => i.code !== "NCI").map((i) => (
                       <span key={i.code} style={{ color: INK_DIM, letterSpacing: ".06em" }}>
                         {i.code} {i.active > 0 ? `${i.active} ACTIVE / ` : ""}{i.total}
@@ -154,11 +154,13 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
                frame; the parenthetical stays honest when other award types
                (e.g. a K) are still active by dates. */
             <div style={{ display: "flex", flexDirection: "column", gap: 9, borderLeft: `1px solid ${LINE_RULE}`, paddingLeft: 14, maxWidth: 560 }}>
-              <span style={{ ...mono(11.5), color: COOL.prose, lineHeight: 1.6, letterSpacing: ".02em" }}>
+              {/* Prose rule 2026-08-12: the section's absence statement → FACE.value,
+                  matching its sibling zero-state ("No matched federal funding…") */}
+              <span style={{ ...serif(13), color: CANON.INK.BODY, lineHeight: 1.6 }}>
                 No active independent NIH awards ({facts.total} matched, {facts.activeByDates === 0 ? "none currently active" : `${facts.activeByDates} active by dates, none independent as contact PI`})
                 {facts.latestFy != null ? ` · most recent FY${facts.latestFy}` : ""}
               </span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", ...mono(9.5), letterSpacing: ".06em", color: INK_DIM }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", ...mono(9), letterSpacing: ".06em", color: INK_DIM }}>
                 {facts.firstIndependentFy != null ? <span>FIRST INDEPENDENT AWARD FY{facts.firstIndependentFy}</span> : null}
                 {facts.mechanisms.length ? <span>{facts.mechanisms.map((m) => `${m.family} ×${m.count}`).join(" · ")}</span> : null}
                 <span>CONTACT PI ON {facts.contactPiCount}{facts.mpiCount > 0 ? ` · MPI ON ${facts.mpiCount}` : ""}</span>
@@ -171,7 +173,7 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
           )}
 
           {/* PROVENANCE — fine print, sentence-cased, smallest and dimmest */}
-          <div style={{ ...mono(8), letterSpacing: ".04em", color: INK_HEAD, lineHeight: 1.7, borderTop: `1px solid ${LINE}`, paddingTop: 6, maxWidth: 560, marginTop: "auto" }}>
+          <div style={{ ...mono(9), letterSpacing: ".04em", color: INK_HEAD, lineHeight: 1.7, borderTop: `1px solid ${LINE}`, paddingTop: 6, maxWidth: 560, marginTop: "auto" }}>
             Matched by investigator name and institution against NIH RePORTER's PI list (contact PI + MPIs — co-investigators are not in this record) · FY2012–2026, curated activity codes · independent = non-K mechanism · project dates are administrative records
           </div>
         </>

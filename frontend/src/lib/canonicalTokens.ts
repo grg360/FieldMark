@@ -154,11 +154,22 @@ export const T = {
 // state, badge urgency and ledger totals off the color channel (color stays
 // the cohort markers' monopoly).
 export const FACE = {
-  // Value face: names, prose, serif figures. Fallback runs through the
-  // shipped Source Serif 4 so the swap window shows a same-class serif, never
-  // an unstyled flash.
+  // Value face: names, prose, and HEADLINE/STANDALONE DISPLAY NUMERALS (hero
+  // figures, rank ordinals standing alone). NUMERAL RULE (settled 2026-08-12):
+  // display numerals are value-face; tabular/column/row numerals are data-face;
+  // tiebreaker — anything that column-aligns is FACE.data.
+  // PROSE RULE (locked 2026-08-12): serif carries narrative/interpretive
+  // prose, text ABOUT THE PERSON, and empty-states. Mono never carries prose —
+  // see FACE.data for what mono annotates. Fallback runs through the shipped
+  // Source Serif 4 so the swap window shows a same-class serif, never an
+  // unstyled flash — Source Serif must only ever paint during that swap window.
   value: "'Newsreader', 'Source Serif 4', Georgia, serif",
-  // Data face: every numeral, label, tracked cap. tabular-nums where columns align.
+  // Data face: labels, tracked caps, and every TABULAR/COLUMN/ROW numeral
+  // (numeral rule above — standalone display figures go to FACE.value).
+  // PROSE RULE (locked 2026-08-12): mono is the DATA-ANNOTATION voice only —
+  // provenance, sort order, cell/badge semantics, source/method notes, control
+  // microcopy. Sentence prose that interprets the record or speaks about the
+  // person is FACE.value. tabular-nums where columns align.
   data: "'IBM Plex Mono', ui-monospace, monospace",
   // UI face: body copy, controls, meta rows.
   ui: "'IBM Plex Sans', system-ui, sans-serif",

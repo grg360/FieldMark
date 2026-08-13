@@ -12,8 +12,11 @@
   --font-serif: 'IBM Plex Serif', Georgia, serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  /* Ground & surfaces (warm near-black) */
-  --ground: #0a0a0a;
+  /* Ground & surfaces (warm near-black)
+     --ground re-pointed 2026-08-12 (RFC-02 pilot #6): flat mirror of canonical
+     GROUND.BASE (canonicalTokens.ts) so body/overscroll match the app shell's
+     radial DEPTH.GROUND. Was the legacy achromatic #0a0a0a. */
+  --ground: #0F1114;
   --surface-well: #0d0c0b;
   --surface-card: #161515; /* one point of red over neutral — a trace of warmth, no brown cast */
   --surface-raised: #1b1915;

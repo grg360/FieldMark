@@ -17,6 +17,7 @@ import { isOnRisingBoard } from "../../lib/risingProfile";
 import HcpProfileBrief from "./HcpProfileBrief";
 import CommunityHcpProfile from "./CommunityHcpProfile";
 import RisingHcpProfile from "./RisingHcpProfile";
+import { CANON, FACE } from "../../lib/canonicalTokens";
 
 export default function ProfileDispatch() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +41,7 @@ export default function ProfileDispatch() {
 
   if (route === null) {
     return (
-      <div style={{ background: "#08090A", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#7C8288", font: "400 11px 'IBM Plex Mono',monospace" }}>
+      <div style={{ background: CANON.GROUND.BASE, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: CANON.INK.LABEL, font: `400 11px ${FACE.data}` }}>
         Loading profile…
       </div>
     );

@@ -16,7 +16,7 @@
 // genuinely-live read here.
 
 import { useEffect, useState } from "react";
-import { COOL } from "../../lib/designTokens";
+import { CANON, FACE } from "../../lib/canonicalTokens";
 import { getHcpWebSignals, type WebSignal } from "../../lib/api";
 import ContactAccessCard from "../ContactAccessCard";
 import ContextualizeHCPForm from "../ContextualizeHCPForm";
@@ -42,7 +42,7 @@ const FI_FIELDS = [
 
 const btn = {
   padding: "8px 14px", background: "none", border: "1px solid rgba(255,255,255,.14)", cursor: "pointer",
-  font: "500 10px 'IBM Plex Mono',monospace", letterSpacing: ".08em", color: COOL.prose, borderRadius: 2,
+  font: `500 11px ${FACE.data}`, letterSpacing: ".08em", color: CANON.INK.BODY, borderRadius: 2,
 } as const;
 
 export default function ProfileSecondaryControls({ hcpId, hcpName, specialty }: {
@@ -99,7 +99,7 @@ export default function ProfileSecondaryControls({ hcpId, hcpName, specialty }: 
       {reportOpen && (
         <FiModal title="Report data issue" onClose={() => setReportOpen(false)}>
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Issue type</div>
+            <div style={{ fontSize: 13, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Issue type</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ISSUE_TYPES.map((opt) => (
                 <FiChip key={opt} label={opt} selected={issueType === opt} onClick={() => setIssueType(issueType === opt ? null : opt)} />
@@ -107,7 +107,7 @@ export default function ProfileSecondaryControls({ hcpId, hcpName, specialty }: 
             </div>
           </div>
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Notes (select all that apply)</div>
+            <div style={{ fontSize: 13, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Notes (select all that apply)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ISSUE_NOTE_CHIPS.map((opt) => (
                 <FiChip key={opt} label={opt} selected={issueNotes.has(opt)} multi onClick={() => {
@@ -125,7 +125,7 @@ export default function ProfileSecondaryControls({ hcpId, hcpName, specialty }: 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {FI_FIELDS.map((f) => (
               <div key={f.key}>
-                <div style={{ fontSize: 12, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>{f.label}</div>
+                <div style={{ fontSize: 13, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>{f.label}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {f.options.map((opt) => (
                     <FiChip key={opt} label={opt} selected={validation[f.key] === opt}
@@ -134,7 +134,7 @@ export default function ProfileSecondaryControls({ hcpId, hcpName, specialty }: 
                 </div>
               </div>
             ))}
-            <div style={{ fontSize: 11, color: "#3A3A3F" }}>Your identity is never shared. Contributor UUID only.</div>
+            <div style={{ fontSize: 11, color: CANON.INK.GHOST }}>Your identity is never shared. Contributor UUID only.</div>
             <button type="button" disabled={!allValidated} style={{ ...btn, opacity: allValidated ? 1 : 0.4, cursor: allValidated ? "pointer" : "not-allowed" }}
               onClick={() => { if (!allValidated) return; setFiOpen(false); showToast("Field review recorded — the submission path (field-intel write) is not yet wired; stored locally only."); }}>Submit validation</button>
           </div>
