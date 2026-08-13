@@ -18,7 +18,8 @@ import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 import PeopleNavStrip from "../PeopleNavStrip";
-import { FONT, GROUND, LINE, GOLD, COOL, WARM } from "../../lib/designTokens";
+
+import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
 import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
 import { getDrawerLayerData, prefetchDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
@@ -75,29 +76,45 @@ function useIsMobile(): boolean {
 // Register tokens substituted 2026-08-05 for exact value matches only; every
 // remaining literal is a near-twin of a token (one digit off) or a cohort
 // semantic — converging those is a visible change, deferred on purpose.
+// CANONICAL MIGRATION 2026-08-13. Every near-twin the 2026-08-05 pass declined
+// to converge now resolves to its canonical step — the whole ramp is cool, so
+// the "converging is a visible change" objection is spent: the change IS the
+// resurfacing. Composition (RFC-02 §03): the page ground comes from the shell
+// (AppLayout paints DEPTH.GROUND on BASE); the BOARD is the section-level
+// PANEL; the card inside it steps DOWN to a flat RAISE (never two stacked
+// gradients); rows are flat with an INSET hover; the drawer is OVERHANG.
 const P = {
-  page: "#08090A", // near-twin of GROUND.g0 #0a0a0a — NOT converged
-  card: GROUND.g1, // g1 well inside the g2 board (Commit C)
-  head: "#0B0D10", // near-twin of GROUND.g1 — NOT converged
-  rowHover: "#131619", // near-twin of LINE.l0's value — NOT converged
-  drawer: "#0A0C0F", // near-twin of GROUND.g1 (one digit from P.band) — NOT converged
-  band: GROUND.g1, // #0a0c0e, exact
-  line: "rgba(255,255,255,.06)", // alpha hairlines; register rules are opaque — NOT converged
-  lineMed: "rgba(255,255,255,.09)",
-  lineStrong: "rgba(255,255,255,.14)",
-  amber: GOLD.rank, // #e0a75e — this file is the token's source
-  ink0: COOL.ui, // cool ramp — this family fed the COOL ink steps
-  ink1: COOL.ui, // was INK_COOL.ink1 #e7e8e9 — retired into ui (Δ1.02, invisible)
-  ink2: COOL.prose,
-  ink3: COOL.muted,
-  ink4: "#8F959A", // near-twin of retired grey2 — NOT converged
-  ink5: "#7C8288", // near-twin of COOL.label (not equal) — NOT converged
-  ink6: "#63696E", // near-twin of COOL.faint — NOT converged
-  dash: "#71787E", // between COOL.label and retired grey4 — NOT converged
+  page: CANON.GROUND.BASE, // was #08090A — the shell's ground, not a second one
+  card: CANON.GROUND.RAISE, // flat inside the PANEL board (child steps down)
+  head: CANON.GROUND.INSET, // was #0B0D10 — a header well reads as INSET
+  rowHover: CANON.GROUND.INSET, // was #131619 — INSET's stated role is hover fill
+  drawer: CANON.GROUND.RAISE, // was #0A0C0F — drawer body; depth comes from OVERHANG
+  band: CANON.GROUND.RAISE,
+  // Alpha hairlines retired: the register's rules are opaque ramp steps, so the
+  // three alpha whites collapse onto HAIR/HAIR/EDGE (rule 1 — one value verbatim).
+  line: CANON.LINE.HAIR,
+  lineMed: CANON.LINE.HAIR,
+  lineStrong: CANON.LINE.EDGE,
+  amber: CANON.GOLD.RANK, // #E0A75E — byte-identical carry
+  ink0: CANON.INK.PRIME,
+  ink1: CANON.INK.PRIME,
+  ink2: CANON.INK.BODY,
+  ink3: CANON.INK.LABEL,
+  ink4: CANON.INK.LABEL, // was #8F959A — LABEL is the luminance match
+  ink5: CANON.INK.MUTE, // was #7C8288
+  ink6: CANON.INK.MUTE, // was #63696E — MUTE, not GHOST: these carry live text
+  dash: CANON.INK.MUTE, // honest-absence dash keeps its own name and its own step
 } as const;
 
-const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
-const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.serif}` } as const);
+// EST factFinish inks (session-minted warm literals) reconciled into the cool
+// canonical ramp — same luminance role, one ramp: #A8A29A→LABEL (primary fact),
+// #43434A→GHOST (fade), #5F5F66→MUTE (insights minor).
+const FACT_PRIMARY = CANON.INK.LABEL;
+const FACT_FADE = CANON.INK.GHOST;
+const FACT_MINOR = CANON.INK.MUTE;
+
+const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 
 // COM rail (Design "Community Rail" 2A, 2026-08-11): tier vocabulary +
 // reach abbreviation. Lowercase words render as true small-caps via
@@ -256,8 +273,8 @@ function RisingChipView({ flag, hcpId, hcpName = "", mobile = false }: { flag: R
           title="Senior-authored years within the FieldMark corpus — we see only what is ingested. Opens the senior-author publications."
           style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${P.lineStrong}`, background: "transparent", padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em", textDecoration: "none", cursor: "pointer" }}
         >
-          <span style={{ color: "#8fb8a6" }}>SENIOR AUTHORSHIP SINCE {flag.first_senior_year ?? "—"}</span>
-          <span style={{ color: "#7A5520" }}>·</span>
+          <span style={{ color: CANON.MARK.EST }}>SENIOR AUTHORSHIP SINCE {flag.first_senior_year ?? "—"}</span>
+          <span style={{ color: CANON.GOLD.EDGE }}>·</span>
           <span style={{ color: P.ink4 }}>{flag.recent_senior_pubs ?? "—"} PAPERS</span>
         </Link>
       ) : null}
@@ -278,7 +295,7 @@ function RisingChipView({ flag, hcpId, hcpName = "", mobile = false }: { flag: R
             // network legs — warming it on badge hover kills the pop-up's
             // frame-then-content two-step. Small deliberate target, no dwell timer.
             onMouseEnter={() => prefetchOpenTrialsDetail(hcpId)}
-            style={{ display: "inline-flex", alignItems: "center", border: `1px solid rgba(63,184,175,0.45)`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: "#3FB8AF", cursor: "pointer" }}
+            style={{ display: "inline-flex", alignItems: "center", border: `1px solid rgba(63,184,175,0.45)`, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5, 600), letterSpacing: ".09em", color: CANON.ACTION.LINK, cursor: "pointer" }}
           >
             OPEN TRIAL
           </span>
@@ -316,7 +333,7 @@ function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }:
             onClick={(e) => { e.stopPropagation(); setTrialsOpen((o) => !o); }}
             // hover prefetch — see RisingChipView's badge note
             onMouseEnter={() => prefetchOpenTrialsDetail(hcpId)}
-            style={{ ...chipBase, border: `1px solid rgba(63,184,175,0.45)`, color: "#3FB8AF", cursor: "pointer" }}
+            style={{ ...chipBase, border: `1px solid rgba(63,184,175,0.45)`, color: CANON.ACTION.LINK, cursor: "pointer" }}
           >
             OPEN TRIAL
           </span>
@@ -324,7 +341,7 @@ function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }:
         </span>
       ) : null}
       {est?.senior_recent ? (
-        <span title={`>= 1 senior-authored publication in the last 24 months — ${est.senior_pubs_24mo} in window${est.latest_senior_year ? `, latest ${est.latest_senior_year}` : ""}. Within the FieldMark corpus — we see only what is ingested.`} style={{ ...chipBase, border: `1px solid rgba(143,184,166,0.45)`, color: "#8fb8a6" }}>
+        <span title={`>= 1 senior-authored publication in the last 24 months — ${est.senior_pubs_24mo} in window${est.latest_senior_year ? `, latest ${est.latest_senior_year}` : ""}. Within the FieldMark corpus — we see only what is ingested.`} style={{ ...chipBase, border: `1px solid rgba(143,184,166,0.45)`, color: CANON.MARK.EST }}>
           SENIOR AUTHORSHIP · {est.senior_pubs_24mo} IN 24 MO
         </span>
       ) : null}
@@ -350,8 +367,8 @@ function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }:
 //                  publications" never a pie, floor on total_labeled_pubs
 //   BELIEF       — extracted positions: divergence as a corpus fact; the
 //                  absent state is "empty, not contradicted", verbatim
-const SEP_INK = "#ddd6cb"; // a neighbour that separates
-const NOSEP_INK = "#6b6660"; // "does not separate here"
+const SEP_INK = CANON.INK.BODY; // a neighbour that separates
+const NOSEP_INK = CANON.INK.MUTE; // "does not separate here"
 // Belief-position quotes take SEP_INK too (2026-08-09 ruling): the quoted
 // claims are long-dwell reading, so the register's warm-for-long-dwell rule
 // would put them on the WARM ramp (they shipped at #c6bfb4) — but inside the
@@ -459,7 +476,7 @@ function practiceLayer(
   if (total < PRACTICE_FLOOR) {
     return {
       text: `Too few labeled publications to characterize focus — ${total} of this HCP’s publications carry a canonical label, below the floor of ${PRACTICE_FLOOR}. Focus is not asserted here rather than inferred thinly.`,
-      color: "#8b8479", classes: [],
+      color: CANON.INK.MUTE, classes: [],
       lines: nbrs.map((n) => ({ rank: `#${n.rank}`, text: "not compared — the floor is not met on this side of the layer.", color: NOSEP_INK })),
     };
   }
@@ -519,7 +536,7 @@ function beliefLayer(
   if (n === 0) {
     return {
       text: "No extracted belief positions for this HCP yet. Nothing has been surfaced from this record — the layer is empty, not contradicted.",
-      color: "#8b8479", claims: [], more: 0,
+      color: CANON.INK.MUTE, claims: [], more: 0,
       lines: nbrs.map((x) => ({
         rank: `#${x.rank}`,
         text: x.d.beliefCount
@@ -548,9 +565,9 @@ function DrawerSection({ label, sub, mobile, rightInset, children }: { label: st
     // NO divider (2026-08-09 final): sections separate by spacing alone —
     // the drawer's outer perimeter is its only line.
     <div style={{ display: mobile ? "flex" : "grid", flexDirection: "column", gridTemplateColumns: "210px 1fr", gap: mobile ? 10 : 32, padding: mobile ? "20px 14px" : "26px 22px" }}>
-      <div style={{ ...mono(10, 500), letterSpacing: ".14em", lineHeight: 1.7 }}>
-        <div style={{ color: "#8b8479" }}>{label}</div>
-        <div style={{ marginTop: 4, color: "#4f4a44" }}>{sub}</div>
+      <div style={{ ...mono(11, 500), letterSpacing: ".14em", lineHeight: 1.7 }}>
+        <div style={{ color: CANON.INK.MUTE }}>{label}</div>
+        <div style={{ marginTop: 4, color: CANON.INK.MUTE }}>{sub}</div>
       </div>
       {/* rightInset clears the top-edge PROFILE tab on the first section (desktop) */}
       <div style={rightInset && !mobile ? { paddingRight: rightInset } : undefined}>{children}</div>
@@ -563,7 +580,7 @@ function NeighbourLines({ lines }: { lines: NeighbourLine[] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
       {lines.map((l) => (
         <div key={l.rank} style={{ display: "grid", gridTemplateColumns: "52px 1fr", gap: 16, alignItems: "baseline" }}>
-          <span style={{ ...mono(12), color: "#7d766c", textAlign: "right" }}>{l.rank}</span>
+          <span style={{ ...mono(13), color: CANON.INK.MUTE, textAlign: "right" }}>{l.rank}</span>
           <span style={{ ...serif(15), lineHeight: 1.55, textWrap: "pretty" as const, color: l.color }}>{l.text}</span>
         </div>
       ))}
@@ -620,12 +637,20 @@ function DrawerOverhang({ children }: { children: ReactNode }) {
         style={{
           position: "relative",
           zIndex: 2,
-          background: "linear-gradient(180deg,#15151a 0%,#111114 30%,#0e0e11 100%)",
+          // Canonical 2026-08-13: the hand-rolled three-stop gradient + hand-set
+          // cast shadow ARE the OVERHANG register — swapped for the token, so a
+          // ramp re-temperature carries the drawer with it. The 5px overhang,
+          // the transitions and the one-line system below are unchanged.
+          ...DEPTH.OVERHANG,
+          // ONE LINE SYSTEM preserved: OVERHANG ships a top-edge rim, but this
+          // box is documented to draw NO edge (the drawer's own drawerRule is
+          // the only perimeter line). Take the token's SURFACE and SHADOW, drop
+          // its rim — the depth cue here is the top-lit gradient + cast shadow.
+          borderTop: "none",
           margin: entered ? "0 -5px" : "0 0px", // the 5px overhang
-          // depth from surface + cast shadow ONLY (2026-08-09 round 4): the
-          // inset lip was an edge shadow — removed so the outer LINE is purely
-          // the real hairline border on the drawer element.
-          boxShadow: entered ? "0 22px 40px -20px rgba(0,0,0,.92)" : "0 0 0 rgba(0,0,0,0)",
+          // Shadow stays animated (0 when closed); the entered value is now the
+          // canonical OVERHANG cast rather than the hand-set rgba(0,0,0,.92).
+          boxShadow: entered ? (DEPTH.OVERHANG.boxShadow as string) : "0 0 0 rgba(0,0,0,0)",
           transition: `margin .42s ${DRAWER_EASE}, box-shadow .42s ease`,
         }}
       >
@@ -687,7 +712,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
           // design and invisible at 10.5px — the mono face was the blocker,
           // not the weight. Sans bolds visibly at this size. Size and
           // letter-spacing unchanged.
-          font: `700 ${mobile ? "9.5px" : "10.5px"} ${FONT.sans}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
+          font: `700 ${mobile ? "9px" : "11px"} ${FACE.ui}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
           background: `${cfg.markerColor}1A`, border: drawerRule(cfg), borderTop: mobile ? drawerRule(cfg) : "none",
           padding: mobile ? "7px 14px" : "11px 26px 10px", whiteSpace: "nowrap",
           boxShadow: mobile ? "none" : "0 4px 14px rgba(0,0,0,.35)",
@@ -698,29 +723,29 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
         PROFILE
       </Link>
       <DrawerSection label={cfg.tag === "RS" ? "SCORE · WHAT IS ACCELERATING" : "SCORE · WHICH ENGINE"} sub="ALWAYS PRESENT" mobile={mobile} rightInset={160}>
-        <div style={{ ...serif(16), lineHeight: 1.62, color: SEP_INK, textWrap: "pretty" as const }}>{spine.text}</div>
+        <div style={{ ...serif(17), lineHeight: 1.62, color: SEP_INK, textWrap: "pretty" as const }}>{spine.text}</div>
         <NeighbourLines lines={spine.lines} />
       </DrawerSection>
 
       <DrawerSection label="PRACTICE · CANONICAL FOCUS" sub={cov.practice} mobile={mobile}>
         {layers == null ? (
-          <div style={{ ...mono(10), color: P.ink5, letterSpacing: ".1em" }}>READING THE LABELED CORPUS…</div>
+          <div style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em" }}>READING THE LABELED CORPUS…</div>
         ) : (
           <>
-            <div style={{ ...serif(16), lineHeight: 1.62, color: pr.color, textWrap: "pretty" as const }}>{pr.text}</div>
+            <div style={{ ...serif(17), lineHeight: 1.62, color: pr.color, textWrap: "pretty" as const }}>{pr.text}</div>
             {pr.classes.length ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
                 {pr.classes.map((k) => (
                   <div key={k.name} style={{ display: "grid", gridTemplateColumns: mobile ? "84px 1fr" : "112px 1fr auto", gap: 16, alignItems: "baseline" }}>
-                    <span style={{ ...mono(14), color: P.amber, textAlign: "right" }}>{k.count}</span>
+                    <span style={{ ...mono(15), color: P.amber, textAlign: "right" }}>{k.count}</span>
                     <span style={{ ...serif(15), color: SEP_INK }}>{k.name}</span>
-                    {mobile ? null : <span style={{ ...mono(10), letterSpacing: ".1em", color: "#5d5851" }}>{k.primary.toUpperCase()}</span>}
+                    {mobile ? null : <span style={{ ...mono(11), letterSpacing: ".1em", color: CANON.INK.MUTE }}>{k.primary.toUpperCase()}</span>}
                   </div>
                 ))}
               </div>
             ) : null}
             <NeighbourLines lines={pr.lines} />
-            <div style={{ ...mono(9), letterSpacing: ".1em", color: "#4f4a44", lineHeight: 1.7, marginTop: 16 }}>
+            <div style={{ ...mono(9), letterSpacing: ".1em", color: CANON.INK.MUTE, lineHeight: 1.7, marginTop: 16 }}>
               A PUBLICATION CAN CARRY SEVERAL CANONICAL LABELS — COUNTS OVERLAP AND DO NOT SUM TO THE LABELED TOTAL.
             </div>
           </>
@@ -729,16 +754,16 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
 
       <DrawerSection label="BELIEF · EXTRACTED POSITIONS" sub={cov.belief} mobile={mobile}>
         {layers == null ? (
-          <div style={{ ...mono(10), color: P.ink5, letterSpacing: ".1em" }}>READING THE POSITION RECORD…</div>
+          <div style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em" }}>READING THE POSITION RECORD…</div>
         ) : (
           <>
-            <div style={{ ...serif(16), lineHeight: 1.62, color: bl.color, textWrap: "pretty" as const }}>{bl.text}</div>
+            <div style={{ ...serif(17), lineHeight: 1.62, color: bl.color, textWrap: "pretty" as const }}>{bl.text}</div>
             {bl.claims.length ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16, paddingLeft: 16, borderLeft: "1px solid rgba(216,162,74,.28)" }}>
                 {bl.claims.map((c, i) => (
                   <div key={i} style={{ ...serif(15), lineHeight: 1.55, color: SEP_INK, fontStyle: "italic", textWrap: "pretty" as const }}>{c}</div>
                 ))}
-                {bl.more > 0 ? <div style={{ ...mono(9.5), letterSpacing: ".1em", color: P.ink5 }}>+ {bl.more} MORE ON THE PROFILE</div> : null}
+                {bl.more > 0 ? <div style={{ ...mono(9), letterSpacing: ".1em", color: P.ink5 }}>+ {bl.more} MORE ON THE PROFILE</div> : null}
               </div>
             ) : null}
             <NeighbourLines lines={bl.lines} />
@@ -751,7 +776,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
           sits at the top of the folder) — see the container's first child. The
           tab remains the one profile affordance; row-click expansion untouched. */}
       <div style={{ padding: mobile ? "14px 14px 20px" : "16px 22px 22px" }}>
-        <div style={{ ...mono(9), letterSpacing: ".1em", color: "#4f4a44", lineHeight: 1.7 }}>
+        <div style={{ ...mono(9), letterSpacing: ".1em", color: CANON.INK.MUTE, lineHeight: 1.7 }}>
           EVERY LAYER IS COMPUTED AGAINST BOTH ADJACENT RANKS; A NEIGHBOUR THAT DOES NOT SEPARATE SAYS SO.
           PERCENTILES, METHODOLOGY VERSION AND SOURCE RECORDS LIVE ON THE PROFILE.
         </div>
@@ -764,17 +789,17 @@ function EvidenceChipView({ row, mobile = false }: { row: LedgerRow; mobile?: bo
   const chip = evidenceChip(row);
   if (!chip) return null;
   const dashed = chip.strength === "other";
-  const border = chip.strength === "anchored" ? "#4A3618" : chip.strength === "supported" ? P.lineStrong : P.lineMed;
+  const border = chip.strength === "anchored" ? CANON.GOLD.EDGE : chip.strength === "supported" ? P.lineStrong : P.lineMed;
   const bg = chip.strength === "anchored" ? "rgba(224,167,94,.05)" : "transparent";
-  const tierColor = chip.strength === "anchored" ? P.amber : chip.strength === "supported" ? "#B99A68" : P.ink4;
+  const tierColor = chip.strength === "anchored" ? P.amber : chip.strength === "supported" ? CANON.GOLD.RANK : P.ink4;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 3 }}>
       <span style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", flexWrap: "wrap", gap: 8, border: `1px ${dashed ? "dashed" : "solid"} ${border}`, background: bg, padding: mobile ? "3px 8px" : "4px 9px", ...mono(mobile ? 9 : 9.5), letterSpacing: ".09em" }}>
         <span style={{ color: tierColor }}>{chip.tierWord}</span>
         {chip.segments.map((seg, i) => (
           <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#7A5520" }}>·</span>
-            <span style={{ color: chip.strength === "anchored" && i === 1 ? GOLD.gold : P.ink4 }}>{seg}</span>
+            <span style={{ color: CANON.GOLD.EDGE }}>·</span>
+            <span style={{ color: chip.strength === "anchored" && i === 1 ? CANON.GOLD.PRIME : P.ink4 }}>{seg}</span>
           </span>
         ))}
       </span>
@@ -788,9 +813,9 @@ function EvidenceChipView({ row, mobile = false }: { row: LedgerRow; mobile?: bo
 // Filter chip (COM tier chips + ALL) — selected reads amber, unselected dim.
 function chipStyle(on: boolean): CSSProperties {
   return {
-    ...mono(9.5),
+    ...mono(9),
     letterSpacing: ".1em",
-    color: on ? "#E0A94A" : P.ink6,
+    color: on ? CANON.GOLD.PRIME : P.ink6,
     background: on ? "rgba(224,167,94,.08)" : "transparent",
     border: `1px solid ${on ? "rgba(224,167,94,.5)" : P.lineMed}`,
     padding: "5px 9px",
@@ -936,12 +961,12 @@ function Row({
         {row.rank != null ? (
           <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", gap: 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-              <span style={{ font: `600 40px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.86, letterSpacing: "-.015em" }}>
+              <span style={{ font: `600 44px ${FACE.data}`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.86, letterSpacing: "-.015em" }}>
                 {row.rank}
               </span>
-              <span style={{ ...mono(9.5, 500), color: "#A07B45", letterSpacing: ".12em" }}>US</span>
+              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>US</span>
             </div>
-            <span style={{ ...mono(9.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
+            <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
           </div>
         ) : (
           // COM rail — Design "Community Rail" 2A · SET IN SERIF (2026-08-11):
@@ -952,14 +977,14 @@ function Row({
           // here from the rail header, which now labels only the tier word).
           // Absence is never zero: no Part B benes renders "—".
           <div style={{ width: 104, paddingRight: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 7, textAlign: "center" }}>
-            <span style={{ ...serif(15, 500), color: "#B3C0C9", fontVariant: "small-caps", letterSpacing: "0.02em", lineHeight: 1.15 }}>
+            <span style={{ ...serif(15, 500), color: CANON.INK.BODY, fontVariant: "small-caps", letterSpacing: "0.02em", lineHeight: 1.15 }}>
               {COM_RAIL_TIER_WORD[row.tier ?? ""] ?? "community"}
             </span>
-            <span style={{ width: 26, height: 1, background: "#2B3A44" }} />
-            <span style={{ ...mono(12), color: "#6F7D87", letterSpacing: ".05em", fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ width: 26, height: 1, background: CANON.LINE.EDGE }} />
+            <span style={{ ...mono(13), color: CANON.INK.MUTE, letterSpacing: ".05em", fontVariantNumeric: "tabular-nums" }}>
               {fmtReachK(row.patientVolume)}
             </span>
-            <span style={{ ...mono(7.5), color: "#6F7D87", letterSpacing: ".16em", whiteSpace: "nowrap" }}>REACH · 3YR</span>
+            <span style={{ ...mono(9), color: CANON.INK.MUTE, letterSpacing: ".16em", whiteSpace: "nowrap" }}>REACH · 3YR</span>
           </div>
         )}
         {/* name + chips + summary */}
@@ -993,7 +1018,7 @@ function Row({
               reconsider the slot before badging community. */}
           {flag ? <RisingChipView flag={flag} hcpId={row.hcpId} hcpName={row.name} /> : (openTrial || estFlag?.senior_recent || estFlag?.verified_social) ? <EstablishedChipView openTrial={openTrial} est={estFlag} hcpId={row.hcpId} hcpName={row.name} /> : row.tier ? <EvidenceChipView row={row} /> : null}
           {row.summary ? (
-            <div style={{ ...serif(13.5), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div>
+            <div style={{ ...serif(13), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
         </div>
         {/* cohort score — 2A numeric treatment (frame: Ledger Numeric Typography
@@ -1014,21 +1039,21 @@ function Row({
               <div style={{ width: 88, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 7 }}>
                 <div style={{ width: 44, height: 2, background: P.amber }} />
                 <div style={{ display: "flex", alignItems: "baseline", letterSpacing: "-.012em" }}>
-                  <span style={{ ...serif(44, 600), lineHeight: 0.92, color: WARM.prose }}>{ipart}</span>
-                  {dpart ? <span style={{ ...serif(30), lineHeight: 0.92, color: WARM.body }}>.{dpart}</span> : null}
+                  <span style={{ ...serif(44, 600), lineHeight: 0.92, color: CANON.INK.PRIME }}>{ipart}</span>
+                  {dpart ? <span style={{ ...serif(30), lineHeight: 0.92, color: CANON.INK.BODY }}>.{dpart}</span> : null}
                 </div>
               </div>
             );
           })()
         ) : row.idx != null ? (
-          <div style={{ width: 88, textAlign: "right", ...mono(18, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
+          <div style={{ width: 88, textAlign: "right", ...mono(17, 500), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>
             {floorFixed(row.idx, cfg.idxDecimals)}
           </div>
         ) : (
           // COM roster (Phase 3): no index — the Part-D presence fact takes the
           // slot (centered under the MEDICARE / PART D head since 2026-08-12;
           // serif cool finish same day).
-          <div style={{ width: 88, textAlign: "center", ...(cfg.factFinish ? { ...serif(13, 500), color: P.ink0, letterSpacing: ".02em" } : { ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }) }}>
+          <div style={{ width: 88, textAlign: "center", ...(cfg.factFinish ? { ...serif(13, 500), color: P.ink0, letterSpacing: ".02em" } : { ...mono(9), color: P.ink5, letterSpacing: ".08em" }) }}>
             {/* white label + rule-amber check (2026-08-12 split) */}
             {row.partDPresent ? (cfg.factFinish ? <>PART D <span style={{ color: P.amber }}>✓</span></> : "PART D ✓") : ""}
           </div>
@@ -1042,11 +1067,11 @@ function Row({
         {cfg.tag === "COM" ? (
           <div style={{ width: 88, textAlign: "center" }}>
             {row.patientVolume != null && row.patientVolume > 0 ? (
-              <span style={cfg.factFinish ? { ...serif(13, 500), color: P.ink0, letterSpacing: ".02em" } : { ...mono(9.5), color: P.ink5, letterSpacing: ".08em" }}>
+              <span style={cfg.factFinish ? { ...serif(13, 500), color: P.ink0, letterSpacing: ".02em" } : { ...mono(9), color: P.ink5, letterSpacing: ".08em" }}>
                 {cfg.factFinish ? <>PART B <span style={{ color: P.amber }}>✓</span></> : "PART B ✓"}
               </span>
             ) : (
-              <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>—</span>
+              <span style={{ ...mono(9), color: P.dash, letterSpacing: ".1em" }}>—</span>
             )}
           </div>
         ) : null}
@@ -1056,7 +1081,7 @@ function Row({
           if (d.kind === "absent") {
             return (
               <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
-                <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>{d.text}</span>
+                <span style={{ ...mono(9), color: P.dash, letterSpacing: ".1em" }}>{d.text}</span>
               </div>
             );
           }
@@ -1069,9 +1094,9 @@ function Row({
             return (
               <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
                 {col.noRank ? (
-                  <span style={{ ...serif(15), color: "#43434A" }}>{d.text}</span>
+                  <span style={{ ...serif(15), color: FACT_FADE }}>{d.text}</span>
                 ) : (
-                  <span style={{ ...serif(22, 500), color: "#A8A29A" }}>{d.text}</span>
+                  <span style={{ ...serif(20, 500), color: FACT_PRIMARY }}>{d.text}</span>
                 )}
               </div>
             );
@@ -1084,9 +1109,9 @@ function Row({
             return (
               <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
                 {col.noRank ? (
-                  <span style={{ ...serif(15), color: "#43434A" }}>{d.text}</span>
+                  <span style={{ ...serif(15), color: FACT_FADE }}>{d.text}</span>
                 ) : (
-                  <span style={{ ...serif(22, 500), color: "#A8A29A" }}>{d.text}</span>
+                  <span style={{ ...serif(20, 500), color: FACT_PRIMARY }}>{d.text}</span>
                 )}
               </div>
             );
@@ -1107,9 +1132,9 @@ function Row({
           {insight > 0 ? (
             // EST/RS ramp and COM factFinish share the insights minor tint
             // (frame literal #5F5F66).
-            <span style={{ ...mono(cfg.numericRamp || cfg.factFinish ? 12 : 13), color: cfg.numericRamp || cfg.factFinish ? "#5F5F66" : P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
+            <span style={{ ...mono(13), color: cfg.numericRamp || cfg.factFinish ? FACT_MINOR : P.ink2, fontVariantNumeric: "tabular-nums" }}>{insight}</span>
           ) : (
-            <span style={{ ...mono(9.5), color: P.dash, letterSpacing: ".1em" }}>—</span>
+            <span style={{ ...mono(9), color: P.dash, letterSpacing: ".1em" }}>—</span>
           )}
         </div>
         {/* TRACKED — bookmark toggle (does not open the drawer) */}
@@ -1143,7 +1168,7 @@ function Row({
           {menuOpen ? (
             <>
               <div onClick={(e) => { stop(e); setMenuOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div onClick={stop} style={{ position: "absolute", top: 26, left: 0, zIndex: 41, background: "#0C0E11", border: `1px solid ${P.lineStrong}`, boxShadow: "0 8px 24px rgba(0,0,0,.5)", minWidth: 176 }}>
+              <div onClick={stop} style={{ position: "absolute", top: 26, left: 0, zIndex: 41, background: CANON.GROUND.BASE, border: `1px solid ${P.lineStrong}`, boxShadow: "0 8px 24px rgba(0,0,0,.5)", minWidth: 176 }}>
                 {STATUS_ORDER.map((s) => (
                   <button
                     key={s}
@@ -1153,7 +1178,7 @@ function Row({
                     onMouseLeave={(e) => (e.currentTarget.style.background = s === status ? P.rowHover : "transparent")}
                   >
                     <StateLadder status={s} />
-                    <span style={{ ...mono(10), color: s === status ? P.ink1 : P.ink4, letterSpacing: ".04em" }}>{STATUS_LABEL[s]}</span>
+                    <span style={{ ...mono(11), color: s === status ? P.ink1 : P.ink4, letterSpacing: ".04em" }}>{STATUS_LABEL[s]}</span>
                   </button>
                 ))}
               </div>
@@ -1227,19 +1252,19 @@ function MobileRow({
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           {row.rank != null ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <span style={{ font: `600 34px 'IBM Plex Sans Condensed','IBM Plex Mono',monospace`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
-              <span style={{ ...mono(8.5, 500), color: "#A07B45", letterSpacing: ".12em" }}>US</span>
-              <span style={{ ...mono(8.5), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
+              <span style={{ font: `600 30px ${FACE.data}`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
+              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>US</span>
+              <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
             </div>
           ) : (
             // COM mobile rail — 2A adapted inline for 390px: tier word (serif
             // small-caps) leads, abbreviated reach + label follow; wraps clean.
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ ...serif(13, 500), color: "#B3C0C9", fontVariant: "small-caps", letterSpacing: "0.02em" }}>
+              <span style={{ ...serif(13, 500), color: CANON.INK.BODY, fontVariant: "small-caps", letterSpacing: "0.02em" }}>
                 {COM_RAIL_TIER_WORD[row.tier ?? ""] ?? "community"}
               </span>
-              <span style={{ ...mono(10.5), color: "#6F7D87", letterSpacing: ".05em", fontVariantNumeric: "tabular-nums" }}>{fmtReachK(row.patientVolume)}</span>
-              <span style={{ ...mono(7.5), color: "#6F7D87", letterSpacing: ".16em" }}>MEDICARE REACH</span>
+              <span style={{ ...mono(11), color: CANON.INK.MUTE, letterSpacing: ".05em", fontVariantNumeric: "tabular-nums" }}>{fmtReachK(row.patientVolume)}</span>
+              <span style={{ ...mono(9), color: CANON.INK.MUTE, letterSpacing: ".16em" }}>MEDICARE REACH</span>
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1254,15 +1279,15 @@ function MobileRow({
 
         {/* name + archetype + meta */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <Link to={`/hcp/${row.hcpId}`} onClick={stop} style={{ ...serif(16, 500), color: P.ink0, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}` }}>{row.name}</Link>
+          <Link to={`/hcp/${row.hcpId}`} onClick={stop} style={{ ...serif(17, 500), color: P.ink0, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}` }}>{row.name}</Link>
           {row.archetype ? (
-            <span style={{ ...mono(8.5, 500), color: P.ink3, letterSpacing: ".08em", padding: "1px 5px", border: `1px solid ${P.lineStrong}`, borderRadius: 2 }}>{row.archetype.toUpperCase()}</span>
+            <span style={{ ...mono(9, 500), color: P.ink3, letterSpacing: ".08em", padding: "1px 5px", border: `1px solid ${P.lineStrong}`, borderRadius: 2 }}>{row.archetype.toUpperCase()}</span>
           ) : null}
         </div>
         {row.chips.length ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
             {row.chips.map((chip, i) => (
-              <span key={i} style={{ ...mono(9.5), color: i === 0 ? P.ink4 : P.ink5, letterSpacing: ".02em" }}>{chip}</span>
+              <span key={i} style={{ ...mono(9), color: i === 0 ? P.ink4 : P.ink5, letterSpacing: ".02em" }}>{chip}</span>
             ))}
           </div>
         ) : null}
@@ -1277,8 +1302,8 @@ function MobileRow({
         <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 16px", paddingTop: 1 }}>
           {cells.map((c) => (
             <span key={c.label} style={{ display: "inline-flex", alignItems: "baseline", gap: 5 }}>
-              <span style={{ ...mono(8.5, 500), color: P.ink6, letterSpacing: ".12em" }}>{c.label}</span>
-              <span style={{ ...mono(12), color: c.value === "—" ? P.dash : P.ink1, fontVariantNumeric: "tabular-nums" }}>{c.value}</span>
+              <span style={{ ...mono(9, 500), color: P.ink6, letterSpacing: ".12em" }}>{c.label}</span>
+              <span style={{ ...mono(13), color: c.value === "—" ? P.dash : P.ink1, fontVariantNumeric: "tabular-nums" }}>{c.value}</span>
             </span>
           ))}
         </div>
@@ -1297,11 +1322,11 @@ function MobileRow({
           {menuOpen ? (
             <>
               <div onClick={(e) => { stop(e); setMenuOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div onClick={stop} style={{ position: "absolute", top: 26, left: 0, zIndex: 41, background: "#0C0E11", border: `1px solid ${P.lineStrong}`, boxShadow: "0 8px 24px rgba(0,0,0,.5)", minWidth: 190 }}>
+              <div onClick={stop} style={{ position: "absolute", top: 26, left: 0, zIndex: 41, background: CANON.GROUND.BASE, border: `1px solid ${P.lineStrong}`, boxShadow: "0 8px 24px rgba(0,0,0,.5)", minWidth: 190 }}>
                 {STATUS_ORDER.map((s) => (
                   <button key={s} onClick={(e) => { stop(e); setMenuOpen(false); if (s !== status) void setStatus(row.hcpId, s, "cohort_ledger"); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "9px 11px", background: s === status ? P.rowHover : "transparent", border: "none", borderBottom: `1px solid ${P.line}`, cursor: "pointer", textAlign: "left" }}>
                     <StateLadder status={s} />
-                    <span style={{ ...mono(10.5), color: s === status ? P.ink1 : P.ink4, letterSpacing: ".04em" }}>{STATUS_LABEL[s]}</span>
+                    <span style={{ ...mono(11), color: s === status ? P.ink1 : P.ink4, letterSpacing: ".04em" }}>{STATUS_LABEL[s]}</span>
                   </button>
                 ))}
               </div>
@@ -1337,13 +1362,13 @@ interface CallSheetFacts {
 }
 
 const CS = {
-  label: "#8b8479",
-  micro: "#5d5851",
-  faint: "#4f4a44",
-  prose: "#ddd6cb",
-  dim: "#6b6660",
-  gold: "#d8a24a",
-  hair: "rgba(255,255,255,.05)",
+  label: CANON.INK.MUTE,
+  micro: CANON.INK.MUTE,
+  faint: CANON.INK.MUTE,
+  prose: CANON.INK.BODY,
+  dim: CANON.INK.MUTE,
+  gold: CANON.GOLD.PRIME,
+  hair: CANON.LINE.HAIR,
 };
 
 function csSig(signals: WebSignal[], type: string): WebSignal | null {
@@ -1440,35 +1465,35 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
     railRows.push(railRow("practice", (
       <>
         {microLabel("PRACTICE GROUP")}
-        <div style={{ ...serif(14), color: CS.prose, lineHeight: 1.5 }}>{inst?.signal_value ?? facts.nppesInstitution ?? "Practice-based · no institutional affiliation"}</div>
+        <div style={{ ...serif(15), color: CS.prose, lineHeight: 1.5 }}>{inst?.signal_value ?? facts.nppesInstitution ?? "Practice-based · no institutional affiliation"}</div>
         {inst?.source_url || faculty?.signal_value ? (
-          <a href={inst?.source_url ?? faculty?.signal_value ?? undefined} target="_blank" rel="noreferrer" style={{ ...mono(9.5), letterSpacing: ".1em", color: CS.gold, textDecoration: "none", display: "inline-block", marginTop: 5 }}>PRACTICE PAGE ↗</a>
+          <a href={inst?.source_url ?? faculty?.signal_value ?? undefined} target="_blank" rel="noreferrer" style={{ ...mono(9), letterSpacing: ".1em", color: CS.gold, textDecoration: "none", display: "inline-block", marginTop: 5 }}>PRACTICE PAGE ↗</a>
         ) : null}
       </>
     ), true));
-    if (title) railRows.push(railRow("title", (<>{microLabel("TITLE")}<div style={{ ...serif(14), color: CS.prose }}>{title.signal_value}</div></>)));
-    if (dept) railRows.push(railRow("dept", (<>{microLabel("DEPARTMENT")}<div style={{ ...serif(14), color: CS.prose }}>{dept.signal_value}</div></>)));
-    if (phone) railRows.push(railRow("phone", (<>{microLabel("OFFICE LINE")}<div style={{ ...mono(14, 500), color: CS.gold }}>{phone.signal_value}</div></>)));
+    if (title) railRows.push(railRow("title", (<>{microLabel("TITLE")}<div style={{ ...serif(15), color: CS.prose }}>{title.signal_value}</div></>)));
+    if (dept) railRows.push(railRow("dept", (<>{microLabel("DEPARTMENT")}<div style={{ ...serif(15), color: CS.prose }}>{dept.signal_value}</div></>)));
+    if (phone) railRows.push(railRow("phone", (<>{microLabel("OFFICE LINE")}<div style={{ ...mono(15, 500), color: CS.gold }}>{phone.signal_value}</div></>)));
     if (linkedin) railRows.push(railRow("li", (
       <>
         {microLabel("LINKEDIN")}
-        <a href={linkedin.signal_value.startsWith("http") ? linkedin.signal_value : "https://" + linkedin.signal_value} target="_blank" rel="noreferrer" style={{ ...mono(9.5), letterSpacing: ".1em", color: CS.gold, textDecoration: "none" }}>OPEN ↗</a>
+        <a href={linkedin.signal_value.startsWith("http") ? linkedin.signal_value : "https://" + linkedin.signal_value} target="_blank" rel="noreferrer" style={{ ...mono(9), letterSpacing: ".1em", color: CS.gold, textDecoration: "none" }}>OPEN ↗</a>
       </>
     )));
-    if (email) railRows.push(railRow("email", (<>{microLabel("EMAIL")}<div style={{ ...mono(11.5), color: CS.prose, overflowWrap: "anywhere" }}>{email.signal_value}</div></>)));
+    if (email) railRows.push(railRow("email", (<>{microLabel("EMAIL")}<div style={{ ...mono(11), color: CS.prose, overflowWrap: "anywhere" }}>{email.signal_value}</div></>)));
     if (missingBits.length) railRows.push(railRow("missing", (
       <>
         {microLabel("NOT FOUND", true)}
-        <div style={{ ...serif(12.5), color: CS.dim, lineHeight: 1.55 }}>No {missingBits.join(", ")} resolved.</div>
+        <div style={{ ...serif(13), color: CS.dim, lineHeight: 1.55 }}>No {missingBits.join(", ")} resolved.</div>
       </>
     )));
   } else {
     // NPPES facts ARE access information — real content, never blank or an error.
-    railRows.push(railRow("loc", (<>{microLabel("PRACTICE LOCATION")}<div style={{ ...serif(14), color: CS.prose }}>{loc || "Not on record"}</div></>), true));
-    if (row.chips[0]) railRows.push(railRow("spec", (<>{microLabel("SPECIALTY")}<div style={{ ...serif(14), color: CS.prose }}>{row.chips[0]}</div></>)));
-    if (facts.setting) railRows.push(railRow("set", (<>{microLabel("SETTING")}<div style={{ ...serif(14), color: CS.prose }}>{titleCase(facts.setting)}</div></>)));
+    railRows.push(railRow("loc", (<>{microLabel("PRACTICE LOCATION")}<div style={{ ...serif(15), color: CS.prose }}>{loc || "Not on record"}</div></>), true));
+    if (row.chips[0]) railRows.push(railRow("spec", (<>{microLabel("SPECIALTY")}<div style={{ ...serif(15), color: CS.prose }}>{row.chips[0]}</div></>)));
+    if (facts.setting) railRows.push(railRow("set", (<>{microLabel("SETTING")}<div style={{ ...serif(15), color: CS.prose }}>{titleCase(facts.setting)}</div></>)));
     railRows.push(railRow("state", (
-      <div style={{ ...mono(9.5), letterSpacing: ".08em", lineHeight: 1.7, color: CS.dim }}>
+      <div style={{ ...mono(9), letterSpacing: ".08em", lineHeight: 1.7, color: CS.dim }}>
         {searchedNothing ? "SEARCHED — NO PUBLIC WEB PRESENCE FOUND." : facts.loaded ? "CONTACT INTEL NOT YET GATHERED · SEE PROFILE" : ""}
       </div>
     )));
@@ -1491,7 +1516,7 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
           ...(mobile
             ? { display: "block", width: "fit-content", marginLeft: "auto", margin: "10px 14px 0 auto", borderRadius: 6 }
             : { position: "absolute" as const, right: 22, top: 0, zIndex: 3, borderRadius: "0 0 8px 8px" }),
-          font: `700 ${mobile ? "9.5px" : "10.5px"} ${FONT.sans}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
+          font: `700 ${mobile ? "9px" : "11px"} ${FACE.ui}`, letterSpacing: ".2em", color: cfg.markerColor, textDecoration: "none",
           background: `${cfg.markerColor}1A`, border: drawerRule(cfg), borderTop: mobile ? drawerRule(cfg) : "none",
           padding: mobile ? "7px 14px" : "11px 26px 10px", whiteSpace: "nowrap",
           boxShadow: mobile ? "none" : "0 4px 14px rgba(0,0,0,.35)",
@@ -1508,16 +1533,16 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
           {row.summary ? (
             // Absent-first summary slot: renders only when the narrative exists;
             // regenerable text (Phase 4), so no layout depends on it.
-            <div style={{ ...serif(13.5), fontStyle: "italic", lineHeight: 1.6, color: COOL.prose, textWrap: "pretty" }}>{row.summary}</div>
+            <div style={{ ...serif(13), fontStyle: "italic", lineHeight: 1.6, color: CANON.INK.BODY, textWrap: "pretty" }}>{row.summary}</div>
           ) : null}
-          <div style={{ ...serif(14), lineHeight: 1.65, color: CS.prose, textWrap: "pretty" }}>
+          <div style={{ ...serif(15), lineHeight: 1.65, color: CS.prose, textWrap: "pretty" }}>
             {tierSentence} {reachSentence} {practiceSentence}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 9, paddingTop: 12, borderTop: `1px solid ${CS.hair}` }}>
             {gridRows.map((g) => (
               <div key={g.label} style={{ display: "grid", gridTemplateColumns: mobile ? "110px 1fr" : "150px 1fr", gap: 12, alignItems: "baseline" }}>
                 <span style={{ ...mono(9), letterSpacing: ".12em", color: g.dim ? CS.faint : CS.micro }}>{g.label}</span>
-                <span style={{ ...serif(13.5), lineHeight: 1.5, color: g.dim ? CS.dim : CS.prose }}>{g.value}</span>
+                <span style={{ ...serif(13), lineHeight: 1.5, color: g.dim ? CS.dim : CS.prose }}>{g.value}</span>
               </div>
             ))}
           </div>
@@ -1538,7 +1563,7 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
       {/* Footer — the rule text alone, full width. The PROFILE affordance is
           the top-right filing tab (2026-08-12, matching EST/RS). */}
       <div style={{ padding: mobile ? "10px 16px 14px 19px" : "10px 26px 14px 127px", borderTop: `1px solid ${CS.hair}` }}>
-        <span style={{ ...mono(8.5), letterSpacing: ".1em", lineHeight: 1.7, color: CS.faint }}>
+        <span style={{ ...mono(9), letterSpacing: ".1em", lineHeight: 1.7, color: CS.faint }}>
           CLAIMS-DERIVED FACTS AND RESOLVED WEB SIGNALS · NOTHING HERE IS RANKED · PROVENANCE AND SOURCE RECORDS LIVE ON THE PROFILE
         </span>
       </div>
@@ -1549,9 +1574,9 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
 function BandHeader({ band }: { band: Band }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 20px 7px 23px", background: P.band, borderBottom: `1px solid ${P.line}` }}>
-      <span style={{ ...mono(9.5, 500), letterSpacing: ".16em", color: P.ink4 }}>{band.label}</span>
+      <span style={{ ...mono(9, 500), letterSpacing: ".16em", color: P.ink4 }}>{band.label}</span>
       <span style={{ flex: 1, height: 1, background: P.lineMed }} />
-      <span style={{ ...mono(9.5), letterSpacing: ".1em", color: "#767C81" }}>{band.note}</span>
+      <span style={{ ...mono(9), letterSpacing: ".1em", color: CANON.INK.MUTE }}>{band.note}</span>
     </div>
   );
 }
@@ -1868,7 +1893,7 @@ export default function CohortLedger() {
         />
         {/* Commit C 2026-08-05: g2 board per the Pulse scheme; the ledger card
             inside is a g1 well with an l1 edge. */}
-        <div style={{ padding: "24px 20px 48px", margin: "8px 0 24px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+        <div style={{ padding: "24px 20px 48px", margin: "8px 0 24px", ...DEPTH.PANEL, border: `1px solid ${CANON.LINE.HAIR}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
           {/* Hero — canonical H1 (PageHero, Commit B 2026-08-05): the ledger's
               title leaves the card header for a page hero; the header row keeps
               the cohort tick + the meta line at card scale. */}
@@ -1886,16 +1911,16 @@ export default function CohortLedger() {
               stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT", center: true }] : undefined}
             />
           </div>
-          <div style={{ border: `1px solid ${LINE.l1}`, background: P.card }}>
+          <div style={{ border: `1px solid ${CANON.LINE.HAIR}`, background: P.card }}>
 
             {/* header — cohort tick + meta line (title moved to the page hero) */}
             <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 6 : 0, justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
               <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <span style={{ width: 3, height: 14, background: cfg.markerColor }} />
-                <span style={{ ...mono(9.5, 600), color: cfg.markerColor, letterSpacing: ".14em" }}>{cfg.tag}</span>
+                <span style={{ ...mono(9, 600), color: cfg.markerColor, letterSpacing: ".14em" }}>{cfg.tag}</span>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <span style={{ ...mono(10.5), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
+                <span style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
                 {/* Territory scope (Commit 2): the selector IS the control and the
                     label — counts, chips and rows all reslice server-side. */}
                 <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1903,7 +1928,7 @@ export default function CohortLedger() {
                   <select
                     value={scope?.key ?? "national"}
                     onChange={(e) => applyScope(e.target.value)}
-                    style={{ ...mono(10), background: P.card, color: P.ink5, border: `1px solid ${P.lineStrong}`, padding: "4px 6px", letterSpacing: ".08em" }}
+                    style={{ ...mono(11), background: P.card, color: P.ink5, border: `1px solid ${P.lineStrong}`, padding: "4px 6px", letterSpacing: ".08em" }}
                   >
                     {myTerritory ? <option value="mine">{myTerritory.label.toUpperCase()}</option> : null}
                     {LEDGER_REGION_OPTIONS.map((o) => (
@@ -1980,9 +2005,9 @@ export default function CohortLedger() {
                   <>
                     {!isCom ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 20px 7px 23px", background: P.band, borderBottom: `1px solid ${P.line}` }}>
-                        <span style={{ ...mono(9.5, 500), letterSpacing: ".16em", color: P.ink4 }}>RANKED</span>
+                        <span style={{ ...mono(9, 500), letterSpacing: ".16em", color: P.ink4 }}>RANKED</span>
                         <span style={{ flex: 1, height: 1, background: P.lineMed }} />
-                        <span style={{ ...mono(9.5), letterSpacing: ".1em", color: "#767C81" }}>
+                        <span style={{ ...mono(9), letterSpacing: ".1em", color: CANON.INK.MUTE }}>
                           BELOW THE TIED HEAD · THE INDEX SEPARATES EACH ROW
                         </span>
                       </div>
@@ -2006,7 +2031,7 @@ export default function CohortLedger() {
                       tailRows.map(renderRow)
                     )}
                     {hasMore ? (
-                      <div style={{ padding: "12px 23px", ...mono(10), color: P.ink5, letterSpacing: ".08em", borderTop: `1px solid ${P.line}` }}>
+                      <div style={{ padding: "12px 23px", ...mono(11), color: P.ink5, letterSpacing: ".08em", borderTop: `1px solid ${P.line}` }}>
                         Loading more of the cohort… {rows.length.toLocaleString()} of {(isCom ? filteredTotal : cohortTotal).toLocaleString()}
                       </div>
                     ) : null}
@@ -2018,7 +2043,7 @@ export default function CohortLedger() {
             {/* footer caveats */}
             <div style={{ padding: "14px 20px 16px 23px", display: "flex", flexDirection: "column", gap: 5, maxWidth: 1180 }}>
               {cfg.notes.map((n, i) => (
-                <div key={i} style={{ ...mono(10), lineHeight: 1.75, color: "#767C81", letterSpacing: ".04em" }}>{n}</div>
+                <div key={i} style={{ ...mono(11), lineHeight: 1.75, color: CANON.INK.MUTE, letterSpacing: ".04em" }}>{n}</div>
               ))}
             </div>
           </div>
