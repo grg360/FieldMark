@@ -122,7 +122,8 @@ COHORT_SCORE_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "community": {
         "score_table": "hcp_community_scores_v2",
-        "rank_table": "hcp_community_ranks_v2",
+        # rank_table removed (2026-08-12): hcp_community_ranks_v2 retired —
+        # the key was dead here anyway (see the rising NOTE above).
         # score_fields removed (Phase 2, 2026-08-11): the four *_score columns
         # they mapped are 100% NULL — dead reads that fed None into prompts.
         # Community narrative regen off raw facts is Phase 4.
@@ -844,16 +845,18 @@ def fetch_established_top_hcp_ids(
 def fetch_community_top_hcp_ids(
     supabase: Client, top_n: int, visible_ta_ids: List[str]
 ) -> Set[str]:
-    """Community cohort selection: US-scope, top N per TA from hcp_community_ranks_v2.
+    """Community cohort selection: top N per TA, volume-ordered off membership.
 
-    Exact mirror of fetch_established_top_hcp_ids (per-TA, scope_type='region'/'US',
-    ordered by rank) — hcp_community_ranks_v2 carries the same global + US-region scope
-    rows per HCP, so scoping to US yields one row per HCP (without it, top-N *rows* would
-    collapse to ~N/2 unique HCPs). Replaces the old selector that read
-    hcps_v2.cohort_classification/cohort_score — a TA-independent legacy column that pulled
-    the global top-N across ALL TAs (Hepatology/Rare-Disease dominating an --ta nsclc run).
-    NOTE: AD has zero rows here — AD community lives in community_practitioners (the
-    directory), not this table — so an AD run correctly selects no community narratives.
+    NSCLC reads the board view (qualifies, ordered by Medicare reach — the
+    2026-08-11 pre-freeze fix). Non-NSCLC TAs read hcp_community_scores_v2
+    membership with the same volume ordering (2026-08-12: hcp_community_ranks_v2
+    retired — its post-freeze rank was row_number over NULL scores). Replaces
+    the old selector that read hcps_v2.cohort_classification/cohort_score — a
+    TA-independent legacy column that pulled the global top-N across ALL TAs
+    (Hepatology/Rare-Disease dominating an --ta nsclc run).
+    NOTE: AD has zero rows here — AD community lives in community_practitioners
+    (the directory), not this table — so an AD run correctly selects no
+    community narratives.
     """
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
@@ -874,17 +877,22 @@ def fetch_community_top_hcp_ids(
                     )
                 selected.update(collect_top_n_hcp_ids(make_query, top_n))
             else:
-                # Non-NSCLC TAs: no board view exists; the ungated ranks read
-                # remains (no such TA is currently visible — AD community has
-                # zero rows here).
+                # Non-NSCLC TAs: no board view exists; membership is the scores
+                # base table (hcp_community_ranks_v2 retired post-freeze — its
+                # rank was row_number over NULL scores). Ordering mirrors the
+                # NSCLC board fix: Medicare reach (patient_volume DESC), the
+                # one honest ordering the base table carries. NOTE: the old
+                # read US-scoped via the view's region rows; the scores table
+                # has no country column, so this pool is unscoped — acceptable
+                # while no non-NSCLC community narrative run is scheduled, and
+                # flagged for the per-TA gate decision when one becomes visible.
                 def make_query(ta_id=ta_id):
                     return (
-                        supabase.table("hcp_community_ranks_v2")
-                        .select("hcp_id,rank")
+                        supabase.table("hcp_community_scores_v2")
+                        .select("hcp_id,patient_volume")
                         .eq("therapeutic_area_id", ta_id)
-                        .eq("scope_type", "region")
-                        .eq("scope_value", "US")
-                        .order("rank", desc=False)
+                        .order("patient_volume", desc=True)
+                        .order("hcp_id", desc=False)
                     )
                 selected.update(collect_top_n_hcp_ids(make_query, top_n))
         except Exception as exc:
@@ -1049,7 +1057,7 @@ def load_hcp_contexts(
         print(f"Attached positions for {sum(1 for v in positions_by_pair.values() if v)} HCP x TA pairs")
 
     if not single_hcp_id and "community" in target_cohorts:
-        print(f"Selecting community top-{community_top_n} per (TA x visible scope) from hcp_community_ranks_v2...")
+        print(f"Selecting community top-{community_top_n} per TA (board membership, volume-ordered)...")
         community_ids = fetch_community_top_hcp_ids(supabase, community_top_n, visible_ta_ids)
         print(f"Community rank selection: {len(community_ids)} unique HCPs")
         for hcp_id in community_ids:
@@ -2284,7 +2292,7 @@ def run_pipeline(
             )
             if not (gate_resp.data or []):
                 gate_resp = (
-                    supabase.table("hcp_community_ranks_v2")
+                    supabase.table("hcp_community_scores_v2")
                     .select("hcp_id")
                     .eq("hcp_id", single_hcp_id)
                     .neq("therapeutic_area_id", COMMUNITY_GATE_NSCLC_TA_ID)
@@ -2309,7 +2317,7 @@ def run_pipeline(
                 f"Established downselect: top {established_top_n} per (TA x visible scope) from ranks"
             )
         if "community" in target_cohorts:
-            print(f"Community downselect: top {community_top_n} per (TA x visible scope) from hcp_community_ranks_v2")
+            print(f"Community downselect: top {community_top_n} per TA (board membership, volume-ordered)")
     print()
 
     contexts, ta_name_map = load_hcp_contexts(

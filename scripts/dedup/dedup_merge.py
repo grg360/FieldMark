@@ -502,10 +502,6 @@ def merge_record_into_survivor(
         ("hcp_medicare_by_ta_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_scores_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_established_scores_v2", "hcp_id", ["therapeutic_area_id"]),
-        # hcp_community_ranks_v2 is intentionally absent from this list: it is a
-        # VIEW over hcp_community_scores_v2 (live row_number ranks), so moving or
-        # stripping the scores row is what moves or removes the rank rows —
-        # there is nothing to write on the view itself.
         ("hcp_community_scores_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_therapeutic_areas_v2", "hcp_id", ["therapeutic_area_id"]),
         ("hcp_institutions_v2", "hcp_id", ["reference_institution_id"]),
@@ -642,9 +638,7 @@ def merge_record_into_survivor(
     # unresolved tier (the manual Aditi cleanup, automated). Academic status is
     # BOARD-MEMBERSHIP ground truth (an established/rising rank row exists), not
     # hcp_cohort_classification_v2. Runs before the tables_conflict loop so the
-    # loop finds nothing to move; only ever touches the STUB's rows. The stub's
-    # hcp_community_ranks_v2 rows need no delete of their own — that is a view
-    # over hcp_community_scores_v2, so they vanish with the score rows.
+    # loop finds nothing to move; only ever touches the STUB's rows.
     cur.execute(
         "SELECT (EXISTS (SELECT 1 FROM hcp_established_ranks_v3 WHERE hcp_id = %s) "
         "OR EXISTS (SELECT 1 FROM hcp_rising_star_ranks_v3 WHERE hcp_id = %s)) AS is_academic",
@@ -653,7 +647,6 @@ def merge_record_into_survivor(
     survivor_is_academic = bool(cur.fetchone()["is_academic"])
     if survivor_is_academic:
         strip_scores = count_rows_for_hcp(cur, "hcp_community_scores_v2", "hcp_id", stub_id)
-        strip_ranks = count_rows_for_hcp(cur, "hcp_community_ranks_v2", "hcp_id", stub_id)
         cur.execute(
             "SELECT COUNT(*) AS c FROM hcp_score_ranks_v2 WHERE hcp_id = %s AND cohort = 'community'",
             (stub_id,),
@@ -666,7 +659,6 @@ def merge_record_into_survivor(
         print(
             f"      [COHORT_STRIP] {'would delete' if dry_run else 'deleting'} "
             f"{strip_scores} hcp_community_scores_v2 row(s) for stub={stub_id}; "
-            f"{strip_ranks} derived hcp_community_ranks_v2 row(s) vanish with them (view); "
             f"{strip_score_ranks} hcp_score_ranks_v2 cohort='community' row(s)"
         )
         if not dry_run:

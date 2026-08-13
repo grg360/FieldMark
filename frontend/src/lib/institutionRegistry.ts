@@ -208,11 +208,18 @@ export async function countUnresolvedForRecord(
   if (candidates.length === 0) return 0;
   // Ranked = present on any of the three boards for this TA.
   const ids = candidates.slice(0, 150);
+  // Community membership (G2 correction with the ranks-view retirement): for
+  // NSCLC the board's qualifies flag is the membership truth — the old ranks
+  // view counted every scored HCP, over-counting by the ~8k scored-but-not-
+  // qualifying US tail. Other TAs stay ungated on the scores base table.
+  const NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d";
   const [est, ris, risAd, com] = await Promise.all([
     supabase.from("hcp_established_ranks_v3").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
     supabase.from("hcp_rising_star_ranks_v3").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
     supabase.from("hcp_rising_composite_v1").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
-    supabase.from("hcp_community_ranks_v2").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
+    taId === NSCLC_TA_ID
+      ? supabase.from("community_board_nsclc_v1").select("hcp_id").eq("qualifies", true).in("hcp_id", ids)
+      : supabase.from("hcp_community_scores_v2").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
   ]);
   const ranked = new Set<string>();
   for (const res of [est, ris, risAd, com]) {

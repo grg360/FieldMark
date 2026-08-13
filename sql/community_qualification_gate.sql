@@ -1,3 +1,12 @@
+-- ############################################################################
+-- SUPERSEDED (2026-08-12) — DO NOT APPLY. Every body below reads
+-- hcp_community_ranks_v2, which is retired (DROP staged in
+-- drop_hcp_community_ranks_v2.sql). Live sources of record:
+--   * get_community_filtered (rows, both overloads)  -> sql/community_roster_v1.sql
+--   * get_community_filtered_count (both overloads)  -> sql/community_count_rpc_board_repoint.sql
+-- Kept for the G2-cutover history recorded in the header below.
+-- ############################################################################
+--
 -- Community qualification gate — read layer only, NSCLC ONLY.
 --
 -- G2 CUTOVER (2026-08-11): membership truth moved to the view

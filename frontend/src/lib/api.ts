@@ -76,7 +76,7 @@ async function enrichAndMapCohortRows(
   taSlug: string,
   taId: string,
   scopeLabel: string,
-  rankTable: string,
+  rankTable: string | null,
   cohort: CohortKind,
 ): Promise<{ rows: RisingStar[]; error: string | null }> {
   if (rankRows.length === 0) {
@@ -108,8 +108,11 @@ async function enrichAndMapCohortRows(
     }
   }
 
+  // rankTable null = the cohort has no rank source (community, post-freeze:
+  // hcp_community_ranks_v2 retired; the roster is not ranked, so global_rank
+  // stays null and HCPCard renders no #N).
   const { data: globalRankRows } =
-    cohort === "rising_star" || cohort === "rising_composite"
+    cohort === "rising_star" || cohort === "rising_composite" || rankTable == null
       ? { data: null }
       : await supabase
           .from(rankTable)
@@ -572,7 +575,7 @@ async function fetchCohortViaRpc(
   offset: number,
   countRpc: string,
   rowsRpc: string,
-  rankTable: string,
+  rankTable: string | null,
   cohort: CohortKind,
 ): Promise<{ rows: RisingStar[]; total: number; error: string | null }> {
   const rpcScope = resolveRpcScopeParams(filters);
@@ -1289,7 +1292,7 @@ export async function getCommunity(
       offset,
       "get_community_filtered_count",
       "get_community_filtered",
-      "hcp_community_ranks_v2",
+      null,
       "community",
     );
     if (fetchError) {
@@ -1832,9 +1835,12 @@ export async function getHCPDetail(
               .select("rising_star_percentile")
               .eq("hcp_id", hcpId)
               .eq("therapeutic_area_id", taId),
+        // Membership-only read (the length is all that's consumed below;
+        // cohortScore is forced null for community). Post view-retirement this
+        // reads the scores base table — same per-(hcp, TA) membership set.
         supabase
-          .from("hcp_community_ranks_v2")
-          .select("normalized_score, scope_type, scope_value")
+          .from("hcp_community_scores_v2")
+          .select("hcp_id")
           .eq("hcp_id", hcpId)
           .eq("therapeutic_area_id", taId),
         // Community membership (G2 cutover): for NSCLC, membership truth is
@@ -2577,7 +2583,8 @@ export async function searchHCPs(
   // Community membership (read layer, G2 cutover): hcps_v2.
   // cohort_classification is denormalized, so a Community-classified match must
   // also hold real membership — community_board_nsclc_v1.qualifies for NSCLC,
-  // or any non-NSCLC community rank row (other TAs are ungated). Non-members
+  // or any non-NSCLC scores row (other TAs are ungated; hcp_community_scores_v2
+  // is the membership base since the ranks view retired). Non-members
   // (misclassified academics, pharma-only qualifiers) are dropped from search
   // results entirely.
   const communityIds = [...byHcpId.values()]
@@ -2591,7 +2598,7 @@ export async function searchHCPs(
         .in("hcp_id", communityIds)
         .eq("qualifies", true),
       supabase
-        .from("hcp_community_ranks_v2")
+        .from("hcp_community_scores_v2")
         .select("hcp_id")
         .in("hcp_id", communityIds)
         .neq("therapeutic_area_id", TA_ID_MAP.nsclc),
