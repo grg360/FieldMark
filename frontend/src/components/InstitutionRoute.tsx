@@ -33,30 +33,33 @@ import {
   type RosterRow,
 } from "../lib/institutionRegistry";
 import { getCurrentUser } from "../lib/authHelpers";
+import { STATUS_LABEL, type RelationshipStatus } from "../lib/relationships";
 import { supabase } from "../lib/supabase";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT, GOLD, GROUND, LINE } from "../lib/designTokens";
+import { CANON, DEPTH, FACE } from "../lib/canonicalTokens";
 import AppLayout from "./AppLayout";
 import InstitutionResearchThemesPanel from "./InstitutionResearchThemesPanel";
 import InstitutionCollaborationsPanel from "./InstitutionCollaborationsPanel";
 import InstitutionExternalPartnersPanel from "./InstitutionExternalPartnersPanel";
 
+// Canonical migration 2026-08-13 — same map as InstitutionsIndexRoute (the two
+// files share this palette verbatim; keeping them identical is the point).
 const C = {
-  bg: "#0a0a0b",
-  hair: "#141417",
-  hairStrong: "#1e1e21",
-  bandBg: "#0e0e11",
-  ink1: "#e6e3dc",
-  ink2: "#98958d",
-  ink3: "#8b887f",
-  ink4: "#6a6862",
-  ink5: "#575651",
-  amber: GOLD.bright, // was #c9a35c — gold convergence 2026-08-05
-  link: "#8fa3ab",
+  bg: CANON.GROUND.BASE,
+  hair: CANON.LINE.HAIR,
+  hairStrong: CANON.LINE.EDGE,
+  bandBg: CANON.GROUND.RAISE,
+  ink1: CANON.INK.PRIME,
+  ink2: CANON.INK.BODY,
+  ink3: CANON.INK.LABEL,
+  ink4: CANON.INK.MUTE,
+  ink5: CANON.INK.MUTE,
+  amber: CANON.GOLD.PRIME,
+  link: CANON.ACTION.LINK,
 };
 
 const mono = (size: number, opts?: { ls?: string; color?: string; weight?: number; lh?: number }) => ({
-  fontFamily: FONT.mono,
+  fontFamily: FACE.data,
   fontSize: size,
   fontWeight: opts?.weight ?? 400,
   letterSpacing: opts?.ls ?? "0.1em",
@@ -239,10 +242,10 @@ export default function InstitutionRoute() {
     return (
       <AppLayout width="wide">
         <div style={{ padding: isMobile ? "32px 16px" : "48px 28px", width: "100%", boxSizing: "border-box" }}>
-          <div style={{ fontFamily: FONT.serif, fontSize: 20, color: C.ink1, marginBottom: 10 }}>
+          <div style={{ fontFamily: FACE.value, fontSize: 20, color: C.ink1, marginBottom: 10 }}>
             No registry record resolves from this address.
           </div>
-          <div style={{ fontFamily: FONT.serif, fontSize: 14, fontWeight: 300, color: C.ink2, maxWidth: 560, lineHeight: 1.6 }}>
+          <div style={{ fontFamily: FACE.value, fontSize: 15, fontWeight: 300, color: C.ink2, maxWidth: 560, lineHeight: 1.6 }}>
             Either the institution carries no ranked {taUpper} HCP, or the name string behind this link has no
             registry match yet. Registry coverage is an enrichment overlay — the string, not the registry, owns the URL.
           </div>
@@ -265,7 +268,7 @@ export default function InstitutionRoute() {
       record.nciDesignation ? (
         <span style={{ ...mono(13, { color: C.amber, ls: "0" }) }}>{record.nciDesignation}</span>
       ) : (
-        <span style={{ ...mono(12, { color: C.ink4, ls: "0", lh: 1.4 }) }}>
+        <span style={{ ...mono(13, { color: C.ink4, ls: "0", lh: 1.4 }) }}>
           {record.type === "community_idn" ? "NONE — NOT A CANCER CENTRE" : "NONE"}
         </span>
       ),
@@ -276,7 +279,7 @@ export default function InstitutionRoute() {
       record.networkParent ? (
         <span style={{ ...mono(13, { color: C.link, ls: "0" }) }}>{record.networkParent}</span>
       ) : (
-        <span style={{ ...mono(12, { color: C.ink4, ls: "0", lh: 1.4 }) }}>NONE — SINGLE-SITE RECORD</span>
+        <span style={{ ...mono(13, { color: C.ink4, ls: "0", lh: 1.4 }) }}>NONE — SINGLE-SITE RECORD</span>
       ),
     ],
     [
@@ -289,7 +292,7 @@ export default function InstitutionRoute() {
       ) : record.state ? (
         <span style={{ ...mono(13, { color: C.ink1, ls: "0" }) }}>{record.state}</span>
       ) : (
-        <span style={{ ...mono(12, { color: C.ink4, ls: "0", lh: 1.4 }) }}>NOT ON RECORD</span>
+        <span style={{ ...mono(13, { color: C.ink4, ls: "0", lh: 1.4 }) }}>NOT ON RECORD</span>
       ),
     ],
     [
@@ -299,7 +302,7 @@ export default function InstitutionRoute() {
           {geo.lat.toFixed(4)}, {geo.lng.toFixed(4)}
         </span>
       ) : (
-        <span style={{ ...mono(12, { color: C.ink4, ls: "0", lh: 1.4 }) }}>NOT ON RECORD</span>
+        <span style={{ ...mono(13, { color: C.ink4, ls: "0", lh: 1.4 }) }}>NOT ON RECORD</span>
       ),
     ],
   ];
@@ -330,10 +333,10 @@ export default function InstitutionRoute() {
               <span style={{ ...mono(15, { color: C.ink1, ls: "0.13em", weight: 500 }) }}>
                 RISING STARS · {list.length} OF {members.length}
               </span>
-              <span style={{ ...mono(10, { ls: "0.13em" }) }}>RANKS AND INDEX BELOW ARE WITHIN THE RISING STAR COHORT</span>
+              <span style={{ ...mono(11, { ls: "0.13em" }) }}>RANKS AND INDEX BELOW ARE WITHIN THE RISING STAR COHORT</span>
             </div>
             {!isMobile ? (
-              <span style={{ textAlign: "right", ...mono(10, { ls: "0.13em", color: C.ink5, lh: 1.7 }) }}>
+              <span style={{ textAlign: "right", ...mono(11, { ls: "0.13em", color: C.ink5, lh: 1.7 }) }}>
                 A SEPARATE RANKING, NOT A CONTINUATION OF THE ONE ABOVE
                 <br />
                 NOTHING HERE IS COMPARABLE TO A FIGURE IN THE BAND ABOVE
@@ -350,7 +353,7 @@ export default function InstitutionRoute() {
               background: C.bandBg,
               borderTop: `1px solid ${C.hairStrong}`,
               borderBottom: `1px solid ${C.hairStrong}`,
-              ...mono(10, { ls: "0.13em" }),
+              ...mono(11, { ls: "0.13em" }),
             }}
           >
             <span>
@@ -381,49 +384,73 @@ export default function InstitutionRoute() {
                 gap: isMobile ? 6 : 20,
                 padding: `17px ${pad}`,
                 borderBottom: `1px solid ${C.hair}`,
-                alignItems: "start",
+                // Centered 2026-08-13 (was "start"): row height is driven by the
+                // themes cell (1 or 2 lines), so top-anchoring left the rank,
+                // index and contact cells hanging at the top of tall rows. The
+                // per-cell paddingTop nudges that propped up the old alignment
+                // are removed with it — they would fight a true center.
+                alignItems: isMobile ? "start" : "center",
               }}
             >
               <div style={{ display: "flex", flexDirection: isMobile ? "row" : "column", gap: isMobile ? 10 : 3, alignItems: isMobile ? "baseline" : "flex-start" }}>
-                <span style={{ ...mono(27, { color: (m.us_rank ?? 999) <= 10 ? C.amber : C.ink3, ls: "0" }) }}>
+                {/* Rank numerals are amber for EVERY row (2026-08-13), matching the
+                    EST/RS ledger's rank rail: GOLD.RANK at 600, the token reserved
+                    for "rank numerals and ledger ordinals ONLY". The old
+                    us_rank <= 10 ternary is dropped — the top-10 fact is already
+                    stated in the record header, and colour now means "this is a
+                    rank" rather than "this rank is special". */}
+                <span style={{ ...mono(25, { color: CANON.GOLD.RANK, weight: 600, ls: "0" }) }}>
                   {m.us_rank ?? "—"}
                 </span>
                 <span style={{ ...mono(9, { color: C.ink4 }) }}>
                   {COHORT_ABBR[m.cohort]} · US{m.global_rank != null ? ` · #${m.global_rank.toLocaleString()} GLOBAL` : ""}
                 </span>
                 {isMobile ? (
-                  <span style={{ fontFamily: FONT.serif, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{m.name}</span>
+                  <span style={{ fontFamily: FACE.value, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{m.name}</span>
                 ) : null}
               </div>
               {!isMobile ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ fontFamily: FONT.serif, fontSize: 17, lineHeight: 1.2, fontWeight: 500, color: C.ink1 }}>{m.name}</span>
+                  <span style={{ fontFamily: FACE.value, fontSize: 17, lineHeight: 1.2, fontWeight: 500, color: C.ink1 }}>{m.name}</span>
                 </div>
               ) : null}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingTop: 3, paddingLeft: isMobile ? 0 : undefined }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingLeft: isMobile ? 0 : undefined }}>
                 {themes.length > 0 ? (
                   themes.map((t) => (
-                    <span key={t} style={{ padding: "3px 7px", background: "#17171b", ...mono(10, { ls: "0", lh: 1.3, color: "#a9a69e" }) }}>
+                    // Fill dropped 2026-08-13: the pill was uniform on every
+                    // chip — no match/primary/secondary state — so it encoded
+                    // nothing the column header doesn't already say, and its
+                    // padding made long themes wrap into a two-line block while
+                    // short ones read as text. Plain mono on the row ground,
+                    // like every other roster cell; the NO THEMES absence state
+                    // was already unfilled, so the slot is now consistent.
+                    <span key={t} style={{ ...mono(11, { ls: "0", lh: 1.3, color: CANON.INK.LABEL }) }}>
                       {t}
                     </span>
                   ))
                 ) : (
-                  <span style={{ ...mono(10, { color: C.ink5, ls: "0.08em", lh: 1.4 }) }}>NO THEMES ON RECORD</span>
+                  <span style={{ ...mono(11, { color: C.ink5, ls: "0.08em", lh: 1.4 }) }}>NO THEMES ON RECORD</span>
                 )}
               </div>
-              <div style={{ textAlign: isMobile ? "left" : ("right" as const), ...mono(17, { color: C.ink1, ls: "0" }), paddingTop: 5 }}>
+              <div style={{ textAlign: isMobile ? "left" : ("right" as const), ...mono(17, { color: C.ink1, ls: "0" }) }}>
                 {floor1(m.index_score)}
               </div>
+              {/* Contact state: neutral ink always (2026-08-13) — amber is the
+                  rank column's alone, and an amber "NOT ENGAGED" contradicted
+                  itself. BOTH branches now read the one STATUS_LABEL map, so the
+                  enum path can no longer render a raw "NOT_ENGAGED" while the
+                  empty path renders a hand-written literal. */}
               <div
                 style={{
                   textAlign: isMobile ? "left" : ("right" as const),
-                  ...mono(9, { ls: "0.08em", color: engaged != null && engaged > 0 ? C.amber : C.ink5 }),
-                  paddingTop: isMobile ? 0 : 8,
+                  ...mono(9, { ls: "0.08em", color: C.ink5 }),
                 }}
               >
-                {engaged != null && engaged > 0
-                  ? (statusByHcp.get(m.hcp_id) ?? "engaged").toUpperCase()
-                  : "NOT ENGAGED"}
+                {STATUS_LABEL[
+                  (engaged != null && engaged > 0
+                    ? (statusByHcp.get(m.hcp_id) as RelationshipStatus | undefined)
+                    : undefined) ?? "not_engaged"
+                ].toUpperCase()}
               </div>
             </div>
           );
@@ -435,8 +462,8 @@ export default function InstitutionRoute() {
   return (
     <AppLayout width="wide">
       {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
-      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", background: GROUND.g2, border: `1px solid ${LINE.l1}` }}>
-        <div style={{ padding: `12px ${pad}`, borderBottom: `1px solid ${C.hair}`, ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", ...DEPTH.PANEL, border: `1px solid ${CANON.LINE.HAIR}` }}>
+        <div style={{ padding: `12px ${pad}`, borderBottom: `1px solid ${C.hair}`, ...mono(11, { ls: "0.12em", color: C.ink5 }) }}>
           «{" "}
           <Link to={`/institutions/${taSlug}`} style={{ color: C.link }}>
             INSTITUTIONS / {taUpper}
@@ -460,17 +487,17 @@ export default function InstitutionRoute() {
               display: "flex",
               flexDirection: "column",
               gap: 14,
-              borderLeft: `2px solid ${members.length > 3 ? C.amber : "#3e3e42"}`,
+              borderLeft: `2px solid ${members.length > 3 ? C.amber : CANON.INK.GHOST}`,
               paddingLeft: 16,
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              <span style={{ ...mono(10, { ls: "0.16em", color: members.length > 3 ? C.amber : C.ink4 }) }}>REGISTRY INSTITUTION</span>
-              <span style={{ fontFamily: FONT.serif, fontSize: isMobile ? 28 : 38, lineHeight: 1.1, fontWeight: 500, color: C.ink1 }}>
+              <span style={{ ...mono(11, { ls: "0.16em", color: members.length > 3 ? C.amber : C.ink4 }) }}>REGISTRY INSTITUTION</span>
+              <span style={{ fontFamily: FACE.value, fontSize: isMobile ? 25 : 30, lineHeight: 1.1, fontWeight: 500, color: C.ink1 }}>
                 {record.name}
               </span>
             </div>
-            <div style={{ fontFamily: FONT.serif, fontSize: 15, lineHeight: 1.6, fontWeight: 300, color: C.ink2, maxWidth: 660 }}>
+            <div style={{ fontFamily: FACE.value, fontSize: 15, lineHeight: 1.6, fontWeight: 300, color: C.ink2, maxWidth: 660 }}>
               {members.length === 1
                 ? `One ranked ${taUpper} HCP, in the ${COHORT_LABEL[members[0].cohort].toLowerCase()} cohort.`
                 : `${members.length} ranked ${taUpper} HCPs — ${record.est} established, ${record.ris} rising, ${record.com} community.` +
@@ -495,7 +522,7 @@ export default function InstitutionRoute() {
               RANKED {taUpper} HCP · {members.length}
             </span>
           </div>
-          <span style={{ ...mono(10, { color: C.ink5, lh: 1.5 }) }}>
+          <span style={{ ...mono(11, { color: C.ink5, lh: 1.5 }) }}>
             {unresolvedN > 0
               ? `${unresolvedN} HCP CARRYING A ${record.name.toUpperCase()} NAME STRING DID NOT RESOLVE TO THIS RECORD AND ARE NOT COUNTED`
               : singleRoster
@@ -567,7 +594,7 @@ export default function InstitutionRoute() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: `22px ${pad} 26px` }}>
-          <span style={{ ...mono(10, { ls: "0.1em", color: C.ink5 }) }}>
+          <span style={{ ...mono(11, { ls: "0.1em", color: C.ink5 }) }}>
             REGISTRY RECORD · PRIMARY LINK VIA TYPE LADDER · SECONDARY LINKS PRESERVED IN hcp_institutions_v2
           </span>
         </div>

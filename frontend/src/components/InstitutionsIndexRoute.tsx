@@ -21,30 +21,36 @@ import {
   type InstitutionAgg,
 } from "../lib/institutionRegistry";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT, GOLD, GROUND, LINE } from "../lib/designTokens";
+import { CANON, DEPTH, FACE } from "../lib/canonicalTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
 
+// CANONICAL MIGRATION 2026-08-13. The warm parchment ramp folds into the one
+// cool ink ramp by luminance role; the near-black hairlines become the
+// register's OPAQUE rules (LINE.HAIR/EDGE) — visibly more present than the
+// old #141417/#1e1e21, which is the intended canonical behaviour. Composition:
+// the page ground comes from the shell (AppLayout paints DEPTH.GROUND on BASE);
+// section containers take PANEL; bands/toggles are INSET wells; rows stay flat.
 const C = {
-  bg: "#0a0a0b",
-  hair: "#141417",
-  hairStrong: "#1e1e21",
-  bandBg: "#0e0e11",
-  ink1: "#e6e3dc",
-  ink2: "#98958d",
-  ink3: "#8b887f",
-  ink4: "#6a6862",
-  ink5: "#575651",
-  ink6: "#4e4d49",
-  amber: GOLD.bright, // was #c9a35c — gold convergence 2026-08-05
-  chipBorder: "#2b2b30",
-  link: "#8fa3ab",
-  toggleBg: "#1d1d20",
-  toggleBorder: "#26262a",
+  bg: CANON.GROUND.BASE,
+  hair: CANON.LINE.HAIR,
+  hairStrong: CANON.LINE.EDGE,
+  bandBg: CANON.GROUND.RAISE,
+  ink1: CANON.INK.PRIME,
+  ink2: CANON.INK.BODY,
+  ink3: CANON.INK.LABEL, // the default mono ink — the label voice
+  ink4: CANON.INK.MUTE,
+  ink5: CANON.INK.MUTE, // near-twin of ink4 collapses (rule 1)
+  ink6: CANON.INK.MUTE, // carries live absence copy → never GHOST (rule 4)
+  amber: CANON.GOLD.PRIME,
+  chipBorder: CANON.LINE.HAIR,
+  link: CANON.ACTION.LINK, // was steel #8fa3ab — links are the one action colour
+  toggleBg: CANON.GROUND.INSET,
+  toggleBorder: CANON.LINE.HAIR,
 };
 
 const mono = (size: number, opts?: { ls?: string; color?: string; weight?: number; lh?: number }) => ({
-  fontFamily: FONT.mono,
+  fontFamily: FACE.data,
   fontSize: size,
   fontWeight: opts?.weight ?? 400,
   letterSpacing: opts?.ls ?? "0.1em",
@@ -158,20 +164,20 @@ export default function InstitutionsIndexRoute() {
     );
     void identity;
     const networkLine = a.networkParent ? (
-      <span style={{ ...mono(10, { ls: "0.05em", color: C.ink4, lh: 1.5 }) }}>
+      <span style={{ ...mono(11, { ls: "0.05em", color: C.ink4, lh: 1.5 }) }}>
         NETWORK <span style={{ color: C.link }}>{a.networkParent}</span>
         {(memberSitesByParent.get(a.networkParent) ?? 0) > 1
           ? ` · ${memberSitesByParent.get(a.networkParent)} MEMBER SITES REPRESENTED`
           : ""}
       </span>
     ) : (
-      <span style={{ ...mono(10, { color: C.ink6 }) }}>NO NETWORK PARENT · SINGLE-SITE REGISTRY RECORD</span>
+      <span style={{ ...mono(11, { color: C.ink6 }) }}>NO NETWORK PARENT · SINGLE-SITE REGISTRY RECORD</span>
     );
     const split = (
       <div style={{ display: "flex", gap: isMobile ? 10 : 16, ...mono(11), paddingTop: isMobile ? 0 : 5 }}>
         {([["EST", a.est], ["RIS", a.ris], ["COM", a.com]] as const).map(([label, n]) => (
           <span key={label}>
-            <span style={{ color: n > 0 ? C.ink1 : "#3e3e42", fontSize: 14 }}>{n}</span> {label}
+            <span style={{ color: n > 0 ? C.ink1 : CANON.INK.GHOST, fontSize: 15 }}>{n}</span> {label}
           </span>
         ))}
       </div>
@@ -207,7 +213,7 @@ export default function InstitutionsIndexRoute() {
           border: "none",
           padding: 0,
           cursor: "pointer",
-          ...mono(15, { ls: "0", color: pinned ? C.amber : "#3e3e42" }),
+          ...mono(15, { ls: "0", color: pinned ? C.amber : CANON.INK.GHOST }),
           paddingTop: 4,
         }}
       >
@@ -225,7 +231,7 @@ export default function InstitutionsIndexRoute() {
             <span style={{ ...mono(25, { color: a.band === "A" || a.band === "B" ? C.amber : C.ink3, ls: "0" }), minWidth: 38 }}>
               {a.memberCount}
             </span>
-            <span style={{ fontFamily: FONT.serif, fontSize: 17, lineHeight: 1.25, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
+            <span style={{ fontFamily: FACE.value, fontSize: 17, lineHeight: 1.25, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
           </div>
           <div style={{ paddingLeft: 48, display: "flex", flexDirection: "column", gap: 6 }}>
             {identityLine}
@@ -251,10 +257,10 @@ export default function InstitutionsIndexRoute() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ ...mono(30, { color: a.band === "A" || a.band === "B" ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
-          <span style={{ ...mono(10, { color: C.ink4 }) }}>{a.bestUsRank != null ? `BEST #${a.bestUsRank} US` : "NO US RANK HELD"}</span>
+          <span style={{ ...mono(11, { color: C.ink4 }) }}>{a.bestUsRank != null ? `BEST #${a.bestUsRank} US` : "NO US RANK HELD"}</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          <span style={{ fontFamily: FONT.serif, fontSize: 19, lineHeight: 1.2, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
+          <span style={{ fontFamily: FACE.value, fontSize: 20, lineHeight: 1.2, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
           {identityLine}
           {networkLine}
         </div>
@@ -338,20 +344,20 @@ export default function InstitutionsIndexRoute() {
                     alignItems: "baseline",
                     justifyContent: "space-between",
                     padding: isMobile ? "12px 16px" : "14px 28px",
-                    background: "#101014",
+                    background: CANON.GROUND.INSET,
                     borderBottom: `1px solid ${C.hairStrong}`,
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-                    <span style={{ ...mono(22, { color: C.amber, ls: "0" }) }}>{total}</span>
-                    <span style={{ fontFamily: FONT.serif, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{parent}</span>
-                    <span style={{ ...mono(10, { ls: "0.12em", color: C.ink4 }) }}>
+                    <span style={{ ...mono(20, { color: C.amber, ls: "0" }) }}>{total}</span>
+                    <span style={{ fontFamily: FACE.value, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{parent}</span>
+                    <span style={{ ...mono(11, { ls: "0.12em", color: C.ink4 }) }}>
                       {members.length} MEMBER SITE{members.length === 1 ? "" : "S"} REPRESENTED
                       {best != null ? ` · BEST #${best} US` : ""}
                     </span>
                   </div>
                   {!isMobile ? (
-                    <span style={{ ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>
+                    <span style={{ ...mono(11, { ls: "0.12em", color: C.ink5 }) }}>
                       NETWORK TOTALS ARE SUMS OF THE SITES BELOW — NOTHING IS HIDDEN IN THEM
                     </span>
                   ) : null}
@@ -373,10 +379,10 @@ export default function InstitutionsIndexRoute() {
                         alignItems: "center",
                       }}
                     >
-                      <span style={{ ...mono(19, { color: a.memberCount >= 5 ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
-                      <span style={{ fontFamily: FONT.serif, fontSize: 16, color: C.ink1 }}>{a.name}</span>
+                      <span style={{ ...mono(20, { color: a.memberCount >= 5 ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
+                      <span style={{ fontFamily: FACE.value, fontSize: 17, color: C.ink1 }}>{a.name}</span>
                       {!isMobile ? (
-                        <span style={{ ...mono(10, { ls: "0.06em" }) }}>
+                        <span style={{ ...mono(11, { ls: "0.06em" }) }}>
                           {a.state ?? "—"} · {a.type} ·{" "}
                           {a.nciDesignation ?? <span style={{ color: C.ink5 }}>NO NCI DESIGNATION</span>}
                         </span>
@@ -397,21 +403,21 @@ export default function InstitutionsIndexRoute() {
               alignItems: "baseline",
               justifyContent: "space-between",
               padding: isMobile ? "12px 16px" : "14px 28px",
-              background: "#101014",
+              background: CANON.GROUND.INSET,
               borderBottom: `1px solid ${C.hairStrong}`,
             }}
           >
             <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-              <span style={{ ...mono(22, { color: C.ink3, ls: "0" }) }}>
+              <span style={{ ...mono(20, { color: C.ink3, ls: "0" }) }}>
                 {unparented.reduce((s, a) => s + a.memberCount, 0)}
               </span>
-              <span style={{ fontFamily: FONT.serif, fontSize: 17, fontWeight: 500, color: C.ink1 }}>Unparented</span>
-              <span style={{ ...mono(10, { ls: "0.12em", color: C.ink4 }) }}>
+              <span style={{ fontFamily: FACE.value, fontSize: 17, fontWeight: 500, color: C.ink1 }}>Unparented</span>
+              <span style={{ ...mono(11, { ls: "0.12em", color: C.ink4 }) }}>
                 {unparented.length} REPRESENTED INSTITUTIONS HAVE NO NETWORK PARENT
               </span>
             </div>
             {!isMobile ? (
-              <span style={{ ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>NOT A NETWORK — THE ABSENCE OF ONE</span>
+              <span style={{ ...mono(11, { ls: "0.12em", color: C.ink5 }) }}>NOT A NETWORK — THE ABSENCE OF ONE</span>
             ) : null}
           </div>
           {unparented.map((a) => (
@@ -468,7 +474,7 @@ export default function InstitutionsIndexRoute() {
   return (
     <AppLayout width="wide">
       {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
-      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", background: GROUND.g2, border: `1px solid ${LINE.l1}` }}>
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", ...DEPTH.PANEL, border: `1px solid ${CANON.LINE.HAIR}` }}>
         {/* Hero — canonical H1 (PageHero, Commit B 2026-08-05). The amber-edge
             mono header becomes eyebrow/serif title/dek; the right meta lines
             fold into the meta slot and the REPRESENTED count into the cluster. */}
@@ -497,7 +503,7 @@ export default function InstitutionsIndexRoute() {
             overflowX: "auto",
           }}
         >
-          {!isMobile ? <span style={{ ...mono(10, { ls: "0.14em", color: C.ink5 }) }}>GROUPING</span> : null}
+          {!isMobile ? <span style={{ ...mono(11, { ls: "0.14em", color: C.ink5 }) }}>GROUPING</span> : null}
           <div style={{ display: "flex", border: `1px solid ${C.toggleBorder}`, flexShrink: 0 }}>
             {groupingTabs.map(([key, label], i) => (
               <button
@@ -511,8 +517,8 @@ export default function InstitutionsIndexRoute() {
                   color: grouping === key ? C.ink1 : C.ink3,
                   border: "none",
                   borderLeft: i > 0 ? `1px solid ${C.toggleBorder}` : "none",
-                  fontFamily: FONT.serif,
-                  fontSize: 12,
+                  fontFamily: FACE.value,
+                  fontSize: 13,
                   cursor: "pointer",
                 }}
               >
@@ -546,7 +552,7 @@ export default function InstitutionsIndexRoute() {
         {loading ? (
           <div style={{ padding: "48px 28px", ...mono(11, { color: C.ink4 }) }}>RESOLVING THE REGISTRY…</div>
         ) : aggs.length === 0 ? (
-          <div style={{ padding: "48px 28px", fontFamily: FONT.serif, fontSize: 14, color: C.ink2 }}>
+          <div style={{ padding: "48px 28px", fontFamily: FACE.value, fontSize: 15, color: C.ink2 }}>
             No registry institution carries a ranked HCP in this cohort yet.
           </div>
         ) : (

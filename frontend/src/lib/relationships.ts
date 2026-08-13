@@ -9,6 +9,23 @@ export type RelationshipStatus =
   | "active_relationship"
   | "paused";
 
+// The ONE display map for the six states (lifted here 2026-08-13). It lived in
+// four places — CohortLedger, CommunityHcpProfile, PracticeFirstProfile, and a
+// switch in StatusEditor — and a fifth surface (InstitutionRoute) had no map at
+// all: it uppercased the raw enum, so a real relationship row rendered
+// "NOT_ENGAGED" while every row without one showed a hardcoded "NOT ENGAGED".
+// Single-sourcing it next to the type is what stops that drift recurring.
+// Callers that want caps do their own .toUpperCase() — the map stays Title Case
+// so it can serve both registers.
+export const STATUS_LABEL: Record<RelationshipStatus, string> = {
+  not_engaged: "Not Engaged",
+  targeted: "Targeted",
+  contacted: "Contacted",
+  engaged: "Engaged",
+  active_relationship: "Active Relationship",
+  paused: "Paused",
+};
+
 export type Priority = "low" | "normal" | "high";
 
 export interface Relationship {

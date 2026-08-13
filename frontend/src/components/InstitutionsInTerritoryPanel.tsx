@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFilterContext } from "../lib/filter-context";
 import { apiSlugForTaId, getTopInstitutionsInTerritory, type TerritoryInstitution } from "../lib/api";
-import { FONT, COLOR } from "../lib/designTokens";
+import { CANON, FACE } from "../lib/canonicalTokens";
 
 interface Props {
   taSlug: string;
@@ -51,12 +51,12 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
         {/* Eyebrow role (§type 5): sans, 11/600, 0.18em, --ink-4 */}
         <span
           style={{
-            fontFamily: FONT.sans,
+            fontFamily: FACE.ui,
             fontSize: 11,
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.18em",
-            color: COLOR.ink4,
+            color: CANON.INK.MUTE,
           }}
         >
           {states.length > 0 ? "Institutions in your territory" : "Top institutions"}
@@ -67,17 +67,17 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
           style={{
             background: "none",
             border: "none",
-            color: COLOR.indigoLink,
-            fontSize: 12,
+            color: CANON.ACTION.LINK,
+            fontSize: 13,
             cursor: "pointer",
             padding: 0,
             textDecoration: "none",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = COLOR.indigoLinkHover;
+            e.currentTarget.style.color = CANON.ACTION.HOVER;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = COLOR.indigoLink;
+            e.currentTarget.style.color = CANON.ACTION.LINK;
           }}
         >
           View all →
@@ -106,8 +106,8 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
               padding: "16px 18px",
               textAlign: "left",
               cursor: "pointer",
-              color: COLOR.ink1,
-              fontFamily: FONT.sans,
+              color: CANON.INK.PRIME,
+              fontFamily: FACE.ui,
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
@@ -118,10 +118,10 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
                 220px card); the design's own institution-name spec. */}
             <div
               style={{
-                fontSize: 13.5,
+                fontSize: 13,
                 fontWeight: 600,
                 letterSpacing: "-0.005em",
-                color: "#E7E4DC",
+                color: CANON.INK.PRIME,
                 lineHeight: 1.35,
                 overflow: "hidden",
                 display: "-webkit-box",
@@ -134,24 +134,24 @@ export default function InstitutionsInTerritoryPanel({ taSlug, taId }: Props) {
 
             {/* Counts are mono (data rule); the RS/Est unit labels are sans. Cohort-count
                 coloring kept as-is (rising violet, established amber). */}
-            <div style={{ display: "flex", gap: 14, fontSize: 12.5 }}>
+            <div style={{ display: "flex", gap: 14, fontSize: 13 }}>
               <span>
-                <span style={{ fontFamily: FONT.mono, fontWeight: 600, color: "#9B6DFF", fontVariantNumeric: "tabular-nums" }}>
+                <span style={{ fontFamily: FACE.data, fontWeight: 600, color: CANON.MARK.RS, fontVariantNumeric: "tabular-nums" }}>
                   {inst.rising_star_count}
                 </span>
-                <span style={{ color: "#6E6A62" }}> RS</span>
+                <span style={{ color: CANON.INK.MUTE }}> RS</span>
               </span>
               <span>
-                <span style={{ fontFamily: FONT.mono, fontWeight: 600, color: "#E8A020", fontVariantNumeric: "tabular-nums" }}>
+                <span style={{ fontFamily: FACE.data, fontWeight: 600, color: CANON.GOLD.PRIME, fontVariantNumeric: "tabular-nums" }}>
                   {inst.established_count}
                 </span>
-                <span style={{ color: "#6E6A62" }}> Est</span>
+                <span style={{ color: CANON.INK.MUTE }}> Est</span>
               </span>
             </div>
 
             {inst.top_rising_star_name ? (
-              <div style={{ fontSize: 12, color: "#6E6A62" }}>
-                Top: <span style={{ color: "#B6B2AA" }}>{inst.top_rising_star_name}</span>
+              <div style={{ fontSize: 13, color: CANON.INK.MUTE }}>
+                Top: <span style={{ color: CANON.INK.BODY }}>{inst.top_rising_star_name}</span>
               </div>
             ) : null}
           </button>

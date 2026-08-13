@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { InstitutionResearchTheme } from "../lib/institutionThemes";
 import { institutionToSlug } from "../lib/institutionUtils";
-import { COLOR } from "../lib/designTokens";
+import { CANON } from "../lib/canonicalTokens";
 
 interface Props {
   themes: InstitutionResearchTheme[];
@@ -17,11 +17,11 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
   const hasMore = themes.length > 10;
 
   return (
-    <div style={{ padding: "20px 24px", borderRadius: 8, border: "1px solid #1E1E22", backgroundColor: COLOR.surfaceWell }}>
+    <div style={{ padding: "20px 24px", borderRadius: 8, border: "1px solid #1E1E22", backgroundColor: CANON.GROUND.BASE }}>
       <div
         style={{
           fontSize: 13,
-          color: COLOR.ink1,
+          color: CANON.INK.PRIME,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           marginBottom: 4,
@@ -29,12 +29,12 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
       >
         Top Research Themes
       </div>
-      <div style={{ fontSize: 11, color: COLOR.ink4, marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginBottom: 12 }}>
         Most-published {taDisplayName || "NSCLC"} topics at {institutionName}
       </div>
 
       {themes.length === 0 ? (
-        <div style={{ fontSize: 13, color: COLOR.ink4, padding: "16px 0", textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: CANON.INK.MUTE, padding: "16px 0", textAlign: "center" }}>
           No research themes available yet.
         </div>
       ) : (
@@ -52,7 +52,7 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
                   width: "100%",
                   padding: "12px 16px",
                   border: "none",
-                  backgroundColor: COLOR.surfaceRaised,
+                  backgroundColor: CANON.GROUND.INSET,
                   borderRadius: 4,
                   textAlign: "left",
                   cursor: "pointer",
@@ -61,25 +61,25 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
                   transition: "background-color 120ms",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
+                  e.currentTarget.style.backgroundColor = CANON.GROUND.INSET;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
+                  e.currentTarget.style.backgroundColor = CANON.GROUND.INSET;
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "baseline", minWidth: 0 }}>
-                    <span style={{ fontSize: 12, color: COLOR.ink4, flexShrink: 0, width: 20 }}>{idx + 1}.</span>
-                    <span style={{ fontSize: 13, color: COLOR.ink1, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 13, color: CANON.INK.MUTE, flexShrink: 0, width: 20 }}>{idx + 1}.</span>
+                    <span style={{ fontSize: 13, color: CANON.INK.PRIME, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {theme.theme_name}
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: 4, alignItems: "baseline", flexShrink: 0 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{theme.total_paper_count}</span>
-                    <span style={{ fontSize: 12, color: COLOR.ink3 }}>papers</span>
+                    <span style={{ fontSize: 17, fontWeight: 700, color: CANON.GOLD.PRIME }}>{theme.total_paper_count}</span>
+                    <span style={{ fontSize: 13, color: CANON.INK.LABEL }}>papers</span>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: COLOR.ink3, marginTop: 4, marginLeft: 30 }}>
+                <div style={{ fontSize: 13, color: CANON.INK.LABEL, marginTop: 4, marginLeft: 30 }}>
                   {theme.investigator_count} investigator{theme.investigator_count === 1 ? "" : "s"}
                   {theme.core_count > 0 ? ` (${theme.core_count} core)` : ""}
                   {theme.top_contributor ? ` ${String.fromCharCode(0x00b7)} Top: ${theme.top_contributor.name} (${theme.top_contributor.paper_count} papers)` : ""}
@@ -97,8 +97,8 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
                 marginTop: 12,
                 background: "none",
                 border: "none",
-                color: "#9B6DFF",
-                fontSize: 12,
+                color: CANON.ACTION.LINK,
+                fontSize: 13,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 padding: "8px 0",

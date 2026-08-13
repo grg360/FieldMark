@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { InstitutionCollaboration } from "../lib/api";
 import { institutionToSlug } from "../lib/institutionUtils";
-import { COLOR } from "../lib/designTokens";
+import { CANON } from "../lib/canonicalTokens";
 
 interface Props {
   collaborations: InstitutionCollaboration[];
@@ -26,7 +26,7 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
       <div
         style={{
           fontSize: 13,
-          color: COLOR.ink1,
+          color: CANON.INK.PRIME,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           marginBottom: 4,
@@ -34,7 +34,7 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
       >
         Top Internal Collaborations
       </div>
-      <div style={{ fontSize: 11, color: COLOR.ink4, marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginBottom: 12 }}>
         Investigator pairs ranked by shared publications
       </div>
 
@@ -47,37 +47,37 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
               justifyContent: "space-between",
               alignItems: "center",
               padding: "12px 16px",
-              backgroundColor: COLOR.surfaceRaised,
+              backgroundColor: CANON.GROUND.INSET,
               borderRadius: 4,
               cursor: "default",
               transition: "background-color 120ms",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
+              e.currentTarget.style.backgroundColor = CANON.GROUND.INSET;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
+              e.currentTarget.style.backgroundColor = CANON.GROUND.INSET;
             }}
           >
-            <div style={{ fontSize: 13, color: COLOR.ink1 }}>
+            <div style={{ fontSize: 13, color: CANON.INK.PRIME }}>
               <a
                 href={`/hcp/${c.hcp1_id}`}
                 onClick={(e) => {
                   e.preventDefault();
                   onHcpClick(c.hcp1_id);
                 }}
-                style={{ color: COLOR.ink1, textDecoration: "none" }}
+                style={{ color: CANON.INK.PRIME, textDecoration: "none" }}
               >
                 {c.hcp1_name}
               </a>
-              <span style={{ margin: "0 8px", color: COLOR.ink4 }}>{"\u2194"}</span>
+              <span style={{ margin: "0 8px", color: CANON.INK.MUTE }}>{"\u2194"}</span>
               <a
                 href={`/hcp/${c.hcp2_id}`}
                 onClick={(e) => {
                   e.preventDefault();
                   onHcpClick(c.hcp2_id);
                 }}
-                style={{ color: COLOR.ink1, textDecoration: "none" }}
+                style={{ color: CANON.INK.PRIME, textDecoration: "none" }}
               >
                 {c.hcp2_name}
               </a>
@@ -101,8 +101,8 @@ export default function InstitutionCollaborationsPanel({ collaborations, onHcpCl
                 fontFamily: "inherit",
               }}
             >
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{c.shared_publications}</span>
-              <span style={{ fontSize: 12, color: COLOR.ink3 }}>papers</span>
+              <span style={{ fontSize: 17, fontWeight: 700, color: CANON.GOLD.PRIME }}>{c.shared_publications}</span>
+              <span style={{ fontSize: 13, color: CANON.INK.LABEL }}>papers</span>
             </button>
           </div>
         ))}

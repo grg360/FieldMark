@@ -30,7 +30,7 @@ import { useTrack, type Track } from "../../lib/TrackContext";
 import { resolveFeedRoute, trackToDashboardSlug } from "../../lib/routeSlugs";
 import { taIdForApiSlug, getHcpWebSignals, type WebSignal } from "../../lib/api";
 import { supabase } from "../../lib/supabase";
-import type { RelationshipStatus } from "../../lib/relationships";
+import { STATUS_LABEL, type RelationshipStatus } from "../../lib/relationships";
 import {
   COHORTS,
   floorFixed,
@@ -175,14 +175,8 @@ const STATUS_ORDER: RelationshipStatus[] = [
   "active_relationship",
   "paused",
 ];
-const STATUS_LABEL: Record<RelationshipStatus, string> = {
-  not_engaged: "Not Engaged",
-  targeted: "Targeted",
-  contacted: "Contacted",
-  engaged: "Engaged",
-  active_relationship: "Active Relationship",
-  paused: "Paused",
-};
+// STATUS_LABEL now lives in lib/relationships.ts beside the type it labels
+// (single-sourced 2026-08-13); this file imports it.
 const STATUS_FILL: Record<RelationshipStatus, number> = {
   not_engaged: 0,
   targeted: 1,
