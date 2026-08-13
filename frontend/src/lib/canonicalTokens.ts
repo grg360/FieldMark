@@ -175,8 +175,10 @@ export const FACE = {
   ui: "'IBM Plex Sans', system-ui, sans-serif",
 } as const;
 // Stray faces — flagged for retirement DURING migration, not removed here:
-//   · 'IBM Plex Sans Condensed' (CohortLedger rank numerals) → folds into
-//     FACE.data with tabular-nums, or survives as a scoped FACE/RANK — the
-//     RFC-01 open question, decided at the ledger's migration.
+//   · 'IBM Plex Sans Condensed' — RESOLVED 2026-08-13 at the ledger's migration:
+//     FOLDED INTO FACE.data with tabular-nums, no scoped FACE/RANK. The numeral
+//     rule decides it — ledger rank ordinals sit in a column and column-align,
+//     and the tiebreaker sends anything that column-aligns to the data face.
+//     Zero consumers remain.
 //   · 'IBM Plex Serif' — ghost (loaded in index.html, zero renders) → deletes
 //     from the font link at migration.
