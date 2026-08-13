@@ -15,6 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipControls";
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
 import FederalFundingSection from "./FederalFundingSection";
+import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import { FiToast } from "../FieldIntelligenceShared";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -671,8 +672,45 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           </div>
         </Card>
 
-        {/* relationship + contact — directly under the score row, matching the
-            established spine's sequence (signal block, then the workspace
+        {/* signal summary — moved up 2026-08-13 (EST parity): the established
+            spine reads header → SIGNAL SUMMARY → workspace controls. M&V is the
+            rising-specific slot-2 content; the prose sits right after it, not
+            below the record. */}
+        <SectionHead title="SIGNAL SUMMARY" sub="WHO IS THIS, AND WHAT IS MOVING"
+          right="GENERATED SYNTHESIS" />
+        {/* Prose at the same 74ch measure as the established spine, provenance
+            stamp as the right-field counterweight — the two spines now compose
+            identically (a demo reads Marmarelis/Aditi beside an established HCP
+            and sees one pattern). The stamp keeps the rising-only lines the
+            footer carried: the freshness verdict and the no-rank-by-prompt note. */}
+        {p.narrative?.narrative_text ? (
+          /* Single column (2026-08-07): same dead-field fix as the established
+             brief — full-width prose at a 90ch measure, provenance stamp folded
+             to one mono caveat line beneath. */
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={{ ...serif(13, SERIF_INK), textWrap: "pretty" } as CSSProperties}>
+              {p.narrative.narrative_text}
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${RULE}`, ...mono(9, FAINT, 0.08), lineHeight: 1.7 }}>
+              GENERATED SYNTHESIS · DATA RUN {p.narrative.generated_at ? new Date(p.narrative.generated_at).toISOString().slice(0, 10) : "UNSTAMPED"} · PROMPT {(p.narrative.prompt_version ?? "UNVERSIONED").toUpperCase()} · {p.narrative_current === false ? "DATA HAS MOVED SINCE" : "CURRENT VS LATEST RUN"} · NO RANK OR PERCENTILE BY PROMPT — THE HEADER RENDERS THOSE LIVE · REVIEW BEFORE USE · NO CLINICAL CLAIM
+            </div>
+          </Card>
+        ) : (
+          <Card style={{ padding: "20px 22px" }}>
+            <div style={mono(13, MUT, 0.14, 500)}>NO NARRATIVE GENERATED AT THIS RANK</div>
+            <div style={{ marginTop: 14, ...serif(13, INK2) }}>
+              Narrative generation follows the weekly build's cut — the top 200 of the US board. This profile is outside
+              that cut, so no narrative exists and no stale text is held for it. The four components above are the
+              complete rising signal for this HCP, and they are fully covered. Nothing is being withheld.
+            </div>
+            <div style={{ marginTop: 16, ...mono(9, FAINT, 0.12), lineHeight: 1.6 }}>
+              GENERATION CUT · TOP 200 US · RE-EVALUATED EACH WEEKLY BUILD · NO STALE TEXT IS HELD FOR THIS PROFILE
+            </div>
+          </Card>
+        )}
+
+        {/* relationship + contact — directly under the signal summary, matching
+            the established spine's sequence (signal block, then the workspace
             controls); contact must not sit at the bottom of the profile */}
         <SectionHead title="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS" right="SYNCS WITH THE RISING LEDGER" />
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
@@ -683,6 +721,17 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             <ProfileSecondaryControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
           </Card>
         </div>
+
+        {/* field insights — ported from the community spine (2026-08-06); moved
+            up 2026-08-13 (EST parity): the workspace tier (relationship, then
+            team-captured insights) sits above the public evidence record on all
+            three spines. Composer + captured list (msl_hcp_notes write path). */}
+        <SectionHead title="FIELD INSIGHTS" sub={`${notes.length} CAPTURED · MSL-CAPTURED · YOUR TEAM ONLY`}
+          right="COMPOSER + BELIEF LINKS · SAME WRITE PATH AS THE OTHER SPINES" />
+        <Card style={{ padding: "18px 22px" }}>
+          {/* hideHeader: the SectionHead above is the one header (same fix as community) */}
+          <FieldInsights hcp={profileHcp(hcpId, name, "NSCLC")} variant="ledger" hideHeader />
+        </Card>
 
         {/* the record — frame 1A, paired windows (see the REC note above) */}
         <SectionHead title="THE RECORD" sub="TWO FIVE-YEAR WINDOWS · FOUR MEASURES"
@@ -750,6 +799,15 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           SOURCE TABLES · WINDOW COUNTS AND CITATION ACCRUAL ARE SEPARATE MEASURES AND ARE NOT COMPARED TO EACH OTHER
         </div>
 
+        {/* MEDICARE ADMINISTERED THERAPY — EST parity (2026-08-13): the same
+            self-headed block, same position (right after THE RECORD). ~95% of
+            the rising board has no office-administered claims under a personal
+            NPI — the block's honest-absence states (no_claims / no_npi) are the
+            intended render there, exactly as on the established spine. */}
+        <div style={{ marginTop: 26 }}>
+          <AdministeredVolumeBlock hcpId={hcpId} taSlug="nsclc" withholdSeam />
+        </div>
+
         {/* established standing */}
         <SectionHead title="ESTABLISHED STANDING"
           sub="DUAL-BOARD MEMBERS CARRY AN ESTABLISHED RANK IN NSCLC"
@@ -807,40 +865,6 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         <Card style={{ padding: "18px 22px" }}>
           <FederalFundingSection hcpId={hcpId} />
         </Card>
-
-        {/* signal summary */}
-        <SectionHead title="SIGNAL SUMMARY" sub="WHO IS THIS, AND WHAT IS MOVING"
-          right="GENERATED SYNTHESIS" />
-        {/* Prose at the same 74ch measure as the established spine, provenance
-            stamp as the right-field counterweight — the two spines now compose
-            identically (a demo reads Marmarelis/Aditi beside an established HCP
-            and sees one pattern). The stamp keeps the rising-only lines the
-            footer carried: the freshness verdict and the no-rank-by-prompt note. */}
-        {p.narrative?.narrative_text ? (
-          /* Single column (2026-08-07): same dead-field fix as the established
-             brief — full-width prose at a 90ch measure, provenance stamp folded
-             to one mono caveat line beneath. */
-          <Card style={{ padding: "20px 22px" }}>
-            <div style={{ ...serif(13, SERIF_INK), textWrap: "pretty" } as CSSProperties}>
-              {p.narrative.narrative_text}
-            </div>
-            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${RULE}`, ...mono(9, FAINT, 0.08), lineHeight: 1.7 }}>
-              GENERATED SYNTHESIS · DATA RUN {p.narrative.generated_at ? new Date(p.narrative.generated_at).toISOString().slice(0, 10) : "UNSTAMPED"} · PROMPT {(p.narrative.prompt_version ?? "UNVERSIONED").toUpperCase()} · {p.narrative_current === false ? "DATA HAS MOVED SINCE" : "CURRENT VS LATEST RUN"} · NO RANK OR PERCENTILE BY PROMPT — THE HEADER RENDERS THOSE LIVE · REVIEW BEFORE USE · NO CLINICAL CLAIM
-            </div>
-          </Card>
-        ) : (
-          <Card style={{ padding: "20px 22px" }}>
-            <div style={mono(13, MUT, 0.14, 500)}>NO NARRATIVE GENERATED AT THIS RANK</div>
-            <div style={{ marginTop: 14, ...serif(13, INK2) }}>
-              Narrative generation follows the weekly build's cut — the top 200 of the US board. This profile is outside
-              that cut, so no narrative exists and no stale text is held for it. The four components above are the
-              complete rising signal for this HCP, and they are fully covered. Nothing is being withheld.
-            </div>
-            <div style={{ marginTop: 16, ...mono(9, FAINT, 0.12), lineHeight: 1.6 }}>
-              GENERATION CUT · TOP 200 US · RE-EVALUATED EACH WEEKLY BUILD · NO STALE TEXT IS HELD FOR THIS PROFILE
-            </div>
-          </Card>
-        )}
 
         {/* established neighbourhood — header is conditional on the claim being true */}
         <SectionHead title={inEstNeighbourhood ? "THE ESTABLISHED NEIGHBORHOOD" : "TOP COLLABORATORS"}
@@ -973,18 +997,6 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
           </Card>
         )}
-
-        {/* field insights — ported from the community spine (2026-08-06): the
-            composer + captured list (msl_hcp_notes write path). Rising was the
-            one spine an MSL could not log an insight on — and with 59% positions
-            coverage it is where the belief-link mechanism has the most claims
-            to link to. */}
-        <SectionHead title="FIELD INSIGHTS" sub={`${notes.length} CAPTURED · MSL-CAPTURED · YOUR TEAM ONLY`}
-          right="COMPOSER + BELIEF LINKS · SAME WRITE PATH AS THE OTHER SPINES" />
-        <Card style={{ padding: "18px 22px" }}>
-          {/* hideHeader: the SectionHead above is the one header (same fix as community) */}
-          <FieldInsights hcp={profileHcp(hcpId, name, "NSCLC")} variant="ledger" hideHeader />
-        </Card>
 
         {/* field intelligence — ported from the community spine: the peer
             validation panel. Submit path unwired there too; states so honestly. */}
