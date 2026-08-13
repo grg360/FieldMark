@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { softDeleteNote, type InteractionType, type InsightStrength, type Note } from "../../lib/relationships";
 import { formatOccurredAt, formatRelative } from "./dateFormat";
-import { COLOR, FONT, COOL } from "../../lib/designTokens";
+import { COLOR, COOL } from "../../lib/designTokens";
+import { FACE } from "../../lib/canonicalTokens";
 import InsightComposer from "./InsightComposer";
 
 function interactionTypeLabel(type: InteractionType): string {
@@ -41,7 +42,7 @@ function strengthChipStyle(strength: InsightStrength): CSSProperties {
 }
 
 const chipBase: CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
   padding: "4px 8px",
   borderRadius: 3,
   textTransform: "uppercase",
@@ -104,7 +105,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
           border: "1px solid #1E1E22",
           borderRadius: 4,
           padding: 12,
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: FACE.ui,
         }}
       >
         <InsightComposer
@@ -123,7 +124,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
   }
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ fontFamily: FACE.ui }}>
       <div
         style={
           ledger
@@ -151,20 +152,20 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
             // bordered mono chip. Platform charcoal/gold/ink only — no purple/orange/blue.
             <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
               {note.interaction_type !== "general" ? (
-                <span style={{ font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#8caf94", textTransform: "uppercase" }}>
+                <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: "#8caf94", textTransform: "uppercase" }}>
                   {interactionTypeLabel(note.interaction_type)}
                 </span>
               ) : null}
               {note.insight_strength !== "routine" ? (
                 <span style={{
-                  font: "600 8px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", padding: "3px 6px",
+                  font: `600 9px/1 ${FACE.data}`, letterSpacing: ".14em", padding: "3px 6px",
                   color: note.insight_strength === "notable" ? "#9aa19b" : "#d99a3c",
                   border: `1px solid ${note.insight_strength === "notable" ? "#2a2e2c" : "#5c4419"}`,
                 }}>
                   {note.insight_strength === "notable" ? "NOTABLE" : "STRATEGIC"}
                 </span>
               ) : null}
-              <span style={{ font: "400 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#5f6762" }}>
+              <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: "#5f6762" }}>
                 {formatOccurredAt(note.occurred_at).toUpperCase()}
               </span>
             </div>
@@ -188,7 +189,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
               {(typeStyle || note.insight_strength !== "routine") && (
                 <span style={{ color: "#6B6A65", margin: "0 6px" }}>·</span>
               )}
-              <span style={{ fontSize: 12, color: "#9B9892" }}>{formatOccurredAt(note.occurred_at)}</span>
+              <span style={{ fontSize: 13, color: "#9B9892" }}>{formatOccurredAt(note.occurred_at)}</span>
             </div>
           )}
 
@@ -205,8 +206,8 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
               style={
                 ledger
                   ? { background: "none", border: "none", color: "#4b514d", cursor: "pointer", padding: "0 2px", lineHeight: 1,
-                      font: "700 12px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".08em" }
-                  : { background: "none", border: "none", color: "#6B6A65", fontSize: 16, cursor: "pointer", padding: "0 4px", lineHeight: 1 }
+                      font: `700 13px/1 ${FACE.data}`, letterSpacing: ".08em" }
+                  : { background: "none", border: "none", color: "#6B6A65", fontSize: 17, cursor: "pointer", padding: "0 4px", lineHeight: 1 }
               }
             >
               {ledger ? "···" : "· · ·"}
@@ -235,7 +236,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                   style={
                     ledger
                       ? { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none",
-                          color: COOL.prose, cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
+                          color: COOL.prose, cursor: "pointer", font: `500 11px/1 ${FACE.data}`, letterSpacing: ".12em", textTransform: "uppercase" }
                       : { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "#E8E6DF", fontSize: 13, cursor: "pointer" }
                   }
                 >
@@ -250,7 +251,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                   style={
                     ledger
                       ? { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none",
-                          color: COOL.prose, cursor: "pointer", font: "500 10px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".12em", textTransform: "uppercase" }
+                          color: COOL.prose, cursor: "pointer", font: `500 11px/1 ${FACE.data}`, letterSpacing: ".12em", textTransform: "uppercase" }
                       : { display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "#E8E6DF", fontSize: 13, cursor: "pointer" }
                   }
                 >
@@ -264,8 +265,8 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
         {/* Body prose is serif on this platform (both variants); ledger uses the frame's
             note ink + measure. */}
         <div style={ledger
-          ? { fontFamily: FONT.serif, fontSize: 13.5, color: "#ddd8cd", lineHeight: 1.6, whiteSpace: "pre-wrap", marginTop: 11, textWrap: "pretty" as const }
-          : { fontFamily: FONT.serif, fontSize: 15, color: COLOR.ink1, lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
+          ? { fontFamily: FACE.value, fontSize: 13, color: "#ddd8cd", lineHeight: 1.6, whiteSpace: "pre-wrap", marginTop: 11, textWrap: "pretty" as const }
+          : { fontFamily: FACE.value, fontSize: 15, color: COLOR.ink1, lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
           {note.body}
         </div>
 
@@ -290,13 +291,13 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
             if (ledger) {
               return (
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 8, marginTop: 11 }}>
-                  <span style={{ font: "400 8px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".16em", color: "#4b514d" }}>LINKED POSITION</span>
+                  <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: "#4b514d" }}>LINKED POSITION</span>
                   <button
                     type="button"
                     onClick={goToClaim}
                     aria-label={`View linked Belief Profile: ${note.belief_claim_title}`}
                     style={{ background: "none", border: "none", padding: "0 0 2px", cursor: "pointer",
-                      font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".1em", color: "#71b3a7", borderBottom: "1px solid #2f4a46" }}
+                      font: `600 9px/1 ${FACE.data}`, letterSpacing: ".1em", color: "#71b3a7", borderBottom: "1px solid #2f4a46" }}
                   >
                     {note.belief_claim_title.toUpperCase()} ↗
                   </button>
@@ -311,7 +312,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
                   background: "rgba(155, 109, 255, 0.08)", border: "1px solid rgba(155, 109, 255, 0.30)",
-                  color: "#B89BFF", padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 500,
+                  color: "#B89BFF", padding: "6px 10px", borderRadius: 6, fontSize: 13, fontWeight: 500,
                   cursor: "pointer", fontFamily: "inherit", marginTop: 10, transition: "background-color 120ms ease",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.14)"; }}

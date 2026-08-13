@@ -4,13 +4,15 @@
 // old-generation affordance on the profile spine): nothing else on the page
 // uses a filled button, and the absence is stated, not decorated.
 
+import { FACE } from "../../lib/canonicalTokens";
+
 interface Props {
   firstName: string;
   onAddClick: () => void;
 }
 
-const MONO = "'IBM Plex Mono',ui-monospace,monospace";
-const SERIF = "'Source Serif 4',Georgia,serif";
+const MONO = FACE.data;
+const SERIF = FACE.value; // was Source Serif 4 — the fallback face rendering live (side-by-side-serifs bug)
 
 export default function EmptyInsightsState({ firstName, onAddClick }: Props) {
   return (

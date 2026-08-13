@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { RelationshipStatus } from "../../lib/relationships";
 import { COOL, FONT, GOLD, GROUND, LINE } from "../../lib/designTokens";
+import { CANON } from "../../lib/canonicalTokens"; // g2 → INSET, 2026-08-12 composition fix
 
 const STATUS_VALUES: RelationshipStatus[] = [
   "not_engaged",
@@ -37,7 +38,7 @@ function statusColor(status: RelationshipStatus): { bg: string; fg: string; bord
     case "not_engaged":
       return { bg: "transparent", fg: COOL.label, border: `1px solid ${LINE.l1}` };
     case "targeted":
-      return { bg: GROUND.g2, fg: COOL.muted, border: `1px solid ${LINE.l1}` };
+      return { bg: CANON.GROUND.INSET, fg: COOL.muted, border: `1px solid ${LINE.l1}` };
     case "contacted":
       return { bg: LINE.l0, fg: COOL.prose, border: `1px solid ${LINE.l2}` };
     case "engaged":
@@ -97,7 +98,7 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
         style={{
           padding: "4px 9px",
           borderRadius: 2,
-          fontSize: 9.5,
+          fontSize: 9,
           fontWeight: 600,
           textTransform: "uppercase",
           letterSpacing: "0.1em",
@@ -124,7 +125,7 @@ export default function StatusEditor({ currentStatus, pending, onChange }: Props
             top: "100%",
             left: 0,
             marginTop: 4,
-            backgroundColor: GROUND.g2,
+            backgroundColor: CANON.GROUND.INSET,
             border: `1px solid ${LINE.l1}`,
             borderRadius: 2,
             zIndex: 10,

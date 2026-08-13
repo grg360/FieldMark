@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Note } from "../../lib/relationships";
+import { FACE } from "../../lib/canonicalTokens";
 import InsightCard from "./InsightCard";
 
 interface Props {
@@ -17,7 +18,7 @@ export default function InsightThread({ notes, firstName, userId, hcpId, onMutat
   const visibleNotes = showToggle && !expanded ? notes.slice(0, 3) : notes;
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ fontFamily: FACE.ui }}>
       <div style={{ display: "flex", flexDirection: "column", gap: variant === "ledger" ? 0 : 8 }}>
         {visibleNotes.map((note) => (
           <InsightCard

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Note } from "../../lib/relationships";
+import { FACE } from "../../lib/canonicalTokens";
 import InsightComposer from "./InsightComposer";
 
 interface Props {
@@ -43,7 +44,7 @@ export default function InsightComposerModal({
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: FACE.ui,
       }}
       onClick={() => onCancel?.()}
     >

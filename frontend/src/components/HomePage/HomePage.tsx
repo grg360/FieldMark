@@ -48,6 +48,7 @@ import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { GOLD as GOLD_T, GROUND, LINE } from "../../lib/designTokens";
+import { FACE } from "../../lib/canonicalTokens";
 
 // ── palette (from the frame) ──────────────────────────────────────────────────
 // Commit C 2026-08-05: the bespoke warm panel joins the Pulse board scheme —
@@ -59,8 +60,10 @@ const GOLD = GOLD_T.bright, GOLD2 = "#e0aa4a", GOLD_LINK = "#e0c08a";
 const INK1 = "#f0ebe1", INK2 = "#e8e3d9", INK3 = "#c8c3ba";
 const MID = "#8a8681", MID2 = "#a5a097", DIM = "#5d5a54", DIM2 = "#3a3833";
 const RED = "#b5705c", GREEN = "#9dbfa4", STEEL = "#93a9ad";
-const SERIF = "'Spectral', Georgia, serif";
-const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+// Spectral retired 2026-08-12 (last consumer): the one value face is FACE.value
+// (Newsreader); Spectral's load also dropped from index.html the same day.
+const SERIF = FACE.value;
+const MONO = FACE.data;
 
 // Cohort chip border colors — the platform's canonical cohort markers, taken from
 // the cohort ledger's COH map (cohortLedger.ts, "confirmed against the frame's own

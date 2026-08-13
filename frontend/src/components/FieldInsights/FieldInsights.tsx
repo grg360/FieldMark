@@ -5,6 +5,7 @@ import { getNotesForHcp, type Note } from "../../lib/relationships";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { FONT } from "../../lib/designTokens";
+import { FACE } from "../../lib/canonicalTokens";
 import EmptyInsightsState from "./EmptyInsightsState";
 import InsightComposer from "./InsightComposer";
 import InsightComposerModal from "./InsightComposerModal";
@@ -104,7 +105,7 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
   const sectionStyle = {
     padding: "16px",
     borderBottom: "1px solid #1E1E22",
-    fontFamily: "system-ui, -apple-system, sans-serif",
+    fontFamily: FACE.ui,
   } as const;
 
   if (isLoading) {

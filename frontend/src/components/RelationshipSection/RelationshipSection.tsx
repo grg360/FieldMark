@@ -122,7 +122,7 @@ export default function RelationshipSection({ hcp }: Props) {
           <div
             style={{
               fontFamily: FONT.mono,
-              fontSize: 10,
+              fontSize: 11,
               color: COOL.label,
               textTransform: "uppercase",
               letterSpacing: "0.14em",
@@ -143,7 +143,7 @@ export default function RelationshipSection({ hcp }: Props) {
           <div
             style={{
               fontFamily: FONT.mono,
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 600,
               color: COOL.label,
               textTransform: "uppercase",
