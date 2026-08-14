@@ -13,6 +13,7 @@ import { getRisingBoard, getRisingFlags, type RisingBoard, type RisingFlags } fr
 import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
+import { resolveLocation } from "../../lib/location";
 
 // Register tokens (2026-08-05): fresh surface, consumes the register — see the
 // palette note in Profile/RisingHcpProfile.tsx. Cohort greens + archetype
@@ -115,7 +116,7 @@ export default function RisingLedger() {
   const geoValues = useMemo(() => {
     const vals: string[] = [];
     for (const r of scoped) {
-      const g = region === "EU" ? r.country : r.state;
+      const g = region === "EU" ? (r.effective_country ?? r.country) : r.state;
       if (g && !vals.includes(g)) vals.push(g);
     }
     return vals.sort();
@@ -130,7 +131,9 @@ export default function RisingLedger() {
   const filtered = useMemo(() => {
     if (absenceMode) return [];
     if (geo === "ALL") return scoped;
-    return scoped.filter((r) => (region === "EU" ? r.country : r.state) === geo);
+    return scoped.filter(
+      (r) => (region === "EU" ? (r.effective_country ?? r.country) : r.state) === geo,
+    );
   }, [scoped, geo, region, absenceMode]);
 
   const sorted = useMemo(() => filtered.slice().sort((a, b) => a.drank - b.drank), [filtered]);
@@ -426,9 +429,37 @@ export default function RisingLedger() {
                           <div style={{ font: `500 11px/1 ${MONO}`, color: MUT }}>{r.drank}</div>
                           <div style={{ font: `400 12.5px/1.3 ${SERIF}`, color: INK0 }}>{r.name}</div>
                           <div style={{ font: `400 10.5px/1.35 ${SERIF}`, color: MUT3 }}>{r.institution ?? "INSTITUTION NOT ON RECORD"}</div>
-                          <div style={mono(9, r.state || r.country ? MUT : DIM, 0.08)}>
-                            {region === "EU" ? (r.country ?? "NOT IN REGISTRY") : (r.state ?? r.country ?? "NOT IN REGISTRY")}
-                          </div>
+                          {/* Geo cell. Named absence, never blank (see header note). In EU
+                              mode the cell places by the RE-DERIVED location and marks any
+                              location we cannot confirm is current with the year its
+                              evidence comes from — see lib/location.ts. */}
+                          {(() => {
+                            const gloc = resolveLocation({
+                              country: r.country,
+                              currentCountry: r.current_country,
+                              affiliationConfidence: r.affiliation_confidence,
+                              affiliationAsOf: r.affiliation_as_of,
+                            });
+                            const primary =
+                              region === "EU" ? gloc.code : (r.state ?? gloc.code);
+                            const present = primary != null;
+                            // The year only qualifies the country, so it is suppressed in
+                            // US mode where the cell is showing an NPPES state instead.
+                            const showAsOf =
+                              present && gloc.hedged && gloc.asOf != null &&
+                              (region === "EU" || r.state == null);
+                            return (
+                              <div
+                                style={mono(9, present ? MUT : DIM, 0.08)}
+                                title={present ? gloc.title : undefined}
+                              >
+                                {present ? primary : "NOT IN REGISTRY"}
+                                {showAsOf && (
+                                  <span style={{ color: DIM }}> ·{gloc.asOf}</span>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                           {flags.get(r.hcp_id)?.senior_transition ? (
                             <span title="Senior-authored years within the FieldMark corpus — we see only what is ingested." style={{ padding: "2px 6px", border: `1px solid ${GREEN_DK}`, font: `600 7.5px/1.3 ${MONO}`, letterSpacing: ".1em", color: GREEN }}>SENIOR SINCE {flags.get(r.hcp_id)?.first_senior_year ?? "—"}</span>

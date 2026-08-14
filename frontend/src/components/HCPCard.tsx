@@ -7,6 +7,7 @@ import { formatEngagementDollar, formatIntDisplay, formatScoreFloor1 } from "../
 import { institutionToSlug } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import { buildSubline } from "../lib/subline";
+import { LOCATION_ABSENT_LABEL, resolveLocation } from "../lib/location";
 import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import { FONT, COLOR } from "../lib/designTokens";
@@ -457,7 +458,16 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
   // Community (Phase 3 roster): not ranked — no #rank, no numeral; the badge
   // slot carries the evidence tier + Medicare reach fact instead.
   const displayRank = isRisingCohort ? (hcp.scope_rank ?? hcp.rank) : isCommunityPlain ? null : hcp.rank;
-  const countryCode = getCountryCode(hcp.country ?? null);
+  // Location resolution + hedging live in lib/location.ts (single source of truth).
+  // The flag follows the RESOLVED location, not the historical one, so a relocated
+  // KOL stops flying the flag of the country they left.
+  const loc = resolveLocation({
+    country: hcp.country,
+    currentCountry: hcp.currentCountry,
+    affiliationConfidence: hcp.affiliationConfidence,
+    affiliationAsOf: hcp.affiliationAsOf,
+  });
+  const countryCode = getCountryCode(loc.code);
   const { institution: cardInstitution, state: cardState } = getCardInstitutionAndState(hcp);
   const affiliationLine = formatCardAffiliationLine(hcp);
   if (typeof window !== "undefined" && (hcp as { last_name?: string }).last_name === "McKean") {
@@ -579,8 +589,15 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
                 srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
                 width="16"
                 height="12"
-                alt={hcp.country || ""}
-                style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }}
+                alt={loc.code || ""}
+                title={loc.title}
+                style={{
+                  borderRadius: "2px",
+                  objectFit: "cover",
+                  flexShrink: 0,
+                  // A location we cannot confirm is current renders quieter than one we can.
+                  opacity: loc.hedged ? 0.55 : 1,
+                }}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -759,10 +776,35 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
               >
                 #{displayRank}
               </span>
-              <span style={{ fontFamily: FONT.sans, color: "#77736B", letterSpacing: "0.06em" }}>
+              {/* Absence discipline: this slot used to read `country ?? "US"`, which
+                  asserted "US" for every HCP with no country on file. A missing location
+                  is now a NAMED absence, and a location we are not confident is current
+                  carries the year its evidence comes from. */}
+              <span
+                style={{
+                  fontFamily: FONT.sans,
+                  color: loc.absent ? "#57534b" : "#77736B",
+                  letterSpacing: "0.06em",
+                }}
+                title={isRisingCohort ? undefined : loc.title}
+              >
                 {" "}
-                {isRisingCohort ? risingScopeLabel : (hcp.country ?? "US").toUpperCase()}
+                {isRisingCohort ? risingScopeLabel : loc.absent ? LOCATION_ABSENT_LABEL : loc.code}
               </span>
+              {!isRisingCohort && loc.hedged && loc.asOf != null && (
+                <span
+                  style={{
+                    fontFamily: FONT.mono,
+                    color: "#57534b",
+                    letterSpacing: "0.04em",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                  title={loc.title}
+                >
+                  {" "}
+                  ·{loc.asOf}
+                </span>
+              )}
               {!isRisingCohort && hcp.global_rank != null && (
                 <>
                   <span style={{ color: "#3d3a34" }}> · </span>

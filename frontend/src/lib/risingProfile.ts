@@ -94,8 +94,18 @@ export interface RisingBoardRow {
   mom: number | null;
   vis: number | null;
   name: string;
+  /** COALESCE(current_institution, institution_normalized) — agrees with effective_country. */
   institution: string | null;
+  /** The preserved historical institution, for comparison. */
+  institution_historical: string | null;
+  /** Historical, preserved. */
   country: string | null;
+  /** Re-derived from recent publications (2026-08-14). */
+  current_country: string | null;
+  /** COALESCE(current_country, country) — what eu_rank is computed from. */
+  effective_country: string | null;
+  affiliation_confidence: string | null;
+  affiliation_as_of: number | null;
   state: string | null;
   career_first_pub_year: number | null;
 }
