@@ -34,6 +34,10 @@ export interface TrialInvestigator {
   cohort: string;
   rank: number | null;
   confidence: number;
+  /** Which board the rank came off. GLOBAL people carry no US-board rank —
+   *  they are not unranked, they are ranked somewhere else. Rendered as the
+   *  same "GLOBAL" qualifier the portfolio uses, BESIDE the chip. */
+  rankScope: "US" | "GLOBAL";
 }
 export interface RawTrial {
   trial_id: string;
@@ -147,7 +151,9 @@ function tagInterventions(ivs: RawTrial["interventions"]): InterventionTag[] {
 }
 
 function toTrial(raw: RawTrial): Trial {
-  const invs = raw.investigators ?? [];
+  // Every rank the RPC returns is a US-board rank by construction; the GLOBAL
+  // ones are stamped later by backfillGlobalRanks.
+  const invs = (raw.investigators ?? []).map((iv) => ({ ...iv, rankScope: "US" as const }));
   const interventions = tagInterventions(raw.interventions);
   const regionSet = new Set<USSubRegionKey>();
   for (const iv of invs) {
@@ -211,13 +217,90 @@ export function buildSurface(all: Trial[], region: USSubRegionKey | null): Trial
   };
 }
 
+// ── global-rank backfill ─────────────────────────────────────────────────────
+// get_nsclc_trials_surface() resolves rank against the US BOARD ONLY: its
+// established arm filters scope_type='region' AND scope_value='US', and its
+// rising arm reads the us_rank column. An investigator who sits on the board
+// but outside the US therefore comes back with a cohort and a NULL rank, which
+// the chip's rank-gate correctly reads as "unresolved" and paints UNRANKED.
+//
+// That made UNRANKED mean "not on the US board" rather than "not in the
+// cohort" — measured 2026-08-13: 57 of 347 investigator slots (37 distinct
+// people) rendered UNRANKED, and ALL 37 carry a real global rank. Zero were
+// genuinely unranked. Sophie Cousin is rising #27 globally (us_rank NULL, FR).
+//
+// This pass restores the number from the same tables the profile and the
+// portfolio read, using the portfolio's own ladder (rising board first, then
+// established global), and marks it GLOBAL so the surface can say WHICH board
+// it came off rather than silently mixing two scales.
+//
+// NOTE: this repairs the LABEL, not the population. Someone carrying only a
+// global ESTABLISHED rank and no rising row is dropped by the RPC's inner join
+// before the frontend ever sees them, so they are missing from the roster
+// entirely. Only the RPC can fix that — see the migration authored alongside
+// this change.
+async function backfillGlobalRanks(trials: Trial[]): Promise<void> {
+  const unresolved = new Set<string>();
+  for (const t of trials) for (const iv of t.investigators) if (iv.rank == null) unresolved.add(iv.hcp_id);
+  if (unresolved.size === 0) return;
+
+  const ids = [...unresolved];
+  const CHUNK = 100;
+  const risingGlobal = new Map<string, number>();
+  const estGlobal = new Map<string, number>();
+
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const [rs, est] = await Promise.all([
+      supabase.from("hcp_rising_star_ranks_v3").select("hcp_id, rank").in("hcp_id", chunk),
+      supabase.from("hcp_established_ranks_v3").select("hcp_id, rank").eq("scope_type", "global").in("hcp_id", chunk),
+    ]);
+    if (rs.error) console.warn("backfillGlobalRanks: rising chunk error", rs.error);
+    if (est.error) console.warn("backfillGlobalRanks: established chunk error", est.error);
+    for (const r of (rs.data ?? []) as { hcp_id: string; rank: number | null }[]) {
+      if (r.rank != null && !risingGlobal.has(r.hcp_id)) risingGlobal.set(r.hcp_id, r.rank);
+    }
+    // Keep the best (lowest) global established rank when an HCP is ranked in
+    // more than one TA — the same tie-break getTrackedHcpsInTerritory uses.
+    for (const e of (est.data ?? []) as { hcp_id: string; rank: number | null }[]) {
+      if (e.rank == null) continue;
+      const prev = estGlobal.get(e.hcp_id);
+      if (prev == null || e.rank < prev) estGlobal.set(e.hcp_id, e.rank);
+    }
+  }
+
+  for (const t of trials) {
+    for (const iv of t.investigators) {
+      if (iv.rank != null) continue;
+      // Honour the cohort the RPC already resolved: a rising investigator takes
+      // the rising board's global rank, an established one the established
+      // board's. Falling back across cohorts would print a number from a board
+      // the person's own chip does not claim.
+      const rank = iv.cohort === "established"
+        ? estGlobal.get(iv.hcp_id) ?? risingGlobal.get(iv.hcp_id) ?? null
+        : risingGlobal.get(iv.hcp_id) ?? estGlobal.get(iv.hcp_id) ?? null;
+      if (rank == null) continue; // genuinely unranked — UNRANKED is the truth
+      iv.rank = rank;
+      iv.rankScope = "GLOBAL";
+    }
+  }
+}
+
 export async function fetchTrials(): Promise<Trial[]> {
   const { data, error } = await supabase.rpc("get_nsclc_trials_surface");
   if (error) {
     console.warn("fetchTrials: RPC error", error);
     return [];
   }
-  return ((data ?? []) as RawTrial[]).map(toTrial);
+  const trials = ((data ?? []) as RawTrial[]).map(toTrial);
+  try {
+    await backfillGlobalRanks(trials);
+  } catch (err) {
+    // A failed backfill must not blank the surface — it degrades to the RPC's
+    // US-only answer, which is what shipped before this pass existed.
+    console.warn("fetchTrials: global-rank backfill failed", err);
+  }
+  return trials;
 }
 
 export const REGION_ORDER = US_SUB_REGION_ORDER;

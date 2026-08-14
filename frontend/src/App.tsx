@@ -813,7 +813,12 @@ export default function App() {
       <Routes>
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/pulse" element={<PulsePage />} />
-      <Route path="/trials" element={<TrialsPage />} />
+      {/* /trials sits outside the authed block's RelationshipsProvider, so its
+          chips had no track/untrack action. The provider bootstraps its own
+          user via getCurrentUser, so mounting it here gives the surface the
+          SAME tracking state and toggle the ledger and the portfolio use,
+          without moving the route or changing its auth gating. */}
+      <Route path="/trials" element={<RelationshipsProvider><TrialsPage /></RelationshipsProvider>} />
       <Route path="/pulse/:ta" element={<PulsePage />} />
       <Route path="/join/:code" element={<SignupScreen />} />
       <Route path="/join" element={<SignupScreen />} />

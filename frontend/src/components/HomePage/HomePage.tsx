@@ -14,7 +14,7 @@
 // proxied. Portfolio chips (name + cohort + us_rank badge) ARE sourceable via
 // getTrackedHcpsInTerritory — the shipped home's tracking-chip reader.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { useTA } from "../../lib/TAContext";
@@ -23,6 +23,7 @@ import { taLabelToApiSlug, taSlugToLabel } from "../../lib/routeSlugs";
 import { supabase } from "../../lib/supabase";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { getTrackedHcpIds } from "../../lib/watchlists";
+import { useRelationships } from "../../contexts/RelationshipsContext";
 import { getFieldInsightsForCurrentUser, type FieldInsight } from "../../lib/fieldInsights";
 import { getPinnedInstitutionsForUser, getInstitutionsByNames } from "../../lib/institutionPins";
 import { getWhatMoved, WHAT_MOVED_SEEDED, type WhatMoved, type Mover } from "../../lib/homeWhatMoved";
@@ -45,10 +46,11 @@ import {
   type TrackedHcpChip,
 } from "../../lib/home";
 import AppLayout from "../AppLayout";
+import HCPChip, { toChipCohort } from "../HCPChip";
 import PageHero from "../PageHero";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { GOLD as GOLD_T, GROUND, LINE } from "../../lib/designTokens";
-import { FACE } from "../../lib/canonicalTokens";
+import { CANON, FACE } from "../../lib/canonicalTokens";
 
 // ── palette (from the frame) ──────────────────────────────────────────────────
 // Commit C 2026-08-05: the bespoke warm panel joins the Pulse board scheme —
@@ -65,19 +67,24 @@ const RED = "#b5705c", GREEN = "#9dbfa4", STEEL = "#93a9ad";
 const SERIF = FACE.value;
 const MONO = FACE.data;
 
-// Cohort chip border colors — the platform's canonical cohort markers, taken from
-// the cohort ledger's COH map (cohortLedger.ts, "confirmed against the frame's own
-// COH map"); Established also matches HcpProfileBrief's P.sage cohort marker.
-// Unknown/null cohort falls back to the neutral chip border.
-const COHORT_BORDER: Record<string, string> = {
-  established: "#6E8F76", // deep sage
-  rising_star: "#9A8CC8", // purple
-  community: "#B0848F", // rose
-};
+// Cohort chip borders retired 2026-08-13: the shared HCPChip owns cohort
+// colour now, derived from the canonical MARK tokens.
 
 const mono = (size: number, weight = 400, color = MID, ls = ".12em") => ({ font: `${weight} ${size}px/1 ${MONO}`, letterSpacing: ls, color });
 const serif = (size: number, weight = 400, color = INK2, lh = 1.2) => ({ font: `${weight} ${size}px/${lh} ${SERIF}`, color });
 const num = (n: number) => n.toLocaleString("en-US");
+
+// Hint link — canonical ACTION.LINK, inheriting the hint's serif and size so it
+// reads as a word IN the sentence rather than a control pasted into it. The
+// underline is offset and dimmed so a 13px serif link does not out-shout the
+// line it sits in.
+const hintLink: CSSProperties = {
+  color: CANON.ACTION.LINK,
+  textDecoration: "underline",
+  textDecorationColor: "rgba(63,184,175,.45)",
+  textUnderlineOffset: 2,
+  cursor: "pointer",
+};
 
 const fmtDue = (iso: string | null): string => {
   if (!iso) return "NO DATE";
@@ -90,6 +97,42 @@ export default function HomePage() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const { setTA } = useTA();
+  // Same tracking source as the ledger and Trials — the portfolio bookmark is
+  // the same control, not a second one.
+  const { isTracked, toggleSave, getOtherWatchlists } = useRelationships();
+  // The portfolio's untrack hint. toggleSave removes from the DEFAULT list only
+  // and then re-derives tracked as the union of every list, so untracking
+  // someone who also sits on another list cannot change the bookmark — it
+  // flipped off and sprang back, which reads as a broken control. The rule
+  // here: the bookmark only moves when the person is ACTUALLY being untracked;
+  // otherwise it holds and says why.
+  // Structured, not a prebuilt string: the list name is a LINK, so the message
+  // has to be assembled in JSX rather than interpolated.
+  type UntrackHint =
+    | { kind: "blocked"; person: string; others: { id: string; name: string }[] }
+    | { kind: "error" };
+  const [untrackHint, setUntrackHint] = useState<UntrackHint | null>(null);
+
+  const portfolioBookmarkTap = async (hcpId: string, name: string) => {
+    if (!isTracked(hcpId)) { void toggleSave(hcpId, "home_portfolio").catch(() => {}); return; }
+    let others: { id: string; name: string }[];
+    try {
+      others = await getOtherWatchlists(hcpId);
+    } catch {
+      // Could not establish whether the untrack would stick. Do NOT guess: a
+      // wrong guess is the spring-back this exists to prevent.
+      setUntrackHint({ kind: "error" });
+      return;
+    }
+    if (others.length === 0) { void toggleSave(hcpId, "home_portfolio").catch(() => {}); return; }
+    setUntrackHint({ kind: "blocked", person: name, others });
+  };
+
+  useEffect(() => {
+    if (!untrackHint) return;
+    const t = setTimeout(() => setUntrackHint(null), 6000);
+    return () => clearTimeout(t);
+  }, [untrackHint]);
   const [homeTaId, setHomeTaId] = useState<string | undefined>(undefined);
   const [taSlug, setTaSlug] = useState<string>("nsclc");
   const [firstName, setFirstName] = useState("there");
@@ -436,25 +479,74 @@ export default function HomePage() {
                             gold #figure per the platform's "amber for rank only" rule. Link +
                             population are unchanged. */}
                         {portfolioChips.map((chip) => (
-                          <span
-                            key={chip.hcp_id}
-                            onClick={() => navigate(`/hcp/${chip.hcp_id}`)}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 7px", border: `1px solid ${(chip.cohort ? COHORT_BORDER[chip.cohort] : undefined) ?? BORDER}`, ...mono(11, 400, INK3, "0"), whiteSpace: "nowrap", cursor: "pointer" }}
-                          >
-                            <span>{chip.name}</span>
-                            {chip.ladder !== null && (chip.cohort_rank !== null || chip.tier !== null) ? (
-                              <span style={mono(9, 400, MID, ".04em")}>{chip.ladder}</span>
+                          // Shared HCPChip (2026-08-13): this chip and the Trials
+                          // roster strip used to disagree about what a person looks
+                          // like. Both now render the SAME object — name · cohort ·
+                          // rank. The ladder word and the community tier are context,
+                          // so they sit BESIDE the chip, not inside it.
+                          // maxWidth/minWidth are what actually contain a long
+                          // name. This wrapper is shrink-to-fit around the chip,
+                          // so a percentage limit ON the chip resolves against
+                          // the chip itself and never binds; the rail's width
+                          // only enters through the wrapper, whose containing
+                          // block IS the rail. Without these a 60-character name
+                          // ran 62px past the rail edge and scrolled the row.
+                          <span key={chip.hcp_id} style={{ display: "inline-flex", alignItems: "center", gap: 6, maxWidth: "100%", minWidth: 0 }}>
+                            <HCPChip
+                              hcpId={chip.hcp_id}
+                              name={chip.name}
+                              cohort={toChipCohort(chip.cohort, chip.cohort_rank)}
+                              rank={chip.cohort_rank}
+                              tracked={isTracked(chip.hcp_id)}
+                              onToggleTracked={() => { void portfolioBookmarkTap(chip.hcp_id, chip.name); }}
+                              // Every chip in the portfolio is tracked by
+                              // definition, so the mark says nothing here — it
+                              // steps back to an amber outline and keeps the
+                              // untrack tap. See bookmarkTone.
+                              bookmarkTone="quiet"
+                            />
+                            {/* The ladder tag is only shown when it says something
+                                the chip does not: the chip already renders EST/RS/COM,
+                                so only "EST GLOBAL" (rank came off the global board,
+                                not the US one) still earns space beside it. */}
+                            {chip.ladder === "EST GLOBAL" ? (
+                              <span style={mono(9, 400, MID, ".04em")}>GLOBAL</span>
                             ) : null}
-                            {chip.cohort_rank !== null ? (
-                              <span style={mono(11, 400, GOLD, "0")}>#{chip.cohort_rank}</span>
-                            ) : chip.tier !== null ? (
-                              // Community (Phase 3): the tier word, never a number.
+                            {chip.cohort_rank === null && chip.tier !== null ? (
                               <span style={mono(9, 400, MID, ".06em")}>{chip.tier.replace("_", "-").toUpperCase()}</span>
-                            ) : (
-                              <span style={mono(9, 400, DIM, ".06em")}>UNRANKED</span>
-                            )}
+                            ) : null}
                           </span>
                         ))}
+                      </div>
+                    ) : null}
+                    {/* Inline, self-clearing, no modal. It reports a state that
+                        did NOT change, so it sits with the wall rather than
+                        interrupting it. */}
+                    {untrackHint ? (
+                      <div role="status" aria-live="polite" style={{ display: "flex", gap: 7, alignItems: "baseline", borderTop: `1px solid ${HAIR}`, paddingTop: 11 }}>
+                        <span style={{ color: GOLD, fontSize: 9, lineHeight: 1.7 }}>●</span>
+                        <span style={{ ...serif(13, 300, MID, 1.5) }}>
+                          {untrackHint.kind === "error" ? (
+                            "Couldn't check this person's other lists — nothing changed."
+                          ) : (
+                            <>
+                              {untrackHint.person} stays tracked — also on{" "}
+                              {/* "Remove there too" needs somewhere to go. One
+                                  list deep-links to it (/me/watchlists/:id is a
+                                  real route); several go to the index, since
+                                  picking between them IS the disambiguation UI
+                                  we are not building inline. */}
+                              {untrackHint.others.length === 1 ? (
+                                <>
+                                  “<Link to={`/me/watchlists/${untrackHint.others[0].id}`} style={hintLink}>{untrackHint.others[0].name}</Link>”
+                                </>
+                              ) : (
+                                <Link to="/me/watchlists" style={hintLink}>{untrackHint.others.length} other lists</Link>
+                              )}
+                              . Remove there too to untrack.
+                            </>
+                          )}
+                        </span>
                       </div>
                     ) : null}
                   </div>
