@@ -48,6 +48,9 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
   8 career            8a career_enrichment_from_clusters.py --only-changed-today --target-version v2
                       8b openalex_author_enrichment.py --hcp-ids-file affected.txt --snapshot-date <TODAY>
                       8c derive_career_first_pub_year_v2.py --ta <slug> --ingestion-run-id <HCP_RUN_ID> --snapshot-date <TODAY> --execute
+                      8f recompute_in_corpus_pub_count.py --execute --summary-out <ingest_run_summary.json>
+                         Populates hcps_v2.in_corpus_pub_count -- the count of publications we
+                         actually hold -- from author_pub_flat. Leaves total_career_pubs alone.
                       8d cohort_classification_v2.py --ta <slug> --execute
                       8e hcp_industry_classifier.py  (FULL reclassify of hcps_v2 -> hcp_industry_classification_v1)
                          Runs AFTER institution_normalized is final (stages 2/8) and BEFORE stage 9, because
@@ -125,6 +128,7 @@ SCRIPTS: Dict[str, str] = {
     "career_first": "scripts/enrich/derive_career_first_pub_year_v2.py",
     "cohort": "scripts/classify/cohort_classification_v2.py",
     "industry_classify": "scripts/classify/hcp_industry_classifier.py",  # 8e: affiliation-type classification, feeds the rising ACADEMIC filter
+    "in_corpus_pub_count": "scripts/enrich/recompute_in_corpus_pub_count.py",  # 8f: populate hcps_v2.in_corpus_pub_count from author_pub_flat (does NOT touch total_career_pubs)
     "rising_score": "scripts/score/rising_score.py",
     "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
     "trials_status_refresh": "scripts/ingest/trials_pipeline.py",     # 11: weekly trial-fact refresh (--refresh-status)
@@ -344,6 +348,10 @@ def cmd_career_first(slug: str, hcp_run_id: str, snapshot: str) -> List[str]:
     return py("career_first") + [
         "--ta", slug, "--ingestion-run-id", hcp_run_id, "--snapshot-date", snapshot, "--execute",
     ]
+
+
+def cmd_in_corpus_pub_count(summary_path: str) -> List[str]:
+    return py("in_corpus_pub_count") + ["--execute", "--summary-out", summary_path]
 
 
 def cmd_cohort(slug: str) -> List[str]:
@@ -817,6 +825,21 @@ def run_cycle(
             run_stage(8, "career_enrichment(8a)", cmd_career_enrich())
             run_stage(8, "openalex_enrichment(8b)", cmd_openalex_enrich(str(affected), snapshot))
             run_stage(8, "career_first_pub_year(8c)", cmd_career_first(slug, hcp_run_id, snapshot))
+            # 8f: populate hcps_v2.in_corpus_pub_count from author_pub_flat. Sibling of 8c --
+            # the other publication-derived stat on hcps_v2, from the same substrate. Placed
+            # AFTER 8c because both read the post-dedup HCP set, and inside stage 8 because
+            # this is where publication-derived columns are refreshed.
+            #
+            # This stage feeds NO ranking gate. It was originally scoped to recompute
+            # total_career_pubs -- which scoring_pipeline.passes_ranking_publication_threshold
+            # DOES read as a hard gate -- and that was cancelled: total_career_pubs holds a
+            # career total on most rows and a frozen in-corpus count on others, so writing the
+            # corpus aggregate over it would have redefined the column and moved the >=10 gate
+            # as a side effect. The aggregate now lands in its own column and total_career_pubs
+            # is untouched, so this stage cannot move any board.
+            # Full-corpus, TA-agnostic, ~2-4 min; exits non-zero on a partial write and never
+            # reports OK on one.
+            run_stage(8, "in_corpus_pub_count(8f)", cmd_in_corpus_pub_count(str(ingest_summary)))
             run_stage(8, "cohort_classification(8d)", cmd_cohort(slug))
             # 8e: FULL reclassify of hcps_v2 into hcp_industry_classification_v1. MUST be the last
             # step of stage 8 -- after institution_normalized is final (create_hcps + the 8a/8b
