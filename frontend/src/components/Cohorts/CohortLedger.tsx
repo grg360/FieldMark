@@ -24,6 +24,7 @@ import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFla
 import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
 import { getDrawerLayerData, prefetchDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
 import TrialsPopup from "./TrialsPopup";
+import TerritorySelect from "./TerritorySelect";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -49,14 +50,15 @@ import {
   type LedgerMeta,
   type LedgerRow,
   type Band,
-  LEDGER_REGION_OPTIONS,
+  ledgerTerritoryTree,
+  scopeFromKey,
+  scopeIncludesUs,
   titleCase,
   money,
   type LedgerScope,
 } from "../../lib/cohortLedger";
 import { getCurrentUser } from "../../lib/authHelpers";
 import { getUserTerritoryContext } from "../../lib/home";
-import { statesFromTerritory } from "../../lib/filter-context";
 
 // ≤767px is the mobile treatment (stage 4). Reactive to viewport changes / rotation.
 function useIsMobile(): boolean {
@@ -958,8 +960,17 @@ function Row({
               <span style={{ font: `600 44px ${FACE.data}`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.86, letterSpacing: "-.015em" }}>
                 {row.rank}
               </span>
-              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>US</span>
+              {/* Scope label was hardcoded "US" — it asserted US for every row, so a
+                  German KOL read "#1 US". It now names the country this rank is actually
+                  against. Rising additionally carries the Europe rank, giving the three
+                  scores: country · Europe · global. */}
+              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
+                {row.scoredCountry ?? "US"}
+              </span>
             </div>
+            {row.europeRank != null && (
+              <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUROPE</span>
+            )}
             <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
           </div>
         ) : (
@@ -1247,7 +1258,12 @@ function MobileRow({
           {row.rank != null ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
               <span style={{ font: `600 30px ${FACE.data}`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
-              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>US</span>
+              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
+                {row.scoredCountry ?? "US"}
+              </span>
+              {row.europeRank != null && (
+                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EU</span>
+              )}
               <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
             </div>
           ) : (
@@ -1688,11 +1704,11 @@ export default function CohortLedger() {
       if (!alive) return;
       const mine: LedgerScope | null =
         ctx && ctx.states.length > 0
-          ? { key: "mine", label: ctx.territoryLabel ?? "My territory", states: ctx.states }
+          ? { key: "mine", label: ctx.territoryLabel ?? "My territory", states: ctx.states, countries: ["US"] }
           : null;
       setMyTerritory(mine);
       setScope(
-        cfg.tag === "COM" && mine ? mine : { key: "national", label: "National", states: [] },
+        cfg.tag === "COM" && mine ? mine : { key: "us:national", label: "United States", states: [], countries: ["US"] },
       );
       setTerritoryResolved(true);
     })();
@@ -1703,15 +1719,7 @@ export default function CohortLedger() {
   }, []);
   const applyScope = useCallback(
     (key: string) => {
-      const next: LedgerScope =
-        key === "mine" && myTerritory
-          ? myTerritory
-          : {
-              key,
-              label: LEDGER_REGION_OPTIONS.find((o) => o.key === key)?.label ?? "National",
-              states: statesFromTerritory(key),
-            };
-      setScope(next);
+      setScope(scopeFromKey(key, myTerritory));
     },
     [myTerritory],
   );
@@ -1722,7 +1730,7 @@ export default function CohortLedger() {
   useEffect(() => {
     if (!territoryResolved) return;
     setScope(
-      cfg.tag === "COM" && myTerritory ? myTerritory : { key: "national", label: "National", states: [] },
+      cfg.tag === "COM" && myTerritory ? myTerritory : { key: "us:national", label: "United States", states: [], countries: ["US"] },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg]);
@@ -1772,8 +1780,12 @@ export default function CohortLedger() {
     loadingMore.current = true;
     // COM re-loads page 0 when the tier filter changes (a different population → a fresh
     // contiguous ranking); EST/RS ignore selectedTiers.
+    // States are meaningful ONLY on a US scope — the RPCs return zero rows for a
+    // country+state mismatch (e.g. {DE} + {NY}). scopeFromKey already clears states on a
+    // European scope; this is the belt-and-braces gate at the call site.
+    const statesArg = scopeIncludesUs(scope) ? scope?.states : [];
     const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
-    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0, LEDGER_PAGE_SIZE, tiersArg, scope?.states)])
+    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0, LEDGER_PAGE_SIZE, tiersArg, statesArg, scope?.countries)])
       .then(([m, page]) => {
         if (!alive) return;
         setMeta(m);
@@ -1809,8 +1821,12 @@ export default function CohortLedger() {
           ? { tierPriority: lastRow.tierPriority ?? 5, patientVolume: lastRow.patientVolume ?? 0, hcpId: lastRow.hcpId }
           : undefined
         : (lastRow?.rank ?? 0);
+    // States are meaningful ONLY on a US scope — the RPCs return zero rows for a
+    // country+state mismatch (e.g. {DE} + {NY}). scopeFromKey already clears states on a
+    // European scope; this is the belt-and-braces gate at the call site.
+    const statesArg = scopeIncludesUs(scope) ? scope?.states : [];
     const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
-    loadLedgerPage(cfg, afterCursor, LEDGER_PAGE_SIZE, tiersArg, scope?.states)
+    loadLedgerPage(cfg, afterCursor, LEDGER_PAGE_SIZE, tiersArg, statesArg, scope?.countries)
       .then((page) => {
         setRows((prev) => [...prev, ...page.rows]);
         setHasMore(page.hasMore);
@@ -1919,16 +1935,14 @@ export default function CohortLedger() {
                     label — counts, chips and rows all reslice server-side. */}
                 <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ ...mono(9, 500), color: P.ink4, letterSpacing: ".14em" }}>TERRITORY</span>
-                  <select
-                    value={scope?.key ?? "national"}
-                    onChange={(e) => applyScope(e.target.value)}
-                    style={{ ...mono(11), background: P.card, color: P.ink5, border: `1px solid ${P.lineStrong}`, padding: "4px 6px", letterSpacing: ".08em" }}
-                  >
-                    {myTerritory ? <option value="mine">{myTerritory.label.toUpperCase()}</option> : null}
-                    {LEDGER_REGION_OPTIONS.map((o) => (
-                      <option key={o.key} value={o.key}>{o.label.toUpperCase()}</option>
-                    ))}
-                  </select>
+                  <TerritorySelect
+                    nodes={ledgerTerritoryTree(cfg.tag)}
+                    value={scope?.key ?? "us:national"}
+                    onChange={applyScope}
+                    mine={myTerritory ? { key: "mine", label: myTerritory.label } : null}
+                    mono={mono}
+                    palette={P}
+                  />
                 </label>
               </span>
             </div>

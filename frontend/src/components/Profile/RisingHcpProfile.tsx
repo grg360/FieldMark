@@ -660,7 +660,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               <div style={{ font: `500 15px/1 ${MONO}`, color: RANK_GOLD }}>{fmtPctl(composite)}</div>
             </div>
             <div style={{ width: 1, height: 16, background: CANON.LINE.EDGE }} />
-            <div onClick={() => navigate("/rising?mode=quadrant")} style={{ display: "flex", alignItems: "baseline", gap: 8, cursor: "pointer" }}>
+            <div onClick={() => navigate("/rising/quadrant")} style={{ display: "flex", alignItems: "baseline", gap: 8, cursor: "pointer" }}>
               <div style={mono(9, DIM, 0.13)}>QUADRANT</div>
               <div style={{ font: `500 11px/1 ${MONO}`, letterSpacing: ".11em", color: quad.color }}>{quad.name}</div>
               <div style={mono(9, GREEN_DK, 0.11)}>SEE POSITION ↗</div>

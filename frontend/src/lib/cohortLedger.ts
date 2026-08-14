@@ -18,6 +18,8 @@
 // Source of fact is the DB (ledger_meta for ceilings; *_ledger RPCs for rows).
 
 import { supabase } from "./supabase";
+import { statesFromTerritory } from "./filter-context";
+import { resolveLocation } from "./location";
 
 export type ColKind = "pct" | "money" | "count";
 
@@ -202,6 +204,18 @@ export interface LedgerRow {
   supportedEvidence?: string | null; // verbatim from the view (group 5 stays "cross-indication targeted therapy observed")
   supportedEvidenceRank?: number | null;
   lungWeighted?: boolean;
+  // Location (2026-08-14). scoredCountry is the country this row is PLACED by — for
+  // Established that is the country it was scored in (scope_value), for Rising the
+  // re-derived current location. The rest feed the confidence hedge in lib/location.ts.
+  scoredCountry?: string | null;
+  /** Rank within the HCP's own country (Rising). Equals `rank` on a single-country slice. */
+  countryRank?: number | null;
+  /** Rank across all of Europe (Rising). NULL for non-European HCPs. */
+  europeRank?: number | null;
+  country?: string | null;
+  currentCountry?: string | null;
+  affiliationConfidence?: string | null;
+  affiliationAsOf?: number | null;
 }
 
 export interface LedgerData {
@@ -514,7 +528,25 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     chips = [S(r.specialty), loc].filter(Boolean);
   } else {
     const inst = S(r.institution);
-    chips = [S(r.state), inst].filter(Boolean);
+    // Location chip: the US state where we have one (unchanged for US rows), otherwise
+    // the country this row is placed by — so a European KOL reads "GERMANY · Charité"
+    // instead of losing their location entirely to a US-only NPPES field. Hedged via
+    // lib/location.ts: a location we cannot confirm is current carries its evidence year.
+    const state = S(r.state);
+    let place = state;
+    if (!place) {
+      const loc = resolveLocation({
+        country: S(r.scored_country) || S(r.country),
+        currentCountry: S(r.current_country),
+        affiliationConfidence: S(r.affiliation_confidence),
+        affiliationAsOf: r.affiliation_as_of == null ? null : Number(r.affiliation_as_of),
+      });
+      // Established places by the SCORED country, so never let the hedge relabel the
+      // chip to a different country than the pool this rank belongs to.
+      const placed = S(r.scored_country) || loc.code || "";
+      place = placed && loc.hedged && loc.asOf ? `${placed} · ${loc.asOf}` : placed;
+    }
+    chips = [place, inst].filter(Boolean);
   }
 
   const base: LedgerRow = {
@@ -529,6 +561,13 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     scores,
     idx: cfg.tag === "COM" ? null : Number(r.idx),
     summary: (r.summary as string) ?? null,
+    scoredCountry: S(r.scored_country) || null,
+    countryRank: r.country_rank == null ? null : Number(r.country_rank),
+    europeRank: r.europe_rank == null ? null : Number(r.europe_rank),
+    country: S(r.country) || null,
+    currentCountry: S(r.current_country) || null,
+    affiliationConfidence: S(r.affiliation_confidence) || null,
+    affiliationAsOf: r.affiliation_as_of == null ? null : Number(r.affiliation_as_of),
   };
 
   if (cfg.tag === "COM") {
@@ -573,18 +612,129 @@ export const LEDGER_PAGE_SIZE = 1000; // PostgREST hard cap; also our page size
 // selector emits these canonical keys, so statesFromTerritory can never miss
 // on casing); "national" = empty states = the RPCs' DEFAULT behavior.
 export interface LedgerScope {
-  key: string; // "mine" | "northeast" | ... | "national"
-  label: string; // display word (territory_label for mine, region name otherwise)
-  states: string[]; // [] = national
+  key: string; // "mine" | "us:northeast" | "us:national" | "eu:all" | "eu:DE"
+  label: string; // display word (territory_label for mine, region/country name otherwise)
+  states: string[]; // US state codes. [] = no state filter.
+  countries: string[]; // country codes passed to the RPCs' p_countries.
 }
+// US sub-territories. "National" is NOT here any more: it was the old US-only label for
+// "no state filter", and now that the top level is geographic the PARENT ("United States")
+// carries that meaning. Selecting the parent yields exactly the scope the old
+// "national" key produced — countries ["US"], states [] — so the US board is unchanged.
 export const LEDGER_REGION_OPTIONS: { key: string; label: string }[] = [
   { key: "northeast", label: "Northeast" },
   { key: "southeast", label: "Southeast" },
   { key: "midwest", label: "Midwest" },
   { key: "southwest", label: "Southwest" },
   { key: "west", label: "West" },
-  { key: "national", label: "National" },
 ];
+
+// ── Territory axis 2: country (2026-08-14) ─────────────────────────────────
+// The ledger territory is now TWO axes: country (or multi-country region) and, only
+// when the country is the US, a US-state territory. US states are meaningless for a
+// German KOL — the RPC returns 0 rows for {DE} + {NY} — so the states axis is gated on
+// the country resolving to US, mirroring the scopeIncludesUs rule in lib/api.ts.
+//
+// "Europe" is GEOGRAPHY, not the EU: the UK, Switzerland and Norway are Europe and
+// belong on this axis regardless of membership. This list is stable reference data, not
+// a tuned value — countries with no rows simply return an empty ledger.
+export const EUROPE_COUNTRIES: string[] = [
+  "GB", "DE", "FR", "IT", "ES", "NL", "BE", "AT", "IE", "PT", "CH", "SE", "DK", "NO",
+  "FI", "IS", "PL", "CZ", "HU", "GR", "RO", "BG", "SK", "SI", "HR", "EE", "LV", "LT",
+  "LU", "MT", "CY", "RS", "UA",
+];
+
+export const COUNTRY_LABELS: Record<string, string> = {
+  GB: "United Kingdom", DE: "Germany", FR: "France", IT: "Italy", ES: "Spain",
+  NL: "Netherlands", BE: "Belgium", AT: "Austria", IE: "Ireland", PT: "Portugal",
+  CH: "Switzerland", SE: "Sweden", DK: "Denmark", NO: "Norway", FI: "Finland",
+  IS: "Iceland", PL: "Poland", CZ: "Czechia", HU: "Hungary", GR: "Greece",
+  RO: "Romania", BG: "Bulgaria", SK: "Slovakia", SI: "Slovenia", HR: "Croatia",
+  EE: "Estonia", LV: "Latvia", LT: "Lithuania", LU: "Luxembourg", MT: "Malta",
+  CY: "Cyprus", RS: "Serbia", UA: "Ukraine", US: "United States",
+};
+
+/** Europe country options, ordered by market size then alphabetically. */
+export const LEDGER_EUROPE_OPTIONS: { key: string; label: string }[] = (() => {
+  const primary = ["GB", "DE", "FR", "IT", "ES", "NL", "CH"];
+  const rest = EUROPE_COUNTRIES.filter((c) => !primary.includes(c)).sort((a, b) =>
+    (COUNTRY_LABELS[a] ?? a).localeCompare(COUNTRY_LABELS[b] ?? b),
+  );
+  return [...primary, ...rest].map((c) => ({ key: `eu:${c}`, label: COUNTRY_LABELS[c] ?? c }));
+})();
+
+/**
+ * Resolve a selector key into a full two-axis scope.
+ *
+ * "mine" is the user's own US territory and keeps its US country axis. Every other key
+ * is prefixed so the two axes can never be confused: "us:*" carries a state list,
+ * "eu:*" carries a country list and NEVER a state list.
+ */
+export function scopeFromKey(key: string, myTerritory: LedgerScope | null): LedgerScope {
+  if (key === "mine" && myTerritory) return myTerritory;
+  if (key === "eu:all") {
+    return { key, label: "Europe (all)", states: [], countries: EUROPE_COUNTRIES };
+  }
+  if (key.startsWith("eu:")) {
+    const cc = key.slice(3).toUpperCase();
+    return { key, label: COUNTRY_LABELS[cc] ?? cc, states: [], countries: [cc] };
+  }
+  const regionKey = key.startsWith("us:") ? key.slice(3) : key;
+  return {
+    key: `us:${regionKey}`,
+    label: LEDGER_REGION_OPTIONS.find((o) => o.key === regionKey)?.label ?? "United States",
+    states: statesFromTerritory(regionKey),
+    countries: ["US"],
+  };
+}
+
+/**
+ * The territory menu: two geographic parents, each SELECTABLE and EXPANDABLE.
+ *
+ *   United States — selecting it IS the national board (states: []); expanding reveals
+ *                   the five US sub-territories.
+ *   Europe        — selecting it is the all-Europe board; expanding reveals the countries.
+ *
+ * `selectable` is false for a parent a cohort cannot express: Established ranks are
+ * scope-local AND normalised within scope, so an all-Europe Established selection would
+ * return several rank-1 rows. That parent stays EXPANDABLE (its countries are all valid
+ * individually) but is not itself selectable — see LEDGER_TERRITORY_TREE.
+ */
+export interface TerritoryNode {
+  key: string;
+  label: string;
+  selectable: boolean;
+  children: { key: string; label: string }[];
+}
+
+export function ledgerTerritoryTree(cohortTag: string): TerritoryNode[] {
+  const us: TerritoryNode = {
+    key: "us:national",
+    label: "United States",
+    selectable: true,
+    children: LEDGER_REGION_OPTIONS.map((o) => ({ key: `us:${o.key}`, label: o.label })),
+  };
+  // Community has no country axis at all (~50% of that board has no country signal).
+  if (cohortTag === "COM") return [us];
+  return [
+    us,
+    {
+      key: "eu:all",
+      label: "Europe",
+      // Rising's rank is derived at read time over whatever pool is selected, so an
+      // all-Europe ordering is correct. Established's is not — it degrades to
+      // expand-only: every European COUNTRY remains selectable, only the aggregate is
+      // withheld, until an additive scorer scope exists for it.
+      selectable: cohortTag === "RS",
+      children: LEDGER_EUROPE_OPTIONS,
+    },
+  ];
+}
+
+/** True when the state axis is meaningful for this scope (country resolves to US). */
+export function scopeIncludesUs(scope: LedgerScope | null): boolean {
+  return !!scope && scope.countries.length === 1 && scope.countries[0] === "US";
+}
 /** COM roster keyset cursor (Phase 3): the last row's raw ordering tuple. The RPC
  *  negates volume internally so the composite (tier, -volume, hcp_id) compares as
  *  one ascending tuple. */
@@ -604,6 +754,7 @@ export async function loadLedgerPage(
   limit = LEDGER_PAGE_SIZE,
   tiers?: string[],
   states?: string[],
+  countries?: string[],
 ): Promise<LedgerData & { hasMore: boolean }> {
   // COM's roster RPC takes the composite cursor + p_tiers (default anchored+supported
   // when omitted) and returns filtered_total alongside cohort_total. EST/RS RPCs take
@@ -622,6 +773,10 @@ export async function loadLedgerPage(
   if (cfg.tag === "COM" && tiers && tiers.length) args.p_tiers = tiers;
   // Territory scope (all three RPCs accept p_states; omitted = DEFAULT '{}' = national).
   if (states && states.length) args.p_states = states;
+  // Country axis (EST/RS only — community_ledger has no p_countries and stays US-only,
+  // held deliberately: ~50% of that board has no country signal at all). Omitted =
+  // the RPCs' DEFAULT '{US}', so an unset country axis behaves exactly as before.
+  if (cfg.tag !== "COM" && countries && countries.length) args.p_countries = countries;
   const { data, error } = await supabase.rpc(cfg.rpc, args);
   if (error) {
     console.error(`${cfg.rpc} failed:`, error.message);
