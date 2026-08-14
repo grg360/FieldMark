@@ -1392,15 +1392,17 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
     (async () => {
       const [signals, hcpRes] = await Promise.all([
         getHcpWebSignals(row.hcpId),
-        supabase.from("hcps_v2").select("nppes_practice_setting, total_career_pubs, institution_normalized").eq("id", row.hcpId).maybeSingle(),
+        supabase.from("hcps_v2").select("nppes_practice_setting, in_corpus_pub_count, institution_normalized").eq("id", row.hcpId).maybeSingle(),
       ]);
       if (!alive) return;
-      const h = (hcpRes.data ?? {}) as { nppes_practice_setting?: string | null; total_career_pubs?: number | null; institution_normalized?: string | null };
+      const h = (hcpRes.data ?? {}) as { nppes_practice_setting?: string | null; in_corpus_pub_count?: number | null; institution_normalized?: string | null };
       setFacts({
         loaded: true,
         signals,
         setting: h.nppes_practice_setting ?? null,
-        pubs: h.total_career_pubs ?? null,
+        // in_corpus_pub_count, NOT total_career_pubs: what WE hold, not a career
+        // total. NULL means no OpenAlex record — unmeasured, never zero.
+        pubs: h.in_corpus_pub_count ?? null,
         nppesInstitution: h.institution_normalized ?? null,
       });
     })();
@@ -1448,7 +1450,10 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
     { label: "MEDICARE REACH", value: vol != null ? vol.toLocaleString() + " beneficiaries · 3-year Part B" : "No Part B record — unmeasured, not zero", dim: vol == null },
     { label: "SETTING", value: [facts.setting ? titleCase(facts.setting) : null, loc || null].filter(Boolean).join(" · ") || "Not on record", dim: !facts.setting && !loc },
     { label: "PHARMA CONTACT", value: eng != null && eng > 0 ? money(eng) + " lifetime" + (companies ? " across " + Math.round(companies) + " companies" : "") + " — a fact, not a rating" : "None recorded — absence of a record, not of relationships", dim: !(eng != null && eng > 0) },
-    { label: "PUBLICATIONS", value: facts.pubs != null && facts.pubs > 0 ? String(facts.pubs) + " on record" : "None on record — expected in this cohort, not a gap", dim: !(facts.pubs != null && facts.pubs > 0) },
+    // No `> 0` test: in_corpus_pub_count is never 0 when non-null (a staged row has
+    // at least one flattened publication). NULL is the only empty state and it means
+    // unmeasured — no OpenAlex record — not a count of nothing.
+    { label: "PUBLICATIONS (IN CORPUS)", value: facts.pubs != null ? String(facts.pubs) + " in the FieldMark corpus" : "Not indexed — no OpenAlex record. Expected in this cohort, not a gap", dim: facts.pubs == null },
   ];
 
   // RIGHT rail — the per-row matrix.
