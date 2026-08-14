@@ -544,8 +544,14 @@ export default function HcpProfileBrief() {
                       </div>
                     ))}
                   </div>
+                  {/* Provenance for the category mix above, NOT a publication count.
+                      record_depth.papers counts the distinct papers the POSITIONS were
+                      extracted from (hcp_scientific_positions_v1), so it is a small
+                      number beside a full career record — this read "4 PUBLICATIONS"
+                      for an HCP with 285. "FROM n PAPERS" states the relationship and
+                      matches the SOURCES/PAPERS vocabulary of the synthesis stamp. */}
                   <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink6, paddingTop: 2 }}>
-                    {p.record_depth.papers ?? 0} PUBLICATION{p.record_depth.papers === 1 ? "" : "S"}{p.record_depth.oldest && p.record_depth.newest ? ` · ${p.record_depth.oldest}–${p.record_depth.newest}` : ""}
+                    FROM {p.record_depth.papers ?? 0} PAPER{p.record_depth.papers === 1 ? "" : "S"}{p.record_depth.oldest && p.record_depth.newest ? ` · ${p.record_depth.oldest}–${p.record_depth.newest}` : ""}
                   </span>
                 </div>
               ) : null}

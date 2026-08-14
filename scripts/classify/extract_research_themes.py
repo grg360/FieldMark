@@ -70,18 +70,18 @@ TARGET_HCPS_SQL_NSCLC_RISING_US = """
 SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.us_rank
 FROM hcps_v2 h
 JOIN hcp_rising_star_ranks_v3 r ON r.hcp_id = h.id
-WHERE r.therapeutic_area_id = %s
-  AND h.country = 'US'
+WHERE r.therapeutic_area_id = %(ta_id)s
+  AND h.current_country = 'US'
   AND r.us_rank IS NOT NULL
 ORDER BY r.us_rank ASC
 """
 
-TARGET_HCPS_SQL_ESTABLISHED_US = """
+TARGET_HCPS_SQL_ESTABLISHED_REGION = """
 SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
 FROM hcps_v2 h
 JOIN hcp_established_ranks_v3 r ON r.hcp_id = h.id
-WHERE r.therapeutic_area_id = %s
-  AND r.scope_type = 'region' AND r.scope_value = 'US'
+WHERE r.therapeutic_area_id = %(ta_id)s
+  AND r.scope_type = 'region' AND r.scope_value = ANY(%(scope_value)s)
 ORDER BY r.rank ASC
 """
 
@@ -89,7 +89,7 @@ TARGET_HCPS_SQL_ESTABLISHED_GLOBAL = """
 SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
 FROM hcps_v2 h
 JOIN hcp_established_ranks_v3 r ON r.hcp_id = h.id
-WHERE r.therapeutic_area_id = %s
+WHERE r.therapeutic_area_id = %(ta_id)s
   AND r.scope_type = 'global'
 ORDER BY r.rank ASC
 """
@@ -101,7 +101,7 @@ TARGET_HCPS_SQL_RISING_COMPOSITE_GLOBAL = """
 SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
 FROM hcps_v2 h
 JOIN hcp_rising_composite_v1 r ON r.hcp_id = h.id
-WHERE r.therapeutic_area_id = %s
+WHERE r.therapeutic_area_id = %(ta_id)s
   AND r.scope_type = 'global'
 ORDER BY r.rank ASC
 """
@@ -139,11 +139,11 @@ TA_CONFIGS = {
             "'a defined patient-selection strategy'"
         ),
         "selection": {
-            "us": TARGET_HCPS_SQL_ESTABLISHED_US,
+            "region": TARGET_HCPS_SQL_ESTABLISHED_REGION,
             "global": TARGET_HCPS_SQL_ESTABLISHED_GLOBAL,
             "rising-global": TARGET_HCPS_SQL_RISING_COMPOSITE_GLOBAL,
         },
-        "default_scope": "us",
+        "default_scope": "region",
     },
 }
 DEFAULT_TA = "nsclc"
@@ -467,9 +467,16 @@ def call_claude(
     raise RuntimeError(f"Claude API failed after retries: {last_error}")
 
 
-def fetch_target_hcps(conn: psycopg.Connection, target_sql: str, ta_id: str) -> List[Dict[str, Any]]:
+def fetch_target_hcps(
+    conn: psycopg.Connection,
+    target_sql: str,
+    ta_id: str,
+    scope_value: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
     with conn.cursor() as cur:
-        cur.execute(target_sql, (ta_id,))
+        # Named params: psycopg3 ignores keys the statement does not reference, so
+        # one call site serves both the scope_value-bearing SQL and the rest.
+        cur.execute(target_sql, {"ta_id": ta_id, "scope_value": scope_value})
         return list(cur.fetchall())
 
 
@@ -593,8 +600,20 @@ def parse_args() -> argparse.Namespace:
         "--scope",
         default=None,
         help=(
-            "Cohort scope within the TA (e.g. AD: 'us' vs 'global'). "
+            "Cohort scope within the TA (e.g. AD: 'region' vs 'global'). "
             "Defaults to the TA config's default_scope. Valid values are per-TA."
+        ),
+    )
+    parser.add_argument(
+        "--scope-value",
+        nargs="+",
+        default=None,
+        metavar="CODE",
+        help=(
+            "Country code(s) for a region-scoped selection, e.g. --scope-value US, "
+            "or --scope-value DE FR GB for a multi-country region. REQUIRED (no "
+            "default) when the chosen --scope is region-scoped; rejected when it "
+            "is not, so a run can never appear scoped when it is not."
         ),
     )
     parser.add_argument(
@@ -645,13 +664,28 @@ def main() -> int:
             f"Invalid --scope '{scope}' for --ta {ta_slug}. Valid scopes: {valid}"
         )
     target_sql = ta_cfg["selection"][scope]
+    scope_is_regional = "%(scope_value)s" in target_sql
+    scope_value: Optional[List[str]] = args.scope_value
+    if scope_is_regional and not scope_value:
+        raise SystemExit(
+            f"--scope-value is required for --ta {ta_slug} --scope {scope} "
+            f"(region-scoped selection). There is no default: pass the country "
+            f"code(s) explicitly, e.g. --scope-value US."
+        )
+    if scope_value and not scope_is_regional:
+        raise SystemExit(
+            f"--scope-value is not accepted for --ta {ta_slug} --scope {scope} "
+            f"(selection is not region-scoped). Refusing to run rather than "
+            f"silently ignoring it."
+        )
     tag = ta_cfg["tag"]
     domain = ta_cfg["domain"]
     theme_examples = ta_cfg["theme_examples"]
     generic_negative = ta_cfg["generic_negative"]
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(domain=domain)
     # Per-TA/scope checkpoint so an AD run can never resume from an NSCLC checkpoint.
-    checkpoint_path = f"extract_research_themes_{ta_slug}_{scope}_checkpoint.json"
+    scope_tag = scope + ("_" + "-".join(scope_value) if scope_value else "")
+    checkpoint_path = f"extract_research_themes_{ta_slug}_{scope_tag}_checkpoint.json"
 
     database_url = get_required_env("DATABASE_URL")
     api_key = get_required_env("ANTHROPIC_API_KEY")
@@ -677,10 +711,12 @@ def main() -> int:
         conn.autocommit = False
         ta_id = resolve_ta_id(conn, ta_slug)  # fix B: needs conn
         print(
-            f"Loading target HCPs | TA: {tag} ({ta_slug}) | scope: {scope}...",
+            f"Loading target HCPs | TA: {tag} ({ta_slug}) | scope: {scope}"
+            + (f" | scope-value: {','.join(scope_value)}" if scope_value else "")
+            + "...",
             flush=True,
         )
-        hcps = fetch_target_hcps(conn, target_sql, ta_id)
+        hcps = fetch_target_hcps(conn, target_sql, ta_id, scope_value)
         total_loaded = len(hcps)
         print(f"Loaded {total_loaded} HCPs meeting publication threshold.", flush=True)
 

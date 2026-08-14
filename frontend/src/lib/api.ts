@@ -287,11 +287,17 @@ async function enrichAndMapCohortRows(
 
     const missingIds = narrativeIds.filter((id: string) => !narrativeMap.has(id));
     if (missingIds.length > 0) {
+      // This fallback kept the cohort filter but dropped therapeutic_area_slug, so a
+      // narrative written for a DIFFERENT therapeutic area could fill the gap — the
+      // path by which hepatology community narratives could surface on an NSCLC
+      // card. A narrative is about an HCP's standing WITHIN a TA and does not
+      // transfer; the TA filter is restored and absence stays absence.
       const { data: fallbackNarratives, error: fbError } = await supabase
         .from("hcp_narratives_v2")
         .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at")
         .in("hcp_id", missingIds)
         .eq("cohort", narrativeCohort)
+        .eq("therapeutic_area_slug", taSlug)
         .order("generated_at", { ascending: false });
 
       if (fbError) {
@@ -1177,56 +1183,6 @@ async function fetchAllPaginated<T>(
   return { data: allRows, error: null };
 }
 
-/** TA-specific narrative first, then most recent narrative for this HCP. */
-export async function getHCPNarrative(
-  hcpId: string,
-  therapeuticArea?: string,
-): Promise<ApiResult<string | null>> {
-  try {
-    const taSlug = resolveTASlug(therapeuticArea);
-
-    if (taSlug) {
-      // Cohort-keyed table (2026-08-06): a dual-board member holds one row per
-      // cohort, so this generic reader takes the newest — maybeSingle() on
-      // (hcp, slug) alone would error on multi-row.
-      const { data, error } = await supabase
-        .from("hcp_narratives_v2")
-        .select("narrative_text")
-        .eq("hcp_id", hcpId)
-        .eq("therapeutic_area_slug", taSlug)
-        .order("generated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        return { data: null, error: error.message };
-      }
-      if (data?.narrative_text) {
-        return { data: data.narrative_text as string, error: null };
-      }
-    }
-
-    const fallback = await supabase
-      .from("hcp_narratives_v2")
-      .select("narrative_text")
-      .eq("hcp_id", hcpId)
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (fallback.error) {
-      return { data: null, error: fallback.error.message };
-    }
-
-    return { data: (fallback.data?.narrative_text as string | null) ?? null, error: null };
-  } catch (err) {
-    return {
-      data: null,
-      error: err instanceof Error ? err.message : "Unknown error occurred",
-    };
-  }
-}
-
 export async function fetchHcpThemes(hcpId: string): Promise<ApiResult<ResearchTheme[]>> {
   try {
     const { data, error } = await supabase
@@ -1730,18 +1686,19 @@ export async function getHCPDetail(
       ).maybeSingle();
     })();
 
-    // Narrative is TA-strict: NO fallback to other TAs. If the HCP has no
-    // narrative for this TA, narrative is null.
+    // Narrative is TA-strict AND cohort-strict. Taking "newest row for this TA"
+    // silently rendered the WRONG COHORT's narrative: Martin Reck (DE Established
+    // #1) showed a community-cohort v1.0 narrative, because community was simply
+    // the most recent row he had. The rows are fetched for every cohort here and
+    // the one matching the cohort this profile actually resolved is selected after
+    // the rank promise settles (below) — no extra round trip, and a cohort with no
+    // narrative yields none rather than borrowing another cohort's.
     const narrativePromise = supabase
       .from("hcp_narratives_v2")
-      .select("narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug")
+      .select("narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug, cohort")
       .eq("hcp_id", hcpId)
       .eq("therapeutic_area_slug", narrativeTaSlug)
-      // Cohort-keyed table (2026-08-06): newest row wins in this generic
-      // reader; maybeSingle() alone would error on a dual-board member.
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("generated_at", { ascending: false });
 
     const medicarePromise = supabase
       .from("hcp_medicare_summary_v2")
@@ -1861,16 +1818,27 @@ export async function getHCPDetail(
       })
       .filter(Boolean);
 
-    const narrativeData = (narrativeResult as {
-      data?: {
-        narrative_text: string | null;
-        why_now: string | null;
-        engagement_angle: string | null;
-        caution_flags: string | null;
-        signal_strength: string | null;
-        generated_at: string | null;
-      } | null;
-    }).data ?? null;
+    // Cohort-strict selection (see the narrativePromise note above). The rank promise
+    // resolves which cohort THIS profile is, and only that cohort's narrative is used.
+    // The rank tables say "rising"; the narrative table says "rising_star" — the same
+    // mapping the card feed already applies.
+    type NarrativeRow = {
+      narrative_text: string | null;
+      why_now: string | null;
+      engagement_angle: string | null;
+      caution_flags: string | null;
+      signal_strength: string | null;
+      generated_at: string | null;
+      cohort: string | null;
+    };
+    const narrativeRows =
+      ((narrativeResult as { data?: NarrativeRow[] | null }).data ?? []) as NarrativeRow[];
+    const rankCohort = (rankResult as { data?: { cohort?: string | null } | null }).data?.cohort ?? null;
+    const narrativeCohortWanted =
+      rankCohort === "rising" || rankCohort === "rising_composite" ? "rising_star" : rankCohort;
+    const narrativeData: NarrativeRow | null = narrativeCohortWanted
+      ? (narrativeRows.find((r) => r.cohort === narrativeCohortWanted) ?? null)
+      : null;
 
     // Cohort classification AND score are per-TA — they live in the cohort rank tables
     // keyed by therapeutic_area_id, NOT in the global hcps_v2.cohort_classification /

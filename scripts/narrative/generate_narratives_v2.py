@@ -79,6 +79,11 @@ PROMPT_VERSION = "v1.0"
 # still exact). Narratives now cite only durable facts: two-window publication
 # counts with years, collaborator expansion, citation growth, therapeutic focus,
 # and authorship trajectory as a direction, not a percentage.
+# 2026-08-14: the literal below is now only a FALLBACK-FREE default for reference.
+# The authoritative value is narrative_prompt_versions.current_version, loaded at
+# startup by load_prompt_versions(); a missing cohort row is a hard failure, never
+# a silent default (a wrong version stamped on a generated narrative is invisible
+# afterwards, which is exactly the class of drift this table exists to end).
 ESTABLISHED_PROMPT_VERSION = "established_v3.0"
 # v4.1 (2026-08-06): archetype vocabulary removed (retired with the board
 # rebuild — the ranks column is NULL for every row, and v4.0's 'Emerging
@@ -87,6 +92,48 @@ ESTABLISHED_PROMPT_VERSION = "established_v3.0"
 # authorship direction reworded as window claims, not career claims.
 RISING_STAR_PROMPT_VERSION = "rising_star_v4.1"
 ANTHROPIC_VERSION = "2023-06-01"
+
+# Cohort -> current prompt version, loaded once at startup from
+# narrative_prompt_versions (migrations/2026_08_14_narrative_prompt_versions.sql).
+# Populated by load_prompt_versions(); read via prompt_version_for().
+PROMPT_VERSIONS: dict[str, str] = {}
+REQUIRED_PROMPT_COHORTS = ("community", "established", "rising_star")
+
+
+def load_prompt_versions(conn) -> dict[str, str]:
+    """Load the current prompt version per cohort. Fails loudly on a missing row.
+
+    There is deliberately no fallback to the module literals: a generation run
+    that stamps a stale or invented version on thousands of rows leaves no trace
+    of the mistake, so an incomplete table must stop the run rather than let it
+    proceed on a guess.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT cohort, current_version FROM narrative_prompt_versions")
+        # get_db_conn() sets row_factory=dict_row connection-wide, so rows are
+        # mappings: row[0] is a KEY lookup, not positional. Read by column name.
+        loaded = {row["cohort"]: row["current_version"] for row in cur.fetchall()}
+    missing = [c for c in REQUIRED_PROMPT_COHORTS if not loaded.get(c)]
+    if missing:
+        raise SystemExit(
+            "FATAL: narrative_prompt_versions has no current_version for: "
+            + ", ".join(missing)
+            + ". Seed the table (see migrations/2026_08_14_narrative_prompt_versions.sql) "
+              "before generating - refusing to stamp a guessed prompt_version."
+        )
+    PROMPT_VERSIONS.update(loaded)
+    return loaded
+
+
+def prompt_version_for(cohort: str) -> str:
+    """Current prompt version for a cohort. Requires load_prompt_versions() first."""
+    version = PROMPT_VERSIONS.get(cohort)
+    if not version:
+        raise SystemExit(
+            f"FATAL: no prompt version loaded for cohort '{cohort}'. "
+            "load_prompt_versions() must run before generation."
+        )
+    return version
 
 # Pricing (per million tokens) — Sonnet 4.6
 COST_INPUT_PER_MTOK = 3.00
@@ -903,7 +950,7 @@ def fetch_hcps_by_ids(
     hcps_table = get_table_name("hcps", target_version)
     if target_version == "v2":
         hcp_select_cols = (
-            "id,first_name,last_name,institution_normalized,country,"
+            "id,first_name,last_name,institution_normalized,current_country,"
             "cohort_classification,cohort_score,total_career_pubs,career_first_pub_year_v2"
         )
     else:
@@ -929,6 +976,8 @@ def fetch_hcps_by_ids(
                     row["institution"] = row.pop("institution_normalized")
                 if "career_first_pub_year_v2" in row:
                     row["first_pub_year"] = row.pop("career_first_pub_year_v2")
+                if "current_country" in row:
+                    row["country"] = row.pop("current_country")
         hcps.extend(batch)
     return hcps
 
@@ -2150,12 +2199,16 @@ def upsert_narrative(
 ) -> None:
     """Write narrative to hcp_narratives."""
     generated_at = datetime.now(timezone.utc).isoformat()
+    # 2026-08-14: the stamped version comes from narrative_prompt_versions via
+    # prompt_version_for(), not from a module literal, so the generator and every
+    # reader of is_current agree by construction. The cohort keys match the values
+    # written to hcp_narratives_v2.cohort ('community' is the catch-all, as before).
     if ctx.cohort_classification == "rising_star":
-        prompt_version = RISING_STAR_PROMPT_VERSION
+        prompt_version = prompt_version_for("rising_star")
     elif ctx.cohort_classification == "established":
-        prompt_version = ESTABLISHED_PROMPT_VERSION
+        prompt_version = prompt_version_for("established")
     else:
-        prompt_version = PROMPT_VERSION
+        prompt_version = prompt_version_for("community")
     if target_version == "v2":
         # Provenance stamp (2026-08-05): record which scoring snapshot this
         # narrative read. Source rows are overwritten in place on recompute, so
@@ -2534,6 +2587,19 @@ def main() -> int:
         help="Concurrent API workers. 1 = legacy sequential pacing with sleep; 6-8 recommended for batch regens.",
     )
     args = parser.parse_args()
+
+    # .env BEFORE the prompt-version load below. The only other load_dotenv() call
+    # is the first statement of run_pipeline(), which main() does not reach until
+    # after this block -- so without this line get_db_conn() below raises
+    # "Missing DATABASE_URL" on every invocation. Idempotent: run_pipeline's call
+    # stays, so a direct caller of run_pipeline() is unaffected.
+    load_dotenv()
+
+    # Prompt versions come from narrative_prompt_versions, loaded before any
+    # generation so a missing cohort row stops the run here rather than after
+    # thousands of rows have been stamped with a guessed version.
+    with get_db_conn() as _pv_conn:
+        load_prompt_versions(_pv_conn)
 
     if args.hcp_id and args.cohort == "all":
         print(
