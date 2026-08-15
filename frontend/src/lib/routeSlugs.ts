@@ -47,7 +47,7 @@ export const DASHBOARD_SLUG_TO_TRACK: Record<string, Track> = {
 
 const ONCOLOGY_SLUG_TO_LABEL: Record<string, string> = {
   all: "All",
-  nsclc: "NSCLC",
+  nsclc: "Lung Cancer",
   "car-t": "CAR-T",
   dlbcl: "DLBCL",
   melanoma: "Melanoma",

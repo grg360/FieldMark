@@ -1,3 +1,6 @@
+-- TA resolved by SLUG, not name (2026-08-15): therapeutic_areas.name became
+-- 'Lung Cancer'; the slug stays 'nsclc' and is the stable key. Resolving by
+-- name here would return NULL and this would silently emit empty results.
 -- Ledger territory, STAGE 2 — location fields on the row payload, and the decided
 -- country-field split between the two cohorts.
 --
@@ -44,7 +47,7 @@ CREATE OR REPLACE FUNCTION public.established_ledger(
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  with ta as (select id from therapeutic_areas where name = 'NSCLC'),
+  with ta as (select id from therapeutic_areas where slug = 'nsclc'),
   us as (
     select r.hcp_id, r.rank, r.scientific_influence_pctile as sci,
            r.network_influence_pctile as net, r.pharma_engagement_pctile as ph,
@@ -125,7 +128,7 @@ CREATE OR REPLACE FUNCTION public.rising_ledger(
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  with ta as (select id from therapeutic_areas where name = 'NSCLC'),
+  with ta as (select id from therapeutic_areas where slug = 'nsclc'),
   base as (
     select r.hcp_id,
            row_number() over (order by r.rank) as rank,

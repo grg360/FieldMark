@@ -1,3 +1,6 @@
+-- TA resolved by SLUG, not name (2026-08-15): therapeutic_areas.name became
+-- 'Lung Cancer'; the slug stays 'nsclc' and is the stable key. Resolving by
+-- name here would return NULL and this would silently emit empty results.
 -- community_practice_profile — practice-reality payload for PracticeFirstProfile
 -- (captured from live 2026-08-11 via pg_get_functiondef; editor-applied object,
 -- previously restorable from nowhere — this file is now its source of record).
@@ -19,7 +22,7 @@ declare
   v_ta uuid;
   v_result json;
 begin
-  select id into v_ta from therapeutic_areas where name = 'NSCLC';
+  select id into v_ta from therapeutic_areas where slug = 'nsclc';
 
   with med as (
     select beneficiaries_2021, beneficiaries_2022, beneficiaries_2023,

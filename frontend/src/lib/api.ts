@@ -834,7 +834,7 @@ export function taIdForApiSlug(slug: string): string | undefined {
 }
 
 const TA_DISPLAY_NAME_BY_SLUG: Record<string, string> = {
-  nsclc: "NSCLC",
+  nsclc: "Lung Cancer",
   "atopic-dermatitis": "Atopic Dermatitis",
   hepatology: "Hepatology",
   "rare-disease": "Rare Disease",
@@ -3464,7 +3464,7 @@ export interface LandscapeLeaderboards {
 
 function landscapeTaSlugToName(taSlug: string): string {
   const map: Record<string, string> = {
-    nsclc: "NSCLC",
+    nsclc: "Lung Cancer",
     oncology: "Oncology",
     hepatology: "Hepatology",
     immunology: "Immunology",

@@ -59,7 +59,7 @@ const INDICATION_NAME_TO_SLUG: Record<string, string> = {
 
 const INDICATION_SLUG_TO_NAME: Record<string, string> = {
   "all": "All",
-  "nsclc": "NSCLC",
+  "nsclc": "Lung Cancer",
   "car-t": "CAR-T",
   "dlbcl": "DLBCL",
   "melanoma": "Melanoma",

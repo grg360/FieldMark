@@ -1447,7 +1447,6 @@ def load_hcp_contexts(
 def freshness_filter(
     contexts: List[HCPContext],
     supabase: Client,
-    ta_name_map: Dict[str, str],
     target_version: str = "v1",
 ) -> List[HCPContext]:
     """Drop contexts whose narrative is newer than the latest score row."""
@@ -1462,7 +1461,16 @@ def freshness_filter(
     skipped = 0
     for ctx in contexts:
         ta_id = ctx.therapeutic_area_id
-        ta_slug = ta_slug_from_name(ta_name_map.get(ta_id))
+        # SLUG COMES FROM THE COLUMN, NOT FROM THE NAME (2026-08-15).
+        # ta_slug_from_name() lower-cases the DISPLAY NAME and swaps spaces for
+        # underscores. That happened to equal the slug while the TA was called
+        # 'NSCLC'; after the rename to 'Lung Cancer' it yields 'lung_cancer',
+        # which matches none of the 4,740 stored rows. The freshness lookup would
+        # then find nothing, judge every narrative missing, and silently
+        # regenerate the entire corpus. ctx.therapeutic_area_slug is populated
+        # from therapeutic_areas.slug — the same value the writer stamps — so the
+        # filter and the write can no longer disagree.
+        ta_slug = ctx.therapeutic_area_slug
         try:
             narr_query = (
                 supabase.table(narratives_table)
@@ -2497,7 +2505,7 @@ def run_pipeline(
     if not force:
         if not (dry_run and single_hcp_id):
             contexts = freshness_filter(
-                contexts, supabase, ta_name_map, target_version=target_version
+                contexts, supabase, target_version=target_version
             )
         elif dry_run and single_hcp_id:
             print("[DRY RUN] Skipping freshness filter for single-HCP preview.")

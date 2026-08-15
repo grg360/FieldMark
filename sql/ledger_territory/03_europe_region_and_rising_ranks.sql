@@ -1,3 +1,6 @@
+-- TA resolved by SLUG, not name (2026-08-15): therapeutic_areas.name became
+-- 'Lung Cancer'; the slug stays 'nsclc' and is the stable key. Resolving by
+-- name here would return NULL and this would silently emit empty results.
 -- Ledger territory, STAGE 3 — the Europe region as reference data, and the 3-score
 -- Rising model (country rank / Europe rank / global rank).
 --
@@ -69,7 +72,7 @@ CREATE OR REPLACE FUNCTION public.rising_ledger(
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  with ta as (select id from therapeutic_areas where name = 'NSCLC'),
+  with ta as (select id from therapeutic_areas where slug = 'nsclc'),
   europe as (select country_code from region_countries where region_key = 'EUROPE'),
   -- The whole board with its effective country, once. Both auxiliary ranks are computed
   -- over THIS set (the full board), never over the current selection — so they do not

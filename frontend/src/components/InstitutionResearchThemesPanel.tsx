@@ -30,7 +30,7 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
         Top Research Themes
       </div>
       <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginBottom: 12 }}>
-        Most-published {taDisplayName || "NSCLC"} topics at {institutionName}
+        Most-published {taDisplayName || "Lung Cancer"} topics at {institutionName}
       </div>
 
       {themes.length === 0 ? (
