@@ -84,7 +84,21 @@ PROMPT_VERSION = "v1.0"
 # startup by load_prompt_versions(); a missing cohort row is a hard failure, never
 # a silent default (a wrong version stamped on a generated narrative is invisible
 # afterwards, which is exactly the class of drift this table exists to end).
-ESTABLISHED_PROMPT_VERSION = "established_v3.0"
+# v3.1 (2026-08-14): engagement_angle rewritten to open on the STANCE, not on the
+# meeting. v3.0 asked "where this expert's perspective adds value — anchored,
+# where possible, in the specific stances above", and 134 of 229 v3.0 narratives
+# (59%) opened with a meeting frame, 118 of them with the literal words
+# "Conversations anchored in" — the participle came straight out of the
+# instruction. Three causes, all structural: the field was framed as a PLACE
+# ("where"), the requested noun was a TOPIC on both sides of its own comparison
+# ("a topic they have argued a position on is a better angle than a topic they
+# merely publish in"), and it was the only consequential prose field with no
+# constraint on its opener. v3.1 asks for a claim with content, attributed by
+# surname, and makes the encounter the second sentence's job. No banned-phrase
+# list: the minority of v3.0 rows that already led with the stance ("Drilon's
+# published arguments on the inadequacy of current diagnostic assays...") show
+# the target form is reachable by asking for it directly.
+ESTABLISHED_PROMPT_VERSION = "established_v3.1"
 # v4.1 (2026-08-06): archetype vocabulary removed (retired with the board
 # rebuild — the ranks column is NULL for every row, and v4.0's 'Emerging
 # Leader' fallback fabricated a label for all 619); window labels read the
@@ -495,6 +509,79 @@ def fetch_rising_star_top_hcp_ids_v3(
         except Exception as exc:
             print(f"[load] rising selection query failed for TA {ta_id}: {exc}")
     return selected
+
+
+def resolve_cohort_for_hcp(
+    supabase: Client,
+    hcp_id: str,
+    visible_ta_ids: List[str],
+    target_cohorts: List[str],
+) -> Optional[str]:
+    """Resolve an HCP's cohort WITHOUT reading hcps_v2.cohort_classification.
+
+    THE DEAD COLUMN (2026-08-14). hcps_v2.cohort_classification is a legacy,
+    TA-independent, unmaintained denormalisation: NULL for 78.7% of the
+    Established board and 10.5% of the Rising board, and skewed -- 84% of the
+    Established nulls are non-US. Keith M. Kerr sits at Established global rank
+    48 with a GB region rank of 2 and is NULL in that column, so single-HCP mode
+    refused to generate for him. No board derives from it.
+
+    BOARD MEMBERSHIP FIRST, taxonomy second. This mirrors what bulk mode already
+    does: bulk selects by board and then OVERWRITES row["cohort_classification"]
+    from cohort_by_hcp, so the column was never load-bearing there. Single-HCP
+    mode was the one path still trusting it. Checking boards first keeps the two
+    modes agreeing on the same HCP.
+
+    hcp_cohort_classification_v2 is the fallback, not the primary: its
+    'rising_eligible' is a wider career-structure gate than the rising BOARD
+    (a member can be rising_eligible and not ranked), so a board hit is the
+    stronger statement and must win.
+    """
+    def _cohort_ok(name: str) -> bool:
+        return name in target_cohorts
+
+    if _cohort_ok("established"):
+        resp = (
+            supabase.table("hcp_established_ranks_v3")
+            .select("hcp_id")
+            .eq("hcp_id", hcp_id)
+            .in_("therapeutic_area_id", visible_ta_ids)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return "established"
+
+    if _cohort_ok("rising_star"):
+        resp = (
+            supabase.table("hcp_rising_star_ranks_v3")
+            .select("hcp_id")
+            .eq("hcp_id", hcp_id)
+            .in_("therapeutic_area_id", visible_ta_ids)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return "rising_star"
+
+    # Fallback: the maintained per-(hcp, TA) taxonomy.
+    resp = (
+        supabase.table("hcp_cohort_classification_v2")
+        .select("cohort")
+        .eq("hcp_id", hcp_id)
+        .in_("therapeutic_area_id", visible_ta_ids)
+        .execute()
+    )
+    taxonomy_to_cohort = {
+        "established": "established",
+        "rising_eligible": "rising_star",
+        "community": "community",
+    }
+    for row in resp.data or []:
+        mapped = taxonomy_to_cohort.get(row.get("cohort") or "")
+        if mapped and _cohort_ok(mapped):
+            return mapped
+    return None
 
 
 def fetch_rising_star_v3_context_rows(
@@ -1037,13 +1124,21 @@ def load_hcp_contexts(
             print(f"[WARNING] HCP {single_hcp_id} not found.")
             return [], {}
         hcp = hcp_rows[0]
-        cohort = hcp.get("cohort_classification")
-        if not cohort or cohort not in target_cohorts:
+        # Resolved from board membership / hcp_cohort_classification_v2 -- NOT from
+        # hcps_v2.cohort_classification, which is NULL for most of both boards.
+        cohort = resolve_cohort_for_hcp(
+            supabase, single_hcp_id, list(visible_ta_ids), list(target_cohorts)
+        )
+        if not cohort:
             print(
-                f"[WARNING] HCP {single_hcp_id} cohort_classification={cohort!r} "
-                f"does not match target cohorts {target_cohorts}."
+                f"[WARNING] HCP {single_hcp_id} is not on the Established or Rising "
+                f"board for the visible TAs and has no matching "
+                f"hcp_cohort_classification_v2 row for target cohorts {target_cohorts}."
             )
             return [], {}
+        # Keep the in-memory row consistent with the resolved cohort; every
+        # downstream reader takes it from here, not from the DB column.
+        hcp["cohort_classification"] = cohort
         cohort_by_hcp[single_hcp_id] = cohort
         hcps = hcp_rows
         if cohort == "rising_star":
@@ -1984,7 +2079,7 @@ def build_prompt_established(ctx: HCPContext) -> str:
         "Constraints:\n"
         "- narrative: exactly 3 sentences. When positions exist, open on the strongest/most consequential stance (per the STANCE rule) grounded in a position record. When they do not, open on what most distinguishes THIS expert's published output — a specific thematic or methodological concentration, guideline contribution, or senior-author record — not their rank or largest number. Do NOT open with rank, score, or 'is a recognized expert'. State TA-scoped senior-author counts using senior_pub_count and senior_pub_recent_5yr (e.g. '54 NSCLC publications as senior author, including 35 in the last 5 years'). ALWAYS label this figure 'senior-author publications' — NEVER 'career publications', 'career output', or a bare 'publications' count; the number is the TA-scoped senior-author count, not a career total, and mislabelling it as career output is wrong. NEVER use the phrase 'leadership publications'. If guideline_pub_count > 0 you may reference contributor to N TA guideline publications. NEVER cite cohort_score, composite score, total_career_pubs, works_count, or any career-total figure; never an 'X publications over Y years' construction. Be specific and data-anchored; avoid hagiography; invent no numbers.\n"
         "- why_now: one sentence, max 30 words. The single strongest reason to engage THIS expert now — their most consequential sourced stance, a recent senior-author concentration, or a guideline role. Numbers or a specific stance required. Do not open with the therapeutic area.\n"
-        "- engagement_angle: exactly 2 sentences. Where this expert's perspective adds value — anchored, where possible, in the specific stances above (a topic they have argued a position on is a better angle than a topic they merely publish in). Practical and scientific.\n"
+        "- engagement_angle: exactly 2 sentences, and the FIRST must open on this expert's own claim. Sentence 1: state a specific position this expert has argued — its actual content, attributed to them by surname (what they found, what they dispute, what they call inadequate or unresolved). The grammatical subject of that sentence is the expert or their finding; the encounter with an MSL is not the subject and does not appear until sentence 2. Sentence 2: what that position opens up scientifically — the question it puts on the table. A CLAIM CARRIES CONTENT AND COULD BE ARGUED WITH; A TOPIC IS ONLY A SUBJECT HEADING. \"Dequeker's finding that over a quarter of EQA failures produce no corrective action\" is a claim and is sufficient; \"molecular testing standardization\" is a topic and is not. If no Sourced Position supports a specific claim, open on the most concrete single element of the published record instead and say plainly that no argued position is on file — never substitute a thematic label for a stance. Practical and scientific.\n"
         "- signal_strength: exactly 1 sentence. Honest confidence in this read, grounded in how much sourced evidence exists (number of positions, senior-author depth). Do NOT mention pharma, payments, or industry engagement.\n"
         "- caution_flags: 1 sentence OR the JSON literal null. Default to null. Only populate for a SPECIFIC, ACTIONABLE scientific concern evident in the sourced record (e.g. the expert's own published caution about a mechanism or toxicity that directly bears on an MSL conversation). Do NOT reference pharma engagement, payments, or industry relationships. Do NOT hedge or speculate.\n"
         "- NO INDUSTRY LANGUAGE: do not mention Open Payments, pharma engagement, industry collaboration, payments, or commercial relationships in ANY field. None of that data is provided and it is out of scope for this version.\n"
@@ -2312,11 +2407,31 @@ def run_pipeline(
         hcp_rows = fetch_hcps_by_ids(supabase, {single_hcp_id}, target_version)
         if not hcp_rows:
             raise ValueError(f"HCP not found: {single_hcp_id}")
-        actual_cohort = hcp_rows[0].get("cohort_classification")
+        # Resolved from board membership / hcp_cohort_classification_v2. Reading
+        # hcps_v2.cohort_classification here refused every board member the dead
+        # column left NULL -- 78.7% of the Established board, 84% of them non-US.
+        visible_ta_ids_for_gate = load_visible_ta_ids(supabase)
+        actual_cohort = resolve_cohort_for_hcp(
+            supabase, single_hcp_id, visible_ta_ids_for_gate, list(target_cohorts)
+        )
         if actual_cohort != expected_cohort:
+            # Re-resolve without the target filter so the error can name the
+            # cohort the HCP actually belongs to, rather than just saying "None".
+            true_cohort = resolve_cohort_for_hcp(
+                supabase,
+                single_hcp_id,
+                visible_ta_ids_for_gate,
+                ["established", "rising_star", "community"],
+            )
+            if true_cohort is None:
+                raise ValueError(
+                    f"HCP {single_hcp_id} is not on the Established or Rising board "
+                    f"for the visible TAs and has no hcp_cohort_classification_v2 row. "
+                    f"Cannot generate a '{expected_cohort}' narrative."
+                )
             raise ValueError(
-                f"HCP {single_hcp_id} cohort_classification is '{actual_cohort}', "
-                f"not '{expected_cohort}'. Use --cohort {actual_cohort} to regenerate."
+                f"HCP {single_hcp_id} resolves to cohort '{true_cohort}', "
+                f"not '{expected_cohort}'. Use --cohort {true_cohort} to regenerate."
             )
         hcp_name = (
             f"{hcp_rows[0].get('first_name') or ''} {hcp_rows[0].get('last_name') or ''}"
