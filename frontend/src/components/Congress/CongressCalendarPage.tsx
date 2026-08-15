@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { GROUND, LINE, INK, GOLD, DEPTH, FACE, T } from "../../lib/canonicalTokens";
+import { GROUND, LINE, INK, GOLD, DEPTH, FACE, T, SEQ } from "../../lib/canonicalTokens";
 import { supabase } from "../../lib/supabase";
 import PageHero from "../PageHero";
 import {
@@ -504,10 +504,17 @@ export default function CongressCalendarPage() {
                       if (s && meetsThreshold(s)) {
                         return (
                           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                            {/* HELD for Unit 3 (VIZ): magnitude sparkline, legacy
-                                ink4 verbatim. Unit 3 routes it to the SEQ ramp. */}
+                            {/* Ambient magnitude in a neutral list -> the SEQ ramp.
+                                SEQ[3] is the quietest LEGAL step: SEQ[2] measures
+                                2.69:1 on the panel, under the 3:1 floor for a
+                                graphical mark (legacy ink4 was 3.77:1, SEQ[3] is
+                                4.87:1). The FEATURED card's sparkline stays
+                                GOLD.PRIME on purpose — it belongs to the live /
+                                most-recent card and inherits that card's colour
+                                identity, where these are ambient magnitude in a
+                                neutral list. The asymmetry is deliberate. */}
                             <div style={{ minWidth: 0, flex: "0 1 auto" }}>
-                              <VolumeSparks daily={s.daily} color="#77736B" width={110} height={22} />
+                              <VolumeSparks daily={s.daily} color={SEQ[3]} width={110} height={22} />
                             </div>
                             <div style={{ ...mono(T.LABEL, INK.LABEL), minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{INT.format(s.total_posts)} posts</div>
                           </div>

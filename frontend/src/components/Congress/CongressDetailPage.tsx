@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { GROUND, LINE, INK, GOLD, MARK, ACTION, DEPTH, FACE, T } from "../../lib/canonicalTokens";
+import { GROUND, LINE, INK, GOLD, MARK, ACTION, DEPTH, FACE, T, SEQ } from "../../lib/canonicalTokens";
 import { supabase } from "../../lib/supabase";
 import {
   CONGRESSES,
@@ -84,21 +84,35 @@ function fmtShortDay(iso: string): string {
 // Square-root y-scale: the series spans ~45x (55 -> 2,492), so a linear scale
 // crushes the pre-meeting run-up into invisible stubs. sqrt keeps the run-up
 // build legible against the in-session peak while staying monotonic and zero-at-zero.
-// HELD IN FULL for Unit 3 (VIZ). These four are a CHART SERIES, not interface
-// chrome, and canonical keeps VIZ and the semantic set from borrowing either
-// way. Held at the legacy values verbatim so Unit 1 changes no chart pixel.
+// PHASE COLOURS (Unit 3). These four are NOT four categories, which is why they
+// do not take VIZ_ROTATION. baseline -> runup -> session -> post is ONE ordered
+// progression along the x-axis: contiguous blocks of the same quantity (posts
+// per day), not stacked segments that need telling apart. VIZ_ROTATION's rule —
+// "consecutive bands take non-adjacent hues" — exists for the latter, and
+// applying it here would make a temporal build read as four unrelated things.
+// So the three CONTEXT phases take consecutive steps of the SEQ ramp, which is
+// what an ordered progression is, and prominence rises with proximity to the
+// meeting: baseline < post < runup.
 //
-// WHY THE WHOLE ARRAY AND NOT JUST baseline: run-up was ink4 and post-session
-// was ink5, and Unit 1's ink ramp sends BOTH to INK.MUTE — which would have
-// silently collapsed two of the four categories onto one colour. The ink
-// convergence is correct for text (ink5 sat at 2.33:1, below the floor) and
-// wrong for a categorical series. Unit 3 gives these four real VIZ slots, with
-// the in-session amber keeping its live/imminent meaning through the mapping.
+// SESSION STAYS GOLD.PRIME, AND THAT IS DELIBERATE. Canonical says VIZ and the
+// semantic accents never borrow from each other, and VIZ carries no amber at all
+// — its warm quadrant (40°-100°) is reserved precisely so "a chart never
+// collides with amber". No VIZ slot can therefore express in-session. But the
+// RULE'S PURPOSE is that amber appearing in a chart must mean the semantic
+// thing, and here it means exactly that: the meeting is on — the same claim
+// STATE_STYLE.live makes with the same token. This is the rule satisfied, not
+// bypassed. It is the one sanctioned crossing on this surface; if strict
+// separation is ever wanted, the alternative is all four phases on SEQ with the
+// session window marked by amber interface chrome under the axis instead.
+//
+// Prominence ordering is preserved exactly and every context step gains contrast
+// against the card (relative luminance): baseline .0365->.0487, post
+// .0872->.1087, runup .1724->.2373, session .4240 unchanged.
 const PHASES = [
-  { key: "baseline", label: "BASELINE CHATTER", color: "#3A352F" },
-  { key: "runup", label: "RUN-UP", color: "#77736B" },
-  { key: "session", label: "IN-SESSION", color: "#E8A020" },
-  { key: "post", label: "POST-SESSION", color: "#57534b" },
+  { key: "baseline", label: "BASELINE CHATTER", color: SEQ[1] },
+  { key: "runup", label: "RUN-UP", color: SEQ[3] },
+  { key: "session", label: "IN-SESSION", color: GOLD.PRIME },
+  { key: "post", label: "POST-SESSION", color: SEQ[2] },
 ] as const;
 type PhaseKey = (typeof PHASES)[number]["key"];
 
@@ -189,11 +203,6 @@ function VolumeChart({ c, s }: { c: Congress; s: CongressSocial }) {
 }
 
 // Compact follower formatting for the Top Voices panel (49,684 -> "49.7K").
-// HELD for Unit 3 (VIZ): the voice and hashtag bars are MAGNITUDE, which
-// canonical routes to the SEQ ramp, not to a semantic accent. Kept as the
-// legacy indigo verbatim so Unit 1 changes no chart pixel.
-const COLOR_INDIGO_HELD_UNIT3 = "#5566E8";
-
 const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
 function PresenterCard({ p }: { p: ConfirmedPresenter }) {
@@ -465,7 +474,7 @@ export default function CongressDetailPage() {
                                       <span style={mono(T.MICRO, INK.MUTE)}>{pct(v).toFixed(1)}%</span>
                                     </div>
                                     <div style={{ height: 4, background: LINE.EDGE, borderRadius: 1, overflow: "hidden" }}>
-                                      <div style={{ height: "100%", width: `${(v.posts / maxPosts) * 100}%`, background: COLOR_INDIGO_HELD_UNIT3, borderRadius: 1 }} />
+                                      <div style={{ height: "100%", width: `${(v.posts / maxPosts) * 100}%`, background: SEQ[4], borderRadius: 1 }} />
                                     </div>
                                   </div>
                                 </div>
@@ -499,7 +508,7 @@ export default function CongressDetailPage() {
                             <span style={mono(T.LABEL, INK.LABEL)}>{INT.format(h.posts)}</span>
                           </div>
                           <div style={{ height: 5, background: LINE.EDGE, borderRadius: 1, overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${(h.posts / maxPosts) * 100}%`, background: COLOR_INDIGO_HELD_UNIT3, borderRadius: 1 }} />
+                            <div style={{ height: "100%", width: `${(h.posts / maxPosts) * 100}%`, background: SEQ[4], borderRadius: 1 }} />
                           </div>
                         </div>
                       ));
