@@ -138,6 +138,24 @@ BEGIN
 
   SELECT id INTO v_anchor FROM field_intel_anchors WHERE pubmed_id = p_pubmed_id;
   IF v_anchor IS NULL THEN
+-- ── ARCHITECTURAL GAP, LOGGED 2026-08-15 — THE FORUM HAS NO TA SCOPE ────────
+  -- "In the corpus" is this RPC's ENTIRE eligibility test. Not "in this TA's
+  -- corpus" — any row in publications_v2, from any therapeutic area. That is how
+  -- PMID 40305708 ("Phase 3 Trial of Semaglutide in MASH", NEJM, Hepatology-
+  -- tagged, 590 citations) became a live anchor on a lung-cancer forum, and why
+  -- it sorted FIRST: getForumIndex orders by citation_count across an unfiltered
+  -- set, and it out-cites every NSCLC anchor by better than 2x.
+  --
+  -- NOT A CORPUS PROBLEM. Unlike the mesothelioma contamination, nothing in
+  -- publication_therapeutic_areas_v2 is wrong here — that paper is correctly
+  -- tagged Hepatology and only Hepatology. The corpus is clean; the forum simply
+  -- does not ask which TA it belongs to.
+  --
+  -- SCOPING IT IS NOT A ONE-LINE FILTER. field_intel_anchors carries no
+  -- therapeutic_area_id, and the forum has no TA at all: no route param, no
+  -- config, no column. A real fix needs three things — a column on the anchor
+  -- table, a predicate here, and a route or config source for the TA. LOGGED,
+  -- DELIBERATELY NOT BUILT.
     SELECT id, journal INTO v_pub_id, v_journal FROM publications_v2 WHERE pubmed_id = p_pubmed_id;
     IF v_pub_id IS NULL THEN
       RETURN jsonb_build_object('ok', false, 'reason', 'That publication is not in the FieldMark corpus.');
