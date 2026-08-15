@@ -7,6 +7,13 @@
 // only the pre-existing seed corpus carries the SEEDED marker.
 
 import { useState } from "react";
+// ── SEAM, DELIBERATE (2026-08-15) ───────────────────────────────────────────
+// This file stays on the LEGACY designTokens vocabulary while its four siblings
+// (ForumIndexPage, ThreadPage, ModerationPage, fiUi) moved to canonicalTokens.
+// That is not an oversight. This component renders inside PublicationsListPage
+// (FullCareerView, PublicationCard, PublicationsSurface) — a finished surface —
+// so migrating it here would silently restyle a surface outside this migration.
+// Move it when Publications is migrated, not before.
 import { COLOR, FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
 import { createReply, createThread, FORUM_WRITE_HANDLE, type WriteResult } from "../../lib/fieldIntelligence";
 import { mono, ProvenanceChip } from "./fiUi";
