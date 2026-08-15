@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { COLOR, FONT, GROUND, LINE } from "../../lib/designTokens";
+import { GROUND, LINE, INK, GOLD, DEPTH, FACE, T } from "../../lib/canonicalTokens";
 import { supabase } from "../../lib/supabase";
 import PageHero from "../PageHero";
 import {
@@ -57,11 +57,13 @@ const TA_LABEL = "Oncology";
 // row opacity (past = 62%, per the design's state ladder), never by dimming the ink,
 // so the one congress we actually have data for isn't the hardest row to read.
 const STATE_STYLE: Record<CongressState, { dot: string; nameFg: string }> = {
-  live: { dot: COLOR.amber, nameFg: COLOR.ink1 },
-  imminent: { dot: "rgba(232,160,32,0.55)", nameFg: COLOR.ink1 },
-  upcoming: { dot: COLOR.ink4, nameFg: COLOR.ink1 },
-  recently_past: { dot: COLOR.ink5, nameFg: COLOR.ink1 },
-  past: { dot: "#3A352F", nameFg: COLOR.ink1 },
+  live: { dot: GOLD.PRIME, nameFg: INK.PRIME },
+  imminent: { dot: GOLD.MUTE, nameFg: INK.PRIME },
+  upcoming: { dot: INK.MUTE, nameFg: INK.PRIME },
+  // recently_past steps below upcoming — INK.GHOST is the ramp's non-text step.
+  recently_past: { dot: INK.GHOST, nameFg: INK.PRIME },
+  // past is a marker glyph, not text, so it may sit below the text floor.
+  past: { dot: LINE.EDGE, nameFg: INK.PRIME },
 };
 
 // Row opacity by state — the only de-emphasis for past rows (no accent, no dark ink).
@@ -69,19 +71,63 @@ const ROW_OPACITY: Record<CongressState, number> = {
   live: 1, imminent: 1, upcoming: 1, recently_past: 0.82, past: 0.62,
 };
 
-const REL_COLOR = { high: COLOR.amber, moderate: COLOR.ink3, low: COLOR.ink5 } as const;
+const REL_COLOR = { high: GOLD.PRIME, moderate: INK.LABEL, low: INK.MUTE } as const;
 
 // Rail label brightness/weight is THERAPEUTIC-AREA RELEVANCE — three tiers,
 // progressively muted. Never state, never lane (lanes only resolve collisions).
 const RAIL_LABEL: Record<Relevance, { color: string; weight: number }> = {
-  high: { color: COLOR.ink1, weight: 600 },
-  moderate: { color: COLOR.ink3, weight: 500 },
-  low: { color: COLOR.ink5, weight: 400 },
+  high: { color: INK.PRIME, weight: 600 },
+  moderate: { color: INK.LABEL, weight: 500 },
+  low: { color: INK.MUTE, weight: 400 },
 };
 
-const mono = (size: number, color = COLOR.ink3): React.CSSProperties => ({
-  fontFamily: FONT.mono, fontSize: size, color, letterSpacing: "0.04em",
+// `color: string` is deliberate. canonicalTokens is `as const`, so an
+// unannotated default narrows this parameter to the literal "#949CA5" and
+// every call passing any other token is a type error (54 of them at HEAD).
+const mono = (size: number, color: string = INK.LABEL): React.CSSProperties => ({
+  fontFamily: FACE.data, fontSize: size, color, letterSpacing: "0.04em",
 });
+
+// ── Rail geometry ────────────────────────────────────────────────────────────
+// These were six literals inline in the marker JSX (60 / 88 / 38 / 31 / -3.5 / 34).
+// Nothing threw when the type scale moved underneath them; the labels just
+// collided or floated. Four of the six are genuinely DERIVED from the strip and
+// the type scale and now recompute themselves. Two are not — they are TUNED, and
+// are labelled as such below so a later reader doesn't mistake a judgement call
+// for arithmetic.
+//
+// Everything is anchored to the container's BOTTOM edge, which is why a label
+// size change cannot move the dot or the connector: labels are positioned by
+// their bottom, so their height only affects clearance between the two lanes.
+const RAIL_H = 150; // container height
+const STRIP_BOTTOM = 34; // calendar strip floor — the rail's baseline
+const RULE_H = 1; // the baseline rule's own thickness
+const DOT = 7; // marker dot diameter
+
+// DERIVED — dot centre lands exactly on the baseline rule's centre (both 34.5).
+const DOT_BOTTOM = STRIP_BOTTOM + RULE_H / 2 - DOT / 2;
+// DERIVED — centres the dot horizontally on the marker's `left: %` anchor.
+const DOT_LEFT = -DOT / 2;
+// DERIVED — the connector starts where the dot ends.
+const CONNECTOR_BOTTOM = DOT_BOTTOM + DOT;
+// DERIVED — IBM Plex Mono renders `normal` line-height at exactly 1.5x its
+// font-size (measured across 8.5–24px). This is the ONE place the type scale
+// enters the geometry: change T.MICRO and the lanes re-space themselves.
+const LABEL_H = T.MICRO * 1.5;
+
+// TUNED, NOT DERIVED — chosen to preserve the shipped layout, not computed from
+// anything. CONNECTOR_MIN is the shortest connector that still reads as a stem
+// rather than a smudge; LANE_GAP is the clear space that keeps two stacked
+// labels legible. Both are judgement calls and either can be re-tuned on sight
+// without invalidating the four derivations above.
+const CONNECTOR_MIN = 22;
+const LANE_GAP = 14;
+
+const LANE_0_BOTTOM = CONNECTOR_BOTTOM + CONNECTOR_MIN; // 60 — unchanged from the literal
+// 87.5, not the old hardcoded 88: LABEL_H flowing through is the entire point of
+// the block, so the half-pixel stays rather than being rounded back to the
+// number that happened to be tuned for the old 14.24px label.
+const LANE_1_BOTTOM = LANE_0_BOTTOM + LABEL_H + LANE_GAP;
 
 function fmtDates(c: Congress): string {
   const s = new Date(`${c.start_date}T00:00:00Z`);
@@ -138,7 +184,17 @@ function useRail(now: Date) {
 
 export default function CongressCalendarPage() {
   const navigate = useNavigate();
-  const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint (was 640; standardized 2026-08-10)
+  // TWO gates, because two things on this surface fail at different widths.
+  // isMobile — the ledger breakpoint (was 640; standardized 2026-08-10). Drives
+  // the featured card and the time rail, both of which are fine well below it.
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  // listStacked — the 7-column list only. Its fixed columns (806px) + gaps (84px)
+  // + row padding (24px) + the 1fr track's ~108px min-content give the grid a
+  // 1022px floor, so it needs a 1120px viewport (board = viewport - 96). Below
+  // that the grid overflowed its panel and put the EXPERTS column in the page
+  // gutter — measured 96px over at 1024, 320px over at 800. The stacked card is
+  // a correct rendering at those widths; the grid is not.
+  const listStacked = useMediaQuery("(max-width: 1119px)");
   const [params] = useSearchParams();
   // Dev-only reference-date override so the LIVE / IMMINENT treatments can be
   // exercised before a congress is actually live (e.g. /congress?now=2026-05-31).
@@ -202,10 +258,22 @@ export default function CongressCalendarPage() {
 
   const nowLabel = now.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
 
+  // width="wide" (1440), not the AppLayout default "standard" (1120): the desktop
+  // list commits 876px of fixed columns + 84px of gaps = 960 of the 1000 available
+  // at standard, leaving 40px for a 1fr track whose min-content is ~174px. `1fr`
+  // is minmax(auto, 1fr) and cannot go below min-content, so the grid overflowed
+  // its panel by 119px and pushed the EXPERTS column into the page gutter.
+  // Paired with the compressible column 6 below — width alone leaves the same
+  // failure waiting at a narrower viewport.
   return (
-    <AppLayout>
-      {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
-      <div style={{ fontFamily: FONT.sans, color: COLOR.ink1, margin: "8px 0 24px", padding: "28px 32px 36px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, display: "flex", flexDirection: "column", gap: 24 }}>
+    <AppLayout width="wide">
+      {/* Board surface. Was the legacy g2 flat fill; now the canonical editorial
+          container — DEPTH.PANEL derives its gradient from GROUND.RAISE by
+          L-shift, so it follows any future re-temperature of the ramp.
+          SPREAD ORDER MATTERS: DEPTH.PANEL carries a `borderTop` rim, and the
+          `border` shorthand would silently overwrite it if it came afterwards.
+          Border first, depth last. */}
+      <div style={{ fontFamily: FACE.ui, color: INK.PRIME, margin: "8px 0 24px", padding: "28px 32px 36px", border: `1px solid ${LINE.HAIR}`, ...DEPTH.PANEL, display: "flex", flexDirection: "column", gap: 24 }}>
         {/* header */}
         <div>
           {/* Full H1 (PageHero, Commit B follow-up 2026-08-05): serif title +
@@ -243,56 +311,56 @@ export default function CongressCalendarPage() {
           // Real figures only — RPC social totals + counted presenters. WoW is a
           // live-week construct; the recent variant shows the three closing stats.
           const tiles = [
-            { k: "POSTS", v: s ? INT.format(s.total_posts) : "—", c: COLOR.ink1 },
-            { k: "VOICES", v: s ? INT.format(s.voices) : "—", c: COLOR.ink1 },
+            { k: "POSTS", v: s ? INT.format(s.total_posts) : "—", c: INK.PRIME },
+            { k: "VOICES", v: s ? INT.format(s.voices) : "—", c: INK.PRIME },
             // WoW renders only when the RPC's observation + volume gate passes —
             // on null the tile is omitted entirely (no zero, no dash).
-            ...(isLive && s && s.wow_pct != null ? [{ k: "WoW", v: `${s.wow_pct > 0 ? "+" : ""}${s.wow_pct}%`, c: COLOR.amber }] : []),
-            { k: "CONFIRMED", v: confirmed != null ? String(confirmed) : "—", c: COLOR.ink1 },
+            ...(isLive && s && s.wow_pct != null ? [{ k: "WoW", v: `${s.wow_pct > 0 ? "+" : ""}${s.wow_pct}%`, c: GOLD.PRIME }] : []),
+            { k: "CONFIRMED", v: confirmed != null ? String(confirmed) : "—", c: INK.PRIME },
           ];
           return (
             <div>
-              <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600, marginBottom: 8 }}>{isLive ? "LIVE NOW" : "MOST RECENT"}</div>
-              <div style={{ border: `1px solid ${COLOR.amber}`, borderRadius: 6, background: "linear-gradient(180deg, rgba(232,160,32,0.055), rgba(232,160,32,0.015))", display: "flex", flexDirection: isMobile ? "column" : "row" }}>
-                <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", alignItems: "flex-start", [isMobile ? "borderBottom" : "borderRight"]: `1px solid rgba(232,160,32,0.22)` }}>
+              <div style={{ ...mono(T.LABEL, GOLD.PRIME), letterSpacing: "0.16em", fontWeight: 600, marginBottom: 8 }}>{isLive ? "LIVE NOW" : "MOST RECENT"}</div>
+              <div style={{ border: `1px solid ${GOLD.PRIME}`, borderRadius: 6, background: GOLD.WASH, display: "flex", flexDirection: isMobile ? "column" : "row" }}>
+                <div style={{ flex: 1, padding: "20px 22px", display: "flex", flexDirection: "column", alignItems: "flex-start", [isMobile ? "borderBottom" : "borderRight"]: `1px solid ${GOLD.EDGE}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLOR.amber }} />
-                    <div style={{ ...mono(10, COLOR.amber), letterSpacing: "0.16em", fontWeight: 600 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: GOLD.PRIME }} />
+                    <div style={{ ...mono(T.LABEL, GOLD.PRIME), letterSpacing: "0.16em", fontWeight: 600 }}>
                       {isLive ? `LIVE${d ? ` · DAY ${d.day} OF ${d.of}` : ""}` : "MOST RECENT"}
                     </div>
                   </div>
-                  <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, marginBottom: 6 }}>{c.short_name}</div>
-                  <div style={{ fontFamily: FONT.serif, fontSize: 15, color: COLOR.ink3, marginBottom: 16 }}>{c.society_full}</div>
-                  <div style={{ display: "flex", gap: 24, ...mono(11, COLOR.ink3), flexWrap: "wrap" }}>
-                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>DATES</div>{fmtDates(c)}</div>
-                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>LOCATION</div>{c.venue ? `${c.venue} · ` : ""}{c.city}{c.state ? `, ${c.state}` : ""}</div>
-                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>CAPTURED VIA</div><span style={{ color: COLOR.amber }}>{c.hashtags[0]}</span></div>
-                    <div><div style={{ ...mono(9, COLOR.ink5), letterSpacing: "0.1em", marginBottom: 4 }}>RELEVANCE</div><span style={{ color: COLOR.ink1 }}>{rel ? rel.toUpperCase() : "—"}</span> · {TA_LABEL}</div>
+                  <div style={{ fontSize: T.FIGURE, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, marginBottom: 6 }}>{c.short_name}</div>
+                  <div style={{ fontFamily: FACE.value, fontSize: T.BODY, color: INK.LABEL, marginBottom: 16 }}>{c.society_full}</div>
+                  <div style={{ display: "flex", gap: 24, ...mono(T.LABEL, INK.LABEL), flexWrap: "wrap" }}>
+                    <div><div style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.1em", marginBottom: 4 }}>DATES</div>{fmtDates(c)}</div>
+                    <div><div style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.1em", marginBottom: 4 }}>LOCATION</div>{c.venue ? `${c.venue} · ` : ""}{c.city}{c.state ? `, ${c.state}` : ""}</div>
+                    <div><div style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.1em", marginBottom: 4 }}>CAPTURED VIA</div><span style={{ color: GOLD.PRIME }}>{c.hashtags[0]}</span></div>
+                    <div><div style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.1em", marginBottom: 4 }}>RELEVANCE</div><span style={{ color: INK.PRIME }}>{rel ? rel.toUpperCase() : "—"}</span> · {TA_LABEL}</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => navigate(`/congress/${c.slug}`)}
-                    style={{ marginTop: 18, background: "none", border: "1px solid rgba(232,160,32,0.4)", borderRadius: 4, padding: "7px 14px", cursor: "pointer", ...mono(10, COLOR.amber), letterSpacing: "0.14em", fontWeight: 600 }}
+                    style={{ marginTop: 18, background: "none", border: `1px solid ${GOLD.EDGE}`, borderRadius: 4, padding: "7px 14px", cursor: "pointer", ...mono(T.LABEL, GOLD.PRIME), letterSpacing: "0.14em", fontWeight: 600 }}
                   >
                     OPEN CONGRESS →
                   </button>
                 </div>
                 <div style={{ width: isMobile ? "100%" : 452, boxSizing: "border-box", padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length},1fr)`, gap: 1, background: "rgba(232,160,32,0.18)", border: "1px solid rgba(232,160,32,0.18)", borderRadius: 2 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length},1fr)`, gap: 1, background: GOLD.EDGE, border: `1px solid ${GOLD.EDGE}`, borderRadius: 2 }}>
                     {tiles.map((st) => (
-                      <div key={st.k} style={{ background: COLOR.surfaceWell, padding: "10px 11px" }}>
-                        <div style={{ ...mono(8.5, "#8A6524"), letterSpacing: "0.1em", marginBottom: 7 }}>{st.k}</div>
-                        <div style={{ ...mono(17, st.c), fontWeight: 600 }}>{st.v}</div>
+                      <div key={st.k} style={{ background: GROUND.INSET, padding: "10px 11px" }}>
+                        <div style={{ ...mono(T.MICRO, INK.LABEL), letterSpacing: "0.1em", marginBottom: 7 }}>{st.k}</div>
+                        <div style={{ ...mono(T.LEAD, st.c), fontWeight: 600 }}>{st.v}</div>
                       </div>
                     ))}
                   </div>
                   {s && meetsThreshold(s) ? (
                     <div>
-                      <div style={{ ...mono(8.5, "#8A6524"), letterSpacing: "0.11em", marginBottom: 9 }}>DAILY POST VOLUME · OBSERVED DAYS</div>
-                      <VolumeSparks daily={s.daily} color={COLOR.amber} width={isMobile ? 300 : 408} height={44} />
+                      <div style={{ ...mono(T.MICRO, INK.LABEL), letterSpacing: "0.11em", marginBottom: 9 }}>DAILY POST VOLUME · OBSERVED DAYS</div>
+                      <VolumeSparks daily={s.daily} color={GOLD.PRIME} width={isMobile ? 300 : 408} height={44} />
                     </div>
                   ) : null}
-                  <div style={{ ...mono(9.5, COLOR.ink4), marginTop: "auto" }}>
+                  <div style={{ ...mono(T.MICRO, INK.MUTE), marginTop: "auto" }}>
                     Social volume under {c.hashtags[0]}. Not attendance. Confirmed presenters come from the abstract list — the conversation and the podium are different populations.
                   </div>
                 </div>
@@ -303,40 +371,40 @@ export default function CongressCalendarPage() {
 
         {/* ── time rail (desktop only — mobile relies on the stacked list) ── */}
         {!isMobile && (
-        <div style={{ background: COLOR.surfaceWell, border: `1px solid ${COLOR.hairStrong}`, borderRadius: 6, padding: "16px 18px 12px" }}>
+        <div style={{ background: GROUND.INSET, border: `1px solid ${LINE.EDGE}`, borderRadius: 6, padding: "16px 18px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
-            <div style={{ ...mono(10, COLOR.ink3), letterSpacing: "0.16em", fontWeight: 600 }}>THE YEAR — PROPORTIONAL TIME</div>
-            <div style={mono(10, COLOR.ink5)}>Position and spacing are true to the calendar. Marker weight is therapeutic-area relevance, not size of meeting.</div>
+            <div style={{ ...mono(T.LABEL, INK.LABEL), letterSpacing: "0.16em", fontWeight: 600 }}>THE YEAR — PROPORTIONAL TIME</div>
+            <div style={mono(T.LABEL, INK.MUTE)}>Position and spacing are true to the calendar. Marker weight is therapeutic-area relevance, not size of meeting.</div>
           </div>
-          <div style={{ position: "relative", height: 150 }}>
+          <div style={{ position: "relative", height: RAIL_H }}>
             {/* calendar strip — uniform column tint down to the baseline, so the
                 rail reads as a calendar surface rather than a bare axis */}
-            <div style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 34, background: COLOR.surfaceCard, borderRadius: 2 }} />
+            <div style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: STRIP_BOTTOM, background: GROUND.RAISE, borderRadius: 2 }} />
             {/* hairline dividers at every month boundary (incl. both strip edges) */}
             {[...rail.months.map((m) => m.leftPct), 100].map((pct, i) => (
-              <div key={`boundary-${i}`} style={{ position: "absolute", top: 0, bottom: 34, left: `${pct}%`, width: 1, background: COLOR.hair }} />
+              <div key={`boundary-${i}`} style={{ position: "absolute", top: 0, bottom: STRIP_BOTTOM, left: `${pct}%`, width: 1, background: LINE.HAIR }} />
             ))}
             {/* month columns */}
             {rail.months.map((m) => (
-              <div key={m.label + m.leftPct} style={{ position: "absolute", bottom: 6, left: `${m.leftPct}%`, ...mono(9, COLOR.ink5), letterSpacing: "0.1em" }}>{m.label}</div>
+              <div key={m.label + m.leftPct} style={{ position: "absolute", bottom: 6, left: `${m.leftPct}%`, ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.1em" }}>{m.label}</div>
             ))}
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 34, height: 1, background: COLOR.hairStrong }} />
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: STRIP_BOTTOM, height: RULE_H, background: LINE.EDGE }} />
             {/* now line */}
-            <div style={{ position: "absolute", top: 0, bottom: 22, width: 1, background: COLOR.amber, left: `${rail.nowPct}%` }} />
-            <div style={{ position: "absolute", top: -2, transform: "translateX(-50%)", ...mono(9, COLOR.amber), letterSpacing: "0.14em", fontWeight: 600, background: COLOR.surfaceCard, padding: "0 5px", left: `${rail.nowPct}%` }}>NOW</div>
+            <div style={{ position: "absolute", top: 0, bottom: 22, width: 1, background: GOLD.PRIME, left: `${rail.nowPct}%` }} />
+            <div style={{ position: "absolute", top: -2, transform: "translateX(-50%)", ...mono(T.MICRO, GOLD.PRIME), letterSpacing: "0.14em", fontWeight: 600, background: GROUND.RAISE, padding: "0 5px", left: `${rail.nowPct}%` }}>NOW</div>
             {/* markers — lane sets vertical position only (collision); label
                 brightness/weight is TA relevance (RAIL_LABEL), never lane or state */}
             {rail.markers.map(({ congress, leftPct, lane }) => {
               const st = congressState(congress, now);
               const rel = relevanceFor(congress, TA_SLUG);
               const lbl = rel ? RAIL_LABEL[rel] : RAIL_LABEL.low;
-              const labelBottom = lane === 0 ? 60 : 88;   // two lanes
-              const lineHeight = labelBottom - 38;         // connect dot up to the label
+              const labelBottom = lane === 0 ? LANE_0_BOTTOM : LANE_1_BOTTOM;
+              const lineHeight = labelBottom - CONNECTOR_BOTTOM; // stem: dot top -> label bottom
               return (
                 <div key={congress.slug} style={{ position: "absolute", bottom: 0, left: `${leftPct}%` }}>
-                  <div style={{ position: "absolute", bottom: 38, left: 0, width: 1, background: STATE_STYLE[st].dot, height: lineHeight }} />
-                  <div style={{ position: "absolute", bottom: 31, left: -3.5, width: 7, height: 7, borderRadius: "50%", background: STATE_STYLE[st].dot }} />
-                  <div style={{ position: "absolute", left: 0, transform: "translateX(-50%)", whiteSpace: "nowrap", bottom: labelBottom, ...mono(9.5, lbl.color), letterSpacing: "0.08em", fontWeight: lbl.weight }}>{congress.short_name}</div>
+                  <div style={{ position: "absolute", bottom: CONNECTOR_BOTTOM, left: 0, width: 1, background: STATE_STYLE[st].dot, height: lineHeight }} />
+                  <div style={{ position: "absolute", bottom: DOT_BOTTOM, left: DOT_LEFT, width: DOT, height: DOT, borderRadius: "50%", background: STATE_STYLE[st].dot }} />
+                  <div style={{ position: "absolute", left: 0, transform: "translateX(-50%)", whiteSpace: "nowrap", bottom: labelBottom, ...mono(T.MICRO, lbl.color), letterSpacing: "0.08em", fontWeight: lbl.weight }}>{congress.short_name}</div>
                 </div>
               );
             })}
@@ -346,14 +414,14 @@ export default function CongressCalendarPage() {
 
         {/* ── list ── */}
         <div>
-          {!isMobile && (
-          <div style={{ display: "grid", gridTemplateColumns: "220px 150px 190px 90px 130px 1fr 96px", gap: 14, padding: "0 12px 8px", ...mono(9, COLOR.ink5), letterSpacing: "0.13em", fontWeight: 500, borderBottom: `1px solid ${COLOR.hairStrong}` }}>
+          {!listStacked && (
+          <div style={{ display: "grid", gridTemplateColumns: "190px 150px 150px 90px 130px 1fr 96px", gap: 14, padding: "0 12px 8px", ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.13em", fontWeight: 500, borderBottom: `1px solid ${LINE.EDGE}` }}>
             <div>CONGRESS</div><div>DATES</div><div>LOCATION</div><div>COUNTDOWN</div><div>TA RELEVANCE</div><div>SOCIAL SIGNAL</div><div style={{ textAlign: "right" }}>EXPERTS</div>
           </div>
           )}
           {groups.map((g) => (
             <div key={g.key}>
-              <div style={{ padding: "18px 12px 8px", ...mono(10, g.key === "live" || g.key === "imminent" ? COLOR.amber : COLOR.ink4), letterSpacing: "0.16em", fontWeight: 600 }}>{g.title}</div>
+              <div style={{ padding: "18px 12px 8px", ...mono(T.LABEL, g.key === "live" || g.key === "imminent" ? GOLD.PRIME : INK.MUTE), letterSpacing: "0.16em", fontWeight: 600 }}>{g.title}</div>
               {g.congresses.map((c) => {
                 const st = congressState(c, now);
                 const rel = relevanceFor(c, TA_SLUG);
@@ -365,35 +433,39 @@ export default function CongressCalendarPage() {
                   : s ? `${INT.format(s.total_posts)}/${SOCIAL_THRESHOLD.posts} posts` : "no captured posts";
                 const rowStyleBase = {
                   padding: "13px 12px", width: "100%", textAlign: "left" as const,
-                  background: "none", border: "none", borderBottom: `1px solid ${COLOR.hair}`,
+                  background: "none", border: "none", borderBottom: `1px solid ${LINE.HAIR}`,
                   borderLeft: `2px solid ${STATE_STYLE[st].dot}`, cursor: "pointer", opacity: ROW_OPACITY[st],
                 };
                 const relBars = (h: number) => (
                   <div style={{ display: "flex", gap: 2 }}>
                     {[0, 1, 2].map((i) => (
-                      <div key={i} style={{ width: 12, height: h, borderRadius: 1, background: rel && (i < { high: 3, moderate: 2, low: 1 }[rel]) ? REL_COLOR[rel] : COLOR.hairStrong }} />
+                      <div key={i} style={{ width: 12, height: h, borderRadius: 1, background: rel && (i < { high: 3, moderate: 2, low: 1 }[rel]) ? REL_COLOR[rel] : LINE.EDGE }} />
                     ))}
                   </div>
                 );
-                if (isMobile) {
+                if (listStacked) {
                   return (
                     <button key={c.slug} type="button" onClick={() => navigate(`/congress/${c.slug}`)}
                       style={{ ...rowStyleBase, display: "flex", flexDirection: "column", gap: 8 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: STATE_STYLE[st].nameFg }}>{c.short_name}</div>
-                        <div style={{ ...mono(13, st === "live" ? COLOR.amber : COLOR.ink2), fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{countdownLabel(c, now)}</div>
+                        <div style={{ fontSize: T.BODY, fontWeight: 600, color: STATE_STYLE[st].nameFg }}>{c.short_name}</div>
+                        <div style={{ ...mono(T.META, st === "live" ? GOLD.PRIME : INK.BODY), fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{countdownLabel(c, now)}</div>
                       </div>
-                      <div style={mono(10.5, COLOR.ink4)}>{fmtDates(c)} · {c.city}{c.state ? `, ${c.state}` : `, ${c.country}`}</div>
+                      <div style={mono(T.LABEL, INK.MUTE)}>{fmtDates(c)} · {c.city}{c.state ? `, ${c.state}` : `, ${c.country}`}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         {relBars(3)}
-                        <div style={{ ...mono(9, rel ? REL_COLOR[rel] : COLOR.ink5), letterSpacing: "0.08em", fontWeight: 500 }}>{rel ? rel.toUpperCase() : "—"}</div>
-                        <div style={{ width: 1, height: 10, background: COLOR.hairStrong }} />
-                        <div style={mono(9.5, COLOR.ink5)}>{mobileSignal}</div>
-                        {hasAbstracts && confirmed != null && (
-                          <>
-                            <div style={{ width: 1, height: 10, background: COLOR.hairStrong }} />
-                            <div style={mono(9.5, COLOR.ink3)}>{confirmed} confirmed</div>
-                          </>
+                        <div style={{ ...mono(T.MICRO, rel ? REL_COLOR[rel] : INK.MUTE), letterSpacing: "0.08em", fontWeight: 500 }}>{rel ? rel.toUpperCase() : "—"}</div>
+                        <div style={{ width: 1, height: 10, background: LINE.EDGE }} />
+                        <div style={mono(T.LABEL, INK.MUTE)}>{mobileSignal}</div>
+                        {/* The datum always renders. Omitting it on the 14 rows with
+                            no abstract list was worse than the desktop em-dash: the
+                            field simply vanished, so absence was indistinguishable
+                            from "not a thing we track". */}
+                        <div style={{ width: 1, height: 10, background: LINE.EDGE }} />
+                        {hasAbstracts && confirmed != null ? (
+                          <div style={mono(T.MICRO, INK.LABEL)}>{confirmed} confirmed</div>
+                        ) : (
+                          <div style={mono(T.MICRO, INK.MUTE)}>abstract list pending</div>
                         )}
                       </div>
                     </button>
@@ -406,24 +478,24 @@ export default function CongressCalendarPage() {
                     onClick={() => navigate(`/congress/${c.slug}`)}
                     style={{
                       ...rowStyleBase,
-                      display: "grid", gridTemplateColumns: "220px 150px 190px 90px 130px 1fr 96px", gap: 14,
+                      display: "grid", gridTemplateColumns: "190px 150px 150px 90px 130px 1fr 96px", gap: 14,
                       alignItems: "center",
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: STATE_STYLE[st].nameFg }}>{c.short_name}</div>
-                      <div style={{ ...mono(10, COLOR.ink5), marginTop: 3 }}>{c.society_short}</div>
+                      <div style={{ fontSize: T.BODY, fontWeight: 600, color: STATE_STYLE[st].nameFg }}>{c.short_name}</div>
+                      <div style={{ ...mono(T.LABEL, INK.MUTE), marginTop: 3 }}>{c.society_short}</div>
                     </div>
-                    <div style={mono(11, COLOR.ink2)}>{fmtDates(c)}</div>
-                    <div style={mono(11, COLOR.ink3)}>{c.city}{c.state ? `, ${c.state}` : `, ${c.country}`}</div>
-                    <div style={{ ...mono(13, st === "live" ? COLOR.amber : COLOR.ink2), fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{countdownLabel(c, now)}</div>
+                    <div style={mono(T.LABEL, INK.BODY)}>{fmtDates(c)}</div>
+                    <div style={mono(T.LABEL, INK.LABEL)}>{c.city}{c.state ? `, ${c.state}` : `, ${c.country}`}</div>
+                    <div style={{ ...mono(T.META, st === "live" ? GOLD.PRIME : INK.BODY), fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{countdownLabel(c, now)}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ display: "flex", gap: 2 }}>
                         {[0, 1, 2].map((i) => (
-                          <div key={i} style={{ width: 12, height: 4, borderRadius: 1, background: rel && (i < { high: 3, moderate: 2, low: 1 }[rel]) ? REL_COLOR[rel] : COLOR.hairStrong }} />
+                          <div key={i} style={{ width: 12, height: 4, borderRadius: 1, background: rel && (i < { high: 3, moderate: 2, low: 1 }[rel]) ? REL_COLOR[rel] : LINE.EDGE }} />
                         ))}
                       </div>
-                      <div style={{ ...mono(9.5, rel ? REL_COLOR[rel] : COLOR.ink5), letterSpacing: "0.08em", fontWeight: 500 }}>{rel ? rel.toUpperCase() : "—"}</div>
+                      <div style={{ ...mono(T.MICRO, rel ? REL_COLOR[rel] : INK.MUTE), letterSpacing: "0.08em", fontWeight: 500 }}>{rel ? rel.toUpperCase() : "—"}</div>
                     </div>
                     {/* Social signal — sparkline once past the 250/40 threshold; below it,
                         the honest state (counts toward threshold); no posts → nothing. */}
@@ -432,15 +504,19 @@ export default function CongressCalendarPage() {
                       if (s && meetsThreshold(s)) {
                         return (
                           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                            <VolumeSparks daily={s.daily} color={COLOR.ink4} width={110} height={22} />
-                            <div style={mono(10, COLOR.ink3)}>{INT.format(s.total_posts)} posts</div>
+                            {/* HELD for Unit 3 (VIZ): magnitude sparkline, legacy
+                                ink4 verbatim. Unit 3 routes it to the SEQ ramp. */}
+                            <div style={{ minWidth: 0, flex: "0 1 auto" }}>
+                              <VolumeSparks daily={s.daily} color="#77736B" width={110} height={22} />
+                            </div>
+                            <div style={{ ...mono(T.LABEL, INK.LABEL), minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{INT.format(s.total_posts)} posts</div>
                           </div>
                         );
                       }
                       return (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 110, height: 1, background: COLOR.hairStrong }} />
-                          <div style={mono(10, COLOR.ink5)}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <div style={{ width: 110, minWidth: 0, flex: "0 1 auto", height: 1, background: LINE.EDGE }} />
+                          <div style={{ ...mono(T.LABEL, INK.MUTE), minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {s ? `${INT.format(s.total_posts)}/${SOCIAL_THRESHOLD.posts} posts` : "no captured posts"}
                           </div>
                         </div>
@@ -451,11 +527,16 @@ export default function CongressCalendarPage() {
                     <div style={{ textAlign: "right" }}>
                       {hasAbstracts && confirmed != null ? (
                         <>
-                          <div style={{ ...mono(13, COLOR.ink1), fontWeight: 600 }}>{confirmed}</div>
-                          <div style={{ ...mono(9, COLOR.ink5), marginTop: 4 }}>confirmed</div>
+                          <div style={{ ...mono(T.META, INK.PRIME), fontWeight: 600 }}>{confirmed}</div>
+                          <div style={{ ...mono(T.MICRO, INK.MUTE), marginTop: 4 }}>confirmed</div>
                         </>
                       ) : (
-                        <div style={{ ...mono(13, COLOR.ink5) }}>—</div>
+                        // Absence is not zero: 14 of 15 congresses have
+                        // abstract_source = null, so this is the common case. The
+                        // bare em-dash read as "no experts"; this names the missing
+                        // SOURCE instead. The footer already explains that confirmed
+                        // presenters come from the published abstract list.
+                        <div style={{ ...mono(T.MICRO, INK.MUTE) }}>abstract list pending</div>
                       )}
                     </div>
                   </button>
@@ -466,8 +547,8 @@ export default function CongressCalendarPage() {
         </div>
 
         {/* footer — distinguishes the confirmed vs inferred populations (the point of the page) */}
-        <div style={{ padding: "12px 14px", border: `1px solid ${COLOR.hair}`, borderRadius: 6, background: COLOR.surfaceWell, fontFamily: FONT.serif, fontSize: 13.5, lineHeight: 1.6, color: COLOR.ink3 }}>
-          Confirmed presenters come from the meeting&rsquo;s published abstract list. Expert counts for congresses without abstract data are tracked experts showing public activity under the congress hashtag — <span style={{ color: COLOR.ink2 }}>a signal of engagement with the conversation, not a record of attendance.</span> Congresses with no captured posts show nothing rather than an estimate.
+        <div style={{ padding: "12px 14px", border: `1px solid ${LINE.HAIR}`, borderRadius: 6, background: GROUND.INSET, fontFamily: FACE.value, fontSize: T.META, lineHeight: 1.6, color: INK.LABEL }}>
+          Confirmed presenters come from the meeting&rsquo;s published abstract list. Expert counts for congresses without abstract data are tracked experts showing public activity under the congress hashtag — <span style={{ color: INK.BODY }}>a signal of engagement with the conversation, not a record of attendance.</span> Congresses with no captured posts show nothing rather than an estimate.
         </div>
       </div>
     </AppLayout>

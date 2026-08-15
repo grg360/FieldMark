@@ -47,6 +47,19 @@ export const GOLD = {
   RANK: "#E0A75E", // rank numerals and ledger ordinals ONLY — desaturated on purpose
   EDGE: "#6A4E18", // gold at rule weight: underlines, active-tab borders, focus edges
   WASH: "rgba(232,160,32,0.10)", // GOLD/PRIME @ .10 — selected row, gold chip fill
+  // MUTE — gold one step down, for STATE LADDERS that need a second amber rung.
+  // Added 2026-08-15 at the Congress migration. DERIVED, not picked: PRIME's own
+  // hue (74.9°) and chroma (.152) held verbatim, lightness lowered until relative
+  // luminance hits the GEOMETRIC MIDPOINT of its two ladder neighbours —
+  // PRIME (RL .4240) and INK/MUTE (RL .1525) → target .2543, landed .2550.
+  //   oklch(0.64 0.152 74.9) = #C17B00
+  // Why it had to exist: the Congress calendar's five-state dot is the ONLY state
+  // channel in a list row, and its imminent rung was a hand-rolled
+  // rgba(232,160,32,.55) that flattened to RL .1569 — 2.9% off upcoming's .1525,
+  // i.e. invisible. EDGE could not serve (RL .086 renders imminent DIMMER than
+  // upcoming, inverting the ladder) and RANK is reserved. Named for INK/MUTE:
+  // same voice, stepped down, so the two read as a pair where they meet.
+  MUTE: "#C17B00",
 } as const;
 
 export const MARK = {
