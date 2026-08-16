@@ -5,6 +5,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { GROUND, LINE, INK, GOLD, DEPTH, FACE, T, SEQ } from "../../lib/canonicalTokens";
 import { supabase } from "../../lib/supabase";
 import PageHero from "../PageHero";
+import { taLabelForSlug } from "../../lib/taLabels";
 import {
   CONGRESSES,
   congressState,
@@ -279,10 +280,24 @@ export default function CongressCalendarPage() {
           {/* Full H1 (PageHero, Commit B follow-up 2026-08-05): serif title +
               cluster from figures the surface already computes. */}
           <PageHero
-            eyebrow="Fieldmark · Congress calendar"
+            // narrow was never passed — the surface computes isMobile at :190 for
+            // its featured card but the hero never saw it. Same defect found on
+            // RisingQuadrant; both predate the convergence.
+            narrow={isMobile}
+            // HERO CONTRACT 2026-08-15. The title was the TA ("Oncology" at 52)
+            // and the surface name sat in the eyebrow — exactly inverted from
+            // the rule. "Fieldmark" is gone from the eyebrow: the platform name
+            // is in the nav on every page, and the first segment is SCOPE.
+            //
+            // The TA segment is the INDICATION, not the area. This calendar's
+            // data scope is TA_SLUG — relevanceFor(c, TA_SLUG) filters every row
+            // on nsclc — so an eyebrow reading "CONG · ONCOLOGY" would name a
+            // broader scope than the surface actually shows. The eyebrow states
+            // what the filter does. 268px, inside the 310px narrow budget.
+            eyebrow={`Cong · ${taLabelForSlug(TA_SLUG)} · ${TA_LABEL}`}
             meta={nowLabel}
-            title={TA_LABEL}
-            stats={(() => {
+            title="Congresses"
+            stats={{ variant: "cluster", items: (() => {
               const upcoming = CONGRESSES.filter((c) => ["upcoming", "imminent", "live"].includes(congressState(c, now))).length;
               const featured = liveCongress ?? mostRecentCongress;
               const posts = featured ? socialBySlug[featured.slug]?.total_posts ?? null : null;
@@ -293,7 +308,7 @@ export default function CongressCalendarPage() {
                   ? [{ value: INT.format(posts), label: `POSTS · ${featured.short_name.toUpperCase()}`, gold: true }]
                   : []),
               ];
-            })()}
+            })() }}
           />
         </div>
 

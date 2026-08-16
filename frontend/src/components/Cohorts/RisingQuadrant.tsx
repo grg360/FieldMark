@@ -185,19 +185,34 @@ export default function RisingQuadrant() {
 
         <div style={{ padding: "14px 0 18px" }}>
           <PageHero
-            eyebrow="RIS · Rising ledger"
+            // narrow was never passed (found at the 2026-08-15 migration): the
+            // surface computes isMobile for its own grid but the hero never saw
+            // it, so at 387px the title rendered at 52 over two lines and the
+            // eyebrow and meta each took three. Wiring it is the whole fix.
+            narrow={isMobile}
+            // Same contract as the cohort ledger: the H1 names the surface, the
+            // TA is scope. Retires the " / " join — the fourth of the four join
+            // conventions the convergence collapses.
+            eyebrow={`RIS · ${taLabelForSlug(TA_SLUG)} · Oncology`}
             meta="ONE BOARD · TWO MODES · WEEKLY BUILD"
-            title={`Rising Ledger / ${taLabelForSlug(TA_SLUG)}`}
-            stats={[
+            title="Rising Ledger"
+            stats={{ variant: "cluster", items: [
               { value: scoped.length.toLocaleString("en-US"), label: "IN VIEW" },
               { value: String(usCount), label: "US" },
               { value: String(euCount), label: "EU" },
               { value: total.toLocaleString("en-US"), label: "TOTAL BOARD", gold: true },
-            ]}
+            ] }}
           />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 0 14px", flexWrap: "wrap" }}>
-          <div style={{ padding: "2px 5px", background: "#1c2a26", font: `600 8px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>RIS</div>
+          {/* Same cohort identity mark as the ledger (2026-08-15). Was a filled
+              #1c2a26 chip at mono 8 — smaller again than the ledger's 9. The tick
+              form is rule + word, not a filled box, so the mark reads the same on
+              both surfaces of the same board. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+            <div style={{ width: 4, height: 22, background: GREEN }} />
+            <div style={{ font: `600 13px/1.4 ${MONO}`, letterSpacing: ".11em", color: GREEN }}>RISING STARS</div>
+          </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", gap: 2 }}>
           </div>

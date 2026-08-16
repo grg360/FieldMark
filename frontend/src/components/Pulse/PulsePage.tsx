@@ -8,6 +8,9 @@ import type { PulsePayload } from "../../lib/pulse";
 import { FONT, GROUND, LINE, GOLD, COOL, TRACK } from "../../lib/designTokens";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import AppLayout from "../AppLayout";
+import PageHero from "../PageHero";
+import { taLabelForSlug } from "../../lib/taLabels";
+import { parentTaLabelForIndicationSlug } from "../../lib/routeSlugs";
 
 // Scientific Pulse — the redesign, built from docs/design/Scientific Pulse.dc.html
 // (layout authority). Every figure is COMPUTED from the payload via
@@ -139,15 +142,23 @@ function MovementBar({ row }: { row: LedgerRow }) {
 }
 
 // ── Masthead ────────────────────────────────────────────────────────────────
-function Stat({ value, label, gold }: { value: string; label: string; gold?: boolean }) {
-  return (
-    <div>
-      <div style={{ ...mono(26, gold ? C.gold : C.ink, -0.01), lineHeight: 1 }}>{value}</div>
-      <div style={{ ...mono(9.5, C.muted2, 0.16), marginTop: 6 }}>{label}</div>
-    </div>
-  );
-}
-
+// ── Masthead — PageHero (2026-08-15) ────────────────────────────────────────
+// The freeze lifts, hero only. PageHero was EXTRACTED from the block that stood
+// here ("structure and values verbatim"), so every token, size and rule is
+// already identical — this deletes a copy, it does not restyle anything. The
+// local Stat helper went with it; it had no other caller.
+//
+// What changed, and only this: the title and eyebrow swap. The H1 was the TA
+// (payload.ta_label) with "SCIENTIFIC PULSE" in the eyebrow — inverted from the
+// title rule, which says the H1 names the SURFACE and the TA is scope. Narrow
+// title steps 38 -> 30 with the rest of the platform.
+//
+// Two local behaviours are preserved HERE rather than in the component, because
+// they are content decisions this surface makes and not hero mechanics:
+//   · the third stat shortens its label to MEASURED on narrow;
+//   · the fourth (SOURCE · PUBMED, gold) is omitted entirely on narrow.
+// Everything else on Pulse — frozen literals, fixture, type scale, charts —
+// is untouched.
 function Masthead({
   payload,
   ledger,
@@ -158,57 +169,24 @@ function Masthead({
   narrow: boolean;
 }) {
   const updated = formatWindowDate(payload.window.current_end).toUpperCase();
+  const area = parentTaLabelForIndicationSlug(payload.ta_slug);
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-        <div style={mono(10.5, C.gold, 0.28)}>SCIENTIFIC PULSE</div>
-        <div style={{ flex: 1, height: 1, background: C.border }} />
-        <div style={mono(10, C.muted2, 0.16)}>UPDATED THROUGH {updated}</div>
-      </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: narrow ? "stretch" : "flex-end",
-          flexDirection: narrow ? "column" : "row",
-          justifyContent: "space-between",
-          marginTop: 20,
-          gap: narrow ? 22 : 60,
-        }}
-      >
-        <div>
-          <div style={{ fontFamily: SERIF, fontSize: narrow ? 38 : 52, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1, color: C.ink }}>
-            {payload.ta_label}
-          </div>
-          <div style={{ fontFamily: SERIF, fontSize: narrow ? 15 : 17, color: C.ink2, marginTop: 12, maxWidth: 620, lineHeight: 1.4 }}>
-            Where scientific attention is moving in this therapeutic area, measured across published literature.
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 0,
-            borderLeft: narrow ? "none" : `1px solid ${C.border}`,
-            borderTop: narrow ? `1px solid ${C.border}` : "none",
-            borderBottom: narrow ? `1px solid ${C.border}` : "none",
-          }}
-        >
-          <div style={{ padding: narrow ? "12px 20px 12px 0" : "0 26px", borderRight: `1px solid ${C.border}`, flex: narrow ? 1 : "none" }}>
-            <Stat value={ledger.totals.publications.toLocaleString()} label="PUBLICATIONS" />
-          </div>
-          <div style={{ padding: "0 26px", borderRight: `1px solid ${C.border}`, flex: narrow ? 1 : "none" }}>
-            <Stat value={String(ledger.totals.themes)} label="THEMES" />
-          </div>
-          <div style={{ padding: "0 26px", borderRight: narrow ? "none" : `1px solid ${C.border}`, flex: narrow ? 1 : "none" }}>
-            <Stat value={String(ledger.measuredCount)} label={narrow ? "MEASURED" : "MOVEMENT MEASURED"} />
-          </div>
-          {!narrow && (
-            <div style={{ padding: "0 0 0 26px" }}>
-              <Stat value="1" label="SOURCE · PUBMED" gold />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <PageHero
+      narrow={narrow}
+      eyebrow={["Pulse", taLabelForSlug(payload.ta_slug), area].filter(Boolean).join(" · ")}
+      meta={`UPDATED THROUGH ${updated}`}
+      title="Scientific Pulse"
+      dek="Where scientific attention is moving in this therapeutic area, measured across published literature."
+      stats={{
+        variant: "cluster",
+        items: [
+          { value: ledger.totals.publications.toLocaleString(), label: "PUBLICATIONS" },
+          { value: String(ledger.totals.themes), label: "THEMES" },
+          { value: String(ledger.measuredCount), label: narrow ? "MEASURED" : "MOVEMENT MEASURED" },
+          ...(narrow ? [] : [{ value: "1", label: "SOURCE · PUBMED", gold: true }]),
+        ],
+      }}
+    />
   );
 }
 

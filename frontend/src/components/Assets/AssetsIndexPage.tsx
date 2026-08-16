@@ -12,11 +12,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import AppLayout from "../AppLayout";
-import { CANON, FACE } from "../../lib/canonicalTokens";
+import { CANON, FACE, DEPTH } from "../../lib/canonicalTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { ASSETS, DEPLOYMENT_ASSETS, BACKBONE_ASSETS } from "../../lib/assetConfig";
 import { ASSETS_TA_SLUG } from "../../lib/assetConfig";
 import { taLabelForSlug } from "../../lib/taLabels";
+import { parentTaLabelForIndicationSlug } from "../../lib/routeSlugs";
+import PageHero from "../PageHero";
 import {
   loadAssetIndex,
   DENSITY_GLYPH,
@@ -199,21 +201,33 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
   });
 
   return (
-    <div style={{ paddingBottom: 0 }}>
+    <div style={{ ...DEPTH.PANEL, border: `1px solid ${CANON.LINE.HAIR}`, margin: "8px 0 24px", paddingBottom: 0 }}>
       {/* header */}
-      <div style={{ padding: isMobile ? "22px 16px 0" : "30px 34px 0", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 470px", gap: isMobile ? 22 : 56, alignItems: "start" }}>
-        <div>
-          <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".24em", color: MUT3, marginBottom: 12 }}>INDEX · VOLUME III</div>
-          <h1 style={{ margin: "0 0 12px", font: `400 30px/1.1 ${SERIF}`, letterSpacing: "-.008em", color: INK }}>Drugs Index · {taLabelForSlug(ASSETS_TA_SLUG)}</h1>
-          <p style={{ margin: 0, maxWidth: 620, font: `300 15px/1.55 ${SERIF}`, color: MUT }}>Organized by molecular target, because that is how treatment is selected and how a territory is worked. Grouping cuts across modality: amivantamab is a bispecific antibody sitting with small-molecule TKIs, because they compete for the same patient.</p>
-        </div>
-        <div style={{ paddingTop: 4 }}>
-          <ReachRow label={`${DEPLOYMENT_ASSETS.length} deployment assets reach`} value={fmt(model.header.deploymentPubs)} />
-          <ReachRow label={`${BACKBONE_ASSETS.length} backbone agents reach`} value={fmt(model.header.backbonePubs)} />
-          <ReachRow label={`all ${ASSETS.length} reach`} value={fmt(model.header.allPubs)} />
-          <ReachRow label={`${taLabelForSlug(ASSETS_TA_SLUG)} corpus`} value={fmt(model.header.corpus)} />
-          <p style={{ margin: "10px 0 0", font: `400 9px/1.6 ${MONO}`, letterSpacing: ".02em", color: DIM, maxWidth: 420 }}>Distinct publications, not asset–publication edges. The first two scopes overlap by {fmt(model.header.overlap)} records and do not partition — they are not drawn as a whole.</p>
-        </div>
+      {/* HERO (PageHero, 2026-08-15). The two-column grid — minmax(0,1fr) 470px,
+          gap 56, alignItems start — is gone; PageHero's flex row carries the same
+          shape (text left, figures right) with the reach rows as the TABLE stat
+          variant and the overlap note as its `foot`. What that costs: the 470px
+          column is content-sized now (minWidth 250), the gap is 60 not 56, and
+          the dek takes the hero's 620px measure.
+          This surface was the only one of the eight with NO container at all —
+          bare ground inside AppLayout. It takes DEPTH.PANEL like the rest. */}
+      <div style={{ padding: isMobile ? "22px 16px 0" : "30px 34px 0" }}>
+        <PageHero
+          narrow={isMobile}
+          eyebrow={["Drugs", taLabelForSlug(ASSETS_TA_SLUG), parentTaLabelForIndicationSlug(ASSETS_TA_SLUG)].filter(Boolean).join(" · ")}
+          title="Drugs Index"
+          dek="Organized by molecular target, because that is how treatment is selected and how a territory is worked. Grouping cuts across modality: amivantamab is a bispecific antibody sitting with small-molecule TKIs, because they compete for the same patient."
+          stats={{
+            variant: "table",
+            items: [
+              { value: fmt(model.header.deploymentPubs), label: `${DEPLOYMENT_ASSETS.length} deployment assets reach` },
+              { value: fmt(model.header.backbonePubs), label: `${BACKBONE_ASSETS.length} backbone agents reach` },
+              { value: fmt(model.header.allPubs), label: `all ${ASSETS.length} reach` },
+              { value: fmt(model.header.corpus), label: `${taLabelForSlug(ASSETS_TA_SLUG)} corpus` },
+            ],
+            foot: `Distinct publications, not asset–publication edges. The first two scopes overlap by ${fmt(model.header.overlap)} records and do not partition — they are not drawn as a whole.`,
+          }}
+        />
       </div>
 
       {/* controls */}
@@ -317,15 +331,6 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
         <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>FieldMark {taLabelForSlug(ASSETS_TA_SLUG).toLowerCase()} corpus, {fmt(model.header.corpus)} records, indexed {formatIndexDate(model.header.indexDate)}.</span>
         <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>{view === "flat" ? `FLAT VIEW · ${DEPLOYMENT_ASSETS.length} ROWS` : `${model.counts.rows} TARGET ROWS · ${model.backbone.rows.length} BACKBONE · ${model.nullNonBackbone.length} UNTARGETED`}</span>
       </div>
-    </div>
-  );
-}
-
-function ReachRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: `1px solid ${H4}`, padding: "5px 0" }}>
-      <span style={{ font: `400 11px/1 ${MONO}`, letterSpacing: ".06em", color: CANON.INK.MUTE }}>{label}</span>
-      <span style={{ font: `500 13px/1 ${MONO}`, fontVariantNumeric: "tabular-nums", color: INK }}>{value}</span>
     </div>
   );
 }

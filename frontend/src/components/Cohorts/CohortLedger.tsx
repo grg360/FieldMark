@@ -1925,24 +1925,48 @@ export default function CohortLedger() {
           <div style={{ padding: "6px 0 22px" }}>
             <PageHero
               narrow={isMobile}
-              // Header pattern (2026-08-11, all three cohorts): the cohort name
-              // is the bold H1; the TA scope moves to the eyebrow as a
-              // breadcrumb ("TAG · Cohort ledger · NSCLC · Oncology") — scope
-              // qualified, never dropped. Title treatment only: each cohort's
-              // body chrome stays truthful to whether it ranks.
-              eyebrow={`${cfg.tag} · Cohort ledger · ${taLabelForSlug(LEDGER_TA_SLUG)} · Oncology`}
+              // HERO CONTRACT 2026-08-15. Reverses the 2026-08-11 header pattern,
+              // which made the COHORT the H1 ("ESTABLISHED" at 52) and pushed the
+              // surface name into the eyebrow. Under the title rule the H1 names
+              // the SURFACE and everything that varies — cohort, TA — is scope.
+              // The practical argument: switching cohorts changed the biggest
+              // word on the page, so moving between three views of one board read
+              // as moving between three surfaces. The cohort is not lost, and is
+              // not only in the eyebrow: the ledger card directly below still
+              // carries its tick in cfg.markerColor plus the tag.
+              // The eyebrow drops to SCOPE · TA · AREA — 3 segments, 259px,
+              // down from 4 and 407px, which was the widest string in the system.
+              eyebrow={`${cfg.tag} · ${taLabelForSlug(LEDGER_TA_SLUG)} · Oncology`}
               meta={`WEEKLY BUILD · AS OF ${formatScoringDate(scoredAt)}`}
-              title={cfg.title.split(" / ")[0]}
-              stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT", center: true }] : undefined}
+              title="Cohort Ledger"
+              // The cluster label names the cohort instead of saying "IN COHORT".
+              // With the cohort out of the H1 this is the one place it is stated
+              // at a legible size, next to the figure it counts. The name is
+              // taken from cfg.title, which lost its only consumer when the
+              // title rule moved the cohort out of the H1 — so the field earns
+              // its keep again rather than sitting dead with a stale "/ NSCLC"
+              // half nobody renders.
+              stats={cohortTotal ? { variant: "cluster", items: [{ value: cohortTotal.toLocaleString(), label: `${cfg.title.split(" / ")[0]} HCPs`, center: true }] } : undefined}
             />
           </div>
           <div style={{ border: `1px solid ${CANON.LINE.HAIR}`, background: P.card }}>
 
             {/* header — cohort tick + meta line (title moved to the page hero) */}
             <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 6 : 0, justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <span style={{ width: 3, height: 14, background: cfg.markerColor }} />
-                <span style={{ ...mono(9, 600), color: cfg.markerColor, letterSpacing: ".14em" }}>{cfg.tag}</span>
+              {/* COHORT IDENTITY MARK (2026-08-15). Was a 3x14 rule beside the
+                  3-letter tag at mono 9 — the smallest type on the card, carrying
+                  the surface's most important remaining signal after the title
+                  rule moved the cohort out of the H1. Now spelled out at 13/600
+                  with a 4x22 rule: a step above the 11px meta beside it and well
+                  below the 30/52 title, which is the slot it should hold. The
+                  eyebrow stays gold and abbreviated (EST) precisely because this
+                  mark spells it out 60px below in the cohort's own colour, so
+                  the abbreviation is never the only statement of the cohort.
+                  Tracking eases .14em -> .11em: wide tracking at 9px reads as
+                  deliberate, at 13px it reads as loose. */}
+              <span style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                <span style={{ width: 4, height: 22, background: cfg.markerColor }} />
+                <span style={{ ...mono(13, 600), color: cfg.markerColor, letterSpacing: ".11em" }}>{cfg.title.split(" / ")[0]}</span>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <span style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>

@@ -13,6 +13,8 @@ import { useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import HCPChip, { HCPChipRow, toChipCohort } from "../HCPChip";
 import { taLabelForSlug } from "../../lib/taLabels";
+import { parentTaLabelForIndicationSlug } from "../../lib/routeSlugs";
+import PageHero from "../PageHero";
 
 // The trials RPC is TA-locked (get_nsclc_trials_surface). Slug is the pin.
 const TRIALS_TA_SLUG = "nsclc";
@@ -86,6 +88,47 @@ const DISCLOSURES: [string, string][] = [
 type Order = "recruiting" | "phase" | "start";
 const PHASE_RANK: Record<string, number> = { "PHASE 3": 0, "PHASE 2/3": 1, "PHASE 2": 2, "PHASE 1/2": 3, "PHASE 1": 4, "EARLY PHASE 1": 5, "N/A": 6 };
 
+// ── Hero (PageHero, 2026-08-15) ─────────────────────────────────────────────
+// ONE hero for both branches. Desktop and MobileBoard each carried their own
+// masthead and had already drifted: desktop showed a scope sentence, a prose dek
+// and a two-line date stamp; mobile showed a counts line, no dek, and the same
+// two dates already collapsed onto ONE line. Sharing the component is what stops
+// that recurring.
+//
+// META. The two dates are two different facts and both survive: SET is which
+// trials are in the set (manual crawl), STATUS is whether they are still
+// recruiting (weekly refresh). What drops is the mechanism wording — "AS OF
+// CRAWL", "AS OF … REFRESH" — which is not lost from the surface: DISCLOSURES
+// below states both in full prose ("recruiting as of the 27 JUL 2026 refresh,
+// not as of now" / "complete as of the 12 JUN 2026 crawl"). Measured, the
+// mechanism form is 410px and wraps on a phone; this form is 274px and does not.
+//
+// STATS take the TABLE variant: "126 open trials" is a label/value pair, and a
+// tile rendering 126 over OPEN TRIALS loses the sentence. This is the shape the
+// cluster could not express and the reason the variant exists.
+function TrialsHero({ surface, loading, narrow }: { surface: TrialsSurface; loading: boolean; narrow: boolean }) {
+  const area = parentTaLabelForIndicationSlug(TRIALS_TA_SLUG);
+  const ta = taLabelForSlug(TRIALS_TA_SLUG);
+  return (
+    <PageHero
+      narrow={narrow}
+      eyebrow={["Trials", ta, area].filter(Boolean).join(" · ")}
+      meta={`SET ${CRAWL} · STATUS ${REFRESH}`}
+      title="Trials"
+      scope={`Open lung trials naming at least one ranked ${ta} investigator`}
+      dek="Every open lung trial on ClinicalTrials.gov that names an investigator matched to the ranked cohort. Trials are the rows; territory, roster, sponsor and phase are lenses on the same set."
+      stats={{
+        variant: "table",
+        items: [
+          { value: loading ? "…" : String(surface.openCount), label: "open trials" },
+          { value: loading ? "…" : String(surface.industryCount), label: "industry-sponsored" },
+          { value: loading ? "…" : `${surface.rosterAssetsOnTrial} of ${surface.rosterAssetsTotal}`, label: "roster assets on trial" },
+        ],
+      }}
+    />
+  );
+}
+
 export default function TrialsPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 767px)");
@@ -149,26 +192,9 @@ export default function TrialsPage() {
 
   return (
     <AppLayout width="wide">
-      <div style={{ ...DEPTH.PANEL, border: `1px solid ${P.line}`, marginTop: 8 }}>
-        {/* masthead */}
-        <div style={{ padding: "24px 28px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px 40px", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7, flex: "1 1 340px", minWidth: 0, maxWidth: 660 }}>
-            <div style={{ ...mono(9, 400, ".18em"), color: P.ink6 }}>FIELDMARK / TRIALS</div>
-            <div style={{ ...serif(25, 600), color: P.ink0, lineHeight: 1.05 }}>Trials</div>
-            <div style={{ ...mono(9, 400, ".14em"), color: P.amberDim }}>OPEN LUNG TRIALS NAMING AT LEAST ONE RANKED {taLabelForSlug(TRIALS_TA_SLUG).toUpperCase()} INVESTIGATOR</div>
-            <p style={{ ...serif(13), color: P.ink2, lineHeight: 1.65, margin: "6px 0 0" }}>
-              Every open lung trial on ClinicalTrials.gov that names an investigator matched to the ranked cohort. Trials are the rows; territory, roster, sponsor and phase are lenses on the same set.
-            </p>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", flex: "0 1 auto", minWidth: 250 }}>
-            {[["open trials", surface.openCount], ["industry-sponsored", surface.industryCount], ["roster assets on trial", `${surface.rosterAssetsOnTrial} of ${surface.rosterAssetsTotal}`]].map(([k, v]) => (
-              <div key={String(k)} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "5px 0", borderBottom: `1px solid ${P.line}` }}>
-                <span style={{ ...mono(9), color: P.ink4 }}>{k}</span>
-                <span style={{ ...mono(13, 600), color: P.ink0 }}>{loading ? "…" : v}</span>
-              </div>
-            ))}
-            <div style={{ ...mono(9, 400, ".13em"), color: P.ink6, textAlign: "right", paddingTop: 8, lineHeight: 1.7 }}>SET AS OF CRAWL {CRAWL}<br />STATUS AS OF {REFRESH} REFRESH</div>
-          </div>
+      <div style={{ ...DEPTH.PANEL, border: `1px solid ${P.line}`, margin: "8px 0 24px" }}>
+        <div style={{ padding: "26px 28px 0" }}>
+          <TrialsHero surface={surface} loading={loading} narrow={false} />
         </div>
 
         {/* territory band */}
@@ -379,16 +405,14 @@ function MobileBoard({ surface, listed, rosterChips, isTracked, toggleSave, regi
   loading: boolean;
 }) {
   return (
-    <div style={{ ...DEPTH.PANEL, border: `1px solid ${P.line}`, marginTop: 8 }}>
+    <div style={{ ...DEPTH.PANEL, border: `1px solid ${P.line}`, margin: "8px 0 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 16px", borderBottom: `1px solid ${P.line}` }}>
         <span style={{ ...mono(11, 600, ".22em"), color: P.amber }}>FIELDMARK</span>
         <span style={{ ...mono(9, 400, ".16em"), color: P.ink0, borderBottom: `1px solid ${P.amber}`, paddingBottom: 2 }}>TRIALS</span>
       </div>
 
-      <div style={{ padding: "18px 16px 0", display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={{ ...serif(25, 600), color: P.ink0, lineHeight: 1.05 }}>Trials</div>
-        <div style={{ ...mono(9, 400, ".14em"), color: P.amberDim, lineHeight: 1.6 }}>{loading ? "…" : `${surface.openCount} OPEN · ${surface.industryCount} INDUSTRY · ${surface.rosterAssetsOnTrial} OF ${surface.rosterAssetsTotal} ROSTER ASSETS`}</div>
-        <div style={{ ...mono(9, 400, ".12em"), color: P.ink6, lineHeight: 1.7 }}>SET AS OF CRAWL {CRAWL} · STATUS AS OF {REFRESH}</div>
+      <div style={{ padding: "18px 16px 0" }}>
+        <TrialsHero surface={surface} loading={loading} narrow />
       </div>
 
       <div style={{ margin: "16px 16px 0", border: `1px solid ${P.line3}`, background: P.panel }}>

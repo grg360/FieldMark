@@ -182,8 +182,16 @@ export default function PageHero({
         }}
       >
         <div>
-          <div
+          {/* <h1>, not <div> (2026-08-15). Every surface that adopted this hero
+              lost its level-1 heading, because the component rendered a styled
+              div — Drugs was the only one of the eight that had a real h1 and it
+              went when the header was swapped. The tag is unconditional: a hero
+              IS the page heading, so there is no variant where it should not be
+              one. margin:0 kills the UA default; every other value is unchanged,
+              so this is a semantic fix with no visual delta. */}
+          <h1
             style={{
+              margin: 0,
               fontFamily: FONT.serif,
               fontSize: titleSize,
               fontWeight: 600,
@@ -194,7 +202,7 @@ export default function PageHero({
             }}
           >
             {title}
-          </div>
+          </h1>
           {scope ? (
             <div style={{ fontFamily: FONT.mono, fontSize: 9.5, letterSpacing: "0.16em", color: GOLD.gold, textTransform: "uppercase", marginTop: 10 }}>
               {scope}
@@ -207,7 +215,12 @@ export default function PageHero({
           ) : null}
         </div>
         {table ? (
-          <div style={{ minWidth: 250, flex: "0 1 auto", display: "flex", flexDirection: "column" }}>
+          // alignSelf FLEX-START: the cluster bottom-aligns with the dek because
+          // tiles sit ON that baseline, but a ruled table reads from its first
+          // row down — bottom-aligning it hangs the rows off the dek instead of
+          // starting them level with the title. Alignment is part of what the
+          // variant is, not a prop.
+          <div style={{ minWidth: 250, flex: "0 1 auto", alignSelf: "flex-start", display: "flex", flexDirection: "column" }}>
             {table.items.map((s, i) => (
               <div
                 key={`${s.label}-${i}`}
