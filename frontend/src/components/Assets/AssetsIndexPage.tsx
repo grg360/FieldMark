@@ -15,6 +15,8 @@ import AppLayout from "../AppLayout";
 import { CANON, FACE } from "../../lib/canonicalTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { ASSETS, DEPLOYMENT_ASSETS, BACKBONE_ASSETS } from "../../lib/assetConfig";
+import { ASSETS_TA_SLUG } from "../../lib/assetConfig";
+import { taLabelForSlug } from "../../lib/taLabels";
 import {
   loadAssetIndex,
   DENSITY_GLYPH,
@@ -202,14 +204,14 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
       <div style={{ padding: isMobile ? "22px 16px 0" : "30px 34px 0", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 470px", gap: isMobile ? 22 : 56, alignItems: "start" }}>
         <div>
           <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".24em", color: MUT3, marginBottom: 12 }}>INDEX · VOLUME III</div>
-          <h1 style={{ margin: "0 0 12px", font: `400 30px/1.1 ${SERIF}`, letterSpacing: "-.008em", color: INK }}>Drugs Index · NSCLC</h1>
+          <h1 style={{ margin: "0 0 12px", font: `400 30px/1.1 ${SERIF}`, letterSpacing: "-.008em", color: INK }}>Drugs Index · {taLabelForSlug(ASSETS_TA_SLUG)}</h1>
           <p style={{ margin: 0, maxWidth: 620, font: `300 15px/1.55 ${SERIF}`, color: MUT }}>Organized by molecular target, because that is how treatment is selected and how a territory is worked. Grouping cuts across modality: amivantamab is a bispecific antibody sitting with small-molecule TKIs, because they compete for the same patient.</p>
         </div>
         <div style={{ paddingTop: 4 }}>
           <ReachRow label={`${DEPLOYMENT_ASSETS.length} deployment assets reach`} value={fmt(model.header.deploymentPubs)} />
           <ReachRow label={`${BACKBONE_ASSETS.length} backbone agents reach`} value={fmt(model.header.backbonePubs)} />
           <ReachRow label={`all ${ASSETS.length} reach`} value={fmt(model.header.allPubs)} />
-          <ReachRow label="NSCLC corpus" value={fmt(model.header.corpus)} />
+          <ReachRow label={`${taLabelForSlug(ASSETS_TA_SLUG)} corpus`} value={fmt(model.header.corpus)} />
           <p style={{ margin: "10px 0 0", font: `400 9px/1.6 ${MONO}`, letterSpacing: ".02em", color: DIM, maxWidth: 420 }}>Distinct publications, not asset–publication edges. The first two scopes overlap by {fmt(model.header.overlap)} records and do not partition — they are not drawn as a whole.</p>
         </div>
       </div>
@@ -312,7 +314,7 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
         <p style={{ margin: 0, maxWidth: 1180, font: `400 9px/1.7 ${MONO}`, color: CANON.INK.MUTE }}>{model.counts.targetGroups} target groups from the controlled vocabulary, holding the {model.counts.targetedAssets} deployment assets that carry a target; the rest have none. Multi-target assets appear in every group they belong to, marked <span style={{ color: GOLD_FAINT }}>ALSO IN</span> — so the groups hold {model.counts.rows} rows for {model.counts.targetedAssets} assets, and group publication totals do not sum to {fmt(model.header.deploymentPubs)}.</p>
       </div>
       <div style={{ margin: "16px 0 0", borderTop: `1px solid ${H1}`, padding: isMobile ? "12px 16px 26px" : "12px 34px 26px", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
-        <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>FieldMark NSCLC corpus, {fmt(model.header.corpus)} records, indexed {formatIndexDate(model.header.indexDate)}.</span>
+        <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>FieldMark {taLabelForSlug(ASSETS_TA_SLUG).toLowerCase()} corpus, {fmt(model.header.corpus)} records, indexed {formatIndexDate(model.header.indexDate)}.</span>
         <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>{view === "flat" ? `FLAT VIEW · ${DEPLOYMENT_ASSETS.length} ROWS` : `${model.counts.rows} TARGET ROWS · ${model.backbone.rows.length} BACKBONE · ${model.nullNonBackbone.length} UNTARGETED`}</span>
       </div>
     </div>

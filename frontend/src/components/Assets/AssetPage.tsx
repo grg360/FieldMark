@@ -15,10 +15,17 @@ import { AuthorsPanel, CongressPanel, ForumPanel } from "./RightRail";
 import { CONTENT_WIDTH } from "../../lib/designTokens";
 import { CANON, FACE } from "../../lib/canonicalTokens";
 import { assetBySlug, identityLine, matchTerms, type AssetConfig } from "../../lib/assetConfig";
-import { NSCLC_CORPUS_TOTAL, formatIndexDate } from "../../lib/assets";
+import { ASSETS_TA_SLUG } from "../../lib/assetConfig";
+import { taLabelForSlug } from "../../lib/taLabels";
+// NSCLC_CORPUS_TOTAL is deliberately NOT imported here any more. It is the
+// documented FALLBACK for when asset_index_meta() is unavailable, and this
+// page was printing it as fact — quoting 85,302 while the Drugs Index, on the
+// same data, showed the live 85,944. The fallback now lives in one place
+// (loadAssetPage), where the index keeps it too.
+import { formatIndexDate } from "../../lib/assets";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { buildComposition, themeColorMap } from "../../lib/assetLogic";
-import { loadAssetPage, type AssetPageData, type AssetOverview } from "../../lib/assetPage";
+import { loadAssetPage, type AssetPageData, type AssetOverview, type AssetIndexMeta } from "../../lib/assetPage";
 
 const eyebrow = {
   fontFamily: FACE.data,
@@ -84,7 +91,7 @@ function Tile({ label, value, sub, amber }: { label: string; value: string; sub:
   );
 }
 
-function StatTiles({ o, mobile }: { o: AssetOverview; mobile: boolean }) {
+function StatTiles({ o, meta, mobile }: { o: AssetOverview; meta: AssetIndexMeta; mobile: boolean }) {
   if (mobile) {
     // Two hero tiles; the remaining ratios ride a compact mono line (they also
     // appear in full in "What this page counted").
@@ -113,8 +120,8 @@ function StatTiles({ o, mobile }: { o: AssetOverview; mobile: boolean }) {
   }
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
-      <Tile label="Publications" amber value={o.total_pubs.toLocaleString()} sub={`of ${NSCLC_CORPUS_TOTAL.toLocaleString()} NSCLC corpus`} />
-      <Tile label="2026 to date" amber value={o.ytd_2026.toLocaleString()} sub={`through ${formatIndexDate()} · part year`} />
+      <Tile label="Publications" amber value={o.total_pubs.toLocaleString()} sub={`of ${meta.corpus.toLocaleString()} ${taLabelForSlug(ASSETS_TA_SLUG).toLowerCase()} corpus`} />
+      <Tile label="2026 to date" amber value={o.ytd_2026.toLocaleString()} sub={`through ${formatIndexDate(meta.indexDate)} · part year`} />
       <Tile label="Authors resolved" value={o.authors_resolved.toLocaleString()} sub={`of ${o.author_strings.toLocaleString()} author strings`} />
       <Tile label="Open access" value={pctOf(o.open_access, o.total_pubs)} sub={`${o.open_access.toLocaleString()} full texts linked`} />
       <Tile label="Themed" value={pctOf(o.themed, o.total_pubs)} sub={`${o.themed.toLocaleString()} with canonical theme`} />
@@ -156,7 +163,7 @@ function MobileSection({ label, count, children }: { label: string; count: strin
 }
 
 // ── What this page counted ───────────────────────────────────────────────────
-function WhatCounted({ asset, o, themedPct, mobile }: { asset: AssetConfig; o: AssetOverview; themedPct: number; mobile: boolean }) {
+function WhatCounted({ asset, o, meta, themedPct, mobile }: { asset: AssetConfig; o: AssetOverview; meta: AssetIndexMeta; themedPct: number; mobile: boolean }) {
   const terms = matchTerms(asset);
   return (
     <div style={{ padding: mobile ? "20px 16px 28px" : "20px 32px 24px", borderTop: `1px solid ${CANON.LINE.HAIR}`, background: CANON.GROUND.RAISE }}>
@@ -169,8 +176,8 @@ function WhatCounted({ asset, o, themedPct, mobile }: { asset: AssetConfig; o: A
             {i < terms.length - 1 ? (i === terms.length - 2 ? " or " : ", ") : ""}
           </span>
         ))}{" "}
-        in title or abstract · FieldMark NSCLC corpus, {NSCLC_CORPUS_TOTAL.toLocaleString()} records,
-        indexed {formatIndexDate()}. Composition on the {o.themed.toLocaleString()} records carrying a
+        in title or abstract · FieldMark {taLabelForSlug(ASSETS_TA_SLUG).toLowerCase()} corpus, {meta.corpus.toLocaleString()} records,
+        indexed {formatIndexDate(meta.indexDate)}. Composition on the {o.themed.toLocaleString()} records carrying a
         canonical theme ({Math.round(themedPct * 100)}%). Trajectory on{" "}
         {o.trajectory_resolved.toLocaleString()} records with year-resolved citations (
         {pctOf(o.trajectory_resolved, o.total_pubs)}). Authorship resolved to the HCP graph for{" "}
@@ -247,7 +254,7 @@ export default function AssetPage() {
         </div>
       ) : isMobile ? (
         <>
-          <StatTiles o={o} mobile />
+          <StatTiles o={o} meta={data.meta} mobile />
           <div style={{ padding: "20px 16px", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
             <CompositionChart composition={composition} mobile />
           </div>
@@ -263,11 +270,11 @@ export default function AssetPage() {
           <MobileSection label="Forum threads" count={String(data.forum.length)}>
             <ForumPanel threads={data.forum} />
           </MobileSection>
-          <WhatCounted asset={asset} o={o} themedPct={themedPct} mobile />
+          <WhatCounted asset={asset} o={o} meta={data.meta} themedPct={themedPct} mobile />
         </>
       ) : (
         <>
-          <StatTiles o={o} mobile={false} />
+          <StatTiles o={o} meta={data.meta} mobile={false} />
 
           <div style={{ padding: "28px 32px 30px", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
             <CompositionChart composition={composition} assetName={asset.generic} full={fullComposition} />
@@ -302,7 +309,7 @@ export default function AssetPage() {
             </div>
           </div>
 
-          <WhatCounted asset={asset} o={o} themedPct={themedPct} mobile={false} />
+          <WhatCounted asset={asset} o={o} meta={data.meta} themedPct={themedPct} mobile={false} />
         </>
       )}
     </div>,

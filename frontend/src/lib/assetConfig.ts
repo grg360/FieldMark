@@ -85,6 +85,10 @@ export function matchTerms(a: AssetConfig): string[] {
 // Identity subtitle beneath the asset title, e.g.
 // "3rd-generation EGFR TKI · oral · AZD9291 · first approval 2015 · 4 NSCLC indications".
 // Each segment is dropped when its datum is absent rather than printed empty.
+// The drug monographs are built from one TA's corpus. Slug is the pin; the
+// label is derived at the render sites (lib/taLabels.ts).
+export const ASSETS_TA_SLUG = "nsclc";
+
 export function identityLine(a: AssetConfig): string {
   const parts: string[] = [a.drug_class, a.route];
   if (a.display_code) parts.push(a.display_code);

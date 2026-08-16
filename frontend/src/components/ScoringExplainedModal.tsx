@@ -319,6 +319,11 @@ export default function ScoringExplainedModal({ open, onClose, scrollToSection }
           <section id="fm-scoring-community">
             <h3 style={headingStyle}>Community</h3>
             <p style={subStyle}>Practicing clinicians with a Medicare claims footprint</p>
+            {/* NSCLC IS CORRECT HERE — DO NOT WIDEN TO "LUNG CANCER". Part B
+                qualification runs on an NSCLC-specific code set with no SCLC
+                codes; renaming it would overstate what qualifies a clinician.
+                The TA display label was renamed 2026-08-15, this criterion was
+                not. Mirrors the evidence-tier note in CohortLedger. */}
             <p style={bodyText}>
               Community HCPs qualify through a claims footprint: recorded NSCLC Part B beneficiaries, or any Part D oncology
               prescribing. Qualification is a fact about claims, not a judgment about the clinician.

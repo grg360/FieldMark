@@ -8,6 +8,8 @@ import { Link } from "react-router-dom";
 import { CANON, FACE } from "../../lib/canonicalTokens";
 import { SEQ } from "../../lib/canonicalTokens";
 import { authorInitialName, authorRankLabel } from "../../lib/assetLogic";
+import { ASSETS_TA_SLUG } from "../../lib/assetConfig";
+import { taLabelForSlug } from "../../lib/taLabels";
 import type { AuthorsPayload, CongressPresenter, ForumThread } from "../../lib/assetPage";
 
 const eyebrow = {
@@ -96,7 +98,9 @@ export function CongressPanel({ presenters }: { presenters: CongressPresenter[] 
                     {p.name}
                   </Link>
                   <div style={{ ...metaMono, marginTop: 4 }}>
-                    {p.established_rank != null ? `NSCLC ESTABLISHED #${p.established_rank}` : "CONFIRMED PRESENTER"}
+                    {p.established_rank != null
+                      ? `${taLabelForSlug(ASSETS_TA_SLUG).toUpperCase()} ESTABLISHED #${p.established_rank}`
+                      : "CONFIRMED PRESENTER"}
                   </div>
                 </div>
                 <div style={{ fontFamily: FACE.data, fontSize: 11, color: CANON.INK.MUTE, textAlign: "right", flex: "none" }}>

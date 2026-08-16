@@ -11,6 +11,12 @@ import { LOCATION_ABSENT_LABEL, resolveLocation } from "../lib/location";
 import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import { FONT, COLOR } from "../lib/designTokens";
+import { taLabelForSlug } from "../lib/taLabels";
+
+// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
+// the stable identity — and the display label is derived from it, never typed
+// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+const CARD_TA_SLUG = "nsclc";
 
 function risingStarArchetypeShortLabel(archetype: string | null | undefined): string {
   switch (archetype) {
@@ -381,8 +387,8 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
 // Community roster tier labels (Phase 3): card chip vocabulary. heme_dominant
 // gets the affirmative different-specialty label, never a deficit one.
 const COMMUNITY_TIER_CARD_LABEL: Record<string, string> = {
-  anchored: "ANCHORED · NSCLC EVIDENCE",
-  supported: "SUPPORTED · NSCLC EVIDENCE",
+  anchored: `ANCHORED · ${taLabelForSlug(CARD_TA_SLUG).toUpperCase()} EVIDENCE`,
+  supported: `SUPPORTED · ${taLabelForSlug(CARD_TA_SLUG).toUpperCase()} EVIDENCE`,
   heme_dominant: "HEME-FOCUSED PRACTICE",
   candidate: "CANDIDATE",
   unresolved: "NO MEDICARE EVIDENCE",
@@ -704,7 +710,19 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
             specialty label, not a deficit one. */}
         {isCommunityPlain ? (
           <div
-            style={{ position: "absolute", top: 12, right: 12, textAlign: "right", zIndex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}
+            // GUARDED 2026-08-15. This box is absolutely positioned and was
+            // unconstrained, so it grew LEFTWARD from the card edge straight
+            // over the name/affiliation line. It never showed because
+            // evidenceTier is null across the community feed today — which is
+            // exactly why it needs a cap rather than an eyeball.
+            //
+            // 104px comes off the card's OWN geometry, not a guess: the
+            // identity block above caps itself at `calc(100% - 136px)`, i.e.
+            // the card already reserves 136px for this slot. Take the 12px
+            // right inset off that, and leave a 20px gutter matching the
+            // card's own horizontal padding, and the slot is 136-12-20 = 104.
+            // Text wraps right-aligned inside it; it can no longer reach the name.
+            style={{ position: "absolute", top: 12, right: 12, maxWidth: 104, textAlign: "right", zIndex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}
           >
             <span
               style={{

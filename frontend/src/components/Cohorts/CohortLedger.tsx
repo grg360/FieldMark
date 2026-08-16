@@ -20,6 +20,10 @@ import { useScoringDate, formatScoringDate } from "../../lib/scoringMeta";
 import PeopleNavStrip from "../PeopleNavStrip";
 
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
+import { taLabelForSlug } from "../../lib/taLabels";
+
+// The ledger RPCs are TA-locked (see the strip note below). Slug is the pin.
+const LEDGER_TA_SLUG = "nsclc";
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
 import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
 import { getDrawerLayerData, prefetchDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
@@ -1427,8 +1431,14 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
       const recurs = row.recurrenceBand === "recurs" ? ", recurring across years rather than appearing once" : "";
       return "Anchored on their own prescribing record — " + (stems || "lung-only oral") + " claims" + (years ? " in " + years : "") + recurs + ".";
     }
+    // NSCLC IS CORRECT HERE — DO NOT WIDEN TO "LUNG CANCER". The evidence tier is
+    // computed from a claims code set that is NSCLC-specific and carries no SCLC
+    // codes, so naming it "lung cancer" would assert coverage the data does not
+    // have. The TA DISPLAY LABEL was renamed 2026-08-15; this clinical criterion
+    // was not. Same for the candidate tier below, and ScoringExplainedModal.
     if (row.tier === "supported") return "Supported by " + (row.supportedEvidence ?? "corroborating NSCLC evidence") + " in the claims record.";
     if (row.tier === "heme_dominant") return "A heme-focused practice — the oral record concentrates in blood cancers; a different specialty, not a deficit.";
+    // NSCLC-specific by construction: see the supported-tier note above.
     if (row.tier === "candidate") return "An oncology claims footprint without NSCLC-specific drug evidence — a candidate on the record so far.";
     return "No Medicare drug-claims evidence to characterize the treatment mix.";
   })();
@@ -1920,7 +1930,7 @@ export default function CohortLedger() {
               // breadcrumb ("TAG · Cohort ledger · NSCLC · Oncology") — scope
               // qualified, never dropped. Title treatment only: each cohort's
               // body chrome stays truthful to whether it ranks.
-              eyebrow={`${cfg.tag} · Cohort ledger · NSCLC · Oncology`}
+              eyebrow={`${cfg.tag} · Cohort ledger · ${taLabelForSlug(LEDGER_TA_SLUG)} · Oncology`}
               meta={`WEEKLY BUILD · AS OF ${formatScoringDate(scoredAt)}`}
               title={cfg.title.split(" / ")[0]}
               stats={cohortTotal ? [{ value: cohortTotal.toLocaleString(), label: "IN COHORT", center: true }] : undefined}

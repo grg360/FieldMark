@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { taLabelForSlug } from "./lib/taLabels";
 import { useMediaQuery } from "./lib/useMediaQuery";
 import {
   Navigate,
@@ -623,14 +624,14 @@ function FeedLayout({
                 marginBottom: "12px",
               }}
             >
-              Telescope is currently available for Oncology (NSCLC) and Immunology (Atopic Dermatitis)
+              Telescope is currently available for Oncology ({taLabelForSlug("nsclc")}) and Immunology (Atopic Dermatitis)
             </div>
             <div style={{ fontSize: "13px", maxWidth: "480px", lineHeight: 1.5 }}>
               {selectedTA === "Immunology"
                 ? "Select the Atopic Dermatitis indication under Immunology to explore its collaboration network. Other immunology indications are in development."
                 : selectedTA === "Oncology"
-                ? "Select the All or NSCLC indication under Oncology to explore the NSCLC collaboration network. Other oncology indications are in development."
-                : "Hepatology and Rare Disease coverage are in development. Select Oncology (NSCLC) or Immunology (Atopic Dermatitis) to explore a collaboration network."}
+                ? `Select the All or ${taLabelForSlug("nsclc")} indication under Oncology to explore the ${taLabelForSlug("nsclc").toLowerCase()} collaboration network. Other oncology indications are in development.`
+                : `Hepatology and Rare Disease coverage are in development. Select Oncology (${taLabelForSlug("nsclc")}) or Immunology (Atopic Dermatitis) to explore a collaboration network.`}
             </div>
           </div>
         )

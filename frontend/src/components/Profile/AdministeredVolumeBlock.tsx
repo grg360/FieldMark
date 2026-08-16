@@ -23,6 +23,12 @@ import {
   type AgentBadge,
 } from "../../lib/administeredVolume";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
+import { taLabelForSlug } from "../../lib/taLabels";
+
+// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
+// the stable identity — and the display label is derived from it, never typed
+// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+const BLOCK_TA_SLUG = "nsclc";
 
 // Ink follows reading mode at the BLOCK level (2026-08-06): this is a data table
 // scanned as a unit, so it is one temperature — the COOL ramp throughout. The
@@ -54,7 +60,11 @@ const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as 
 const int = (v: number | null | undefined) => (v == null ? "—" : Math.round(v).toLocaleString());
 
 const BADGE_LABEL: Record<AgentBadge, string> = {
-  nsclc_anchored: "NSCLC-ANCHORED",
+  // The KEY stays nsclc_anchored — it is the value administeredVolume.ts emits.
+  // Only the label moves. Reads "ANCHORED · LUNG CANCER", matching the sibling
+  // tier vocabulary in PracticeFirstProfile/HCPCard; the hyphenated compound
+  // worked for an acronym and not for two words.
+  nsclc_anchored: `ANCHORED · ${taLabelForSlug(BLOCK_TA_SLUG).toUpperCase()}`,
   thoracic_enriched: "THORACIC-ENRICHED · MULTI-INDICATION",
 };
 

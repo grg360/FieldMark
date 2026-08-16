@@ -18,6 +18,10 @@ import { getRisingBoard, type RisingBoard } from "../../lib/risingProfile";
 import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
+import { taLabelForSlug } from "../../lib/taLabels";
+
+// This ledger is pinned to one TA. The SLUG is the pin; the label is derived.
+const TA_SLUG = "nsclc";
 
 // Register tokens (2026-08-05): fresh surface, consumes the register — see the
 // palette note in Profile/RisingHcpProfile.tsx. Cohort greens + archetype
@@ -183,7 +187,7 @@ export default function RisingQuadrant() {
           <PageHero
             eyebrow="RIS · Rising ledger"
             meta="ONE BOARD · TWO MODES · WEEKLY BUILD"
-            title="Rising Ledger / NSCLC"
+            title={`Rising Ledger / ${taLabelForSlug(TA_SLUG)}`}
             stats={[
               { value: scoped.length.toLocaleString("en-US"), label: "IN VIEW" },
               { value: String(usCount), label: "US" },

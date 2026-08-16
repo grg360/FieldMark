@@ -25,6 +25,7 @@ import nsclcNodes from "../data/telescope_nsclc_nodes.json";
 import nsclcEdges from "../data/telescope_nsclc_edges.json";
 import adNodes from "../data/telescope_ad_nodes.json";
 import adEdges from "../data/telescope_ad_edges.json";
+import { taLabelForSlug } from "../lib/taLabels";
 
 // `cohort` + `rank` are the collaborator's OWN standing, baked by the exporter
 // from the rank tables (cohort = the stronger of the cohorts they hold, by
@@ -619,7 +620,10 @@ class Sky extends Component<Props, State> {
         ));
       } else {
         const c = orb![focus.k], h = g.nodes[focus.p];
-        const ta = this.props.taId === AD_TA_ID ? "AD" : "NSCLC";
+        // Was the bare abbreviation "AD"/"NSCLC" typed inline. These strings are
+        // SENTENCES, so the label comes from the map and the community form was
+        // reworded — "A Lung Cancer community board clinician" does not parse.
+        const ta = taLabelForSlug(this.props.taId === AD_TA_ID ? "atopic-dermatitis" : "nsclc");
         // The star is "outside the sky" (not drawn among the fifty) — but that is a
         // fact about the DRAWING, not the person. Where the platform ranks them,
         // SHOW the rank; deny a ranking ONLY when there genuinely is none.
@@ -632,7 +636,7 @@ class Sky extends Component<Props, State> {
           banner = ROLE[c.srcCohort] + " #" + c.rank + " in " + ta + ". This star sits outside the fifty drawn in this sky — it is on " + h.name + "'s orbit because they share " + c.w + " publications.";
         } else if (c.srcCohort === "community") {
           selRole = ROLE.community; selRoleColor = TINT.community ?? OTHER;
-          banner = "A " + ta + " community board clinician — community is not ranked. It is here because " + h.name + " has " + c.w + " shared publications with them.";
+          banner = "A community board clinician in " + ta + " — community is not ranked. It is here because " + h.name + " has " + c.w + " shared publications with them.";
         } else {
           selRole = ROLE.other; selRoleColor = OTHER;
           banner = "Not ranked in " + ta + ". It is here because " + h.name + " has " + c.w + " shared publications with them.";
@@ -849,7 +853,7 @@ class Sky extends Component<Props, State> {
               <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#ffd89b", boxShadow: "0 0 10px rgba(255,216,155,0.9)" }} />
               <div style={{ font: "400 10px/1 Jost,sans-serif", letterSpacing: "0.36em", textTransform: "uppercase", color: "#e6e3da" }}>SkyView</div>
             </div>
-            <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#4d5468" }}>{this.props.taId === AD_TA_ID ? "AD" : "NSCLC"}</div>
+            <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#4d5468" }}>{taLabelForSlug(this.props.taId === AD_TA_ID ? "atopic-dermatitis" : "nsclc").toUpperCase()}</div>
           </div>
           <div style={{ font: "200 22px/1.24 Jost,sans-serif", color: "#e6e3da", textWrap: "pretty" } as CSSProperties}>Recognized names</div>
           <div style={{ font: "300 12px/1.55 Jost,sans-serif", color: "#6b7288", marginTop: 6, textWrap: "pretty" } as CSSProperties}>Established and rising stars, and the co-authorship among them. Tap one, then travel collaborator to collaborator.</div>

@@ -24,6 +24,12 @@ import {
   type RisingProfile,
 } from "../../lib/risingProfile";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
+import { taLabelForSlug } from "../../lib/taLabels";
+
+// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
+// the stable identity — and the display label is derived from it, never typed
+// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+const PROFILE_TA_SLUG = "nsclc";
 
 // Register tokens (2026-08-05): this surface was written fresh, so unlike the
 // migrated frames it CONSUMES the register rather than preserving frame bytes —
@@ -433,7 +439,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         {/* breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 14px", flexWrap: "wrap" }}>
           <div style={{ padding: "2px 5px", background: "#1c2a26", font: `600 9px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>RIS</div>
-          <div style={mono(9, MUT2)}>RISING / NSCLC</div>
+          <div style={mono(9, MUT2)}>RISING / {taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()}</div>
           <div style={{ color: CANON.LINE.EDGE, fontSize: 9 }}>›</div>
           <div style={mono(9, MUT2)}>
             {usRank != null ? `RANK #${usRank} US` : `RANK #${rank.toLocaleString("en-US")} GLOBAL`}
@@ -810,7 +816,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
         {/* established standing */}
         <SectionHead title="ESTABLISHED STANDING"
-          sub="DUAL-BOARD MEMBERS CARRY AN ESTABLISHED RANK IN NSCLC"
+          sub={`DUAL-BOARD MEMBERS CARRY AN ESTABLISHED RANK IN ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()}`}
           right="RISING WINS THE ROUTE · ESTABLISHED RANK IS A SECTION, NOT A COMPETING SURFACE" />
         {dual ? (
           <Card style={{ padding: "20px 22px" }}>
@@ -837,7 +843,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
             <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={mono(9, MUT2, 0.11)}>
-                US ESTABLISHED RANK IN NSCLC · SCORE {Number(p.established_us!.cohort_score).toFixed(2)}
+                US ESTABLISHED RANK IN {taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} · SCORE {Number(p.established_us!.cohort_score).toFixed(2)}
                 {p.established_global ? ` · GLOBAL ESTABLISHED RANK ${p.established_global.rank.toLocaleString("en-US")}` : ""}
               </div>
               <div style={{ flex: 1 }} />
@@ -853,7 +859,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             <div style={{ marginTop: 14, ...serif(13, INK2) }}>
               {p.established_global
                 ? `Ranked on the global established board (rank ${p.established_global.rank.toLocaleString("en-US")}) but not US-scoped. The rising surface is the primary record for this profile.`
-                : "No established rank in NSCLC. For rising-only physicians this surface is the whole record — nothing is routed elsewhere and no established section renders."}
+                : `No established rank in ${taLabelForSlug(PROFILE_TA_SLUG)}. For rising-only physicians this surface is the whole record — nothing is routed elsewhere and no established section renders.`}
             </div>
           </Card>
         )}

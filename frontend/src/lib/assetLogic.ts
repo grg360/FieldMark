@@ -7,6 +7,8 @@
 
 import { COLOR } from "./designTokens";
 import { VIZ, VIZ_ROTATION } from "./canonicalTokens";
+import { ASSETS_TA_SLUG } from "./assetConfig";
+import { taLabelForSlug } from "./taLabels";
 
 // ── The theme ramp ───────────────────────────────────────────────────────────
 // Design's one new categorical scale (frame 1f): a fixed cool ramp, lightest band
@@ -326,7 +328,8 @@ export function authorRankLabel(
   scopeType: string | null,
   scopeValue: string | null,
 ): string {
-  if (boardRank == null) return "NOT RANKED IN NSCLC";
+  const ta = taLabelForSlug(ASSETS_TA_SLUG).toUpperCase();
+  if (boardRank == null) return `NOT RANKED IN ${ta}`;
   const scope = scopeType === "global" || !scopeValue ? "GLOBAL" : scopeValue.toUpperCase();
-  return `NSCLC #${boardRank} · ${scope}`;
+  return `${ta} #${boardRank} · ${scope}`;
 }

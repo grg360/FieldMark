@@ -12,6 +12,10 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import HCPChip, { HCPChipRow, toChipCohort } from "../HCPChip";
+import { taLabelForSlug } from "../../lib/taLabels";
+
+// The trials RPC is TA-locked (get_nsclc_trials_surface). Slug is the pin.
+const TRIALS_TA_SLUG = "nsclc";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { fetchTrials, buildSurface, type Trial, type Region, type TrialsSurface } from "../../lib/trials";
@@ -151,7 +155,7 @@ export default function TrialsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 7, flex: "1 1 340px", minWidth: 0, maxWidth: 660 }}>
             <div style={{ ...mono(9, 400, ".18em"), color: P.ink6 }}>FIELDMARK / TRIALS</div>
             <div style={{ ...serif(25, 600), color: P.ink0, lineHeight: 1.05 }}>Trials</div>
-            <div style={{ ...mono(9, 400, ".14em"), color: P.amberDim }}>OPEN LUNG TRIALS NAMING AT LEAST ONE RANKED NSCLC INVESTIGATOR</div>
+            <div style={{ ...mono(9, 400, ".14em"), color: P.amberDim }}>OPEN LUNG TRIALS NAMING AT LEAST ONE RANKED {taLabelForSlug(TRIALS_TA_SLUG).toUpperCase()} INVESTIGATOR</div>
             <p style={{ ...serif(13), color: P.ink2, lineHeight: 1.65, margin: "6px 0 0" }}>
               Every open lung trial on ClinicalTrials.gov that names an investigator matched to the ranked cohort. Trials are the rows; territory, roster, sponsor and phase are lenses on the same set.
             </p>

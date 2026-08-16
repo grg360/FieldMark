@@ -1,4 +1,5 @@
 import { firstEmbedded } from "./cohort-metrics";
+import { TA_DISPLAY_NAME_BY_SLUG } from "./taLabels";
 import { formatBibliographyByline } from "./authorByline";
 import { dedupeHCPs } from "./hcp-dedupe";
 import {
@@ -833,14 +834,8 @@ export function taIdForApiSlug(slug: string): string | undefined {
   return TA_ID_MAP[slug.toLowerCase().trim()];
 }
 
-const TA_DISPLAY_NAME_BY_SLUG: Record<string, string> = {
-  nsclc: "Lung Cancer",
-  "atopic-dermatitis": "Atopic Dermatitis",
-  hepatology: "Hepatology",
-  "rare-disease": "Rare Disease",
-  immunology: "Immunology",
-  oncology: "Oncology",
-};
+// TA_DISPLAY_NAME_BY_SLUG moved to lib/taLabels.ts 2026-08-15 and is imported
+// back here, so the label strings have exactly one home. See that file for why.
 
 export function taDisplayNameForId(taId: string): string {
   const slug = apiSlugForTaId(taId);

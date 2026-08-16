@@ -1,4 +1,5 @@
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { taLabelForSlug } from "../../lib/taLabels";
 // Practice-first community HCP profile. Frame authority:
 // docs/design/Community HCP Profile Practice First.dc.html — layout, section order,
 // treatments and palette are the frame's; every number is a live binding. Composed
@@ -99,10 +100,15 @@ const CLAIMS_TAG: Record<string, { text: (c: ClassifiedProduct) => string; color
   route_unknown: { text: () => "ROUTE UNKNOWN", color: F.ghost2 },
 };
 
+// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
+// the stable identity — and the display label is derived from it, never typed
+// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+const PROFILE_TA_SLUG = "nsclc";
+
 // Community roster tier vocabulary (Phase 3) — affirmative labels only.
 const COMMUNITY_TIER_LABEL: Record<string, string> = {
-  anchored: "ANCHORED · NSCLC EVIDENCE",
-  supported: "SUPPORTED · NSCLC EVIDENCE",
+  anchored: `ANCHORED · ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} EVIDENCE`,
+  supported: `SUPPORTED · ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} EVIDENCE`,
   heme_dominant: "HEME-FOCUSED PRACTICE",
   candidate: "CANDIDATE",
   unresolved: "NO MEDICARE EVIDENCE",
@@ -830,7 +836,7 @@ function AdminRow({ c, aligned }: { c: AdminCode; aligned: ClassifiedProduct[] }
       ) : (
         <span style={{ ...mono(12), color: F.bright }}>{(c.name ?? "").toLowerCase().replace(/\s+injection\b.*$/, "")}{engagedBy ? <span style={{ color: F.subtle }}> · {engagedBy.product.drug}</span> : null}</span>
       )}
-      <span style={{ ...mono(11), color: gap ? F.ghost : engagedBy ? F.amber : F.faint }}>{gap ? "outside NSCLC reference" : (c.category ?? "—")}{engagedBy && !gap ? " · engaged" : ""}</span>
+      <span style={{ ...mono(11), color: gap ? F.ghost : engagedBy ? F.amber : F.faint }}>{gap ? `outside the ${taLabelForSlug(PROFILE_TA_SLUG).toLowerCase()} reference set` : (c.category ?? "—")}{engagedBy && !gap ? " · engaged" : ""}</span>
       <span style={{ textAlign: "right", ...mono(9), letterSpacing: "0.1em", color: gap ? F.ghost : engagedBy ? F.amber : F.green }}>{gap ? "DATA TASK" : engagedBy ? `PAID · ${money(engagedBy.product.amount)}` : "NONE REPORTED"}</span>
     </div>
   );

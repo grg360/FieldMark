@@ -21,6 +21,7 @@ import {
   type InstitutionAgg,
 } from "../lib/institutionRegistry";
 import { useMediaQuery } from "../lib/useMediaQuery";
+import { taLabelForSlug } from "../lib/taLabels";
 import { CANON, DEPTH, FACE } from "../lib/canonicalTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
@@ -160,7 +161,12 @@ export default function InstitutionsIndexRoute() {
     return m;
   }, [aggs]);
 
-  const taUpper = taSlug.toUpperCase().replace(/-/g, " ");
+  // taUpper was `taSlug.toUpperCase().replace(/-/g, " ")` — a label invented by
+  // string-manipulating an identifier. It rendered "Institutions / NSCLC" no
+  // matter what the TA was actually called, and it is the reason the rename was
+  // invisible on this surface. Labels come from the map now; the slug stays the
+  // identity. See lib/taLabels.ts.
+  const taLabel = taLabelForSlug(taSlug);
 
   const openRecord = (a: InstitutionAgg) => navigate(`/institution/${a.slug}?ta=${taSlug}`);
 
@@ -555,10 +561,13 @@ export default function InstitutionsIndexRoute() {
             narrow={isMobile}
             eyebrow="Inst"
             meta={"PRIMARY LINK ONLY · ORDERED BY RANKED-HCP COUNT · NOT A RANKING"}
-            title={`Institutions / ${taUpper}`}
+            title={`Institutions / ${taLabel}`}
             dek={loading
               ? "Resolving the registry…"
-              : `${aggs.length} registry institutions carry at least one ranked ${taUpper} HCP. Registry institutions carrying none in this cohort are not listed.`}
+              // "ranked ${taLabel} HCP" read as a compound noun once the label
+              // stopped being an acronym. Moving the TA behind "in" keeps the
+              // sentence working for any label length.
+              : `${aggs.length} registry institutions carry at least one ranked HCP in ${taLabel}. Registry institutions carrying none in this cohort are not listed.`}
             stats={[{ value: String(aggs.length), label: "REPRESENTED", center: true }]}
           />
         </div>
