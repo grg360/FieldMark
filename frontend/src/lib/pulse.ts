@@ -67,7 +67,12 @@ export interface PulseEvent {
 }
 
 export interface PulsePayload {
-  therapeutic_area: string;
+  /** Stable identity - keys PULSE_BY_TA / PULSE_SYNTHESIS_BY_TA and matches the
+   *  URL segment. Was folded into `therapeutic_area`, a single string doing both
+   *  display and dispatch; the 2026-08-15 rename split them. */
+  ta_slug: string;
+  /** Display only - the page headline. Rename freely; nothing keys on it. */
+  ta_label: string;
   generated_at: string;
   /** Time grain of the windows. Day grain is unsupported (most pub_dates are month-precision). */
   grain: "month";

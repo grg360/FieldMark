@@ -84,7 +84,6 @@ import { TAProvider, deriveTAValue, useTA } from "./lib/TAContext";
 import {
   buildHcpDetailPath,
   getIndicationTaId,
-  indicationLabelToSlug,
   resolveFeedRoute,
   taLabelToApiSlug,
   taSlugToLabel,
@@ -127,9 +126,13 @@ function isCohortFeedTrack(track: string): boolean {
   return track === "established" || track === "community" || track === "rising-stars";
 }
 
-function isTelescopeAvailable(ta: string, indication: string): boolean {
-  if (ta === "Oncology") return indication === "All" || indication === "NSCLC";
-  if (ta === "Immunology") return indication === "Atopic Dermatitis";
+// Keyed on the indication SLUG. This took the LABEL until 2026-08-15, so the
+// moment nsclc's label became "Lung Cancer" every /oncology/telescope/nsclc URL
+// failed this test and SkyView rendered its "not available" empty state instead
+// of the graph. Slugs come off the URL and never move.
+function isTelescopeAvailable(ta: string, indicationSlug: string): boolean {
+  if (ta === "Oncology") return indicationSlug === "all" || indicationSlug === "nsclc";
+  if (ta === "Immunology") return indicationSlug === "atopic-dermatitis";
   return false;
 }
 
@@ -241,8 +244,9 @@ function FeedLayout({
     isHomePath: location.pathname === "/",
   });
   const selectedTA = route.taLabel;
-  const selectedIndication = route.indicationLabel;
-  const indicationTaId = getIndicationTaId(selectedTA, selectedIndication);
+  const selectedIndication = route.indicationLabel; // DISPLAY ONLY
+  const selectedIndicationSlug = route.indicationSlug; // identity
+  const indicationTaId = getIndicationTaId(selectedTA, selectedIndicationSlug);
 
   // Phase 1a: mirror the URL-resolved TA into TAContext (the URL stays authoritative
   // on feed routes; the context reflects it). No consumer reads it yet.
@@ -330,7 +334,7 @@ function FeedLayout({
 
   function formatSectionHeaderLabel(): string {
     const taLabel =
-      track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication)
+      track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndicationSlug)
         ? selectedTA === "Immunology"
           ? "Immunology (Atopic Dermatitis) - Telescope"
           : "Oncology (NSCLC) - Telescope"
@@ -521,11 +525,11 @@ function FeedLayout({
   // Only when the Telescope is actually available for the current TA/indication (else the
   // "not available" card renders in the normal stacked layout).
   const telescopeImmersive =
-    !isNarrow && track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication);
+    !isNarrow && track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndicationSlug);
   // The SkyView surface (desktop immersive AND mobile list) drops PeopleNavStrip:
   // its cohort links were the last remaining path to the card feed. Gated on the
   // surface, not on `immersive`, so mobile is covered too.
-  const onSkyview = track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication);
+  const onSkyview = track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndicationSlug);
 
   return (
     <>
@@ -581,7 +585,7 @@ function FeedLayout({
           (/field-intelligence) is the one FI system. SurfaceHCPForm is retained
           unrouted — its chip flow migrates into the forum. */}
       {track === "skyview" ? (
-        isTelescopeAvailable(selectedTA, selectedIndication) ? (
+        isTelescopeAvailable(selectedTA, selectedIndicationSlug) ? (
           // Telescope Final (frame ea483f5c): self-contained constellation field + focus
           // orbit + off-field reveal + mobile list. Replaces the old Telescope +
           // TelescopeDrawer + TelescopeLegend trio (retained unrouted). Reads the static

@@ -2,7 +2,12 @@ import type { Track } from "./TrackContext";
 import { INDICATIONS_BY_TA } from "../components/IndicationFilter";
 
 export const HOME_TA = "Oncology";
-export const HOME_INDICATION = "NSCLC";
+// The home indication as a SLUG, not a label. It was "NSCLC" - a display string
+// used as an identity - which is exactly what broke on the 2026-08-15 rename:
+// the slug->label map moved to "Lung Cancer" while this constant kept feeding
+// the old label into label-keyed lookups, and every miss fell through to "all".
+// Labels are derived from this, never the reverse.
+export const HOME_INDICATION_SLUG = "nsclc";
 export const HOME_DASHBOARD: Track = "established";
 
 export const TA_SLUG_TO_LABEL: Record<string, string> = {
@@ -100,20 +105,10 @@ const INDICATION_SLUG_MAP_BY_TA: Record<string, Record<string, string>> = {
   Immunology: IMMUNOLOGY_SLUG_TO_LABEL,
 };
 
-function invertMap(map: Record<string, string>): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [slug, label] of Object.entries(map)) {
-    out[label] = slug;
-  }
-  return out;
-}
-
-const INDICATION_LABEL_TO_SLUG_BY_TA: Record<string, Record<string, string>> = {
-  Oncology: invertMap(ONCOLOGY_SLUG_TO_LABEL),
-  Hepatology: invertMap(HEPATOLOGY_SLUG_TO_LABEL),
-  "Rare Disease": invertMap(RARE_DISEASE_SLUG_TO_LABEL),
-  Immunology: invertMap(IMMUNOLOGY_SLUG_TO_LABEL),
-};
+// There is deliberately NO label->slug map here. Inverting a display map made
+// the label load-bearing: rename a label and every caller still passing the old
+// string silently resolved to "all" instead of failing. Identity flows one way
+// now - slug in, label out - and callers hold the slug.
 
 export function taSlugToLabel(taSlug: string | undefined): string {
   if (taSlug && TA_SLUG_TO_LABEL[taSlug]) return TA_SLUG_TO_LABEL[taSlug];
@@ -156,33 +151,27 @@ export function indicationSlugToLabel(taLabel: string, indicationSlug: string): 
   return map[indicationSlug.toLowerCase()] ?? null;
 }
 
-export function indicationLabelToSlug(taLabel: string, indicationLabel: string): string {
-  const map = INDICATION_LABEL_TO_SLUG_BY_TA[taLabel];
-  if (!map) return "all";
-  return map[indicationLabel] ?? "all";
-}
-
-export function getFirstActiveIndicationLabel(taLabel: string): string {
-  const options = INDICATIONS_BY_TA[taLabel] ?? [{ label: "All", active: true }];
-  const firstActive = options.find((o) => o.active);
-  return firstActive?.label ?? "All";
-}
-
-export function isIndicationDataActive(taLabel: string, indicationLabel: string): boolean {
+export function getFirstActiveIndicationSlug(taLabel: string): string {
   const options = INDICATIONS_BY_TA[taLabel] ?? [];
-  const match = options.find((o) => o.label === indicationLabel);
+  const firstActive = options.find((o) => o.active);
+  return firstActive?.slug ?? "all";
+}
+
+export function isIndicationDataActive(taLabel: string, indicationSlug: string): boolean {
+  const options = INDICATIONS_BY_TA[taLabel] ?? [];
+  const match = options.find((o) => o.slug === indicationSlug);
   return match?.active ?? false;
 }
 
-export function getIndicationCount(taLabel: string, indicationLabel: string): number | null {
+export function getIndicationCount(taLabel: string, indicationSlug: string): number | null {
   const options = INDICATIONS_BY_TA[taLabel] ?? [];
-  const match = options.find((o) => o.label === indicationLabel);
+  const match = options.find((o) => o.slug === indicationSlug);
   return match?.count ?? null;
 }
 
-export function getIndicationTaId(taLabel: string, indicationLabel: string): string | undefined {
+export function getIndicationTaId(taLabel: string, indicationSlug: string): string | undefined {
   const options = INDICATIONS_BY_TA[taLabel] ?? [];
-  const match = options.find((o) => o.label === indicationLabel);
+  const match = options.find((o) => o.slug === indicationSlug);
   return match?.taId;
 }
 
@@ -192,28 +181,25 @@ export function resolveIndicationForTa(
   isHomePath: boolean,
 ): { label: string; slug: string; dataActive: boolean } {
   if (indicationSlug) {
-    const label = indicationSlugToLabel(taLabel, indicationSlug);
+    const slug = indicationSlug.toLowerCase();
+    const label = indicationSlugToLabel(taLabel, slug);
     if (label) {
-      return {
-        label,
-        slug: indicationSlug.toLowerCase(),
-        dataActive: isIndicationDataActive(taLabel, label),
-      };
+      return { label, slug, dataActive: isIndicationDataActive(taLabel, slug) };
     }
   }
 
   if (isHomePath && taLabel === HOME_TA) {
     return {
-      label: HOME_INDICATION,
-      slug: "nsclc",
+      label: indicationSlugToLabel(taLabel, HOME_INDICATION_SLUG) ?? HOME_INDICATION_SLUG,
+      slug: HOME_INDICATION_SLUG,
       dataActive: true,
     };
   }
 
-  const firstActive = getFirstActiveIndicationLabel(taLabel);
+  const firstActiveSlug = getFirstActiveIndicationSlug(taLabel);
   return {
-    label: firstActive,
-    slug: indicationLabelToSlug(taLabel, firstActive),
+    label: indicationSlugToLabel(taLabel, firstActiveSlug) ?? firstActiveSlug,
+    slug: firstActiveSlug,
     dataActive: true,
   };
 }
@@ -268,21 +254,17 @@ export function resolveFeedRoute(params: {
     indicationSlug: indicationResolved.slug,
     indicationLabel: indicationResolved.label,
     indicationDataActive: indicationResolved.dataActive,
-    indicationCount: getIndicationCount(taLabel, indicationResolved.label),
+    indicationCount: getIndicationCount(taLabel, indicationResolved.slug),
     isHomePath,
   };
 }
 
 export function resolveIndicationForTaSwitch(
   newTaLabel: string,
-  currentIndicationLabel: string,
+  currentIndicationSlug: string,
 ): { label: string; slug: string } {
-  if (isIndicationDataActive(newTaLabel, currentIndicationLabel)) {
-    return {
-      label: currentIndicationLabel,
-      slug: indicationLabelToSlug(newTaLabel, currentIndicationLabel),
-    };
-  }
-  const label = getFirstActiveIndicationLabel(newTaLabel);
-  return { label, slug: indicationLabelToSlug(newTaLabel, label) };
+  const slug = isIndicationDataActive(newTaLabel, currentIndicationSlug)
+    ? currentIndicationSlug
+    : getFirstActiveIndicationSlug(newTaLabel);
+  return { label: indicationSlugToLabel(newTaLabel, slug) ?? slug, slug };
 }

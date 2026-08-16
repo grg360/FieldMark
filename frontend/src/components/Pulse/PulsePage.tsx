@@ -177,7 +177,7 @@ function Masthead({
       >
         <div>
           <div style={{ fontFamily: SERIF, fontSize: narrow ? 38 : 52, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1, color: C.ink }}>
-            {payload.therapeutic_area}
+            {payload.ta_label}
           </div>
           <div style={{ fontFamily: SERIF, fontSize: narrow ? 15 : 17, color: C.ink2, marginTop: 12, maxWidth: 620, lineHeight: 1.4 }}>
             Where scientific attention is moving in this therapeutic area, measured across published literature.
@@ -372,7 +372,7 @@ function TwoWindows({ ledger, narrow }: { ledger: PulseLedger; narrow: boolean }
 
 // ── Synthesis (editorial — provenance relabelled, correction 4) ─────────────
 function Synthesis({ payload }: { payload: PulsePayload }) {
-  const slug = payload.therapeutic_area.toLowerCase();
+  const slug = payload.ta_slug;
   const frozen = PULSE_SYNTHESIS_BY_TA[slug];
   const body =
     frozen &&
