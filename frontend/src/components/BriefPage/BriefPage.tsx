@@ -446,12 +446,12 @@ export default function BriefPage() {
             meta={fmtGenerated(brief.generated_at)}
             title={hcp.name}
             dek={dek}
-            stats={[
+            stats={{ variant: "cluster", items: [
               { value: hcp.score != null ? hcp.score.toFixed(1) : "—", label: "SCORE", gold: true },
               { value: hcp.rank != null ? `#${hcp.rank}` : "—", label: "RANK · US" },
               { value: String(opportunities.length), label: "OPPORTUNITIES" },
               { value: String(sourceCount), label: "SOURCES CITED" },
-            ]}
+            ] }}
           />
         </div>
 

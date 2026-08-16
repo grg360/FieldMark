@@ -5,7 +5,7 @@
 // hidden — with no "coming soon" badge (messaged separately).
 
 import type { CSSProperties, ReactNode } from "react";
-import { GROUND, LINE, INK, GOLD, MARK, STATE, FACE } from "../../lib/canonicalTokens";
+import { GROUND, LINE, INK, GOLD, MARK, STATE, FACE, T } from "../../lib/canonicalTokens";
 import type { ComplianceState } from "../../lib/fieldIntelligence";
 
 // THE forum's two type helpers. Consolidated here 2026-08-15 from three mono()
@@ -145,7 +145,7 @@ export function PrototypeStrip() {
     >
       <span
         style={{
-          ...mono(10, GOLD.PRIME),
+          ...mono(T.LABEL, GOLD.PRIME),
           letterSpacing: "0.16em",
           fontWeight: 600,
           border: `1px solid ${GOLD.EDGE}`,
@@ -154,7 +154,7 @@ export function PrototypeStrip() {
       >
         ILLUSTRATIVE PROTOTYPE
       </span>
-      <span style={{ fontSize: 12.5, color: INK.LABEL, lineHeight: 1.5 }}>
+      <span style={{ fontSize: T.META, color: INK.LABEL, lineHeight: 1.5 }}>
         Publications, journals and PMIDs are real.{" "}
         <strong style={{ color: INK.PRIME, fontWeight: 500 }}>
           Every post, handle and moderation record below is fabricated
@@ -178,7 +178,7 @@ export function ComplianceChip({
   return (
     <span
       style={{
-        ...mono(9, s.fg),
+        ...mono(T.MICRO, s.fg),
         letterSpacing: "0.1em",
         fontWeight: 600,
         background: s.bg,
@@ -222,7 +222,7 @@ export function DisabledControl({
   title?: string;
 }) {
   const base: CSSProperties = {
-    ...mono(10.5, INK.MUTE),
+    ...mono(T.LABEL, INK.MUTE),
     letterSpacing: "0.08em",
     padding: "8px 14px",
     borderRadius: 4,

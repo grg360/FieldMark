@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { GROUND, LINE, INK, GOLD, ACTION, STATE, FACE } from "../../lib/canonicalTokens";
+import { GROUND, LINE, INK, GOLD, ACTION, STATE, FACE, T } from "../../lib/canonicalTokens";
 import { getModerationQueue, type ModerationRecord, type QueueState } from "../../lib/fieldIntelligence";
 import { DisabledControl, mono, PrototypeStrip } from "./fiUi";
 
@@ -24,7 +24,7 @@ const MOD_ACTIONS = ["RETURN TO AUTHOR FOR EDIT", "ATTACH CONTEXT NOTE", "HOLD F
 function QueueChip({ state }: { state: QueueState }) {
   const m = QUEUE_META[state];
   return (
-    <span style={{ ...mono(9.5, m.fg), letterSpacing: "0.1em", fontWeight: 600, background: m.bg, border: `1px solid ${m.border}`, padding: "2px 7px", whiteSpace: "nowrap" }}>
+    <span style={{ ...mono(T.MICRO, m.fg), letterSpacing: "0.1em", fontWeight: 600, background: m.bg, border: `1px solid ${m.border}`, padding: "2px 7px", whiteSpace: "nowrap" }}>
       {m.label}
     </span>
   );
@@ -34,9 +34,9 @@ function AuditLog({ record }: { record: ModerationRecord }) {
   if (!record.audit_log?.length) return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={{ ...mono(9.5, INK.MUTE), letterSpacing: "0.14em" }}>AUDIT LOG</span>
+      <span style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.14em" }}>AUDIT LOG</span>
       {record.audit_log.map((e, i) => (
-        <div key={i} style={{ display: "flex", gap: 10, ...mono(10, INK.MUTE) }}>
+        <div key={i} style={{ display: "flex", gap: 10, ...mono(T.LABEL, INK.MUTE) }}>
           <span style={{ color: INK.MUTE, minWidth: 42 }}>{e.t}</span>
           <span style={{ color: INK.LABEL }}>{e.event}</span>
         </div>
@@ -51,37 +51,37 @@ function CaseDetail({ record }: { record: ModerationRecord }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <QueueChip state={record.queue_state} />
-          <span style={mono(11, INK.BODY)}>CASE {record.case_number}</span>
+          <span style={mono(T.LABEL, INK.BODY)}>CASE {record.case_number}</span>
         </div>
-        <span style={mono(10.5, INK.MUTE)}>{record.sla_label ?? record.timing_label ?? ""}</span>
+        <span style={mono(T.LABEL, INK.MUTE)}>{record.sla_label ?? record.timing_label ?? ""}</span>
       </div>
-      <span style={mono(10.5, INK.MUTE)}>
+      <span style={mono(T.LABEL, INK.MUTE)}>
         {record.author_handle} · MSL Verified{record.anchor_pubmed_id ? ` · PMID ${record.anchor_pubmed_id}` : ""}
       </span>
 
       {record.queue_state === "blocked_at_composer" ? (
         <>
-          <span style={{ fontFamily: FACE.value, fontSize: 15, lineHeight: 1.6, color: INK.BODY }}>{record.blocked_reason}</span>
-          <span style={mono(10, INK.MUTE)}>{record.notification_state}</span>
+          <span style={{ fontFamily: FACE.value, fontSize: T.BODY, lineHeight: 1.6, color: INK.BODY }}>{record.blocked_reason}</span>
+          <span style={mono(T.LABEL, INK.MUTE)}>{record.notification_state}</span>
           {record.decision_text && (
-            <span style={{ fontSize: 12.5, lineHeight: 1.6, color: INK.MUTE }}>{record.decision_text}</span>
+            <span style={{ fontSize: T.META, lineHeight: 1.6, color: INK.MUTE }}>{record.decision_text}</span>
           )}
         </>
       ) : null}
 
       {record.anchor_check_text && (
         <div style={{ display: "flex", flexDirection: "column", gap: 7, padding: "12px 14px", background: ACTION.WASH, border: `1px solid ${ACTION.LINK}` }}>
-          <span style={{ ...mono(9.5, ACTION.LINK), letterSpacing: "0.12em" }}>ANCHOR CHECK</span>
-          <span style={{ fontSize: 12.5, lineHeight: 1.6, color: INK.LABEL }}>{record.anchor_check_text}</span>
+          <span style={{ ...mono(T.MICRO, ACTION.LINK), letterSpacing: "0.12em" }}>ANCHOR CHECK</span>
+          <span style={{ fontSize: T.META, lineHeight: 1.6, color: INK.LABEL }}>{record.anchor_check_text}</span>
         </div>
       )}
 
       {record.clause_text && (
         <div style={{ display: "flex", flexDirection: "column", gap: 7, padding: "12px 14px", background: GROUND.INSET, border: `1px solid ${STATE.DANGER}` }}>
-          <span style={{ ...mono(9.5, STATE.DANGER), letterSpacing: "0.12em" }}>DECISION · {record.clause_cited}</span>
-          <span style={{ fontSize: 12.5, lineHeight: 1.6, color: INK.BODY }}>{record.clause_text}</span>
+          <span style={{ ...mono(T.MICRO, STATE.DANGER), letterSpacing: "0.12em" }}>DECISION · {record.clause_cited}</span>
+          <span style={{ fontSize: T.META, lineHeight: 1.6, color: INK.BODY }}>{record.clause_text}</span>
           {record.notification_state && (
-            <span style={mono(9.5, INK.MUTE)}>
+            <span style={mono(T.MICRO, INK.MUTE)}>
               {record.notification_state}
               {record.appeal_window_days != null ? ` · appeal window ${record.appeal_window_days} days` : ""}
             </span>
@@ -91,21 +91,21 @@ function CaseDetail({ record }: { record: ModerationRecord }) {
 
       {(record.classifier_score != null || record.account_history) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={{ ...mono(9.5, INK.MUTE), letterSpacing: "0.14em" }}>SIGNALS</span>
+          <span style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.14em" }}>SIGNALS</span>
           {record.classifier_score != null && (
-            <span style={mono(10, INK.LABEL)}>
+            <span style={mono(T.LABEL, INK.LABEL)}>
               Classifier · {record.classifier_score.toFixed(2)} recommendation likelihood
               {record.classifier_score < 0.8 ? " (below the 0.80 auto-hold threshold)" : " · auto-held from view"}
             </span>
           )}
-          {record.account_history && <span style={mono(10, INK.LABEL)}>Account history: {record.account_history}</span>}
+          {record.account_history && <span style={mono(T.LABEL, INK.LABEL)}>Account history: {record.account_history}</span>}
         </div>
       )}
 
       {record.follow_up_text && (
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          <span style={{ ...mono(9.5, INK.MUTE), letterSpacing: "0.14em" }}>FOLLOW-UP</span>
-          <span style={{ fontSize: 12.5, lineHeight: 1.6, color: INK.LABEL }}>{record.follow_up_text}</span>
+          <span style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.14em" }}>FOLLOW-UP</span>
+          <span style={{ fontSize: T.META, lineHeight: 1.6, color: INK.LABEL }}>{record.follow_up_text}</span>
         </div>
       )}
 
@@ -113,7 +113,7 @@ function CaseDetail({ record }: { record: ModerationRecord }) {
 
       {/* Moderator actions — rendered, inert. Every action requires a clause. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
-        <span style={{ ...mono(9.5, INK.MUTE), letterSpacing: "0.14em" }}>ACTIONS</span>
+        <span style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.14em" }}>ACTIONS</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {(record.queue_state === "blocked_at_composer"
             ? ["SUGGEST AN ANCHOR", "CLOSE · NO ACTION NEEDED"]
@@ -122,7 +122,7 @@ function CaseDetail({ record }: { record: ModerationRecord }) {
             <DisabledControl key={a} variant="ghost">{a}</DisabledControl>
           ))}
         </div>
-        <span style={{ fontSize: 11.5, lineHeight: 1.6, color: INK.MUTE }}>
+        <span style={{ fontSize: T.LABEL, lineHeight: 1.6, color: INK.MUTE }}>
           Every action requires a clause citation and is written to the audit log with the
           moderator&rsquo;s identity. Removals and holds are disclosed to the author; clears are not
           disclosed to the flagger&rsquo;s peers.
@@ -159,9 +159,9 @@ export default function ModerationPage() {
         <PrototypeStrip />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={{ ...mono(10.5, INK.MUTE), letterSpacing: "0.18em" }}>MODERATOR VIEW · FIELDMARK MEDICAL AFFAIRS</span>
-          <h1 style={{ margin: 0, fontFamily: FACE.value, fontSize: 30, fontWeight: 500, color: INK.PRIME }}>Review queue · Oncology</h1>
-          <div style={{ display: "flex", gap: 22, ...mono(10.5, INK.MUTE), flexWrap: "wrap" }}>
+          <span style={{ ...mono(T.LABEL, INK.MUTE), letterSpacing: "0.18em" }}>MODERATOR VIEW · FIELDMARK MEDICAL AFFAIRS</span>
+          <h1 style={{ margin: 0, fontFamily: FACE.value, fontSize: T.FIGURE, fontWeight: 500, color: INK.PRIME }}>Review queue · Oncology</h1>
+          <div style={{ display: "flex", gap: 22, ...mono(T.LABEL, INK.MUTE), flexWrap: "wrap" }}>
             <span><span style={{ color: INK.PRIME }}>{loaded ? open : "—"}</span> OPEN</span>
             <span><span style={{ color: INK.PRIME }}>41m</span> MEDIAN TO ACTION</span>
             <span><span style={{ color: INK.PRIME }}>12</span> AUTO-SIGNALS TODAY</span>
@@ -183,32 +183,32 @@ export default function ModerationPage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <QueueChip state={r.queue_state} />
-                    <span style={mono(9.5, INK.MUTE)}>{r.timing_label ?? ""}</span>
+                    <span style={mono(T.MICRO, INK.MUTE)}>{r.timing_label ?? ""}</span>
                   </div>
-                  <span style={{ fontFamily: FACE.value, fontSize: 13, lineHeight: 1.45, color: INK.BODY }}>
+                  <span style={{ fontFamily: FACE.value, fontSize: T.META, lineHeight: 1.45, color: INK.BODY }}>
                     {r.blocked_reason ?? r.anchor_check_text?.slice(0, 90) ?? r.clause_text?.slice(0, 90) ?? ""}
                   </span>
-                  <span style={mono(9.5, INK.MUTE)}>{r.author_handle}{r.anchor_pubmed_id ? ` · PMID ${r.anchor_pubmed_id}` : ""}</span>
+                  <span style={mono(T.MICRO, INK.MUTE)}>{r.author_handle}{r.anchor_pubmed_id ? ` · PMID ${r.anchor_pubmed_id}` : ""}</span>
                 </button>
               );
             })}
           </div>
 
           {/* case detail */}
-          <div>{current ? <CaseDetail record={current} /> : <div style={{ ...mono(11, INK.MUTE), padding: 20 }}>Select a case.</div>}</div>
+          <div>{current ? <CaseDetail record={current} /> : <div style={{ ...mono(T.LABEL, INK.MUTE), padding: 20 }}>Select a case.</div>}</div>
         </div>
 
         {/* who moderates — load-bearing copy, verbatim */}
         <div style={{ padding: "16px 18px", background: GROUND.INSET, border: `1px solid ${LINE.HAIR}`, display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ ...mono(9.5, INK.MUTE), letterSpacing: "0.14em" }}>WHO MODERATES</span>
-          <span style={{ fontSize: 12.5, lineHeight: 1.65, color: INK.LABEL, maxWidth: "92ch" }}>
+          <span style={{ ...mono(T.MICRO, INK.MUTE), letterSpacing: "0.14em" }}>WHO MODERATES</span>
+          <span style={{ fontSize: T.META, lineHeight: 1.65, color: INK.LABEL, maxWidth: "92ch" }}>
             Reviewers are FieldMark medical-affairs staff with no affiliation to any manufacturer,
             and no member company can see, direct or appeal another company&rsquo;s cases. Classifier
             thresholds, clause list and action counts are published quarterly.
           </span>
         </div>
 
-        <Link to="/field-intelligence" style={{ ...mono(10.5, INK.LABEL), letterSpacing: "0.1em" }}>← ALL THREADS</Link>
+        <Link to="/field-intelligence" style={{ ...mono(T.LABEL, INK.LABEL), letterSpacing: "0.1em" }}>← ALL THREADS</Link>
       </div>
     </AppLayout>
   );

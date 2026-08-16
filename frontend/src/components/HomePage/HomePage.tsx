@@ -285,14 +285,14 @@ export default function HomePage() {
               eyebrow="Fieldmark · Home"
               meta={`${dateLine} · SESSION OPENED`}
               title={`${greeting}, ${firstName}`}
-              stats={[
+              stats={{ variant: "cluster", items: [
                 { value: String(stats.overdue), label: "FOLLOW-UPS OVERDUE", valueColor: RED, center: true },
                 { value: String(stats.total), label: "FOLLOW-UPS OPEN", center: true },
                 { value: String(trackedCount), label: "PORTFOLIO TRACKED", onClick: go.watchlists, center: true },
                 // A fact, not an achievement metric (2026-08-05): the old
                 // percentage moved 25 points when the board was re-gated.
                 { value: coverage ? `${coverage.tracked_count} of ${coverage.total_rising_stars_in_territory}` : "0 of 0", label: "TERRITORY RISING TRACKED", center: true },
-              ]}
+              ] }}
             />
           </div>
 

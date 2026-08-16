@@ -213,11 +213,11 @@ function WeekBody({
               title={headline}
               maxTitleCh={24}
               dek={week.state === "quiet" ? `Fourteen days, ${week.tracked_total} people. ${ABSENCE.publications} ${ABSENCE.trials} ${ABSENCE.congress}` : undefined}
-              stats={[
+              stats={{ variant: "cluster", items: [
                 { value: String(week.tracked_total), label: "TRACKED" },
                 { value: String(eventCount), label: "EVENTS · 14D" },
                 { value: String(week.rank_movement.movers.length), label: "RANK MOVERS", gold: week.rank_movement.movers.length > 0 },
-              ]}
+              ] }}
             />
             {week.state === "quiet" ? null : (
               <div style={{ ...mono(11, DIM, ".12em"), lineHeight: 1.7, maxWidth: "80ch" }}>
