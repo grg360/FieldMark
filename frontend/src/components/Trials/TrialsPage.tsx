@@ -31,9 +31,23 @@ import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 // this surface has no charts — the phase and recruiting colours encode STATE in
 // the interface, not categories in data, so they stay on semantic tokens.
 // Composition: page ground comes from the shell; the board is the section
-// PANEL; rows are flat; nothing floats, so no OVERHANG.
+// PANEL; nothing floats, so no OVERHANG.
+// WINDOW ROWS 2026-08-15 — reverses "rows are flat" above, matching the
+// treatment settled on Institutions the same day. The flat list was held
+// together by two hexes the canonical migration never reached: a 1px #16140f
+// rule measuring 1.034:1 on its own ground (i.e. not a boundary at all) and a
+// decorative 2px #4e3a16 left rail that encoded NOTHING — constant on every
+// row, unconditioned by phase, status or recruiting. Both are gone. Separation
+// is now FILL, not line: the row list sits in a well cut back to GROUND.BASE
+// (the page-canvas value, so it reads as a hole in the board rather than a
+// fifth plane) and each row is raised to GROUND.RAISE with DEPTH.RIM for the
+// lit top edge. The step is 1.062:1 — invisible as a 1px border, a container
+// across a block. The 14px gap is what lets BASE show between rows.
 const P = {
-  board: CANON.GROUND.BASE, panel: CANON.GROUND.RAISE, well: CANON.GROUND.INSET,
+  // rowWell/rowFill were board/well, which had no consumers. The well is BASE so
+  // the rows sit ABOVE the region holding them; the row is RAISE, genuinely
+  // lighter than what's behind it (1.062:1).
+  rowWell: CANON.GROUND.BASE, panel: CANON.GROUND.RAISE, rowFill: CANON.GROUND.RAISE,
   line: CANON.LINE.HAIR, line2: CANON.LINE.HAIR, line3: CANON.LINE.EDGE,
   amber: CANON.GOLD.PRIME, amberHi: CANON.GOLD.RANK, amberDim: CANON.GOLD.EDGE, rosterLink: CANON.GOLD.PRIME,
   ink0: CANON.INK.PRIME, ink1: CANON.INK.BODY, ink2: CANON.INK.LABEL, ink3: CANON.INK.LABEL,
@@ -250,8 +264,13 @@ export default function TrialsPage() {
         {/* trial rows */}
         {loading ? (
           <div style={{ padding: "40px 28px", ...mono(11), color: P.ink4 }}>Loading trials…</div>
-        ) : listed.map((t) => (
-          <div key={t.raw.trial_id} style={{ margin: "0 28px", borderBottom: `1px solid #16140f`, borderLeft: `2px solid #4e3a16`, display: "grid", gridTemplateColumns: "112px 1fr 104px", gap: 16, padding: "14px 0 15px 14px" }}>
+        ) : (
+        // The well: margin 14 + padding 14 puts each row's EDGE at 28 — level
+        // with every other block on the board — and its content at 42, exactly
+        // where the old border-left rail put it. Nothing shifts but the ground.
+        <div style={{ margin: "0 14px", padding: 14, display: "flex", flexDirection: "column", gap: 14, background: P.rowWell }}>
+        {listed.map((t) => (
+          <div key={t.raw.trial_id} style={{ background: P.rowFill, ...DEPTH.RIM, display: "grid", gridTemplateColumns: "112px 1fr 104px", gap: 16, padding: "14px 14px 15px 14px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               <span style={{ border: `1px solid ${P.line3}`, padding: "3px 0", textAlign: "center", ...mono(9, 600, ".13em"), color: P.ink1 }}>{t.phaseLabel}</span>
               <span style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
@@ -325,6 +344,8 @@ export default function TrialsPage() {
             </div>
           </div>
         ))}
+        </div>
+        )}
 
         {/* disclosures */}
         <div style={{ margin: "26px 28px 0", paddingTop: 16, borderTop: `1px solid ${P.line}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 40px" }}>
@@ -402,8 +423,12 @@ function MobileBoard({ surface, listed, rosterChips, isTracked, toggleSave, regi
         <span style={{ ...mono(9, 400, ".13em"), color: P.ink6 }}>{listed.length} SHOWN</span>
       </div>
 
-      {loading ? <div style={{ padding: "30px 16px", ...mono(11), color: P.ink4 }}>Loading…</div> : listed.map((t) => (
-        <div key={t.raw.trial_id} style={{ margin: "0 16px", borderTop: `1px solid #16140f`, borderLeft: `2px solid #4e3a16`, padding: "12px 0 13px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+      {loading ? <div style={{ padding: "30px 16px", ...mono(11), color: P.ink4 }}>Loading…</div> : (
+      // Same well, phone gutters: 6 + 10 + 12 lands content at 28 and the row
+      // edge at 16, level with the rest of the mobile board.
+      <div style={{ margin: "0 6px", padding: 10, display: "flex", flexDirection: "column", gap: 14, background: P.rowWell }}>
+      {listed.map((t) => (
+        <div key={t.raw.trial_id} style={{ background: P.rowFill, ...DEPTH.RIM, padding: "12px 12px 13px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <span style={{ border: `1px solid ${P.line3}`, padding: "2px 6px", ...mono(9, 600, ".12em"), color: P.ink1 }}>{t.phaseLabel}</span>
             <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}>
@@ -449,6 +474,8 @@ function MobileBoard({ surface, listed, rosterChips, isTracked, toggleSave, regi
           </div>
         </div>
       ))}
+      </div>
+      )}
 
       <div style={{ margin: "18px 16px 0", paddingTop: 14, borderTop: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 10, paddingBottom: 18 }}>
         {DISCLOSURES.map(([k, v]) => (

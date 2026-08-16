@@ -9,7 +9,7 @@
 // community dominates by volume on many rows — the split is what keeps that
 // legible: 315 as E300/R34/C3 means something different than C300).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getCurrentUser } from "../lib/authHelpers";
 import { getPinnedInstitutionsForUser, pinInstitution, unpinInstitution } from "../lib/institutionPins";
@@ -30,12 +30,32 @@ import PageHero from "./PageHero";
 // register's OPAQUE rules (LINE.HAIR/EDGE) — visibly more present than the
 // old #141417/#1e1e21, which is the intended canonical behaviour. Composition:
 // the page ground comes from the shell (AppLayout paints DEPTH.GROUND on BASE);
-// section containers take PANEL; bands/toggles are INSET wells; rows stay flat.
+// section containers take PANEL; bands/toggles are INSET wells.
+// ROW ENCLOSURE 2026-08-15 — a deliberate reversal of that migration's fourth
+// clause, "rows stay flat". Flat rows held while the band was the stronger
+// mark, but the band's fill was GROUND.RAISE sitting on a DEPTH.PANEL board
+// whose gradient settles to RAISE: the fill measured 1.00–1.05:1 against its
+// own ground, i.e. it was not there. Band and row were both reduced to an
+// abutting rule and the list read as one undifferentiated stack.
+// SEPARATED BY FILL, NOT BY LINE. The first pass at this drew the row as a
+// LINE.EDGE box, which read as outlined boxes on a flat sheet — more lines, no
+// dimension, because row fill, section fill and the gap between rows were all
+// one value and the border was doing all the work. The fix is the Intelligence
+// inset-note finding: the RAISE↔BASE step is 1.062:1, which is nothing at 1px
+// and a container at block scale. So use it as FILL. The list region is a well
+// cut back to GROUND.BASE — the page-canvas value, so it reads as a hole in the
+// board, not a fifth plane — and each row is raised off it to GROUND.RAISE with
+// DEPTH.RIM for the lit top edge. No row border at all: at block scale the
+// fill step IS the boundary. The 14px gap is what lets BASE show between rows.
+// Flat rows are retired here, not forgotten.
 const C = {
-  bg: CANON.GROUND.BASE,
+  // The list well. BASE is the page-canvas value, so the region the rows sit in
+  // reads as cut back through the board rather than stacked on top of it.
+  wellBg: CANON.GROUND.BASE,
+  rowBg: CANON.GROUND.RAISE, // rows are genuinely lighter than what's behind them: 1.062:1
   hair: CANON.LINE.HAIR,
   hairStrong: CANON.LINE.EDGE,
-  bandBg: CANON.GROUND.RAISE,
+  bandBg: CANON.GROUND.INSET, // was RAISE — 1.00–1.05:1 on the PANEL board, an invisible fill
   ink1: CANON.INK.PRIME,
   ink2: CANON.INK.BODY,
   ink3: CANON.INK.LABEL, // the default mono ink — the label voice
@@ -43,6 +63,11 @@ const C = {
   ink5: CANON.INK.MUTE, // near-twin of ink4 collapses (rule 1)
   ink6: CANON.INK.MUTE, // carries live absence copy → never GHOST (rule 4)
   amber: CANON.GOLD.PRIME,
+  // Gold at rule weight. The top-10 chip's border was GOLD.PRIME (8.039:1) —
+  // the same value as the chip's own numeral, so the enclosure shouted louder
+  // than the figure it enclosed. EDGE holds the ladder (2.303:1, still 1.80x
+  // the plain LINE.HAIR chip at 1.281:1) without competing with the text.
+  amberEdge: CANON.GOLD.EDGE,
   chipBorder: CANON.LINE.HAIR,
   link: CANON.ACTION.LINK, // was steel #8fa3ab — links are the one action colour
   toggleBg: CANON.GROUND.INSET,
@@ -189,7 +214,7 @@ export default function InstitutionsIndexRoute() {
             key={`${r}-${i}`}
             style={{
               padding: "3px 7px",
-              border: r <= 10 ? `1px solid ${C.amber}` : `1px solid ${C.chipBorder}`,
+              border: r <= 10 ? `1px solid ${C.amberEdge}` : `1px solid ${C.chipBorder}`,
               ...mono(11, { ls: "0", color: r <= 10 ? C.amber : C.ink3 }),
             }}
           >
@@ -225,7 +250,12 @@ export default function InstitutionsIndexRoute() {
       return (
         <div
           onClick={() => openRecord(a)}
-          style={{ cursor: "pointer", padding: "15px 16px", borderBottom: `1px solid ${C.hair}` }}
+          style={{
+            cursor: "pointer",
+            padding: "15px 14px",
+            background: C.rowBg, // 1.062:1 over the BASE well — the boundary IS the fill
+            ...DEPTH.RIM, // the only line on the row: the lit top edge
+          }}
         >
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 7 }}>
             <span style={{ ...mono(25, { color: a.band === "A" || a.band === "B" ? C.amber : C.ink3, ls: "0" }), minWidth: 38 }}>
@@ -250,8 +280,12 @@ export default function InstitutionsIndexRoute() {
           display: "grid",
           gridTemplateColumns: "120px 1fr 348px 168px 44px",
           gap: 20,
-          padding: dense ? "16px 28px" : "18px 28px",
-          borderBottom: `1px solid ${C.hair}`,
+          // 14px of the old 28px gutter moves out to the RowList wrapper, so
+          // grid content still lands at 28px from the board edge and stays
+          // registered against the column header.
+          padding: dense ? "16px 14px" : "18px 14px",
+          background: C.rowBg, // 1.062:1 over the BASE well — the boundary IS the fill
+          ...DEPTH.RIM, // the only line on the row: the lit top edge
           alignItems: "start",
         }}
       >
@@ -271,6 +305,26 @@ export default function InstitutionsIndexRoute() {
     );
   }
 
+  // The list well: the container BEHIND the rows, cut back to BASE so the
+  // RAISE rows sit above it. The 14px gap and gutter are what let that darker
+  // value show through — without them the fill step has nowhere to read. The
+  // band stays OUTSIDE this well, which is what makes it full-bleed.
+  function RowList({ children }: { children: ReactNode }) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          padding: isMobile ? 10 : 14,
+          background: C.wellBg,
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   function BandHeader({ left, right }: { left: string; right?: string }) {
     return (
       <div
@@ -279,6 +333,12 @@ export default function InstitutionsIndexRoute() {
           alignItems: "baseline",
           justifyContent: "space-between",
           padding: isMobile ? "9px 16px" : "11px 28px",
+          // Full-bleed: spans the board edge to edge, outside the RowList well.
+          // Fill + bleed is what makes it a different KIND of mark from the
+          // rows; both rules stay LINE.EDGE. INSET survives the well going to
+          // BASE — its step GROWS from 1.126:1 (over RAISE) to 1.195:1 over the
+          // well it now abuts, and the three fills stay monotonic:
+          // well BASE < row RAISE (1.062) < band INSET (1.195).
           background: C.bandBg,
           borderTop: `1px solid ${C.hairStrong}`,
           borderBottom: `1px solid ${C.hairStrong}`,
@@ -308,9 +368,11 @@ export default function InstitutionsIndexRoute() {
                   : "ORDER IS DESCRIPTIVE, NOT A RANKING"
               }
             />
-            {members.map((a) => (
-              <Row key={a.id} a={a} dense={b === "D"} />
-            ))}
+            <RowList>
+              {members.map((a) => (
+                <Row key={a.id} a={a} dense={b === "D"} />
+              ))}
+            </RowList>
           </div>
         );
       });
@@ -420,9 +482,11 @@ export default function InstitutionsIndexRoute() {
               <span style={{ ...mono(11, { ls: "0.12em", color: C.ink5 }) }}>NOT A NETWORK — THE ABSENCE OF ONE</span>
             ) : null}
           </div>
-          {unparented.map((a) => (
-            <Row key={a.id} a={a} dense />
-          ))}
+          <RowList>
+            {unparented.map((a) => (
+              <Row key={a.id} a={a} dense />
+            ))}
+          </RowList>
         </>
       );
     }
@@ -442,15 +506,23 @@ export default function InstitutionsIndexRoute() {
           <BandHeader
             left={`${state} · ${members.length} INSTITUTION${members.length === 1 ? "" : "S"} · ${members.reduce((s, a) => s + a.memberCount, 0)} RANKED HCP`}
           />
-          {members.map((a) => (
-            <Row key={a.id} a={a} dense />
-          ))}
+          <RowList>
+            {members.map((a) => (
+              <Row key={a.id} a={a} dense />
+            ))}
+          </RowList>
         </div>
       ));
     }
     // A–Z
     const alpha = [...aggs].sort((x, y) => x.name.localeCompare(y.name));
-    return alpha.map((a) => <Row key={a.id} a={a} dense />);
+    return (
+      <RowList>
+        {alpha.map((a) => (
+          <Row key={a.id} a={a} dense />
+        ))}
+      </RowList>
+    );
   }
 
   const totalRanked = useMemo(() => {
