@@ -151,6 +151,23 @@ export function indicationSlugToLabel(taLabel: string, indicationSlug: string): 
   return map[indicationSlug.toLowerCase()] ?? null;
 }
 
+/**
+ * The AREA an indication belongs to — "nsclc" -> "Oncology". Derived by asking
+ * the existing per-TA slug maps which one owns the slug; no new table, so it
+ * cannot drift from indicationSlugToLabel. "all" is skipped because every TA
+ * has one and it identifies nothing.
+ *
+ * Feeds the hero eyebrow's third segment (SCOPE · TA · AREA).
+ */
+export function parentTaLabelForIndicationSlug(indicationSlug: string): string | null {
+  const key = indicationSlug.trim().toLowerCase();
+  if (!key || key === "all") return null;
+  for (const [taLabel, map] of Object.entries(INDICATION_SLUG_MAP_BY_TA)) {
+    if (map[key]) return taLabel;
+  }
+  return null;
+}
+
 export function getFirstActiveIndicationSlug(taLabel: string): string {
   const options = INDICATIONS_BY_TA[taLabel] ?? [];
   const firstActive = options.find((o) => o.active);

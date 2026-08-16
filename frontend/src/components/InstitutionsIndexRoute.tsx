@@ -22,6 +22,7 @@ import {
 } from "../lib/institutionRegistry";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { taLabelForSlug } from "../lib/taLabels";
+import { parentTaLabelForIndicationSlug } from "../lib/routeSlugs";
 import { CANON, DEPTH, FACE } from "../lib/canonicalTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
@@ -167,6 +168,13 @@ export default function InstitutionsIndexRoute() {
   // invisible on this surface. Labels come from the map now; the slug stays the
   // identity. See lib/taLabels.ts.
   const taLabel = taLabelForSlug(taSlug);
+  // HERO CONTRACT 2026-08-15 — the title names the SURFACE and the TA lives in
+  // the eyebrow, in one form: SCOPE · TA · AREA. The TA is a filter state, not
+  // an identity: it changes when the tab changes and the surface does not, so a
+  // title reading "Institutions / Lung Cancer" was naming two things at once.
+  // Both segments derive from the slug — nothing here is typed out.
+  const taArea = parentTaLabelForIndicationSlug(taSlug);
+  const heroEyebrow = ["Inst", taLabel, taArea].filter(Boolean).join(" · ");
 
   const openRecord = (a: InstitutionAgg) => navigate(`/institution/${a.slug}?ta=${taSlug}`);
 
@@ -368,11 +376,13 @@ export default function InstitutionsIndexRoute() {
           <div key={b}>
             <BandHeader
               left={`BAND ${b} · ${BAND_LABEL[b]} · ${members.length} INSTITUTION${members.length === 1 ? "" : "S"}`}
-              right={
-                b === "D"
-                  ? "MOST HOLD ONE OR TWO — THE COUNT IS THE WHOLE STORY OF THE ROW"
-                  : "ORDER IS DESCRIPTIVE, NOT A RANKING"
-              }
+              // The A/B/C branch read "ORDER IS DESCRIPTIVE, NOT A RANKING" —
+              // the same claim as the list note ten pixels above it, in a second
+              // wording. Retired 2026-08-15: the note supersedes it, because the
+              // note renders in all four groupings and this only ever appeared on
+              // Concentration. Band D keeps its right-note; it is a different
+              // claim (what the count MEANS at the tail), not a ranking denial.
+              right={b === "D" ? "MOST HOLD ONE OR TWO — THE COUNT IS THE WHOLE STORY OF THE ROW" : undefined}
             />
             <RowList>
               {members.map((a) => (
@@ -559,16 +569,28 @@ export default function InstitutionsIndexRoute() {
         <div style={{ padding: isMobile ? "18px 16px 14px" : "26px 28px 0" }}>
           <PageHero
             narrow={isMobile}
-            eyebrow="Inst"
-            meta={"PRIMARY LINK ONLY · ORDERED BY RANKED-HCP COUNT · NOT A RANKING"}
-            title={`Institutions / ${taLabel}`}
+            eyebrow={heroEyebrow}
+            /* META IS EMPTY, DELIBERATELY (2026-08-15). It held three separate
+                assertions at 479px — 1.9x the next longest meta on any surface,
+                and the only one that overflowed its row on a phone. Hero Rule 3
+                specifies a date or coverage stamp for this slot; this surface
+                has no build timestamp to stamp (fetchTaRoster returns rows, not
+                a snapshot time), so inventing one would be worse than leaving it
+                empty. The rule still spans — an empty right field is a content
+                decision, not a defect (Hero Rule 4). The three claims are not
+                dropped: PRIMARY LINK ONLY moved into the dek below, and the
+                ordering pair moved to the list note above the first band. */
+            title="Institutions"
             dek={loading
               ? "Resolving the registry…"
               // "ranked ${taLabel} HCP" read as a compound noun once the label
               // stopped being an acronym. Moving the TA behind "in" keeps the
               // sentence working for any label length.
-              : `${aggs.length} registry institutions carry at least one ranked HCP in ${taLabel}. Registry institutions carrying none in this cohort are not listed.`}
-            stats={[{ value: String(aggs.length), label: "REPRESENTED", center: true }]}
+              // "via their primary link" carries the PRIMARY LINK ONLY claim out
+              // of the meta and into the sentence that defines what a row IS —
+              // which is where a scope qualifier belongs.
+              : `${aggs.length} registry institutions carry at least one ranked HCP in ${taLabel} via their primary link. Registry institutions carrying none in this cohort are not listed.`}
+            stats={{ variant: "cluster", items: [{ value: String(aggs.length), label: "REPRESENTED", center: true }] }}
           />
         </div>
 
@@ -607,6 +629,27 @@ export default function InstitutionsIndexRoute() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* ORDERING NOTE (2026-08-15) — "ORDERED BY RANKED-HCP COUNT · NOT A
+            RANKING" moved here out of the hero meta. It sits directly above the
+            list and directly below the control that changes the ordering, which
+            is where a reader needs it; in the hero it was a claim about the list
+            floating three blocks away from one.
+            It renders in EVERY grouping and at every width, which the old
+            placement did not achieve either: the band right-note carries
+            "ORDER IS DESCRIPTIVE, NOT A RANKING" in concentration view only —
+            State passes no right note, Network builds its own headers, and A–Z
+            has no band at all, so three of four groupings stated the ordering
+            and denied the ranking nowhere. */}
+        <div
+          style={{
+            padding: isMobile ? "10px 16px" : "12px 28px",
+            borderBottom: `1px solid ${C.hair}`,
+            ...mono(9, { ls: "0.13em", color: C.ink5, lh: 1.6 }),
+          }}
+        >
+          ORDERED BY RANKED-HCP COUNT · NOT A RANKING
         </div>
 
         {/* Column header (desktop, concentration/az only) */}
