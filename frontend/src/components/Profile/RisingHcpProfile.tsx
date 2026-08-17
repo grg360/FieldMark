@@ -505,10 +505,18 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
               </div>
 
               <div style={{ marginTop: 22, font: `400 30px/1.12 ${SERIF}`, color: INK0, letterSpacing: "-.01em" }}>{name}</div>
-              {/* Event badge + trial flag (2026-08-05). Selector is window-based
-                  (rising_board_flags: zero early-window seniors, >= 3 recent,
-                  active within 24 months); the DISPLAY is career-anchored so it
-                  does not shift as the windows roll. */}
+              {/* Event badge + trial flag (2026-08-05). FIRST SENIOR AUTHORSHIP:
+                  no senior-author paper in the early rolling window, at least one
+                  since, still active within 24 months. rising_board_flags also
+                  requires >= 3 in the recent window, but since the 2026-08-17 floor
+                  (MIN_VELOCITY_DELTA = 3 in rising_star_scoring.py) every board
+                  member clears that by construction — 58 of 58 — so on this surface
+                  the badge means "was not a senior author before, is one now". It
+                  still discriminates: 20 of 58, cut from the 24 with a zero early
+                  window by the 24-month activity test. The >= 3 clause STAYS in the
+                  RPC, which reads the momentum spine and not the board, and would
+                  otherwise fire for a non-member on a single paper. The DISPLAY is
+                  career-anchored so it does not shift as the windows roll. */}
               {flags?.senior_transition || flags?.on_open_trial ? (
                 <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start" }}>
                   {flags?.senior_transition ? (

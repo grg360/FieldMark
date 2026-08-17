@@ -253,7 +253,10 @@ function Bookmark({ on }: { on: boolean }) {
 // Rising evidence chip (2026-08-05): the /rising badges (RECENT SENIOR
 // AUTHORSHIP, OPEN TRIAL) in the community ledger's chip slot — same component
 // family, cohort-specific content. Both facts come from rising_board_flags,
-// already computed for the rising surface.
+// already computed for the rising surface. The authorship badge reads FIRST
+// senior authorship (empty early window, active since); its ">= 3 recent" half
+// stopped discriminating at the 2026-08-17 floor, which every board member
+// clears by construction — see the full note in RisingHcpProfile.tsx.
 function RisingChipView({ flag, hcpId, hcpName = "", mobile = false }: { flag: RisingFlags; hcpId: string; hcpName?: string; mobile?: boolean }) {
   const senior = flag.senior_transition;
   const trial = flag.on_open_trial;
