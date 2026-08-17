@@ -87,7 +87,11 @@ export interface RisingProfile {
 export interface RisingBoardRow {
   hcp_id: string;
   rank: number;
+  /** STORED on hcp_rising_star_ranks_v3 — scored against the historical `country`. */
   us_rank: number | null;
+  /** Read-time row_number() over effective_country, symmetric with eu_rank. Reproduces
+   *  rising_ledger's US rank exactly; the quadrant scopes and sorts US by this. */
+  us_rank_eff: number | null;
   eu_rank: number | null;
   archetype: string | null;
   pctl: number | null;

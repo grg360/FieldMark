@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { updateNextAction, type Priority } from "./relationships";
+import { getRisingBoard } from "./risingProfile";
 
 // Therapeutic area UUID lookup. Keys are strings stored in msl_profiles.therapeutic_areas.
 // Migrate to a UUID column on msl_profiles when team features ship.
@@ -1269,17 +1270,44 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
     if (allHcps.length === 0) return [];
 
     const hcpIdsInTerritory = allHcps.map((h) => h.id);
-    type RankRow = { hcp_id: string; us_rank: number | null };
-    const ranksByHcpId = new Map<string, number | null>();
 
-    for (let i = 0; i < hcpIdsInTerritory.length; i += CHUNK_SIZE) {
-      const chunk = hcpIdsInTerritory.slice(i, i + CHUNK_SIZE);
-      const { data } = await supabase
-        .from("hcp_rising_star_ranks_v3")
-        .select("hcp_id, us_rank")
-        .in("hcp_id", chunk);
-      for (const row of (data ?? []) as RankRow[]) {
-        ranksByHcpId.set(row.hcp_id, row.us_rank);
+    // Rising US rank: us_rank_eff off rising_board(), NOT the stored
+    // hcp_rising_star_ranks_v3.us_rank this used to read directly.
+    //
+    // WHY LOCATED, NOT SCORED. The stored us_rank places by the historical
+    // `country` the board was scored against. A tracked chip exists because the
+    // person is in THIS MSL's territory — being located is the whole reason the
+    // row is on screen — so the badge has to agree with where they are now. And
+    // the failure was not a wrong number, it was a wrong LADDER: a null us_rank
+    // does not just drop the rank, it falls through to EST / EST GLOBAL / COM
+    // below. Misako Nagasaka (global rising #18, US #4, country JP -> current US)
+    // carried no stored us_rank and so badged as established.
+    //
+    // us_rank_eff is row_number() over the stored global rank within the
+    // effective-country set, symmetric with eu_rank — see
+    // migrations/2026_08_17_rising_board_us_rank_eff.sql. Reading the RPC rather
+    // than recomputing it here keeps this surface on the same definition as the
+    // quadrant and the ledger; a client-side reimplementation is exactly the
+    // drift that migration was written to end.
+    //
+    // SCOPE: rising_board() is NSCLC-only, which today is the whole of
+    // hcp_rising_star_ranks_v3 (251 rows, one TA, no HCP ranked in two). The
+    // query this replaces was TA-agnostic in code but NSCLC-only in fact, so
+    // nothing narrows. If a second TA is ever written to that table, this map
+    // stops covering it — the AD rising board lives in hcp_rising_composite_v1
+    // and is not read here either way. One RPC call replaces N chunked selects.
+    const ranksByHcpId = new Map<string, number | null>();
+    {
+      const trackedIds = new Set(hcpIdsInTerritory);
+      try {
+        const board = await getRisingBoard();
+        for (const row of board.rows) {
+          if (trackedIds.has(row.hcp_id)) ranksByHcpId.set(row.hcp_id, row.us_rank_eff);
+        }
+      } catch (err) {
+        // Fail soft, as every other block here does: no rising rank means the
+        // ladder falls to EST, never a blank chip.
+        console.warn("getTrackedHcpsInTerritory: rising_board error", err);
       }
     }
 
