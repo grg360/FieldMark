@@ -287,14 +287,18 @@ export default function CongressCalendarPage() {
             // HERO CONTRACT 2026-08-15. The title was the TA ("Oncology" at 52)
             // and the surface name sat in the eyebrow — exactly inverted from
             // the rule. "Fieldmark" is gone from the eyebrow: the platform name
-            // is in the nav on every page, and the first segment is SCOPE.
+            // is in the nav on every page.
             //
-            // The TA segment is the INDICATION, not the area. This calendar's
-            // data scope is TA_SLUG — relevanceFor(c, TA_SLUG) filters every row
-            // on nsclc — so an eyebrow reading "CONG · ONCOLOGY" would name a
-            // broader scope than the surface actually shows. The eyebrow states
-            // what the filter does. 268px, inside the 310px narrow budget.
-            eyebrow={`Cong · ${taLabelForSlug(TA_SLUG)} · ${TA_LABEL}`}
+            // THE SCOPE SEGMENT IS GONE (2026-08-16), with the other seven. The
+            // form is TA · AREA. What survives from the old note is the reason
+            // the FIRST segment is the INDICATION and not the area: this surface
+            // is area-scoped in its NAME — "Congresses", an oncology calendar —
+            // but its data scope is TA_SLUG, and relevanceFor(c, TA_SLUG) filters
+            // every row on nsclc. An eyebrow reading "ONCOLOGY" alone would name
+            // a broader scope than the surface actually shows. So Congresses
+            // takes the same two segments as the rest: 203px, well inside the
+            // 310px narrow budget and 65px down from the three-segment form.
+            eyebrow={`${taLabelForSlug(TA_SLUG)} · ${TA_LABEL}`}
             meta={nowLabel}
             title="Congresses"
             stats={{ variant: "cluster", items: (() => {

@@ -169,12 +169,18 @@ export default function InstitutionsIndexRoute() {
   // identity. See lib/taLabels.ts.
   const taLabel = taLabelForSlug(taSlug);
   // HERO CONTRACT 2026-08-15 — the title names the SURFACE and the TA lives in
-  // the eyebrow, in one form: SCOPE · TA · AREA. The TA is a filter state, not
-  // an identity: it changes when the tab changes and the surface does not, so a
+  // the eyebrow, in one form: TA · AREA. The TA is a filter state, not an
+  // identity: it changes when the tab changes and the surface does not, so a
   // title reading "Institutions / Lung Cancer" was naming two things at once.
-  // Both segments derive from the slug — nothing here is typed out.
+  //
+  // THE SCOPE SEGMENT IS GONE (2026-08-16). It read "INST" — the title one size
+  // down, sitting 40px above the word "Institutions" and restating it. Seven of
+  // the eight surfaces had the same redundancy, and the abbreviation read as a
+  // truncation artifact rather than a label. What is left is the only thing in
+  // the eyebrow the title does not already say. Both segments derive from the
+  // slug — nothing here is typed out.
   const taArea = parentTaLabelForIndicationSlug(taSlug);
-  const heroEyebrow = ["Inst", taLabel, taArea].filter(Boolean).join(" · ");
+  const heroEyebrow = [taLabel, taArea].filter(Boolean).join(" · ");
 
   const openRecord = (a: InstitutionAgg) => navigate(`/institution/${a.slug}?ta=${taSlug}`);
 

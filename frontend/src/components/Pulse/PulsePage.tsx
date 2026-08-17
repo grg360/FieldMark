@@ -173,7 +173,7 @@ function Masthead({
   return (
     <PageHero
       narrow={narrow}
-      eyebrow={["Pulse", taLabelForSlug(payload.ta_slug), area].filter(Boolean).join(" · ")}
+      eyebrow={[taLabelForSlug(payload.ta_slug), area].filter(Boolean).join(" · ")}
       meta={`UPDATED THROUGH ${updated}`}
       title="Scientific Pulse"
       dek="Where scientific attention is moving in this therapeutic area, measured across published literature."

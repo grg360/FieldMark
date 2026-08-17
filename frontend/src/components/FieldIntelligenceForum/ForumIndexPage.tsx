@@ -73,13 +73,15 @@ function DisclosureBand({ tail, narrow }: { tail: string; narrow: boolean }) {
 }
 
 // ── Masthead — PageHero (2026-08-15) ────────────────────────────────────────
-// EYEBROW IS "FI" ALONE, NOT "FI · LUNG CANCER · ONCOLOGY". The convergence
-// format is SCOPE · TA · AREA, but this surface HAS NO TA SCOPE: getForumIndex
-// (lib/fieldIntelligence.ts:110) joins field_intel_anchors to publications_v2
-// with no therapeutic-area predicate, and that gap is logged there with a real
-// instance — a Hepatology/MASH paper once led a lung-cancer board on citation
-// count. Naming a TA here would assert a filter that does not exist. The TA
-// segments go in when the scope does, not before.
+// NO EYEBROW (2026-08-16). The format is TA · AREA, and this surface has no TA
+// scope: getForumIndex (lib/fieldIntelligence.ts:110) joins field_intel_anchors
+// to publications_v2 with no therapeutic-area predicate, and that gap is logged
+// there with a real instance — a Hepatology/MASH paper once led a lung-cancer
+// board on citation count. Naming a TA here would assert a filter that does not
+// exist. It held "FI" alone while the format still had a scope segment; that
+// segment is gone, so nothing true is left to say and the slot goes empty. The
+// hairline still spans — it is structure, not text (Hero Rule 1). The eyebrow
+// goes in when the scope does, not before.
 //
 // WHAT ELSE CHANGED, and what it cost:
 //   · stat values were SERIF 25 — editorial figures in the title's own face.
@@ -115,7 +117,6 @@ function Masthead({
       <PageHero
         narrow={narrow}
         above={<div style={{ margin: `0 -${gutter}px` }}>{band}</div>}
-        eyebrow="FI"
         meta="UPDATED THROUGH THE LATEST INGEST"
         title="Field Intelligence Forum"
         dek={subtitle}
@@ -689,16 +690,19 @@ export default function ForumIndexPage() {
           </>
         ) : (
           <>
-            {/* EYEBROW IS "FI" ALONE — NO TA SEGMENTS. The convergence format is
-                SCOPE · TA · AREA, but this surface has no TA scope to name:
-                getForumIndex() joins field_intel_anchors to publications_v2 with
-                no therapeutic-area predicate. That gap is logged in full at
+            {/* NO EYEBROW AT ALL (2026-08-16). The format is TA · AREA and this
+                surface has neither to name: getForumIndex() joins
+                field_intel_anchors to publications_v2 with no therapeutic-area
+                predicate. That gap is logged in full at
                 lib/fieldIntelligence.ts:110 ("ARCHITECTURAL GAP, LOGGED
                 2026-08-15 — NO TA SCOPE"), with a real instance: a Hepatology
                 MASH paper led a lung-cancer board on citation count.
-                ADD "· Lung Cancer · Oncology" HERE when, and only when,
-                getForumIndex gains that predicate. Until then the eyebrow would
-                assert a filter the query does not apply. */}
+                The previous answer was to hold the scope segment ("FI") alone
+                and wait for the predicate. With the scope segment retired
+                platform-wide there is nothing true left to put here, so the
+                surface passes no eyebrow — legal under the contract, which
+                makes it optional. PASS "`${ta} · Oncology`" when, and only
+                when, getForumIndex gains that predicate. */}
             <Masthead
               band={<DisclosureBand narrow={narrow} tail={empty ? "APPLIES WHETHER OR NOT THREADS EXIST" : "APPLIES TO EVERY THREAD BELOW"} />}
               narrow={narrow}

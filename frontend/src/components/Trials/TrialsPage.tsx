@@ -112,7 +112,7 @@ function TrialsHero({ surface, loading, narrow }: { surface: TrialsSurface; load
   return (
     <PageHero
       narrow={narrow}
-      eyebrow={["Trials", ta, area].filter(Boolean).join(" · ")}
+      eyebrow={[ta, area].filter(Boolean).join(" · ")}
       meta={`SET ${CRAWL} · STATUS ${REFRESH}`}
       title="Trials"
       scope={`Open lung trials naming at least one ranked ${ta} investigator`}

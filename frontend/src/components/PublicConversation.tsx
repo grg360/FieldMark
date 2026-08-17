@@ -207,7 +207,7 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
       <div style={{ padding: narrow ? "14px 18px" : "15px 28px", background: CARD, borderBottom: `1px solid ${HAIR}` }}>
         <PageHero
           narrow={narrow}
-          eyebrow={["Social", taLabel, "Oncology"].filter(Boolean).join(" · ")}
+          eyebrow={[taLabel, "Oncology"].filter(Boolean).join(" · ")}
           meta={mode === "conversation" ? "POSTS 20 MAY — 03 JUN 2026" : "NEWEST FIRST BY POSTED_AT"}
           title="The Public Conversation"
           stats={{

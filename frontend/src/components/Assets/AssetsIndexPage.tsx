@@ -214,7 +214,7 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
       <div style={{ padding: isMobile ? "22px 16px 0" : "30px 34px 0" }}>
         <PageHero
           narrow={isMobile}
-          eyebrow={["Drugs", taLabelForSlug(ASSETS_TA_SLUG), parentTaLabelForIndicationSlug(ASSETS_TA_SLUG)].filter(Boolean).join(" · ")}
+          eyebrow={[taLabelForSlug(ASSETS_TA_SLUG), parentTaLabelForIndicationSlug(ASSETS_TA_SLUG)].filter(Boolean).join(" · ")}
           title="Drugs Index"
           dek="Organized by molecular target, because that is how treatment is selected and how a territory is worked. Grouping cuts across modality: amivantamab is a bispecific antibody sitting with small-molecule TKIs, because they compete for the same patient."
           stats={{

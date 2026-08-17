@@ -1934,9 +1934,39 @@ export default function CohortLedger() {
               // as moving between three surfaces. The cohort is not lost, and is
               // not only in the eyebrow: the ledger card directly below still
               // carries its tick in cfg.markerColor plus the tag.
-              // The eyebrow drops to SCOPE · TA · AREA — 3 segments, 259px,
-              // down from 4 and 407px, which was the widest string in the system.
-              eyebrow={`${cfg.tag} · ${taLabelForSlug(LEDGER_TA_SLUG)} · Oncology`}
+              //
+              // THE COHORT SEGMENT SURVIVES THE 2026-08-16 SCOPE CUT, alone of the
+              // eight. Everywhere else the first segment restated the title one
+              // size down; here it does not — "Cohort Ledger" does not say WHICH
+              // cohort, and which cohort is the whole difference between three
+              // views that are otherwise the same surface. So the rule is not
+              // "drop the first segment", it is "drop what the title already
+              // says", and on this surface that leaves the cohort standing.
+              //
+              // It spells out now (ESTABLISHED, not EST) for the same reason the
+              // abbreviations went elsewhere: EST read as a truncation artifact.
+              // cfg.title.split is the same source the cluster label and the
+              // identity mark below already read, so the three agree by
+              // construction.
+              //
+              // AREA DROPS ON NARROW (2026-08-16). Spelling the cohort out put all
+              // three over the 310px budget at 386px — ESTABLISHED 333, COMMUNITY
+              // 314, RISING STARS 342. Dropping ONCOLOGY costs a flat 102px and
+              // brings all three well inside: 231 / 213 / 240, i.e. 79 / 98 / 70
+              // of headroom. The lever is the SAME rule that cut the
+              // scope segment, applied one level down: drop what is already said.
+              // ONCOLOGY is derivable from LUNG CANCER — the area is implied by
+              // the indication, so on a phone it is the segment carrying the least
+              // that is not already there. It is not a new exception and not a
+              // truncation: the string is shorter by a whole segment, chosen, not
+              // clipped mid-word. Desktop keeps all three, because desktop has the
+              // room and the area is worth stating where it costs nothing.
+              //
+              // ONLY THE TWO LEDGERS PULL THIS LEVER, because only they carry a
+              // cohort segment. The six TA-only surfaces sit at 203px at every
+              // width and keep both segments — dropping ONCOLOGY there would
+              // leave LUNG CANCER alone, buying nothing and costing the pairing.
+              eyebrow={[cfg.title.split(" / ")[0], taLabelForSlug(LEDGER_TA_SLUG), isMobile ? null : "Oncology"].filter(Boolean).join(" · ")}
               meta={`WEEKLY BUILD · AS OF ${formatScoringDate(scoredAt)}`}
               title="Cohort Ledger"
               // The cluster label names the cohort instead of saying "IN COHORT".
@@ -1959,9 +1989,9 @@ export default function CohortLedger() {
                   rule moved the cohort out of the H1. Now spelled out at 13/600
                   with a 4x22 rule: a step above the 11px meta beside it and well
                   below the 30/52 title, which is the slot it should hold. The
-                  eyebrow stays gold and abbreviated (EST) precisely because this
-                  mark spells it out 60px below in the cohort's own colour, so
-                  the abbreviation is never the only statement of the cohort.
+                  eyebrow no longer abbreviates against it (2026-08-16): both
+                  read cfg.title.split(" / ")[0], so the gold eyebrow above and
+                  this mark in the cohort's own colour say the same word.
                   Tracking eases .14em -> .11em: wide tracking at 9px reads as
                   deliberate, at 13px it reads as loose. */}
               <span style={{ display: "flex", alignItems: "center", gap: 11 }}>

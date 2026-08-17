@@ -25,8 +25,10 @@
 //             a tile renders "43" over "DEPLOYMENT ASSETS", never
 //             "43 deployment assets reach ......... 17,667". Both forms are
 //             legitimate; the cluster is not the general case.
-//   eyebrow? — Social removed its eyebrow deliberately (2026-08-07). The rule
-//             still spans, because the rule is structure, not text.
+//   eyebrow? — added for Social, which removed its eyebrow in 2026-08-07 (it
+//             took it back at the convergence). Intelligence is the consumer
+//             now, from 2026-08-16. The rule still spans in both cases,
+//             because the rule is structure, not text.
 //
 // THE TITLE RULE (2026-08-15): the title names the SURFACE, always. The TA is a
 // filter state, not an identity — it changes on a tab switch and the surface
@@ -34,8 +36,32 @@
 // that had grown up independently: " / " (Institutions, Social), " · " (Drugs),
 // and TA-as-title (Congresses, Pulse).
 //
-// EYEBROW FORMAT: SCOPE · TA · AREA — "EST · LUNG CANCER · ONCOLOGY". The TA
+// EYEBROW FORMAT (2026-08-16): TA · AREA — "LUNG CANCER · ONCOLOGY". The TA
 // segment is always derived through taLabelForSlug, never typed.
+//
+// THE SCOPE SEGMENT IS RETIRED. It was the first of three (EST · LUNG CANCER ·
+// ONCOLOGY) and on seven of the eight surfaces it restated the title one size
+// down — INST sitting 40px above "Institutions", CONG above "Congresses". Two
+// costs, both real: the eyebrow spent its widest segment saying nothing new,
+// and the abbreviations read as truncation artifacts rather than labels.
+// Intelligence made it plain — it could only ever hold the scope segment, so
+// with the segment gone it holds nothing and passes no eyebrow at all.
+//
+// THE TEST IS NOT "DROP THE FIRST SEGMENT", it is "drop what is already said".
+// The two ledgers keep a cohort segment (ESTABLISHED · LUNG CANCER · ONCOLOGY,
+// RISING STARS · …) because "Cohort Ledger" and "Rising Ledger" do not name
+// WHICH board, and which board is the whole difference between three views of
+// one surface. Spelling the cohort out put those two over the 310px narrow
+// budget — 333 / 342 / 314 for EST / RS / COM against 203 for the other six.
+//
+// SO THE SAME TEST RUNS AGAIN ONE LEVEL DOWN, and only where a cohort segment
+// is present: on narrow the ledgers drop ONCOLOGY, because the area is
+// derivable from LUNG CANCER and is therefore what is already said. That is
+// the lever, and it is the whole of it — nothing is truncated anywhere in this
+// component. A clipped eyebrow is the failure the abbreviations were, one step
+// later; dropping a segment by rule is not. The six TA-only surfaces do not
+// pull it: they fit at every width, and losing ONCOLOGY would strand LUNG
+// CANCER alone for no gain.
 //
 // NOT PARAMETERIZED, ON PURPOSE — these are the convergence, not defaults:
 //   · title serif 600/-0.01em at TWO sizes: 52 index, 30 detail. Not five.
@@ -102,7 +128,8 @@ export default function PageHero({
    *  add horizontal padding around PageHero, or the band cannot reach the panel
    *  edge — the padding belongs on the surface's own content blocks instead. */
   above?: ReactNode;
-  /** Optional: Social has none deliberately. The rule spans regardless. */
+  /** Optional: Intelligence has none, having no TA scope to name. The rule
+   *  spans regardless. */
   eyebrow?: string;
   meta?: string;
   title: ReactNode;

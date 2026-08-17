@@ -193,7 +193,20 @@ export default function RisingQuadrant() {
             // Same contract as the cohort ledger: the H1 names the surface, the
             // TA is scope. Retires the " / " join — the fourth of the four join
             // conventions the convergence collapses.
-            eyebrow={`RIS · ${taLabelForSlug(TA_SLUG)} · Oncology`}
+            //
+            // The cohort segment survives the 2026-08-16 scope cut on the same
+            // ground as the ledger: "Rising Ledger" names the surface but the
+            // board it shows is one of three, and the eyebrow is where that is
+            // said. RIS spells out for the same reason EST did.
+            //
+            // AREA DROPS ON NARROW, with the cohort ledger and for its reason:
+            // ONCOLOGY is derivable from LUNG CANCER, so under width pressure it
+            // is the segment already said. Same "drop what is already said" rule
+            // as the scope cut, one level down — not a new exception. This was
+            // the longest eyebrow in the system at 342px against a 310px budget;
+            // the lever costs 102px and brings it to 240, 70px inside. Desktop
+            // keeps all three.
+            eyebrow={["RISING STARS", taLabelForSlug(TA_SLUG), isMobile ? null : "Oncology"].filter(Boolean).join(" · ")}
             meta="ONE BOARD · TWO MODES · WEEKLY BUILD"
             title="Rising Ledger"
             stats={{ variant: "cluster", items: [
