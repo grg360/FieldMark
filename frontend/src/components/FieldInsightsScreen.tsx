@@ -155,7 +155,7 @@ export default function FieldInsightsScreen() {
           meta={latest ? `UPDATED THROUGH ${latest}` : "MSL-CAPTURED FIELD INTELLIGENCE"}
           title="Field Insights"
           dek="Structured field intelligence from your HCP interactions. Each insight ties published beliefs to current beliefs across your territory. Share this view with your manager to surface emerging themes and patterns."
-          stats={empty ? undefined : heroStats}
+          stats={empty ? undefined : { variant: "cluster", items: heroStats }}
         />
 
         {loading ? (

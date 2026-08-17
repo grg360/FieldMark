@@ -13,7 +13,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT, COOL, GOLD, GROUND, LINE } from "../../lib/designTokens";
+import PageHero from "../PageHero";
+import { GROUND, LINE, INK, GOLD, STATE, DEPTH, FACE, T } from "../../lib/canonicalTokens";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import {
   getForumIndex,
@@ -21,72 +22,13 @@ import {
   type ForumIndexAnchor,
   type ForumThread,
 } from "../../lib/fieldIntelligence";
-import { ProvenanceChip } from "./fiUi";
+import { mono, ProvenanceChip, serif } from "./fiUi";
 
 // The card grid stops being readable at roughly two dozen threads; past this the
 // forum renders as the ledger table (item 2 — switched on the LIVE count, not a
 // second static layout).
 const SCALE_THRESHOLD = 24;
 const INT = new Intl.NumberFormat("en-US");
-
-// ── Frame palette (terminal / near-black, muted gold; matched to Scientific Pulse) ──
-// Commit C 2026-08-05: box/cards/edges join the Pulse board scheme (g2 board,
-// g1 wells, l0/l1 rules); golds/inks stay the frame's own pending their pass.
-// Grounds un-reversed 2026-08-07: the FIELD (surface — the box interior and
-// the grid gaps) is the darker step and the CONTAINERS (cards, bands, rows)
-// are the lighter charcoal raised on it — matching the thread page, where
-// g2 containers sit on the dark page ground.
-const C = {
-  surface: GROUND.g1,
-  card: GROUND.g2,
-  cardDark: GROUND.g1,
-  cardAlt: GROUND.g2,
-  border: LINE.l1,
-  borderSoft: LINE.l0,
-  hair: LINE.l0,
-  borderMed: LINE.l2,
-  frameBorder: "#1e2228",
-  gold: GOLD.gold, // was #c9973f — gold convergence 2026-08-05
-  goldDim: "#b08b4e",
-  goldDark: "#8a6c3a",
-  goldBright: "#e0b063",
-  orange: "#c07a2e",
-  ink: "#e9e6df",
-  ink2: "#ded9d0",
-  ink3: "#9aa1a9",
-  ink4: "#79818b",
-  ink5: COOL.prose, // prose mint #c9d0d8 retired into COOL.prose 2026-08-05 (Two Ramps)
-  muted: "#6b747e",
-  muted2: "#5a636d",
-  faint: "#4f5862",
-  faint2: "#3f4750",
-  removed: "#cf8158",
-  removedBorder: "rgba(176,96,58,.5)",
-  removedBg: "rgba(176,96,58,.17)",
-  urBorder: "rgba(201,151,63,.38)",
-  urBg: "rgba(201,151,63,.07)",
-  note: "#98a0a8",
-  noteBorder: "#2b3138",
-  goldChipBg: "rgba(201,151,63,.09)",
-} as const;
-
-const SERIF = "'Source Serif 4', Georgia, serif";
-const MONO = FONT.mono;
-
-const mono = (size: number, color: string, ls = 0.14, weight = 400): CSSProperties => ({
-  fontFamily: MONO,
-  fontSize: size,
-  fontWeight: weight,
-  letterSpacing: `${ls}em`,
-  color,
-});
-const serif = (size: number, color: string, lh = 1.5, weight = 400): CSSProperties => ({
-  fontFamily: SERIF,
-  fontSize: size,
-  fontWeight: weight,
-  lineHeight: lh,
-  color,
-});
 
 interface FlatThread {
   thread: ForumThread;
@@ -97,13 +39,13 @@ interface FlatThread {
 function DisclosureBand({ tail, narrow }: { tail: string; narrow: boolean }) {
   if (narrow) {
     return (
-      <div style={{ background: C.cardAlt, borderBottom: `1px solid ${C.border}`, padding: "13px 22px", display: "flex", gap: 11 }}>
-        <div style={{ width: 2, background: C.gold, flexShrink: 0 }} />
+      <div style={{ background: GROUND.INSET, borderBottom: `1px solid ${LINE.HAIR}`, padding: "13px 22px", display: "flex", gap: 11 }}>
+        <div style={{ width: 2, background: GOLD.PRIME, flexShrink: 0 }} />
         <div>
-          <div style={mono(9.5, C.gold, 0.18, 500)}>ILLUSTRATIVE PROTOTYPE</div>
-          <p style={{ ...serif(12.5, C.ink3, 1.5), marginTop: 8 }}>
+          <div style={mono(T.MICRO, GOLD.PRIME, 0.18, 500)}>ILLUSTRATIVE PROTOTYPE</div>
+          <p style={{ ...serif(T.META, INK.LABEL, 1.5, 400), marginTop: 8 }}>
             Publications, journals and PMIDs are real.{" "}
-            <strong style={{ color: C.ink2, fontWeight: 600 }}>Content marked SEEDED — its posts, handles and moderation records — is fabricated</strong>{" "}
+            <strong style={{ color: INK.BODY, fontWeight: 600 }}>Content marked SEEDED — its posts, handles and moderation records — is fabricated</strong>{" "}
             for compliance review. Content marked LIVE is authored on this surface by a verified MSL. LIVE posts are checked for recommendation language, off-label content and physician names before publishing.
           </p>
         </div>
@@ -111,17 +53,17 @@ function DisclosureBand({ tail, narrow }: { tail: string; narrow: boolean }) {
     );
   }
   return (
-    <div style={{ background: C.cardAlt, borderBottom: `1px solid ${C.border}`, padding: "15px 40px", display: "flex", alignItems: "flex-start", gap: 24 }}>
+    <div style={{ background: GROUND.INSET, borderBottom: `1px solid ${LINE.HAIR}`, padding: "15px 40px", display: "flex", alignItems: "flex-start", gap: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 11, flexShrink: 0, paddingTop: 2 }}>
-        <div style={{ width: 2, height: 22, background: C.gold }} />
-        <span style={mono(10, C.gold, 0.2, 500)}>ILLUSTRATIVE PROTOTYPE</span>
+        <div style={{ width: 2, height: 22, background: GOLD.PRIME }} />
+        <span style={mono(T.LABEL, GOLD.PRIME, 0.2, 500)}>ILLUSTRATIVE PROTOTYPE</span>
       </div>
-      <p style={{ ...serif(13.5, C.ink3, 1.55), maxWidth: 820 }}>
+      <p style={{ ...serif(T.META, INK.LABEL, 1.55, 400), maxWidth: 820 }}>
         Publications, journals and PMIDs are real.{" "}
-        <strong style={{ color: C.ink2, fontWeight: 600 }}>Content marked SEEDED — its posts, handles and moderation records — is fabricated</strong>{" "}
+        <strong style={{ color: INK.BODY, fontWeight: 600 }}>Content marked SEEDED — its posts, handles and moderation records — is fabricated</strong>{" "}
         for compliance review. Content marked LIVE is authored on this surface by a verified MSL. LIVE posts are checked for recommendation language, off-label content and physician names before publishing.
       </p>
-      <div style={{ marginLeft: "auto", ...mono(10, C.faint, 0.15), lineHeight: 1.7, textAlign: "right", flexShrink: 0 }}>
+      <div style={{ marginLeft: "auto", ...mono(T.LABEL, INK.MUTE, 0.15, 400), lineHeight: 1.7, textAlign: "right", flexShrink: 0 }}>
         PERMANENT DISCLOSURE
         <br />
         {tail}
@@ -130,80 +72,74 @@ function DisclosureBand({ tail, narrow }: { tail: string; narrow: boolean }) {
   );
 }
 
-// ── Masthead with the four computed header counts (item 1) ───────────────────
-function Stat({ value, label, gold }: { value: string; label: string; gold?: boolean }) {
-  // centred over the label (2026-08-07 — same treatment as the ledger heroes)
-  return (
-    <div style={{ padding: "0 24px", textAlign: "center" }}>
-      <div style={serif(25, gold ? C.gold : C.ink, 1)}>{value}</div>
-      <div style={{ ...mono(9.5, gold ? C.goldDark : C.faint, 0.16), marginTop: 8 }}>{label}</div>
-    </div>
-  );
-}
-
+// ── Masthead — PageHero (2026-08-15) ────────────────────────────────────────
+// NO EYEBROW (2026-08-16). The format is TA · AREA, and this surface has no TA
+// scope: getForumIndex (lib/fieldIntelligence.ts:110) joins field_intel_anchors
+// to publications_v2 with no therapeutic-area predicate, and that gap is logged
+// there with a real instance — a Hepatology/MASH paper once led a lung-cancer
+// board on citation count. Naming a TA here would assert a filter that does not
+// exist. It held "FI" alone while the format still had a scope segment; that
+// segment is gone, so nothing true is left to say and the slot goes empty. The
+// hairline still spans — it is structure, not text (Hero Rule 1). The eyebrow
+// goes in when the scope does, not before.
+//
+// WHAT ELSE CHANGED, and what it cost:
+//   · stat values were SERIF 25 — editorial figures in the title's own face.
+//     They are mono 26 now, the data face every other surface uses. This is the
+//     largest character change on the surface and it is deliberate: a count of
+//     threads is data, not a headline.
+//   · the explicit 1px x 44px divider rules become the cluster's borderRight.
+//   · the eyebrow row was space-between with NO rule. It takes the spanning
+//     hairline (Hero Rule 1: the rule is structure, not text) and the
+//     "UPDATED THROUGH THE LATEST INGEST" stamp becomes the meta right of it.
+//   · title 46/400 -> 52/600 desktop; narrow stays 30, which is what T.FIGURE
+//     already gave it.
+//   · "ANCHORED DISCUSSION" leaves the eyebrow. The claim is not lost — the dek
+//     below states it in full ("Every thread is anchored to a published paper").
+//
+// The disclosure band uses the new `above` slot. It is full-bleed via a negative
+// margin matching the wrapper's gutter, because PageHero's body needs that
+// gutter and the band must reach the panel edge.
 function Masthead({
   narrow,
   subtitle,
   stats,
+  band,
 }: {
   narrow: boolean;
   subtitle: string;
   stats: { value: string; label: string; gold?: boolean }[];
+  band: ReactNode;
 }) {
-  if (narrow) {
-    return (
-      <div style={{ padding: "24px 22px 0" }}>
-        <div style={mono(9.5, C.goldDim, 0.2, 500)}>ANCHORED DISCUSSION</div>
-        <h1 style={{ ...serif(30, C.ink, 1.08), margin: "12px 0 0", letterSpacing: "-0.01em" }}>Field Intelligence Forum</h1>
-        <p style={{ ...serif(14, C.ink3, 1.55), marginTop: 12 }}>{subtitle}</p>
-        <div style={{ marginTop: 16, display: "flex", gap: 16, flexWrap: "wrap" }}>
-          {stats.map((s) => (
-            <span key={s.label} style={mono(10, s.gold ? C.goldDark : C.faint, 0.13)}>
-              {s.value} {s.label}
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const gutter = narrow ? 22 : 40;
   return (
-    <div style={{ padding: "46px 40px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={mono(10.5, C.goldDim, 0.2, 500)}>ANCHORED DISCUSSION</span>
-        <span style={mono(10, C.faint, 0.15)}>UPDATED THROUGH THE LATEST INGEST</span>
-      </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 64, marginTop: 16 }}>
-        <div style={{ maxWidth: 600 }}>
-          <h1 style={{ ...serif(46, C.ink, 1.06), margin: 0, letterSpacing: "-0.01em" }}>Field Intelligence Forum</h1>
-          <p style={{ ...serif(15, C.ink3, 1.6), marginTop: 14 }}>{subtitle}</p>
-        </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "flex-end" }}>
-          {stats.map((s, i) => (
-            <div key={s.label} style={{ display: "flex", alignItems: "flex-end" }}>
-              {i > 0 && <div style={{ width: 1, height: 44, background: "#191d22" }} />}
-              <Stat value={s.value} label={s.label} gold={s.gold} />
-            </div>
-          ))}
-        </div>
-      </div>
+    <div style={{ padding: `0 ${gutter}px` }}>
+      <PageHero
+        narrow={narrow}
+        above={<div style={{ margin: `0 -${gutter}px` }}>{band}</div>}
+        meta="UPDATED THROUGH THE LATEST INGEST"
+        title="Field Intelligence Forum"
+        dek={subtitle}
+        stats={{ variant: "cluster", items: stats }}
+      />
     </div>
   );
 }
 
 // ── Moderation badges (item 4) — presence driven by moderation records ───────
 function badgeStyle(border: string, bg: string, color: string): CSSProperties {
-  return { padding: "3px 7px", border: `1px solid ${border}`, background: bg, ...mono(9.5, color, 0.13, 500), whiteSpace: "nowrap" };
+  return { padding: "3px 7px", border: `1px solid ${border}`, background: bg, ...mono(T.MICRO, color, 0.13, 500), whiteSpace: "nowrap" };
 }
 function Moderation({ t, moderated }: { t: ForumThread; moderated: boolean }) {
   const hasMod = moderated && t.under_review_count + t.removed_count + t.context_note_count > 0;
   if (!hasMod) {
-    return <span style={mono(9.5, C.faint, 0.13)}>NO MODERATION ON THIS THREAD</span>;
+    return <span style={mono(T.MICRO, INK.MUTE, 0.13, 400)}>NO MODERATION ON THIS THREAD</span>;
   }
   return (
     <>
-      {t.under_review_count > 0 && <span style={badgeStyle(C.urBorder, C.urBg, C.gold)}>◇ UNDER REVIEW · {t.under_review_count}</span>}
-      {t.removed_count > 0 && <span style={badgeStyle(C.removedBorder, C.removedBg, C.removed)}>× REMOVED · {t.removed_count}</span>}
-      {t.context_note_count > 0 && <span style={badgeStyle(C.noteBorder, "transparent", C.note)}>† CONTEXT NOTE · {t.context_note_count}</span>}
+      {t.under_review_count > 0 && <span style={badgeStyle(GOLD.EDGE, GOLD.WASH, GOLD.PRIME)}>◇ UNDER REVIEW · {t.under_review_count}</span>}
+      {t.removed_count > 0 && <span style={badgeStyle(STATE.DANGER, GROUND.INSET, STATE.DANGER)}>× REMOVED · {t.removed_count}</span>}
+      {t.context_note_count > 0 && <span style={badgeStyle(LINE.HAIR, "transparent", INK.LABEL)}>† CONTEXT NOTE · {t.context_note_count}</span>}
     </>
   );
 }
@@ -217,29 +153,29 @@ function AnchorRequiredBlock({ narrow, onBibliography }: { narrow: boolean; onBi
   ];
   if (narrow) {
     return (
-      <div style={{ margin: "20px 22px 0", background: C.card, padding: "16px 18px" }}>
+      <div style={{ margin: "20px 22px 0", background: GROUND.RAISE, padding: "16px 18px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 2, height: 11, background: C.gold }} />
-          <span style={mono(9.5, C.gold, 0.16, 500)}>ANCHOR REQUIRED</span>
+          <div style={{ width: 2, height: 11, background: GOLD.PRIME }} />
+          <span style={mono(T.MICRO, GOLD.PRIME, 0.16, 500)}>ANCHOR REQUIRED</span>
         </div>
-        <p style={{ ...serif(13, C.ink3, 1.55), marginTop: 11 }}>
+        <p style={{ ...serif(T.META, INK.LABEL, 1.55, 400), marginTop: 11 }}>
           There is no composer here. Threads start from a publication card in the bibliography — the paper you choose becomes the anchor.
         </p>
-        <button type="button" onClick={onBibliography} style={{ marginTop: 13, padding: "9px 14px", border: "1px solid #3a3227", background: C.urBg, ...mono(9.5, C.gold, 0.15, 500), cursor: "pointer" }}>
+        <button type="button" onClick={onBibliography} style={{ marginTop: 13, padding: "9px 14px", border: `1px solid ${GOLD.EDGE}`, background: GOLD.WASH, ...mono(T.MICRO, GOLD.PRIME, 0.15, 500), cursor: "pointer" }}>
           OPEN THE BIBLIOGRAPHY&nbsp; →
         </button>
       </div>
     );
   }
   return (
-    <div style={{ margin: "34px 40px 0", background: C.card, padding: "20px 26px 18px" }}>
+    <div style={{ margin: "34px 40px 0", background: GROUND.RAISE, padding: "20px 26px 18px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 30 }}>
         <div style={{ width: 132, flexShrink: 0, paddingTop: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <div style={{ width: 2, height: 11, background: C.gold }} />
-            <span style={mono(10, C.gold, 0.16, 500)}>ANCHOR REQUIRED</span>
+            <div style={{ width: 2, height: 11, background: GOLD.PRIME }} />
+            <span style={mono(T.LABEL, GOLD.PRIME, 0.16, 500)}>ANCHOR REQUIRED</span>
           </div>
-          <div style={{ ...mono(10, C.faint, 0.1), marginTop: 9, lineHeight: 1.6 }}>
+          <div style={{ ...mono(T.LABEL, INK.MUTE, 0.1, 400), marginTop: 9, lineHeight: 1.6 }}>
             NO COMPOSER
             <br />
             ON THIS SURFACE
@@ -248,17 +184,17 @@ function AnchorRequiredBlock({ narrow, onBibliography }: { narrow: boolean; onBi
         <div style={{ display: "flex", gap: 34, flex: 1 }}>
           {steps.map(([head, body]) => (
             <div key={head} style={{ flex: 1 }}>
-              <div style={mono(10, C.goldDark, 0.16, 500)}>{head}</div>
-              <p style={{ ...serif(13.5, C.ink3, 1.5), marginTop: 9 }}>{body}</p>
+              <div style={mono(T.LABEL, GOLD.MUTE, 0.16, 500)}>{head}</div>
+              <p style={{ ...serif(T.META, INK.LABEL, 1.5, 400), marginTop: 9 }}>{body}</p>
             </div>
           ))}
         </div>
-        <button type="button" onClick={onBibliography} style={{ flexShrink: 0, alignSelf: "center", padding: "10px 16px", border: "1px solid #3a3227", background: C.urBg, ...mono(10, C.gold, 0.16, 500), cursor: "pointer" }}>
+        <button type="button" onClick={onBibliography} style={{ flexShrink: 0, alignSelf: "center", padding: "10px 16px", border: `1px solid ${GOLD.EDGE}`, background: GOLD.WASH, ...mono(T.LABEL, GOLD.PRIME, 0.16, 500), cursor: "pointer" }}>
           OPEN THE BIBLIOGRAPHY&nbsp; →
         </button>
       </div>
-      <div style={{ height: 1, background: C.borderSoft, margin: "18px 0 14px" }} />
-      <p style={serif(13, C.ink4, 1.55)}>
+      <div style={{ height: 1, background: LINE.HAIR, margin: "18px 0 14px" }} />
+      <p style={serif(T.META, INK.MUTE, 1.55, 400)}>
         Topic discussion only — no HCP names in posts, no product claims, no discussion of unapproved use. Replies are scoped to what the anchored paper reports.
       </p>
     </div>
@@ -278,10 +214,10 @@ function ViewToggle({ view, onView, right, narrow }: { view: "pub" | "question";
           flex: narrow ? 1 : "none",
           textAlign: "center",
           padding: narrow ? "9px 0" : "9px 18px",
-          background: on ? C.goldChipBg : "transparent",
+          background: on ? GOLD.WASH : "transparent",
           border: "none",
           cursor: "pointer",
-          ...mono(narrow ? 10 : 11, on ? C.gold : C.muted, 0.14, on ? 500 : 400),
+          ...mono(narrow ? 10 : 11, on ? GOLD.PRIME : INK.MUTE, 0.14, on ? 500 : 400),
         }}
       >
         {label}
@@ -290,7 +226,7 @@ function ViewToggle({ view, onView, right, narrow }: { view: "pub" | "question";
   };
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: narrow ? "20px 22px 0" : "36px 40px 0", gap: 16 }}>
-      <div style={{ display: "flex", background: C.card, padding: 3, flex: narrow ? 1 : "none" }}>
+      <div style={{ display: "flex", background: GROUND.RAISE, padding: 3, flex: narrow ? 1 : "none" }}>
         {tab("pub", "BY PUBLICATION")}
         {tab("question", "BY QUESTION")}
       </div>
@@ -301,21 +237,40 @@ function ViewToggle({ view, onView, right, narrow }: { view: "pub" | "question";
 
 // ── Anchor card (state 01) — uniform heights via fixed question windows ──────
 function QuestionWindow({ t, moderated }: { t: ForumThread; moderated: boolean }) {
-  // Narrow: the fixed 98px window exists to align cards across the desktop
-  // two-column grid; in the single mobile column it only clips — moderation
-  // badges ran past the card edge and were cut mid-chip. The window goes
-  // natural-height and the badge row wraps (2026-08-10).
-  const narrow = useMediaQuery("(max-width: 900px)");
+  // The window used to be pinned to height:98 with overflow:hidden above a local
+  // 900px breakpoint, to align cards across the two-column grid. It did not do
+  // that job and it clipped moderation badges at every desktop width:
+  //
+  //   >= ~1025px  three badges fit one line; the stack (44 title + 10 + meta
+  //               + 10 + 22.3 badge row) reaches 107.3px -> bottom 9.3px sliced,
+  //               which is why badges read as having their borders cut off
+  //   900-1025px  the row wraps to two lines, 136.5px -> 38.5px clipped, the
+  //               entire second line invisible
+  //
+  // The pin was never what aligned the cards: the anchor grid is align-items:
+  // stretch, so the CARDS already equalise. Only this inner window was fixed, so
+  // removing the pin lets a taller card set its row height — correct behaviour
+  // for a variable-count badge row, not a regression.
+  //
+  // Rejected: capping at two badges with a "+1" chip. On a surface whose whole
+  // subject is moderation, hiding moderation state is the wrong trade.
+  //
+  // overflow:hidden stays on the TITLE clamp below, where it does real work; it
+  // is gone from this container, which is where it was doing the clipping.
+  // Removing the pin also retires this component's local 900px breakpoint — one
+  // of the three that were live on this surface.
   return (
-    <Link to={`/field-intelligence/thread/${t.id}`} style={{ display: "block", height: narrow ? "auto" : 98, minHeight: 98, overflow: "hidden", textDecoration: "none" }}>
-      <p style={{ ...serif(15, C.ink2, 1.45), height: 44, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
+    <Link to={`/field-intelligence/thread/${t.id}`} style={{ display: "block", minHeight: 98, textDecoration: "none" }}>
+      <p style={{ ...serif(T.BODY, INK.BODY, 1.45, 400), height: 44, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
         {t.question_title}
       </p>
-      <div style={{ ...mono(10, C.faint, 0.12), marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ ...mono(T.LABEL, INK.MUTE, 0.12, 400), marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <ProvenanceChip seed={t.is_seed} />
         <span>{t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"} · {t.recency_label.toUpperCase()}</span>
       </div>
-      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", minHeight: 19 }}>
+      {/* minHeight 23, not 19: a badge is 22.3px tall (9.5px mono + 3px padding
+            + 1px border, doubled), so 19 under-reserved its own single line. */}
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", minHeight: 23 }}>
         <Moderation t={t} moderated={moderated} />
       </div>
     </Link>
@@ -329,38 +284,53 @@ function AnchorCard({ anchor, moderatedIds }: { anchor: ForumIndexAnchor; modera
   const pub = anchor.publication;
   const primaryId = (threads.find((t) => t.is_primary) ?? first)?.id;
   return (
-    <div style={{ background: C.card, padding: "24px 26px 20px", display: "flex", flexDirection: "column" }}>
+    // BOUNDARY BY BORDER, NOT BY GRADIENT. DEPTH.CARD was measured and rejected:
+    // its two stops are #191b1f -> #15181C, a self-contrast of 1.033:1, and the
+    // whole ground ramp lives in the bottom 1% of the luminance scale
+    // (GROUND.BASE RL .0055, RAISE .0090). At that depth a gradient cannot draw an
+    // edge. canonicalTokens says as much itself: DEPTH.RIM "carries more perceived
+    // depth than doubling a gradient, at zero contrast cost".
+    //
+    // So the edge is a real LINE.EDGE border (1.60:1 against the card fill — ~15x
+    // the gradient), the cards are discrete objects via the grid's 16px gap, and
+    // DEPTH.RIM adds the light-from-above cue on the top edge only.
+    //
+    // SPREAD ORDER: DEPTH.RIM carries a `borderTop`, so the `border` shorthand must
+    // come FIRST or it silently overwrites the rim. Border first, depth last.
+    <div style={{ background: GROUND.RAISE, padding: "24px 26px 20px", border: `1px solid ${LINE.EDGE}`, ...DEPTH.RIM, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={mono(10.5, C.goldDim, 0.13, 500)}>{anchor.journal_abbrev} · {pub?.pub_year ?? "—"}</span>
-        <span style={mono(10.5, C.faint, 0.1)}>PMID {anchor.pubmed_id}</span>
+        <span style={mono(T.LABEL, GOLD.PRIME, 0.13, 500)}>{anchor.journal_abbrev} · {pub?.pub_year ?? "—"}</span>
+        <span style={mono(T.LABEL, INK.MUTE, 0.1, 400)}>PMID {anchor.pubmed_id}</span>
       </div>
-      <h3 style={{ ...serif(20, C.ink, 1.34, 600), marginTop: 14, letterSpacing: "-0.005em", height: 54, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <h3 style={{ ...serif(T.SUB, INK.PRIME, 1.34, 600), marginTop: 14, letterSpacing: "-0.005em", height: 54, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
         {pub?.title ?? "—"}
       </h3>
-      <div style={{ marginTop: 12, display: "flex", gap: 20, ...mono(10.5, C.faint, 0.11) }}>
+      <div style={{ marginTop: 12, display: "flex", gap: 20, ...mono(T.LABEL, INK.MUTE, 0.11, 400) }}>
         <span>{INT.format(pub?.citation_count ?? 0)} CITATIONS</span>
         <span>{anchor.thread_count} {anchor.thread_count === 1 ? "THREAD" : "THREADS"}</span>
         <span>{anchor.reply_count} {anchor.reply_count === 1 ? "REPLY" : "REPLIES"}</span>
       </div>
-      <div style={{ height: 1, background: C.borderSoft, marginTop: 18 }} />
-      <div style={{ display: "flex", flexDirection: "column", paddingTop: 16 }}>
+      {/* Header rule retired: with a real card edge, three equal LINE.HAIR rules
+          inside the card made every level of the hierarchy the same weight. The
+          one remaining rule now means exactly one thing — "next thread". Spacing
+          carries what the rule used to. */}
+      <div style={{ display: "flex", flexDirection: "column", paddingTop: 34 }}>
         {first && <QuestionWindow t={first} moderated={moderatedIds.has(first.id)} />}
-        <div style={{ height: 1, background: C.hair, margin: "14px 0" }} />
+        <div style={{ height: 1, background: LINE.HAIR, margin: "14px 0" }} />
         {second ? (
           <QuestionWindow t={second} moderated={moderatedIds.has(second.id)} />
         ) : (
-          <div style={{ height: 98, overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "center", background: C.cardDark, margin: "0 -12px", padding: "0 12px" }}>
-            <span style={mono(10, C.faint, 0.14)}>ONE THREAD ON THIS ANCHOR</span>
-            <p style={{ ...serif(13, C.muted, 1.45), marginTop: 10 }}>
+          <div style={{ minHeight: 98, display: "flex", flexDirection: "column", justifyContent: "center", borderLeft: `1px solid ${LINE.HAIR}`, paddingLeft: 14 }}>
+            <span style={mono(T.LABEL, INK.MUTE, 0.14, 400)}>ONE THREAD ON THIS ANCHOR</span>
+            <p style={{ ...serif(T.META, INK.MUTE, 1.45, 400), marginTop: 10 }}>
               A second question on this paper starts the same way — from its card in the bibliography.
             </p>
           </div>
         )}
       </div>
-      <div style={{ height: 1, background: C.borderSoft, marginTop: 14 }} />
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={mono(10, C.faint, 0.13)}>LAST ACTIVITY {first?.recency_label.toUpperCase() ?? "—"}</span>
-        <Link to={`/field-intelligence/thread/${primaryId}`} style={{ ...mono(10, C.goldDark, 0.13, 500), textDecoration: "none" }}>
+      <div style={{ marginTop: 26, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={mono(T.LABEL, INK.MUTE, 0.13, 400)}>LAST ACTIVITY {first?.recency_label.toUpperCase() ?? "—"}</span>
+        <Link to={`/field-intelligence/thread/${primaryId}`} style={{ ...mono(T.LABEL, GOLD.MUTE, 0.13, 500), textDecoration: "none" }}>
           OPEN ANCHOR&nbsp; →
         </Link>
       </div>
@@ -380,15 +350,15 @@ function AnchorCard({ anchor, moderatedIds }: { anchor: ForumIndexAnchor; modera
 function QuestionList({ flat, moderatedIds, narrow }: { flat: FlatThread[]; moderatedIds: Set<string>; narrow: boolean }) {
   if (narrow) {
     return (
-      <div style={{ margin: "18px 22px 0", display: "flex", flexDirection: "column", gap: 1, background: C.surface }}>
+      <div style={{ margin: "18px 22px 0", display: "flex", flexDirection: "column", gap: 1, background: GROUND.BASE }}>
         {flat.map(({ thread: t, anchor: a }) => (
-          <Link key={t.id} to={`/field-intelligence/thread/${t.id}`} style={{ background: C.card, padding: "16px 18px", textDecoration: "none", display: "block" }}>
-            <p style={serif(14.5, C.ink, 1.42)}>{t.question_title}</p>
-            <div style={{ ...mono(9.5, C.goldDim, 0.11, 500), marginTop: 10, lineHeight: 1.5 }}>
+          <Link key={t.id} to={`/field-intelligence/thread/${t.id}`} style={{ background: GROUND.RAISE, padding: "16px 18px", textDecoration: "none", display: "block" }}>
+            <p style={serif(T.BODY, INK.PRIME, 1.42, 400)}>{t.question_title}</p>
+            <div style={{ ...mono(T.MICRO, GOLD.PRIME, 0.11, 500), marginTop: 10, lineHeight: 1.5 }}>
               {a.journal_abbrev} · {a.publication?.pub_year ?? "—"} · PMID {a.pubmed_id}
             </div>
             <div style={{ marginTop: 9, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={mono(9.5, C.faint, 0.12)}>{t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"} · {t.recency_label.toUpperCase()}</span>
+              <span style={mono(T.MICRO, INK.MUTE, 0.12, 400)}>{t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"} · {t.recency_label.toUpperCase()}</span>
               <Moderation t={t} moderated={moderatedIds.has(t.id)} />
             </div>
           </Link>
@@ -398,26 +368,26 @@ function QuestionList({ flat, moderatedIds, narrow }: { flat: FlatThread[]; mode
   }
   return (
     <div style={{ margin: "16px 40px 0" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 330px 132px", gap: 36, padding: "18px 26px 12px", ...mono(9.5, C.muted2, 0.16) }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 330px 132px", gap: 36, padding: "18px 26px 12px", ...mono(T.MICRO, INK.MUTE, 0.16, 400) }}>
         <span>QUESTION</span>
         <span>ANCHORED TO</span>
         <span style={{ textAlign: "right" }}>ACTIVITY · MODERATION</span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 1, background: C.surface }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, background: GROUND.BASE }}>
         {flat.map(({ thread: t, anchor: a }) => (
-          <div key={t.id} style={{ background: C.card, padding: "20px 26px", display: "grid", gridTemplateColumns: "1fr 330px 132px", gap: 36, alignItems: "center" }}>
+          <div key={t.id} style={{ background: GROUND.RAISE, padding: "20px 26px", display: "grid", gridTemplateColumns: "1fr 330px 132px", gap: 36, alignItems: "center" }}>
             <div style={{ minWidth: 0 }}>
-              <Link to={`/field-intelligence/thread/${t.id}`} style={{ ...serif(17, C.ink, 1.4), textDecoration: "none" }}>{t.question_title}</Link>
-              <div style={{ ...mono(10, C.faint, 0.12), marginTop: 9 }}>OPENED BY {t.author_handle} · {t.recency_label.toUpperCase()}</div>
+              <Link to={`/field-intelligence/thread/${t.id}`} style={{ ...serif(T.LEAD, INK.PRIME, 1.4, 400), textDecoration: "none" }}>{t.question_title}</Link>
+              <div style={{ ...mono(T.LABEL, INK.MUTE, 0.12, 400), marginTop: 9 }}>OPENED BY {t.author_handle} · {t.recency_label.toUpperCase()}</div>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={mono(10, C.goldDim, 0.12, 500)}>{a.journal_abbrev} · {a.publication?.pub_year ?? "—"} · PMID {a.pubmed_id}</div>
-              <p style={{ ...serif(13, C.ink4, 1.45), marginTop: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div style={mono(T.LABEL, GOLD.PRIME, 0.12, 500)}>{a.journal_abbrev} · {a.publication?.pub_year ?? "—"} · PMID {a.pubmed_id}</div>
+              <p style={{ ...serif(T.META, INK.MUTE, 1.45, 400), marginTop: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {a.publication?.title ?? ""}
               </p>
             </div>
             <div style={{ justifySelf: "end", textAlign: "right" }}>
-              <div style={mono(10.5, C.note, 0.12)}>{t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"}</div>
+              <div style={mono(T.LABEL, INK.LABEL, 0.12, 400)}>{t.reply_count} {t.reply_count === 1 ? "REPLY" : "REPLIES"}</div>
               <div style={{ marginTop: 9, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
                 <Moderation t={t} moderated={moderatedIds.has(t.id)} />
               </div>
@@ -434,15 +404,15 @@ function Ledger({ flat, moderatedIds, narrow }: { flat: FlatThread[]; moderatedI
   const pad = (n: number) => String(n).padStart(2, "0");
   if (narrow) {
     return (
-      <div style={{ margin: "14px 22px 0", display: "flex", flexDirection: "column", gap: 1, background: C.surface }}>
+      <div style={{ margin: "14px 22px 0", display: "flex", flexDirection: "column", gap: 1, background: GROUND.BASE }}>
         {flat.map(({ thread: t, anchor: a }, i) => (
-          <div key={t.id} style={{ background: C.card, padding: "14px 16px", display: "flex", gap: 14 }}>
-            <span style={{ ...mono(10, C.faint2, 0.06), flexShrink: 0, lineHeight: 1.5 }}>{pad(i + 1)}</span>
+          <div key={t.id} style={{ background: GROUND.RAISE, padding: "14px 16px", display: "flex", gap: 14 }}>
+            <span style={{ ...mono(T.LABEL, INK.MUTE, 0.06, 400), flexShrink: 0, lineHeight: 1.5 }}>{pad(i + 1)}</span>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <Link to={`/field-intelligence/thread/${t.id}`} style={{ ...serif(14, C.ink, 1.4), textDecoration: "none", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>{t.question_title}</Link>
-              <div style={{ ...mono(9, C.goldDim, 0.1, 500), marginTop: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.journal_abbrev} · PMID {a.pubmed_id}</div>
+              <Link to={`/field-intelligence/thread/${t.id}`} style={{ ...serif(T.BODY, INK.PRIME, 1.4, 400), textDecoration: "none", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>{t.question_title}</Link>
+              <div style={{ ...mono(T.MICRO, GOLD.PRIME, 0.1, 500), marginTop: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.journal_abbrev} · PMID {a.pubmed_id}</div>
               <div style={{ marginTop: 8, display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}>
-                <span style={mono(9, C.faint, 0.12)}>{t.reply_count} REPLIES · {t.recency_label.toUpperCase()}</span>
+                <span style={mono(T.MICRO, INK.MUTE, 0.12, 400)}>{t.reply_count} REPLIES · {t.recency_label.toUpperCase()}</span>
                 <Moderation t={t} moderated={moderatedIds.has(t.id)} />
               </div>
             </div>
@@ -454,13 +424,13 @@ function Ledger({ flat, moderatedIds, narrow }: { flat: FlatThread[]; moderatedI
   const GRID = "44px 1fr 300px 78px 108px 116px";
   return (
     <div style={{ margin: "18px 40px 0" }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 16, padding: "0 22px 10px", ...mono(9.5, C.muted2, 0.14) }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 16, padding: "0 22px 10px", ...mono(T.MICRO, INK.MUTE, 0.14, 400) }}>
         <span>MODERATION KEY</span>
-        <span style={{ color: C.gold }}>◇ UNDER REVIEW</span>
-        <span style={{ color: C.removed }}>× REMOVED</span>
-        <span style={{ color: C.note }}>† CONTEXT NOTE</span>
+        <span style={{ color: GOLD.PRIME }}>◇ UNDER REVIEW</span>
+        <span style={{ color: STATE.DANGER }}>× REMOVED</span>
+        <span style={{ color: INK.LABEL }}>† CONTEXT NOTE</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 24, padding: "0 22px 12px", ...mono(9.5, C.muted2, 0.16), lineHeight: 1.5, borderBottom: `1px solid ${C.borderSoft}` }}>
+      <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 24, padding: "0 22px 12px", ...mono(T.MICRO, INK.MUTE, 0.16, 400), lineHeight: 1.5, borderBottom: `1px solid ${LINE.HAIR}` }}>
         <span>#</span>
         <span>QUESTION</span>
         <span>ANCHOR</span>
@@ -468,28 +438,28 @@ function Ledger({ flat, moderatedIds, narrow }: { flat: FlatThread[]; moderatedI
         <span style={{ textAlign: "right" }}>LAST</span>
         <span style={{ textAlign: "right" }}>MODERATION</span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 1, background: C.surface, marginTop: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, background: GROUND.BASE, marginTop: 1 }}>
         {flat.map(({ thread: t, anchor: a }, i) => (
-          <div key={t.id} style={{ background: C.card, padding: "15px 22px", display: "grid", gridTemplateColumns: GRID, gap: 24, alignItems: "center" }}>
-            <span style={mono(11, C.muted2, 0.06)}>{pad(i + 1)}</span>
+          <div key={t.id} style={{ background: GROUND.RAISE, padding: "15px 22px", display: "grid", gridTemplateColumns: GRID, gap: 24, alignItems: "center" }}>
+            <span style={mono(T.LABEL, INK.MUTE, 0.06, 400)}>{pad(i + 1)}</span>
             <div style={{ minWidth: 0 }}>
-              <Link to={`/field-intelligence/thread/${t.id}`} style={{ ...serif(15.5, C.ink, 1.35), textDecoration: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{t.question_title}</Link>
-              <div style={{ ...mono(9.5, C.faint, 0.12), marginTop: 6 }}>{t.author_handle}</div>
+              <Link to={`/field-intelligence/thread/${t.id}`} style={{ ...serif(T.BODY, INK.PRIME, 1.35, 400), textDecoration: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{t.question_title}</Link>
+              <div style={{ ...mono(T.MICRO, INK.MUTE, 0.12, 400), marginTop: 6 }}>{t.author_handle}</div>
             </div>
-            <div style={{ minWidth: 0, ...mono(10, C.goldDim, 0.1), lineHeight: 1.55, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {a.journal_abbrev}<span style={{ color: C.faint }}> · PMID {a.pubmed_id}</span>
+            <div style={{ minWidth: 0, ...mono(T.LABEL, GOLD.PRIME, 0.1, 400), lineHeight: 1.55, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {a.journal_abbrev}<span style={{ color: INK.MUTE }}> · PMID {a.pubmed_id}</span>
             </div>
-            <span style={{ textAlign: "right", ...mono(11, C.note, 0) }}>{t.reply_count}</span>
-            <span style={{ textAlign: "right", ...mono(10, C.faint, 0.1) }}>{t.recency_label.toUpperCase()}</span>
+            <span style={{ textAlign: "right", ...mono(T.LABEL, INK.LABEL, 0, 400) }}>{t.reply_count}</span>
+            <span style={{ textAlign: "right", ...mono(T.LABEL, INK.MUTE, 0.1, 400) }}>{t.recency_label.toUpperCase()}</span>
             <div style={{ justifySelf: "end", display: "flex", gap: 5, justifyContent: "flex-end", alignItems: "center" }}>
               {moderatedIds.has(t.id) && t.under_review_count + t.removed_count + t.context_note_count > 0 ? (
                 <>
-                  {t.under_review_count > 0 && <span style={badgeStyle(C.urBorder, C.urBg, C.gold)}>◇ {t.under_review_count}</span>}
-                  {t.removed_count > 0 && <span style={badgeStyle(C.removedBorder, C.removedBg, C.removed)}>× {t.removed_count}</span>}
-                  {t.context_note_count > 0 && <span style={badgeStyle(C.noteBorder, "transparent", C.note)}>† {t.context_note_count}</span>}
+                  {t.under_review_count > 0 && <span style={badgeStyle(GOLD.EDGE, GOLD.WASH, GOLD.PRIME)}>◇ {t.under_review_count}</span>}
+                  {t.removed_count > 0 && <span style={badgeStyle(STATE.DANGER, GROUND.INSET, STATE.DANGER)}>× {t.removed_count}</span>}
+                  {t.context_note_count > 0 && <span style={badgeStyle(LINE.HAIR, "transparent", INK.LABEL)}>† {t.context_note_count}</span>}
                 </>
               ) : (
-                <span style={mono(10, C.faint2, 0)}>—</span>
+                <span style={mono(T.LABEL, INK.MUTE, 0, 400)}>—</span>
               )}
             </div>
           </div>
@@ -509,11 +479,11 @@ function EmptyState({ narrow, onBibliography }: { narrow: boolean; onBibliograph
   const stepsBlock = (
     <div style={{ marginTop: narrow ? 22 : 34 }}>
       {steps.map(([head, body], i) => (
-        <div key={head} style={{ display: "flex", gap: narrow ? 16 : 26, padding: narrow ? "14px 0" : "18px 0", borderTop: `1px solid ${C.borderSoft}`, borderBottom: i === 2 ? `1px solid ${C.borderSoft}` : undefined }}>
-          <span style={{ ...mono(narrow ? 10 : 11, C.goldDark, 0, 500), flexShrink: 0, width: narrow ? 20 : 26, lineHeight: 1.5 }}>{pad2(i + 1)}</span>
+        <div key={head} style={{ display: "flex", gap: narrow ? 16 : 26, padding: narrow ? "14px 0" : "18px 0", borderTop: `1px solid ${LINE.HAIR}`, borderBottom: i === 2 ? `1px solid ${LINE.HAIR}` : undefined }}>
+          <span style={{ ...mono(narrow ? 10 : 11, GOLD.MUTE, 0, 500), flexShrink: 0, width: narrow ? 20 : 26, lineHeight: 1.5 }}>{pad2(i + 1)}</span>
           <div>
-            <div style={mono(narrow ? 9.5 : 10.5, C.ink5, 0.16, 500)}>{head}</div>
-            <p style={{ ...serif(narrow ? 13 : 14, C.ink4, 1.55), marginTop: 7 }}>{body}</p>
+            <div style={mono(narrow ? 9.5 : 10.5, INK.BODY, 0.16, 500)}>{head}</div>
+            <p style={{ ...serif(narrow ? 13 : 14, INK.MUTE, 1.55, 400), marginTop: 7 }}>{body}</p>
           </div>
         </div>
       ))}
@@ -521,75 +491,75 @@ function EmptyState({ narrow, onBibliography }: { narrow: boolean; onBibliograph
   );
   if (narrow) {
     return (
-      <div style={{ margin: "20px 22px 0", background: C.card, padding: "24px 20px" }}>
+      <div style={{ margin: "20px 22px 0", background: GROUND.RAISE, padding: "24px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 2, height: 11, background: C.gold }} />
-          <span style={mono(9.5, C.gold, 0.17, 500)}>NO THREADS OPEN</span>
+          <div style={{ width: 2, height: 11, background: GOLD.PRIME }} />
+          <span style={mono(T.MICRO, GOLD.PRIME, 0.17, 500)}>NO THREADS OPEN</span>
         </div>
-        <h2 style={{ ...serif(25, C.ink, 1.22), marginTop: 16 }}>No one has anchored a question yet.</h2>
-        <p style={{ ...serif(14, C.ink3, 1.6), marginTop: 13 }}>
+        <h2 style={{ ...serif(T.TITLE, INK.PRIME, 1.22, 400), marginTop: 16 }}>No one has anchored a question yet.</h2>
+        <p style={{ ...serif(T.BODY, INK.LABEL, 1.6, 400), marginTop: 13 }}>
           This is where verified MSLs discuss what a published paper reports — one thread per question, tied to the paper it came from.
         </p>
         {stepsBlock}
-        <button type="button" onClick={onBibliography} style={{ marginTop: 20, display: "block", width: "100%", textAlign: "center", padding: "13px 16px", border: "1px solid #3a3227", background: C.urBg, ...mono(10, C.gold, 0.16, 500), cursor: "pointer" }}>
+        <button type="button" onClick={onBibliography} style={{ marginTop: 20, display: "block", width: "100%", textAlign: "center", padding: "13px 16px", border: `1px solid ${GOLD.EDGE}`, background: GOLD.WASH, ...mono(T.LABEL, GOLD.PRIME, 0.16, 500), cursor: "pointer" }}>
           OPEN THE BIBLIOGRAPHY&nbsp; →
         </button>
       </div>
     );
   }
   return (
-    <div style={{ margin: "16px 40px 0", display: "grid", gridTemplateColumns: "1fr 440px", gap: 1, background: C.surface }}>
-      <div style={{ background: C.card, padding: "44px 48px 40px" }}>
+    <div style={{ margin: "16px 40px 0", display: "grid", gridTemplateColumns: "1fr 440px", gap: 1, background: GROUND.BASE }}>
+      <div style={{ background: GROUND.RAISE, padding: "44px 48px 40px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-          <div style={{ width: 2, height: 11, background: C.gold }} />
-          <span style={mono(10.5, C.gold, 0.18, 500)}>NO THREADS OPEN</span>
+          <div style={{ width: 2, height: 11, background: GOLD.PRIME }} />
+          <span style={mono(T.LABEL, GOLD.PRIME, 0.18, 500)}>NO THREADS OPEN</span>
         </div>
-        <h2 style={{ ...serif(34, C.ink, 1.2), marginTop: 22, letterSpacing: "-0.01em", maxWidth: 520 }}>No one has anchored a question yet.</h2>
-        <p style={{ ...serif(15.5, C.ink3, 1.62), marginTop: 16, maxWidth: 560 }}>
+        <h2 style={{ ...serif(34, INK.PRIME, 1.2, 400), marginTop: 22, letterSpacing: "-0.01em", maxWidth: 520 }}>No one has anchored a question yet.</h2>
+        <p style={{ ...serif(T.BODY, INK.LABEL, 1.62, 400), marginTop: 16, maxWidth: 560 }}>
           This is where verified MSLs discuss what a published paper reports — one thread per question, each one tied to the paper it came from. The room is open. It fills the moment someone picks an anchor.
         </p>
         {stepsBlock}
-        <button type="button" onClick={onBibliography} style={{ marginTop: 28, display: "inline-block", padding: "13px 20px", border: "1px solid #3a3227", background: C.urBg, ...mono(11, C.gold, 0.17, 500), cursor: "pointer" }}>
+        <button type="button" onClick={onBibliography} style={{ marginTop: 28, display: "inline-block", padding: "13px 20px", border: `1px solid ${GOLD.EDGE}`, background: GOLD.WASH, ...mono(T.LABEL, GOLD.PRIME, 0.17, 500), cursor: "pointer" }}>
           OPEN THE BIBLIOGRAPHY&nbsp; →
         </button>
-        <div style={{ marginTop: 34, paddingTop: 20, borderTop: `1px solid ${C.borderSoft}`, display: "flex", gap: 26, alignItems: "flex-start" }}>
+        <div style={{ marginTop: 34, paddingTop: 20, borderTop: `1px solid ${LINE.HAIR}`, display: "flex", gap: 26, alignItems: "flex-start" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0, paddingTop: 1 }}>
-            <div style={{ width: 2, height: 11, background: C.goldDark }} />
-            <span style={mono(10, C.goldDim, 0.16, 500)}>ANCHOR REQUIRED</span>
+            <div style={{ width: 2, height: 11, background: GOLD.MUTE }} />
+            <span style={mono(T.LABEL, GOLD.PRIME, 0.16, 500)}>ANCHOR REQUIRED</span>
           </div>
-          <p style={serif(13.5, C.ink4, 1.6)}>
+          <p style={serif(T.META, INK.MUTE, 1.6, 400)}>
             Topic discussion only — no HCP names in posts, no product claims, no discussion of unapproved use. Replies are scoped to what the anchored paper reports. Moderation states are shown on the thread, not hidden.
           </p>
         </div>
       </div>
-      <div style={{ background: C.card, padding: "44px 40px 40px" }}>
-        <div style={mono(10, C.muted, 0.18, 500)}>ILLUSTRATION · NOT A REAL THREAD</div>
-        <p style={{ ...serif(13.5, C.ink4, 1.55), marginTop: 14 }}>
+      <div style={{ background: GROUND.RAISE, padding: "44px 40px 40px" }}>
+        <div style={mono(T.LABEL, INK.MUTE, 0.18, 500)}>ILLUSTRATION · NOT A REAL THREAD</div>
+        <p style={{ ...serif(T.META, INK.MUTE, 1.55, 400), marginTop: 14 }}>
           What one thread looks like once it exists. The anchor sits above the question; moderation states are shown in place.
         </p>
-        <div style={{ marginTop: 24, padding: "24px 26px", background: C.cardDark, opacity: 0.55 }}>
+        <div style={{ marginTop: 24, padding: "24px 26px", background: GROUND.BASE, opacity: 0.55 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <span style={mono(10.5, C.goldDim, 0.13, 500)}>NEJM · 2025</span>
-            <span style={mono(10.5, C.faint, 0.1)}>PMID 40454646</span>
+            <span style={mono(T.LABEL, GOLD.PRIME, 0.13, 500)}>NEJM · 2025</span>
+            <span style={mono(T.LABEL, INK.MUTE, 0.1, 400)}>PMID 40454646</span>
           </div>
-          <h3 style={{ ...serif(19, C.ink5, 1.34, 600), marginTop: 14, height: 51, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <h3 style={{ ...serif(T.SUB, INK.BODY, 1.34, 600), marginTop: 14, height: 51, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" }}>
             Tarlatamab in Small-Cell Lung Cancer after Platinum-Based Chemotherapy.
           </h3>
-          <div style={{ marginTop: 12, display: "flex", gap: 18, ...mono(10.5, C.faint, 0.11) }}>
+          <div style={{ marginTop: 12, display: "flex", gap: 18, ...mono(T.LABEL, INK.MUTE, 0.11, 400) }}>
             <span>153 CITATIONS</span>
             <span>0 THREADS</span>
           </div>
-          <div style={{ height: 1, background: C.borderSoft, marginTop: 18 }} />
-          <p style={{ ...serif(15, C.muted, 1.45), marginTop: 16, fontStyle: "italic" }}>A question scoped to what this paper reports would appear here.</p>
+          <div style={{ height: 1, background: LINE.HAIR, marginTop: 18 }} />
+          <p style={{ ...serif(T.BODY, INK.MUTE, 1.45, 400), marginTop: 16, fontStyle: "italic" }}>A question scoped to what this paper reports would appear here.</p>
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span style={badgeStyle(C.urBorder, C.urBg, C.gold)}>◇ UNDER REVIEW</span>
-            <span style={badgeStyle(C.removedBorder, C.removedBg, C.removed)}>× REMOVED</span>
-            <span style={badgeStyle(C.noteBorder, "transparent", C.note)}>† CONTEXT NOTE</span>
+            <span style={badgeStyle(GOLD.EDGE, GOLD.WASH, GOLD.PRIME)}>◇ UNDER REVIEW</span>
+            <span style={badgeStyle(STATE.DANGER, GROUND.INSET, STATE.DANGER)}>× REMOVED</span>
+            <span style={badgeStyle(LINE.HAIR, "transparent", INK.LABEL)}>† CONTEXT NOTE</span>
           </div>
         </div>
-        <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.borderSoft}` }}>
-          <div style={mono(10, C.muted2, 0.16)}>MODERATION IS VISIBLE BY DESIGN</div>
-          <p style={{ ...serif(13, C.muted, 1.6), marginTop: 11 }}>
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${LINE.HAIR}` }}>
+          <div style={mono(T.LABEL, INK.MUTE, 0.16, 400)}>MODERATION IS VISIBLE BY DESIGN</div>
+          <p style={{ ...serif(T.META, INK.MUTE, 1.6, 400), marginTop: 11 }}>
             Threads under review stay listed. Removed posts leave a record in place of the post. Context notes are attached, not substituted.
           </p>
         </div>
@@ -615,6 +585,34 @@ export default function ForumIndexPage() {
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState<"pub" | "question">("pub");
 
+  // ── DEFERRED (2026-08-15): error state, drafted and held ────────────────────
+  // `idx.error` is discarded here. On a failed query the page falls through to
+  // `empty` and the Masthead draws "0 THREADS · 0 REPLIES · FORUM STATUS: OPEN"
+  // — three affirmative claims, all false, the last one in gold (this surface's
+  // live/active colour). That is a count standing in for a fact, not an absence.
+  //
+  // NOT FIXED YET ON PURPOSE: the forum is a prototype on simulated data, so the
+  // failure path is not reachable by a real user. Implement this when the forum
+  // takes real contributions. The copy is settled — it must NOT reuse the empty
+  // state's vocabulary ("NO THREADS OPEN" / "No one has anchored a question
+  // yet.") and must NOT display a number anywhere in the branch:
+  //
+  //   branch      !loaded -> LOADING / failed -> error / else the board
+  //   Masthead    stats={[]}  (stats.map over [] is already safe)
+  //   subtitle    "The forum could not be reached. What follows is a connection
+  //                failure, not a reading of the board."
+  //   kicker      FORUM DID NOT LOAD          (neutral ink, NOT gold: gold means
+  //                                            live here; NOT STATE.DANGER: that
+  //                                            means a moderation action)
+  //   headline    "We could not reach the forum."
+  //   body        "This is a failure to load, not a count. We are not telling
+  //                you the forum is empty — we are telling you we could not read
+  //                it. No thread has been closed and nothing has been removed."
+  //
+  // SECOND, SMALLER GAP, also deferred: getModeratedThreadIds() swallows its own
+  // error and returns an empty Set (lib/fieldIntelligence.ts). Moderation badges
+  // then silently vanish board-wide and every thread draws the "NO MODERATION ON
+  // THIS THREAD" line — an absence claim the data cannot support.
   useEffect(() => {
     let cancelled = false;
     Promise.all([getForumIndex(), getModeratedThreadIds()]).then(([idx, mod]) => {
@@ -681,14 +679,32 @@ export default function ForumIndexPage() {
 
   return (
     <AppLayout width="wide">
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink, margin: "8px 0 24px", fontFamily: SERIF, overflow: "hidden", paddingBottom: narrow ? 24 : 0 }}>
-        <DisclosureBand narrow={narrow} tail={empty ? "APPLIES WHETHER OR NOT THREADS EXIST" : "APPLIES TO EVERY THREAD BELOW"} />
-
+      <div style={{ ...DEPTH.PANEL, border: `1px solid ${LINE.HAIR}`, color: INK.PRIME, margin: "8px 0 24px", fontFamily: FACE.value, overflow: "hidden", paddingBottom: narrow ? 24 : 0 }}>
+        {/* The band is PERMANENT, so the loading branch keeps its own copy — it
+            must not vanish while the board resolves. Once loaded it renders
+            inside the hero's `above` slot. */}
         {!loaded ? (
-          <div style={{ padding: narrow ? "40px 22px" : "60px 40px", ...mono(11, C.muted, 0.14) }}>LOADING FORUM…</div>
+          <>
+            <DisclosureBand narrow={narrow} tail={empty ? "APPLIES WHETHER OR NOT THREADS EXIST" : "APPLIES TO EVERY THREAD BELOW"} />
+            <div style={{ padding: narrow ? "40px 22px" : "60px 40px", ...mono(T.LABEL, INK.MUTE, 0.14, 400) }}>LOADING FORUM…</div>
+          </>
         ) : (
           <>
+            {/* NO EYEBROW AT ALL (2026-08-16). The format is TA · AREA and this
+                surface has neither to name: getForumIndex() joins
+                field_intel_anchors to publications_v2 with no therapeutic-area
+                predicate. That gap is logged in full at
+                lib/fieldIntelligence.ts:110 ("ARCHITECTURAL GAP, LOGGED
+                2026-08-15 — NO TA SCOPE"), with a real instance: a Hepatology
+                MASH paper led a lung-cancer board on citation count.
+                The previous answer was to hold the scope segment ("FI") alone
+                and wait for the predicate. With the scope segment retired
+                platform-wide there is nothing true left to put here, so the
+                surface passes no eyebrow — legal under the contract, which
+                makes it optional. PASS "`${ta} · Oncology`" when, and only
+                when, getForumIndex gains that predicate. */}
             <Masthead
+              band={<DisclosureBand narrow={narrow} tail={empty ? "APPLIES WHETHER OR NOT THREADS EXIST" : "APPLIES TO EVERY THREAD BELOW"} />}
               narrow={narrow}
               subtitle={empty ? "Every thread is anchored to a published paper. A thread cannot be opened without one — the anchor defines the scope of what is on topic, and what is not." : subtitle}
               stats={
@@ -704,7 +720,7 @@ export default function ForumIndexPage() {
 
             {empty ? (
               <>
-                <ViewToggle view={view} onView={setView} narrow={narrow} right={<span style={mono(10, C.faint, 0.15)}>BOTH VIEWS EMPTY UNTIL THE FIRST THREAD IS ANCHORED</span>} />
+                <ViewToggle view={view} onView={setView} narrow={narrow} right={<span style={mono(T.LABEL, INK.MUTE, 0.15, 400)}>BOTH VIEWS EMPTY UNTIL THE FIRST THREAD IS ANCHORED</span>} />
                 <EmptyState narrow={narrow} onBibliography={openBibliography} />
               </>
             ) : (
@@ -719,11 +735,11 @@ export default function ForumIndexPage() {
                   narrow={narrow}
                   right={
                     view === "question" ? (
-                      <span style={mono(10, C.faint, 0.15)}>ANCHOR SHOWN PER THREAD · MOST RECENT FIRST</span>
+                      <span style={mono(T.LABEL, INK.MUTE, 0.15, 400)}>ANCHOR SHOWN PER THREAD · MOST RECENT FIRST</span>
                     ) : atScale ? (
-                      <span style={mono(10, C.faint, 0.15)}>LEDGER · SORTED BY LAST ACTIVITY</span>
+                      <span style={mono(T.LABEL, INK.MUTE, 0.15, 400)}>LEDGER · SORTED BY LAST ACTIVITY</span>
                     ) : (
-                      <span style={mono(10, C.faint, 0.15)}>{counts.anchors} ANCHORS · MOST RECENT ACTIVITY FIRST</span>
+                      <span style={mono(T.LABEL, INK.MUTE, 0.15, 400)}>{counts.anchors} ANCHORS · MOST RECENT ACTIVITY FIRST</span>
                     )
                   }
                 />
@@ -736,7 +752,7 @@ export default function ForumIndexPage() {
                   // minmax(0,·): a bare 1fr track floors at the card's min-content —
                   // the clamped anchor title reports full one-line width and pushed
                   // the whole column past the phone viewport (2026-08-10)
-                  <div style={{ margin: narrow ? "16px 22px 0" : "16px 40px 0", display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "repeat(2, minmax(0,1fr))", gap: 1, background: C.surface }}>
+                  <div style={{ margin: narrow ? "16px 22px 0" : "16px 40px 0", display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "repeat(2, minmax(0,1fr))", gap: 16 }}>
                     {orderedAnchors.map((a) => (
                       <AnchorCard key={a.id} anchor={a} moderatedIds={moderatedIds} />
                     ))}
@@ -745,16 +761,16 @@ export default function ForumIndexPage() {
 
                 {/* By question keeps the anchor-required constraint below the list. */}
                 {view === "question" && (
-                  <div style={{ margin: narrow ? "20px 22px 0" : "34px 40px 0", background: C.card, padding: narrow ? "16px 18px" : "18px 26px", display: "flex", alignItems: "center", gap: 26, flexWrap: "wrap" }}>
+                  <div style={{ margin: narrow ? "20px 22px 0" : "34px 40px 0", background: GROUND.RAISE, padding: narrow ? "16px 18px" : "18px 26px", display: "flex", alignItems: "center", gap: 26, flexWrap: "wrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0 }}>
-                      <div style={{ width: 2, height: 11, background: C.gold }} />
-                      <span style={mono(10, C.gold, 0.16, 500)}>ANCHOR REQUIRED</span>
+                      <div style={{ width: 2, height: 11, background: GOLD.PRIME }} />
+                      <span style={mono(T.LABEL, GOLD.PRIME, 0.16, 500)}>ANCHOR REQUIRED</span>
                     </div>
-                    <p style={{ ...serif(13.5, C.ink3, 1.55), flex: 1, minWidth: 240 }}>
+                    <p style={{ ...serif(T.META, INK.LABEL, 1.55, 400), flex: 1, minWidth: 240 }}>
                       Grouping by question does not loosen scope. Topic discussion only — no HCP names in posts, no product claims, no discussion of unapproved use. Replies stay scoped to what the anchored paper reports.
                     </p>
                     {!narrow && (
-                      <button type="button" onClick={openBibliography} style={{ marginLeft: "auto", flexShrink: 0, padding: "10px 16px", border: "1px solid #3a3227", background: C.urBg, ...mono(10, C.gold, 0.16, 500), cursor: "pointer" }}>
+                      <button type="button" onClick={openBibliography} style={{ marginLeft: "auto", flexShrink: 0, padding: "10px 16px", border: `1px solid ${GOLD.EDGE}`, background: GOLD.WASH, ...mono(T.LABEL, GOLD.PRIME, 0.16, 500), cursor: "pointer" }}>
                         OPEN THE BIBLIOGRAPHY&nbsp; →
                       </button>
                     )}

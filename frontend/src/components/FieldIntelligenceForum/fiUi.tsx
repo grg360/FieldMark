@@ -1,24 +1,50 @@
 // Field Intelligence Forum — shared UI kit. Design-token only; the five new
 // patterns (frame 6) reuse the existing palette. Red appears only for removal,
-// at the same chroma as amber and indigo (COLOR.danger). Every write affordance
+// at the same chroma as amber and indigo (STATE.DANGER). Every write affordance
 // here is inert: DisabledControl renders the control visibly disabled — never
 // hidden — with no "coming soon" badge (messaged separately).
 
 import type { CSSProperties, ReactNode } from "react";
-import { COLOR, FONT, GOLD, COOL, LINE } from "../../lib/designTokens";
+import { GROUND, LINE, INK, GOLD, MARK, STATE, FACE, T } from "../../lib/canonicalTokens";
 import type { ComplianceState } from "../../lib/fieldIntelligence";
 
-export const mono = (size: number, color: string = COLOR.ink3): CSSProperties => ({
-  fontFamily: FONT.mono,
+// THE forum's two type helpers. Consolidated here 2026-08-15 from three mono()
+// and two serif() definitions (ForumIndexPage, fiUi, DiscussAffordance) that had
+// drifted apart. ForumIndexPage's 4-parameter shape is the superset and wins.
+//
+// TWO DEFAULTS THAT HAD TO BE RECONCILED CAREFULLY:
+//   ls     ForumIndexPage defaulted 0.14, fiUi hard-coded 0.04. Safe to settle on
+//          0.04 because every ForumIndexPage call passes ls EXPLICITLY (verified:
+//          all 60 sites are 3- or 4-arg), so its default was never exercised.
+//   weight ForumIndexPage defaulted 400; fiUi emitted none, letting weight
+//          inherit. Those are not interchangeable — ThreadPage, ModerationPage
+//          and fiUi have 15 bold containers a nested label could inherit from.
+//          So weight is emitted ONLY when passed, and ForumIndexPage's calls that
+//          relied on its 400 default now pass 400 explicitly. Output is identical
+//          at all 98 call sites.
+export const mono = (
+  size: number,
+  color: string = INK.LABEL,
+  ls = 0.04,
+  weight?: number,
+): CSSProperties => ({
+  fontFamily: FACE.data,
   fontSize: size,
   color,
-  letterSpacing: "0.04em",
+  letterSpacing: `${ls}em`,
+  ...(weight === undefined ? {} : { fontWeight: weight }),
 });
-export const serif = (size: number, color: string = COLOR.ink2): CSSProperties => ({
-  fontFamily: FONT.serif,
+export const serif = (
+  size: number,
+  color: string = INK.BODY,
+  lh = 1.6,
+  weight?: number,
+): CSSProperties => ({
+  fontFamily: FACE.value,
   fontSize: size,
   color,
-  lineHeight: 1.6,
+  lineHeight: lh,
+  ...(weight === undefined ? {} : { fontWeight: weight }),
 });
 
 // Compliance-state palette — one chip per post, never a bare color.
@@ -30,10 +56,14 @@ export const STATE_STYLE: Record<
   ComplianceState,
   { fg: string; bg: string; border: string; label: string }
 > = {
-  on_anchor: { fg: "#7fb094", bg: "rgba(95,169,126,0.08)", border: "rgba(95,169,126,0.24)", label: "ON ANCHOR" },
-  under_review: { fg: COLOR.amber, bg: "rgba(232,160,32,0.10)", border: "rgba(232,160,32,0.32)", label: "UNDER REVIEW" },
-  context_note: { fg: COOL.chromeStrong, bg: "rgba(255,255,255,0.04)", border: LINE.l2, label: "CONTEXT NOTE" },
-  removed: { fg: COLOR.danger, bg: "rgba(232,112,78,0.10)", border: "rgba(232,112,78,0.30)", label: "REMOVED" },
+  on_anchor: { fg: MARK.EST, bg: MARK.EST_WASH, border: MARK.EST, label: "ON ANCHOR" },
+  under_review: { fg: GOLD.PRIME, bg: GOLD.WASH, border: GOLD.EDGE, label: "UNDER REVIEW" },
+  context_note: { fg: INK.LABEL, bg: GROUND.INSET, border: LINE.EDGE, label: "CONTEXT NOTE" },
+  // REMOVED takes STATE.DANGER: a moderation removal is the destructive-action
+  // semantic, which is what DANGER carries. Canonical has no danger WASH, and the
+  // rule is not to mint one-off alphas, so the fill is GROUND.INSET and the red
+  // is carried by the mark and its border.
+  removed: { fg: STATE.DANGER, bg: GROUND.INSET, border: STATE.DANGER, label: "REMOVED" },
 };
 
 // SIMULATION MARKER (pattern 05). Dashed amber outline, mono, per post — dashed
@@ -43,11 +73,11 @@ export function SimulatedChip({ size = 9 }: { size?: number }) {
   return (
     <span
       style={{
-        ...mono(size, GOLD.gold),
+        ...mono(size, GOLD.PRIME),
         letterSpacing: "0.12em",
         fontWeight: 600,
-        background: "rgba(232,160,32,0.06)",
-        border: "1px dashed rgba(232,160,32,0.42)",
+        background: GOLD.WASH,
+        border: `1px dashed ${GOLD.EDGE}`,
         padding: "2px 6px",
         whiteSpace: "nowrap",
       }}
@@ -67,11 +97,11 @@ export function ProvenanceChip({ seed, size = 9 }: { seed: boolean; size?: numbe
     return (
       <span
         style={{
-          ...mono(size, GOLD.gold),
+          ...mono(size, GOLD.PRIME),
           letterSpacing: "0.12em",
           fontWeight: 600,
-          background: "rgba(232,160,32,0.06)",
-          border: "1px dashed rgba(232,160,32,0.42)",
+          background: GOLD.WASH,
+          border: `1px dashed ${GOLD.EDGE}`,
           padding: "2px 6px",
           whiteSpace: "nowrap",
         }}
@@ -83,11 +113,11 @@ export function ProvenanceChip({ seed, size = 9 }: { seed: boolean; size?: numbe
   return (
     <span
       style={{
-        ...mono(size, "#7fb094"),
+        ...mono(size, MARK.EST),
         letterSpacing: "0.12em",
         fontWeight: 600,
-        background: "rgba(95,169,126,0.08)",
-        border: "1px solid rgba(95,169,126,0.30)",
+        background: MARK.EST_WASH,
+        border: `1px solid ${MARK.EST}`,
         padding: "2px 6px",
         whiteSpace: "nowrap",
       }}
@@ -107,26 +137,26 @@ export function PrototypeStrip() {
         alignItems: "center",
         gap: 14,
         padding: "9px 16px",
-        background: "rgba(232,160,32,0.07)",
-        border: "1px solid rgba(232,160,32,0.22)",
+        background: GOLD.WASH,
+        border: `1px solid ${GOLD.EDGE}`,
         borderRadius: 6,
         flexWrap: "wrap",
       }}
     >
       <span
         style={{
-          ...mono(10, COLOR.amber),
+          ...mono(T.LABEL, GOLD.PRIME),
           letterSpacing: "0.16em",
           fontWeight: 600,
-          border: "1px solid rgba(232,160,32,0.45)",
+          border: `1px solid ${GOLD.EDGE}`,
           padding: "3px 7px",
         }}
       >
         ILLUSTRATIVE PROTOTYPE
       </span>
-      <span style={{ fontSize: 12.5, color: COLOR.ink3, lineHeight: 1.5 }}>
+      <span style={{ fontSize: T.META, color: INK.LABEL, lineHeight: 1.5 }}>
         Publications, journals and PMIDs are real.{" "}
-        <strong style={{ color: COLOR.ink1, fontWeight: 500 }}>
+        <strong style={{ color: INK.PRIME, fontWeight: 500 }}>
           Every post, handle and moderation record below is fabricated
         </strong>{" "}
         for compliance review. No real individual is represented or quoted.
@@ -148,7 +178,7 @@ export function ComplianceChip({
   return (
     <span
       style={{
-        ...mono(9, s.fg),
+        ...mono(T.MICRO, s.fg),
         letterSpacing: "0.1em",
         fontWeight: 600,
         background: s.bg,
@@ -168,9 +198,9 @@ export function VerifiedBadge({ small = false }: { small?: boolean }) {
   return (
     <span
       style={{
-        ...mono(small ? 9 : 9.5, COOL.chromeStrong),
+        ...mono(small ? 9 : 9.5, INK.LABEL),
         letterSpacing: "0.1em",
-        border: `1px solid ${LINE.l2}`,
+        border: `1px solid ${LINE.EDGE}`,
         padding: small ? "1px 5px" : "2px 6px",
         whiteSpace: "nowrap",
       }}
@@ -192,7 +222,7 @@ export function DisabledControl({
   title?: string;
 }) {
   const base: CSSProperties = {
-    ...mono(10.5, COLOR.ink4),
+    ...mono(T.LABEL, INK.MUTE),
     letterSpacing: "0.08em",
     padding: "8px 14px",
     borderRadius: 4,
@@ -208,9 +238,9 @@ export function DisabledControl({
   // (it was the platform's last filled button) and indigo folds to the gold
   // outline. Variant names kept so call sites stay untouched.
   const variants: Record<string, CSSProperties> = {
-    ghost: { border: `1px solid ${LINE.l2}`, background: "transparent", color: COOL.prose },
-    primary: { border: `1px solid ${GOLD.dim}`, background: "transparent", color: GOLD.gold },
-    "solid-amber": { border: `1px solid ${GOLD.dim}`, background: "transparent", color: GOLD.gold },
+    ghost: { border: `1px solid ${LINE.EDGE}`, background: "transparent", color: INK.BODY },
+    primary: { border: `1px solid ${GOLD.MUTE}`, background: "transparent", color: GOLD.PRIME },
+    "solid-amber": { border: `1px solid ${GOLD.MUTE}`, background: "transparent", color: GOLD.PRIME },
   };
   return (
     <span aria-disabled="true" role="button" title={title} style={{ ...base, ...variants[variant] }}>
@@ -228,11 +258,11 @@ export function HandleAvatar({ handle, size = 26 }: { handle: string; size?: num
         width: size,
         height: size,
         borderRadius: "50%",
-        background: LINE.l1,
+        background: LINE.HAIR,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        ...mono(size * 0.42, COLOR.ink2),
+        ...mono(size * 0.42, INK.BODY),
         flexShrink: 0,
       }}
     >

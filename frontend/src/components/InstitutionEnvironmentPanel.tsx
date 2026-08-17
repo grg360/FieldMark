@@ -1,6 +1,6 @@
 // Institutional Environment — four displayed signals (frame: Institutional
 // Environment.dc.html, project 805df654, built 2026-08-10). Register: the
-// institution surface's own tokens (C twins), FONT.mono/serif, C.amber gold —
+// institution surface's own tokens (C twins), FACE.data/serif, C.amber gold —
 // the frame's green-tinted palette is NOT imported. Tile order is the ruled
 // priority: TRIAL DENSITY (anchor) → KOL CONCENTRATION → GUIDELINE-AUTHOR
 // DENSITY → FEDERAL RESEARCH FOOTPRINT (texture). None of the four feeds any
@@ -18,23 +18,23 @@
 // never "0 of N", never an empty tile. Same tile, same caption, same position.
 import { useEffect, useState } from "react";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT, GOLD } from "../lib/designTokens";
+import { CANON, FACE } from "../lib/canonicalTokens";
 import { getInstitutionEnvironment, type InstitutionEnvironment } from "../lib/institutionEnvironment";
 
 // Twins of InstitutionRoute's C tokens (sibling panels each carry their own).
 const C = {
-  bg: "#0a0a0b",
-  bandBg: "#0e0e11",
-  hairStrong: "#1e1e21",
-  ink1: "#e6e3dc",
-  ink3: "#8b887f",
-  ink4: "#6a6862",
-  ink5: "#575651",
-  amber: GOLD.bright,
+  bg: CANON.GROUND.BASE,
+  bandBg: CANON.GROUND.RAISE,
+  hairStrong: CANON.LINE.EDGE,
+  ink1: CANON.INK.PRIME,
+  ink3: CANON.INK.LABEL,
+  ink4: CANON.INK.MUTE,
+  ink5: CANON.INK.MUTE,
+  amber: CANON.GOLD.PRIME,
 };
 
 const mono = (size: number, opts?: { ls?: string; color?: string; weight?: number; lh?: number }) => ({
-  fontFamily: FONT.mono,
+  fontFamily: FACE.data,
   fontSize: size,
   fontWeight: opts?.weight ?? 400,
   letterSpacing: opts?.ls ?? "0.1em",
@@ -50,7 +50,7 @@ const caption = {
 function BigStat({ value, label }: { value: number; label: string }) {
   return (
     <div>
-      <div style={{ fontFamily: FONT.serif, fontSize: 52, lineHeight: 0.9, fontWeight: 400, color: C.ink1, letterSpacing: "-0.01em" }}>{value}</div>
+      <div style={{ fontFamily: FACE.value, fontSize: 44, lineHeight: 0.9, fontWeight: 400, color: C.ink1, letterSpacing: "-0.01em" }}>{value}</div>
       <div style={{ marginTop: 9, ...mono(9, { ls: "0.16em", color: C.ink3 }), textTransform: "uppercase" }}>{label}</div>
     </div>
   );
@@ -61,15 +61,15 @@ const vRule = { width: 1, alignSelf: "stretch" as const, background: C.hairStron
 function TileHead({ title, tag, tagColor }: { title: string; tag: string; tagColor: string }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
-      <div style={{ ...mono(10, { ls: "0.18em", color: C.ink1, weight: 500 }), textTransform: "uppercase" }}>{title}</div>
-      <div style={{ ...mono(8, { ls: "0.18em", color: tagColor }), textTransform: "uppercase" }}>{tag}</div>
+      <div style={{ ...mono(11, { ls: "0.18em", color: C.ink1, weight: 500 }), textTransform: "uppercase" }}>{title}</div>
+      <div style={{ ...mono(9, { ls: "0.18em", color: tagColor }), textTransform: "uppercase" }}>{tag}</div>
     </div>
   );
 }
 
 function Unavailable() {
   // a failed read says so — it never renders as a zero
-  return <div style={{ ...mono(10, { ls: "0.13em", color: C.ink4 }), textTransform: "uppercase" }}>Signal unavailable — read failed.</div>;
+  return <div style={{ ...mono(11, { ls: "0.13em", color: C.ink4 }), textTransform: "uppercase" }}>Signal unavailable — read failed.</div>;
 }
 
 export default function InstitutionEnvironmentPanel({
@@ -98,12 +98,12 @@ export default function InstitutionEnvironmentPanel({
       {/* group header */}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: "6px 24px", paddingBottom: 10, borderBottom: `1px solid ${C.hairStrong}` }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10, textTransform: "uppercase" }}>
-          <span style={mono(10, { ls: "0.14em", color: C.ink5 })}>|</span>
-          <span style={mono(10, { ls: "0.14em", color: C.ink1, weight: 500 })}>Institutional Environment</span>
-          <span style={mono(10, { color: C.ink5 })}>·</span>
-          <span style={mono(10, { ls: "0.14em", color: C.ink3 })}>Four signals</span>
-          <span style={mono(10, { color: C.ink5 })}>·</span>
-          <span style={mono(10, { ls: "0.14em", color: C.ink3 })}>None ranks this institution</span>
+          <span style={mono(11, { ls: "0.14em", color: C.ink5 })}>|</span>
+          <span style={mono(11, { ls: "0.14em", color: C.ink1, weight: 500 })}>Institutional Environment</span>
+          <span style={mono(11, { color: C.ink5 })}>·</span>
+          <span style={mono(11, { ls: "0.14em", color: C.ink3 })}>Four signals</span>
+          <span style={mono(11, { color: C.ink5 })}>·</span>
+          <span style={mono(11, { ls: "0.14em", color: C.ink3 })}>None ranks this institution</span>
         </div>
         <span style={{ ...mono(9, { ls: "0.16em", color: C.ink5 }), textTransform: "uppercase", whiteSpace: "nowrap" }}>Displayed, not ranked</span>
       </div>
@@ -116,11 +116,11 @@ export default function InstitutionEnvironmentPanel({
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 2, background: C.amber, opacity: 0.85 }} />
             <TileHead title="Trial Density" tag="Anchor" tagColor={C.amber} />
             {env === undefined ? (
-              <div style={{ ...mono(9.5, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase" }}>Reading linked investigators…</div>
+              <div style={{ ...mono(9, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase" }}>Reading linked investigators…</div>
             ) : env === null || env.trials == null ? (
               <Unavailable />
             ) : env.trials.openTrialInvestigators === 0 ? (
-              <div style={{ fontFamily: FONT.serif, fontSize: 19, lineHeight: 1.5, color: C.ink3, maxWidth: "44ch" }}>
+              <div style={{ fontFamily: FACE.value, fontSize: 20, lineHeight: 1.5, color: C.ink3, maxWidth: "44ch" }}>
                 No open-trial investigators on record among linked HCPs.
               </div>
             ) : (
@@ -147,7 +147,7 @@ export default function InstitutionEnvironmentPanel({
               <div style={{ paddingBottom: 2 }}>
                 <div style={{ ...mono(9, { ls: "0.16em", color: C.ink3 }), textTransform: "uppercase", marginBottom: 7 }}>Best US rank</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
-                  <span style={{ fontFamily: FONT.serif, fontSize: 26, lineHeight: 1, color: C.ink1 }}>
+                  <span style={{ fontFamily: FACE.value, fontSize: 25, lineHeight: 1, color: C.ink1 }}>
                     {kol.bestUsRank != null ? `#${kol.bestUsRank} US` : "—"}
                   </span>
                   <span style={{ ...mono(9, { ls: "0.14em", color: C.amber }), textTransform: "uppercase", border: `1px solid ${C.hairStrong}`, padding: "3px 6px" }}>
@@ -168,18 +168,18 @@ export default function InstitutionEnvironmentPanel({
           <div>
             <TileHead title="Guideline-Author Density" tag="Supporting" tagColor={C.ink5} />
             {env === undefined ? (
-              <div style={{ ...mono(9.5, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase" }}>Reading the labeled corpus…</div>
+              <div style={{ ...mono(9, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase" }}>Reading the labeled corpus…</div>
             ) : env === null || env.guidelines == null ? (
               <Unavailable />
             ) : (
               <div style={{ display: "flex", alignItems: "flex-end", gap: 24, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 11 }}>
-                  <span style={{ fontFamily: FONT.serif, fontSize: 38, lineHeight: 0.95, color: C.ink1 }}>{env.guidelines.authors}</span>
+                  <span style={{ fontFamily: FACE.value, fontSize: 30, lineHeight: 0.95, color: C.ink1 }}>{env.guidelines.authors}</span>
                   <span style={{ ...mono(9, { ls: "0.15em", color: C.ink3, lh: 1.4 }), textTransform: "uppercase", maxWidth: "11ch", display: "inline-block" }}>Guideline-proxy authors</span>
                 </div>
                 <div style={{ width: 1, height: 30, background: C.hairStrong }} />
                 <div style={{ display: "flex", alignItems: "baseline", gap: 11 }}>
-                  <span style={{ fontFamily: FONT.serif, fontSize: 38, lineHeight: 0.95, color: C.ink1 }}>{env.guidelines.pubs}</span>
+                  <span style={{ fontFamily: FACE.value, fontSize: 30, lineHeight: 0.95, color: C.ink1 }}>{env.guidelines.pubs}</span>
                   <span style={{ ...mono(9, { ls: "0.15em", color: C.ink3, lh: 1.4 }), textTransform: "uppercase", maxWidth: "13ch", display: "inline-block" }}>Guideline-linked publications</span>
                 </div>
               </div>
@@ -194,32 +194,32 @@ export default function InstitutionEnvironmentPanel({
         <div style={{ padding: "18px 28px 18px", background: C.bg }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 20, marginBottom: 14 }}>
             <div style={{ ...mono(9, { ls: "0.2em", color: C.ink3 }), textTransform: "uppercase" }}>Federal Research Footprint</div>
-            <div style={{ ...mono(8, { ls: "0.16em", color: C.ink5 }), textTransform: "uppercase" }}>Displayed, not ranked · no institutional total</div>
+            <div style={{ ...mono(9, { ls: "0.16em", color: C.ink5 }), textTransform: "uppercase" }}>Displayed, not ranked · no institutional total</div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) minmax(0,1.05fr)", gap: isMobile ? 14 : 34, alignItems: "start" }}>
             <div>
               {env === undefined ? (
-                <div style={{ ...mono(9.5, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase" }}>Reading the grant record…</div>
+                <div style={{ ...mono(9, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase" }}>Reading the grant record…</div>
               ) : env === null || env.funding == null ? (
                 <Unavailable />
               ) : zeroCapture ? (
                 // ZERO-CAPTURE — absence prose only; count + composition
                 // suppressed entirely. Never "$0", never "0 of N".
                 <>
-                  <div style={{ ...mono(10, { ls: "0.13em", color: C.ink3 }), textTransform: "uppercase" }}>
+                  <div style={{ ...mono(11, { ls: "0.13em", color: C.ink3 }), textTransform: "uppercase" }}>
                     No matched affiliated investigators with recorded funding.
                   </div>
-                  <div style={{ marginTop: 11, paddingLeft: 12, borderLeft: `1px solid ${C.hairStrong}`, fontFamily: FONT.serif, fontSize: 16, fontStyle: "italic", lineHeight: 1.55, color: C.ink3, maxWidth: "60ch" }}>
+                  <div style={{ marginTop: 11, paddingLeft: 12, borderLeft: `1px solid ${C.hairStrong}`, fontFamily: FACE.value, fontSize: 17, fontStyle: "italic", lineHeight: 1.55, color: C.ink3, maxWidth: "60ch" }}>
                     An absence of matches, not an absence of funding — this institution's NIH footprint is simply not captured through our tracked investigators.
                   </div>
                 </>
               ) : (
                 <>
-                  <div style={{ fontFamily: FONT.serif, fontSize: 16, lineHeight: 1.5, color: C.ink3 }}>
+                  <div style={{ fontFamily: FACE.value, fontSize: 17, lineHeight: 1.5, color: C.ink3 }}>
                     <span style={{ color: C.ink1 }}>{env.funding.fundedInvestigators}</span> of <span style={{ color: C.ink1 }}>{env.trackedInvestigators}</span> tracked investigators hold active NIH funding{" "}
-                    <span style={{ ...mono(8.5, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase", whiteSpace: "nowrap" }}>(by recorded project dates)</span>
+                    <span style={{ ...mono(9, { ls: "0.12em", color: C.ink4 }), textTransform: "uppercase", whiteSpace: "nowrap" }}>(by recorded project dates)</span>
                   </div>
-                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", ...mono(9.5, { ls: "0.13em", color: C.ink3 }), textTransform: "uppercase" }}>
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", ...mono(9, { ls: "0.13em", color: C.ink3 }), textTransform: "uppercase" }}>
                     <span><span style={{ color: C.amber }}>{env.funding.nciSupported}</span> NCI-supported</span>
                     <span style={{ color: C.ink5 }}>|</span>
                     <span><span style={{ color: C.amber }}>{env.funding.r01Equivalent}</span> R01-equivalent</span>
@@ -229,7 +229,7 @@ export default function InstitutionEnvironmentPanel({
                 </>
               )}
             </div>
-            <div style={{ ...caption, fontSize: 8.5, lineHeight: 1.85 }}>
+            <div style={{ ...caption, fontSize: 9, lineHeight: 1.85 }}>
               Funding held by tracked affiliated investigators — typically ~10% of the institution's total NIH footprint, not institutional funding. Not comparable across institutions.
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function InstitutionEnvironmentPanel({
       </div>
 
       {/* panel footer — the no-ranking guarantee, stated on the surface */}
-      <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", gap: 20, ...mono(8.5, { ls: "0.16em", color: C.ink5 }), textTransform: "uppercase" }}>
+      <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", gap: 20, ...mono(9, { ls: "0.16em", color: C.ink5 }), textTransform: "uppercase" }}>
         <span>Nothing above feeds the institution index · bands + member counts remain the only ranking</span>
         <span>Renders only within this institution</span>
       </div>

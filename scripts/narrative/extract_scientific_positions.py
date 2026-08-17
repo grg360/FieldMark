@@ -103,12 +103,16 @@ WHERE therapeutic_area_id = %s
 ORDER BY us_rank
 """
 
+# scope_value is parameterised, NOT removed: the caller must say which region.
+# ANY() so one invocation can cover a multi-country region; a single value is
+# exactly equivalent to the old 'US' literal. Placeholder order matters -- see
+# get_target_hcps.build(), which threads params positionally.
 ESTABLISHED_HCPS_SQL = """
 SELECT hcp_id, 'established' AS cohort, rank AS rank_position
 FROM hcp_established_ranks_v3 e
 WHERE therapeutic_area_id = %s
   AND scope_type = 'region'
-  AND scope_value = 'US'
+  AND scope_value = ANY(%s)
   AND rank <= 200
   {skip_existing}
 ORDER BY rank
@@ -125,6 +129,17 @@ SKIP_EXISTING_CLAUSE = """AND NOT EXISTS (
       AND sp.therapeutic_area_id = %s
   )"""
 
+# TA SCOPING (2026-08-14). This query previously joined only publications_v2 and
+# publication_authors_v2, so it selected an HCP's top-cited papers with NO regard
+# for therapeutic area -- a hepatology paper would be chosen over a lung one if it
+# out-cited it. The join below scopes selection to the TA, and NOT is_excluded
+# drops associations the corpus has marked as belonging elsewhere (mesothelioma,
+# see migrations/2026_08_14_mesothelioma_corpus_separation.sql).
+#
+# Both conditions are needed. The positive join alone would NOT have removed
+# mesothelioma: those papers were correctly NSCLC-tagged by the ingest query's own
+# rules. Selection-side only -- this changes which papers positions are extracted
+# from, and touches no score.
 TOP_PAPERS_SQL = """
 WITH ranked AS (
   SELECT
@@ -142,6 +157,10 @@ WITH ranked AS (
     ) AS rn
   FROM publications_v2 p
   JOIN publication_authors_v2 pa ON pa.publication_id = p.id
+  JOIN publication_therapeutic_areas_v2 pta
+    ON pta.publication_id = p.id
+   AND pta.therapeutic_area_id = %s
+   AND NOT pta.is_excluded
   WHERE pa.hcp_id = %s
     AND p.pub_year >= %s
     AND length(coalesce(p.abstract, '')) >= %s
@@ -280,6 +299,18 @@ def parse_args() -> argparse.Namespace:
         help="Which cohort(s) to process (default: both).",
     )
     parser.add_argument(
+        "--scope-value",
+        nargs="+",
+        default=None,
+        metavar="CODE",
+        help=(
+            "Country code(s) for the established (region-scoped) selection, e.g. "
+            "--scope-value US, or --scope-value DE FR GB for a multi-country "
+            "region. REQUIRED (no default) whenever --cohort includes established; "
+            "unused by the rising_star selection."
+        ),
+    )
+    parser.add_argument(
         "--ta",
         choices=tuple(TA_CONFIGS.keys()),
         default=DEFAULT_TA,
@@ -322,15 +353,20 @@ def get_target_hcps(
     limit: int,
     ta_id: str,
     skip_existing: bool = False,
+    scope_value: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     hcps: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    def build(sql_template: str, alias: str) -> tuple[str, tuple[str, ...]]:
+    def build(
+        sql_template: str, alias: str, mid_params: tuple[Any, ...] = ()
+    ) -> tuple[str, tuple[Any, ...]]:
+        # mid_params sit between the leading ta_id and the trailing ta_id that
+        # SKIP_EXISTING_CLAUSE contributes -- matching placeholder order in the SQL.
         if skip_existing:
             clause = SKIP_EXISTING_CLAUSE.format(alias=alias)
-            return sql_template.format(skip_existing=clause), (ta_id, ta_id)
-        return sql_template.format(skip_existing=""), (ta_id,)
+            return sql_template.format(skip_existing=clause), (ta_id, *mid_params, ta_id)
+        return sql_template.format(skip_existing=""), (ta_id, *mid_params)
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         if cohort in ("rising_star", "both"):
@@ -343,7 +379,14 @@ def get_target_hcps(
                     hcps.append(dict(row))
 
         if cohort in ("established", "both"):
-            sql, params = build(ESTABLISHED_HCPS_SQL, "e")
+            if not scope_value:
+                raise SystemExit(
+                    "--scope-value is required for --cohort established/both "
+                    "(the established selection is region-scoped). There is no "
+                    "default: pass the country code(s) explicitly, e.g. "
+                    "--scope-value US."
+                )
+            sql, params = build(ESTABLISHED_HCPS_SQL, "e", (list(scope_value),))
             cur.execute(sql, params)
             for row in cur.fetchall():
                 hcp_id = str(row["hcp_id"])
@@ -357,11 +400,12 @@ def get_target_hcps(
 def get_top_papers_for_hcp(
     conn: psycopg2.extensions.connection,
     hcp_id: str,
+    ta_id: str,
 ) -> list[dict[str, Any]]:
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             TOP_PAPERS_SQL,
-            (hcp_id, MIN_YEAR, MIN_ABSTRACT_LENGTH, PAPERS_PER_HCP),
+            (ta_id, hcp_id, MIN_YEAR, MIN_ABSTRACT_LENGTH, PAPERS_PER_HCP),
         )
         return [dict(row) for row in cur.fetchall()]
 
@@ -575,12 +619,14 @@ def main() -> int:
 
     try:
         target_hcps = get_target_hcps(
-            conn, args.cohort, effective_limit, ta_id, args.skip_existing
+            conn, args.cohort, effective_limit, ta_id, args.skip_existing,
+            args.scope_value,
         )
         total_hcps = len(target_hcps)
         print(
             f"Loaded {total_hcps} target HCPs "
             f"(ta={args.ta}, cohort={args.cohort}, limit={effective_limit}, "
+            f"scope_value={','.join(args.scope_value) if args.scope_value else '-'}, "
             f"skip_existing={args.skip_existing})"
         )
 
@@ -596,7 +642,7 @@ def main() -> int:
             papers = []
 
             try:
-                papers = get_top_papers_for_hcp(conn, hcp_id)
+                papers = get_top_papers_for_hcp(conn, hcp_id, ta_id)
             except Exception as exc:
                 print(
                     f"[ERROR] HCP {hcp_id} ({cohort}, rank {rank_position}): "

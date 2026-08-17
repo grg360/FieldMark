@@ -10,7 +10,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
+import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { floorFixed } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
@@ -37,37 +37,44 @@ import {
 } from "../../lib/hcpProfile";
 import FederalFundingSection from "./FederalFundingSection";
 import { FiToast } from "../FieldIntelligenceShared";
+import { taLabelForSlug } from "../../lib/taLabels";
 
-// Ledger palette, verbatim (self-contained visual system per the Build Reference).
-// Register tokens substituted 2026-08-05 for exact value matches only (card,
-// band, amber, ink0–3 → COOL). page/head/drawer and the ink4–6/dash greys
-// are near-twins of GROUND/COOL (one digit off) — converging them is a visible
-// change, deferred. sage/teal are cohort semantics; alpha hairlines stay per frame.
-// ink1 carries COOL.ui since the 2026-08-05 consolidation (#e7e8e9 retired, Δ1.02).
+// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
+// the stable identity — and the display label is derived from it, never typed
+// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+const PROFILE_TA_SLUG = "nsclc";
+// Prose voice of the same label: sentences take it lowercase.
+const TA_PROSE = taLabelForSlug(PROFILE_TA_SLUG).toLowerCase();
+
+// CANONICAL MIGRATION (pilot, 2026-08-12): every P key resolves to an
+// RFC-01/02 token — near-twin greys, alpha hairlines and warm surfaces
+// converge. line/lineMed both land on LINE.HAIR; ink0/ink1 both land on
+// INK.PRIME (already one value). ink5 (#7C8288, L*54: the rules' 52–60 gap)
+// maps to INK.LABEL by role — pilot judgment case, see report.
 const P = {
-  page: "#08090A",
-  card: GROUND.g1, // g1 well inside the g2 board (Commit C)
-  head: "#0B0D10",
-  band: GROUND.g1,
-  drawer: "#0A0C0F",
-  line: "rgba(255,255,255,.06)",
-  lineMed: "rgba(255,255,255,.09)",
-  lineStrong: "rgba(255,255,255,.14)",
-  amber: GOLD.rank,
-  sage: "#6E8F76", // Established cohort marker
-  ink0: COOL.ui,
-  ink1: COOL.ui,
-  ink2: COOL.prose,
-  ink3: COOL.muted,
-  ink4: "#8F959A",
-  ink5: "#7C8288",
-  ink6: "#63696E",
-  dash: "#71787E",
-  teal: "#7FB3BB",
+  page: CANON.GROUND.BASE,
+  card: CANON.GROUND.RAISE,
+  head: CANON.GROUND.RAISE,
+  band: CANON.GROUND.RAISE,
+  drawer: CANON.GROUND.RAISE,
+  line: CANON.LINE.HAIR,
+  lineMed: CANON.LINE.HAIR,
+  lineStrong: CANON.LINE.EDGE,
+  amber: CANON.GOLD.RANK,
+  sage: CANON.MARK.EST, // Established cohort marker
+  ink0: CANON.INK.PRIME,
+  ink1: CANON.INK.PRIME,
+  ink2: CANON.INK.BODY,
+  ink3: CANON.INK.LABEL,
+  ink4: CANON.INK.LABEL,
+  ink5: CANON.INK.LABEL,
+  ink6: CANON.INK.MUTE,
+  dash: CANON.INK.MUTE,
+  teal: CANON.ACTION.LINK,
 } as const;
 
-const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
-const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.serif}` } as const);
+const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 
 function SectionHead({ id, tag, count, sub }: { id: string; tag: string; count?: string; sub?: string }) {
   // Mobile (2026-08-10): the descriptor drops BELOW the label as a full-width
@@ -79,7 +86,7 @@ function SectionHead({ id, tag, count, sub }: { id: string; tag: string; count?:
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
           <span style={{ width: 3, height: 13, background: P.sage, flexShrink: 0 }} />
           <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.ink1 }}>{tag}</span>
-          {count ? <span style={{ ...mono(10, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
+          {count ? <span style={{ ...mono(11, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
         </div>
         {sub ? <span style={{ ...mono(9, 500), letterSpacing: ".12em", color: P.ink6, lineHeight: 1.6 }}>{sub}</span> : null}
       </div>
@@ -89,7 +96,7 @@ function SectionHead({ id, tag, count, sub }: { id: string; tag: string; count?:
     <div id={id} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "0 0 12px", scrollMarginTop: 16 }}>
       <span style={{ width: 3, height: 13, background: P.sage }} />
       <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.ink1 }}>{tag}</span>
-      {count ? <span style={{ ...mono(10, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
+      {count ? <span style={{ ...mono(11, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
       {sub ? <span style={{ flex: 1, ...mono(9, 500), letterSpacing: ".12em", color: P.ink6, textAlign: "right" }}>{sub}</span> : null}
     </div>
   );
@@ -125,8 +132,8 @@ function ScoreCell({ label, sub, value, basis, noRank, absent, decimals }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 92 }}>
       <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>{label}<br /><span style={{ color: P.ink5 }}>{sub}</span></span>
-      <span style={{ ...mono(22, 500), color: noRank ? P.ink3 : P.ink0, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{text}</span>
-      <span style={{ ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6 }}>{noRank ? "EXCLUDED FROM RANK" : basis ?? ""}</span>
+      <span style={{ ...mono(20, 500), color: noRank ? P.ink3 : P.ink0, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{text}</span>
+      <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>{noRank ? "EXCLUDED FROM RANK" : basis ?? ""}</span>
     </div>
   );
 }
@@ -134,7 +141,7 @@ function ScoreCell({ label, sub, value, basis, noRank, absent, decimals }: {
 function EvidenceRail({ sources, count }: { sources: ProfileSource[] | null; count: number }) {
   // real per-position source COUNT always renders; individual rows render only when real.
   if (!sources || sources.length === 0) {
-    return <span style={{ ...mono(9.5, 500), letterSpacing: ".08em", color: P.ink5 }}>{count} SOURCE{count === 1 ? "" : "S"} · SHOW SOURCES</span>;
+    return <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>{count} SOURCE{count === 1 ? "" : "S"} · SHOW SOURCES</span>;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -149,9 +156,9 @@ function EvidenceRail({ sources, count }: { sources: ProfileSource[] | null; cou
       {sources.slice(0, 4).map((s, i) => {
         const inner = (
           <>
-            <span style={{ ...mono(9.5, 500), letterSpacing: ".06em", color: s.doi ? P.teal : P.ink3, borderBottom: s.doi ? `1px solid rgba(127,179,187,.3)` : "none" }}>{journalShort(s.journal)} {s.pub_year ?? ""}</span>
-            {s.author_role ? <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink5 }}>{roleLabel(s.author_role)}</span> : null}
-            {s.citation_count != null ? <span style={{ ...mono(8.5), color: P.ink6 }}>{s.citation_count} CIT</span> : null}
+            <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: s.doi ? P.teal : P.ink3, borderBottom: s.doi ? `1px solid rgba(127,179,187,.3)` : "none" }}>{journalShort(s.journal)} {s.pub_year ?? ""}</span>
+            {s.author_role ? <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>{roleLabel(s.author_role)}</span> : null}
+            {s.citation_count != null ? <span style={{ ...mono(9), color: P.ink6 }}>{s.citation_count} CIT</span> : null}
           </>
         );
         return s.doi ? (
@@ -162,7 +169,7 @@ function EvidenceRail({ sources, count }: { sources: ProfileSource[] | null; cou
           <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>{inner}</div>
         );
       })}
-      {sources.length > 4 ? <span style={{ ...mono(8.5), color: P.ink6 }}>+ {sources.length - 4} MORE</span> : null}
+      {sources.length > 4 ? <span style={{ ...mono(9), color: P.ink6 }}>+ {sources.length - 4} MORE</span> : null}
     </div>
   );
 }
@@ -193,11 +200,11 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
       style={{ borderTop: `1px solid ${P.line}`, padding: "14px 0", display: "flex", flexDirection: "column", gap: 8, scrollMarginTop: 96 }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ ...serif(16, 600), color: P.ink0 }}>{pos.theme}</span>
-        {single ? <span style={{ ...mono(8, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span> : null}
-        {pos.confidence != null ? <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink5 }}>CONF {pos.confidence.toFixed(2)}</span> : null}
+        <span style={{ ...serif(17, 600), color: P.ink0 }}>{pos.theme}</span>
+        {single ? <span style={{ ...mono(9, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span> : null}
+        {pos.confidence != null ? <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>CONF {pos.confidence.toFixed(2)}</span> : null}
       </div>
-      <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty", display: "block" }}>{pos.summary}</span>
+      <span style={{ ...serif(13), color: P.ink3, lineHeight: 1.55, textWrap: "pretty", display: "block" }}>{pos.summary}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>
         <span>BASIS {basisN} PUBLICATION{basisN === 1 ? "" : "S"}{fullPapers > basisN && basisN > 0 ? ` · SAMPLE OF ${fullPapers}` : ""}</span>
         {yr ? <span>SOURCED {yr}</span> : null}
@@ -205,7 +212,7 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
       {/* EVIDENCE only — the FIELD CORROBORATION and MOVEMENT columns were string
           literals (0 reactions, no prior state), not queries, and are removed. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
-        <span style={{ ...mono(8.5, 600), letterSpacing: ".14em", color: P.ink6 }}>EVIDENCE{fullPapers > basisN ? " · SAMPLE, ALL POSITIONS ↗ FOR THE FULL SET" : ""}</span>
+        <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>EVIDENCE{fullPapers > basisN ? " · SAMPLE, ALL POSITIONS ↗ FOR THE FULL SET" : ""}</span>
         <EvidenceRail sources={sourceRows} count={basisN} />
       </div>
     </div>
@@ -281,10 +288,10 @@ export default function HcpProfileBrief() {
       <div style={{ padding: "20px 24px 48px", display: "flex", flexDirection: "column", gap: 26 }}>
         {/* breadcrumb + section spine */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>
             <span style={{ width: 3, height: 12, background: P.sage }} />
             <span style={{ color: P.sage }}>EST</span>
-            <span style={{ color: P.ink3 }}>ESTABLISHED / NSCLC</span>
+            <span style={{ color: P.ink3 }}>ESTABLISHED / {taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()}</span>
             <span>›</span>
             <span>RANK {s?.rank ?? "—"} US</span>
             <span>›</span>
@@ -299,12 +306,15 @@ export default function HcpProfileBrief() {
         </div>
 
         {/* header + score band (ledger treatment) */}
-        <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, position: "relative" }}>
+        <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, position: "relative" }}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: P.sage }} />
           <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 4, borderBottom: `1px solid ${P.line}`, ...(isMobile ? { alignItems: "center", textAlign: "center" as const } : {}) }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start" }}>
-              <span style={{ ...mono(34, 500), color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s?.index != null ? floorFixed(s.index, 1) : "—"}</span>
-              <span style={{ ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>INDEX · RANK {s?.rank ?? "—"} US · #{s?.global_rank ?? "—"} GLOBAL</span>
+              {/* Numeral rule 2026-08-12: the index is the page's standalone headline
+                  numeral → FACE.value; 34 snapped to T.FIGURE 30 (44 would out-shout
+                  the 30px name beside it — judgment call, flagged). */}
+              <span style={{ ...serif(30, 500), color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s?.index != null ? floorFixed(s.index, 1) : "—"}</span>
+              <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>INDEX · RANK {s?.rank ?? "—"} US · #{s?.global_rank ?? "—"} GLOBAL</span>
             </div>
             <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4 }}>{p.hcp.name}</span>
             <span style={{ ...mono(11), color: P.ink4, letterSpacing: ".02em" }}>
@@ -315,7 +325,7 @@ export default function HcpProfileBrief() {
               ) : null}
               {p.hcp.institution && loc ? " · " : ""}{loc}
             </span>
-            <span style={{ ...mono(9.5, 500), letterSpacing: ".08em", color: P.ink6 }}>
+            <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink6 }}>
               {p.hcp.npi ? (
                 <a href={`https://npiregistry.cms.hhs.gov/provider-view/${p.hcp.npi}`} target="_blank" rel="noopener noreferrer"
                    style={{ color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>NPI {p.hcp.npi} ↗</a>
@@ -324,11 +334,11 @@ export default function HcpProfileBrief() {
             {/* nav parity — Generate Brief + full-page publications / positions */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 8, justifyContent: isMobile ? "center" : "flex-start" }}>
               <button onClick={() => navigate(`/hcp/${p.hcp.id}/brief`)} title="Generate a pre-meeting brief"
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", background: "none", border: `1px solid rgba(224,167,94,.5)`, cursor: "pointer", ...mono(10, 600), letterSpacing: ".08em", color: P.amber, borderRadius: 2 }}>✦ GENERATE BRIEF</button>
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", background: "none", border: `1px solid rgba(224,167,94,.5)`, cursor: "pointer", ...mono(11, 600), letterSpacing: ".08em", color: P.amber, borderRadius: 2 }}>✦ GENERATE BRIEF</button>
               <button onClick={() => navigate(`/hcp/${p.hcp.id}/publications`, { state: { taId: undefined } })} title="All publications"
-                style={{ padding: "7px 13px", background: "none", border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(10, 500), letterSpacing: ".08em", color: P.ink3, borderRadius: 2 }}>ALL PUBLICATIONS ↗</button>
+                style={{ padding: "7px 13px", background: "none", border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(11, 500), letterSpacing: ".08em", color: P.ink3, borderRadius: 2 }}>ALL PUBLICATIONS ↗</button>
               <button onClick={() => navigate(`/hcp/${p.hcp.id}/positions`)} title="Full positions page"
-                style={{ padding: "7px 13px", background: "none", border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(10, 500), letterSpacing: ".08em", color: P.ink3, borderRadius: 2 }}>ALL POSITIONS ↗</button>
+                style={{ padding: "7px 13px", background: "none", border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(11, 500), letterSpacing: ".08em", color: P.ink3, borderRadius: 2 }}>ALL POSITIONS ↗</button>
             </div>
           </div>
           <div style={{ padding: "16px 24px", display: "flex", gap: isMobile ? "16px 28px" : 36, flexWrap: "wrap", alignItems: "flex-start", justifyContent: isMobile ? "center" : "flex-start", textAlign: isMobile ? ("center" as const) : undefined }}>
@@ -354,14 +364,14 @@ export default function HcpProfileBrief() {
                of dead field between them and read as broken. Prose runs the
                container at a 90ch measure; the provenance stamp folds to one mono
                caveat line beneath, the way caveat lines render everywhere else. */
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px" }}>
               <span style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", display: "block" }}>{p.signal_summary}</span>
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${P.line}`, ...mono(9, 500), letterSpacing: ".08em", color: P.ink6, lineHeight: 1.7 }}>
                 GENERATED SYNTHESIS · DATA RUN {p.signal_summary_generated_at ? p.signal_summary_generated_at.slice(0, 10) : "UNSTAMPED"} · READS {p.record_depth.sources ?? 0} SOURCE{p.record_depth.sources === 1 ? "" : "S"} · {p.record_depth.papers ?? 0} PAPER{p.record_depth.papers === 1 ? "" : "S"} · PROMPT {p.signal_summary_version ? p.signal_summary_version.toUpperCase() : "UNVERSIONED"} · REVIEW BEFORE USE · NO CLINICAL CLAIM
               </div>
             </div>
           ) : (
-            <Withheld head="SIGNAL SUMMARY · WITHHELD" title="No generated synthesis for this HCP yet." body="The synthesis is generated over the sourced record. None is on file for this HCP in NSCLC." />
+            <Withheld head="SIGNAL SUMMARY · WITHHELD" title="No generated synthesis for this HCP yet." body={`The synthesis is generated over the sourced record. None is on file for this HCP in ${TA_PROSE}.`} />
           )}
         </div>
 
@@ -372,7 +382,7 @@ export default function HcpProfileBrief() {
           {/* ── RELATIONSHIP ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <SectionHead id="relationship" tag="RELATIONSHIP" count="TRACK · STATUS · FOLLOW-UPS" sub="SYNCS WITH THE LEDGER" />
-            <div style={{ flex: 1, border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
+            <div style={{ flex: 1, border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "16px 20px" }}>
               <ProfileRelationshipControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
             </div>
           </div>
@@ -380,7 +390,7 @@ export default function HcpProfileBrief() {
           {/* ── CONTACT & CONTROLS ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <SectionHead id="contact" tag="CONTACT & CONTROLS" sub="ACCESS · FIELD REVIEW · REPORT · OPT-OUT" />
-            <div style={{ flex: 1, border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 20px" }}>
+            <div style={{ flex: 1, border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "16px 20px" }}>
               <ProfileSecondaryControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} />
             </div>
           </div>
@@ -394,11 +404,11 @@ export default function HcpProfileBrief() {
           {/* Deep-link into the full Field Insights surface, scoped to this HCP —
               the surface is otherwise reachable only from a below-the-fold Home link. */}
           {notes.length > 0 ? (
-            <Link to={`/me/insights?hcp=${p.hcp.id}`} style={{ ...mono(9.5, 500), letterSpacing: ".12em", color: P.ink4, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}`, alignSelf: "flex-start" }}>
+            <Link to={`/me/insights?hcp=${p.hcp.id}`} style={{ ...mono(9, 500), letterSpacing: ".12em", color: P.ink4, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}`, alignSelf: "flex-start" }}>
               ALL FIELD INSIGHTS ON {p.hcp.name.toUpperCase()} ↗
             </Link>
           ) : null}
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
+          <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL }}>
             <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" hideHeader />
           </div>
         </div>
@@ -406,7 +416,7 @@ export default function HcpProfileBrief() {
         {/* ── THE RECORD ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead id="record" tag="THE RECORD" count={`${p.record.publications_total ?? ""} SOURCES`} sub="SCIENTIFIC AND COMMERCIAL FOOTPRINT AT EQUAL WEIGHT" />
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
             {/* stats */}
             {/* stat cells center label over numeral (The Record v2 frame) */}
             <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
@@ -441,11 +451,11 @@ export default function HcpProfileBrief() {
                     <div style={{ display: "flex", flexDirection: "column" }}>
                       {p.record.pharma_companies.map((c, i) => (
                         <div key={i} style={{ display: "grid", gridTemplateColumns: "18px 1fr auto", gap: 14, alignItems: "baseline", padding: "9px 0 10px", borderBottom: `1px solid ${P.line}` }}>
-                          <span style={{ ...mono(10), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{String(i + 1).padStart(2, "0")}</span>
-                          <span style={{ ...mono(10.5), color: P.ink3, letterSpacing: ".04em", minWidth: 0, overflowWrap: "anywhere" }}>
+                          <span style={{ ...mono(11), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{String(i + 1).padStart(2, "0")}</span>
+                          <span style={{ ...mono(11), color: P.ink3, letterSpacing: ".04em", minWidth: 0, overflowWrap: "anywhere" }}>
                             {c.name.toUpperCase()} <span style={{ color: P.ink6 }}>{c.count} PAYMENTS</span>
                           </span>
-                          <span style={{ ...mono(14, 500), color: P.ink1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{money(c.amount)}</span>
+                          <span style={{ ...mono(15, 500), color: P.ink1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{money(c.amount)}</span>
                         </div>
                       ))}
                     </div>
@@ -460,7 +470,7 @@ export default function HcpProfileBrief() {
                 return hasMix ? <EngagementMixDonut mix={mix} /> : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>ENGAGEMENT MIX · 3YR</span>
-                    <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5 }}>No categorized payments in the 3-year window.</span>
+                    <span style={{ ...serif(13), color: P.ink5, lineHeight: 1.5 }}>No categorized payments in the 3-year window.</span>
                   </div>
                 );
               })()}
@@ -477,7 +487,7 @@ export default function HcpProfileBrief() {
                   {collaborators.length ? (
                     <MiniCollaboratorNetwork hcpName={p.hcp.name} hcpId={p.hcp.id} collaborators={collaborators} />
                   ) : (
-                    <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5 }}>No co-authorship network on record for this HCP.</span>
+                    <span style={{ ...serif(13), color: P.ink5, lineHeight: 1.5 }}>No co-authorship network on record for this HCP.</span>
                   )}
                 </div>
               }
@@ -512,11 +522,11 @@ export default function HcpProfileBrief() {
               are both routes to the full positions page; the section-level link is the
               one a reader in the positions finds. */}
           {nPos > 0 ? (
-            <Link to={`/hcp/${p.hcp.id}/positions`} style={{ ...mono(9.5, 500), letterSpacing: ".12em", color: P.ink4, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}`, alignSelf: "flex-start" }}>
+            <Link to={`/hcp/${p.hcp.id}/positions`} style={{ ...mono(9, 500), letterSpacing: ".12em", color: P.ink4, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}`, alignSelf: "flex-start" }}>
               ALL {nPos} POSITION{nPos === 1 ? "" : "S"} ↗
             </Link>
           ) : null}
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
+          <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px" }}>
             {/* synthesis paragraph (or withheld state) at a measure, with the
                 category mix as the right-field counterweight — the shape the prose
                 can't show at a glance. Only rendered when positions exist. */}
@@ -536,14 +546,20 @@ export default function HcpProfileBrief() {
                   <span style={{ ...mono(9, 600), letterSpacing: ".16em", color: P.ink5 }}>BY CATEGORY</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {catMix.map(([cat, n]) => (
-                      <div key={cat} style={{ display: "flex", justifyContent: "space-between", gap: 12, ...mono(9.5, 500), letterSpacing: ".08em", color: P.ink4 }}>
+                      <div key={cat} style={{ display: "flex", justifyContent: "space-between", gap: 12, ...mono(9, 500), letterSpacing: ".08em", color: P.ink4 }}>
                         <span>{cat.replace(/_/g, " ").toUpperCase()}</span>
                         <span style={{ color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{n}</span>
                       </div>
                     ))}
                   </div>
-                  <span style={{ ...mono(8.5, 500), letterSpacing: ".08em", color: P.ink6, paddingTop: 2 }}>
-                    {p.record_depth.papers ?? 0} PUBLICATION{p.record_depth.papers === 1 ? "" : "S"}{p.record_depth.oldest && p.record_depth.newest ? ` · ${p.record_depth.oldest}–${p.record_depth.newest}` : ""}
+                  {/* Provenance for the category mix above, NOT a publication count.
+                      record_depth.papers counts the distinct papers the POSITIONS were
+                      extracted from (hcp_scientific_positions_v1), so it is a small
+                      number beside a full career record — this read "4 PUBLICATIONS"
+                      for an HCP with 285. "FROM n PAPERS" states the relationship and
+                      matches the SOURCES/PAPERS vocabulary of the synthesis stamp. */}
+                  <span style={{ ...mono(9, 500), letterSpacing: ".08em", color: P.ink6, paddingTop: 2 }}>
+                    FROM {p.record_depth.papers ?? 0} PAPER{p.record_depth.papers === 1 ? "" : "S"}{p.record_depth.oldest && p.record_depth.newest ? ` · ${p.record_depth.oldest}–${p.record_depth.newest}` : ""}
                   </span>
                 </div>
               ) : null}
@@ -553,7 +569,7 @@ export default function HcpProfileBrief() {
             {p.belief.tiers && p.belief.tiers.some((t) => t.positions && t.positions.length) ? (
               p.belief.tiers.filter((t) => t.positions && t.positions.length).map((t) => (
                 <div key={t.key} style={{ paddingTop: 12 }}>
-                  <span style={{ ...mono(9.5, 600), letterSpacing: ".14em", color: P.ink4 }}>{t.label} <span style={{ color: P.ink6 }}>{t.positions!.length}</span></span>
+                  <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink4 }}>{t.label} <span style={{ color: P.ink6 }}>{t.positions!.length}</span></span>
                   {t.positions!.map((pos, i) => (
                     <PositionCard key={i} pos={pos} sourceRows={pos.sources} />
                   ))}
@@ -561,14 +577,14 @@ export default function HcpProfileBrief() {
               ))
             ) : p.belief.raw_positions && p.belief.raw_positions.length ? (
               <div style={{ paddingTop: 6 }}>
-                <span style={{ ...mono(9.5, 600), letterSpacing: ".14em", color: P.ink4 }}>SOURCED · BELOW TIER THRESHOLD <span style={{ color: P.ink6 }}>{p.belief.raw_positions.length}</span></span>
+                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink4 }}>SOURCED · BELOW TIER THRESHOLD <span style={{ color: P.ink6 }}>{p.belief.raw_positions.length}</span></span>
                 {p.belief.raw_positions.map((r, i) => (
                   <div key={i} style={{ borderTop: `1px solid ${P.line}`, padding: "13px 0", display: "flex", flexDirection: "column", gap: 6 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
                       <span style={{ ...serif(15, 600), color: P.ink0 }}>{r.text}</span>
-                      <span style={{ ...mono(8, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span>
+                      <span style={{ ...mono(9, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span>
                     </div>
-                    {r.excerpt ? <span style={{ ...serif(12.5), color: P.ink4, lineHeight: 1.5, textWrap: "pretty" }}>{r.excerpt}</span> : null}
+                    {r.excerpt ? <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.5, textWrap: "pretty" }}>{r.excerpt}</span> : null}
                     <div style={{ display: "flex", alignItems: "baseline", gap: 12, ...mono(9), letterSpacing: ".06em", color: P.ink5 }}>
                       <span>{roleLabel(r.role)}</span><span>{r.year}</span>
                       {/* journal·year IS the link — the "OPEN ↗" suffix dropped 2026-08-10 (row-alignment pass) */}
@@ -584,7 +600,7 @@ export default function HcpProfileBrief() {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SOURCED POSITIONS</span>
                 <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
-                  Nothing has been extracted from the published record for this HCP in NSCLC. This is an absence in the record, not evidence that no position exists — the score band above is comparable cohort-wide regardless.
+                  Nothing has been extracted from the published record for this HCP in {TA_PROSE}. This is an absence in the record, not evidence that no position exists — the score band above is comparable cohort-wide regardless.
                   {themes.length ? " Publication-derived research involvement is below — a broader, any-authorship signal that shows where the work is without asserting a stance." : ""}
                 </span>
               </div>
@@ -601,9 +617,9 @@ export default function HcpProfileBrief() {
         {themes.length ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <SectionHead id="themes" tag="RESEARCH INVOLVEMENT" count={`${themes.length} THEME${themes.length === 1 ? "" : "S"} · PUBLICATION-DERIVED`} sub="ACTIVE IN THESE AREAS · ANY-AUTHORSHIP BASIS · INVOLVEMENT, NOT ADVOCACY" />
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px" }}>
               <div style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", paddingBottom: 4 }}>
-                Themes are extracted from this HCP's authored publications in NSCLC — any authorship position counts. They show where the work is. They are a weaker claim than the positions above{nPos ? "" : " would be"}: involvement in an area is not a stance on it.
+                Themes are extracted from this HCP's authored publications in the {TA_PROSE} corpus — any authorship position counts. They show where the work is. They are a weaker claim than the positions above{nPos ? "" : " would be"}: involvement in an area is not a stance on it.
               </div>
               {themes.map((t) => <ThemeRow key={t.id} t={t} />)}
             </div>
@@ -646,8 +662,9 @@ function FieldIntelligencePanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <SectionHead id="field-intel" tag="FIELD INTELLIGENCE" sub="PEER VALIDATION · THREE QUESTIONS" />
-      <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-        <span style={{ ...mono(10), color: P.ink5 }}>Validation pending — 0 MSLs have reviewed this profile.</span>
+      <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Prose rule 2026-08-12: the panel's empty-state → FACE.value, matching Withheld */}
+        <span style={{ ...serif(13), color: P.ink5 }}>Validation pending — 0 MSLs have reviewed this profile.</span>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
             <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.amber }}>COMMUNITY CONFIDENCE</span>
@@ -657,14 +674,14 @@ function FieldIntelligencePanel() {
         </div>
         {FI_QUESTIONS.map((q) => (
           <div key={q.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ ...mono(10), color: P.ink4 }}>{q.label}</span>
+            <span style={{ ...mono(11), color: P.ink4 }}>{q.label}</span>
             <div style={{ display: "flex", gap: 6 }}>
               {q.options.map((opt) => {
                 const on = answers[q.key] === opt;
                 return (
                   <button key={opt} onClick={() => setAnswers((a) => ({ ...a, [q.key]: a[q.key] === opt ? null : opt }))}
                     style={{ flex: 1, textAlign: "center", padding: "7px 0", background: on ? "rgba(255,255,255,.07)" : "none", cursor: "pointer",
-                      border: `1px solid ${on ? "rgba(255,255,255,.28)" : P.lineStrong}`, borderRadius: 3, ...mono(10, on ? 600 : 400), color: on ? P.ink0 : P.ink2, minHeight: 0 }}>
+                      border: `1px solid ${on ? "rgba(255,255,255,.28)" : P.lineStrong}`, borderRadius: 3, ...mono(11, on ? 600 : 400), color: on ? P.ink0 : P.ink2, minHeight: 0 }}>
                     {opt}
                   </button>
                 );
@@ -675,10 +692,10 @@ function FieldIntelligencePanel() {
         <button disabled={!complete}
           onClick={() => { if (!complete) return; showToast("Field review recorded — the submission path (field-intel write) is not yet wired; stored locally only."); }}
           style={{ textAlign: "center", padding: "10px 0", background: "none", border: `1px solid ${P.lineStrong}`, borderRadius: 3,
-            ...mono(10.5, 500), color: complete ? P.ink2 : P.ink6, cursor: complete ? "pointer" : "not-allowed", opacity: complete ? 1 : 0.6, minHeight: 0 }}>
+            ...mono(11, 500), color: complete ? P.ink2 : P.ink6, cursor: complete ? "pointer" : "not-allowed", opacity: complete ? 1 : 0.6, minHeight: 0 }}>
           Submit validation
         </button>
-        <span style={{ textAlign: "center", ...mono(8.5), color: P.ink6, marginTop: -6 }}>Your identity is never shared. Contributor UUID only.</span>
+        <span style={{ textAlign: "center", ...mono(9), color: P.ink6, marginTop: -6 }}>Your identity is never shared. Contributor UUID only.</span>
       </div>
       <FiToast message={toast} />
     </div>
@@ -699,13 +716,13 @@ function ThemeRow({ t }: { t: ResearchTheme }) {
     <div style={{ borderTop: `1px solid ${P.line}`, padding: "12px 0", display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <span style={{ ...serif(15, 600), color: P.ink0 }}>{t.theme_name}</span>
-        <span style={{ ...mono(8, 600), letterSpacing: ".12em", color: chip.color, padding: "1px 6px", border: `1px solid ${chip.border}` }}>{t.centrality.toUpperCase()}</span>
+        <span style={{ ...mono(9, 600), letterSpacing: ".12em", color: chip.color, padding: "1px 6px", border: `1px solid ${chip.border}` }}>{t.centrality.toUpperCase()}</span>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".08em", color: P.ink5 }}>
         <span>ACTIVE IN · {t.paper_count} PUBLICATION{t.paper_count === 1 ? "" : "S"}</span>
         {(t.example_pmids ?? []).slice(0, 3).map((pmid) => (
           <a key={pmid} href={`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`} target="_blank" rel="noreferrer"
-             style={{ ...mono(8.5, 500), letterSpacing: ".06em", color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>
+             style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>
             PMID {pmid} ↗
           </a>
         ))}
@@ -719,7 +736,11 @@ function Shell({ children }: { children: React.ReactNode }) {
     <AppLayout width="wide">
       {/* Commit C 2026-08-05: g2 board per the Pulse scheme; interior cards
           are g1 wells. */}
-      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+      {/* Composition fix 2026-08-12: the wrapper is transparent — each section
+          container carries DEPTH.PANEL and sits on the shell's BASE ground. A
+          full-height PANEL here made RAISE the dominant page field (the blue
+          read). */}
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", fontFamily: FACE.data }}>
         {children}
       </div>
     </AppLayout>
@@ -845,17 +866,18 @@ function EngagementMixDonut({ mix }: { mix: Record<string, number> }) {
             </path>
           ))
         )}
-        <text x={C} y={C - 1} textAnchor="middle" fill={P.ink1} style={{ font: `600 13px ${FONT.mono}`, fontVariantNumeric: "tabular-nums" }}>{money(total)}</text>
-        <text x={C} y={C + 13} textAnchor="middle" fill={P.ink6} style={{ font: `500 7.5px ${FONT.mono}`, letterSpacing: ".14em" }}>3YR TOTAL</text>
+        <text x={C} y={C - 1} textAnchor="middle" fill={P.ink1} style={{ font: `600 13px ${FACE.data}`, fontVariantNumeric: "tabular-nums" }}>{money(total)}</text>
+        {/* 7.5 sat below the MICRO floor — snapped to T.MICRO 9 (scale has no smaller step) */}
+        <text x={C} y={C + 13} textAnchor="middle" fill={P.ink6} style={{ font: `500 9px ${FACE.data}`, letterSpacing: ".14em" }}>3YR TOTAL</text>
       </svg>
       {/* legend — frame grid: swatch · label · promoted amount · share */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 200, flex: 1 }}>
         {entries.map(([k, v], i) => (
           <div key={k} style={{ display: "grid", gridTemplateColumns: "10px 1fr auto 42px", gap: 10, alignItems: "center", paddingBottom: i < entries.length - 1 ? 9 : 0, borderBottom: i < entries.length - 1 ? `1px solid ${P.line}` : "none" }}>
             <span style={{ width: 8, height: 8, background: meta(k).color, display: "block" }} />
-            <span style={{ ...mono(9.5), letterSpacing: ".08em", color: P.ink3 }}>{meta(k).label}</span>
-            <span style={{ ...mono(14, 500), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{money(v)}</span>
-            <span style={{ ...mono(11.5), color: P.ink6, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round((v / total) * 100)}%</span>
+            <span style={{ ...mono(9), letterSpacing: ".08em", color: P.ink3 }}>{meta(k).label}</span>
+            <span style={{ ...mono(15, 500), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{money(v)}</span>
+            <span style={{ ...mono(11), color: P.ink6, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round((v / total) * 100)}%</span>
           </div>
         ))}
       </div>

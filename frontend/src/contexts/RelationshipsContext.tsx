@@ -19,7 +19,7 @@ import {
   type RelationshipMap,
   type RelationshipStatus,
 } from "../lib/relationships";
-import { getTrackedHcpIds } from "../lib/watchlists";
+import { getTrackedHcpIds, getWatchlistMembershipsForRelationship } from "../lib/watchlists";
 import { supabase } from "../lib/supabase";
 
 async function fetchInsightCountByHcpId(userId: string): Promise<Map<string, number>> {
@@ -102,6 +102,14 @@ interface RelationshipsContextValue {
   isSaved: (hcpId: string) => boolean;
   isTracked: (hcpId: string) => boolean;
   toggleSave: (hcpId: string, createdFrom: string) => Promise<void>;
+  /** The NON-DEFAULT, non-archived watchlists this HCP also sits on — id and
+   *  name, so a caller can both NAME the list and LINK to it.
+   *  toggleSave only ever removes from the DEFAULT list and then re-derives
+   *  `tracked` as the union of all lists, so when this is non-empty an untrack
+   *  cannot change the tracked state — the control would flip off and spring
+   *  back. Ask first, and say so instead. Empty → removing from the default
+   *  genuinely untracks them. */
+  getOtherWatchlists: (hcpId: string) => Promise<{ id: string; name: string }[]>;
   refreshTracked: () => Promise<void>; // re-derive the union after watchlist-popover edits
   getStatus: (hcpId: string) => RelationshipStatus;
   setStatus: (hcpId: string, status: RelationshipStatus, createdFrom: string) => Promise<void>;
@@ -299,6 +307,35 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
     }
   }, [userId]);
 
+  // Read-only. Deliberately NOT folded into toggleSave: every other surface's
+  // bookmark is a plain track/untrack and must keep working exactly as it did,
+  // so the policy about what to do with this answer belongs to the caller.
+  const getOtherWatchlists = useCallback(
+    async (hcpId: string): Promise<{ id: string; name: string }[]> => {
+      if (!userId) return [];
+      try {
+        const rel = relationshipMap.get(hcpId) ?? (await getRelationshipMap(userId)).get(hcpId);
+        if (!rel) return [];
+        const [memberIds, lists] = await Promise.all([
+          getWatchlistMembershipsForRelationship(userId, rel.id),
+          getWatchlists(userId),
+        ]);
+        // Resolve the default here rather than trusting cached state: an untrack
+        // that mis-identifies the default would report the list it is about to
+        // remove from as a reason not to remove from it.
+        const defaultId = defaultWatchlistId ?? lists.find((l) => l.is_default)?.id ?? lists[0]?.id ?? null;
+        return lists.filter((l) => l.id !== defaultId && memberIds.has(l.id)).map((l) => ({ id: l.id, name: l.name }));
+      } catch (err) {
+        // Unknown ≠ none. Returning [] would let the caller untrack and hit the
+        // spring-back this exists to prevent, so report nothing-to-say and let
+        // the caller keep the current state.
+        console.warn("getOtherWatchlists failed", err);
+        throw err;
+      }
+    },
+    [userId, relationshipMap, defaultWatchlistId],
+  );
+
   const toggleSave = useCallback(
     async (hcpId: string, createdFrom: string) => {
       if (!userId) return;
@@ -365,6 +402,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       isSaved,
       isTracked,
       toggleSave,
+      getOtherWatchlists,
       refreshTracked,
       getStatus,
       setStatus,
@@ -377,7 +415,7 @@ export function RelationshipsProvider({ children }: { children: ReactNode }) {
       refreshBriefExists,
       refreshAll: loadUserData,
     }),
-    [relationshipMap, isSaved, isTracked, toggleSave, refreshTracked, getStatus, setStatus, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists, loadUserData],
+    [relationshipMap, isSaved, isTracked, toggleSave, getOtherWatchlists, refreshTracked, getStatus, setStatus, isLoading, getInsightCount, refreshInsightCounts, getFollowUpInfo, refreshFollowUpInfo, hasBrief, refreshBriefExists, loadUserData],
   );
 
   return (

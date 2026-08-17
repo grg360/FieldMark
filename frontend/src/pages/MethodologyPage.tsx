@@ -124,6 +124,29 @@ export default function MethodologyPage() {
         </p>
       </div>
 
+      {/* ── Therapeutic area scope — what the Lung Cancer TA covers ──────
+          Added 2026-08-15 with the NSCLC -> Lung Cancer rename. The page had no
+          copy stating the corpus boundary at all; under "NSCLC" a reader could
+          infer it from the name, and under "Lung Cancer" they cannot. */}
+      <div style={sectionStyle}>
+        <SectionHead title="Therapeutic area scope" color={INK_HEAD} note="WHAT THE LUNG CANCER TA COVERS" />
+        <p style={bodyStyle}>
+          The Lung Cancer therapeutic area covers non-small cell lung cancer (NSCLC) and small cell
+          lung cancer (SCLC). Scores, ranks, and cohort assignment are computed across the full lung
+          cancer corpus.
+        </p>
+        <p style={bodyStyle}>
+          Coverage is not even across the two. The underlying literature query was authored for NSCLC
+          terms and later widened to match what it retrieved, so NSCLC representation is denser than
+          SCLC. An expert whose work is predominantly SCLC will be represented, but less completely
+          than an NSCLC counterpart of comparable standing.
+        </p>
+        <p style={bodyStyle}>
+          Mesothelioma is excluded. It is a pleural malignancy rather than a lung parenchymal cancer,
+          and is typically covered by separate field teams.
+        </p>
+      </div>
+
       {/* ── The cohort model — four cards, scored vs classified ─────────── */}
       <div style={sectionStyle}>
         <SectionHead title="The cohort model" color={INK_HEAD} note="FOUR MUTUALLY EXCLUSIVE CLASSES · PER THERAPEUTIC AREA" />

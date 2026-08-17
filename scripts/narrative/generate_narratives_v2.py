@@ -79,7 +79,26 @@ PROMPT_VERSION = "v1.0"
 # still exact). Narratives now cite only durable facts: two-window publication
 # counts with years, collaborator expansion, citation growth, therapeutic focus,
 # and authorship trajectory as a direction, not a percentage.
-ESTABLISHED_PROMPT_VERSION = "established_v3.0"
+# 2026-08-14: the literal below is now only a FALLBACK-FREE default for reference.
+# The authoritative value is narrative_prompt_versions.current_version, loaded at
+# startup by load_prompt_versions(); a missing cohort row is a hard failure, never
+# a silent default (a wrong version stamped on a generated narrative is invisible
+# afterwards, which is exactly the class of drift this table exists to end).
+# v3.1 (2026-08-14): engagement_angle rewritten to open on the STANCE, not on the
+# meeting. v3.0 asked "where this expert's perspective adds value — anchored,
+# where possible, in the specific stances above", and 134 of 229 v3.0 narratives
+# (59%) opened with a meeting frame, 118 of them with the literal words
+# "Conversations anchored in" — the participle came straight out of the
+# instruction. Three causes, all structural: the field was framed as a PLACE
+# ("where"), the requested noun was a TOPIC on both sides of its own comparison
+# ("a topic they have argued a position on is a better angle than a topic they
+# merely publish in"), and it was the only consequential prose field with no
+# constraint on its opener. v3.1 asks for a claim with content, attributed by
+# surname, and makes the encounter the second sentence's job. No banned-phrase
+# list: the minority of v3.0 rows that already led with the stance ("Drilon's
+# published arguments on the inadequacy of current diagnostic assays...") show
+# the target form is reachable by asking for it directly.
+ESTABLISHED_PROMPT_VERSION = "established_v3.1"
 # v4.1 (2026-08-06): archetype vocabulary removed (retired with the board
 # rebuild — the ranks column is NULL for every row, and v4.0's 'Emerging
 # Leader' fallback fabricated a label for all 619); window labels read the
@@ -87,6 +106,48 @@ ESTABLISHED_PROMPT_VERSION = "established_v3.0"
 # authorship direction reworded as window claims, not career claims.
 RISING_STAR_PROMPT_VERSION = "rising_star_v4.1"
 ANTHROPIC_VERSION = "2023-06-01"
+
+# Cohort -> current prompt version, loaded once at startup from
+# narrative_prompt_versions (migrations/2026_08_14_narrative_prompt_versions.sql).
+# Populated by load_prompt_versions(); read via prompt_version_for().
+PROMPT_VERSIONS: dict[str, str] = {}
+REQUIRED_PROMPT_COHORTS = ("community", "established", "rising_star")
+
+
+def load_prompt_versions(conn) -> dict[str, str]:
+    """Load the current prompt version per cohort. Fails loudly on a missing row.
+
+    There is deliberately no fallback to the module literals: a generation run
+    that stamps a stale or invented version on thousands of rows leaves no trace
+    of the mistake, so an incomplete table must stop the run rather than let it
+    proceed on a guess.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT cohort, current_version FROM narrative_prompt_versions")
+        # get_db_conn() sets row_factory=dict_row connection-wide, so rows are
+        # mappings: row[0] is a KEY lookup, not positional. Read by column name.
+        loaded = {row["cohort"]: row["current_version"] for row in cur.fetchall()}
+    missing = [c for c in REQUIRED_PROMPT_COHORTS if not loaded.get(c)]
+    if missing:
+        raise SystemExit(
+            "FATAL: narrative_prompt_versions has no current_version for: "
+            + ", ".join(missing)
+            + ". Seed the table (see migrations/2026_08_14_narrative_prompt_versions.sql) "
+              "before generating - refusing to stamp a guessed prompt_version."
+        )
+    PROMPT_VERSIONS.update(loaded)
+    return loaded
+
+
+def prompt_version_for(cohort: str) -> str:
+    """Current prompt version for a cohort. Requires load_prompt_versions() first."""
+    version = PROMPT_VERSIONS.get(cohort)
+    if not version:
+        raise SystemExit(
+            f"FATAL: no prompt version loaded for cohort '{cohort}'. "
+            "load_prompt_versions() must run before generation."
+        )
+    return version
 
 # Pricing (per million tokens) — Sonnet 4.6
 COST_INPUT_PER_MTOK = 3.00
@@ -449,6 +510,79 @@ def fetch_rising_star_top_hcp_ids_v3(
         except Exception as exc:
             print(f"[load] rising selection query failed for TA {ta_id}: {exc}")
     return selected
+
+
+def resolve_cohort_for_hcp(
+    supabase: Client,
+    hcp_id: str,
+    visible_ta_ids: List[str],
+    target_cohorts: List[str],
+) -> Optional[str]:
+    """Resolve an HCP's cohort WITHOUT reading hcps_v2.cohort_classification.
+
+    THE DEAD COLUMN (2026-08-14). hcps_v2.cohort_classification is a legacy,
+    TA-independent, unmaintained denormalisation: NULL for 78.7% of the
+    Established board and 10.5% of the Rising board, and skewed -- 84% of the
+    Established nulls are non-US. Keith M. Kerr sits at Established global rank
+    48 with a GB region rank of 2 and is NULL in that column, so single-HCP mode
+    refused to generate for him. No board derives from it.
+
+    BOARD MEMBERSHIP FIRST, taxonomy second. This mirrors what bulk mode already
+    does: bulk selects by board and then OVERWRITES row["cohort_classification"]
+    from cohort_by_hcp, so the column was never load-bearing there. Single-HCP
+    mode was the one path still trusting it. Checking boards first keeps the two
+    modes agreeing on the same HCP.
+
+    hcp_cohort_classification_v2 is the fallback, not the primary: its
+    'rising_eligible' is a wider career-structure gate than the rising BOARD
+    (a member can be rising_eligible and not ranked), so a board hit is the
+    stronger statement and must win.
+    """
+    def _cohort_ok(name: str) -> bool:
+        return name in target_cohorts
+
+    if _cohort_ok("established"):
+        resp = (
+            supabase.table("hcp_established_ranks_v3")
+            .select("hcp_id")
+            .eq("hcp_id", hcp_id)
+            .in_("therapeutic_area_id", visible_ta_ids)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return "established"
+
+    if _cohort_ok("rising_star"):
+        resp = (
+            supabase.table("hcp_rising_star_ranks_v3")
+            .select("hcp_id")
+            .eq("hcp_id", hcp_id)
+            .in_("therapeutic_area_id", visible_ta_ids)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return "rising_star"
+
+    # Fallback: the maintained per-(hcp, TA) taxonomy.
+    resp = (
+        supabase.table("hcp_cohort_classification_v2")
+        .select("cohort")
+        .eq("hcp_id", hcp_id)
+        .in_("therapeutic_area_id", visible_ta_ids)
+        .execute()
+    )
+    taxonomy_to_cohort = {
+        "established": "established",
+        "rising_eligible": "rising_star",
+        "community": "community",
+    }
+    for row in resp.data or []:
+        mapped = taxonomy_to_cohort.get(row.get("cohort") or "")
+        if mapped and _cohort_ok(mapped):
+            return mapped
+    return None
 
 
 def fetch_rising_star_v3_context_rows(
@@ -911,7 +1045,7 @@ def fetch_hcps_by_ids(
     hcps_table = get_table_name("hcps", target_version)
     if target_version == "v2":
         hcp_select_cols = (
-            "id,first_name,last_name,institution_normalized,country,"
+            "id,first_name,last_name,institution_normalized,current_country,"
             "cohort_classification,cohort_score,total_career_pubs,career_first_pub_year_v2"
         )
     else:
@@ -937,6 +1071,8 @@ def fetch_hcps_by_ids(
                     row["institution"] = row.pop("institution_normalized")
                 if "career_first_pub_year_v2" in row:
                     row["first_pub_year"] = row.pop("career_first_pub_year_v2")
+                if "current_country" in row:
+                    row["country"] = row.pop("current_country")
         hcps.extend(batch)
     return hcps
 
@@ -996,13 +1132,21 @@ def load_hcp_contexts(
             print(f"[WARNING] HCP {single_hcp_id} not found.")
             return [], {}
         hcp = hcp_rows[0]
-        cohort = hcp.get("cohort_classification")
-        if not cohort or cohort not in target_cohorts:
+        # Resolved from board membership / hcp_cohort_classification_v2 -- NOT from
+        # hcps_v2.cohort_classification, which is NULL for most of both boards.
+        cohort = resolve_cohort_for_hcp(
+            supabase, single_hcp_id, list(visible_ta_ids), list(target_cohorts)
+        )
+        if not cohort:
             print(
-                f"[WARNING] HCP {single_hcp_id} cohort_classification={cohort!r} "
-                f"does not match target cohorts {target_cohorts}."
+                f"[WARNING] HCP {single_hcp_id} is not on the Established or Rising "
+                f"board for the visible TAs and has no matching "
+                f"hcp_cohort_classification_v2 row for target cohorts {target_cohorts}."
             )
             return [], {}
+        # Keep the in-memory row consistent with the resolved cohort; every
+        # downstream reader takes it from here, not from the DB column.
+        hcp["cohort_classification"] = cohort
         cohort_by_hcp[single_hcp_id] = cohort
         hcps = hcp_rows
         if cohort == "rising_star":
@@ -1311,7 +1455,6 @@ def load_hcp_contexts(
 def freshness_filter(
     contexts: List[HCPContext],
     supabase: Client,
-    ta_name_map: Dict[str, str],
     target_version: str = "v1",
 ) -> List[HCPContext]:
     """Drop contexts whose narrative is newer than the latest score row."""
@@ -1326,7 +1469,16 @@ def freshness_filter(
     skipped = 0
     for ctx in contexts:
         ta_id = ctx.therapeutic_area_id
-        ta_slug = ta_slug_from_name(ta_name_map.get(ta_id))
+        # SLUG COMES FROM THE COLUMN, NOT FROM THE NAME (2026-08-15).
+        # ta_slug_from_name() lower-cases the DISPLAY NAME and swaps spaces for
+        # underscores. That happened to equal the slug while the TA was called
+        # 'NSCLC'; after the rename to 'Lung Cancer' it yields 'lung_cancer',
+        # which matches none of the 4,740 stored rows. The freshness lookup would
+        # then find nothing, judge every narrative missing, and silently
+        # regenerate the entire corpus. ctx.therapeutic_area_slug is populated
+        # from therapeutic_areas.slug — the same value the writer stamps — so the
+        # filter and the write can no longer disagree.
+        ta_slug = ctx.therapeutic_area_slug
         try:
             narr_query = (
                 supabase.table(narratives_table)
@@ -1943,7 +2095,7 @@ def build_prompt_established(ctx: HCPContext) -> str:
         "Constraints:\n"
         "- narrative: exactly 3 sentences. When positions exist, open on the strongest/most consequential stance (per the STANCE rule) grounded in a position record. When they do not, open on what most distinguishes THIS expert's published output — a specific thematic or methodological concentration, guideline contribution, or senior-author record — not their rank or largest number. Do NOT open with rank, score, or 'is a recognized expert'. State TA-scoped senior-author counts using senior_pub_count and senior_pub_recent_5yr (e.g. '54 NSCLC publications as senior author, including 35 in the last 5 years'). ALWAYS label this figure 'senior-author publications' — NEVER 'career publications', 'career output', or a bare 'publications' count; the number is the TA-scoped senior-author count, not a career total, and mislabelling it as career output is wrong. NEVER use the phrase 'leadership publications'. If guideline_pub_count > 0 you may reference contributor to N TA guideline publications. NEVER cite cohort_score, composite score, total_career_pubs, works_count, or any career-total figure; never an 'X publications over Y years' construction. Be specific and data-anchored; avoid hagiography; invent no numbers.\n"
         "- why_now: one sentence, max 30 words. The single strongest reason to engage THIS expert now — their most consequential sourced stance, a recent senior-author concentration, or a guideline role. Numbers or a specific stance required. Do not open with the therapeutic area.\n"
-        "- engagement_angle: exactly 2 sentences. Where this expert's perspective adds value — anchored, where possible, in the specific stances above (a topic they have argued a position on is a better angle than a topic they merely publish in). Practical and scientific.\n"
+        "- engagement_angle: exactly 2 sentences, and the FIRST must open on this expert's own claim. Sentence 1: state a specific position this expert has argued — its actual content, attributed to them by surname (what they found, what they dispute, what they call inadequate or unresolved). The grammatical subject of that sentence is the expert or their finding; the encounter with an MSL is not the subject and does not appear until sentence 2. Sentence 2: what that position opens up scientifically — the question it puts on the table. A CLAIM CARRIES CONTENT AND COULD BE ARGUED WITH; A TOPIC IS ONLY A SUBJECT HEADING. \"Dequeker's finding that over a quarter of EQA failures produce no corrective action\" is a claim and is sufficient; \"molecular testing standardization\" is a topic and is not. If no Sourced Position supports a specific claim, open on the most concrete single element of the published record instead and say plainly that no argued position is on file — never substitute a thematic label for a stance. Practical and scientific.\n"
         "- signal_strength: exactly 1 sentence. Honest confidence in this read, grounded in how much sourced evidence exists (number of positions, senior-author depth). Do NOT mention pharma, payments, or industry engagement.\n"
         "- caution_flags: 1 sentence OR the JSON literal null. Default to null. Only populate for a SPECIFIC, ACTIONABLE scientific concern evident in the sourced record (e.g. the expert's own published caution about a mechanism or toxicity that directly bears on an MSL conversation). Do NOT reference pharma engagement, payments, or industry relationships. Do NOT hedge or speculate.\n"
         "- NO INDUSTRY LANGUAGE: do not mention Open Payments, pharma engagement, industry collaboration, payments, or commercial relationships in ANY field. None of that data is provided and it is out of scope for this version.\n"
@@ -2158,12 +2310,16 @@ def upsert_narrative(
 ) -> None:
     """Write narrative to hcp_narratives."""
     generated_at = datetime.now(timezone.utc).isoformat()
+    # 2026-08-14: the stamped version comes from narrative_prompt_versions via
+    # prompt_version_for(), not from a module literal, so the generator and every
+    # reader of is_current agree by construction. The cohort keys match the values
+    # written to hcp_narratives_v2.cohort ('community' is the catch-all, as before).
     if ctx.cohort_classification == "rising_star":
-        prompt_version = RISING_STAR_PROMPT_VERSION
+        prompt_version = prompt_version_for("rising_star")
     elif ctx.cohort_classification == "established":
-        prompt_version = ESTABLISHED_PROMPT_VERSION
+        prompt_version = prompt_version_for("established")
     else:
-        prompt_version = PROMPT_VERSION
+        prompt_version = prompt_version_for("community")
     if target_version == "v2":
         # Provenance stamp (2026-08-05): record which scoring snapshot this
         # narrative read. Source rows are overwritten in place on recompute, so
@@ -2267,11 +2423,31 @@ def run_pipeline(
         hcp_rows = fetch_hcps_by_ids(supabase, {single_hcp_id}, target_version)
         if not hcp_rows:
             raise ValueError(f"HCP not found: {single_hcp_id}")
-        actual_cohort = hcp_rows[0].get("cohort_classification")
+        # Resolved from board membership / hcp_cohort_classification_v2. Reading
+        # hcps_v2.cohort_classification here refused every board member the dead
+        # column left NULL -- 78.7% of the Established board, 84% of them non-US.
+        visible_ta_ids_for_gate = load_visible_ta_ids(supabase)
+        actual_cohort = resolve_cohort_for_hcp(
+            supabase, single_hcp_id, visible_ta_ids_for_gate, list(target_cohorts)
+        )
         if actual_cohort != expected_cohort:
+            # Re-resolve without the target filter so the error can name the
+            # cohort the HCP actually belongs to, rather than just saying "None".
+            true_cohort = resolve_cohort_for_hcp(
+                supabase,
+                single_hcp_id,
+                visible_ta_ids_for_gate,
+                ["established", "rising_star", "community"],
+            )
+            if true_cohort is None:
+                raise ValueError(
+                    f"HCP {single_hcp_id} is not on the Established or Rising board "
+                    f"for the visible TAs and has no hcp_cohort_classification_v2 row. "
+                    f"Cannot generate a '{expected_cohort}' narrative."
+                )
             raise ValueError(
-                f"HCP {single_hcp_id} cohort_classification is '{actual_cohort}', "
-                f"not '{expected_cohort}'. Use --cohort {actual_cohort} to regenerate."
+                f"HCP {single_hcp_id} resolves to cohort '{true_cohort}', "
+                f"not '{expected_cohort}'. Use --cohort {true_cohort} to regenerate."
             )
         hcp_name = (
             f"{hcp_rows[0].get('first_name') or ''} {hcp_rows[0].get('last_name') or ''}"
@@ -2337,7 +2513,7 @@ def run_pipeline(
     if not force:
         if not (dry_run and single_hcp_id):
             contexts = freshness_filter(
-                contexts, supabase, ta_name_map, target_version=target_version
+                contexts, supabase, target_version=target_version
             )
         elif dry_run and single_hcp_id:
             print("[DRY RUN] Skipping freshness filter for single-HCP preview.")
@@ -2542,6 +2718,19 @@ def main() -> int:
         help="Concurrent API workers. 1 = legacy sequential pacing with sleep; 6-8 recommended for batch regens.",
     )
     args = parser.parse_args()
+
+    # .env BEFORE the prompt-version load below. The only other load_dotenv() call
+    # is the first statement of run_pipeline(), which main() does not reach until
+    # after this block -- so without this line get_db_conn() below raises
+    # "Missing DATABASE_URL" on every invocation. Idempotent: run_pipeline's call
+    # stays, so a direct caller of run_pipeline() is unaffected.
+    load_dotenv()
+
+    # Prompt versions come from narrative_prompt_versions, loaded before any
+    # generation so a missing cohort row stops the run here rather than after
+    # thousands of rows have been stamped with a guessed version.
+    with get_db_conn() as _pv_conn:
+        load_prompt_versions(_pv_conn)
 
     if args.hcp_id and args.cohort == "all":
         print(

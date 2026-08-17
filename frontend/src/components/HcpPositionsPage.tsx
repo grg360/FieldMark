@@ -197,7 +197,7 @@ export default function HcpPositionsPage() {
           dek={hcpName
             ? `Every position extracted from the published literature of ${hcpName}${taLabel ? ` in ${taLabel}` : ""}, each held to the sentence that supports it.`
             : "Every position extracted from the published literature, each held to the sentence that supports it."}
-          stats={empty ? undefined : heroStats}
+          stats={empty ? undefined : { variant: "cluster", items: heroStats }}
         />
 
         {loading ? (

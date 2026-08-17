@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { WebSignal } from "../lib/api";
 import { RIGHT_RAIL_HEADER_STYLE } from "./rightRailStyles";
 import { COOL } from "../lib/designTokens";
+import { FACE } from "../lib/canonicalTokens";
 
 interface Props {
   hcpName: string;
@@ -27,11 +28,11 @@ const LP = {
   ink5: "#7C8288",
   ink6: "#63696E",
 } as const;
-const mono = (s: number, w = 400): CSSProperties => ({ font: `${w} ${s}px 'IBM Plex Mono',ui-monospace,monospace` });
-const serif = (s: number, w = 400): CSSProperties => ({ font: `${w} ${s}px 'Source Serif 4',Georgia,serif` });
+const mono = (s: number, w = 400): CSSProperties => ({ font: `${w} ${s}px ${FACE.data}` });
+const serif = (s: number, w = 400): CSSProperties => ({ font: `${w} ${s}px ${FACE.value}` }); // was bare Source Serif 4 — the fallback face rendering live
 
 const SUBSECTION_HEADER_STYLE: CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
   color: "#6B6A65",
   textTransform: "uppercase",
   letterSpacing: "0.06em",
@@ -170,7 +171,7 @@ export default function ContactAccessCard({ hcpName, signals, loading, variant }
           {hasIdentityContent && (
             <div style={{ marginBottom: 16 }}>
               {hcpName ? (
-                <div style={ledger ? { ...serif(14, 600), color: LP.ink0 } : { fontSize: 14, color: "#E8E6DF", fontWeight: 600 }}>{hcpName}</div>
+                <div style={ledger ? { ...serif(15, 600), color: LP.ink0 } : { fontSize: 14, color: "#E8E6DF", fontWeight: 600 }}>{hcpName}</div>
               ) : null}
               {academicTitle ? (
                 <div style={ledger ? { ...serif(13), color: LP.ink3 } : { fontSize: 13, color: "#9B9892" }}>{academicTitle}</div>

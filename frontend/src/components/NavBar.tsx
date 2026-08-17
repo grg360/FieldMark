@@ -24,9 +24,10 @@
 // searches (feed/ledger) are unaffected. Invite lives here, not in the bar.
 // Bibliography is intentionally absent pending its routing fix.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { COLOR, CONTENT_WIDTH, ELEVATION, FONT, TYPE } from "../lib/designTokens";
+import { CONTENT_WIDTH } from "../lib/designTokens";
+import { CANON, DEPTH, FACE, T } from "../lib/canonicalTokens";
 import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/authHelpers";
 import { useIsAdmin } from "../lib/useIsAdmin";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -83,7 +84,39 @@ const NAV_ITEMS: NavItem[] = [
   { key: "skyview", label: "SkyView", to: "/oncology/telescope/nsclc" },
 ];
 
-const SEAM = COLOR.hairStrong;
+const SEAM = CANON.LINE.HAIR;
+// Skyview/immersive backdrop: GROUND.BASE (#0F1114 = 15,17,20) at 42% so the
+// floating bar is the same charcoal as the opaque one, just see-through.
+const TRANSLUCENT_GROUND = "rgba(15,17,20,0.42)";
+
+// Canonical migration 2026-08-13 (chrome pass). The bar is CHROME, not a content
+// panel: it sits flat on GROUND.BASE — the same ground the shell paints — with a
+// single LINE.HAIR bottom seam as its only depth. No PANEL gradient (that would
+// read as a section card floating above the page), no RIM (a top-edge highlight
+// on a bar flush to the viewport top has no light to catch).
+// Composite legacy styles (TYPE.microLabel / TYPE.bodyUI / ELEVATION.card) are
+// re-expressed here in canonical terms rather than imported.
+const MICRO_LABEL: CSSProperties = {
+  fontFamily: FACE.data, // tracked caps are the mono label voice, not sans
+  fontSize: T.MICRO,
+  fontWeight: 600,
+  letterSpacing: "0.11em",
+  textTransform: "uppercase",
+  color: CANON.INK.MUTE,
+};
+const BODY_UI: CSSProperties = {
+  fontFamily: FACE.ui,
+  fontSize: T.META,
+  lineHeight: 1.5,
+  color: CANON.INK.BODY,
+};
+// Dropdown / sheet / modal: these FLOAT over content, which is OVERHANG's stated
+// register (the one depth token the nav earns).
+const FLOATING_PANEL: CSSProperties = {
+  ...DEPTH.OVERHANG,
+  border: `1px solid ${CANON.LINE.HAIR}`,
+  borderRadius: 3,
+};
 
 // Prefix-based active resolution — must hold on nested routes (/hcp/:id,
 // /congress/:slug, /pulse/:ta). Order matters: most specific first.
@@ -227,8 +260,8 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
     <nav
       style={{
         position: "relative",
-        borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : COLOR.hairStrong}`,
-        background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground,
+        borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : CANON.LINE.HAIR}`,
+        background: translucent ? TRANSLUCENT_GROUND : CANON.GROUND.BASE,
         ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
       }}
       aria-label="Primary"
@@ -247,7 +280,7 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
     >
       <Link
         to="/me"
-        style={{ fontFamily: FONT.mono, fontSize: 12.5, letterSpacing: "0.2em", color: COLOR.amber, textDecoration: "none" }}
+        style={{ fontFamily: FACE.data, fontSize: T.META, letterSpacing: "0.2em", color: CANON.GOLD.PRIME, textDecoration: "none" }}
       >
         FIELDMARK
       </Link>
@@ -263,23 +296,23 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
               to={item.to}
               aria-current={on ? "page" : undefined}
               style={{
-                fontFamily: FONT.mono,
-                fontSize: 12,
+                fontFamily: FACE.data,
+                fontSize: T.LABEL,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 textAlign: "center", // 2026-08-10: labels centered within their blocks
-                color: on ? COLOR.ink1 : COLOR.ink3,
+                color: on ? CANON.INK.PRIME : CANON.INK.LABEL,
                 fontWeight: on ? 500 : 400,
                 textDecoration: "none",
                 paddingBottom: 3,
-                boxShadow: on ? `inset 0 -2px 0 ${COLOR.amber}` : "none",
+                boxShadow: on ? `inset 0 -2px 0 ${CANON.GOLD.PRIME}` : "none",
                 lineHeight: 1,
               }}
               onMouseEnter={(e) => {
-                if (!on) e.currentTarget.style.color = COLOR.ink2;
+                if (!on) e.currentTarget.style.color = CANON.INK.BODY;
               }}
               onMouseLeave={(e) => {
-                if (!on) e.currentTarget.style.color = COLOR.ink3;
+                if (!on) e.currentTarget.style.color = CANON.INK.LABEL;
               }}
             >
               {item.label}
@@ -309,8 +342,8 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
           >
             {/* same magnifier as the mobile utility strip — nav chrome, not an afterthought */}
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-              <circle cx="7.5" cy="7.5" r="5.5" stroke={searchOpen ? COLOR.ink1 : COLOR.ink3} strokeWidth="1.5" />
-              <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={searchOpen ? COLOR.ink1 : COLOR.ink3} strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="7.5" cy="7.5" r="5.5" stroke={searchOpen ? CANON.INK.PRIME : CANON.INK.LABEL} strokeWidth="1.5" />
+              <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={searchOpen ? CANON.INK.PRIME : CANON.INK.LABEL} strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
         ) : null}
@@ -387,8 +420,8 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
           alignItems: "center",
           gap: 10,
           padding: "0 12px",
-          borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : COLOR.hairStrong}`,
-          background: translucent ? "rgba(3,5,12,0.42)" : COLOR.ground,
+          borderBottom: `1px solid ${translucent ? "rgba(255,255,255,0.08)" : CANON.LINE.HAIR}`,
+          background: translucent ? TRANSLUCENT_GROUND : CANON.GROUND.BASE,
           ...(translucent ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
         }}
       >
@@ -400,15 +433,15 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
           style={{ background: "none", border: "none", cursor: "pointer", padding: 8, margin: -8, marginRight: -2, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}
         >
           {[0, 1, 2].map((i) => (
-            <span key={i} style={{ display: "block", width: 16, height: 1.5, background: open ? COLOR.amber : COLOR.ink2 }} />
+            <span key={i} style={{ display: "block", width: 16, height: 1.5, background: open ? CANON.GOLD.PRIME : CANON.INK.BODY }} />
           ))}
         </button>
-        <Link to="/me" style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.2em", color: COLOR.amber, textDecoration: "none" }}>
+        <Link to="/me" style={{ fontFamily: FACE.data, fontSize: T.LABEL, letterSpacing: "0.2em", color: CANON.GOLD.PRIME, textDecoration: "none" }}>
           FIELDMARK
         </Link>
         {/* current surface, so the bar orients without the grid */}
         {activeLabel ? (
-          <span style={{ fontFamily: FONT.mono, fontSize: 9.5, letterSpacing: "0.12em", color: COLOR.ink3, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+          <span style={{ fontFamily: FACE.data, fontSize: T.MICRO, letterSpacing: "0.12em", color: CANON.INK.LABEL, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
             / {activeLabel}
           </span>
         ) : null}
@@ -423,8 +456,8 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
               style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", minHeight: 0 }}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                <circle cx="7.5" cy="7.5" r="5.5" stroke={searchOpen ? COLOR.amber : COLOR.ink3} strokeWidth="1.5" />
-                <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={searchOpen ? COLOR.amber : COLOR.ink3} strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="7.5" cy="7.5" r="5.5" stroke={searchOpen ? CANON.GOLD.PRIME : CANON.INK.LABEL} strokeWidth="1.5" />
+                <line x1="11.5" y1="11.5" x2="16" y2="16" stroke={searchOpen ? CANON.GOLD.PRIME : CANON.INK.LABEL} strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </button>
           ) : null}
@@ -457,9 +490,11 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
               left: 0,
               right: 0,
               zIndex: 61,
-              background: COLOR.ground,
-              borderBottom: `1px solid ${COLOR.hairStrong}`,
-              boxShadow: "0 18px 40px rgba(0,0,0,0.6)",
+              // the drawer floats over content → OVERHANG (canonical cast shadow
+              // replaces the hand-rolled one); square top edge against the bar.
+              ...FLOATING_PANEL,
+              borderRadius: 0,
+              borderTop: "none",
               maxHeight: "calc(100vh - 44px)",
               overflowY: "auto",
             }}
@@ -478,14 +513,14 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
                     minHeight: 46,
                     padding: "0 16px",
                     borderBottom: `1px solid ${SEAM}`,
-                    background: on ? COLOR.surfaceRaised : "transparent",
-                    boxShadow: on ? `inset 2px 0 0 ${COLOR.amber}` : "none",
+                    background: on ? CANON.GROUND.INSET : "transparent",
+                    boxShadow: on ? `inset 2px 0 0 ${CANON.GOLD.PRIME}` : "none",
                     textDecoration: "none",
-                    fontFamily: FONT.mono,
-                    fontSize: 12,
+                    fontFamily: FACE.data,
+                    fontSize: T.LABEL,
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: on ? COLOR.ink1 : COLOR.ink3,
+                    color: on ? CANON.INK.PRIME : CANON.INK.LABEL,
                     fontWeight: on ? 500 : 400,
                   }}
                 >
@@ -550,15 +585,15 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
         boxSizing: "border-box",
         borderRadius: "50%",
         backgroundColor: "transparent",
-        border: `1.5px solid ${COLOR.amber}`,
-        color: COLOR.amber,
+        border: `1.5px solid ${CANON.GOLD.PRIME}`,
+        color: CANON.GOLD.PRIME,
         padding: 0,
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: FONT.mono,
-        fontSize: 12,
+        fontFamily: FACE.data,
+        fontSize: T.META,
         fontWeight: 600,
         letterSpacing: "0.02em",
       }}
@@ -569,9 +604,9 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
 
   const rows = (
     <>
-      <div style={{ padding: "12px 14px", borderBottom: `1px solid ${COLOR.hair}`, display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontFamily: FONT.sans, fontSize: 12, color: COLOR.ink1 }}>{menu.email || menu.profile?.first_name || "Signed in"}</span>
-        <span style={{ ...TYPE.microLabel, color: COLOR.ink4 }}>
+      <div style={{ padding: "12px 14px", borderBottom: `1px solid ${CANON.LINE.HAIR}`, display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ fontFamily: FACE.ui, fontSize: T.META, color: CANON.INK.PRIME }}>{menu.email || menu.profile?.first_name || "Signed in"}</span>
+        <span style={{ ...MICRO_LABEL, color: CANON.INK.MUTE }}>
           {[menu.profile?.company, menu.isAdmin ? "ADMIN" : null].filter(Boolean).join(" · ") || "FIELDMARK"}
         </span>
       </div>
@@ -581,7 +616,7 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
         <MenuRow label="Invite colleagues" hint={`${menu.invite!.uses_remaining} LEFT`} hintAmber onClick={() => { setOpen(false); setInviteOpen(true); }} />
       ) : null}
       {menu.isAdmin ? <MenuRow label="Admin" onClick={() => go("/admin")} /> : null}
-      <div style={{ borderTop: `1px solid ${COLOR.hairStrong}` }}>
+      <div style={{ borderTop: `1px solid ${CANON.LINE.HAIR}` }}>
         <MenuRow label="Sign out" hint="→" hintAmber tall onClick={() => void signOut()} />
       </div>
     </>
@@ -591,14 +626,14 @@ function AvatarMenu({ menu, mobile }: { menu: MenuData; mobile: boolean }) {
     <div ref={ref} style={{ position: "relative" }}>
       {pill}
       {open && !mobile ? (
-        <div style={{ ...ELEVATION.card, position: "absolute", top: 40, right: 0, width: 296, overflow: "hidden", zIndex: 100 }}>
+        <div style={{ ...FLOATING_PANEL, position: "absolute", top: 40, right: 0, width: 296, overflow: "hidden", zIndex: 100 }}>
           {rows}
         </div>
       ) : null}
       {open && mobile ? (
         <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(10,12,12,0.72)", zIndex: 90 }} />
-          <div style={{ position: "fixed", top: 36, left: 0, right: 0, background: COLOR.surfaceCard, borderBottom: `1px solid ${COLOR.hairStrong}`, zIndex: 100 }}>
+          <div style={{ position: "fixed", top: 36, left: 0, right: 0, background: CANON.GROUND.RAISE, borderBottom: `1px solid ${CANON.LINE.HAIR}`, zIndex: 100 }}>
             {rows}
           </div>
         </>
@@ -623,16 +658,16 @@ function MenuRow({ label, hint, hintAmber, tall, onClick }: { label: string; hin
         padding: "0 14px",
         background: "transparent",
         border: "none",
-        borderBottom: `1px solid ${COLOR.hair}`,
+        borderBottom: `1px solid ${CANON.LINE.HAIR}`,
         cursor: "pointer",
-        fontFamily: FONT.sans,
+        fontFamily: FACE.ui,
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = COLOR.surfaceRaised)}
+      onMouseEnter={(e) => (e.currentTarget.style.background = CANON.GROUND.INSET)}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      <span style={{ fontSize: 12, color: COLOR.ink1 }}>{label}</span>
+      <span style={{ fontSize: T.META, color: CANON.INK.PRIME }}>{label}</span>
       {hint ? (
-        <span style={{ fontFamily: FONT.mono, fontSize: 9.5, letterSpacing: "0.08em", color: hintAmber ? COLOR.amber : COLOR.ink5 }}>{hint}</span>
+        <span style={{ fontFamily: FACE.data, fontSize: T.MICRO, letterSpacing: "0.08em", color: hintAmber ? CANON.GOLD.PRIME : CANON.INK.MUTE }}>{hint}</span>
       ) : null}
     </button>
   );
@@ -650,18 +685,18 @@ function InviteModal({ invite, onClose }: { invite: MyInvite; onClose: () => voi
   }, [onClose]);
   return (
     <div role="presentation" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div role="dialog" aria-modal="true" aria-label="Invite colleagues" onClick={(e) => e.stopPropagation()} style={{ ...ELEVATION.card, padding: 24, maxWidth: 480, width: "100%", maxHeight: "calc(100dvh - 32px)", overflowY: "auto", fontFamily: FONT.sans }}>
+      <div role="dialog" aria-modal="true" aria-label="Invite colleagues" onClick={(e) => e.stopPropagation()} style={{ ...FLOATING_PANEL, padding: 24, maxWidth: 480, width: "100%", maxHeight: "calc(100dvh - 32px)", overflowY: "auto", fontFamily: FACE.ui }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-          <div style={TYPE.microLabel}>Invite Colleagues</div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: COLOR.ink4, fontSize: 18, lineHeight: 1, cursor: "pointer", padding: 0 }}>
+          <div style={MICRO_LABEL}>Invite Colleagues</div>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: CANON.INK.MUTE, fontSize: T.LEAD, lineHeight: 1, cursor: "pointer", padding: 0 }}>
             {String.fromCharCode(0xd7)}
           </button>
         </div>
-        <p style={{ ...TYPE.bodyUI, margin: "0 0 12px 0" }}>
+        <p style={{ ...BODY_UI, margin: "0 0 12px 0" }}>
           Share your personal link. Anyone you invite gets FieldMark access — and their own invites to pass on.
         </p>
         <InviteShareCard code={invite.code} usesRemaining={invite.uses_remaining} />
-        <div style={{ ...TYPE.microLabel, borderTop: `1px solid ${COLOR.hair}`, margin: "16px 0 12px", paddingTop: 12 }}>Or email an invite</div>
+        <div style={{ ...MICRO_LABEL, borderTop: `1px solid ${CANON.LINE.HAIR}`, margin: "16px 0 12px", paddingTop: 12 }}>Or email an invite</div>
         <InviteEmailForm />
       </div>
     </div>

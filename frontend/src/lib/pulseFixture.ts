@@ -19,7 +19,8 @@ import type { PulsePayload } from "./pulse";
 
 export const NSCLC_PULSE: PulsePayload = {
   grain: "month",
-  therapeutic_area: "NSCLC",
+  ta_slug: "nsclc",
+  ta_label: "Lung Cancer",
   generated_at: "2026-07-27",
   window: {
     current_start: "2026-04-01",

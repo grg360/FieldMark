@@ -12,9 +12,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import AppLayout from "../AppLayout";
-import { FONT, GROUND, LINE, COOL, GOLD as GOLD_T } from "../../lib/designTokens";
+import { CANON, FACE, DEPTH } from "../../lib/canonicalTokens";
 import { formatIndexDate } from "../../lib/assets";
 import { ASSETS, DEPLOYMENT_ASSETS, BACKBONE_ASSETS } from "../../lib/assetConfig";
+import { ASSETS_TA_SLUG } from "../../lib/assetConfig";
+import { taLabelForSlug } from "../../lib/taLabels";
+import { parentTaLabelForIndicationSlug } from "../../lib/routeSlugs";
+import PageHero from "../PageHero";
 import {
   loadAssetIndex,
   DENSITY_GLYPH,
@@ -33,15 +37,26 @@ import {
 // glyph, not text. The
 // gold-tinted active-chip values (#151310 / #e8dcc4 / #6e6558) are semantics
 // and stay local.
-const PANEL = GROUND.g1, PANEL2 = GROUND.g2; // page ground comes from AppLayout
-// Gold convergence 2026-08-05: #c9903c folds into GOLD.gold; #7d6234 AND
-// #6f5629 both fold into GOLD.dim — the faint/dim distinction retires.
-const GOLD = GOLD_T.gold, GOLD_DIM = GOLD_T.dim, GOLD_FAINT = GOLD_T.dim;
-const INK = COOL.ui, INK2 = COOL.ui, INK3 = COOL.prose;
-const MUT = COOL.muted, MUT2 = COOL.chrome, MUT3 = COOL.faint, DIM = COOL.floor, DIM2 = COOL.floor, DIM3 = LINE.l2;
-const H1 = LINE.l0, H2 = LINE.l1, H3 = LINE.l1, H4 = LINE.l0;
-const SERIF = FONT.serif;
-const MONO = FONT.mono;
+const PANEL = CANON.GROUND.RAISE, PANEL2 = CANON.GROUND.INSET; // page ground comes from AppLayout
+// Gold accents are SEMANTIC on this surface and are kept, not neutralised:
+// target-group headers, rank ordinals, the selected-row rule, the ALSO IN
+// cross-references. GOLD_FAINT lands on RANK rather than EDGE — see the flag in
+// the migration note below (EDGE at 7.5px on this ground is not legible).
+const GOLD = CANON.GOLD.PRIME, GOLD_DIM = CANON.GOLD.EDGE, GOLD_FAINT = CANON.GOLD.RANK;
+const INK = CANON.INK.PRIME, INK2 = CANON.INK.PRIME, INK3 = CANON.INK.BODY;
+// 8 legacy ink steps → 5 canonical ones, so two pairs necessarily converge
+// (flagged in the report): MUT/MUT2 → LABEL and MUT3/DIM/DIM2 → MUTE. DIM and
+// DIM2 were ALREADY identical (both COOL.floor). DIM/DIM2 get BRIGHTER — the
+// old palette's own comment flagged them as live micro-text sitting on a
+// non-text step; MUTE fixes that (rule 4) instead of preserving the violation.
+const MUT = CANON.INK.LABEL, MUT2 = CANON.INK.LABEL, MUT3 = CANON.INK.MUTE, DIM = CANON.INK.MUTE, DIM2 = CANON.INK.MUTE;
+// Density glyphs are DATAVIZ (they encode tier) — held at their existing values
+// pending the VIZ palette decision, per the cross-surface deferral.
+const DIM3 = "#2a2f36";
+const DENSITY_ACTIVE = "#6e6558";
+const H1 = CANON.LINE.HAIR, H2 = CANON.LINE.HAIR, H3 = CANON.LINE.HAIR, H4 = CANON.LINE.HAIR;
+const SERIF = FACE.value;
+const MONO = FACE.data;
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -71,9 +86,9 @@ export default function AssetsIndexPage() {
       <div style={{ fontFamily: SERIF, color: INK2 }}>
         <style>{"@keyframes fmIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}"}</style>
         {loading ? (
-          <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 12, color: MUT3 }}>Loading the index…</div>
+          <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 13, color: MUT3 }}>Loading the index…</div>
         ) : failed || !model ? (
-          <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 12, color: MUT3 }}>The drug index could not be loaded.</div>
+          <div style={{ padding: "48px 34px", fontFamily: MONO, fontSize: 13, color: MUT3 }}>The drug index could not be loaded.</div>
         ) : (
           <Index model={model} isMobile={isMobile} />
         )}
@@ -114,7 +129,7 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
     const allTargets = showAlso && rec ? rec.groups.map((g) => (g.kind === "target" ? g.label : g.kind === "chemo" ? "BACKBONE" : "NO TARGET")) : [];
     const alsoText = allTargets.length ? "IN " + allTargets.join(" · ") : alsoTargets.length ? "ALSO IN " + alsoTargets.join(" · ") : "";
     const to = `/assets/${r.slug}`;
-    const nameColor = isActive ? "#f4efe4" : INK3;
+    const nameColor = isActive ? CANON.INK.PRIME : INK3;
     const nameStyle = { font: `400 13px/1.15 ${SERIF}`, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis", color: nameColor, textDecoration: "none", transition: "color .13s ease" };
     return (
       <div
@@ -125,9 +140,9 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
         onMouseEnter={isMobile ? undefined : () => setHov(r.generic)}
         onMouseLeave={isMobile ? undefined : () => setHov(null)}
         onClick={isMobile ? () => navigate(to) : () => setSel(r.generic)}
-        style={{ position: "relative", display: "grid", gridTemplateColumns: "18px minmax(0,1fr) auto auto", alignItems: "baseline", columnGap: 7, padding: "5px 6px 6px 4px", cursor: "pointer", borderBottom: `1px solid ${H4}`, transition: "background .13s ease, box-shadow .13s ease", ...(isActive ? { background: "#181611", boxShadow: `inset 2px 0 0 ${GOLD}` } : {}) }}
+        style={{ position: "relative", display: "grid", gridTemplateColumns: "18px minmax(0,1fr) auto auto", alignItems: "baseline", columnGap: 7, padding: "5px 6px 6px 4px", cursor: "pointer", borderBottom: `1px solid ${H4}`, transition: "background .13s ease, box-shadow .13s ease", ...(isActive ? { background: CANON.GOLD.WASH, boxShadow: `inset 2px 0 0 ${GOLD}` } : {}) }}
       >
-        <span style={{ font: `500 8.5px/1 ${MONO}`, letterSpacing: ".04em", textAlign: "right", color: isActive ? GOLD : "#3e3a35" }}>{String(rank).padStart(2, "0")}</span>
+        <span style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".04em", textAlign: "right", color: isActive ? GOLD : CANON.INK.GHOST }}>{String(rank).padStart(2, "0")}</span>
         {isMobile ? (
           <span style={nameStyle}>{r.generic}</span>
         ) : (
@@ -135,9 +150,9 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
           // pin. Clicking anywhere else on the row still pins.
           <Link to={to} onClick={(e) => e.stopPropagation()} style={nameStyle}>{r.generic}</Link>
         )}
-        <span title={DENSITY_LABEL[r.tier]} style={{ font: `400 7px/1 ${MONO}`, letterSpacing: ".08em", color: isActive ? "#6e6558" : DIM3 }}>{DENSITY_GLYPH[r.tier]}</span>
-        <span style={{ font: `500 11.5px/1 ${MONO}`, fontVariantNumeric: "tabular-nums", textAlign: "right", minWidth: 40, color: isActive ? "#f4efe4" : INK3 }}>{fmt(r.n)}</span>
-        {alsoText ? <div style={{ gridColumn: "2 / 5", padding: "4px 0 1px", font: `500 7.5px/1 ${MONO}`, letterSpacing: ".14em", color: isActive ? GOLD : GOLD_FAINT }}>{alsoText}</div> : null}
+        <span title={DENSITY_LABEL[r.tier]} style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".08em", color: isActive ? DENSITY_ACTIVE : DIM3 }}>{DENSITY_GLYPH[r.tier]}</span>
+        <span style={{ font: `500 11px/1 ${MONO}`, fontVariantNumeric: "tabular-nums", textAlign: "right", minWidth: 40, color: isActive ? CANON.INK.PRIME : INK3 }}>{fmt(r.n)}</span>
+        {alsoText ? <div style={{ gridColumn: "2 / 5", padding: "4px 0 1px", font: `500 9px/1 ${MONO}`, letterSpacing: ".14em", color: isActive ? GOLD : GOLD_FAINT }}>{alsoText}</div> : null}
       </div>
     );
   };
@@ -181,39 +196,51 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
   const openRecord = (slug: string) => navigate(`/assets/${slug}`);
 
   const ctl = (on: boolean): React.CSSProperties => ({
-    padding: "5px 11px", font: `500 9.5px/1 ${MONO}`, letterSpacing: ".11em", cursor: "pointer", borderRadius: 2,
-    background: on ? "#151310" : "transparent", border: `1px solid ${on ? GOLD_DIM : "#242220"}`, color: on ? "#e8dcc4" : MUT3,
+    padding: "5px 11px", font: `500 9px/1 ${MONO}`, letterSpacing: ".11em", cursor: "pointer", borderRadius: 2,
+    background: on ? CANON.GOLD.WASH : "transparent", border: `1px solid ${on ? GOLD_DIM : CANON.LINE.EDGE}`, color: on ? CANON.GOLD.RANK : MUT3,
   });
 
   return (
-    <div style={{ paddingBottom: 0 }}>
+    <div style={{ ...DEPTH.PANEL, border: `1px solid ${CANON.LINE.HAIR}`, margin: "8px 0 24px", paddingBottom: 0 }}>
       {/* header */}
-      <div style={{ padding: isMobile ? "22px 16px 0" : "30px 34px 0", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) 470px", gap: isMobile ? 22 : 56, alignItems: "start" }}>
-        <div>
-          <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".24em", color: MUT3, marginBottom: 12 }}>INDEX · VOLUME III</div>
-          <h1 style={{ margin: "0 0 12px", font: `400 30px/1.1 ${SERIF}`, letterSpacing: "-.008em", color: INK }}>Drugs Index · NSCLC</h1>
-          <p style={{ margin: 0, maxWidth: 620, font: `300 14.5px/1.55 ${SERIF}`, color: MUT }}>Organized by molecular target, because that is how treatment is selected and how a territory is worked. Grouping cuts across modality: amivantamab is a bispecific antibody sitting with small-molecule TKIs, because they compete for the same patient.</p>
-        </div>
-        <div style={{ paddingTop: 4 }}>
-          <ReachRow label={`${DEPLOYMENT_ASSETS.length} deployment assets reach`} value={fmt(model.header.deploymentPubs)} />
-          <ReachRow label={`${BACKBONE_ASSETS.length} backbone agents reach`} value={fmt(model.header.backbonePubs)} />
-          <ReachRow label={`all ${ASSETS.length} reach`} value={fmt(model.header.allPubs)} />
-          <ReachRow label="NSCLC corpus" value={fmt(model.header.corpus)} />
-          <p style={{ margin: "10px 0 0", font: `400 9.5px/1.6 ${MONO}`, letterSpacing: ".02em", color: DIM, maxWidth: 420 }}>Distinct publications, not asset–publication edges. The first two scopes overlap by {fmt(model.header.overlap)} records and do not partition — they are not drawn as a whole.</p>
-        </div>
+      {/* HERO (PageHero, 2026-08-15). The two-column grid — minmax(0,1fr) 470px,
+          gap 56, alignItems start — is gone; PageHero's flex row carries the same
+          shape (text left, figures right) with the reach rows as the TABLE stat
+          variant and the overlap note as its `foot`. What that costs: the 470px
+          column is content-sized now (minWidth 250), the gap is 60 not 56, and
+          the dek takes the hero's 620px measure.
+          This surface was the only one of the eight with NO container at all —
+          bare ground inside AppLayout. It takes DEPTH.PANEL like the rest. */}
+      <div style={{ padding: isMobile ? "22px 16px 0" : "30px 34px 0" }}>
+        <PageHero
+          narrow={isMobile}
+          eyebrow={[taLabelForSlug(ASSETS_TA_SLUG), parentTaLabelForIndicationSlug(ASSETS_TA_SLUG)].filter(Boolean).join(" · ")}
+          title="Drugs Index"
+          dek="Organized by molecular target, because that is how treatment is selected and how a territory is worked. Grouping cuts across modality: amivantamab is a bispecific antibody sitting with small-molecule TKIs, because they compete for the same patient."
+          stats={{
+            variant: "table",
+            items: [
+              { value: fmt(model.header.deploymentPubs), label: `${DEPLOYMENT_ASSETS.length} deployment assets reach` },
+              { value: fmt(model.header.backbonePubs), label: `${BACKBONE_ASSETS.length} backbone agents reach` },
+              { value: fmt(model.header.allPubs), label: `all ${ASSETS.length} reach` },
+              { value: fmt(model.header.corpus), label: `${taLabelForSlug(ASSETS_TA_SLUG)} corpus` },
+            ],
+            foot: `Distinct publications, not asset–publication edges. The first two scopes overlap by ${fmt(model.header.overlap)} records and do not partition — they are not drawn as a whole.`,
+          }}
+        />
       </div>
 
       {/* controls */}
       <div style={{ margin: isMobile ? "22px 16px 0" : "26px 34px 0", borderTop: `1px solid ${H1}`, borderBottom: `1px solid ${H1}`, padding: "10px 0", display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <span style={{ font: `400 8.5px/1 ${MONO}`, letterSpacing: ".16em", color: "#4e4a44" }}>VIEW</span>
+          <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".16em", color: CANON.INK.MUTE }}>VIEW</span>
           <div style={{ display: "flex", gap: 5 }}>
             <button onClick={() => setView("target")} style={ctl(view === "target")}>BY TARGET</button>
             <button onClick={() => setView("flat")} style={ctl(view === "flat")}>FLAT · VOLUME</button>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <span style={{ font: `400 8.5px/1 ${MONO}`, letterSpacing: ".16em", color: "#4e4a44" }}>ORDER</span>
+          <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".16em", color: CANON.INK.MUTE }}>ORDER</span>
           <div style={{ display: "flex", gap: 5 }}>
             <button onClick={() => setSort("volume")} style={ctl(sort === "volume")}>VOLUME</button>
             <button onClick={() => setSort("alpha")} style={ctl(sort === "alpha")}>A–Z</button>
@@ -231,10 +258,10 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
               <div key={ch.ord + ch.label} style={{ breakInside: "avoid", display: "inline-block", width: "100%", margin: "0 0 22px", verticalAlign: "top" }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "0 6px 5px 4px" }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                    <span style={{ font: `500 8.5px/1 ${MONO}`, color: "#413d38", letterSpacing: ".04em" }}>{ch.ord}</span>
-                    <span style={{ font: `600 10.5px/1 ${MONO}`, letterSpacing: ".19em", color: GOLD, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ch.label}</span>
+                    <span style={{ font: `500 9px/1 ${MONO}`, color: CANON.INK.GHOST, letterSpacing: ".04em" }}>{ch.ord}</span>
+                    <span style={{ font: `600 11px/1 ${MONO}`, letterSpacing: ".19em", color: GOLD, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ch.label}</span>
                   </div>
-                  <span style={{ font: `400 8.5px/1 ${MONO}`, letterSpacing: ".05em", color: DIM, whiteSpace: "nowrap" }}>{ch.meta}</span>
+                  <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".05em", color: DIM, whiteSpace: "nowrap" }}>{ch.meta}</span>
                 </div>
                 <div style={{ height: 1, background: H3, margin: "0 6px 6px 4px" }} />
                 {ch.body}
@@ -246,7 +273,7 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1.55fr) minmax(0,1fr)", gap: 30, marginTop: 6, minWidth: 0 }}>
             <div>
               <SectionHead ord="02" accent={MUT2} title="BACKBONE CHEMOTHERAPY" meta={`${model.backbone.rows.length} AGENTS · ${fmt(model.backbone.distinctPubs)} DISTINCT PUBLICATIONS`} />
-              <p style={{ margin: "0 0 14px", maxWidth: 640, font: `300 13px/1.6 ${SERIF}`, color: "#a09a90" }}>These agents have no molecular target. That is what backbone chemotherapy is, not a gap in the data — so they sit outside the target structure rather than in a null group, and they are listed rather than dropped. Section membership keys on <span style={{ font: `400 11.5px/1 ${MONO}`, color: GOLD }}>is_backbone</span>, never on target being null.</p>
+              <p style={{ margin: "0 0 14px", maxWidth: 640, font: `300 13px/1.6 ${SERIF}`, color: MUT }}>These agents have no molecular target. That is what backbone chemotherapy is, not a gap in the data — so they sit outside the target structure rather than in a null group, and they are listed rather than dropped. Section membership keys on <span style={{ font: `400 11px/1 ${MONO}`, color: GOLD }}>is_backbone</span>, never on target being null.</p>
               <div style={{ columns: isMobile ? undefined : "236px 2", columnGap: 30 }}>
                 {[...model.backbone.rows].sort((a, b) => (sort === "alpha" ? a.generic.localeCompare(b.generic) : b.n - a.n)).map((r) => (
                   <div key={r.slug} style={{ breakInside: "avoid" }}>
@@ -254,14 +281,14 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
                   </div>
                 ))}
               </div>
-              <p style={{ margin: "14px 0 0", font: `400 9.5px/1.65 ${MONO}`, color: "#4e4a44", maxWidth: 700 }}>Row counts sum to {fmt(model.backbone.rowSum)} because these agents are co-administered and co-mentioned; {fmt(model.backbone.distinctPubs)} is the distinct union. Density is shown for consistency but these assets are outside the {DEPLOYMENT_ASSETS.length}-asset deployment count in the legend above.</p>
+              <p style={{ margin: "14px 0 0", font: `400 9px/1.65 ${MONO}`, color: CANON.INK.MUTE, maxWidth: 700 }}>Row counts sum to {fmt(model.backbone.rowSum)} because these agents are co-administered and co-mentioned; {fmt(model.backbone.distinctPubs)} is the distinct union. Density is shown for consistency but these assets are outside the {DEPLOYMENT_ASSETS.length}-asset deployment count in the legend above.</p>
             </div>
 
             <div>
               <SectionHead ord="03" accent={MUT2} title="" meta={`${model.nullNonBackbone.length} ASSET · ${fmt(model.nullNonBackbone.reduce((s, r) => s + r.n, 0))} PUBLICATIONS`} />
-              <div style={{ font: `400 9.5px/1 ${MONO}`, letterSpacing: ".16em", color: MUT3, margin: "0 0 12px" }}>NO MOLECULAR TARGET, NOT BACKBONE</div>
+              <div style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".16em", color: MUT3, margin: "0 0 12px" }}>NO MOLECULAR TARGET, NOT BACKBONE</div>
               {model.nullNonBackbone.map((r, i) => <Row key={r.slug} r={r} rank={i + 1} />)}
-              <p style={{ margin: "14px 0 0", font: `300 12.5px/1.6 ${SERIF}`, color: "#a09a90" }}>A deployment asset with <span style={{ font: `400 11px/1 ${MONO}`, color: GOLD }}>target = null</span> and <span style={{ font: `400 11px/1 ${MONO}`, color: GOLD }}>is_backbone = false</span>. It gets its own section, named for what is true of it, rather than being filed under chemotherapy or hidden — a real state in the taxonomy, not a catch-all.</p>
+              <p style={{ margin: "14px 0 0", font: `300 13px/1.6 ${SERIF}`, color: MUT }}>A deployment asset with <span style={{ font: `400 11px/1 ${MONO}`, color: GOLD }}>target = null</span> and <span style={{ font: `400 11px/1 ${MONO}`, color: GOLD }}>is_backbone = false</span>. It gets its own section, named for what is true of it, rather than being filed under chemotherapy or hidden — a real state in the taxonomy, not a catch-all.</p>
             </div>
           </div>
         </div>
@@ -271,9 +298,9 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
           <div style={{ position: "sticky", top: 16, alignSelf: "start", border: `1px solid ${H2}`, background: PANEL, borderRadius: 2, overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderBottom: `1px solid ${H1}`, background: PANEL2 }}>
               <span style={{ width: 2, height: 10, background: GOLD, display: "block" }} />
-              <span style={{ font: `600 9px/1 ${MONO}`, letterSpacing: ".22em", color: "#d8cdb6" }}>BRIEFING</span>
+              <span style={{ font: `600 9px/1 ${MONO}`, letterSpacing: ".22em", color: CANON.INK.BODY }}>BRIEFING</span>
               <span style={{ flex: 1 }} />
-              <span style={{ font: `400 8.5px/1 ${MONO}`, letterSpacing: ".1em", color: "#4e4a44" }}>{active ? (pinned ? "PINNED" : "PREVIEW") : "NO ASSET RAISED"}</span>
+              <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".1em", color: CANON.INK.MUTE }}>{active ? (pinned ? "PINNED" : "PREVIEW") : "NO ASSET RAISED"}</span>
             </div>
             {active && assetMap.get(active) ? (
               <Brief rec={assetMap.get(active)!} model={model} setHov={setHov} setSel={setSel} openRecord={openRecord} />
@@ -281,14 +308,14 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
               <div style={{ padding: "16px 14px 18px" }}>
                 <p style={{ margin: "0 0 16px", font: `300 13px/1.6 ${SERIF}`, color: MUT2 }}>Every row in this index is a linked asset record. Raise one here to read its position before you open it — rank inside its target group, share of that group's literature, and every other group it is carried by.</p>
                 <div style={{ borderTop: `1px solid ${H1}`, paddingTop: 12 }}>
-                  <div style={{ font: `500 8.5px/1 ${MONO}`, letterSpacing: ".18em", color: DIM, marginBottom: 9 }}>MULTI-TARGET ASSETS</div>
+                  <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".18em", color: DIM, marginBottom: 9 }}>MULTI-TARGET ASSETS</div>
                   {multiTarget.map((a) => (
                     <div key={a.slug} onMouseEnter={() => setHov(a.name)} onMouseLeave={() => setHov(null)} onClick={() => setSel(a.name)} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "3px 0", cursor: "pointer" }}>
-                      <span style={{ font: `400 12.5px/1.2 ${SERIF}`, color: INK3 }}>{a.name}</span>
-                      <span style={{ font: `400 8px/1 ${MONO}`, letterSpacing: ".12em", color: GOLD_FAINT }}>{a.groups.filter((g) => g.kind === "target").map((g) => g.label).join(" · ")}</span>
+                      <span style={{ font: `400 13px/1.2 ${SERIF}`, color: INK3 }}>{a.name}</span>
+                      <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".12em", color: GOLD_FAINT }}>{a.groups.filter((g) => g.kind === "target").map((g) => g.label).join(" · ")}</span>
                     </div>
                   ))}
-                  <p style={{ margin: "11px 0 0", font: `400 9px/1.6 ${MONO}`, color: "#45413b" }}>{multiTarget.length} assets appear in every group they belong to — {model.counts.rows} rows for {model.counts.targetedAssets} assets.</p>
+                  <p style={{ margin: "11px 0 0", font: `400 9px/1.6 ${MONO}`, color: CANON.INK.MUTE }}>{multiTarget.length} assets appear in every group they belong to — {model.counts.rows} rows for {model.counts.targetedAssets} assets.</p>
                 </div>
               </div>
             )}
@@ -298,21 +325,12 @@ function Index({ model, isMobile }: { model: AssetIndexModel; isMobile: boolean 
 
       {/* multi-target note + footer */}
       <div style={{ margin: isMobile ? "26px 16px 0" : "26px 34px 0", borderTop: `1px solid ${H1}`, padding: "12px 0 0" }}>
-        <p style={{ margin: 0, maxWidth: 1180, font: `400 9.5px/1.7 ${MONO}`, color: "#4e4a44" }}>{model.counts.targetGroups} target groups from the controlled vocabulary, holding the {model.counts.targetedAssets} deployment assets that carry a target; the rest have none. Multi-target assets appear in every group they belong to, marked <span style={{ color: GOLD_FAINT }}>ALSO IN</span> — so the groups hold {model.counts.rows} rows for {model.counts.targetedAssets} assets, and group publication totals do not sum to {fmt(model.header.deploymentPubs)}.</p>
+        <p style={{ margin: 0, maxWidth: 1180, font: `400 9px/1.7 ${MONO}`, color: CANON.INK.MUTE }}>{model.counts.targetGroups} target groups from the controlled vocabulary, holding the {model.counts.targetedAssets} deployment assets that carry a target; the rest have none. Multi-target assets appear in every group they belong to, marked <span style={{ color: GOLD_FAINT }}>ALSO IN</span> — so the groups hold {model.counts.rows} rows for {model.counts.targetedAssets} assets, and group publication totals do not sum to {fmt(model.header.deploymentPubs)}.</p>
       </div>
       <div style={{ margin: "16px 0 0", borderTop: `1px solid ${H1}`, padding: isMobile ? "12px 16px 26px" : "12px 34px 26px", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
-        <span style={{ font: `400 9.5px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>FieldMark NSCLC corpus, {fmt(model.header.corpus)} records, indexed {formatIndexDate(model.header.indexDate)}.</span>
-        <span style={{ font: `400 9.5px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>{view === "flat" ? `FLAT VIEW · ${DEPLOYMENT_ASSETS.length} ROWS` : `${model.counts.rows} TARGET ROWS · ${model.backbone.rows.length} BACKBONE · ${model.nullNonBackbone.length} UNTARGETED`}</span>
+        <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>FieldMark {taLabelForSlug(ASSETS_TA_SLUG).toLowerCase()} corpus, {fmt(model.header.corpus)} records, indexed {formatIndexDate(model.header.indexDate)}.</span>
+        <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: DIM2 }}>{view === "flat" ? `FLAT VIEW · ${DEPLOYMENT_ASSETS.length} ROWS` : `${model.counts.rows} TARGET ROWS · ${model.backbone.rows.length} BACKBONE · ${model.nullNonBackbone.length} UNTARGETED`}</span>
       </div>
-    </div>
-  );
-}
-
-function ReachRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: `1px solid ${H4}`, padding: "5px 0" }}>
-      <span style={{ font: `400 10px/1 ${MONO}`, letterSpacing: ".06em", color: "#7d776d" }}>{label}</span>
-      <span style={{ font: `500 12px/1 ${MONO}`, fontVariantNumeric: "tabular-nums", color: INK }}>{value}</span>
     </div>
   );
 }
@@ -321,9 +339,9 @@ function SectionHead({ ord, accent, title, meta }: { ord: string; accent: string
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, borderTop: `1px solid ${H2}`, borderBottom: `1px solid ${H2}`, padding: "7px 0", margin: "0 0 16px" }}>
       <span style={{ width: 2, height: 11, background: accent, display: "block" }} />
-      <span style={{ font: `600 9.5px/1 ${MONO}`, letterSpacing: ".2em", color: "#d8cdb6" }}>SECTION {ord}</span>
-      {title ? <span style={{ font: `400 9.5px/1 ${MONO}`, letterSpacing: ".16em", color: MUT3 }}>{title}</span> : null}
-      <span style={{ flex: 1, height: 1, background: "#1a1917" }} />
+      <span style={{ font: `600 9px/1 ${MONO}`, letterSpacing: ".2em", color: CANON.INK.BODY }}>SECTION {ord}</span>
+      {title ? <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".16em", color: MUT3 }}>{title}</span> : null}
+      <span style={{ flex: 1, height: 1, background: CANON.LINE.HAIR }} />
       <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".08em", color: DIM }}>{meta}</span>
     </div>
   );
@@ -370,15 +388,15 @@ function Brief({ rec, model, setHov, setSel, openRecord }: {
 
   return (
     <div style={{ padding: "15px 14px 16px", animation: "fmIn .16s ease both" }}>
-      <div style={{ font: `500 8.5px/1 ${MONO}`, letterSpacing: ".18em", color: GOLD_DIM, marginBottom: 7 }}>{kind}</div>
-      <div style={{ font: `400 21px/1.15 ${SERIF}`, color: INK, marginBottom: 4 }}>{rec.name}</div>
-      <div style={{ font: `400 9.5px/1 ${MONO}`, letterSpacing: ".1em", color: MUT2, marginBottom: 13 }}>{position}</div>
+      <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".18em", color: GOLD_DIM, marginBottom: 7 }}>{kind}</div>
+      <div style={{ font: `400 20px/1.15 ${SERIF}`, color: INK, marginBottom: 4 }}>{rec.name}</div>
+      <div style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".1em", color: MUT2, marginBottom: 13 }}>{position}</div>
       <p style={{ margin: "0 0 14px", font: `300 13px/1.6 ${SERIF}`, color: MUT }}>{line}</p>
 
       <div style={{ borderTop: `1px solid ${H1}`, padding: "9px 0 0" }}>
         {stats.map((s) => (
           <div key={s.k} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
-            <span style={{ font: `400 9.5px/1.3 ${MONO}`, letterSpacing: ".04em", color: MUT3 }}>{s.k}</span>
+            <span style={{ font: `400 9px/1.3 ${MONO}`, letterSpacing: ".04em", color: MUT3 }}>{s.k}</span>
             <span style={{ font: `500 11px/1.3 ${MONO}`, fontVariantNumeric: "tabular-nums", color: INK2, textAlign: "right" }}>{s.v}</span>
           </div>
         ))}
@@ -386,10 +404,10 @@ function Brief({ rec, model, setHov, setSel, openRecord }: {
 
       {rec.groups.length > 1 ? (
         <div style={{ borderTop: `1px solid ${H1}`, marginTop: 11, paddingTop: 10 }}>
-          <div style={{ font: `500 8.5px/1 ${MONO}`, letterSpacing: ".18em", color: DIM, marginBottom: 8 }}>CARRIED BY</div>
+          <div style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".18em", color: DIM, marginBottom: 8 }}>CARRIED BY</div>
           {rec.groups.map((g) => (
             <div key={g.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "3px 0" }}>
-              <span style={{ font: `600 10px/1 ${MONO}`, letterSpacing: ".16em", color: GOLD }}>{g.label}</span>
+              <span style={{ font: `600 11px/1 ${MONO}`, letterSpacing: ".16em", color: GOLD }}>{g.label}</span>
               <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: MUT3 }}>rank {g.rank} of {g.of} · {Math.round((rec.count / g.pubs) * 100)}% of {fmt(g.pubs)}</span>
             </div>
           ))}
@@ -398,24 +416,24 @@ function Brief({ rec, model, setHov, setSel, openRecord }: {
 
       <div style={{ borderTop: `1px solid ${H1}`, marginTop: 11, paddingTop: 10 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={{ font: `500 8.5px/1 ${MONO}`, letterSpacing: ".18em", color: DIM }}>{peerTitle}</span>
-          <span style={{ font: `400 8.5px/1 ${MONO}`, letterSpacing: ".06em", color: "#45413b" }}>{peerGroup.length} assets</span>
+          <span style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".18em", color: DIM }}>{peerTitle}</span>
+          <span style={{ font: `400 9px/1 ${MONO}`, letterSpacing: ".06em", color: CANON.INK.MUTE }}>{peerGroup.length} assets</span>
         </div>
         {peerGroup.map((p, i) => {
           const self = p.generic === rec.name;
           return (
             <div key={p.slug} onMouseEnter={() => setHov(p.generic)} onMouseLeave={() => setHov(null)} onClick={() => setSel(p.generic)} style={{ display: "grid", gridTemplateColumns: "16px minmax(0,1fr) auto", alignItems: "baseline", columnGap: 8, padding: "3px 0 4px", borderBottom: `1px solid #171614`, cursor: "pointer" }}>
-              <span style={{ font: `500 8px/1.2 ${MONO}`, textAlign: "right", color: self ? GOLD : "#3a3630" }}>{String(i + 1).padStart(2, "0")}</span>
-              <span style={{ font: `400 12px/1.2 ${SERIF}`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: self ? "#f4efe4" : "#726d65" }}>{p.generic}</span>
-              <span style={{ font: `400 10px/1.2 ${MONO}`, fontVariantNumeric: "tabular-nums", color: self ? "#f4efe4" : "#726d65" }}>{fmt(p.n)}</span>
+              <span style={{ font: `500 9px/1.2 ${MONO}`, textAlign: "right", color: self ? GOLD : CANON.INK.GHOST }}>{String(i + 1).padStart(2, "0")}</span>
+              <span style={{ font: `400 13px/1.2 ${SERIF}`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: self ? CANON.INK.PRIME : CANON.INK.MUTE }}>{p.generic}</span>
+              <span style={{ font: `400 11px/1.2 ${MONO}`, fontVariantNumeric: "tabular-nums", color: self ? CANON.INK.PRIME : CANON.INK.MUTE }}>{fmt(p.n)}</span>
             </div>
           );
         })}
       </div>
 
-      <div onClick={() => openRecord(rec.slug)} style={{ marginTop: 13, border: `1px solid #2b2925`, borderRadius: 2, padding: "8px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", background: PANEL2 }}>
-        <span style={{ font: `500 9.5px/1 ${MONO}`, letterSpacing: ".14em", color: GOLD }}>OPEN ASSET RECORD</span>
-        <span style={{ font: `400 9.5px/1 ${MONO}`, color: DIM }}>↵</span>
+      <div onClick={() => openRecord(rec.slug)} style={{ marginTop: 13, border: `1px solid ${CANON.LINE.HAIR}`, borderRadius: 2, padding: "8px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", background: PANEL2 }}>
+        <span style={{ font: `500 9px/1 ${MONO}`, letterSpacing: ".14em", color: GOLD }}>OPEN ASSET RECORD</span>
+        <span style={{ font: `400 9px/1 ${MONO}`, color: DIM }}>↵</span>
       </div>
     </div>
   );

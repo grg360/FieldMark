@@ -8,6 +8,9 @@ import {
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import FollowUpItem from "./FollowUpItem";
 import { COOL, FONT, GOLD, GROUND, LINE } from "../../lib/designTokens";
+// Composition fix 2026-08-12: raised fills migrate the legacy g2 step → canonical
+// INSET (inputs/wells/chips step) so these wells read on the new RAISE panels.
+import { CANON, FACE } from "../../lib/canonicalTokens";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -76,7 +79,7 @@ function completedWithin7Days(iso: string): boolean {
 
 function priorityPillStyle(priority: Priority, selected: boolean): CSSProperties {
   if (!selected) {
-    return { backgroundColor: GROUND.g2, color: COOL.label, border: `1px solid ${LINE.l1}` };
+    return { backgroundColor: CANON.GROUND.INSET, color: COOL.label, border: `1px solid ${LINE.l1}` };
   }
   switch (priority) {
     case "high":
@@ -84,9 +87,9 @@ function priorityPillStyle(priority: Priority, selected: boolean): CSSProperties
     case "normal":
       return { backgroundColor: LINE.l2, color: COOL.ui, border: `1px solid ${LINE.l2}` };
     case "low":
-      return { backgroundColor: GROUND.g2, color: COOL.muted, border: `1px solid ${LINE.l1}` };
+      return { backgroundColor: CANON.GROUND.INSET, color: COOL.muted, border: `1px solid ${LINE.l1}` };
     default:
-      return { backgroundColor: GROUND.g2, color: COOL.label, border: `1px solid ${LINE.l1}` };
+      return { backgroundColor: CANON.GROUND.INSET, color: COOL.label, border: `1px solid ${LINE.l1}` };
   }
 }
 
@@ -175,7 +178,7 @@ export default function FollowUpsList({
   const pillBase: CSSProperties = {
     padding: "4px 9px",
     borderRadius: 2,
-    fontSize: 9.5,
+    fontSize: 9,
     letterSpacing: "0.1em",
     textTransform: "uppercase",
     cursor: "pointer",
@@ -211,14 +214,14 @@ export default function FollowUpsList({
             width: "100%",
             boxSizing: "border-box",
             display: "block",
-            backgroundColor: GROUND.g2,
+            backgroundColor: CANON.GROUND.INSET,
             border: `1px solid ${LINE.l1}`,
             borderRadius: 2,
             color: COOL.ui,
-            fontSize: 13.5,
+            fontSize: 13,
             lineHeight: 1.5,
             padding: "7px 10px",
-            fontFamily: FONT.serif,
+            fontFamily: FACE.value, // value-face prose (was legacy FONT.serif — the side-by-side-serifs bug)
             outline: "none",
             resize: "none",
             overflow: "hidden",
@@ -263,7 +266,7 @@ export default function FollowUpsList({
             style={{
               padding: "6px 10px",
               borderRadius: 2,
-              fontSize: 10,
+              fontSize: 11,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: COOL.muted,
@@ -285,7 +288,7 @@ export default function FollowUpsList({
                 left: "50%",
                 transform: "translateX(-50%)",
                 maxWidth: "calc(100vw - 32px)",
-                backgroundColor: GROUND.g2,
+                backgroundColor: CANON.GROUND.INSET,
                 border: `1px solid ${LINE.l1}`,
                 borderRadius: 2,
                 padding: 8,
@@ -293,7 +296,7 @@ export default function FollowUpsList({
                 marginTop: 6,
                 // @ts-expect-error CSS custom properties for react-day-picker
                 "--rdp-accent-color": GOLD.gold,
-                "--rdp-background-color": GROUND.g2,
+                "--rdp-background-color": CANON.GROUND.INSET,
                 "--rdp-day-color": COOL.ui,
                 "--rdp-day-hover-background": LINE.l0,
               }}
@@ -303,8 +306,8 @@ export default function FollowUpsList({
                 selected={composerDueAt ? new Date(composerDueAt) : undefined}
                 onSelect={handleComposerDateSelect}
                 styles={{
-                  caption: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
-                  day: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
+                  caption: { color: COOL.ui, fontSize: 13, fontFamily: FONT.mono },
+                  day: { color: COOL.ui, fontSize: 13, fontFamily: FONT.mono },
                   head_cell: { color: COOL.muted },
                   nav_button: { color: COOL.muted },
                 }}
@@ -324,7 +327,7 @@ export default function FollowUpsList({
             color: GROUND.g0,
             padding: "8px 0",
             borderRadius: 2,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.12em",
@@ -348,7 +351,7 @@ export default function FollowUpsList({
       ) : null}
 
       {showCompletedLine && lastCompletedAction?.completed_at ? (
-        <div style={{ fontFamily: FONT.mono, fontSize: 10.5, letterSpacing: "0.04em", color: COOL.label, marginTop: 8 }}>
+        <div style={{ fontFamily: FONT.mono, fontSize: 11, letterSpacing: "0.04em", color: COOL.label, marginTop: 8 }}>
           {String.fromCharCode(0x2713)} Done {formatRelativeShort(lastCompletedAction.completed_at)}{" "}
           {String.fromCharCode(0x2014)} {lastCompletedAction.body}
         </div>

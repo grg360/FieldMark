@@ -72,8 +72,42 @@ export function regionsForCountry(country: string | null | undefined): RegionKey
 export function countriesForRegion(region: RegionKey): string[] | null {
   if (region === "Global") return null;
   if (region === "Other") {
-    // Other = "not in any defined region". Caller must filter accordingly.
+    // "Other" cannot be expressed as a positive country list — it is the COMPLEMENT of
+    // every defined region, and the set of countries in the data is open-ended. Callers
+    // must use excludedCountriesForRegion() with a negated predicate instead. Returning
+    // [] here is deliberate and is what isExclusionRegion() keys off.
     return [];
   }
   return REGIONS[region] ?? [];
+}
+
+/**
+ * Every country code that belongs to at least one defined region.
+ *
+ * This is the exclusion set for "Other": a country is in the Other bucket precisely
+ * when it is NOT in this list.
+ */
+export const ALL_REGION_COUNTRIES: string[] = Array.from(
+  new Set(Object.values(REGIONS).flat()),
+).sort();
+
+/**
+ * True when a region must be queried as a NEGATION rather than as an `IN (...)` list.
+ *
+ * Only "Other" behaves this way. This exists because the previous code path silently
+ * degraded: countriesForRegion("Other") returned [], the caller skipped its `.in()`
+ * filter entirely, and the query returned EVERY region's rows instead of the Other
+ * bucket — leaving 785 Established HCPs across 32 countries unreachable through the
+ * filter that was supposed to select them.
+ */
+export function isExclusionRegion(region: RegionKey): boolean {
+  return region === "Other";
+}
+
+/**
+ * Country codes to EXCLUDE when querying an exclusion region. Pair with a negated
+ * predicate (`.not("scope_value", "in", ...)`), never with `.in()`.
+ */
+export function excludedCountriesForRegion(region: RegionKey): string[] {
+  return isExclusionRegion(region) ? ALL_REGION_COUNTRIES : [];
 }

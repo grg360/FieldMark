@@ -7,6 +7,7 @@
 // state rather than a spinner that never ends.
 
 import { supabase } from "./supabase";
+import { NSCLC_CORPUS_TOTAL, CORPUS_INDEX_DATE } from "./assets";
 import type { CompositionPayload, CitationYear, OpenAccess } from "./assetLogic";
 
 export interface AssetOverview {
@@ -72,8 +73,19 @@ export interface ForumThread {
   scope_label: string | null;
 }
 
+/** The corpus snapshot this page describes. Same asset_index_meta() RPC the
+ *  Drugs Index reads, so the two surfaces cannot disagree about the corpus.
+ *  The assets.ts constants are the FALLBACK only — they say so themselves — and
+ *  the monograph used to print them as fact, which is how it ended up quoting a
+ *  corpus 642 records behind the index on the same data. */
+export interface AssetIndexMeta {
+  corpus: number;
+  indexDate: string;
+}
+
 export interface AssetPageData {
   overview: AssetOverview | null;
+  meta: AssetIndexMeta;
   composition: CompositionPayload;
   landing: LandingPayload;
   authors: AuthorsPayload;
@@ -91,7 +103,7 @@ async function rpc<T>(fn: string, args: Record<string, unknown>, fallback: T): P
 }
 
 export async function loadAssetPage(generic: string): Promise<AssetPageData> {
-  const [overview, composition, landing, authors, congress, forum] = await Promise.all([
+  const [overview, composition, landing, authors, congress, forum, metaRes] = await Promise.all([
     rpc<AssetOverview | null>("asset_overview", { p_generic: generic }, null),
     rpc<CompositionPayload>("asset_composition", { p_generic: generic }, {
       per_year: [],
@@ -110,7 +122,17 @@ export async function loadAssetPage(generic: string): Promise<AssetPageData> {
     }),
     rpc<CongressPresenter[]>("asset_congress", { p_generic: generic }, []),
     rpc<ForumThread[]>("asset_forum", { p_generic: generic }, []),
+    // Same call and same fallback handling as loadAssetIndex().
+    rpc<unknown>("asset_index_meta", {}, null),
   ]);
 
-  return { overview, composition, landing, authors, congress, forum };
+  const metaRow = (Array.isArray(metaRes) ? metaRes[0] : metaRes) as
+    | { index_date?: string; corpus_total?: number | string }
+    | undefined;
+  const meta: AssetIndexMeta = {
+    corpus: Number(metaRow?.corpus_total) || NSCLC_CORPUS_TOTAL,
+    indexDate: metaRow?.index_date || CORPUS_INDEX_DATE,
+  };
+
+  return { overview, meta, composition, landing, authors, congress, forum };
 }

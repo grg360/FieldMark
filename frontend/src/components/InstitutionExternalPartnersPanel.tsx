@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { ExternalPartnerInstitution } from "../lib/api";
 import { institutionToSlug } from "../lib/institutionUtils";
-import { COLOR } from "../lib/designTokens";
+import { CANON } from "../lib/canonicalTokens";
 
 interface Props {
   partners: ExternalPartnerInstitution[];
@@ -26,7 +26,7 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
       <div
         style={{
           fontSize: 13,
-          color: COLOR.ink1,
+          color: CANON.INK.PRIME,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           marginBottom: 4,
@@ -34,7 +34,7 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
       >
         Top External Partner Institutions
       </div>
-      <div style={{ fontSize: 11, color: COLOR.ink4, marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginBottom: 12 }}>
         Ranked by total co-publications with {sourceInstitutionName}
       </div>
 
@@ -48,23 +48,23 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
               justifyContent: "space-between",
               alignItems: "center",
               padding: "10px 12px",
-              backgroundColor: COLOR.surfaceRaised,
+              backgroundColor: CANON.GROUND.INSET,
               borderRadius: 4,
               cursor: "pointer",
               transition: "background-color 120ms",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
+              e.currentTarget.style.backgroundColor = CANON.GROUND.INSET;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = COLOR.surfaceRaised;
+              e.currentTarget.style.backgroundColor = CANON.GROUND.INSET;
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
                   fontSize: 13,
-                  color: COLOR.ink1,
+                  color: CANON.INK.PRIME,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -72,7 +72,7 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
               >
                 {p.institution_name}
               </div>
-              <div style={{ fontSize: 11, color: COLOR.ink4, marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginTop: 2 }}>
                 {p.source_investigators_count}{" "}
                 {p.source_investigators_count === 1 ? "investigator" : "investigators"}
                 {" \u2194 "}
@@ -80,11 +80,11 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
                 {p.partner_investigators_count === 1 ? "investigator" : "investigators"}
               </div>
               {p.top_connection ? (
-                <div style={{ fontSize: 11, color: COLOR.ink4, marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginTop: 4 }}>
                   Top pair:{" "}
-                  <span style={{ color: COLOR.ink3 }}>{p.top_connection.source_name}</span>
+                  <span style={{ color: CANON.INK.LABEL }}>{p.top_connection.source_name}</span>
                   {" \u2194 "}
-                  <span style={{ color: COLOR.ink3 }}>{p.top_connection.partner_name}</span>
+                  <span style={{ color: CANON.INK.LABEL }}>{p.top_connection.partner_name}</span>
                   {" ("}
                   {p.top_connection.shared_publications} papers
                   {")"}
@@ -111,8 +111,8 @@ export default function InstitutionExternalPartnersPanel({ partners, sourceInsti
                 fontFamily: "inherit",
               }}
             >
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#E8A020" }}>{p.total_shared_publications}</span>
-              <span style={{ fontSize: 12, color: COLOR.ink3 }}>co-pubs</span>
+              <span style={{ fontSize: 17, fontWeight: 700, color: CANON.GOLD.PRIME }}>{p.total_shared_publications}</span>
+              <span style={{ fontSize: 13, color: CANON.INK.LABEL }}>co-pubs</span>
             </button>
           </div>
         ))}

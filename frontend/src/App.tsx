@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { taLabelForSlug } from "./lib/taLabels";
 import { useMediaQuery } from "./lib/useMediaQuery";
 import {
   Navigate,
@@ -40,7 +41,8 @@ import ActionTray from "./components/ActionTray";
 import AssetsIndexPage from "./components/Assets/AssetsIndexPage";
 import AssetPage from "./components/Assets/AssetPage";
 import CohortLedger from "./components/Cohorts/CohortLedger";
-import RisingLedger from "./components/Cohorts/RisingLedger";
+import RisingQuadrant from "./components/Cohorts/RisingQuadrant";
+import RisingRedirect from "./components/Cohorts/RisingRedirect";
 import HcpProfileBrief from "./components/Profile/HcpProfileBrief";
 import ProfileDispatch from "./components/Profile/ProfileDispatch";
 import PracticeFirstProfile from "./components/Profile/PracticeFirstProfile";
@@ -83,7 +85,6 @@ import { TAProvider, deriveTAValue, useTA } from "./lib/TAContext";
 import {
   buildHcpDetailPath,
   getIndicationTaId,
-  indicationLabelToSlug,
   resolveFeedRoute,
   taLabelToApiSlug,
   taSlugToLabel,
@@ -126,9 +127,13 @@ function isCohortFeedTrack(track: string): boolean {
   return track === "established" || track === "community" || track === "rising-stars";
 }
 
-function isTelescopeAvailable(ta: string, indication: string): boolean {
-  if (ta === "Oncology") return indication === "All" || indication === "NSCLC";
-  if (ta === "Immunology") return indication === "Atopic Dermatitis";
+// Keyed on the indication SLUG. This took the LABEL until 2026-08-15, so the
+// moment nsclc's label became "Lung Cancer" every /oncology/telescope/nsclc URL
+// failed this test and SkyView rendered its "not available" empty state instead
+// of the graph. Slugs come off the URL and never move.
+function isTelescopeAvailable(ta: string, indicationSlug: string): boolean {
+  if (ta === "Oncology") return indicationSlug === "all" || indicationSlug === "nsclc";
+  if (ta === "Immunology") return indicationSlug === "atopic-dermatitis";
   return false;
 }
 
@@ -139,7 +144,7 @@ function formatPublicationVelocity(value: number): string {
 
 function formatTherapeuticAreaLabel(value: string | null | undefined): string {
   const v = String(value ?? "").trim().toLowerCase();
-  if (v === "nsclc") return "NSCLC";
+  if (v === "nsclc") return "Lung Cancer";
   if (v === "rare-disease") return "Rare Disease";
   if (v === "hepatology") return "Hepatology";
   if (v === "oncology") return "Oncology";
@@ -161,6 +166,9 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     citTraj: item.citTraj ?? null,
     trialScore: item.trialScore ?? null,
     country: item.country ?? null,
+    currentCountry: item.current_country ?? null,
+    affiliationConfidence: item.affiliation_confidence ?? null,
+    affiliationAsOf: item.affiliation_as_of ?? null,
     narrative: item.narrative ?? null,
     why_now: item.why_now ?? null,
     engagement_angle: item.engagement_angle ?? null,
@@ -237,8 +245,9 @@ function FeedLayout({
     isHomePath: location.pathname === "/",
   });
   const selectedTA = route.taLabel;
-  const selectedIndication = route.indicationLabel;
-  const indicationTaId = getIndicationTaId(selectedTA, selectedIndication);
+  const selectedIndication = route.indicationLabel; // DISPLAY ONLY
+  const selectedIndicationSlug = route.indicationSlug; // identity
+  const indicationTaId = getIndicationTaId(selectedTA, selectedIndicationSlug);
 
   // Phase 1a: mirror the URL-resolved TA into TAContext (the URL stays authoritative
   // on feed routes; the context reflects it). No consumer reads it yet.
@@ -326,7 +335,7 @@ function FeedLayout({
 
   function formatSectionHeaderLabel(): string {
     const taLabel =
-      track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication)
+      track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndicationSlug)
         ? selectedTA === "Immunology"
           ? "Immunology (Atopic Dermatitis) - Telescope"
           : "Oncology (NSCLC) - Telescope"
@@ -517,11 +526,11 @@ function FeedLayout({
   // Only when the Telescope is actually available for the current TA/indication (else the
   // "not available" card renders in the normal stacked layout).
   const telescopeImmersive =
-    !isNarrow && track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication);
+    !isNarrow && track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndicationSlug);
   // The SkyView surface (desktop immersive AND mobile list) drops PeopleNavStrip:
   // its cohort links were the last remaining path to the card feed. Gated on the
   // surface, not on `immersive`, so mobile is covered too.
-  const onSkyview = track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndication);
+  const onSkyview = track === "skyview" && isTelescopeAvailable(selectedTA, selectedIndicationSlug);
 
   return (
     <>
@@ -577,7 +586,7 @@ function FeedLayout({
           (/field-intelligence) is the one FI system. SurfaceHCPForm is retained
           unrouted — its chip flow migrates into the forum. */}
       {track === "skyview" ? (
-        isTelescopeAvailable(selectedTA, selectedIndication) ? (
+        isTelescopeAvailable(selectedTA, selectedIndicationSlug) ? (
           // Telescope Final (frame ea483f5c): self-contained constellation field + focus
           // orbit + off-field reveal + mobile list. Replaces the old Telescope +
           // TelescopeDrawer + TelescopeLegend trio (retained unrouted). Reads the static
@@ -615,14 +624,14 @@ function FeedLayout({
                 marginBottom: "12px",
               }}
             >
-              Telescope is currently available for Oncology (NSCLC) and Immunology (Atopic Dermatitis)
+              Telescope is currently available for Oncology ({taLabelForSlug("nsclc")}) and Immunology (Atopic Dermatitis)
             </div>
             <div style={{ fontSize: "13px", maxWidth: "480px", lineHeight: 1.5 }}>
               {selectedTA === "Immunology"
                 ? "Select the Atopic Dermatitis indication under Immunology to explore its collaboration network. Other immunology indications are in development."
                 : selectedTA === "Oncology"
-                ? "Select the All or NSCLC indication under Oncology to explore the NSCLC collaboration network. Other oncology indications are in development."
-                : "Hepatology and Rare Disease coverage are in development. Select Oncology (NSCLC) or Immunology (Atopic Dermatitis) to explore a collaboration network."}
+                ? `Select the All or ${taLabelForSlug("nsclc")} indication under Oncology to explore the ${taLabelForSlug("nsclc").toLowerCase()} collaboration network. Other oncology indications are in development.`
+                : `Hepatology and Rare Disease coverage are in development. Select Oncology (${taLabelForSlug("nsclc")}) or Immunology (Atopic Dermatitis) to explore a collaboration network.`}
             </div>
           </div>
         )
@@ -813,7 +822,12 @@ export default function App() {
       <Routes>
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/pulse" element={<PulsePage />} />
-      <Route path="/trials" element={<TrialsPage />} />
+      {/* /trials sits outside the authed block's RelationshipsProvider, so its
+          chips had no track/untrack action. The provider bootstraps its own
+          user via getCurrentUser, so mounting it here gives the surface the
+          SAME tracking state and toggle the ledger and the portfolio use,
+          without moving the route or changing its auth gating. */}
+      <Route path="/trials" element={<RelationshipsProvider><TrialsPage /></RelationshipsProvider>} />
       <Route path="/pulse/:ta" element={<PulsePage />} />
       <Route path="/join/:code" element={<SignupScreen />} />
       <Route path="/join" element={<SignupScreen />} />
@@ -846,11 +860,15 @@ export default function App() {
           <Route path="/social/voice/:handle" element={<SocialVoicePage />} />
           <Route path="/social/:ta" element={<SocialPage />} />
           <Route path="/assets" element={<AssetsIndexPage />} />
-          {/* Rising ledger (register + quadrant modes) — the rising surface's own
-              board, docs/design/Rising Surface.dc.html. Runs ALONGSIDE the cohort
-              ledger's rising view for now; repointing /cohorts/ledger/rising-stars
-              here is an open decision. */}
-          <Route path="/rising" element={<RisingLedger />} />
+          {/* Rising register RETIRED 2026-08-14 — the open decision noted here is now
+              settled. Its content lived on /cohorts/ledger/rising-stars already (same
+              RPCs, same badges, same bands) and the country slicing it uniquely had moved
+              to that ledger's territory axis, so the parallel board is gone. /rising
+              redirects; the QUADRANT survives standalone as the one view the ledger has
+              no equivalent for. RisingRedirect preserves the old ?mode=quadrant deep
+              link — a query string cannot be matched by a Route path. */}
+          <Route path="/rising" element={<RisingRedirect />} />
+          <Route path="/rising/quadrant" element={<RisingQuadrant />} />
           <Route path="/cohorts/ledger" element={<CohortLedger />} />
           {/* Addressable cohort (2026-07-31): established | rising-stars | community.
               Bare /cohorts/ledger stays routed as the Established default. */}

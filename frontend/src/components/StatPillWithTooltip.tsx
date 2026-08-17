@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { taLabelForSlug } from "../lib/taLabels";
 
 interface TooltipDef {
   title: string;
@@ -77,7 +78,10 @@ const TOOLTIP_MAP: Record<string, TooltipDef> = {
   },
   PUBS: {
     title: "Career publications",
-    body: "Career NSCLC publications attributed to this HCP (as author or co-author).",
+    // WIDENED 2026-08-15: the corpus covers NSCLC *and* SCLC (MethodologyPage
+    // states the boundary), so "NSCLC publications" named less than the figure
+    // actually counts. This was a wrong claim, not just an old label.
+    body: `Career ${taLabelForSlug("nsclc").toLowerCase()} publications attributed to this HCP (as author or co-author).`,
   },
   CITATIONS: {
     title: "Citations",

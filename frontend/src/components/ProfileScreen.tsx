@@ -24,11 +24,47 @@ const LinkedInIcon = () => (
   </svg>
 );
 
-const INDICATIONS: Record<string, string[]> = {
-  "Rare Disease": ["All", "Fabry disease", "Huntington's", "Sickle cell", "Gaucher", "PKU", "Pompe"],
-  Oncology: ["All", "NSCLC", "CAR-T", "DLBCL", "Melanoma", "CLL", "AML"],
-  Immunology: ["All", "Lupus", "Crohn's", "Myasthenia gravis", "Sjogren's", "CIDP"],
-  Hepatology: ["All", "PBC", "NASH", "PSC", "AIH", "HCC"],
+// DECOUPLED 2026-08-15. These were display names doing double duty as the key of
+// INDICATION_NAME_TO_SLUG, which made the round-trip asymmetric the moment nsclc's
+// label changed: the load path read "Lung Cancer" out of INDICATION_SLUG_TO_NAME
+// while the save path only recognised "NSCLC", so a saved default silently
+// reverted to "all". The picker now holds SLUGS in state and renders labels.
+interface IndicationChoice { slug: string; label: string }
+const INDICATIONS: Record<string, IndicationChoice[]> = {
+  "Rare Disease": [
+    { slug: "all", label: "All" },
+    { slug: "fabry-disease", label: "Fabry disease" },
+    { slug: "huntingtons", label: "Huntington's" },
+    { slug: "sickle-cell", label: "Sickle cell" },
+    { slug: "gaucher", label: "Gaucher" },
+    { slug: "pku", label: "PKU" },
+    { slug: "pompe", label: "Pompe" },
+  ],
+  Oncology: [
+    { slug: "all", label: "All" },
+    { slug: "nsclc", label: "Lung Cancer" },
+    { slug: "car-t", label: "CAR-T" },
+    { slug: "dlbcl", label: "DLBCL" },
+    { slug: "melanoma", label: "Melanoma" },
+    { slug: "cll", label: "CLL" },
+    { slug: "aml", label: "AML" },
+  ],
+  Immunology: [
+    { slug: "all", label: "All" },
+    { slug: "lupus", label: "Lupus" },
+    { slug: "crohns", label: "Crohn's" },
+    { slug: "myasthenia-gravis", label: "Myasthenia gravis" },
+    { slug: "sjogrens", label: "Sjogren's" },
+    { slug: "cidp", label: "CIDP" },
+  ],
+  Hepatology: [
+    { slug: "all", label: "All" },
+    { slug: "pbc", label: "PBC" },
+    { slug: "nash", label: "NASH" },
+    { slug: "psc", label: "PSC" },
+    { slug: "aih", label: "AIH" },
+    { slug: "hcc", label: "HCC" },
+  ],
 };
 
 const REGIONS = ["Northeast", "Southeast", "Midwest", "Southwest", "West", "National"];
@@ -47,19 +83,13 @@ const TA_SLUG_TO_NAME: Record<string, string> = {
   "hepatology": "Hepatology",
 };
 
-const INDICATION_NAME_TO_SLUG: Record<string, string> = {
-  "All": "all",
-  "NSCLC": "nsclc",
-  "CAR-T": "car-t",
-  "DLBCL": "dlbcl",
-  "Melanoma": "melanoma",
-  "CLL": "cll",
-  "AML": "aml",
-};
-
+// No NAME_TO_SLUG twin: the label->slug direction is what broke, and nothing
+// needs it now that state holds the slug. Only slugs listed HERE are persisted
+// to msl_profiles.default_indication_slug; every other picker slug saves as
+// "all", which is exactly what the old name-map fallback did.
 const INDICATION_SLUG_TO_NAME: Record<string, string> = {
   "all": "All",
-  "nsclc": "NSCLC",
+  "nsclc": "Lung Cancer",
   "car-t": "CAR-T",
   "dlbcl": "DLBCL",
   "melanoma": "Melanoma",
@@ -138,7 +168,7 @@ export default function ProfileScreen() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const [selectedTA, setSelectedTA] = useState("Oncology");
-  const [selectedIndication, setSelectedIndication] = useState("All");
+  const [selectedIndication, setSelectedIndication] = useState("all"); // SLUG, not label
   const [selectedRegion, setSelectedRegion] = useState("Northeast");
   const [statesCovered, setStatesCovered] = useState<string[]>([]);
   const [notifications, setNotifications] = useState({
@@ -168,7 +198,7 @@ export default function ProfileScreen() {
         setSelectedTA(TA_SLUG_TO_NAME[p.default_ta_slug]);
       }
       if (p.default_indication_slug && INDICATION_SLUG_TO_NAME[p.default_indication_slug]) {
-        setSelectedIndication(INDICATION_SLUG_TO_NAME[p.default_indication_slug]);
+        setSelectedIndication(p.default_indication_slug);
       }
       if (p.region && REGION_SLUG_TO_NAME[p.region]) {
         setSelectedRegion(REGION_SLUG_TO_NAME[p.region]);
@@ -189,7 +219,7 @@ export default function ProfileScreen() {
 
   function handleTAChange(ta: string) {
     setSelectedTA(ta);
-    setSelectedIndication("All");
+    setSelectedIndication("all");
   }
 
   function handleRegionChange(region: string) {
@@ -205,7 +235,7 @@ export default function ProfileScreen() {
     setError(null);
 
     const taSlug = TA_NAME_TO_SLUG[selectedTA] ?? "oncology";
-    const indSlug = INDICATION_NAME_TO_SLUG[selectedIndication] ?? "all";
+    const indSlug = INDICATION_SLUG_TO_NAME[selectedIndication] ? selectedIndication : "all";
     const regionSlug = REGION_NAME_TO_SLUG[selectedRegion] ?? "northeast";
     const territoryLabel = selectedRegion;
 
@@ -386,12 +416,12 @@ export default function ProfileScreen() {
                 }}
               >
                 {(INDICATIONS[selectedTA] ?? []).map((chip) => {
-                  const isSelected = selectedIndication === chip;
+                  const isSelected = selectedIndication === chip.slug;
                   return (
                     <button
-                      key={chip}
+                      key={chip.slug}
                       type="button"
-                      onClick={() => setSelectedIndication(chip)}
+                      onClick={() => setSelectedIndication(chip.slug)}
                       style={{
                         flexShrink: 0,
                         backgroundColor: isSelected ? "#0D0D0A" : "#0d0c0b",
@@ -404,7 +434,7 @@ export default function ProfileScreen() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {chip}
+                      {chip.label}
                     </button>
                   );
                 })}

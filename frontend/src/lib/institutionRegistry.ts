@@ -206,23 +206,24 @@ export async function countUnresolvedForRecord(
     .map((r) => r.id as string)
     .filter((id) => !rosterHcpIds.has(id));
   if (candidates.length === 0) return 0;
-  // Ranked = present on any of the three boards for this TA.
+  // Ranked = present on any board this surface actually rosters — ESTABLISHED
+  // and RISING only. The community probe was REMOVED 2026-08-13: it read
+  // hcp_community_ranks_v2, a view dropped from the DB that same day, and the
+  // 404 was being swallowed by `res.data ?? []`. It was not repointed to the
+  // board view because it should never have counted: institution_ta_roster_v1
+  // carries no community rows at all (2,495 established + 112 rising, 0
+  // community — community was deliberately taken off institution rosters), so
+  // counting a community-only HCP as "unresolved" would assert that someone is
+  // MISSING from a roster they are excluded from by design. Removing it makes
+  // the count agree with the roster it describes.
   const ids = candidates.slice(0, 150);
-  // Community membership (G2 correction with the ranks-view retirement): for
-  // NSCLC the board's qualifies flag is the membership truth — the old ranks
-  // view counted every scored HCP, over-counting by the ~8k scored-but-not-
-  // qualifying US tail. Other TAs stay ungated on the scores base table.
-  const NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d";
-  const [est, ris, risAd, com] = await Promise.all([
+  const [est, ris, risAd] = await Promise.all([
     supabase.from("hcp_established_ranks_v3").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
     supabase.from("hcp_rising_star_ranks_v3").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
     supabase.from("hcp_rising_composite_v1").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
-    taId === NSCLC_TA_ID
-      ? supabase.from("community_board_nsclc_v1").select("hcp_id").eq("qualifies", true).in("hcp_id", ids)
-      : supabase.from("hcp_community_scores_v2").select("hcp_id").eq("therapeutic_area_id", taId).in("hcp_id", ids),
   ]);
   const ranked = new Set<string>();
-  for (const res of [est, ris, risAd, com]) {
+  for (const res of [est, ris, risAd]) {
     for (const r of res.data ?? []) ranked.add(r.hcp_id as string);
   }
   return ranked.size;

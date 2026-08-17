@@ -42,7 +42,7 @@ const TAContext = createContext<TAContextValue | null>(null);
 
 const STORAGE_KEY = "fieldmark.ta";
 // Safe fallback = the app's home landing (Oncology / NSCLC), matching routeSlugs
-// HOME_TA / HOME_INDICATION. (A per-user default lives in msl_profiles.default_ta_slug;
+// HOME_TA / HOME_INDICATION_SLUG. (A per-user default lives in msl_profiles.default_ta_slug;
 // seeding from it is deferred — it needs an async fetch and no consumer reads this yet.)
 const DEFAULT_PARENT_SLUG = "oncology";
 const DEFAULT_INDICATION_SLUG = "nsclc";
@@ -70,7 +70,7 @@ export function deriveTAValue(parentSlug: string, indicationSlug: string): TAVal
   let dataSlug = indicationSlug;
   let indicationTaId = taIdForApiSlug(dataSlug);
   if (!indicationTaId) {
-    const byIndication = getIndicationTaId(parentLabel, indicationLabel);
+    const byIndication = getIndicationTaId(parentLabel, indicationSlug);
     dataSlug = byIndication
       ? apiSlugForTaId(byIndication) ?? dataSlug
       : taLabelToApiSlug(parentLabel);

@@ -83,9 +83,9 @@ export default function LandscapeRoute() {
             meta={`RANKS AS OF ${formatScoringDate(scoredAt)}`}
             title={`${taLabel} Landscape`}
             dek={"Top 100 US Rising Stars · momentum vs visibility"}
-            stats={[
+            stats={{ variant: "cluster", items: [
               { value: String(points.length || 100), label: "PLOTTED" },
-            ]}
+            ] }}
           />
         </div>
       </div>

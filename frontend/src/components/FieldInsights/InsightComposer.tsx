@@ -19,12 +19,13 @@ import {
 } from "../../lib/insightCategories";
 import { formatOccurredAt } from "./dateFormat";
 import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
+import { FACE } from "../../lib/canonicalTokens";
 
 // ── Register kit (2026-08-07 conversion — Beat 8 surface) ────────────────────
 // Chip treatment shared with the profile rails; the category glyph is the
 // /me/insights action-weight vocabulary (filled = obligates, half = feeds
 // work, outline = accumulates) — taxonomy reads by weight, never by hue.
-const monoLabel: CSSProperties = { fontFamily: FONT.mono, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: COOL.label };
+const monoLabel: CSSProperties = { fontFamily: FONT.mono, fontSize: 9, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: COOL.label };
 const CATEGORY_WEIGHT: Record<InsightCategory, number> = {
   message_challenge: 0, evidence_gap: 1, competitor_signal: 2, safety_observation: 3,
   access_reimbursement: 4, message_reinforcement: 5, patient_selection: 6,
@@ -44,7 +45,7 @@ function TierGlyph({ cat, dim }: { cat: InsightCategory; dim: boolean }) {
 function regChip(selected: boolean): CSSProperties {
   return {
     display: "inline-flex", alignItems: "center", gap: 6,
-    fontFamily: FONT.mono, fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase",
+    fontFamily: FONT.mono, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
     padding: "5px 9px", borderRadius: 0, cursor: "pointer", minHeight: 0,
     background: selected ? "rgba(255,255,255,0.07)" : "transparent",
     border: `1px solid ${selected ? "rgba(255,255,255,0.28)" : LINE.l2}`,
@@ -348,10 +349,10 @@ export default function InsightComposer({
             aria-label={`Add an insight about Dr. ${firstName}`}
             style={{ display: "flex", flexDirection: "column", gap: 8, padding: "13px 16px", cursor: "text" }}
           >
-            <span style={{ fontFamily: "'Source Serif 4',Georgia,serif", fontSize: 13.5, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
+            <span style={{ fontFamily: FACE.value, fontSize: 13, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
-              <span style={{ font: "400 8px/1.5 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
+              <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
+              <span style={{ font: `400 9px/1.5 ${FACE.data}`, letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
             </span>
           </div>
         );
@@ -365,9 +366,9 @@ export default function InsightComposer({
           aria-label={`Add an insight about Dr. ${firstName}`}
           style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 24px", cursor: "text" }}
         >
-          <span style={{ font: "600 9px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
-          <span style={{ flex: 1, fontFamily: "'Source Serif 4',Georgia,serif", fontSize: 13.5, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
-          <span style={{ font: "400 8px/1 'IBM Plex Mono',ui-monospace,monospace", letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
+          <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
+          <span style={{ flex: 1, fontFamily: FACE.value, fontSize: 13, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
+          <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
         </div>
       );
     }
@@ -396,9 +397,9 @@ export default function InsightComposer({
             backgroundColor: "#0D0D10",
             border: "1px solid #1E1E22",
             color: "#E8E6DF",
-            fontSize: 14,
+            fontSize: 15,
             padding: "0 12px",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontFamily: FACE.ui,
             outline: "none",
             cursor: "text",
             marginBottom: 12,
@@ -440,7 +441,7 @@ export default function InsightComposer({
           resize: "none",
           overflow: "hidden",
           outline: "none",
-          fontFamily: FONT.serif,
+          fontFamily: FACE.value,
           boxSizing: "border-box",
         }}
       />
@@ -449,7 +450,7 @@ export default function InsightComposer({
         <div style={{ ...monoLabel, marginBottom: 4 }}>
           Why it matters
         </div>
-        <div style={{ fontFamily: FONT.serif, fontSize: 12.5, color: COOL.muted, marginBottom: 8, lineHeight: 1.45 }}>
+        <div style={{ fontFamily: FACE.value, fontSize: 13, color: COOL.muted, marginBottom: 8, lineHeight: 1.45 }}>
           What's the strategic implication of this insight? This is what your manager will see in their weekly brief.
         </div>
         <textarea
@@ -466,13 +467,13 @@ export default function InsightComposer({
             backgroundColor: GROUND.g2,
             border: `1px solid ${LINE.l1}`,
             color: COOL.ui,
-            fontSize: 13.5,
+            fontSize: 13,
             padding: 12,
             lineHeight: 1.55,
             resize: "none",
             overflow: "hidden",
             outline: "none",
-            fontFamily: FONT.serif,
+            fontFamily: FACE.value,
             boxSizing: "border-box",
           }}
         />
@@ -485,14 +486,14 @@ export default function InsightComposer({
         Link a position <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>(optional)</span>
       </div>
       {beliefClaims === null ? (
-        <div style={{ fontSize: 12, color: "#6B6A65" }}>Loading positions…</div>
+        <div style={{ fontSize: 13, color: "#6B6A65" }}>Loading positions…</div>
       ) : beliefClaims.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#6B6A65", lineHeight: 1.45 }}>
+        <div style={{ fontSize: 13, color: "#6B6A65", lineHeight: 1.45 }}>
           No sourced positions on file — this insight won't link to a belief.
         </div>
       ) : (
         <>
-          <div style={{ fontFamily: FONT.serif, fontSize: 12.5, color: COOL.muted, marginBottom: 8, lineHeight: 1.45 }}>
+          <div style={{ fontFamily: FACE.value, fontSize: 13, color: COOL.muted, marginBottom: 8, lineHeight: 1.45 }}>
             If the conversation related to one of this HCP's published positions, link it — the insight will point at that position on the belief profile.
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -553,7 +554,7 @@ export default function InsightComposer({
             backgroundColor: GROUND.g2,
             border: `1px solid ${LINE.l1}`,
             color: COOL.ui,
-            fontSize: 12.5,
+            fontSize: 13,
             padding: "0 12px",
             fontFamily: FONT.mono,
             outline: "none",
@@ -595,7 +596,7 @@ export default function InsightComposer({
             backgroundColor: GROUND.g2,
             border: `1px solid ${LINE.l1}`,
             color: COOL.ui,
-            fontSize: 12.5,
+            fontSize: 13,
             padding: "0 12px",
             fontFamily: FONT.mono,
             outline: "none",
@@ -675,7 +676,7 @@ export default function InsightComposer({
                 }}
                 styles={{
                   caption: { color: "#E8E6DF", fontSize: 13 },
-                  day: { color: "#E8E6DF", fontSize: 13, fontFamily: "system-ui, -apple-system, sans-serif" },
+                  day: { color: "#E8E6DF", fontSize: 13, fontFamily: FACE.ui },
                   head_cell: { color: "#9B9892" },
                   nav_button: { color: "#9B9892" },
                 }}
@@ -694,7 +695,7 @@ export default function InsightComposer({
             border: "none",
             color: COOL.label,
             fontFamily: FONT.mono,
-            fontSize: 10.5,
+            fontSize: 11,
             letterSpacing: "0.1em",
             textTransform: "uppercase",
             cursor: "pointer",
@@ -716,7 +717,7 @@ export default function InsightComposer({
                 padding: "7px 15px",
                 fontWeight: 600,
                 fontFamily: FONT.mono,
-                fontSize: 10.5,
+                fontSize: 11,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 borderRadius: 0,

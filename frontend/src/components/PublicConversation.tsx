@@ -40,6 +40,7 @@ import { supabase } from "../lib/supabase";
 import { classifyVoice } from "../lib/voiceClassification";
 import { getLatestCaptured, type LatestStream } from "../lib/socialLatest";
 import SocialPostRow from "./SocialPostRow";
+import PageHero from "./PageHero";
 import { GOLD as GOLD_T, GROUND, LINE, FONT, COOL } from "../lib/designTokens";
 
 // Commit C 2026-08-05: the conversation box joins the Pulse board scheme —
@@ -182,23 +183,52 @@ export default function PublicConversation({ taSlug, taLabel, narrow }: { taSlug
 
   return (
     <div style={{ background: BG, border: `1px solid ${LINE.l1}`, margin: "8px 0 24px", fontFamily: MONO }}>
-      {/* title band */}
-      <div style={{ display: "flex", alignItems: narrow ? "flex-start" : "center", flexDirection: narrow ? "column" : "row", gap: narrow ? 8 : 14, justifyContent: "space-between", padding: narrow ? "14px 18px" : "15px 28px", background: CARD, borderBottom: `1px solid ${HAIR}` }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-          {/* the filled PUB tag removed 2026-08-07 — it clipped to "PUS" beside
-              the title and a filled gold chip is off-register; the eyebrow-less
-              title carries the surface name alone */}
-          <span style={{ ...serif(19, INK, 1.2) }}>The Public Conversation <span style={{ color: FAINT }}>/</span> {taLabel}</span>
-        </div>
-        <div style={{ ...mono(narrow ? 9.5 : 10.5, DIM, "0.11em"), lineHeight: 1.7 }}>
-          {mode === "conversation" ? (
-            <>{num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED · {num(d.posts_included)} INCLUDED{narrow ? <br /> : " · "}POSTS 20 MAY — 03 JUN 2026 · CONFIRMED MATCHES FIRST · RESPONSE ORDERS WITHIN EACH GROUP</>
-          ) : (
-            // LATEST owns no window: the caption must not carry the
-            // conversation's 20 May – 3 Jun line above an August stream.
-            <>{num(d.corpus.accounts_total)} ACCOUNTS · {num(d.posts_captured)} TA-TAGGED POSTS CAPTURED{narrow ? <br /> : " · "}NEWEST FIRST BY POSTED_AT · NOT RANKED · NOT WINDOWED</>
-          )}
-        </div>
+      {/* HERO (PageHero, 2026-08-15) ─────────────────────────────────────────
+          Social was the furthest of the eight from the contract, and three of the
+          changes reverse decisions this file made on purpose:
+            · the EYEBROW returns. It was removed 2026-08-07 (the PUB chip clipped
+              to "PUS" and read off-register) and the title carried the surface
+              name alone. The eyebrow is text now, not a filled chip, so the
+              failure that removed it does not recur.
+            · the TITLE goes 19 -> 52/30. This is the largest jump of the eight.
+              Worth watching: this surface quotes named third parties verbatim,
+              and a louder masthead puts the platform's voice above theirs.
+            · the " / " join and its FAINT-coloured slash retire with the other
+              three join conventions.
+          THE CAPTION DOES NOT BECOME A TABLE WHOLESALE. Only three of its parts
+          are figures; the rest are qualifiers with no value/label shape. So it
+          splits by kind rather than being forced into rows:
+            figures  -> table stats (accounts / captured / included)
+            window   -> meta, one line
+            the rest -> the table's foot
+          Both modes keep their own wording, including the rule at the old :196 —
+          LATEST owns no window, so it must not carry the conversation's
+          20 May – 3 Jun line above an August stream. */}
+      <div style={{ padding: narrow ? "14px 18px" : "15px 28px", background: CARD, borderBottom: `1px solid ${HAIR}` }}>
+        <PageHero
+          narrow={narrow}
+          eyebrow={[taLabel, "Oncology"].filter(Boolean).join(" · ")}
+          meta={mode === "conversation" ? "POSTS 20 MAY — 03 JUN 2026" : "NEWEST FIRST BY POSTED_AT"}
+          title="The Public Conversation"
+          stats={{
+            variant: "table",
+            items:
+              mode === "conversation"
+                ? [
+                    { value: num(d.corpus.accounts_total), label: "accounts" },
+                    { value: num(d.posts_captured), label: "TA-tagged posts captured" },
+                    { value: num(d.posts_included), label: "included" },
+                  ]
+                : [
+                    { value: num(d.corpus.accounts_total), label: "accounts" },
+                    { value: num(d.posts_captured), label: "TA-tagged posts captured" },
+                  ],
+            foot:
+              mode === "conversation"
+                ? "CONFIRMED MATCHES FIRST · RESPONSE ORDERS WITHIN EACH GROUP"
+                : "NOT RANKED · NOT WINDOWED",
+          }}
+        />
       </div>
 
       {/* honesty panel — CONVERSATION furniture (group order, window, match

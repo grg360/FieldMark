@@ -11,7 +11,14 @@ export interface HCP {
   institution_full?: string | null;
   npi_number?: string | null;
   npi_specialty?: string | null;
+  /** Historical all-time plurality, frozen at HCP creation. PRESERVED — never overwritten. */
   country: string;
+  /** Re-derived from recent publications (2026-08-14). Prefer this for display via lib/location.ts. */
+  current_country?: string | null;
+  /** 'high' | 'medium' | 'stale' | 'unknown' — gates how plainly a location may be shown. */
+  affiliation_confidence?: string | null;
+  /** Year the winning affiliation evidence comes from. */
+  affiliation_as_of?: number | null;
   /** TODO: load via hcp_therapeutic_areas join; not stored on hcps. */
   therapeutic_area: string | null;
   narrative?: string | null;

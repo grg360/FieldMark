@@ -10,7 +10,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
+import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -38,21 +38,23 @@ import {
   type Product,
 } from "../../lib/communityProfile";
 
-// Register tokens substituted 2026-08-05 for exact value matches only (card,
-// band, amber, ink0–3 → COOL). page/head/drawer and the ink4–6/dash greys
-// are near-twins of GROUND/COOL (one digit off) — converging them is a visible
-// change, deferred. rose/teal are cohort semantics; alpha hairlines stay per frame.
-// ink1 carries COOL.ui since the 2026-08-05 consolidation (#e7e8e9 retired, Δ1.02).
+// CANONICAL MIGRATION (pilot, 2026-08-12): every P key resolves to an
+// RFC-01/02 token — the near-twin greys, alpha hairlines and warm surfaces
+// converge here. line/lineMed both land on LINE.HAIR (the register draws one
+// opaque hair rule, not an alpha ramp); ink0/ink1 both land on INK.PRIME
+// (they were already one value). ink5 (#7C8288, L*54) sits in the rules' 52–60
+// gap — mapped to INK.LABEL by role (it labels), flagged in the pilot report.
 const P = {
-  // card is a g1 well inside the g2 board (Commit C 2026-08-05)
-  page: "#08090A", card: GROUND.g1, head: "#0B0D10", band: GROUND.g1, drawer: "#0A0C0F",
-  line: "rgba(255,255,255,.06)", lineMed: "rgba(255,255,255,.09)", lineStrong: "rgba(255,255,255,.14)",
-  amber: GOLD.rank, rose: "#B0848F", // Community cohort marker (ledger)
-  ink0: COOL.ui, ink1: COOL.ui, ink2: COOL.prose, ink3: COOL.muted, ink4: "#8F959A",
-  ink5: "#7C8288", ink6: "#63696E", dash: "#71787E", teal: "#7FB3BB",
+  page: CANON.GROUND.BASE, card: CANON.GROUND.RAISE, head: CANON.GROUND.RAISE,
+  band: CANON.GROUND.RAISE, drawer: CANON.GROUND.RAISE,
+  line: CANON.LINE.HAIR, lineMed: CANON.LINE.HAIR, lineStrong: CANON.LINE.EDGE,
+  amber: CANON.GOLD.RANK, rose: CANON.MARK.COM, // Community cohort marker (ledger)
+  ink0: CANON.INK.PRIME, ink1: CANON.INK.PRIME, ink2: CANON.INK.BODY, ink3: CANON.INK.LABEL,
+  ink4: CANON.INK.LABEL, ink5: CANON.INK.LABEL, ink6: CANON.INK.MUTE, dash: CANON.INK.MUTE,
+  teal: CANON.ACTION.LINK,
 } as const;
-const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.mono}` } as const);
-const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FONT.serif}` } as const);
+const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 
 const STATUS_LABEL: Record<RelationshipStatus, string> = {
   not_engaged: "Not Engaged", targeted: "Targeted", contacted: "Contacted",
@@ -61,6 +63,10 @@ const STATUS_LABEL: Record<RelationshipStatus, string> = {
 
 // Frame engagement-mix palette (1a): Consulting amber, Speaker blue, Food&Bev green,
 // Honoraria violet, Travel gray. Royalty isn't drawn in the frame — cohort rose.
+// PILOT JUDGMENT CASE — NOT migrated: this is a CHART CATEGORICAL palette, not
+// UI ink. The from→census rules would fold Speaker blue AND Honoraria violet
+// into MARK/RS (two categories, one hue — an information loss), so dataviz
+// categoricals stay literal pending their own ramp decision.
 const MIX_COLOR: Record<string, string> = {
   "Consulting": "#D69A3C", "Speaker bureau": "#5B8FD6", "Food & beverage": "#57A878",
   "Honoraria": "#8A7FB8", "Travel, lodging, education": "#6F7370", "Royalty": "#B0848F",
@@ -100,7 +106,7 @@ function SectionHead({ id, glyph, tag, count, sub }: { id?: string; glyph: strin
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
           <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.rose }}>{glyph}</span>
           <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.ink1 }}>{tag}</span>
-          {count ? <span style={{ ...mono(10, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
+          {count ? <span style={{ ...mono(11, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
         </div>
         {sub ? <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: P.ink6, lineHeight: 1.6 }}>{sub}</span> : null}
       </div>
@@ -110,7 +116,7 @@ function SectionHead({ id, glyph, tag, count, sub }: { id?: string; glyph: strin
     <div id={id} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "0 0 12px", scrollMarginTop: 16, flexWrap: "wrap" }}>
       <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.rose }}>{glyph}</span>
       <span style={{ ...mono(11, 600), letterSpacing: ".16em", color: P.ink1 }}>{tag}</span>
-      {count ? <span style={{ ...mono(10, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
+      {count ? <span style={{ ...mono(11, 500), letterSpacing: ".1em", color: P.ink4 }}>{count}</span> : null}
       {sub ? <span style={{ flex: 1, minWidth: 120, ...mono(9, 500), letterSpacing: ".1em", color: P.ink6, textAlign: "right" }}>{sub}</span> : null}
     </div>
   );
@@ -119,9 +125,11 @@ function SectionHead({ id, glyph, tag, count, sub }: { id?: string; glyph: strin
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout width="wide">
-      {/* Commit C 2026-08-05: g2 board per the Pulse scheme; interior cards
-          are g1 wells. */}
-      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
+      {/* Composition fix 2026-08-12: the wrapper is transparent — each section
+          container carries DEPTH.PANEL and sits on the shell's BASE ground. A
+          full-height PANEL here made RAISE the dominant page field (the blue
+          read). Replaces the Commit C g2-board treatment. */}
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", fontFamily: FACE.data }}>
         {children}
       </div>
     </AppLayout>
@@ -155,7 +163,7 @@ function EvidenceLine({ ev }: { ev: NsclcEvidenceTier | null }) {
         ? `${ev.years_anchored ?? yrs.length}${consecutive ? " consecutive" : ""} years of prescribing is a materially stronger claim than one. Claims and prescribing carry no diagnosis.`
         : `A single year of prescribing. Claims and prescribing carry no diagnosis.`;
   } else if (ev.tier === "supported") {
-    accent = "#B99A68";
+    accent = CANON.GOLD.RANK;
     label = "EVIDENCE · SUPPORTING";
     lead = ev.supported_evidence ? `${ev.supported_evidence}.` : "Supporting evidence observed.";
     caveat = "Supporting evidence, not a lung-specific anchor. Claims and prescribing carry no diagnosis.";
@@ -176,8 +184,8 @@ function EvidenceLine({ ev }: { ev: NsclcEvidenceTier | null }) {
   return (
     <div style={{ borderLeft: `2px solid ${accent}`, padding: "2px 0 2px 14px", marginTop: 4, display: "flex", flexDirection: "column", gap: 8 }}>
       <span style={{ ...mono(9, 500), letterSpacing: ".11em", color: ev.tier === "anchored" ? P.amber : P.ink4 }}>{label}</span>
-      <p style={{ margin: 0, ...serif(13.5), lineHeight: 1.55, color: P.ink2, textWrap: "pretty" }}>{lead}</p>
-      <p style={{ margin: 0, ...serif(12.5), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{caveat}</p>
+      <p style={{ margin: 0, ...serif(13), lineHeight: 1.55, color: P.ink2, textWrap: "pretty" }}>{lead}</p>
+      <p style={{ margin: 0, ...serif(13), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{caveat}</p>
       {ev.lung_weighted ? (
         <span style={{ alignSelf: "flex-start", ...mono(9), letterSpacing: ".1em", color: P.ink4, border: `1px solid ${P.lineStrong}`, padding: "4px 8px" }}>
           LUNG-WEIGHTED ORAL MIX
@@ -245,7 +253,7 @@ export default function CommunityHcpProfile() {
     <Shell>
       <div style={{ padding: "20px 24px 48px", display: "flex", flexDirection: "column", gap: 24 }}>
         {/* breadcrumb */}
-        <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9.5, 500), letterSpacing: ".1em", color: P.ink5 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>
           <span style={{ width: 3, height: 12, background: P.rose }} />
           <span style={{ color: P.rose }}>COMMUNITY</span><span>›</span>
           <Link to="/cohorts/ledger/community" style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
@@ -254,17 +262,17 @@ export default function CommunityHcpProfile() {
         {/* header — frame 1a: three cells (identity+actions | PRACTICE SHAPE | COMMUNITY
             SCORE), one bordered container, left borders between cells. flex-wrap stands in
             for the frame's fixed 1fr/300/300 grid so narrow viewports stack. */}
-        <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, position: "relative", display: "flex", flexWrap: "wrap" }}>
+        <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, position: "relative", display: "flex", flexWrap: "wrap" }}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: P.rose }} />
           {/* identification — chips, name, specialty · location · NPI, action row */}
           <div style={{ flex: "2 1 400px", minWidth: 0, padding: "22px 24px 20px", display: "flex", flexDirection: "column", gap: 7 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", ...mono(8.5, 600), letterSpacing: ".14em" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", ...mono(9, 600), letterSpacing: ".14em" }}>
               <span style={{ color: P.rose, border: `1px solid rgba(176,132,143,.4)`, borderRadius: 3, padding: "3px 7px" }}>COMMUNITY</span>
               <span style={{ color: P.amber, border: `1px solid rgba(224,167,94,.35)`, borderRadius: 3, padding: "3px 7px" }}>{STATUS_LABEL[status].toUpperCase()}</span>
               <span style={{ color: P.ink6 }}>NO PUBLICATION RECORD</span>
             </div>
             <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em" }}>{p.hcp.name}</span>
-            <span style={{ ...mono(10.5), color: P.ink4, letterSpacing: ".02em" }}>
+            <span style={{ ...mono(11), color: P.ink4, letterSpacing: ".02em" }}>
               {p.hcp.specialty ? `${p.hcp.specialty}` : ""}
               {p.hcp.institution ? (
                 <>
@@ -294,12 +302,12 @@ export default function CommunityHcpProfile() {
                   live data. */}
               {p.medicare_paid_corrected != null ? (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ ...mono(10.5), color: P.ink4 }}>Medicare paid</span>
-                  <span style={{ ...mono(12), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{moneyCompact(p.medicare_paid_corrected)}<span style={{ ...mono(9), color: P.ink6 }}> / 3yr</span></span>
+                  <span style={{ ...mono(11), color: P.ink4 }}>Medicare paid</span>
+                  <span style={{ ...mono(13), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{moneyCompact(p.medicare_paid_corrected)}<span style={{ ...mono(9), color: P.ink6 }}> / 3yr</span></span>
                 </div>
               ) : null}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                <span style={{ ...mono(10.5), color: P.ink4 }}>Setting</span>
+                <span style={{ ...mono(11), color: P.ink4 }}>Setting</span>
                 <span style={{ ...mono(11), color: P.ink1 }}>{ps.setting ? `${titleCase(ps.setting)} practice` : "—"}</span>
               </div>
               {/* Open-Payments-derived: gated when zero — a bare "0" beside administered
@@ -307,12 +315,12 @@ export default function CommunityHcpProfile() {
                   payments" (the engagement record carries that honest state). */}
               {(ps.drug_breadth ?? 0) > 0 ? (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ ...mono(10.5), color: P.ink4 }}>Drug breadth</span>
-                  <span style={{ ...mono(12), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{ps.drug_breadth}<span style={{ ...mono(9), color: P.ink6 }}> paid-around products</span></span>
+                  <span style={{ ...mono(11), color: P.ink4 }}>Drug breadth</span>
+                  <span style={{ ...mono(13), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{ps.drug_breadth}<span style={{ ...mono(9), color: P.ink6 }}> paid-around products</span></span>
                 </div>
               ) : null}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                <span style={{ ...mono(10.5), color: P.ink4 }}>Career</span>
+                <span style={{ ...mono(11), color: P.ink4 }}>Career</span>
                 <span style={{ ...mono(11), color: P.ink1 }}>{ps.career_years != null ? `${ps.career_years} yrs post-fellowship` : "—"}</span>
               </div>
             </div>
@@ -323,8 +331,8 @@ export default function CommunityHcpProfile() {
               practice-shape and engagement blocks, not here. */}
           <div style={{ flex: "1 1 260px", maxWidth: 320, padding: "22px 24px 20px", borderLeft: `1px solid ${P.line}`, display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={{ ...mono(9, 600), letterSpacing: ".18em", color: P.ink6 }}>COMMUNITY STANDING</span>
-            <span style={{ ...mono(12, 600), letterSpacing: ".1em", color: P.ink3 }}>NOT RANKED</span>
-            <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.55 }}>
+            <span style={{ ...mono(13, 600), letterSpacing: ".1em", color: P.ink3 }}>NOT RANKED</span>
+            <span style={{ ...serif(13), color: P.ink5, lineHeight: 1.55 }}>
               Community clinicians are not scored or ordered. CMS claims measure throughput, not influence — this profile
               shows the measured facts (Medicare reach, Part D presence, engagement history, practice setting) and asserts
               no ranking among peers.
@@ -355,13 +363,13 @@ export default function CommunityHcpProfile() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="WHY THIS PRACTITIONER" />
           {n?.why_this ? (
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px" }}>
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px" }}>
               <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty" }}>{n.why_this}</div>
             </div>
           ) : (
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
-              <span style={{ ...mono(12, 600), letterSpacing: ".1em", color: P.ink4 }}>NO GENERATED SUMMARY</span>
-              <span style={{ ...serif(12.5), color: P.ink5, lineHeight: 1.5, textWrap: "pretty" }}>Narrative synthesis runs for the top-ranked HCPs in each cohort and this practitioner ranks below that cut. A coverage fact, not a judgment about the practice.</span>
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ ...mono(13, 600), letterSpacing: ".1em", color: P.ink4 }}>NO GENERATED SUMMARY</span>
+              <span style={{ ...serif(13), color: P.ink5, lineHeight: 1.5, textWrap: "pretty" }}>Narrative synthesis runs for the top-ranked HCPs in each cohort and this practitioner ranks below that cut. A coverage fact, not a judgment about the practice.</span>
             </div>
           )}
         </div>
@@ -373,11 +381,11 @@ export default function CommunityHcpProfile() {
         {(n?.signal_strength || n?.why_now || n?.engagement_angle || n?.caution) ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <SectionHead glyph="◆" tag="SIGNAL SUMMARY" sub="MACHINE-DERIVED" />
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
               {[["CONFIDENCE", n?.signal_strength], ["WHY NOW", n?.why_now], ["ENGAGEMENT ANGLE", n?.engagement_angle], ["CAUTION", n?.caution]].map(([l, v]) => v ? (
                 <div key={l as string} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>{l}</span>
-                  <span style={{ ...serif(13.5), color: P.ink3, lineHeight: 1.55, textWrap: "pretty" }}>{v}</span>
+                  <span style={{ ...serif(13), color: P.ink3, lineHeight: 1.55, textWrap: "pretty" }}>{v}</span>
                 </div>
               ) : null)}
               <span style={{ ...mono(9, 500), letterSpacing: ".06em", color: P.ink6 }}>MODEL SYNTHESIS OVER THE RECORD BELOW · REVIEW BEFORE USE · NO CLINICAL CLAIM</span>
@@ -394,9 +402,9 @@ export default function CommunityHcpProfile() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="INDUSTRY ENGAGEMENT RECORD" sub="PRIMARY" />
           {eng.has_record && (companies.length || shown.length) ? (
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL }}>
               {/* compliance framing, verbatim intent */}
-              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${P.line}`, ...serif(12.5), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
+              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${P.line}`, ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
                 CMS Open Payments, disclosed transfers of value, published federally. It describes contact between industry and this practice — <span style={{ color: P.ink2 }}>not influence, not prescribing, not quality of care, and not standing relative to other practitioners</span>. Payment counts are shown beside every amount because thirty $40 meals and one $10K consulting agreement are different facts.
               </div>
 
@@ -410,8 +418,8 @@ export default function CommunityHcpProfile() {
                   ["ACTIVE THROUGH", fmtMonth(activeThrough)],
                 ] as [string, string][]).map(([l, v], i) => (
                   <div key={l} style={{ flex: "1 1 120px", padding: "10px 20px", borderLeft: i ? `1px solid ${P.line}` : "none" }}>
-                    <div style={{ ...mono(8.5, 500), letterSpacing: ".12em", color: P.ink6, paddingBottom: 3 }}>{l}</div>
-                    <div style={{ ...mono(12.5, 500), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{v}</div>
+                    <div style={{ ...mono(9, 500), letterSpacing: ".12em", color: P.ink6, paddingBottom: 3 }}>{l}</div>
+                    <div style={{ ...mono(13, 500), color: P.ink1, fontVariantNumeric: "tabular-nums" }}>{v}</div>
                   </div>
                 ))}
               </div>
@@ -422,12 +430,12 @@ export default function CommunityHcpProfile() {
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "12px 20px 6px", flexWrap: "wrap", gap: 8 }}>
                     <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink3 }}>BY COMPANY <span style={{ color: P.ink6 }}>· TOP {companies.length} OF {eng.distinct_companies ?? companies.length} BY AMOUNT</span></span>
-                    <span style={{ ...mono(8.5), color: P.ink6 }}>
+                    <span style={{ ...mono(9), color: P.ink6 }}>
                       <span style={{ display: "inline-block", width: 14, height: 4, background: P.rose, borderRadius: 1, marginRight: 5, verticalAlign: "middle" }} />amount
                       <span style={{ display: "inline-block", width: 14, height: 3, background: P.ink6, borderRadius: 1, margin: "0 5px 0 12px", verticalAlign: "middle" }} />payments · scaled to the top row
                     </span>
                   </div>
-                  <div style={{ display: isMobile ? "none" : "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6 }}>
+                  <div style={{ display: isMobile ? "none" : "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>
                     <span style={{ width: 26 }}>#</span>
                     <span style={{ flex: "1 1 140px" }}>COMPANY</span>
                     <span style={{ width: 96 }} aria-hidden />
@@ -441,26 +449,26 @@ export default function CommunityHcpProfile() {
                        labels inlined (the column header row is hidden here). */
                     <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "9px 16px", borderBottom: `1px solid ${P.line}` }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                        <span style={{ ...mono(9.5), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{c.rank ?? "—"}</span>
-                        <span style={{ ...serif(12.5), color: P.ink2 }}>{titleCase(c.name)}</span>
+                        <span style={{ ...mono(9), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{c.rank ?? "—"}</span>
+                        <span style={{ ...serif(13), color: P.ink2 }}>{titleCase(c.name)}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                        <span style={{ ...mono(11.5), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(c.amount)}</span>
-                        <span style={{ ...mono(9.5), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{c.payments} PAYMENTS</span>
-                        <span style={{ ...mono(9.5), color: P.ink5 }}>LAST {fmtMonth(c.most_recent)}</span>
+                        <span style={{ ...mono(11), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(c.amount)}</span>
+                        <span style={{ ...mono(9), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{c.payments} PAYMENTS</span>
+                        <span style={{ ...mono(9), color: P.ink5 }}>LAST {fmtMonth(c.most_recent)}</span>
                       </div>
                     </div>
                   ) : (
                     <div key={c.name} style={{ display: "flex", alignItems: "center", padding: "8px 20px", borderBottom: `1px solid ${P.line}` }}>
-                      <span style={{ width: 26, ...mono(9.5), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{c.rank ?? "—"}</span>
+                      <span style={{ width: 26, ...mono(9), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{c.rank ?? "—"}</span>
                       {/* one treatment (2026-08-07): company names serif Title Case, drug names mono */}
-                      <span style={{ flex: "1 1 140px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...serif(12.5), color: P.ink2, paddingRight: 10 }}>{titleCase(c.name)}</span>
+                      <span style={{ flex: "1 1 140px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...serif(13), color: P.ink2, paddingRight: 10 }}>{titleCase(c.name)}</span>
                       <span style={{ width: 96, paddingRight: 10, boxSizing: "border-box" }}>
                         <ShapeBars amount={c.amount} payments={c.payments} maxAmount={maxCoAmount} maxPayments={maxCoPayments} />
                       </span>
-                      <span style={{ width: 70, textAlign: "right", ...mono(11.5), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(c.amount)}</span>
-                      <span style={{ width: 62, textAlign: "right", ...mono(10.5), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{c.payments}</span>
-                      <span style={{ width: 68, textAlign: "right", ...mono(9.5), color: P.ink5 }}>{fmtMonth(c.most_recent)}</span>
+                      <span style={{ width: 70, textAlign: "right", ...mono(11), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(c.amount)}</span>
+                      <span style={{ width: 62, textAlign: "right", ...mono(11), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{c.payments}</span>
+                      <span style={{ width: 68, textAlign: "right", ...mono(9), color: P.ink5 }}>{fmtMonth(c.most_recent)}</span>
                     </div>
                   ))}
                   {tailCompanies > 0 ? (
@@ -478,13 +486,13 @@ export default function CommunityHcpProfile() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "12px 20px 6px", flexWrap: "wrap", gap: 8 }}>
                     <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink3 }}>BY PRODUCT <span style={{ color: P.ink6 }}>· ABOVE THE ${MATERIALITY_USD.toLocaleString()} THRESHOLD</span></span>
                     <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ ...mono(8.5, 600), letterSpacing: ".12em", color: P.ink6 }}>SORT</span>
+                      <span style={{ ...mono(9, 600), letterSpacing: ".12em", color: P.ink6 }}>SORT</span>
                       {(["recency", "amount"] as const).map((k) => (
                         <button key={k} onClick={() => setSort(k)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, minHeight: 0, ...mono(9, sort === k ? 600 : 400), letterSpacing: ".08em", color: sort === k ? P.ink1 : P.ink5 }}>{k.toUpperCase()}</button>
                       ))}
                     </span>
                   </div>
-                  <div style={{ display: isMobile ? "none" : "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(8.5, 500), letterSpacing: ".1em", color: P.ink6 }}>
+                  <div style={{ display: isMobile ? "none" : "flex", padding: "6px 20px", borderBottom: `1px solid ${P.line}`, ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>
                     <span style={{ flex: "2 1 150px" }}>PRODUCT · REPORTING ENTITY</span>
                     <span style={{ width: 70, textAlign: "right" }}>AMOUNT</span>
                     <span style={{ width: 62, textAlign: "right" }}>PAYMENTS</span>
@@ -500,8 +508,8 @@ export default function CommunityHcpProfile() {
             </div>
           ) : (
             <div style={{ border: `1px solid ${P.lineStrong}`, background: P.band, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
-              <span style={{ ...mono(10, 600), letterSpacing: ".12em", color: P.ink4 }}>NO ENGAGEMENT RECORD</span>
-              <span style={{ ...serif(16, 500), color: P.ink1 }}>No reported transfers of value, 2019–2024.</span>
+              <span style={{ ...mono(11, 600), letterSpacing: ".12em", color: P.ink4 }}>NO ENGAGEMENT RECORD</span>
+              <span style={{ ...serif(17, 500), color: P.ink1 }}>No reported transfers of value, 2019–2024.</span>
               <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>This is a fact about disclosure, not about the practitioner. The spine of this profile is missing — plan from claims volume and setting alone. An absence in the open-payments record is not evidence that no relationship exists.</span>
             </div>
           )}
@@ -520,13 +528,14 @@ export default function CommunityHcpProfile() {
         {/* ◆ FIELD INSIGHTS — SECOND SPINE */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="FIELD INSIGHTS" count={`(${notes.length})`} sub="SECOND SPINE · MSL-CAPTURED · YOUR TEAM ONLY" />
-          <div style={{ ...mono(10.5), color: P.ink4, lineHeight: 1.7, letterSpacing: ".01em", textWrap: "pretty" }}>
+          {/* Prose rule 2026-08-12: narrative framing about the practitioner → FACE.value */}
+          <div style={{ ...serif(13), color: P.ink4, lineHeight: 1.6, textWrap: "pretty" }}>
             This practitioner has no published record. Everything below the engagement data is either machine-derived from claims and payments, or written by a person who was in the room. The second kind is scarce and load-bearing here.
           </div>
           {/* functional capture (composer + list) ported from DetailScreen; msl_hcp_notes.
               hideHeader: the SectionHead above is the one header — the component's own
               zero-padding inner header doubled it (2026-08-07). */}
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card }}>
+          <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL }}>
             <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" hideHeader />
           </div>
         </div>
@@ -546,7 +555,7 @@ export default function CommunityHcpProfile() {
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <SectionHead glyph="◆" tag="ENGAGEMENT MIX" count={`${money(eng.lifetime_total)} LIFETIME`} />
-              <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px" }}>
+              <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "16px 22px" }}>
                 {/* stacked bar — segment widths are category share of the 3yr mix */}
                 <div style={{ display: "flex", height: 8, borderRadius: 1, overflow: "hidden", marginBottom: 14 }}>
                   {rows.map((m) => (
@@ -557,16 +566,17 @@ export default function CommunityHcpProfile() {
                   {rows.map((m) => (
                     <div key={m.label} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <span style={{ width: 7, height: 7, background: mixColor(m.label), flex: "none" }} />
-                      <span style={{ flex: 1, ...mono(10.5), color: P.ink2 }}>{m.label}</span>
-                      <span style={{ ...mono(10.5), color: P.ink4 }}>{money(m.amount)}</span>
-                      <span style={{ width: 34, textAlign: "right", ...mono(9.5), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{Math.round(pct(m.amount))}%</span>
+                      <span style={{ flex: 1, ...mono(11), color: P.ink2 }}>{m.label}</span>
+                      <span style={{ ...mono(11), color: P.ink4 }}>{money(m.amount)}</span>
+                      <span style={{ width: 34, textAlign: "right", ...mono(9), color: P.ink6, fontVariantNumeric: "tabular-nums" }}>{Math.round(pct(m.amount))}%</span>
                     </div>
                   ))}
                 </div>
-                {/* synthesis — computed from the real mix + entity rows, no mock figures */}
+                {/* synthesis — computed from the real mix + entity rows, no mock figures.
+                    Prose rule 2026-08-12: interpretive synthesis of the chart → FACE.value */}
                 {topCat && topEnt ? (
-                  <div style={{ marginTop: 11, ...mono(9), lineHeight: 1.55, color: P.ink6 }}>
-                    {topCat.label} leads the mix ({Math.round(pct(topCat.amount))}% of the 3-yr categorized record). The largest single relationship is <span style={{ ...serif(11), color: P.ink4 }}>{titleCase(topEnt.name)}</span> — {money(topEnt.amount)} across {topEnt.payments} payments{restCompanies > 0 ? `; the remainder spreads across ${restCompanies} further companies` : ""}.
+                  <div style={{ marginTop: 11, ...serif(13), lineHeight: 1.55, color: P.ink5 }}>
+                    {topCat.label} leads the mix ({Math.round(pct(topCat.amount))}% of the 3-yr categorized record). The largest single relationship is <span style={{ color: P.ink3 }}>{titleCase(topEnt.name)}</span> — {money(topEnt.amount)} across {topEnt.payments} payments{restCompanies > 0 ? `; the remainder spreads across ${restCompanies} further companies` : ""}.
                   </div>
                 ) : null}
               </div>
@@ -585,7 +595,7 @@ export default function CommunityHcpProfile() {
         {p.timeline && p.timeline.some((t) => (t.total ?? 0) > 0) ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <SectionHead glyph="◆" tag="ENGAGEMENT TIMELINE" />
-            <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px" }}>
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "16px 22px" }}>
               <Timeline data={p.timeline} />
               <span style={{ ...mono(9), color: P.ink6, letterSpacing: ".02em" }}>Yearly totals cover the 2022–2024 reporting window held in the record; 2024 is partial — CMS publishes through June. Do not read the drop as disengagement. Earlier years (2019–2021) are not in the yearly breakdown.</span>
             </div>
@@ -620,14 +630,14 @@ export default function CommunityHcpProfile() {
             (same component, same write path, syncs with the ledger). */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <SectionHead glyph="◆" tag="RELATIONSHIP" sub="STATUS · FOLLOW-UPS · SYNCS WITH THE LEDGER" />
-          <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "16px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
             <RelationshipSection hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} />
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>FIELD NOTES</span>
               {notes.length ? (
-                <span style={{ ...mono(9.5), color: P.ink5, lineHeight: 1.5 }}>{notes.length} field insight{notes.length === 1 ? "" : "s"} captured — shown in the second spine.</span>
+                <span style={{ ...mono(9), color: P.ink5, lineHeight: 1.5 }}>{notes.length} field insight{notes.length === 1 ? "" : "s"} captured — shown in the second spine.</span>
               ) : (
-                <span style={{ border: `1px dashed ${P.lineStrong}`, borderRadius: 3, padding: "12px 14px", ...mono(10), color: P.ink5 }}>No field notes yet — add the first.</span>
+                <span style={{ border: `1px dashed ${P.lineStrong}`, borderRadius: 3, padding: "12px 14px", ...mono(11), color: P.ink5 }}>No field notes yet — add the first.</span>
               )}
             </div>
             <RailControls hcpId={p.hcp.id} hcpName={p.hcp.name} specialty={p.hcp.specialty} lastName={p.hcp.last_name} />
@@ -689,9 +699,9 @@ function ProductRow({ d }: { d: Product }) {
           <span style={{ ...serif(11), color: P.ink5 }}>{d.entity ? titleCase(d.entity) : "—"}</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ ...mono(11.5), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
-          <span style={{ ...mono(9.5), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"} PAYMENTS</span>
-          <span style={{ ...mono(9.5), color: P.ink5 }}>LAST {fmtMonth(d.most_recent)}</span>
+          <span style={{ ...mono(11), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
+          <span style={{ ...mono(9), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"} PAYMENTS</span>
+          <span style={{ ...mono(9), color: P.ink5 }}>LAST {fmtMonth(d.most_recent)}</span>
         </div>
       </div>
     );
@@ -704,9 +714,9 @@ function ProductRow({ d }: { d: Product }) {
         <span style={{ ...mono(11, 500), color: P.ink1, letterSpacing: ".02em" }}>{d.drug}</span>
         <span style={{ ...serif(11), color: P.ink5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.entity ? titleCase(d.entity) : "—"}</span>
       </div>
-      <span style={{ width: 70, textAlign: "right", ...mono(11.5), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
-      <span style={{ width: 62, textAlign: "right", ...mono(10.5), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"}</span>
-      <span style={{ width: 68, textAlign: "right", ...mono(9.5), color: P.ink5 }}>{fmtMonth(d.most_recent)}</span>
+      <span style={{ width: 70, textAlign: "right", ...mono(11), color: P.ink2, fontVariantNumeric: "tabular-nums" }}>{money(d.amount)}</span>
+      <span style={{ width: 62, textAlign: "right", ...mono(11), color: P.ink4, fontVariantNumeric: "tabular-nums" }}>{d.payments ?? "—"}</span>
+      <span style={{ width: 68, textAlign: "right", ...mono(9), color: P.ink5 }}>{fmtMonth(d.most_recent)}</span>
     </div>
   );
 }
@@ -731,7 +741,7 @@ function HeaderActions({ hcpId, npi, onBrief }: { hcpId: string; npi: string | n
   const tracked = isTracked(hcpId);
   const act = {
     display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "none",
-    border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(10, 500), letterSpacing: ".08em",
+    border: `1px solid ${P.lineStrong}`, cursor: "pointer", ...mono(11, 500), letterSpacing: ".08em",
     color: P.ink2, borderRadius: 3, minHeight: 0, textDecoration: "none",
   } as const;
 
@@ -780,7 +790,7 @@ function CommunityContactAccess({ hcp }: { hcp: CommunityProfile["hcp"] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <SectionHead glyph="◆" tag="CONTACT & ACCESS" />
-      <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "16px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "16px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>PRACTICE LOCATION</span>
           <span style={{ ...serif(13), color: P.ink2 }}>{loc || "Location not in the registry"}</span>
@@ -789,11 +799,11 @@ function CommunityContactAccess({ hcp }: { hcp: CommunityProfile["hcp"] }) {
           <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>NPI</span>
           {hcp.npi ? (
             <a href={`https://npiregistry.cms.hhs.gov/provider-view/${hcp.npi}`} target="_blank" rel="noopener noreferrer"
-              style={{ ...mono(11.5), color: P.teal, textDecoration: "none", fontVariantNumeric: "tabular-nums" }}>
+              style={{ ...mono(11), color: P.teal, textDecoration: "none", fontVariantNumeric: "tabular-nums" }}>
               {hcp.npi} · NPI REGISTRY →
             </a>
           ) : (
-            <span style={{ ...mono(10), color: P.ink5 }}>Not on record</span>
+            <span style={{ ...mono(11), color: P.ink5 }}>Not on record</span>
           )}
         </div>
         <div style={{ borderTop: `1px solid ${P.line}`, paddingTop: 10 }}>
@@ -821,8 +831,9 @@ function FieldIntelligencePanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <SectionHead glyph="◆" tag="FIELD INTELLIGENCE" />
-      <div style={{ border: `1px solid ${P.lineMed}`, background: P.card, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-        <span style={{ ...mono(10), color: P.ink5 }}>Validation pending — 0 MSLs have reviewed this profile.</span>
+      <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Prose rule 2026-08-12: the panel's empty-state → FACE.value, matching Withheld */}
+        <span style={{ ...serif(13), color: P.ink5 }}>Validation pending — 0 MSLs have reviewed this profile.</span>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
             <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.amber }}>COMMUNITY CONFIDENCE</span>
@@ -832,14 +843,14 @@ function FieldIntelligencePanel() {
         </div>
         {FI_QUESTIONS.map((q) => (
           <div key={q.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ ...mono(10), color: P.ink4 }}>{q.label}</span>
+            <span style={{ ...mono(11), color: P.ink4 }}>{q.label}</span>
             <div style={{ display: "flex", gap: 6 }}>
               {q.options.map((opt) => {
                 const on = answers[q.key] === opt;
                 return (
                   <button key={opt} onClick={() => setAnswers((a) => ({ ...a, [q.key]: a[q.key] === opt ? null : opt }))}
                     style={{ flex: 1, textAlign: "center", padding: "7px 0", background: on ? "rgba(255,255,255,.07)" : "none", cursor: "pointer",
-                      border: `1px solid ${on ? "rgba(255,255,255,.28)" : P.lineStrong}`, borderRadius: 3, ...mono(10, on ? 600 : 400), color: on ? P.ink0 : P.ink2, minHeight: 0 }}>
+                      border: `1px solid ${on ? "rgba(255,255,255,.28)" : P.lineStrong}`, borderRadius: 3, ...mono(11, on ? 600 : 400), color: on ? P.ink0 : P.ink2, minHeight: 0 }}>
                     {opt}
                   </button>
                 );
@@ -850,10 +861,10 @@ function FieldIntelligencePanel() {
         <button disabled={!complete}
           onClick={() => { if (!complete) return; showToast("Field review recorded — the submission path (field-intel write) is not yet wired; stored locally only."); }}
           style={{ textAlign: "center", padding: "10px 0", background: "none", border: `1px solid ${P.lineStrong}`, borderRadius: 3,
-            ...mono(10.5, 500), color: complete ? P.ink2 : P.ink6, cursor: complete ? "pointer" : "not-allowed", opacity: complete ? 1 : 0.6, minHeight: 0 }}>
+            ...mono(11, 500), color: complete ? P.ink2 : P.ink6, cursor: complete ? "pointer" : "not-allowed", opacity: complete ? 1 : 0.6, minHeight: 0 }}>
           Submit validation
         </button>
-        <span style={{ textAlign: "center", ...mono(8.5), color: P.ink6, marginTop: -6 }}>Your identity is never shared. Contributor UUID only.</span>
+        <span style={{ textAlign: "center", ...mono(9), color: P.ink6, marginTop: -6 }}>Your identity is never shared. Contributor UUID only.</span>
       </div>
       <FiToast message={toast} />
     </div>
@@ -881,7 +892,7 @@ function RailControls({ hcpId: _hcpId, hcpName, specialty, lastName }: { hcpId: 
 
   const stack = {
     textAlign: "center", padding: "9px 0", background: "none", border: `1px solid ${P.lineStrong}`,
-    borderRadius: 3, ...mono(10.5, 500), color: P.ink2, cursor: "pointer", minHeight: 0, width: "100%",
+    borderRadius: 3, ...mono(11, 500), color: P.ink2, cursor: "pointer", minHeight: 0, width: "100%",
   } as const;
 
   return (
@@ -907,7 +918,7 @@ function RailControls({ hcpId: _hcpId, hcpName, specialty, lastName }: { hcpId: 
       {reportOpen && (
         <FiModal title="Report data issue" onClose={() => setReportOpen(false)}>
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Issue type</div>
+            <div style={{ fontSize: 13, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Issue type</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ISSUE_TYPES.map((opt) => (
                 <FiChip key={opt} label={opt} selected={issueType === opt} onClick={() => setIssueType(issueType === opt ? null : opt)} />
@@ -915,7 +926,7 @@ function RailControls({ hcpId: _hcpId, hcpName, specialty, lastName }: { hcpId: 
             </div>
           </div>
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Notes (select all that apply)</div>
+            <div style={{ fontSize: 13, color: "rgba(232,230,223,.5)", marginBottom: 8 }}>Notes (select all that apply)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ISSUE_NOTE_CHIPS.map((opt) => (
                 <FiChip key={opt} label={opt} selected={issueNotes.has(opt)} multi onClick={() => {
@@ -947,7 +958,7 @@ function Timeline({ data }: { data: { year: number; total: number | null }[] }) 
         ))}
       </div>
       {data.some((d) => d.year === 2024) ? (
-        <div style={{ paddingTop: 6, ...mono(8.5), color: P.ink6, letterSpacing: ".06em" }}>2024 · PARTIAL — CMS PUBLISHES THROUGH JUNE</div>
+        <div style={{ paddingTop: 6, ...mono(9), color: P.ink6, letterSpacing: ".06em" }}>2024 · PARTIAL — CMS PUBLISHES THROUGH JUNE</div>
       ) : null}
     </div>
   );

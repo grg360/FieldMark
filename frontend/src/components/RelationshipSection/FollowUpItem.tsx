@@ -8,6 +8,7 @@ import {
 } from "../../lib/relationships";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { COOL, FONT, GOLD, GROUND, LINE } from "../../lib/designTokens";
+import { CANON, FACE } from "../../lib/canonicalTokens"; // g2 → INSET + FACE.value, 2026-08-12
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -244,7 +245,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
     <div style={{ fontFamily: FONT.mono }}>
       <div
         style={{
-          backgroundColor: GROUND.g2,
+          backgroundColor: CANON.GROUND.INSET,
           border: `1px solid ${LINE.l1}`,
           borderLeft: overdue ? `2px solid ${GOLD.gold}` : `1px solid ${LINE.l1}`,
           borderRadius: 2,
@@ -283,7 +284,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   top: "100%",
                   left: 0,
                   marginTop: 4,
-                  backgroundColor: GROUND.g2,
+                  backgroundColor: CANON.GROUND.INSET,
                   border: `1px solid ${LINE.l1}`,
                   borderRadius: 2,
                   zIndex: 10,
@@ -348,9 +349,9 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   border: `1px solid ${LINE.l2}`,
                   borderRadius: 2,
                   color: COOL.ui,
-                  fontSize: 13.5,
+                  fontSize: 13,
                   padding: "4px 8px",
-                  fontFamily: FONT.serif,
+                  fontFamily: FACE.value, // value-face prose (was legacy FONT.serif — the side-by-side-serifs bug)
                   outline: "none",
                 }}
               />
@@ -363,8 +364,8 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   if (e.key === "Enter" || e.key === " ") setEditingBody(true);
                 }}
                 style={{
-                  fontFamily: FONT.serif,
-                  fontSize: 13.5,
+                  fontFamily: FACE.value, // value-face prose (was legacy FONT.serif — the side-by-side-serifs bug)
+                  fontSize: 13,
                   color: COOL.ui,
                   cursor: "pointer",
                   lineHeight: 1.45,
@@ -386,7 +387,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
               style={{
                 padding: "3px 8px",
                 borderRadius: 2,
-                fontSize: 9.5,
+                fontSize: 9,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 color: overdue ? GOLD.gold : COOL.muted,
@@ -405,7 +406,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   position: "absolute",
                   top: "100%",
                   left: 0,
-                  backgroundColor: GROUND.g2,
+                  backgroundColor: CANON.GROUND.INSET,
                   border: `1px solid ${LINE.l1}`,
                   borderRadius: 2,
                   padding: 8,
@@ -413,7 +414,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   marginTop: 6,
                   // @ts-expect-error CSS custom properties for react-day-picker
                   "--rdp-accent-color": GOLD.gold,
-                  "--rdp-background-color": GROUND.g2,
+                  "--rdp-background-color": CANON.GROUND.INSET,
                   "--rdp-day-color": COOL.ui,
                   "--rdp-day-hover-background": LINE.l0,
                 }}
@@ -423,8 +424,8 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
                   selected={item.due_at ? new Date(item.due_at) : undefined}
                   onSelect={(date) => void handleDateSelect(date)}
                   styles={{
-                    caption: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
-                    day: { color: COOL.ui, fontSize: 12, fontFamily: FONT.mono },
+                    caption: { color: COOL.ui, fontSize: 13, fontFamily: FONT.mono },
+                    day: { color: COOL.ui, fontSize: 13, fontFamily: FONT.mono },
                     head_cell: { color: COOL.muted },
                     nav_button: { color: COOL.muted },
                   }}
@@ -442,7 +443,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
               color: COOL.prose,
               padding: "4px 9px",
               borderRadius: 2,
-              fontSize: 9.5,
+              fontSize: 9,
               fontWeight: 600,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
@@ -460,7 +461,7 @@ export default function FollowUpItem({ userId, item, onMutate }: Props) {
             disabled={pending}
             style={{
               color: COOL.label,
-              fontSize: 9.5,
+              fontSize: 9,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               background: "none",

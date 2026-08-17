@@ -12,6 +12,13 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+// ── SEAM, DELIBERATE (2026-08-15) ───────────────────────────────────────────
+// This file stays on the LEGACY designTokens vocabulary while its four siblings
+// (ForumIndexPage, ThreadPage, ModerationPage, fiUi) moved to canonicalTokens.
+// That is not an oversight. This component renders inside PublicationsListPage
+// (FullCareerView, PublicationCard, PublicationsSurface) — a finished surface —
+// so migrating it here would silently restyle a surface outside this migration.
+// Move it when Publications is migrated, not before.
 import { FONT, GOLD, COOL, LINE } from "../../lib/designTokens";
 import type { DiscussAffordance as Affordance } from "../../lib/fieldIntelligence";
 import { invalidateAffordance, useDiscussAffordance } from "./useDiscussAffordance";

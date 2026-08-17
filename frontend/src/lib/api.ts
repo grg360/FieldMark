@@ -1,7 +1,13 @@
 import { firstEmbedded } from "./cohort-metrics";
+import { TA_DISPLAY_NAME_BY_SLUG } from "./taLabels";
 import { formatBibliographyByline } from "./authorByline";
 import { dedupeHCPs } from "./hcp-dedupe";
-import { countriesForRegion, type RegionKey } from "./regions";
+import {
+  countriesForRegion,
+  excludedCountriesForRegion,
+  isExclusionRegion,
+  type RegionKey,
+} from "./regions";
 import { resolveFilterScope } from "./rank-filters";
 import { institutionToSlug } from "./institutionUtils";
 import { supabase } from "./supabase";
@@ -27,6 +33,13 @@ interface RpcScopeParams {
   states: string[];
   scopeLabel: string;
   scopeIncludesUs: boolean;
+  /**
+   * Countries to EXCLUDE rather than include. Non-empty only for the "Other" region,
+   * which is the complement of every defined region and cannot be expressed as an
+   * `IN (...)` list. Callers MUST apply this as a negated predicate; ignoring it is
+   * the bug that made "Other" return every region's rows.
+   */
+  excludeScopeValues: string[];
 }
 
 function resolveRpcScopeParams(filters: FilterState): RpcScopeParams {
@@ -36,6 +49,7 @@ function resolveRpcScopeParams(filters: FilterState): RpcScopeParams {
 
   let scopeType = "region";
   let scopeValues: string[] = [];
+  let excludeScopeValues: string[] = [];
 
   if (scope.scopeType === "global") {
     scopeType = "global";
@@ -47,8 +61,11 @@ function resolveRpcScopeParams(filters: FilterState): RpcScopeParams {
     if (countries === null) {
       scopeType = "global";
       scopeValues = [];
-    } else if (countries.length === 0) {
+    } else if (isExclusionRegion(requestedRegion)) {
+      // "Other" = every country NOT in a defined region. Expressed as an exclusion,
+      // never as an empty include-list (which silently matched everything).
       scopeValues = [];
+      excludeScopeValues = excludedCountriesForRegion(requestedRegion);
     } else {
       scopeValues = countries;
     }
@@ -65,7 +82,7 @@ function resolveRpcScopeParams(filters: FilterState): RpcScopeParams {
       ? filters.states.map((s) => s.toUpperCase())
       : [];
 
-  return { scopeType, scopeValues, states, scopeLabel, scopeIncludesUs };
+  return { scopeType, scopeValues, states, scopeLabel, scopeIncludesUs, excludeScopeValues };
 }
 
 type CohortKind = "rising_star" | "rising_composite" | "established" | "community";
@@ -98,6 +115,14 @@ async function enrichAndMapCohortRows(
       .in("hcp_id", hcpIds);
     if (scopeParams.scopeValues.length > 0) {
       v3Query = v3Query.in("scope_value", scopeParams.scopeValues);
+    } else if (scopeParams.excludeScopeValues.length > 0) {
+      // "Other": everything NOT in a defined region. PostgREST wants the negated `in`
+      // list as a parenthesised, quoted tuple.
+      v3Query = v3Query.not(
+        "scope_value",
+        "in",
+        `(${scopeParams.excludeScopeValues.map((c) => `"${c}"`).join(",")})`,
+      );
     }
     const { data: v3Rows, error: v3Err } = await v3Query;
     if (v3Err) {
@@ -137,6 +162,9 @@ async function enrichAndMapCohortRows(
           institution_normalized,
           institution_raw,
           country,
+          current_country,
+          affiliation_confidence,
+          affiliation_as_of,
           career_first_pub_year,
           cohort_classification,
           cohort_score,
@@ -263,11 +291,17 @@ async function enrichAndMapCohortRows(
 
     const missingIds = narrativeIds.filter((id: string) => !narrativeMap.has(id));
     if (missingIds.length > 0) {
+      // This fallback kept the cohort filter but dropped therapeutic_area_slug, so a
+      // narrative written for a DIFFERENT therapeutic area could fill the gap — the
+      // path by which hepatology community narratives could surface on an NSCLC
+      // card. A narrative is about an HCP's standing WITHIN a TA and does not
+      // transfer; the TA filter is restored and absence stays absence.
       const { data: fallbackNarratives, error: fbError } = await supabase
         .from("hcp_narratives_v2")
         .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at")
         .in("hcp_id", missingIds)
         .eq("cohort", narrativeCohort)
+        .eq("therapeutic_area_slug", taSlug)
         .order("generated_at", { ascending: false });
 
       if (fbError) {
@@ -567,6 +601,47 @@ async function enrichAndMapCohortRows(
   return { rows, error: null };
 }
 
+/**
+ * Distinct scope_values in a rank table that fall OUTSIDE every defined region —
+ * i.e. the concrete membership of the "Other" bucket for this TA.
+ *
+ * Resolved from data rather than hardcoded: the set of countries appearing in the
+ * corpus is open-ended, so a static "Other" list would silently go stale. Cached per
+ * (table, TA) for the session; the rank tables only change on a rescore.
+ */
+const otherScopeValueCache = new Map<string, string[]>();
+
+async function resolveOtherScopeValues(
+  taId: string,
+  rankTable: string,
+  excluded: string[],
+): Promise<string[]> {
+  const key = `${rankTable}:${taId}`;
+  const cached = otherScopeValueCache.get(key);
+  if (cached) return cached;
+
+  const { data, error } = await supabase
+    .from(rankTable)
+    .select("scope_value")
+    .eq("therapeutic_area_id", taId)
+    .eq("scope_type", "region")
+    .not("scope_value", "is", null);
+
+  if (error) return [];
+
+  const excludedSet = new Set(excluded.map((c) => c.toUpperCase()));
+  const values = Array.from(
+    new Set(
+      (data ?? [])
+        .map((r) => String((r as { scope_value: string | null }).scope_value ?? "").toUpperCase())
+        .filter((c) => c !== "" && !excludedSet.has(c)),
+    ),
+  ).sort();
+
+  otherScopeValueCache.set(key, values);
+  return values;
+}
+
 async function fetchCohortViaRpc(
   filters: FilterState,
   taId: string,
@@ -580,6 +655,18 @@ async function fetchCohortViaRpc(
 ): Promise<{ rows: RisingStar[]; total: number; error: string | null }> {
   const rpcScope = resolveRpcScopeParams(filters);
   const scope = resolveFilterScope(filters);
+
+  // "Other" is an exclusion region, but the RPCs only accept a positive
+  // p_scope_values list. Resolve the complement against the actual rank table so the
+  // bucket is reachable without changing the RPC signature. Without this the bail
+  // below fired on the empty include-list and "Other" silently returned nothing.
+  if (rpcScope.excludeScopeValues.length > 0 && rpcScope.scopeValues.length === 0) {
+    rpcScope.scopeValues = await resolveOtherScopeValues(
+      taId,
+      rankTable,
+      rpcScope.excludeScopeValues,
+    );
+  }
 
   // The rising_composite RPC handles global natively (scope_type='global',
   // scope_value=NULL). Every other cohort/RPC has no global rows path, so it
@@ -750,14 +837,8 @@ export function taIdForApiSlug(slug: string): string | undefined {
   return TA_ID_MAP[slug.toLowerCase().trim()];
 }
 
-const TA_DISPLAY_NAME_BY_SLUG: Record<string, string> = {
-  nsclc: "NSCLC",
-  "atopic-dermatitis": "Atopic Dermatitis",
-  hepatology: "Hepatology",
-  "rare-disease": "Rare Disease",
-  immunology: "Immunology",
-  oncology: "Oncology",
-};
+// TA_DISPLAY_NAME_BY_SLUG moved to lib/taLabels.ts 2026-08-15 and is imported
+// back here, so the label strings have exactly one home. See that file for why.
 
 export function taDisplayNameForId(taId: string): string {
   const slug = apiSlugForTaId(taId);
@@ -1004,6 +1085,17 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
         ? String(hcp.npi_specialty)
         : null,
     country: String(hcp.country ?? ""),
+    // Re-derived affiliation (2026-08-14). Carried alongside the preserved historical
+    // `country` so the display layer can hedge — see lib/location.ts.
+    current_country:
+      hcp.current_country != null && String(hcp.current_country).trim() !== ""
+        ? String(hcp.current_country)
+        : null,
+    affiliation_confidence:
+      hcp.affiliation_confidence != null && String(hcp.affiliation_confidence).trim() !== ""
+        ? String(hcp.affiliation_confidence)
+        : null,
+    affiliation_as_of: hcp.affiliation_as_of != null ? Number(hcp.affiliation_as_of) : null,
     // TODO: Source therapeutic_area via hcp_therapeutic_areas join (not an hcps column).
     therapeutic_area: therapeuticArea.trim() !== "" ? therapeuticArea : null,
     hcp_id: row.hcp_id ?? hcp.id ?? "",
@@ -1087,56 +1179,6 @@ async function fetchAllPaginated<T>(
   }
 
   return { data: allRows, error: null };
-}
-
-/** TA-specific narrative first, then most recent narrative for this HCP. */
-export async function getHCPNarrative(
-  hcpId: string,
-  therapeuticArea?: string,
-): Promise<ApiResult<string | null>> {
-  try {
-    const taSlug = resolveTASlug(therapeuticArea);
-
-    if (taSlug) {
-      // Cohort-keyed table (2026-08-06): a dual-board member holds one row per
-      // cohort, so this generic reader takes the newest — maybeSingle() on
-      // (hcp, slug) alone would error on multi-row.
-      const { data, error } = await supabase
-        .from("hcp_narratives_v2")
-        .select("narrative_text")
-        .eq("hcp_id", hcpId)
-        .eq("therapeutic_area_slug", taSlug)
-        .order("generated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        return { data: null, error: error.message };
-      }
-      if (data?.narrative_text) {
-        return { data: data.narrative_text as string, error: null };
-      }
-    }
-
-    const fallback = await supabase
-      .from("hcp_narratives_v2")
-      .select("narrative_text")
-      .eq("hcp_id", hcpId)
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (fallback.error) {
-      return { data: null, error: fallback.error.message };
-    }
-
-    return { data: (fallback.data?.narrative_text as string | null) ?? null, error: null };
-  } catch (err) {
-    return {
-      data: null,
-      error: err instanceof Error ? err.message : "Unknown error occurred",
-    };
-  }
 }
 
 export async function fetchHcpThemes(hcpId: string): Promise<ApiResult<ResearchTheme[]>> {
@@ -1642,18 +1684,19 @@ export async function getHCPDetail(
       ).maybeSingle();
     })();
 
-    // Narrative is TA-strict: NO fallback to other TAs. If the HCP has no
-    // narrative for this TA, narrative is null.
+    // Narrative is TA-strict AND cohort-strict. Taking "newest row for this TA"
+    // silently rendered the WRONG COHORT's narrative: Martin Reck (DE Established
+    // #1) showed a community-cohort v1.0 narrative, because community was simply
+    // the most recent row he had. The rows are fetched for every cohort here and
+    // the one matching the cohort this profile actually resolved is selected after
+    // the rank promise settles (below) — no extra round trip, and a cohort with no
+    // narrative yields none rather than borrowing another cohort's.
     const narrativePromise = supabase
       .from("hcp_narratives_v2")
-      .select("narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug")
+      .select("narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug, cohort")
       .eq("hcp_id", hcpId)
       .eq("therapeutic_area_slug", narrativeTaSlug)
-      // Cohort-keyed table (2026-08-06): newest row wins in this generic
-      // reader; maybeSingle() alone would error on a dual-board member.
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("generated_at", { ascending: false });
 
     const medicarePromise = supabase
       .from("hcp_medicare_summary_v2")
@@ -1773,16 +1816,27 @@ export async function getHCPDetail(
       })
       .filter(Boolean);
 
-    const narrativeData = (narrativeResult as {
-      data?: {
-        narrative_text: string | null;
-        why_now: string | null;
-        engagement_angle: string | null;
-        caution_flags: string | null;
-        signal_strength: string | null;
-        generated_at: string | null;
-      } | null;
-    }).data ?? null;
+    // Cohort-strict selection (see the narrativePromise note above). The rank promise
+    // resolves which cohort THIS profile is, and only that cohort's narrative is used.
+    // The rank tables say "rising"; the narrative table says "rising_star" — the same
+    // mapping the card feed already applies.
+    type NarrativeRow = {
+      narrative_text: string | null;
+      why_now: string | null;
+      engagement_angle: string | null;
+      caution_flags: string | null;
+      signal_strength: string | null;
+      generated_at: string | null;
+      cohort: string | null;
+    };
+    const narrativeRows =
+      ((narrativeResult as { data?: NarrativeRow[] | null }).data ?? []) as NarrativeRow[];
+    const rankCohort = (rankResult as { data?: { cohort?: string | null } | null }).data?.cohort ?? null;
+    const narrativeCohortWanted =
+      rankCohort === "rising" || rankCohort === "rising_composite" ? "rising_star" : rankCohort;
+    const narrativeData: NarrativeRow | null = narrativeCohortWanted
+      ? (narrativeRows.find((r) => r.cohort === narrativeCohortWanted) ?? null)
+      : null;
 
     // Cohort classification AND score are per-TA — they live in the cohort rank tables
     // keyed by therapeutic_area_id, NOT in the global hcps_v2.cohort_classification /
@@ -3412,7 +3466,7 @@ export interface LandscapeLeaderboards {
 
 function landscapeTaSlugToName(taSlug: string): string {
   const map: Record<string, string> = {
-    nsclc: "NSCLC",
+    nsclc: "Lung Cancer",
     oncology: "Oncology",
     hepatology: "Hepatology",
     immunology: "Immunology",

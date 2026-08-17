@@ -107,6 +107,16 @@ export interface ForumIndexAnchor extends ForumAnchor {
   threads: ForumThread[];
 }
 
+// ── ARCHITECTURAL GAP, LOGGED 2026-08-15 — NO TA SCOPE ──────────────────────
+// This join takes publications_v2 with NO therapeutic-area predicate, and the
+// sort below is citation_count across whatever field_intel_anchors happens to
+// hold. The forum can therefore surface any publication in the corpus from any
+// TA, ranked above its own subject matter — PMID 40305708 (Semaglutide in MASH,
+// Hepatology, 590 citations) led a lung-cancer board for exactly this reason.
+// The corpus was not wrong; the forum never asks which TA it is.
+// Scoping needs a therapeutic_area_id on field_intel_anchors, a predicate in
+// fi_create_thread (see sql/field_intelligence_forum_writes.sql), and a route or
+// config source for the TA. LOGGED, DELIBERATELY NOT BUILT.
 export async function getForumIndex(): Promise<{ data: ForumIndexAnchor[] | null; error: unknown }> {
   const { data, error } = await supabase
     .from("field_intel_anchors")

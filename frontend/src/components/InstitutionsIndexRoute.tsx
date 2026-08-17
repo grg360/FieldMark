@@ -9,7 +9,7 @@
 // community dominates by volume on many rows — the split is what keeps that
 // legible: 315 as E300/R34/C3 means something different than C300).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getCurrentUser } from "../lib/authHelpers";
 import { getPinnedInstitutionsForUser, pinInstitution, unpinInstitution } from "../lib/institutionPins";
@@ -21,30 +21,63 @@ import {
   type InstitutionAgg,
 } from "../lib/institutionRegistry";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { FONT, GOLD, GROUND, LINE } from "../lib/designTokens";
+import { taLabelForSlug } from "../lib/taLabels";
+import { parentTaLabelForIndicationSlug } from "../lib/routeSlugs";
+import { CANON, DEPTH, FACE } from "../lib/canonicalTokens";
 import AppLayout from "./AppLayout";
 import PageHero from "./PageHero";
 
+// CANONICAL MIGRATION 2026-08-13. The warm parchment ramp folds into the one
+// cool ink ramp by luminance role; the near-black hairlines become the
+// register's OPAQUE rules (LINE.HAIR/EDGE) — visibly more present than the
+// old #141417/#1e1e21, which is the intended canonical behaviour. Composition:
+// the page ground comes from the shell (AppLayout paints DEPTH.GROUND on BASE);
+// section containers take PANEL; bands/toggles are INSET wells.
+// ROW ENCLOSURE 2026-08-15 — a deliberate reversal of that migration's fourth
+// clause, "rows stay flat". Flat rows held while the band was the stronger
+// mark, but the band's fill was GROUND.RAISE sitting on a DEPTH.PANEL board
+// whose gradient settles to RAISE: the fill measured 1.00–1.05:1 against its
+// own ground, i.e. it was not there. Band and row were both reduced to an
+// abutting rule and the list read as one undifferentiated stack.
+// SEPARATED BY FILL, NOT BY LINE. The first pass at this drew the row as a
+// LINE.EDGE box, which read as outlined boxes on a flat sheet — more lines, no
+// dimension, because row fill, section fill and the gap between rows were all
+// one value and the border was doing all the work. The fix is the Intelligence
+// inset-note finding: the RAISE↔BASE step is 1.062:1, which is nothing at 1px
+// and a container at block scale. So use it as FILL. The list region is a well
+// cut back to GROUND.BASE — the page-canvas value, so it reads as a hole in the
+// board, not a fifth plane — and each row is raised off it to GROUND.RAISE with
+// DEPTH.RIM for the lit top edge. No row border at all: at block scale the
+// fill step IS the boundary. The 14px gap is what lets BASE show between rows.
+// Flat rows are retired here, not forgotten.
 const C = {
-  bg: "#0a0a0b",
-  hair: "#141417",
-  hairStrong: "#1e1e21",
-  bandBg: "#0e0e11",
-  ink1: "#e6e3dc",
-  ink2: "#98958d",
-  ink3: "#8b887f",
-  ink4: "#6a6862",
-  ink5: "#575651",
-  ink6: "#4e4d49",
-  amber: GOLD.bright, // was #c9a35c — gold convergence 2026-08-05
-  chipBorder: "#2b2b30",
-  link: "#8fa3ab",
-  toggleBg: "#1d1d20",
-  toggleBorder: "#26262a",
+  // The list well. BASE is the page-canvas value, so the region the rows sit in
+  // reads as cut back through the board rather than stacked on top of it.
+  wellBg: CANON.GROUND.BASE,
+  rowBg: CANON.GROUND.RAISE, // rows are genuinely lighter than what's behind them: 1.062:1
+  hair: CANON.LINE.HAIR,
+  hairStrong: CANON.LINE.EDGE,
+  bandBg: CANON.GROUND.INSET, // was RAISE — 1.00–1.05:1 on the PANEL board, an invisible fill
+  ink1: CANON.INK.PRIME,
+  ink2: CANON.INK.BODY,
+  ink3: CANON.INK.LABEL, // the default mono ink — the label voice
+  ink4: CANON.INK.MUTE,
+  ink5: CANON.INK.MUTE, // near-twin of ink4 collapses (rule 1)
+  ink6: CANON.INK.MUTE, // carries live absence copy → never GHOST (rule 4)
+  amber: CANON.GOLD.PRIME,
+  // Gold at rule weight. The top-10 chip's border was GOLD.PRIME (8.039:1) —
+  // the same value as the chip's own numeral, so the enclosure shouted louder
+  // than the figure it enclosed. EDGE holds the ladder (2.303:1, still 1.80x
+  // the plain LINE.HAIR chip at 1.281:1) without competing with the text.
+  amberEdge: CANON.GOLD.EDGE,
+  chipBorder: CANON.LINE.HAIR,
+  link: CANON.ACTION.LINK, // was steel #8fa3ab — links are the one action colour
+  toggleBg: CANON.GROUND.INSET,
+  toggleBorder: CANON.LINE.HAIR,
 };
 
 const mono = (size: number, opts?: { ls?: string; color?: string; weight?: number; lh?: number }) => ({
-  fontFamily: FONT.mono,
+  fontFamily: FACE.data,
   fontSize: size,
   fontWeight: opts?.weight ?? 400,
   letterSpacing: opts?.ls ?? "0.1em",
@@ -129,7 +162,25 @@ export default function InstitutionsIndexRoute() {
     return m;
   }, [aggs]);
 
-  const taUpper = taSlug.toUpperCase().replace(/-/g, " ");
+  // taUpper was `taSlug.toUpperCase().replace(/-/g, " ")` — a label invented by
+  // string-manipulating an identifier. It rendered "Institutions / NSCLC" no
+  // matter what the TA was actually called, and it is the reason the rename was
+  // invisible on this surface. Labels come from the map now; the slug stays the
+  // identity. See lib/taLabels.ts.
+  const taLabel = taLabelForSlug(taSlug);
+  // HERO CONTRACT 2026-08-15 — the title names the SURFACE and the TA lives in
+  // the eyebrow, in one form: TA · AREA. The TA is a filter state, not an
+  // identity: it changes when the tab changes and the surface does not, so a
+  // title reading "Institutions / Lung Cancer" was naming two things at once.
+  //
+  // THE SCOPE SEGMENT IS GONE (2026-08-16). It read "INST" — the title one size
+  // down, sitting 40px above the word "Institutions" and restating it. Seven of
+  // the eight surfaces had the same redundancy, and the abbreviation read as a
+  // truncation artifact rather than a label. What is left is the only thing in
+  // the eyebrow the title does not already say. Both segments derive from the
+  // slug — nothing here is typed out.
+  const taArea = parentTaLabelForIndicationSlug(taSlug);
+  const heroEyebrow = [taLabel, taArea].filter(Boolean).join(" · ");
 
   const openRecord = (a: InstitutionAgg) => navigate(`/institution/${a.slug}?ta=${taSlug}`);
 
@@ -158,20 +209,20 @@ export default function InstitutionsIndexRoute() {
     );
     void identity;
     const networkLine = a.networkParent ? (
-      <span style={{ ...mono(10, { ls: "0.05em", color: C.ink4, lh: 1.5 }) }}>
+      <span style={{ ...mono(11, { ls: "0.05em", color: C.ink4, lh: 1.5 }) }}>
         NETWORK <span style={{ color: C.link }}>{a.networkParent}</span>
         {(memberSitesByParent.get(a.networkParent) ?? 0) > 1
           ? ` · ${memberSitesByParent.get(a.networkParent)} MEMBER SITES REPRESENTED`
           : ""}
       </span>
     ) : (
-      <span style={{ ...mono(10, { color: C.ink6 }) }}>NO NETWORK PARENT · SINGLE-SITE REGISTRY RECORD</span>
+      <span style={{ ...mono(11, { color: C.ink6 }) }}>NO NETWORK PARENT · SINGLE-SITE REGISTRY RECORD</span>
     );
     const split = (
       <div style={{ display: "flex", gap: isMobile ? 10 : 16, ...mono(11), paddingTop: isMobile ? 0 : 5 }}>
         {([["EST", a.est], ["RIS", a.ris], ["COM", a.com]] as const).map(([label, n]) => (
           <span key={label}>
-            <span style={{ color: n > 0 ? C.ink1 : "#3e3e42", fontSize: 14 }}>{n}</span> {label}
+            <span style={{ color: n > 0 ? C.ink1 : CANON.INK.GHOST, fontSize: 15 }}>{n}</span> {label}
           </span>
         ))}
       </div>
@@ -183,7 +234,7 @@ export default function InstitutionsIndexRoute() {
             key={`${r}-${i}`}
             style={{
               padding: "3px 7px",
-              border: r <= 10 ? `1px solid ${C.amber}` : `1px solid ${C.chipBorder}`,
+              border: r <= 10 ? `1px solid ${C.amberEdge}` : `1px solid ${C.chipBorder}`,
               ...mono(11, { ls: "0", color: r <= 10 ? C.amber : C.ink3 }),
             }}
           >
@@ -207,7 +258,7 @@ export default function InstitutionsIndexRoute() {
           border: "none",
           padding: 0,
           cursor: "pointer",
-          ...mono(15, { ls: "0", color: pinned ? C.amber : "#3e3e42" }),
+          ...mono(15, { ls: "0", color: pinned ? C.amber : CANON.INK.GHOST }),
           paddingTop: 4,
         }}
       >
@@ -219,13 +270,18 @@ export default function InstitutionsIndexRoute() {
       return (
         <div
           onClick={() => openRecord(a)}
-          style={{ cursor: "pointer", padding: "15px 16px", borderBottom: `1px solid ${C.hair}` }}
+          style={{
+            cursor: "pointer",
+            padding: "15px 14px",
+            background: C.rowBg, // 1.062:1 over the BASE well — the boundary IS the fill
+            ...DEPTH.RIM, // the only line on the row: the lit top edge
+          }}
         >
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 7 }}>
             <span style={{ ...mono(25, { color: a.band === "A" || a.band === "B" ? C.amber : C.ink3, ls: "0" }), minWidth: 38 }}>
               {a.memberCount}
             </span>
-            <span style={{ fontFamily: FONT.serif, fontSize: 17, lineHeight: 1.25, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
+            <span style={{ fontFamily: FACE.value, fontSize: 17, lineHeight: 1.25, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
           </div>
           <div style={{ paddingLeft: 48, display: "flex", flexDirection: "column", gap: 6 }}>
             {identityLine}
@@ -244,23 +300,47 @@ export default function InstitutionsIndexRoute() {
           display: "grid",
           gridTemplateColumns: "120px 1fr 348px 168px 44px",
           gap: 20,
-          padding: dense ? "16px 28px" : "18px 28px",
-          borderBottom: `1px solid ${C.hair}`,
+          // 14px of the old 28px gutter moves out to the RowList wrapper, so
+          // grid content still lands at 28px from the board edge and stays
+          // registered against the column header.
+          padding: dense ? "16px 14px" : "18px 14px",
+          background: C.rowBg, // 1.062:1 over the BASE well — the boundary IS the fill
+          ...DEPTH.RIM, // the only line on the row: the lit top edge
           alignItems: "start",
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ ...mono(30, { color: a.band === "A" || a.band === "B" ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
-          <span style={{ ...mono(10, { color: C.ink4 }) }}>{a.bestUsRank != null ? `BEST #${a.bestUsRank} US` : "NO US RANK HELD"}</span>
+          <span style={{ ...mono(11, { color: C.ink4 }) }}>{a.bestUsRank != null ? `BEST #${a.bestUsRank} US` : "NO US RANK HELD"}</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          <span style={{ fontFamily: FONT.serif, fontSize: 19, lineHeight: 1.2, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
+          <span style={{ fontFamily: FACE.value, fontSize: 20, lineHeight: 1.2, fontWeight: 500, color: C.ink1 }}>{a.name}</span>
           {identityLine}
           {networkLine}
         </div>
         {rankChips}
         {split}
         {pin}
+      </div>
+    );
+  }
+
+  // The list well: the container BEHIND the rows, cut back to BASE so the
+  // RAISE rows sit above it. The 14px gap and gutter are what let that darker
+  // value show through — without them the fill step has nowhere to read. The
+  // band stays OUTSIDE this well, which is what makes it full-bleed.
+  function RowList({ children }: { children: ReactNode }) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          padding: isMobile ? 10 : 14,
+          background: C.wellBg,
+        }}
+      >
+        {children}
       </div>
     );
   }
@@ -273,6 +353,12 @@ export default function InstitutionsIndexRoute() {
           alignItems: "baseline",
           justifyContent: "space-between",
           padding: isMobile ? "9px 16px" : "11px 28px",
+          // Full-bleed: spans the board edge to edge, outside the RowList well.
+          // Fill + bleed is what makes it a different KIND of mark from the
+          // rows; both rules stay LINE.EDGE. INSET survives the well going to
+          // BASE — its step GROWS from 1.126:1 (over RAISE) to 1.195:1 over the
+          // well it now abuts, and the three fills stay monotonic:
+          // well BASE < row RAISE (1.062) < band INSET (1.195).
           background: C.bandBg,
           borderTop: `1px solid ${C.hairStrong}`,
           borderBottom: `1px solid ${C.hairStrong}`,
@@ -296,15 +382,19 @@ export default function InstitutionsIndexRoute() {
           <div key={b}>
             <BandHeader
               left={`BAND ${b} · ${BAND_LABEL[b]} · ${members.length} INSTITUTION${members.length === 1 ? "" : "S"}`}
-              right={
-                b === "D"
-                  ? "MOST HOLD ONE OR TWO — THE COUNT IS THE WHOLE STORY OF THE ROW"
-                  : "ORDER IS DESCRIPTIVE, NOT A RANKING"
-              }
+              // The A/B/C branch read "ORDER IS DESCRIPTIVE, NOT A RANKING" —
+              // the same claim as the list note ten pixels above it, in a second
+              // wording. Retired 2026-08-15: the note supersedes it, because the
+              // note renders in all four groupings and this only ever appeared on
+              // Concentration. Band D keeps its right-note; it is a different
+              // claim (what the count MEANS at the tail), not a ranking denial.
+              right={b === "D" ? "MOST HOLD ONE OR TWO — THE COUNT IS THE WHOLE STORY OF THE ROW" : undefined}
             />
-            {members.map((a) => (
-              <Row key={a.id} a={a} dense={b === "D"} />
-            ))}
+            <RowList>
+              {members.map((a) => (
+                <Row key={a.id} a={a} dense={b === "D"} />
+              ))}
+            </RowList>
           </div>
         );
       });
@@ -338,20 +428,20 @@ export default function InstitutionsIndexRoute() {
                     alignItems: "baseline",
                     justifyContent: "space-between",
                     padding: isMobile ? "12px 16px" : "14px 28px",
-                    background: "#101014",
+                    background: CANON.GROUND.INSET,
                     borderBottom: `1px solid ${C.hairStrong}`,
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-                    <span style={{ ...mono(22, { color: C.amber, ls: "0" }) }}>{total}</span>
-                    <span style={{ fontFamily: FONT.serif, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{parent}</span>
-                    <span style={{ ...mono(10, { ls: "0.12em", color: C.ink4 }) }}>
+                    <span style={{ ...mono(20, { color: C.amber, ls: "0" }) }}>{total}</span>
+                    <span style={{ fontFamily: FACE.value, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{parent}</span>
+                    <span style={{ ...mono(11, { ls: "0.12em", color: C.ink4 }) }}>
                       {members.length} MEMBER SITE{members.length === 1 ? "" : "S"} REPRESENTED
                       {best != null ? ` · BEST #${best} US` : ""}
                     </span>
                   </div>
                   {!isMobile ? (
-                    <span style={{ ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>
+                    <span style={{ ...mono(11, { ls: "0.12em", color: C.ink5 }) }}>
                       NETWORK TOTALS ARE SUMS OF THE SITES BELOW — NOTHING IS HIDDEN IN THEM
                     </span>
                   ) : null}
@@ -373,10 +463,10 @@ export default function InstitutionsIndexRoute() {
                         alignItems: "center",
                       }}
                     >
-                      <span style={{ ...mono(19, { color: a.memberCount >= 5 ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
-                      <span style={{ fontFamily: FONT.serif, fontSize: 16, color: C.ink1 }}>{a.name}</span>
+                      <span style={{ ...mono(20, { color: a.memberCount >= 5 ? C.amber : C.ink3, ls: "0" }) }}>{a.memberCount}</span>
+                      <span style={{ fontFamily: FACE.value, fontSize: 17, color: C.ink1 }}>{a.name}</span>
                       {!isMobile ? (
-                        <span style={{ ...mono(10, { ls: "0.06em" }) }}>
+                        <span style={{ ...mono(11, { ls: "0.06em" }) }}>
                           {a.state ?? "—"} · {a.type} ·{" "}
                           {a.nciDesignation ?? <span style={{ color: C.ink5 }}>NO NCI DESIGNATION</span>}
                         </span>
@@ -397,26 +487,28 @@ export default function InstitutionsIndexRoute() {
               alignItems: "baseline",
               justifyContent: "space-between",
               padding: isMobile ? "12px 16px" : "14px 28px",
-              background: "#101014",
+              background: CANON.GROUND.INSET,
               borderBottom: `1px solid ${C.hairStrong}`,
             }}
           >
             <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-              <span style={{ ...mono(22, { color: C.ink3, ls: "0" }) }}>
+              <span style={{ ...mono(20, { color: C.ink3, ls: "0" }) }}>
                 {unparented.reduce((s, a) => s + a.memberCount, 0)}
               </span>
-              <span style={{ fontFamily: FONT.serif, fontSize: 17, fontWeight: 500, color: C.ink1 }}>Unparented</span>
-              <span style={{ ...mono(10, { ls: "0.12em", color: C.ink4 }) }}>
+              <span style={{ fontFamily: FACE.value, fontSize: 17, fontWeight: 500, color: C.ink1 }}>Unparented</span>
+              <span style={{ ...mono(11, { ls: "0.12em", color: C.ink4 }) }}>
                 {unparented.length} REPRESENTED INSTITUTIONS HAVE NO NETWORK PARENT
               </span>
             </div>
             {!isMobile ? (
-              <span style={{ ...mono(10, { ls: "0.12em", color: C.ink5 }) }}>NOT A NETWORK — THE ABSENCE OF ONE</span>
+              <span style={{ ...mono(11, { ls: "0.12em", color: C.ink5 }) }}>NOT A NETWORK — THE ABSENCE OF ONE</span>
             ) : null}
           </div>
-          {unparented.map((a) => (
-            <Row key={a.id} a={a} dense />
-          ))}
+          <RowList>
+            {unparented.map((a) => (
+              <Row key={a.id} a={a} dense />
+            ))}
+          </RowList>
         </>
       );
     }
@@ -436,15 +528,23 @@ export default function InstitutionsIndexRoute() {
           <BandHeader
             left={`${state} · ${members.length} INSTITUTION${members.length === 1 ? "" : "S"} · ${members.reduce((s, a) => s + a.memberCount, 0)} RANKED HCP`}
           />
-          {members.map((a) => (
-            <Row key={a.id} a={a} dense />
-          ))}
+          <RowList>
+            {members.map((a) => (
+              <Row key={a.id} a={a} dense />
+            ))}
+          </RowList>
         </div>
       ));
     }
     // A–Z
     const alpha = [...aggs].sort((x, y) => x.name.localeCompare(y.name));
-    return alpha.map((a) => <Row key={a.id} a={a} dense />);
+    return (
+      <RowList>
+        {alpha.map((a) => (
+          <Row key={a.id} a={a} dense />
+        ))}
+      </RowList>
+    );
   }
 
   const totalRanked = useMemo(() => {
@@ -468,20 +568,35 @@ export default function InstitutionsIndexRoute() {
   return (
     <AppLayout width="wide">
       {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
-      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", background: GROUND.g2, border: `1px solid ${LINE.l1}` }}>
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", ...DEPTH.PANEL, border: `1px solid ${CANON.LINE.HAIR}` }}>
         {/* Hero — canonical H1 (PageHero, Commit B 2026-08-05). The amber-edge
             mono header becomes eyebrow/serif title/dek; the right meta lines
             fold into the meta slot and the REPRESENTED count into the cluster. */}
         <div style={{ padding: isMobile ? "18px 16px 14px" : "26px 28px 0" }}>
           <PageHero
             narrow={isMobile}
-            eyebrow="Inst"
-            meta={"PRIMARY LINK ONLY · ORDERED BY RANKED-HCP COUNT · NOT A RANKING"}
-            title={`Institutions / ${taUpper}`}
+            eyebrow={heroEyebrow}
+            /* META IS EMPTY, DELIBERATELY (2026-08-15). It held three separate
+                assertions at 479px — 1.9x the next longest meta on any surface,
+                and the only one that overflowed its row on a phone. Hero Rule 3
+                specifies a date or coverage stamp for this slot; this surface
+                has no build timestamp to stamp (fetchTaRoster returns rows, not
+                a snapshot time), so inventing one would be worse than leaving it
+                empty. The rule still spans — an empty right field is a content
+                decision, not a defect (Hero Rule 4). The three claims are not
+                dropped: PRIMARY LINK ONLY moved into the dek below, and the
+                ordering pair moved to the list note above the first band. */
+            title="Institutions"
             dek={loading
               ? "Resolving the registry…"
-              : `${aggs.length} registry institutions carry at least one ranked ${taUpper} HCP. Registry institutions carrying none in this cohort are not listed.`}
-            stats={[{ value: String(aggs.length), label: "REPRESENTED", center: true }]}
+              // "ranked ${taLabel} HCP" read as a compound noun once the label
+              // stopped being an acronym. Moving the TA behind "in" keeps the
+              // sentence working for any label length.
+              // "via their primary link" carries the PRIMARY LINK ONLY claim out
+              // of the meta and into the sentence that defines what a row IS —
+              // which is where a scope qualifier belongs.
+              : `${aggs.length} registry institutions carry at least one ranked HCP in ${taLabel} via their primary link. Registry institutions carrying none in this cohort are not listed.`}
+            stats={{ variant: "cluster", items: [{ value: String(aggs.length), label: "REPRESENTED", center: true }] }}
           />
         </div>
 
@@ -497,7 +612,7 @@ export default function InstitutionsIndexRoute() {
             overflowX: "auto",
           }}
         >
-          {!isMobile ? <span style={{ ...mono(10, { ls: "0.14em", color: C.ink5 }) }}>GROUPING</span> : null}
+          {!isMobile ? <span style={{ ...mono(11, { ls: "0.14em", color: C.ink5 }) }}>GROUPING</span> : null}
           <div style={{ display: "flex", border: `1px solid ${C.toggleBorder}`, flexShrink: 0 }}>
             {groupingTabs.map(([key, label], i) => (
               <button
@@ -511,8 +626,8 @@ export default function InstitutionsIndexRoute() {
                   color: grouping === key ? C.ink1 : C.ink3,
                   border: "none",
                   borderLeft: i > 0 ? `1px solid ${C.toggleBorder}` : "none",
-                  fontFamily: FONT.serif,
-                  fontSize: 12,
+                  fontFamily: FACE.value,
+                  fontSize: 13,
                   cursor: "pointer",
                 }}
               >
@@ -520,6 +635,27 @@ export default function InstitutionsIndexRoute() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* ORDERING NOTE (2026-08-15) — "ORDERED BY RANKED-HCP COUNT · NOT A
+            RANKING" moved here out of the hero meta. It sits directly above the
+            list and directly below the control that changes the ordering, which
+            is where a reader needs it; in the hero it was a claim about the list
+            floating three blocks away from one.
+            It renders in EVERY grouping and at every width, which the old
+            placement did not achieve either: the band right-note carries
+            "ORDER IS DESCRIPTIVE, NOT A RANKING" in concentration view only —
+            State passes no right note, Network builds its own headers, and A–Z
+            has no band at all, so three of four groupings stated the ordering
+            and denied the ranking nowhere. */}
+        <div
+          style={{
+            padding: isMobile ? "10px 16px" : "12px 28px",
+            borderBottom: `1px solid ${C.hair}`,
+            ...mono(9, { ls: "0.13em", color: C.ink5, lh: 1.6 }),
+          }}
+        >
+          ORDERED BY RANKED-HCP COUNT · NOT A RANKING
         </div>
 
         {/* Column header (desktop, concentration/az only) */}
@@ -546,7 +682,7 @@ export default function InstitutionsIndexRoute() {
         {loading ? (
           <div style={{ padding: "48px 28px", ...mono(11, { color: C.ink4 }) }}>RESOLVING THE REGISTRY…</div>
         ) : aggs.length === 0 ? (
-          <div style={{ padding: "48px 28px", fontFamily: FONT.serif, fontSize: 14, color: C.ink2 }}>
+          <div style={{ padding: "48px 28px", fontFamily: FACE.value, fontSize: 15, color: C.ink2 }}>
             No registry institution carries a ranked HCP in this cohort yet.
           </div>
         ) : (

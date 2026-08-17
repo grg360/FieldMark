@@ -31,7 +31,6 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { INDICATIONS_BY_TA } from "./IndicationFilter";
 import {
   buildFeedPath,
-  indicationLabelToSlug,
   resolveFeedRoute,
   resolveIndicationForTaSwitch,
   taLabelToSlug,
@@ -95,8 +94,9 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   const indicationSlug = route.indicationSlug;
 
   // --- REAL live / planned from the indication config (active flag) ---
+  // Identity is o.slug throughout; labels are rendered, never compared.
   const opts = INDICATIONS_BY_TA[taLabel] ?? [];
-  const live = opts.filter((o) => o.active && o.label !== "All");
+  const live = opts.filter((o) => o.active && o.slug !== "all");
   const planned = opts.filter((o) => !o.active);
 
   // Ledger mount marker (onPickCohort is only supplied there). On the ledger, controls
@@ -111,19 +111,18 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   const pickDomain = (chip: string) => {
     if (chip === taLabel || !domainLive(chip)) return;
     const newTaSlug = taLabelToSlug(chip);
-    const { slug: indSlug } = resolveIndicationForTaSwitch(chip, indicationLabel);
+    const { slug: indSlug } = resolveIndicationForTaSwitch(chip, indicationSlug);
     setTA(newTaSlug, indSlug);
     navigate(buildFeedPath(newTaSlug, trackToDashboardSlug(track), indSlug));
     setTaOpen(false); setSheet(false);
   };
 
-  const pickIndication = (label: string) => {
+  const pickIndication = (indSlug: string) => {
     // The active indication is a scope label, not a navigation — clicking it is a no-op
     // (on the ledger it would otherwise route to the card feed under the same scope).
-    if (label === indicationLabel) { setTaOpen(false); setSheet(false); return; }
+    if (indSlug === indicationSlug) { setTaOpen(false); setSheet(false); return; }
     // Ledger: no other indication has a ledger, and the feed is not shipping — inert.
     if (ledgerMount) { setTaOpen(false); setSheet(false); return; }
-    const indSlug = indicationLabelToSlug(taLabel, label);
     setTA(taSlug, indSlug);
     navigate(buildFeedPath(taSlug, trackToDashboardSlug(track), indSlug));
     setTaOpen(false); setSheet(false);
@@ -158,10 +157,10 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   const activeCohort = COHORTS.find((c) => cohortActive(c.key));
   const activeView = VIEWS.find((v) => viewActive(v.key));
   const surface = activeCohort?.label ?? activeView?.label ?? "";
-  const title = indicationLabel === "All" ? taLabel : `${taLabel} — ${indicationLabel}`;
+  const title = indicationSlug === "all" ? taLabel : `${taLabel} — ${indicationLabel}`;
   const count = route.indicationCount;
   const territoryLabel = states.length > 0 ? `Territory · ${states.length}` : "All US";
-  const landscapeLabel = indicationLabel === "All" ? "Landscape" : `${indicationLabel} landscape`;
+  const landscapeLabel = indicationSlug === "all" ? "Landscape" : `${indicationLabel} landscape`;
   const moreMeta = `${live.length} live · ${planned.length} planned`;
 
   // ============================ MOBILE ============================
@@ -176,7 +175,7 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
         </div>
         <div onClick={() => setSheet(true)} style={{ cursor: "pointer", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, padding: "6px 16px 13px", borderBottom: `1px solid ${HAIR}` }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
-            <span style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.1, color: INK }}>{indicationLabel === "All" ? taLabel : indicationLabel}</span>
+            <span style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.1, color: INK }}>{indicationSlug === "all" ? taLabel : indicationLabel}</span>
             <span style={{ fontSize: 10, color: GOLD }}>▾</span>
           </div>
           <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: FAINT, paddingBottom: 4 }}>{moreMeta}</span>
@@ -231,8 +230,8 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
                 <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD }}>Live now · {live.length}</div>
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>
                   {live.map((o) => (
-                    <div key={o.label} onClick={() => pickIndication(o.label)} style={{ cursor: ledgerMount && o.label !== indicationLabel ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
-                      <span style={{ fontFamily: SERIF, fontSize: 17, color: o.label === indicationLabel ? GOLD : ledgerMount ? FAINT : INK }}>{o.label}</span>
+                    <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && o.slug !== indicationSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
+                      <span style={{ fontFamily: SERIF, fontSize: 17, color: o.slug === indicationSlug ? GOLD : ledgerMount ? FAINT : INK }}>{o.label}</span>
                       <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{o.count != null ? `${num(o.count)} HCPs` : "Live"}</span>
                     </div>
                   ))}
@@ -240,7 +239,7 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
                 <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: "#7d786f", marginTop: 22 }}>On the roadmap · {planned.length}</div>
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>
                   {planned.map((o) => (
-                    <div key={o.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
+                    <div key={o.slug} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
                       <span style={{ fontFamily: SERIF, fontSize: 15.5, color: "#6f6b64" }}>{o.label}</span>
                       <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: ".14em", textTransform: "uppercase", color: FAINT }}>Planned</span>
                     </div>
@@ -268,13 +267,13 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
 
         <div style={{ display: "flex", alignItems: "flex-end", gap: 26, flex: 1 }}>
           {/* live indications as serif tabs, "All" first */}
-          {[{ label: "All", key: "All" }, ...live.map((o) => ({ label: o.label, key: o.label }))].map((t) => {
-            const on = t.key === indicationLabel;
+          {[{ label: "All", key: "all" }, ...live.map((o) => ({ label: o.label, key: o.slug }))].map((t) => {
+            const on = t.key === indicationSlug;
             // Ledger: the active indication is the ledger's scope tab; every OTHER
             // indication would route to the card feed, so it renders planned-inert.
             const inert = ledgerMount && !on;
             return (
-              <div key={t.key} onClick={() => pickIndication(t.label)} title={inert ? "Planned" : undefined} style={{ position: "relative", cursor: inert ? "default" : "pointer", paddingBottom: 11, fontFamily: SERIF, fontSize: 16.5, lineHeight: 1, whiteSpace: "nowrap", color: on ? INK : inert ? FAINT : MID }}>
+              <div key={t.key} onClick={() => pickIndication(t.key)} title={inert ? "Planned" : undefined} style={{ position: "relative", cursor: inert ? "default" : "pointer", paddingBottom: 11, fontFamily: SERIF, fontSize: 16.5, lineHeight: 1, whiteSpace: "nowrap", color: on ? INK : inert ? FAINT : MID }}>
                 {t.label}
                 <div style={{ position: "absolute", left: -2, right: -2, bottom: -1, height: 1.5, background: on ? GOLD : "transparent" }} />
               </div>
@@ -298,8 +297,8 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
                       <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>Live now · {live.length}</div>
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         {live.map((o) => (
-                          <div key={o.label} onClick={() => pickIndication(o.label)} style={{ cursor: ledgerMount && o.label !== indicationLabel ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
-                            <span style={{ fontFamily: SERIF, fontSize: 15.5, color: o.label === indicationLabel ? GOLD : ledgerMount ? FAINT : INK }}>{o.label}</span>
+                          <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && o.slug !== indicationSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
+                            <span style={{ fontFamily: SERIF, fontSize: 15.5, color: o.slug === indicationSlug ? GOLD : ledgerMount ? FAINT : INK }}>{o.label}</span>
                             <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{o.count != null ? `${num(o.count)} HCPs` : "Live"}</span>
                           </div>
                         ))}
@@ -312,7 +311,7 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 24px" }}>
                         {planned.map((o) => (
-                          <div key={o.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
+                          <div key={o.slug} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
                             <span style={{ fontFamily: SERIF, fontSize: 14.5, color: "#6f6b64" }}>{o.label}</span>
                             <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: FAINT }}>Planned</span>
                           </div>

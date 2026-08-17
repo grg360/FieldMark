@@ -47,6 +47,19 @@ export const GOLD = {
   RANK: "#E0A75E", // rank numerals and ledger ordinals ONLY — desaturated on purpose
   EDGE: "#6A4E18", // gold at rule weight: underlines, active-tab borders, focus edges
   WASH: "rgba(232,160,32,0.10)", // GOLD/PRIME @ .10 — selected row, gold chip fill
+  // MUTE — gold one step down, for STATE LADDERS that need a second amber rung.
+  // Added 2026-08-15 at the Congress migration. DERIVED, not picked: PRIME's own
+  // hue (74.9°) and chroma (.152) held verbatim, lightness lowered until relative
+  // luminance hits the GEOMETRIC MIDPOINT of its two ladder neighbours —
+  // PRIME (RL .4240) and INK/MUTE (RL .1525) → target .2543, landed .2550.
+  //   oklch(0.64 0.152 74.9) = #C17B00
+  // Why it had to exist: the Congress calendar's five-state dot is the ONLY state
+  // channel in a list row, and its imminent rung was a hand-rolled
+  // rgba(232,160,32,.55) that flattened to RL .1569 — 2.9% off upcoming's .1525,
+  // i.e. invisible. EDGE could not serve (RL .086 renders imminent DIMMER than
+  // upcoming, inverting the ladder) and RANK is reserved. Named for INK/MUTE:
+  // same voice, stepped down, so the two read as a pair where they meet.
+  MUTE: "#C17B00",
 } as const;
 
 export const MARK = {
@@ -154,18 +167,84 @@ export const T = {
 // state, badge urgency and ledger totals off the color channel (color stays
 // the cohort markers' monopoly).
 export const FACE = {
-  // Value face: names, prose, serif figures. Fallback runs through the
-  // shipped Source Serif 4 so the swap window shows a same-class serif, never
-  // an unstyled flash.
+  // Value face: names, prose, and HEADLINE/STANDALONE DISPLAY NUMERALS (hero
+  // figures, rank ordinals standing alone). NUMERAL RULE (settled 2026-08-12):
+  // display numerals are value-face; tabular/column/row numerals are data-face;
+  // tiebreaker — anything that column-aligns is FACE.data.
+  // PROSE RULE (locked 2026-08-12): serif carries narrative/interpretive
+  // prose, text ABOUT THE PERSON, and empty-states. Mono never carries prose —
+  // see FACE.data for what mono annotates. Fallback runs through the shipped
+  // Source Serif 4 so the swap window shows a same-class serif, never an
+  // unstyled flash — Source Serif must only ever paint during that swap window.
   value: "'Newsreader', 'Source Serif 4', Georgia, serif",
-  // Data face: every numeral, label, tracked cap. tabular-nums where columns align.
+  // Data face: labels, tracked caps, and every TABULAR/COLUMN/ROW numeral
+  // (numeral rule above — standalone display figures go to FACE.value).
+  // PROSE RULE (locked 2026-08-12): mono is the DATA-ANNOTATION voice only —
+  // provenance, sort order, cell/badge semantics, source/method notes, control
+  // microcopy. Sentence prose that interprets the record or speaks about the
+  // person is FACE.value. tabular-nums where columns align.
   data: "'IBM Plex Mono', ui-monospace, monospace",
   // UI face: body copy, controls, meta rows.
   ui: "'IBM Plex Sans', system-ui, sans-serif",
 } as const;
 // Stray faces — flagged for retirement DURING migration, not removed here:
-//   · 'IBM Plex Sans Condensed' (CohortLedger rank numerals) → folds into
-//     FACE.data with tabular-nums, or survives as a scoped FACE/RANK — the
-//     RFC-01 open question, decided at the ledger's migration.
+//   · 'IBM Plex Sans Condensed' — RESOLVED 2026-08-13 at the ledger's migration:
+//     FOLDED INTO FACE.data with tabular-nums, no scoped FACE/RANK. The numeral
+//     rule decides it — ledger rank ordinals sit in a column and column-align,
+//     and the tiebreaker sends anything that column-aligns to the data face.
+//     Zero consumers remain.
 //   · 'IBM Plex Serif' — ghost (loaded in index.html, zero renders) → deletes
 //     from the font link at migration.
+
+// ── VIZ — the chart palette (approved 2026-08-13, "FieldMark VIZ palette
+// design"). Held SEPARATE from the semantic set on purpose: semantic accents
+// encode meaning in the INTERFACE, VIZ colours encode categories in DATA, and
+// the two never borrow from each other. Every categorical slot sits at a fixed
+// perceptual lightness (L .70–.76) at near-constant chroma, so no category
+// reads louder than another on charcoal — only the hue changes. Hues sweep
+// 110°→355°; the WARM QUADRANT (40°–100°) is reserved for semantics, which is
+// what stops a chart ever colliding with amber.
+export const VIZ = {
+  C01: "#7C8CF5", // PERIWINKLE  oklch(.72 .14 274)
+  C02: "#46B4D6", // CYAN        oklch(.73 .10 226)
+  C03: "#3EAB9B", // TEAL        oklch(.70 .09 182)
+  C04: "#6FBE7C", // GREEN       oklch(.74 .12 149)
+  C05: "#A9BC5C", // OLIVE       oklch(.76 .13 116)
+  C06: "#AC80EC", // VIOLET      oklch(.71 .15 303)
+  C07: "#D782C4", // ORCHID      oklch(.72 .14 330)
+  C08: "#E7838E", // ROSE        oklch(.72 .14 12)
+  // RESIDUAL. A COLOUR, NOT A GAP: the "Other" bucket is real data, so it takes
+  // a real hue — one lightness step down at a third the chroma, so it recedes
+  // without disappearing. Never assigned to a named category (rule 3).
+  RESIDUAL: "#9A7796", // PLUM   oklch(.60 .05 340)
+} as const;
+
+// Assignment is BY STACK POSITION from this fixed rotation — never by list
+// index, never by hash (rule 1). Consecutive bands take non-adjacent hues so
+// touching segments never share a neighbourhood. A category keeps its slot
+// across every surface (rule 2): EGFR resistance is C01 on Drugs, on
+// Intelligence, on Pulse.
+export const VIZ_ROTATION = [VIZ.C01, VIZ.C06, VIZ.C03, VIZ.C08, VIZ.C04, VIZ.C02, VIZ.C05, VIZ.C07] as const;
+
+// Sequential ramp for MAGNITUDE — sparklines, count bars, density. One ramp,
+// anchored on C01's hue so magnitude and categorical charts read as one family.
+// Steps climb in LIGHTNESS, not hue: SEQ[0] sits just above GROUND.INSET, the
+// top step is the brightest ink in the system after pure text.
+export const SEQ = ["#1B2430", "#27405C", "#345F8E", "#4A8BC0", "#7DB6E4", "#B4D8F5"] as const;
+
+// Pick a categorical slot for stack position `i`; anything past the eighth
+// category collapses into the residual and the legend reads "Other (n …)".
+export const vizSlot = (i: number): string => (i < VIZ_ROTATION.length ? VIZ_ROTATION[i] : VIZ.RESIDUAL);
+// Pick a SEQ step for a 0–1 magnitude. Floors at SEQ-200 so a live value never
+// renders at SEQ-100 (which is a ground, not a series colour).
+export const seqStep = (t: number): string => SEQ[Math.max(1, Math.min(5, 1 + Math.round(t * 3)))];
+
+// The six rules the palette carries (from the approved spec):
+//   1. Categories by stack position, from the fixed rotation.
+//   2. A category keeps its slot across every surface.
+//   3. Past eight categories → RESIDUAL; RESIDUAL is never a named category.
+//   4. GREY NEVER APPEARS IN A CHART SERIES — grey means no-data, disabled or
+//      out-of-window, everywhere in the system.
+//   5. Magnitude never uses categorical hues; category never uses the SEQ ramp.
+//   6. Semantic amber may sit on a chart only as a STATE FLAG or axis-level
+//      annotation — never as a series.

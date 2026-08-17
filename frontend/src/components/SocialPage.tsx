@@ -22,7 +22,7 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 const SOCIAL_CAPTURE_TAS = new Set(["oncology", "hepatology"]);
 // The oncology capture is the NSCLC conversation (its queries were NSCLC/ASCO
 // hashtags); the frame titles the surface "/ NSCLC".
-const SURFACE_LABEL: Record<string, string> = { oncology: "NSCLC", hepatology: "Hepatology" };
+const SURFACE_LABEL: Record<string, string> = { oncology: "Lung Cancer", hepatology: "Hepatology" };
 
 export default function SocialPage() {
   const params = useParams();

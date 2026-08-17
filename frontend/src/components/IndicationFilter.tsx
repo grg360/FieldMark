@@ -1,12 +1,17 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import {
-  buildFeedPath,
-  indicationLabelToSlug,
-  resolveFeedRoute,
-} from "../lib/routeSlugs";
+import { buildFeedPath, resolveFeedRoute } from "../lib/routeSlugs";
 import { useTA } from "../lib/TAContext";
 
+// DECOUPLED 2026-08-15. `label` used to be the identity AND the display string,
+// so renaming NSCLC -> Lung Cancer silently broke every label-keyed lookup: the
+// reverse map's key moved, callers kept passing the old string, and the misses
+// fell through to "all". `slug` is the identity now - stable, matches the URL
+// segment and routeSlugs' slug->label maps. Same shape as AdministeredVolumeBlock's
+// AgentBadge + BADGE_LABEL: the value never moves, the label is free to.
 export interface IndicationOption {
+  /** Stable identity. Every lookup, comparison and route build keys on THIS. */
+  slug: string;
+  /** Display only. Nothing dispatches on it - rename freely. */
   label: string;
   active: boolean;
   count?: number;
@@ -15,52 +20,52 @@ export interface IndicationOption {
 
 export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
   Oncology: [
-    { label: "All", active: true, count: 6549 },
-    { label: "NSCLC", active: true, count: 287 },
-    { label: "CAR-T", active: false },
-    { label: "DLBCL", active: false },
-    { label: "Melanoma", active: false },
-    { label: "CLL", active: false },
-    { label: "AML", active: false },
-    { label: "Breast", active: false },
-    { label: "Prostate", active: false },
-    { label: "Colorectal", active: false },
-    { label: "Bladder", active: false },
-    { label: "Ovarian", active: false },
-    { label: "Kidney", active: false },
-    { label: "Pancreatic", active: false },
-    { label: "Liver/HCC", active: false },
+    { slug: "all", label: "All", active: true, count: 6549 },
+    { slug: "nsclc", label: "Lung Cancer", active: true, count: 287 },
+    { slug: "car-t", label: "CAR-T", active: false },
+    { slug: "dlbcl", label: "DLBCL", active: false },
+    { slug: "melanoma", label: "Melanoma", active: false },
+    { slug: "cll", label: "CLL", active: false },
+    { slug: "aml", label: "AML", active: false },
+    { slug: "breast", label: "Breast", active: false },
+    { slug: "prostate", label: "Prostate", active: false },
+    { slug: "colorectal", label: "Colorectal", active: false },
+    { slug: "bladder", label: "Bladder", active: false },
+    { slug: "ovarian", label: "Ovarian", active: false },
+    { slug: "kidney", label: "Kidney", active: false },
+    { slug: "pancreatic", label: "Pancreatic", active: false },
+    { slug: "liver-hcc", label: "Liver/HCC", active: false },
   ],
   Hepatology: [
-    { label: "All", active: true, count: 2753 },
-    { label: "MASH", active: true, count: 247 },
-    { label: "PBC", active: true, count: 134 },
-    { label: "HCC", active: false },
-    { label: "Autoimmune Hepatitis", active: false },
-    { label: "NAFLD", active: false },
+    { slug: "all", label: "All", active: true, count: 2753 },
+    { slug: "mash", label: "MASH", active: true, count: 247 },
+    { slug: "pbc", label: "PBC", active: true, count: 134 },
+    { slug: "hcc", label: "HCC", active: false },
+    { slug: "autoimmune-hepatitis", label: "Autoimmune Hepatitis", active: false },
+    { slug: "nafld", label: "NAFLD", active: false },
   ],
   "Rare Disease": [
-    { label: "All", active: true, count: 2034 },
-    { label: "Fabry Disease", active: false },
-    { label: "Pompe Disease", active: false },
-    { label: "Gaucher Disease", active: false },
-    { label: "ALS", active: false },
-    { label: "Spinal Muscular Atrophy", active: false },
-    { label: "Cystic Fibrosis", active: false },
+    { slug: "all", label: "All", active: true, count: 2034 },
+    { slug: "fabry-disease", label: "Fabry Disease", active: false },
+    { slug: "pompe-disease", label: "Pompe Disease", active: false },
+    { slug: "gaucher-disease", label: "Gaucher Disease", active: false },
+    { slug: "als", label: "ALS", active: false },
+    { slug: "sma", label: "Spinal Muscular Atrophy", active: false },
+    { slug: "cystic-fibrosis", label: "Cystic Fibrosis", active: false },
   ],
   Immunology: [
-    { label: "All", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
-    { label: "Atopic Dermatitis", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
-    { label: "Psoriasis", active: false },
-    { label: "Rheumatoid Arthritis", active: false },
-    { label: "Crohn's Disease", active: false },
-    { label: "Ulcerative Colitis", active: false },
-    { label: "Lupus", active: false },
-    { label: "Multiple Sclerosis", active: false },
+    { slug: "all", label: "All", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
+    { slug: "atopic-dermatitis", label: "Atopic Dermatitis", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
+    { slug: "psoriasis", label: "Psoriasis", active: false },
+    { slug: "rheumatoid-arthritis", label: "Rheumatoid Arthritis", active: false },
+    { slug: "crohns", label: "Crohn's Disease", active: false },
+    { slug: "ulcerative-colitis", label: "Ulcerative Colitis", active: false },
+    { slug: "lupus", label: "Lupus", active: false },
+    { slug: "multiple-sclerosis", label: "Multiple Sclerosis", active: false },
   ],
 };
 
-const ONCOLOGY_FI_ACTIVE = new Set(["All", "NSCLC"]);
+const ONCOLOGY_FI_ACTIVE = new Set(["all", "nsclc"]); // slugs, never labels
 
 function indicationsForContext(therapeuticArea: string, isFieldIntelligence: boolean): IndicationOption[] {
   const base = INDICATIONS_BY_TA[therapeuticArea] ?? [{ label: "All", active: true }];
@@ -69,19 +74,20 @@ function indicationsForContext(therapeuticArea: string, isFieldIntelligence: boo
   }
   return base.map((option) => ({
     ...option,
-    active: ONCOLOGY_FI_ACTIVE.has(option.label),
+    active: ONCOLOGY_FI_ACTIVE.has(option.slug),
   }));
 }
 
 interface IndicationFilterProps {
   therapeuticArea: string;
-  selected: string;
-  onSelect?: (label: string, count: number | null) => void;
+  /** The selected SLUG, not the label - identity comparisons key on slug. */
+  selectedSlug: string;
+  onSelect?: (slug: string, count: number | null) => void;
 }
 
 export default function IndicationFilter({
   therapeuticArea,
-  selected,
+  selectedSlug,
   onSelect,
 }: IndicationFilterProps) {
   const navigate = useNavigate();
@@ -97,9 +103,8 @@ export default function IndicationFilter({
   });
   const indications = indicationsForContext(therapeuticArea, isFieldIntelligence);
 
-  function handleIndicationSelect(label: string, count: number | null) {
-    onSelect?.(label, count);
-    const indicationSlug = indicationLabelToSlug(therapeuticArea, label);
+  function handleIndicationSelect(indicationSlug: string, count: number | null) {
+    onSelect?.(indicationSlug, count);
     // Phase 1a: track the user's indication selection in TAContext alongside routing.
     setTA(route.taSlug, indicationSlug);
     if (isFieldIntelligence) {
@@ -126,12 +131,12 @@ export default function IndicationFilter({
       }}
     >
       {indications.map((info) => {
-        const isSelected = info.label === selected;
+        const isSelected = info.slug === selectedSlug;
         if (!info.active) {
           if (isFieldIntelligence) {
             return (
               <span
-                key={info.label}
+                key={info.slug}
                 className="fm-indication-chip"
                 style={{
                   flexShrink: 0,
@@ -155,9 +160,9 @@ export default function IndicationFilter({
 
           return (
             <button
-              key={info.label}
+              key={info.slug}
               type="button"
-              onClick={() => handleIndicationSelect(info.label, null)}
+              onClick={() => handleIndicationSelect(info.slug, null)}
               className="fm-indication-chip"
               style={{
                 flexShrink: 0,
@@ -183,9 +188,9 @@ export default function IndicationFilter({
 
         return (
           <button
-            key={info.label}
+            key={info.slug}
             type="button"
-            onClick={() => handleIndicationSelect(info.label, info.count ?? null)}
+            onClick={() => handleIndicationSelect(info.slug, info.count ?? null)}
             className="fm-indication-chip"
             style={{
               flexShrink: 0,

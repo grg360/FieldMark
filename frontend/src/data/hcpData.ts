@@ -11,7 +11,13 @@ export interface HCP {
   citTraj: number | string | null;
   trialScore?: number | null;
   trials?: string;
+  /** Historical, preserved. Prefer currentCountry for display — see lib/location.ts. */
   country?: string | null;
+  /** Re-derived from recent publications (2026-08-14). */
+  currentCountry?: string | null;
+  /** 'high' | 'medium' | 'stale' | 'unknown'. */
+  affiliationConfidence?: string | null;
+  affiliationAsOf?: number | null;
   narrative?: string | null;
   /** From hcp_narratives_v2.why_now — card insight band. */
   why_now?: string | null;

@@ -7,9 +7,16 @@ import { formatEngagementDollar, formatIntDisplay, formatScoreFloor1 } from "../
 import { institutionToSlug } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import { buildSubline } from "../lib/subline";
+import { LOCATION_ABSENT_LABEL, resolveLocation } from "../lib/location";
 import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import { FONT, COLOR } from "../lib/designTokens";
+import { taLabelForSlug } from "../lib/taLabels";
+
+// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
+// the stable identity — and the display label is derived from it, never typed
+// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+const CARD_TA_SLUG = "nsclc";
 
 function risingStarArchetypeShortLabel(archetype: string | null | undefined): string {
   switch (archetype) {
@@ -380,8 +387,8 @@ function statValueForKey(hcp: HCPCardHCP, cohort: string, key: string): string {
 // Community roster tier labels (Phase 3): card chip vocabulary. heme_dominant
 // gets the affirmative different-specialty label, never a deficit one.
 const COMMUNITY_TIER_CARD_LABEL: Record<string, string> = {
-  anchored: "ANCHORED · NSCLC EVIDENCE",
-  supported: "SUPPORTED · NSCLC EVIDENCE",
+  anchored: `ANCHORED · ${taLabelForSlug(CARD_TA_SLUG).toUpperCase()} EVIDENCE`,
+  supported: `SUPPORTED · ${taLabelForSlug(CARD_TA_SLUG).toUpperCase()} EVIDENCE`,
   heme_dominant: "HEME-FOCUSED PRACTICE",
   candidate: "CANDIDATE",
   unresolved: "NO MEDICARE EVIDENCE",
@@ -457,7 +464,16 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
   // Community (Phase 3 roster): not ranked — no #rank, no numeral; the badge
   // slot carries the evidence tier + Medicare reach fact instead.
   const displayRank = isRisingCohort ? (hcp.scope_rank ?? hcp.rank) : isCommunityPlain ? null : hcp.rank;
-  const countryCode = getCountryCode(hcp.country ?? null);
+  // Location resolution + hedging live in lib/location.ts (single source of truth).
+  // The flag follows the RESOLVED location, not the historical one, so a relocated
+  // KOL stops flying the flag of the country they left.
+  const loc = resolveLocation({
+    country: hcp.country,
+    currentCountry: hcp.currentCountry,
+    affiliationConfidence: hcp.affiliationConfidence,
+    affiliationAsOf: hcp.affiliationAsOf,
+  });
+  const countryCode = getCountryCode(loc.code);
   const { institution: cardInstitution, state: cardState } = getCardInstitutionAndState(hcp);
   const affiliationLine = formatCardAffiliationLine(hcp);
   if (typeof window !== "undefined" && (hcp as { last_name?: string }).last_name === "McKean") {
@@ -579,8 +595,15 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
                 srcSet={`https://flagcdn.com/32x24/${countryCode}.png 2x`}
                 width="16"
                 height="12"
-                alt={hcp.country || ""}
-                style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }}
+                alt={loc.code || ""}
+                title={loc.title}
+                style={{
+                  borderRadius: "2px",
+                  objectFit: "cover",
+                  flexShrink: 0,
+                  // A location we cannot confirm is current renders quieter than one we can.
+                  opacity: loc.hedged ? 0.55 : 1,
+                }}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -687,7 +710,19 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
             specialty label, not a deficit one. */}
         {isCommunityPlain ? (
           <div
-            style={{ position: "absolute", top: 12, right: 12, textAlign: "right", zIndex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}
+            // GUARDED 2026-08-15. This box is absolutely positioned and was
+            // unconstrained, so it grew LEFTWARD from the card edge straight
+            // over the name/affiliation line. It never showed because
+            // evidenceTier is null across the community feed today — which is
+            // exactly why it needs a cap rather than an eyeball.
+            //
+            // 104px comes off the card's OWN geometry, not a guess: the
+            // identity block above caps itself at `calc(100% - 136px)`, i.e.
+            // the card already reserves 136px for this slot. Take the 12px
+            // right inset off that, and leave a 20px gutter matching the
+            // card's own horizontal padding, and the slot is 136-12-20 = 104.
+            // Text wraps right-aligned inside it; it can no longer reach the name.
+            style={{ position: "absolute", top: 12, right: 12, maxWidth: 104, textAlign: "right", zIndex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}
           >
             <span
               style={{
@@ -759,10 +794,35 @@ export default function HCPCard({ hcp, onAddPress: _onAddPress, onCardPress }: H
               >
                 #{displayRank}
               </span>
-              <span style={{ fontFamily: FONT.sans, color: "#77736B", letterSpacing: "0.06em" }}>
+              {/* Absence discipline: this slot used to read `country ?? "US"`, which
+                  asserted "US" for every HCP with no country on file. A missing location
+                  is now a NAMED absence, and a location we are not confident is current
+                  carries the year its evidence comes from. */}
+              <span
+                style={{
+                  fontFamily: FONT.sans,
+                  color: loc.absent ? "#57534b" : "#77736B",
+                  letterSpacing: "0.06em",
+                }}
+                title={isRisingCohort ? undefined : loc.title}
+              >
                 {" "}
-                {isRisingCohort ? risingScopeLabel : (hcp.country ?? "US").toUpperCase()}
+                {isRisingCohort ? risingScopeLabel : loc.absent ? LOCATION_ABSENT_LABEL : loc.code}
               </span>
+              {!isRisingCohort && loc.hedged && loc.asOf != null && (
+                <span
+                  style={{
+                    fontFamily: FONT.mono,
+                    color: "#57534b",
+                    letterSpacing: "0.04em",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                  title={loc.title}
+                >
+                  {" "}
+                  ·{loc.asOf}
+                </span>
+              )}
               {!isRisingCohort && hcp.global_rank != null && (
                 <>
                   <span style={{ color: "#3d3a34" }}> · </span>

@@ -1,4 +1,5 @@
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { taLabelForSlug } from "../../lib/taLabels";
 // Practice-first community HCP profile. Frame authority:
 // docs/design/Community HCP Profile Practice First.dc.html — layout, section order,
 // treatments and palette are the frame's; every number is a live binding. Composed
@@ -16,7 +17,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
-import { GROUND, LINE } from "../../lib/designTokens";
+import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { getCurrentUser } from "../../lib/authHelpers";
@@ -39,19 +40,25 @@ import {
   type PracticeProfile, type ClassifiedProduct, type AdminCode,
 } from "../../lib/practiceProfile";
 
-// Frame palette — literals from the .dc.html.
+// CANONICAL MIGRATION (pilot, 2026-08-12): the frame's warm-cream ink ladder
+// converges onto the RFC ramp (bright→PRIME, body→BODY, gray→LABEL,
+// subtle→MUTE, ghost/ghost2→GHOST). Judgment mappings flagged in the pilot
+// report: mid (L*73) and dim (L*59) sit in rule gaps and map by role;
+// faint (L*55) → MUTE by role. blue/blueBorder stay literal — chart/semantic
+// categorical (would collide with violet in MARK/RS); greenBorder stays
+// literal (a dark green EDGE has no opaque canonical counterpart yet).
 const F = {
-  // Commit C 2026-08-05: surfaces/edges join the board scheme (g1 wells,
-  // l0/l1 rules); text + semantic accents stay the frame’s own.
-  page: "#0a0b0b", alt: "#0b0c0c", card: GROUND.g1, hover: "#121414", well: GROUND.g1,
-  line: LINE.l1, lineSub: LINE.l0, lineFaint: LINE.l0, border2: LINE.l2,
-  bright: "#e6e2d8", body: "#cfcbc0", mid: "#b6b2a8", gray: "#9a9f9b", dim: "#8a8f8c",
-  faint: "#7f857f", subtle: "#6b716e", ghost: "#5c625f", ghost2: "#4d534f",
-  amber: "#d69a3c", amberBorder: "#493a20", blue: "#5b8dd9", blueBorder: "#2c3f5c",
-  green: "#4e9e6a", greenBorder: "#22402f", red: "#b8574a", violet: "#8a7fb8",
+  page: CANON.GROUND.BASE, alt: CANON.GROUND.BASE, card: CANON.GROUND.RAISE,
+  hover: CANON.GROUND.INSET, well: CANON.GROUND.RAISE,
+  line: CANON.LINE.HAIR, lineSub: CANON.LINE.HAIR, lineFaint: CANON.LINE.HAIR, border2: CANON.LINE.EDGE,
+  bright: CANON.INK.PRIME, body: CANON.INK.BODY, mid: CANON.INK.BODY, gray: CANON.INK.LABEL,
+  dim: CANON.INK.LABEL, faint: CANON.INK.MUTE, subtle: CANON.INK.MUTE,
+  ghost: CANON.INK.GHOST, ghost2: CANON.INK.GHOST,
+  amber: CANON.GOLD.PRIME, amberBorder: CANON.GOLD.EDGE, blue: "#5b8dd9", blueBorder: "#2c3f5c",
+  green: CANON.MARK.EST, greenBorder: "#22402f", red: CANON.STATE.DANGER, violet: CANON.MARK.RS,
 } as const;
-const mono = (s: number, w = 400) => ({ font: `${w} ${s}px 'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace` } as const);
-const serif = (s: number, w = 400) => ({ font: `${w} ${s}px 'Source Serif 4',Georgia,serif` } as const);
+const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 
 const STATUS_LABEL: Record<RelationshipStatus, string> = {
   not_engaged: "Not Engaged", targeted: "Targeted", contacted: "Contacted",
@@ -93,10 +100,15 @@ const CLAIMS_TAG: Record<string, { text: (c: ClassifiedProduct) => string; color
   route_unknown: { text: () => "ROUTE UNKNOWN", color: F.ghost2 },
 };
 
+// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
+// the stable identity — and the display label is derived from it, never typed
+// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+const PROFILE_TA_SLUG = "nsclc";
+
 // Community roster tier vocabulary (Phase 3) — affirmative labels only.
 const COMMUNITY_TIER_LABEL: Record<string, string> = {
-  anchored: "ANCHORED · NSCLC EVIDENCE",
-  supported: "SUPPORTED · NSCLC EVIDENCE",
+  anchored: `ANCHORED · ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} EVIDENCE`,
+  supported: `SUPPORTED · ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} EVIDENCE`,
   heme_dominant: "HEME-FOCUSED PRACTICE",
   candidate: "CANDIDATE",
   unresolved: "NO MEDICARE EVIDENCE",
@@ -197,7 +209,7 @@ export default function PracticeFirstProfile() {
       </div>
 
       {/* ── header: identity | practice shape | community score ── */}
-      <div style={{ display: "flex", flexWrap: "wrap", borderBottom: `1px solid ${F.line}`, background: F.card }}>
+      <div style={{ display: "flex", flexWrap: "wrap", borderBottom: `1px solid ${F.line}`, ...DEPTH.CARD }}>
         <div style={{ flex: "2 1 420px", minWidth: 0, padding: "22px 28px 24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
             <span style={{ ...mono(9), letterSpacing: "0.16em", color: F.blue, border: `1px solid ${F.blueBorder}`, borderRadius: 2, padding: "3px 8px" }}>COMMUNITY</span>
@@ -207,8 +219,8 @@ export default function PracticeFirstProfile() {
           <div style={{ ...serif(30), lineHeight: 1.12, color: F.bright, letterSpacing: "-0.01em", marginBottom: 12 }}>{p.hcp.name}</div>
           <div style={{ ...mono(11), letterSpacing: "0.06em", color: F.faint, display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
             {p.hcp.specialty ? <span>{p.hcp.specialty}</span> : null}
-            {loc ? <><span style={{ color: "#3a403c" }}>·</span><span>{loc}</span></> : null}
-            {p.hcp.npi ? <><span style={{ color: "#3a403c" }}>·</span><span>NPI {p.hcp.npi}</span></> : null}
+            {loc ? <><span style={{ color: CANON.LINE.EDGE }}>·</span><span>{loc}</span></> : null}
+            {p.hcp.npi ? <><span style={{ color: CANON.LINE.EDGE }}>·</span><span>NPI {p.hcp.npi}</span></> : null}
           </div>
           {org ? (
             <div style={{ ...mono(11), letterSpacing: "0.04em", color: F.faint, marginBottom: 18 }}>
@@ -303,7 +315,7 @@ export default function PracticeFirstProfile() {
           <div style={{ ...mono(10), color: F.ghost }}>{classified.length} products above threshold · top {pr?.admin_codes.length ?? 0} of {fmtInt(med?.distinct_codes_3yr)} codes held</div>
         </div>
         {notAdmin ? (
-          <div style={{ background: F.card, border: `1px solid ${F.line}`, borderRadius: 2, padding: "11px 14px", ...mono(10.5), lineHeight: 1.7, color: F.subtle, marginBottom: 18, textWrap: "pretty" }}>
+          <div style={{ ...DEPTH.CARD, border: `1px solid ${F.line}`, borderRadius: 2, padding: "11px 14px", ...mono(10.5), lineHeight: 1.7, color: F.subtle, marginBottom: 18, textWrap: "pretty" }}>
             Part B claims see what is infused or injected in the office. Oral agents dispense through Part D and are <span style={{ color: F.gray }}>structurally invisible here</span>{oral.length ? ` — ${oral.length} of the ${notAdmin} unmatched products ${oral.length === 1 ? "is" : "are"} oral, and their absence means nothing` : ""}.{injectable.length ? ` The ${injectable.length === 1 ? "injectable" : `${injectable.length} injectables`} with no administration recorded ${injectable.length === 1 ? "is" : "are"} the ${injectable.length === 1 ? "one" : "ones"} worth reading.` : ""}
           </div>
         ) : null}
@@ -313,7 +325,7 @@ export default function PracticeFirstProfile() {
             elsewhere (no-engagement-record, no-Part-B). 1–3 buckets render per HCP. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 1, background: F.line, border: `1px solid ${F.line}`, borderRadius: 2 }}>
           {aligned.length ? (
-            <div style={{ background: F.card, padding: "16px 18px 18px" }}>
+            <div style={{ ...DEPTH.CARD, padding: "16px 18px 18px" }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ ...mono(10), letterSpacing: "0.16em", color: F.amber }}>ALIGNED</span>
                 <span style={{ ...mono(16), color: F.amber }}>{aligned.length}</span>
@@ -335,7 +347,7 @@ export default function PracticeFirstProfile() {
           ) : null}
 
           {notAdmin ? (
-            <div style={{ background: F.card, padding: "16px 18px 18px" }}>
+            <div style={{ ...DEPTH.CARD, padding: "16px 18px 18px" }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ ...mono(10), letterSpacing: "0.16em", color: F.blue }}>PAID AROUND · NOT ADMINISTERED</span>
                 <span style={{ ...mono(16), color: F.blue }}>{notAdmin}</span>
@@ -399,7 +411,7 @@ export default function PracticeFirstProfile() {
           ) : null}
 
           {adminNoEng.length ? (
-            <div style={{ background: F.card, padding: "16px 18px 18px" }}>
+            <div style={{ ...DEPTH.CARD, padding: "16px 18px 18px" }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ ...mono(10), letterSpacing: "0.16em", color: F.green }}>ADMINISTERED · NO ENGAGEMENT</span>
                 <span style={{ ...mono(16), color: F.green }}>{adminNoEng.length}</span>
@@ -421,7 +433,7 @@ export default function PracticeFirstProfile() {
         </div>
 
         {/* WHAT TO DO WITH THIS */}
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginTop: 18, padding: "14px 16px", background: "#0f0d0a", border: "1px solid #2e2416", borderRadius: 2 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginTop: 18, padding: "14px 16px", background: CANON.GROUND.RAISE, border: `1px solid ${CANON.GOLD.EDGE}`, borderRadius: 2 }}>
           <span style={{ color: F.amber, fontSize: 8, lineHeight: 2.2 }}>◆</span>
           <div>
             <div style={{ ...mono(9), letterSpacing: "0.18em", color: F.amber, marginBottom: 6 }}>WHAT TO DO WITH THIS</div>
@@ -451,7 +463,7 @@ export default function PracticeFirstProfile() {
 
         {med ? (
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(300px,1fr) minmax(280px,400px)", gap: 1, background: F.line, border: `1px solid ${F.line}`, borderRadius: 2 }}>
-            <div style={{ background: F.card, padding: "20px 24px 18px" }}>
+            <div style={{ ...DEPTH.CARD, padding: "20px 24px 18px" }}>
               {/* frame (current rev): compact 334px slope + values row + −57% callout,
                   with the trend well and HOW TO READ IT beside it — not full-width bars */}
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(240px,334px) 1fr", gap: 28, alignItems: "start" }}>
@@ -533,7 +545,7 @@ export default function PracticeFirstProfile() {
               </div>
             </div>
 
-            <div style={{ background: F.card, padding: "20px 22px 18px", display: "flex", flexDirection: "column" }}>
+            <div style={{ ...DEPTH.CARD, padding: "20px 22px 18px", display: "flex", flexDirection: "column" }}>
               <div style={{ ...mono(9), letterSpacing: "0.16em", color: F.ghost, marginBottom: 14 }}>SCALE &amp; SETTING</div>
               <ScaleRow l="Services, 3-yr" v={fmtInt(med.services_3yr)} big />
               {med.medicare_paid_corrected != null ? (
@@ -567,7 +579,7 @@ export default function PracticeFirstProfile() {
           <div style={{ ...serif(19), lineHeight: 1.4, color: F.bright, marginBottom: 16, textWrap: "pretty" }}>
             {adminMapped.length} of his top {pr.admin_codes.length} codes map to a named agent — {genericNames.join(", ")}. The rest are supportive-care and unclassified codes outside the NSCLC reference, held as gaps with their rank intact.
           </div>
-          <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>
+          <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, ...DEPTH.CARD }}>
             <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "44px 78px 1.6fr 1fr 120px", gap: 12, padding: "10px 16px", borderBottom: `1px solid ${F.line}`, ...mono(9), letterSpacing: "0.14em", color: F.ghost }}>
               <span>RANK</span><span>CODE</span><span>AGENT</span><span>CLASS</span><span style={{ textAlign: "right" }}>ENGAGEMENT</span>
             </div>
@@ -606,7 +618,7 @@ export default function PracticeFirstProfile() {
                 ALL FIELD INSIGHTS ON {p.hcp.name.toUpperCase()} ↗
               </Link>
             ) : null}
-            <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>
+            <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, ...DEPTH.CARD }}>
               <FieldInsights hcp={profileHcp(p.hcp.id, p.hcp.name, p.hcp.specialty)} variant="ledger" />
             </div>
           </div>
@@ -630,7 +642,7 @@ export default function PracticeFirstProfile() {
                 <span style={{ ...mono(9), letterSpacing: "0.14em", color: F.ghost, marginRight: 2 }}>SORT</span>
                 {(["amount", "recency", "administered"] as const).map((k) => (
                   <button key={k} onClick={() => setEngSort(k)}
-                    style={{ background: engSort === k ? "#111313" : "transparent", border: `1px solid ${engSort === k ? "#3a403c" : F.border2}`, color: engSort === k ? F.body : F.subtle, ...mono(9), letterSpacing: "0.12em", padding: "5px 10px", borderRadius: 2, cursor: "pointer", minHeight: 0 }}>
+                    style={{ background: engSort === k ? CANON.GROUND.INSET : "transparent", border: `1px solid ${engSort === k ? CANON.LINE.EDGE : F.border2}`, color: engSort === k ? F.body : F.subtle, ...mono(9), letterSpacing: "0.12em", padding: "5px 10px", borderRadius: 2, cursor: "pointer", minHeight: 0 }}>
                     {k.toUpperCase()}
                   </button>
                 ))}
@@ -639,12 +651,12 @@ export default function PracticeFirstProfile() {
             <div style={{ ...serif(17), lineHeight: 1.4, color: F.bright, marginBottom: 12, textWrap: "pretty" }}>
               {money(eng.lifetime_total)} lifetime across {eng.distinct_companies ?? "—"} reporting entities. Broad and shallow.
             </div>
-            <div style={{ background: F.card, border: `1px solid ${F.line}`, borderRadius: 2, padding: "11px 14px", ...mono(10.5), lineHeight: 1.7, color: F.subtle, marginBottom: 14, textWrap: "pretty" }}>
+            <div style={{ ...DEPTH.CARD, border: `1px solid ${F.line}`, borderRadius: 2, padding: "11px 14px", ...mono(10.5), lineHeight: 1.7, color: F.subtle, marginBottom: 14, textWrap: "pretty" }}>
               CMS Open Payments, 2019–2024. A record of <span style={{ color: F.gray }}>disclosed transfers of value</span>, published federally. It describes contact between industry and this practice — not influence, not prescribing, not quality of care, and not standing relative to other practitioners. Payment counts sit beside every amount because thirty $40 meals and one $10K consulting agreement are different facts. <span style={{ color: F.gray }}>No per-year trend is shown: at company and at product grain the annual columns are single-year blips and mostly zeros, and a line drawn through them would state a direction the data cannot support.</span>
             </div>
             {engRows.length ? (
             <>
-            <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, background: F.card }}>
+            <div style={{ border: `1px solid ${F.line}`, borderRadius: 2, ...DEPTH.CARD }}>
               <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "1.1fr 1.5fr 80px 74px 84px 1fr", gap: 12, padding: "10px 14px", borderBottom: `1px solid ${F.line}`, ...mono(9), letterSpacing: "0.14em", color: F.ghost }}>
                 <span>PRODUCT</span><span>REPORTING ENTITY</span><span style={{ textAlign: "right" }}>TRANSFERS</span><span style={{ textAlign: "right" }}>PAYMENTS</span><span>LAST</span><span>IN HIS CLAIMS</span>
               </div>
@@ -786,7 +798,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout width="wide">
       {/* Commit C 2026-08-05: g2 board per the Pulse scheme. */}
-      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", background: GROUND.g2, border: `1px solid ${LINE.l1}`, color: F.body, fontFamily: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace", fontSize: 12, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" }}>
+      <div style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 24px", padding: "24px 24px 40px", ...DEPTH.PANEL, border: `1px solid ${CANON.LINE.HAIR}`, color: F.body, fontFamily: FACE.data, fontSize: 12, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" }}>
         {children}
       </div>
     </AppLayout>
@@ -824,7 +836,7 @@ function AdminRow({ c, aligned }: { c: AdminCode; aligned: ClassifiedProduct[] }
       ) : (
         <span style={{ ...mono(12), color: F.bright }}>{(c.name ?? "").toLowerCase().replace(/\s+injection\b.*$/, "")}{engagedBy ? <span style={{ color: F.subtle }}> · {engagedBy.product.drug}</span> : null}</span>
       )}
-      <span style={{ ...mono(11), color: gap ? F.ghost : engagedBy ? F.amber : F.faint }}>{gap ? "outside NSCLC reference" : (c.category ?? "—")}{engagedBy && !gap ? " · engaged" : ""}</span>
+      <span style={{ ...mono(11), color: gap ? F.ghost : engagedBy ? F.amber : F.faint }}>{gap ? `outside the ${taLabelForSlug(PROFILE_TA_SLUG).toLowerCase()} reference set` : (c.category ?? "—")}{engagedBy && !gap ? " · engaged" : ""}</span>
       <span style={{ textAlign: "right", ...mono(9), letterSpacing: "0.1em", color: gap ? F.ghost : engagedBy ? F.amber : F.green }}>{gap ? "DATA TASK" : engagedBy ? `PAID · ${money(engagedBy.product.amount)}` : "NONE REPORTED"}</span>
     </div>
   );
@@ -845,7 +857,7 @@ function HeaderActions({ hcpId, npi, onBrief }: { hcpId: string; npi: string | n
 
   const tracked = isTracked(hcpId);
   const act = {
-    background: "#111313", border: `1px solid ${F.border2}`, color: F.gray, ...mono(10),
+    background: CANON.GROUND.INSET, border: `1px solid ${F.border2}`, color: F.gray, ...mono(10),
     letterSpacing: "0.14em", padding: "7px 13px", borderRadius: 2, cursor: "pointer", minHeight: 0, textDecoration: "none",
   } as const;
 
@@ -863,7 +875,7 @@ function HeaderActions({ hcpId, npi, onBrief }: { hcpId: string; npi: string | n
       <button onClick={onBrief} style={act}>✦ BRIEF</button>
       <button ref={addRef} onClick={() => void openWatchlist()} style={act}>+ LIST</button>
       <button onClick={() => void toggleSave(hcpId, "hcp_profile")}
-        style={{ ...act, background: tracked ? "#101519" : "#111313", border: `1px solid ${tracked ? F.blueBorder : F.border2}`, color: tracked ? F.blue : F.gray }}>
+        style={{ ...act, background: tracked ? CANON.GROUND.INSET : CANON.GROUND.INSET, border: `1px solid ${tracked ? F.blueBorder : F.border2}`, color: tracked ? F.blue : F.gray }}>
         {tracked ? "◗ TRACKED" : "◗ TRACK"}
       </button>
       {npi ? <a href={`https://npiregistry.cms.hhs.gov/provider-view/${npi}`} target="_blank" rel="noopener noreferrer" style={{ ...act, background: "transparent", color: F.subtle }}>NPI Registry →</a> : null}
@@ -905,7 +917,7 @@ function FieldIntelligencePanel() {
               const on = answers[q.key] === opt;
               return (
                 <button key={opt} onClick={() => setAnswers((a) => ({ ...a, [q.key]: a[q.key] === opt ? null : opt }))}
-                  style={{ background: on ? "#181a19" : "#111313", border: `1px solid ${on ? "#3a403c" : F.border2}`, color: on ? F.body : F.gray, ...mono(10), padding: "7px 4px", borderRadius: 2, cursor: "pointer", minHeight: 0 }}>
+                  style={{ background: on ? CANON.GROUND.INSET : CANON.GROUND.RAISE, border: `1px solid ${on ? CANON.LINE.EDGE : F.border2}`, color: on ? F.body : F.gray, ...mono(10), padding: "7px 4px", borderRadius: 2, cursor: "pointer", minHeight: 0 }}>
                   {opt}
                 </button>
               );
@@ -915,7 +927,7 @@ function FieldIntelligencePanel() {
       ))}
       <button disabled={!complete}
         onClick={() => { if (!complete) return; showToast("Field review recorded — the submission path (field-intel write) is not yet wired; stored locally only."); }}
-        style={{ width: "100%", background: "#0f1010", border: `1px solid ${F.border2}`, color: complete ? F.body : F.ghost, ...mono(10), letterSpacing: "0.14em", padding: 9, borderRadius: 2, cursor: complete ? "pointer" : "not-allowed", minHeight: 0 }}>
+        style={{ width: "100%", background: CANON.GROUND.RAISE, border: `1px solid ${F.border2}`, color: complete ? F.body : F.ghost, ...mono(10), letterSpacing: "0.14em", padding: 9, borderRadius: 2, cursor: complete ? "pointer" : "not-allowed", minHeight: 0 }}>
         Submit validation
       </button>
       <div style={{ ...mono(9), color: F.ghost2, textAlign: "center", marginTop: 8 }}>Your identity is never shared. Contributor UUID only.</div>
@@ -943,7 +955,7 @@ function RailControls({ hcpName, specialty, lastName }: { hcpName: string; speci
   return (
     <div>
       <button onClick={() => setCtxOpen(true)}
-        style={{ width: "100%", background: "#111313", border: `1px solid ${F.border2}`, color: F.gray, ...mono(10), letterSpacing: "0.12em", padding: 9, borderRadius: 2, cursor: "pointer", marginBottom: 8, minHeight: 0 }}>Add context</button>
+        style={{ width: "100%", background: CANON.GROUND.INSET, border: `1px solid ${F.border2}`, color: F.gray, ...mono(10), letterSpacing: "0.12em", padding: 9, borderRadius: 2, cursor: "pointer", marginBottom: 8, minHeight: 0 }}>Add context</button>
       <button onClick={() => setReportOpen(true)}
         style={{ width: "100%", background: "transparent", border: `1px solid ${F.border2}`, color: F.subtle, ...mono(10), letterSpacing: "0.12em", padding: 9, borderRadius: 2, cursor: "pointer", minHeight: 0 }}>Report data issue</button>
       <div style={{ ...mono(9), color: F.ghost2, lineHeight: 1.7, marginTop: 14 }}>
@@ -980,7 +992,7 @@ function RailControls({ hcpName, specialty, lastName }: { hcpName: string; speci
             </div>
           </div>
           <button type="button"
-            style={{ background: "#111313", border: `1px solid ${F.border2}`, color: F.gray, ...mono(10), letterSpacing: "0.1em", padding: "8px 14px", borderRadius: 2, cursor: "pointer", minHeight: 0 }}
+            style={{ background: CANON.GROUND.INSET, border: `1px solid ${F.border2}`, color: F.gray, ...mono(10), letterSpacing: "0.1em", padding: "8px 14px", borderRadius: 2, cursor: "pointer", minHeight: 0 }}
             onClick={() => { setReportOpen(false); showToast("Issue reported — thank you for helping improve this profile."); }}>Submit report</button>
         </FiModal>
       )}

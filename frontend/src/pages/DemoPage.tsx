@@ -1,5 +1,6 @@
 import { CSSProperties } from "react";
 import { FONT } from "../lib/designTokens";
+import { taLabelForSlug } from "../lib/taLabels";
 
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
@@ -161,7 +162,7 @@ const footerStyle: CSSProperties = {
 };
 
 const stats = [
-  { value: "80,000+", label: "NSCLC Investigators" },
+  { value: "80,000+", label: `${taLabelForSlug("nsclc")} Investigators` },
   { value: "173,000", label: "Publications" },
   { value: "2,463", label: "Clinical Trials" },
   { value: "6,400", label: "Scientific Positions" },
