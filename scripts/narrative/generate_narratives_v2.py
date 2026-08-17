@@ -228,7 +228,10 @@ def ta_slug_from_name(ta_name: Optional[str]) -> str:
     return ta_name.lower().replace(' ', '_').replace('-', '_')
 
 
-RISING_DEFAULT_TOP_N = 100
+# AD rising only. The legacy (NSCLC etc.) arm defaults to the WHOLE board --
+# see fetch_rising_star_top_hcp_ids_v3. Kept because the AD global board is
+# ~2,867 members, where an uncapped default would be a 28x scope change.
+RISING_AD_DEFAULT_TOP_N = 100
 ESTABLISHED_DEFAULT_TOP_N = 100
 
 # Pipeline behavior
@@ -399,17 +402,24 @@ def pick_latest_scores(score_rows: List[Dict]) -> Dict[Tuple[str, str], Dict]:
 
 def collect_top_n_hcp_ids(
     make_query,
-    top_n: int,
+    top_n: Optional[int],
     page_size: int = 1000,
     allowed_ids: Optional[Set[str]] = None,
 ) -> List[str]:
     """Page through an ordered rank query until top_n rows or exhaustion.
 
+    top_n=None means NO CAP — page until the query is exhausted. Use it when the
+    selection should be "every member of the board" rather than a leaderboard
+    slice; a cap that silently truncates a board is indistinguishable from a
+    smaller board downstream, which is the failure this None mode exists to
+    avoid. Callers that genuinely want a top-N slice keep passing an int.
+
     PostgREST caps any single response at 1000 rows (server max-rows), so a
     single .range(0, top_n - 1) silently truncates whenever top_n > 1000.
     make_query must return a FRESH ordered query builder on each call (builders
     are single-use). page_size must stay <= the server cap so a short batch
-    reliably means exhaustion, not truncation.
+    reliably means exhaustion, not truncation. That short-batch check is what
+    terminates the uncapped path, so page_size must not exceed the server cap.
 
     allowed_ids (G2 cutover): when set, only ids in it are collected — the
     membership filter lives in community_board_nsclc_v1, not in the rank query,
@@ -418,8 +428,8 @@ def collect_top_n_hcp_ids(
     """
     ids: List[str] = []
     offset = 0
-    while len(ids) < top_n:
-        if allowed_ids is None:
+    while top_n is None or len(ids) < top_n:
+        if allowed_ids is None and top_n is not None:
             if offset >= top_n:
                 break
             upper = min(offset + page_size, top_n) - 1
@@ -431,7 +441,7 @@ def collect_top_n_hcp_ids(
             hcp_id = row.get("hcp_id")
             if hcp_id and (allowed_ids is None or str(hcp_id) in allowed_ids):
                 ids.append(str(hcp_id))
-                if len(ids) >= top_n:
+                if top_n is not None and len(ids) >= top_n:
                     break
         if len(batch) < (upper - offset + 1):
             break
@@ -472,22 +482,50 @@ def fetch_top_n_hcp_ids_from_rank_view(
 
 def fetch_rising_star_top_hcp_ids_v3(
     supabase: Client,
-    top_n: int,
+    top_n: Optional[int],
     visible_ta_ids: List[str],
 ) -> Set[str]:
-    """Rising Star cohort selection: top N per TA by rank.
+    """Rising Star cohort selection: the board for each TA, by global rank.
+
+    SCOPE IS GLOBAL, NOT US (2026-08-17). The legacy arm previously selected
+    `us_rank IS NOT NULL ORDER BY us_rank`, i.e. US-scope only, and its docstring
+    called that the product model. It is not: the board is 251 people worldwide
+    and every surface renders all of them. That predicate reached 57 of 251 --
+    it missed the 48 EU members entirely, and it missed movers like Misako
+    Nagasaka (global #18) whose stored us_rank is NULL because the board was
+    scored against her historical country. 119 of 251 members had no narrative.
+
+    `rank` is the board's own key and carries no territory concept, so ordering
+    by it needs no country predicate. This also makes the two arms below agree:
+    the AD arm already selected scope_type='global' ordered by rank, and the
+    established selector already iterates VISIBLE_SCOPES including ('global',
+    None). This arm was the only selector on the platform scoped to one country.
+    Territory is a DISPLAY concern -- rising_board() computes us_rank_eff and
+    eu_rank at read time for the surfaces that place people by location.
 
     Per-TA model split:
-      - AD: GLOBAL top-N by composite rank from hcp_rising_composite_v1 (AD is
+      - AD: GLOBAL by composite rank from hcp_rising_composite_v1 (AD is
         global-first; the composite table stores global rows as scope_type='global',
         scope_value=NULL).
-      - Every other TA: frozen legacy path — US-scope only, top-N by us_rank from
-        hcp_rising_star_ranks_v3 (US-default product model; intl HCPs excluded).
+      - Every other TA: hcp_rising_star_ranks_v3 by `rank`, no country predicate.
+
+    top_n=None means the WHOLE board for the TA, and is the default for the
+    legacy arm -- at 251 members a top-N expresses a ceiling that no longer
+    exists, and a cap that silently truncates a board reads downstream as a
+    smaller board. The AD arm keeps an explicit cap (see below): its global
+    board is ~2,867 members, so "no cap" there is a different decision that
+    has not been made.
     """
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
         try:
             if str(ta_id) == AD_TA_ID:
+                # AD is NOT uncapped by default. Its global board is ~2,867 vs
+                # NSCLC's 251, so inheriting top_n=None here would silently turn
+                # a 100-HCP run into a 2,867-HCP one. An explicit --rising-top
+                # still applies to both arms.
+                ad_top_n = top_n if top_n is not None else RISING_AD_DEFAULT_TOP_N
+
                 def make_query(ta_id=ta_id):
                     return (
                         supabase.table("hcp_rising_composite_v1")
@@ -496,16 +534,18 @@ def fetch_rising_star_top_hcp_ids_v3(
                         .eq("scope_type", "global")
                         .order("rank", desc=False)
                     )
+
+                selected.update(collect_top_n_hcp_ids(make_query, ad_top_n))
             else:
                 def make_query(ta_id=ta_id):
                     return (
                         supabase.table("hcp_rising_star_ranks_v3")
                         .select("hcp_id")
                         .eq("therapeutic_area_id", ta_id)
-                        .not_.is_("us_rank", "null")
-                        .order("us_rank", desc=False)
+                        .order("rank", desc=False)
                     )
-            selected.update(collect_top_n_hcp_ids(make_query, top_n))
+
+                selected.update(collect_top_n_hcp_ids(make_query, top_n))
         except Exception as exc:
             print(f"[load] rising selection query failed for TA {ta_id}: {exc}")
     return selected
@@ -1073,7 +1113,7 @@ def load_hcp_contexts(
     supabase: Client,
     target_cohorts: List[str],
     community_top_n: int,
-    rising_top_n: int,
+    rising_top_n: Optional[int],
     established_top_n: int,
     target_version: str = "v1",
     single_hcp_id: Optional[str] = None,
@@ -1163,8 +1203,14 @@ def load_hcp_contexts(
             print(f"Loaded community HCP {single_hcp_id}")
     elif "rising_star" in target_cohorts:
         print(
-            f"Selecting rising_star top-{rising_top_n} per (TA x visible scope) "
-            "from the rising rank source (per-TA model: composite for AD, legacy v3 otherwise)..."
+            "Selecting rising_star "
+            + (
+                f"WHOLE BOARD per TA (AD capped at {RISING_AD_DEFAULT_TOP_N})"
+                if rising_top_n is None
+                else f"top-{rising_top_n} per TA"
+            )
+            + " by GLOBAL rank from the rising rank source "
+            "(per-TA model: composite for AD, v3 otherwise)..."
         )
         rising_ids = fetch_rising_star_top_hcp_ids_v3(
             supabase, rising_top_n, visible_ta_ids
@@ -2385,7 +2431,7 @@ def estimate_cost(num_calls: int) -> float:
 def run_pipeline(
     target_cohorts: List[str],
     community_top_n: int,
-    rising_top_n: int,
+    rising_top_n: Optional[int],
     established_top_n: int,
     dry_run: bool,
     force: bool,
@@ -2479,7 +2525,16 @@ def run_pipeline(
     else:
         print(f"Target cohorts: {target_cohorts}")
         if "rising_star" in target_cohorts:
-            print(f"Rising star downselect: top {rising_top_n} per (TA x visible scope) from ranks")
+            print(
+                "Rising star downselect: "
+                + (
+                    "WHOLE BOARD per TA (no cap; AD capped at "
+                    f"{RISING_AD_DEFAULT_TOP_N})"
+                    if rising_top_n is None
+                    else f"top {rising_top_n} per TA"
+                )
+                + " from ranks, by global rank"
+            )
         if "established" in target_cohorts:
             print(
                 f"Established downselect: top {established_top_n} per (TA x visible scope) from ranks"
@@ -2661,8 +2716,13 @@ def main() -> int:
     parser.add_argument(
         "--rising-top",
         type=int,
-        default=RISING_DEFAULT_TOP_N,
-        help="Top N per (TA x visible scope) for rising_star cohort",
+        default=None,
+        help=(
+            "Cap the rising_star selection at N per TA. Omit for the WHOLE board "
+            f"(the default). Atopic Dermatitis falls back to {RISING_AD_DEFAULT_TOP_N} "
+            "when this is omitted, because its global board is ~2,867 members; an "
+            "explicit value here applies to every TA."
+        ),
     )
     parser.add_argument(
         "--established-top",

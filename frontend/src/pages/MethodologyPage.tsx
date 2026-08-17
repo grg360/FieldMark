@@ -275,6 +275,15 @@ export default function MethodologyPage() {
         <p style={bodyStyle}>
           The Rising Star cohort is gated by an industry classifier and hard eligibility floors, not by self-described affiliation. An HCP enters the momentum-model board only if classified academic by our institution classifier, with 15 or fewer years since first publication, and with at least 5 publications in each comparison window (network momentum additionally requires at least 20 collaborators per window). The 15-year cap is a hard predicate in the scoring query, not a soft convention. In therapeutic areas running the emergence model, eligibility instead comes from the per-TA career-structure taxonomy - a career age of 3-10 years plus a TA publication floor - and the industry gate also admits government investigators at NCI/NIH (engageable trialists, not regulators).
         </p>
+        <p style={bodyStyle}>
+          A Rising Star must also have <strong style={{ color: INK_HEAD }}>moved</strong>. The board requires at least three more senior-author publications in the recent five-year window than in the one before it - not three papers, but three more than the prior window produced. An HCP publishing steadily at the same level does not qualify however high that level is, and an HCP whose senior-author output fell does not qualify at all.
+        </p>
+        <p style={bodyStyle}>
+          The floor was raised from "any increase". Any increase meant a single extra paper cleared the board, which admitted two in five members on the smallest measurable change and left no room beneath the threshold - nobody could be one paper away from entering, because entering required only the first one. Three papers is far enough above the noise that crossing it is a fact about someone's trajectory rather than about which window a manuscript landed in, and it leaves a visible approach: an HCP at two is close, and that is a thing worth knowing.
+        </p>
+        <p style={bodyStyle}>
+          This is what separates the Rising Star board from the Established one. Established measures standing - how much, how cited, how connected, in absolute terms. Rising measures change, and a large body of work earns no place here on its size alone. The two boards are not a ranking of the same people at different career stages; they answer different questions.
+        </p>
       </div>
 
       {/* ── Community — 40/30/15/10/5 bar + evidence-tier ladder ────────── */}
