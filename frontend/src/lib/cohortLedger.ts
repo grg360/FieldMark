@@ -665,6 +665,18 @@ export const COUNTRY_LABELS: Record<string, string> = {
  *  stands in for the NULL scope_value that global rows carry. Never a country code. */
 export const GLOBAL_SCOPE_SENTINEL = "__global__";
 
+/** Sentinel passed in the ledger RPCs' p_countries to select the all-Europe scope.
+ *  Not an ISO country code, so it cannot collide with one. The two cohorts honour it
+ *  by DIFFERENT mechanisms, which is why one sentinel serves both:
+ *    EST  established_ledger finds a STORED bucket (scope_type='region',
+ *         scope_value='EUROPE') written by recompute_established_ranks_v3.py --
+ *         Established ranks are normalised within scope, so all-Europe had to be
+ *         scored as its own pool.
+ *    RS   rising_ledger EXPANDS it into region_countries('EUROPE') at read time --
+ *         Rising's rank is a row_number() over the selection, so no scoring needed.
+ *  Either way the 33 codes live in region_countries and nowhere else. */
+export const EUROPE_SCOPE_SENTINEL = "EUROPE";
+
 /** Europe country options, ordered by market size then alphabetically. */
 export const LEDGER_EUROPE_OPTIONS: { key: string; label: string }[] = (() => {
   const primary = ["GB", "DE", "FR", "IT", "ES", "NL", "CH"];
@@ -691,7 +703,11 @@ export function scopeFromKey(key: string, myTerritory: LedgerScope | null): Ledg
     return { key, label: "Global", states: [], countries: [GLOBAL_SCOPE_SENTINEL] };
   }
   if (key === "eu:all") {
-    return { key, label: "Europe (all)", states: [], countries: EUROPE_COUNTRIES };
+    // The SENTINEL, not the 33 codes (2026-08-18). Sending the list made this file a
+    // second source of truth for what Europe is; sending the sentinel leaves exactly
+    // one, in region_countries. EUROPE_COUNTRIES survives below for the per-country
+    // child options, which are labels rather than a definition of the region.
+    return { key, label: "Europe (all)", states: [], countries: [EUROPE_SCOPE_SENTINEL] };
   }
   if (key.startsWith("eu:")) {
     const cc = key.slice(3).toUpperCase();
@@ -752,11 +768,14 @@ export function ledgerTerritoryTree(cohortTag: string): TerritoryNode[] {
     {
       key: "eu:all",
       label: "Europe",
-      // Rising's rank is derived at read time over whatever pool is selected, so an
-      // all-Europe ordering is correct. Established's is not — it degrades to
-      // expand-only: every European COUNTRY remains selectable, only the aggregate is
-      // withheld, until an additive scorer scope exists for it.
-      selectable: cohortTag === "RS",
+      // Selectable for both cohorts since 2026-08-18. Established was expand-only
+      // because its ranks are normalised WITHIN a scope, so an all-Europe selection
+      // would have unioned 31 country boards into 31 rank-1 rows. The additive scorer
+      // scope this comment was waiting for now exists — recompute_established_ranks_v3
+      // writes an aggregate EUROPE bucket (3,849 rows for NSCLC, ranks 1..n over one
+      // pool) — so the aggregate is a real board for EST exactly as it always was for
+      // RS, which derives its ordering at read time.
+      selectable: true,
       children: LEDGER_EUROPE_OPTIONS,
     },
     global,

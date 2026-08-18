@@ -40,6 +40,43 @@ Scope rows (same intent as the old hcp_established_ranks_v2 materialization):
     scope_value=NULL)
   - HCPs with a non-null country also get a region scope row
     (scope_type='region', scope_value=<country code>)
+  - HCPs whose country is in region_countries('EUROPE') ALSO get an aggregate
+    region row (scope_type='region', scope_value='EUROPE') -- see below
+
+THE EUROPE AGGREGATE SCOPE (2026-08-18). Established ranks are scope-local AND
+normalised within scope, so an all-Europe selection could not be assembled by
+unioning the per-country boards: that returns 31 rank-1 rows. The ledger's Europe
+parent was therefore expand-only (selectable: cohortTag === "RS" in
+lib/cohortLedger.ts). This scope is the additive scorer bucket that makes it
+selectable -- one pool of 3,859, percentiles computed within it, ranks 1..n.
+
+  MEMBERSHIP IS THE UNION OF THE PER-COUNTRY BUCKETS, BY CONSTRUCTION. The set
+  comes from the SAME h.country the per-country row is emitted from, so a person
+  in the EUROPE bucket is always in exactly one of its 31 country buckets. Deriving
+  it from anything else (current_country, an affiliation rollup) would let the
+  aggregate contradict its own children -- someone visible in EUROPE but in no
+  European country board, or the reverse.
+
+  NOT effective_country, deliberately. Rising places by COALESCE(current_country,
+  country); Established is scored-as-stored everywhere and has no effective-country
+  analogue yet (see rising_board's us_rank_eff for what that would look like). Using
+  one here would silently place people in a pool their own country row disagrees
+  with. When Established does get an effective-country reading it moves ALL its
+  scopes at once, not this one.
+
+  'EUROPE' IS NOT AN ISO CODE, which is what makes the bucket safe to add to a
+  shared table: every consumer pinned to scope_value='US' or a country list is
+  unaffected. The exception found in the 2026-08-18 consumer sweep is the "Other"
+  region board (lib/api.ts resolveRpcScopeParams), which expresses itself as
+  NOT IN (every defined country) and therefore matches aggregate scope values too.
+  That query is fixed in the same change; anything added later that filters by
+  negation has to exclude aggregates the same way.
+
+  COUNTRY LIST FROM region_countries, NEVER HARDCODED. Same table rising_ledger
+  and rising_board read, so the three cannot drift. 'EUROPE' is geography (33
+  codes, incl. GB/CH/NO/RS/UA); 'EU' is the 27-member union and is a DIFFERENT
+  key -- rising_board read 'EU' until 2026-08-18 and showed 48 Europeans where the
+  ledger showed 53.
 
 Usage:
     python recompute_established_ranks_v3.py --ta nsclc
@@ -59,6 +96,10 @@ import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor, execute_values
 
+# The aggregate Europe scope_value AND the region_countries key -- deliberately the
+# same string, so the bucket and the list it is built from cannot be repointed apart.
+EUROPE_SCOPE_VALUE = "EUROPE"
+
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -77,6 +118,24 @@ def resolve_ta_id(conn, slug: str):
         if not row:
             raise ValueError(f"TA not found: {slug}")
         return row[0]
+
+
+def fetch_region_countries(conn, region_key):
+    """The country set for a region, from the DB. Single source of truth shared with
+    rising_ledger and rising_board -- a hardcoded list here would be a fourth copy to
+    keep in sync, and the one that silently shrinks a board when it drifts."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT country_code FROM region_countries WHERE region_key = %s",
+            (region_key,),
+        )
+        codes = {row[0] for row in cur.fetchall()}
+    if not codes:
+        raise RuntimeError(
+            f"region_countries has no rows for region_key={region_key!r}; "
+            "refusing to emit an empty aggregate scope"
+        )
+    return codes
 
 
 def fetch_established_cohort(conn, ta_id):
@@ -130,6 +189,8 @@ def fetch_established_cohort(conn, ta_id):
         )
         base_rows = cur.fetchall()
 
+    europe_codes = fetch_region_countries(conn, EUROPE_SCOPE_VALUE)
+
     expanded = []
     for row in base_rows:
         expanded.append(
@@ -154,6 +215,19 @@ def fetch_established_cohort(conn, ta_id):
                     "institution_normalized": row["institution_normalized"],
                 }
             )
+            # The aggregate Europe pool. Emitted from the SAME `country` as the row
+            # above, so the aggregate is the exact union of its country buckets.
+            if country in europe_codes:
+                expanded.append(
+                    {
+                        "hcp_id": row["hcp_id"],
+                        "scope_type": "region",
+                        "scope_value": EUROPE_SCOPE_VALUE,
+                        "first_name": row["first_name"],
+                        "last_name": row["last_name"],
+                        "institution_normalized": row["institution_normalized"],
+                    }
+                )
     return expanded
 
 

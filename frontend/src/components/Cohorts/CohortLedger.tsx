@@ -1276,8 +1276,11 @@ function MobileRow({
               <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
                 {row.scopeLabel ?? row.scoredCountry ?? "US"}
               </span>
+              {/* EUR, not EUROPE: this rail abbreviates (GLB beside it), and EUR keeps the
+                  geographic 33-country reading distinct from the EU-27 one at chip width.
+                  The desktop rail has the room and spells it EUROPE. */}
               {row.europeRank != null && (
-                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUROPE</span>
+                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUR</span>
               )}
               {/* Guarded like the desktop rail: NULL on a global selection. */}
               {row.globalRank != null && (
