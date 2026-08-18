@@ -81,7 +81,9 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       DERIVES its target set (anti-join vs hcp_hcpcs_detail) from local parquets; no-ops when
                       clean. TA-agnostic. Logs to pipeline_runs as hcpcs_detail_topup.
                       NON-BLOCKING: failure -> WARN (not FAILED), never gates the cycle.
- 13 narratives        generate_narratives_v2.py --cohort rising_star|established --*-top 200 --target-version v2
+ 13 narratives        generate_narratives_v2.py --cohort rising_star|established|community --target-version v2
+                      (rising: NO --rising-top = whole board; established: --established-top 200;
+                       community: NO cap, anchored+supported tiers only -- decided 2026-08-17)
                       --force --yes --workers 6 --ta <slug>  (13a rising, 13b established)
                       Narrative regen COUPLED to the stage-9 scoring recompute; stamps
                       hcp_narratives_v2.source_enrichment_run_id from hcp_scientific_momentum_v1 so staleness
@@ -414,24 +416,46 @@ def cmd_hcpcs_topup() -> List[str]:
     return py("hcpcs_topup") + ["--execute", "--triggered-by", "reingest_cycle"]
 
 
-def cmd_narratives(slug: str, cohort: str, top_flag: str) -> List[str]:
+def cmd_narratives(slug: str, cohort: str, top_flag: Optional[str]) -> List[str]:
     # 13: narrative regeneration, coupled to the scoring recompute (stage 9).
     # Manual generation decoupled from scoring was the staleness mechanism the
     # 2026-08-05 audit quantified (96.7% of narratives quoted a superseded
     # snapshot). Runs AFTER stage 9 so it reads the freshly-stamped
     # enrichment_run_id from hcp_scientific_momentum_v1 (written into
     # hcp_narratives_v2.source_enrichment_run_id).
-    # Scope: rising_star + established, top 200 US each. Community is
-    # DELIBERATELY not regenerated here -- its generation cut follows rank while
-    # the community ledger now sorts by evidence tier; regenerating on the rank
-    # cut would entrench a selection the product no longer uses (open decision).
+    # Scope: rising_star (WHOLE BOARD) + established (top 200 US) + community
+    # (anchored + supported tiers, uncapped).
+    #
+    # COMMUNITY WAS AN OPEN DECISION UNTIL 2026-08-17, and is now decided. It had
+    # been excluded because its generation cut followed hcps_v2.cohort_score while
+    # the ledger sorts by evidence tier, so regenerating would have entrenched a
+    # selection the product no longer used. Two things settled it: the composite
+    # freeze NULLed cohort_score corpus-wide, so the old cut no longer computes at
+    # all; and the cut chosen -- anchored + supported -- is exactly what
+    # community_ledger() already defaults to (coalesce(p_tiers,
+    # array['anchored','supported'])), so generated set and displayed set are the
+    # same population by construction. heme_dominant / candidate / unresolved stay
+    # uncovered on purpose: a narrative about an unresolved evidence tier is prose
+    # about an absence.
+    #
+    # top_flag=None means PASS NO CAP, and rising uses it (2026-08-17). The rising
+    # selector was uncapped that day so its default reaches the whole board, but a
+    # caller passing --rising-top 200 re-imposed the cap from the outside: the board
+    # is 251, so the cycle would have silently dropped 51 members every week while
+    # the script's own default was correct. A cap that only exists at the call site
+    # is the harder version of the same defect -- reading the selector proves nothing.
+    #
+    # Established still passes --established-top 200 against a 2,990-member US board.
+    # That is a KNOWN, DELIBERATE cut, not an oversight: uncapping it is a cost
+    # decision (~15x the calls), so it stays until someone makes that call.
     # --force: prompt v4.1/v3.0 forbid rank/percentile prose; existing rows must
     # be overwritten, not skipped. Since the 2026-08-06 cohort key, 13a and 13b
     # write to separate (hcp, slug, cohort) rows — a dual-board member keeps
     # both narratives. --yes: unattended (stdin=DEVNULL). --workers 6:
     # parallel API calls; generate_narratives_v2 retries 429/529 with backoff.
+    cap: List[str] = [] if top_flag is None else [top_flag, "200"]
     return py("narratives") + [
-        "--cohort", cohort, top_flag, "200",
+        "--cohort", cohort, *cap,
         "--target-version", "v2", "--force", "--yes", "--workers", "6",
         "--ta", slug,
     ]
@@ -951,18 +975,26 @@ def run_cycle(
                       f"cycle still SUCCESS (non-blocking). Claims detail left at prior load.",
                       file=sys.stderr)
 
-        # 13 NARRATIVES -- NON-BLOCKING. Regenerates rising_star + established narratives
-        # (top 200 US each) AFTER the scoring recompute (stage 9), stamping each row with
+        # 13 NARRATIVES -- NON-BLOCKING. Regenerates rising_star + established + community
+        # narratives (rising: whole board; established: top 200 US; community: anchored +
+        # supported tiers, uncapped) AFTER the scoring recompute (stage 9),
+        # stamping each row with
         # the momentum snapshot's enrichment_run_id. This closes the staleness loop the
         # 2026-08-05 audit quantified: narratives were generated manually, decoupled from
-        # the recompute, so 96.7% quoted a snapshot that no longer existed. Community is
-        # deliberately excluded (rank-cut selection vs evidence-tier ledger -- open
-        # decision). BILLED (Anthropic API, ~$2.20/cycle at 400 calls); failure is
+        # the recompute, so 96.7% quoted a snapshot that no longer existed. Community
+        # joined on 2026-08-17 (cut decided: anchored + supported, matching the ledger's
+        # own default). BILLED (Anthropic API); failure is
         # isolated (WARN not FAILED): a stale narrative must never gate the data cycle.
         if running(13):
             for sub_name, cohort, top_flag in (
-                ("narratives_rising(13a)", "rising_star", "--rising-top"),
+                # None => whole board. See cmd_narratives for why rising is uncapped
+                # and established deliberately is not.
+                ("narratives_rising(13a)", "rising_star", None),
                 ("narratives_established(13b)", "established", "--established-top"),
+                # Community: uncapped -- the tier filter in
+                # fetch_community_top_hcp_ids IS the scope, so --community-top
+                # does not apply to the NSCLC board.
+                ("narratives_community(13c)", "community", None),
             ):
                 try:
                     run_stage(13, sub_name, cmd_narratives(slug, cohort, top_flag))

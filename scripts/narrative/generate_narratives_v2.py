@@ -244,6 +244,24 @@ COMMUNITY_DEFAULT_TOP_N = 500
 # get_community_filtered RPCs (sql/community_qualification_gate.sql).
 COMMUNITY_GATE_NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
 COMMUNITY_BOARD_VIEW = "community_board_nsclc_v1"
+
+# The community narrative cut (decided 2026-08-17): anchored + supported only.
+# This is EXACTLY community_ledger()'s own default -- that RPC opens with
+#   with sel as (select coalesce(p_tiers, array['anchored','supported']) as tiers)
+# so the generated set and the ledger's default view are the same population by
+# construction, not by coincidence.
+#
+# heme_dominant / candidate / unresolved are deliberately UNCOVERED: a narrative
+# about an unresolved evidence tier is prose about an absence.
+#
+# Order mirrors community_ledger()'s tier_priority CASE
+#   anchored=1, supported=2, heme_dominant=3, candidate=4, else=5
+# ordered by (tier_priority, -patient_volume, hcp_id).
+# Listed explicitly rather than sorted alphabetically: 'anchored' < 'supported'
+# happens to agree with priority 1 < 2, but that is a coincidence of these two
+# names and breaks the moment a tier like 'heme_dominant' (priority 3, sorts
+# before 'supported') enters the cut.
+COMMUNITY_NARRATIVE_TIERS = ("anchored", "supported")
 API_SLEEP_SECONDS = 0.5
 PROGRESS_EVERY = 25
 # 1200, not 600 (2026-08-03): the established_v2.0 prompt adds sourced positions
@@ -1018,35 +1036,55 @@ def fetch_established_top_hcp_ids(
 def fetch_community_top_hcp_ids(
     supabase: Client, top_n: int, visible_ta_ids: List[str]
 ) -> Set[str]:
-    """Community cohort selection: US-scope, top N per TA from hcp_community_ranks_v2.
+    """Community cohort selection: NSCLC = anchored + supported tiers, uncapped.
 
-    Exact mirror of fetch_established_top_hcp_ids (per-TA, scope_type='region'/'US',
-    ordered by rank) — hcp_community_ranks_v2 carries the same global + US-region scope
-    rows per HCP, so scoping to US yields one row per HCP (without it, top-N *rows* would
-    collapse to ~N/2 unique HCPs). Replaces the old selector that read
-    hcps_v2.cohort_classification/cohort_score — a TA-independent legacy column that pulled
-    the global top-N across ALL TAs (Hepatology/Rare-Disease dominating an --ta nsclc run).
-    NOTE: AD has zero rows here — AD community lives in community_practitioners (the
-    directory), not this table — so an AD run correctly selects no community narratives.
+    The NSCLC branch reads the qualifying board view, filtered to the narrative
+    tiers and ordered exactly as community_ledger() orders its rows. top_n does
+    NOT apply there -- see the branch comment. Other TAs keep the legacy path.
+
+    LEGACY BRANCH (non-NSCLC TAs only): per-TA, scope_type='region'/'US', ordered by
+    rank from hcp_community_ranks_v2, capped at top_n. It replaced an older selector
+    that read hcps_v2.cohort_classification/cohort_score — a TA-independent legacy
+    column that pulled the global top-N across ALL TAs (Hepatology/Rare-Disease
+    dominating an --ta nsclc run).
+    WARNING: hcp_community_ranks_v2 has since been DROPPED. That branch would now
+    fail outright. It is unreached today (no non-NSCLC TA with community rows is
+    visible; AD community lives in community_practitioners, the directory), so it is
+    left in place rather than guessed at — but it is dead code standing on a dropped
+    view, not a working fallback.
     """
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
         try:
             if ta_id == COMMUNITY_GATE_NSCLC_TA_ID:
-                # Phase 3 (pre-freeze fix, 2026-08-11): the board view is
-                # membership AND ordering in one — qualifying members by
-                # Medicare reach (patient_volume DESC, hcp_id tiebreak). No
-                # rank or score is read, so this selector is correct no matter
-                # when it runs relative to the score freeze.
-                def make_query(ta_id=ta_id):
-                    return (
-                        supabase.table(COMMUNITY_BOARD_VIEW)
-                        .select("hcp_id")
-                        .eq("qualifies", True)
-                        .order("patient_volume", desc=True)
-                        .order("hcp_id", desc=False)
-                    )
-                selected.update(collect_top_n_hcp_ids(make_query, top_n))
+                # TIER-SCOPED, UNCAPPED (2026-08-17). One query per tier in the
+                # ledger's priority order, each ordered by Medicare reach then
+                # hcp_id -- i.e. (tier_priority, -patient_volume, hcp_id), which
+                # is community_ledger()'s ORDER BY verbatim.
+                #
+                # top_n is NOT applied here: the TIER FILTER is the scope. The
+                # previous cut ordered by hcps_v2.cohort_score, a column the
+                # composite freeze has since nulled corpus-wide, and it disagreed
+                # with the ledger's display order -- which is how Naim Nazha ended
+                # up anchored at Medicare-reach rank 94 with no narrative while
+                # rows above and below him rendered one.
+                #
+                # NOTE the ordering is not load-bearing while this is uncapped:
+                # the selected SET is {anchored} U {supported} regardless of order,
+                # and order only decides the sequence of API calls. It becomes
+                # load-bearing again the moment any cap is reintroduced, which is
+                # why it mirrors the ledger exactly rather than approximately.
+                for tier in COMMUNITY_NARRATIVE_TIERS:
+                    def make_query(ta_id=ta_id, tier=tier):
+                        return (
+                            supabase.table(COMMUNITY_BOARD_VIEW)
+                            .select("hcp_id")
+                            .eq("qualifies", True)
+                            .eq("evidence_tier", tier)
+                            .order("patient_volume", desc=True)
+                            .order("hcp_id", desc=False)
+                        )
+                    selected.update(collect_top_n_hcp_ids(make_query, None))
             else:
                 # Non-NSCLC TAs: no board view exists; the ungated ranks read
                 # remains (no such TA is currently visible — AD community has
