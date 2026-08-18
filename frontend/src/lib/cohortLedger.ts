@@ -208,6 +208,11 @@ export interface LedgerRow {
   // Established that is the country it was scored in (scope_value), for Rising the
   // re-derived current location. The rest feed the confidence hedge in lib/location.ts.
   scoredCountry?: string | null;
+  /** The POOL this rank was computed against, as a label — "GLOBAL" on a global
+   *  selection, otherwise the country. Distinct from scoredCountry, which the rail
+   *  also uses as the row's own location chip: on a global board every row needs its
+   *  own country there while the rank chip must read GLOBAL. One field cannot be both. */
+  scopeLabel?: string | null;
   /** Rank within the HCP's own country (Rising). Equals `rank` on a single-country slice. */
   countryRank?: number | null;
   /** Rank across all of Europe (Rising). NULL for non-European HCPs. */
@@ -562,6 +567,7 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     idx: cfg.tag === "COM" ? null : Number(r.idx),
     summary: (r.summary as string) ?? null,
     scoredCountry: S(r.scored_country) || null,
+    scopeLabel: S(r.scope_label) || null,
     countryRank: r.country_rank == null ? null : Number(r.country_rank),
     europeRank: r.europe_rank == null ? null : Number(r.europe_rank),
     country: S(r.country) || null,
@@ -654,6 +660,11 @@ export const COUNTRY_LABELS: Record<string, string> = {
   CY: "Cyprus", RS: "Serbia", UA: "Ukraine", US: "United States",
 };
 
+/** Sentinel passed in the ledger RPCs' p_countries to select the GLOBAL scope.
+ *  Mirrors hcp_established_board_snapshots.scope_value, where '__global__' already
+ *  stands in for the NULL scope_value that global rows carry. Never a country code. */
+export const GLOBAL_SCOPE_SENTINEL = "__global__";
+
 /** Europe country options, ordered by market size then alphabetically. */
 export const LEDGER_EUROPE_OPTIONS: { key: string; label: string }[] = (() => {
   const primary = ["GB", "DE", "FR", "IT", "ES", "NL", "CH"];
@@ -672,6 +683,13 @@ export const LEDGER_EUROPE_OPTIONS: { key: string; label: string }[] = (() => {
  */
 export function scopeFromKey(key: string, myTerritory: LedgerScope | null): LedgerScope {
   if (key === "mine" && myTerritory) return myTerritory;
+  if (key === "global") {
+    // GLOBAL_SCOPE_SENTINEL, not a country code. established_ledger / rising_ledger
+    // read it out of p_countries and select scope_type='global' instead of a country
+    // set — a sentinel rather than a new RPC parameter, which would have meant
+    // DROP + CREATE on a live SECURITY DEFINER function.
+    return { key, label: "Global", states: [], countries: [GLOBAL_SCOPE_SENTINEL] };
+  }
   if (key === "eu:all") {
     return { key, label: "Europe (all)", states: [], countries: EUROPE_COUNTRIES };
   }
@@ -714,8 +732,21 @@ export function ledgerTerritoryTree(cohortTag: string): TerritoryNode[] {
     selectable: true,
     children: LEDGER_REGION_OPTIONS.map((o) => ({ key: `us:${o.key}`, label: o.label })),
   };
-  // Community has no country axis at all (~50% of that board has no country signal).
+  // Community has no country axis at all: community_ledger takes no p_countries
+  // parameter, and the board is US-only by construction (every member is derived
+  // from US Medicare claims). A Global option there would either duplicate the US
+  // national view or return nothing, so COM keeps United States alone.
   if (cohortTag === "COM") return [us];
+  const global: TerritoryNode = {
+    key: "global",
+    label: "Global",
+    // Selectable for EST and RS alike: the global-scope rows already exist and are
+    // already correctly scored (16,976 for EST), and Rising's rank is a read-time
+    // row_number() over the stored global rank, so its global view is the whole
+    // board. Nothing is rescored. No children — Global is a leaf.
+    selectable: true,
+    children: [],
+  };
   return [
     us,
     {
@@ -728,12 +759,17 @@ export function ledgerTerritoryTree(cohortTag: string): TerritoryNode[] {
       selectable: cohortTag === "RS",
       children: LEDGER_EUROPE_OPTIONS,
     },
+    global,
   ];
 }
 
 /** True when the state axis is meaningful for this scope (country resolves to US). */
 export function scopeIncludesUs(scope: LedgerScope | null): boolean {
   return !!scope && scope.countries.length === 1 && scope.countries[0] === "US";
+}
+/** True when the selection is the global scope rather than a country set. */
+export function scopeIsGlobal(scope: LedgerScope | null): boolean {
+  return !!scope && scope.countries.length === 1 && scope.countries[0] === GLOBAL_SCOPE_SENTINEL;
 }
 /** COM roster keyset cursor (Phase 3): the last row's raw ordering tuple. The RPC
  *  negates volume internally so the composite (tier, -volume, hcp_id) compares as

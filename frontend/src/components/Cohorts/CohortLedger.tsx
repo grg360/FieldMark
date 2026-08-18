@@ -968,17 +968,25 @@ function Row({
                 {row.rank}
               </span>
               {/* Scope label was hardcoded "US" — it asserted US for every row, so a
-                  German KOL read "#1 US". It now names the country this rank is actually
-                  against. Rising additionally carries the Europe rank, giving the three
-                  scores: country · Europe · global. */}
+                  German KOL read "#1 US". It names the POOL this rank is against:
+                  scopeLabel, which reads "GLOBAL" on a global selection and the country
+                  otherwise. scoredCountry is NOT used here — on a global board it holds
+                  the row's own country for the location chip, and reusing it would label
+                  a global rank with a country it was not computed against. The old
+                  `?? "US"` fallback would have asserted US for all 16,976 global rows. */}
               <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
-                {row.scoredCountry ?? "US"}
+                {row.scopeLabel ?? row.scoredCountry ?? "US"}
               </span>
             </div>
             {row.europeRank != null && (
               <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUROPE</span>
             )}
-            <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
+            {/* Guarded (2026-08-17): on a global selection the scope rank IS the global
+                rank, so the RPC returns NULL here rather than printing the same number
+                twice. Unguarded this rendered a bare "#— GLOBAL". */}
+            {row.globalRank != null && (
+              <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank} GLOBAL</span>
+            )}
           </div>
         ) : (
           // COM rail — Design "Community Rail" 2A · SET IN SERIF (2026-08-11):
@@ -1266,12 +1274,15 @@ function MobileRow({
             <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
               <span style={{ font: `600 30px ${FACE.data}`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
               <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
-                {row.scoredCountry ?? "US"}
+                {row.scopeLabel ?? row.scoredCountry ?? "US"}
               </span>
               {row.europeRank != null && (
                 <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EU</span>
               )}
-              <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
+              {/* Guarded like the desktop rail: NULL on a global selection. */}
+              {row.globalRank != null && (
+                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank} GLB</span>
+              )}
             </div>
           ) : (
             // COM mobile rail — 2A adapted inline for 390px: tier word (serif
