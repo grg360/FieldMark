@@ -1,32 +1,128 @@
 """
 take_weekly_snapshot.py
 
-Captures a weekly snapshot of hcp_rising_star_ranks_v3 and 
-hcp_established_ranks_v3 into history tables for momentum/delta 
-computations.
+Captures board state into hcp_rising_board_snapshots / hcp_established_board_snapshots
+(migrations/2026_08_17_board_snapshots_v2.sql).
 
-Run weekly via GitHub Actions cron. Idempotent — re-running the same 
-day uses ON CONFLICT DO NOTHING.
+WHAT CHANGED (2026-08-17) AND WHY
+---------------------------------
+The previous version wrote the OUTPUTS of scoring -- ranks and percentiles -- and
+none of the variables the boards are GATED on. When the rising board moved
+619 -> 251 (MIN_VELOCITY_DELTA raised from > 0 to >= 3), the snapshot showed 368
+departures with no recoverable reason.
+
+The reason cannot be recovered later. hcp_scientific_momentum_v1,
+hcp_network_momentum_v1 and hcp_cohort_classification_v2 are all OVERWRITTEN IN
+PLACE -- one row per (hcp, TA), restamped every scoring cycle. Every prior value
+of pub_velocity_delta / recent_senior_pubs / early_senior_pubs is destroyed each
+run. A week not captured is permanently unanswerable, so this script's job is to
+copy the gate inputs at the moment they are true.
+
+THIS SCRIPT CAPTURES, IT NEVER RECOMPUTES. Every value is read from the tables
+the scoring stage wrote. It must therefore run AFTER stage 9 (see
+reingest_cycle.py stage 9.5), and source_computed_at carries the scoring row's
+own computed_at so a snapshot can be proven to match what shipped.
+
+RISING CAPTURES THE ELIGIBLE POOL, NOT THE BOARD (~2,232 rows/TA vs 251).
+is_on_board marks the members. Non-members are the point: 122 people currently
+clear every gate but the momentum floor, and they are next week's entrants. You
+cannot see an entrant coming if you only store the board.
+
+The pool is the cohort gate AND the presence of a scientific-momentum row.
+The cohort gate ALONE admits 23,062 HCPs for NSCLC -- 10x the storage for people
+who have no momentum computation at all and therefore cannot be "one paper from
+entry" in any meaningful sense. All 251 board members are inside the pool
+(verified 2026-08-17: 0 outside).
+
+ESTABLISHED IS WRITE-ON-CHANGE, not weekly. recompute_established_ranks_v3.py is
+NOT part of the reingest cycle (stage 9 runs rising only) and its computed_at
+moves roughly monthly, so a weekly capture would write ~4 identical copies per
+real change. Scoped to global + US + EU5, the scopes anything actually renders.
+
+COMMUNITY IS STOPPED and stays stopped -- see the note at the call site.
 
 Usage:
-    python pipelines/take_weekly_snapshot.py
-    python pipelines/take_weekly_snapshot.py --date 2026-06-08  # override
+    python scripts/utilities/take_weekly_snapshot.py --dry-run
+    python scripts/utilities/take_weekly_snapshot.py
+    python scripts/utilities/take_weekly_snapshot.py --ta nsclc
+    python scripts/utilities/take_weekly_snapshot.py --date 2026-08-17
+
+Idempotent: ON CONFLICT DO NOTHING on the snapshot_date key, so re-running the
+same day is a no-op rather than a duplicate.
 
 Env vars required:
-    SUPABASE_URL
-    SUPABASE_SERVICE_ROLE_KEY
+    DATABASE_URL
 """
 
 import argparse
 import os
+import re
 import sys
 from datetime import date
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 
 load_dotenv()
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# Established scopes worth archiving: the ones established_ledger, ledger_meta,
+# the institution roster and the narrative generator's VISIBLE_SCOPES read.
+# The other 74 region scopes are 15,180 of 38,012 live rows and render nowhere.
+ESTABLISHED_REGION_SCOPES = ("US", "DE", "FR", "IT", "ES", "GB")
+
+# Sentinel for scope_type='global', whose scope_value is NULL in the source. A
+# NULL cannot participate in a PRIMARY KEY; hcp_board_movement_v1 maps it back.
+GLOBAL_SCOPE_SENTINEL = "__global__"
+
+# THRESHOLD PROVENANCE. These are read out of the scoring sources at run time
+# rather than hardcoded here, so the recorded constant is provably the one in
+# force. Hardcoding would reintroduce exactly the drift the columns exist to
+# prevent -- the 619 -> 251 move WAS one of these numbers changing.
+THRESHOLD_SOURCES: Dict[str, Tuple[str, str]] = {
+    "min_velocity_delta":  ("scripts/score/rising_star_scoring.py",         "MIN_VELOCITY_DELTA"),
+    "min_pubs_per_window": ("scripts/score/scientific_momentum_scoring.py", "MIN_PUBS_PER_WINDOW"),
+    "max_career_years":    ("scripts/score/scientific_momentum_scoring.py", "MAX_CAREER_YEARS"),
+    "min_collaborators":   ("scripts/score/network_momentum_scoring.py",    "MIN_COLLABORATORS_PER_WINDOW"),
+}
+
+
+def read_int_constant(rel_path: str, name: str) -> int:
+    """Read a module-level int constant from a source file WITHOUT importing it.
+
+    Importing would execute load_dotenv() and any other module-level work in the
+    scoring scripts. Parsing is side-effect free and deterministic.
+
+    Raises rather than defaulting: a renamed constant must fail the snapshot
+    loudly, not silently record NULL provenance. A snapshot that cannot say
+    which threshold was in force is the failure this whole table set exists to
+    prevent.
+    """
+    path = REPO_ROOT / rel_path
+    if not path.exists():
+        raise SystemExit(f"threshold source missing: {rel_path} (looking for {name})")
+    text = path.read_text(encoding="utf-8")
+    m = re.search(rf"^{re.escape(name)}\s*=\s*(-?\d+)\s*$", text, re.MULTILINE)
+    if not m:
+        raise SystemExit(
+            f"could not read {name} from {rel_path}. If it was renamed or made "
+            f"non-literal, update THRESHOLD_SOURCES -- do not let the snapshot "
+            f"record NULL provenance."
+        )
+    return int(m.group(1))
+
+
+def load_thresholds() -> Dict[str, int]:
+    values = {k: read_int_constant(p, n) for k, (p, n) in THRESHOLD_SOURCES.items()}
+    print("Thresholds in force (read from source):")
+    for k, v in values.items():
+        rel, name = THRESHOLD_SOURCES[k]
+        print(f"  {name:<28} = {v:<4} ({rel})")
+    return values
 
 
 def get_connection():
@@ -37,257 +133,425 @@ def get_connection():
     return psycopg2.connect(url)
 
 
-def take_rising_star_snapshot(conn, snapshot_date):
-    print(f"\n=== Rising Star snapshot for {snapshot_date} ===")
-    
+def resolve_ta_ids(conn, ta_slug: Optional[str]) -> List[Tuple[str, str]]:
+    """Return [(ta_id, slug)]. Default: every TA with rows on either board."""
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT 
-                hcp_id, 
-                therapeutic_area_id,
-                us_rank,
-                rank as global_rank,
-                rising_star_percentile,
-                archetype,
-                scientific_momentum_percentile,
-                network_momentum_percentile,
-                scientific_visibility_percentile,
-                network_visibility_percentile
-            FROM hcp_rising_star_ranks_v3
-        """)
-        rows = cur.fetchall()
-    
-    print(f"Source rows: {len(rows):,}")
-    
-    if not rows:
-        print("No rising star data to snapshot. Skipping.")
-        return
-    
-    # Prepare for batch insert
-    values = [
-        (
-            snapshot_date,
-            r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]
-        )
-        for r in rows
-    ]
-    
-    with conn.cursor() as cur:
-        execute_values(
-            cur,
+        if ta_slug:
+            cur.execute("SELECT id::text, slug FROM therapeutic_areas WHERE slug = %s", (ta_slug,))
+            rows = cur.fetchall()
+            if not rows:
+                raise SystemExit(f"unknown TA slug: {ta_slug}")
+            return [(r[0], r[1]) for r in rows]
+        cur.execute(
             """
-            INSERT INTO hcp_rising_star_snapshots (
-                snapshot_date,
-                hcp_id,
-                therapeutic_area_id,
-                us_rank,
-                global_rank,
-                rising_star_percentile,
-                archetype,
-                scientific_momentum_percentile,
-                network_momentum_percentile,
-                scientific_visibility_percentile,
-                network_visibility_percentile
-            ) VALUES %s
-            ON CONFLICT (snapshot_date, hcp_id, therapeutic_area_id) 
-            DO NOTHING
-            """,
-            values,
-            page_size=500,
-        )
-        inserted = cur.rowcount
-    
-    conn.commit()
-    print(f"Inserted: {inserted:,} rows into hcp_rising_star_snapshots")
-
-
-def take_established_snapshot(conn, snapshot_date):
-    print(f"\n=== Established snapshot for {snapshot_date} ===")
-    
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT 
-                hcp_id,
-                therapeutic_area_id,
-                scope_type,
-                scope_value,
-                rank,
-                cohort_score
-            FROM hcp_established_ranks_v3
-        """)
-        rows = cur.fetchall()
-    
-    print(f"Source rows: {len(rows):,}")
-    
-    if not rows:
-        print("No established data to snapshot. Skipping.")
-        return
-    
-    values = [
-        (
-            snapshot_date,
-            r[0],   # hcp_id
-            r[1],   # therapeutic_area_id
-            r[2],   # scope_type
-            r[3],   # scope_value
-            r[4],   # rank -> us_rank (when scope_value='US')
-            r[5],   # cohort_score
-        )
-        for r in rows
-    ]
-    
-    with conn.cursor() as cur:
-        execute_values(
-            cur,
+            SELECT ta.id::text, ta.slug
+            FROM therapeutic_areas ta
+            WHERE EXISTS (SELECT 1 FROM hcp_rising_star_ranks_v3 r WHERE r.therapeutic_area_id = ta.id)
+               OR EXISTS (SELECT 1 FROM hcp_established_ranks_v3 e WHERE e.therapeutic_area_id = ta.id)
+            ORDER BY ta.slug
             """
-            INSERT INTO hcp_established_snapshots (
-                snapshot_date,
-                hcp_id,
-                therapeutic_area_id,
-                scope_type,
-                scope_value,
-                us_rank,
-                cohort_score
-            ) VALUES %s
-            ON CONFLICT (snapshot_date, hcp_id, therapeutic_area_id, scope_type, COALESCE(scope_value, '__null__')) 
-            DO NOTHING
-            """,
-            values,
-            page_size=500,
         )
-        inserted = cur.rowcount
-    
-    conn.commit()
-    print(f"Inserted: {inserted:,} rows into hcp_established_snapshots")
+        return [(r[0], r[1]) for r in cur.fetchall()]
 
 
-def take_community_snapshot(conn, snapshot_date):
-    print(f"\n=== Community snapshot for {snapshot_date} ===")
+# ─────────────────────────────────────────────────────────────────────────────
+# RISING
+# ─────────────────────────────────────────────────────────────────────────────
 
+RISING_SELECT = """
+    SELECT
+        cc.hcp_id,
+        cc.therapeutic_area_id,
+        ta.slug,
+        h.first_name,
+        h.last_name,
+        COALESCE(h.current_institution, h.institution_normalized)          AS institution,
+        h.country                                                         AS country_at_snapshot,
+        NULLIF(BTRIM(COALESCE(h.current_country, h.country)), '')         AS effective_country,
+        (r.hcp_id IS NOT NULL)                                            AS is_on_board,
+        -- Board members carry the ranks row's computed_at (what shipped);
+        -- pool-only rows carry the momentum row's, which is what gated them.
+        COALESCE(r.computed_at, sm.computed_at)                           AS source_computed_at,
+        COALESCE(r.enrichment_run_id, sm.enrichment_run_id)               AS enrichment_run_id,
+        r.rank                                                            AS global_rank,
+        r.us_rank,
+        r.rising_star_percentile,
+        r.rising_star_raw,
+        r.momentum_component,
+        r.visibility_component,
+        r.scientific_momentum_percentile,
+        r.network_momentum_percentile,
+        r.scientific_visibility_percentile,
+        r.network_visibility_percentile,
+        sm.pub_velocity_delta,
+        sm.recent_senior_pubs,
+        sm.early_senior_pubs,
+        sm.recent_total_pubs,
+        sm.early_total_pubs,
+        nm.recent_collaborator_count,
+        nm.early_collaborator_count,
+        cc.career_age,
+        cc.cohort                                                         AS cohort_classification,
+        ic.classification                                                 AS industry_classification,
+        sm.early_window_start,
+        sm.early_window_end,
+        sm.recent_window_start,
+        sm.recent_window_end
+    FROM hcp_cohort_classification_v2 cc
+    JOIN therapeutic_areas ta
+      ON ta.id = cc.therapeutic_area_id
+    -- INNER: the pool is HCPs that have a momentum computation. The cohort gate
+    -- alone is 23,062 for NSCLC; without a momentum row there is no delta and
+    -- so no meaningful distance from the floor.
+    JOIN hcp_scientific_momentum_v1 sm
+      ON sm.hcp_id = cc.hcp_id AND sm.therapeutic_area_id = cc.therapeutic_area_id
+    -- LEFT: a missing network-momentum row means the collaborator gate was
+    -- failed. Recorded as NULL rather than excluded, so that reason survives.
+    LEFT JOIN hcp_network_momentum_v1 nm
+      ON nm.hcp_id = cc.hcp_id AND nm.therapeutic_area_id = cc.therapeutic_area_id
+    LEFT JOIN hcp_rising_star_ranks_v3 r
+      ON r.hcp_id = cc.hcp_id AND r.therapeutic_area_id = cc.therapeutic_area_id
+    LEFT JOIN hcps_v2 h
+      ON h.id = cc.hcp_id
+    LEFT JOIN hcp_industry_classification_v1 ic
+      ON ic.hcp_id = cc.hcp_id
+    WHERE cc.therapeutic_area_id = %s
+      AND (cc.cohort = 'rising_eligible'
+           OR (cc.cohort = 'established' AND cc.career_age <= 15))
+"""
+
+RISING_INSERT = """
+    INSERT INTO hcp_rising_board_snapshots (
+        snapshot_date, hcp_id, therapeutic_area_id, therapeutic_area_slug,
+        first_name, last_name, institution_at_snapshot, country_at_snapshot,
+        effective_country_at_snapshot,
+        is_on_board, source_computed_at, enrichment_run_id, source,
+        global_rank, us_rank,
+        rising_star_percentile, rising_star_raw,
+        momentum_component, visibility_component,
+        scientific_momentum_percentile, network_momentum_percentile,
+        scientific_visibility_percentile, network_visibility_percentile,
+        pub_velocity_delta, recent_senior_pubs, early_senior_pubs,
+        recent_total_pubs, early_total_pubs,
+        recent_collaborator_count, early_collaborator_count,
+        career_age, cohort_classification, industry_classification,
+        early_window_start, early_window_end,
+        recent_window_start, recent_window_end,
+        min_velocity_delta_applied, min_pubs_per_window_applied,
+        min_collaborators_applied, max_career_years_applied
+    ) VALUES %s
+    ON CONFLICT (snapshot_date, hcp_id, therapeutic_area_id) DO NOTHING
+"""
+
+
+def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) -> int:
+    print(f"\n=== Rising: {slug} @ {snapshot_date} ===")
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT 
-                hcp_id,
-                therapeutic_area_id,
-                scope_type,
-                scope_value,
-                rank,
-                composite_score,
-                normalized_score
-            FROM hcp_community_ranks_v2
-        """)
+        cur.execute(RISING_SELECT, (ta_id,))
         rows = cur.fetchall()
 
-    print(f"Source rows: {len(rows):,}")
-
     if not rows:
-        print("No community data to snapshot. Skipping.")
-        return
+        print("  no eligible-pool rows; skipping")
+        return 0
 
-    values = [
-        (snapshot_date, r[0], r[1], r[2], r[3], r[4], r[5], r[6])
-        for r in rows
-    ]
+    # Column offsets into RISING_SELECT. Named rather than inlined: an off-by-one
+    # here would silently record the wrong variable as the gating one.
+    HCP_ID, IS_ON_BOARD, PUB_VELOCITY_DELTA, RECENT_COLLAB = 0, 8, 21, 26
+    floor = float(thresholds["min_velocity_delta"])
 
-    with conn.cursor() as cur:
-        execute_values(
-            cur,
-            """
-            INSERT INTO hcp_community_snapshots (
-                snapshot_date,
-                hcp_id,
-                therapeutic_area_id,
-                scope_type,
-                scope_value,
-                rank,
-                composite_score,
-                normalized_score
-            ) VALUES %s
-            ON CONFLICT (snapshot_date, hcp_id, therapeutic_area_id, scope_type, COALESCE(scope_value, '__null__')) 
-            DO NOTHING
-            """,
-            values,
-            page_size=500,
+    on_board = sum(1 for r in rows if r[IS_ON_BOARD])
+
+    # ── THESE COUNTERS ARE A SECOND EXPRESSION OF THE BOARD GATE ─────────────
+    # The authoritative one lives in rising_star_scoring.py (the delta floor) and
+    # network_momentum_scoring.py (the per-window collaborator floor). Anything
+    # restated in two places drifts, and a counter computed from a superseded
+    # rule is the same failure the threshold-provenance columns exist to prevent
+    # -- a number that looks authoritative and quietly is not.
+    #
+    # So the gate is RECONSTRUCTED here and CHECKED against what the scorer
+    # actually produced, rather than trusted. Note what is and is not checkable:
+    #
+    #   "exit_exposed is a subset of on_board"      -- TAUTOLOGY. The predicate
+    #   "entry_ready never exceeds pool minus board" -- TAUTOLOGY.
+    # Both follow from the predicates themselves (one requires is_on_board, the
+    # other requires NOT is_on_board), so asserting them can never fail and
+    # catches nothing. They are documented, not asserted, for that reason.
+    #
+    # The invariant that CAN fail is set equality between the reconstructed gate
+    # and actual membership. Verified exact on the 2026-08-17 capture: 251 == 251,
+    # zero rows in either direction. If a fourth gate is added to the scorer,
+    # reconstructed becomes a strict superset of actual and this fires.
+    def gate_says_on_board(r) -> bool:
+        return (
+            r[PUB_VELOCITY_DELTA] is not None
+            and float(r[PUB_VELOCITY_DELTA]) >= floor
+            and r[RECENT_COLLAB] is not None      # NULL <=> no network-momentum row
+                                                  # <=> failed MIN_COLLABORATORS_PER_WINDOW
         )
-        inserted = cur.rowcount
 
-    conn.commit()
-    print(f"Inserted: {inserted:,} rows into hcp_community_snapshots")
+    actual = {r[HCP_ID] for r in rows if r[IS_ON_BOARD]}
+    reconstructed = {r[HCP_ID] for r in rows if gate_says_on_board(r)}
+    phantom, missed = reconstructed - actual, actual - reconstructed
 
-
-def report_history(conn):
-    """Print summary of snapshots in the database."""
-    print("\n=== Snapshot history ===")
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT snapshot_date, COUNT(*) AS row_count
-            FROM hcp_rising_star_snapshots
-            GROUP BY snapshot_date
-            ORDER BY snapshot_date DESC
-            LIMIT 10
-        """)
-        print("\nRising Star snapshots:")
-        for row in cur.fetchall():
-            print(f"  {row[0]}: {row[1]:,} rows")
-        
-        cur.execute("""
-            SELECT snapshot_date, COUNT(*) AS row_count
-            FROM hcp_established_snapshots
-            GROUP BY snapshot_date
-            ORDER BY snapshot_date DESC
-            LIMIT 10
-        """)
-        print("\nEstablished snapshots:")
-        for row in cur.fetchall():
-            print(f"  {row[0]}: {row[1]:,} rows")
-
-        cur.execute("""
-            SELECT snapshot_date, COUNT(*) AS row_count
-            FROM hcp_community_snapshots
-            GROUP BY snapshot_date
-            ORDER BY snapshot_date DESC
-            LIMIT 10
-        """)
-        print("\nCommunity snapshots:")
-        for row in cur.fetchall():
-            print(f"  {row[0]}: {row[1]:,} rows")
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--date",
-        type=str,
-        default=None,
-        help="Override snapshot date (YYYY-MM-DD). Defaults to today.",
+    # One senior-author paper from a membership change -- outbound and inbound.
+    # NOT the delta axis alone: 22 people sit at delta = floor-1 while failing the
+    # collaborator gate, and a paper does not admit them, so counting them as
+    # "one short" overstates inbound churn.
+    exit_exposed = sum(
+        1 for r in rows
+        if r[IS_ON_BOARD]
+        and r[PUB_VELOCITY_DELTA] is not None and float(r[PUB_VELOCITY_DELTA]) == floor
     )
-    args = parser.parse_args()
-    
-    if args.date:
-        snapshot_date = date.fromisoformat(args.date)
+    entry_ready = sum(
+        1 for r in rows
+        if not r[IS_ON_BOARD]
+        and r[PUB_VELOCITY_DELTA] is not None and float(r[PUB_VELOCITY_DELTA]) == floor - 1
+        and r[RECENT_COLLAB] is not None
+    )
+
+    print(f"  pool {len(rows):,} | on board {on_board:,}")
+    if phantom or missed:
+        # Capture still proceeds -- the rows are irreplaceable and the stage is
+        # non-blocking -- but refuse to print numbers derived from a rule that no
+        # longer matches the scorer.
+        print(
+            f"  !! GATE DRIFT: reconstructed board {len(reconstructed):,} != actual {len(actual):,} "
+            f"({len(phantom):,} reconstructed-not-actual, {len(missed):,} actual-not-reconstructed).\n"
+            f"     The board gate changed underneath these counters. exit-exposed / entry-ready "
+            f"SUPPRESSED as unreliable; the captured rows are unaffected and still correct.\n"
+            f"     Reconcile gate_says_on_board() against rising_star_scoring.py and "
+            f"network_momentum_scoring.py."
+        )
     else:
-        snapshot_date = date.today()
-    
-    print(f"Snapshot date: {snapshot_date}")
-    
+        print(
+            f"  exit-exposed {exit_exposed:,} (on board, delta={floor:g}) | "
+            f"entry-ready {entry_ready:,} (delta={floor - 1:g}, all other gates clear)"
+        )
+
+    if dry_run:
+        print("  [DRY RUN] nothing written")
+        return 0
+
+    values = [
+        (
+            snapshot_date,
+            row[0], row[1], row[2],                    # hcp_id, ta_id, slug
+            row[3], row[4], row[5], row[6], row[7],    # identity
+            row[8], row[9], row[10], "capture",        # membership + provenance
+            row[11], row[12],                          # global_rank, us_rank
+            row[13], row[14], row[15], row[16],        # score outputs
+            row[17], row[18], row[19], row[20],        # component percentiles
+            row[21], row[22], row[23],                 # delta + both sides
+            row[24], row[25],                          # total pubs both windows
+            row[26], row[27],                          # collaborators both windows
+            row[28], row[29], row[30],                 # career_age, cohort, industry
+            row[31], row[32], row[33], row[34],        # window bounds
+            thresholds["min_velocity_delta"],
+            thresholds["min_pubs_per_window"],
+            thresholds["min_collaborators"],
+            thresholds["max_career_years"],
+        )
+        for row in rows
+    ]
+
+    with conn.cursor() as cur:
+        execute_values(cur, RISING_INSERT, values, page_size=500)
+        inserted = cur.rowcount
+    conn.commit()
+    print(f"  inserted {inserted:,} rows")
+    return inserted
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ESTABLISHED — write-on-change
+# ─────────────────────────────────────────────────────────────────────────────
+
+ESTABLISHED_SELECT = """
+    SELECT
+        r.hcp_id,
+        r.therapeutic_area_id,
+        ta.slug,
+        h.first_name,
+        h.last_name,
+        COALESCE(h.current_institution, h.institution_normalized)  AS institution,
+        h.country,
+        NULLIF(BTRIM(COALESCE(h.current_country, h.country)), '')  AS effective_country,
+        r.computed_at,
+        r.enrichment_run_id,
+        r.scope_type,
+        COALESCE(r.scope_value, %s)                                AS scope_value,
+        r.rank,
+        r.cohort_score,
+        r.scientific_influence_pctile,
+        r.network_influence_pctile,
+        r.pharma_engagement_pctile,
+        cc.cohort                                                  AS cohort_classification,
+        ic.classification                                          AS industry_classification,
+        ic.matched_pattern,
+        cc.career_age
+    FROM hcp_established_ranks_v3 r
+    JOIN therapeutic_areas ta
+      ON ta.id = r.therapeutic_area_id
+    LEFT JOIN hcps_v2 h
+      ON h.id = r.hcp_id
+    LEFT JOIN hcp_cohort_classification_v2 cc
+      ON cc.hcp_id = r.hcp_id AND cc.therapeutic_area_id = r.therapeutic_area_id
+    LEFT JOIN hcp_industry_classification_v1 ic
+      ON ic.hcp_id = r.hcp_id
+    WHERE r.therapeutic_area_id = %s
+      AND (r.scope_type = 'global'
+           OR (r.scope_type = 'region' AND r.scope_value = ANY(%s)))
+"""
+
+ESTABLISHED_INSERT = """
+    INSERT INTO hcp_established_board_snapshots (
+        snapshot_date, hcp_id, therapeutic_area_id, therapeutic_area_slug,
+        first_name, last_name, institution_at_snapshot, country_at_snapshot,
+        effective_country_at_snapshot,
+        is_on_board, source_computed_at, enrichment_run_id, source,
+        scope_type, scope_value, rank,
+        cohort_score, scientific_influence_pctile,
+        network_influence_pctile, pharma_engagement_pctile,
+        cohort_classification, industry_classification,
+        industry_matched_pattern, career_age
+    ) VALUES %s
+    ON CONFLICT (snapshot_date, hcp_id, therapeutic_area_id, scope_type, scope_value)
+    DO NOTHING
+"""
+
+
+def established_needs_capture(conn, ta_id) -> Tuple[bool, str]:
+    """Write-on-change: skip when the board has not been recomputed since the
+    last capture. Established is recomputed roughly monthly and off-cycle, so a
+    weekly run would otherwise write ~4 identical copies per real change."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT max(computed_at) FROM hcp_established_ranks_v3 WHERE therapeutic_area_id = %s",
+            (ta_id,),
+        )
+        live = cur.fetchone()[0]
+        cur.execute(
+            "SELECT max(source_computed_at) FROM hcp_established_board_snapshots "
+            "WHERE therapeutic_area_id = %s AND source = 'capture'",
+            (ta_id,),
+        )
+        captured = cur.fetchone()[0]
+    if live is None:
+        return False, "no live established rows"
+    if captured is None:
+        return True, "no prior capture"
+    if live > captured:
+        return True, f"recomputed {live:%Y-%m-%d} > last capture {captured:%Y-%m-%d}"
+    return False, f"unchanged since {captured:%Y-%m-%d}"
+
+
+def take_established_snapshot(conn, snapshot_date, ta_id, slug, dry_run) -> int:
+    needed, why = established_needs_capture(conn, ta_id)
+    print(f"\n=== Established: {slug} @ {snapshot_date} ===")
+    print(f"  write-on-change: {'CAPTURE' if needed else 'SKIP'} ({why})")
+    if not needed:
+        return 0
+
+    with conn.cursor() as cur:
+        cur.execute(
+            ESTABLISHED_SELECT,
+            (GLOBAL_SCOPE_SENTINEL, ta_id, list(ESTABLISHED_REGION_SCOPES)),
+        )
+        rows = cur.fetchall()
+
+    print(f"  rows (global + {'/'.join(ESTABLISHED_REGION_SCOPES)}): {len(rows):,}")
+    if not rows:
+        return 0
+    if dry_run:
+        print("  [DRY RUN] nothing written")
+        return 0
+
+    values = [
+        (
+            snapshot_date,
+            row[0], row[1], row[2],
+            row[3], row[4], row[5], row[6], row[7],
+            True,                  # established membership IS presence in the table
+            row[8], row[9], "capture",
+            row[10], row[11], row[12],
+            row[13], row[14], row[15], row[16],
+            row[17], row[18], row[19], row[20],
+        )
+        for row in rows
+    ]
+
+    with conn.cursor() as cur:
+        execute_values(cur, ESTABLISHED_INSERT, values, page_size=500)
+        inserted = cur.rowcount
+    conn.commit()
+    print(f"  inserted {inserted:,} rows")
+    return inserted
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMMUNITY — stopped, retained for history
+# ─────────────────────────────────────────────────────────────────────────────
+# Community snapshots STOPPED (Phase 3, 2026-08-11) and NOT revived by the
+# 2026-08-17 rebuild. Community is not ranked -- there is no rank/composite/
+# normalized_score to archive -- and the old arm read hcp_community_ranks_v2,
+# which has since been DROPPED, so it would now fail outright.
+# hcp_community_snapshots (160,712 rows through 2026-08-05) is retained as the
+# historical record of the ranked era. A community WHAT-MOVED (tier transitions
+# + fact changes) needs a THIRD table shape, not this one.
+
+
+def report_history(conn) -> None:
+    print("\n=== Snapshot history ===")
+    for table, label in (
+        ("hcp_rising_board_snapshots", "Rising (v2)"),
+        ("hcp_established_board_snapshots", "Established (v2)"),
+    ):
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT snapshot_date, source, count(*),
+                       count(*) FILTER (WHERE is_on_board)
+                FROM {table}
+                GROUP BY snapshot_date, source
+                ORDER BY snapshot_date DESC, source
+                LIMIT 12
+                """
+            )
+            rows = cur.fetchall()
+        print(f"\n{label}:")
+        if not rows:
+            print("  (empty)")
+        for d, src, n, on_board in rows:
+            print(f"  {d} [{src:<7}] {n:>7,} rows | {on_board:>6,} on board")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--date", default=None, help="Override snapshot date (YYYY-MM-DD). Default: today.")
+    parser.add_argument("--ta", default=None, help="Restrict to one TA slug. Default: all boarded TAs.")
+    parser.add_argument("--dry-run", action="store_true", help="Report counts, write nothing.")
+    args = parser.parse_args()
+
+    snapshot_date = date.fromisoformat(args.date) if args.date else date.today()
+    print(f"Snapshot date: {snapshot_date}{'  [DRY RUN]' if args.dry_run else ''}")
+
+    thresholds = load_thresholds()
+
     conn = get_connection()
     try:
-        take_rising_star_snapshot(conn, snapshot_date)
-        take_established_snapshot(conn, snapshot_date)
-        # Community snapshots STOPPED (Phase 3, 2026-08-11): community is not
-        # ranked — there is no rank/composite/normalized_score to archive, and
-        # the arm was the script's last reader of the frozen score columns.
-        # take_community_snapshot stays defined for history's sake but must not
-        # run. hcp_community_snapshots (160,712 rows through 2026-08-05) is
-        # retained as the historical record of the ranked era. A future
-        # community WHAT-MOVED (tier transitions + fact changes) needs a NEW
-        # snapshot shape, not this one.
-        # take_community_snapshot(conn, snapshot_date)
+        tas = resolve_ta_ids(conn, args.ta)
+        print(f"\nTAs in scope: {', '.join(s for _, s in tas)}")
+
+        total = 0
+        for ta_id, slug in tas:
+            total += take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, args.dry_run)
+            total += take_established_snapshot(conn, snapshot_date, ta_id, slug, args.dry_run)
+        # take_community_snapshot -- intentionally absent, see note above.
+
         report_history(conn)
+        print(f"\nSnapshot complete. Rows written: {total:,}")
     finally:
         conn.close()
-    
-    print("\nSnapshot complete.")
 
 
 if __name__ == "__main__":
