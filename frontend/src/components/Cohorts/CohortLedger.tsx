@@ -1277,7 +1277,7 @@ function MobileRow({
                 {row.scopeLabel ?? row.scoredCountry ?? "US"}
               </span>
               {row.europeRank != null && (
-                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EU</span>
+                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUROPE</span>
               )}
               {/* Guarded like the desktop rail: NULL on a global selection. */}
               {row.globalRank != null && (
