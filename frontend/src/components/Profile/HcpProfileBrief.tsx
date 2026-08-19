@@ -36,6 +36,7 @@ import {
   type ProfileSource,
 } from "../../lib/hcpProfile";
 import FederalFundingSection from "./FederalFundingSection";
+import { isNonUsRecord, countryName } from "../../lib/usOnlySections";
 import { FiToast } from "../FieldIntelligenceShared";
 import { taLabelForSlug } from "../../lib/taLabels";
 
@@ -124,15 +125,25 @@ function ScoreCell({ label, sub, value, basis, noRank, absent, decimals }: {
   label: string; sub: string; value: number | null; basis?: string; noRank?: boolean; absent?: string; decimals?: number;
 }) {
   let text: string;
+  let isAbsent = false;
   if (value == null || (noRank && value <= 0)) {
     text = absent ?? "—";
+    isAbsent = true;
   } else {
     text = decimals != null ? floorFixed(value, decimals) : String(Math.round(value));
   }
+  // AN ABSENT SENTENCE IS A NOTE, NOT A NUMERAL (2026-08-19). This slot is sized for a
+  // figure at mono(20); the territory-scope copy ("US disclosure system - no coverage
+  // for Germany.") measures ~540px there, wrapping the score band and out-shouting the
+  // index beside it. The test is PROSE vs LABEL, not a character count: every existing
+  // absent string is an all-caps label ("NO DISCLOSURES ON RECORD", "NO OP DATA") and
+  // keeps the numeral size; anything containing lower-case is a sentence and drops to
+  // the note size, so a future absent string picks the right treatment on its own.
+  const asNote = isAbsent && /[a-z]/.test(text);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 92 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 92, maxWidth: asNote ? 260 : undefined }}>
       <span style={{ ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>{label}<br /><span style={{ color: P.ink5 }}>{sub}</span></span>
-      <span style={{ ...mono(20, 500), color: noRank ? P.ink3 : P.ink0, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{text}</span>
+      <span style={{ ...(asNote ? mono(11) : mono(20, 500)), color: noRank ? P.ink3 : P.ink0, fontVariantNumeric: "tabular-nums", lineHeight: asNote ? 1.45 : 1 }}>{text}</span>
       <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>{noRank ? "EXCLUDED FROM RANK" : basis ?? ""}</span>
     </div>
   );
@@ -268,6 +279,10 @@ export default function HcpProfileBrief() {
   if (!p || !p.hcp?.name) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>This profile could not be loaded.</div></Shell>;
 
   const s = p.scores;
+  // US-ONLY SECTION GATE (2026-08-19). Known non-US only — an unknown country keeps the
+  // existing absence text, because a missing country must not scope a US physician out
+  // of their own Medicare section.
+  const nonUs = isNonUsRecord(p.hcp.country);
   const nPos = positionCount(p);
   const hasSynthPara = renderSynthesis(p);
   // Belief-profile counterweight: the position mix by category — the shape the
@@ -293,7 +308,10 @@ export default function HcpProfileBrief() {
             <span style={{ color: P.sage }}>EST</span>
             <span style={{ color: P.ink3 }}>ESTABLISHED / {taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()}</span>
             <span>›</span>
-            <span>RANK {s?.rank ?? "—"} US</span>
+            {/* The POOL, not a hardcoded US (2026-08-19). hcp_profile_brief resolves the
+                US row if there is one and otherwise the global row, so this asserted a US
+                rank for every non-US HCP — Martin Reck read "RANK 3 US" with no US row. */}
+            <span>RANK {s?.rank ?? "—"} {s?.scope_label ?? "US"}</span>
             <span>›</span>
             <Link to="/cohorts/ledger/established" style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
           </div>
@@ -314,7 +332,14 @@ export default function HcpProfileBrief() {
                   numeral → FACE.value; 34 snapped to T.FIGURE 30 (44 would out-shout
                   the 30px name beside it — judgment call, flagged). */}
               <span style={{ ...serif(30, 500), color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s?.index != null ? floorFixed(s.index, 1) : "—"}</span>
-              <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>INDEX · RANK {s?.rank ?? "—"} US · #{s?.global_rank ?? "—"} GLOBAL</span>
+              {/* Same repoint, plus the ledger's companion rule: on a GLOBAL resolution the
+                  companion would print the same rank twice under two labels ("RANK 3 GLOBAL ·
+                  #3 GLOBAL"), so it is suppressed exactly as established_ledger nulls its own
+                  global_rank on a global selection. A US row keeps both. */}
+              <span style={{ ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>
+                INDEX · RANK {s?.rank ?? "—"} {s?.scope_label ?? "US"}
+                {s?.scope_label !== "GLOBAL" && s?.global_rank != null ? ` · #${s.global_rank} GLOBAL` : ""}
+              </span>
             </div>
             <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4 }}>{p.hcp.name}</span>
             <span style={{ ...mono(11), color: P.ink4, letterSpacing: ".02em" }}>
@@ -329,7 +354,11 @@ export default function HcpProfileBrief() {
               {p.hcp.npi ? (
                 <a href={`https://npiregistry.cms.hhs.gov/provider-view/${p.hcp.npi}`} target="_blank" rel="noopener noreferrer"
                    style={{ color: P.teal, textDecoration: "none", borderBottom: `1px solid rgba(127,179,187,.3)` }}>NPI {p.hcp.npi} ↗</a>
-              ) : null}{p.hcp.specialty ? ` · ${p.hcp.specialty.toUpperCase()}` : ""} · VERIFIED NPI REGISTRY
+              ) : null}{p.hcp.specialty ? ` · ${p.hcp.specialty.toUpperCase()}` : ""}
+              {/* "VERIFIED NPI REGISTRY" was OUTSIDE the npi conditional (2026-08-19), so a
+                  record with no NPI — every non-US HCP, and US ones awaiting a match —
+                  claimed a registry verification that never happened. */}
+              {p.hcp.npi ? " · VERIFIED NPI REGISTRY" : ""}
             </span>
             {/* nav parity — Generate Brief + full-page publications / positions */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 8, justifyContent: isMobile ? "center" : "flex-start" }}>
@@ -342,10 +371,28 @@ export default function HcpProfileBrief() {
             </div>
           </div>
           <div style={{ padding: "16px 24px", display: "flex", gap: isMobile ? "16px 28px" : 36, flexWrap: "wrap", alignItems: "flex-start", justifyContent: isMobile ? "center" : "flex-start", textAlign: isMobile ? ("center" as const) : undefined }}>
-            <ScoreCell label="INDEX" sub="IN COHORT" value={s?.index ?? null} decimals={1} basis={s?.vs_cohort_mean != null ? `${s.vs_cohort_mean > 0 ? "+" : ""}${s.vs_cohort_mean} VS COHORT MEAN` : ""} />
+            {/* The pool is NAMED (2026-08-19). hcp_profile_brief resolves the US row if
+                there is one and falls back to global, so "IN COHORT" alone would let a
+                global score read as a US one. Ledger convention: label the pool. */}
+            {/* THE "+N VS COHORT MEAN" BASIS WAS DELETED 2026-08-19, not relabelled.
+                cohort_score is a weighted mean of percentile ranks, so the cohort mean is
+                ~50 BY CONSTRUCTION in every scope, TA and population size (measured:
+                global 50.15, US 51.96, EUROPE 50.29). The delta was therefore index - 50 —
+                a near-constant transform of the number printed beside it, reading +49.5 to
+                +49.9 for the entire global top 30, and shifting by two points for the same
+                person between the US and global boards for no reason to do with them.
+                An honest label ("against a distribution whose mean is 50 by construction")
+                would not rescue a number that cannot vary; same call as the SCI/NET ceiling
+                columns on the ledger — delete rather than annotate. */}
+            <ScoreCell label="INDEX" sub={s?.scope_label ? `IN ${s.scope_label} COHORT` : "IN COHORT"} value={s?.index ?? null} decimals={1} />
             <ScoreCell label="SCI" sub="CEILING" value={s?.sci ?? null} decimals={1} basis={s?.basis_senior != null ? `${s.basis_senior} SENIOR PUBS` : ""} />
             <ScoreCell label="NET" sub="CEILING" value={s?.net ?? null} decimals={1} basis={s?.basis_papers != null ? `${s.basis_papers} PAPERS` : ""} />
-            <ScoreCell label="PHARMA" sub="NOT RANKED" value={s?.pharma ?? null} decimals={1} noRank absent="NO DISCLOSURES ON RECORD" />
+            {/* Open Payments is a US disclosure system. "NO DISCLOSURES ON RECORD"
+                asserts an empty record; for a non-US physician there is no record to be
+                empty, so the absent text names the register's territory instead. A US
+                HCP with genuinely no disclosures keeps the original wording. */}
+            <ScoreCell label="PHARMA" sub="NOT RANKED" value={s?.pharma ?? null} decimals={1} noRank
+              absent={nonUs ? `US disclosure system — no coverage for ${countryName(p.hcp.country)}.` : "NO DISCLOSURES ON RECORD"} />
           </div>
           {/* Identity footer strip (frame): distinct publications, positions, themes,
               field insights — the record's real footprint. The old line counted
@@ -479,7 +526,7 @@ export default function HcpProfileBrief() {
               left={
                 /* federal funding — NIH RePORTER display facts; displayed, never
                    ranked — state (rich/sparse) derives from the HCP's data */
-                <FederalFundingSection hcpId={p.hcp.id} />
+                <FederalFundingSection hcpId={p.hcp.id} nonUsCountry={nonUs ? countryName(p.hcp.country) : null} />
               }
               right={
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -501,7 +548,12 @@ export default function HcpProfileBrief() {
              2026-08-10 (Option A): it asserted the tumour-type attribution the
              2026-08-04 block rewrite removed, and its "treats at scale" question
              read an empty state as an answer Part B cannot give. ── */}
-        <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug="nsclc" withholdSeam />
+        {/* MEDICARE IS US-ONLY (2026-08-19). Part B is a US claims system, so for a
+            non-US record the block is scoped out rather than rendered with its
+            no-NPI absence text — which explained, at three paragraphs, why Part B
+            could not be read for a German oncologist. A US record with no NPI still
+            gets that text: the absence is real there, and this gate does not touch it. */}
+        {nonUs ? null : <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug="nsclc" withholdSeam />}
 
         {/* THE BRIEF section removed (2026-08-03, per Design): the frame drops it in
             both populated and sparse. Its three cards were WHAT CHANGED and WHERE

@@ -31,7 +31,7 @@ function money(v: number): string {
   return `$${Math.round(v)}`;
 }
 
-export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
+export default function FederalFundingSection({ hcpId, nonUsCountry }: { hcpId: string; nonUsCountry?: string | null }) {
   const [facts, setFacts] = useState<HcpGrantFacts | null | undefined>(undefined);
 
   useEffect(() => {
@@ -47,10 +47,20 @@ export default function FederalFundingSection({ hcpId }: { hcpId: string }) {
     // collaborators column's depth when this section is the shorter one.
     <div style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%" }}>
       <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: INK_HEAD }}>
-        FEDERAL FUNDING · NIH REPORTER · DISPLAYED, NOT RANKED
+        {nonUsCountry ? "FEDERAL FUNDING · NIH REPORTER · UNITED STATES ONLY" : "FEDERAL FUNDING · NIH REPORTER · DISPLAYED, NOT RANKED"}
       </span>
 
-      {facts === undefined ? (
+      {/* US-ONLY REGISTER (2026-08-19). For a non-US record the section still renders —
+          an absent section is indistinguishable from a question nobody asked, and a
+          non-US researcher CAN hold a genuine RePORTER award — but it states the
+          register's territory in one line instead of running the grant read and
+          reporting an absence. The scoring language ("DISPLAYED, NOT RANKED") is
+          dropped with it: there is nothing being displayed-not-ranked here. */}
+      {nonUsCountry ? (
+        <span style={{ ...serif(13), color: CANON.INK.LABEL, lineHeight: 1.5 }}>
+          NIH RePORTER records US federal awards. It does not cover {nonUsCountry}, so an absence here reflects the register's territory rather than this physician's funding.
+        </span>
+      ) : facts === undefined ? (
         <span style={{ ...mono(9), letterSpacing: ".1em", color: INK_DIM }}>READING THE GRANT RECORD…</span>
       ) : facts === null ? (
         // read failed — say nothing rather than assert a false absence

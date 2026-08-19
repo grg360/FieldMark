@@ -32,6 +32,9 @@ export interface RisingProfile {
     nppes_practice_city: string | null;
     career_first_pub_year: number | null;
     npi_number: string | null;
+    /** COALESCE(current_country, country), 2026-08-19 — the gate for US-only sections.
+     *  NULL means UNKNOWN, not non-US. `country` above is the historical value. */
+    effective_country: string | null;
   };
   rising: {
     rank: number;
@@ -74,7 +77,10 @@ export interface RisingProfile {
     source_enrichment_run_id: string | null;
   } | null;
   narrative_current: boolean | null;
-  established_us: { rank: number; cohort_score: number } | null;
+  /** scope_label added 2026-08-19: est_us resolves the US row if there is one and
+   *  falls back to global, so this may be a GLOBAL rank. The standing card MUST render
+   *  the label — unlabelled it would print "#3 US" for a non-US member. */
+  established_us: { rank: number; cohort_score: number; scope_label: string | null } | null;
   established_global: { rank: number; cohort_score: number } | null;
   positions: { total: number; first_basis: number; senior_basis: number } | null;
   leadership: { senior_pub_count: number | null; first_pub_count: number | null } | null;
