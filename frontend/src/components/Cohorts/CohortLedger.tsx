@@ -989,9 +989,18 @@ function Row({
                   the row's own country for the location chip, and reusing it would label
                   a global rank with a country it was not computed against. The old
                   `?? "US"` fallback would have asserted US for all 16,976 global rows. */}
-              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
-                {row.scopeLabel ?? row.scoredCountry ?? "US"}
-              </span>
+              {/* SUPPRESSED ON A GLOBAL SELECTION (2026-08-19). On the global board this
+                  printed "GLOBAL" hard against a 44px numeral in a 92px content box --
+                  three digits already overrun it ("100" measures 79.2px, the label 38.9px,
+                  against 92px -- so they collide from rank 100 down) -- while the companion
+                  line beneath repeats the same word. Every other scope KEEPS the label: it
+                  names the POOL the rank was computed against, and without it a German row
+                  reads as an unqualified "#1". */}
+              {row.scopeLabel !== "GLOBAL" ? (
+                <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
+                  {row.scopeLabel ?? row.scoredCountry ?? "US"}
+                </span>
+              ) : null}
             </div>
             {row.europeRank != null && (
               <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUROPE</span>
@@ -1288,9 +1297,18 @@ function MobileRow({
           {row.rank != null ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
               <span style={{ font: `600 30px ${FACE.data}`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
-              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
-                {row.scopeLabel ?? row.scoredCountry ?? "US"}
-              </span>
+              {/* SUPPRESSED ON A GLOBAL SELECTION (2026-08-19). On the global board this
+                  printed "GLOBAL" hard against a 44px numeral in a 92px content box --
+                  three digits already overrun it ("100" measures 79.2px, the label 38.9px,
+                  against 92px -- so they collide from rank 100 down) -- while the companion
+                  line beneath repeats the same word. Every other scope KEEPS the label: it
+                  names the POOL the rank was computed against, and without it a German row
+                  reads as an unqualified "#1". */}
+              {row.scopeLabel !== "GLOBAL" ? (
+                <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
+                  {row.scopeLabel ?? row.scoredCountry ?? "US"}
+                </span>
+              ) : null}
               {/* EUR, not EUROPE: this rail abbreviates (GLB beside it), and EUR keeps the
                   geographic 33-country reading distinct from the EU-27 one at chip width.
                   The desktop rail has the room and spells it EUROPE. */}

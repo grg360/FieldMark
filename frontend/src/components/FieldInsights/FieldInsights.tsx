@@ -5,7 +5,17 @@ import { getNotesForHcp, type Note } from "../../lib/relationships";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { FONT } from "../../lib/designTokens";
-import { FACE } from "../../lib/canonicalTokens";
+// Palette repointed to canonical tokens 2026-08-19 (the block was on hardcoded hex that
+// predated the token migration): #1E1E22 -> GROUND.INSET, #0a0b0b -> GROUND.BASE,
+// #1a1d1c -> LINE.HAIR, #8f8b83 -> INK.LABEL, #6B6A65 -> INK.MUTE (the token's own
+// comment records it absorbing this exact hex, "census #6b6a65 x130"), #E8A020 ->
+// GOLD.PRIME (same hex, now named rather than repeated).
+//
+// TWO BORDERS TAKE LINE.HAIR RATHER THAN THEIR VALUE-EQUIVALENT: `1px solid #1E1E22`
+// and `1px solid #1a1d1c` were rules drawn in fill colours, and LINE.HAIR is the token
+// for a 1px rule. That lightens both hairlines slightly (#1E1E22/#1a1d1c -> #272D34) --
+// the one place this repoint changes a pixel rather than just naming it.
+import { FACE, CANON } from "../../lib/canonicalTokens";
 import EmptyInsightsState from "./EmptyInsightsState";
 import InsightComposer from "./InsightComposer";
 import InsightComposerModal from "./InsightComposerModal";
@@ -104,7 +114,7 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
 
   const sectionStyle = {
     padding: "16px",
-    borderBottom: "1px solid #1E1E22",
+    borderBottom: `1px solid ${CANON.LINE.HAIR}`,
     fontFamily: FACE.ui,
   } as const;
 
@@ -115,7 +125,7 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
           aria-hidden
           style={{
             height: 60,
-            backgroundColor: "#1E1E22",
+            backgroundColor: CANON.GROUND.INSET,
             borderRadius: 4,
             opacity: 0.35,
           }}
@@ -162,14 +172,14 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
             fontFamily: FONT.sans,
             fontSize: 11,
             fontWeight: 600,
-            color: "#8f8b83",
+            color: CANON.INK.LABEL,
             letterSpacing: "0.18em",
             textTransform: "uppercase",
             marginBottom: 12,
           }}
         >
           FIELD INSIGHTS{" "}
-          <span style={{ color: "#6B6A65", textTransform: "none", letterSpacing: "normal" }}>
+          <span style={{ color: CANON.INK.MUTE, textTransform: "none", letterSpacing: "normal" }}>
             ({notes.length})
           </span>
         </div>
@@ -178,7 +188,7 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
       {variant === "ledger" ? (
         // ledger capture affordance — the frame's "+ CAPTURE" bar (composer renders the
         // gold marker + serif prompt + SOURCE·TAG·LINK affordance in the ledger register).
-        <div style={{ borderBottom: "1px solid #1a1d1c", background: "#0a0b0b" }}>
+        <div style={{ borderBottom: `1px solid ${CANON.LINE.HAIR}`, background: CANON.GROUND.BASE }}>
           <InsightComposer userId={userId} hcpId={hcpId} firstName={firstName} isInline variant="ledger" onSave={handleSave} />
         </div>
       ) : !isMobile ? (
@@ -198,8 +208,8 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
             width: "75%",
             marginBottom: 12,
             padding: "8px 16px",
-            backgroundColor: "#E8A020",
-            color: "#0A0A0B",
+            backgroundColor: CANON.GOLD.PRIME,
+            color: CANON.GROUND.BASE,
             border: "none",
             borderRadius: 4,
             fontWeight: 500,
