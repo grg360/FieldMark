@@ -515,9 +515,11 @@ def fetch_rising_star_top_hcp_ids_v3(
 
     `rank` is the board's own key and carries no territory concept, so ordering
     by it needs no country predicate. This also makes the two arms below agree:
-    the AD arm already selected scope_type='global' ordered by rank, and the
-    established selector already iterates VISIBLE_SCOPES including ('global',
-    None). This arm was the only selector on the platform scoped to one country.
+    the AD arm already selected scope_type='global' ordered by rank. (The
+    established selector was still US-scoped when this was written; it was
+    repointed to the global scope on 2026-08-18 and the two now agree. Note
+    VISIBLE_SCOPES / fetch_top_n_hcp_ids_from_rank_view is DEAD CODE -- defined,
+    never called, and two of its three entries match zero rows.)
     Territory is a DISPLAY concern -- rising_board() computes us_rank_eff and
     eu_rank at read time for the surfaces that place people by location.
 
@@ -1010,10 +1012,22 @@ def merge_established_leadership_rows(
 def fetch_established_top_hcp_ids(
     supabase: Client, top_n: int, visible_ta_ids: List[str]
 ) -> Set[str]:
-    """Established cohort selection: US-scope only, top N per TA from hcp_established_ranks_v3.
+    """Established cohort selection: the board by GLOBAL rank, top N per TA.
 
-    Matches the platform's US-default product model. Global/international HCPs are
-    intentionally excluded from narrative generation.
+    SCOPE IS GLOBAL, NOT US (2026-08-18), mirroring the Rising change of 08-17.
+    This selector previously read scope_type='region'/scope_value='US' and its
+    docstring called that the product model. It is not: the Established ledger
+    gained a Global territory scope on 08-17 and every surface renders it. That
+    predicate reached 2,992 of the 17,041 global rows, and the top-200 cut it
+    produced was exactly the US region top 200 -- so the global board's own top
+    three (Yi-Long Wu, Caicun Zhou, Shun Lu, all CN) had no narrative while
+    ranks 4-9 did. 87 of the global top 200 were missing, and every CN/JP/KR/CA
+    member was absent.
+
+    `rank` on the global scope is the board's own key and carries no territory
+    concept, so ordering by it needs no country predicate. Territory is a
+    DISPLAY concern -- the ledger renders scope_label separately from
+    scored_country, and the profile header reads ranks live.
     """
     selected: Set[str] = set()
     for ta_id in visible_ta_ids:
@@ -1023,8 +1037,8 @@ def fetch_established_top_hcp_ids(
                     supabase.table("hcp_established_ranks_v3")
                     .select("hcp_id,rank")
                     .eq("therapeutic_area_id", ta_id)
-                    .eq("scope_type", "region")
-                    .eq("scope_value", "US")
+                    .eq("scope_type", "global")
+                    .is_("scope_value", None)
                     .order("rank", desc=False)
                 )
             selected.update(collect_top_n_hcp_ids(make_query, top_n))
@@ -1261,7 +1275,7 @@ def load_hcp_contexts(
         print(f"Loaded {len(rising_star_v3_by_pair)} Rising Star v3 HCP x TA signal rows")
 
     if not single_hcp_id and "established" in target_cohorts:
-        print(f"Selecting established top-{established_top_n} per (TA x visible scope) from hcp_established_ranks_v3...")
+        print(f"Selecting established top-{established_top_n} per TA by GLOBAL rank from hcp_established_ranks_v3...")
         established_ids = fetch_established_top_hcp_ids(supabase, established_top_n, visible_ta_ids)
         print(f"Established rank selection: {len(established_ids)} unique HCPs")
         for hcp_id in established_ids:
@@ -1603,11 +1617,19 @@ def freshness_filter(
                 continue
 
             if ctx.cohort_classification == "established":
+                # ORDER BY IS LOAD-BEARING (2026-08-18). An HCP now holds ~2.3
+                # rows here (global + one or more region scopes), and the region
+                # scopes are recomputed by separate migrations -- so an unordered
+                # limit(1) samples an ARBITRARY scope row's computed_at and the
+                # staleness verdict becomes nondeterministic per HCP. Taking the
+                # newest keeps "is the narrative older than the scoring?" a
+                # question about the latest scoring, whichever scope produced it.
                 score_resp = (
                     supabase.table("hcp_established_ranks_v3")
                     .select("computed_at")
                     .eq("hcp_id", ctx.hcp_id)
                     .eq("therapeutic_area_id", ctx.therapeutic_area_id)
+                    .order("computed_at", desc=True)
                     .limit(1)
                     .execute()
                 )

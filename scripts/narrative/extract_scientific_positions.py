@@ -103,7 +103,30 @@ WHERE therapeutic_area_id = %s
 ORDER BY us_rank
 """
 
-# scope_value is parameterised, NOT removed: the caller must say which region.
+# GLOBAL IS THE DEFAULT (2026-08-18), mirroring the narrative selector repoint of
+# the same day. The Established ledger gained a Global territory scope on 08-17,
+# and the global board's own top ranks are what every surface renders -- so the
+# default cut here is the global top 200, not a per-country one.
+#
+# WHY THIS MATTERS FOR SIZING: the region SQL below is `rank <= 200` PER COUNTRY,
+# so `--scope-value CN JP KR TW AU HK SG` selects 1,159 HCPs, of which only 78 sit
+# in the global top 200. The two cuts are not interchangeable and the region one
+# is ~15x larger. Positions are the substrate the Established narrative prompt
+# reads, so the cut here must match the cut the narrative selector uses.
+ESTABLISHED_HCPS_GLOBAL_SQL = """
+SELECT hcp_id, 'established' AS cohort, rank AS rank_position
+FROM hcp_established_ranks_v3 e
+WHERE therapeutic_area_id = %s
+  AND scope_type = 'global'
+  AND scope_value IS NULL
+  AND rank <= 200
+  {skip_existing}
+ORDER BY rank
+"""
+
+# REGION PATH RETAINED. --scope-value still selects per-country top 200 and is
+# byte-identical to its pre-08-18 behaviour; it is how the US and Europe passes
+# were run and stays reproducible. It is now opt-in rather than required.
 # ANY() so one invocation can cover a multi-country region; a single value is
 # exactly equivalent to the old 'US' literal. Placeholder order matters -- see
 # get_target_hcps.build(), which threads params positionally.
@@ -304,10 +327,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         metavar="CODE",
         help=(
-            "Country code(s) for the established (region-scoped) selection, e.g. "
-            "--scope-value US, or --scope-value DE FR GB for a multi-country "
-            "region. REQUIRED (no default) whenever --cohort includes established; "
-            "unused by the rising_star selection."
+            "OPTIONAL. Omit for the GLOBAL top 200 (the default since 2026-08-18, "
+            "matching the narrative selector's cut). Pass country code(s) to use "
+            "the per-country region path instead, e.g. --scope-value US, or "
+            "--scope-value DE FR GB for a multi-country region -- note that is "
+            "top 200 PER COUNTRY, so 7 codes select ~1,159 HCPs, not 200. "
+            "Unused by the rising_star selection."
         ),
     )
     parser.add_argument(
@@ -379,14 +404,14 @@ def get_target_hcps(
                     hcps.append(dict(row))
 
         if cohort in ("established", "both"):
-            if not scope_value:
-                raise SystemExit(
-                    "--scope-value is required for --cohort established/both "
-                    "(the established selection is region-scoped). There is no "
-                    "default: pass the country code(s) explicitly, e.g. "
-                    "--scope-value US."
-                )
-            sql, params = build(ESTABLISHED_HCPS_SQL, "e", (list(scope_value),))
+            # GLOBAL BY DEFAULT (2026-08-18). Omitting --scope-value selects the
+            # global top 200 -- the same cut the narrative selector now uses, so
+            # stage 1 and stage 2 cover the same people. Passing --scope-value
+            # keeps the per-country top-200 path (how US and Europe were run).
+            if scope_value:
+                sql, params = build(ESTABLISHED_HCPS_SQL, "e", (list(scope_value),))
+            else:
+                sql, params = build(ESTABLISHED_HCPS_GLOBAL_SQL, "e")
             cur.execute(sql, params)
             for row in cur.fetchall():
                 hcp_id = str(row["hcp_id"])
@@ -626,7 +651,7 @@ def main() -> int:
         print(
             f"Loaded {total_hcps} target HCPs "
             f"(ta={args.ta}, cohort={args.cohort}, limit={effective_limit}, "
-            f"scope_value={','.join(args.scope_value) if args.scope_value else '-'}, "
+            f"scope={','.join(args.scope_value) + ' (region top-200 per country)' if args.scope_value else 'GLOBAL top-200'}, "
             f"skip_existing={args.skip_existing})"
         )
 
