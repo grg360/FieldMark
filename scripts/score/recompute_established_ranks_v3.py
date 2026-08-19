@@ -40,8 +40,9 @@ Scope rows (same intent as the old hcp_established_ranks_v2 materialization):
     scope_value=NULL)
   - HCPs with a non-null country also get a region scope row
     (scope_type='region', scope_value=<country code>)
-  - HCPs whose country is in region_countries('EUROPE') ALSO get an aggregate
-    region row (scope_type='region', scope_value='EUROPE') -- see below
+  - HCPs whose country falls in a region flagged regions.aggregate_scope ALSO get an
+    aggregate region row (scope_type='region', scope_value=<region_key>) -- see below.
+    EUROPE and APAC are flagged today.
 
 THE EUROPE AGGREGATE SCOPE (2026-08-18). Established ranks are scope-local AND
 normalised within scope, so an all-Europe selection could not be assembled by
@@ -96,9 +97,17 @@ import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor, execute_values
 
-# The aggregate Europe scope_value AND the region_countries key -- deliberately the
-# same string, so the bucket and the list it is built from cannot be repointed apart.
-EUROPE_SCOPE_VALUE = "EUROPE"
+# Aggregate scopes are DATA, not a constant here (generalised 2026-08-18). A region
+# gets an aggregate bucket when regions.aggregate_scope is true; the scope_value written
+# IS the region_key, so the bucket and the country list it is built from cannot be
+# repointed apart. EUROPE and APAC are flagged today. Adding LATAM is an UPDATE on
+# regions plus a re-run -- no edit here, and none in either ledger RPC.
+#
+# WHY A FLAG RATHER THAN "every multi-country region": measured 2026-08-18 against this
+# cohort, the derived rule writes 19,018 aggregate rows against the 12,620 wanted --
+# EU5 (2,733), EU (3,320) and EUROPE (3,849) are three overlapping boards over the same
+# people, and LATAM (66) is too small to rank. Which regions deserve a board is a
+# product decision; it is stored.
 
 load_dotenv()
 
@@ -136,6 +145,37 @@ def fetch_region_countries(conn, region_key):
             "refusing to emit an empty aggregate scope"
         )
     return codes
+
+
+def fetch_aggregate_regions(conn):
+    """[(region_key, {country codes})] for every region flagged aggregate_scope.
+
+    One query rather than a fetch per region, and ordered by regions.sort_order so a
+    re-run emits its scopes in a stable order. A flagged region with no countries is a
+    misconfiguration, not an empty board -- it would write a scope nobody can be in --
+    so the join drops it and the caller is told."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT r.region_key,
+                   array_agg(rc.country_code ORDER BY rc.country_code) AS codes
+            FROM regions r
+            JOIN region_countries rc ON rc.region_key = r.region_key
+            WHERE r.aggregate_scope
+            GROUP BY r.region_key, r.sort_order
+            ORDER BY r.sort_order, r.region_key
+            """
+        )
+        regions = [(row[0], set(row[1])) for row in cur.fetchall()]
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM regions WHERE aggregate_scope")
+        flagged = cur.fetchone()[0]
+    if flagged != len(regions):
+        raise RuntimeError(
+            f"{flagged} regions are flagged aggregate_scope but only {len(regions)} have "
+            "countries in region_countries; refusing to emit an empty aggregate scope"
+        )
+    return regions
 
 
 def fetch_established_cohort(conn, ta_id):
@@ -189,7 +229,7 @@ def fetch_established_cohort(conn, ta_id):
         )
         base_rows = cur.fetchall()
 
-    europe_codes = fetch_region_countries(conn, EUROPE_SCOPE_VALUE)
+    aggregate_regions = fetch_aggregate_regions(conn)
 
     expanded = []
     for row in base_rows:
@@ -215,19 +255,23 @@ def fetch_established_cohort(conn, ta_id):
                     "institution_normalized": row["institution_normalized"],
                 }
             )
-            # The aggregate Europe pool. Emitted from the SAME `country` as the row
-            # above, so the aggregate is the exact union of its country buckets.
-            if country in europe_codes:
-                expanded.append(
-                    {
-                        "hcp_id": row["hcp_id"],
-                        "scope_type": "region",
-                        "scope_value": EUROPE_SCOPE_VALUE,
-                        "first_name": row["first_name"],
-                        "last_name": row["last_name"],
-                        "institution_normalized": row["institution_normalized"],
-                    }
-                )
+            # The aggregate pools. Emitted from the SAME `country` as the row above,
+            # so each aggregate is the exact union of its country buckets. A person in
+            # two flagged regions would get a row in each -- no region overlaps today
+            # (EUROPE and APAC are disjoint), and the flag is what keeps it that way:
+            # EU5/EU/EUROPE would have overlapped, which is why the rule was rejected.
+            for region_key, codes in aggregate_regions:
+                if country in codes:
+                    expanded.append(
+                        {
+                            "hcp_id": row["hcp_id"],
+                            "scope_type": "region",
+                            "scope_value": region_key,
+                            "first_name": row["first_name"],
+                            "last_name": row["last_name"],
+                            "institution_normalized": row["institution_normalized"],
+                        }
+                    )
     return expanded
 
 
@@ -286,11 +330,24 @@ def compute_percentiles_in_scope(values_dict):
         return {}
     items = sorted(values_dict.items(), key=lambda kv: kv[1], reverse=True)
     n = len(items)
-    if n == 1:
-        return {items[0][0]: 100.0}
     out = {}
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # Weibull plotting position: 100 * (n + 1 - rank) / (n + 1), which for this
+    # 0-indexed descending loop is 100 * (n - position) / (n + 1).
+    #
+    # It replaced 100.0 * (1.0 - position / (n - 1)), which put the first member at
+    # EXACTLY 100.0 and the last at EXACTLY 0.0 — artifacts of a finite list rendered
+    # as facts. First of 251 is standing above 250 measured people, not above everyone.
+    #
+    # AFFINE IN THE OLD VALUE: p_new = a * p_old + b, a = (n-1)/(n+1), b = 100/(n+1).
+    # Both constants depend only on n, so ORDER WITHIN THIS COLUMN IS UNCHANGED. The
+    # same two lines appear in eight sibling scorers; they are one convention, and the
+    # doc lists all nine.
+    #
+    # n == 1 no longer needs a special case (the denominator is n+1, never zero) and
+    # returns 50.0 rather than 100.0 — a lone member is neither top nor bottom.
     for position, (key, _) in enumerate(items):
-        percentile = 100.0 * (1.0 - position / (n - 1))
+        percentile = 100.0 * (n - position) / (n + 1)
         out[key] = round(percentile, 2)
     return out
 

@@ -206,7 +206,25 @@ export default function MethodologyPage() {
           {"Cohort Score = 0.60 * Scientific Influence + 0.40 * Network Influence\nPharma Engagement: computed and displayed, weight 0.00 in ranking"}
         </pre>
         <p style={bodyStyle}>
-          Each input is itself a percentile rank within the cohort, so the composite is meaningfully bounded between 0 and 100.
+          Each input is expressed as a percentile, so the composite is bounded between 0 and 100. The two inputs are not built the same way, and the difference is worth stating. Scientific Influence is a single percentile rank of a publication-leadership score computed once for the therapeutic area. Network Influence is a percentile rank of the network influence score, which is <em>itself</em> a composite of three centrality percentiles - degree, eigenvector and betweenness. So the network term is a ranking of a ranking, and it compresses accordingly: it is the reason two people separated by a genuine difference in reach can land within a hundredth of each other at the top of a board.
+        </p>
+        <p style={bodyStyle}>
+          One consequence we are actively correcting: the scientific percentile is computed across the whole therapeutic area, while the network percentile is recomputed within whichever territory you are viewing. The same person can therefore carry a slightly different Cohort Score on a country board than on the global one - identical on the scientific half, moved on the network half. At the top of a board the difference is under a tenth of a point; mid-board it can reach several points. We are moving both inputs onto the therapeutic-area population so that a person has one score regardless of the territory selected.
+        </p>
+        <p style={bodyStyle}>
+          <strong>Why no one scores 100, and no one scores 0.</strong> Every FieldMark percentile answers one question: how many people in this cohort does this person stand above? We compute it from position - first, second, third - over a finite, known list. That makes the endpoints a matter of arithmetic, and until 2026-08-18 the arithmetic said the first person was at the 100th percentile and the last at the 0th.
+        </p>
+        <p style={bodyStyle}>
+          Neither is a fact about anyone. Being first in a list of 251 is not standing above every oncologist in lung cancer; it is standing above 250 named people we have measured. Being last is not the absence of standing - it is the 251st position in the same list. A score of exactly 100 claims a ceiling the data cannot see past, and a score of exactly 0 claims a floor that isn't there.
+        </p>
+        <p style={bodyStyle}>
+          Percentiles are now placed at <code>100 x (n + 1 - rank) / (n + 1)</code>. On a board of 251 the leader reads 99.6 and the last member reads 0.4. The ordering is unchanged and the distance between neighbours is unchanged; what changes is that both ends now sit inside the range, where the evidence puts them. The convention is the same on every board, so a Rising percentile and an Established one still mean the same thing.
+        </p>
+        <p style={bodyStyle}>
+          The same argument settles a smaller case. Some territories hold exactly one ranked HCP, and that person used to score 100 - top of a list of one. They now score 50. Being the only person we have measured in a country is not evidence of standing above anyone; it is the middle of a list with no one else in it, and the score says so.
+        </p>
+        <p style={bodyStyle}>
+          <strong>Ranked on, displayed as.</strong> The Established ledger orders rows by the Cohort Score above, but the columns beside the rank do not show its inputs. They show two counts - citations on senior-authored papers in this therapeutic area, and distinct co-authors over a ten-year window. The reason is that both ranked inputs are percentiles that saturate at the top: across the leading rows of a board they print the same number to one decimal, so a column of them tells you nothing about the people you are comparing. The counts do not saturate, and they are facts rather than positions. They are evidence beside the ranking, not the ranking itself, and they will not descend in perfect step with it - a row can hold more citations than the row above it and still sit lower, because citations are one part of one of the two ranked signals.
         </p>
       </div>
 

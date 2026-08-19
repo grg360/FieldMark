@@ -131,14 +131,25 @@ def compute_percentile_ranks(
     if not hcp_ids:
         return {}
     n = len(hcp_ids)
-    if n == 1:
-        return {hcp_ids[0]: 100.0}
     arr = [values[h] for h in hcp_ids]
-    # rankdata: 1 = lowest. Convert so highest value -> 100.0, lowest -> 0.0.
+    # rankdata: 1 = lowest.
     ranks = rankdata(arr, method="average")
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # Weibull plotting position: ascending rank r maps to 100 * r / (n + 1), so the
+    # highest value lands at 100n/(n+1) and the lowest at 100/(n+1).
+    #
+    # It replaced 100.0 * (r - 1) / (n - 1), which put the top at EXACTLY 100.0 and the
+    # bottom at EXACTLY 0.0 — artifacts of a finite list rendered as facts.
+    #
+    # AFFINE IN THE OLD VALUE: p_new = a * p_old + b, a = (n-1)/(n+1), b = 100/(n+1),
+    # so ORDER WITHIN THIS COLUMN IS UNCHANGED. method="average" still shares a value
+    # between genuine ties. Eight sibling scorers carry the same convention.
+    #
+    # n == 1 no longer needs a special case (denominator n+1 is never zero) and returns
+    # 50.0 rather than 100.0 — a lone member is neither top nor bottom.
     out: dict[str, float] = {}
     for h, r in zip(hcp_ids, ranks):
-        out[h] = round(100.0 * (r - 1) / (n - 1), 2)
+        out[h] = round(100.0 * r / (n + 1), 2)
     return out
 
 
