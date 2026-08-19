@@ -3,12 +3,17 @@
 // ONE config-driven component across three cohorts. Stage 1 wired Established; stage 2
 // adds Rising Star and Community as sibling configs. The computed rules Design flagged
 // as MUST-NOT-BE-SIMPLIFIED live here as pure functions and are cohort-agnostic:
-//   • ceiling-saturation machinery (ledger_meta ceilings → thresholds()) survives, but
-//     CELLS NO LONGER DASH ON IT (2026-07-31): the absolute 3-point window on a
-//     percentile distribution that compresses at the top by construction dashed the
-//     whole first screen of large cohorts. Scores print as stored; the tied-head bands
-//     carry the "spread is inside resolution" honesty, as INDEX always did. thresholds()
-//     still feeds why() — the drawer's ceiling-saturation narrative.
+//   • ceiling-saturation machinery (ledger_meta ceilings → thresholds()) is DEAD as of
+//     the 2026-08-18 audit, and this comment used to claim otherwise. CELLS STOPPED
+//     DASHING ON IT 2026-07-31: the absolute 3-point window on a percentile distribution
+//     that compresses at the top by construction dashed the whole first screen of large
+//     cohorts. Scores print as stored; the tied-head bands carry the "spread is inside
+//     resolution" honesty, as INDEX always did. What this comment claimed still ran —
+//     "thresholds() still feeds why()" — does not: cellDisplay takes the threshold map as
+//     `_th` and ignores it, and why() HAS NO CALLERS anywhere in the frontend. The whole
+//     chain (ledger_meta.ceilings → thresholds() → th → cellDisplay/why) computes nothing
+//     that reaches a pixel. Left in place pending the Established column decision, which
+//     may remove its last nominal consumer outright.
 //   • bands are a HEAD-ONLY "treat as tied" device — the same ceiling-proximity logic
 //     on the INDEX column. Rows whose index is within the cohort's resolution of the
 //     index ceiling form the tied bands; below that boundary the ledger is a plain
@@ -20,6 +25,7 @@
 import { supabase } from "./supabase";
 import { statesFromTerritory } from "./filter-context";
 import { resolveLocation } from "./location";
+import type { LedgerRegion } from "./ledgerRegions";
 
 export type ColKind = "pct" | "money" | "count";
 
@@ -90,13 +96,42 @@ export const EST_CONFIG: CohortConfig = {
   label: "Established",
   nameSub: "INSTITUTION · GENERATED SUMMARY",
   meta: "{total} HCP · SCIENTIFIC + NETWORK RANK THE COHORT · PHARMA EXCLUDED",
+  // DISPLAYED QUANTITIES, NOT THE RANKED INPUTS (2026-08-18). SCI CEILING and NET
+  // CEILING used to sit here as percentiles and both saturated: on the Europe board
+  // ranks 1-5 are 99.976 / 99.952 / 99.938 / 99.910 / 99.892 and every one printed
+  // "99.9". The ordering key is unchanged -- still cohort_score = 0.60*sci + 0.40*net
+  // -- so this is a change of evidence, not of ranking. The methodology page states
+  // that split explicitly; see "ranked on, displayed as".
+  //
+  // WHY CITATIONS AND NOT SENIOR PUBS, which is the more obvious quantity: small
+  // integers repeat. Measured on the Europe board's top 500, senior_pub_count carries
+  // 47 distinct values with its modal value on 10% of rows, against 351 for citations
+  // and 345 for collaborators -- it saturates too, just at the other end of the range.
+  // It also empties faster: 0% zero through rank 500 for citations, against
+  // senior_pub_count's 13% by rank 1,500 and 72% beyond.
+  //
+  // Both still bottom out in the deep tail (citations 75% zero past rank 1,500 on
+  // Europe). That zero is TRUE -- no citations on senior-authored NSCLC papers -- and
+  // every candidate measured shares it. It is the honest floor of the corpus, not a
+  // gap this column invented.
   cols: [
-    { key: "sci", label: "SCI", sub: "CEILING", w: 66, kind: "pct", decimals: 1 },
-    { key: "net", label: "NET", sub: "CEILING", w: 66, kind: "pct", decimals: 1 },
+    // headSub is DISPLAY ONLY and deliberately shorter than sub. "SENIOR-AUTHORED"
+    // rendered 99.9px inside this 100px box — 0.05px of slack per side — which left
+    // no gap to the head on its left and read as one string. "SENIOR-AUTH" is 73.3px,
+    // so the column keeps its width and gains 13.35px per side. `sub` stays long
+    // because trace() reads it in running text, where the abbreviation would be worse.
+    { key: "sencit", label: "CITATIONS", sub: "SENIOR-AUTHORED", head: "CITATIONS", headSub: "SENIOR-AUTH", w: 100, kind: "count", unit: "citations on senior-authored papers", prov: "FieldMark corpus", align: "center" },
+    { key: "collab", label: "COLLABORATORS", sub: "10-YEAR", head: "COLLABORATORS", headSub: "10-YEAR", w: 104, kind: "count", unit: "distinct co-authors", prov: "co-authorship graph", align: "center" },
     { key: "ph", label: "PHARMA", sub: "NOT RANKED", w: 120, kind: "pct", noRank: true, absent: "NO OP DATA", decimals: 1 },
   ],
   bandResolution: 0.3,
-  idxDecimals: 1,
+  // TWO decimals since 2026-08-18. At one, floorFixed put the whole Europe head on
+  // "99.9" (five people, one number). At two they read 99.97 / 99.95 / 99.93 / 99.91 /
+  // 99.89. Stops at two on purpose: percentile granularity is 100/N -- 0.033 on the US
+  // board, 0.026 on Europe -- so a third decimal is finer than the inputs can resolve.
+  // The tied-head bands are unaffected either way: layout() compares raw floats and
+  // idxDecimals only formats the label.
+  idxDecimals: 2,
   numericRamp: true,
   rpc: "established_ledger",
   notes: [
@@ -334,7 +369,10 @@ export function cellDisplay(row: LedgerRow, col: ScoreCol, _th: Record<string, n
     return col.absent ? { text: col.absent, kind: "absent" } : { text: "—", kind: "dash" };
   }
   if (col.kind === "money") return { text: money(v), kind: "num" };
-  if (col.kind === "count") return { text: String(Math.round(v)), kind: "num" };
+  // toLocaleString since 2026-08-18: citations and collaborators run to four digits
+  // ("2686" reads as a code, "2,686" as a quantity). COM's count columns are all
+  // two-digit, so this is a no-op there.
+  if (col.kind === "count") return { text: Math.round(v).toLocaleString(), kind: "num" };
   return { text: col.decimals != null ? floorFixed(v, col.decimals) : String(Math.round(v)), kind: "num" };
 }
 
@@ -435,6 +473,12 @@ function scoreLabel(col: ScoreCol, v: number): string {
   return `${col.label} ${col.decimals != null ? floorFixed(v, col.decimals) : Math.round(v)}`;
 }
 
+// ‼ DEAD SINCE AT LEAST 2026-08-18 (no callers anywhere in the frontend) AND NOW
+//   WRONG FOR ESTABLISHED. The 2026-08-18 column swap left EST with no ranked pct
+//   column, so rankCols is empty for it and the first branch below -- written for
+//   Community -- would narrate an Established row as "ranked on practice volume,
+//   setting and career stage". Harmless while nothing calls this; fix the branch
+//   before reviving it.
 export function why(cfg: CohortConfig, row: LedgerRow, th: Record<string, number | null>): string {
   const rankCols = cfg.cols.filter((c) => c.kind === "pct" && !c.noRank);
 
@@ -526,6 +570,15 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
   const name = `${S(r.first_name)} ${S(r.last_name)}`.trim();
   const scores: Record<string, number | null> = {};
   for (const col of cfg.cols) scores[col.key] = N(r[col.key]);
+  // sci/net are no longer Established COLUMNS, but estEngine() in CohortLedger.tsx
+  // reads both out of row.scores to pick the drawer's "network-led / scientific-led"
+  // spine and its neighbour-comparison lines. scores is built from cfg.cols alone, so
+  // dropping the columns would have blanked that narrative with no type error and no
+  // runtime error -- estEngine simply returns null. The RPC still sends both.
+  if (cfg.tag === "EST") {
+    scores.sci = N(r.sci);
+    scores.net = N(r.net);
+  }
 
   let chips: string[];
   if (cfg.tag === "COM") {
@@ -658,6 +711,25 @@ export const COUNTRY_LABELS: Record<string, string> = {
   RO: "Romania", BG: "Bulgaria", SK: "Slovakia", SI: "Slovenia", HR: "Croatia",
   EE: "Estonia", LV: "Latvia", LT: "Lithuania", LU: "Luxembourg", MT: "Malta",
   CY: "Cyprus", RS: "Serbia", UA: "Ukraine", US: "United States",
+  // APAC (2026-08-18). Country DISPLAY NAMES stay in the frontend on purpose: region
+  // MEMBERSHIP moved to the database (regions / region_countries), but there is no
+  // country_name column there, and a label map is presentation, not fact. If these ever
+  // need translating this is the file that changes.
+  JP: "Japan", CN: "China", KR: "South Korea", AU: "Australia", TW: "Taiwan",
+  HK: "Hong Kong", IN: "India", SG: "Singapore", TH: "Thailand", MY: "Malaysia",
+  NZ: "New Zealand", VN: "Vietnam", ID: "Indonesia", PH: "Philippines",
+};
+
+/** Display order for an aggregate region's country children: these first, in this
+ *  order, then everything else alphabetically by label. Presentation only — the
+ *  membership comes from region_countries via ledger_regions().
+ *
+ *  APAC leads with Japan rather than China deliberately. China is 5,147 of the 8,771
+ *  Established APAC rows (59%); a Japanese or Korean user scrolling past the Chinese
+ *  board to find themselves is the failure this ordering exists to avoid. */
+export const REGION_PRIMARY_MARKETS: Record<string, string[]> = {
+  EUROPE: ["GB", "DE", "FR", "IT", "ES", "NL", "CH"],
+  APAC: ["JP", "CN", "KR", "AU", "TW"],
 };
 
 /** Sentinel passed in the ledger RPCs' p_countries to select the GLOBAL scope.
@@ -665,26 +737,37 @@ export const COUNTRY_LABELS: Record<string, string> = {
  *  stands in for the NULL scope_value that global rows carry. Never a country code. */
 export const GLOBAL_SCOPE_SENTINEL = "__global__";
 
-/** Sentinel passed in the ledger RPCs' p_countries to select the all-Europe scope.
- *  Not an ISO country code, so it cannot collide with one. The two cohorts honour it
- *  by DIFFERENT mechanisms, which is why one sentinel serves both:
+/** An AGGREGATE REGION sentinel: the region_key itself, passed in p_countries where
+ *  ISO codes normally go. Generalised 2026-08-18 from a single EUROPE constant — the
+ *  literal is gone from this file, both ledger RPCs and the scorer.
+ *
+ *  Region keys are never two-letter ISO codes, so they cannot collide with a country.
+ *  The two cohorts honour a sentinel by DIFFERENT mechanisms, which is why one form
+ *  serves both:
  *    EST  established_ledger finds a STORED bucket (scope_type='region',
- *         scope_value='EUROPE') written by recompute_established_ranks_v3.py --
- *         Established ranks are normalised within scope, so all-Europe had to be
- *         scored as its own pool.
- *    RS   rising_ledger EXPANDS it into region_countries('EUROPE') at read time --
- *         Rising's rank is a row_number() over the selection, so no scoring needed.
- *  Either way the 33 codes live in region_countries and nowhere else. */
-export const EUROPE_SCOPE_SENTINEL = "EUROPE";
+ *         scope_value=<region_key>) written by recompute_established_ranks_v3.py for
+ *         every region flagged regions.aggregate_scope — Established ranks are
+ *         normalised within scope, so an aggregate has to be scored as its own pool.
+ *    RS   rising_ledger EXPANDS it from region_countries at read time — Rising's rank
+ *         is a row_number() over the selection, so no scoring is needed.
+ *  Either way the country list lives in region_countries and nowhere else. */
+export const isAggregateScopeValue = (v: string): boolean =>
+  v !== GLOBAL_SCOPE_SENTINEL && v.length > 2;
 
-/** Europe country options, ordered by market size then alphabetically. */
-export const LEDGER_EUROPE_OPTIONS: { key: string; label: string }[] = (() => {
-  const primary = ["GB", "DE", "FR", "IT", "ES", "NL", "CH"];
-  const rest = EUROPE_COUNTRIES.filter((c) => !primary.includes(c)).sort((a, b) =>
-    (COUNTRY_LABELS[a] ?? a).localeCompare(COUNTRY_LABELS[b] ?? b),
-  );
-  return [...primary, ...rest].map((c) => ({ key: `eu:${c}`, label: COUNTRY_LABELS[c] ?? c }));
-})();
+/** An aggregate region's country children, ordered by REGION_PRIMARY_MARKETS then
+ *  alphabetically by label. Countries with no rows are KEPT — Europe has shown
+ *  Luxembourg and Malta since it shipped, and hiding empties would change a surface
+ *  that is already live, which is its own decision rather than a side effect of APAC. */
+export function regionCountryOptions(region: { region_key: string; countries: string[] }): { key: string; label: string }[] {
+  const primary = REGION_PRIMARY_MARKETS[region.region_key] ?? [];
+  const rest = region.countries
+    .filter((c) => !primary.includes(c))
+    .sort((a, b) => (COUNTRY_LABELS[a] ?? a).localeCompare(COUNTRY_LABELS[b] ?? b));
+  return [...primary.filter((c) => region.countries.includes(c)), ...rest].map((c) => ({
+    key: `cc:${c}`,
+    label: COUNTRY_LABELS[c] ?? c,
+  }));
+}
 
 /**
  * Resolve a selector key into a full two-axis scope.
@@ -693,7 +776,11 @@ export const LEDGER_EUROPE_OPTIONS: { key: string; label: string }[] = (() => {
  * is prefixed so the two axes can never be confused: "us:*" carries a state list,
  * "eu:*" carries a country list and NEVER a state list.
  */
-export function scopeFromKey(key: string, myTerritory: LedgerScope | null): LedgerScope {
+export function scopeFromKey(
+  key: string,
+  myTerritory: LedgerScope | null,
+  regions: { region_key: string; display_name: string }[] = [],
+): LedgerScope {
   if (key === "mine" && myTerritory) return myTerritory;
   if (key === "global") {
     // GLOBAL_SCOPE_SENTINEL, not a country code. established_ledger / rising_ledger
@@ -702,14 +789,15 @@ export function scopeFromKey(key: string, myTerritory: LedgerScope | null): Ledg
     // DROP + CREATE on a live SECURITY DEFINER function.
     return { key, label: "Global", states: [], countries: [GLOBAL_SCOPE_SENTINEL] };
   }
-  if (key === "eu:all") {
-    // The SENTINEL, not the 33 codes (2026-08-18). Sending the list made this file a
-    // second source of truth for what Europe is; sending the sentinel leaves exactly
-    // one, in region_countries. EUROPE_COUNTRIES survives below for the per-country
-    // child options, which are labels rather than a definition of the region.
-    return { key, label: "Europe (all)", states: [], countries: [EUROPE_SCOPE_SENTINEL] };
+  if (key.startsWith("agg:")) {
+    // The region key as the sentinel — one code path for EUROPE, APAC and anything
+    // flagged later. `regions` supplies the label only; the membership never comes
+    // from this file.
+    const rk = key.slice(4);
+    const label = regions.find((r) => r.region_key === rk)?.display_name ?? rk;
+    return { key, label: `${label} (all)`, states: [], countries: [rk] };
   }
-  if (key.startsWith("eu:")) {
+  if (key.startsWith("cc:")) {
     const cc = key.slice(3).toUpperCase();
     return { key, label: COUNTRY_LABELS[cc] ?? cc, states: [], countries: [cc] };
   }
@@ -741,7 +829,10 @@ export interface TerritoryNode {
   children: { key: string; label: string }[];
 }
 
-export function ledgerTerritoryTree(cohortTag: string): TerritoryNode[] {
+export function ledgerTerritoryTree(
+  cohortTag: string,
+  regions: LedgerRegion[] = [],
+): TerritoryNode[] {
   const us: TerritoryNode = {
     key: "us:national",
     label: "United States",
@@ -763,23 +854,33 @@ export function ledgerTerritoryTree(cohortTag: string): TerritoryNode[] {
     selectable: true,
     children: [],
   };
-  return [
-    us,
-    {
-      key: "eu:all",
-      label: "Europe",
-      // Selectable for both cohorts since 2026-08-18. Established was expand-only
-      // because its ranks are normalised WITHIN a scope, so an all-Europe selection
-      // would have unioned 31 country boards into 31 rank-1 rows. The additive scorer
-      // scope this comment was waiting for now exists — recompute_established_ranks_v3
-      // writes an aggregate EUROPE bucket (3,849 rows for NSCLC, ranks 1..n over one
-      // pool) — so the aggregate is a real board for EST exactly as it always was for
-      // RS, which derives its ordering at read time.
-      selectable: true,
-      children: LEDGER_EUROPE_OPTIONS,
-    },
-    global,
-  ];
+  // THE REGION PARENTS COME FROM THE DATABASE (2026-08-18), not from a list here.
+  //
+  // WHICH REGIONS RENDER: only those flagged regions.aggregate_scope. `regions` holds
+  // eight non-global keys, and rendering all of them would put EU5, EU and EUROPE in
+  // the same menu — three overlapping European boards over the same people — plus
+  // LATAM (66 Established rows) and MENA (279), which nobody selected. The flag is the
+  // product decision about which aggregates exist; the menu follows it.
+  //
+  // SELECTABLE: an aggregate is selectable when its scored bucket exists (Established,
+  // where ranks are normalised within scope so the pool must be scored) or when the
+  // cohort ranks at read time (Rising, whose row_number() over the selection is correct
+  // for any pool). Both conditions are satisfied by a flagged region today, so this
+  // reads as `true` — it is written out because an unflagged region rendered here in
+  // future would be expand-only for EST and selectable for RS, which is exactly the
+  // state Europe was in before its bucket was scored.
+  //
+  // Adding a region is an UPDATE on regions.aggregate_scope plus a scorer run. No edit
+  // here, none in either ledger RPC, none in the scorer.
+  const aggregates: TerritoryNode[] = regions
+    .filter((r) => r.aggregate_scope && !r.is_global && !r.is_catchall && r.countries.length > 1)
+    .map((r) => ({
+      key: `agg:${r.region_key}`,
+      label: r.display_name,
+      selectable: r.aggregate_scope || cohortTag === "RS",
+      children: regionCountryOptions(r),
+    }));
+  return [us, ...aggregates, global];
 }
 
 /** True when the state axis is meaningful for this scope (country resolves to US). */
