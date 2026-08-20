@@ -37,17 +37,37 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# MOMENTUM FLOOR (2026-08-17): three more senior-author papers in the recent
-# rolling window than in the prior one. Raised from > 0, which admitted 39.7% of
-# the board (246 of 619) on a single extra paper and left no approach ramp --
-# nobody could be one paper from entry, because entry required only the first.
-# Measured at 3: board 619 -> 251, US 123 -> 57, EU 132 -> 48; mean early->recent
-# senior progression of admitted members 1.3->4.4 becomes 2.2->7.9. Named here
-# beside the other thresholds; the momentum pipeline's own gates live with the
-# computation (MIN_PUBS_PER_WINDOW, MAX_CAREER_YEARS in
-# scientific_momentum_scoring.py; MIN_COLLABORATORS_PER_WINDOW in
-# network_momentum_scoring.py).
-MIN_VELOCITY_DELTA = 3
+# COHERENCE FLOOR (2026-08-20). A rising star must clear the median of the
+# eligible pool on ALL FOUR signals the board is built from.
+#
+# WHAT IT REPLACED, AND WHY. The gate was MIN_VELOCITY_DELTA -- a raw count of
+# senior-author papers gained between the rolling windows (>0 until 08-17, then
+# >=3). A count on a small integer cannot separate emergence from accident. At
+# >0 it admitted Moises Velez, whose senior count moved 0->1 while his total
+# output went 5->6, his citation rate fell 593->22 (-96%) and his collaborators
+# contracted 57->45. At >=3 it removed Aditi Singh, who was US #5 on the
+# composite with senior 0->1, total pubs 9->25, collaborators 47->150. Both had
+# delta 1. No count, and no transition or non-decline rule built on these
+# columns, separates them -- measured 2026-08-20 across seven candidate gates,
+# every transition form admitted Velez.
+#
+# The four components do separate them, decisively: Singh is 93/81/92/79 and
+# Velez is 67/6/28/12. The gate now asks whether the signals AGREE, not how big
+# one of them is.
+#
+# WHAT IT COSTS, PLAINLY. Strong output without network expansion no longer
+# qualifies. Antonio Passaro (97/43/99/97) and Giuseppe Lamberti (99/43/97/96)
+# are excluded on network momentum alone despite ranking 52 and 54 today. That
+# is the intended meaning of the rule, not a defect in it: a board about
+# trajectory should not admit a record whose collaboration network is static.
+# A floor fitted to readmit them (P42) was measured and rejected -- it is a
+# constant chosen to clear two named people, and at P40 it also readmits the
+# falling-citation records the gate exists to catch.
+#
+# The momentum pipeline's own gates live with the computation
+# (MIN_PUBS_PER_WINDOW, MAX_CAREER_YEARS in scientific_momentum_scoring.py;
+# MIN_COLLABORATORS_PER_WINDOW in network_momentum_scoring.py).
+MIN_COMPONENT_PERCENTILE = 50
 
 W_MOMENTUM = 0.70
 W_VISIBILITY = 0.30
@@ -72,7 +92,24 @@ def resolve_ta_id(conn, slug: str) -> str:
         return str(row[0])
 
 
-def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_2021_2025') -> list[dict]:
+def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_roll') -> list[dict]:
+    """Fetch the ELIGIBLE POOL -- the cohort gate only, no component floor.
+
+    THE POOL IS NOT THE BOARD (2026-08-20). This used to apply the momentum
+    floor in SQL and return the board directly. The coherence gate cannot be a
+    SQL predicate: two of its four components (scientific and network
+    VISIBILITY) are percentile ranks computed in this script, so they do not
+    exist until the pool is in memory. The gate therefore moves to
+    build_results(), which percentiles over this pool and then selects.
+
+    vis_window defaults to 'recent_roll' (2026-08-20), not the fixed
+    'recent_2021_2025' label. The other three components are computed on the
+    rolling windows (2021-08-01..2026-07-31); the fixed label is a separate,
+    staler capture ending a year earlier. Reading it here made the gate assert
+    agreement between DIFFERENT PERIODS rather than between signals. The rolling
+    centrality rows already existed -- no recompute was needed, only this
+    default. Measured effect on its own: board 330 -> 338, US 56 -> 59.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -104,14 +141,12 @@ def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_2021_2025') 
             WHERE sm.therapeutic_area_id = %(ta_id)s
               AND (cc.cohort = 'rising_eligible'
                    OR (cc.cohort = 'established' AND cc.career_age <= 15))
-              -- MOMENTUM FLOOR (2026-08-05, raised 2026-08-17): a board defined
-              -- by trajectory excludes members whose senior-author output did not
-              -- move. One condition on the thing the cohort claims to measure;
-              -- degree can fall for reasons unrelated to trajectory, so it is not
-              -- part of the floor. Threshold is MIN_VELOCITY_DELTA above.
-              AND sm.pub_velocity_delta >= %(min_delta)s
+              -- NO COMPONENT FLOOR HERE (2026-08-20). The momentum floor that
+              -- stood on this line (sm.pub_velocity_delta >= MIN_VELOCITY_DELTA)
+              -- is gone; selection is now MIN_COMPONENT_PERCENTILE applied to
+              -- all four components in build_results(). See the constant.
             """,
-            {"ta_id": ta_id, "vis_window": vis_window, "min_delta": MIN_VELOCITY_DELTA},
+            {"ta_id": ta_id, "vis_window": vis_window},
         )
         return [
             {
@@ -187,7 +222,23 @@ def build_results(rows: list[dict]) -> list[dict]:
         {r["hcp_id"]: r["network_visibility_raw"] for r in rows},
     )
 
-    results: list[dict] = []
+    # THE GATE (2026-08-20). Percentiles above are over the ELIGIBLE POOL, so the
+    # floor is reproducible from the stored columns: anyone can re-derive board
+    # membership by reading the four *_percentile values off
+    # hcp_rising_star_ranks_v3 and checking them against MIN_COMPONENT_PERCENTILE.
+    # Under the old gate that was impossible -- the deciding variable
+    # (pub_velocity_delta) lived in a different table that is overwritten in place.
+    #
+    # DENOMINATOR NOTE, worth knowing before comparing to history: the visibility
+    # percentiles are now taken over the eligible pool (~1,934) rather than over
+    # the post-gate board (251), because a value used to SELECT the board cannot
+    # be computed FROM the board without circularity. Stored sci_vis/net_vis
+    # therefore shift for everyone relative to pre-08-20 rows. sci_mom/net_mom are
+    # unchanged -- they arrive already percentiled from the momentum pipeline over
+    # its own eligible set. That mixture of denominators predates this change and
+    # is logged as a separate finding; it is not introduced here.
+    gated: list[dict] = []
+    excluded_by_component = {"sci_mom": 0, "net_mom": 0, "sci_vis": 0, "net_vis": 0}
     for row in rows:
         hcp_id = row["hcp_id"]
         sci_mom = row["scientific_momentum_percentile"]
@@ -197,6 +248,37 @@ def build_results(rows: list[dict]) -> list[dict]:
             + W_NET * recent_citations_pctiles[hcp_id]
         )
         net_vis = net_vis_pctiles[hcp_id]
+
+        components = {
+            "sci_mom": sci_mom, "net_mom": net_mom,
+            "sci_vis": sci_vis, "net_vis": net_vis,
+        }
+        below = [k for k, v in components.items() if v < MIN_COMPONENT_PERCENTILE]
+        if below:
+            # Attribute to every failing axis, not just the first: the counts are
+            # a diagnostic of WHICH signal is doing the excluding, and on the
+            # 08-20 measurement that was overwhelmingly network momentum.
+            for k in below:
+                excluded_by_component[k] += 1
+            continue
+        gated.append({**row, "_sci_vis": sci_vis, "_net_vis": net_vis})
+
+    print(
+        f"[gate] eligible {len(rows):,} -> board {len(gated):,} "
+        f"(all four components >= P{MIN_COMPONENT_PERCENTILE:g})"
+    )
+    print(
+        "[gate] exclusions by axis (an HCP can fail more than one): "
+        + ", ".join(f"{k} {v:,}" for k, v in excluded_by_component.items())
+    )
+
+    results: list[dict] = []
+    for row in gated:
+        hcp_id = row["hcp_id"]
+        sci_mom = row["scientific_momentum_percentile"]
+        net_mom = row["network_momentum_percentile"]
+        sci_vis = row["_sci_vis"]
+        net_vis = row["_net_vis"]
 
         momentum_component = W_SCI * sci_mom + W_NET * net_mom
         visibility_component = W_SCI * sci_vis + W_NET * net_vis
@@ -334,7 +416,7 @@ def upsert_results(conn, ta_id: str, results: list[dict], run_id: str) -> int:
 
 
 @click.command()
-@click.option("--vis-window", default="recent_2021_2025", help="hcp_network_centrality_v2.window_type used for network visibility")
+@click.option("--vis-window", default="recent_roll", help="hcp_network_centrality_v2.window_type for network visibility. Default 'recent_roll' matches the rolling windows the other three components use; 'recent_2021_2025' is the older fixed label and ends a year earlier.")
 @click.option("--ta", default="nsclc", help="Therapeutic area slug")
 @click.option("--dry-run", is_flag=True, help="Compute but do not write to DB")
 @click.option("--debug-top", default=20, type=int, help="Print top N by rising_star_percentile")
@@ -348,12 +430,15 @@ def main(ta: str, dry_run: bool, debug_top: int, vis_window: str) -> None:
     rows = fetch_input_signals(conn, ta_id, vis_window=vis_window)
     print(f"Loaded {len(rows):,} eligible HCPs")
 
-    print("Computing composite scores and archetypes...")
+    print("Applying the coherence gate and computing composite scores...")
     results = build_results(rows)
-    print(f"Scored HCPs: {len(results):,}")
+    print(f"Board size: {len(results):,}")
 
     if not results:
-        print("No eligible HCPs found. Exiting.")
+        # Guard matters more under a four-way AND than under a count floor: a
+        # single upstream component arriving all-NULL would empty the board, and
+        # upsert_results() deletes nothing when handed zero rows.
+        print("No HCPs cleared the gate. Exiting without writing.")
         conn.close()
         return
 
