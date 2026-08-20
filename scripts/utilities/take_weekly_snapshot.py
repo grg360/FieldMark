@@ -61,6 +61,7 @@ import sys
 from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from uuid import uuid4
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -84,7 +85,12 @@ GLOBAL_SCOPE_SENTINEL = "__global__"
 # force. Hardcoding would reintroduce exactly the drift the columns exist to
 # prevent -- the 619 -> 251 move WAS one of these numbers changing.
 THRESHOLD_SOURCES: Dict[str, Tuple[str, str]] = {
-    "min_velocity_delta":  ("scripts/score/rising_star_scoring.py",         "MIN_VELOCITY_DELTA"),
+    # 2026-08-20: MIN_VELOCITY_DELTA no longer exists. The rising gate is now
+    # MIN_COMPONENT_PERCENTILE applied to all four components. read_int_constant
+    # raises on a missing name by design, so leaving the old entry here would
+    # have failed every future capture -- which is the intended behaviour, and
+    # is how this was caught.
+    "min_component_percentile": ("scripts/score/rising_star_scoring.py",    "MIN_COMPONENT_PERCENTILE"),
     "min_pubs_per_window": ("scripts/score/scientific_momentum_scoring.py", "MIN_PUBS_PER_WINDOW"),
     "max_career_years":    ("scripts/score/scientific_momentum_scoring.py", "MAX_CAREER_YEARS"),
     "min_collaborators":   ("scripts/score/network_momentum_scoring.py",    "MIN_COLLABORATORS_PER_WINDOW"),
@@ -222,6 +228,7 @@ RISING_SELECT = """
 
 RISING_INSERT = """
     INSERT INTO hcp_rising_board_snapshots (
+        capture_id,
         snapshot_date, hcp_id, therapeutic_area_id, therapeutic_area_slug,
         first_name, last_name, institution_at_snapshot, country_at_snapshot,
         effective_country_at_snapshot,
@@ -237,11 +244,107 @@ RISING_INSERT = """
         career_age, cohort_classification, industry_classification,
         early_window_start, early_window_end,
         recent_window_start, recent_window_end,
-        min_velocity_delta_applied, min_pubs_per_window_applied,
+        min_component_percentile_applied, min_pubs_per_window_applied,
         min_collaborators_applied, max_career_years_applied
     ) VALUES %s
-    ON CONFLICT (snapshot_date, hcp_id, therapeutic_area_id) DO NOTHING
+    -- KEYED ON capture_id (2026-08-20, migration
+    -- 2026_08_20_rising_snapshot_capture_id.sql). A calendar day may hold several
+    -- board states; capture_id is minted once per run and is constant across every
+    -- row of that run, so each state is its own capture.
+    --
+    -- THE TWO KEYS THIS REPLACED both failed, for different reasons. The original
+    -- (snapshot_date, hcp_id, TA) with DO NOTHING made the second capture of
+    -- 2026-08-20 a total no-op -- the 251 -> 336 gate change went unrecorded while
+    -- printing "inserted 0 rows". Its replacement keyed on source_computed_at,
+    -- which is PER ROW (board members from the ranks table, off-board pool members
+    -- from the momentum table), so off-board rows still collided and DO UPDATE
+    -- overwrote 1,769 rows of the earlier capture with the later one's provenance.
+    --
+    -- DO UPDATE is correct HERE because capture_id is only ever reused
+    -- deliberately, by find_existing_capture_id() below, when the scoring being
+    -- captured is the same scoring already captured. That is a refresh in place.
+    -- Every other run mints a new id and inserts.
+    ON CONFLICT (capture_id, hcp_id, therapeutic_area_id)
+    DO UPDATE SET
+      is_on_board = EXCLUDED.is_on_board,
+      global_rank = EXCLUDED.global_rank,
+      us_rank = EXCLUDED.us_rank,
+      rising_star_percentile = EXCLUDED.rising_star_percentile,
+      rising_star_raw = EXCLUDED.rising_star_raw,
+      momentum_component = EXCLUDED.momentum_component,
+      visibility_component = EXCLUDED.visibility_component,
+      scientific_momentum_percentile = EXCLUDED.scientific_momentum_percentile,
+      network_momentum_percentile = EXCLUDED.network_momentum_percentile,
+      scientific_visibility_percentile = EXCLUDED.scientific_visibility_percentile,
+      network_visibility_percentile = EXCLUDED.network_visibility_percentile,
+      pub_velocity_delta = EXCLUDED.pub_velocity_delta,
+      recent_senior_pubs = EXCLUDED.recent_senior_pubs,
+      early_senior_pubs = EXCLUDED.early_senior_pubs,
+      recent_total_pubs = EXCLUDED.recent_total_pubs,
+      early_total_pubs = EXCLUDED.early_total_pubs,
+      recent_collaborator_count = EXCLUDED.recent_collaborator_count,
+      early_collaborator_count = EXCLUDED.early_collaborator_count,
+      min_component_percentile_applied = EXCLUDED.min_component_percentile_applied
 """
+
+
+def find_existing_capture_id(conn, snapshot_date, ta_id, board_computed_at):
+    """The capture_id already holding THIS scoring output, if there is one.
+
+    IDEMPOTENCE LIVES HERE, NOT IN THE KEY. capture_id is minted per run, so
+    without this check a second run against unchanged scoring would insert a
+    complete duplicate capture. With it, the writer reuses the existing id and the
+    ON CONFLICT DO UPDATE becomes a genuine refresh in place.
+
+    THE FINGERPRINT IS THE BOARD'S computed_at. Board rows take source_computed_at
+    from hcp_rising_star_ranks_v3, so it moves if and only if the scorer has re-run
+    -- which is exactly when a new capture is warranted. Off-board rows are NOT
+    usable for this: they take it from hcp_scientific_momentum_v1, which does not
+    move when only the rising scorer runs, and keying on it is what corrupted the
+    2026-08-20 captures.
+
+    Returns None when the scoring is new, and the caller mints a fresh uuid.
+    """
+    if board_computed_at is None:
+        return None
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT capture_id
+            FROM hcp_rising_board_snapshots
+            WHERE snapshot_date = %s
+              AND therapeutic_area_id = %s
+              AND is_on_board
+              AND source_computed_at = %s
+            LIMIT 1
+            """,
+            (snapshot_date, ta_id, board_computed_at),
+        )
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def execute_values_counted(cur, sql: str, values: list, page_size: int = 500) -> int:
+    """execute_values, returning the TOTAL rows written rather than the last page's.
+
+    THE COUNTER LIED (2026-08-20). execute_values sends one statement per page, so
+    cur.rowcount afterwards reflects only the FINAL page. The 2026-08-20 morning
+    capture wrote 2,232 rows in pages of 500 and reported "inserted 232" -- 4x500
+    plus a 232-row remainder. That understatement is what made the evening
+    capture's total collision look unremarkable: a number far below the pool size
+    had already been normalised as what this script prints.
+
+    Paging explicitly and summing is the whole fix. Under ON CONFLICT DO UPDATE
+    the total counts inserts AND refreshes, which is why callers say "wrote"
+    rather than "inserted" -- an unchanged re-capture legitimately reports the
+    full row count, and reporting it as inserts would be the mirror-image lie.
+    """
+    total = 0
+    for start in range(0, len(values), page_size):
+        page = values[start : start + page_size]
+        execute_values(cur, sql, page, page_size=len(page))
+        total += cur.rowcount or 0
+    return total
 
 
 def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) -> int:
@@ -257,7 +360,7 @@ def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) 
     # Column offsets into RISING_SELECT. Named rather than inlined: an off-by-one
     # here would silently record the wrong variable as the gating one.
     HCP_ID, IS_ON_BOARD, PUB_VELOCITY_DELTA, RECENT_COLLAB = 0, 8, 21, 26
-    floor = float(thresholds["min_velocity_delta"])
+    floor = float(thresholds["min_component_percentile"])
 
     on_board = sum(1 for r in rows if r[IS_ON_BOARD])
 
@@ -281,36 +384,68 @@ def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) 
     # and actual membership. Verified exact on the 2026-08-17 capture: 251 == 251,
     # zero rows in either direction. If a fourth gate is added to the scorer,
     # reconstructed becomes a strict superset of actual and this fires.
-    def gate_says_on_board(r) -> bool:
-        return (
-            r[PUB_VELOCITY_DELTA] is not None
-            and float(r[PUB_VELOCITY_DELTA]) >= floor
-            and r[RECENT_COLLAB] is not None      # NULL <=> no network-momentum row
-                                                  # <=> failed MIN_COLLABORATORS_PER_WINDOW
+    # RECONSTRUCTION DISARMED (2026-08-20) — READ THIS BEFORE TRUSTING THE COUNTERS.
+    #
+    # The gate is no longer reconstructible from the pool columns. It is now
+    # MIN_COMPONENT_PERCENTILE against all four components, and two of those
+    # (scientific and network VISIBILITY) are percentile ranks computed inside
+    # rising_star_scoring.py over the eligible pool. They are written to
+    # hcp_rising_star_ranks_v3 for BOARD MEMBERS ONLY, so for the ~1,700 pool
+    # members who are off the board the deciding values do not exist anywhere.
+    #
+    # Reconstructing from pub_velocity_delta would be worse than not
+    # reconstructing: it would compute a confident set-equality result against a
+    # rule the scorer no longer applies. That is precisely the "number that looks
+    # authoritative and quietly is not" this block was written to prevent, so the
+    # honest move is to stop claiming the check.
+    #
+    # TO RESTORE IT, the scorer must persist the four component percentiles for
+    # the whole eligible pool, not just the board. That is a real change (the
+    # ranks table is board-only by construction) and is NOT done here.
+    #
+    # WHAT IS LOST: phantom/missed detection, and the exit-exposed / entry-ready
+    # counters below, which were defined in units of senior-author papers. "One
+    # paper from entry" has no meaning under a four-percentile floor -- an entrant
+    # now approaches along four axes at once.
+    GATE_RECONSTRUCTIBLE = False
+
+    def gate_says_on_board(r) -> bool:  # pragma: no cover - disarmed, see above
+        raise NotImplementedError(
+            "rising gate is not reconstructible from snapshot columns since 2026-08-20"
         )
 
     actual = {r[HCP_ID] for r in rows if r[IS_ON_BOARD]}
-    reconstructed = {r[HCP_ID] for r in rows if gate_says_on_board(r)}
-    phantom, missed = reconstructed - actual, actual - reconstructed
-
-    # One senior-author paper from a membership change -- outbound and inbound.
-    # NOT the delta axis alone: 22 people sit at delta = floor-1 while failing the
-    # collaborator gate, and a paper does not admit them, so counting them as
-    # "one short" overstates inbound churn.
-    exit_exposed = sum(
-        1 for r in rows
-        if r[IS_ON_BOARD]
-        and r[PUB_VELOCITY_DELTA] is not None and float(r[PUB_VELOCITY_DELTA]) == floor
-    )
-    entry_ready = sum(
-        1 for r in rows
-        if not r[IS_ON_BOARD]
-        and r[PUB_VELOCITY_DELTA] is not None and float(r[PUB_VELOCITY_DELTA]) == floor - 1
-        and r[RECENT_COLLAB] is not None
-    )
+    if GATE_RECONSTRUCTIBLE:
+        reconstructed = {r[HCP_ID] for r in rows if gate_says_on_board(r)}
+        phantom, missed = reconstructed - actual, actual - reconstructed
+        # One senior-author paper from a membership change -- outbound and inbound.
+        # NOT the delta axis alone: 22 people sit at delta = floor-1 while failing
+        # the collaborator gate, and a paper does not admit them, so counting them
+        # as "one short" overstates inbound churn.
+        exit_exposed = sum(
+            1 for r in rows
+            if r[IS_ON_BOARD]
+            and r[PUB_VELOCITY_DELTA] is not None and float(r[PUB_VELOCITY_DELTA]) == floor
+        )
+        entry_ready = sum(
+            1 for r in rows
+            if not r[IS_ON_BOARD]
+            and r[PUB_VELOCITY_DELTA] is not None and float(r[PUB_VELOCITY_DELTA]) == floor - 1
+            and r[RECENT_COLLAB] is not None
+        )
+    else:
+        reconstructed, phantom, missed = set(), set(), set()
+        exit_exposed = entry_ready = None
 
     print(f"  pool {len(rows):,} | on board {on_board:,}")
-    if phantom or missed:
+    if not GATE_RECONSTRUCTIBLE:
+        print(
+            "  gate check SKIPPED: the coherence gate (all four components >= "
+            f"P{floor:g}) is not reconstructible from snapshot columns -- the two "
+            "visibility percentiles are not stored for off-board pool members. "
+            "Captured rows are unaffected. See GATE_RECONSTRUCTIBLE above."
+        )
+    elif phantom or missed:
         # Capture still proceeds -- the rows are irreplaceable and the stage is
         # non-blocking -- but refuse to print numbers derived from a rule that no
         # longer matches the scorer.
@@ -332,8 +467,24 @@ def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) 
         print("  [DRY RUN] nothing written")
         return 0
 
+    # CAPTURE IDENTITY. Reuse the id already holding this exact scoring output if
+    # there is one (a re-run against unmoved scoring is a refresh, not a new
+    # state); otherwise mint one. row[9] is source_computed_at, and only board rows
+    # carry the scorer's own timestamp -- see find_existing_capture_id().
+    board_computed_at = next(
+        (r[9] for r in rows if r[IS_ON_BOARD] and r[9] is not None), None
+    )
+    existing = find_existing_capture_id(conn, snapshot_date, ta_id, board_computed_at)
+    capture_id = existing or str(uuid4())
+    print(
+        f"  capture {capture_id} "
+        f"({'refreshing existing capture' if existing else 'new capture'}; "
+        f"board scored {board_computed_at})"
+    )
+
     values = [
         (
+            capture_id,
             snapshot_date,
             row[0], row[1], row[2],                    # hcp_id, ta_id, slug
             row[3], row[4], row[5], row[6], row[7],    # identity
@@ -346,7 +497,7 @@ def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) 
             row[26], row[27],                          # collaborators both windows
             row[28], row[29], row[30],                 # career_age, cohort, industry
             row[31], row[32], row[33], row[34],        # window bounds
-            thresholds["min_velocity_delta"],
+            thresholds["min_component_percentile"],
             thresholds["min_pubs_per_window"],
             thresholds["min_collaborators"],
             thresholds["max_career_years"],
@@ -355,10 +506,15 @@ def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) 
     ]
 
     with conn.cursor() as cur:
-        execute_values(cur, RISING_INSERT, values, page_size=500)
-        inserted = cur.rowcount
+        inserted = execute_values_counted(cur, RISING_INSERT, values)
     conn.commit()
-    print(f"  inserted {inserted:,} rows")
+    print(f"  wrote {inserted:,} rows of {len(values):,} (inserted or refreshed)")
+    if inserted != len(values):
+        print(
+            f"  !! {len(values) - inserted:,} row(s) were neither inserted nor refreshed. "
+            "Under the widened key this should not happen; investigate before "
+            "trusting this capture."
+        )
     return inserted
 
 
@@ -481,10 +637,19 @@ def take_established_snapshot(conn, snapshot_date, ta_id, slug, dry_run) -> int:
     ]
 
     with conn.cursor() as cur:
-        execute_values(cur, ESTABLISHED_INSERT, values, page_size=500)
-        inserted = cur.rowcount
+        # Established keeps ON CONFLICT DO NOTHING on its narrow, date-keyed PK --
+        # it carries the same defect as rising did and is untreated (see the
+        # migration note). The counter fix applies regardless: a partial write
+        # here now shows as a shortfall instead of hiding in the last page.
+        inserted = execute_values_counted(cur, ESTABLISHED_INSERT, values)
     conn.commit()
-    print(f"  inserted {inserted:,} rows")
+    print(f"  wrote {inserted:,} rows of {len(values):,}")
+    if inserted != len(values):
+        print(
+            f"  NOTE: {len(values) - inserted:,} row(s) already present for this "
+            "snapshot_date and were skipped (established is still date-keyed, "
+            "ON CONFLICT DO NOTHING)."
+        )
     return inserted
 
 
