@@ -3,7 +3,21 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 // .dc.html, project 0512b0fa, built 2026-08-09). Presentation layer ONLY: the
 // content shipped in commit 4808893 is LOCKED — every number, weight, formula
 // and claim below is verbatim from that commit; this file arranges it, it does
-// not edit it. The 1B devices: four cohort cards (scored-ranked vs
+// not edit it.
+//
+// ONE EXCEPTION, 2026-08-20 — A FACTUAL CORRECTION, NOT A REWRITE. The
+// "Why no one scores 100" section worked its example against a Rising board of
+// 251. That board is now 336 (the 2026-08-20 coherence gate replaced the
+// velocity-delta gate in rising_star_scoring.py and resized it), so the page
+// was illustrating the percentile convention with a denominator production no
+// longer uses. The board size and the two worked endpoints were recomputed
+// against n = 336 using the page's own stated formula, 100 x (n + 1 - rank) /
+// (n + 1): the leader moves 99.6 → 99.7 (33,600/337 = 99.703) and the last
+// member 0.4 → 0.3 (100/337 = 0.297). Nothing else in the section changed —
+// the convention, the argument and the sentence structure are the committed
+// text. Re-derive both figures if the board is resized again.
+//
+// The 1B devices: four cohort cards (scored-ranked vs
 // classified-not-ranked), every formula as a full-width proportion bar whose
 // widths ARE the weights (pharma 0.00 renders as an EMPTY tray — the exclusion
 // is visible, not just stated), the evidence-tier ladder, and the data-source
@@ -215,10 +229,10 @@ export default function MethodologyPage() {
           <strong>Why no one scores 100, and no one scores 0.</strong> Every FieldMark percentile answers one question: how many people in this cohort does this person stand above? We compute it from position - first, second, third - over a finite, known list. That makes the endpoints a matter of arithmetic, and until 2026-08-18 the arithmetic said the first person was at the 100th percentile and the last at the 0th.
         </p>
         <p style={bodyStyle}>
-          Neither is a fact about anyone. Being first in a list of 251 is not standing above every oncologist in lung cancer; it is standing above 250 named people we have measured. Being last is not the absence of standing - it is the 251st position in the same list. A score of exactly 100 claims a ceiling the data cannot see past, and a score of exactly 0 claims a floor that isn't there.
+          Neither is a fact about anyone. Being first in a list of 336 is not standing above every oncologist in lung cancer; it is standing above 335 named people we have measured. Being last is not the absence of standing - it is the 336th position in the same list. A score of exactly 100 claims a ceiling the data cannot see past, and a score of exactly 0 claims a floor that isn't there.
         </p>
         <p style={bodyStyle}>
-          Percentiles are now placed at <code>100 x (n + 1 - rank) / (n + 1)</code>. On a board of 251 the leader reads 99.6 and the last member reads 0.4. The ordering is unchanged and the distance between neighbours is unchanged; what changes is that both ends now sit inside the range, where the evidence puts them. The convention is the same on every board, so a Rising percentile and an Established one still mean the same thing.
+          Percentiles are now placed at <code>100 x (n + 1 - rank) / (n + 1)</code>. On a board of 336 the leader reads 99.7 and the last member reads 0.3. The ordering is unchanged and the distance between neighbours is unchanged; what changes is that both ends now sit inside the range, where the evidence puts them. The convention is the same on every board, so a Rising percentile and an Established one still mean the same thing.
         </p>
         <p style={bodyStyle}>
           The same argument settles a smaller case. Some territories hold exactly one ranked HCP, and that person used to score 100 - top of a list of one. They now score 50. Being the only person we have measured in a country is not evidence of standing above anyone; it is the middle of a list with no one else in it, and the score says so.

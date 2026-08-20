@@ -26,6 +26,12 @@ export default function LandscapeRoute() {
 
   const taLabel = indicationSlugToLabel("Oncology", taSlug) ?? taSlug.toUpperCase();
 
+  // The size of the plotted set, or null when there is nothing plotted. NULL
+  // RATHER THAN 0 on purpose: every consumer below has to decide what to do
+  // about absence, and a 0 would let one of them print "Top 0 US Rising Stars"
+  // or "ranked within the plotted 0" without the type ever objecting.
+  const plotted = points.length > 0 ? points.length : null;
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -82,9 +88,19 @@ export default function LandscapeRoute() {
             eyebrow={"Fieldmark · Landscape"}
             meta={`RANKS AS OF ${formatScoringDate(scoredAt)}`}
             title={`${taLabel} Landscape`}
-            dek={"Top 100 US Rising Stars · momentum vs visibility"}
+            // The count comes from the plotted set, never from a literal
+            // (2026-08-20). Both this dek and the tile below carried `|| 100`,
+            // so an empty board announced "Top 100 US Rising Stars" over an
+            // empty chart and a tile reading 100 — a fabricated figure standing
+            // in for a missing one, which is the failure this platform's
+            // absence rules exist to prevent. With no points the dek simply
+            // drops the count rather than naming a number we do not have.
+            dek={plotted != null ? `Top ${plotted} US Rising Stars · momentum vs visibility` : "US Rising Stars · momentum vs visibility"}
             stats={{ variant: "cluster", items: [
-              { value: String(points.length || 100), label: "PLOTTED" },
+              // Three states, distinguished: still loading, genuinely empty,
+              // and a real count. The em-dash is the platform's honest-absence
+              // glyph (cohortLedger cellDisplay) — absence is never a number.
+              { value: loading ? "…" : plotted != null ? String(plotted) : "—", label: "PLOTTED" },
             ] }}
           />
         </div>
@@ -99,7 +115,11 @@ export default function LandscapeRoute() {
           <div key={axis} style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 9, letterSpacing: "0.16em", color: "#6e6b66", width: 18 }}>{axis}</span>
             <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12, letterSpacing: "0.1em", color: "#ece9e4" }}>{name}</span>
-            <span style={{ fontSize: 12, color: "#6e6b66" }}>percentile composite · ranked within the plotted {points.length || 100}</span>
+            {/* Same `|| 100` fallback as the hero, fixed with it: this line
+                asserts the denominator the axis is ranked within, and printing
+                a stand-in there misstates what the axis MEANS, not just how
+                many dots are on it. */}
+            <span style={{ fontSize: 12, color: "#6e6b66" }}>percentile composite{plotted != null ? ` · ranked within the plotted ${plotted}` : ""}</span>
           </div>
         ))}
       </div>

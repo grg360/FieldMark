@@ -161,11 +161,22 @@ const footerStyle: CSSProperties = {
   maxWidth: 1000,
 };
 
+// HAND-MAINTAINED FIGURES, corrected 2026-08-20. These four tiles are string
+// literals: /demo is an unauthenticated marketing surface with no Supabase
+// client and no query path, so there is nothing here to derive them from. That
+// makes them the only numbers on the platform that can drift silently — every
+// other stat tile in the app reads its value from an RPC.
+//
+// THEY MUST BE RE-VERIFIED AGAINST THE LIVE COUNTS BEFORE ANY EXTERNAL USE —
+// a deck, a demo, a link sent outside the team. Rounded and "+"-suffixed on
+// purpose: a figure that claims less precision than it has cannot go stale in
+// the way an exact count does. Whoever refreshes these should record the date
+// on this line and say what they were checked against.
 const stats = [
-  { value: "80,000+", label: `${taLabelForSlug("nsclc")} Investigators` },
-  { value: "173,000", label: "Publications" },
-  { value: "2,463", label: "Clinical Trials" },
-  { value: "6,400", label: "Scientific Positions" },
+  { value: "17,000+", label: `Scored ${taLabelForSlug("nsclc")} Investigators` },
+  { value: "87,000", label: `${taLabelForSlug("nsclc")} Publications` },
+  { value: "88", label: "Countries" },
+  { value: "22,000+", label: "Extracted Scientific Positions" },
 ];
 
 export default function DemoPage() {
