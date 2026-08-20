@@ -11,6 +11,7 @@ import AppLayout from "../AppLayout";
 import PublicationsSurface from "./PublicationsSurface";
 import FullCareerView from "./FullCareerView";
 import PageHero from "../PageHero";
+import { CANON, DEPTH } from "../../lib/canonicalTokens";
 
 // The redesigned per-HCP publications surface. Two modes off the same route:
 //   • year-scoped (a year in nav-state or ?year=) → the dense/sparse band view.
@@ -78,6 +79,34 @@ export default function HcpPublicationsPage() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs} width="wide">
+      {/* PAGE PANEL (2026-08-19). This surface rendered its hero and every row
+          directly on the app ground — measured at a 918px viewport, breadcrumb,
+          title, stat row, column header and first card ALL sat at left: 16, which
+          is AppLayout's padding and nothing else. PageHero has no container of its
+          own by design (see its comment: the padding "belongs on the surface's own
+          content blocks"), so a surface that does not supply one gets no container
+          at all. This is the same wrapper the Cohort Ledger (:2007), Institutions
+          (:571) and Congress calendar (:277) use.
+
+          BORDER BEFORE DEPTH.PANEL, NOT AFTER. DEPTH.PANEL carries its own borderTop
+          rim, and the `border` shorthand silently overwrites it when it comes second
+          — the exact bug CongressCalendarPage:274-276 documents. Spread order here
+          is load-bearing, not style.
+
+          44px HORIZONTAL (2026-08-19, raised from 32). Every row in PublicationsSurface carries
+          `padding: "15px 0"` — no horizontal inset at all — so its borderTop/Bottom rules
+          span the full content width and terminate flush against the panel padding. At
+          20px they read as touching the border even though nothing escapes it: measured,
+          hero and rows both start at the content edge and zero elements cross it. 32px is
+          Congress calendar's 32 was the right reference for A PANEL but the wrong one for
+          A NUMERAL AGAINST A BORDER: measured, the ledger insets its 44px rank numeral
+          46px from the panel edge (20px panel padding + 23px row padding, because it
+          nests a board inside its panel), while 32 here put this page's 22px numeral at
+          34px. 44 puts it at 45 -- within a pixel of the ledger -- and moves the hero and
+          the rules together, which keeps them aligned. The alternative — insetting the rows instead, the way
+          the ledger nests a board inside its panel — belongs with the six-surface batch,
+          where Trials and HCP positions raise the same question. */}
+      <div style={{ margin: "8px 0 24px", padding: "24px 44px 48px", border: `1px solid ${CANON.LINE.HAIR}`, ...DEPTH.PANEL }}>
       {/* Reduced H1 (PageHero, Commit B 2026-08-05); the mono record label
           rides the meta slot. */}
       <div style={{ marginBottom: 22 }}>
@@ -100,6 +129,7 @@ export default function HcpPublicationsPage() {
       ) : (
         <FullCareerView hcpId={hcpId ?? ""} seniorRows={seniorRows} coAuthorTotal={coAuthorTotal} ledger={ledger} hcpName={hcpName} />
       )}
+      </div>
     </AppLayout>
   );
 }
