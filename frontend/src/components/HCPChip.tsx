@@ -94,11 +94,19 @@ const SKIN = {
 } as const;
 
 /** Normalise whatever a surface calls a cohort into the chip's three slots.
- *  Anything unrecognised — and anything RANKLESS — resolves to null, which is
- *  the unresolved state: chip shape kept, fill dropped. Defaulting an unknown
- *  cohort into a real slot would paint a person a cohort they do not hold. */
-export function toChipCohort(raw: string | null | undefined, rank?: number | null): ChipCohort {
-  if (rank == null) return null;
+ *  Anything unrecognised resolves to null, which is the unresolved state: chip
+ *  shape kept, fill dropped. Defaulting an unknown cohort into a real slot would
+ *  paint a person a cohort they do not hold.
+ *
+ *  RANKLESS IS NOT THE SAME AS UNRESOLVED (2026-08-20). The guard used to be
+ *  `rank == null`, which was correct for the two ranked boards and wrong for the
+ *  third: community is not ranked BY DESIGN -- home.ts:1352, "the chip wears the
+ *  evidence-tier word, never a number" -- so every qualifying community member
+ *  fell to null here and rendered UNRANKED, asserting they hold no board position
+ *  when community_board_nsclc_v1 says they hold an anchored one. A tier is a
+ *  position; pass it and the chip keeps its COM fill. */
+export function toChipCohort(raw: string | null | undefined, rank?: number | null, tier?: string | null): ChipCohort {
+  if (rank == null && tier == null) return null;
   switch (raw) {
     case "established":
       return "established";
@@ -116,6 +124,21 @@ const COHORT_TAG: Record<Exclude<ChipCohort, null>, string> = {
   established: "EST",
   rising: "RS",
   community: "COM",
+};
+
+// Community wears its evidence tier where the ranked boards wear a number.
+// Mirrors COM_RAIL_TIER_WORD (Cohorts/CohortLedger.tsx) so the chip and the
+// community rail cannot drift into two vocabularies for one fact.
+//
+// `unresolved` is deliberately absent. The rail renders it "no medicare
+// evidence", which is five words and will not fit a chip -- and it is not a
+// tier claim anyway, it is the absence of one. It falls through to the bare
+// COM tag below, which is the honest reading.
+const TIER_TAG: Record<string, string> = {
+  anchored: "ANCHORED",
+  supported: "SUPPORTED",
+  heme_dominant: "HEME-FOCUSED",
+  candidate: "CANDIDATE",
 };
 
 /** The ledger's tracked bookmark — same glyph, same amber, everywhere. 7×10.
@@ -163,6 +186,17 @@ export interface HCPChipProps {
   cohort?: ChipCohort;
   /** Omit or null when the person carries no rank on this board. */
   rank?: number | null;
+  /** Community's evidence tier. Community is not ranked, so this is what the
+   *  chip shows in the rank slot -- never alongside a number. */
+  tier?: string | null;
+  /** The rank this person LAST held on a board they have since left, with the
+   *  snapshot date it was true on. NOT printed on the chip -- it suppresses the
+   *  rank slot entirely and moves the fact to the hover. Without it a de-listed
+   *  person is indistinguishable from one who was never ranked, and the chip
+   *  asserts the second. See rankText. */
+  priorRank?: number | null;
+  priorLadder?: "RS" | "EST" | null;
+  priorAsOf?: string | null;
   tracked?: boolean;
   /** Wire this and the bookmark becomes the track/untrack control: solid amber
    *  when tracked, a faint outline when not. WITHOUT it the chip keeps its old
@@ -176,7 +210,7 @@ export interface HCPChipProps {
   style?: CSSProperties;
 }
 
-export default function HCPChip({ hcpId, name, cohort = null, rank = null, tracked = false, onToggleTracked, bookmarkTone = "full", style }: HCPChipProps) {
+export default function HCPChip({ hcpId, name, cohort = null, rank = null, tier = null, priorRank = null, priorLadder = null, priorAsOf = null, tracked = false, onToggleTracked, bookmarkTone = "full", style }: HCPChipProps) {
   const [hover, setHover] = useState(false);
   const [markHover, setMarkHover] = useState(false);
   const s = cohort ? SKIN[cohort] : null;
@@ -186,7 +220,35 @@ export default function HCPChip({ hcpId, name, cohort = null, rank = null, track
   const edge = s ? rgba(s.marker, 0.32) : CANON.LINE.EDGE;
   const nameInk = s ? s.name : CANON.INK.BODY;
   const rankInk = s ? s.marker : CANON.INK.MUTE;
-  const rankText = cohort && rank != null ? `${COHORT_TAG[cohort]} ${rank}` : "UNRANKED";
+  // Four states. Three print something; the fourth prints NOTHING, on purpose.
+  //   ranked      -> "RS 5"
+  //   tiered      -> "ANCHORED"   community holds a position, just not a number
+  //   de-listed   -> null         name alone, no tag, no fill -- see below
+  //   never ranked-> "UNRANKED"   which now means exactly what it says
+  //
+  // WHY DE-LISTED PRINTS NOTHING (2026-08-20). It briefly printed "WAS RS 5".
+  // That is a true fact and the wrong one for this surface: the portfolio is
+  // about who you are tracking NOW, and a rank someone held a fortnight ago is
+  // noise competing with the live ranks beside it. The fact the reader needs is
+  // "not on a board today", and an empty rank slot on a chip whose neighbours
+  // all carry one states that without spending a word. History is not discarded
+  // -- it moves to the hover, which is where history belongs.
+  //
+  // UNRANKED IS STILL REACHABLE and still correct: it is the terminal fallback
+  // for someone with no rank, no tier and no prior rank. Trials depends on that
+  // reading (lib/trials.ts:282, "genuinely unranked -- UNRANKED is the truth").
+  // What changed is that it can no longer be reached by someone who WAS ranked.
+  const rankText =
+    cohort && rank != null ? `${COHORT_TAG[cohort]} ${rank}`
+    : tier ? TIER_TAG[tier] ?? "COM"
+    : priorRank != null && priorLadder ? null
+    : "UNRANKED";
+  // The whole de-listing fact, carried on hover. priorAsOf is the date the rank
+  // was last true, NOT today.
+  const rankTitle =
+    priorRank != null && priorLadder && priorAsOf
+      ? `${priorLadder === "RS" ? "Rising Star" : "Established"} US #${priorRank} as of ${priorAsOf} — no longer on the board`
+      : undefined;
   // Tracked is INFORMATION and always shows. The untracked outline is an
   // AFFORDANCE and only shows where tracking is actually wired.
   const showBookmark = tracked || !!onToggleTracked;
@@ -329,7 +391,7 @@ export default function HCPChip({ hcpId, name, cohort = null, rank = null, track
             either size changes. */}
         <Link
           to={`/hcp/${hcpId}`}
-          title={`${name} — ${rankText}`}
+          title={rankTitle ? `${name} — ${rankTitle}` : rankText ? `${name} — ${rankText}` : name}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -343,18 +405,20 @@ export default function HCPChip({ hcpId, name, cohort = null, rank = null, track
           }}
         >
           <span style={{ position: "relative", top: 1, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
-          <span
-            style={{
-              flex: "none",
-              fontFamily: FACE.data,
-              fontSize: 10,
-              letterSpacing: ".06em",
-              color: rankInk,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {rankText}
-          </span>
+          {rankText ? (
+            <span
+              style={{
+                flex: "none",
+                fontFamily: FACE.data,
+                fontSize: 10,
+                letterSpacing: ".06em",
+                color: rankInk,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {rankText}
+            </span>
+          ) : null}
         </Link>
       </span>
     </span>

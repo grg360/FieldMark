@@ -495,15 +495,36 @@ export default function HomePage() {
                             <HCPChip
                               hcpId={chip.hcp_id}
                               name={chip.name}
-                              cohort={toChipCohort(chip.cohort, chip.cohort_rank)}
+                              cohort={toChipCohort(chip.cohort, chip.cohort_rank, chip.tier)}
                               rank={chip.cohort_rank}
+                              // Community's tier and a de-listed person's last held
+                              // rank both reach the chip now; see HCPChip rankText.
+                              tier={chip.tier}
+                              priorRank={chip.prior_rank}
+                              priorLadder={chip.prior_ladder}
+                              priorAsOf={chip.prior_as_of}
                               tracked={isTracked(chip.hcp_id)}
                               onToggleTracked={() => { void portfolioBookmarkTap(chip.hcp_id, chip.name); }}
-                              // Every chip in the portfolio is tracked by
-                              // definition, so the mark says nothing here — it
-                              // steps back to an amber outline and keeps the
-                              // untrack tap. See bookmarkTone.
-                              bookmarkTone="quiet"
+                              // DEFAULT "full" — bookmarkTone="quiet" was removed
+                              // here 2026-08-20. The premise was right and the
+                              // conclusion was backwards: every chip on this rail
+                              // IS tracked (the list is filtered to the tracked set
+                              // at :196), and the quiet tone answered that by
+                              // dropping the mark to an amber outline. But an
+                              // outline is the chip's UNTRACKED resting state
+                              // everywhere else, so a wall of them read as a
+                              // portfolio of people you have not tracked — the
+                              // exact opposite of the fact. The two rest states
+                              // were separated only by stroke colour on a 0.9px
+                              // hairline (amber .55 vs white .30) and by hover,
+                              // which touch does not have.
+                              //
+                              // Solid is redundant here, and redundant is the
+                              // correct failure: it repeats something true. The
+                              // quiet branch survives in HCPChip unused; if the
+                              // 39-mark wall reads heavy again, the fix is a
+                              // lighter tracked state, not one that borrows the
+                              // untracked one.
                             />
                             {/* The ladder tag is only shown when it says something
                                 the chip does not: the chip already renders EST/RS/COM,
