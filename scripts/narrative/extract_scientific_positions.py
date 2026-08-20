@@ -36,8 +36,26 @@ MIN_ABSTRACT_LENGTH = 800
 MIN_YEAR = 2020
 PAPERS_PER_HCP = 10
 MAX_POSITIONS_PER_PAPER = 10
+# QUOTA REMOVED (2026-08-19). The prompt previously said "Extract up to 5", and the
+# model returned EXACTLY 5 on 51 of 51 papers, twice -- 255 positions both runs, stdev
+# 0.00. It was a quota, not a ceiling: a 3,455-char Lancet Oncology trial report and an
+# 850-char German-language review both yielded five. Removing the target moved total
+# volume by -4 (251 vs 255) but took per-paper spread from 0.00 to 1.03 (range 3-8), so
+# the extractor can now say "this abstract has little to offer". Cost and groundedness
+# unchanged ($0.99 vs $1.01; ~100% of excerpts verbatim in the abstract).
+#
+# This is justified on expressiveness ALONE. A same-prompt test-retest on these 51
+# papers disagreed with itself on 40% of positions, and every recurrence-density gain
+# first attributed to this change sat inside that noise band. Do not cite recurrence as
+# a reason for this edit.
 ANTHROPIC_MAX_TOKENS = 2000
 DRY_RUN_HCP_LIMIT = 3
+
+# Token accounting. response.usage was previously read and discarded, which left
+# every question about this run's cost answerable only by estimate. Accumulated at
+# module scope so call_anthropic keeps its single-return-value shape and no call
+# site has to change.
+USAGE = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
 
 # Per-TA config. The nsclc entry reproduces the original prompt text verbatim so
 # its rendered prompt is byte-for-byte identical; non-NSCLC TAs use TA-neutral
@@ -244,7 +262,7 @@ Passage (abstract):
 {abstract}
 
 TASK
-Extract up to 5 distinct, high-value scientific positions. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
+Extract the distinct, high-value scientific positions this passage genuinely advances. There is no target number. Many abstracts support only two or three; some support none at all. Do not pad the list to reach a count - a short list of well-grounded positions is more useful than a longer padded one. Extract at most 10. A position should help an MSL understand the author's scientific stance, treatment philosophy, patient-selection view, safety concern, biomarker perspective, resistance concern, or unmet-need framing.
 
 Prefer positions that reflect the author's interpretation, clinical implication, treatment philosophy, or future direction. Do not extract bare findings (what the study measured or reported) unless they directly support a broader scientific position the author is advancing.
 
@@ -482,6 +500,9 @@ def call_anthropic(client: anthropic.Anthropic, prompt: str) -> list[dict[str, A
         max_tokens=ANTHROPIC_MAX_TOKENS,
         messages=[{"role": "user", "content": prompt}],
     )
+    USAGE["calls"] += 1
+    USAGE["input_tokens"] += int(response.usage.input_tokens)
+    USAGE["output_tokens"] += int(response.usage.output_tokens)
     raw_text = extract_response_text(response)
     cleaned = strip_markdown_fences(raw_text)
 
@@ -769,6 +790,13 @@ def main() -> int:
         for position_type, count in sorted(stats["positions_by_type"].items()):
             print(f"  {position_type}: {count}")
         print(f"API errors: {stats['api_errors']}")
+        if USAGE["calls"]:
+            print(
+                f"Token usage: {USAGE['input_tokens']:,} in / "
+                f"{USAGE['output_tokens']:,} out over {USAGE['calls']:,} calls "
+                f"({USAGE['input_tokens'] // USAGE['calls']:,} in / "
+                f"{USAGE['output_tokens'] // USAGE['calls']:,} out per call)"
+            )
 
         if args.dry_run:
             print("\nDry run complete - no database writes.")

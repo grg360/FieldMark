@@ -72,10 +72,29 @@ TA_CONFIGS: dict[str, dict[str, str]] = {
 }
 DEFAULT_TA = "nsclc"
 
-GET_HCPS_WITH_POSITIONS_SQL = (
-    "SELECT DISTINCT hcp_id FROM hcp_scientific_positions_v1 "
-    "WHERE therapeutic_area_id = %s ORDER BY hcp_id"
-)
+# Selection is GLOBAL and has always been -- no country, rank or scope predicate.
+# Coverage gaps here are unrun batches, never a filter.
+GET_HCPS_WITH_POSITIONS_SQL = """
+SELECT DISTINCT sp.hcp_id FROM hcp_scientific_positions_v1 sp
+WHERE sp.therapeutic_area_id = %s
+  {skip_existing}
+ORDER BY sp.hcp_id
+"""
+
+# When --skip-existing is set, exclude HCPs that already carry a synthesis for this
+# TA, so a re-run only covers the not-yet-synthesised tail. Without it the UPSERT's
+# ON CONFLICT DO UPDATE rewrites every existing row -- on 2026-08-19 that was 263
+# US syntheses, all of them already newer than their source positions, i.e. $13.52
+# of duplicate spend and 263 rewritten characterisations for no change. --limit is
+# NOT a substitute: it truncates by `ORDER BY hcp_id` (UUID order), so it cannot
+# target the uncovered. Matches the flag of the same name on
+# extract_scientific_positions.py. Adds one %s (the TA tag).
+SKIP_EXISTING_CLAUSE = """AND NOT EXISTS (
+    SELECT 1 FROM hcp_ai_overviews ao
+    WHERE ao.hcp_id = sp.hcp_id
+      AND ao.synthesis_type = 'scientific_positions'
+      AND ao.therapeutic_area = %s
+  )"""
 
 GET_POSITIONS_FOR_HCP_SQL = """
 SELECT
@@ -396,6 +415,14 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_TA,
         help="Therapeutic area to process (default: nsclc).",
     )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Only process HCPs with no synthesis yet for this TA. Without this "
+        "the UPSERT rewrites every existing synthesis, which costs full price and "
+        "churns already-published characterisations. --limit is not a substitute: "
+        "it truncates by hcp_id order and cannot target the uncovered.",
+    )
     return parser.parse_args()
 
 
@@ -416,18 +443,36 @@ def get_target_hcp_ids(
     hcp_id_filter: str | None = None,
     limit: int | None = None,
     ta_id: str | None = None,
-) -> list[str]:
+    skip_existing: bool = False,
+    ta_tag: str | None = None,
+) -> tuple[list[str], int]:
+    """Returns (hcp_ids_to_process, selected_before_limit).
+
+    BOTH NUMBERS, because they differ and the difference is not obvious.
+    --dry-run sets limit=1 (DRY_RUN_HCP_LIMIT), and the slice below is applied
+    AFTER selection -- so a dry-run of a 305-HCP selection processes 1. Reporting
+    only the post-slice count reads as "the selector matched 1", which is how a
+    correct --skip-existing run was misread as a broken clause on 2026-08-19.
+    """
     if hcp_id_filter:
-        return [hcp_id_filter]
+        return [hcp_id_filter], 1
+
+    if skip_existing:
+        sql = GET_HCPS_WITH_POSITIONS_SQL.format(skip_existing=SKIP_EXISTING_CLAUSE)
+        params: tuple[Any, ...] = (ta_id, ta_tag)
+    else:
+        sql = GET_HCPS_WITH_POSITIONS_SQL.format(skip_existing="")
+        params = (ta_id,)
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(GET_HCPS_WITH_POSITIONS_SQL, (ta_id,))
+        cur.execute(sql, params)
         rows = cur.fetchall()
 
     hcp_ids = [str(row["hcp_id"]) for row in rows]
+    selected = len(hcp_ids)
     if limit is not None:
-        return hcp_ids[:limit]
-    return hcp_ids
+        return hcp_ids[:limit], selected
+    return hcp_ids, selected
 
 
 def get_positions_for_hcp(
@@ -729,9 +774,25 @@ def main() -> int:
     }
 
     try:
-        target_hcp_ids = get_target_hcp_ids(conn, args.hcp_id, effective_limit, ta["ta_id"])
+        target_hcp_ids, selected_hcps = get_target_hcp_ids(
+            conn,
+            args.hcp_id,
+            effective_limit,
+            ta["ta_id"],
+            skip_existing=args.skip_existing,
+            ta_tag=ta["tag"],
+        )
         total_hcps = len(target_hcp_ids)
-        print(f"Loaded {total_hcps} target HCPs (ta={args.ta})")
+        scope_label = (
+            "uncovered only" if args.skip_existing
+            else "ALL — existing syntheses will be rewritten"
+        )
+        print(
+            f"Selected {selected_hcps} HCPs ({scope_label}); processing {total_hcps} (ta={args.ta})"
+        )
+        if total_hcps < selected_hcps:
+            reason = "--dry-run" if args.dry_run else f"--limit {args.limit}"
+            print(f"  NOTE: {reason} caps this run at {total_hcps} of {selected_hcps} selected.")
 
         if total_hcps == 0:
             print("No HCPs to process.")
