@@ -29,6 +29,8 @@ import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
 import { getDrawerLayerData, prefetchDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
 import TrialsPopup from "./TrialsPopup";
 import TerritorySelect from "./TerritorySelect";
+import ScoreTooltip from "../ScoreTooltip";
+import { metricKeyFor } from "../../lib/scoreDefinitions";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -123,6 +125,17 @@ const FACT_FADE = CANON.INK.GHOST;
 const FACT_MINOR = CANON.INK.MUTE;
 
 const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+
+// The tooltip affordance on a column head. A DOTTED UNDERLINE rather than a
+// caret glyph: the header's width budget is already tight — SENIOR-AUTH is
+// 73.3px inside a 100px box and COHORT SCORE 79.9px inside 88px — and a caret
+// costs real width where an underline costs none. Amber at 45% so it reads as
+// an affordance rather than a rule, and sits under the head word only, never
+// under the sub-label. Touch has no hover, so this must be visible at rest.
+const TIP_HEAD: CSSProperties = {
+  borderBottom: "1px dotted rgba(224,167,94,0.45)",
+  paddingBottom: 1,
+};
 const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 
 // COM rail (Design "Community Rail" 2A, 2026-08-11): tier vocabulary +
@@ -886,18 +899,29 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
         // "0-100" over "COMPOSITE": the range is the more useful fact now that the two
         // columns beside it are unbounded counts. Construction is on the methodology page.
         <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-          COHORT SCORE<br /><span style={{ color: P.ink5 }}>0-100</span>
+          {/* This branch is EST or RS by construction (COM took the other arm
+              above), so the key is always one of the two — never null here. */}
+          <ScoreTooltip metricKey={metricKeyFor(cfg.tag, "idx")}>
+            <span style={TIP_HEAD}>COHORT SCORE</span><br /><span style={{ color: P.ink5 }}>0-100</span>
+          </ScoreTooltip>
         </div>
       )}
-      {cfg.cols.map((c) => (
+      {cfg.cols.map((c) => {
+        // null on COM — metricKeyFor prefixes est_/rs_ only, so the Community
+        // heads pass through ScoreTooltip untouched and gain no affordance.
+        const tip = metricKeyFor(cfg.tag, c.key);
+        return (
         // c.align is the single-source alignment shared with the Row value
         // cell (2026-08-12); absent = legacy centered head over a right value.
         <div key={c.key} style={{ width: c.w, textAlign: c.align ?? "center", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-          {c.head ?? c.label}
-          {/* headSub === "" is the explicit single-line head (PHARMA ENGAGEMENT) */}
-          {(c.headSub ?? c.sub) ? <><br /><span style={{ color: P.ink5 }}>{c.headSub ?? c.sub}</span></> : null}
+          <ScoreTooltip metricKey={tip}>
+            <span style={tip ? TIP_HEAD : undefined}>{c.head ?? c.label}</span>
+            {/* headSub === "" is the explicit single-line head (PHARMA ENGAGEMENT) */}
+            {(c.headSub ?? c.sub) ? <><br /><span style={{ color: P.ink5 }}>{c.headSub ?? c.sub}</span></> : null}
+          </ScoreTooltip>
         </div>
-      ))}
+        );
+      })}
       {/* our-side controls — universal across cohorts */}
       <div style={{ width: 14 }} />
       {head("INSIGHTS", OURS.insight)}
