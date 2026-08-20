@@ -55,6 +55,9 @@ import {
   type LedgerRow,
   type Band,
   ledgerTerritoryTree,
+} from "../../lib/cohortLedger";
+import { loadLedgerRegions, type LedgerRegion } from "../../lib/ledgerRegions";
+import {
   scopeFromKey,
   scopeIncludesUs,
   titleCase,
@@ -253,7 +256,10 @@ function Bookmark({ on }: { on: boolean }) {
 // Rising evidence chip (2026-08-05): the /rising badges (RECENT SENIOR
 // AUTHORSHIP, OPEN TRIAL) in the community ledger's chip slot — same component
 // family, cohort-specific content. Both facts come from rising_board_flags,
-// already computed for the rising surface.
+// already computed for the rising surface. The authorship badge reads FIRST
+// senior authorship (empty early window, active since); its ">= 3 recent" half
+// stopped discriminating at the 2026-08-17 floor, which every board member
+// clears by construction — see the full note in RisingHcpProfile.tsx.
 function RisingChipView({ flag, hcpId, hcpName = "", mobile = false }: { flag: RisingFlags; hcpId: string; hcpName?: string; mobile?: boolean }) {
   const senior = flag.senior_transition;
   const trial = flag.on_open_trial;
@@ -867,8 +873,20 @@ function ColumnHeads({ cfg }: { cfg: CohortConfig }) {
           </div>
         </>
       ) : (
+        // TWO LINES SINCE 2026-08-18, and the second line is what fixes the collision.
+        // This head was single-line in a row set to alignItems:"flex-end", so it
+        // bottom-aligned onto the SUB-label row of its two-line neighbours: COHORT
+        // SCORE (79.9px in an 88px box, 4.05px of slack) sat 4.1px from SENIOR-AUTHORED
+        // (99.9px in a 100px box, 0.05px of slack) and the two read as one string —
+        // the gap was 0.62 of a character, tighter than the letter-spacing inside
+        // either word. Giving it a sub-line moves the long string up to the head row,
+        // where there is room: 24.1px against CITATIONS above, 40.7px between 0-100
+        // and SENIOR-AUTH below. Costs no width.
+        //
+        // "0-100" over "COMPOSITE": the range is the more useful fact now that the two
+        // columns beside it are unbounded counts. Construction is on the methodology page.
         <div style={{ width: 88, textAlign: "center", whiteSpace: "nowrap", ...mono(9, 500), letterSpacing: ".14em", color: P.ink6 }}>
-          COHORT SCORE
+          COHORT SCORE<br /><span style={{ color: P.ink5 }}>0-100</span>
         </div>
       )}
       {cfg.cols.map((c) => (
@@ -965,17 +983,34 @@ function Row({
                 {row.rank}
               </span>
               {/* Scope label was hardcoded "US" — it asserted US for every row, so a
-                  German KOL read "#1 US". It now names the country this rank is actually
-                  against. Rising additionally carries the Europe rank, giving the three
-                  scores: country · Europe · global. */}
-              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
-                {row.scoredCountry ?? "US"}
-              </span>
+                  German KOL read "#1 US". It names the POOL this rank is against:
+                  scopeLabel, which reads "GLOBAL" on a global selection and the country
+                  otherwise. scoredCountry is NOT used here — on a global board it holds
+                  the row's own country for the location chip, and reusing it would label
+                  a global rank with a country it was not computed against. The old
+                  `?? "US"` fallback would have asserted US for all 16,976 global rows. */}
+              {/* SUPPRESSED ON A GLOBAL SELECTION (2026-08-19). On the global board this
+                  printed "GLOBAL" hard against a 44px numeral in a 92px content box --
+                  three digits already overrun it ("100" measures 79.2px, the label 38.9px,
+                  against 92px -- so they collide from rank 100 down) -- while the companion
+                  line beneath repeats the same word. Every other scope KEEPS the label: it
+                  names the POOL the rank was computed against, and without it a German row
+                  reads as an unqualified "#1". */}
+              {row.scopeLabel !== "GLOBAL" ? (
+                <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
+                  {row.scopeLabel ?? row.scoredCountry ?? "US"}
+                </span>
+              ) : null}
             </div>
             {row.europeRank != null && (
               <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUROPE</span>
             )}
-            <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLOBAL</span>
+            {/* Guarded (2026-08-17): on a global selection the scope rank IS the global
+                rank, so the RPC returns NULL here rather than printing the same number
+                twice. Unguarded this rendered a bare "#— GLOBAL". */}
+            {row.globalRank != null && (
+              <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank} GLOBAL</span>
+            )}
           </div>
         ) : (
           // COM rail — Design "Community Rail" 2A · SET IN SERIF (2026-08-11):
@@ -1262,13 +1297,28 @@ function MobileRow({
           {row.rank != null ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
               <span style={{ font: `600 30px ${FACE.data}`, color: P.amber, fontVariantNumeric: "tabular-nums", lineHeight: 0.85, letterSpacing: "-.015em" }}>{row.rank}</span>
-              <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
-                {row.scoredCountry ?? "US"}
-              </span>
+              {/* SUPPRESSED ON A GLOBAL SELECTION (2026-08-19). On the global board this
+                  printed "GLOBAL" hard against a 44px numeral in a 92px content box --
+                  three digits already overrun it ("100" measures 79.2px, the label 38.9px,
+                  against 92px -- so they collide from rank 100 down) -- while the companion
+                  line beneath repeats the same word. Every other scope KEEPS the label: it
+                  names the POOL the rank was computed against, and without it a German row
+                  reads as an unqualified "#1". */}
+              {row.scopeLabel !== "GLOBAL" ? (
+                <span style={{ ...mono(9, 500), color: CANON.GOLD.RANK, letterSpacing: ".12em" }}>
+                  {row.scopeLabel ?? row.scoredCountry ?? "US"}
+                </span>
+              ) : null}
+              {/* EUR, not EUROPE: this rail abbreviates (GLB beside it), and EUR keeps the
+                  geographic 33-country reading distinct from the EU-27 one at chip width.
+                  The desktop rail has the room and spells it EUROPE. */}
               {row.europeRank != null && (
-                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EU</span>
+                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.europeRank} EUR</span>
               )}
-              <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank ?? "—"} GLB</span>
+              {/* Guarded like the desktop rail: NULL on a global selection. */}
+              {row.globalRank != null && (
+                <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".06em" }}>#{row.globalRank} GLB</span>
+              )}
             </div>
           ) : (
             // COM mobile rail — 2A adapted inline for 390px: tier word (serif
@@ -1710,6 +1760,12 @@ export default function CohortLedger() {
   // (override stays view-local, per the morning rule).
   const [myTerritory, setMyTerritory] = useState<LedgerScope | null>(null);
   const [scope, setScope] = useState<LedgerScope | null>(null);
+  // Territory regions from ledger_regions() (2026-08-18). The menu's parents used to be
+  // hardcoded; they are now whatever regions.aggregate_scope flags. Declared here rather
+  // than with the data state below because applyScope closes over it. Loaded once — the
+  // loader memoises — and an empty result degrades to United States + Global rather than
+  // an empty menu.
+  const [ledgerRegions, setLedgerRegions] = useState<LedgerRegion[]>([]);
   const [territoryResolved, setTerritoryResolved] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -1732,11 +1788,22 @@ export default function CohortLedger() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    let alive = true;
+    void loadLedgerRegions().then((r) => {
+      if (alive) setLedgerRegions(r);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const applyScope = useCallback(
     (key: string) => {
-      setScope(scopeFromKey(key, myTerritory));
+      // regions supplies the aggregate's LABEL only — the country membership is
+      // resolved server-side from the region key we send as the sentinel.
+      setScope(scopeFromKey(key, myTerritory, ledgerRegions));
     },
-    [myTerritory],
+    [myTerritory, ledgerRegions],
   );
   // Cohort switches do NOT remount this component (one route component for all
   // three), so the reset to the incoming cohort's default must be explicit:
@@ -1877,10 +1944,29 @@ export default function CohortLedger() {
   // COM is tier-sorted, not index-sorted, so the ceiling-saturation "treat as tied"
   // bands do not apply — render one flat ranked list. EST/RS keep the band device.
   const { headBands, tailRows } = isCom ? { headBands: [] as Band[], tailRows: rows } : layout(cfg, rows);
-  const cohortTotal = isCom ? rpcCohortTotal : (meta?.cohortTotal ?? rows.length);
+  // THE SELECTION-SCOPED COUNT, for all three cohorts (2026-08-18). This read
+  // ledger_meta for EST/RS, which takes no scope argument at all: its EST branch is
+  // pinned to scope_value='US' and its RS branch to effective country 'US', so the
+  // header printed the US total under whatever territory was selected — 2,992 over a
+  // 3,849-row Europe board, 2,992 over a 462-row German one, and 58 over Rising's
+  // 53-row Europe board. It agreed only on the default US view, which is why the
+  // 2026-08-17 repoint left EST alone believing its placement was scope-coherent.
+  //
+  // rpcCohortTotal is established_ledger/rising_ledger's own cohort_total, refetched
+  // by the effect above on every scope change — the right number was already in hand
+  // and discarded. Preferred over teaching ledger_meta the selection, which would mean
+  // DROP + CREATE on a live SECURITY DEFINER RPC (a signature change cannot go through
+  // CREATE OR REPLACE) to recompute something the row RPC already returns.
+  const cohortTotal = rpcCohortTotal;
+  // Loaded-flag moved off `meta` (2026-08-18): the count no longer comes from it, so
+  // gating the line on it would tie the header to an RPC it no longer reads. `loading`
+  // covers the same first-paint case — blank until the page resolves, rather than a
+  // momentary "0 HCP". ledger_meta is still called: its ceilings feed thresholds(),
+  // and unpicking that dead chain (cellDisplay ignores the threshold argument) is a
+  // wider change than this fix.
   const metaLine = isCom
     ? `${filteredTotal.toLocaleString()} OF ${cohortTotal.toLocaleString()} HCP · PART D + PART B DERIVED · EVIDENCE TIERS`
-    : (meta ? cfg.meta.replace("{total}", cohortTotal.toLocaleString()) : "");
+    : (loading ? "" : cfg.meta.replace("{total}", cohortTotal.toLocaleString()));
 
   const toggle = useCallback((id: string) => setOpen((o) => (o === id ? null : id)), []);
   const isMobile = useIsMobile();
@@ -2005,7 +2091,7 @@ export default function CohortLedger() {
                 <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ ...mono(9, 500), color: P.ink4, letterSpacing: ".14em" }}>TERRITORY</span>
                   <TerritorySelect
-                    nodes={ledgerTerritoryTree(cfg.tag)}
+                    nodes={ledgerTerritoryTree(cfg.tag, ledgerRegions)}
                     value={scope?.key ?? "us:national"}
                     onChange={applyScope}
                     mine={myTerritory ? { key: "mine", label: myTerritory.label } : null}

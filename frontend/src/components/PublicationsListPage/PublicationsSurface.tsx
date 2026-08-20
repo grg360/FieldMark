@@ -19,6 +19,11 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useMemo, useState } from "react";
 import type { PublicationListRow } from "../../lib/publicationsList";
 import DiscussAffordance from "../FieldIntelligenceForum/DiscussAffordance";
+// Palette (2026-08-19): the OPEN ACCESS stat was #7ba36f, a SECOND GREEN. canonicalTokens
+// allows exactly one — MARK.EST doubles as STATE.POSITIVE, "never a second green" — and open
+// access is neither a cohort nor a positive state. It is a property of a publication, so it
+// takes the same ink as its neighbours (CO-AUTHOR and CITATIONS already use C.ink2).
+import { CANON } from "../../lib/canonicalTokens";
 
 // Below this many papers in a year, counts read as noise (a "2" looks like an error),
 // so absences become sentences and per-band totals are dropped. CHOSEN, not computed —
@@ -231,7 +236,25 @@ export default function PublicationsSurface({
   );
 
   return (
-    <div style={{ background: C.bg, color: C.ink, fontFamily: MONO, display: "flex", flexDirection: "column", gap: 22 }}>
+    // ROW INSET (2026-08-19). Every block below — the stat row, the chip row, the column
+    // header, the band headers and each publication row — was built with no horizontal
+    // padding, because until the page gained a panel there was no edge for an inset to
+    // mean anything against. The result inside the panel: the leftmost column (the
+    // citation numerals, the SENIOR AUTHOR / CO-AUTHOR band labels) and the rightmost
+    // elements (HAS A DISCUSSION THREAD, the N PAPERS count) sat hard on the content-box
+    // edge, reading as flush against the panel border while the hero above them did not.
+    //
+    // 20px here rather than more panel padding: widening the panel moves everything
+    // together and preserves the same edge relationship. This puts a margin BETWEEN the
+    // row content and the panel's own padding, which is the structure the ledger gets
+    // from nesting a board inside its panel (20px panel + 23px row).
+    //
+    // ALL FOUR SIDES, not just horizontal. This root paints its own darker ground
+    // (C.bg #08080a against the panel's gradient), so it reads as a band inside the
+    // panel — and with paddingTop 0 the stat numerals sat exactly on that band's top
+    // edge, measured identical to the pixel. A background that is visible is an edge,
+    // and an edge needs the same clearance on every side.
+    <div style={{ background: C.bg, color: C.ink, fontFamily: MONO, display: "flex", flexDirection: "column", gap: 22, padding: 20 }}>
       {/* Header stat row (frame 1a/1c): the four figures that summarise the scope —
           senior-author leads in gold, open access in green. */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 34, flexWrap: "wrap", paddingBottom: 4 }}>
@@ -239,7 +262,7 @@ export default function PublicationsSurface({
         <Stat n={String(nCo)} label="CO-AUTHOR" color={C.ink2} />
         <div style={{ width: 1, alignSelf: "stretch", background: C.line2 }} />
         <Stat n={totalCites.toLocaleString()} label={year != null ? "CITATIONS · THIS YEAR" : "CITATIONS · ALL YEARS"} color={C.ink2} />
-        <Stat n={String(nOa)} label="OPEN ACCESS · FULL TEXT" color="#7ba36f" />
+        <Stat n={String(nOa)} label="OPEN ACCESS · FULL TEXT" color={CANON.INK.BODY} />
       </div>
 
       {/* controls */}

@@ -67,6 +67,11 @@ export interface HcpProfile {
     state: string | null;
     npi: string | null;
     specialty: string | null;
+    /** Effective country (COALESCE(current_country, country)), 2026-08-19. The gate for
+     *  the US-only sections — Medicare Part B, Open Payments, NIH RePORTER. NULL means
+     *  UNKNOWN, not non-US: an unknown country must never scope a US physician out of
+     *  their own Medicare section, so the gates check for a known non-US value. */
+    country: string | null;
   };
   scores: {
     index: number | null;
@@ -75,7 +80,10 @@ export interface HcpProfile {
     sci: number | null;
     net: number | null;
     pharma: number | null;
-    vs_cohort_mean: number | null;
+    /** The POOL this score was computed against — "US" or "GLOBAL" (2026-08-19).
+     *  hcp_profile_brief resolves the US row if there is one and falls back to global,
+     *  so the surface must name the pool rather than implying US. Ledger convention. */
+    scope_label: string | null;
     basis_papers: number | null;
     basis_senior: number | null;
   } | null;

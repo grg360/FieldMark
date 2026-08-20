@@ -58,6 +58,9 @@ type Region = "US" | "EU" | "BOTH" | "ALL";
 
 // Archetype taxonomy retired 2026-08-05 — rows carry the RECENT SENIOR
 // AUTHORSHIP event badge and the open-trial flag instead (rising_board_flags).
+// That badge marks FIRST senior authorship (empty early window, active since);
+// its ">= 3 recent" half is implied by the 2026-08-17 momentum floor and no
+// longer selects — see the full note in RisingHcpProfile.tsx.
 
 function chip(active: boolean): CSSProperties {
   return active
@@ -99,16 +102,28 @@ export default function RisingQuadrant() {
     return () => { alive = false; };
   }, []);
 
+  // US scope reads us_rank_eff, NOT the stored us_rank. Both are on the payload.
+  //   us_rank      — stored on hcp_rising_star_ranks_v3, scored against the historical
+  //                  `country`. A scored artifact; deliberately left alone by the Tier-1
+  //                  affiliation migration.
+  //   us_rank_eff  — read-time row_number() over effective_country, exactly symmetric
+  //                  with eu_rank, which has been computed this way since
+  //                  sql/affiliation/04_rising_board_current_country.sql.
+  // The EU branch below was already effective-country; the US branch was not, so this
+  // component showed 57 US against the ledger's 58 and sorted by a different key.
+  // us_rank_eff reproduces rising_ledger's US rank exactly (58/58 members, 58/58 ranks),
+  // so the quadrant and the ledger now agree by construction. BOTH is repointed with it
+  // or "US + EU" would exclude people the "US" scope includes.
   const scoped = useMemo(() => {
     if (!board) return [];
     const rows = board.rows;
-    if (region === "US") return rows.filter((r) => r.us_rank != null).map((r) => ({ ...r, drank: r.us_rank! }));
+    if (region === "US") return rows.filter((r) => r.us_rank_eff != null).map((r) => ({ ...r, drank: r.us_rank_eff! }));
     if (region === "EU") return rows.filter((r) => r.eu_rank != null).map((r) => ({ ...r, drank: r.eu_rank! }));
-    if (region === "BOTH") return rows.filter((r) => r.us_rank != null || r.eu_rank != null).map((r) => ({ ...r, drank: r.rank }));
+    if (region === "BOTH") return rows.filter((r) => r.us_rank_eff != null || r.eu_rank != null).map((r) => ({ ...r, drank: r.rank }));
     return rows.map((r) => ({ ...r, drank: r.rank }));
   }, [board, region]);
 
-  const usCount = board ? board.rows.filter((r) => r.us_rank != null).length : 0;
+  const usCount = board ? board.rows.filter((r) => r.us_rank_eff != null).length : 0;
   const euCount = board ? board.rows.filter((r) => r.eu_rank != null).length : 0;
   const total = board ? board.rows.length : 0;
 

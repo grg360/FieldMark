@@ -22,8 +22,9 @@ Scopes mirror recompute_established_ranks_v3:
   - one global row per HCP (scope_type='global', scope_value=NULL)
   - one region row when country is non-null (scope_type='region', scope_value=country)
 
-Network percentile is re-derived within each scope using the continuous formula
-100.0 * (1.0 - position / (n - 1)). Missing network raw scores are excluded from
+Network percentile is re-derived within each scope using the shared convention
+100.0 * (n - position) / (n + 1) — the Weibull plotting position, see
+docs/PERCENTILE_CONVENTION.md. Missing network raw scores are excluded from
 the composite via per-HCP weight renormalization (emergence-only when network absent).
 
 Usage:
@@ -153,11 +154,24 @@ def compute_percentiles_in_scope(values_dict):
         return {}
     items = sorted(values_dict.items(), key=lambda kv: kv[1], reverse=True)
     n = len(items)
-    if n == 1:
-        return {items[0][0]: 100.0}
     out = {}
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # Weibull plotting position: 100 * (n + 1 - rank) / (n + 1), which for this
+    # 0-indexed descending loop is 100 * (n - position) / (n + 1).
+    #
+    # It replaced 100.0 * (1.0 - position / (n - 1)), which put the first member at
+    # EXACTLY 100.0 and the last at EXACTLY 0.0 — artifacts of a finite list rendered
+    # as facts. First of 251 is standing above 250 measured people, not above everyone.
+    #
+    # AFFINE IN THE OLD VALUE: p_new = a * p_old + b, a = (n-1)/(n+1), b = 100/(n+1).
+    # Both constants depend only on n, so ORDER WITHIN THIS COLUMN IS UNCHANGED. The
+    # same two lines appear in eight sibling scorers; they are one convention, and the
+    # doc lists all nine.
+    #
+    # n == 1 no longer needs a special case (the denominator is n+1, never zero) and
+    # returns 50.0 rather than 100.0 — a lone member is neither top nor bottom.
     for position, (key, _) in enumerate(items):
-        percentile = 100.0 * (1.0 - position / (n - 1))
+        percentile = 100.0 * (n - position) / (n + 1)
         out[key] = round(percentile, 2)
     return out
 

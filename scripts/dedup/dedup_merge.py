@@ -301,7 +301,40 @@ def is_more_specific_institution(primary_inst: str, stub_inst: str) -> bool:
     return s_hint and not p_hint
 
 
-def compute_primary_update_payload(primary: Dict[str, Any], stub: Dict[str, Any]) -> Dict[str, Any]:
+# Fields whose merge rules ASSUME the stub carries genuine added specificity.
+# That assumption holds for NPI stubs (the population this executor was written
+# for) and is FALSE BY CONSTRUCTION for the 2026-07-22/23 MD5-hash shells, whose
+# defining signature is UNNORMALISED raw affiliation and NO NPI:
+#
+#   institution_normalized  is_more_specific_institution() prefers the LONGER
+#       string when it contains a keyword hint (department/division/centre/...).
+#       The shells hold the raw affiliation verbatim, so they win that test and
+#       would overwrite a clean survivor value -- measured: 862 of 1,093 pairs.
+#       e.g. "Universite Paris-Saclay" -> "Universite Paris-Saclay, Gustave
+#       Roussy, Departement d'Oncologie Medicale, Villejuif, France; ..."
+#
+#   nppes_*  the fill-if-empty rule presumes NPPES provenance. ZERO shells have
+#       an NPI, so no nppes_* value on them came from NPPES. In practice
+#       nppes_practice_city holds parsed affiliation fragments -- "Chongqing
+#       University", "Ren Ji Hospital", "West Huaihai Road" -- and would have
+#       been written to 1,038 of 1,093 survivors that currently have none.
+#
+# total_career_pubs is NOT suppressed: it is max(primary, stub) and every shell
+# has it NULL, so the merge is provably a no-op there.
+SUPPRESSED_FOR_UNNORMALISED_STUBS = frozenset({
+    "institution_normalized",
+    "nppes_practice_state",
+    "nppes_practice_city",
+    "nppes_practice_setting",
+    "nppes_career_stage_years",
+})
+
+
+def compute_primary_update_payload(
+    primary: Dict[str, Any],
+    stub: Dict[str, Any],
+    suppress_fields: Optional[Set[str]] = None,
+) -> Dict[str, Any]:
     payload: Dict[str, Any] = {}
     if not ns(primary.get("nppes_practice_state")) and ns(stub.get("nppes_practice_state")):
         payload["nppes_practice_state"] = ns(stub.get("nppes_practice_state"))
@@ -323,6 +356,10 @@ def compute_primary_update_payload(primary: Dict[str, Any], stub: Dict[str, Any]
     p_pubs = int(primary.get("total_career_pubs") or 0)
     s_pubs = int(stub.get("total_career_pubs") or 0)
     payload["total_career_pubs"] = max(p_pubs, s_pubs)
+
+    if suppress_fields:
+        for field in suppress_fields:
+            payload.pop(field, None)
 
     return payload
 
@@ -465,6 +502,7 @@ def merge_record_into_survivor(
     survivor_id: str,
     stub_id: str,
     dry_run: bool,
+    suppress_fields: Optional[Set[str]] = None,
 ) -> Dict[str, Dict[str, int]]:
     """
     Merge a single stub record INTO a fixed survivor (no survivor re-selection).
@@ -579,7 +617,7 @@ def merge_record_into_survivor(
                 f"npi {primary_npi} kept); stub npi {stub_npi} discarded with the stub delete"
             )
 
-    payload = compute_primary_update_payload(primary, stub)
+    payload = compute_primary_update_payload(primary, stub, suppress_fields)
 
     # NPI unique-constraint-safe shuffle — provenance travels with the NPI:
     # 1) (if moving) NULL stub.npi_number to free the unique slot
@@ -647,6 +685,12 @@ def merge_record_into_survivor(
     survivor_is_academic = bool(cur.fetchone()["is_academic"])
     if survivor_is_academic:
         strip_scores = count_rows_for_hcp(cur, "hcp_community_scores_v2", "hcp_id", stub_id)
+        # hcp_community_ranks_v2 was DROPPED (community ranks retirement,
+        # 2026-08-13). This used to count its rows purely to print how many
+        # "vanish with the view" -- decorative, nothing depended on it, and no
+        # DELETE was ever issued against it. Left in place it raises
+        # UndefinedTable and takes the whole merge executor down with it, which
+        # is how this was found: the executor could not run at all.
         cur.execute(
             "SELECT COUNT(*) AS c FROM hcp_score_ranks_v2 WHERE hcp_id = %s AND cohort = 'community'",
             (stub_id,),

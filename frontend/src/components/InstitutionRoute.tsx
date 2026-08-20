@@ -308,9 +308,24 @@ export default function InstitutionRoute() {
   ];
 
   function cohortBand(cohort: CohortKey) {
+    // Ordered by global_rank, not us_rank. us_rank is the STORED US column, which
+    // places by the historical country the board was scored against and is null
+    // for 18 established roster rows — those sank to the bottom on the old
+    // `?? 1e9`, below every ranked colleague, which is not a statement anyone
+    // meant to make. global_rank is already on institution_ta_roster_v1 (never
+    // null across all 2,548 rows today) so this needs no RPC change and no
+    // fallback that can actually fire.
+    //
+    // The numeral below renders global_rank to match, so ordering and displayed
+    // key are the same fact. That pairing is load-bearing: the rising band does
+    // not reorder under this sort (0 of 29 institutions — every linked rising HCP
+    // carries a stored us_rank and both keys derive from the same global
+    // ordering), but the established band reorders at 58 of 142 institutions,
+    // 880 rows. Sorting on one key while displaying the other would have rendered
+    // those US ranks visibly out of sequence.
     const list = members
       .filter((m) => m.cohort === cohort)
-      .sort((a, b) => (a.us_rank ?? 1e9) - (b.us_rank ?? 1e9));
+      .sort((a, b) => (a.global_rank ?? 1e9) - (b.global_rank ?? 1e9));
     if (list.length === 0) return null;
     const scores = list.map((m) => m.index_score).filter((v): v is number => v != null);
     const scoreSpan =
@@ -398,12 +413,21 @@ export default function InstitutionRoute() {
                     for "rank numerals and ledger ordinals ONLY". The old
                     us_rank <= 10 ternary is dropped — the top-10 fact is already
                     stated in the record header, and colour now means "this is a
-                    rank" rather than "this rank is special". */}
+                    rank" rather than "this rank is special".
+
+                    GLOBAL AND US SWAPPED (2026-08-17): the numeral is global_rank,
+                    the key the band is sorted by, and the US rank is demoted to the
+                    sublabel. Previously the numeral was the STORED us_rank — which
+                    places by the historical country the board was scored against
+                    and is null for 18 established roster rows, so those rendered a
+                    dash. global_rank is never null across all 2,548 rows, so the
+                    dash is now unreachable and every member shows a number. The
+                    ?? "—" stays as a type guard, not an expected state. */}
                 <span style={{ ...mono(25, { color: CANON.GOLD.RANK, weight: 600, ls: "0" }) }}>
-                  {m.us_rank ?? "—"}
+                  {m.global_rank?.toLocaleString() ?? "—"}
                 </span>
                 <span style={{ ...mono(9, { color: C.ink4 }) }}>
-                  {COHORT_ABBR[m.cohort]} · US{m.global_rank != null ? ` · #${m.global_rank.toLocaleString()} GLOBAL` : ""}
+                  {COHORT_ABBR[m.cohort]} · GLOBAL{m.us_rank != null ? ` · #${m.us_rank.toLocaleString()} US` : ""}
                 </span>
                 {isMobile ? (
                   <span style={{ fontFamily: FACE.value, fontSize: 17, fontWeight: 500, color: C.ink1 }}>{m.name}</span>

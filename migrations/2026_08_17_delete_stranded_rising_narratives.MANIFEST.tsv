@@ -1,0 +1,279 @@
+id	hcp_id	name	bucket	classification_v2	prompt_version	generated_on	after_delete
+0bd58481-a93c-41fe-841b-8794d4bafba4	848b93c1-d1d7-47f2-b19e-b5e7b1d6b1f7	Alice Avancini	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+80230e14-38df-4734-9b52-e22e13da11f8	978300dc-6e6b-41bd-ac53-61fce7bd9d0c	Anna Minchom	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+3c9db795-41bc-46ff-93b4-cb91a8c709c6	d3a2253b-768e-4ac7-87ee-45135291064d	Anwen Xiong	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+b86d0c9f-0a2a-466b-b9dd-ea3eacc0f94a	241fe4fd-aae5-4a0a-99aa-e2026d8db2b5	Aurélie Lagrange	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+ff51957f-a43b-4261-931e-0fe56faa667f	3f68613a-cb3f-4ed6-a5da-dc49004a48b6	Daniel Kazdal	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+87456138-e9a0-4ac1-916c-7636e95efee4	9c074866-1421-408b-ae32-9bc24bc5f01a	Dongqing Lv	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+14ea1c55-edc7-4fee-b38e-009aa34db3d4	fbf486b9-353d-4194-8530-7702fdf70364	Emanuele Vita	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+e6bf1d9f-3293-4638-8562-3cb44f921142	fc574fc2-b0dc-46f6-bb37-6991975057e2	Estela Sánchez‐Herrero	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+bb893850-e226-49cf-8451-0df388c6b968	83a6184e-5948-4323-aa4f-6251099991ab	Fabrizio Citarella	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+3a5a3506-12bc-4a9b-860e-8fe710091eba	88230656-07b0-422a-a89e-bb4907c375ff	Farastuk Bozorgmehr	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+28f2520a-ec57-4cac-a02e-07c962290f92	0b651899-941a-4483-8dc7-be864e758e8f	Fernando Franco	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+261cf43e-e487-461d-8b97-4b6fb28c2310	8c684325-eac4-4015-ae61-058a37b3639e	Filippo Gustavo Dall’Olio	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+562b61f0-b4b8-4ea8-8dd1-7e1b93871f58	d6493af8-139e-411a-afca-eb053d339deb	Francesco Pepe	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+dca22d60-d945-49cc-bfa3-0b5890632b14	942942e0-3e07-4bf0-b32a-fb553d0f2b77	Giorgia Guaitoli	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+4c822888-48ea-4ff7-9fd1-39d025cca6d6	2577d5b9-9d4b-4217-a5d1-4f9ac684baab	Giuseppe Viscardi	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+d25ade74-5eb5-46fc-8e4c-123f86403445	97a5863d-d147-43c3-96a9-7bafbffe3f76	Guangjian Yang	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+5c61c8f6-d7a1-434f-b5a0-2c6fe8c46c33	abc2e087-6621-42c5-8283-691093313e40	Guofang Zhao	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+60a37246-a84b-41e0-90e3-ead0e7c337f8	fbce07d2-eead-4a7e-b0c4-9b5080bce7d0	Jia‐Tao Zhang	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+3417b174-b0cd-4f7b-b99c-2eff999d0a99	dd94b378-cd85-4121-b9c4-c96aa8fa5911	Jiajun Deng	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+128f0819-6a73-45b8-a2e8-eecda069f0ec	7e61af52-a979-4b2f-b758-f0a45a1eeaa0	Jin Shi	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+39fc9196-7552-4cbb-93e2-22c78a8ab47d	c34ece46-2abe-475c-b882-97121a3926ce	Jonathan Benzaquen	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+b3b5dd11-fb43-4646-a16b-65cf2b4912e2	e9ccd7a1-5cda-46b6-aa12-841fc5d79112	Laura V. Klotz	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+a921257a-d616-4a72-9656-77cbe435ac22	d0a21ab1-8cef-4460-83df-2de5caf1bf6e	Lejie Cao	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+b022e113-55f3-445d-8e15-880f8885542c	3ee48dbd-e059-41f1-ad07-f9b640e19ac9	Lizhu Lin	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+ac4a5883-a033-430e-8120-d56371b9a6af	bbdec13d-bd17-4aba-9e8a-921e96bf6a3c	Luigi Ventura	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+54cfeffd-1f00-4a57-9ba5-8f290394f15f	885dde09-d579-45c1-9501-32a185cdcdfd	Lukas Käsmann	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+a093b0a8-8e37-4835-bd8b-4235e59bffd6	0c36b3ea-8667-47f2-9482-a99b990f85c8	Marco Tagliamento	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+b2198db3-4ae2-456f-b816-c6a54af5fa1f	891671d1-f1cf-45a4-9875-8bf377c383fa	Maria Lucia Reale	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+ebf7c08d-eb11-43f5-9955-8520adb25188	556d1452-b79b-4916-8c50-67b635864903	Martin Metzenmacher	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+0d88b80d-f6e8-4bc3-854e-337635b0bc08	5cf1c2ea-b02d-4e98-a8f1-ef66b3c01a0c	Min Peng	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+0ad64a63-003c-4ab9-8f65-252d9cc353a8	6cc72971-1a6d-4b5a-a6c6-817d3265e0c5	Nikolaj Frost	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+37dfcdeb-8c39-42a5-9437-e045cf8a8341	23cefe93-fad3-4093-a16a-8248dfe2a4d5	Pedro De Marchi	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+6f32e23c-c0fa-4b0e-9bf3-69a163b50f67	2a40745d-1e91-4ab3-9f98-8533eb44d129	Pedro Rocha	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+1d1cf71c-d7ce-4575-bec7-15f06a9fde4d	5e4f7bbe-071f-4234-a77a-a6519882e1b5	Roxana Reyes	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+1d1708f0-a569-4088-913d-cdef5454b987	c437ea46-643b-4065-a708-e3c2e1d90e7b	Sara Elena Rebuzzi	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+f90439d9-1cf1-4f37-b2ac-00a226c0bcba	3153f729-209b-4d33-9acb-833661ffa2c9	Sehhoon Park	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+3601dd78-6e21-4afe-836a-61f76eeaabf7	25159dcd-3de5-49a5-bdaa-bf8c4c137218	Tingting Wang	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+c7446bd8-37a3-4298-bb9b-b36f464a84ec	8a321e67-f9eb-491c-aa08-948654108604	Valerio Gristina	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+4447394f-b2aa-4f71-bd15-42fd4583712f	6643fb0e-75b9-40e1-8634-00e1a72efcdd	Vito Longo	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+c63dc7b8-5ff2-4511-81c5-5fbbb695f831	bd7b2583-9fc8-4f11-9619-bde7e9ebb584	Xinqing Lin	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+b51ecef8-9d17-4a51-a5c8-cd1481a6175e	203456e4-3228-4f67-867e-f90a7803e67f	Xiuyu Cai	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+35ce092d-5b50-4bd6-810f-b5463142c68d	aa65d05f-b517-45cd-86ec-909ba7b44604	Yuchen Han	boardless	rising_eligible	rising_star_v3.4	2026-06-07	NONE_LEFT
+7e73a438-ecd1-4f19-8440-ec1ccce65adf	8300b9bd-2fc5-436e-af99-05bff4ffd8ac	Afsheen N. Iqbal	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+d967b5b4-5ed1-472c-9e00-6943c8265f4c	5932cde0-bfa5-459f-8501-2c741a5333d8	Alissa Poteete	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+cfefc5b5-ff83-4cf4-a1c9-9f8f9988685a	f78fc297-3150-4780-be0d-b066fef2aa98	Amy L. Cummings	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+9db1241c-fc83-442f-8387-7e783bc55389	ed40b96f-7f4c-44af-a9cf-d163f42bcc1d	Angel Qin	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+ec6ce08f-e0c8-44f5-b861-a8f395544018	8f32b388-425d-4b13-b7ba-4a796dc38952	Anna Wurtz	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+4391a041-de8a-4b68-a239-c9c5f72b0a39	4ebddb01-ff9c-4259-899c-82b7ebd2b9e4	Annemarie F. Shepherd	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+88a4d5fb-2977-4a78-b992-84bd8337bc04	baa2cebf-2619-46f6-86fe-f7a7377c1fcd	Aparna Hegde	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+8eed6da8-6606-4856-9419-ea96d065e62e	5d13d87b-d733-4fcc-a4a6-9ec06dd1014e	B. Leticia Rodriguez	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+bace574b-c817-4a23-9b9a-854273ebd13d	740a0ce0-0026-4624-a06b-ea699cf9247b	Brian S. Henick	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+8f04a7c3-44b9-4ce0-862b-d6317139d32a	7508fcd0-bf25-4fb8-a918-7b694fdf4829	C. Patrick	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+5521a4c3-4e53-457c-b939-8baef197b726	adabbd76-2c00-4b85-9c7f-713523c4c859	Carl M. Gay	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+5e370fa9-9118-423d-9c7e-b6175c11f840	5eb689e2-09e1-4773-989e-1f1c81063348	Dorothy J. Giroux	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+1d3d06be-3b36-45cf-89ca-4692fd9b4e61	fb831bca-1f2d-4add-998b-eeb6a969e32e	Emily S. Chambers	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+87cb1c2f-fb64-4f20-847d-a8de7827211e	2ab0bb27-32f9-4523-a491-2f3f8e2a5b84	Erin L. Schenk	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+a7dda541-4152-4323-8428-cfa0f173f861	5331be58-910a-43f6-accc-6541f330037d	Fernando C. Santini	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+298d8b85-ad8b-4bba-bd1d-634d3c051143	15fb63a2-f3b2-40f9-835a-8ab206722d52	Hampartsoum B. Barsoumian	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+d52f8e8d-99f7-43b2-bbc3-1ec601863bd3	43144a66-b32a-4522-ae26-0fa086cfc12c	Hira Rizvi	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+73379490-a586-4de5-856d-331bf1d6d23a	cb13e7b9-2c1c-4890-a967-f282699eb27e	Isa Mambetsariev	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+9688c89b-345f-4698-b3ac-3b78f265bf05	a3c3ac11-7199-488b-a41a-992c7774b713	James J. Saller	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+51a236d4-16c8-4837-82f3-e94d487fa992	d9eb06e3-c348-4141-8e2b-fc2ff4cd99f2	Jared J. Fradette	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+cebcc855-2465-4816-bd79-ee1b61310340	2d3f6037-2701-454c-96f2-6163cc7313f5	Jason C. Chang	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+cbb61b43-5cfc-4c89-826f-2c26bc785c2a	d7c7423f-20d0-4b4b-a867-dd4b7410fa43	Jeff Lewis	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+ac7d1a45-8ebf-4f44-a3fd-b30d62f2539b	72bf1413-402f-47d3-9a4c-10eade8701fa	Jeffrey C. Thompson	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+3ebe625e-b652-4dcd-a761-a95cd2fc3966	b195fb55-4bd5-4ebd-a4f9-c8bce9761fd0	Jeremy Fricke	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+1033b02e-889a-4bd9-aa88-18d4e09397df	807a941b-eeb3-4cb1-b8a8-8b18c05e3112	Jiajia Zhang	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+9b70e121-b4bf-4aff-a1ec-4ef25d06c2e0	3be13ab2-bb51-4d41-a89c-037e095b1e73	Jieling Miao	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+044a564d-3b51-48bc-b939-40f6a70147e3	cf9d02be-332c-4cb3-9bfe-4ab155aea3c0	Kerry L. Reynolds	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+5a017edf-6f4d-48ae-9607-cfc2b25e5841	2e4e4a1d-06eb-4d10-aeac-20ddd2f7f4f7	Latasha Little	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+e55d8fa1-cabe-4f0c-b173-2a6a0a6a50e9	e5345557-f9cd-4aa2-a2b8-0affda9e70e8	Linda S. Ahn	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+7e72d0ae-3031-4909-bb73-c9d51325d8a4	faefe4a3-e72c-4097-87f7-f4fcaa68c497	Marissa S. Mattar	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+4f07f8d0-9614-42fa-9ba8-668ce160a778	1dda9bc1-73c9-40af-90cb-13beed0ec5dd	Michael S. Oh	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+98b675bc-fbc9-4925-8789-fd9a1a35fc53	0ab53077-919a-4471-b240-4a633f4804d5	Mohammadhadi Khorrami	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+cb9bfaaa-6ff6-4e25-afb6-787f4f2762ca	d0087106-74b0-4a03-8eae-8faecebf1d33	Nicholas R. Mayne	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+fbc5e966-c61e-4f6e-a3fe-236e086a4b44	ff98dc41-7bae-4c8a-b6ec-d70f45ac218f	Nikhil Sebastian	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+671ab26a-c674-4258-8905-980316d7ae83	9b02d167-e5d5-4f73-9862-d9ac6cf6313c	Paula A. Ugalde	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+dbff154f-333d-4aa7-bbfe-18958097fbc1	f9515b75-03bf-4226-8705-5159411219c1	Priya Velu	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+12cedcf1-75ea-45e0-944b-b7ef553d3e73	75bad9ff-9965-4fef-990b-ac9a2702735f	Qiuxiang Ou	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+d6bde1dc-2bb7-4498-83fb-8964a56c18e9	7a0d014d-0889-42ae-82ab-b60acb324a0e	Rania G. Aly	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+0ebb9979-c5b8-459f-b355-8c866693fc47	bcccedbe-b017-44ce-9327-3540be278736	Rebecca Pharaon	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+57bf623d-53e8-4bf8-b92a-c6699cf2421a	d2b69143-a12e-4d10-9a02-c304e5874ea0	Ruoying Yu	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+24896d20-2b6b-4bd6-ba68-ec740a57ceb9	c46422ad-cb7a-476c-8c54-a4bad0091d8a	Scott M. Atay	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+bf711d6a-7c85-472e-8e16-0a2cc53691cf	e1216932-fc8f-470b-b133-97bbcb0dadd0	Sibo Tian	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+fcd141a2-e6c0-416f-8444-ff0a1a74945a	4e07b5da-c2f0-4d10-b698-473f114b3461	Simon Heeke	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+dc31bce5-ceec-4a69-a2a2-bcbae2fcdd30	36c22bf3-9165-4087-9c83-145e81659609	Viola W. Zhu	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+22d273e0-bb35-4f41-aabe-86ed8f717c3e	ad0973c8-9335-4d85-95d7-82fd796befa5	W. Victoria Lai	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+54831705-39ba-47b4-988c-ef08e3fa8012	b070fd6e-c671-43f1-bd28-43eeae1b882d	Waree Rinsurongkawong	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+7f236a4c-2730-4a35-b404-09ce825cd35b	37a124d0-6425-40e3-9e95-a920e306c32f	Whitney S. Brandt	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+52c06faf-b163-4595-bf77-fcbab6f51b59	223de699-3f03-41b8-b005-55b831a45274	Yuki Shinno	boardless	rising_eligible	rising_star_v4.0	2026-08-05	NONE_LEFT
+a426d3c2-9733-40ae-bce4-c955b1aa3c14	659e0892-0795-4976-9938-8e43e4ea473b	Aditi P. Singh	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+46ab23fb-be5c-438a-ba8f-32bc5d64ca1d	39ebbec8-6527-4f3c-bddf-50c01bd5571b	Barzin Y. Nabet	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+2aff21d5-3b05-4b94-b325-882862da932d	d8977545-64dd-488b-ab06-6064eff33630	Benjamin J. Drapkin	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+cc082d5a-253a-4378-9abf-34406354b7ad	42dab34d-9bee-4ca6-8d40-03f97b676e78	Cole Friedes	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+3a3717b0-c276-4a00-98a3-5d426a06c0d7	e6fe8fac-fd22-416d-8498-97351982ce75	Débora S. Bruno	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+8ffdec99-3a61-44b8-8640-c322dfe4775a	96e415c2-3e9c-49cd-a90c-f05c461a7a02	Gene Grant Finley	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+c566bd7c-c6b8-42e9-bc9f-43514bfc2898	51760cb9-3694-4e5c-a7e5-937c477c495f	Ibiayi Dagogo‐Jack	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+cc9a5123-1f07-432e-bcf3-836ea82208d7	f0b04e18-3abb-4e24-a5eb-a5ffb3b15915	Jacob Sands	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+1f929c92-64a4-402d-ae90-ffbe2dbb3f60	f4024aa0-218c-4863-88d6-08a6182f96dd	Jacqulyne Robichaux	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+926c1dbb-29bc-4d0c-817c-f32f5710ae76	b4ea7814-7bf0-4586-924d-156258ee8f47	Jennifer W. Carlisle	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+e73a1b76-bad2-4760-8ef8-99524172879b	07101917-d39c-4177-b351-2f74ae53a2cc	Jessica Konen	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+cfcdede9-3393-4953-a545-2436af343adf	1c4160e4-a916-494d-b9e8-93648cdf75b0	Jia Luo	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+1b92ef5f-ee98-4264-b092-39f1657f9e7d	96c62709-b540-454d-b71f-d80bb8176072	Joshua E. Reuss	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+73a2322e-2a51-45f0-8d4e-6d6ee6622f20	8ecced92-e307-4f6c-906b-77d68205c569	Marcelo V. Negrão	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+463ed7b6-3352-4d78-8204-10c0fd15bfe0	727d2911-4e36-487e-bcb7-00e0416d53d6	Matthew S. Ning	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+1234283f-3300-4c24-873e-cb078201af5f	6c2196cf-30d3-46df-971b-822a428a46e2	Meghan J. Mooradian	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+f2e62c40-2f9f-4a90-b280-cff526b11afa	f6ada284-68c4-4763-a571-49781f6ccb9f	Michael Offin	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+c2d7c717-c0e1-46d5-8a9a-6292e95e0b51	6f8e9b36-1f4e-426f-acd7-b154941d8089	Moises J. Velez	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+870f698d-d7f8-4ee4-b6a2-77d963df5ab7	f0d590b8-b45b-4163-a0c5-07e28306bd5f	Pradnya D. Patil	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+8c20e8da-5118-4a99-9646-e2cbd40c3a6b	07a06ad9-0d67-47d9-bab9-f1b1befe705b	Ramin Salehi‐Rad	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+4230225c-0b95-418a-b619-ae3b6cac26a1	bd43319c-2cdc-4f10-867e-60886fd4d835	Sally C. M. Lau	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+7fa2b392-6f8f-4a32-b7d9-f968f1c52b87	f223feee-4fbf-4592-97cc-6364c2c9fcd2	Saumil Gandhi	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+6d6fc3d5-bb90-4d78-9e15-e18ec49be033	13da93e6-a899-41cf-adaf-d811a54b3614	Sonam Puri	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+e72694d3-b05e-410c-9881-8940bccaf05e	7f5a7db3-3053-4155-9c1d-3cef45a7466c	Sylvia M. Lee	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+4bf602cf-a424-4e28-a903-465910b4d5ba	6d3206ad-f8b8-4bb3-91b0-ca74aa0fb332	Thomas Lycan	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+c4d7db4a-efa5-428e-9bda-17686cde330e	eaf03157-feb9-4c6f-8a56-f89a4178b407	Vincent K. Lam	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+65badf87-56b9-4204-83c3-8d1b811baccc	7216a7d6-a583-466d-8974-157592667767	Yin P. Hung	boardless	rising_eligible	rising_star_v4.1	2026-08-17	NONE_LEFT
+6dab1480-d705-479d-a7fc-63af5b456860	ad99437a-6926-4329-8d55-28a23cd74f59	Ryo Ariyasu	boardless	rising_eligible	v1.0	2026-06-04	NONE_LEFT
+4cd095a4-45e6-424f-b761-fb93f4d348ac	09215e4d-c5d5-465e-b72b-15170102e76b	Seigo Katakura	boardless	rising_eligible	v1.0	2026-06-04	NONE_LEFT
+aa81e32e-c352-4ec1-ae75-5bb331d4a83a	a41673d6-e5d5-4b37-b38d-4ffa2193a616	Steven Kao	boardless	rising_eligible	v1.0	2026-06-04	NONE_LEFT
+7c11f62b-3f92-4752-9fc5-47ac4eb7f557	e651c920-07a7-4dc9-83dc-dc16c5024ec8	Alessandra Bulotta	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+36423998-bdec-4d0a-8d85-6964f439af11	b2ab223d-a4c8-4873-8aef-bea1e3d58de6	Alex Martínez‐Martí	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+0a6cbda8-3dad-4823-a2b5-ccdf6eadf38f	9749ef49-d894-431c-adb1-569e3e9fd0e4	Antonio Calles	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+54a213f9-0862-4b4a-8023-eaae26e3ca75	0246151b-64b2-4676-ad82-c4044975dd57	Arturo Navarro-Martín	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+e5f56333-1ff5-4830-a129-e2cb08fe4d74	8e9833c8-c76f-43a5-badd-b3389b1a9b21	Atocha Romero	established_board	established	rising_star_v3.4	2026-06-07	has_other
+c94a729f-cea3-41ad-878d-198c09b7f2e2	8969001f-a29a-4981-acb3-7895693089fb	Aurélie Swalduz	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+bef5558c-f5aa-439d-b875-2f9bdb4aa095	f694de74-0c68-458b-a7f0-adcdb8be2b2a	Bin Xu	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+3699aaae-9ea1-48cc-b654-cc92797c487b	6ca0bb5c-21b7-42f4-8b3d-75a32b73305f	Carlos Aguado	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+9a6d2bca-8c7f-4c74-a480-5a94b2b04d78	195ca53a-6d89-4d75-a2c1-f1d7246999ff	Carminia Maria Della Corte	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+d3d53137-a5cb-400a-b296-547ec16772b0	17ef69ab-238a-4e09-8ba9-ed2a18c92694	Colin R. Lindsay	established_board	established	rising_star_v3.4	2026-06-07	has_other
+4898a880-8046-4c55-8e28-b5a6b328b2cd	f7e42510-c156-4b36-88b4-d65ef3fb200a	Dania Nachira	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+4a459034-a8a2-4d96-a2bf-63917e996868	e3f0fedd-5cff-4158-834c-7f8156c69492	Daniel C. Christoph	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+1f9ffce4-a6e7-4fdb-ae49-7721ebc1bf78	b1aedbba-c7ad-4178-84eb-22450b0924b2	Diansheng Zhong	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+c157728b-50e9-4f31-9ca9-2c2af0b87152	39b81ad1-3b21-4b6b-bbf7-fa2de9220896	Édouard Auclin	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+f1219458-650f-4143-89a3-ebc745d4cfbd	ad5fd815-0d94-4291-9e5c-843bf422c703	Fabio Conforti	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+34540ede-6e50-4a16-baae-0eaa76d2e9a0	d3e6b3ed-ee4e-4cd0-97a8-45b11a748f41	Fabrizio Tabbò	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+32bc6f53-360f-4fcf-b94b-b6892645986c	3cd5123a-8345-49b2-bf35-8cb528623f7c	Francesco Agustoni	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+81e48b4b-6331-4a56-8a74-bc9c1548e627	44cae309-ef95-4c7e-8761-2d1d7d8b6a43	Gabriele Minuti	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+a89e81fe-4eb3-4d80-9a1c-6c950b1eaa9f	0015ed55-de71-4ae4-982b-76ddb505850e	Gaia Piperno	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+d64db819-66ca-42cc-b952-3600fa8dfd3d	1ebf7457-888b-418a-9832-6fb2b3138d76	Gaofeng Li	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+526bc878-d050-40fd-ab37-86800b09bb7b	dd6342b2-5f9a-4183-92b3-139273d7f5bf	Giandomenico Roviello	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+98579b27-accc-4b62-9359-617b478ee163	4da84f67-ffb9-489c-bdec-b1d09b24b6a3	Ivana Sullivan	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+6b6349c5-a093-4a8c-9f8e-972778007c52	c8c7c187-a6b2-412b-8868-2ae7e35fa450	Jinbo Zhao	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+2467581a-62c5-47be-8ded-17ecfe7d5c64	a3fd3d00-aa98-4ff1-9b73-8bb79e9aa2ff	Juliana Guarize	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+70cf2d9b-09a3-43be-b492-85eefe07c745	3af57fbe-03e7-443f-908b-95acd7cdaf97	Kejing Tang	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+c90e4179-083b-4316-b39e-d6bc93525d5a	b087d046-d633-41a2-bd98-da2f48efa780	Kezhong Chen	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+ffdea4ef-7710-447c-8907-e6bbfee76804	5939d338-9269-4d2b-aa44-6473fc6c0fe5	Lele Zhang	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+b063d5ec-d6c2-4ba0-808a-d0743b47ea2f	9ec73935-efae-4d41-bcff-d4b02cc27e54	Lieming Ding	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+159f3a28-2fb0-421d-84e0-38f0d7f73d52	deb5cf69-8fa0-43a6-9916-0bb0498a09b2	Liyun Miao	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+5678d1aa-6eb3-44cb-98dd-041452bdcc3f	ca4abb14-228c-4dba-99f7-b3b99ee19226	Marco Chiappetta	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+7ae7aaaa-809b-4d7e-9263-35f2ef1d918f	4effa7bc-74d4-4dbb-abb3-18e7e4ffb8ca	Marco Russano	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+516cf2b8-f720-41e0-b6e5-8636a45b2d29	533cc59b-600b-4fbd-a4da-e0ff901643c8	Marianna Macerelli	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+e6cd4569-eeee-4a8f-943d-b420088b199c	e8876001-f73c-496b-af6c-4f95be6a3033	Mark Kriegsmann	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+109a5da5-7528-4c78-985b-98dbbec47146	a5ea2f0e-d151-4bdd-b003-21834bfb8da5	Mark T.A. Donoghue	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+330ea906-f283-4656-8818-0c883666f896	f378052e-99d9-4f65-be25-56647f77519e	Marta Brambilla	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+7bb4e096-d343-48c1-b7ab-9398b28168ee	d618afda-35d1-469d-a0f9-41903f7a8f0c	Matteo Santoni	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+22b9e3fc-ecea-4f41-ba28-af43068402bb	2ed1b9cb-ffd2-447b-8c11-1dc7c1d36a93	Melanie Janning	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+4d289a3c-88c4-439c-8354-fd793ccade5d	dbf710d6-241f-4280-b253-66a3284c1904	Michele Simbolo	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+706bfe50-2cc8-4a64-8cd7-7cc6ee8f9196	792bf9eb-6f88-4513-a46b-6d350525b234	Pernelle Lavaud	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+8f664ee3-3c65-42bd-9661-985880a9731b	0e94b966-f20c-4101-aaee-8677f3824344	Petros Christopoulos	established_board	established	rising_star_v3.4	2026-06-07	has_other
+436047d6-2703-4899-ac5d-92a6d90d1e1f	0c5c4255-0e11-4299-a205-7084ea1aa121	Pietro Bertoglio	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+f46df4da-164a-4f8a-9cc7-c78f36d819d0	ba7406a2-5a4b-4935-933e-72ebe16ab121	R. Descourt	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+d4bd4ca1-4c71-4978-9433-956a6c35d88b	c50f8b21-fa1f-40c0-bbd7-afa44c4123f3	Rafael López Castro	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+4c7f15b2-34a1-4d51-98f5-4ff8c0d09ed3	f7abde5b-22bf-45bf-9672-089ef7077ea8	Raffaele Giusti	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+491c88de-f084-4d91-9a75-18c8ae7ae4c4	36a8e31f-ceb7-45f0-9058-cc5e3a3e2860	Shankar Siva	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+a11fe462-5b55-4b3f-8b8f-4369814e6fb4	00749591-ab16-4320-9d73-7e2db02d9e76	Shinji Kohsaka	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+c4f77846-af98-4e40-ac5f-397eb7babd25	6ed53e15-8448-418f-b73e-25e1725f2f2c	Sophie Cousin	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+c732874d-0a29-41b0-9349-4127c4090922	16d3a675-9b09-49fa-946a-7fc881145735	Stefano Bongiolatti	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+a8ba8151-08a8-4b66-9fb6-6a2d5e61fd98	50a20f25-dd62-4fd6-a5df-cfdaae3dfe59	Takahiro Karasaki	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+c3635966-ef82-4d21-8772-6c89b963ddbb	a571569a-3490-4b4c-864d-9abd696e13e0	Valerio Nardone	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+b539ca36-5e4c-4de9-80a2-dc8e997e64e1	7e9959d6-f3ed-4bab-b13e-bd4239f4b742	Vincent Fallet	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+855ce2f7-562d-4657-a3eb-6812da7bf130	22a4d97f-f60c-4fcd-8274-b9b64804f80e	Vincenzo Sforza	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+ec5c3ada-0832-4f13-b3f0-79a7bdf9661c	5f097c1f-7707-4d24-a17f-75aa74cf9613	Virginia Calvo	established_board	established	rising_star_v3.4	2026-06-07	has_other
+ddb86115-edf2-4f84-8d2d-a1ea9b817296	e7bd1375-b154-40b0-b36c-1d28c6d2b2dc	Xabier Mielgo-Rubio	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+2cf147e7-8bd6-45eb-956b-e2db23198021	876b58e7-0dc0-4c4e-b13d-29d43d3a3255	Xiaoli Zhu	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+7004a545-4c98-44a8-b150-0c86a48fe322	be2dc1c5-d7a4-4fa0-a986-e814c5c95f1e	Yong Fang	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+852ad61c-e9db-4f40-97bf-495ec4bfc84c	543fa1f6-f1d8-4edd-9577-8f8cf6600b3c	Yu Yao	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+2a88fd06-52ff-4f68-916e-0a86ba91a16e	70e5a3c6-6179-4611-b043-a73dc1971e1d	Yueyin Pan	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+db4eec15-4c85-4e6e-a553-d1277dfc1f50	93f154f6-bc73-41de-9b89-9dd4e5784f1f	Yung‐Hung Luo	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+1f9f5638-26ec-49b7-9ce6-53097b8eb947	9a703b64-68f9-4faa-9b03-7858cbfdf0c2	Zhihuang Hu	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+6b8d3c5a-1786-4ab6-8abe-6cc1a9b91b4f	41daa2ec-d008-47c7-a51d-26d4faf90f0c	Zhiyong He	established_board	established	rising_star_v3.4	2026-06-07	NONE_LEFT
+afc22f14-ca26-4c3c-9be9-d29673c69689	39d4dedb-a1b9-469e-b2c6-0286f3323bdf	Ammar Sukari	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+f75b58a4-95d5-4fcc-8fcb-d34f3430fbfc	b00e7056-9ff1-4e88-a669-1fd11986ddca	Anh T. Le	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+286b1e67-f5e1-4e64-972c-466b12e8026a	0d2e4e6d-0f32-4646-a6b8-ac7114b2407c	Apar Pataer	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+c9e140f8-c8a1-4212-8a16-f2b13e0b5240	870b70b3-5344-46f9-a3d5-1a650f43992f	Ayal A. Aizer	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+bd5cd6db-0d20-4397-a806-1a9adb1bbc65	0020a328-1ffd-4a87-a820-ff27daacb590	Ben Creelan	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+7edf3f3e-4d01-44fc-a7ec-d291d45abb64	82826ae4-743d-4d6b-a5ed-a7b126ffe83b	Brett W. Carter	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+d79b3142-f208-43d7-8556-cf43c2e8e80c	61285d5a-a912-475f-a64a-e128fd16c6f0	Caroline E. McCoach	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+46cc51e3-8255-4b8b-bf08-3fe13df40edc	41419308-74dd-4c74-9a79-5d52e7f5a9da	Chen Chen	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+9a6415a8-93d9-4177-9cfa-98348f9a5e71	5de9f6c8-6213-4e49-bea9-09e4baeb3b50	Christine Ciunci	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+f193bb6b-7831-452c-9d7b-e6d694de0d59	4ab83558-dd4d-470b-9579-4e544de590cd	Conor Steuer	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+f0537ee1-f4cc-4550-8aba-77d6dce2b4ea	3e522454-9057-4237-bfb0-8dcb49af2a65	Deepa Rangachari	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+b198633a-79e5-4aa9-a166-6c3cba485ef2	150756fb-2643-41cc-9851-3889a0dfa6d5	Edwin J. Ostrin	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+05b0656e-7f31-41fe-ba1b-1fc43b27ad1c	687ca005-f6c3-4743-a632-f7b1405271d9	Erica L. Carpenter	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+a8b4c603-0914-4967-ba5d-57e522a34416	c12b3958-51d9-4fac-bf34-03ebc911ea56	Erin M. Corsini	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+c2e4deba-96ca-44db-83d0-fd9977c12de3	c0baf501-fa9f-40b3-a524-4c1509a0aa16	Ethan B. Ludmir	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+ff10fb6b-b0c3-4206-a22b-e23fd3e4eb7a	6ab1135a-382a-48ce-bd51-fd10c00d7a1c	Farjana Fattah	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+e66cb91a-2062-41c5-a9ec-2b90bd295143	fe132264-5f32-4163-bb1a-7b073418a143	Francisco Sánchez-Vega	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+bbc58adc-4d40-4dce-a6ca-db3702fa6e01	c3086edd-1c5f-4aca-97c0-286989902492	Girish S. Shroff	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+49ba8b5b-0256-478d-acb0-18423b1d8045	c702db67-7bc0-492e-b6db-0a937b7a6861	Hua Bao	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+e4a5205d-09e7-4f87-a429-c026532eee74	0fb7fb5e-cccb-4cfc-a89a-dd27a73d222c	Hui Yu	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+02b08cc6-e979-4629-a954-4453ef69bff4	c8174c42-363c-4fbd-8204-a8a0db5da2e4	Isabel R. Preeshagul	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+b57c8672-5c70-4d71-b019-523614af3eaf	cf793abf-9c6a-486c-91d6-ef007c84f71e	Ismail M. Meraz	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+653a3a52-dc3f-4db0-810e-6107b2fdc218	64ac997c-a96c-4408-800d-b09ab579b763	Jimmy Ruiz	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+a2f1e517-feae-472b-b09f-d64a165da07c	85455e0a-7f39-4665-8823-0486a756ae66	John T. Poirier	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+165226ac-32b3-47f9-b369-b0a4bdc173ca	272f5194-9380-411c-bac1-dbb64830e197	Jose M. Pacheco	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+382ed22e-0e81-4b61-aa3b-95a872059962	040f355f-cd2e-428d-a6ca-5c4c2f92002b	Joshua Bauml	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+ccd55189-d394-44ee-b690-ebd129bd56be	1060f8de-8d14-4db8-8d48-0ace0981ee78	Kay See Tan	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+7be9590a-fd94-4ace-96d5-85cba49a17f1	c29e52fe-6c06-4e43-92f8-f70446877cad	Kurtis D. Davies	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+f63db81f-bf62-4fc3-97d1-3cdfc19bd5a0	f8c9697b-ac77-4c9d-b62e-c149a26a1b2e	Lauren L. Ritterhouse	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+9b475cca-a1a8-47ca-99a9-9263cbec419e	acb45857-b122-42bd-a550-ca5758475262	Lynne D. Berry	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+d66f9e2d-efc2-4a47-9b19-5b6fcafe4fde	f96c18a6-89db-43c9-a264-263c70f4ee4f	Maen Hussein	established_board	established	rising_star_v4.0	2026-08-05	has_other
+a3f151eb-4332-42e6-beeb-9b46a7facda7	43d805fa-b50c-4473-bbe1-5892b9b6941d	Magda Bahcall	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+5562310d-20ec-4210-8296-cd52a474e4d4	de03c1a2-7486-48cb-846f-00c868e0d054	Matthew M. Harkenrider	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+df0418fc-08b5-430c-bf56-a98ca0ed4b18	7b9fb23f-be1c-477f-ad28-75f6e77710c4	Michael F. Gensheimer	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+2d4b51a2-8a52-4f6d-8181-e0bc4a120889	6c46ed04-68f7-4f45-8641-8667513c1abb	Michael Farris	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+27e0164b-bacc-4ec5-a2fa-4987966d46ae	cb0ed3ba-db4c-443f-b573-4b768f06ca46	Mohamed E. Abazeed	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+3740ee0d-0799-4132-826f-6d6f68b8e36f	fad4f76e-3bde-4e25-9605-3e29050c24d4	Nicholas G. Zaorsky	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+35697a25-b97f-4107-8236-12d1ac83b4b1	ef965d6e-b025-4747-bba1-e4a62f52bf7f	Nicholas R. Faris	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+31392742-9a63-4373-914d-4a17e5db814c	ea165b22-86c3-4d77-ac3d-ed5ad43cb459	Nisha Mohindra	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+181db383-6e67-4c8f-b5f6-03231d88786a	d3b3c6a2-446d-4913-be99-403900bbd801	Pamela Samson	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+9e604a72-63c6-4953-8882-146aeb421779	8cc96e78-171b-4530-9b2a-cad026c308b3	Quynh‐Nhu Nguyen	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+5fa1bf38-64c6-41a6-83af-04f148153766	2787d84a-a328-482e-90b4-02982a3028aa	Robert E. Merritt	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+1314c5f8-fb6c-4fdd-a4be-2fe6dce23244	5817d556-8f00-4849-9eee-e02b8316bcac	Robert J. Cardnell	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+5c47e36b-a53b-41fc-bae0-8c95d8d09ec7	11a0b3e5-5015-4011-b316-a96d6f5d7525	Runzhe Chen	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+725e3e33-cb36-4d07-9e49-854d2a69b539	4c51d916-474e-4602-aa3f-e5f972a751be	Ryan D. Gentzler	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+94405880-2c95-4e35-9c40-022598ecf642	b7388bda-012a-481a-a1d6-866bbece6203	Ryma Benayed	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+741d36ea-9691-43f9-8166-2ccbe032c639	f40a6ef1-ba7c-4f25-b635-fa7a1c791b28	Shahed N. Badiyan	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+7f2111c7-119e-4cd7-a060-e021b4166b44	495ff34d-5b45-43e2-89fc-2503aa6bf58c	Sharyn I. Katz	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+48ccc666-1564-441f-a107-565aa56251bb	d8d08005-2218-4bfa-ad71-fc3c0ee4c79b	Tapan K. Maity	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+25f40482-1b55-459f-816d-6c7bf7be4fd6	500ef208-761b-4036-9851-a51869970792	Terence T. Sio	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+cb0d88a5-29ce-47c3-a918-fcc73f83b5f0	a01c10b9-9a21-4014-9aeb-ab8facd7a10c	Theresa A. Boyle	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+4b635c89-5ad1-4e8e-8cef-c01469ce3eda	d637aa71-d71c-4f9f-8ec3-6fb663106fc8	Ting Xu	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+1c1db27b-d40e-4106-ad2d-605c63816bfa	6413db7b-0293-45a2-8fcd-9a5169e31fb7	Tran C. Thai	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+30d74531-0e5e-4676-a290-db9c7c65a1f7	e8a685ff-898b-4170-8e3e-ab411b114933	Udayan Guha	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+f8b39bce-a0fb-418d-9dc2-f44e5caa0062	0e074fc9-6fa0-4d21-9d39-fd841a5d58a8	Victor Olivas	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+bb232d90-47e5-433f-9233-8571988b410a	1ab395ed-1aa4-483f-9f0e-d207f160915d	William P. Levin	established_board	established	rising_star_v4.0	2026-08-05	NONE_LEFT
+dcfcb827-11fb-4806-80f0-a656f90184b6	6648e326-c5e9-4fe3-a778-29decba1b669	Alexandre Reuben	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+372e39db-42ca-43bd-9677-6f8b51ece36c	44a9472a-5aa4-4b7e-bfbf-b5dd0755836e	Àlvaro Quintanal-Villalonga	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+08594c7c-b3d2-43df-aeb1-d67af1fca362	13d15487-c38b-438e-b56e-5fac2dbafbe5	Andrew J. Plodkowski	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+cdd5f9b5-b03c-477d-86c6-5d9730433af1	eeb40cdf-a2d4-40dd-a69c-d7b3b72a4099	Benjamin H. Kann	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+e7b4611b-025b-413e-a08e-ae6996a302f8	b5ee1d52-6181-41a3-a91e-79aa92878327	Carolyn J. Presley	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+80f31aec-dd89-4456-9a1b-e779ac07e10a	4cb1bad6-ab44-4473-a563-253ae66be107	Catherine B. Meador	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+4a94251b-6c2b-4714-8884-fec58f7fa66e	8317c658-469b-497f-91d2-b80e390e52aa	Chantale Bernatchez	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+10a219d7-a5e9-45ae-9c8a-b39bb83cad43	11a226e4-f635-4772-825d-79e144e81e32	Christina S. Baik	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+0daf3a86-79c4-422d-839e-f5f9e4accc8d	0ae5152e-fb98-41cf-9fce-e9f487a02382	Collin M. Blakely	established_board	established	rising_star_v4.1	2026-08-17	has_other
+c7cc6f7a-99c0-4c31-bcb4-c8a6f4f576d5	6806b094-a456-41e1-8b33-5f1c6135ee19	Daniel M. Trifiletti	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+e51c7edc-a085-43ec-9aad-e4d6e5eae670	20c0988c-e4e3-4e62-9d1a-dda8020258aa	Frank E. Mott	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+a7e20b14-938d-4eb1-bca9-a338bd037166	41a0f1a4-cf22-4738-8663-dafadc7e6ae0	Imayavaramban Lakshmanan	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+d9990935-42eb-474e-ace8-66e930aea122	f28b42b3-1fde-4046-a5e2-a18a0c8d993f	Jason J. Luke	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+cf8be82c-23a5-4a5e-8738-2a92710bfc10	b4b21f67-b88a-4922-afcd-9465428f7cb4	Jeffrey Clarke	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+debee90f-ed56-4445-938e-e421f5e675d1	ec3a3b67-05d1-4631-bb09-e7ee1c374de2	Jennifer L. Sauter	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+c09b154a-9f96-47e2-9cb9-5256cc4e3634	01cb967b-9f10-49ed-88eb-3f8965e2b9a7	Jessica R. Bauman	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+ef417a61-c38e-4c8d-bf56-0bb3069b23d2	cb2f85df-d17e-4c9e-9478-90fd9a44592d	Jonathan T. Yang	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+2dc576e9-5dd2-4cbf-93ff-68f44acb516a	2ea6246a-692f-4427-a532-f6cf0e41660c	Kathryn F. Mileham	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+942b939e-45cd-4341-8996-681d4cd1b6fb	a2710de3-6655-46b7-8dfb-bea5af2e00c4	Kenneth L. Kehl	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+489f519f-60f0-4045-860b-b930c6d81c17	e18f97fa-6992-4436-9fcd-d85915a83f9e	Khinh Ranh Voong	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+b1031057-56bb-4ae9-8338-50fb9715748b	b8ea3bfa-f53f-4108-9739-449a636f51ee	Liza C. Villaruz	established_board	established	rising_star_v4.1	2026-08-17	has_other
+658cf0ef-7516-4f7a-aed7-6c20d9a2f44d	252b48b2-12ab-43aa-9ed6-07ec7710fff4	Loretta Erhunmwunsee	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+dd03d690-96b6-4d3c-9ceb-41995bb8c1ca	cb3b249e-743a-4484-b7ed-b4f305898e2b	Maria Thor	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+4ff72ca3-fbe6-494f-8c7b-aa82d7ad6364	f6cd0c53-1b5f-4491-b501-7e5e933e9f31	Marjorie G. Zauderer	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+fbd4838d-3398-4ef6-b3ca-b351f2b9aae7	17456067-fa82-479a-b6ab-acb48ee98d5c	Masanori Kawakami	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+4d38fe0a-7b2e-42a3-bcaa-097cd87de56e	8fc6d649-4a7f-4bcf-9c0d-fc0a77c1561e	Matthew P. Deek	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+d1116e8b-7d39-4991-a402-16b783d2dc81	d30851f2-6ba2-44d6-a224-6fe91e1917bf	Nitin Roper	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+96c41650-0e87-4c38-ad65-4453e66a1919	98e47765-319b-4b6b-898c-024eb59acb52	Piro Lito	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+21c5dd3c-9f54-4d7f-80df-afe874aac742	9b75e4f1-2a84-4eaa-b1f3-56f6ed0b2ec7	Rachel E. Sanborn	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+d563d180-0136-4a04-9f14-80c91ab0c6d8	b196e3d4-58c8-42ff-9cdc-c7c58487520a	Rajwanth Veluswamy	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+8d6f438c-1c1d-4eab-81b6-d779098e7cdb	b7eefc1d-53c4-4962-baf5-afbe8f6daf30	Richard D. Hall	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+c7f2f8c7-89ef-4a63-9038-fae728ab086f	92392d7a-dd31-4c85-800d-1f67ed869366	Ronglai Shen	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+b2017104-3009-48cd-990d-4b76ae4dc3d4	c3573e4f-8e13-4671-ad0c-b76301b438cb	Shadia I. Jalal	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+0cc2a10e-707c-485f-b433-cf2bc445d568	7353b33e-96cb-4dd2-be0c-9542a59224db	Siddhartha Devarakonda	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+06799847-e1e9-4c1e-a604-ed2e05e20885	6cb1872f-0338-4784-9c49-66671becbed1	Taher Abu Hejleh	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+d798240c-4ea0-4b47-99a5-6419d8a628e3	a52c288f-1b96-4a58-b046-c85ae1804ac8	Veronica Chiang	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+ace2241e-5ec3-41b6-920f-c7f6ec97bbfa	973dec43-5ff7-4095-8404-3a3898cbd2d6	Xue Wu	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+6d540757-01f9-46bd-b2bf-09483282b9fb	6e7acc52-2544-4d15-9b9b-625bbb075d8c	Yanyan Lou	established_board	established	rising_star_v4.1	2026-08-17	has_other
+45956e94-bf2a-4bbc-8ceb-9a2f63ae8dcf	7e4e09f8-1916-4336-946a-823b0960c610	Yasir Y. Elamin	established_board	established	rising_star_v4.1	2026-08-17	NONE_LEFT
+2100401f-24a2-4f43-a3ea-80fef816d7f8	955e5d8c-d1ba-4c7c-8004-d92499cfb5c7	Alessandro Di Federico	established_board	established	v1.0	2026-06-04	NONE_LEFT
+ecd8ac50-2d6a-4657-8889-85efbe55fccc	b9f7cdd3-4faa-4608-8f19-acc56d1bbfc4	Jun Lü	established_board	established	v1.0	2026-06-04	NONE_LEFT

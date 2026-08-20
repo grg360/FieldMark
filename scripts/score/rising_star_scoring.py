@@ -37,6 +37,18 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# MOMENTUM FLOOR (2026-08-17): three more senior-author papers in the recent
+# rolling window than in the prior one. Raised from > 0, which admitted 39.7% of
+# the board (246 of 619) on a single extra paper and left no approach ramp --
+# nobody could be one paper from entry, because entry required only the first.
+# Measured at 3: board 619 -> 251, US 123 -> 57, EU 132 -> 48; mean early->recent
+# senior progression of admitted members 1.3->4.4 becomes 2.2->7.9. Named here
+# beside the other thresholds; the momentum pipeline's own gates live with the
+# computation (MIN_PUBS_PER_WINDOW, MAX_CAREER_YEARS in
+# scientific_momentum_scoring.py; MIN_COLLABORATORS_PER_WINDOW in
+# network_momentum_scoring.py).
+MIN_VELOCITY_DELTA = 3
+
 W_MOMENTUM = 0.70
 W_VISIBILITY = 0.30
 W_SCI = 0.50
@@ -92,14 +104,14 @@ def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_2021_2025') 
             WHERE sm.therapeutic_area_id = %(ta_id)s
               AND (cc.cohort = 'rising_eligible'
                    OR (cc.cohort = 'established' AND cc.career_age <= 15))
-              -- MOMENTUM FLOOR (2026-08-05): a board defined by trajectory
-              -- excludes members whose senior-author output shrank. One
-              -- condition on the thing the cohort claims to measure; degree
-              -- can fall for reasons unrelated to trajectory, so it is not
-              -- part of the floor.
-              AND sm.pub_velocity_delta > 0
+              -- MOMENTUM FLOOR (2026-08-05, raised 2026-08-17): a board defined
+              -- by trajectory excludes members whose senior-author output did not
+              -- move. One condition on the thing the cohort claims to measure;
+              -- degree can fall for reasons unrelated to trajectory, so it is not
+              -- part of the floor. Threshold is MIN_VELOCITY_DELTA above.
+              AND sm.pub_velocity_delta >= %(min_delta)s
             """,
-            {"ta_id": ta_id, "vis_window": vis_window},
+            {"ta_id": ta_id, "vis_window": vis_window, "min_delta": MIN_VELOCITY_DELTA},
         )
         return [
             {
@@ -119,12 +131,24 @@ def compute_percentile_ranks(hcp_ids: list[str], values: dict[str, float]) -> di
     if not hcp_ids:
         return {}
     n = len(hcp_ids)
-    if n == 1:
-        return {hcp_ids[0]: 100.0}
     ordered_values = [values[hcp_id] for hcp_id in hcp_ids]
     ranks = rankdata(ordered_values, method="average")
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # Weibull plotting position. rankdata gives 1 = lowest, so ascending rank r maps
+    # to 100 * r / (n + 1); the highest value (r = n) lands at 100n/(n+1), the lowest
+    # at 100/(n+1).
+    #
+    # It replaced 100.0 * (r - 1) / (n - 1), which put the top at EXACTLY 100.0 and the
+    # bottom at EXACTLY 0.0 — artifacts of a finite list rendered as facts.
+    #
+    # AFFINE IN THE OLD VALUE: p_new = a * p_old + b, a = (n-1)/(n+1), b = 100/(n+1),
+    # so ORDER WITHIN THIS COLUMN IS UNCHANGED. method="average" still shares a value
+    # between genuine ties. Eight sibling scorers carry the same convention.
+    #
+    # n == 1 no longer needs a special case (denominator n+1 is never zero) and returns
+    # 50.0 rather than 100.0 — a lone member is neither top nor bottom.
     return {
-        hcp_id: round(100.0 * (ranks[i] - 1) / (n - 1), 2)
+        hcp_id: round(100.0 * ranks[i] / (n + 1), 2)
         for i, hcp_id in enumerate(hcp_ids)
     }
 

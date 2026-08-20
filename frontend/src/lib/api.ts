@@ -8,6 +8,8 @@ import {
   isExclusionRegion,
   type RegionKey,
 } from "./regions";
+// Aggregate (non-country) scope values — see the "Other" region query below.
+import { aggregateScopeValues } from "./ledgerRegions";
 import { resolveFilterScope } from "./rank-filters";
 import { institutionToSlug } from "./institutionUtils";
 import { supabase } from "./supabase";
@@ -118,10 +120,22 @@ async function enrichAndMapCohortRows(
     } else if (scopeParams.excludeScopeValues.length > 0) {
       // "Other": everything NOT in a defined region. PostgREST wants the negated `in`
       // list as a parenthesised, quoted tuple.
+      //
+      // AGGREGATE SCOPES MUST BE EXCLUDED TOO (2026-08-18, generalised same day). This
+      // is the one query in the sweep that selects scope rows by NEGATION, so it is the
+      // one that a new non-country scope_value silently joins: an aggregate bucket is
+      // not in ALL_REGION_COUNTRIES, so without this every European HCP — and now every
+      // APAC one — would surface on the "Other" board carrying their aggregate rank, on
+      // top of the country row they already have.
+      //
+      // The list is READ FROM regions.aggregate_scope rather than hardcoded, so a region
+      // flagged later is excluded here without an edit. A negation cannot be
+      // additive-safe on its own; this is what makes it so.
+      const aggregates = await aggregateScopeValues();
       v3Query = v3Query.not(
         "scope_value",
         "in",
-        `(${scopeParams.excludeScopeValues.map((c) => `"${c}"`).join(",")})`,
+        `(${[...scopeParams.excludeScopeValues, ...aggregates].map((c) => `"${c}"`).join(",")})`,
       );
     }
     const { data: v3Rows, error: v3Err } = await v3Query;

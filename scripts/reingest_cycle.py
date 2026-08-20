@@ -59,6 +59,15 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                          TA-agnostic (classifies every HCP, no --ta) and run FULL each cycle for now (one pass +
                          upsert). --hcp-ids-file exists for an incremental pass later but the cycle does not use it.
   9 score             rising_score.py --ta <slug> --execute
+  9.5 board_snapshot  take_weekly_snapshot.py --ta <slug>
+                      Captures the rising ELIGIBLE POOL (~2,232/TA, is_on_board flags the 251)
+                      and the established board (global+US+EU5, write-on-change) WITH THE GATE
+                      INPUTS -- pub_velocity_delta, both senior-pub counts, collaborator counts,
+                      career_age, rolling window bounds, and the thresholds in force.
+                      MUST follow stage 9: it copies what shipped, never recomputes.
+                      NON-BLOCKING: failure -> WARN (not FAILED), never gates the cycle -- BUT the
+                      loss is PERMANENT (hcp_scientific_momentum_v1 is overwritten next cycle),
+                      unlike stages 10-13 where the artifact merely goes stale. Chase this WARN.
  10 asset_matches      build_asset_matches.py  (rebuild asset_publication_v1 from config/assets.json)
                       NON-BLOCKING + NSCLC-ONLY: runs after scoring; failure -> WARN (not FAILED), so a
                       stale asset table never gates the cycle. Swap-in build (~2s live lock, ~95s total).
@@ -72,7 +81,9 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       DERIVES its target set (anti-join vs hcp_hcpcs_detail) from local parquets; no-ops when
                       clean. TA-agnostic. Logs to pipeline_runs as hcpcs_detail_topup.
                       NON-BLOCKING: failure -> WARN (not FAILED), never gates the cycle.
- 13 narratives        generate_narratives_v2.py --cohort rising_star|established --*-top 200 --target-version v2
+ 13 narratives        generate_narratives_v2.py --cohort rising_star|established|community --target-version v2
+                      (rising: NO --rising-top = whole board; established: --established-top 200;
+                       community: NO cap, anchored+supported tiers only -- decided 2026-08-17)
                       --force --yes --workers 6 --ta <slug>  (13a rising, 13b established)
                       Narrative regen COUPLED to the stage-9 scoring recompute; stamps
                       hcp_narratives_v2.source_enrichment_run_id from hcp_scientific_momentum_v1 so staleness
@@ -133,6 +144,7 @@ SCRIPTS: Dict[str, str] = {
     "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
     "trials_status_refresh": "scripts/ingest/trials_pipeline.py",     # 11: weekly trial-fact refresh (--refresh-status)
     "hcpcs_topup": "scripts/ingest/hcpcs_detail_topup.py",            # 12: Medicare claims top-up for newly-NPI'd HCPs
+    "board_snapshot": "scripts/utilities/take_weekly_snapshot.py",    # 9.5: capture board state + GATE INPUTS after scoring
     "narratives": "scripts/narrative/generate_narratives_v2.py",      # 13: narrative regen coupled to the scoring recompute
 }
 
@@ -370,6 +382,21 @@ def cmd_rising_score(slug: str) -> List[str]:
     return py("rising_score") + ["--ta", slug, "--execute"]
 
 
+def cmd_board_snapshot(slug: str) -> List[str]:
+    """9.5 -- capture what stage 9 just shipped.
+
+    MUST run after stage 9 and MUST NOT recompute anything: it copies the scoring
+    outputs AND the gate inputs (pub_velocity_delta, both senior-pub counts,
+    collaborator counts, career_age, the rolling window bounds, and the thresholds
+    in force) out of tables that are OVERWRITTEN IN PLACE on the next cycle.
+    hcp_scientific_momentum_v1 keeps exactly one row per (hcp, TA), so a week that
+    is not captured here can never be reconstructed.
+
+    No --date: the snapshot is stamped today, which is the cycle's own date.
+    """
+    return py("board_snapshot") + ["--ta", slug]
+
+
 def cmd_build_asset_matches() -> List[str]:
     # 10: rebuild asset_publication_v1 from config/assets.json (swap-in; no args -- reads DATABASE_URL).
     return py("asset_matches")
@@ -389,24 +416,46 @@ def cmd_hcpcs_topup() -> List[str]:
     return py("hcpcs_topup") + ["--execute", "--triggered-by", "reingest_cycle"]
 
 
-def cmd_narratives(slug: str, cohort: str, top_flag: str) -> List[str]:
+def cmd_narratives(slug: str, cohort: str, top_flag: Optional[str]) -> List[str]:
     # 13: narrative regeneration, coupled to the scoring recompute (stage 9).
     # Manual generation decoupled from scoring was the staleness mechanism the
     # 2026-08-05 audit quantified (96.7% of narratives quoted a superseded
     # snapshot). Runs AFTER stage 9 so it reads the freshly-stamped
     # enrichment_run_id from hcp_scientific_momentum_v1 (written into
     # hcp_narratives_v2.source_enrichment_run_id).
-    # Scope: rising_star + established, top 200 US each. Community is
-    # DELIBERATELY not regenerated here -- its generation cut follows rank while
-    # the community ledger now sorts by evidence tier; regenerating on the rank
-    # cut would entrench a selection the product no longer uses (open decision).
+    # Scope: rising_star (WHOLE BOARD) + established (top 200 US) + community
+    # (anchored + supported tiers, uncapped).
+    #
+    # COMMUNITY WAS AN OPEN DECISION UNTIL 2026-08-17, and is now decided. It had
+    # been excluded because its generation cut followed hcps_v2.cohort_score while
+    # the ledger sorts by evidence tier, so regenerating would have entrenched a
+    # selection the product no longer used. Two things settled it: the composite
+    # freeze NULLed cohort_score corpus-wide, so the old cut no longer computes at
+    # all; and the cut chosen -- anchored + supported -- is exactly what
+    # community_ledger() already defaults to (coalesce(p_tiers,
+    # array['anchored','supported'])), so generated set and displayed set are the
+    # same population by construction. heme_dominant / candidate / unresolved stay
+    # uncovered on purpose: a narrative about an unresolved evidence tier is prose
+    # about an absence.
+    #
+    # top_flag=None means PASS NO CAP, and rising uses it (2026-08-17). The rising
+    # selector was uncapped that day so its default reaches the whole board, but a
+    # caller passing --rising-top 200 re-imposed the cap from the outside: the board
+    # is 251, so the cycle would have silently dropped 51 members every week while
+    # the script's own default was correct. A cap that only exists at the call site
+    # is the harder version of the same defect -- reading the selector proves nothing.
+    #
+    # Established still passes --established-top 200 against a 2,990-member US board.
+    # That is a KNOWN, DELIBERATE cut, not an oversight: uncapping it is a cost
+    # decision (~15x the calls), so it stays until someone makes that call.
     # --force: prompt v4.1/v3.0 forbid rank/percentile prose; existing rows must
     # be overwritten, not skipped. Since the 2026-08-06 cohort key, 13a and 13b
     # write to separate (hcp, slug, cohort) rows — a dual-board member keeps
     # both narratives. --yes: unattended (stdin=DEVNULL). --workers 6:
     # parallel API calls; generate_narratives_v2 retries 429/529 with backoff.
+    cap: List[str] = [] if top_flag is None else [top_flag, "200"]
     return py("narratives") + [
-        "--cohort", cohort, top_flag, "200",
+        "--cohort", cohort, *cap,
         "--target-version", "v2", "--force", "--yes", "--workers", "6",
         "--ta", slug,
     ]
@@ -606,6 +655,10 @@ def print_plan(
          "AFTER institution_normalized is final, BEFORE stage 9 -- rising momentum scoring "
          "INNER JOINs this table on classification='ACADEMIC')", cmd_industry_classify()),
         ("9  rising_score", cmd_rising_score(slug)),
+        ("9.5 board_snapshot (capture rising eligible pool + established board WITH the "
+          "gate inputs; AFTER scoring so it records what shipped, never recomputes; "
+          "NON-BLOCKING -- WARN not FAILED, but the loss is PERMANENT)",
+         cmd_board_snapshot(slug)),
         (("10 asset_matches (rebuild asset_publication_v1 from config/assets.json; swap-in ~2s live lock; "
           "NON-BLOCKING -- WARN not FAILED)" if slug == ASSET_MATCHES_TA
           else f"10 asset_matches  [SKIPPED: NSCLC-only, ta={slug}]"),
@@ -854,6 +907,27 @@ def run_cycle(
             run_stage(9, "rising_score", cmd_rising_score(slug))
             note(9, "score", "OK")
 
+            # 9.5 BOARD SNAPSHOT -- NON-BLOCKING. Inside stage 9's gate because it captures
+            # stage 9's output: the board plus the variables it was gated on. It must never
+            # recompute, only copy, so it belongs immediately after the scorer and before
+            # anything else can touch the momentum tables.
+            #
+            # Non-blocking on purpose, and the trade is asymmetric: a failed capture costs
+            # one week of history, a failed cycle costs the whole ingest. But unlike stages
+            # 10-13, where the artifact merely goes stale, the loss here is PERMANENT --
+            # hcp_scientific_momentum_v1 is overwritten next run -- so this WARN is worth
+            # chasing the same day.
+            try:
+                run_stage(9, "board_snapshot(9.5)", cmd_board_snapshot(slug))
+                note(9, "board_snapshot", "OK")
+            except Exception as se:  # non-blocking: log + continue (StageFailure incl.)
+                note(9, "board_snapshot", f"WARN({type(se).__name__})")
+                print(f"\n[reingest_cycle] WARN: stage 9.5 board_snapshot failed ({se}); "
+                      f"cycle still SUCCESS (non-blocking). THIS WEEK'S GATE INPUTS ARE LOST "
+                      f"PERMANENTLY -- the momentum tables are overwritten next cycle. "
+                      f"Re-run TODAY: python scripts/utilities/take_weekly_snapshot.py "
+                      f"--ta {slug}", file=sys.stderr)
+
         # 10 ASSET MATCHES (NSCLC only) -- NON-BLOCKING. After the scoring chain; failure is
         # isolated so it never marks the cycle FAILED (a stale asset table costs ~400 pubs/month
         # and must not gate the rising scores). Skipped for non-NSCLC TAs (no asset config).
@@ -901,18 +975,26 @@ def run_cycle(
                       f"cycle still SUCCESS (non-blocking). Claims detail left at prior load.",
                       file=sys.stderr)
 
-        # 13 NARRATIVES -- NON-BLOCKING. Regenerates rising_star + established narratives
-        # (top 200 US each) AFTER the scoring recompute (stage 9), stamping each row with
+        # 13 NARRATIVES -- NON-BLOCKING. Regenerates rising_star + established + community
+        # narratives (rising: whole board; established: top 200 US; community: anchored +
+        # supported tiers, uncapped) AFTER the scoring recompute (stage 9),
+        # stamping each row with
         # the momentum snapshot's enrichment_run_id. This closes the staleness loop the
         # 2026-08-05 audit quantified: narratives were generated manually, decoupled from
-        # the recompute, so 96.7% quoted a snapshot that no longer existed. Community is
-        # deliberately excluded (rank-cut selection vs evidence-tier ledger -- open
-        # decision). BILLED (Anthropic API, ~$2.20/cycle at 400 calls); failure is
+        # the recompute, so 96.7% quoted a snapshot that no longer existed. Community
+        # joined on 2026-08-17 (cut decided: anchored + supported, matching the ledger's
+        # own default). BILLED (Anthropic API); failure is
         # isolated (WARN not FAILED): a stale narrative must never gate the data cycle.
         if running(13):
             for sub_name, cohort, top_flag in (
-                ("narratives_rising(13a)", "rising_star", "--rising-top"),
+                # None => whole board. See cmd_narratives for why rising is uncapped
+                # and established deliberately is not.
+                ("narratives_rising(13a)", "rising_star", None),
                 ("narratives_established(13b)", "established", "--established-top"),
+                # Community: uncapped -- the tier filter in
+                # fetch_community_top_hcp_ids IS the scope, so --community-top
+                # does not apply to the NSCLC board.
+                ("narratives_community(13c)", "community", None),
             ):
                 try:
                     run_stage(13, sub_name, cmd_narratives(slug, cohort, top_flag))
