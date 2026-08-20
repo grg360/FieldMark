@@ -5,6 +5,7 @@ import GlobalFooter from "./GlobalFooter";
 import FloatingBackToTop from "./FloatingBackToTop";
 import { FONT, SPACE, CONTENT_WIDTH, COOL, LINE, type ContentWidth } from "../lib/designTokens";
 import { DEPTH } from "../lib/canonicalTokens";
+import { useMediaQuery } from "../lib/useMediaQuery";
 
 export interface BreadcrumbItem {
   label: string;
@@ -35,6 +36,20 @@ export default function AppLayout({
   navTranslucent = false,
 }: Props) {
   const maxWidth = CONTENT_WIDTH[width];
+  // CONTENT GUTTER (2026-08-19). Was a flat SPACE.lg (16) at every viewport, which is
+  // what made surfaces without their own panel read as hard-left: measured on the
+  // publications page, breadcrumb, title, stat row, column header and first card all
+  // sat at left:16 with nothing between them and the viewport edge.
+  //
+  // 32 above the mobile breakpoint, 16 at or below it. The breakpoint is the same
+  // max-width:767px the ledger's useIsMobile uses, so a surface does not change gutter
+  // and layout at two different widths.
+  //
+  // THIS NARROWS THE CONTENT COLUMN BY 32px, which matters for the ledger's tablet
+  // header overflow (docs/LEDGER_HEADER_TABLET_OVERFLOW.md) — its fixed columns need
+  // 1,095px of content width, so the viewport floor moves with this value.
+  const narrowGutter = useMediaQuery("(max-width: 767px)");
+  const gutter = narrowGutter ? SPACE.lg : 32;
   const navigate = useNavigate();
 
   return (
@@ -70,7 +85,7 @@ export default function AppLayout({
           boxSizing: "border-box",
         }}
       >
-        <div style={{ padding: SPACE.lg }}>
+        <div style={{ padding: gutter }}>
 
         {breadcrumbs && breadcrumbs.length > 0 ? (
           // Register breadcrumb (2026-08-05): mono uppercase with slash

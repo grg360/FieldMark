@@ -13,6 +13,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { PublicationListRow, PublicationYearLedgerRow } from "../../lib/publicationsList";
 import DiscussAffordance from "../FieldIntelligenceForum/DiscussAffordance";
+// Palette (2026-08-19): the OPEN ACCESS stat was #7ba36f, a SECOND GREEN. canonicalTokens
+// allows exactly one — MARK.EST doubles as STATE.POSITIVE, "never a second green" — and open
+// access is neither a cohort nor a positive state. It is a property of a publication, so it
+// takes the same ink as its neighbours (CO-AUTHOR and CITATIONS already use C.ink2).
+import { CANON } from "../../lib/canonicalTokens";
 
 const C = {
   bg: "#08080a", gold: "#d8a34a", ink: "#e6e3dd", ink2: "#c6c2bb", mid: "#6f6d68",
@@ -137,14 +142,14 @@ export default function FullCareerView({
   );
 
   return (
-    <div style={{ background: C.bg, color: C.ink, fontFamily: MONO, display: "flex", flexDirection: "column", gap: 26 }}>
+    <div style={{ background: C.bg, color: C.ink, fontFamily: MONO, display: "flex", flexDirection: "column", gap: 26, padding: 20 }}>
       {/* header stat row (frame 1c) */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 34, flexWrap: "wrap", paddingBottom: 2 }}>
         <Stat n={senior.length.toLocaleString()} label="SENIOR AUTHOR" color={C.gold} />
         <Stat n={coAuthorTotal.toLocaleString()} label="CO-AUTHOR" color={C.ink2} />
         <div style={{ width: 1, alignSelf: "stretch", background: C.line2 }} />
         <Stat n={totalCites.toLocaleString()} label="CITATIONS · ALL YEARS" color={C.ink2} />
-        <Stat n={totalOa.toLocaleString()} label="OPEN ACCESS · FULL TEXT" color="#7ba36f" />
+        <Stat n={totalOa.toLocaleString()} label="OPEN ACCESS · FULL TEXT" color={CANON.INK.BODY} />
       </div>
 
       {/* SENIOR AUTHOR — five most cited, expandable to all. The id is the landing

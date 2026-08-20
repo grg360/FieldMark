@@ -481,7 +481,13 @@ export default function HcpProfileBrief() {
                 {/* A year click navigates to the redesigned publications surface (URL
                     changes to ?year=), not an in-route state overlay — so the year view
                     is reachable, linkable, and browser-back returns to the profile. */}
-                <Timeline data={p.record.timeline} onYearPress={(y) => navigate(`/hcp/${p.hcp.id}/publications?year=${y}`)} />
+                <Timeline data={p.record.timeline} onYearPress={(y) => {
+                  navigate(`/hcp/${p.hcp.id}/publications?year=${y}`);
+                  // Belt-and-braces with ScrollToTop (2026-08-19): the timeline sits ~2,229px
+                  // down the profile, so this was the one navigation where the carried-over
+                  // offset was always large enough to land mid-page.
+                  window.scrollTo(0, 0);
+                }} />
               </div>
             ) : null}
             {/* THE RECORD recompose (The Record v2 frame, approved 2026-08-10):
@@ -588,8 +594,15 @@ export default function HcpProfileBrief() {
                   <div style={{ ...serif(15, 400), color: P.ink2, lineHeight: 1.6, textWrap: "pretty", paddingBottom: 6 }}>{p.belief.headline}</div>
                 ) : nPos > 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 10 }}>
-                    <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SYNTHESIS AT THIS DEPTH</span>
-                    <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", display: "block" }}>The one-paragraph characterisation is generated from the shape of a record — the tiers, the recurrences, the throughline. {nPos} position{nPos === 1 ? "" : "s"} {nPos === 1 ? "has" : "have"} no shape. The positions themselves are below, unsummarised.</span>
+                    {/* Was: "NO SYNTHESIS AT THIS DEPTH" / "{n} positions have no shape"
+                        (2026-08-19). Both were false. Depth is not the condition — the
+                        synthesis script has no depth gate at all, and on the day this
+                        changed the un-synthesised group had HIGHER average depth than
+                        the synthesised one (7.20 vs 6.67 papers). Martin Reck sat on
+                        this branch at the extractor's ceiling: 10 papers, 50 positions.
+                        The real cause is an unrun batch, so the copy now says that. */}
+                    <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>SYNTHESIS NOT YET GENERATED</span>
+                    <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", display: "block" }}>The one-paragraph characterisation is generated separately from the positions and has not yet been produced for this record. The positions themselves are below, unsummarised.</span>
                   </div>
                 ) : null}
               </div>
@@ -629,12 +642,22 @@ export default function HcpProfileBrief() {
               ))
             ) : p.belief.raw_positions && p.belief.raw_positions.length ? (
               <div style={{ paddingTop: 6 }}>
-                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink4 }}>SOURCED · BELOW TIER THRESHOLD <span style={{ color: P.ink6 }}>{p.belief.raw_positions.length}</span></span>
+                {/* LABELS STATE WHAT IS MEASURED (2026-08-19). This header read
+                    "SOURCED · BELOW TIER THRESHOLD {n}", but no threshold exists
+                    anywhere in the code — {n} is simply raw_positions.length, and
+                    nothing is compared to anything. It now names the count it shows. */}
+                <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink4 }}>SOURCED POSITIONS <span style={{ color: P.ink6 }}>{p.belief.raw_positions.length}</span></span>
+                {/* Replaces the per-card SINGLE SOURCE chip, which was hardcoded and
+                    therefore tautological: every raw position is one row with exactly
+                    one publication_id, so the chip could never NOT render and measured
+                    nothing. It also read as a claim-level statement, which it is not —
+                    the same claim can recur in another paper and both copies were
+                    chipped. Stated once, as a property of the list. */}
+                <div style={{ ...mono(9), letterSpacing: ".06em", color: P.ink6, paddingTop: 4 }}>EACH POSITION BELOW IS ONE STATEMENT FROM ONE PAPER</div>
                 {p.belief.raw_positions.map((r, i) => (
                   <div key={i} style={{ borderTop: `1px solid ${P.line}`, padding: "13px 0", display: "flex", flexDirection: "column", gap: 6 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
                       <span style={{ ...serif(15, 600), color: P.ink0 }}>{r.text}</span>
-                      <span style={{ ...mono(9, 600), letterSpacing: ".12em", color: P.amber, padding: "1px 6px", border: `1px solid rgba(224,167,94,.4)` }}>SINGLE SOURCE</span>
                     </div>
                     {r.excerpt ? <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.5, textWrap: "pretty" }}>{r.excerpt}</span> : null}
                     <div style={{ display: "flex", alignItems: "baseline", gap: 12, ...mono(9), letterSpacing: ".06em", color: P.ink5 }}>
@@ -645,7 +668,10 @@ export default function HcpProfileBrief() {
                   </div>
                 ))}
                 <div style={{ ...mono(9), lineHeight: 1.6, color: P.ink6, letterSpacing: ".04em", paddingTop: 12, borderTop: `1px solid ${P.line}`, marginTop: 6 }}>
-                  NO POSITIONS REACHED A TIER. TIERS NEED A PATTERN — A CLAIM RECURRING ACROSS VENUES, CORROBORATED IN THE FIELD — WHICH THIS RECORD CANNOT ESTABLISH. EMPTY TIERS ARE NOT DRAWN.
+                  {/* Was: "...WHICH THIS RECORD CANNOT ESTABLISH." Nothing was tested,
+                      so nothing failed — tiers are drawn from the synthesis, and the
+                      absence of one is an unrun batch, not a verdict on the record. */}
+                  TIERS ARE DRAWN FROM THE SYNTHESIS, WHICH HAS NOT BEEN GENERATED FOR THIS RECORD. EMPTY TIERS ARE NOT DRAWN.
                 </div>
               </div>
             ) : (

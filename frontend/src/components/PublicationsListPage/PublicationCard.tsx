@@ -4,6 +4,12 @@ import { formatByline } from "../../lib/authorByline";
 import { COLOR, ELEVATION, FONT } from "../../lib/designTokens";
 import DiscussAffordance from "../FieldIntelligenceForum/DiscussAffordance";
 import type { DiscussAffordance as Affordance } from "../../lib/fieldIntelligence";
+// Palette (2026-08-19): the OPEN ACCESS chip and its link were #7fb094, a second green on
+// a page that already carried another (#7ba36f on the stat). Teal is the canonical colour
+// for "this is clickable" (ACTION.LINK) and the chip IS a link to the full text, so it keeps
+// a distinguishing colour without borrowing green's meaning. Its border takes LINE.EDGE
+// rather than a green-tinted rgba.
+import { CANON } from "../../lib/canonicalTokens";
 
 interface Props {
   pub: PublicationListRow;
@@ -126,11 +132,11 @@ export default function PublicationCard({ pub, affordance, isMobile, existingOnl
               that doesn't imply readability; no DOI → nothing. */}
           {pub.fullTextUrl && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-              <a href={pub.fullTextUrl} target="_blank" rel="noopener noreferrer" style={{ ...mono(10.5, pub.fullTextIsOa ? "#7fb094" : COLOR.indigoLink), textDecoration: "none" }}>
+              <a href={pub.fullTextUrl} target="_blank" rel="noopener noreferrer" style={{ ...mono(10.5, pub.fullTextIsOa ? CANON.ACTION.LINK : COLOR.indigoLink), textDecoration: "none" }}>
                 {pub.fullTextIsOa ? "Read full text ↗" : "View on publisher ↗"}
               </a>
               {pub.fullTextIsOa && (
-                <span style={{ ...mono(8.5, "#7fb094"), letterSpacing: "0.1em", border: "1px solid rgba(95,169,126,0.35)", borderRadius: 2, padding: "1px 5px" }}>
+                <span style={{ ...mono(8.5, CANON.ACTION.LINK), letterSpacing: "0.1em", border: `1px solid ${CANON.LINE.EDGE}`, borderRadius: 2, padding: "1px 5px" }}>
                   OPEN ACCESS
                 </span>
               )}
