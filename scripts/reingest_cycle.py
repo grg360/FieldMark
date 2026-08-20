@@ -416,6 +416,36 @@ def cmd_hcpcs_topup() -> List[str]:
     return py("hcpcs_topup") + ["--execute", "--triggered-by", "reingest_cycle"]
 
 
+def cmd_stranded_sweep(slug: str, cohort: str) -> List[str]:
+    """13.5 -- delete narratives whose HCP left the board in stage 9's rescore.
+
+    A STANDING STEP BECAUSE THE GATE IS A PERCENTILE. Under the old
+    MIN_VELOCITY_DELTA the rising board was gated by a COUNT of senior-author
+    papers, which moves only when someone publishes -- so strandings arrived as
+    rare one-off batches when the threshold itself changed, and were cleaned up by
+    hand (migrations 2026_08_17 and 2026_08_20). Since 2026-08-20 the gate is
+    MIN_COMPONENT_PERCENTILE against the eligible pool, and a percentile floor
+    moves when ANYONE ELSE moves. Members now drift across the median every cycle
+    without doing anything differently, so this is ordinary churn and must not
+    depend on someone remembering.
+
+    AFTER STAGE 13, NOT BEFORE. Stage 13 regenerates narratives for current board
+    members; this removes narratives for people who are no longer members. In that
+    order the board is fully covered before anything is deleted. Reversed, the
+    sweep deletes rows generation would have replaced and the board is briefly
+    uncovered -- the 08-17 sweep ran that way round and left 270 people with
+    nothing pending a later run.
+
+    The script writes a manifest and a full-row-image RESTORE file before deleting
+    anything, and re-derives the target set inside the delete transaction, so a
+    board that moved in between aborts the delete instead of orphaning the backup.
+    """
+    return [
+        sys.executable, str(REPO_ROOT / "scripts" / "narrative" / "sweep_stranded_narratives.py"),
+        "--ta", slug, "--cohort", cohort,
+    ]
+
+
 def cmd_narratives(slug: str, cohort: str, top_flag: Optional[str]) -> List[str]:
     # 13: narrative regeneration, coupled to the scoring recompute (stage 9).
     # Manual generation decoupled from scoring was the staleness mechanism the
@@ -1004,6 +1034,34 @@ def run_cycle(
                     print(f"\n[reingest_cycle] WARN: stage 13 {sub_name} failed ({ne}); "
                           f"cycle still SUCCESS (non-blocking). Narratives left at prior generation.",
                           file=sys.stderr)
+
+            # 13.5 STRANDED SWEEP -- NON-BLOCKING. Inside stage 13's gate and after
+            # its sub-stages, because it deletes what stage 13 did NOT regenerate:
+            # narratives for people stage 9 removed from the board. See
+            # cmd_stranded_sweep for why this is standing work rather than a
+            # one-off migration.
+            #
+            # Failure here is the mildest in the cycle -- a stranded narrative is a
+            # row the ledgers already do not read for a non-member, so leaving it
+            # one more week costs a stale row and no wrong answer. That is why it
+            # is last and non-blocking. It is still worth clearing, because the row
+            # asserts a board membership the board does not.
+            #
+            # Only cohorts with a membership table are swept; community's board is
+            # a tier-filtered view and is deliberately unsupported in the script.
+            for sweep_cohort in ("rising_star", "established"):
+                try:
+                    run_stage(13, f"stranded_sweep(13.5:{sweep_cohort})",
+                              cmd_stranded_sweep(slug, sweep_cohort))
+                    note(13, f"stranded_sweep_{sweep_cohort}", "OK")
+                except Exception as se:  # non-blocking: log + continue
+                    note(13, f"stranded_sweep_{sweep_cohort}", f"WARN({type(se).__name__})")
+                    print(f"\n[reingest_cycle] WARN: stage 13.5 stranded_sweep "
+                          f"({sweep_cohort}) failed ({se}); cycle still SUCCESS "
+                          f"(non-blocking). Narratives for former board members remain "
+                          f"on file and will be swept next cycle. Re-run manually: "
+                          f"python scripts/narrative/sweep_stranded_narratives.py "
+                          f"--ta {slug} --cohort {sweep_cohort}", file=sys.stderr)
 
     except StageFailure as f:
         note(f.stage_no, f.name, f"FAILED(exit={f.returncode})")
