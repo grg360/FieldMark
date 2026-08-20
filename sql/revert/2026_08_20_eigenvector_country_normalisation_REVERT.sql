@@ -1,0 +1,38 @@
+-- REVERT NOTE for the eigenvector-delta country normalisation (V3), 2026-08-20.
+-- Branch: resurfacing.
+--
+-- THERE IS NO SQL TO RUN. This file exists because the change has no migration and
+-- would otherwise leave no revert trail beside its siblings. The change is entirely
+-- in Python and reverts with git:
+--
+--   scripts/score/network_momentum_scoring.py
+--     - MIN_NORM_GROUP / ROW_GROUP constants          -> remove
+--     - compute_eigenvector_delta_pctiles_by_group()   -> remove
+--     - call site restored to:
+--         eigenvector_delta_pctiles = compute_percentile_ranks(
+--             hcp_ids, {r["hcp_id"]: r["eigenvector_delta"] for r in eligible})
+--     - norm_country dropped from the SELECT, the row dict, and the eligible dict
+--
+--   frontend/src/pages/MethodologyPage.tsx
+--     - the two paragraphs describing within-country normalisation
+--
+-- WHAT REVERTING THE CODE DOES NOT DO. hcp_network_momentum_v1 is overwritten in
+-- place, one row per (hcp, TA). Reverting the code changes nothing on its own; the
+-- stored network_momentum_percentile keeps whatever the last run wrote until
+-- network_momentum_scoring.py is re-run, and hcp_rising_star_ranks_v3 keeps the
+-- board built from it until rising_star_scoring.py is re-run after that. Full
+-- revert is: git revert, then re-run network momentum, then re-run rising star,
+-- in that order.
+--
+-- THE PRE-CHANGE BOARD is preserved at hcp_rising_board_snapshots snapshot_date
+-- '2026-08-20' (2,232 pool rows, 251 on board, gate inputs captured under
+-- min_velocity_delta_applied = 3). That capture predates BOTH the coherence gate
+-- and this normalisation, and is the recovery path for either.
+--
+-- WHAT REVERTING COSTS YOU. The artifact returns: median eigenvector delta +13.0
+-- for CN against 0.0 US / 0.0 JP / -3.0 EU5, with degree delta identical across
+-- all groups. Board composition returns to 46.4% CN from 28.9%. See
+-- docs/NETWORK_MOMENTUM_EIGENVECTOR_ARTIFACT.md for the full measurement set and
+-- for why cross-institution and cross-country filtering were rejected as fixes.
+
+SELECT 'no-op: see comments above' AS revert_note;
