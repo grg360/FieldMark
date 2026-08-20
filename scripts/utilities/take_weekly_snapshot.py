@@ -666,28 +666,74 @@ def take_established_snapshot(conn, snapshot_date, ta_id, slug, dry_run) -> int:
 
 
 def report_history(conn) -> None:
+    """One line per CAPTURE, not per calendar day.
+
+    THE INSTRUMENT WAS LYING (2026-08-20). This grouped by snapshot_date, which
+    assumes one board state per day -- the same assumption the primary key made and
+    that a gate change falsifies. Once 2026-08-20 held two captures it summed them
+    and printed 4,464 rows / 587 on board: a board that never existed.
+
+    Grouping by created_at instead is WORSE, and was the actual trap. ON CONFLICT
+    DO UPDATE does not touch created_at, so a capture completed in two passes
+    carries two values -- capture a21259c1 shows 463 rows at 17:08 and 1,769 at
+    18:04. Read as a grouping key that invents a third capture that never ran, and
+    it did, for three consecutive runs, while the stored data was correct after the
+    first one.
+
+    capture_id is the only column that identifies a capture. created_at is honest
+    row-level provenance -- when each row was physically written -- so it is shown
+    as a DISPLAY column (the earliest write in the capture) and never grouped on.
+
+    Established has no capture_id: its table is still date-keyed and carries the
+    same defect, so it keeps the old grouping and is labelled as such.
+    """
     print("\n=== Snapshot history ===")
-    for table, label in (
-        ("hcp_rising_board_snapshots", "Rising (v2)"),
-        ("hcp_established_board_snapshots", "Established (v2)"),
-    ):
-        with conn.cursor() as cur:
-            cur.execute(
-                f"""
-                SELECT snapshot_date, source, count(*),
-                       count(*) FILTER (WHERE is_on_board)
-                FROM {table}
-                GROUP BY snapshot_date, source
-                ORDER BY snapshot_date DESC, source
-                LIMIT 12
-                """
-            )
-            rows = cur.fetchall()
-        print(f"\n{label}:")
-        if not rows:
-            print("  (empty)")
-        for d, src, n, on_board in rows:
-            print(f"  {d} [{src:<7}] {n:>7,} rows | {on_board:>6,} on board")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT snapshot_date, capture_id, min(source) AS source,
+                   min(created_at) AS first_written,
+                   count(DISTINCT created_at) AS write_passes,
+                   count(*) AS rows,
+                   count(*) FILTER (WHERE is_on_board) AS on_board,
+                   max(min_velocity_delta_applied)::text AS mvd,
+                   max(min_component_percentile_applied)::text AS mcp
+            FROM hcp_rising_board_snapshots
+            GROUP BY snapshot_date, capture_id
+            ORDER BY snapshot_date DESC, min(created_at) DESC
+            LIMIT 12
+            """
+        )
+        rows = cur.fetchall()
+    print("\nRising (v2) - one line per capture:")
+    if not rows:
+        print("  (empty)")
+    for d, cid, src, first, passes, n, on_board, mvd, mcp in rows:
+        gate = f"delta>={mvd}" if mvd else (f"P{mcp}" if mcp else "-")
+        extra = f" ({passes} write passes)" if passes and passes > 1 else ""
+        print(
+            f"  {d} [{src:<7}] {str(cid)[:8]} {n:>7,} rows | {on_board:>6,} on board "
+            f"| gate {gate:<9} | first written {first:%Y-%m-%d %H:%M}{extra}"
+        )
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT snapshot_date, source, count(*),
+                   count(*) FILTER (WHERE is_on_board)
+            FROM hcp_established_board_snapshots
+            GROUP BY snapshot_date, source
+            ORDER BY snapshot_date DESC, source
+            LIMIT 12
+            """
+        )
+        rows = cur.fetchall()
+    print("\nEstablished (v2) - grouped by DATE (no capture_id; still date-keyed):")
+    if not rows:
+        print("  (empty)")
+    for d, src, n, on_board in rows:
+        print(f"  {d} [{src:<7}] {n:>7,} rows | {on_board:>6,} on board")
 
 
 def main() -> None:
