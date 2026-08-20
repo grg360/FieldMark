@@ -126,15 +126,29 @@ const FACT_MINOR = CANON.INK.MUTE;
 
 const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
 
-// The tooltip affordance on a column head. A DOTTED UNDERLINE rather than a
-// caret glyph: the header's width budget is already tight — SENIOR-AUTH is
-// 73.3px inside a 100px box and COHORT SCORE 79.9px inside 88px — and a caret
-// costs real width where an underline costs none. Amber at 45% so it reads as
-// an affordance rather than a rule, and sits under the head word only, never
-// under the sub-label. Touch has no hover, so this must be visible at rest.
+// The tooltip affordance on a column head: ONE STEP UP THE INK RAMP, nothing
+// else. No border, no underline, no glyph.
+//
+// The first build drew a 1px dotted amber-45% border-bottom here and it was
+// wrong twice over. Amber is SEMANTIC on this surface — rank numerals, the
+// anchoring rule, tracked state, the Medicare presence check — so spending it
+// on chrome dilutes the one channel that carries meaning. And nine dotted
+// segments across a 9px tracked-caps row did not read as nine affordances; at
+// that scale they merged into a single yellow bar running through the header.
+//
+// Luminance carries it instead. A non-tooltip head rests at P.ink6
+// (CANON.INK.MUTE, L* 47); a tooltip-bearing head takes P.ink4
+// (CANON.INK.LABEL, L* 64) — the next rung up, and already a header colour on
+// this row (the COM EVIDENCE TIER head uses it). Seventeen points of lightness
+// is a visible difference between two heads sitting side by side, and it costs
+// no width, which the header cannot spare: SENIOR-AUTH is 73.3px inside a
+// 100px box and COHORT SCORE 79.9px inside 88px.
+//
+// Touch has no hover, so this must be legible at rest — which is exactly what
+// a resting-state colour step is, and what a hover-revealed cue would not be.
 const TIP_HEAD: CSSProperties = {
-  borderBottom: "1px dotted rgba(224,167,94,0.45)",
-  paddingBottom: 1,
+  cursor: "pointer",
+  color: P.ink4,
 };
 const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 
@@ -415,12 +429,10 @@ const drawerRule = (cfg: CohortConfig) => `1px solid ${cfg.markerColor}`;
 // all four sides. It is the ONLY line in the drawer — interior section
 // dividers were removed the same day (sections separate by spacing alone).
 const drawerPerimeter = (cfg: CohortConfig) => `3px solid ${cfg.markerColor}`;
-// Coverage sublabels, measured 2026-08-08 (EST/US n=2,990; RS/US n=123):
-// canonical-labeled pubs 97% / 99%; extracted positions 8% / 80%.
-const COVERAGE = {
-  EST: { practice: "97% OF COHORT", belief: "8% OF COHORT" },
-  RS: { practice: "99% OF COHORT", belief: "80% OF COHORT" },
-} as const;
+// The COVERAGE sublabels that stood here were removed 2026-08-20. The measured
+// figures and the reasoning are preserved verbatim in
+// docs/DRAWER_COVERAGE_SUBLINES_REMOVED.md, along with what to use if they are
+// ever rebuilt query-derived (count_hcps_with_positions for the belief half).
 
 const fmt1 = (v: number | null | undefined) => (v == null ? "—" : v.toFixed(1));
 
@@ -586,7 +598,14 @@ function DrawerSection({ label, sub, mobile, rightInset, children }: { label: st
     <div style={{ display: mobile ? "flex" : "grid", flexDirection: "column", gridTemplateColumns: "210px 1fr", gap: mobile ? 10 : 32, padding: mobile ? "20px 14px" : "26px 22px" }}>
       <div style={{ ...mono(11, 500), letterSpacing: ".14em", lineHeight: 1.7 }}>
         <div style={{ color: CANON.INK.MUTE }}>{label}</div>
-        <div style={{ marginTop: 4, color: CANON.INK.MUTE }}>{sub}</div>
+        {/* GUARDED (2026-08-20): an empty sub renders NOTHING — not an empty
+            div carrying marginTop 4, which would leave the eyebrow sitting 4px
+            high in its rail against the sections that still have a sub-line.
+            Layers 2 and 3 lost their sub when the COVERAGE percentages were
+            removed (docs/DRAWER_COVERAGE_SUBLINES_REMOVED.md); layer 1 keeps
+            ALWAYS PRESENT, so both states are live in one drawer and the
+            spacing has to be right in both. */}
+        {sub ? <div style={{ marginTop: 4, color: CANON.INK.MUTE }}>{sub}</div> : null}
       </div>
       {/* rightInset clears the top-edge PROFILE tab on the first section (desktop) */}
       <div style={rightInset && !mobile ? { paddingRight: rightInset } : undefined}>{children}</div>
@@ -694,7 +713,6 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.hcpId, nbrKey, taId]);
 
-  const cov = cfg.tag === "RS" ? COVERAGE.RS : COVERAGE.EST;
   const spine = spineLayer(cfg, row, nbrRows);
   const empty: DrawerLayerData = { topicTotal: 0, topicClasses: [], beliefCount: 0, beliefTexts: [] };
   const subj = layers?.get(row.hcpId) ?? empty;
@@ -746,7 +764,13 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
         <NeighbourLines lines={spine.lines} />
       </DrawerSection>
 
-      <DrawerSection label="PRACTICE · CANONICAL FOCUS" sub={cov.practice} mobile={mobile}>
+      {/* sub="" since 2026-08-20 — this carried "97% OF COHORT" (EST) /
+          "99% OF COHORT" (RS), a US-slice rate measured once on 2026-08-08 and
+          printed unchanged under every territory once the country axis landed.
+          Removed rather than corrected: a population rate in a single row's
+          rail reads as a fact about that row. Record and rebuild conditions in
+          docs/DRAWER_COVERAGE_SUBLINES_REMOVED.md. */}
+      <DrawerSection label="PRACTICE · CANONICAL FOCUS" sub="" mobile={mobile}>
         {layers == null ? (
           <div style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em" }}>READING THE LABELED CORPUS…</div>
         ) : (
@@ -771,7 +795,11 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
         )}
       </DrawerSection>
 
-      <DrawerSection label="BELIEF · EXTRACTED POSITIONS" sub={cov.belief} mobile={mobile}>
+      {/* sub="" since 2026-08-20 — carried "8% OF COHORT" (EST) / "80% OF
+          COHORT" (RS). Same removal as PRACTICE above. If it comes back, the
+          belief half is already query-derived elsewhere: count_hcps_with_positions,
+          the RPC behind HcpPositionsPage. */}
+      <DrawerSection label="BELIEF · EXTRACTED POSITIONS" sub="" mobile={mobile}>
         {layers == null ? (
           <div style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em" }}>READING THE POSITION RECORD…</div>
         ) : (
