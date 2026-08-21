@@ -130,6 +130,17 @@ export interface TrackedHcpChip {
   /** Community (Phase 3 roster): the evidence-tier word — community chips show
    *  the tier, never a number. */
   tier: string | null;
+  /** Set ONLY when every live ladder missed and the person is on no board today,
+   *  but a snapshot shows they held a rank before. The chip does not PRINT this
+   *  -- a de-listed person renders as name alone, because on a surface about
+   *  current tracking the fact that matters is "not on a board now". What the
+   *  prior rank buys is the distinction from someone never ranked: it suppresses
+   *  the "UNRANKED" label, which asserted the wrong thing, and it carries the
+   *  full history into the hover. See HCPChip rankText. */
+  prior_rank: number | null;
+  prior_ladder: "RS" | null;
+  /** The snapshot date the prior rank was last true on — NOT today. */
+  prior_as_of: string | null;
 }
 
 export interface TerritoryCoverageStats {
@@ -1364,6 +1375,59 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       }
     }
 
+    // FIFTH RUNG — the last rank they held, for people the four live ladders all
+    // miss (2026-08-20). MIN_VELOCITY_DELTA 3 (commit 0117bc4) cut the rising
+    // board 619 -> 251 and took seven tracked HCPs off it in one run, two of them
+    // from inside the global top 40. They hold no row in ANY rank table now, so the
+    // chip called them UNRANKED -- which asserts "never ranked" about people ranked
+    // twelve days earlier.
+    //
+    // READ THE LAST is_on_board = true ROW, NOT THE LATEST ROW. The de-listing row
+    // itself (2026-08-17) carries is_on_board = false with global_rank AND us_rank
+    // both NULL -- it records WHY they fell, not from where. The rank lives on the
+    // preceding on-board snapshot. Taking the newest row of any kind gets a null
+    // rank back and degrades straight to UNRANKED again.
+    //
+    // Only consulted for chips that would otherwise render UNRANKED, so this is one
+    // extra round trip on a handful of ids, not on the portfolio.
+    //
+    // DEFINITION DRIFT, KNOWN AND ACCEPTED: this us_rank is the stored snapshot
+    // figure, while a LIVE RS chip shows us_rank_eff off rising_board(). The two
+    // are not the same definition -- see docs/SNAPSHOT_US_RANK_PREDATES_EFF.md.
+    type PriorRow = { hcp_id: string; snapshot_date: string; us_rank: number | null };
+    const priorByHcpId = new Map<string, { rank: number; asOf: string }>();
+    {
+      const unresolved = hcpIdsInTerritory.filter(
+        (id) =>
+          ranksByHcpId.get(id) == null &&
+          estRanksByHcpId.get(id) == null &&
+          globalEstByHcpId.get(id) == null &&
+          comTierByHcpId.get(id) == null,
+      );
+      for (let i = 0; i < unresolved.length; i += CHUNK_SIZE) {
+        const chunk = unresolved.slice(i, i + CHUNK_SIZE);
+        const { data, error } = await supabase
+          .from("hcp_rising_board_snapshots")
+          .select("hcp_id, snapshot_date, us_rank")
+          .eq("is_on_board", true)
+          .not("us_rank", "is", null)
+          .in("hcp_id", chunk)
+          .order("snapshot_date", { ascending: false });
+        if (error) {
+          // Fail soft like every other block here: no prior rank just means the
+          // chip keeps saying UNRANKED, which is the pre-2026-08-20 behaviour.
+          console.warn("getTrackedHcpsInTerritory: prior-rank snapshot error", error);
+          continue;
+        }
+        // Ordered newest-first, so the FIRST row seen per hcp is the most recent
+        // snapshot they were on the board for. Later rows are older; skip them.
+        for (const row of (data ?? []) as PriorRow[]) {
+          if (row.us_rank == null || priorByHcpId.has(row.hcp_id)) continue;
+          priorByHcpId.set(row.hcp_id, { rank: row.us_rank, asOf: row.snapshot_date });
+        }
+      }
+    }
+
     const chips: TrackedHcpChip[] = allHcps.map((h) => {
       const cohortLower = (h.cohort_classification ?? "").toLowerCase();
       let cohort: TrackedHcpChip["cohort"] = null;
@@ -1378,6 +1442,7 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       const est = estRanksByHcpId.get(h.id) ?? null;
       const estGlobal = globalEstByHcpId.get(h.id) ?? null;
       const comTier = comTierByHcpId.get(h.id) ?? null;
+      const prior = priorByHcpId.get(h.id) ?? null;
       let ladder: TrackedHcpChip["ladder"] = null;
       let cohort_rank: number | null = null;
       let tier: string | null = null;
@@ -1385,6 +1450,9 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
       else if (est != null) { ladder = "EST"; cohort_rank = est; cohort = "established"; }
       else if (estGlobal != null) { ladder = "EST GLOBAL"; cohort_rank = estGlobal; cohort = "established"; }
       else if (comTier != null) { ladder = "COM"; tier = comTier; cohort = "community"; }
+      // No cohort is set for the prior-rank case ON PURPOSE. They are not on the
+      // board, so they must not wear its fill -- the chip keeps the unresolved
+      // treatment and the TEXT carries the tense.
 
       return {
         hcp_id: h.id,
@@ -1393,6 +1461,9 @@ export async function getTrackedHcpsInTerritory(userId: string): Promise<Tracked
         cohort_rank,
         ladder,
         tier,
+        prior_rank: cohort_rank == null && tier == null && prior ? prior.rank : null,
+        prior_ladder: cohort_rank == null && tier == null && prior ? "RS" : null,
+        prior_as_of: cohort_rank == null && tier == null && prior ? prior.asOf : null,
       };
     });
 

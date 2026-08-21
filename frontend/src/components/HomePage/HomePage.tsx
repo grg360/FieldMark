@@ -406,7 +406,7 @@ export default function HomePage() {
                           <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 20px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                               {n.interaction_type ? <span style={{ ...mono(9, 400, MID, ".14em"), border: `1px solid ${DIM2}`, padding: "4px 6px" }}>{n.interaction_type.replace(/_/g, " ").toUpperCase()}</span> : null}
-                              <span style={serif(16, 400, INK2)}>{`${n.hcp_first_name ?? ""} ${n.hcp_last_name ?? ""}`.trim()}</span>
+                              <Link to={`/hcp/${n.hcp_id}`} style={{ ...serif(16, 400, INK2), textDecoration: "none", borderBottom: `1px solid ${HAIR}` }}>{`${n.hcp_first_name ?? ""} ${n.hcp_last_name ?? ""}`.trim()}</Link>
                               <span style={mono(10, 400, DIM)}>{fmtDue(n.occurred_at)}</span>
                             </div>
                             {/* body VERBATIM from msl_hcp_notes (test rows render as stored) */}
@@ -634,7 +634,7 @@ export default function HomePage() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 20px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
                           {n.interaction_type ? <span style={{ ...mono(9, 400, MID, ".14em"), border: `1px solid ${DIM2}`, padding: "4px 6px" }}>{n.interaction_type.replace(/_/g, " ").toUpperCase()}</span> : null}
-                          <span style={serif(16, 400, INK2)}>{`${n.hcp_first_name ?? ""} ${n.hcp_last_name ?? ""}`.trim()}</span>
+                          <Link to={`/hcp/${n.hcp_id}`} style={{ ...serif(16, 400, INK2), textDecoration: "none", borderBottom: `1px solid ${HAIR}` }}>{`${n.hcp_first_name ?? ""} ${n.hcp_last_name ?? ""}`.trim()}</Link>
                           <span style={mono(10, 400, DIM)}>{fmtDue(n.occurred_at)}</span>
                         </div>
                         {/* body VERBATIM from msl_hcp_notes (test rows render as stored) */}
