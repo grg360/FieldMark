@@ -41,7 +41,7 @@ export const METRIC_DEFS: Record<string, MetricDef> = {
   },
   est_ph: {
     title: "Pharma · Not Ranked",
-    body: "CMS Open Payments percentile over three program years: payment volume, distinct companies, distinct drugs, transaction count. Evidence beside the ranking, weight zero.",
+    body: "Where this physician sits against the cohort on pharma engagement - 45.0 means above 45% of the cohort. Built from CMS Open Payments over three program years: payment volume, number of companies, number of drugs, and transaction count. Shown as evidence, weighted zero in the ranking.",
   },
   rs_idx: {
     title: "Cohort Score · 0–100",

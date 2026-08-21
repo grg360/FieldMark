@@ -41,7 +41,7 @@ export interface ScoreCol {
   w: number;
   kind: ColKind;
   noRank?: boolean; // informational, never ranks, never suppresses (Pharma, Engagement)
-  absent?: string; // text shown when the value is absent (NO OP DATA / NONE RECORDED)
+  absent?: string; // text shown when the value is absent (NO RECORD / NONE RECORDED)
   unit?: string; // trace noun for count columns (e.g. "distinct companies")
   prov?: string; // trace provenance (e.g. "Open Payments", "NPPES")
   // pct display precision: decimals set → floorFixed(v, decimals); absent → integer round.
@@ -122,7 +122,18 @@ export const EST_CONFIG: CohortConfig = {
     // because trace() reads it in running text, where the abbreviation would be worse.
     { key: "sencit", label: "CITATIONS", sub: "SENIOR-AUTHORED", head: "CITATIONS", headSub: "SENIOR-AUTH", w: 100, kind: "count", unit: "citations on senior-authored papers", prov: "FieldMark corpus", align: "center" },
     { key: "collab", label: "COLLABORATORS", sub: "10-YEAR", head: "COLLABORATORS", headSub: "10-YEAR", w: 104, kind: "count", unit: "distinct co-authors", prov: "co-authorship graph", align: "center" },
-    { key: "ph", label: "PHARMA", sub: "NOT RANKED", w: 120, kind: "pct", noRank: true, absent: "NO OP DATA", decimals: 1 },
+    // align "center" added 2026-08-20. This column was the only one of the three
+    // with no `align`, so it fell to the Row cell's `?? "right"` fallback while
+    // its HEAD took ColumnHeads' `?? "center"` — the one column where head and
+    // value disagreed. Setting it here fixes both at once, which is the whole
+    // point of the field (see the ScoreCol.align note above).
+    //
+    // absent "NO RECORD", was "NO OP DATA". "OP" is internal shorthand for Open
+    // Payments and appears nowhere else on the surface; the string it explains
+    // is a reader-facing absence state. The MEANING is unchanged and still
+    // exact: CMS holds no payment record, which is not the same as a payment of
+    // zero — see the cellDisplay note that routes 0 and null to this text.
+    { key: "ph", label: "PHARMA", sub: "NOT RANKED", w: 120, kind: "pct", noRank: true, absent: "NO RECORD", decimals: 1, align: "center" },
   ],
   bandResolution: 0.3,
   // TWO decimals since 2026-08-18. At one, floorFixed put the whole Europe head on
@@ -137,7 +148,7 @@ export const EST_CONFIG: CohortConfig = {
   notes: [
     "SCI AND NET PRINT AS STORED · THE COHORT COMPRESSES AT THE TOP BY CONSTRUCTION, SO NEAR-IDENTICAL HEAD VALUES ARE THE DATA, NOT A DISPLAY ARTIFACT — THE TIED BANDS ABOVE CARRY THAT.",
     "INDEX = SCI + NET COMPOSITE · RANK IS THE ONLY FIGURE ON THIS ROW THAT SEPARATES ANYONE.",
-    "PHARMA IS EXCLUDED FROM THE RANKING · OPEN PAYMENTS EXISTS FOR A MINORITY OF US ESTABLISHED HCP · “NO OP DATA” IS ABSENCE OF A RECORD, NOT ABSENCE OF PAYMENT.",
+    "PHARMA IS EXCLUDED FROM THE RANKING · OPEN PAYMENTS EXISTS FOR A MINORITY OF US ESTABLISHED HCP · “NO RECORD” IS ABSENCE OF A RECORD, NOT ABSENCE OF PAYMENT.",
     "QUARTER-OVER-QUARTER RANK HISTORY IS NOT COLLECTED YET, SO NO TRAJECTORY COLUMN IS DRAWN.",
   ],
   traceFoot:
@@ -352,7 +363,7 @@ export function money(v: number): string {
 }
 
 /** Absent handling per kind:
- *   pct+noRank (Pharma): null or ≤0 → "NO OP DATA" (a 0 is an absent record, not a measured low).
+ *   pct+noRank (Pharma): null or ≤0 → "NO RECORD" (a 0 is an absent record, not a measured low).
  *   money (Engagement): null → "NONE RECORDED" (CMS holds no record — Buroker case).
  *   count (Companies): null → em-dash, never 0.
  *   pct: null → dash; else prints AS STORED.

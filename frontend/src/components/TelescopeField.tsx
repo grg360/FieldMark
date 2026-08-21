@@ -566,14 +566,17 @@ class Sky extends Component<Props, State> {
     // labels (HTML, projected each paint via data-wx/wy)
     const labels: JSX.Element[] = []; const rects: { x: number; y: number; w: number; h: number }[] = [];
     const PANEL = { x0: VW - EDGE - PANELW - 12, y0: VH * 0.3, x1: VW, y1: VH - 84 };
-    // A label's React key is the STAR's identity, never its position in this array —
-    // see the push below. `emitted` makes that key contract explicit: a node gets at
-    // most one chip, first placement wins. The focus/hover chips are placed before the
-    // ambient pool precisely so they take precedence, and in an orbit ("o") focus the
-    // host node is neither focusIdx nor in orbFieldIdx, so the ambient loop does not
-    // skip it — without this it could be chipped twice under one key.
+    // A chip carries the FOCUS it names — one source for both its React key and what a
+    // tap on it selects, so the two cannot drift apart. The key is the star's identity,
+    // never its position in this array (see the push below). `emitted` makes that key
+    // contract explicit: a node gets at most one chip, first placement wins. The
+    // focus/hover chips are placed before the ambient pool precisely so they take
+    // precedence, and in an orbit ("o") focus the host node is neither focusIdx nor in
+    // orbFieldIdx, so the ambient loop does not skip it — without this it could be
+    // chipped twice under one key.
     const emitted = new Set<string>();
-    const chip = (id: string, wx: number, wy: number, text: string, fs: number, color: string, suffix: string | null, track: string, clearance: number, prefer: "l" | "r" | 0, avoidPanel: boolean) => {
+    const chip = (target: Focus, wx: number, wy: number, text: string, fs: number, color: string, suffix: string | null, track: string, clearance: number, prefer: "l" | "r" | 0, avoidPanel: boolean) => {
+      const id = target.t === "f" ? "f" + target.i : "o" + target.p + "-" + target.k;
       if (emitted.has(id)) return;
       const sxp = VW / 2 + (wx - cam.x) * cam.z, syp = VH / 2 + (wy - cam.y) * cam.z;
       if (sxp < 40 || sxp > VW - 40 || syp < this.safeTop() + 16 || syp > VH - 30) return;
@@ -607,19 +610,37 @@ class Sky extends Component<Props, State> {
       // is HTML, so background + padding size themselves to the real glyph run with no
       // measurement and no per-frame cost. textShadow is kept: it still does the work
       // where the plate ends.
-      labels.push(<div key={id} data-wx={wx.toFixed(1)} data-wy={wy.toFixed(1)} data-side={right ? "r" : "l"} style={{ position: "absolute", left: sxp.toFixed(1) + "px", top: syp.toFixed(1) + "px", transform: `translate(${right ? off + "px" : "calc(-100% - " + off + "px)"},-50%)`, whiteSpace: "nowrap", font: `400 ${fs}px/1.15 ${FONT.serif}`, letterSpacing: "0.015em", color, background: "rgba(4,6,13,0.82)", padding: "3px 8px", borderRadius: 3, textShadow: "0 0 4px rgba(4,6,13,0.95), 0 0 9px rgba(4,6,13,0.8), 0 1px 14px rgba(4,6,13,0.6)", transition: "opacity 400ms ease" }}>{label}</div>);
+      labels.push(<div key={id} data-wx={wx.toFixed(1)} data-wy={wy.toFixed(1)} data-side={right ? "r" : "l"}
+        // THE NAME SELECTS THE PERSON IT NAMES (2026-08-20). The overlay is
+        // pointerEvents:none, so a tap on a name used to fall through to the host and
+        // hit() resolved whatever star sat UNDER THE NAME — never the star the name
+        // belongs to, because the chip is offset from its star by `off` (46px+ for a
+        // big leader) and runs ~150px wide. Measured on the landing camera: not one
+        // point on Riess's own plate selected Riess; the centre selected Philip C. Mack.
+        //
+        // This calls focusOn(target) DIRECTLY. It does not go through hit(), so the
+        // 58px nearest-wins tolerance is not involved and cannot pick a neighbour.
+        //
+        // pointerDown is stopped so the host never starts a drag under a chip — that is
+        // what keeps a tap from also panning, and what stops the host's onUp from
+        // running hit() (which would deselect on a miss). Consequence, stated: a drag
+        // that BEGINS on a label does not pan. The gaps between labels — nearly all of
+        // the sky — still do, because the container stays pointerEvents:none.
+        onPointerDown={this.stop}
+        onPointerUp={(ev) => { ev.stopPropagation(); this.focusOn(target); }}
+        style={{ position: "absolute", left: sxp.toFixed(1) + "px", top: syp.toFixed(1) + "px", transform: `translate(${right ? off + "px" : "calc(-100% - " + off + "px)"},-50%)`, whiteSpace: "nowrap", font: `400 ${fs}px/1.15 ${FONT.serif}`, letterSpacing: "0.015em", color, background: "rgba(4,6,13,0.82)", padding: "3px 8px", borderRadius: 3, textShadow: "0 0 4px rgba(4,6,13,0.95), 0 0 9px rgba(4,6,13,0.8), 0 1px 14px rgba(4,6,13,0.6)", transition: "opacity 400ms ease", pointerEvents: "auto", cursor: "pointer" }}>{label}</div>);
     };
     if (focus) {
       const hostN = g.nodes[orbHost!];
       const hostBlur = ((hostN.cohort === "established" ? 11 : 7) + hostN.deg * 0.28) * 2.1;
       const hostR = ((hostN.cohort === "established" ? 2.6 + hostN.deg * 0.12 : 1.9 + hostN.deg * 0.09) * 2.3 + hostBlur * 0.85) * cam.z + 10;
-      if (focus.t === "f") chip("f" + hostN.i, hostN.x, hostN.y, hostN.name, 19, "#f6f2e8", null, "0.03em", hostR, 0, false);
-      else chip("f" + hostN.i, hostN.x, hostN.y, hostN.name, 14, "rgba(226,223,214,0.62)", null, "0.05em", 0, 0, false);
+      if (focus.t === "f") chip({ t: "f", i: hostN.i }, hostN.x, hostN.y, hostN.name, 19, "#f6f2e8", null, "0.03em", hostR, 0, false);
+      else chip({ t: "f", i: hostN.i }, hostN.x, hostN.y, hostN.name, 14, "rgba(226,223,214,0.62)", null, "0.05em", 0, 0, false);
       orb!.forEach((c, k) => {
         const sel = focus.t === "o" && focus.k === k;
         const clear = (c.inField ? (c.fieldIndex >= 0 ? rad[c.fieldIndex] : 4) : (sel ? 21 : 16)) * cam.z + 13;
         const side: "l" | "r" = c.x < hostN.x ? "l" : "r";
-        chip(c.fieldIndex >= 0 ? "f" + c.fieldIndex : "o" + orbHost + "-" + k, c.x, c.y, c.name, sel ? 19 : 13, sel ? "#f2f7ff" : c.inField ? "#cdcac1" : "#a8bdd8", sel ? null : String(c.w), sel ? "0.03em" : "0.06em", clear, side, false);
+        chip(c.fieldIndex >= 0 ? { t: "f", i: c.fieldIndex } : { t: "o", p: orbHost!, k }, c.x, c.y, c.name, sel ? 19 : 13, sel ? "#f2f7ff" : c.inField ? "#cdcac1" : "#a8bdd8", sel ? null : String(c.w), sel ? "0.03em" : "0.06em", clear, side, false);
       });
     }
     // Consistent glow clearance (2026-08-07): every label offsets past its own
@@ -636,12 +657,12 @@ class Sky extends Component<Props, State> {
     // hover chip — placed last — lost the collision check to it and was
     // culled. Exactly the biggest stars (Heymach, Wistuba, Ramalingam) never
     // visibly responded to hover while unlabelled mid-tier stars lit up.
-    if (nearIdx != null) chip("f" + nearIdx, g.nodes[nearIdx].x, g.nodes[nearIdx].y, g.nodes[nearIdx].name, 15, "#f6f2e8", null, "0.03em", glowClear(nearIdx), 0, false);
+    if (nearIdx != null) chip({ t: "f", i: nearIdx }, g.nodes[nearIdx].x, g.nodes[nearIdx].y, g.nodes[nearIdx].name, 15, "#f6f2e8", null, "0.03em", glowClear(nearIdx), 0, false);
     const pool = g.nodes.filter((n) => inCohort(n) && (zoomedIn || isLeader(n))).slice().sort((a, b) => b.deg - a.deg);
     pool.slice(0, zoomedIn ? 40 : density === "full" ? 22 : 14).forEach((n) => {
       if (n.i === nearIdx) return;
       if (focus && (n.i === focusIdx || orbFieldIdx.has(n.i))) return;
-      chip("f" + n.i, n.x, n.y, n.name, 12.5, focus ? "rgba(226,223,214,0.3)" : "rgba(226,223,214,0.5)", null, "0.05em", glowClear(n.i), 0, !!focus);
+      chip({ t: "f", i: n.i }, n.x, n.y, n.name, 12.5, focus ? "rgba(226,223,214,0.3)" : "rgba(226,223,214,0.5)", null, "0.05em", glowClear(n.i), 0, !!focus);
     });
 
     // panel content

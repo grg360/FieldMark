@@ -1211,19 +1211,33 @@ function Row({
               </div>
             );
           }
-          // Ranked cohorts (cfg.numericRamp) ride the 2A ramp below the score:
-          // pharma faded a step further (frame literals #A8A29A/#43434A — warm
-          // support, chrome-dark fade; near-twins of no register token, NOT
-          // converged). Dash/absent cells keep their treatment — the ramp is
-          // for numerals only. COM keeps the mono cells (no ramp on the roster).
+          // Ranked cohorts (cfg.numericRamp) ride the 2A ramp below the score.
+          // ONE TREATMENT FOR EVERY QUANTITY (2026-08-20). Pharma used to fade
+          // a step further here — serif(15) in FACT_FADE against serif(20,500)
+          // in FACT_PRIMARY for citations and collaborators — so the column
+          // read as less true than its neighbours rather than as excluded from
+          // the ranking. Two objections settled it. FACT_FADE is
+          // CANON.INK.GHOST (#434B54, L* 33), whose own token comment reserves
+          // it for "empty-state glyph ... text floor is above this": a real
+          // measured dollar percentile was being drawn in the ink kept for
+          // nothing-is-here. And the zero-weight fact already has a carrier —
+          // the column head says NOT RANKED, in words, once. Dimming every
+          // value to repeat it spent the ink channel on something the header
+          // states better.
+          //
+          // Absence is untouched and still separates: the d.kind === "absent"
+          // branch above keeps mono(9) in P.dash, so a row with no record still
+          // reads differently from a row with a number. Grey means absent here,
+          // and now it means only that.
+          //
+          // COM keeps the mono cells (no ramp on the roster); its own noRank
+          // fade lives in the factFinish branch below and is NOT changed —
+          // that column is a dollar total beside unbounded counts, a different
+          // question from this one.
           if (cfg.numericRamp && d.kind !== "dash") {
             return (
               <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
-                {col.noRank ? (
-                  <span style={{ ...serif(15), color: FACT_FADE }}>{d.text}</span>
-                ) : (
-                  <span style={{ ...serif(20, 500), color: FACT_PRIMARY }}>{d.text}</span>
-                )}
+                <span style={{ ...serif(20, 500), color: FACT_PRIMARY }}>{d.text}</span>
               </div>
             );
           }
