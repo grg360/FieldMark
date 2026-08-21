@@ -63,6 +63,20 @@ export const METRIC_DEFS: Record<string, MetricDef> = {
     title: "Network Visibility",
     body: "Current co-authorship centrality in the recent rolling window.",
   },
+  // A BADGE, NOT A METRIC — the only entry here that describes a chip on the
+  // Established shelf rather than a column. It earns a definition because its
+  // predecessor copy asserted something the pipeline does not do: it claimed
+  // the match was "confirmed by a person" and "never asserted from a database
+  // match alone", while scripts/social/dol_matching.py sets
+  // hcps_v2.is_verified_dol automatically at a score >= 70 (name similarity,
+  // institution, TA keyword and platform-verified signals). Measured
+  // 2026-08-20: 173 HCPs carry the flag, 161 of them with an automated
+  // high-confidence match, and only 27 have verified_dol_at set at all.
+  // The body below states what the flag actually asserts.
+  est_verified_dol: {
+    title: "Verified DOL",
+    body: "Social account matched to this physician by name, institution and therapeutic-area signals at high confidence. Automated match, not a claimed or self-identified account.",
+  },
   // ── Community evidence tiers ───────────────────────────────────────────
   // These describe the FILTER CHIPS, not columns. Community's column heads
   // stay untooltipped: the roster is not ranked and its columns are displayed

@@ -345,8 +345,10 @@ function RisingChipView({ flag, hcpId, hcpName = "", mobile = false }: { flag: R
 //                    agnostic; count/trialIds carried for the future pop-up)
 //   SENIOR AUTHORSHIP sage #8fb8a6 — same hue as Rising's authorship badge:
 //                    same claim-type, cross-ledger consistency
-//   VERIFIED SOCIAL  PURE INK      — deliberately not amber: amber sits
-//                    gold-adjacent to rank on the same row
+//   VERIFIED DOL     PURE INK      — deliberately not amber: amber sits
+//                    gold-adjacent to rank on the same row. (Was VERIFIED
+//                    SOCIAL until 2026-08-20; renamed to the vocabulary the
+//                    DOL panel and listing modal already use.)
 // Overlap at ship time: 808 rows one chip, 189 two, 13 all three — one wrap
 // row absorbs the max stack on desktop; mobile wraps to a second line.
 function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }: { openTrial?: OpenTrialFlag; est?: EstablishedFlags; hcpId: string; hcpName: string; mobile?: boolean }) {
@@ -378,10 +380,24 @@ function EstablishedChipView({ openTrial, est, hcpId, hcpName, mobile = false }:
           SENIOR AUTHORSHIP · {est.senior_pubs_24mo} IN 24 MO
         </span>
       ) : null}
+      {/* VERIFIED DOL, renamed from VERIFIED SOCIAL 2026-08-20 to match the two
+          surfaces that already use this vocabulary (DOLHeroPanel,
+          DOLListingModal) — one fact, one word for it.
+          The title changed with it, and that is the substantive half. The old
+          copy read "confirmed by a person ... Never asserted from a database
+          match alone", which is the opposite of what happens:
+          scripts/social/dol_matching.py sets hcps_v2.is_verified_dol
+          automatically wherever its signal score clears 70. Of the 173 HCPs
+          holding the flag on 2026-08-20, 161 have an automated high-confidence
+          match and only 27 carry a verified_dol_at timestamp. The chip now
+          says what the flag means. The flag, the RPC and the matcher are
+          untouched. */}
       {est?.verified_social ? (
-        <span title="Social account matched to our corpus and confirmed by a person — the same gate as the Social surface's gold. Never asserted from a database match alone." style={{ ...chipBase, border: `1px solid ${P.lineStrong}`, color: P.ink0 }}>
-          VERIFIED SOCIAL
-        </span>
+        <ScoreTooltip metricKey="est_verified_dol">
+          <span title="Social account matched to this physician by name, institution and therapeutic-area signals at high confidence. Automated match, not a claimed or self-identified account." style={{ ...chipBase, border: `1px solid ${P.lineStrong}`, color: P.ink0, cursor: "pointer" }}>
+            VERIFIED DOL
+          </span>
+        </ScoreTooltip>
       ) : null}
     </div>
   );
