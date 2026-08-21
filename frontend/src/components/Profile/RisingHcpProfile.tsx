@@ -16,6 +16,7 @@ import ProfileRelationshipControls, { profileHcp } from "./ProfileRelationshipCo
 import ProfileSecondaryControls from "./ProfileSecondaryControls";
 import FederalFundingSection from "./FederalFundingSection";
 import { isNonUsRecord, countryName } from "../../lib/usOnlySections";
+import CountryFlag from "../CountryFlag";
 import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import { FiToast } from "../FieldIntelligenceShared";
@@ -176,6 +177,11 @@ const REC = {
   dash: CANON.GROUND.INSET, // NO STOCK dashed rule
 } as const;
 const REC_TICK_CAP = 60; // above this many recent-window papers, squares → proportion bars
+// The recent-window numeral — the one large number in each RECORD row. Was 44px, which
+// read as a headline rather than a ledger figure and, on CITATIONS, ran "+2,568" back
+// under its own bar. 34px still carries the row (1.7x the early window's 20px) at a
+// width the value column can hold.
+const REC_VALUE_SIZE = 34;
 
 function RecRow({ label, sub, children, right, last = false }: {
   label: string; sub: string; children: ReactNode; right: ReactNode; last?: boolean;
@@ -198,10 +204,14 @@ function RecWindow({ label, bar, value, recent = false }: {
 }) {
   const isMobile = useMediaQuery("(max-width: 767px)"); // 2026-08-10: stack so the paper tally gets full width
   return (
-    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "132px 1fr 74px", alignItems: "center", gap: isMobile ? 8 : 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "132px 1fr 100px", alignItems: "center", gap: isMobile ? 8 : 16 }}>
       <div style={mono(11, recent ? MUT : MUT2, 0.09)}>{label}</div>
       <div>{bar}</div>
-      <div style={{ textAlign: "right" }}>{value}</div>
+      {/* CENTRED, not right-aligned: the two windows' values differ in size by 14px, so
+          a shared right edge left the small early numeral visibly off the large recent
+          one. A shared centre axis stacks them. The column is 100px (was 74px) so a
+          five-figure accrual sits inside it instead of overhanging its own bar. */}
+      <div style={{ textAlign: "center" }}>{value}</div>
     </div>
   );
 }
@@ -246,7 +256,7 @@ function RecCountRow({ label, sub, caption, early, recent, ew, rw, absent }: {
         value={<div style={{ font: `300 20px/1 ${SERIF}`, color: MUT3, fontVariantNumeric: "tabular-nums" }}>{early.toLocaleString("en-US")}</div>} />
       <RecWindow label={rw} recent
         bar={<div style={{ display: "flex", height: 16, background: REC.track }}><div style={{ flex: 1, background: REC.countBar }} /></div>}
-        value={<div style={{ font: `400 44px/0.9 ${SERIF}`, color: INK0, fontVariantNumeric: "tabular-nums" }}>{recent.toLocaleString("en-US")}</div>} />
+        value={<div style={{ font: `400 ${REC_VALUE_SIZE}px/0.95 ${SERIF}`, color: INK0, fontVariantNumeric: "tabular-nums" }}>{recent.toLocaleString("en-US")}</div>} />
     </RecRow>
   );
 }
@@ -513,7 +523,22 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
                 </div>
               </div>
 
-              <div style={{ marginTop: 22, font: `400 30px/1.12 ${SERIF}`, color: INK0, letterSpacing: "-.01em" }}>{name}</div>
+              {/* Same 18px flag as the Established hero — both names are 30px.
+                  effective_country, NOT country: the former is
+                  COALESCE(current_country, country), the latter the historical
+                  value, and the two disagree for anyone who has moved. Both are
+                  country-only, so neither can carry a state code. No hedge
+                  suppression: this payload carries no affiliation fields. */}
+              {/* FLEX ROW, alignItems center (2026-08-21 fix). The flag was an
+                  inline <img> inside a BLOCK div, so it sat in the name's text
+                  flow and broke to the next line whenever the name plus the
+                  flag's 34px exceeded the column — which is most names on the
+                  mobile column and long ones on desktop. A flex row cannot
+                  break between its items (flex-wrap defaults to nowrap), so
+                  this is a guarantee rather than a width that happens to fit.
+                  gap replaces the component's marginLeft; alignItems centres
+                  the 18px flag against the 30px serif. */}
+              <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 10, font: `400 30px/1.12 ${SERIF}`, color: INK0, letterSpacing: "-.01em" }}>{name}<CountryFlag code={p.hcp.effective_country} height={18} marginLeft={0} /></div>
               {/* Event badge + trial flag (2026-08-05). FIRST SENIOR AUTHORSHIP:
                   no senior-author paper in the early rolling window, at least one
                   since, still active within 24 months. rising_board_flags also
@@ -778,7 +803,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             <RecWindow label={rw} recent
               bar={<div style={{ display: "flex", height: 16, background: REC.track }}><div style={{ flex: 1, background: REC.citeBar }} /></div>}
               value={m?.citation_velocity_delta != null ? (
-                <div style={{ font: `400 44px/0.9 ${SERIF}`, color: INK0, fontVariantNumeric: "tabular-nums" }}>
+                <div style={{ font: `400 ${REC_VALUE_SIZE}px/0.95 ${SERIF}`, color: INK0, fontVariantNumeric: "tabular-nums" }}>
                   {`${m.citation_velocity_delta >= 0 ? "+" : "−"}${Math.abs(m.citation_velocity_delta).toLocaleString("en-US")}`}
                 </div>
               ) : (

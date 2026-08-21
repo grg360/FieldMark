@@ -31,6 +31,8 @@ import TrialsPopup from "./TrialsPopup";
 import TerritorySelect from "./TerritorySelect";
 import ScoreTooltip from "../ScoreTooltip";
 import { metricKeyFor } from "../../lib/scoreDefinitions";
+import { flagSrc } from "../../lib/countryFlag";
+import { resolveLocation } from "../../lib/location";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
@@ -119,12 +121,69 @@ const P = {
 
 // EST factFinish inks (session-minted warm literals) reconciled into the cool
 // canonical ramp — same luminance role, one ramp: #A8A29A→LABEL (primary fact),
-// #43434A→GHOST (fade), #5F5F66→MUTE (insights minor).
+// #5F5F66→MUTE (insights minor).
+//
+// The third, FACT_FADE (#43434A→GHOST), is RETIRED as of 2026-08-21. It carried
+// the noRank de-emphasis on PHARMA, and with the last of those cells now taking
+// FACT_PRIMARY like every other quantity, nothing referenced it. The comments at
+// the two call sites still name it, because they explain what was removed.
 const FACT_PRIMARY = CANON.INK.LABEL;
-const FACT_FADE = CANON.INK.GHOST;
 const FACT_MINOR = CANON.INK.MUTE;
 
 const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as const);
+
+// The country flag on the NAME LINE (2026-08-21). Beside the physician, not
+// beside the rank: the rail's scope label names the POOL a rank was computed
+// against, so a flag there answered "which board" when the reader is asking
+// "who is this". On the name line it answers the second question, and it now
+// appears on every row rather than only on rows whose chip happens to be a
+// country.
+//
+// SOURCE IS row.scoredCountry, NEVER chips[0]. Three reasons, all load-bearing:
+//   · chips[0] is a US STATE as often as a country, and 14 state codes collide
+//     with a vendored flag (CA, DE, GA, IN, LA, MO, PA, ID, MA, PR ...) — a
+//     Delaware physician would fly the German flag.
+//   · chips[0] carries the hedge suffix ("DE · 2023"), so reading it would mean
+//     parsing a display string back into data.
+//   · scoredCountry is country-only by construction: Established resolves it
+//     from scope_value (ISO-2, plus the EUROPE bucket which is redirected to
+//     h.country) and Rising from coalesce(current_country, country). Verified
+//     live: 0 of 2,992 US-board rows carry a non-US country there.
+//
+// APAC FALLBACK. The Established APAC scope does NOT get EUROPE's redirect, so
+// on an APAC selection scored_country is the literal 'APAC'. The length check
+// catches it and falls back to row.country, which is the person's own code.
+// Fix the RPC to mirror the EUROPE branch and this fallback becomes dead — it
+// is deliberately harmless either way.
+//
+// HEDGE SUPPRESSION. A hedged row is one where the current country cannot be
+// confirmed from recent publications; the chip says so in words ("DE · 2023"),
+// and a flag would assert more confidence than the words beside it. resolveLocation
+// is the SAME function mapRow uses to build that chip, so the flag and the chip
+// cannot disagree about what counts as hedged — a reimplemented boolean here
+// would drift the first time the rule changed.
+function NameFlag({ row }: { row: LedgerRow }) {
+  const code = row.scoredCountry && row.scoredCountry.length === 2 ? row.scoredCountry : row.country;
+  const src = flagSrc(code);
+  if (!src) return null;
+  const { hedged } = resolveLocation({
+    country: row.country,
+    currentCountry: row.currentCountry,
+    affiliationConfidence: row.affiliationConfidence,
+    affiliationAsOf: row.affiliationAsOf,
+  });
+  if (hedged) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      width={12}
+      height={9}
+      style={{ width: 12, height: 9, verticalAlign: "middle", flexShrink: 0, alignSelf: "center" }}
+    />
+  );
+}
 
 // The tooltip affordance on a column head: ONE STEP UP THE INK RAMP, nothing
 // else. No border, no underline, no glyph.
@@ -1125,6 +1184,9 @@ function Row({
             >
               {row.name}
             </Link>
+            {/* Sibling flex item — inherits the row's gap: 9 and its baseline
+                alignment; alignSelf centres the 12x9 against the 17px serif. */}
+            <NameFlag row={row} />
             {/* archetype chip — Rising Star only, a physician attribute inline with the name */}
             {row.archetype ? (
               <span style={{ ...mono(9, 500), color: P.ink3, letterSpacing: ".1em", padding: "1px 6px", border: `1px solid ${P.lineStrong}`, borderRadius: 2, alignSelf: "center" }}>
@@ -1230,10 +1292,12 @@ function Row({
           // reads differently from a row with a number. Grey means absent here,
           // and now it means only that.
           //
-          // COM keeps the mono cells (no ramp on the roster); its own noRank
-          // fade lives in the factFinish branch below and is NOT changed —
-          // that column is a dollar total beside unbounded counts, a different
-          // question from this one.
+          // COM keeps the mono cells (no ramp on the roster). Its noRank fade in
+          // the factFinish branch below was carved out of this change on
+          // 2026-08-20 — "a dollar total beside unbounded counts, a different
+          // question" — and that carve-out was retired on 2026-08-21: the same
+          // two objections apply verbatim to the roster, so the rule is now one
+          // treatment for every quantity on every cohort.
           if (cfg.numericRamp && d.kind !== "dash") {
             return (
               <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
@@ -1246,13 +1310,25 @@ function Row({
           // de-emphasis hierarchy. Dash/absent cells keep their treatment:
           // the finish is for facts only.
           if (cfg.factFinish && d.kind !== "dash") {
+            // ONE TREATMENT FOR EVERY QUANTITY, COM TOO (2026-08-21). PHARMA
+            // PAYMENTS was the last cell still fading for noRank: serif(15) in
+            // FACT_FADE beside serif(20,500) in FACT_PRIMARY for COMPANIES
+            // ENGAGED and YEARS IN PRACTICE, so a measured dollar total read as
+            // less true than the counts either side of it rather than as
+            // excluded from a ranking. FACT_FADE is CANON.INK.GHOST, whose own
+            // token comment reserves it for "empty-state glyph ... text floor is
+            // above this" — the ink kept for nothing-is-here, spent on a real
+            // figure. And "not ranked" already has a carrier: the column head
+            // says it in words, and the cohort meta line says the whole roster
+            // is not ranked. Dimming every value repeated what the header states
+            // better.
+            //
+            // Absence still separates and is untouched: the d.kind === "absent"
+            // branch above keeps NONE RECORDED in mono(9)/P.dash, so a row CMS
+            // holds no record for still reads differently from one it does.
             return (
               <div key={col.key} style={{ width: col.w, textAlign: col.align ?? "right" }}>
-                {col.noRank ? (
-                  <span style={{ ...serif(15), color: FACT_FADE }}>{d.text}</span>
-                ) : (
-                  <span style={{ ...serif(20, 500), color: FACT_PRIMARY }}>{d.text}</span>
-                )}
+                <span style={{ ...serif(20, 500), color: FACT_PRIMARY }}>{d.text}</span>
               </div>
             );
           }
@@ -1291,13 +1367,21 @@ function Row({
             removed 2026-08-09: a categorical state rendered as a meter read as a
             random white band on the row edge and competed with the score numerals.
             The ladder still renders inside the status menu below. */}
-        {/* COM centers the label under the centered RELATIONSHIP head (2026-08-12,
-            with the strip's plumb pass); EST/RS keep their shipped left set. */}
-        <div style={{ width: OURS.state, position: "relative", textAlign: cfg.tag === "COM" ? "center" : undefined }}>
+        {/* ALL THREE COHORTS CENTER under the centered RELATIONSHIP head
+            (2026-08-20). COM alone was centered on 2026-08-12 and EST/RS were
+            left on their shipped left set, which made this the one column on
+            the row where the head and the value disagreed on Established and
+            Rising — the two boards most looked at. The COM-only exception is
+            gone: one treatment, no cfg.tag ternaries. The head has always been
+            unconditionally centered (see ColumnHeads' `head` helper), so this
+            is the value moving to meet it, not a new alignment being chosen.
+            The status label still wraps at the word break rather than
+            overflowing the 108px column. */}
+        <div style={{ width: OURS.state, position: "relative", textAlign: "center" }}>
           <button
             onClick={(e) => { stop(e); setMenuOpen((o) => !o); }}
             title={STATUS_LABEL[status]}
-            style={{ display: cfg.tag === "COM" ? "inline-flex" : "flex", justifyContent: cfg.tag === "COM" ? "center" : undefined, alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0, textAlign: cfg.tag === "COM" ? "center" : "left" }}
+            style={{ display: "inline-flex", justifyContent: "center", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 2px", cursor: "pointer", minHeight: 0, textAlign: "center" }}
           >
             {/* wraps at the word break (ACTIVE / RELATIONSHIP) instead of overflowing
                 the 108px column — nowrap removed 2026-08-06 */}
@@ -1443,6 +1527,9 @@ function MobileRow({
           {row.archetype ? (
             <span style={{ ...mono(9, 500), color: P.ink3, letterSpacing: ".08em", padding: "1px 5px", border: `1px solid ${P.lineStrong}`, borderRadius: 2 }}>{row.archetype.toUpperCase()}</span>
           ) : null}
+          {/* End of the NAME div, not between name and chips: chips[0] lives in
+              a separate container below, so there is no position between them. */}
+          <NameFlag row={row} />
         </div>
         {row.chips.length ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>

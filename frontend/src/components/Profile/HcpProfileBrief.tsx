@@ -36,6 +36,7 @@ import {
   type ProfileSource,
 } from "../../lib/hcpProfile";
 import FederalFundingSection from "./FederalFundingSection";
+import CountryFlag from "../CountryFlag";
 import { isNonUsRecord, countryName } from "../../lib/usOnlySections";
 import { FiToast } from "../FieldIntelligenceShared";
 import { taLabelForSlug } from "../../lib/taLabels";
@@ -341,7 +342,13 @@ export default function HcpProfileBrief() {
                 {s?.scope_label !== "GLOBAL" && s?.global_rank != null ? ` · #${s.global_rank} GLOBAL` : ""}
               </span>
             </div>
-            <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4 }}>{p.hcp.name}</span>
+            {/* Flag sized to the 30px hero: 18px tall (0.6x), 24 wide at 4:3.
+                p.hcp.country is COALESCE(current_country, country) — country-only,
+                so the 14 state-code collisions cannot reach it. No hedge
+                suppression here: this payload carries no affiliation_confidence
+                / affiliation_as_of, so the ledger's resolveLocation rule cannot
+                be applied and is NOT reinvented. See the report. */}
+            <span style={{ ...serif(30, 400), color: P.ink0, letterSpacing: "-.01em", paddingTop: 4, display: "flex", alignItems: "center", gap: 10 }}>{p.hcp.name}<CountryFlag code={p.hcp.country} height={18} marginLeft={0} /></span>
             <span style={{ ...mono(11), color: P.ink4, letterSpacing: ".02em" }}>
               {p.hcp.institution ? (
                 <a href={`/institution/${institutionToSlug(p.hcp.institution)}`}
