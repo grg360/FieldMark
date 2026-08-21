@@ -145,8 +145,11 @@ export default function PublicationCard({ pub, affordance, isMobile, existingOnl
         </div>
       </div>
 
-      {/* right: discussion affordance (compact) + reserved slots */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: isMobile ? "flex-start" : "flex-end" }}>
+      {/* right: discussion affordance (compact) + reserved slots.
+          minWidth: 0 — a grid item's automatic minimum is its content width, so anything
+          in here that cannot wrap would widen past the 216px track and run back over the
+          card's meta row rather than being clipped to its column. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0, alignItems: isMobile ? "flex-start" : "flex-end" }}>
         {/* existingOnly (set by the caller): OPEN DISCUSSION only where a thread
             exists — no "ask the first question" on a threadless row. */}
         <DiscussAffordance pmid={pub.pmid} journalAbbrev={pub.journal} title={pub.title} compact affordance={affordance} existingOnly={existingOnly} />

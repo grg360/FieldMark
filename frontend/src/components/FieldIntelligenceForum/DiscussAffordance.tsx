@@ -102,15 +102,27 @@ export default function DiscussAffordance({
     // existingOnly surfaces render nothing on a threadless row — no create affordance.
     if (existingOnly) return null;
     // no discussion — dashed, the word + short invitation
+    //
+    // THIS BLOCK WRAPS (2026-08-20). It carried `whiteSpace: nowrap` on desktop, but its
+    // one-line width is ~360px and every caller reserves a narrower fixed track for it
+    // (PublicationCard's right column is 216px). A nowrap child of a fixed grid track does
+    // not shrink -- it overflows, and because the column is flex-end aligned the overflow
+    // ran LEFT, straight across the card's meta row (the author-position chip and a long
+    // journal name). Wrapping inside the reserved column is the fix; nothing about the
+    // invitation needs to be on one line.
+    //
+    // The label + invitation are ONE inner span, not two bare flex children, so they flow
+    // as a single paragraph instead of two items that wrap against each other.
     const empty = (
       <span
         onClick={canWrite && pmid ? () => setComposing(true) : undefined}
         aria-disabled={canWrite ? undefined : "true"}
         role="button"
-        style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 11px", border: `1px dashed ${LINE.l1}`, borderRadius: 4, ...mono(10.5, canWrite ? GOLD.gold : COOL.chrome), whiteSpace: isMobile ? "normal" : "nowrap", cursor: canWrite ? "pointer" : "not-allowed", opacity: canWrite ? 1 : 0.7 }}
+        style={{ display: "inline-flex", alignItems: "flex-start", gap: 7, padding: "7px 11px", border: `1px dashed ${LINE.l1}`, borderRadius: 4, ...mono(10.5, canWrite ? GOLD.gold : COOL.chrome), lineHeight: 1.45, maxWidth: "100%", textAlign: "left", overflowWrap: "anywhere", cursor: canWrite ? "pointer" : "not-allowed", opacity: canWrite ? 1 : 0.7 }}
       >
-        <SpeechGlyph color={canWrite ? GOLD.gold : COOL.label} />
-        Discuss <span style={{ color: COOL.label }}>· starts a public thread visible to verified MSLs</span>
+        {/* nudged onto the first line's optical centre now that the text can run to two */}
+        <span style={{ display: "flex", marginTop: 2 }}><SpeechGlyph color={canWrite ? GOLD.gold : COOL.label} /></span>
+        <span>Discuss <span style={{ color: COOL.label }}>· starts a public thread visible to verified MSLs</span></span>
       </span>
     );
     return (<>{empty}{composer}</>);
