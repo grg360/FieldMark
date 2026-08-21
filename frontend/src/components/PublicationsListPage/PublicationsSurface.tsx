@@ -30,13 +30,13 @@ import { CANON } from "../../lib/canonicalTokens";
 // the surface says so. Heymach 2020 (43) is dense; 2016 (7) is sparse.
 export const SPARSE_THRESHOLD = 8;
 
-const C = {
+export const C = {
   bg: "#08080a", gold: "#d8a34a", goldHi: "#f0c477", goldBg: "#1a140a",
   ink: "#e6e3dd", ink2: "#c6c2bb", mid: "#6f6d68", dim: "#57554f", faint: "#46443f", faint2: "#3f3d39",
   line: "#1e1e21", line2: "#2a2a2e", tick: "#33322f", tickOn: "#6f6d68",
 } as const;
-const MONO = "'IBM Plex Mono',ui-monospace,monospace";
-const SERIF = "'Source Serif 4',Georgia,serif";
+export const MONO = "'IBM Plex Mono',ui-monospace,monospace";
+export const SERIF = "'Source Serif 4',Georgia,serif";
 
 type Order = "contribution" | "cited" | "recent";
 type Density = "ledger" | "detail";
@@ -60,7 +60,7 @@ function journalShort(j: string | null): string {
 
 // The provenance line: PMID · journal, then study-type / theme / assets, each present
 // only when it has a value. No labels, no reserved slots — it simply shortens.
-function ProvenanceLine({ r }: { r: PublicationListRow }) {
+export function ProvenanceLine({ r }: { r: PublicationListRow }) {
   const bits: React.ReactNode[] = [];
   if (r.pmid) bits.push(
     <a key="pmid" href={`https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`} target="_blank" rel="noreferrer" style={{ color: C.mid, borderBottom: `1px solid ${C.line2}` }}>PMID {r.pmid}</a>,
@@ -80,7 +80,7 @@ function ProvenanceLine({ r }: { r: PublicationListRow }) {
 }
 
 // Full-text: OA badge (readable) / a subscription DOI link / the one stated absence.
-function FullText({ r }: { r: PublicationListRow }) {
+export function FullText({ r }: { r: PublicationListRow }) {
   if (r.fullTextIsOa && r.fullTextUrl)
     return <a href={r.fullTextUrl} target="_blank" rel="noreferrer" style={{ font: `600 9px/1 ${MONO}`, letterSpacing: ".14em", color: C.gold, border: `1px solid ${C.faint}`, padding: "4px 7px" }}>OPEN ACCESS ↗</a>;
   if (r.fullTextUrl)
@@ -109,7 +109,7 @@ function Byline({ r, surname }: { r: PublicationListRow; surname: string }) {
   );
 }
 
-function bylineOf(r: PublicationListRow): string {
+export function bylineOf(r: PublicationListRow): string {
   if (r.bylineText) return r.bylineText;
   const a = r.pubmed_authorships;
   if (!Array.isArray(a)) return "";

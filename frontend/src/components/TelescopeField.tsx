@@ -198,7 +198,10 @@ class Sky extends Component<Props, State> {
   _oc: Record<number, OrbNode[]> = {};
   _df: DustDot[] | null = null; _dm: DustDot[] | null = null;
   _cam: Cam; _camT: Cam; _anim: { from: Cam; to: Cam; t0: number; dur: number } | null = null;
-  _drag: { sx: number; sy: number; wx: number; wy: number; moved: number } | null = null;
+  // sx/sy: the pointerdown ANCHOR — the pan math measures from it and must not drift.
+  // lx/ly: the PREVIOUS move position, so `moved` can accumulate the incremental step.
+  // id: the owning pointerId — a second finger neither replaces this drag nor drives it.
+  _drag: { id: number; sx: number; sy: number; wx: number; wy: number; lx: number; ly: number; moved: number } | null = null;
   _vel = { x: 0, y: 0 };
   _targets: { key: string; t: "f" | "o"; i?: number; p?: number; k?: number; x: number; y: number }[] = [];
   _raf: number | null = null; _st: ReturnType<typeof setTimeout> | null = null; _zt: ReturnType<typeof setTimeout> | null = null;
@@ -388,15 +391,30 @@ class Sky extends Component<Props, State> {
   }
   stop = (ev: RPointerEvent) => { ev.stopPropagation(); };
   onDown = (ev: RPointerEvent) => {
+    // MULTI-TOUCH GUARD: a drag belongs to the pointer that started it. A second finger
+    // used to overwrite _drag wholesale, so the pan jumped to the new contact and that
+    // finger's lift ran the selection.
+    if (this._drag && this._drag.id !== ev.pointerId) return;
     const p = this.toWorld(ev); if (!p) return;
-    this._anim = null; this._drag = { sx: p.sx, sy: p.sy, wx: p.x, wy: p.y, moved: 0 }; this._vel = { x: 0, y: 0 };
+    this._anim = null; this._drag = { id: ev.pointerId, sx: p.sx, sy: p.sy, wx: p.x, wy: p.y, lx: p.sx, ly: p.sy, moved: 0 }; this._vel = { x: 0, y: 0 };
     if (this.hostRef.current) this.hostRef.current.style.cursor = "grabbing";
     try { (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId); } catch { /* ignore */ }
   };
   onMove = (ev: RPointerEvent) => {
+    if (this._drag && this._drag.id !== ev.pointerId) return; // not the owning pointer
     const p = this.toWorld(ev); if (!p) return;
     if (this._drag) {
-      const d = this._drag; d.moved += Math.abs(p.sx - d.sx) + Math.abs(p.sy - d.sy);
+      const d = this._drag;
+      // PATH LENGTH, NOT OFFSET-FROM-ANCHOR. This read `p.sx - d.sx` — the distance from
+      // the DOWN point — on every move, so `moved` grew with the NUMBER of pointermove
+      // events rather than the distance travelled. A finger resting 3px off the anchor
+      // fires ~10 moves in 150ms and banked ~60 against a threshold of 7 without going
+      // anywhere, and the tap was discarded as a drag. A mouse emits one or two moves
+      // between down and up, which is why this only ever bit touch.
+      d.moved += Math.abs(p.sx - d.lx) + Math.abs(p.sy - d.ly);
+      d.lx = p.sx; d.ly = p.sy;
+      // The pan still measures from the ANCHOR (d.sx/d.sy) — unchanged, and correct:
+      // it is what keeps the world point grabbed at pointerdown under the pointer.
       const nx = this.clampX(d.wx - (p.sx - d.sx) / this._cam.z), ny = this.clampY(d.wy - (p.sy - d.sy) / this._cam.z);
       this._vel = { x: (nx - this._cam.x) * 0.9, y: (ny - this._cam.y) * 0.9 };
       this._cam = { x: nx, y: ny, z: this._cam.z }; this._camT = { ...this._cam }; this.paint(); return;
@@ -407,10 +425,14 @@ class Sky extends Component<Props, State> {
     if (hk !== ck) this.setState({ near: h ? (h.t === "f" ? { t: "f", i: h.i! } : { t: "o", p: h.p!, k: h.k! }) : null });
   };
   onUp = (ev: RPointerEvent) => {
+    if (this._drag && this._drag.id !== ev.pointerId) return; // a non-owning finger lifting is not a tap
     const d = this._drag; this._drag = null;
     if (this.hostRef.current) this.hostRef.current.style.cursor = "grab";
     if (!d) return;
-    if (d.moved > 7) { this.kick(); return; }
+    // 12, raised from 7 (2026-08-20): now that `moved` is a true path length the budget
+    // is spent only by real travel, and a finger on a large touchscreen does not hold as
+    // still as a mouse. Below this a lift is a tap; above it, an intentional pan.
+    if (d.moved > 12) { this.kick(); return; }
     const p = this.toWorld(ev); if (!p) return;
     const h = this.hit(p);
     if (h) this.focusOn(h.t === "f" ? { t: "f", i: h.i! } : { t: "o", p: h.p!, k: h.k! });
