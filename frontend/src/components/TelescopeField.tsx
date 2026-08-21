@@ -795,8 +795,11 @@ class Sky extends Component<Props, State> {
 
         <div ref={this.labelRef} style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>{labels}</div>
 
-        {/* title / trail */}
-        <div style={{ position: "absolute", left: EDGE, top: TOP, maxWidth: Math.round(Math.min(460, VW * 0.36)), display: "flex", flexDirection: "column", gap: narrow ? 14 : 18 }}>
+        {/* title / trail — same defect as the controls block above, same fix. The two text
+            children already set pointerEvents:none, but that only makes the CHILD skip the
+            hit test; the point then resolves to this parent, which was a live target. Up to
+            460px wide and the full height of the intro stack, over the top-left of the sky. */}
+        <div style={{ position: "absolute", left: EDGE, top: TOP, maxWidth: Math.round(Math.min(460, VW * 0.36)), display: "flex", flexDirection: "column", gap: narrow ? 14 : 18, pointerEvents: "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, pointerEvents: "none" }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#ffd89b", boxShadow: "0 0 12px rgba(255,216,155,0.9)" }} />
             <div style={{ font: "400 11px/1 Jost,sans-serif", letterSpacing: "0.42em", textTransform: "uppercase", color: "#e6e3da" }}>SkyView</div>
@@ -809,7 +812,7 @@ class Sky extends Component<Props, State> {
             </div>
           ) : null}
           {this.state.trail.length > 0 ? (
-            <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+            <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", flexDirection: "column", gap: 11, pointerEvents: "auto" }}>
               <div style={{ font: "400 9px/1 Jost,sans-serif", letterSpacing: "0.28em", textTransform: "uppercase", color: "#3f4658" }}>Your route</div>
               <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap", maxWidth: 430 }}>
                 <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#4d5468", cursor: "pointer" }} onClick={this.pullBack}>Full sky</div>
@@ -824,9 +827,22 @@ class Sky extends Component<Props, State> {
           ) : null}
         </div>
 
-        {/* search + controls */}
-        <div style={{ position: "absolute", right: EDGE, top: TOP, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: narrow ? 16 : 20, width: Math.round(Math.max(238, Math.min(330, VW * 0.21))) }}>
-          <div style={{ width: "100%", position: "relative" }}>
+        {/* search + controls
+            POINTER-TRANSPARENT CONTAINER (2026-08-21). This block had no pointerEvents rule
+            and no stop handler, so its whole border box was a live hit target — including
+            the gaps between its flex children and the areas of children that set
+            pointerEvents:none, which fall through to the parent, not past it. It paints
+            ABOVE the label overlay, so at every 4K scaling factor it sat on top of the
+            orbit label in the top-right and swallowed the tap: the chip never fired, the
+            event bubbled to the host, and hit() ran instead — selecting a neighbour or, on
+            a miss with a focus active, deselecting. Measured at 1920 CSS px (a 4K panel at
+            Windows' default 200%): 115 of the 120px of Helena A. Yu's plate underneath it.
+            pointer-events INHERITS, so "none" here covers every descendant and each
+            interactive child opts back in with "auto" — the same pattern the label overlay
+            at :775 and the legend at :887 already use. The densityNote stays transparent;
+            it is not interactive. */}
+        <div style={{ position: "absolute", right: EDGE, top: TOP, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: narrow ? 16 : 20, width: Math.round(Math.max(238, Math.min(330, VW * 0.21))), pointerEvents: "none" }}>
+          <div style={{ width: "100%", position: "relative", pointerEvents: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${qOpen ? "rgba(255,216,155,0.5)" : "rgba(255,255,255,0.1)"}`, padding: "0 2px 11px", transition: "border-color 260ms ease" }}>
               <div style={{ width: 9, height: 9, borderRadius: "50%", border: "1px solid #4d5468", flex: "none" }} />
               <input type="text" value={query} placeholder="Fly to a researcher" onChange={(e) => this.setState({ query: e.target.value, qOpen: true })} onFocus={() => this.setState({ qOpen: true })} onPointerDown={this.stop} onPointerUp={this.stop} style={{ all: "unset", boxSizing: "border-box", flex: 1, font: "300 14px/1.2 Jost,sans-serif", letterSpacing: "0.04em", color: "#e6e3da", caretColor: "#ffd89b" }} />
@@ -848,8 +864,8 @@ class Sky extends Component<Props, State> {
               </div>
             ) : null}
           </div>
-          <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", gap: 24 }}>{cohortTabs.map(([k, label]) => <div key={k} style={quiet(cohort === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ cohort: k }); }}>{label}</div>)}</div>
-          <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", gap: 24 }}>{densityTabs.map(([k, label]) => <div key={k} style={quiet(density === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ density: k }); }}>{label}</div>)}</div>
+          <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", gap: 24, pointerEvents: "auto" }}>{cohortTabs.map(([k, label]) => <div key={k} style={quiet(cohort === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ cohort: k }); }}>{label}</div>)}</div>
+          <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ display: "flex", gap: 24, pointerEvents: "auto" }}>{densityTabs.map(([k, label]) => <div key={k} style={quiet(density === k)} onClick={(ev) => { ev.stopPropagation(); this.setState({ density: k }); }}>{label}</div>)}</div>
           <div style={{ font: "300 11px/1.6 Jost,sans-serif", letterSpacing: "0.03em", color: "#3f4658", textAlign: "right", maxWidth: 250, textWrap: "pretty" } as CSSProperties}>{densityNote}</div>
         </div>
 
@@ -895,9 +911,9 @@ class Sky extends Component<Props, State> {
 
         {/* cam controls — shielded like the other overlays (fix 1 + 2) so a moved
             click on Reset / Return-to-full-sky isn't captured by the host as a pan. */}
-        <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ position: "absolute", right: EDGE, bottom: EDGE, display: "flex", alignItems: "center", gap: narrow ? 16 : 26 }}>
+        <div onPointerDown={this.stop} onPointerUp={this.stop} style={{ position: "absolute", right: EDGE, bottom: EDGE, display: "flex", alignItems: "center", gap: narrow ? 16 : 26, pointerEvents: "none" }}>
           <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#343b4c", pointerEvents: "none" }}>Drag · Scroll · Click</div>
-          {canReset ? <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a6178", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.12)", paddingBottom: 5 }} onClick={this.pullBack}>{resetLabel}</div> : null}
+          {canReset ? <div style={{ font: "300 11px/1 Jost,sans-serif", letterSpacing: "0.18em", textTransform: "uppercase", color: "#5a6178", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.12)", paddingBottom: 5, pointerEvents: "auto" }} onClick={this.pullBack}>{resetLabel}</div> : null}
         </div>
 
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 22, textAlign: "center", pointerEvents: "none" }}>
