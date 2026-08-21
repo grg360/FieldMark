@@ -480,12 +480,15 @@ function spineLayer(cfg: CohortConfig, row: LedgerRow, nbrs: LedgerRow[]): { tex
   const eng = estEngine(row.scores);
   const sci = row.scores.sci, net = row.scores.net;
   const text = eng === "network-led"
-    ? `Network is their ceiling — ${fmt1(net)} against ${fmt1(sci)} scientific. Network-led: the composite score hides which engine carries each person.`
+    ? `Network is their ceiling — ${fmt1(net)} against ${fmt1(sci)} scientific. Network-led: the composite score hides which signal carries each person.`
     : eng === "scientific-led"
-      ? `Scientific is their ceiling — ${fmt1(sci)} against ${fmt1(net)} network. Scientific-led: the composite score hides which engine carries each person.`
+      ? `Scientific is their ceiling — ${fmt1(sci)} against ${fmt1(net)} network. Scientific-led: the composite score hides which signal carries each person.`
       : eng === "balanced"
-        ? `Scientific and network ceilings tie at ${fmt1(sci)} — neither engine leads.`
-        : "Engine ceilings incomplete on this row.";
+        ? `Scientific and network ceilings tie at ${fmt1(sci)} — neither signal leads.`
+        // Absence statement, so it names WHAT IS MISSING rather than the layer
+        // (2026-08-20). estEngine returns null when sci or net is null, so this
+        // is the row where the comparison cannot be made at all.
+        : "A ceiling is missing on this row.";
   return {
     text,
     lines: nbrs.map((n) => {
@@ -494,7 +497,7 @@ function spineLayer(cfg: CohortConfig, row: LedgerRow, nbrs: LedgerRow[]): { tex
       const nums = `(${fmt1(n.scores.sci)} sci / ${fmt1(n.scores.net)} net)`;
       return ne === eng
         ? { rank: `#${n.rank}`, text: `${ne} on the same ordering ${nums} — does not separate here.`, color: NOSEP_INK }
-        : { rank: `#${n.rank}`, text: `${ne} ${nums} — the inverse engine.`, color: SEP_INK };
+        : { rank: `#${n.rank}`, text: `${ne} ${nums} — the inverse.`, color: SEP_INK };
     }),
   };
 }
@@ -599,12 +602,15 @@ function DrawerSection({ label, sub, mobile, rightInset, children }: { label: st
       <div style={{ ...mono(11, 500), letterSpacing: ".14em", lineHeight: 1.7 }}>
         <div style={{ color: CANON.INK.MUTE }}>{label}</div>
         {/* GUARDED (2026-08-20): an empty sub renders NOTHING — not an empty
-            div carrying marginTop 4, which would leave the eyebrow sitting 4px
-            high in its rail against the sections that still have a sub-line.
-            Layers 2 and 3 lost their sub when the COVERAGE percentages were
-            removed (docs/DRAWER_COVERAGE_SUBLINES_REMOVED.md); layer 1 keeps
-            ALWAYS PRESENT, so both states are live in one drawer and the
-            spacing has to be right in both. */}
+            div carrying marginTop 4, which would push the section body down
+            against a rail that has no second line to justify it.
+            ALL THREE LAYERS NOW PASS "" (layers 2 and 3 lost the COVERAGE
+            percentages, layer 1 lost ALWAYS PRESENT once it had nothing left to
+            contrast with — docs/DRAWER_COVERAGE_SUBLINES_REMOVED.md), so this
+            branch is the only one taken today and `sub` is inert. The guard and
+            the prop stay: the rail is a two-line slot by design and the next
+            thing to earn that slot — a real, scoped, query-derived figure — will
+            need it. Delete both together if that never happens. */}
         {sub ? <div style={{ marginTop: 4, color: CANON.INK.MUTE }}>{sub}</div> : null}
       </div>
       {/* rightInset clears the top-edge PROFILE tab on the first section (desktop) */}
@@ -759,7 +765,15 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
       >
         PROFILE
       </Link>
-      <DrawerSection label={cfg.tag === "RS" ? "SCORE · WHAT IS ACCELERATING" : "SCORE · WHICH ENGINE"} sub="ALWAYS PRESENT" mobile={mobile} rightInset={160}>
+      {/* sub="" since 2026-08-20, in the same pass that took the sub-lines off
+          layers 2 and 3. This carried "ALWAYS PRESENT", which was only ever a
+          CONTRAST — it earned its place by sitting against "97% OF COHORT" and
+          "8% OF COHORT" and saying this layer, unlike those, never goes
+          missing. With both of those gone it contrasts with nothing and reads
+          as a fragment hanging off the eyebrow. The claim is still true and
+          still structural (the spine comes from row data already loaded, so it
+          cannot be absent) — it just no longer needs saying. */}
+      <DrawerSection label={cfg.tag === "RS" ? "SCORE · WHAT IS ACCELERATING" : "SCORE · WHICH SIGNAL LEADS"} sub="" mobile={mobile} rightInset={160}>
         <div style={{ ...serif(17), lineHeight: 1.62, color: SEP_INK, textWrap: "pretty" as const }}>{spine.text}</div>
         <NeighbourLines lines={spine.lines} />
       </DrawerSection>
@@ -2170,19 +2184,68 @@ export default function CohortLedger() {
                 {COM_TIER_FILTERS.map((t) => {
                   const on = selectedTiers.includes(t.key);
                   const n = tierCounts?.[t.key];
+                  const tip = metricKeyFor("COM", t.key);
+                  // TWO HIT TARGETS, SIDE BY SIDE — never nested (2026-08-20).
+                  // The chip is a click-toggle that filters the board, and
+                  // ScoreTooltip's trigger also opens on click and stops
+                  // propagation. Wrapping the button in the trigger would fire
+                  // BOTH on every tap: the filter would still toggle (the inner
+                  // button handles it first, in the target phase) but a
+                  // definition panel would pop open on every filter press. That
+                  // is stealing the tap in effect even though it does not break
+                  // the filter, so the two are siblings instead.
+                  //
+                  // Same fix as HCPChip's bookmark, for the same reason ("the
+                  // box moved out here so the two hit targets are SIBLINGS
+                  // rather than nested"): the chip's visual box moves up to a
+                  // span carrying chipStyle, and the filter button becomes a
+                  // transparent child inheriting the chip's own type and ink.
+                  // The visible chip is unchanged; what was one hit target is
+                  // now two, and the filter's is by far the larger.
                   return (
-                    <button
+                    <span
                       key={t.key}
-                      onClick={() =>
-                        setSelectedTiers((prev) => {
-                          const next = prev.includes(t.key) ? prev.filter((x) => x !== t.key) : [...prev, t.key];
-                          return next.length ? next : COM_DEFAULT_TIERS; // never empty
-                        })
-                      }
-                      style={chipStyle(on)}
+                      style={{ ...chipStyle(on), display: "inline-flex", alignItems: "center", gap: 6, cursor: "default" }}
                     >
-                      {t.label}{n != null ? ` ${n.toLocaleString()}` : ""}
-                    </button>
+                      <button
+                        onClick={() =>
+                          setSelectedTiers((prev) => {
+                            const next = prev.includes(t.key) ? prev.filter((x) => x !== t.key) : [...prev, t.key];
+                            return next.length ? next : COM_DEFAULT_TIERS; // never empty
+                          })
+                        }
+                        aria-pressed={on}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          margin: 0,
+                          font: "inherit",
+                          letterSpacing: "inherit",
+                          color: "inherit",
+                          cursor: "pointer",
+                          minHeight: 0,
+                        }}
+                      >
+                        {t.label}{n != null ? ` ${n.toLocaleString()}` : ""}
+                      </button>
+                      {/* The definition trigger. A glyph rather than a colour
+                          step (the EST/RS head treatment) because on these
+                          chips colour already carries SELECTED state — amber on,
+                          dim off — and a second meaning on the same channel
+                          would make a defined chip look selected. Dim at rest
+                          and visible at rest: touch has no hover. */}
+                      {tip ? (
+                        <ScoreTooltip metricKey={tip}>
+                          <span
+                            aria-label={`What ${t.label} means`}
+                            style={{ ...mono(9), color: on ? "rgba(224,167,94,.7)" : P.ink5, letterSpacing: 0 }}
+                          >
+                            ?
+                          </span>
+                        </ScoreTooltip>
+                      ) : null}
+                    </span>
                   );
                 })}
                 {cfg.sortLabel ? (

@@ -63,11 +63,60 @@ export const METRIC_DEFS: Record<string, MetricDef> = {
     title: "Network Visibility",
     body: "Current co-authorship centrality in the recent rolling window.",
   },
+  // ── Community evidence tiers ───────────────────────────────────────────
+  // These describe the FILTER CHIPS, not columns. Community's column heads
+  // stay untooltipped: the roster is not ranked and its columns are displayed
+  // facts that say what they are. The tier is the one asserted evidence claim
+  // on a community row, and it is the one thing a reader cannot infer from the
+  // word alone — hence definitions here and nowhere else on the cohort.
+  com_anchored: {
+    title: "Anchored",
+    body: "At least one Medicare Part D claim for a drug used only in lung cancer. The strongest evidence tier - the prescription itself identifies the practice.",
+  },
+  com_supported: {
+    title: "Supported",
+    body: "Part B administration of a lung-cancer regimen, or Part D claims for drugs used predominantly but not exclusively in lung cancer. Strong evidence, one step below a lung-only prescription.",
+  },
+  com_candidates: {
+    title: "Candidates",
+    body: "An oncology claim on record, but nothing yet that ties the practice to lung cancer specifically.",
+  },
+  com_no_medicare: {
+    title: "No Medicare Evidence",
+    body: "No Part D or Part B oncology claims found. Absence of Medicare evidence is not absence of practice - it reflects what the claims data can see.",
+  },
+  com_heme_dominant: {
+    title: "Heme-Dominant",
+    body: "Claims concentrated in blood cancers rather than solid tumours - a year with heavy oncology volume, over 70% haematology, and no lung claims. Shown so the practice is not mistaken for a lung-cancer one.",
+  },
 };
 
-/** The tooltip key for a ledger column head, or null where none exists.
- *  COM returns null for every column — the roster is not ranked. */
+/** COM tier key (cohortLedger COM_TIER_FILTERS) -> METRIC_DEFS key.
+ *
+ *  AN EXPLICIT MAP, NOT A PREFIX. Two of the five do not transliterate:
+ *  `candidate` -> `com_candidates` (the chip label is plural) and
+ *  `unresolved` -> `com_no_medicare` (the chip is worded for the reader, the
+ *  tier is worded for the data). A `com_${key}` prefix would silently resolve
+ *  those two to nothing and drop their tooltips with no error. */
+const COM_TIER_METRIC_KEY: Record<string, string> = {
+  anchored: "com_anchored",
+  supported: "com_supported",
+  candidate: "com_candidates",
+  unresolved: "com_no_medicare",
+  heme_dominant: "com_heme_dominant",
+};
+
+/** The tooltip key for a ledger column head or a COM tier filter chip, or null
+ *  where none exists.
+ *
+ *  COM resolves TIER KEYS ONLY. Its column keys (eng, companies, years) are not
+ *  in COM_TIER_METRIC_KEY, so they return null and the community column heads
+ *  keep their pass-through — unchanged from the EST/RS head pass. */
 export function metricKeyFor(cohortTag: string, colKey: string): string | null {
+  if (cohortTag === "COM") {
+    const key = COM_TIER_METRIC_KEY[colKey];
+    return key && key in METRIC_DEFS ? key : null;
+  }
   const prefix = cohortTag === "EST" ? "est_" : cohortTag === "RS" ? "rs_" : null;
   if (!prefix) return null;
   const key = `${prefix}${colKey}`;
