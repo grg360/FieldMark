@@ -162,11 +162,18 @@ export const RS_CONFIG: CohortConfig = {
   label: "Rising Star",
   nameSub: "INSTITUTION · GENERATED SUMMARY",
   meta: "{total} HCP · FOUR METRICS · ALL FOUR DISCRIMINATE, SO ALL FOUR PRINT",
+  // align "center" on all four, 2026-08-20 — the same head/value desync just
+  // fixed on Established's ph column, and for the same reason: with no `align`
+  // the HEAD takes ColumnHeads' `?? "center"` while the VALUE takes the Row
+  // cell's `?? "right"`, so every one of these columns drew its number off-axis
+  // from its own label. Rising was the whole cohort's worth of it — four
+  // columns, not one. Setting the field fixes both ends at once, which is what
+  // it exists for (see the ScoreCol.align note above).
   cols: [
-    { key: "scimom", label: "SCI MOM", sub: "PCTILE", head: "SCIENTIFIC", headSub: "MOMENTUM", w: 78, kind: "pct" },
-    { key: "netmom", label: "NET MOM", sub: "PCTILE", head: "NETWORK", headSub: "MOMENTUM", w: 78, kind: "pct" },
-    { key: "scivis", label: "SCI VIS", sub: "PCTILE", head: "SCIENTIFIC", headSub: "VISIBILITY", w: 78, kind: "pct" },
-    { key: "netvis", label: "NET VIS", sub: "PCTILE", head: "NETWORK", headSub: "VISIBILITY", w: 78, kind: "pct" },
+    { key: "scimom", label: "SCI MOM", sub: "PCTILE", head: "SCIENTIFIC", headSub: "MOMENTUM", w: 78, kind: "pct", align: "center" },
+    { key: "netmom", label: "NET MOM", sub: "PCTILE", head: "NETWORK", headSub: "MOMENTUM", w: 78, kind: "pct", align: "center" },
+    { key: "scivis", label: "SCI VIS", sub: "PCTILE", head: "SCIENTIFIC", headSub: "VISIBILITY", w: 78, kind: "pct", align: "center" },
+    { key: "netvis", label: "NET VIS", sub: "PCTILE", head: "NETWORK", headSub: "VISIBILITY", w: 78, kind: "pct", align: "center" },
   ],
   // four columns don't fit 390, so they pair by family rather than drop
   mobilePairs: [

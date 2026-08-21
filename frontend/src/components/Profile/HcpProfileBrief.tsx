@@ -512,6 +512,14 @@ export default function HcpProfileBrief() {
                         </div>
                       ))}
                     </div>
+                  ) : nonUs ? (
+                    /* TERRITORY, NOT ABSENCE (2026-08-21). The US string below
+                       asserts an EMPTY record; for a non-US physician there is no
+                       record to be empty, so it claimed a fact the register cannot
+                       hold. Same reasoning the PHARMA score cell already applied
+                       above, and the same voice as FederalFundingSection's non-US
+                       state — carried down here, where it had been missed. */
+                    <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.5 }}>Open Payments records US industry disclosures. It does not cover {countryName(p.hcp.country)}, so an absence here reflects the register&rsquo;s territory rather than this physician&rsquo;s relationships.</span>
                   ) : (
                     <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.5 }}>No disclosed payments in the record. This is an absence in the open-payments record. It is not evidence that no relationship exists.</span>
                   )}
@@ -523,7 +531,12 @@ export default function HcpProfileBrief() {
                 return hasMix ? <EngagementMixDonut mix={mix} /> : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink6 }}>ENGAGEMENT MIX · 3YR</span>
-                    <span style={{ ...serif(13), color: P.ink5, lineHeight: 1.5 }}>No categorized payments in the 3-year window.</span>
+                    {/* Same territory correction as the company list, shortened —
+                        this is a donut caption, not a paragraph, so it states the
+                        register's scope and stops. */}
+                    <span style={{ ...serif(13), color: P.ink5, lineHeight: 1.5 }}>
+                      {nonUs ? `Open Payments does not cover ${countryName(p.hcp.country)}.` : "No categorized payments in the 3-year window."}
+                    </span>
                   </div>
                 );
               })()}

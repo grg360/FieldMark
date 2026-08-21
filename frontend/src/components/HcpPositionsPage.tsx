@@ -281,14 +281,52 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
+// The publication title is SERIF at reading size in the position prose's own
+// warm ink (2026-08-20). It was 10px mono in COOL.muted with a hard
+// `slice(0, 90)` — dimmer and smaller than the five positions it governs, so
+// the parent of the group read as chrome beneath its own children, and the cut
+// landed mid-word at a fixed character count regardless of viewport (both of
+// Singh's titles overrun it). Now it wraps.
+//
+// It takes WARM.body, the SAME ink as the position text, not WARM.prose: the
+// title is the context for the positions, not a louder headline over them.
+// Journal · year · citations keep the mono chrome treatment and drop to their
+// own line — inline they competed with the title for the same first line and
+// the two voices ran together.
+const titleStyle = {
+  font: `400 16px/1.45 ${SERIF}`,
+  color: WARM.body,
+  textWrap: "pretty" as const,
+};
+
 function PubGroupCard({ group: g }: { group: PubGroup }) {
   const bits = [g.journal?.toUpperCase(), g.year != null ? String(g.year) : null, g.citations != null ? `${fmt(g.citations)} CITATIONS` : null].filter(Boolean);
+  // The title IS the link when a DOI exists — HcpProfileBrief:666's convention:
+  // no "OPEN ↗" suffix, no chip, just the label carrying the href with a
+  // hairline underline so it reads as reachable. The DOI/PUBMED chips on the
+  // right are unchanged; they stay as the explicit, always-visible affordance.
+  const title = g.doi ? (
+    <a
+      href={`https://doi.org/${g.doi}`}
+      target="_blank"
+      rel="noreferrer"
+      style={{ ...titleStyle, textDecoration: "none", borderBottom: `1px solid rgba(216,211,194,.28)` }}
+    >
+      {g.title}
+    </a>
+  ) : (
+    <span style={titleStyle}>{g.title}</span>
+  );
   return (
     <div style={{ border: `1px solid ${LINE.l1}`, background: GROUND.g2 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 24, padding: "14px 26px", background: GROUND.g1, borderBottom: `1px solid ${LINE.l1}` }}>
-        <div style={{ ...mono(10, COOL.muted, 0.16, 500), lineHeight: 1.5 }}>
-          {g.title.length > 90 ? `${g.title.slice(0, 90)}…` : g.title}
-          {bits.length ? <span style={{ color: COOL.chrome }}>{"  ·  "}{bits.join("  ·  ")}</span> : null}
+        {/* minWidth 0 is load-bearing now the slice is gone: a flex item
+            defaults to min-width auto, so without it a long unbroken title
+            would push the DOI/PUBMED links off the right edge instead of
+            wrapping. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+          {title}
+          {bits.length ? <div style={{ ...mono(10, COOL.chrome, 0.16, 500), lineHeight: 1.5 }}>{bits.join("  ·  ")}</div> : null}
         </div>
         <div style={{ display: "flex", gap: 14, flex: "none" }}>
           {g.doi ? <a href={`https://doi.org/${g.doi}`} target="_blank" rel="noreferrer" style={{ ...mono(10, GOLD.gold, 0.14, 500), textDecoration: "none" }}>DOI</a> : null}

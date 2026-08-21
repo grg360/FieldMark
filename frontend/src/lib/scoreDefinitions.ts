@@ -49,19 +49,19 @@ export const METRIC_DEFS: Record<string, MetricDef> = {
   },
   rs_scimom: {
     title: "Scientific Momentum",
-    body: "Change in output between two five-year windows: publication velocity, citation volume, authorship progression.",
+    body: "Where this physician sits against the board on research growth - 96 means faster growth than 96% of the board. Compares the last five years against the five before: how many papers, how often they are cited, and whether they are moving into senior-author positions.",
   },
   rs_netmom: {
     title: "Network Momentum",
-    body: "Change in co-authorship centrality between the same two windows - eigenvector, degree and betweenness deltas. Eigenvector is normalised within country before percentiling.",
+    body: "Where this physician sits against the board on how fast their collaboration network is growing - 83 means faster than 83% of the board. Measures the change in how many co-authors they have, how central they sit between research groups, and how well-connected those co-authors are. Compared within their own country, so a densifying national research community does not read as personal momentum.",
   },
   rs_scivis: {
     title: "Scientific Visibility",
-    body: "Current footprint in the recent window: total publications and citation volume, weighted evenly.",
+    body: "Where this physician sits against the board on current published output - 97 means more visible than 97% of the board. Two halves, weighted evenly: how many papers in the recent window, and how many citations those papers have drawn.",
   },
   rs_netvis: {
     title: "Network Visibility",
-    body: "Current co-authorship centrality in the recent rolling window.",
+    body: "Where this physician sits against the board on how central they are in the co-authorship network today - 98 means more central than 98% of the board. Counts direct collaborators and how much research traffic runs through them, in the recent window.",
   },
   // A BADGE, NOT A METRIC — the only entry here that describes a chip on the
   // Established shelf rather than a column. It earns a definition because its
