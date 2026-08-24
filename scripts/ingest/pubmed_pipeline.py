@@ -125,6 +125,31 @@ HTTP_RETRY_BASE_SECONDS = 2.0
 HTTP_RETRY_MAX_SECONDS = 30.0
 
 
+# Redaction is keyed on the PARAM NAME, never on the secret's value: the pattern keeps
+# working when the key is rotated, and the secret itself never has to appear in this file.
+# Two shapes leak:
+#   1. requests' HTTPError.__str__ embeds the fully-resolved URL -- "...&api_key=SECRET".
+#   2. NCBI's own 400 body echoes the key back:
+#      {"error":"API key invalid","api-key":"SECRET","type":"invalid","status":"unknown"}
+# Path to disk: HTTPError str -> RuntimeError -> traceback -> child stderr -> run_stage's
+# stderr=STDOUT -> orchestrator stdout -> run_weekly_reingest.ps1's Tee-Object -> logs/.
+_REDACT_PATTERNS = (
+    re.compile(r"(api_key=)[^&\s\"']+", re.IGNORECASE),        # URL query param
+    re.compile(r'("api-key"\s*:\s*")[^"]*(")', re.IGNORECASE),  # NCBI JSON body field
+    re.compile(r'("api_key"\s*:\s*")[^"]*(")', re.IGNORECASE),  # defensive: underscore variant
+)
+
+
+def _redact(text: str) -> str:
+    """Strip the PubMed API key from anything about to be logged or raised."""
+    if not text:
+        return text
+    out = _REDACT_PATTERNS[0].sub(r"\1<REDACTED>", text)
+    for pattern in _REDACT_PATTERNS[1:]:
+        out = pattern.sub(r"\1<REDACTED>\2", out)
+    return out
+
+
 def _response_body_excerpt(exc: requests.exceptions.HTTPError, limit: int = 400) -> str:
     """Best-effort excerpt of the response body attached to an HTTPError.
 
@@ -141,7 +166,7 @@ def _response_body_excerpt(exc: requests.exceptions.HTTPError, limit: int = 400)
         return ""
     if not body:
         return ""
-    body = " ".join(body.split())
+    body = _redact(" ".join(body.split()))
     return body[:limit] + ("..." if len(body) > limit else "")
 
 
@@ -196,7 +221,7 @@ def _http_with_retry(
             if not _is_transient_http_error(exc, body):
                 # Adapter already exhausted its 429/5xx budget; other 4xx are deterministic.
                 raise RuntimeError(
-                    f"HTTP request failed for {url}: {exc}"
+                    _redact(f"HTTP request failed for {url}: {exc}")
                     + (f" | body: {body}" if body else "")
                 ) from exc
             last_exc = exc
@@ -221,18 +246,18 @@ def _http_with_retry(
             delay = random.uniform(0, ceiling)
             print(
                 f"[pubmed_pipeline] [retry {attempt}/{HTTP_RETRY_ATTEMPTS - 1}] {label} {url}: "
-                f"{type(exc).__name__}: {exc}; retrying in {delay:.1f}s",
+                f"{type(exc).__name__}: {_redact(str(exc))}; retrying in {delay:.1f}s",
                 file=sys.stderr, flush=True,
             )
             time.sleep(delay)
         except requests.RequestException as exc:
             # Anything else in the requests hierarchy: not classified as transient, fail fast.
-            raise RuntimeError(f"HTTP request failed for {url}: {exc}") from exc
+            raise RuntimeError(_redact(f"HTTP request failed for {url}: {exc}")) from exc
 
     # Body on the exhausted path too: this is the revoked-key case, and "retried 4x and gave
     # up" is only actionable if the log says WHY.
     raise RuntimeError(
-        f"HTTP request failed for {url} after {HTTP_RETRY_ATTEMPTS} attempts: {last_exc}"
+        _redact(f"HTTP request failed for {url} after {HTTP_RETRY_ATTEMPTS} attempts: {last_exc}")
         + (f" | body: {last_body}" if last_body else "")
     ) from last_exc
 
@@ -991,6 +1016,12 @@ def pubmed_efetch(
         if email:
             params["email"] = email
         if api_key:
+            # THE ONLY CALL SITE THAT PUTS THE KEY IN A URL. The other three POST, so their
+            # params go in the body and never reach a query string. This one stays GET
+            # deliberately: URL length was measured at 1,271 chars for a 100-PMID batch and
+            # both GET and POST return 200, so there is no diagnosed reason to change the
+            # highest-traffic call site. Containment is _redact() on every raise/log path --
+            # requests' HTTPError.__str__ embeds the resolved URL, key included.
             params["api_key"] = api_key
 
         response = safe_get(efetch_url, params=params, session=session)
