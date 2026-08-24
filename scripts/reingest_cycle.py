@@ -529,7 +529,16 @@ def run_stage(
     assert proc.stdout is not None
     pat = re.compile(capture_pattern) if capture_pattern else None
     for line in proc.stdout:
-        sys.stdout.write(line)
+        # BELT AND BRACES over force_utf8_stdio(). That reconfigure normally makes this
+        # unencodable-character crash impossible, but it can be defeated -- stdout replaced by
+        # a wrapper without reconfigure, a redirect this process does not control, a future
+        # caller importing run_stage without going through main(). A long UNRESUMABLE run must
+        # degrade to a mangled progress bar, never die on one.
+        try:
+            sys.stdout.write(line)
+        except UnicodeEncodeError:
+            enc = getattr(sys.stdout, "encoding", None) or "ascii"
+            sys.stdout.write(line.encode(enc, errors="replace").decode(enc, errors="replace"))
         sys.stdout.flush()
         if pat and captured is None:
             m = pat.search(line)
@@ -1376,7 +1385,37 @@ def resolve_resume(value: Optional[str]) -> Optional[int]:
     )
 
 
+def force_utf8_stdio() -> None:
+    """Make this process's own stdout/stderr unable to crash on a display character.
+
+    THE CRASH THIS PREVENTS: run_stage streams child output with
+    `sys.stdout.write(line)`. The child's bytes are already decoded correctly (the pipe is
+    opened encoding="utf-8", errors="replace"), but WRITING that line re-encodes it to the
+    orchestrator's own stdout encoding -- cp1252 under PowerShell. A tqdm progress glyph
+    (U+258F, U+2588) is unencodable there, so the write raises UnicodeEncodeError and kills
+    the whole cycle. It killed the 2026-08-03 03:00 run at stage 1, and again on the CRC
+    build AFTER stage 1 had successfully retrieved 147,400/147,400 PMIDs -- an unresumable
+    run lost to a bar character.
+
+    run_weekly_reingest.ps1 sets PYTHONUTF8=1, which covers the cron path. This covers every
+    OTHER way the orchestrator is started -- a manual run, another wrapper, an IDE -- so the
+    protection belongs to the program rather than to one launcher.
+    """
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:  # already replaced by something non-standard; nothing to do
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            # Never let the hardening itself be the thing that fails the run.
+            pass
+
+
 def main() -> int:
+    # FIRST statement: must precede any output, including argparse's own error messages.
+    force_utf8_stdio()
     args = parse_args()
     load_dotenv()
     slug = args.ta
