@@ -37,7 +37,9 @@ import argparse
 import calendar
 import json
 import os
+import random
 import re
+import sys
 import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -103,22 +105,168 @@ def build_http_session() -> requests.Session:
     return session
 
 
-def safe_get(url: str, params: Dict[str, str], session: requests.Session, timeout: int = 40) -> Response:
+# Transport failures the ADAPTER CANNOT retry. urllib3's Retry (build_http_session) covers
+# connect/read failures and the 429/5xx status list, but it considers a request finished once
+# response HEADERS arrive -- so a body that starts and then truncates is never re-issued. That
+# is `ProtocolError: Response ended prematurely`, surfacing as ChunkedEncodingError, and it
+# killed a 13-minute verification run twice. These are the classes worth one more layer.
+#
+# DELIBERATELY ABSENT: 429 and 5xx. The adapter already owns those with its own budget; a
+# second layer would multiply attempts (5 x 4) rather than add resilience, and at ~7 req/s
+# against NCBI's 10/s ceiling a retry storm is a real way to turn a blip into sustained 429s.
+HTTP_TRANSIENT_EXCEPTIONS = (
+    requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ContentDecodingError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+)
+HTTP_RETRY_ATTEMPTS = 4
+HTTP_RETRY_BASE_SECONDS = 2.0
+HTTP_RETRY_MAX_SECONDS = 30.0
+
+
+def _response_body_excerpt(exc: requests.exceptions.HTTPError, limit: int = 400) -> str:
+    """Best-effort excerpt of the response body attached to an HTTPError.
+
+    WHY THIS EXISTS: the body is where NCBI says what actually went wrong. Raising only the
+    status line ("400 Client Error: Bad Request") threw that away, so diagnosing the CRC
+    build's batch-32 failure meant reproducing it from scratch rather than reading the log.
+    """
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
     try:
-        response = session.get(url, params=params, timeout=timeout)
-        response.raise_for_status()
-        return response
-    except requests.RequestException as exc:
-        raise RuntimeError(f"HTTP request failed for {url}: {exc}") from exc
+        body = (response.text or "").strip()
+    except Exception:
+        return ""
+    if not body:
+        return ""
+    body = " ".join(body.split())
+    return body[:limit] + ("..." if len(body) > limit else "")
+
+
+# A 400 carrying this is NCBI's key-validation service refusing the request, NOT a malformed
+# request. Observed body:
+#   {"error":"API key invalid","api-key":"...","type":"invalid","status":"unknown"}
+# It is INTERMITTENT under sustained load -- it killed the CRC build at efetch batch 32 of
+# 1474, after ~1,600 successful calls with the same key, and the same key worked again
+# immediately after. Matching on the BODY rather than the bare 400 keeps every other 4xx
+# fail-fast. A genuinely revoked key simply retries 4 times and then fails, which is correct
+# and costs a few seconds.
+API_KEY_INVALID_MARKERS = ("api key invalid", '"error":"api key invalid"')
+
+
+def _is_transient_http_error(exc: requests.exceptions.HTTPError, body: str) -> bool:
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    if status != 400:
+        return False
+    lowered = body.lower()
+    return any(marker in lowered for marker in API_KEY_INVALID_MARKERS)
+
+
+def _http_with_retry(
+    do_request: Callable[[], Response],
+    url: str,
+    label: str,
+) -> Response:
+    """Issue a request, retrying post-header transport failures and transient 4xx.
+
+    Fails fast on 4xx by default -- raise_for_status has already classified it, and a 400
+    malformed term / 403 / 414 URI-too-long is deterministic, so re-sending is pure waste.
+    The ONE exception is a 400 whose BODY says the API key is invalid: that is NCBI's key
+    service under load, it is intermittent, and failing fast on it costs an entire
+    unresumable run. See API_KEY_INVALID_MARKERS.
+
+    NOTE ON REJECTED QUERIES: PubMed answers a bad query with HTTP 200 and an <ERROR>
+    element, so it never reaches this function's except clause at all. Rejection is detected
+    by the callers' `root.findtext("ERROR")` checks, which sit OUTSIDE this retry. A query
+    PubMed rejected therefore cannot be re-issued here -- keep it that way.
+    """
+    last_exc: Optional[BaseException] = None
+    last_body = ""
+    for attempt in range(1, HTTP_RETRY_ATTEMPTS + 1):
+        try:
+            response = do_request()
+            response.raise_for_status()
+            return response
+        except requests.exceptions.HTTPError as exc:
+            body = _response_body_excerpt(exc)
+            last_body = body
+            if not _is_transient_http_error(exc, body):
+                # Adapter already exhausted its 429/5xx budget; other 4xx are deterministic.
+                raise RuntimeError(
+                    f"HTTP request failed for {url}: {exc}"
+                    + (f" | body: {body}" if body else "")
+                ) from exc
+            last_exc = exc
+            if attempt == HTTP_RETRY_ATTEMPTS:
+                break
+            ceiling = min(HTTP_RETRY_BASE_SECONDS * (2 ** (attempt - 1)), HTTP_RETRY_MAX_SECONDS)
+            delay = random.uniform(0, ceiling)
+            print(
+                f"[pubmed_pipeline] [retry {attempt}/{HTTP_RETRY_ATTEMPTS - 1}] {label} {url}: "
+                f"HTTP 400 API-key-invalid (transient, NCBI key service); "
+                f"retrying in {delay:.1f}s",
+                file=sys.stderr, flush=True,
+            )
+            time.sleep(delay)
+        except HTTP_TRANSIENT_EXCEPTIONS as exc:
+            last_exc = exc
+            if attempt == HTTP_RETRY_ATTEMPTS:
+                break
+            # Full jitter: sleep is uniform in [0, min(base * 2^(n-1), cap)]. Subdivided
+            # windows fail in correlated bursts, so unjittered backoff would re-collide.
+            ceiling = min(HTTP_RETRY_BASE_SECONDS * (2 ** (attempt - 1)), HTTP_RETRY_MAX_SECONDS)
+            delay = random.uniform(0, ceiling)
+            print(
+                f"[pubmed_pipeline] [retry {attempt}/{HTTP_RETRY_ATTEMPTS - 1}] {label} {url}: "
+                f"{type(exc).__name__}: {exc}; retrying in {delay:.1f}s",
+                file=sys.stderr, flush=True,
+            )
+            time.sleep(delay)
+        except requests.RequestException as exc:
+            # Anything else in the requests hierarchy: not classified as transient, fail fast.
+            raise RuntimeError(f"HTTP request failed for {url}: {exc}") from exc
+
+    # Body on the exhausted path too: this is the revoked-key case, and "retried 4x and gave
+    # up" is only actionable if the log says WHY.
+    raise RuntimeError(
+        f"HTTP request failed for {url} after {HTTP_RETRY_ATTEMPTS} attempts: {last_exc}"
+        + (f" | body: {last_body}" if last_body else "")
+    ) from last_exc
+
+
+# NCBI allows 10 req/sec with an API key, 3 without. 0.15s (~6.7/s) rather than the previous
+# 0.11s (~9.1/s): at 91% of the ceiling any burst -- retries, or the chunker's now-numerous
+# ESearch inits landing between paced EFetch calls -- crosses 10/s and earns 429s, which the
+# adapter retries, sustaining the condition. Costs ~25% wall-clock for real headroom.
+# The no-key value is unchanged.
+def pubmed_sleep_seconds() -> float:
+    return 0.15 if os.getenv("PUBMED_API_KEY") else 0.34
+
+
+def pubmed_pace() -> None:
+    """Sleep one inter-request interval.
+
+    Applied to EVERY PubMed call including the ESearch count and history-init calls, which
+    were previously unpaced. That was harmless when a run made one of each; the recursive
+    sub-year chunker issues one init per window (~120+ for a ten-year build, each landing
+    immediately after a paced EFetch page).
+    """
+    time.sleep(pubmed_sleep_seconds())
+
+
+def safe_get(url: str, params: Dict[str, str], session: requests.Session, timeout: int = 40) -> Response:
+    return _http_with_retry(
+        lambda: session.get(url, params=params, timeout=timeout), url, "GET"
+    )
 
 
 def safe_post(url: str, data: Dict[str, str], session: requests.Session, timeout: int = 40) -> Response:
-    try:
-        response = session.post(url, data=data, timeout=timeout)
-        response.raise_for_status()
-        return response
-    except requests.RequestException as exc:
-        raise RuntimeError(f"HTTP request failed for {url}: {exc}") from exc
+    return _http_with_retry(
+        lambda: session.post(url, data=data, timeout=timeout), url, "POST"
+    )
 
 
 SUPABASE_TRANSIENT_MARKERS = (
@@ -426,6 +574,7 @@ def pubmed_esearch_count(
         params["api_key"] = api_key
 
     response = safe_post(esearch_url, data=params, session=session)
+    pubmed_pace()
     root = parse_xml(response.content, "esearch_count")
     if root.findtext("ERROR"):
         raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
@@ -540,6 +689,7 @@ def pubmed_esearch_init_history(
         init_params["api_key"] = api_key
 
     response = safe_post(esearch_url, data=init_params, session=session)
+    pubmed_pace()
     root = parse_xml(response.content, "esearch_init")
     if root.findtext("ERROR"):
         raise RuntimeError(f"PubMed ESearch error: {root.findtext('ERROR')}")
@@ -643,7 +793,7 @@ def pubmed_esearch(
     esearch_url = f"{base_url}/esearch.fcgi"
     efetch_url = f"{base_url}/efetch.fcgi"
     api_key = os.getenv("PUBMED_API_KEY")
-    sleep_seconds = 0.11 if api_key else 0.34
+    sleep_seconds = pubmed_sleep_seconds()
     stats_subdivided = [0]  # list so the nested recursion can mutate it
 
     webenv, query_key, total_count = pubmed_esearch_init_history(
@@ -829,7 +979,7 @@ def pubmed_efetch(
 ) -> List[ET.Element]:
     efetch_url = f"{base_url}/efetch.fcgi"
     api_key = os.getenv("PUBMED_API_KEY")
-    sleep_seconds = 0.11 if api_key else 0.34
+    sleep_seconds = pubmed_sleep_seconds()
     all_articles: List[ET.Element] = []
     for batch in tqdm(list(chunked(list(pmids), 100)), desc="fetching publications", unit="batch"):
         params = {
