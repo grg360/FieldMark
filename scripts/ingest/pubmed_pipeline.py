@@ -34,6 +34,7 @@ max_results, and retrieval metadata. years_back is in years; null means no date 
 from __future__ import annotations
 
 import argparse
+import calendar
 import json
 import os
 import re
@@ -449,6 +450,49 @@ def iter_year_date_ranges(days_back: int) -> List[Tuple[str, str]]:
     return ranges
 
 
+def subdivide_date_range(mindate: str, maxdate: str) -> List[Tuple[str, str]]:
+    """Split an inclusive YYYY/MM/DD window into the next-finer level (newest first).
+
+    Multi-year -> calendar years; within one year -> calendar months; within one
+    month -> days. Returns [] for a single day, which is the recursion floor: the
+    caller MUST raise there rather than truncate.
+
+    Sub-ranges are clipped to the parent window, so the union is exactly the parent
+    and no paper can fall between two sub-windows.
+    """
+    start = datetime.strptime(mindate, "%Y/%m/%d").date()
+    end = datetime.strptime(maxdate, "%Y/%m/%d").date()
+    if start >= end:
+        return []
+
+    out: List[Tuple[str, str]] = []
+    fmt = "%Y/%m/%d"
+
+    if end.year > start.year:
+        for year in range(end.year, start.year - 1, -1):
+            s = max(start, date(year, 1, 1))
+            e = min(end, date(year, 12, 31))
+            if s <= e:
+                out.append((s.strftime(fmt), e.strftime(fmt)))
+        return out
+
+    if start.month != end.month:
+        year = start.year
+        for month in range(end.month, start.month - 1, -1):
+            last = calendar.monthrange(year, month)[1]
+            s = max(start, date(year, month, 1))
+            e = min(end, date(year, month, last))
+            if s <= e:
+                out.append((s.strftime(fmt), e.strftime(fmt)))
+        return out
+
+    day = end
+    while day >= start:
+        out.append((day.strftime(fmt), day.strftime(fmt)))
+        day -= timedelta(days=1)
+    return out
+
+
 def iter_decade_date_ranges() -> List[Tuple[str, str]]:
     """Split full PubMed history into decade chunks (newest first)."""
     end = date.today()
@@ -585,11 +629,22 @@ def pubmed_esearch(
     tool_name: str,
     mindate: Optional[str] = None,
     maxdate: Optional[str] = None,
+    stats: Optional[Dict[str, int]] = None,
 ) -> List[str]:
+    """Retrieve the PMID set for a query/window.
+
+    `stats`, when passed, is filled with retrieval instrumentation:
+      esearch_available  - true ESearch total for the whole query/window
+      esearch_retrieved  - PMIDs actually returned (deduped)
+      chunks_subdivided  - windows that exceeded the cap and had to be split
+      esearch_target     - what we were ALLOWED to fetch (available, or --limit)
+    The caller compares retrieved against target; a shortfall must fail the stage.
+    """
     esearch_url = f"{base_url}/esearch.fcgi"
     efetch_url = f"{base_url}/efetch.fcgi"
     api_key = os.getenv("PUBMED_API_KEY")
     sleep_seconds = 0.11 if api_key else 0.34
+    stats_subdivided = [0]  # list so the nested recursion can mutate it
 
     webenv, query_key, total_count = pubmed_esearch_init_history(
         session=session,
@@ -646,27 +701,63 @@ def pubmed_esearch(
 
         seen: Set[str] = set()
         unique_ids = ids  # reuse list, populate with unique PMIDs in order
-        for mindate, maxdate in date_ranges:
+
+        def retrieve_window(win_mindate: str, win_maxdate: str) -> None:
+            """Fetch one window, RECURSING when it exceeds the per-session cap.
+
+            Replaces the previous `session_target = min(chunk_count, MAX)`, which
+            silently discarded everything above 9,999 -- a whole-year chunk of a
+            high-volume TA lost ~40% of that year with no error, no warning and no
+            funnel field (measured: NSCLC 2021-2024 flattened at ~9.4k against
+            11.2-12.1k available).
+
+            Each level opens its OWN history session -- sessions are independent, so
+            subdividing needs no new API surface -- and appends into the shared
+            seen/unique_ids accumulators, leaving dedup and ordering unchanged.
+            """
+            nonlocal last_progress_logged
             if len(unique_ids) >= overall_target:
-                break
-            chunk_webenv, chunk_query_key, chunk_count = pubmed_esearch_init_history(
+                return
+
+            win_webenv, win_query_key, win_count = pubmed_esearch_init_history(
                 session=session,
                 esearch_url=esearch_url,
                 query=query,
                 email=email,
                 tool_name=tool_name,
-                mindate=mindate,
-                maxdate=maxdate,
+                mindate=win_mindate,
+                maxdate=win_maxdate,
             )
-            if chunk_count == 0:
-                continue
-            session_target = min(chunk_count, PUBMED_HISTORY_MAX_PMIDS)
-            batch_ids, total_retrieved, last_progress_logged = pubmed_efetch_history_pmids(
+            if win_count == 0:
+                return
+
+            if win_count > PUBMED_HISTORY_MAX_PMIDS:
+                subranges = subdivide_date_range(win_mindate, win_maxdate)
+                if not subranges:
+                    # Recursion floor: a SINGLE DAY over the cap. Pathological, and the
+                    # only remaining options are truncate (the bug) or fail. Fail.
+                    raise RuntimeError(
+                        f"Single-day window {win_mindate} returned {win_count:,} PMIDs "
+                        f"(> {PUBMED_HISTORY_MAX_PMIDS}); cannot subdivide below one day. "
+                        f"Refusing to truncate silently -- narrow the query or raise the cap."
+                    )
+                stats_subdivided[0] += 1
+                print(
+                    f"  [chunk] {win_mindate}..{win_maxdate} = {win_count:,} PMIDs > "
+                    f"{PUBMED_HISTORY_MAX_PMIDS:,}; subdividing into {len(subranges)} sub-window(s)"
+                )
+                for sub_mindate, sub_maxdate in subranges:
+                    retrieve_window(sub_mindate, sub_maxdate)
+                    if len(unique_ids) >= overall_target:
+                        return
+                return
+
+            batch_ids, _retrieved, last_progress_logged = pubmed_efetch_history_pmids(
                 session=session,
                 efetch_url=efetch_url,
-                webenv=chunk_webenv,
-                query_key=chunk_query_key,
-                session_target=session_target,
+                webenv=win_webenv,
+                query_key=win_query_key,
+                session_target=win_count,
                 per_call=per_call,
                 email=email,
                 tool_name=tool_name,
@@ -683,6 +774,11 @@ def pubmed_esearch(
                     if len(unique_ids) >= overall_target:
                         break
 
+        for mindate, maxdate in date_ranges:
+            if len(unique_ids) >= overall_target:
+                break
+            retrieve_window(mindate, maxdate)
+
     # Preserve order while removing any duplicated PMIDs (single-session path only).
     if overall_target <= PUBMED_HISTORY_MAX_PMIDS:
         seen: Set[str] = set()
@@ -691,9 +787,13 @@ def pubmed_esearch(
             if pmid not in seen:
                 seen.add(pmid)
                 unique_ids.append(pmid)
-    if max_results is not None:
-        return unique_ids[:max_results]
-    return unique_ids
+    result = unique_ids[:max_results] if max_results is not None else unique_ids
+    if stats is not None:
+        stats["esearch_available"] = total_count
+        stats["esearch_retrieved"] = len(result)
+        stats["chunks_subdivided"] = stats_subdivided[0]
+        stats["esearch_target"] = overall_target
+    return result
 
 
 def chunked(items: Sequence[str], size: int) -> Iterable[Sequence[str]]:
@@ -1154,6 +1254,14 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         funnel: Dict[str, Any] = {
             "ta_slug": ta_slug,
             "esearch_candidates": 0,
+            # Retrieval instrumentation. esearch_candidates records what we FETCHED;
+            # without esearch_available there was nothing to compare it against, so a
+            # chunk truncated at the 9,999 cap looked identical to a complete fetch.
+            "esearch_available": 0,
+            "esearch_retrieved": 0,
+            "esearch_target": 0,
+            "chunks_subdivided": 0,
+            "short_fetch": False,
             "efetch_articles": 0,
             "extracted_pmids": 0,
             "publications_upserted": 0,
@@ -1256,6 +1364,7 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
             print(f"PubMed reports {total_available:,} total matching PMIDs for this query/window.")
 
             print("Searching PubMed...")
+            esearch_stats: Dict[str, int] = {}
             pmids = pubmed_esearch(
                 session=session,
                 base_url=base_url,
@@ -1267,7 +1376,28 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
                 tool_name=tool_name,
                 mindate=window_mindate,
                 maxdate=window_maxdate,
+                stats=esearch_stats,
             )
+            funnel["esearch_available"] = esearch_stats.get("esearch_available", 0)
+            funnel["esearch_retrieved"] = esearch_stats.get("esearch_retrieved", 0)
+            funnel["esearch_target"] = esearch_stats.get("esearch_target", 0)
+            funnel["chunks_subdivided"] = esearch_stats.get("chunks_subdivided", 0)
+            # SHORT FETCH: retrieved fewer than we were allowed to. Compared against
+            # target, not available, so an intentional --limit is not a failure.
+            funnel["short_fetch"] = (
+                funnel["esearch_retrieved"] < funnel["esearch_target"]
+            )
+            print(
+                f"Retrieval: available={funnel['esearch_available']:,} "
+                f"target={funnel['esearch_target']:,} "
+                f"retrieved={funnel['esearch_retrieved']:,} "
+                f"subdivided_windows={funnel['chunks_subdivided']}"
+            )
+            if funnel["short_fetch"]:
+                print(
+                    f"[pubmed_pipeline] [ERROR] SHORT FETCH for {ta_slug}: retrieved "
+                    f"{funnel['esearch_retrieved']:,} of {funnel['esearch_target']:,}."
+                )
             # Do NOT persist the windowed PMID set into the shared checkpoint: it is a partial
             # (date-bounded) view and would poison a later full-corpus run's pmid_retrieval cache.
             if checkpoint is not None and not date_window_override:
@@ -1407,8 +1537,22 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         and f["publications_upserted"] == 0
     ]
 
+    # SHORT-FETCH GUARD: a TA that retrieved fewer PMIDs than ESearch offered has
+    # silently lost papers. Before the recursive chunker this was the normal outcome
+    # for any high-volume year and nothing recorded it. Checkpoint-skip runs are
+    # exempt (they retrieve 0 by design); dry runs are exempt below.
+    short = [
+        f for f in ta_funnels
+        if not f["dry_run"]
+        and not f["write_skipped_by_checkpoint"]
+        and f["short_fetch"]
+    ]
+
     totals = {
         "esearch_candidates": sum(f["esearch_candidates"] for f in ta_funnels),
+        "esearch_available": sum(f["esearch_available"] for f in ta_funnels),
+        "esearch_retrieved": sum(f["esearch_retrieved"] for f in ta_funnels),
+        "chunks_subdivided": sum(f["chunks_subdivided"] for f in ta_funnels),
         "efetch_articles": sum(f["efetch_articles"] for f in ta_funnels),
         "extracted_pmids": sum(f["extracted_pmids"] for f in ta_funnels),
         "publications_upserted": sum(f["publications_upserted"] for f in ta_funnels),
@@ -1421,6 +1565,7 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         "per_ta": ta_funnels,
         "totals": totals,
         "starved_tas": [f["ta_slug"] for f in starved],
+        "short_fetch_tas": [f["ta_slug"] for f in short],
     }
     summary_path = Path(run_summary_out) if run_summary_out else (REPO_ROOT / "pubmed_run_summary.json")
     try:
@@ -1442,6 +1587,18 @@ def run_pipeline(args: Optional[argparse.Namespace] = None) -> Optional[str]:
         raise SystemExit(
             f"[pubmed_pipeline] FAIL: {len(starved)} TA(s) consumed candidates but persisted 0 "
             f"publications: {detail}. See {summary_path}."
+        )
+
+    if short:
+        detail = ", ".join(
+            f"{f['ta_slug']}(retrieved={f['esearch_retrieved']}, "
+            f"target={f['esearch_target']}, available={f['esearch_available']}, "
+            f"subdivided={f['chunks_subdivided']})"
+            for f in short
+        )
+        raise SystemExit(
+            f"[pubmed_pipeline] FAIL: {len(short)} TA(s) retrieved fewer PMIDs than ESearch "
+            f"offered -- papers were silently dropped: {detail}. See {summary_path}."
         )
 
     print("Pipeline run completed.")
