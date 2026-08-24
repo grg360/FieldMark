@@ -696,6 +696,25 @@ def print_plan(
         ("11 trials_status_refresh (open-status trials refreshed by nct_id via filter.ids; trial facts "
          "only, NO HCP crawl, NO trial_investigators writes; NON-BLOCKING -- WARN not FAILED)",
          cmd_trials_status_refresh()),
+        # 12/13/13.5 were MISSING from this list until 2026-08-24 while the module docstring
+        # claimed --dry-run "prints the full plan (all stages...)". Every dry run to date
+        # therefore hid the BILLED portion of the cycle: three narrative sub-stages, two of
+        # them uncapped. A plan that omits the expensive stages is worse than no plan.
+        ("12 hcpcs_topup (Medicare claims top-up for newly-NPI'd HCPs; derives its own target set "
+         "and no-ops when clean; NON-BLOCKING -- WARN not FAILED)",
+         cmd_hcpcs_topup()),
+        ("13 narratives -- BILLED (Anthropic API), NON-BLOCKING (WARN not FAILED). Three sub-stages:", []),
+        ("   13a narratives_rising      [UNCAPPED: whole rising board]",
+         cmd_narratives(slug, "rising_star", None)),
+        ("   13b narratives_established [capped --established-top 200; DELIBERATE cut against a "
+         "~2,990-member US board -- uncapping is a ~15x cost decision]",
+         cmd_narratives(slug, "established", "--established-top")),
+        ("   13c narratives_community   [UNCAPPED: anchored + supported tiers; the tier filter IS the scope]",
+         cmd_narratives(slug, "community", None)),
+        ("13.5 stranded_sweep (delete narratives for HCPs stage 9 removed from the board; "
+         "inside stage 13's gate, after its sub-stages; NON-BLOCKING)", []),
+        ("   13.5a stranded_sweep rising_star", cmd_stranded_sweep(slug, "rising_star")),
+        ("   13.5b stranded_sweep established", cmd_stranded_sweep(slug, "established")),
     ]
 
     print("=" * 72)
