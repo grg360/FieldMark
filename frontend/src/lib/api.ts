@@ -834,6 +834,7 @@ const TA_ID_MAP: Record<string, string> = {
   "rare-disease": "833e7b38-d01b-409e-82c0-71eb29e138a0",
   hepatology: "9b31947b-5ce2-41fd-bed8-0c09b9e5ad3e",
   nsclc: "c0065b03-a25e-4e9a-bde4-4b4d0db7827d",
+  "colorectal-cancer": "a2b28e54-0e0e-48a7-98e1-504f48e45d81",
   oncology: "095bc902-c3dc-48a3-8167-52ee55795d60",
   immunology: "4cf07827-ff1c-451e-832e-0e0a14ea9c86",
   "atopic-dermatitis": "9e4139d2-e062-4a58-8728-cdabb2d7dca1",

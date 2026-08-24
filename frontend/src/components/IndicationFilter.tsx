@@ -29,7 +29,7 @@ export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
     { slug: "aml", label: "AML", active: false },
     { slug: "breast", label: "Breast", active: false },
     { slug: "prostate", label: "Prostate", active: false },
-    { slug: "colorectal", label: "Colorectal", active: false },
+    { slug: "colorectal-cancer", label: "Colorectal Cancer", active: false },
     { slug: "bladder", label: "Bladder", active: false },
     { slug: "ovarian", label: "Ovarian", active: false },
     { slug: "kidney", label: "Kidney", active: false },

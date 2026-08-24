@@ -44,6 +44,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))  # scripts/score -> scr
 # --- Stopgap model map (until a config column exists). Using it prints a LOUD warning. ---
 RISING_MODEL: Dict[str, str] = {
     "nsclc": "momentum",
+    "colorectal-cancer": "momentum",
     "atopic-dermatitis": "emergence_composite",
 }
 

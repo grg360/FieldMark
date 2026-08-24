@@ -23,6 +23,7 @@
 //   · lib/routeSlugs.ts ONCOLOGY_SLUG_TO_LABEL (indication-scoped, per-TA)
 export const TA_DISPLAY_NAME_BY_SLUG: Record<string, string> = {
   nsclc: "Lung Cancer",
+  "colorectal-cancer": "Colorectal Cancer",
   "atopic-dermatitis": "Atopic Dermatitis",
   hepatology: "Hepatology",
   "rare-disease": "Rare Disease",

@@ -53,6 +53,12 @@ export const DASHBOARD_SLUG_TO_TRACK: Record<string, Track> = {
 const ONCOLOGY_SLUG_TO_LABEL: Record<string, string> = {
   all: "All",
   nsclc: "Lung Cancer",
+  // The BUILT colorectal TA (ta_uuid a2b28e54…). The inactive "colorectal"
+  // placeholder was retired 2026-08-24 in favour of this slug, so there is now
+  // exactly ONE colorectal identifier in the frontend. Do not reintroduce a
+  // bare "colorectal" — it would resolve to a label here while missing
+  // TA_ID_MAP, i.e. look valid and carry no TA id.
+  "colorectal-cancer": "Colorectal Cancer",
   "car-t": "CAR-T",
   dlbcl: "DLBCL",
   melanoma: "Melanoma",
@@ -60,7 +66,6 @@ const ONCOLOGY_SLUG_TO_LABEL: Record<string, string> = {
   aml: "AML",
   breast: "Breast",
   prostate: "Prostate",
-  colorectal: "Colorectal",
   bladder: "Bladder",
   ovarian: "Ovarian",
   kidney: "Kidney",
