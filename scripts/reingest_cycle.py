@@ -627,23 +627,29 @@ def esearch_total_for_window(slug: str, days: int) -> Optional[int]:
 
 
 def confirm_build_mode(
-    slug: str, ta_id: str, days: int, existing_pubs: int, force_rebuild: bool, assume_yes: bool,
+    slug: str, ta_id: str, days: int, existing_pubs: Optional[int],
+    force_rebuild: bool, assume_yes: bool, prompt: bool = True,
 ) -> None:
     """Gate C + the not-resumable warning. Prints scale and cross-TA blast radius, then blocks.
 
     STDIN IS DEVNULL FOR EVERY CHILD PROCESS in this orchestrator because it runs unattended
     at 3am. A prompt that blocks forever in cron is worse than no prompt, so a non-TTY without
     --yes is refused outright rather than left hanging.
+
+    prompt=False prints the block and returns without gating. --dry-run uses that: the blast
+    radius is MORE useful before you commit to the run than at the moment you are asked to
+    confirm it, and a preview must never block on input.
     """
     projected = esearch_total_for_window(slug, days)
     projected_s = f"~{projected:,} papers" if projected is not None else "unavailable (ESearch probe failed)"
+    existing_s = f"{existing_pubs:,} tagged to this TA" if existing_pubs is not None else "unavailable (DB probe failed)"
 
     print("=" * 72)
     print(f"  BUILD MODE (--build-mode new)  ta={slug}")
     print("=" * 72)
     print(f"  Window            : --days {days}  ({days // DAYS_PER_YEAR} years, from pubmed.years_back)")
     print(f"  Projected scale   : {projected_s}")
-    print(f"  Existing pubs     : {existing_pubs:,} tagged to this TA")
+    print(f"  Existing pubs     : {existing_s}")
     print(f"  Stages            : 1 -> {BUILD_MODE_MAX_STAGE} (13 narratives + 13.5 sweep SKIPPED)")
     print()
     print("  STAGE 1 IS NOT RESUMABLE. If it dies partway you restart from zero:")
@@ -659,11 +665,17 @@ def confirm_build_mode(
     print("    7b dedup_merge          Merges GLOBALLY at tier merge_fragment_high_confidence.")
     print("    8e industry_classify    FULL reclassify of hcps_v2, all TAs.")
     print("    11 trials_status        Refreshes open-status trials globally.")
-    if force_rebuild:
+    if force_rebuild and existing_pubs:
         print()
         print(f"  --force-rebuild: proceeding despite {existing_pubs:,} existing publication(s).")
+    if existing_pubs and not force_rebuild:
+        print()
+        print(f"  GATE D WILL REFUSE THIS RUN: {existing_pubs:,} publication(s) already tagged.")
+        print(f"    Pass --force-rebuild to override, or --build-mode incremental to top up.")
     print("=" * 72)
 
+    if not prompt:
+        return
     if assume_yes:
         print("  --yes given; proceeding without confirmation.")
         return
@@ -1383,6 +1395,20 @@ def main() -> int:
                   f"--mindate/--maxdate to override.")
 
     if not execute:
+        if args.build_mode == "new":
+            # Same block --execute prints, minus the gate. Resolving ta_id here means the dry
+            # run makes two read-only probes (a SELECT and one retmax=0 ESearch) where it
+            # previously made none -- worth it, since the existing-pub count and the blast
+            # radius are exactly what you want BEFORE committing to a multi-hour build.
+            # Both are best-effort: a preview must not fail because a probe did.
+            try:
+                probe_ta_id = resolve_ta_id(slug)
+                existing = ta_publication_count(probe_ta_id)
+            except Exception:
+                probe_ta_id, existing = "<TA_ID>", None
+            days = int(date_args[1]) if date_args and date_args[0] == "--days" else 0
+            confirm_build_mode(slug, probe_ta_id, days, existing,
+                               args.force_rebuild, args.yes, prompt=False)
         print_plan(slug, date.today().isoformat(), work_dir_for(slug), args.ingest_limit, date_args,
                    build_mode=args.build_mode)
         return 0
