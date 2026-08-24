@@ -715,7 +715,8 @@ def pubmed_esearch(
             subdividing needs no new API surface -- and appends into the shared
             seen/unique_ids accumulators, leaving dedup and ordering unchanged.
             """
-            nonlocal last_progress_logged
+            # No nonlocal: progress counters are per-window now (see the call below), and
+            # the only cross-window state is seen/unique_ids, which are mutated in place.
             if len(unique_ids) >= overall_target:
                 return
 
@@ -752,7 +753,7 @@ def pubmed_esearch(
                         return
                 return
 
-            batch_ids, _retrieved, last_progress_logged = pubmed_efetch_history_pmids(
+            batch_ids, _retrieved, _progress = pubmed_efetch_history_pmids(
                 session=session,
                 efetch_url=efetch_url,
                 webenv=win_webenv,
@@ -762,10 +763,28 @@ def pubmed_esearch(
                 email=email,
                 tool_name=tool_name,
                 sleep_seconds=sleep_seconds,
-                total_retrieved=len(unique_ids),
-                overall_target=overall_target,
-                last_progress_logged=last_progress_logged,
-                max_total=overall_target,
+                # SELF-CONTAINED per-window fetch: this window's own count is the target and
+                # its own counter starts at 0, so the window is always retrieved COMPLETELY.
+                #
+                # It previously passed total_retrieved=len(unique_ids) with the GLOBAL
+                # overall_target, which made pubmed_efetch_history_pmids stop on
+                # `total_retrieved >= stop_at` -- a UNIQUE-pmid target spent as a RAW-fetch
+                # budget. Date windows overlap heavily (year-only pdat values all land in
+                # January, so a year's months sum to ~140% of the year), so duplicates
+                # exhaust that budget before the unique target is met; late windows get
+                # clipped mid-fetch and the unique pmids in their tails are lost. Measured
+                # on 2022-2026 NSCLC: 51,380 retrieved of 52,548 available, stuck there
+                # because every remaining window was clipped to the same shrinking budget.
+                # Setting only max_total=None does NOT fix it: stop_at falls back to
+                # overall_target, which is the same number.
+                #
+                # Global bookkeeping (dedup + the overall_target early-break) lives in
+                # retrieve_window, above and below. Each window is <= the per-session cap,
+                # so an uncapped per-window fetch is bounded by construction.
+                total_retrieved=0,
+                overall_target=win_count,
+                last_progress_logged=0,
+                max_total=None,
             )
             for pmid in batch_ids:
                 if pmid not in seen:
