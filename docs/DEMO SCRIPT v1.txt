@@ -1,0 +1,178 @@
+BEAT 1 — The problem + scope (75 sec)
+NAV: No clicking yet. You're on a blank slide or your desktop. Browser not yet visible.
+Voice:
+"Before I show you anything, I want to name the problem we set out to solve.
+Today's MSL tools are excellent at telling you who an investigator is. Their publications, their credentials, their network — what they've done.
+They're much weaker at helping you remember what you've learned from them. Over months, over years, across dozens of scientific conversations.
+The data systems in Medical Affairs are mature. The systems for building institutional memory from scientific engagement aren't.
+That's the problem FieldMark is built around. Everything I'm about to show you is evidence for whether we've solved it.
+[Pause 2 seconds]
+One framing note before we start. What you'll see today is FieldMark for NSCLC — our launch indication. The architecture is therapeutic-area-agnostic. We estimate seven to ten days to replicate this for any new indication. NSCLC is just where the substrate is deepest right now."
+
+BEAT 2 — Cohort framing (25 sec)
+NAV: Still no clicking. Stay on blank/desktop.
+Voice:
+"One more piece of framing.
+FieldMark organizes investigators into three cohorts, because the questions you ask about each type are fundamentally different.
+Established investigators are the ones who matter today — the senior authors, the trial chairs, the guideline writers.
+Rising Stars are the investigators who'll matter tomorrow — and they're the hardest to identify with traditional tools, because they don't yet have the citation counts or the chair positions.
+Community physicians are where the medicine actually reaches patients — and they require a different kind of intelligence model entirely.
+Three cohorts, three intelligence models. We'll look at one of each."
+
+BEAT 3 — Established: Heymach + scoring (60 sec)
+NAV — start here: Switch to browser. You should already be on /me.
+ACTION 3.1: Click the John V. Heymach chip in YOUR HCP PORTFOLIO. Wait for profile to load.
+Voice (begin while page loads):
+"Let's start with the Established cohort.
+This is John V. Heymach, MD Anderson Cancer Center. One of the global leaders in NSCLC research."
+ACTION 3.2: Scroll slowly down the page, just enough to show publication count, then scroll back up.
+Voice:
+"Before any field interaction, FieldMark has already assembled his scientific profile — publication history, collaborator network, an explainable scoring model."
+ACTION 3.3: Scroll to the ESTABLISHED SCORE block (right side of page, just below the publication timeline). Pause scrolling so the score, the rank line, and the three signal bars are all visible.
+Voice:
+"The Established score decomposes into three signals. Scientific Influence — publication leadership, citation impact, guideline authorship. Network Influence — collaboration network centrality from a decade of NSCLC co-authorship. Pharma Engagement — Open Payments breadth, surfaced as context but explicitly excluded from the ranking. Heymach scores 99, 100, and 95 across the three. Composite 99 of 100. Ranked 8th in the US, 51st globally.
+The platform isn't asking the MSL to teach it who Heymach is. It already knows. The question is what it does with that knowledge."
+
+BEAT 4 — The substrate (60 sec)
+NAV: No clicking. Stay on Heymach's page exactly where you ended Beat 3. Or scroll slightly to keep the page feeling alive — your call.
+Voice:
+"Quick word about what's underneath this.
+The platform indexes more than 80,000 NSCLC investigators worldwide, with about 14,000 US-based providers covered through the national provider registry. Nearly 173,000 publications indexed since 2015, with 120,000 of those from the past five years alone. 2,463 NSCLC clinical trials, including nearly a thousand currently active or recruiting. 6,400 scientific positions extracted across the investigator corpus.
+Source data spans PubMed, ClinicalTrials.gov, OpenAlex, NPPES, Open Payments, Medicare claims, and real-time signals from Twitter and Bluesky.
+This is the substrate. Everything we're about to look at sits on top of it."
+
+BEAT 5 — The different question (2 min — SLOW HERE)
+NAV — ACTION 5.1: Scroll down on Heymach's page to the Belief Profile section. You should see the section header "Belief Profile" with the "Deep Corpus" or similar badge, the synthesis paragraph, then the "Strongly Advocates" expandable items.
+Voice:
+"Most of the platforms in this space — H1, Veeva, the systems you're familiar with — are excellent at one thing: telling you who an investigator is. That's information retrieval. What I'm about to show you is something different.
+[Pause 2 seconds — let silence sit]
+Most platforms answer one question. We deliberately answered a different one.
+[Pause 2 seconds]
+Not 'what has this investigator published?' — every system can answer that.
+We asked: 'what scientific positions has this investigator consistently advanced across their career?'"
+ACTION 5.2: Scroll slowly through the Belief Profile claims. Let each section come into view as you talk: Strongly Advocates, then Frequently Raises.
+Voice (continue scrolling):
+"Fifty positions for Heymach. Each one synthesized from his full publication corpus. Each one linked to the specific papers that support it.
+Strongly Advocates: Perioperative Immunochemotherapy Efficacy. Radioimmunotherapy Combinations. Resistance Reversal Strategies. Precision IO Selection.
+Frequently Raises: Biomarker-Guided Trial Design. Oncogene-Driven ICI Limits.
+This isn't a topic list. It's a coherent scientific worldview, extracted from more than a decade of senior-author publications, structured into positions an MSL can actually work with.
+[Pause]
+And one thing worth naming explicitly. Everything you're seeing here is explainable. Every position links back to the supporting publications. Every recommendation links back to the evidence that generated it. We made a deliberate decision that nothing in this platform should require blind trust."
+
+BEAT 6 — Singh + the connection moment (95 sec — SLOW HERE)
+NAV — ACTION 6.1: Click Home in the breadcrumb (top-left of page) or the FIELDMARK logo. You'll return to /me.
+ACTION 6.2: Click the Aditi P. Singh chip in YOUR HCP PORTFOLIO. Wait for profile to load.
+Voice (begin while page loads):
+"Now let's look at a Rising Star.
+This is Aditi P. Singh, University of Pennsylvania. Ranked first in the US among NSCLC Rising Stars.
+That's the platform's day-one intelligence layer on her. Here's the second layer — the one that makes FieldMark a system of memory rather than a system of retrieval."
+ACTION 6.3: Scroll down on Singh's page to the FIELD INSIGHTS section. You should see her two insights. Click on the community CGP utilization insight (the one that mentions "detection rates" and "We're good at finding things"). The insight expands or you may need to click into it — whichever surface FieldMark uses for the full insight view.
+Voice (as you click):
+"This is a Field Insight I captured after a recent call with Dr. Singh. She circled back on the community CGP utilization data we'd shared. Pushed back on the framing that detection rates alone are a meaningful success metric. Said directly: 'We're good at finding things. We're not good at doing anything about it.'
+That observation could live in any CRM as a free-text note. In most platforms, it would."
+ACTION 6.4: Click the Linked Belief Profile chip at the bottom of the insight — labeled "Profiling-to-Treatment Gap" (or similar). The platform should navigate to or scroll to her Belief Profile section showing that specific claim.
+Voice (as you click):
+"In FieldMark, it's anchored to a specific scientific position she's already been advancing in the literature. Profiling-to-Treatment Gap. Supported by her 2020 first-authored paper.
+[Pause 2 seconds]
+This is the connection I haven't seen elsewhere. The observation isn't stored as an isolated note. It's anchored to the scientific position the investigator has already been advancing in the literature.
+The next time anyone in our team prepares for an engagement with Dr. Singh, they don't just have the insight. They see how that insight reinforces — or sharpens, or contradicts — a position the platform already knows she holds."
+
+BEAT 7 — Rising Star scoring (95 sec)
+NAV — ACTION 7.1: Scroll back up on Singh's page to the RISING STAR SCORE block. The headline "99 / 100", "Rank 1 US · Rank 18 Global", BALANCED archetype badge, and the four tiles (Scientific Momentum, Network Momentum, Scientific Visibility, Network Visibility) should all be visible.
+Voice:
+"While we're on Singh, the Rising Star scoring is worth pausing on.
+This cohort is arguably the most strategically important for Medical Affairs — and the hardest to identify with traditional tools. These are the investigators who matter tomorrow, before they're chairing NEJM steering committees.
+Singh ranks first in the US, 18th globally. 99 of 100. The badge here is 'Balanced' — meaning her trajectory is strong on both scientific output and network expansion.
+The score decomposes into four signals.
+Scientific Momentum — 91. How fast her publication output is accelerating, comparing her recent five years to her earlier five.
+Network Momentum — 94. How quickly her co-authorship network is expanding. Her collaborator count grew from 39 to 159 over the past five years. More than a fourfold increase.
+Scientific Visibility — 92. Her current publication footprint as a senior author. Citation impact, guideline authorship contributions, recent senior-author output. This is asking 'where does she stand today as a published voice?' — distinct from Scientific Momentum, which is asking 'how fast is she becoming a louder one?'
+Network Visibility — 81. Her current centrality in the NSCLC co-authorship graph. Not just how many collaborators she has, but how connected they are to each other and to the broader network. Investigators who bridge between clusters score higher than investigators embedded in a single tight group.
+This is a meaningfully different question than 'who's publishing the most?' or 'who has the most citations?' Those tell you who matters today. This tells you who's becoming important — which is exactly what an MSL needs to know to invest engagement time wisely."
+
+BEAT 8 — Telescope (60 sec)
+NAV — ACTION 8.1: Click on Telescope in the main navigation (top nav bar, depending on where it lives — confirm before recording). Wait for the visualization to render fully.
+Voice (begin while loading):
+"Step back from individual profiles for a moment.
+This is Telescope. The platform's view of the NSCLC scientific community as a structure — not a list of researchers, but a network of relationships."
+ACTION 8.2: Once rendered, slowly move the cursor over the visualization — hover, maybe click on one or two clusters. Don't navigate away, just demonstrate interactivity.
+Voice:
+"Every node is an investigator. Every edge is a co-authorship. 328,000 edges across the NSCLC investigator graph. Clusters form around therapeutic subfocus, institutional affiliation, collaborative history.
+You can see where the field's centers of gravity sit. Where the connectors are. Where the boundary-spanners are — investigators who bridge between clusters and tend to drive cross-pollination.
+This isn't a feature most MSL platforms have. It exists because we treat the scientific community as a structure to reason about, not a list to filter."
+
+BEAT 9 — Social + Rising Voices chart (95 sec)
+NAV — ACTION 9.1: Click on Social in the main navigation. The Social page loads with the Rising Voices chart at the top.
+Voice (begin while loading):
+"One more discovery surface.
+Digital Opinion Leaders — investigators whose influence runs as much through Twitter and Bluesky as through publications — have been one of the hardest things for Medical Affairs to track systematically. Most teams either miss the signal entirely or end up with someone manually screenshotting tweets into PowerPoint.
+The hard part isn't finding investigators on social. It's separating noise from signal. Follower count alone is misleading — an investigator with 30,000 passive followers may have less actual influence than someone with 500 followers who's read carefully by the right audience."
+ACTION 9.2: Hover over the Rising Voices chart. Move the cursor toward the upper-left cluster (the amber/orange dots — Rising Voices).
+Voice:
+"This is the Rising Voices chart. Engagement-per-follower on the vertical axis, follower count on the horizontal — both logarithmic. The classification rule is concrete: a Rising Voice has fewer than 5,000 followers and engagement rates above 5 percent — meaning their scientific posts get genuine reaction from the audience they have, even though their audience is small. An Established voice has 5,000-plus followers and engagement above 2 percent.
+The chart filters out noise — minimum 100 followers, minimum 20 total engagements, at least 4 posts over the last 30 days. 136 voices passing the bar right now in NSCLC.
+Every dot is clickable through to the underlying investigator profile, where their published belief profile sits alongside whatever they're saying publicly right now. Scientific positioning evolves in real time. Publications are the historical record. Social signals are the leading edge. Most MSL tools see one. The platform sees both — and connects them back to the belief profiles we've already built."
+
+BEAT 10 — The Brief (90 sec)
+NAV — ACTION 10.1: Click Home in the breadcrumb or the FIELDMARK logo. Return to /me.
+ACTION 10.2: Click the Pasi A. Jänne chip in YOUR HCP PORTFOLIO.
+ACTION 10.3: On Jänne's profile page, click the BRIEF button (top of page, next to + LIST). His pre-generated brief should load immediately (you warmed it earlier).
+Voice (begin during navigation):
+"Once enough field intelligence has accumulated on an investigator, the platform synthesizes it before the next meeting.
+This is a pre-meeting brief for Pasi Jänne, Dana-Farber.
+[Pause as the brief renders]
+Notice that the AI isn't searching the internet or inventing recommendations. It's reasoning over a structured body of evidence that's already unique to this relationship — published positions, recent field insights, outstanding follow-ups, his collaboration network."
+ACTION 10.4: Scroll slowly through the brief, letting each opportunity card come into view as you describe it.
+Voice:
+"Number one — engage him on the post-osimertinib chemo sequencing gap he raised on the LAURA steering committee call. Cited directly to the insight that captured that observation.
+Number three — there's a live belief gap between him and community oncologists on HER2 IHC stratification. The platform spotted it from a tumor board case insight and recommends asking whether he'd formalize his position in a peer-facing format.
+Number four — Paweletz's liquid biopsy work at Dana-Farber is a natural bridge to his stated concern about MET bypass detection. The platform identified the bridge from the collaborator network.
+This is what makes the AI feel earned. It's not generating ideas from nothing. It's assembling intelligence the platform has already built, reasoning about it, and surfacing what an MSL should do with it."
+
+BEAT 11 — The workflow (40 sec)
+NAV — ACTION 11.1: Click Home in the breadcrumb or the FIELDMARK logo. Return to /me.
+Voice (begin while loading):
+"This is the workspace.
+Overdue follow-ups surfaced first. Open actions across the portfolio. Tracked HCPs across all three cohorts. Pinned institutions with their NSCLC investigator counts.
+This isn't a database an MSL queries when they remember to. It's where the work happens. Insights captured become linked belief claims. Linked claims compound into briefs. Briefs surface follow-ups. Follow-ups close into the next interaction. Every cycle makes the next engagement smarter."
+
+BEAT 12 — Field to Strategy + Field to Field (90 sec)
+NAV — ACTION 12.1: Click View Follow-Ups OR navigate to /me/insights directly. (Confirm before recording which route is fastest — /me/insights is the Field Insights page with the Share button.)
+Voice (begin while loading):
+"Everything I've shown you so far is the individual MSL view. The platform's real organizational value is in how field intelligence connects back to the rest of Medical Affairs."
+ACTION 12.2: The Field Insights page loads, showing insights organized by HCP. Slowly scroll once to show the structure (HCP groupings, insight cards, Linked Belief Profile chips). Make sure the Share button (top-right) is visible.
+Voice:
+"This is the Field Insights surface. Every observation an MSL captures, organized by HCP, by category, by date. Each insight tied to the published belief it reinforces or challenges."
+ACTION 12.3: Move cursor to hover the Share button (don't click — just hover so it's visually drawn to it).
+Voice:
+"And critically — this is shareable. The MSL doesn't have to translate their field observations into a separate weekly report or PowerPoint summary. They share the structured view directly with Medical Strategy, with their manager, with whoever needs to see what the field is hearing.
+The connection runs the other direction in most pharma orgs today. Strategy flows down to field as messaging. Field flows up as anecdotes. The platform turns field observations into a structured artifact that Medical Strategy can actually act on."
+ACTION 12.4: Click Home in the breadcrumb. Click the Aditi P. Singh chip again. On Singh's profile, scroll down to the FIELD INTELLIGENCE section (right column, below FIELD NOTES).
+Voice (during navigation):
+"There's also a peer layer."
+Voice (once you're on FIELD INTELLIGENCE):
+"When multiple MSLs are tracking the same investigator, the platform aggregates what the field collectively knows. Other MSLs can confirm an insight, partially confirm it, or dispute it based on their own engagements. They rate the investigator's current engagement potential. They flag whether the platform's read on scientific credibility matches reality.
+A single MSL's intelligence on an HCP is valuable. The field's collective intelligence, structured and validated by people who actually engage with the investigator, is something different. That's where Medical Affairs has never really had a tool."
+
+BEAT 13 — Community (75 sec)
+NAV — ACTION 13.1: Click Home in the breadcrumb. Click the Maen Hussein chip in YOUR HCP PORTFOLIO.
+Voice (begin during navigation):
+"One last cohort to show you.
+Different investigators require different intelligence models. Academic leaders are best understood through their scientific positions. Community physicians are best understood through their practice patterns."
+ACTION 13.2: Scroll down to the WHY THIS PRACTITIONER section on Hussein's profile. Pause there.
+Voice:
+"Maen Hussein runs a high-volume community oncology practice in Central Florida. 43,000 Medicare beneficiaries. $81K in lifetime pharma engagement across 60 companies. Tagrisso utilization declining 60 percent year-over-year — a signal worth understanding before any EGFR conversation."
+ACTION 13.3: Scroll down further to the COMMUNITY SCORE tiles (Patient Volume, Pharma Engagement, Pharma Reach, Drug Breadth).
+Voice:
+"The Community score decomposes differently. Patient Volume — annual Medicare beneficiaries seen. Pharma Engagement — lifetime payments received. Pharma Reach — distinct pharmaceutical companies engaged. Drug Breadth — distinct agents with payment relationships.
+The platform indexes 12,500 pharma engagement records and Medicare practice records covering nearly 16 million patient encounters in NSCLC. That's the substrate for community intelligence — a different kind of evidence than publications, but evidence nonetheless."
+
+BEAT 14 — The close (50 sec)
+NAV — ACTION 14.1: Click Home in the breadcrumb to return to /me. Or, if you want a cleaner ending, switch back to your blank slide / desktop view for the close.
+Voice:
+"That's the tour.
+The features matter, but they're not really the story. The story is that we're building something that doesn't quite fit the existing category.
+H1, Veeva, the platforms you already know — they're systems of information retrieval. Who is this investigator? What have they published?
+FieldMark is a system of scientific memory and reasoning. What has this investigator consistently argued? What have we learned from engaging with them? How should that change our next conversation?
+If this works, every interaction makes the platform smarter — not just for the individual MSL, but eventually for the entire medical affairs organization. The goal isn't simply to prepare for the next conversation. It's to preserve institutional scientific memory that usually disappears after the meeting ends.
+Thanks for taking the time."
