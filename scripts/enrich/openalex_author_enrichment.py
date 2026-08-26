@@ -9,6 +9,21 @@ Writes time-stamped snapshots to hcp_author_metrics_v2.
 Idempotent on (hcp_id, snapshot_date). Re-runs on the same day skip already-fetched
 HCPs; runs on a different day write new snapshots.
 
+FETCH MODE: BATCHED (2026-08-25). Authors are fetched ~50 at a time via the list
+form /authors?filter=openalex_id:A1|A2|..., not one HTTP call per author. This is
+a BILLED List operation (1 credit per request, $0.0001) where the singleton form
+was free, but it collapses ~192k requests into ~3.9k -- and, more importantly,
+drops the request rate from ~9/s (throttling territory) to ~1/s.
+
+WRITE CONTRACT -- a row is a claim about what OpenAlex said:
+  * id present in a 200 response  -> full metrics row
+  * id absent from a 200 response -> fetch_status='not_found' (PROVEN absent)
+  * request never answered        -> NO ROW AT ALL; the id stays missing at this
+                                     snapshot_date and --resume retries it.
+The pre-batching code wrote fetch_status='error' rows with counts_by_year=None on
+any exception, and --resume (which had no status filter) then skipped them
+forever. Both halves of that trap are fixed.
+
 Required environment variables:
 - SUPABASE_URL
 - SUPABASE_KEY
@@ -47,12 +62,26 @@ from supabase import Client, create_client
 
 OPENALEX_BASE = "https://api.openalex.org"
 DEFAULT_BATCH_SIZE = 200            # Supabase upsert batch size
-DEFAULT_WORKERS = 1                 # serial by default; --workers N for concurrent
-REQUEST_TIMEOUT = 30                # seconds
-MAX_RETRIES = 4                     # per HCP, with exponential backoff
+DEFAULT_WORKERS = 2                 # concurrent fetch workers (batched: 2 is ample)
+REQUEST_TIMEOUT = 60                # seconds (a 50-id OR filter is slower than a singleton)
+MAX_RETRIES = 4                     # per request, with exponential backoff
 RETRY_BACKOFF_BASE = 2.0            # 2, 4, 8, 16 seconds
-PROGRESS_INTERVAL = 1000            # print progress every N HCPs
+PROGRESS_INTERVAL = 1000            # print progress every N link rows
 RATE_WINDOW = 200                   # rolling average window for rate / ETA
+
+# --- Batched author fetch -------------------------------------------------
+# The /authors/{id} singleton form is free and unlimited but costs one HTTP
+# round-trip per author (~192k for a first build). The list form
+#   /authors?filter=openalex_id:A1|A2|...
+# is a BILLED List operation (1 credit per REQUEST regardless of id count,
+# $0.0001 each) and collapses 50 authors into one call. Measured 2026-08-25:
+#   n=5..50 all HTTP 200; n=60 works but ~9s; 50 ids ~2.4s.
+#   A 50-id filter 504'd once with reason="query_timeout" ("You were not
+#   charged for this request") -- transient, not a hard ceiling. Hence
+#   split-and-retry rather than a lower fixed chunk size.
+AUTHOR_CHUNK_SIZE = 50              # ids per list request (OpenAlex documented OR max)
+OPENALEX_PER_PAGE_MAX = 200         # API ceiling for per-page
+MAX_SINGLE_RETRIES = 3              # extra attempts once a chunk is down to one id
 
 POLITE_POOL_EMAIL = "garrett@fieldmark.local"   # used in mailto for polite pool
 
@@ -84,6 +113,10 @@ H_INDEX_DISPROPORTION_WORKS = 2000
 # ============================================================
 
 INTERRUPTED = False
+
+
+def eprint(msg: str) -> None:
+    print(msg, file=sys.stderr, flush=True)
 
 
 def install_signal_handler() -> None:
@@ -143,43 +176,153 @@ def author_id_to_slug(full_id: str) -> str:
     return full_id.rsplit("/", 1)[-1]
 
 
-def fetch_author(openalex_author_id: str, api_key: str, mailto: str) -> Dict[str, Any]:
-    """
-    Fetch one OpenAlex author by ID. Returns the parsed JSON dict.
+class ChunkFetchError(Exception):
+    """A list request did not yield a trustworthy answer for its ids.
 
-    Raises:
-        requests.HTTPError on non-2xx after retries
-        ValueError on 404 (caller maps to fetch_status='not_found')
+    Raised for non-2xx, connection failures, and the meta.count/len(results)
+    mismatch. The caller splits the chunk and retries; NOTHING is ever written
+    on the strength of a chunk that raised this -- an unanswered request says
+    nothing about any id in it.
     """
-    slug = author_id_to_slug(openalex_author_id)
-    url = f"{OPENALEX_BASE}/authors/{slug}"
-    params = {"api_key": api_key, "mailto": mailto}
 
-    last_error: Optional[Exception] = None
+
+def _sleep_for_retry(resp: Optional[requests.Response], attempt: int) -> None:
+    """Honour Retry-After when the server sends one; else exponential backoff.
+
+    Blind 2/4/8/16 both over-waits when the server asks for less and
+    under-waits when it asks for more. OpenAlex exposes Retry-After
+    (see access-control-expose-headers).
+    """
+    if resp is not None:
+        raw = resp.headers.get("Retry-After")
+        if raw:
+            try:
+                # Retry-After is delta-seconds in every OpenAlex response seen.
+                wait = float(raw)
+                if wait >= 0:
+                    time.sleep(min(wait, 120.0))
+                    return
+            except (TypeError, ValueError):
+                pass  # http-date form -> fall through to backoff
+    time.sleep(RETRY_BACKOFF_BASE ** attempt)
+
+
+def fetch_authors_batch(
+    author_ids: List[str], api_key: str, mailto: str
+) -> Tuple[Dict[str, Dict[str, Any]], Optional[str]]:
+    """Fetch up to AUTHOR_CHUNK_SIZE authors in ONE list request.
+
+    Returns ({short_id: payload}, x_ratelimit_remaining). Ids absent from the
+    returned mapping were absent from a 200 response -- i.e. genuinely not
+    found (verified 2026-08-25: a bogus id is silently omitted and meta.count
+    drops, with no error).
+
+    Raises ChunkFetchError if the request did not produce a trustworthy answer.
+    """
+    slugs = [author_id_to_slug(a) for a in author_ids]
+    # per-page MUST be >= the id count. With the default 25 a 40-id filter
+    # returns meta.count=40 but only 25 results -- a silent 37% data loss on a
+    # 200 response (measured). The assertion below is the backstop.
+    per_page = min(OPENALEX_PER_PAGE_MAX, max(len(slugs), 25))
+    params = {
+        "filter": "openalex_id:" + "|".join(slugs),
+        "per-page": per_page,
+        "api_key": api_key,
+        "mailto": mailto,
+    }
+
+    last_error: Optional[str] = None
     for attempt in range(MAX_RETRIES):
+        resp = None
         try:
-            resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
-            if resp.status_code == 404:
-                raise ValueError(f"author_not_found:{slug}")
-            if resp.status_code == 429:
-                # Rate limited; back off harder
-                backoff = RETRY_BACKOFF_BASE ** (attempt + 1)
-                time.sleep(backoff)
-                continue
+            resp = requests.get(
+                f"{OPENALEX_BASE}/authors", params=params, timeout=REQUEST_TIMEOUT
+            )
+            if resp.status_code == 429 or resp.status_code >= 500:
+                # 504 query_timeout on big OR filters is transient and explicitly
+                # uncharged; 429 is throttling. Both retry, then split.
+                last_error = f"HTTP {resp.status_code}"
+                if attempt < MAX_RETRIES - 1:
+                    _sleep_for_retry(resp, attempt)
+                    continue
+                raise ChunkFetchError(f"{last_error} after {MAX_RETRIES} attempts")
             resp.raise_for_status()
-            return resp.json()
-        except ValueError:
+            body = resp.json()
+        except ChunkFetchError:
             raise
-        except (requests.RequestException, requests.HTTPError) as exc:
-            last_error = exc
+        except (requests.RequestException, ValueError) as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
             if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_BACKOFF_BASE ** attempt)
+                _sleep_for_retry(resp, attempt)
                 continue
-            raise
+            raise ChunkFetchError(last_error) from exc
 
-    if last_error:
-        raise last_error
-    raise RuntimeError("unexpected exit from fetch_author retry loop")
+        results = body.get("results") or []
+        meta_count = (body.get("meta") or {}).get("count")
+
+        # Hard failure for this chunk: the response is internally inconsistent,
+        # which in practice means pagination silently truncated it.
+        if meta_count is not None and meta_count != len(results):
+            raise ChunkFetchError(
+                f"meta.count={meta_count} != len(results)={len(results)} "
+                f"(per_page={per_page}, asked={len(slugs)}) -- truncated response"
+            )
+
+        by_id: Dict[str, Dict[str, Any]] = {}
+        for item in results:
+            raw_id = item.get("id")
+            if raw_id:
+                by_id[author_id_to_slug(str(raw_id))] = item
+        return by_id, resp.headers.get("X-RateLimit-Remaining")
+
+    raise ChunkFetchError(last_error or "unexpected exit from fetch_authors_batch")
+
+
+def resolve_author_ids(
+    author_ids: List[str], api_key: str, mailto: str
+) -> Tuple[Dict[str, Dict[str, Any]], Set[str], Set[str], Optional[str]]:
+    """Resolve ids to payloads, splitting on failure. NEVER raises.
+
+    Returns (payload_by_short_id, not_found, unresolved, rate_remaining).
+
+      payload_by_short_id : present in a 200 response
+      not_found           : PROVEN absent from a 200 response
+      unresolved          : we never got a trustworthy answer -> write nothing,
+                            leave for the next --resume
+
+    A failing chunk is halved and each half retried, down to single ids. This
+    keeps one bad id (or one 504) from condemning its 49 neighbours.
+    """
+    if not author_ids:
+        return {}, set(), set(), None
+    try:
+        by_id, remaining = fetch_authors_batch(author_ids, api_key, mailto)
+        asked = {author_id_to_slug(a) for a in author_ids}
+        return by_id, asked - set(by_id.keys()), set(), remaining
+    except ChunkFetchError as exc:
+        if len(author_ids) == 1:
+            slug = author_id_to_slug(author_ids[0])
+            for attempt in range(MAX_SINGLE_RETRIES):
+                time.sleep(RETRY_BACKOFF_BASE ** attempt)
+                try:
+                    by_id, remaining = fetch_authors_batch(author_ids, api_key, mailto)
+                    return by_id, {slug} - set(by_id.keys()), set(), remaining
+                except ChunkFetchError:
+                    continue
+            eprint(f"[openalex_enrich] unresolved after retries: {slug} ({exc})")
+            return {}, set(), {slug}, None
+
+        mid = len(author_ids) // 2
+        left = resolve_author_ids(author_ids[:mid], api_key, mailto)
+        right = resolve_author_ids(author_ids[mid:], api_key, mailto)
+        merged = dict(left[0])
+        merged.update(right[0])
+        return (
+            merged,
+            left[1] | right[1],
+            left[2] | right[2],
+            right[3] or left[3],
+        )
 
 
 def parse_author_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -391,7 +534,16 @@ def load_link_rows(
 
 
 def load_done_for_snapshot(client: Client, snapshot_date: str) -> set:
-    """Return hcp_ids that already have a row for the given snapshot_date."""
+    """Return hcp_ids that already have a USABLE row for the given snapshot_date.
+
+    fetch_status='error' rows are EXCLUDED. Those are legacy poison rows from
+    the pre-batching implementation, which wrote counts_by_year=None on any
+    exception; because this query had no status filter, --resume treated them
+    as done and never retried them -- a permanent silent gap that 8c then
+    reads as "this HCP has no career onset". Excluding them makes every one
+    retryable. The batched path no longer writes such rows at all (an
+    unanswered request writes nothing), so this filter is purely remedial.
+    """
     out: set = set()
     page_size = 1000
     cur = 0
@@ -401,6 +553,7 @@ def load_done_for_snapshot(client: Client, snapshot_date: str) -> set:
             client.table("hcp_author_metrics_v2")
             .select("hcp_id")
             .eq("snapshot_date", snapshot_date)
+            .or_("fetch_status.is.null,fetch_status.neq.error")
             .range(cur, end)
         )
         resp = q.execute()
@@ -575,61 +728,97 @@ def run(args: argparse.Namespace) -> int:
         print("\n[openalex_enrich] interrupt received; workers will finish in-flight requests then exit")
     signal.signal(signal.SIGINT, _handle_interrupt)
 
-    def fetch_one(link: LinkRow) -> MetricsRow:
-        """Worker: fetch + parse one author. Returns a MetricsRow. Updates stats under lock."""
-        t0 = time.monotonic()
-        fetch_status = None
-        fetch_error = None
-        quality_flags = None
-        parsed = {
-            "cited_by_count": None,
-            "works_count": None,
-            "h_index": None,
-            "i10_index": None,
-            "two_yr_mean_citedness": None,
-            "counts_by_year": None,
-        }
+    # Shared, lock-guarded view of the API's credit gauge. Only meaningful now
+    # that we issue BILLED list requests -- singleton lookups never decremented it.
+    rate_remaining: Dict[str, Optional[str]] = {"value": None}
+    rate_lock = threading.Lock()
 
-        try:
-            payload = fetch_author(link.openalex_author_id, openalex_key, POLITE_POOL_EMAIL)
+    def fetch_chunk(chunk: List[LinkRow]) -> List[MetricsRow]:
+        """Worker: resolve one chunk of link rows in a single list request.
+
+        Returns ONLY rows we have an answer for. Ids the API never answered
+        about are omitted entirely -- they stay missing at this snapshot_date
+        and the next --resume picks them up.
+        """
+        t0 = time.monotonic()
+        # A chunk is keyed by distinct author id; two link rows may share one.
+        distinct_ids = sorted({link.openalex_author_id for link in chunk})
+        by_id, not_found, unresolved, remaining = resolve_author_ids(
+            distinct_ids, openalex_key, POLITE_POOL_EMAIL
+        )
+
+        if remaining is not None:
+            with rate_lock:
+                rate_remaining["value"] = remaining
+
+        elapsed = time.monotonic() - t0
+        with stats_lock:
+            # Amortise the request cost across the ids it covered, so the
+            # existing per-item ETA arithmetic stays meaningful.
+            per_item = elapsed / max(1, len(distinct_ids))
+            for _ in distinct_ids:
+                stats.recent_durations.append(per_item)
+
+        rows: List[MetricsRow] = []
+        for link in chunk:
+            slug = author_id_to_slug(link.openalex_author_id)
+
+            if slug in unresolved:
+                # No trustworthy answer. Write NOTHING -- a row here would be a
+                # claim we cannot support, and --resume would skip it forever.
+                with stats_lock:
+                    stats.fetched_error += 1
+                continue
+
+            if slug in not_found:
+                # PROVEN absent from a 200 response: the 404 equivalent.
+                with stats_lock:
+                    stats.fetched_not_found += 1
+                rows.append(MetricsRow(
+                    hcp_id=link.hcp_id,
+                    openalex_author_id=link.openalex_author_id,
+                    snapshot_date=today,
+                    cited_by_count=None, works_count=None, h_index=None,
+                    i10_index=None, counts_by_year=None, two_yr_mean_citedness=None,
+                    enrichment_run_id=enrichment_run_id,
+                    fetch_status="not_found",
+                    fetch_error=f"author_not_found:{slug}",
+                    data_quality_flags=None,
+                ))
+                continue
+
+            payload = by_id.get(slug)
+            if payload is None:
+                # Belt and braces: neither resolved, not_found, nor unresolved.
+                with stats_lock:
+                    stats.fetched_error += 1
+                eprint(f"[openalex_enrich] BUG: {slug} in no result bucket; skipped")
+                continue
+
             parsed = parse_author_payload(payload)
             quality_flags = compute_data_quality_flags(parsed)
-
-            if quality_flags is not None and quality_flags.get("conflation_suspected"):
-                with stats_lock:
+            with stats_lock:
+                if quality_flags is not None and quality_flags.get("conflation_suspected"):
                     stats.flagged_disambiguation_suspect += 1
-            else:
-                with stats_lock:
+                else:
                     stats.fetched_ok += 1
-        except ValueError as ve:
-            fetch_status = "not_found"
-            fetch_error = str(ve)
-            with stats_lock:
-                stats.fetched_not_found += 1
-        except Exception as exc:
-            fetch_status = "error"
-            fetch_error = f"{type(exc).__name__}: {exc}"[:500]
-            with stats_lock:
-                stats.fetched_error += 1
 
-        with stats_lock:
-            stats.recent_durations.append(time.monotonic() - t0)
-
-        return MetricsRow(
-            hcp_id=link.hcp_id,
-            openalex_author_id=link.openalex_author_id,
-            snapshot_date=today,
-            cited_by_count=parsed["cited_by_count"],
-            works_count=parsed["works_count"],
-            h_index=parsed["h_index"],
-            i10_index=parsed["i10_index"],
-            counts_by_year=parsed["counts_by_year"],
-            two_yr_mean_citedness=parsed["two_yr_mean_citedness"],
-            enrichment_run_id=enrichment_run_id,
-            fetch_status=fetch_status,
-            fetch_error=fetch_error,
-            data_quality_flags=quality_flags,
-        )
+            rows.append(MetricsRow(
+                hcp_id=link.hcp_id,
+                openalex_author_id=link.openalex_author_id,
+                snapshot_date=today,
+                cited_by_count=parsed["cited_by_count"],
+                works_count=parsed["works_count"],
+                h_index=parsed["h_index"],
+                i10_index=parsed["i10_index"],
+                counts_by_year=parsed["counts_by_year"],
+                two_yr_mean_citedness=parsed["two_yr_mean_citedness"],
+                enrichment_run_id=enrichment_run_id,
+                fetch_status=None,
+                fetch_error=None,
+                data_quality_flags=quality_flags,
+            ))
+        return rows
 
     # Filter out skipped links before dispatching
     work_items = [link for link in links if link.hcp_id not in done_today]
@@ -638,40 +827,51 @@ def run(args: argparse.Namespace) -> int:
         with stats_lock:
             stats.skipped_already_done = skipped_count
 
-    print(f"[openalex_enrich] dispatching {len(work_items)} fetches across {args.workers} worker(s) (bounded window)")
+    # Chunk for the batched list endpoint: ~50 authors per HTTP request.
+    chunks: List[List[LinkRow]] = [
+        work_items[i:i + AUTHOR_CHUNK_SIZE]
+        for i in range(0, len(work_items), AUTHOR_CHUNK_SIZE)
+    ]
+    print(
+        f"[openalex_enrich] dispatching {len(work_items)} link rows as {len(chunks)} "
+        f"batched request(s) of <={AUTHOR_CHUNK_SIZE} across {args.workers} worker(s)"
+    )
 
-    processed = 0
+    processed = 0            # link rows accounted for (answered or deliberately skipped)
+    last_progress_at = 0
     max_in_flight = max(args.workers * 2, args.workers + 4)
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        work_iter = iter(work_items)
+        work_iter = iter(chunks)
         in_flight = set()
         # Prime the window
         for _ in range(max_in_flight):
             try:
-                link = next(work_iter)
+                chunk = next(work_iter)
             except StopIteration:
                 break
-            in_flight.add(executor.submit(fetch_one, link))
+            in_flight.add(executor.submit(fetch_chunk, chunk))
         while in_flight:
             done, in_flight = wait(in_flight, return_when=FIRST_COMPLETED)
             for future in done:
-                # Refill: submit one new task per completed task, unless interrupted or exhausted
+                # Refill: submit one new chunk per completed chunk, unless interrupted or exhausted
                 if not INTERRUPTED:
                     try:
-                        link = next(work_iter)
-                        in_flight.add(executor.submit(fetch_one, link))
+                        chunk = next(work_iter)
+                        in_flight.add(executor.submit(fetch_chunk, chunk))
                     except StopIteration:
                         pass
                 try:
-                    metrics_row = future.result()
+                    metrics_rows = future.result()
                 except Exception as exc:
-                    print(f"[openalex_enrich] WARN: unexpected worker exception: {exc}")
+                    # resolve_author_ids never raises, so this is a real bug --
+                    # surface it rather than silently dropping a whole chunk.
+                    eprint(f"[openalex_enrich] WARN: unexpected worker exception: {exc}")
                     continue
 
                 # Thread-safe append to pending buffer
                 should_flush = False
                 with pending_lock:
-                    pending.append(metrics_row)
+                    pending.extend(metrics_rows)
                     if len(pending) >= args.batch_size:
                         should_flush = True
 
@@ -684,20 +884,24 @@ def run(args: argparse.Namespace) -> int:
                             pending = []
                         upsert_batch(client, batch_to_write, args.dry_run)
 
-                processed += 1
-                if processed % PROGRESS_INTERVAL == 0:
+                processed += AUTHOR_CHUNK_SIZE
+                if processed - last_progress_at >= PROGRESS_INTERVAL:
+                    last_progress_at = processed
+                    with rate_lock:
+                        rem = rate_remaining["value"]
                     with stats_lock:
                         if stats.recent_durations:
                             avg = sum(stats.recent_durations) / len(stats.recent_durations)
-                            remaining = len(work_items) - processed
+                            remaining = max(0, len(work_items) - processed)
                             # With concurrency, effective rate is avg/workers
                             eta_seconds = (avg * remaining) / max(1, args.workers)
                             eta_min = eta_seconds / 60.0
                             print(
-                                f"[openalex_enrich] {processed}/{len(work_items)} | "
+                                f"[openalex_enrich] ~{min(processed, len(work_items))}/{len(work_items)} | "
                                 f"ok={stats.fetched_ok} 404={stats.fetched_not_found} err={stats.fetched_error} "
                                 f"flag={stats.flagged_disambiguation_suspect} skip={stats.skipped_already_done} | "
-                                f"workers={args.workers} avg={avg*1000:.0f}ms/req eta={eta_min:.1f}min"
+                                f"workers={args.workers} avg={avg*1000:.0f}ms/author eta={eta_min:.1f}min "
+                                f"credits_remaining={rem if rem is not None else 'n/a'}"
                             )
 
     # Final flush
@@ -708,8 +912,8 @@ def run(args: argparse.Namespace) -> int:
     print("[openalex_enrich] complete.")
     print(f"[openalex_enrich] total_input={stats.total_input}")
     print(f"[openalex_enrich] fetched_ok={stats.fetched_ok}")
-    print(f"[openalex_enrich] fetched_not_found={stats.fetched_not_found}")
-    print(f"[openalex_enrich] fetched_error={stats.fetched_error}")
+    print(f"[openalex_enrich] fetched_not_found={stats.fetched_not_found}  (proven absent from a 200 response; row written with fetch_status='not_found')")
+    print(f"[openalex_enrich] unresolved={stats.fetched_error}  (no trustworthy answer; NO row written -- re-run with --resume to retry)")
     print(f"[openalex_enrich] flagged_disambiguation_suspect={stats.flagged_disambiguation_suspect}")
     print(f"[openalex_enrich] skipped_already_done={stats.skipped_already_done}")
     print(f"[openalex_enrich] elapsed={elapsed/60:.1f}min ({elapsed:.0f}s)")
@@ -731,7 +935,10 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Supabase upsert batch size.")
     p.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
-                   help="Number of concurrent fetch workers (default 1, safe ceiling 8).")
+                   help=f"Concurrent batched-request workers (default {DEFAULT_WORKERS}). Each worker "
+                        f"issues one list request covering up to {AUTHOR_CHUNK_SIZE} authors, so 2 "
+                        f"workers is ~1 req/s -- far below the 10 req/s limit. Raising this mainly "
+                        f"increases 504 query_timeout exposure on big OR filters.")
     p.add_argument(
         "--ta",
         type=str,
