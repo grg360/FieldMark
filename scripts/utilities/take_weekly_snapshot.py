@@ -97,6 +97,26 @@ THRESHOLD_SOURCES: Dict[str, Tuple[str, str]] = {
 }
 
 
+# COHORT GATE PROVENANCE (2026-08-26). The four thresholds above are int literals
+# in Python and are read out of source; the COHORT GATE is a SQL predicate and is
+# not, so nothing in a capture recorded which population the pool-relative
+# percentiles were taken over. That is the exact failure the threshold block exists
+# to prevent: on 2026-08-26 the pool went 1,934 -> 792 while all four recorded
+# constants stayed identical, which would have made a population change
+# indistinguishable from no change at all.
+#
+# scientific_visibility_percentile and network_visibility_percentile are computed
+# over the POOL, so they are only comparable between captures carrying the SAME
+# value here. Bump this string whenever the gate above moves.
+#
+# Captures taken between 2026-08-05 (ba84d41) and 2026-08-26 carry
+# 'rising_eligible|established_career_age<=15', backfilled by
+# migrations/2026_08_26_rising_snapshot_cohort_gate.sql. That literal is NOT
+# mirrored here: one owner per string, and the backfill is a one-time statement
+# about rows that already exist.
+COHORT_GATE_APPLIED = "rising_eligible"
+
+
 def read_int_constant(rel_path: str, name: str) -> int:
     """Read a module-level int constant from a source file WITHOUT importing it.
 
@@ -128,6 +148,10 @@ def load_thresholds() -> Dict[str, int]:
     for k, v in values.items():
         rel, name = THRESHOLD_SOURCES[k]
         print(f"  {name:<28} = {v:<4} ({rel})")
+    # Printed with the thresholds because it is one: the gate that decides the
+    # pool the visibility percentiles are taken over. It is a predicate rather
+    # than a literal, so it is declared here rather than read from source.
+    print(f"  {'COHORT_GATE_APPLIED':<28} = {COHORT_GATE_APPLIED}")
     return values
 
 
@@ -221,9 +245,16 @@ RISING_SELECT = """
       ON h.id = cc.hcp_id
     LEFT JOIN hcp_industry_classification_v1 ic
       ON ic.hcp_id = cc.hcp_id
+    -- POOL GATE. Must MIRROR rising_star_scoring.fetch_input_signals() exactly.
+    -- Narrowed 2026-08-26 alongside it: the OR-15 clause
+    --   OR (cc.cohort = 'established' AND cc.career_age <= 15)
+    -- came out of both places in one commit. Left here alone, every future capture
+    -- would have recorded 1,142 established HCPs as "in the pool, off the board"
+    -- for a board they are no longer eligible for -- an exclusion reason that is no
+    -- longer the reason. If you change the scorer's gate, change this one in the
+    -- same commit and bump COHORT_GATE_APPLIED.
     WHERE cc.therapeutic_area_id = %s
-      AND (cc.cohort = 'rising_eligible'
-           OR (cc.cohort = 'established' AND cc.career_age <= 15))
+      AND cc.cohort = 'rising_eligible'
 """
 
 RISING_INSERT = """
@@ -245,7 +276,8 @@ RISING_INSERT = """
         early_window_start, early_window_end,
         recent_window_start, recent_window_end,
         min_component_percentile_applied, min_pubs_per_window_applied,
-        min_collaborators_applied, max_career_years_applied
+        min_collaborators_applied, max_career_years_applied,
+        cohort_gate_applied
     ) VALUES %s
     -- KEYED ON capture_id (2026-08-20, migration
     -- 2026_08_20_rising_snapshot_capture_id.sql). A calendar day may hold several
@@ -284,7 +316,8 @@ RISING_INSERT = """
       early_total_pubs = EXCLUDED.early_total_pubs,
       recent_collaborator_count = EXCLUDED.recent_collaborator_count,
       early_collaborator_count = EXCLUDED.early_collaborator_count,
-      min_component_percentile_applied = EXCLUDED.min_component_percentile_applied
+      min_component_percentile_applied = EXCLUDED.min_component_percentile_applied,
+      cohort_gate_applied = EXCLUDED.cohort_gate_applied
 """
 
 
@@ -303,6 +336,17 @@ def find_existing_capture_id(conn, snapshot_date, ta_id, board_computed_at):
     move when only the rising scorer runs, and keying on it is what corrupted the
     2026-08-20 captures.
 
+    THE COHORT GATE IS PART OF THE FINGERPRINT (2026-08-26). computed_at alone is
+    not enough, because the POOL can change without the BOARD being rescored. That
+    is exactly the state this repo is in the moment the OR-15 removal lands and
+    before rising_star_scoring.py is re-run: board rows still carry the 08-20
+    scorer's timestamp, so a snapshot taken now would match the existing capture,
+    reuse its id, and DO UPDATE a narrowed pool on top of a wider one -- leaving a
+    single capture_id holding 1,142 established rows written under the old gate
+    alongside rows stamped with the new one. A capture that describes two
+    populations at once is worse than either.
+    Different gate => different capture, always.
+
     Returns None when the scoring is new, and the caller mints a fresh uuid.
     """
     if board_computed_at is None:
@@ -316,9 +360,10 @@ def find_existing_capture_id(conn, snapshot_date, ta_id, board_computed_at):
               AND therapeutic_area_id = %s
               AND is_on_board
               AND source_computed_at = %s
+              AND cohort_gate_applied IS NOT DISTINCT FROM %s
             LIMIT 1
             """,
-            (snapshot_date, ta_id, board_computed_at),
+            (snapshot_date, ta_id, board_computed_at, COHORT_GATE_APPLIED),
         )
         row = cur.fetchone()
     return row[0] if row else None
@@ -501,6 +546,7 @@ def take_rising_snapshot(conn, snapshot_date, ta_id, slug, thresholds, dry_run) 
             thresholds["min_pubs_per_window"],
             thresholds["min_collaborators"],
             thresholds["max_career_years"],
+            COHORT_GATE_APPLIED,
         )
         for row in rows
     ]

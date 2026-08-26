@@ -2,9 +2,20 @@
 //
 //   1. RISING — membership in hcp_rising_star_ranks_v3 for the TA, read directly
 //      by isOnRisingBoard() before the spine is consulted. Rising WINS over an
-//      established rank: 422 of the 619 board members are dual-board (78 of the
-//      123 US), and their established rank renders as a SECTION on the rising
-//      profile, never as a competing route.
+//      established rank.
+//
+//      THAT PRECEDENCE NO LONGER DECIDES ANYTHING (2026-08-26). It existed because
+//      the rising gate carried an OR-15 clause admitting established HCPs onto the
+//      rising board — 203 of NSCLC's 336 members were dual-board at the last
+//      measurement (this comment previously said 422 of 619, itself stale). The
+//      clause is gone and the boards are disjoint by construction, so rules 1 and
+//      2 can no longer both match. The ordering is kept because it costs nothing
+//      and is the correct tie-break if the two ever overlap again.
+//
+//      CONSEQUENCE, LOGGED NOT FIXED: RisingHcpProfile still renders an established
+//      rank as a SECTION for dual-board members. That path is now unreachable. Read
+//      docs/RISING_EXCLUSIVE_GATE_DEBT.md before deleting it — the section is also the
+//      layout slot the design authority reserves for it.
 //   2. ACADEMIC — membership of the ESTABLISHED board, via hcp_profile_spine().
 //   3. COMMUNITY — everyone else.
 //

@@ -60,12 +60,18 @@ function fmtSessionDate(iso: string): string {
 }
 // Chip rule (founder decision 2026-07-28): BOARD MEMBERSHIP drives the chip,
 // rising first. A presenter is chipped for the board an MSL can actually browse
-// them on; dual-board HCPs (122 exist) show RISING because the Rising board is
-// the smaller, more deliberate list (209 US members vs 3,178 Established).
-// One chip only — dual chips were the original bug. No board rank -> no chip.
-// (Career structure — hcp_cohort_classification_v2 — is a different construct
-// and deliberately NOT consulted here; the rising board is ~61% career-
-// established, so classification would mislabel board membership.)
+// them on. One chip only — dual chips were the original bug. No board rank ->
+// no chip.
+//
+// THE DUAL-BOARD CASE IS GONE (2026-08-26). This comment used to say 122
+// dual-board HCPs existed and that rising won for them because it is the smaller
+// list. It also said hcp_cohort_classification_v2 was deliberately NOT consulted
+// because "the rising board is ~61% career-established, so classification would
+// mislabel board membership". Both statements described the OR-15 gate, which
+// admitted established HCPs onto the rising board; that clause was removed from
+// rising_star_scoring.py and the two boards are now disjoint by construction.
+// The rising-first ordering is retained and costs nothing: it is now simply the
+// order in which two mutually exclusive lookups are tried.
 function boardRank(p: ConfirmedPresenter): number | null {
   return p.rising_rank ?? p.established_rank;
 }

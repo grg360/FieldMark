@@ -66,7 +66,9 @@ Each Rising Star is also assigned an archetype based on momentum signals:
 - **Network Accelerator** — rapidly building network influence, more modest publication acceleration
 - **Emerging Leader** — meeting the Rising Star threshold but not yet showing breakout signal in either dimension
 
-The Rising Star cohort is restricted to academic HCPs (those classified as practicing in academic institutions) and to HCPs with 15 or fewer years since their first publication. The 15-year cap is a soft definition: beyond 15 years, an HCP is treated as Established by definition, regardless of momentum.
+The Rising Star cohort is restricted to academic HCPs (those classified as practicing in academic institutions) and to HCPs the per-therapeutic-area career-structure taxonomy classifies as Rising: three to ten years since first publication, plus a publication floor within the therapeutic area. This is a hard boundary, not a soft one. An HCP the taxonomy classifies as Established is not eligible for a Rising board at any momentum — which is what makes the three cohorts above mutually exclusive rather than merely described as such.
+
+Between 5 August and 26 August 2026 that was not the case. The board was drawn from a wider pool that also admitted anyone classified Established within fifteen years of their first publication, and roughly two thirds of its members held both classifications at once. The wider pool had been introduced to route around an unmaintained data column, not because a three-to-ten board had been tried and found too small; it had not been tried.
 
 ## Community Scoring
 

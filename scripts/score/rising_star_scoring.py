@@ -120,7 +120,25 @@ def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_roll') -> li
               sm.recent_citation_rate,
               nm.network_momentum_percentile,
               nc.network_influence_score AS network_visibility_raw,
-              h.country
+              -- EFFECTIVE COUNTRY, not h.country (2026-08-20). This projection is the
+              -- sole basis for us_rank (see build_results: the US slice is
+              -- `r.get("country") == "US"`), and h.country is the HISTORICAL column.
+              -- Every other consumer -- rising_ledger, rising_board's us_rank_eff and
+              -- eu_rank, the established scope resolution, RisingQuadrant, HCPChip --
+              -- resolves country as coalesce(current_country, country), which is what
+              -- the 2026-08-14 affiliation re-derivation maintains.
+              --
+              -- Measured on the 336-member board before this change: 73 members were
+              -- US by h.country and 76 by the effective country. The three additions
+              -- (Di Federico IT->US at Dana-Farber, Nagasaka JP->US, Pabani CA->US) sit
+              -- high enough that 71 of the 73 existing us_rank values were off by 2-3,
+              -- and the three themselves carried NO us_rank at all -- a global #9
+              -- reading "RANK #9 GLOBAL" on the profile because the US rank it should
+              -- have shown (#3) did not exist.
+              --
+              -- Board MEMBERSHIP is unaffected: the gate is four component percentiles
+              -- and never reads country. Only ordering within the US slice moves.
+              coalesce(h.current_country, h.country) AS country
             FROM hcp_scientific_momentum_v1 sm
             JOIN hcp_network_momentum_v1 nm
               ON nm.hcp_id = sm.hcp_id
@@ -130,17 +148,36 @@ def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_roll') -> li
               AND nc.therapeutic_area_id = sm.therapeutic_area_id
               AND nc.window_type = %(vis_window)s
             JOIN hcps_v2 h ON h.id = sm.hcp_id
-            -- GATE (2026-08-05): the maintained v2 taxonomy replaces the stale
-            -- hcps_v2.cohort_classification column (73.6%% null, unmaintained,
-            -- froze the board). OR-15: rising_eligible, or established within
-            -- the momentum pipeline's own 15-year career cap — the two
-            -- taxonomies draw their boundary at ~10 vs 15 years by design.
+            -- GATE (2026-08-26): the maintained v2 taxonomy, rising_eligible ONLY.
+            --
+            -- RISING IS EXCLUSIVE. The clause that stood here --
+            --   OR (cc.cohort = 'established' AND cc.career_age <= 15)
+            -- was added 2026-08-05 (ba84d41) to replace a gate reading the stale
+            -- hcps_v2.cohort_classification column: 73.6%% null, unmaintained, and
+            -- the thing that had frozen the board. "FROZE THE BOARD" REFERRED TO THE
+            -- DEAD COLUMN, NOT TO A CAREER-AGE BOUNDARY -- a rising_eligible-only
+            -- board had never run in production, so there was never evidence that
+            -- the taxonomy's own 3-10 boundary would be too small.
+            --
+            -- The clause solved a DATA-SOURCE problem and created a COHORT-OVERLAP
+            -- problem as a side effect: 203 of NSCLC's 336 members were also
+            -- classified established, and 34 of those held an established narrative
+            -- alongside a rising one. docs/fieldmark-methodology-page.md promises
+            -- customers "three mutually exclusive cohorts"; while the clause stood,
+            -- that sentence was false. Rising now means what the taxonomy says it
+            -- means: career age 3-10 with the TA publication floor.
+            --
+            -- MEASURED COST, 2026-08-26 (NSCLC, vis_window recent_roll). Pool
+            -- 1,934 -> 792. Board 336 -> 149, US 76 -> 42. That is NOT pure
+            -- attrition: 133 of the 336 survive, 203 leave, and 16 rising_eligible
+            -- HCPs who fail the wider gate ENTER, because the two visibility
+            -- percentiles are recomputed over the smaller pool and clear P50
+            -- against it. Membership moves in both directions.
             JOIN hcp_cohort_classification_v2 cc
               ON cc.hcp_id = sm.hcp_id
               AND cc.therapeutic_area_id = sm.therapeutic_area_id
             WHERE sm.therapeutic_area_id = %(ta_id)s
-              AND (cc.cohort = 'rising_eligible'
-                   OR (cc.cohort = 'established' AND cc.career_age <= 15))
+              AND cc.cohort = 'rising_eligible'
               -- NO COMPONENT FLOOR HERE (2026-08-20). The momentum floor that
               -- stood on this line (sm.pub_velocity_delta >= MIN_VELOCITY_DELTA)
               -- is gone; selection is now MIN_COMPONENT_PERCENTILE applied to
@@ -230,13 +267,30 @@ def build_results(rows: list[dict]) -> list[dict]:
     # (pub_velocity_delta) lived in a different table that is overwritten in place.
     #
     # DENOMINATOR NOTE, worth knowing before comparing to history: the visibility
-    # percentiles are now taken over the eligible pool (~1,934) rather than over
-    # the post-gate board (251), because a value used to SELECT the board cannot
-    # be computed FROM the board without circularity. Stored sci_vis/net_vis
-    # therefore shift for everyone relative to pre-08-20 rows. sci_mom/net_mom are
-    # unchanged -- they arrive already percentiled from the momentum pipeline over
-    # its own eligible set. That mixture of denominators predates this change and
-    # is logged as a separate finding; it is not introduced here.
+    # percentiles are taken over the ELIGIBLE POOL (792 for NSCLC as of 2026-08-26,
+    # ~1,934 before the OR-15 clause was removed) rather than over the post-gate
+    # board, because a value used to SELECT the board cannot be computed FROM the
+    # board without circularity. Stored sci_vis/net_vis therefore shift for
+    # everyone whenever the pool definition moves -- once at the 08-20 gate change
+    # and again at the 08-26 cohort change.
+    #
+    # THE MIXED DENOMINATOR, AND THAT IT JUST GOT WIDER (2026-08-26). sci_mom and
+    # net_mom are NOT recomputed here -- they arrive already percentiled from
+    # hcp_scientific_momentum_v1 / hcp_network_momentum_v1. Neither of those
+    # scorers joins hcp_cohort_classification_v2 at all; their population is
+    # ACADEMIC industry classification AND
+    # (CURRENT_YEAR - hcps_v2.career_first_pub_year_v2) <= MAX_CAREER_YEARS (15).
+    # Removing the OR-15 clause narrowed the pool THIS script percentiles over
+    # without touching theirs, so MIN_COMPONENT_PERCENTILE now means two different
+    # things inside one four-way AND: P50 of the 792-person rising_eligible pool on
+    # the visibility axes, P50 of the ~15-year academic momentum population -- which
+    # still contains every established HCP the gate above just excluded -- on the
+    # momentum axes.
+    #
+    # The mixture PREDATES this change and is NOT fixed here, deliberately: aligning
+    # the momentum pipelines to the rising cohort would re-scope four scorers and
+    # every board that reads them. It is recorded so the gap is not rediscovered as
+    # a surprise. See docs/RISING_EXCLUSIVE_GATE_DEBT.md.
     gated: list[dict] = []
     excluded_by_component = {"sci_mom": 0, "net_mom": 0, "sci_vis": 0, "net_vis": 0}
     for row in rows:
