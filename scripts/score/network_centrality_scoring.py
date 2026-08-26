@@ -20,6 +20,7 @@ Dependencies:
 from __future__ import annotations
 
 import os
+import time
 from uuid import uuid4
 
 import click
@@ -36,11 +37,71 @@ W_DEGREE = 0.4
 W_EIGENVECTOR = 0.4
 W_BETWEENNESS = 0.2
 
+# --- Edge-fetch transport (2026-08-25) ------------------------------------
+# fetch_edges runs a ~150s self-join over publication_authors_v2 and returns
+# ~0.8-1.0M rows through the Supabase POOLER. Measured 2026-08-25:
+#   CRC  early_roll   778,093 edges / 148s      CRC  recent_roll 1,023,034 / 161s
+#   NSCLC early_roll  755,016 edges / 140s      (696,922 on 2026-08-17)
+# CRC is only 3% larger than NSCLC, so this is NOT a CRC-specific problem --
+# the weekly NSCLC cron runs the same query at 97% of the size. The old code
+# held the connection silent for the whole computation and then fetchall()'d
+# every row into one Python list; a single transient drop killed the entire
+# 5-step rising chain with "SSL connection has been closed unexpectedly".
+#
+# TRANSPORT ONLY: the SQL, the edge set and the centrality math are unchanged.
+EDGE_ITERSIZE = 50_000          # rows per server-side FETCH
+FETCH_ATTEMPTS = 3              # bounded retry around the whole stream
+FETCH_BACKOFF_BASE = 2.0        # 2s, 4s between attempts
+STATEMENT_TIMEOUT_MS = 600_000  # 10 min -- generous over the measured ~160s
+CONNECT_TIMEOUT_S = 30
+
 
 def get_conn():
+    """Connect with TCP keepalives and an explicit statement timeout.
+
+    keepalives matter because this script goes long stretches sending nothing:
+    ~150s inside the edge query, then many minutes computing betweenness while
+    the connection sits idle before the write. Without them a pooled connection
+    can be reaped with no error until the next use.
+    """
     if not DATABASE_URL:
         raise EnvironmentError("Missing DATABASE_URL")
-    return psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(
+        DATABASE_URL,
+        connect_timeout=CONNECT_TIMEOUT_S,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+    )
+    # SET rather than libpq `options=`: reliably applied through the pooler.
+    with conn.cursor() as cur:
+        cur.execute(f"SET statement_timeout = {STATEMENT_TIMEOUT_MS}")
+    conn.commit()
+    return conn
+
+
+def ensure_conn(conn):
+    """Return a live connection, reconnecting if the old one died while idle.
+
+    `conn` is opened before the edge fetch and then sits unused for the whole
+    centrality computation -- ~7 minutes on a 778k-edge graph, dominated by
+    betweenness. A pooled connection can be closed server-side in that window
+    (observed 2026-08-25: the fetch succeeded and `lookup_hcp_names` then died
+    with "server closed the connection unexpectedly"). TCP keepalives do not
+    prevent an application-layer pooler timeout, so probe and replace.
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        return conn
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        print("  [conn] connection died while idle; reconnecting", flush=True)
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001 - already dead
+            pass
+        return get_conn()
 
 
 def resolve_ta_id(conn, slug: str) -> str:
@@ -52,8 +113,7 @@ def resolve_ta_id(conn, slug: str) -> str:
         return str(row[0])
 
 
-def fetch_edges(
-    conn,
+def build_edges_query(
     ta_id: str,
     window_years: int | None = None,
     start_year: int | None = None,
@@ -103,9 +163,100 @@ def fetch_edges(
             SELECT hcp_a, hcp_b, shared_pubs FROM hcp_pub_pairs
             """
 
-    with conn.cursor() as cur:
-        cur.execute(sql, (ta_id,) + year_params)
-        return [(row[0], row[1], int(row[2])) for row in cur.fetchall()]
+    return sql, (ta_id,) + year_params
+
+
+def iter_edges(conn, sql: str, params: tuple):
+    """Stream edges through a NAMED (server-side) cursor.
+
+    A named cursor keeps the result set on the server and pulls it in
+    itersize-sized FETCH batches. Two consequences, both of which are the point:
+      * the client-server link exchanges traffic every batch instead of going
+        silent for the whole transfer, and
+      * peak Python memory is bounded by itersize, not by the full ~1M rows.
+
+    AUTOCOMMIT: a server-side cursor only exists inside a transaction. psycopg2
+    connections default to autocommit=False, but assert it rather than assume --
+    under autocommit the portal is destroyed after the first FETCH and the
+    stream silently truncates.
+    """
+    if getattr(conn, "autocommit", False):
+        raise RuntimeError(
+            "iter_edges requires autocommit=False (server-side cursors need a transaction)"
+        )
+    # Unique name: a named cursor is a server object and must not collide with
+    # another portal on the same session.
+    with conn.cursor(name=f"edges_{uuid4().hex}") as cur:
+        cur.itersize = EDGE_ITERSIZE
+        cur.execute(sql, params)
+        for row in cur:
+            yield row[0], row[1], int(row[2])
+
+
+def fetch_edges_into_graph(
+    ta_id: str,
+    min_edge_weight: int,
+    **window_kwargs,
+) -> tuple[nx.Graph, int, int]:
+    """Stream edges straight into the graph, with a bounded retry.
+
+    Returns (graph, edges_kept, edges_filtered) -- identical values to the old
+    fetchall()-then-loop, because the same rows are applied by the same filter.
+    Graph construction is order-independent, so streaming changes nothing.
+
+    The retry rebuilds from scratch on each attempt. A dropped server-side
+    cursor cannot be resumed, and a half-built graph is worse than none -- so a
+    failed attempt discards its partial graph and starts over on a FRESH
+    connection (the old one is dead by definition).
+    """
+    sql, params = build_edges_query(ta_id, **window_kwargs)
+    last_exc: Exception | None = None
+
+    for attempt in range(1, FETCH_ATTEMPTS + 1):
+        conn = None
+        try:
+            conn = get_conn()
+            graph = nx.Graph()
+            edges_kept = 0
+            edges_filtered = 0
+            streamed = 0
+            for hcp_a, hcp_b, weight in iter_edges(conn, sql, params):
+                streamed += 1
+                w = int(weight)
+                if w >= min_edge_weight:
+                    graph.add_edge(hcp_a, hcp_b, weight=w)
+                    edges_kept += 1
+                else:
+                    edges_filtered += 1
+                if streamed % (EDGE_ITERSIZE * 4) == 0:
+                    print(f"  ...streamed {streamed:,} edge rows", flush=True)
+            conn.commit()
+            print(f"Found {streamed:,} co-authorship pairs (streamed)")
+            return graph, edges_kept, edges_filtered
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
+            # The failure class this function exists for: SSL/connection drops
+            # mid-stream. Programming errors are NOT caught -- they must not be
+            # retried three times before surfacing.
+            last_exc = exc
+            print(
+                f"  [fetch_edges] attempt {attempt}/{FETCH_ATTEMPTS} failed: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            if attempt < FETCH_ATTEMPTS:
+                backoff = FETCH_BACKOFF_BASE ** attempt
+                print(f"  [fetch_edges] retrying in {backoff:.0f}s (graph discarded)", flush=True)
+                time.sleep(backoff)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:  # noqa: BLE001 - closing a dead conn must not mask the cause
+                    pass
+
+    raise RuntimeError(
+        f"fetch_edges failed after {FETCH_ATTEMPTS} attempts: {last_exc}"
+    ) from last_exc
 
 
 def compute_percentiles(scores_dict):
@@ -297,34 +448,24 @@ def main(
             f"Computing network centrality for TA={ta} "
             f"window={window_years}yr ({window_type})"
         )
-    print("Fetching edges...")
-    edges_raw = fetch_edges(
-        conn,
+    print("Fetching edges (server-side cursor, streaming into the graph)...")
+    # Streamed on its own short-lived connection so a mid-stream drop cannot
+    # poison `conn`, which is still needed for the name lookup and the write.
+    graph, edges_kept, edges_filtered = fetch_edges_into_graph(
         ta_id,
+        min_edge_weight,
         window_years=window_years if (start_year is None and start_date is None) else None,
         start_year=start_year,
         end_year=end_year,
         start_date=start_date,
         end_date=end_date,
     )
-    print(f"Found {len(edges_raw)} co-authorship pairs")
 
-    if not edges_raw:
+    if graph.number_of_edges() == 0 and edges_filtered == 0:
         print("No edges found. Exiting.")
         conn.close()
         return
 
-    print("Building graph...")
-    graph = nx.Graph()
-    edges_kept = 0
-    edges_filtered = 0
-    for hcp_a, hcp_b, weight in edges_raw:
-        w = int(weight)
-        if w >= min_edge_weight:
-            graph.add_edge(hcp_a, hcp_b, weight=w)
-            edges_kept += 1
-        else:
-            edges_filtered += 1
     print(f"Edges kept: {edges_kept}, filtered (weight < {min_edge_weight}): {edges_filtered}")
     print(f"Graph: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")
 
@@ -398,6 +539,9 @@ def main(
         results, key=lambda r: r["network_influence_score"], reverse=True
     )
     top_n = sorted_results[:debug_top]
+    # First DB use since before the fetch -- the connection has been idle
+    # through the whole centrality computation.
+    conn = ensure_conn(conn)
     hcp_names = lookup_hcp_names(conn, [r["hcp_id"] for r in top_n])
 
     print(f"\n=== Top {debug_top} by Network Influence Score ({ta}, {window_type}) ===")
@@ -421,6 +565,7 @@ def main(
         print(f"\n[dry-run] would have written {len(results)} rows")
     else:
         run_id = str(uuid4())
+        conn = ensure_conn(conn)
         written = upsert_results(conn, ta_id, window_type, results, run_id, window_start=win_start, window_end=win_end)
         print(f"\nWrote {written} rows to hcp_network_centrality_v2")
         print(f"Run ID: {run_id}")
