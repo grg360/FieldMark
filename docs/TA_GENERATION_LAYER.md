@@ -173,6 +173,11 @@ with the same discipline the existing stages have: per-stage completion notes, n
 failure must not gate the data cycle, and the billed stages gated behind an explicit flag the way
 build mode gates stage 13.
 
+> Designed 2026-08-25 as a separate second orchestrator (`scripts/generate_cycle.py`) rather than an
+> extension of `reingest_cycle.py` — see [`GENERATE_CYCLE_DESIGN.md`](GENERATE_CYCLE_DESIGN.md) for
+> the dependency order, billed-stage cost shape, verified-resume model, completion guards, and the
+> slug/name/id resolution trap. Not yet built.
+
 ---
 
 ## Open defects found during this audit
@@ -184,6 +189,11 @@ populating `hcps_v2.in_corpus_pub_count` from `author_pub_flat`. `print_plan` ju
 
 This is the same omission class as the stages 12/13/13.5 gap fixed in `234b5bf` — that fix appended
 only the stages named in the task and did not re-audit the 8-series. Not yet fixed.
+
+> Re-confirmed still present 2026-08-25 during the CRC first build. Execution-side orchestrator
+> findings from that build — stage 6's per-row write cost, child-stdout buffering, missing
+> completion guards and the absent `--stop-after` — are recorded separately in
+> [`ORCHESTRATOR_DEBT.md`](ORCHESTRATOR_DEBT.md).
 
 ---
 
