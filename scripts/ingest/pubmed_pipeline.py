@@ -1118,6 +1118,83 @@ def parse_authorships(article: ET.Element) -> List[Dict[str, Any]]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# THE FOUR FIELDS THIS PIPELINE USED TO DROP (2026-08-26)
+#
+# _publication_v2_row() hardcoded publication_types, mesh_terms, abstract and
+# language to None while the article XML was in scope -- parse_authorships(article)
+# ran two lines above the nulls. The four parsers below are ported VERBATIM from
+# ingest_publications.py (parse_abstract, parse_mesh_terms,
+# parse_publication_types, parse_language), the same convention parse_pub_date and
+# parse_authorships already follow.
+#
+# WHY PORTED AND NOT IMPORTED. scripts/ingest has no __init__.py, so an import
+# needs sys.path surgery -- and ingest_publications.py is ORPHANED (nothing calls
+# it; see TA_BUILD_GUIDE - 24Aug26.md:457,585). Importing would make the live
+# weekly cycle depend on a script the build guides tell people to stay away from
+# and that is a deletion candidate. Four pure XML functions, no shared state.
+#
+# WHAT IT COST, MEASURED 2026-08-26. The nulls were introduced 2026-07-02 in
+# 5f5c0d7 (AD ingestion v2). ad27ade on 07-23 rewrote this function's signature
+# and carried them through unchanged -- it is NOT the origin. Splitting
+# publications_v2 by the source stamp shows the damage exactly:
+#
+#   source='pubmed_v2_ingest' (ingest_publications.py)  403,671 pubs, 403,671 typed
+#   source='pubmed'           (THIS pipeline)           169,197 pubs,      81 typed
+#
+# Every TA built through reingest_cycle.py since 07-02 lost all four. Colorectal
+# Cancer is 100% this path: 147,218 publications with zero publication_types, zero
+# mesh_terms, zero abstracts, zero language. publication_leadership_scoring.py
+# reads publication_types for its Editorial and Systematic Review / Meta-Analysis
+# terms, so both are inert for CRC today; zero abstracts is the wider cost, since
+# abstracts feed the billed theme and scientific-position extractors.
+# ---------------------------------------------------------------------------
+
+
+def parse_abstract(article: ET.Element) -> Optional[str]:
+    """Structured abstracts are flattened to 'Label: text' segments joined by spaces, capped at
+    10k chars. Ported from ingest_publications.py."""
+    parts: List[str] = []
+    for ab in article.findall("./MedlineCitation/Article/Abstract/AbstractText"):
+        label = ab.attrib.get("Label")
+        text = (ab.text or "").strip()
+        if not text:
+            continue
+        if label:
+            parts.append(f"{label}: {text}")
+        else:
+            parts.append(text)
+    if not parts:
+        return None
+    joined = " ".join(parts)
+    return joined[:10000]  # cap at 10k chars
+
+
+def parse_mesh_terms(article: ET.Element) -> List[str]:
+    """MeSH DescriptorName values, in document order. Ported from ingest_publications.py."""
+    out: List[str] = []
+    for mh in article.findall("./MedlineCitation/MeshHeadingList/MeshHeading/DescriptorName"):
+        if mh.text:
+            out.append(mh.text.strip())
+    return out
+
+
+def parse_publication_types(article: ET.Element) -> List[str]:
+    """PubMed PublicationType values -- 'Practice Guideline', 'Consensus Statement', 'Editorial',
+    'Systematic Review', 'Meta-Analysis' are the five publication_leadership_scoring.py reads.
+    Ported from ingest_publications.py."""
+    out: List[str] = []
+    for pt in article.findall("./MedlineCitation/Article/PublicationTypeList/PublicationType"):
+        if pt.text:
+            out.append(pt.text.strip())
+    return out
+
+
+def parse_language(article: ET.Element) -> Optional[str]:
+    """Ported from ingest_publications.py."""
+    return text_or_none(article.find("./MedlineCitation/Article/Language"))
+
+
 def extract_publication_rows(
     articles: Sequence[ET.Element], therapeutic_area_id: Optional[str]
 ) -> List[Dict[str, object]]:
@@ -1156,6 +1233,18 @@ def _publication_v2_row(
     former feeds the Pulse theme time-series, the latter preserves author data raw for later
     OpenAlex linkage without minting HCP identities.
 
+    SO ARE abstract, language, mesh_terms and publication_types, since 2026-08-26. All four were
+    hardcoded to None from 2026-07-02 (5f5c0d7) while the XML sat in scope; see the block above the
+    parsers for the measured cost. THE REMAINING NULLS ARE DELIBERATE and are not the same defect:
+    openalex_work_id, citation_count, citation_counts_by_year and openalex_enriched_at are not in
+    the E-utilities efetch response at all and are filled by the OpenAlex enrichment stage.
+
+    RE-INGEST NOW REPAIRS RATHER THAN ERASES. The upsert is on_conflict='pubmed_id' and these keys
+    are in the payload, so PostgREST writes them on every conflict. While they were None that made a
+    re-ingest DESTRUCTIVE -- re-touching a PMID that ingest_publications.py had populated would have
+    nulled all four. Now the same path backfills them. That reversal is what makes a backfill free:
+    re-running this pipeline over an existing corpus repairs it in place.
+
     NOTE: ingestion_run_id is intentionally NOT in this payload. Including it would make the
     on_conflict="pubmed_id" upsert overwrite it on every re-ingest (last-wrote semantics). It is
     INSERT-ONLY: stamped in upsert_publications on rows where it is still NULL (created-by).
@@ -1165,14 +1254,14 @@ def _publication_v2_row(
         "doi": parse_doi(article),
         "openalex_work_id": None,
         "title": text_or_none(article.find("./MedlineCitation/Article/ArticleTitle")),
-        "abstract": None,
+        "abstract": parse_abstract(article),
         "journal": text_or_none(article.find("./MedlineCitation/Article/Journal/Title")),
         "pub_year": parse_pub_year(article),
         "pub_date": parse_pub_date(article),
-        "language": None,
+        "language": parse_language(article),
         "pubmed_authorships": parse_authorships(article),
-        "mesh_terms": None,
-        "publication_types": None,
+        "mesh_terms": parse_mesh_terms(article),
+        "publication_types": parse_publication_types(article),
         "citation_count": None,  # Not available directly in E-utilities efetch response.
         "citation_counts_by_year": None,
         "openalex_enriched_at": None,
