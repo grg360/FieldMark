@@ -45,6 +45,21 @@ load_dotenv()
 
 MODEL = "claude-sonnet-4-6"
 
+# PASS-2 OUTPUT CEILING (raised 8192 -> 16384, 2026-08-27).
+#
+# Pass 2 echoes every input theme back in its response, so output scales with batch size
+# AND with theme-name length. Measured on the CRC run that exposed this: a full 200-item
+# response is ~10,800 tokens (count_tokens on a reconstructed response built from real
+# theme names and real bucket names, 53.9 tokens/item). Against the old 8,192 ceiling that
+# is ~130% of budget -- truncation was not bad luck, it was arithmetically certain for
+# every full batch. Five of six CRC batches died at char 26,517-27,226, a 709-char window
+# across five independent calls.
+#
+# 16384 with the default batch of 100 is ~5,400 tokens used, ~3x headroom. THE HEADROOM IS
+# NOT THE FIX -- the stop_reason check in run_pass_2 is. This ceiling only buys room; the
+# check is what makes an overflow announce itself instead of arriving as "malformed JSON".
+PASS_2_MAX_TOKENS = 16384
+
 TOP_THEMES_SQL = """
 SELECT theme_name, COUNT(DISTINCT hcp_id) AS n_hcps
 FROM public.hcp_research_themes_v2
@@ -386,23 +401,57 @@ def run_pass_2(
         batch_num = batch_idx // batch_size + 1
         prompt = build_pass_2_prompt(ta_upper, canonicals, batch)
 
+        response = None
         try:
             response = client.messages.create(
                 model=MODEL,
-                max_tokens=8192,
+                max_tokens=PASS_2_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
             )
+            # CHECK THE STOP REASON BEFORE PARSING. A truncated response is an HTTP 200
+            # carrying valid content that happens to be half a document, so it reaches
+            # json.loads and dies there as "Unterminated string" -- a parser error for a
+            # condition the API already reported. Catching it here names the cause, the
+            # batch and the size; catching it at json.loads names a character offset.
+            if response.stop_reason == "max_tokens":
+                raise RuntimeError(
+                    f"batch {batch_num}/{total_batches} TRUNCATED at max_tokens: "
+                    f"{len(batch)} themes requested, response hit the "
+                    f"{PASS_2_MAX_TOKENS:,}-token ceiling "
+                    f"({getattr(response.usage, 'output_tokens', '?')} output tokens). "
+                    f"Pass 2 echoes every theme back, so output scales with batch size -- "
+                    f"lower --pass-2-batch-size (currently {batch_size}) or raise "
+                    f"PASS_2_MAX_TOKENS. Nothing was parsed; this batch is unassigned."
+                )
             batch_results = parse_pass_2_response(response.content[0].text)
         except Exception as exc:
             print(
                 f"  ERROR batch {batch_num}/{total_batches}: {exc}",
                 file=sys.stderr,
             )
+            # LOG ENOUGH TO DIAGNOSE BY READING, NOT BY RECONSTRUCTING. The previous
+            # version stored only batch_num/themes/error, so establishing that five CRC
+            # failures were truncation rather than malformed content took rebuilding a
+            # synthetic response and counting its tokens. stop_reason answers it outright;
+            # response_text makes "is the last line cut mid-value" a one-line check.
+            usage = getattr(response, "usage", None) if response is not None else None
+            text = None
+            if response is not None:
+                try:
+                    text = response.content[0].text
+                except (AttributeError, IndexError):
+                    text = None
             failed_batches.append(
                 {
                     "batch_num": batch_num,
+                    "batch_size": len(batch),
                     "themes": batch,
                     "error": str(exc),
+                    "stop_reason": getattr(response, "stop_reason", None),
+                    "output_tokens": getattr(usage, "output_tokens", None),
+                    "input_tokens": getattr(usage, "input_tokens", None),
+                    "max_tokens_requested": PASS_2_MAX_TOKENS,
+                    "response_text": text,
                 }
             )
             time.sleep(1)
@@ -494,7 +543,11 @@ def run_pass_2(
 )
 @click.option("--pass", "pass_num", default="all", type=click.Choice(["1", "2", "all"]))
 @click.option("--pass-1-sample-size", default=500, show_default=True)
-@click.option("--pass-2-batch-size", default=200, show_default=True)
+# 200 -> 100 (2026-08-27). At 200, a full response is ~10,800 tokens and could never fit
+# any ceiling this script had; NSCLC's successful run used 100. 100 items is ~5,400 tokens.
+# Halving the batch roughly doubles the fixed per-batch cost of re-sending the canonical
+# bucket list, which is small against the theme payload.
+@click.option("--pass-2-batch-size", default=100, show_default=True)
 @click.option("--dry-run", is_flag=True)
 @click.option("--resume", is_flag=True)
 def main(
