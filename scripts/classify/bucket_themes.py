@@ -31,6 +31,12 @@ from typing import Any
 import click
 import psycopg
 from anthropic import Anthropic
+
+# Same directory, and Python puts the running script's directory on sys.path[0].
+# extract_research_themes has no module-level side effects -- its load_dotenv() and its
+# Anthropic client construction both live inside main() -- so importing it is free.
+# See the --ta option below for why this import exists at all.
+from extract_research_themes import TA_CONFIGS as _THEME_TA_CONFIGS
 from dotenv import load_dotenv
 from psycopg.rows import dict_row
 from supabase import Client, create_client
@@ -466,7 +472,25 @@ def run_pass_2(
 @click.option(
     "--ta",
     required=True,
-    type=click.Choice(["nsclc", "hepatology", "immunology", "raredisease"]),
+    # DERIVED FROM TA_CONFIGS, NOT HARDCODED (2026-08-27).
+    #
+    # This list used to read ["nsclc", "hepatology", "immunology", "raredisease"] -- a set
+    # that has drifted from reality in both directions. It admits hepatology, immunology
+    # and raredisease, none of which has a TA_CONFIGS entry in the script that WRITES the
+    # themes, so they could never have anything to bucket. And it rejects
+    # atopic-dermatitis, a shipped TA with 3,499 extracted theme rows: `--ta
+    # atopic-dermatitis` never got past click, which is the FIRST reason those rows were
+    # never bucketed (the ta.upper() vs tag mismatch below is the second).
+    #
+    # Deriving the list means a new TA is one edit -- the TA_CONFIGS entry -- rather than
+    # two files that must be remembered together.
+    #
+    # NOTE this unblocks CRC but NOT AD. CRC's tag is spelled SLUG.UPPER(), so ta.upper()
+    # finds it. AD's tag is 'Atopic Dermatitis' and ta.upper() is 'ATOPIC-DERMATITIS', so
+    # AD now reaches a clear "No themes found for therapeutic_area=ATOPIC-DERMATITIS"
+    # instead of an argparse rejection -- a better error, still an error. Fixing AD needs
+    # the real fix: read TA_CONFIGS[ta]["tag"] here instead of computing ta.upper().
+    type=click.Choice(sorted(_THEME_TA_CONFIGS.keys())),
 )
 @click.option("--pass", "pass_num", default="all", type=click.Choice(["1", "2", "all"]))
 @click.option("--pass-1-sample-size", default=500, show_default=True)

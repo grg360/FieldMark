@@ -106,6 +106,39 @@ WHERE r.therapeutic_area_id = %(ta_id)s
 ORDER BY r.rank ASC
 """
 
+# Momentum-model rising board, ALL COUNTRIES, ordered by global rank.
+#
+# NOT the NSCLC rising SQL. That one carries `h.current_country = 'US' AND r.us_rank IS
+# NOT NULL`, which made sense against a board of ~1,588 with ~1,064 US-ranked members.
+# Applied to a small board it is destructive: CRC's rising board is 140 members across
+# 29 countries, of which only 21 hold a us_rank -- an 85% cut, and the survivors are not
+# the strongest, merely the American ones. Ordering by r.rank keeps the board's own
+# ranking rather than a country-local one.
+TARGET_HCPS_SQL_RISING_ALL_COUNTRIES = """
+SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
+FROM hcps_v2 h
+JOIN hcp_rising_star_ranks_v3 r ON r.hcp_id = h.id
+WHERE r.therapeutic_area_id = %(ta_id)s
+ORDER BY r.rank ASC
+"""
+
+# Established global board, TOP 200 ONLY.
+#
+# THE LIMIT IS THE POINT. The unbounded TARGET_HCPS_SQL_ESTABLISHED_GLOBAL above is
+# whole-board: for CRC that is 24,735 HCPs, i.e. 24,735 billed calls from one flag.
+# 200 matches the cap the narrative generator already applies to the established arm
+# (ESTABLISHED_DEFAULT_TOP_N = 100, raised to 200 by the cycle), so the themes and the
+# narratives cover the same people instead of one silently exceeding the other.
+TARGET_HCPS_SQL_ESTABLISHED_GLOBAL_TOP200 = """
+SELECT DISTINCT h.id, h.first_name, h.last_name, h.institution_normalized, r.rank
+FROM hcps_v2 h
+JOIN hcp_established_ranks_v3 r ON r.hcp_id = h.id
+WHERE r.therapeutic_area_id = %(ta_id)s
+  AND r.scope_type = 'global'
+ORDER BY r.rank ASC
+LIMIT 200
+"""
+
 # Per-TA config. The nsclc entry reproduces the original prompt text and
 # NSCLC-Rising-US selection verbatim (byte-identical rendered prompts, identical
 # selected HCP set). Non-NSCLC TAs supply their own cohort scoping, tag, and
@@ -144,6 +177,54 @@ TA_CONFIGS = {
             "rising-global": TARGET_HCPS_SQL_RISING_COMPOSITE_GLOBAL,
         },
         "default_scope": "region",
+    },
+    "colorectal-cancer": {
+        # TAG IS SLUG.UPPER() DELIBERATELY, AND IT IS A WORKAROUND, NOT A RESOLUTION.
+        #
+        # Two writers derive this key by different rules. THIS script writes whatever
+        # literal sits here into hcp_research_themes_v2.therapeutic_area. bucket_themes.py
+        # independently computes `ta_upper = ta.upper()` and looks for that, raising
+        # "No themes found for therapeutic_area=..." on anything else. The two agree only
+        # where tag happens to equal SLUG.UPPER() -- true for nsclc by coincidence
+        # ('nsclc'.upper() == 'NSCLC' == tag), false for atopic-dermatitis, whose tag is
+        # 'Atopic Dermatitis' while bucket_themes hunts 'ATOPIC-DERMATITIS'. That mismatch
+        # is why AD has 3,499 rows in hcp_research_themes_v2 and ZERO in theme_canonical_v1:
+        # billed extraction that has never been bucketed, in a shipped TA.
+        #
+        # 'COLORECTAL-CANCER' is the only value that satisfies both derivations with no
+        # code change. It also bakes a fourth spelling into a column that already holds
+        # 'NSCLC' and 'Atopic Dermatitis', so it makes the underlying inconsistency worse
+        # while making this TA work.
+        #
+        # THE REAL FIX is for bucket_themes.py to read TA_CONFIGS[slug]["tag"] from this
+        # dict -- the same source this script writes from -- instead of computing
+        # ta.upper() independently. That is a small change, it retires the class, and it
+        # is the only thing that also unorphans AD's rows. Until it lands, every new TA
+        # must spell its tag SLUG.UPPER() or hit the same wall.
+        "tag": "COLORECTAL-CANCER",
+        "domain": "colorectal cancer",
+        "generic_negative": "'colorectal cancer'",
+        # TA-NEUTRAL, following AD rather than NSCLC. NSCLC's exemplars name real
+        # mechanisms ('EGFR-mutant resistance mechanisms'), which reads as helpful and is
+        # actually a thumb on the scale: it tells the model which themes this TA is
+        # "supposed" to have before it has read a single abstract. These teach the SHAPE of
+        # a specific theme without asserting any CRC biology, so what comes back is what
+        # the corpus says rather than what the prompt suggested.
+        "theme_examples": (
+            "'a specific molecular-subtype focus' or "
+            "'a defined treatment-sequencing question'"
+        ),
+        "selection": {
+            # 140 HCPs. All countries -- see TARGET_HCPS_SQL_RISING_ALL_COUNTRIES for why
+            # the NSCLC US-only predicate would cut this to 21.
+            "rising": TARGET_HCPS_SQL_RISING_ALL_COUNTRIES,
+            # 200 HCPs, capped. The uncapped established global board is 24,735.
+            "global-200": TARGET_HCPS_SQL_ESTABLISHED_GLOBAL_TOP200,
+        },
+        # THE DEFAULT IS THE CHEAP ONE, ON PURPose. --ta is the only required flag and
+        # --scope defaults to this, so an invocation that forgets --scope costs 140 calls,
+        # not 24,735. The expensive scope must be asked for by name.
+        "default_scope": "rising",
     },
 }
 DEFAULT_TA = "nsclc"
