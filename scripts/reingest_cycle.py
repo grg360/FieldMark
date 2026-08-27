@@ -303,6 +303,21 @@ def cmd_openalex_enrich_pubs() -> List[str]:
     # to count toward thin HCPs' corpus_pub_count). Steady-state volume ~= new pubs/week; the FIRST
     # run clears the whole backlog (potentially large). To scope tighter, openalex_pipeline would need
     # a --pmids/--pub-ids filter (it has none today) -- a deliberate follow-up, not silently assumed.
+    #
+    # NO STALENESS WINDOW HERE, DELIBERATELY (2026-08-27). openalex_pipeline gained --stale-days /
+    # --max-refresh / --stale-since-year, which re-enrich publications whose citation counts have
+    # gone stale. THIS INVOCATION IS UNCHANGED and still drains only the openalex_enriched_at IS
+    # NULL backlog, because an unqualified --stale-days on the weekly cycle is a sawtooth: 370,447
+    # rows were last enriched in May 2026, so the first cycle after such a flag landed would sweep
+    # all of them through a stage that normally handles thousands -- on the critical path, where a
+    # failure blocks 1c/1d and stage 2 -- and then go quiet until the next N-day boundary produces
+    # the next spike.
+    #
+    # IF you later want refresh inside the cycle, add it BOUNDED. The point of --max-refresh is that
+    # duration stops being a function of how long since the last run:
+    #     ["--stale-days", "90", "--max-refresh", "25000", "--stale-since-year", "2023"]
+    # ~25k rows is a predictable per-cycle ceiling that converges the corpus over about three weeks
+    # of cycles. Until then, run refresh as a separate deliberate job.
     return py("openalex_pipeline") + ["--target-version", "v2", "--skip-career-enrichment"]
 
 

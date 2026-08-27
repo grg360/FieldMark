@@ -4,11 +4,26 @@ from __future__ import annotations
 FieldMark OpenAlex pipeline: DOI citation enrichment and HCP career publication counts.
 
 1) For each publication with a DOI and no openalex_enriched_at yet, batch-fetch OpenAlex work
-   metadata and update citation_count plus related OpenAlex fields.
+   metadata and update citation_count plus related OpenAlex fields. With --stale-days N, ALSO
+   re-enriches publications last enriched more than N days ago.
 2) For each HCP (optionally only those without total_career_pubs), search OpenAlex authors
    by name; on a confident match, store works_count as total_career_pubs on hcps.
 
-Environment: SUPABASE_URL, SUPABASE_KEY, PUBMED_EMAIL (polite pool mailto for OpenAlex).
+Environment: SUPABASE_URL, SUPABASE_KEY, PUBMED_EMAIL (polite pool mailto for OpenAlex),
+DATABASE_URL (direct 5432 connection -- the DOI phase writes over psycopg, not PostgREST;
+see update_publications_enrichment_batch).
+
+Refresh usage:
+    # drain the NULL backlog only (unchanged default behaviour)
+    python openalex_pipeline.py --target-version v2 --skip-career-enrichment
+
+    # backlog + anything enriched more than 90 days ago, oldest first, 25k ceiling
+    python openalex_pipeline.py --target-version v2 --skip-career-enrichment \
+        --stale-days 90 --max-refresh 25000
+
+    # same, restricted to publications recent enough for their counts to still move
+    python openalex_pipeline.py --target-version v2 --skip-career-enrichment \
+        --stale-days 90 --max-refresh 25000 --stale-since-year 2023
 """
 
 import argparse
@@ -23,8 +38,10 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Set
 
+import psycopg2
 import requests
 from dotenv import load_dotenv
+from psycopg2.extras import Json, execute_values
 from supabase import Client, create_client
 
 # ============================================================
@@ -49,6 +66,7 @@ DEFAULT_TIMEOUT_SECONDS = 20
 AUTHOR_MATCH_SCORE_THRESHOLD = 0.75
 
 BATCH_SIZE = 100  # OpenAlex's max OR values per filter
+WRITE_BATCH_SIZE = 500  # Rows per set-based UPDATE. See update_publications_enrichment_batch.
 BATCH_SLEEP_SECONDS = 0.25  # Modest pacing to avoid OpenAlex slow-response degradation
 CHECKPOINT_FILE_V1 = "openalex_checkpoint_v1.json"
 CHECKPOINT_FILE_V2 = "openalex_checkpoint_v2.json"
@@ -124,45 +142,96 @@ def init_supabase() -> Client:
     return create_client(supabase_url, supabase_key)
 
 
-def fetch_publications_with_doi(supabase: Client, target_version: str = "v1") -> List[Dict]:
+def get_pg_conn():
+    """Direct Postgres connection for the DOI phase's set-based selector and writer.
+
+    SEPARATE TRANSPORT, DELIBERATELY. The rest of this script talks PostgREST; the DOI phase
+    reads and writes in bulk, which PostgREST cannot express (one HTTP round-trip per row, and
+    no NULLS FIRST ordering). Same mixed-transport pattern the scorers and take_weekly_snapshot
+    already use.
     """
-    Returns publications with non-null DOI that have not been enriched by the new
-    pipeline (no openalex_enriched_at timestamp). This catches both the
-    original-pipeline-only cohort and any publications where the new pipeline failed
-    to write.
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise EnvironmentError(
+            "DATABASE_URL is required by the DOI enrichment phase (set-based read/write). "
+            "Use the direct 5432 connection, not the 6543 pooler."
+        )
+    return psycopg2.connect(url)
+
+
+def fetch_publications_with_doi(
+    target_version: str = "v1",
+    stale_days: Optional[int] = None,
+    max_refresh: Optional[int] = None,
+    stale_since_year: Optional[int] = None,
+    pg_conn=None,
+) -> List[Dict]:
+    """Publications with a DOI that need enrichment: the NULL backlog, plus optionally stale rows.
+
+    THE BACKLOG IS ALWAYS INCLUDED, NEVER REPLACED. --stale-days ADDS the re-enrich slice to the
+    never-enriched set; it does not swap one for the other. Replacing would let a refresh run
+    silently skip publications that have no OpenAlex data at all -- the one class with nothing to
+    fall back on. NULLS FIRST ordering puts them at the head of the queue, so a --max-refresh cap
+    drains the backlog before it spends any budget on refreshes.
+
+    ORDER IS openalex_enriched_at ASC NULLS FIRST, which makes --max-refresh converge: each run
+    takes the oldest slice, stamps it with now(), and the next run takes the next-oldest. A cap
+    plus this ordering turns an unbounded refresh into a fixed per-run budget that sweeps the
+    whole corpus over successive runs.
+
+    --stale-since-year is the cheap approximation of age-aware refresh. A 2015 paper's citation
+    count moves a few counts a year; a 2026 paper's moves weekly. Restricting to recent pub_year
+    spends the budget where the numbers actually change.
+
+    READ OVER PSYCOPG, not PostgREST: NULLS FIRST is not expressible through the client, and the
+    OR of "null or older than N days" is far clearer in SQL than in a .or_() filter string.
     """
     publications_table = get_table_name("publications", target_version)
-    publications: List[Dict] = []
-    offset = 0
+    owns_conn = pg_conn is None
+    conn = pg_conn or get_pg_conn()
 
-    while True:
-        try:
-            response = (
-                supabase.table(publications_table)
-                .select("id,doi,citation_count")
-                .not_.is_("doi", "null")
-                .is_("openalex_enriched_at", "null")
-                .order("id")
-                .range(offset, offset + FETCH_PAGE_SIZE - 1)
-                .execute()
+    where = ["doi IS NOT NULL"]
+    params: List[object] = []
+    if stale_days is None:
+        where.append("openalex_enriched_at IS NULL")
+    else:
+        where.append(
+            "(openalex_enriched_at IS NULL "
+            " OR openalex_enriched_at < now() - make_interval(days => %s))"
+        )
+        params.append(int(stale_days))
+        if stale_since_year is not None:
+            # Applies to the STALE arm only -- the never-enriched backlog is drained regardless
+            # of publication year, because "no data at all" is not a staleness question.
+            where[-1] = (
+                "(openalex_enriched_at IS NULL "
+                " OR (openalex_enriched_at < now() - make_interval(days => %s) "
+                "     AND pub_year >= %s))"
             )
-        except Exception as exc:
-            raise RuntimeError(f"Failed loading publications page at offset {offset}: {exc}") from exc
+            params.append(int(stale_since_year))
 
-        batch = response.data or []
-        if not batch:
-            break
+    sql = (
+        f"SELECT id::text, doi, citation_count FROM {publications_table} "
+        f"WHERE {' AND '.join(where)} "
+        f"ORDER BY openalex_enriched_at ASC NULLS FIRST, id"
+    )
+    if max_refresh is not None:
+        sql += " LIMIT %s"
+        params.append(int(max_refresh))
 
-        for row in batch:
-            doi = normalize_doi(row.get("doi"))
-            if doi:
-                row["doi"] = doi
-                publications.append(row)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+    finally:
+        if owns_conn:
+            conn.close()
 
-        if len(batch) < FETCH_PAGE_SIZE:
-            break
-        offset += FETCH_PAGE_SIZE
-
+    publications: List[Dict] = []
+    for row in rows:
+        doi = normalize_doi(row[1])
+        if doi:
+            publications.append({"id": row[0], "doi": doi, "citation_count": row[2]})
     return publications
 
 
@@ -359,43 +428,78 @@ def extract_publication_fields(work_payload: Dict) -> Dict:
     }
 
 
-def update_publication_enrichment(
-    supabase: Client,
-    publication_id: str,
-    fields: Dict,
+# The seven OpenAlex-owned columns, in the order the VALUES tuples carry them. jsonb columns
+# are wrapped in psycopg2's Json adapter; citation_count is an int, publication_type text.
+_ENRICH_JSONB = ("citation_counts_by_year", "authorships", "primary_location",
+                 "openalex_concepts", "open_access")
+
+
+def update_publications_enrichment_batch(
+    pg_conn,
+    pending: Sequence[tuple],
     target_version: str = "v1",
-) -> None:
+) -> int:
+    """Set-based UPDATE for a batch of (publication_id, fields). Returns rows written.
+
+    THIS REPLACED ONE POSTGREST UPDATE PER PUBLICATION (2026-08-27). The fetch side of this
+    pipeline has always batched 100 DOIs into a single OpenAlex call; the WRITE side did
+    `.update(...).eq("id", publication_id)` once per row -- the exact shape ORCHESTRATOR_DEBT.md
+    records as its top finding (stage 6: 631,928 PostgREST UPDATEs, 13.3 hours, ~76ms each).
+    At that rate a full corpus refresh of 542,821 enriched rows was ~11.4 hours, write-dominated
+    roughly 15:1 over the fetch. Batched, the same work is ~1,100 statements and the run becomes
+    fetch-bound. Without this, --stale-days would be a switch nobody could afford to flip.
+
+    COALESCE PRESERVES THE OLD PER-FIELD SEMANTICS EXACTLY. The row-at-a-time writer built its
+    update dict from non-None values only, so a field OpenAlex did not return left the existing
+    value alone. A set-based UPDATE has one column list for the whole batch, so that behaviour
+    has to be written out: COALESCE(v.col, p.col) per column. Without it, one publication missing
+    open_access would null that column for itself -- reintroducing, per-field, the same
+    overwrite-with-nothing bug just removed from pubmed_pipeline's payload.
+
+    openalex_enriched_at is the ONE column set unconditionally. It is the progress marker and the
+    staleness clock; COALESCE-ing it would mean a refreshed row never records that it was
+    refreshed, and --stale-days would re-select it forever.
     """
-    Update a publication row with extracted OpenAlex fields.
-    Writes all non-None values and always sets openalex_enriched_at to current UTC.
-    """
+    if not pending:
+        return 0
     publications_table = get_table_name("publications", target_version)
-    update_dict: Dict = {}
-    if fields.get("citation_count") is not None:
-        update_dict["citation_count"] = fields["citation_count"]
-    for key in (
-        "citation_counts_by_year",
-        "authorships",
-        "primary_location",
-        "openalex_concepts",
-        "open_access",
-    ):
-        if fields.get(key) is not None:
-            update_dict[key] = fields[key]
-    if fields.get("publication_type") is not None:
-        update_dict["publication_type"] = fields["publication_type"]
+    now_iso = datetime.now(timezone.utc)
 
-    update_dict["openalex_enriched_at"] = datetime.now(timezone.utc).isoformat()
+    values = []
+    for publication_id, fields in pending:
+        values.append((
+            publication_id,
+            fields.get("citation_count"),
+            *[Json(fields[k]) if fields.get(k) is not None else None for k in _ENRICH_JSONB],
+            fields.get("publication_type"),
+            now_iso,
+        ))
 
-    try:
-        response = supabase.table(publications_table).update(update_dict).eq("id", publication_id).execute()
-        if not response.data:
-            raise RuntimeError(
-                f"Update returned empty data for publication {publication_id} - "
-                f"row not matched or write silently dropped"
-            )
-    except Exception as exc:
-        raise RuntimeError(f"Failed updating publication {publication_id}: {exc}") from exc
+    sql = f"""
+        UPDATE {publications_table} p
+           SET citation_count          = COALESCE(v.citation_count, p.citation_count),
+               citation_counts_by_year = COALESCE(v.citation_counts_by_year, p.citation_counts_by_year),
+               authorships             = COALESCE(v.authorships, p.authorships),
+               primary_location        = COALESCE(v.primary_location, p.primary_location),
+               openalex_concepts       = COALESCE(v.openalex_concepts, p.openalex_concepts),
+               open_access             = COALESCE(v.open_access, p.open_access),
+               publication_type        = COALESCE(v.publication_type, p.publication_type),
+               openalex_enriched_at    = v.openalex_enriched_at
+          FROM (VALUES %s) AS v(id, citation_count, citation_counts_by_year, authorships,
+                                primary_location, openalex_concepts, open_access,
+                                publication_type, openalex_enriched_at)
+         WHERE p.id = v.id
+    """
+    template = ("(%s::uuid, %s::integer, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, "
+                "%s::jsonb, %s::text, %s::timestamptz)")
+
+    written = 0
+    with pg_conn.cursor() as cur:
+        for start in range(0, len(values), WRITE_BATCH_SIZE):
+            chunk = values[start : start + WRITE_BATCH_SIZE]
+            execute_values(cur, sql, chunk, template=template)
+            written += cur.rowcount or 0
+    return written
 
 
 def search_openalex_authors(
@@ -582,6 +686,9 @@ def run_pipeline(
     skip_career_enrichment: bool = False,
     reset_checkpoint: bool = False,
     target_version: str = "v1",
+    stale_days: Optional[int] = None,
+    max_refresh: Optional[int] = None,
+    stale_since_year: Optional[int] = None,
 ) -> None:
     load_dotenv()
     supabase = init_supabase()
@@ -596,10 +703,39 @@ def run_pipeline(
             if checkpoint_path.exists():
                 checkpoint_path.unlink()
                 print("Checkpoint reset; processing full cohort.")
-        print("Loading unenriched publications with DOI (openalex_enriched_at is null)...")
-        publications = fetch_publications_with_doi(supabase, target_version)
-        processed_ids = load_checkpoint(target_version)
-        publications_to_process = [p for p in publications if str(p["id"]) not in processed_ids]
+
+        pg_conn = get_pg_conn()
+        if stale_days is None:
+            print("Loading unenriched publications with DOI (openalex_enriched_at is null)...")
+        else:
+            print(
+                f"Loading publications with DOI: the NULL backlog PLUS anything enriched more "
+                f"than {stale_days} days ago"
+                + (f", pub_year >= {stale_since_year}" if stale_since_year is not None else "")
+                + (f", oldest {max_refresh:,} first" if max_refresh is not None else ", uncapped")
+                + "..."
+            )
+        publications = fetch_publications_with_doi(
+            target_version,
+            stale_days=stale_days, max_refresh=max_refresh,
+            stale_since_year=stale_since_year, pg_conn=pg_conn,
+        )
+
+        # CHECKPOINT BYPASS IN REFRESH MODE (2026-08-27). The checkpoint is a CUMULATIVE set of
+        # publication ids this script has ever processed, so every stale row is already in it from
+        # its original enrichment. Honouring it here would select exactly the right rows and then
+        # filter all of them out -- a silent no-op, the same class of bug that cost 23-vs-368 pubs
+        # in pubmed_pipeline and that reingest_cycle now defends against by always passing
+        # --reset-checkpoint. In refresh mode openalex_enriched_at IS the progress marker: it is
+        # stamped on every successful write, so a killed run resumes correctly from the database
+        # with no file involved, and cannot disagree with it.
+        if stale_days is None:
+            processed_ids = load_checkpoint(target_version)
+            publications_to_process = [p for p in publications if str(p["id"]) not in processed_ids]
+        else:
+            processed_ids = set()
+            publications_to_process = list(publications)
+            print("Refresh mode: checkpoint bypassed; openalex_enriched_at is the progress marker.")
         stats = PipelineStats(total_loaded=len(publications))
         already = len(publications) - len(publications_to_process)
         k = len(publications_to_process)
@@ -629,30 +765,53 @@ def run_pipeline(
                         _print_doi_batch_progress(stats, batch_index, total_batches, start_time)
                     continue
 
+                # THE WRITE CONTRACT, same as backfill_pubmed_fields.py: a DOI OpenAlex did not
+                # return gets NO WRITE. Its openalex_enriched_at is left as it was -- NULL for a
+                # backlog row, its old timestamp for a stale one -- so it stays selectable and the
+                # next run retries it. Absence of an answer is not an answer, and stamping the
+                # marker on a row we learned nothing about would silently retire it forever.
+                pending: List[tuple] = []
                 for publication in batch:
                     publication_id = publication.get("id")
                     doi = publication.get("doi")
 
                     if not publication_id or not doi:
                         stats.failed += 1
-                    else:
-                        work = works_map.get(doi)
-                        if work is None:
-                            stats.not_found_or_missing_citations += 1
-                        else:
-                            fields = extract_publication_fields(work)
-                            has_any_field = any(value is not None for value in fields.values())
-                            if not has_any_field:
-                                stats.not_found_or_missing_citations += 1
-                                processed_ids.add(str(publication["id"]))
-                                continue
-                            try:
-                                update_publication_enrichment(supabase, str(publication_id), fields, target_version)
-                            except RuntimeError:
-                                stats.failed += 1
-                            else:
-                                stats.updated += 1
+                        processed_ids.add(str(publication["id"]))
+                        continue
+
+                    work = works_map.get(doi)
+                    if work is None:
+                        stats.not_found_or_missing_citations += 1
+                        processed_ids.add(str(publication["id"]))
+                        continue
+
+                    fields = extract_publication_fields(work)
+                    if not any(value is not None for value in fields.values()):
+                        stats.not_found_or_missing_citations += 1
+                        processed_ids.add(str(publication["id"]))
+                        continue
+
+                    pending.append((str(publication_id), fields))
                     processed_ids.add(str(publication["id"]))
+
+                assert all(pid in {str(p["id"]) for p in batch} for pid, _ in pending), (
+                    "write batch contains a publication id that was not in the fetched batch"
+                )
+
+                if pending:
+                    try:
+                        written = update_publications_enrichment_batch(pg_conn, pending, target_version)
+                        pg_conn.commit()
+                    except Exception as exc:
+                        pg_conn.rollback()
+                        # Batch granularity: the row-at-a-time writer failed one publication at a
+                        # time. Reported honestly rather than silently -- a failed chunk is
+                        # re-selected next run because its marker was never stamped.
+                        stats.failed += len(pending)
+                        logger.warning("Batch UPDATE failed for %d publication(s): %s", len(pending), exc)
+                    else:
+                        stats.updated += written
 
                 stats.processed += len(batch)
                 time.sleep(BATCH_SLEEP_SECONDS)
@@ -663,6 +822,7 @@ def run_pipeline(
                     _print_doi_batch_progress(stats, batch_index, total_batches, start_time)
 
         save_checkpoint(processed_ids, target_version)
+        pg_conn.close()
 
         print("\n=== OpenAlex DOI Enrichment Summary ===")
         print(f"Total loaded: {stats.total_loaded}")
@@ -711,12 +871,47 @@ if __name__ == "__main__":
             default="v1",
             help="Schema version to write to. v1=legacy tables, v2=rebuild tables.",
         )
+        # NO DEFAULT ON --stale-days, deliberately. The right interval depends on publication age,
+        # not wall-clock: an old paper's citation count barely moves, a recent one's moves weekly,
+        # and any single number either over-refreshes the old corpus or under-refreshes the new.
+        # Leaving it unset keeps the historical behaviour (drain the NULL backlog) exactly, so
+        # nothing that invokes this script today changes.
+        parser.add_argument(
+            "--stale-days",
+            type=int,
+            default=None,
+            help="ALSO re-enrich publications last enriched more than N days ago. The NULL backlog "
+                 "is always included regardless. Bypasses the checkpoint (see run_pipeline).",
+        )
+        parser.add_argument(
+            "--max-refresh",
+            type=int,
+            default=None,
+            help="Cap the publications selected this run, oldest-enriched first. Converts an "
+                 "unbounded refresh into a fixed per-run budget that converges over successive "
+                 "runs. Recommended whenever --stale-days is set.",
+        )
+        parser.add_argument(
+            "--stale-since-year",
+            type=int,
+            default=None,
+            help="Restrict the STALE arm to pub_year >= Y (the NULL backlog is unaffected). Spends "
+                 "the refresh budget on publications whose counts still move.",
+        )
         args = parser.parse_args()
+        if args.max_refresh is not None and args.stale_days is None:
+            print("[WARN] --max-refresh without --stale-days caps the NULL backlog drain. "
+                  "That is legal but probably not what you meant.")
+        if args.stale_since_year is not None and args.stale_days is None:
+            parser.error("--stale-since-year has no effect without --stale-days.")
         run_pipeline(
             skip_doi_enrichment=args.skip_doi_enrichment or env_flag_true("SKIP_DOI_ENRICHMENT"),
             skip_career_enrichment=args.skip_career_enrichment,
             reset_checkpoint=args.reset_checkpoint,
             target_version=args.target_version,
+            stale_days=args.stale_days,
+            max_refresh=args.max_refresh,
+            stale_since_year=args.stale_since_year,
         )
     except Exception as error:
         print(f"[ERROR] OpenAlex pipeline failed: {error}")
