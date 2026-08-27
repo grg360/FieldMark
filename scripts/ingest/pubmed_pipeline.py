@@ -1235,24 +1235,45 @@ def _publication_v2_row(
 
     SO ARE abstract, language, mesh_terms and publication_types, since 2026-08-26. All four were
     hardcoded to None from 2026-07-02 (5f5c0d7) while the XML sat in scope; see the block above the
-    parsers for the measured cost. THE REMAINING NULLS ARE DELIBERATE and are not the same defect:
-    openalex_work_id, citation_count, citation_counts_by_year and openalex_enriched_at are not in
-    the E-utilities efetch response at all and are filled by the OpenAlex enrichment stage.
+    parsers for the measured cost.
 
     RE-INGEST NOW REPAIRS RATHER THAN ERASES. The upsert is on_conflict='pubmed_id' and these keys
     are in the payload, so PostgREST writes them on every conflict. While they were None that made a
     re-ingest DESTRUCTIVE -- re-touching a PMID that ingest_publications.py had populated would have
-    nulled all four. Now the same path backfills them. That reversal is what makes a backfill free:
-    re-running this pipeline over an existing corpus repairs it in place.
+    nulled all four. Now the same path backfills them.
 
-    NOTE: ingestion_run_id is intentionally NOT in this payload. Including it would make the
-    on_conflict="pubmed_id" upsert overwrite it on every re-ingest (last-wrote semantics). It is
-    INSERT-ONLY: stamped in upsert_publications on rows where it is still NULL (created-by).
+    WHAT IS IN THIS PAYLOAD IS WHAT A RE-INGEST OVERWRITES. That is the whole contract. A key
+    belongs here only if THIS function can derive it from THIS article's XML; anything else is
+    someone else's column and must be omitted, not set to None.
+
+    THE FOUR OPENALEX COLUMNS ARE OMITTED FOR EXACTLY THAT REASON (2026-08-27). openalex_work_id,
+    citation_count, citation_counts_by_year and openalex_enriched_at used to sit here as explicit
+    None. They cannot be parsed from an E-utilities efetch response -- they are written by
+    enrich/openalex_pipeline.py -- so carrying them meant every re-touch of an existing PMID
+    silently erased another stage's work. Measured on CRC before the scoped backfill was written:
+    a full pipeline re-run would have nulled 142,450 citation_counts, 142,450
+    citation_counts_by_year and 142,450 openalex_enriched_at. citation_count is a direct input to
+    publication_leadership_scoring (W_SENIOR_CITATION_LOG 12.0, W_FIRST_CITATION_LOG 5.0), so the
+    re-run would have broken the board it was meant to unblock. All four are nullable with no
+    column default, so omitting them yields NULL on INSERT -- byte-identical to the explicit None
+    for a genuinely new publication, and a no-op on conflict.
+
+    CONSEQUENCE, DELIBERATE: an already-enriched row is no longer reset to
+    openalex_enriched_at IS NULL by a re-ingest, and openalex_pipeline.fetch_publications_with_doi()
+    selects on exactly that predicate. So citation counts on existing rows are no longer refreshed
+    as a side effect of re-ingestion. They were only ever refreshed BY THE DESTRUCTION -- null the
+    timestamp, re-enrich next cycle -- which is not a refresh mechanism, it is a bug with an
+    upside. A real refresh wants an explicit re-enrich path (a --since / --stale-days selector on
+    openalex_pipeline); until that exists, counts on already-enriched publications are frozen.
+
+    NOTE: ingestion_run_id is intentionally NOT in this payload either, for a different reason.
+    Including it would make the on_conflict="pubmed_id" upsert overwrite it on every re-ingest
+    (last-wrote semantics). It is INSERT-ONLY: stamped in upsert_publications on rows where it is
+    still NULL (created-by).
     """
     return {
         "pubmed_id": pmid,
         "doi": parse_doi(article),
-        "openalex_work_id": None,
         "title": text_or_none(article.find("./MedlineCitation/Article/ArticleTitle")),
         "abstract": parse_abstract(article),
         "journal": text_or_none(article.find("./MedlineCitation/Article/Journal/Title")),
@@ -1262,13 +1283,17 @@ def _publication_v2_row(
         "pubmed_authorships": parse_authorships(article),
         "mesh_terms": parse_mesh_terms(article),
         "publication_types": parse_publication_types(article),
-        "citation_count": None,  # Not available directly in E-utilities efetch response.
-        "citation_counts_by_year": None,
-        "openalex_enriched_at": None,
         "source_therapeutic_area_id": therapeutic_area_id,
         "source": PUBMED_SOURCE,
-        # ingestion_run_id deliberately omitted -> excluded from the ON CONFLICT UPDATE set,
-        # so a re-ingest never overwrites a pre-existing value. Stamped insert-only below.
+        # DELIBERATELY OMITTED -- see the docstring. Every key present here is overwritten on
+        # conflict, so a key this function cannot derive from the XML must not appear at all:
+        #   openalex_work_id, citation_count, citation_counts_by_year, openalex_enriched_at
+        #     -> owned by enrich/openalex_pipeline.py. Nullable, no column default, so they
+        #        default to NULL on INSERT and are untouched on UPDATE.
+        #   ingestion_run_id
+        #     -> insert-only (created-by), stamped in upsert_publications where still NULL.
+        #   ingested_at
+        #     -> DEFAULT now() on INSERT; omitted so a re-ingest does not restamp it.
     }
 
 
