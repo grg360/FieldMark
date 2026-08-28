@@ -722,13 +722,16 @@ def confirm_build_mode(
         raise SystemExit("Aborted by operator.")
 
 
+# TA RESOLUTION MOVED TO scripts/utils/ta_registry.py (2026-08-27). Signature kept -- this
+# one takes only the slug and opened its own connection; the registry does the same, so the
+# call sites are unchanged. See the shared module for why nine copies became one.
+import os as _os, sys as _sys  # noqa: E402
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "utils"))
+from ta_registry import resolve_ta as _resolve_ta  # noqa: E402
+
+
 def resolve_ta_id(slug: str) -> str:
-    with _connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT id FROM therapeutic_areas WHERE slug = %s", (slug,))
-        row = cur.fetchone()
-        if not row:
-            raise SystemExit(f"No therapeutic_area with slug '{slug}'.")
-        return str(row[0])
+    return _resolve_ta(slug).id
 
 
 def _write_ids_file(sql: str, params: Tuple, path: Path, label: str) -> int:

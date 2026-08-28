@@ -112,18 +112,12 @@ def _ensure_dataframe(result: Union[pd.DataFrame, pd.Series]) -> pd.DataFrame:
     return result
 
 
-def resolve_ta_id(supabase: Client, slug: str) -> str:
-    response = (
-        supabase.table("therapeutic_areas")
-        .select("id")
-        .eq("slug", slug)
-        .limit(1)
-        .execute()
-    )
-    rows = response.data or []
-    if not rows:
-        raise RuntimeError(f"No therapeutic_area found with slug='{slug}'")
-    return str(rows[0]["id"])
+# TA RESOLUTION MOVED TO scripts/utils/ta_registry.py (2026-08-27). Supabase variant: this
+# script holds a PostgREST client, not a DB connection, so it uses the client-side resolver.
+# Same cache, same error listing every valid slug.
+import os as _os, sys as _sys  # noqa: E402
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
+from ta_registry import resolve_ta_id_supabase as resolve_ta_id  # noqa: E402,F401
 
 
 def fetch_community_hcp_ids(supabase: Client, ta_id: str) -> List[str]:

@@ -29,8 +29,10 @@ import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 
-NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
-AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
+# TA uuids are no longer constants here -- see the note above TA_CONFIGS.
+import os as _os, sys as _sys  # noqa: E402
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
+from ta_registry import resolve_ta  # noqa: E402
 MODEL_NAME = "claude-sonnet-4-6"
 MIN_ABSTRACT_LENGTH = 800
 MIN_YEAR = 2020
@@ -60,9 +62,19 @@ USAGE = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
 # Per-TA config. The nsclc entry reproduces the original prompt text verbatim so
 # its rendered prompt is byte-for-byte identical; non-NSCLC TAs use TA-neutral
 # teaching exemplars so extraction is not biased toward NSCLC drugs/biomarkers.
+# TA UUIDs REMOVED FROM THIS DICT (2026-08-27). They were hardcoded here, again in
+# generate_scientific_position_synthesis, and again in extract_research_themes -- three copies
+# of the same three constants, none of which the database knows about. The id is now resolved
+# at USE time via scripts/utils/ta_registry.
+#
+# RESOLVED AT USE TIME, NOT AT IMPORT, deliberately: this dict is built at module scope, so
+# calling the resolver here would make merely importing the module open a database connection.
+# generate_cycle imports extract_research_themes for its TA_CONFIGS precisely because that
+# module has no import-time side effects; the same property is worth keeping here.
+#
+# What remains in the dict is what is genuinely per-script: the prompt fragments.
 TA_CONFIGS: dict[str, dict[str, str]] = {
     "nsclc": {
-        "ta_id": NSCLC_TA_ID,
         "label": "NSCLC",
         "finding_position_example": (
             '- Finding (avoid): "Median TTD was 13.2 vs 7.5 months."\n'
@@ -72,7 +84,6 @@ TA_CONFIGS: dict[str, dict[str, str]] = {
         "biomarker_examples": "PD-L1, mutation status, ctDNA, molecular markers",
     },
     "atopic-dermatitis": {
-        "ta_id": AD_TA_ID,
         "label": "atopic dermatitis",
         "finding_position_example": (
             '- Finding (avoid): "The active arm achieved a higher response rate '
@@ -84,6 +95,25 @@ TA_CONFIGS: dict[str, dict[str, str]] = {
         "biomarker_examples": (
             "disease-relevant molecular or serologic markers, expression or "
             "mutation status, biomarker levels"
+        ),
+    },
+    "colorectal-cancer": {
+        "label": "colorectal cancer",
+        # TA-NEUTRAL, following the atopic-dermatitis entry rather than nsclc's. The
+        # nsclc exemplar names a real drug and a real endpoint pair ("amivantamab-
+        # chemotherapy", "TTD and TTST"), which is safe there because it reproduces the
+        # original prompt verbatim, but as a template it teaches the model which answers
+        # the TA is supposed to produce. These teach the finding-vs-position DISTINCTION
+        # without asserting any CRC biology.
+        "finding_position_example": (
+            '- Finding (avoid): "The experimental arm showed longer progression-free '
+            'survival than the control arm."\n'
+            '- Position (extract): "The size and durability of the benefit justify '
+            'this regimen as a preferred option for the biomarker-defined subgroup."'
+        ),
+        "biomarker_examples": (
+            "disease-relevant molecular or serologic markers, mismatch-repair or "
+            "microsatellite status, mutation status, ctDNA"
         ),
     },
 }
@@ -610,7 +640,7 @@ def main() -> int:
     load_dotenv()
     args = parse_args()
     ta = TA_CONFIGS[args.ta]
-    ta_id = ta["ta_id"]
+    ta_id = resolve_ta(args.ta).id
 
     effective_limit = args.limit
     if args.dry_run:

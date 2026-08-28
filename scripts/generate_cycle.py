@@ -96,37 +96,83 @@ def get_conn():
     return psycopg2.connect(url)
 
 
-def scalar(conn, sql: str, params: tuple = ()) -> int:
+def scalar(conn, sql: str, params=()) -> int:
+    """params may be a tuple (%s placeholders) or a dict (%(name)s placeholders)."""
     with conn.cursor() as cur:
         cur.execute(sql, params)
         row = cur.fetchone()
         return int(row[0]) if row and row[0] is not None else 0
 
 
-def read_ta_configs_tag(slug: str) -> Optional[str]:
-    """G1's `tag` for this slug, parsed from extract_research_themes.py WITHOUT importing it.
+def _themes_ta_configs() -> Optional[Dict[str, Dict]]:
+    """extract_research_themes.TA_CONFIGS, imported -- not regex-parsed out of the source.
 
-    Importing would run load_dotenv() and construct an Anthropic client. Parsing is side-effect
-    free. The value is the script's own hardcoded literal -- it cannot be derived from the slug or
-    the name, and whatever sits in that dict BECOMES the value written to
-    hcp_research_themes_v2.therapeutic_area. A missing entry is not a config gap to paper over; it
-    means nobody has made the cohort-scoping decision for this TA yet (the entry also needs a
-    `selection` SQL), so G1 is genuinely not runnable.
+    This used to scrape the dict with a regex, on the belief that importing would run
+    load_dotenv() and construct an Anthropic client. That was wrong: both happen inside
+    main() (:648 and :692), and the module has no top-level statements at all. bucket_themes
+    now imports it for exactly this reason.
+
+    Importing rather than parsing is what makes the WORK-SET honest. The regex could only
+    ever reach `tag`; the thing that actually decides G1's cost and completion is the
+    `selection` SQL, which is a multi-line string that regex-scraping a nested dict cannot
+    reliably recover. Returns None if the import fails for any reason -- callers degrade to a
+    labelled proxy rather than crashing the orchestrator over a config read.
     """
-    path = REPO_ROOT / "scripts" / "classify" / "extract_research_themes.py"
-    if not path.exists():
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "scripts" / "classify"))
+        import extract_research_themes as _themes  # noqa: PLC0415
+        return dict(_themes.TA_CONFIGS)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[warn] could not import extract_research_themes.TA_CONFIGS ({exc}); "
+              f"G1 falls back to a labelled proxy work-set")
         return None
-    text = io.open(path, encoding="utf-8").read()
-    block = re.search(r"TA_CONFIGS\s*=\s*\{(.*?)\n\}", text, re.S)
-    if not block:
+
+
+def read_ta_configs_tag(slug: str) -> Optional[str]:
+    """G1's `tag` for this slug -- the literal written to
+    hcp_research_themes_v2.therapeutic_area.
+
+    It cannot be derived from the slug or the name; whatever sits in that dict BECOMES the
+    stored value. A missing entry is not a config gap to paper over -- it means nobody has
+    made the cohort-scoping decision for this TA yet (the entry also needs a `selection`
+    SQL), so G1 is genuinely not runnable.
+    """
+    cfg = _themes_ta_configs()
+    if not cfg:
         return None
-    entry = re.search(
-        rf'"{re.escape(slug)}"\s*:\s*\{{(.*?)\n    \}}', block.group(1), re.S
-    )
+    entry = cfg.get(slug)
+    return entry.get("tag") if entry else None
+
+
+def themes_selection_sql(slug: str) -> Tuple[Optional[str], Optional[str]]:
+    """(sql, scope_name) for the TA's DEFAULT selection scope, or (None, reason).
+
+    THIS IS THE FIX for G1 reporting BELOW THRESHOLD on a stage that completed. G1's
+    work-set was the whole TA population -- every HCP in hcp_therapeutic_areas_v2 without a
+    theme row, 106,551 for CRC -- but extract_research_themes does not target that. It
+    targets TA_CONFIGS[slug]["selection"][scope], which for CRC's default scope is the
+    140-member rising board. The postcheck therefore demanded 90% of 106,551 (95,792) from a
+    run that had correctly written 115, and re-ran a completed billed stage.
+
+    Same root cause as the cost estimate's upper bound: a proxy standing in for a scope the
+    orchestrator could have read directly.
+    """
+    cfg = _themes_ta_configs()
+    if not cfg:
+        return None, "TA_CONFIGS unavailable"
+    entry = cfg.get(slug)
     if not entry:
-        return None
-    tag = re.search(r'"tag"\s*:\s*"([^"]+)"', entry.group(1))
-    return tag.group(1) if tag else None
+        return None, f"no TA_CONFIGS entry for {slug}"
+    scope = entry.get("default_scope")
+    sql = (entry.get("selection") or {}).get(scope)
+    if not sql:
+        return None, f"no selection SQL for default_scope={scope!r}"
+    if "%(scope_value)s" in sql:
+        # Region-scoped selections need a country list the orchestrator has no way to
+        # choose. Refuse to guess -- a wrong country list is a wrong work-set, which is the
+        # bug being fixed.
+        return None, f"default_scope={scope!r} is region-scoped and needs --scope-value"
+    return sql, scope
 
 
 def read_str_constant(rel_path: str, names: Tuple[str, ...]) -> Optional[str]:
@@ -585,13 +631,30 @@ def pre_g8(conn, ta):
 # --- verification (read the TARGET TABLE; never a counter) -------------------
 
 def ver_g1(conn, ta):
+    """Themed HCPs WITHIN THE SELECTION, so verify and work-set count the same population.
+
+    Counting themed HCPs across the whole TA while the work-set counted the selection was
+    half the mismatch: the two numbers described different sets, so their ratio meant
+    nothing. Both now describe the selection.
+    """
     if not ta.themes_tag:
         return 0, "hcp_research_themes_v2 (no TA_CONFIGS tag to query by)"
+    sql, _scope = themes_selection_sql(ta.slug)
+    if sql:
+        n = scalar(
+            conn,
+            f"SELECT count(*) FROM ({sql}) sel "
+            f"WHERE EXISTS (SELECT 1 FROM hcp_research_themes_v2 t "
+            f"              WHERE t.hcp_id = sel.id AND t.therapeutic_area = %(tag)s)",
+            {"ta_id": ta.uuid, "tag": ta.themes_tag},
+        )
+        return n, (f"hcp_research_themes_v2 @ {ta.themes_tag!r}, within the "
+                   f"{_scope!r} selection")
     return scalar(
         conn,
         "SELECT count(DISTINCT hcp_id) FROM hcp_research_themes_v2 WHERE therapeutic_area = %s",
         (ta.themes_tag,),
-    ), f"hcp_research_themes_v2 distinct hcp_id @ {ta.themes_tag!r}"
+    ), f"hcp_research_themes_v2 distinct hcp_id @ {ta.themes_tag!r} (WHOLE TA -- proxy)"
 
 
 def ver_g2(conn, ta):
@@ -666,17 +729,27 @@ def ver_g8(conn, ta):
 # --- work-sets (the billed pre-flight counts) -------------------------------
 
 def ws_g1(conn, ta):
-    """UPPER BOUND, not the billed count.
+    """THE ACTUAL TARGET COUNT: rows returned by the TA's own selection SQL.
 
-    This is the design's pre-flight query -- every HCP in the TA without a theme row. But
-    extract_research_themes.py scopes its actual targets with TA_CONFIGS[slug]["selection"], a
-    per-TA cohort SQL (nsclc: rising US only), so this over-counts by roughly two orders of
-    magnitude there. Kept as the bound because the selection SQL cannot be evaluated from here
-    without importing a billed script -- but LABELLED wherever printed, because an unlabelled
-    85,394 reads as a spend forecast.
+    Runs TA_CONFIGS[slug]["selection"][default_scope] verbatim -- the same statement
+    extract_research_themes runs -- so the work-set, the cost estimate and the postcheck all
+    describe the population the script will really call the API for.
+
+    Falls back to the old whole-TA proxy ONLY if the selection cannot be resolved, and
+    ws_g1_is_proxy() tells the caller so it can be labelled. An unlabelled proxy is what
+    caused the false BELOW THRESHOLD.
     """
     if not ta.themes_tag:
         return 0
+    sql, _scope = themes_selection_sql(ta.slug)
+    if sql:
+        # THE FULL SELECTION, not the remainder. Every other stage's work-set is the total
+        # target and the postcheck compares verify/work-set against POSTCONDITION_RATIO; a
+        # work-set of "what is left" would make that ratio compare done against remaining,
+        # which is meaningless. The BILLABLE count (what the script will actually call the
+        # API for, since it skips already-themed HCPs) is work-set minus verify, and
+        # print_cost reports that separately.
+        return scalar(conn, f"SELECT count(*) FROM ({sql}) sel", {"ta_id": ta.uuid})
     return scalar(
         conn,
         "SELECT count(*) FROM hcp_therapeutic_areas_v2 hta WHERE hta.therapeutic_area_id = %s "
@@ -684,6 +757,12 @@ def ws_g1(conn, ta):
         "AND t.therapeutic_area = %s)",
         (ta.uuid, ta.themes_tag),
     )
+
+
+def ws_g1_is_proxy(ta) -> Optional[str]:
+    """Reason string when ws_g1 fell back to the whole-TA proxy, else None."""
+    sql, reason = themes_selection_sql(ta.slug)
+    return None if sql else reason
 
 
 def ws_g2(conn, ta):
@@ -909,24 +988,32 @@ def count_tokens_floor(stage: Stage) -> Tuple[Optional[int], str]:
         return None, f"count_tokens unavailable ({type(exc).__name__})"
 
 
-def print_cost(stage: Stage, workset: int) -> None:
+def print_cost(stage: Stage, workset: int, ta: Optional[ResolvedTA] = None,
+               already: int = 0) -> None:
     if not stage.billed:
         return
     floor, how = count_tokens_floor(stage)
-    print(f"    cost      work-set {workset:,} calls")
+    billable = max(workset - already, 0)
+    print(f"    cost      work-set {workset:,} target"
+          + (f", {billable:,} still to do (the script skips already-processed HCPs)"
+             if already else ""))
     if stage.id == "G1":
-        print(f"              UPPER BOUND -- NOT scoped by TA_CONFIGS['selection'], the per-TA "
-              f"cohort SQL that decides G1's")
-        print(f"              real targets (nsclc selects rising-US only). A ceiling, not a "
-              f"forecast.")
+        reason = ws_g1_is_proxy(ta) if ta else "no TA resolved"
+        if reason:
+            print(f"              UPPER BOUND -- could not resolve the selection SQL "
+                  f"({reason}); this is the whole-TA")
+            print(f"              population, a ceiling and not a forecast.")
+        else:
+            print(f"              Scoped by TA_CONFIGS['selection'][default_scope] -- the "
+                  f"population the script really targets.")
     if floor is None:
         print(f"              INPUT FLOOR UNMEASURED -- {how}")
         print(f"              Refusing to substitute the built-in estimator (its 600-token "
               f"input constant is 3-5x low).")
         return
-    in_tok = floor * workset
+    in_tok = floor * billable
     in_usd = in_tok / 1_000_000 * PRICE_PER_MTOK_INPUT
-    print(f"              input FLOOR {floor:,} tok/call x {workset:,} = {in_tok:,} tok "
+    print(f"              input FLOOR {floor:,} tok/call x {billable:,} = {in_tok:,} tok "
           f"~= ${in_usd:,.2f}   [{how}]")
     print(f"              FLOOR ONLY: excludes the per-call payload (publication text, HCP "
           f"context). Output side is an assumption, not an estimate --")
@@ -978,7 +1065,7 @@ def run_stage(stage: Stage, ta: ResolvedTA, conn, execute: bool, state: Dict) ->
     workset = stage.workset(conn, ta)
     print(f"  verify    {before:,} rows in {vlabel}")
     print(f"  work-set  {workset:,}")
-    print_cost(stage, workset)
+    print_cost(stage, workset, ta, already=before)
 
     if before > 0 and workset > 0 and before >= workset * POSTCONDITION_RATIO:
         print(f"  SKIP      already complete "

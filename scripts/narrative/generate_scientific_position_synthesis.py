@@ -31,9 +31,11 @@ import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 
-NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
-NSCLC_TA_NAME = "NSCLC"
-AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1"
+NSCLC_TA_NAME = "NSCLC"  # written to hcp_ai_overviews.therapeutic_area for nsclc only
+# TA uuids are no longer constants here -- see the note above TA_CONFIGS.
+import os as _os, sys as _sys  # noqa: E402
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
+from ta_registry import resolve_ta  # noqa: E402
 MODEL_NAME = "claude-sonnet-4-6"
 SYNTHESIS_TYPE = "scientific_positions"
 ANTHROPIC_MAX_TOKENS = 4000
@@ -45,9 +47,20 @@ CONCURRENCY_LIMIT = 8
 # Per-TA config. The nsclc entry reproduces the original prompt text and written
 # tag ("NSCLC") verbatim so its behavior is byte-for-byte identical; non-NSCLC
 # TAs use TA-neutral theme exemplars and write their own slug tag.
+# TA UUIDs REMOVED FROM THIS DICT (2026-08-27). They were hardcoded here, again in
+# extract_scientific_positions, and again in extract_research_themes -- three copies of the
+# same constants, none of which the database knows about. The id is now resolved at USE time
+# via scripts/utils/ta_registry.
+#
+# RESOLVED AT USE TIME, NOT AT IMPORT, deliberately: this dict is built at module scope, so
+# calling the resolver here would make merely importing the module open a database connection.
+# generate_cycle imports extract_research_themes for its TA_CONFIGS precisely because that
+# module has no import-time side effects; the same property is worth keeping here.
+#
+# What remains in the dict is what is genuinely per-script: the prompt fragments and the
+# `tag` written to hcp_ai_overviews.therapeutic_area.
 TA_CONFIGS: dict[str, dict[str, str]] = {
     "nsclc": {
-        "ta_id": NSCLC_TA_ID,
         "tag": NSCLC_TA_NAME,  # written to hcp_ai_overviews.therapeutic_area
         "label": "NSCLC",  # prompt framing
         "theme_naming_examples": (
@@ -58,13 +71,28 @@ TA_CONFIGS: dict[str, dict[str, str]] = {
         ),
     },
     "atopic-dermatitis": {
-        "ta_id": AD_TA_ID,
         "tag": "atopic-dermatitis",  # slug, matches the frontend read
         "label": "atopic dermatitis",
         "theme_naming_examples": (
             '  - Good: name the scientific concept or strategy, e.g. '
             '"Combination Maintenance Strategy", "Early Treatment Escalation", '
             '"Biomarker-Guided Selection", "Long-Term Disease Control"\n'
+            '  - Bad: name a drug or a single endpoint result, e.g. '
+            '"Drug X Efficacy", "Agent Y Sequencing", "Compound Z Improves Endpoint"'
+        ),
+    },
+    "colorectal-cancer": {
+        # SLUG, following atopic-dermatitis. This is written to
+        # hcp_ai_overviews.therapeutic_area, the internally-inconsistent column that holds
+        # 'NSCLC' for one TA and 'atopic-dermatitis' for another. The slug is the platform
+        # convention and the form the frontend reads; nsclc's uppercase value is the
+        # outlier, preserved only because changing it would orphan 598 existing rows.
+        "tag": "colorectal-cancer",
+        "label": "colorectal cancer",
+        "theme_naming_examples": (
+            '  - Good: name the scientific concept or strategy, e.g. '
+            '"Biomarker-Guided Selection", "Treatment Sequencing Strategy", '
+            '"Locoregional Control", "Minimal Residual Disease Monitoring"\n'
             '  - Bad: name a drug or a single endpoint result, e.g. '
             '"Drug X Efficacy", "Agent Y Sequencing", "Compound Z Improves Endpoint"'
         ),
@@ -645,7 +673,7 @@ async def run_all_hcps(
         try:
             try:
                 async with db_lock:
-                    positions = get_positions_for_hcp(conn, hcp_id, ta["ta_id"])
+                    positions = get_positions_for_hcp(conn, hcp_id, _ta_id)
             except Exception as exc:
                 async with db_lock:
                     stats["db_errors"] += 1
@@ -751,6 +779,7 @@ def main() -> int:
     load_dotenv()
     args = parse_args()
     ta = TA_CONFIGS[args.ta]
+    _ta_id = resolve_ta(args.ta).id
 
     if args.hcp_id:
         effective_limit = None
@@ -778,7 +807,7 @@ def main() -> int:
             conn,
             args.hcp_id,
             effective_limit,
-            ta["ta_id"],
+            _ta_id,
             skip_existing=args.skip_existing,
             ta_tag=ta["tag"],
         )

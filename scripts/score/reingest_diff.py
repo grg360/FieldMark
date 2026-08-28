@@ -208,19 +208,12 @@ class SnapshotRow:
     pub_count: Optional[int]
 
 
-def resolve_ta_id(supabase: Client, ta_slug: str) -> str:
-    rows = (
-        supabase.table("therapeutic_areas")
-        .select("id,slug")
-        .eq("slug", ta_slug)   # slug is unique + lowercase; no ILIKE
-        .limit(1)
-        .execute()
-        .data
-        or []
-    )
-    if not rows:
-        raise SystemExit(f"No therapeutic_areas row for slug '{ta_slug}'")
-    return str(rows[0]["id"])
+# TA RESOLUTION MOVED TO scripts/utils/ta_registry.py (2026-08-27). Supabase variant: this
+# script holds a PostgREST client, not a DB connection, so it uses the client-side resolver.
+# Same cache, same error listing every valid slug.
+import os as _os, sys as _sys  # noqa: E402
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
+from ta_registry import resolve_ta_id_supabase as resolve_ta_id  # noqa: E402,F401
 
 
 def _int_or_none(v: Any) -> Optional[int]:

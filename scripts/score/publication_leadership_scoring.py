@@ -46,13 +46,15 @@ def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
 
-def resolve_ta_id(conn, slug: str) -> str:
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM therapeutic_areas WHERE slug = %s", (slug,))
-        row = cur.fetchone()
-        if not row:
-            raise ValueError(f"TA slug not found: {slug}")
-        return str(row[0])
+# TA RESOLUTION MOVED TO scripts/utils/ta_registry.py (2026-08-27).
+# Replaced a local resolve_ta_id that was one of NINE near-identical copies across sixteen
+# scripts -- same query, different return types (str(row[0]) / row[0] / row["id"]) and
+# different exceptions (ValueError / RuntimeError / SystemExit). Fifteen of them reported only
+# "TA slug not found: <slug>", which repeats the typo back without saying what IS valid.
+# The shared resolver caches per process and raises with the full slug list.
+import os as _os, sys as _sys  # noqa: E402
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
+from ta_registry import resolve_ta_id  # noqa: E402,F401
 
 
 def fetch_established_hcp_ids(conn, ta_id: str, limit: int | None = None) -> list[str]:
