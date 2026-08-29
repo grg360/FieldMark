@@ -31,6 +31,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,6 +55,27 @@ PRICE_PER_MTOK_OUTPUT = 15.00
 
 POSTCONDITION_RATIO = 0.90
 STATE_DIR = REPO_ROOT / ".generate_work"
+
+# ── CHILD OUTPUT CAPTURE ─────────────────────────────────────────────────────
+# Three diagnoses in the 2026-08-27/28 CRC session each cost multiple round-trips purely
+# because a child's output was gone by the time anyone looked:
+#   * bucket_themes pass-2 truncation -- needed a synthetic response rebuilt from real theme
+#     names and a count_tokens call to establish that 200 items could not fit in 8,192.
+#   * G8 exiting 1 -- needed reading generate_narratives_v2 end to end to find the
+#     confirmation prompt that EOFs without --yes.
+#   * "1,206 extracted / 393 held" -- needed tracing write_positions by hand.
+# Every one of those was answerable from the child's own stdout. It was streamed to a
+# terminal and discarded.
+#
+# TAIL_LINES = 150. Sized from what actually needs to survive, not a round number: a chained
+# Python traceback runs ~40-60 lines, generate_narratives_v2's cost-estimate plus summary
+# block ~25, and the progress lines immediately before a failure -- the causal context -- are
+# another ~20. 150 carries all three with room, and caps the state file at roughly 18 KB per
+# stage, which keeps generate_state.json something a person still reads rather than greps.
+# The FULL output always goes to the log file, so the tail is a convenience, never the record.
+TAIL_LINES = 150
+LOG_DIR_NAME = "logs"
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1029,6 +1051,19 @@ def state_path(slug: str) -> Path:
     return STATE_DIR / slug / "generate_state.json"
 
 
+def stage_log_path(slug: str, stage_id: str) -> Path:
+    """One log file per stage RUN, timestamped -- never overwritten.
+
+    Timestamped rather than fixed-name because a stage is commonly run several times (a
+    failure, a fix, a top-up), and the interesting one is often not the last. Keeping every
+    run costs kilobytes and preserves the before/after that makes a fix verifiable.
+    """
+    d = STATE_DIR / slug / LOG_DIR_NAME
+    d.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return d / f"{stage_id}-{stamp}.log"
+
+
 def load_state(slug: str) -> Dict:
     p = state_path(slug)
     if not p.is_file():
@@ -1091,28 +1126,74 @@ def run_stage(stage: Stage, ta: ResolvedTA, conn, execute: bool, state: Dict) ->
     # while letting each line be classified. On a hit we stop the child immediately rather
     # than letting it grind through the rest of its work-set against a closed account.
     hit: Optional[SpendLimitReached] = None
-    proc = subprocess.Popen(
-        cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1, errors="replace",
-    )
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        sys.stdout.write(line)
-        if hit is None:
-            hit = spend_limit_from_output(line, stage.id)
-            if hit:
-                print(f"\n  SPEND     wall detected in {stage.id} output -- terminating the "
-                      f"child; the rest of its work-set would fail identically.")
-                proc.terminate()
-    rc = proc.wait()
+    log_path = stage_log_path(ta.slug, stage.id)
+    # RING BUFFER, not a list. A stage like G3 or G7 prints progress per batch and can emit
+    # hundreds of thousands of lines; accumulating them to slice a tail would hold the whole
+    # run in memory for no benefit. deque(maxlen=) is O(1) and bounded by construction.
+    tail: deque = deque(maxlen=TAIL_LINES)
+    # NOTABLE lines are ring-buffered separately so a traceback that scrolled past 150 lines
+    # of trailing progress is still in the state file. Cheap, and it is exactly the line an
+    # operator looks for first.
+    notable: deque = deque(maxlen=40)
+    _NOTABLE = ("Traceback", "[ERROR]", "ERROR", "WARN", "Exception", "SAFETY VIOLATION")
+    line_count = 0
+    started = datetime.now(timezone.utc)
+
+    # STREAMS STAY MERGED (stderr=STDOUT), deliberately -- a deviation worth naming.
+    # Splitting them would give a separate stderr tail, but it would destroy the interleaving,
+    # and the interleaving is the diagnostic. "progress line, progress line, [ERROR] DB write
+    # failed for HCP x" reads as cause and effect; two separate tails do not. These scripts
+    # also print their errors with an identifiable prefix (`[ERROR]`, `Traceback`), so stderr
+    # lines stay findable by content -- which is what the `notable` buffer keys on.
+    with io.open(log_path, "w", encoding="utf-8", newline="") as logf:
+        logf.write(f"# stage   {stage.id} {stage.title}\n")
+        logf.write(f"# ta      {ta.slug}\n")
+        logf.write(f"# started {started.isoformat()}\n")
+        logf.write(f"# command {' '.join(cmd)}\n#\n")
+        proc = subprocess.Popen(
+            cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1, errors="replace",
+        )
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            sys.stdout.write(line)          # 1. terminal, unchanged
+            logf.write(line)                # 2. full log, streamed -- never buffered whole
+            tail.append(line.rstrip("\n"))  # 3. bounded tail
+            line_count += 1
+            if any(m in line for m in _NOTABLE):
+                notable.append(line.rstrip("\n"))
+            if hit is None:
+                hit = spend_limit_from_output(line, stage.id)
+                if hit:
+                    print(f"\n  SPEND     wall detected in {stage.id} output -- terminating the "
+                          f"child; the rest of its work-set would fail identically.")
+                    proc.terminate()
+        rc = proc.wait()
+        logf.write(f"#\n# exit    {rc}\n# lines   {line_count}\n")
+
+    # COMMAND LINE AS INVOKED, so a stage is re-runnable by hand from the state file alone --
+    # no reconstruction from build_cmd(), no guessing which flags this run used.
+    provenance = {
+        "command": " ".join(cmd),
+        "log": str(log_path.relative_to(REPO_ROOT)),
+        "exit": rc,
+        "output_lines": line_count,
+        "duration_s": round((datetime.now(timezone.utc) - started).total_seconds(), 1),
+        "tail": list(tail),
+    }
+    if notable:
+        provenance["notable"] = list(notable)
+    print(f"  log       {log_path.relative_to(REPO_ROOT)}  ({line_count:,} lines)")
 
     if hit:
         state[stage.id] = {"status": "spend-limit", "kind": hit.kind,
-                           "resumes_at": hit.resumes_at, "at": _now()}
+                           "resumes_at": hit.resumes_at, "at": _now(), **provenance}
         raise hit
     if rc != 0:
         print(f"  FAILED    exit {rc}")
-        state[stage.id] = {"status": "failed", "exit": rc, "at": _now()}
+        if notable:
+            print("  last notable line: " + notable[-1][:160])
+        state[stage.id] = {"status": "failed", "at": _now(), **provenance}
         return False
 
     after, _ = stage.verify(conn, ta)
@@ -1121,7 +1202,7 @@ def run_stage(stage: Stage, ta: ResolvedTA, conn, execute: bool, state: Dict) ->
     print(f"  postcheck {after:,} rows (was {before:,}, need >= {threshold:,}) "
           f"-> {'OK' if passed else 'BELOW THRESHOLD'}")
     state[stage.id] = {"status": "complete" if passed else "short", "actual": after,
-                       "expected": workset, "at": _now(), "verified": True}
+                       "expected": workset, "at": _now(), "verified": True, **provenance}
     return passed
 
 

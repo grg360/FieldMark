@@ -111,10 +111,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import io
 import re
 import subprocess
 import sys
 import time
+from collections import deque
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -218,11 +220,17 @@ MAX_STAGE = STAGE_ORDER[-1][0]
 
 
 class StageFailure(Exception):
-    def __init__(self, stage_no: int, name: str, returncode: int):
+    def __init__(self, stage_no: int, name: str, returncode: int,
+                 log_path: Optional[str] = None, tail: Optional[List[str]] = None):
         super().__init__(f"stage {stage_no} ({name}) exited {returncode}")
         self.stage_no = stage_no
         self.name = name
         self.returncode = returncode
+        # 2026-08-29: the child's output used to end at the terminal. run_stage now streams a
+        # full copy to .reingest_work/<slug>/logs/ and keeps a bounded tail; both ride on the
+        # exception so the top-level handler can name them without re-plumbing every caller.
+        self.log_path = log_path
+        self.tail = tail or []
 
 
 def get_required_env(name: str) -> str:
@@ -518,6 +526,22 @@ def cmd_narratives(slug: str, cohort: str, top_flag: Optional[str]) -> List[str]
 # Subprocess runner (streams live output, optionally captures a stdout pattern), fail-fast.
 # ---------------------------------------------------------------------------
 
+STAGE_TAIL_LINES = 150
+#: Set by main() once the slug is known. run_stage is called before that in no path today,
+#: but it stays Optional so an import-time or pre-slug call degrades to "no log file" rather
+#: than crashing a multi-hour run over a directory that does not exist yet.
+_LOG_DIR: Optional[Path] = None
+
+
+def _stage_log_path(stage_no: int, name: str) -> Optional[Path]:
+    if _LOG_DIR is None:
+        return None
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-")[:40]
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return _LOG_DIR / f"{stage_no:02d}-{safe}-{stamp}.log"
+
+
 def run_stage(
     stage_no: int, name: str, cmd: List[str],
     capture_pattern: Optional[str] = None, extra_env: Optional[Dict[str, str]] = None,
@@ -536,6 +560,16 @@ def run_stage(
     # stdin=DEVNULL: this orchestrator is unattended (3am cron). No stage should ever expect
     # interactive input; with DEVNULL a stray input() gets EOF and raises (fail-fast) instead of
     # blocking forever on an inherited pipe/TTY -- the exact ta_tagging hang after its committed reads.
+    # CHILD OUTPUT IS NOW PERSISTED (2026-08-29). Same reasoning as generate_cycle: a stage
+    # that fails at 3am leaves nothing behind but an exit code, and the diagnosis then costs a
+    # re-run of a multi-hour stage. Full copy to a timestamped file; bounded tail in memory for
+    # the failure message. deque(maxlen=) because stage 6 and 8b emit hundreds of thousands of
+    # progress lines and buffering them whole would be worse than the problem.
+    log_path = _stage_log_path(stage_no, name)
+    tail: deque = deque(maxlen=STAGE_TAIL_LINES)
+    logf = io.open(log_path, "w", encoding="utf-8", newline="") if log_path else None
+    if logf:
+        logf.write(f"# stage {stage_no} {name}\n# $ {_display(cmd)}\n#\n")
     proc = subprocess.Popen(
         cmd, cwd=str(REPO_ROOT), stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -544,6 +578,9 @@ def run_stage(
     assert proc.stdout is not None
     pat = re.compile(capture_pattern) if capture_pattern else None
     for line in proc.stdout:
+        if logf:
+            logf.write(line)
+        tail.append(line.rstrip("\n"))
         # BELT AND BRACES over force_utf8_stdio(). That reconfigure normally makes this
         # unencodable-character crash impossible, but it can be defeated -- stdout replaced by
         # a wrapper without reconfigure, a redirect this process does not control, a future
@@ -561,9 +598,16 @@ def run_stage(
                 captured = m.group(1)
     proc.wait()
     dt = time.time() - t0
+    if logf:
+        logf.write(f"#\n# exit {proc.returncode}  ({dt:.0f}s)\n")
+        logf.close()
     if proc.returncode != 0:
-        raise StageFailure(stage_no, name, proc.returncode)
-    print(f"[stage {stage_no}] {name} OK ({dt:.0f}s)", flush=True)
+        if log_path:
+            print(f"[stage {stage_no}] full output: {log_path}", flush=True)
+        raise StageFailure(stage_no, name, proc.returncode,
+                           log_path=str(log_path) if log_path else None, tail=list(tail))
+    print(f"[stage {stage_no}] {name} OK ({dt:.0f}s)"
+          + (f"  log: {log_path.name}" if log_path else ""), flush=True)
     return captured
 
 
@@ -789,6 +833,8 @@ def gen_ta_hcp_ids_file(ta_id: str, path: Path) -> int:
 def work_dir_for(slug: str) -> Path:
     d = REPO_ROOT / ".reingest_work" / slug
     d.mkdir(parents=True, exist_ok=True)
+    global _LOG_DIR
+    _LOG_DIR = d / "logs"
     return d
 
 
