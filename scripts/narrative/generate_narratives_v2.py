@@ -2626,7 +2626,7 @@ def run_pipeline(
     )
     if not contexts:
         print("No HCPs found for target cohorts. Exiting.")
-        return
+        return (0, 0)
 
     if not force:
         if not (dry_run and single_hcp_id):
@@ -2637,7 +2637,7 @@ def run_pipeline(
             print("[DRY RUN] Skipping freshness filter for single-HCP preview.")
         if not contexts:
             print("All contexts filtered by freshness. Exiting.")
-            return
+            return (0, 0)
 
     cohort_breakdown: Dict[str, int] = {}
     for ctx in contexts:
@@ -2697,7 +2697,7 @@ def run_pipeline(
                     print(f"[DRY RUN] Sample generation failed: {exc}")
             else:
                 print("[DRY RUN] No contexts available for sample narrative.")
-        return
+        return (0, 0)
 
     print(f"Narratives to generate by cohort:")
     for cohort, count in sorted(cohort_breakdown.items()):
@@ -2716,7 +2716,7 @@ def run_pipeline(
             )
         if confirm.strip().lower() != "yes":
             print("Cancelled by user.")
-            return
+            return (0, 0)
 
     anthropic_api_key = get_required_env("ANTHROPIC_API_KEY")
     success = 0
@@ -2767,6 +2767,7 @@ def run_pipeline(
     print(f"Narratives generated: {success}")
     print(f"Failures: {failed}")
     print(f"Actual cost: ~${estimate_cost(success):.2f}")
+    return (success, failed)
 
 
 def main() -> int:
@@ -2869,7 +2870,7 @@ def main() -> int:
         target_cohorts = [args.cohort]
 
     try:
-        run_pipeline(
+        generated, failures = run_pipeline(
             target_cohorts=target_cohorts,
             community_top_n=args.community_top,
             rising_top_n=args.rising_top,
@@ -2882,6 +2883,15 @@ def main() -> int:
             assume_yes=args.yes,
             workers=args.workers,
         )
+        # ALL-FAILED RULE. _process catches every per-HCP exception into `failed` and
+        # run_pipeline returned None, so main() reported success even when 100% of narratives
+        # failed -- at full token cost. This stage is the most exposed of the ten: ta_cycle runs
+        # it NON-BLOCKING (stage 13), so a non-zero exit is still only a WARN there, but a WARN
+        # is visible and an exit 0 is not. Not a partial threshold: generate_cycle's G8 postcheck
+        # already measures the ratio against hcp_narratives_v2.
+        if failures and not generated:
+            print(f"[FAIL] 0 of {failures} attempted narratives generated.", file=sys.stderr)
+            return 1
         return 0
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)

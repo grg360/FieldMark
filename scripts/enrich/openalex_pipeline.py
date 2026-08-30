@@ -31,6 +31,7 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -689,11 +690,12 @@ def run_pipeline(
     stale_days: Optional[int] = None,
     max_refresh: Optional[int] = None,
     stale_since_year: Optional[int] = None,
-) -> None:
+) -> Optional["PipelineStats"]:
     load_dotenv()
     supabase = init_supabase()
     session = build_http_session()
     polite_mailto = get_required_env("PUBMED_EMAIL")
+    doi_stats: Optional["PipelineStats"] = None
 
     if skip_doi_enrichment:
         print("SKIP_DOI_ENRICHMENT enabled: skipping DOI citation enrichment phase.")
@@ -737,6 +739,7 @@ def run_pipeline(
             publications_to_process = list(publications)
             print("Refresh mode: checkpoint bypassed; openalex_enriched_at is the progress marker.")
         stats = PipelineStats(total_loaded=len(publications))
+        doi_stats = stats
         already = len(publications) - len(publications_to_process)
         k = len(publications_to_process)
         print(
@@ -845,6 +848,10 @@ def run_pipeline(
     else:
         print("Career enrichment skipped per --skip-career-enrichment flag.")
 
+    # Hand the DOI-phase stats back so the entry point can apply the all-failed rule.
+    # None when the DOI phase was skipped -- nothing was attempted, so nothing to judge.
+    return doi_stats
+
 
 if __name__ == "__main__":
     try:
@@ -904,7 +911,7 @@ if __name__ == "__main__":
                   "That is legal but probably not what you meant.")
         if args.stale_since_year is not None and args.stale_days is None:
             parser.error("--stale-since-year has no effect without --stale-days.")
-        run_pipeline(
+        _stats = run_pipeline(
             skip_doi_enrichment=args.skip_doi_enrichment or env_flag_true("SKIP_DOI_ENRICHMENT"),
             skip_career_enrichment=args.skip_career_enrichment,
             reset_checkpoint=args.reset_checkpoint,
@@ -913,6 +920,17 @@ if __name__ == "__main__":
             max_refresh=args.max_refresh,
             stale_since_year=args.stale_since_year,
         )
+        # ALL-FAILED RULE. This script had no main() and no exit code at all: run_pipeline
+        # returned None and the process exited 0 unless an exception escaped, while
+        # stats.failed accumulated silently across 17 swallow-and-continue handlers. This is
+        # stage 1b -- BILLED, and 14,414s of the CRC build. attempted EXCLUDES
+        # not_found_or_missing_citations, which is an expected OpenAlex outcome, not a failure.
+        if _stats is not None:
+            _attempted = _stats.updated + _stats.failed
+            if _attempted and not _stats.updated:
+                print(f"[FAIL] 0 of {_attempted} attempted publications enriched "
+                      f"({_stats.failed} failed).", file=sys.stderr)
+                raise SystemExit(1)
     except Exception as error:
         print(f"[ERROR] OpenAlex pipeline failed: {error}")
         raise

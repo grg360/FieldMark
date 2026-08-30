@@ -918,6 +918,17 @@ def run(args: argparse.Namespace) -> int:
     print(f"[openalex_enrich] skipped_already_done={stats.skipped_already_done}")
     print(f"[openalex_enrich] elapsed={elapsed/60:.1f}min ({elapsed:.0f}s)")
     print(f"[openalex_enrich] enrichment_run_id={enrichment_run_id}")
+
+    # ALL-FAILED RULE. attempted counts only authors we tried to resolve this run: it EXCLUDES
+    # skipped_already_done (a --resume no-op) and INCLUDES fetched_not_found, which this script
+    # treats as a real answer -- it is proven-absent from a 200 response and a row IS written,
+    # so it is a success for this purpose. Only fetched_error means no trustworthy answer and
+    # no row. Everything unresolved with nothing written is the unambiguous failure.
+    attempted = stats.fetched_ok + stats.fetched_not_found + stats.fetched_error
+    if attempted and not (stats.fetched_ok + stats.fetched_not_found):
+        print(f"[FAIL] 0 of {attempted} attempted authors resolved "
+              f"({stats.fetched_error} unresolved).", file=sys.stderr)
+        return 1
     return 0
 
 

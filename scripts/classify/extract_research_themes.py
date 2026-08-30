@@ -981,7 +981,17 @@ def main() -> int:
 
     if dry_run:
         print("\nDry run complete - no database writes or checkpoint updates.", flush=True)
+        return 0
 
+    # ALL-FAILED RULE. attempted EXCLUDES skipped_count: a --skip-existing run where every HCP
+    # was already extracted has successful_count == 0 and is a correct no-op, not a failure.
+    # Only "everything we actually tried, failed" is unambiguous. Not a partial threshold --
+    # generate_cycle's postcheck owns the ratio, measured against hcp_research_themes_v2.
+    attempted = stats.successful_count + stats.failed_count
+    if attempted and not stats.successful_count:
+        print(f"\n[FAIL] 0 of {attempted} attempted HCPs extracted "
+              f"({stats.failed_count} failed).", file=sys.stderr, flush=True)
+        return 1
     return 0
 
 

@@ -527,6 +527,15 @@ def main() -> int:
     print(f"Failed (all author fetches failed): {stats.failed}", flush=True)
     print(f"Partial (some author fetches failed but proceeded): {stats.partial}", flush=True)
     print(f"Wall time: {wall:.1f}s", flush=True)
+
+    # ALL-FAILED RULE. This script already draws the line the rule needs: `failed` means the
+    # item produced nothing, `partial` means it proceeded anyway -- so only `failed` counts
+    # against success, and `partial` is deliberately ignored here. attempted EXCLUDES
+    # no_cluster: an HCP with no hcp_openalex_authors rows was never attempted.
+    attempted = stats.updated + stats.failed
+    if attempted and not stats.updated:
+        eprint(f"[FAIL] 0 of {attempted} attempted HCPs enriched ({stats.failed} failed).")
+        return 1
     return 0
 
 

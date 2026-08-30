@@ -550,21 +550,21 @@ def run(
 
     if not scoped_hcp_ids:
         print("No scoped HCPs - nothing to do.")
-        return
+        return 0, 0   # nothing attempted
 
     # Step 1: Build linkage index
     by_oa, scoped_oa_ids = build_linkage_index(client, scoped_hcp_ids)
 
     if not scoped_oa_ids:
         print("No OA IDs found for scoped HCPs - nothing to do.")
-        return
+        return 0, 0   # nothing attempted
 
     # Step 2: Fetch author-pub links from author_pub_flat
     flat_rows = fetch_pub_links_from_flat(client, scoped_oa_ids, limit=None)
 
     if not flat_rows:
         print("No publications found in author_pub_flat for scoped OA IDs.")
-        return
+        return 0, 0   # nothing attempted
 
     # Step 3: Process flat rows -> build publication_authors_v2 rows
     print(f"\nProcessing {len(flat_rows):,} author-publication links...")
@@ -684,6 +684,8 @@ def run(
 
     total_elapsed = time.perf_counter() - t0
     print(f"\nTotal runtime: {total_elapsed:.1f}s ({total_elapsed / 60:.2f} min)")
+    # (resolved pairs, orphans) for the all-failed rule in main().
+    return len(output_rows), orphan_total
 
 
 # ---------------------------------------------------------------------------
@@ -761,7 +763,23 @@ def main() -> None:
         print("No HCPs found matching scope criteria. Exiting.")
         raise SystemExit(0)
 
-    run(client, scoped_hcp_ids, dry_run=dry_run, limit=args.limit, write_all_winners=write_all_winners)
+    resolved, orphaned = run(
+        client, scoped_hcp_ids, dry_run=dry_run, limit=args.limit,
+        write_all_winners=write_all_winners,
+    )
+
+    # ALL-FAILED RULE. Success is RESOLVED PAIRS, not rows written: the insert is ON CONFLICT
+    # DO NOTHING, so a re-run legitimately writes 0 (the CRC pass skipped 416,721 already-
+    # existing rows of 1,063,990). Only "everything we tried to disambiguate orphaned" is
+    # unambiguous. orphan_total alone is NOT a failure signal -- 31 of 1,068,120 orphaned on
+    # the CRC build, all ror_no_match, a known structural gap. skipped_non_scoped is likewise
+    # not judged here: the summary calls it an R3 risk, but what rate is acceptable is exactly
+    # the per-script judgment this rule deliberately does not make.
+    attempted = resolved + orphaned
+    if attempted and not resolved:
+        print(f"[FAIL] 0 of {attempted:,} attempted (pub, hcp) links resolved "
+              f"({orphaned:,} orphaned).", file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

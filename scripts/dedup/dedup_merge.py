@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
@@ -952,6 +953,16 @@ def main() -> None:
         print("Failed reasons:")
         for hid, reason in failure_reasons:
             print(f"  {hid}: {reason}")
+
+    # ALL-FAILED RULE. `failed` was printed and then dropped: main() returned None, so the
+    # process exited 0 even when every merge in the component set raised. This stage merges
+    # GLOBALLY at the high-confidence tier and ran 2,394s on the CRC build against 4s weekly,
+    # so a silent total failure is expensive to discover late. A component set with nothing to
+    # merge yields attempted == 0 and stays quiet.
+    attempted = successes + failed
+    if attempted and not successes:
+        print(f"[FAIL] 0 of {attempted} attempted record merges succeeded.", file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

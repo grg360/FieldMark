@@ -843,7 +843,21 @@ def main() -> int:
 
         if args.dry_run:
             print("\nDry run complete - no database writes.")
+            return 0
 
+        # ALL-FAILED RULE. On 2026-08-25 every one of 15 HCPs died with a NameError, db_errors
+        # reached 15, and this returned 0 -- the orchestrator recorded the stage as succeeded and
+        # only G5's postcheck caught it. A stage that attempted work and wrote nothing did not
+        # succeed. Deliberately NOT a partial-failure threshold: what an acceptable error rate is
+        # differs per script, and generate_cycle's postcheck already measures that against the
+        # target table rather than against a counter the script keeps about itself.
+        if total_hcps and not stats["syntheses_written"]:
+            print(
+                f"\n[FAIL] 0 of {total_hcps} syntheses written "
+                f"({stats['api_errors']} API errors, {stats['db_errors']} DB errors).",
+                file=sys.stderr,
+            )
+            return 1
         return 0
     finally:
         conn.close()

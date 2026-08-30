@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import re
+import sys
 import time
 from collections import Counter
 from dataclasses import dataclass
@@ -778,7 +779,7 @@ def select_open_trial_nct_ids(c: Client, target_version: str) -> List[str]:
     return out
 
 
-def refresh_status(target_version: str = "v1", dry_run: bool = False) -> None:
+def refresh_status(target_version: str = "v1", dry_run: bool = False) -> int:
     """--refresh-status: refresh trial-level facts (status, phase, completion_date, sponsor,
     conditions, interventions, ...) for open-status trials by fetching them from CT.gov BY
     NCT ID (filter.ids), batched under the URL-length cap.
@@ -798,7 +799,7 @@ def refresh_status(target_version: str = "v1", dry_run: bool = False) -> None:
     print(f"Open-status trials to refresh: {total:,} | batch: {REFRESH_ID_BATCH} ids | CT.gov requests: {n_batches}")
     if dry_run:
         print("[DRY RUN] No CT.gov fetch and no database writes.")
-        return
+        return 0
 
     start = time.time()
     updated = 0
@@ -826,6 +827,18 @@ def refresh_status(target_version: str = "v1", dry_run: bool = False) -> None:
     if len(missing) > 50:
         print(f"  ... and {len(missing) - 50:,} more (all kept)")
     print(f"Elapsed: {time.time() - start:.0f}s")
+
+    # ALL-FAILED RULE. `updated` was printed and dropped; the entry point called this for its
+    # side effects and exited 0 regardless. attempted is the requested open-status set, so a
+    # run that asked CT.gov for trials and got NOTHING back -- the signature of an API outage
+    # or a changed contract -- now exits non-zero. ta_cycle runs stage 11 NON-BLOCKING, so this
+    # surfaces as a WARN rather than a failed cycle, which is the right weight for an external
+    # call; but a WARN is visible and an exit 0 is not.
+    if total and not updated:
+        print(f"[FAIL] 0 of {total:,} requested open-status trials refreshed from CT.gov.",
+              file=sys.stderr)
+        return 1
+    return 0
 
 
 def run(
@@ -993,6 +1006,6 @@ if __name__ == "__main__":
     )
     a = p.parse_args()
     if a.refresh_status:
-        refresh_status(a.target_version, dry_run=a.dry_run)
+        raise SystemExit(refresh_status(a.target_version, dry_run=a.dry_run))
     else:
         run(a.test, a.limit, a.reset_checkpoint, a.target_version, ta_slug=a.ta, dry_run=a.dry_run)

@@ -830,7 +830,19 @@ def main() -> int:
 
         if args.dry_run:
             print("\nDry run complete - no database writes.")
+            return 0
 
+        # ALL-FAILED RULE (see the same guard in generate_scientific_position_synthesis.py).
+        # positions_extracted is incremented only on the write path, so it is the honest
+        # "succeeded" signal here. Not a partial-failure threshold: some HCPs legitimately
+        # yield no positions, and only ZERO across an attempted run is unambiguous.
+        if stats["hcps_processed"] and not stats["positions_extracted"]:
+            print(
+                f"\n[FAIL] 0 positions written across {stats['hcps_processed']} HCPs "
+                f"({stats['api_errors']} API errors).",
+                file=sys.stderr,
+            )
+            return 1
         return 0
     finally:
         conn.close()
