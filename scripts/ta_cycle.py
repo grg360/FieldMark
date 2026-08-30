@@ -935,6 +935,333 @@ def print_stage_work_set(stage_label: str, value: Optional[int], unit: str) -> O
     return value
 
 
+# ---------------------------------------------------------------------------
+# Postchecks -- did the stage actually do its work?
+# ---------------------------------------------------------------------------
+#
+# Modelled on generate_cycle's Stage/verify/workset machinery, with ONE structural difference
+# that is not optional. generate_cycle enforces a single predicate --
+#     after > before and after >= 0.90 * workset
+# -- and that works next door because all eight of its stages have the same shape: generate N
+# new rows for N inputs. ta_cycle's stages mostly do NOT insert. They update in place, rebuild
+# idempotently, or drain a backlog:
+#
+#   * 5 step_f is ON CONFLICT DO NOTHING -- the CRC pass wrote 647,269 and skipped 416,721
+#     already-existing rows; a re-run legitimately writes ZERO.
+#   * 6 authorship only UPDATEs publication_authors_v2 -- the row count does not move at all.
+#   * 1c flatten is a full rebuild -- after ~= before IS success.
+#   * 1b openalex CONSUMES a backlog -- success is the count going DOWN.
+#   * 12 hcpcs no-ops when clean -- after == before is correct.
+#
+# `after > before` would therefore fail five stages that worked perfectly. Hence four predicate
+# KINDS rather than one formula, each with its own ratio and its own reason.
+#
+# THE THREE-STATE OUTCOME is the other half. Today "non-blocking" does two jobs: it answers
+# "does this fail the cycle?" AND, by having no check at all, "did this stage do its work?".
+# Those are different questions, and the first answer has been suppressing the second -- which
+# is why stage 13 could generate nothing at full token cost and report success. SHORT is always
+# recorded and printed; it only GATES for blocking stages.
+
+OUTCOME_OK = "OK"
+OUTCOME_SHORT = "SHORT"
+OUTCOME_FAILED = "FAILED"
+
+#: GROWTH keeps generate_cycle's 0.90 for symmetry -- same stage shape, same tolerance.
+RATIO_GROWTH = 0.90
+#: NON_REGRESSION is TIGHTER, deliberately. These stages rebuild a table that already exists;
+#: the expectation is "it did not shrink". A 10% silent loss of author_pub_flat or
+#: publication_authors_v2 is a catastrophe, not a tolerance.
+RATIO_NON_REGRESSION = 0.98
+
+
+@dataclass(frozen=True)
+class Postcheck:
+    """One stage's acceptance test, read from the TARGET TABLE (never a counter the stage
+    keeps about itself -- that is the distinction that let G5 report success on 15 failures).
+
+    kind:
+      GROWTH          after > before AND after >= ratio * workset.  Inserts proportional to
+                      the work-set. The generate_cycle shape.
+      NON_REGRESSION  after >= ratio * before.  Idempotent full rebuilds and no-op-when-clean
+                      top-ups, where after == before is the SUCCESS case.
+      COVERAGE        covered >= ratio * workset, where `sql` counts rows now carrying the
+                      property the stage writes.  Update-in-place stages.
+      DRAIN           after < before.  Backlog consumers. DIRECTIONAL, NO RATIO -- see the
+                      bound note below for why a ratio here is not merely loose but wrong.
+      NONE            no honest signal exists; the stage prints nothing rather than a guess.
+    """
+    kind: str
+    label: str                      # target table + what is counted, in the stage's own terms
+    sql: Optional[str] = None       # %s = TA uuid iff ta_scoped; extra params appended after
+    ta_scoped: bool = False
+    ratio: Optional[float] = None
+    blocking: bool = True
+    file_based: bool = False        # acceptance signal is an artifact, not a table -- see below
+    note: str = ""
+
+
+# NEVER RATIO AGAINST A BOUND. Three work-sets from the scale-estimate layer are bounds, not
+# exact counts, and comparing `after` to a bound produces a number that looks measured and is
+# not:
+#   * 1b  the backlog count is a LOWER bound -- stage 1 adds its whole batch to it mid-run, so
+#         `after >= 0.90 * workset` would pass precisely when nothing drained. DRAIN instead.
+#   * 6   on a build the TA-scoped count is an UPPER bound for the batch. The exact Class B
+#         number (ANY(batch)) is measured at stage start, so the postcheck uses THAT.
+#   * 12  the anti-join is an UPPER bound -- the stage intersects it with the local parquets,
+#         so most of it is legitimately not processed. No exact count exists, so it falls back
+#         to NON_REGRESSION and no ratio is applied to the bound at all.
+
+POSTCHECKS: Dict[str, Postcheck] = {
+    # 1 -- acceptance is PMIDS RESOLVED TO ROWS, not the TA link table: that is what stage 3
+    # reads. 0.95 not 0.90 because ESearch-to-persisted is near-lossless (CRC 147,218 of
+    # 147,400 = 99.88%, NSCLC 162 of 162); at 0.90 a 9% ingest loss would pass silently.
+    # The quiet-week path never reaches here -- it returns SUCCESS/skipped before the check.
+    "1": Postcheck("COVERAGE", "publications_v2 rows resolved from primary_pmids",
+                   ratio=0.95, blocking=True),
+    "1b": Postcheck("DRAIN", "publications_v2 still needing OpenAlex enrichment",
+                    sql="SELECT count(*) FROM publications_v2 "
+                        "WHERE doi IS NOT NULL AND openalex_enriched_at IS NULL",
+                    blocking=True,
+                    note="directional: the backlog must shrink; workset is a LOWER bound"),
+    "1c": Postcheck("NON_REGRESSION", "author_pub_flat rows",
+                    sql="SELECT count(*) FROM author_pub_flat",
+                    ratio=RATIO_NON_REGRESSION, blocking=True),
+    # 1d -- NON_REGRESSION needs no work-set, which is the right answer: the HAVING >= 3
+    # aggregate IS the work, so any pre-count would cost what the stage costs.
+    # openalex_author_inventory has no therapeutic_area_id column, so this is corpus-wide.
+    "1d": Postcheck("NON_REGRESSION", "openalex_author_inventory rows (corpus-wide)",
+                    sql="SELECT count(*) FROM openalex_author_inventory",
+                    ratio=RATIO_NON_REGRESSION, blocking=True),
+    # 2 -- Class C for work-sets (success is a DECISION: create / link / defer, and a cluster
+    # that correctly creates nothing is a success). NON_REGRESSION on the target table is the
+    # honest check; a ratio against an invented work-set would not be.
+    "2": Postcheck("NON_REGRESSION", "hcps_v2 rows",
+                   sql="SELECT count(*) FROM hcps_v2",
+                   ratio=RATIO_NON_REGRESSION, blocking=True),
+    # 3 and 7a -- ACCEPTANCE SIGNAL IS A FILE, NOT A TABLE. Both write an artifact
+    # (affected.txt, dedup_candidates_phase1.csv) and no database row, so the check can only
+    # ask "did the artifact get written and is it non-empty". That is SELF-REPORT BY ARTIFACT
+    # and is strictly WEAKER than every other check here: a target-table read is evidence about
+    # the database, whereas a file the stage just wrote is the stage's own account of itself --
+    # the same class of signal as the counters that let G5 exit 0 on 15 failures. Kept because
+    # a weak check beats none, but it should not be read as equivalent to the others.
+    "3": Postcheck("COVERAGE", "affected.txt lines (FILE -- self-report, not a table read)",
+                   ratio=0.50, blocking=True, file_based=True),
+    "4": Postcheck("GROWTH", "hcp_therapeutic_areas_v2 rows for the TA",
+                   sql="SELECT count(*) FROM hcp_therapeutic_areas_v2 "
+                       "WHERE therapeutic_area_id = %s",
+                   ta_scoped=True, ratio=RATIO_GROWTH, blocking=True),
+    "5": Postcheck("NON_REGRESSION", "publication_authors_v2 rows joined to TA pubs",
+                   sql="SELECT count(*) FROM publication_authors_v2 pa "
+                       "JOIN publication_therapeutic_areas_v2 pta "
+                       "ON pta.publication_id = pa.publication_id "
+                       "WHERE pta.therapeutic_area_id = %s",
+                   ta_scoped=True, ratio=RATIO_NON_REGRESSION, blocking=True),
+    # 6 -- the stage UPDATEs, so the row count never moves; coverage of the property it writes
+    # is the only real signal. --author-position-mode skip means author_position stays NULL, so
+    # is_first_author is the column to read (nullable, and 118,669 of 2,678,881 rows are NULL
+    # corpus-wide today). Ratio 0.50: coverage depends on how much of the batch OpenAlex has
+    # enriched, which varies per batch -- a high ratio would fire constantly.
+    "6": Postcheck("COVERAGE", "batch publication_authors_v2 rows with is_first_author set",
+                   sql="SELECT count(*) FROM publication_authors_v2 "
+                       "WHERE publication_id = ANY(%s::uuid[]) AND is_first_author IS NOT NULL",
+                   ratio=0.50, blocking=True),
+    "7a": Postcheck("COVERAGE",
+                    "dedup_candidates_phase1.csv (FILE -- self-report, not a table read)",
+                    ratio=0.0, blocking=True, file_based=True,
+                    note="existence check only: a run with no candidates is legitimate"),
+    # 7b, 8a -- Class C. 7b's scope is 7a's CSV output; 8a's filter is client-side while paging.
+    "7b": Postcheck("NONE", "dedup_merge -- scope is 7a's output; no honest pre-count"),
+    "8a": Postcheck("NONE", "career_enrichment -- --only-changed-today filters client-side"),
+    "8b": Postcheck("COVERAGE", "hcp_author_metrics_v2 rows at this snapshot_date",
+                    sql="SELECT count(DISTINCT hcp_id) FROM hcp_author_metrics_v2 "
+                        "WHERE snapshot_date = %s",
+                    ratio=0.50, blocking=True),
+    "8c": Postcheck("COVERAGE", "TA HCPs with career_first_pub_year_v2 set",
+                    sql="SELECT count(*) FROM hcps_v2 h "
+                        "JOIN hcp_therapeutic_areas_v2 t ON t.hcp_id = h.id "
+                        "WHERE t.therapeutic_area_id = %s "
+                        "AND h.career_first_pub_year_v2 IS NOT NULL",
+                    ta_scoped=True, ratio=0.50, blocking=True),
+    # 8f already verifies itself BEFORE COMMIT -- it re-queries every staged row against
+    # hcps_v2 and raises PARTIAL WRITE / COUNT MISMATCH, rolling back. A postcheck here would
+    # be strictly weaker than the guarantee the stage already gives.
+    "8f": Postcheck("NONE", "in_corpus_pub_count -- self-verifies pre-commit; nothing to add"),
+    "8d": Postcheck("GROWTH", "hcp_cohort_classification_v2 rows for the TA",
+                    sql="SELECT count(*) FROM hcp_cohort_classification_v2 "
+                        "WHERE therapeutic_area_id = %s",
+                    ta_scoped=True, ratio=RATIO_GROWTH, blocking=True),
+    "8e": Postcheck("NON_REGRESSION", "hcp_industry_classification_v1 rows",
+                    sql="SELECT count(*) FROM hcp_industry_classification_v1",
+                    ratio=RATIO_NON_REGRESSION, blocking=True),
+    "9": Postcheck("GROWTH", "hcp_rising_star_ranks_v3 rows for the TA",
+                   sql="SELECT count(*) FROM hcp_rising_star_ranks_v3 "
+                       "WHERE therapeutic_area_id = %s",
+                   ta_scoped=True, ratio=RATIO_GROWTH, blocking=True),
+    # 9.5 -- NOW BLOCKING, and this is the one reclassification in the set. Its own comment
+    # already said the quiet part: "the loss is PERMANENT (hcp_scientific_momentum_v1 is
+    # overwritten next cycle), unlike stages 10-13 where the artifact merely goes stale. Chase
+    # this WARN." A WARN that must be chased is a failure with extra steps, and irreversible
+    # loss is the one thing that should gate.
+    "9.5": Postcheck("COVERAGE", "hcp_rising_board_snapshots rows at this snapshot_date",
+                     sql="SELECT count(*) FROM hcp_rising_board_snapshots "
+                         "WHERE snapshot_date = %s AND therapeutic_area_id = %s",
+                     ratio=0.50, blocking=True,
+                     note="reclassified to BLOCKING 2026-08-29: the loss is permanent"),
+    "10": Postcheck("NON_REGRESSION", "asset_publication_v1 rows",
+                    sql="SELECT count(*) FROM asset_publication_v1",
+                    ratio=RATIO_NON_REGRESSION, blocking=False),
+    "11": Postcheck("COVERAGE", "open-status trials touched today",
+                    sql="SELECT count(*) FROM clinical_trials_v2 WHERE status IN "
+                        "('RECRUITING','NOT_YET_RECRUITING','ACTIVE_NOT_RECRUITING',"
+                        "'ENROLLING_BY_INVITATION') AND updated_at::date = %s",
+                    ratio=0.50, blocking=False),
+    # 12 -- the work-set is an UPPER bound (the stage intersects it with local parquets), so
+    # per the bound rule no ratio is applied to it. NON_REGRESSION on coverage instead.
+    "12": Postcheck("NON_REGRESSION", "hcp_hcpcs_detail distinct hcp_id",
+                    sql="SELECT count(DISTINCT hcp_id) FROM hcp_hcpcs_detail",
+                    ratio=RATIO_NON_REGRESSION, blocking=False),
+    "13a": Postcheck("GROWTH", "hcp_narratives_v2 rising rows for the TA",
+                     sql="SELECT count(*) FROM hcp_narratives_v2 "
+                         "WHERE therapeutic_area_slug = %s AND cohort = 'rising_star'",
+                     ratio=RATIO_GROWTH, blocking=False),
+    "13b": Postcheck("GROWTH", "hcp_narratives_v2 established rows for the TA",
+                     sql="SELECT count(*) FROM hcp_narratives_v2 "
+                         "WHERE therapeutic_area_slug = %s AND cohort = 'established'",
+                     ratio=RATIO_GROWTH, blocking=False),
+    "13c": Postcheck("GROWTH", "hcp_narratives_v2 community rows for the TA",
+                     sql="SELECT count(*) FROM hcp_narratives_v2 "
+                         "WHERE therapeutic_area_slug = %s AND cohort = 'community'",
+                     ratio=RATIO_GROWTH, blocking=False),
+    # 13.5 -- NOT IMPLEMENTED, deliberately, and this is a gap rather than a decision that the
+    # stage needs no check. The honest verify is "no narrative remains for an HCP the stage-9
+    # rescore removed from the board", which is a per-cohort anti-join against a DIFFERENT
+    # membership table for rising (hcp_rising_star_ranks_v3) and established, and community has
+    # no membership table at all -- it is a tier-filtered view, which is why the sweep script
+    # itself refuses that cohort. Writing one query here would have to encode that asymmetry,
+    # and getting it wrong deletes narratives. Left for its own change.
+    "13.5": Postcheck("NONE", "stranded_sweep -- per-cohort anti-join not yet written"),
+}
+
+
+def postcheck_read(pc: Postcheck, params: Tuple = ()) -> Optional[int]:
+    """One best-effort target-table read. Never raises: a postcheck must not be the thing that
+    fails a run, and an unreadable check reports 'unavailable' rather than a verdict."""
+    if pc.kind == "NONE" or pc.file_based or not pc.sql:
+        return None
+    return count_scalar(pc.sql, params)
+
+
+def postcheck_evaluate(
+    pc: Postcheck, before: Optional[int], after: Optional[int], workset: Optional[int],
+) -> Tuple[str, str]:
+    """(outcome, human message). OUTCOME_SHORT means the stage ran but did not do its work."""
+    if pc.kind == "NONE":
+        return OUTCOME_OK, f"no postcheck -- {pc.label}"
+    if after is None:
+        return OUTCOME_OK, f"postcheck unavailable ({pc.label}) -- not treated as failure"
+
+    if pc.kind == "DRAIN":
+        if before is None:
+            return OUTCOME_OK, f"{pc.label}: {after:,} (no before-count; direction unknown)"
+        ok = after < before
+        return (OUTCOME_OK if ok else OUTCOME_SHORT,
+                f"{pc.label}: {before:,} -> {after:,} "
+                f"({'drained' if ok else 'DID NOT DRAIN'})")
+
+    if pc.kind == "NON_REGRESSION":
+        if before is None:
+            return OUTCOME_OK, f"{pc.label}: {after:,} (no before-count)"
+        threshold = int(before * (pc.ratio or RATIO_NON_REGRESSION))
+        ok = after >= threshold
+        return (OUTCOME_OK if ok else OUTCOME_SHORT,
+                f"{pc.label}: {before:,} -> {after:,} (need >= {threshold:,})")
+
+    if pc.kind == "GROWTH":
+        if not workset:
+            # No work-set: fall back to non-regression rather than ratio against nothing.
+            if before is None:
+                return OUTCOME_OK, f"{pc.label}: {after:,} (no work-set, no before-count)"
+            ok = after >= before
+            return (OUTCOME_OK if ok else OUTCOME_SHORT,
+                    f"{pc.label}: {before:,} -> {after:,} (no work-set; non-regression only)")
+        threshold = int(workset * (pc.ratio or RATIO_GROWTH))
+        grew = after > before if before is not None else True
+        ok = grew and after >= threshold
+        return (OUTCOME_OK if ok else OUTCOME_SHORT,
+                f"{pc.label}: {before if before is None else format(before, ',')} -> {after:,} "
+                f"(need > before and >= {threshold:,} of work-set {workset:,})")
+
+    # COVERAGE
+    if not workset:
+        return OUTCOME_OK, f"{pc.label}: {after:,} (no work-set to cover)"
+    threshold = int(workset * (pc.ratio or 0.5))
+    ok = after >= threshold
+    return (OUTCOME_OK if ok else OUTCOME_SHORT,
+            f"{pc.label}: {after:,} of work-set {workset:,} "
+            f"(need >= {threshold:,}, ratio {pc.ratio})")
+
+
+def report_postcheck(
+    stage_label: str, pc: Postcheck, before: Optional[int], after: Optional[int],
+    workset: Optional[int],
+) -> str:
+    """Print the verdict and return the outcome. SHORT is ALWAYS printed, for blocking and
+    non-blocking stages alike -- that separation is the whole point of the three-state
+    outcome. Only the caller decides whether SHORT also gates."""
+    outcome, msg = postcheck_evaluate(pc, before, after, workset)
+    if pc.kind == "NONE":
+        return OUTCOME_OK
+    gate = "" if pc.blocking else "  [non-blocking]"
+    print(f"[stage {stage_label}] postcheck {outcome}: {msg}{gate}", flush=True)
+    if pc.note:
+        print(f"[stage {stage_label}]   ^ {pc.note}", flush=True)
+    return outcome
+
+
+#: Print order for the postcheck plan -- cycle order, not dict order.
+POSTCHECK_ORDER = ("1", "1b", "1c", "1d", "2", "3", "4", "5", "6", "7a", "7b",
+                   "8a", "8b", "8c", "8f", "8d", "8e", "9", "9.5", "10", "11", "12",
+                   "13a", "13b", "13c", "13.5")
+
+
+def print_postcheck_plan(slug: str, operation: str) -> None:
+    """What each stage will be held to, printed at plan time alongside the scale estimates.
+
+    The plan used to say what would RUN and, since the scale work, how MUCH. It still did not
+    say what would COUNT AS DONE -- which is the question the postchecks answer, and the one
+    nobody could answer for stage 13.
+    """
+    print("=" * 72)
+    print(f"  POSTCHECK PLAN (--operation {operation})  ta={slug}")
+    print("=" * 72)
+    print(f"  {'stage':<6} {'kind':<15} {'ratio':>6}  {'gates?':<8} target")
+    for key in POSTCHECK_ORDER:
+        pc = POSTCHECKS.get(key)
+        if pc is None:
+            continue
+        if operation == "build" and key.startswith("13"):
+            print(f"  {key:<6} {'-- SKIPPED: stage 13 is above the build ceiling --':<40}")
+            continue
+        if pc.kind == "NONE":
+            print(f"  {key:<6} {'(none)':<15} {'':>6}  {'':<8} {pc.label}")
+            continue
+        if key == "10" and slug != ASSET_MATCHES_TA:
+            print(f"  {key:<6} {'(skipped)':<15} {'':>6}  {'':<8} "
+                  f"{ASSET_MATCHES_TA}-only stage; not run for {slug}")
+            continue
+        ratio = f"{pc.ratio:.2f}" if pc.ratio is not None else "n/a"
+        gates = "BLOCKS" if pc.blocking else "warns"
+        flag = "  [FILE: self-report]" if pc.file_based else ""
+        print(f"  {key:<6} {pc.kind:<15} {ratio:>6}  {gates:<8} {pc.label}{flag}")
+    print()
+    print("  GROWTH 0.90 (as generate_cycle) | NON_REGRESSION 0.98 (tighter: these rebuild an")
+    print("  existing table, so a 10% loss is a catastrophe not a tolerance) | COVERAGE per")
+    print("  stage (1 -> 0.95, others 0.50) | DRAIN directional, no ratio.")
+    print("  SHORT on a 'warns' stage is printed and recorded but does not stop the cycle.")
+    print("=" * 72)
+
+
 def confirm_build(
     slug: str, ta_id: str, days: int, existing_pubs: Optional[int],
     force_rebuild: bool, assume_yes: bool, prompt: bool = True,
@@ -1317,7 +1644,36 @@ def run_cycle(
             "operation": operation, "plan_scale": plan_scale, "stages": stage_status,
         })
 
-    def note(n: int, name: str, status: str, work_set: Optional[int] = None) -> None:
+    def pc_before(key: str, params: Tuple = ()) -> Optional[int]:
+        """Snapshot the target table BEFORE the stage runs. Cheap and best-effort."""
+        pc = POSTCHECKS.get(key)
+        return postcheck_read(pc, params) if pc else None
+
+    def pc_after(
+        key: str, stage_no: int, stage_label: str, before: Optional[int],
+        workset: Optional[int] = None, params: Tuple = (),
+    ) -> str:
+        """Read the target table again, print the verdict, return OK/SHORT.
+
+        BLOCKING is decided here, not by the caller: a SHORT on a blocking stage raises
+        StageFailure so the chain stops, while a SHORT on a non-blocking stage is printed,
+        recorded, and allowed through. That is the separation the three-state outcome exists
+        for -- non-blocking now means "does not gate", NOT "unverified".
+        """
+        pc = POSTCHECKS.get(key)
+        if pc is None:
+            return OUTCOME_OK
+        after = postcheck_read(pc, params)
+        outcome = report_postcheck(stage_label, pc, before, after, workset)
+        if outcome == OUTCOME_SHORT and pc.blocking:
+            raise StageFailure(
+                stage_no, f"{stage_label} postcheck", -1,
+                tail=[f"POSTCHECK {outcome}: {pc.label}"],
+            )
+        return outcome
+
+    def note(n: int, name: str, status: str, work_set: Optional[int] = None,
+             postcheck: Optional[str] = None) -> None:
         """Record a stage outcome, its work-set and its duration, then persist.
 
         duration_s comes from run_stage via _LAST_STAGE_DURATION, consumed and cleared here so
@@ -1334,6 +1690,10 @@ def run_cycle(
         rec: Dict = {"stage": n, "name": name, "status": status}
         if work_set is not None:
             rec["work_set_count"] = work_set
+        # OK / SHORT / FAILED, recorded independently of `status`. A non-blocking stage can be
+        # status=OK and postcheck=SHORT -- that pair is exactly the case stage 13 hid.
+        if postcheck is not None:
+            rec["postcheck"] = postcheck
         if _LAST_STAGE_DURATION is not None:
             rec["duration_s"] = round(_LAST_STAGE_DURATION, 1)
             _LAST_STAGE_DURATION = None
@@ -1435,22 +1795,29 @@ def run_cycle(
             # env has that var set truthy -> without the override, 1b skips the very phase that writes
             # publications_v2.authorships and is a silent no-op. The child's load_dotenv(override=False)
             # keeps our "0" (the key is already present in the child env), so .env cannot re-enable it.
+            _b = pc_before("1b")
             run_stage(1, "openalex_enrich_pubs(1b)", cmd_openalex_enrich_pubs(),
                       extra_env={"SKIP_DOI_ENRICHMENT": "0"})
-            note(1, "openalex_enrich_pubs(1b)", "OK")
+            note(1, "openalex_enrich_pubs(1b)", "OK",
+                 postcheck=pc_after("1b", 1, "1b", _b))
 
             # 1c: rebuild author_pub_flat from the now-enriched authorships (GATE-D: after 1b).
+            _b = pc_before("1c")
             run_stage(1, "flatten_author_pub_flat(1c)", cmd_run_sql_file(str(BUILD_AUTHOR_FLAT_SQL)))
-            note(1, "flatten_author_pub_flat(1c)", "OK")
+            note(1, "flatten_author_pub_flat(1c)", "OK",
+                 postcheck=pc_after("1c", 1, "1c", _b))
 
             # 1d: inventory upsert for this TA's authors (GATE-B: GREATEST no-clobber, in the committed
             # SQL). ta_id is a BOUND param; run_sql raises statement_timeout for the heavy aggregate.
+            _b = pc_before("1d")
             run_stage(1, "inventory_upsert(1d)", cmd_run_sql_file(
                 str(INVENTORY_UPSERT_SQL_FILE), {"ta_id": ta_id}, INVENTORY_STATEMENT_TIMEOUT))
-            note(1, "inventory_upsert(1d)", "OK")
+            note(1, "inventory_upsert(1d)", "OK",
+                 postcheck=pc_after("1d", 1, "1d", _b))
 
         # 2 CREATE HCPS (mint HCP_RUN_ID)
         if running(2):
+            _b2 = pc_before("2")
             run_stage(2, "create_hcps", cmd_create_hcps(slug, str(run_summary)))
             if not run_summary.exists():
                 raise SystemExit("create_hcps did not write run_summary.json.")
@@ -1460,7 +1827,7 @@ def run_cycle(
                 raise SystemExit("run_summary.json has no ingestion_run_id.")
             print(f"  captured HCP_RUN_ID={hcp_run_id}")
             persist()  # run ids minted by this stage -- land them first
-            note(2, "create_hcps", "OK")
+            note(2, "create_hcps", "OK", postcheck=pc_after("2", 2, "2", _b2))
 
         # [gen batch_pubs] needed by stages 3 and 6 -- resolved from the PRIMARY pmid set
         # (authoritative batch identity: pubmed_id = ANY(primary_pmids.txt)), NOT the created-by
@@ -1472,6 +1839,19 @@ def run_cycle(
                 )
             if running(3) or not batch_pubs.exists():
                 gen_batch_pubs_file(primary_pmids, batch_pubs)
+            # STAGE 1'S POSTCHECK, taken here because this is where the number exists: the
+            # acceptance signal is pmids RESOLVED TO ROWS (what stage 3 reads), not the TA link
+            # table. 0.95, not 0.90 -- ESearch-to-persisted is near-lossless (CRC 147,218 of
+            # 147,400 = 99.88%), so at 0.90 a 9% ingest loss would pass silently. The quiet-week
+            # path returns SUCCESS/skipped well before this line and never reaches it.
+            if running(1):
+                _pm = count_file_lines(primary_pmids)
+                _bp = count_file_lines(batch_pubs)
+                _pc1 = POSTCHECKS["1"]
+                _out = report_postcheck("1", _pc1, None, _bp, _pm)
+                if _out == OUTCOME_SHORT and _pc1.blocking:
+                    raise StageFailure(1, "1 postcheck", -1,
+                                       tail=[f"POSTCHECK {_out}: {_pc1.label}"])
 
         # 3 AFFECTED
         if running(3):
@@ -1479,15 +1859,25 @@ def run_cycle(
                 raise SystemExit("HCP_RUN_ID unknown. Re-run from top.")
             ws = print_stage_work_set("3", count_file_lines(batch_pubs), "batch publications")
             run_stage(3, "affected", cmd_compute_affected(hcp_run_id, str(batch_pubs), str(affected)))
-            note(3, "affected", "OK", work_set=ws)
+            # FILE-BASED acceptance -- see the POSTCHECKS["3"] comment. Self-report, weaker
+            # than every target-table check here.
+            _out3 = report_postcheck("3", POSTCHECKS["3"], None, count_file_lines(affected), ws)
+            if _out3 == OUTCOME_SHORT:
+                raise StageFailure(3, "3 postcheck", -1, tail=["POSTCHECK SHORT: affected.txt"])
+            note(3, "affected", "OK", work_set=ws, postcheck=_out3)
 
         # 4 TA TAGGING
         if running(4):
             if not affected.exists():
                 raise SystemExit(f"{affected} missing. Re-run from stage 3.")
             ws = print_stage_work_set("4", count_file_lines(affected), "affected HCPs")
+            _b = pc_before("4", (ta_id,))
             run_stage(4, "ta_tagging", cmd_ta_tagging(slug, str(affected)))
-            note(4, "ta_tagging", "OK", work_set=ws)
+            # NOT ratioed against the affected-set work-set: ta_tagging only tags the subset
+            # that scores for this TA (CRC: 101,536 of 416,260 pubs), so the affected count is
+            # not the population the target table counts. Non-regression fallback via ws=None.
+            note(4, "ta_tagging", "OK", work_set=ws,
+                 postcheck=pc_after("4", 4, "4", _b, None, (ta_id,)))
 
         # [gen ta_hcp_ids] for stage 5
         if running(5):
@@ -1499,8 +1889,10 @@ def run_cycle(
             # for stage 5 is the same query one step earlier; printing both makes visible that
             # step_f is TA-scoped, so this barely moves between a build and a weekly run.
             ws = print_stage_work_set("5", count_file_lines(ta_hcp_ids), "HCPs in the TA")
+            _b = pc_before("5", (ta_id,))
             run_stage(5, "step_f", cmd_step_f(str(ta_hcp_ids)))
-            note(5, "step_f", "OK", work_set=ws)
+            note(5, "step_f", "OK", work_set=ws,
+                 postcheck=pc_after("5", 5, "5", _b, None, (ta_id,)))
 
         # 6 AUTHORSHIP 9b
         if running(6):
@@ -1518,8 +1910,14 @@ def run_cycle(
                 ),
                 "publication_authors_v2 rows to derive",
             )
+            _batch_ids = read_pmids_file(batch_pubs)
+            _b = pc_before("6", (_batch_ids,))
             run_stage(6, "authorship_9b", cmd_authorship(str(batch_pubs)))
-            note(6, "authorship_9b", "OK", work_set=ws)
+            # Compared against `ws`, the MEASURED batch-scoped count taken above -- never
+            # against the plan-time TA-scoped upper bound the build printed. See the bound
+            # rule at POSTCHECKS.
+            note(6, "authorship_9b", "OK", work_set=ws,
+                 postcheck=pc_after("6", 6, "6", _b, ws, (_batch_ids,)))
 
         # 7 DEDUP (detect then merge)
         if running(7):
@@ -1532,7 +1930,13 @@ def run_cycle(
                 "HCPs seeded by this run",
             )
             run_stage(7, "dedup_detect", cmd_dedup_detect(hcp_run_id))
-            note(7, "dedup_detect", "OK", work_set=ws)
+            # FILE-BASED acceptance (dedup_candidates_phase1.csv) -- see POSTCHECKS["7a"].
+            # Existence only, ratio 0.0: a run that legitimately finds no candidates is not a
+            # failure, so this can only catch "the stage wrote nothing at all".
+            _csv = REPO_ROOT / "dedup_candidates_phase1.csv"
+            note(7, "dedup_detect", "OK", work_set=ws,
+                 postcheck=report_postcheck("7a", POSTCHECKS["7a"], None,
+                                            count_file_lines(_csv), ws))
             # 7b is Class C: its scope is 7a's candidate output at the high-confidence tier,
             # which does not exist until 7a has written. No number is printed rather than a
             # guess -- 7b ran 2,394s on the CRC build against 4s weekly, so a wrong estimate
@@ -1546,10 +1950,18 @@ def run_cycle(
                 raise SystemExit(f"{affected} missing. Re-run from stage 3.")
             if not hcp_run_id:
                 raise SystemExit("HCP_RUN_ID unknown. Re-run from top.")
+            # 8a is Class C -- POSTCHECKS["8a"] is NONE. --only-changed-today filters
+            # client-side while paging the cluster join, so no target-table predicate
+            # distinguishes "nothing needed enriching" from "everything failed".
             run_stage(8, "career_enrichment(8a)", cmd_career_enrich())
-            print_stage_work_set("8b", count_file_lines(affected), "HCPs to enrich (OpenAlex API)")
+            _ws8b = print_stage_work_set("8b", count_file_lines(affected),
+                                         "HCPs to enrich (OpenAlex API)")
+            _b8b = pc_before("8b", (snapshot,))
             run_stage(8, "openalex_enrichment(8b)", cmd_openalex_enrich(str(affected), snapshot))
+            _o8b = pc_after("8b", 8, "8b", _b8b, _ws8b, (snapshot,))
+            _b8c = pc_before("8c", (ta_id,))
             run_stage(8, "career_first_pub_year(8c)", cmd_career_first(slug, hcp_run_id, snapshot))
+            _o8c = pc_after("8c", 8, "8c", _b8c, None, (ta_id,))
             # 8f: populate hcps_v2.in_corpus_pub_count from author_pub_flat. Sibling of 8c --
             # the other publication-derived stat on hcps_v2, from the same substrate. Placed
             # AFTER 8c because both read the post-dedup HCP set, and inside stage 8 because
@@ -1565,51 +1977,67 @@ def run_cycle(
             # Full-corpus, TA-agnostic, ~2-4 min; exits non-zero on a partial write and never
             # reports OK on one.
             run_stage(8, "in_corpus_pub_count(8f)", cmd_in_corpus_pub_count(str(ingest_summary)))
+            _b8d = pc_before("8d", (ta_id,))
             run_stage(8, "cohort_classification(8d)", cmd_cohort(slug))
+            _o8d = pc_after("8d", 8, "8d", _b8d, None, (ta_id,))
             # 8e: FULL reclassify of hcps_v2 into hcp_industry_classification_v1. MUST be the last
             # step of stage 8 -- after institution_normalized is final (create_hcps + the 8a/8b
             # enrichment above) and BEFORE stage 9. The rising momentum scripts INNER JOIN this
             # table filtered to classification='ACADEMIC', so any HCP without a current row is
             # silently dropped from rising scoring. Run full (no --hcp-ids-file) for now.
+            _b8e = pc_before("8e")
             run_stage(8, "industry_classify(8e)", cmd_industry_classify())
-            note(8, "career", "OK")
+            _o8e = pc_after("8e", 8, "8e", _b8e)
+            # Stage 8 is five sub-stages under one note. The recorded postcheck is the WORST
+            # of them, so a SHORT anywhere in the chain survives into run_state.json rather
+            # than being averaged away by four OKs.
+            note(8, "career", "OK",
+                 postcheck=(OUTCOME_SHORT if OUTCOME_SHORT in (_o8b, _o8c, _o8d, _o8e)
+                            else OUTCOME_OK))
 
         # 9 SCORE
         if running(9):
+            _b9 = pc_before("9", (ta_id,))
             run_stage(9, "rising_score", cmd_rising_score(slug))
-            note(9, "score", "OK")
+            note(9, "score", "OK",
+                 postcheck=pc_after("9", 9, "9", _b9, plan_scale.get("9"), (ta_id,)))
 
-            # 9.5 BOARD SNAPSHOT -- NON-BLOCKING. Inside stage 9's gate because it captures
+            # 9.5 BOARD SNAPSHOT -- BLOCKING as of 2026-08-29. Inside stage 9's gate because it captures
             # stage 9's output: the board plus the variables it was gated on. It must never
             # recompute, only copy, so it belongs immediately after the scorer and before
             # anything else can touch the momentum tables.
             #
-            # Non-blocking on purpose, and the trade is asymmetric: a failed capture costs
-            # one week of history, a failed cycle costs the whole ingest. But unlike stages
-            # 10-13, where the artifact merely goes stale, the loss here is PERMANENT --
-            # hcp_scientific_momentum_v1 is overwritten next run -- so this WARN is worth
-            # chasing the same day.
-            try:
-                run_stage(9, "board_snapshot(9.5)", cmd_board_snapshot(slug))
-                note(9, "board_snapshot", "OK")
-            except Exception as se:  # non-blocking: log + continue (StageFailure incl.)
-                note(9, "board_snapshot", f"WARN({type(se).__name__})")
-                print(f"\n[ta_cycle] WARN: stage 9.5 board_snapshot failed ({se}); "
-                      f"cycle still SUCCESS (non-blocking). THIS WEEK'S GATE INPUTS ARE LOST "
-                      f"PERMANENTLY -- the momentum tables are overwritten next cycle. "
-                      f"Re-run TODAY: python scripts/utilities/take_weekly_snapshot.py "
-                      f"--ta {slug}", file=sys.stderr)
+            # RECLASSIFIED TO BLOCKING, 2026-08-29. The previous comment argued the trade was
+            # asymmetric -- a failed capture costs one week of history, a failed cycle costs
+            # the whole ingest -- and then conceded, in the same breath, that "the loss here is
+            # PERMANENT (hcp_scientific_momentum_v1 is overwritten next run), so this WARN is
+            # worth chasing the same day". A WARN that must be chased the same day is a failure
+            # with extra steps, and this was the only WARN in the cycle whose damage cannot be
+            # repaired by re-running the stage later. Irreversibility is what should gate;
+            # every other non-blocking stage leaves an artifact that merely goes stale.
+            _b95 = pc_before("9.5", (snapshot, ta_id))
+            run_stage(9, "board_snapshot(9.5)", cmd_board_snapshot(slug))
+            note(9, "board_snapshot", "OK",
+                 postcheck=pc_after("9.5", 9, "9.5", _b95, plan_scale.get("9"),
+                                    (snapshot, ta_id)))
 
         # 10 ASSET MATCHES (NSCLC only) -- NON-BLOCKING. After the scoring chain; failure is
         # isolated so it never marks the cycle FAILED (a stale asset table costs ~400 pubs/month
         # and must not gate the rising scores). Skipped for non-NSCLC TAs (no asset config).
         if running(10):
             if slug != ASSET_MATCHES_TA:
+                # SKIPPED, not WARN: for a non-NSCLC TA there is no asset config and nothing to
+                # do, so the postcheck does not apply rather than failing quietly. The plan-time
+                # scale block already prints 0 for this stage on such a TA.
+                print(f"[stage 10] SKIPPED: {ASSET_MATCHES_TA}-only stage, ta={slug} -- "
+                      f"no work-set and no postcheck.", flush=True)
                 note(10, "asset_matches", f"SKIPPED(not {ASSET_MATCHES_TA})")
             else:
                 try:
+                    _b10 = pc_before("10")
                     run_stage(10, "asset_matches", cmd_build_asset_matches())
-                    note(10, "asset_matches", "OK")
+                    note(10, "asset_matches", "OK",
+                         postcheck=pc_after("10", 10, "10", _b10))
                 except Exception as ae:  # non-blocking: log + continue (StageFailure incl.)
                     note(10, "asset_matches", f"WARN({type(ae).__name__})")
                     print(f"\n[ta_cycle] WARN: stage 10 asset_matches failed ({ae}); "
@@ -1623,8 +2051,10 @@ def run_cycle(
         # external CT.gov call, so failure is isolated (WARN not FAILED) and never gates the cycle.
         if running(11):
             try:
+                _b11 = pc_before("11", (snapshot,))
                 run_stage(11, "trials_status_refresh", cmd_trials_status_refresh())
-                note(11, "trials_status", "OK")
+                note(11, "trials_status", "OK",
+                     postcheck=pc_after("11", 11, "11", _b11, plan_scale.get("11"), (snapshot,)))
             except Exception as te:  # non-blocking: log + continue (StageFailure incl.)
                 note(11, "trials_status", f"WARN({type(te).__name__})")
                 print(f"\n[ta_cycle] WARN: stage 11 trials_status_refresh failed ({te}); "
@@ -1639,8 +2069,13 @@ def run_cycle(
         # must never gate the publication cycle. Logs to pipeline_runs as hcpcs_detail_topup.
         if running(12):
             try:
+                # The plan-time work-set for 12 is an UPPER bound (the stage intersects the
+                # anti-join with the local parquets, so most of it is legitimately not
+                # processed) and no exact count exists. Per the bound rule it is NOT passed as
+                # a work-set: NON_REGRESSION on coverage instead.
+                _b12 = pc_before("12")
                 run_stage(12, "hcpcs_topup", cmd_hcpcs_topup())
-                note(12, "hcpcs_topup", "OK")
+                note(12, "hcpcs_topup", "OK", postcheck=pc_after("12", 12, "12", _b12))
             except Exception as he:  # non-blocking: log + continue (StageFailure incl.)
                 note(12, "hcpcs_topup", f"WARN({type(he).__name__})")
                 print(f"\n[ta_cycle] WARN: stage 12 hcpcs_topup failed ({he}); "
@@ -1658,19 +2093,27 @@ def run_cycle(
         # own default). BILLED (Anthropic API); failure is
         # isolated (WARN not FAILED): a stale narrative must never gate the data cycle.
         if running(13):
-            for sub_name, cohort, top_flag in (
+            for sub_name, cohort, top_flag, pc_key in (
                 # None => whole board. See cmd_narratives for why rising is uncapped
                 # and established deliberately is not.
-                ("narratives_rising(13a)", "rising_star", None),
-                ("narratives_established(13b)", "established", "--established-top"),
+                ("narratives_rising(13a)", "rising_star", None, "13a"),
+                ("narratives_established(13b)", "established", "--established-top", "13b"),
                 # Community: uncapped -- the tier filter in
                 # fetch_community_top_hcp_ids IS the scope, so --community-top
                 # does not apply to the NSCLC board.
-                ("narratives_community(13c)", "community", None),
+                ("narratives_community(13c)", "community", None, "13c"),
             ):
                 try:
+                    # STAYS NON-BLOCKING -- a stale narrative must never gate the data cycle,
+                    # which is already committed by now. But non-blocking no longer means
+                    # UNVERIFIED: this is the stage that generated nothing at full token cost
+                    # and reported success, and it did so precisely because nothing looked.
+                    # A SHORT here is printed and recorded; it just does not stop the chain.
+                    _b13 = pc_before(pc_key, (slug,))
                     run_stage(13, sub_name, cmd_narratives(slug, cohort, top_flag))
-                    note(13, sub_name, "OK")
+                    note(13, sub_name, "OK",
+                         postcheck=pc_after(pc_key, 13, pc_key, _b13,
+                                            plan_scale.get(pc_key), (slug,)))
                 except Exception as ne:  # non-blocking: log + continue (StageFailure incl.)
                     note(13, sub_name, f"WARN({type(ne).__name__})")
                     print(f"\n[ta_cycle] WARN: stage 13 {sub_name} failed ({ne}); "
@@ -1730,6 +2173,18 @@ def run_cycle(
         "stages_skipped": [13] if operation == "build" else [],
     })
     print(f"\n{'='*72}\n  TA CYCLE SUCCESS ({operation})  ta={slug}  ({time.time()-t0:.0f}s)\n{'='*72}")
+
+    # SHORT MUST SURVIVE TO THE SUMMARY. A non-blocking stage that did not do its work reports
+    # SUCCESS at the cycle level by design -- that is what non-blocking means -- so if the only
+    # record of the shortfall were one line 2,000 lines up the scrollback, this would reproduce
+    # the very failure the postchecks exist to end. Listed here, and in run_state.json.
+    shorts = [r for r in stage_status if r.get("postcheck") == OUTCOME_SHORT]
+    if shorts:
+        print(f"\n  POSTCHECK SHORT on {len(shorts)} stage(s) -- the cycle SUCCEEDED because "
+              f"these are non-blocking, but they did NOT do their work:")
+        for r in shorts:
+            print(f"    stage {r['stage']:<4} {r['name']}")
+        print("  Investigate before trusting the surfaces these feed.")
     if operation == "build":
         print(f"\n  SKIPPED (--operation build): stage 13 narratives + 13.5 stranded sweep.")
         print(f"    13a narratives_rising       --cohort rising_star          (UNCAPPED, whole board)")
@@ -1878,6 +2333,7 @@ def main() -> int:
         # a preview that reversed them would rehearse a different decision than the real run.
         if probe_ta_id:
             print_scale_estimates(probe_ta_id, slug, args.operation, days)
+            print_postcheck_plan(slug, args.operation)
         else:
             print("  SCALE ESTIMATES: skipped -- could not resolve ta_id for "
                   f"'{slug}' (DB unavailable).")
