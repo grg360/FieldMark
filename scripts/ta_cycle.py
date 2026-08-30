@@ -134,6 +134,7 @@ import subprocess
 import sys
 import time
 from collections import deque
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -554,6 +555,11 @@ STAGE_TAIL_LINES = 150
 #: than crashing a multi-hour run over a directory that does not exist yet.
 _LOG_DIR: Optional[Path] = None
 
+#: Duration of the most recent run_stage call, in seconds. Written by run_stage, consumed and
+#: cleared by note(). See the comment at the assignment for why it is a global rather than a
+#: return value.
+_LAST_STAGE_DURATION: Optional[float] = None
+
 
 def _stage_log_path(stage_no: int, name: str) -> Optional[Path]:
     if _LOG_DIR is None:
@@ -620,6 +626,12 @@ def run_stage(
                 captured = m.group(1)
     proc.wait()
     dt = time.time() - t0
+    # Stash the measured duration so note() can persist it without threading a return value
+    # through ~30 call sites. Consumed and cleared by note(), so a SKIPPED stage that follows a
+    # real one never inherits the previous stage's time. Set BEFORE the failure raise, so a
+    # crashed stage records how long it ran -- that is exactly the run you want the number from.
+    global _LAST_STAGE_DURATION
+    _LAST_STAGE_DURATION = dt
     if logf:
         logf.write(f"#\n# exit {proc.returncode}  ({dt:.0f}s)\n")
         logf.close()
@@ -714,6 +726,213 @@ def esearch_total_for_window(slug: str, days: int) -> Optional[int]:
         return int(json.loads(resp.text)["esearchresult"]["count"])
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Scale estimates -- what each stage is about to process
+# ---------------------------------------------------------------------------
+#
+# THE PLAN SAID WHAT WOULD RUN, NEVER HOW MUCH. On the 2026-08-24 CRC build, stage 6 processed
+# 631,880 publication_authors_v2 rows against a 617-row NSCLC weekly baseline -- 1,024x. That
+# number is a 1.8s count query, and it is the number that would have stopped the build before
+# it started. It took hours of clock-watching to discover instead.
+#
+# CLASS A (here): countable at PLAN TIME, before stage 1 -- when you are still deciding whether
+#   to start. Printed by print_scale_estimates() in --dry-run and, on --operation build, BEFORE
+#   the confirmation gate, so the blast radius and the scale are on screen for the same decision.
+# CLASS B (at stage start): only knowable once an upstream stage has produced its input -- a
+#   file line count, or a count keyed on a run id that does not exist yet. Printed by
+#   print_stage_work_set() with a "measured now" marker so a stage-4 count appearing at minute
+#   forty is never mistaken for something the plan knew.
+# CLASS C: 1d inventory (the HAVING >= 3 aggregate IS the work), 2 create_hcps (the clustering
+#   prefilter IS the decision), 7b dedup_merge (scope is 7a's output), 8a career_enrichment
+#   (--only-changed-today filters client-side while paging). These print NOTHING. A guess here
+#   is worse than silence: it would be read as measured.
+#
+# Every probe is best-effort and individually timed out. A scale estimate must never be the
+# thing that fails a run -- an unavailable number prints "unavailable", never raises.
+
+SCALE_PROBE_TIMEOUT = "20s"
+
+
+@dataclass(frozen=True)
+class ScaleProbe:
+    """One Class-A work-set count. `sql` takes the TA uuid as its only param iff ta_scoped."""
+    key: str                    # stage label as printed, e.g. "6"
+    label: str                  # what the number counts, in the stage's own terms
+    sql: str
+    ta_scoped: bool = False
+    operations: Tuple[str, ...] = ("build", "refresh")
+    nsclc_only: bool = False    # stage is hardcoded to NSCLC; other TAs get an explicit 0
+    caveat: str = ""
+
+
+SCALE_PROBES: Tuple[ScaleProbe, ...] = (
+    ScaleProbe("1b", "publications needing OpenAlex enrichment",
+               "SELECT count(*) FROM publications_v2 "
+               "WHERE doi IS NOT NULL AND openalex_enriched_at IS NULL",
+               caveat="backlog only; stage 1 adds its whole batch to this"),
+    ScaleProbe("1c", "publications flattened into author_pub_flat",
+               "SELECT count(*) FROM publications_v2 WHERE authorships IS NOT NULL",
+               caveat="full O(corpus) rebuild -- identical work in both operations"),
+    ScaleProbe("5", "HCPs in the TA (step_f is TA-scoped, NOT batch-scoped)",
+               "SELECT count(*) FROM hcp_therapeutic_areas_v2 WHERE therapeutic_area_id = %s",
+               ta_scoped=True),
+    # Stage 6 at PLAN TIME is a build-only upper bound: on a first build the batch IS the TA, so
+    # the TA-scoped join returns what the batch-scoped ANY(...) will return, ~0.6s, before stage
+    # 1 rather than at stage 6. On a refresh the batch is a tiny slice of the TA, so this number
+    # would overstate by ~1000x and is deliberately not offered -- the refresh gets the exact
+    # Class B count when stage 6 starts.
+    ScaleProbe("6", "publication_authors_v2 rows to derive (upper bound: whole TA)",
+               "SELECT count(*) FROM publication_authors_v2 pa "
+               "JOIN publication_therapeutic_areas_v2 pta ON pta.publication_id = pa.publication_id "
+               "WHERE pta.therapeutic_area_id = %s",
+               ta_scoped=True, operations=("build",),
+               caveat="upper bound; on a build the batch is the whole TA"),
+    ScaleProbe("8d", "HCPs to classify (TA-scoped)",
+               "SELECT count(*) FROM hcp_therapeutic_areas_v2 WHERE therapeutic_area_id = %s",
+               ta_scoped=True),
+    ScaleProbe("8e/8f", "HCPs reclassified / recounted (whole hcps_v2, TA-agnostic)",
+               "SELECT count(*) FROM hcps_v2",
+               caveat="full pass every run -- identical work in both operations"),
+    ScaleProbe("9", "rising eligible pool at the LAST run",
+               "SELECT count(*) FROM hcp_scientific_momentum_v1 WHERE therapeutic_area_id = %s",
+               ta_scoped=True,
+               caveat="prior run's pool; 0 on a first build because no prior run exists"),
+    ScaleProbe("10", "asset_publication_v1 rows rebuilt",
+               "SELECT count(*) FROM asset_publication_v1", nsclc_only=True),
+    ScaleProbe("11", "open-status trials refreshed (global, TA-agnostic)",
+               "SELECT count(*) FROM clinical_trials_v2 WHERE status IN "
+               "('RECRUITING','NOT_YET_RECRUITING','ACTIVE_NOT_RECRUITING','ENROLLING_BY_INVITATION')"),
+    ScaleProbe("12", "NPI'd HCPs with no hcp_hcpcs_detail row",
+               "SELECT count(*) FROM hcps_v2 h WHERE h.npi_number IS NOT NULL "
+               "AND NOT EXISTS (SELECT 1 FROM hcp_hcpcs_detail d WHERE d.hcp_id = h.id)",
+               caveat="upper bound; the stage intersects this with the local parquets"),
+    # 13 is skipped under --operation build (BUILD_MAX_STAGE), so these are refresh-only.
+    ScaleProbe("13a", "rising narratives (whole board, UNCAPPED, BILLED)",
+               "SELECT count(*) FROM hcp_rising_star_ranks_v3 WHERE therapeutic_area_id = %s",
+               ta_scoped=True, operations=("refresh",)),
+    ScaleProbe("13c", "community narratives (BILLED)",
+               "SELECT count(*) FROM community_board_nsclc_v1 WHERE qualifies",
+               operations=("refresh",), nsclc_only=True,
+               caveat="upper bound: all tiers; the stage runs anchored + supported only"),
+)
+
+
+def collect_scale_estimates(
+    ta_id: str, slug: str, operation: str,
+) -> Tuple[List[Tuple[str, str, Optional[int], str]], float]:
+    """Run every applicable Class-A probe. Returns (rows, elapsed_seconds).
+
+    Best-effort by construction: a probe that errors or times out yields None and the caller
+    prints "unavailable". Opens ONE connection for the whole set.
+    """
+    rows: List[Tuple[str, str, Optional[int], str]] = []
+    t0 = time.time()
+    conn = None
+    try:
+        conn = _connect()
+        conn.autocommit = True
+    except Exception as exc:
+        return [("--", f"database unavailable ({type(exc).__name__}); no scale estimates",
+                 None, "")], time.time() - t0
+    try:
+        for probe in SCALE_PROBES:
+            if operation not in probe.operations:
+                continue
+            if probe.nsclc_only and slug != ASSET_MATCHES_TA:
+                rows.append((probe.key, probe.label, 0,
+                             f"NSCLC-only stage; nothing to do for {slug}"))
+                continue
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"SET statement_timeout = '{SCALE_PROBE_TIMEOUT}'")
+                    cur.execute(probe.sql, (ta_id,) if probe.ta_scoped else ())
+                    rows.append((probe.key, probe.label, int(cur.fetchone()[0]), probe.caveat))
+            except Exception as exc:
+                rows.append((probe.key, probe.label, None,
+                             f"probe failed: {type(exc).__name__}"))
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return rows, time.time() - t0
+
+
+def print_scale_estimates(ta_id: str, slug: str, operation: str, days: int = 0) -> Dict[str, int]:
+    """Print the Class-A block. Returns {stage_key: count} for persistence into run_state.json."""
+    print("=" * 72)
+    print(f"  SCALE ESTIMATES (plan time, --operation {operation})  ta={slug}")
+    print("=" * 72)
+
+    projected = esearch_total_for_window(slug, days) if days else None
+    if projected is not None:
+        print(f"  {'1':<6} {projected:>12,}  papers ESearch projects for this window")
+    else:
+        print(f"  {'1':<6} {'unavailable':>12}  papers (ESearch probe failed or no window)")
+
+    rows, elapsed = collect_scale_estimates(ta_id, slug, operation)
+    collected: Dict[str, int] = {}
+    for key, label, value, caveat in rows:
+        shown = f"{value:,}" if value is not None else "unavailable"
+        print(f"  {key:<6} {shown:>12}  {label}")
+        if caveat:
+            print(f"  {'':<6} {'':>12}  ^ {caveat}")
+        if value is not None:
+            collected[key] = value
+    print()
+    print(f"  Class C stages print nothing by design: 1d (the HAVING aggregate IS the work),")
+    print(f"    2 (the clustering prefilter IS the decision), 7b (scope is 7a's output),")
+    print(f"    8a (--only-changed-today filters client-side). A guess would read as measured.")
+    print(f"  Stages 3, 4, 6, 7a, 8b report at stage start -- their input does not exist yet.")
+    print(f"  ({len(rows)} probes in {elapsed:.1f}s)")
+    print("=" * 72)
+    return collected
+
+
+def count_file_lines(path: Path) -> Optional[int]:
+    """Non-blank line count, or None. Used for the file-scoped Class-B work-sets."""
+    try:
+        with io.open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return sum(1 for line in fh if line.strip())
+    except Exception:
+        return None
+
+
+def count_scalar(sql: str, params: Tuple = ()) -> Optional[int]:
+    """One best-effort scalar count for a Class-B work-set. Never raises."""
+    try:
+        conn = _connect()
+    except Exception:
+        return None
+    try:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(f"SET statement_timeout = '{SCALE_PROBE_TIMEOUT}'")
+            cur.execute(sql, params)
+            return int(cur.fetchone()[0])
+    except Exception:
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def print_stage_work_set(stage_label: str, value: Optional[int], unit: str) -> Optional[int]:
+    """Class-B: a work-set measured when the stage starts, NOT at plan time.
+
+    The marker is not decoration. These numbers appear mid-run -- stage 4's landed at minute
+    forty of the CRC build -- and a bare count in the same format as the plan-time block would
+    be read as something the plan knew and you ignored.
+    """
+    shown = f"{value:,}" if value is not None else "unavailable"
+    print(f"[stage {stage_label}] work-set: {shown} {unit}  "
+          f"(MEASURED NOW -- input did not exist at plan time)", flush=True)
+    return value
 
 
 def confirm_build(
@@ -1037,6 +1256,7 @@ def run_cycle(
 
     start_n = resume_from or 1
     stage_status: List[Dict] = []
+    plan_scale: Dict[str, int] = {}
 
     # Resolve / recover shared state.
     if resume_from:
@@ -1086,8 +1306,39 @@ def run_cycle(
         hcp_run_id = None
         ta_id = resolve_ta_id(slug)
 
-    def note(n: int, name: str, status: str) -> None:
-        stage_status.append({"stage": n, "name": name, "status": status})
+    def persist() -> None:
+        """Write run_state.json with everything recovered on a resume, plus the per-stage
+        record. Called after EVERY stage rather than only after 1 and 2: a run that dies at
+        stage 8 must still leave its stage-1..7 durations behind, because those are the only
+        defensible input to a later estimate. The file is small; the write is not worth
+        batching."""
+        save_state(work, {
+            "ta_id": ta_id, "pub_run_id": pub_run_id, "hcp_run_id": hcp_run_id,
+            "operation": operation, "plan_scale": plan_scale, "stages": stage_status,
+        })
+
+    def note(n: int, name: str, status: str, work_set: Optional[int] = None) -> None:
+        """Record a stage outcome, its work-set and its duration, then persist.
+
+        duration_s comes from run_stage via _LAST_STAGE_DURATION, consumed and cleared here so
+        a SKIPPED note that follows a real stage does not inherit the previous stage's time.
+
+        work_set_count is the MEASURED work-set where one was taken (Class B), never the
+        plan-time estimate -- those live under the separate `plan_scale` key so the two can
+        never be confused. Together they make seconds-per-unit derivable for the SAME TA and
+        SAME operation, which is the only comparison the measured ratio spread supports:
+        per-stage CRC:NSCLC ran from 1.2x (stage 5) to 599x (dedup_merge), so no single
+        cross-TA scalar exists and none is computed anywhere.
+        """
+        global _LAST_STAGE_DURATION
+        rec: Dict = {"stage": n, "name": name, "status": status}
+        if work_set is not None:
+            rec["work_set_count"] = work_set
+        if _LAST_STAGE_DURATION is not None:
+            rec["duration_s"] = round(_LAST_STAGE_DURATION, 1)
+            _LAST_STAGE_DURATION = None
+        stage_status.append(rec)
+        persist()
 
     # --operation build caps the cycle at stage 12. One predicate carries both bounds, so
     # stage 13's existing `if running(13):` gate suppresses 13 AND the 13.5 sweep nested inside
@@ -1117,7 +1368,14 @@ def run_cycle(
                 f"  --operation refresh."
             )
         days = int(date_args[1]) if date_args and date_args[0] == "--days" else 0
+        # SCALE BEFORE THE GATE. The confirmation asks "proceed?"; the scale block is half the
+        # answer, and on the CRC build the half nobody had. Printing it after the prompt would
+        # put the 1,024x number on screen only once the decision was already made.
+        plan_scale = print_scale_estimates(ta_id, slug, operation, days)
         confirm_build(slug, ta_id, days, existing, force_rebuild, assume_yes)
+    elif resume_from is None:
+        days = int(date_args[1]) if date_args and date_args[0] == "--days" else 0
+        plan_scale = print_scale_estimates(ta_id, slug, operation, days)
 
     print("=" * 72)
     print(f"  TA CYCLE - EXECUTE ({operation})  ta={slug} ta_id={ta_id} snapshot={snapshot}")
@@ -1134,8 +1392,7 @@ def run_cycle(
             )
             if not pub_run_id:
                 raise StageFailure(1, "ingest", 1)  # could not capture PUB_RUN_ID
-            save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id,
-                              "hcp_run_id": hcp_run_id, "operation": operation})
+            persist()  # run ids minted by this stage -- land them first
             note(1, "ingest", "OK")
 
             # QUIET-WEEK GATE: stage 1 emits primary_pmids.txt (the authoritative batch = the esearch
@@ -1202,8 +1459,7 @@ def run_cycle(
             if not hcp_run_id:
                 raise SystemExit("run_summary.json has no ingestion_run_id.")
             print(f"  captured HCP_RUN_ID={hcp_run_id}")
-            save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id,
-                              "hcp_run_id": hcp_run_id, "operation": operation})
+            persist()  # run ids minted by this stage -- land them first
             note(2, "create_hcps", "OK")
 
         # [gen batch_pubs] needed by stages 3 and 6 -- resolved from the PRIMARY pmid set
@@ -1221,15 +1477,17 @@ def run_cycle(
         if running(3):
             if not hcp_run_id:
                 raise SystemExit("HCP_RUN_ID unknown. Re-run from top.")
+            ws = print_stage_work_set("3", count_file_lines(batch_pubs), "batch publications")
             run_stage(3, "affected", cmd_compute_affected(hcp_run_id, str(batch_pubs), str(affected)))
-            note(3, "affected", "OK")
+            note(3, "affected", "OK", work_set=ws)
 
         # 4 TA TAGGING
         if running(4):
             if not affected.exists():
                 raise SystemExit(f"{affected} missing. Re-run from stage 3.")
+            ws = print_stage_work_set("4", count_file_lines(affected), "affected HCPs")
             run_stage(4, "ta_tagging", cmd_ta_tagging(slug, str(affected)))
-            note(4, "ta_tagging", "OK")
+            note(4, "ta_tagging", "OK", work_set=ws)
 
         # [gen ta_hcp_ids] for stage 5
         if running(5):
@@ -1237,23 +1495,50 @@ def run_cycle(
 
         # 5 STEP F
         if running(5):
+            # Exact count of the file stage 4 just produced. The plan-time Class-A estimate
+            # for stage 5 is the same query one step earlier; printing both makes visible that
+            # step_f is TA-scoped, so this barely moves between a build and a weekly run.
+            ws = print_stage_work_set("5", count_file_lines(ta_hcp_ids), "HCPs in the TA")
             run_stage(5, "step_f", cmd_step_f(str(ta_hcp_ids)))
-            note(5, "step_f", "OK")
+            note(5, "step_f", "OK", work_set=ws)
 
         # 6 AUTHORSHIP 9b
         if running(6):
             if not batch_pubs.exists():
                 raise SystemExit(f"{batch_pubs} missing. Re-run from stage 3.")
+            # THE 1,024x NUMBER, exact. On a build the plan already printed the TA-scoped
+            # upper bound before stage 1; this is the batch-scoped truth. On a refresh this is
+            # the only place it can be known, because the batch is a slice of the TA.
+            ws = print_stage_work_set(
+                "6",
+                count_scalar(
+                    "SELECT count(*) FROM publication_authors_v2 "
+                    "WHERE publication_id = ANY(%s::uuid[])",
+                    (read_pmids_file(batch_pubs),),
+                ),
+                "publication_authors_v2 rows to derive",
+            )
             run_stage(6, "authorship_9b", cmd_authorship(str(batch_pubs)))
-            note(6, "authorship_9b", "OK")
+            note(6, "authorship_9b", "OK", work_set=ws)
 
         # 7 DEDUP (detect then merge)
         if running(7):
             if not hcp_run_id:
                 raise SystemExit("HCP_RUN_ID unknown. Re-run from top.")
+            ws = print_stage_work_set(
+                "7a",
+                count_scalar("SELECT count(*) FROM hcps_v2 WHERE ingestion_run_id = %s",
+                             (hcp_run_id,)),
+                "HCPs seeded by this run",
+            )
             run_stage(7, "dedup_detect", cmd_dedup_detect(hcp_run_id))
+            note(7, "dedup_detect", "OK", work_set=ws)
+            # 7b is Class C: its scope is 7a's candidate output at the high-confidence tier,
+            # which does not exist until 7a has written. No number is printed rather than a
+            # guess -- 7b ran 2,394s on the CRC build against 4s weekly, so a wrong estimate
+            # here would be actively misleading.
             run_stage(7, "dedup_merge", cmd_dedup_merge())
-            note(7, "dedup", "OK")
+            note(7, "dedup_merge", "OK")
 
         # 8 CAREER CHAIN (8a-8d)
         if running(8):
@@ -1262,6 +1547,7 @@ def run_cycle(
             if not hcp_run_id:
                 raise SystemExit("HCP_RUN_ID unknown. Re-run from top.")
             run_stage(8, "career_enrichment(8a)", cmd_career_enrich())
+            print_stage_work_set("8b", count_file_lines(affected), "HCPs to enrich (OpenAlex API)")
             run_stage(8, "openalex_enrichment(8b)", cmd_openalex_enrich(str(affected), snapshot))
             run_stage(8, "career_first_pub_year(8c)", cmd_career_first(slug, hcp_run_id, snapshot))
             # 8f: populate hcps_v2.in_corpus_pub_count from author_pub_flat. Sibling of 8c --
@@ -1580,19 +1866,29 @@ def main() -> int:
                   f"--mindate/--maxdate to override.")
 
     if not execute:
+        # ta_id is now resolved for BOTH operations, not just build: the scale estimates are
+        # the point of a dry run, and every TA-scoped probe needs the uuid. Still best-effort --
+        # a preview must never fail because a probe did.
+        try:
+            probe_ta_id: Optional[str] = resolve_ta_id(slug)
+        except Exception:
+            probe_ta_id = None
+        days = int(date_args[1]) if date_args and date_args[0] == "--days" else 0
+        # Same ORDER --execute uses: scale, then the gate block. The two are read together and
+        # a preview that reversed them would rehearse a different decision than the real run.
+        if probe_ta_id:
+            print_scale_estimates(probe_ta_id, slug, args.operation, days)
+        else:
+            print("  SCALE ESTIMATES: skipped -- could not resolve ta_id for "
+                  f"'{slug}' (DB unavailable).")
         if args.operation == "build":
-            # Same block --execute prints, minus the gate. Resolving ta_id here means the dry
-            # run makes two read-only probes (a SELECT and one retmax=0 ESearch) where it
-            # previously made none -- worth it, since the existing-pub count and the blast
+            # Same block --execute prints, minus the gate. The existing-pub count and the blast
             # radius are exactly what you want BEFORE committing to a multi-hour build.
-            # Both are best-effort: a preview must not fail because a probe did.
             try:
-                probe_ta_id = resolve_ta_id(slug)
-                existing = ta_publication_count(probe_ta_id)
+                existing = ta_publication_count(probe_ta_id) if probe_ta_id else None
             except Exception:
-                probe_ta_id, existing = "<TA_ID>", None
-            days = int(date_args[1]) if date_args and date_args[0] == "--days" else 0
-            confirm_build(slug, probe_ta_id, days, existing,
+                existing = None
+            confirm_build(slug, probe_ta_id or "<TA_ID>", days, existing,
                           args.force_rebuild, args.yes, prompt=False)
         print_plan(slug, date.today().isoformat(), work_dir_for(slug), args.ingest_limit, date_args,
                    operation=args.operation)
