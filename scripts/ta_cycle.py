@@ -236,6 +236,30 @@ STAGE_ORDER: List[Tuple[int, str]] = [
 STAGE_NAME_TO_NUM = {name: n for n, name in STAGE_ORDER}
 MAX_STAGE = STAGE_ORDER[-1][0]
 
+# SUB-STAGE LABELS, IN EXECUTION ORDER. STAGE_ORDER above is the 13 coarse stages that
+# --resume-from has always addressed; this is the finer grain the plan and the postchecks
+# already print, and the unit --stop-after accepts. Note 8f sits between 8c and 8d -- that is
+# the real execution order, not a typo: 8f is 8c's sibling (the other publication-derived stat
+# on hcps_v2) and both must land before 8d classifies on them.
+#
+# Modelled on generate_cycle's STAGE_ORDER/index arithmetic rather than a second mechanism:
+# start and stop are ordinals into one ordered list, and `stop < start` is refused. The only
+# difference is grain -- generate_cycle's stages have no sub-steps to address.
+STAGE_LABELS: List[Tuple[str, int]] = [
+    ("1", 1), ("1b", 1), ("1c", 1), ("1d", 1),
+    ("2", 2), ("3", 3), ("4", 4), ("5", 5), ("6", 6),
+    ("7a", 7), ("7b", 7),
+    ("8a", 8), ("8b", 8), ("8c", 8), ("8f", 8), ("8d", 8), ("8e", 8),
+    ("9", 9), ("9.5", 9),
+    ("10", 10), ("11", 11), ("12", 12),
+    ("13a", 13), ("13b", 13), ("13c", 13), ("13.5", 13),
+]
+LABEL_ORDINAL: Dict[str, int] = {lbl: i for i, (lbl, _) in enumerate(STAGE_LABELS)}
+LABEL_STAGE_NO: Dict[str, int] = {lbl: n for lbl, n in STAGE_LABELS}
+LAST_ORDINAL = len(STAGE_LABELS) - 1
+#: Highest ordinal --operation build may reach: the last label at or below BUILD_MAX_STAGE.
+BUILD_CEILING_ORDINAL = max(i for i, (_, n) in enumerate(STAGE_LABELS) if n <= BUILD_MAX_STAGE)
+
 
 class StageFailure(Exception):
     def __init__(self, stage_no: int, name: str, returncode: int,
@@ -1219,13 +1243,14 @@ def report_postcheck(
     return outcome
 
 
-#: Print order for the postcheck plan -- cycle order, not dict order.
-POSTCHECK_ORDER = ("1", "1b", "1c", "1d", "2", "3", "4", "5", "6", "7a", "7b",
-                   "8a", "8b", "8c", "8f", "8d", "8e", "9", "9.5", "10", "11", "12",
-                   "13a", "13b", "13c", "13.5")
+#: Print order for the postcheck plan. Derived from STAGE_LABELS rather than restated: the
+#: plan, the postchecks and --stop-after must address the same units in the same order, and two
+#: hand-maintained lists would drift.
+POSTCHECK_ORDER: Tuple[str, ...] = tuple(lbl for lbl, _ in STAGE_LABELS)
 
 
-def print_postcheck_plan(slug: str, operation: str) -> None:
+def print_postcheck_plan(slug: str, operation: str,
+                         stop_after: Optional[str] = None) -> None:
     """What each stage will be held to, printed at plan time alongside the scale estimates.
 
     The plan used to say what would RUN and, since the scale work, how MUCH. It still did not
@@ -1233,15 +1258,32 @@ def print_postcheck_plan(slug: str, operation: str) -> None:
     nobody could answer for stage 13.
     """
     print("=" * 72)
-    print(f"  POSTCHECK PLAN (--operation {operation})  ta={slug}")
+    window = f"1 -> {stop_after}" if stop_after else "full cycle"
+    if operation == "build":
+        ceiling_label = STAGE_LABELS[BUILD_CEILING_ORDINAL][0]
+        window += f"  (build ceiling: {ceiling_label})"
+    print(f"  POSTCHECK PLAN (--operation {operation})  ta={slug}   window: {window}")
     print("=" * 72)
     print(f"  {'stage':<6} {'kind':<15} {'ratio':>6}  {'gates?':<8} target")
     for key in POSTCHECK_ORDER:
         pc = POSTCHECKS.get(key)
         if pc is None:
             continue
-        if operation == "build" and key.startswith("13"):
-            print(f"  {key:<6} {'-- SKIPPED: stage 13 is above the build ceiling --':<40}")
+        # THREE DIFFERENT REASONS, NEVER ONE WORD -- and when two bounds exclude the same
+        # stage, BOTH are named. A bare "SKIPPED" is what let the 08-25 ceiling change go
+        # unnoticed, and "after --stop-after 8f" alone would hide from the operator that 13a
+        # is ALSO forbidden by the operation, which is the more important of the two facts.
+        _past_stop = bool(stop_after) and LABEL_ORDINAL[key] > LABEL_ORDINAL[stop_after]
+        _past_ceiling = operation == "build" and LABEL_ORDINAL[key] > BUILD_CEILING_ORDINAL
+        if _past_stop or _past_ceiling:
+            if _past_ceiling and _past_stop:
+                why = (f"above --operation build ceiling (stage {BUILD_MAX_STAGE}) "
+                       f"AND after --stop-after {stop_after}")
+            elif _past_ceiling:
+                why = f"above --operation build ceiling (stage {BUILD_MAX_STAGE})"
+            else:
+                why = f"after --stop-after {stop_after}"
+            print(f"  {key:<6} -- NOT RUN: {why} --")
             continue
         if pc.kind == "NONE":
             print(f"  {key:<6} {'(none)':<15} {'':>6}  {'':<8} {pc.label}")
@@ -1439,7 +1481,7 @@ def write_completion_marker(work: Path, marker: Dict) -> None:
 def print_plan(
     slug: str, snapshot: str, work: Path,
     ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
-    operation: str = "refresh",
+    operation: str = "refresh", stop_after: Optional[str] = None,
 ) -> None:
     A = str(work / "affected.txt")
     B = str(work / "batch_pubs.txt")
@@ -1569,6 +1611,7 @@ def run_cycle(
     slug: str, resume_from: Optional[int],
     ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
     operation: str = "refresh", force_rebuild: bool = False, assume_yes: bool = False,
+    stop_after: Optional[str] = None,
 ) -> int:
     work = work_dir_for(slug)
     affected = work / "affected.txt"
@@ -1642,6 +1685,13 @@ def run_cycle(
         save_state(work, {
             "ta_id": ta_id, "pub_run_id": pub_run_id, "hcp_run_id": hcp_run_id,
             "operation": operation, "plan_scale": plan_scale, "stages": stage_status,
+            # WHERE THE RUN DELIBERATELY STOPPED, and where it actually got to. Those are
+            # different states and the marker could not previously tell them apart: a run that
+            # ended at 8f because it was ASKED to looked identical to one that ended at 8f
+            # because 8d crashed and the chain stopped. `stop_after` is the instruction,
+            # `last_label_run` is the outcome; a later --resume-from can compare them.
+            "stop_after": stop_after,
+            "last_label_run": STAGE_LABELS[stop_ord][0],
         })
 
     def pc_before(key: str, params: Tuple = ()) -> Optional[int]:
@@ -1706,8 +1756,43 @@ def run_cycle(
     # reachable on one -- see ORCHESTRATOR_DEBT.md section 5.
     max_stage = BUILD_MAX_STAGE if operation == "build" else MAX_STAGE
 
+    # ONE ORDINAL WINDOW over STAGE_LABELS, exactly generate_cycle's arithmetic. Three bounds
+    # collapse into it, and each keeps its own REASON so the plan can say which one applied:
+    #   start_ord   --resume-from (coarse stage -> its first sub-label)
+    #   ceiling_ord --operation build's stage-12 ceiling
+    #   stop_ord    --stop-after
+    # argparse has already refused stop_after ABOVE the ceiling and stop_after BELOW the start,
+    # so by here the three cannot contradict each other.
+    start_lbl = next((lbl for lbl, n in STAGE_LABELS if n == start_n), STAGE_LABELS[0][0])
+    start_ord = LABEL_ORDINAL[start_lbl]
+    ceiling_ord = BUILD_CEILING_ORDINAL if operation == "build" else LAST_ORDINAL
+    stop_ord = min(LABEL_ORDINAL[stop_after] if stop_after else LAST_ORDINAL, ceiling_ord)
+
+    def running_label(label: str) -> bool:
+        """Does this SUB-STAGE run? The finest gate; every sub-stage consults it."""
+        return start_ord <= LABEL_ORDINAL[label] <= stop_ord
+
+    def skip_reason(label: str) -> str:
+        """Why a sub-stage is not running -- never a bare SKIPPED. The 08-25 near-miss came
+        from a ceiling that silently changed; a skip whose cause is unnamed is the same
+        failure in miniature."""
+        o = LABEL_ORDINAL[label]
+        if o < start_ord:
+            return f"before --resume-from {start_lbl}"
+        past_stop = bool(stop_after) and o > LABEL_ORDINAL[stop_after]
+        past_ceiling = o > ceiling_ord
+        if past_ceiling and past_stop:
+            return (f"above --operation build ceiling (stage {BUILD_MAX_STAGE}) "
+                    f"AND after --stop-after {stop_after}")
+        if past_ceiling:
+            return f"above --operation build ceiling (stage {BUILD_MAX_STAGE})"
+        if past_stop:
+            return f"after --stop-after {stop_after}"
+        return "not scheduled"
+
     def running(n: int) -> bool:
-        return start_n <= n <= max_stage
+        """Does any sub-stage of this coarse stage run? Preserves every existing call site."""
+        return any(running_label(lbl) for lbl, sn in STAGE_LABELS if sn == n)
 
     if operation == "build" and resume_from is None:
         # START-OF-RUN ONLY. Gate D and the confirmation are decisions about STARTING a build,
@@ -1795,25 +1880,42 @@ def run_cycle(
             # env has that var set truthy -> without the override, 1b skips the very phase that writes
             # publications_v2.authorships and is a silent no-op. The child's load_dotenv(override=False)
             # keeps our "0" (the key is already present in the child env), so .env cannot re-enable it.
-            _b = pc_before("1b")
-            run_stage(1, "openalex_enrich_pubs(1b)", cmd_openalex_enrich_pubs(),
-                      extra_env={"SKIP_DOI_ENRICHMENT": "0"})
-            note(1, "openalex_enrich_pubs(1b)", "OK",
-                 postcheck=pc_after("1b", 1, "1b", _b))
+            if running_label("1b"):
+                _b = pc_before("1b")
+                run_stage(1, "openalex_enrich_pubs(1b)", cmd_openalex_enrich_pubs(),
+                          extra_env={"SKIP_DOI_ENRICHMENT": "0"})
+                note(1, "openalex_enrich_pubs(1b)", "OK",
+                     postcheck=pc_after("1b", 1, "1b", _b))
+            else:
+                print(f"[stage 1b] SKIPPED: {skip_reason('1b')}", flush=True)
+                note(LABEL_STAGE_NO['1b'], "1b", f"SKIPPED({skip_reason('1b')})")
+
 
             # 1c: rebuild author_pub_flat from the now-enriched authorships (GATE-D: after 1b).
-            _b = pc_before("1c")
-            run_stage(1, "flatten_author_pub_flat(1c)", cmd_run_sql_file(str(BUILD_AUTHOR_FLAT_SQL)))
-            note(1, "flatten_author_pub_flat(1c)", "OK",
-                 postcheck=pc_after("1c", 1, "1c", _b))
+            if running_label("1c"):
+                _b = pc_before("1c")
+                run_stage(1, "flatten_author_pub_flat(1c)",
+                          cmd_run_sql_file(str(BUILD_AUTHOR_FLAT_SQL)))
+                note(1, "flatten_author_pub_flat(1c)", "OK",
+                     postcheck=pc_after("1c", 1, "1c", _b))
+            else:
+                print(f"[stage 1c] SKIPPED: {skip_reason('1c')}", flush=True)
+                note(LABEL_STAGE_NO['1c'], "1c", f"SKIPPED({skip_reason('1c')})")
+
 
             # 1d: inventory upsert for this TA's authors (GATE-B: GREATEST no-clobber, in the committed
             # SQL). ta_id is a BOUND param; run_sql raises statement_timeout for the heavy aggregate.
-            _b = pc_before("1d")
-            run_stage(1, "inventory_upsert(1d)", cmd_run_sql_file(
-                str(INVENTORY_UPSERT_SQL_FILE), {"ta_id": ta_id}, INVENTORY_STATEMENT_TIMEOUT))
-            note(1, "inventory_upsert(1d)", "OK",
-                 postcheck=pc_after("1d", 1, "1d", _b))
+            if running_label("1d"):
+                _b = pc_before("1d")
+                run_stage(1, "inventory_upsert(1d)", cmd_run_sql_file(
+                    str(INVENTORY_UPSERT_SQL_FILE), {"ta_id": ta_id},
+                    INVENTORY_STATEMENT_TIMEOUT))
+                note(1, "inventory_upsert(1d)", "OK",
+                     postcheck=pc_after("1d", 1, "1d", _b))
+            else:
+                print(f"[stage 1d] SKIPPED: {skip_reason('1d')}", flush=True)
+                note(LABEL_STAGE_NO['1d'], "1d", f"SKIPPED({skip_reason('1d')})")
+
 
         # 2 CREATE HCPS (mint HCP_RUN_ID)
         if running(2):
@@ -1941,8 +2043,12 @@ def run_cycle(
             # which does not exist until 7a has written. No number is printed rather than a
             # guess -- 7b ran 2,394s on the CRC build against 4s weekly, so a wrong estimate
             # here would be actively misleading.
-            run_stage(7, "dedup_merge", cmd_dedup_merge())
-            note(7, "dedup_merge", "OK")
+            if running_label("7b"):
+                run_stage(7, "dedup_merge", cmd_dedup_merge())
+                note(7, "dedup_merge", "OK")
+            else:
+                print(f"[stage 7b] SKIPPED: {skip_reason('7b')}", flush=True)
+                note(7, "7b", f"SKIPPED({skip_reason('7b')})")
 
         # 8 CAREER CHAIN (8a-8d)
         if running(8):
@@ -1953,15 +2059,27 @@ def run_cycle(
             # 8a is Class C -- POSTCHECKS["8a"] is NONE. --only-changed-today filters
             # client-side while paging the cluster join, so no target-table predicate
             # distinguishes "nothing needed enriching" from "everything failed".
-            run_stage(8, "career_enrichment(8a)", cmd_career_enrich())
-            _ws8b = print_stage_work_set("8b", count_file_lines(affected),
-                                         "HCPs to enrich (OpenAlex API)")
-            _b8b = pc_before("8b", (snapshot,))
-            run_stage(8, "openalex_enrichment(8b)", cmd_openalex_enrich(str(affected), snapshot))
-            _o8b = pc_after("8b", 8, "8b", _b8b, _ws8b, (snapshot,))
-            _b8c = pc_before("8c", (ta_id,))
-            run_stage(8, "career_first_pub_year(8c)", cmd_career_first(slug, hcp_run_id, snapshot))
-            _o8c = pc_after("8c", 8, "8c", _b8c, None, (ta_id,))
+            if running_label("8a"):
+                run_stage(8, "career_enrichment(8a)", cmd_career_enrich())
+            else:
+                print(f"[stage 8a] SKIPPED: {skip_reason('8a')}", flush=True)
+            _o8b = _o8c = OUTCOME_OK
+            if running_label("8b"):
+                _ws8b = print_stage_work_set("8b", count_file_lines(affected),
+                                             "HCPs to enrich (OpenAlex API)")
+                _b8b = pc_before("8b", (snapshot,))
+                run_stage(8, "openalex_enrichment(8b)",
+                          cmd_openalex_enrich(str(affected), snapshot))
+                _o8b = pc_after("8b", 8, "8b", _b8b, _ws8b, (snapshot,))
+            else:
+                print(f"[stage 8b] SKIPPED: {skip_reason('8b')}", flush=True)
+            if running_label("8c"):
+                _b8c = pc_before("8c", (ta_id,))
+                run_stage(8, "career_first_pub_year(8c)",
+                          cmd_career_first(slug, hcp_run_id, snapshot))
+                _o8c = pc_after("8c", 8, "8c", _b8c, None, (ta_id,))
+            else:
+                print(f"[stage 8c] SKIPPED: {skip_reason('8c')}", flush=True)
             # 8f: populate hcps_v2.in_corpus_pub_count from author_pub_flat. Sibling of 8c --
             # the other publication-derived stat on hcps_v2, from the same substrate. Placed
             # AFTER 8c because both read the post-dedup HCP set, and inside stage 8 because
@@ -1976,31 +2094,54 @@ def run_cycle(
             # is untouched, so this stage cannot move any board.
             # Full-corpus, TA-agnostic, ~2-4 min; exits non-zero on a partial write and never
             # reports OK on one.
-            run_stage(8, "in_corpus_pub_count(8f)", cmd_in_corpus_pub_count(str(ingest_summary)))
-            _b8d = pc_before("8d", (ta_id,))
-            run_stage(8, "cohort_classification(8d)", cmd_cohort(slug))
-            _o8d = pc_after("8d", 8, "8d", _b8d, None, (ta_id,))
+            if running_label("8f"):
+                run_stage(8, "in_corpus_pub_count(8f)",
+                          cmd_in_corpus_pub_count(str(ingest_summary)))
+            else:
+                print(f"[stage 8f] SKIPPED: {skip_reason('8f')}", flush=True)
+            _o8d = OUTCOME_OK
+            if running_label("8d"):
+                _b8d = pc_before("8d", (ta_id,))
+                run_stage(8, "cohort_classification(8d)", cmd_cohort(slug))
+                _o8d = pc_after("8d", 8, "8d", _b8d, None, (ta_id,))
+            else:
+                print(f"[stage 8d] SKIPPED: {skip_reason('8d')}", flush=True)
             # 8e: FULL reclassify of hcps_v2 into hcp_industry_classification_v1. MUST be the last
             # step of stage 8 -- after institution_normalized is final (create_hcps + the 8a/8b
             # enrichment above) and BEFORE stage 9. The rising momentum scripts INNER JOIN this
             # table filtered to classification='ACADEMIC', so any HCP without a current row is
             # silently dropped from rising scoring. Run full (no --hcp-ids-file) for now.
-            _b8e = pc_before("8e")
-            run_stage(8, "industry_classify(8e)", cmd_industry_classify())
-            _o8e = pc_after("8e", 8, "8e", _b8e)
+            _o8e = OUTCOME_OK
+            if running_label("8e"):
+                _b8e = pc_before("8e")
+                run_stage(8, "industry_classify(8e)", cmd_industry_classify())
+                _o8e = pc_after("8e", 8, "8e", _b8e)
+            else:
+                print(f"[stage 8e] SKIPPED: {skip_reason('8e')}", flush=True)
             # Stage 8 is five sub-stages under one note. The recorded postcheck is the WORST
             # of them, so a SHORT anywhere in the chain survives into run_state.json rather
             # than being averaged away by four OKs.
-            note(8, "career", "OK",
+            # Stage 8 is six sub-stages under one note. If --stop-after cut the chain partway
+            # the status must say so: "OK" on a stage that ran 8a-8f but not 8d/8e would assert
+            # work that did not happen, which is the same class of untruth the postchecks exist
+            # to end. The recorded postcheck is the WORST of the sub-stages that DID run, so a
+            # SHORT anywhere survives rather than being averaged away by the others.
+            _ran8 = [lbl for lbl in ("8a", "8b", "8c", "8f", "8d", "8e") if running_label(lbl)]
+            _all8 = len(_ran8) == 6
+            note(8, "career", "OK" if _all8 else f"PARTIAL(ran {'+'.join(_ran8)})",
                  postcheck=(OUTCOME_SHORT if OUTCOME_SHORT in (_o8b, _o8c, _o8d, _o8e)
                             else OUTCOME_OK))
 
         # 9 SCORE
         if running(9):
-            _b9 = pc_before("9", (ta_id,))
-            run_stage(9, "rising_score", cmd_rising_score(slug))
-            note(9, "score", "OK",
-                 postcheck=pc_after("9", 9, "9", _b9, plan_scale.get("9"), (ta_id,)))
+            if running_label("9"):
+                _b9 = pc_before("9", (ta_id,))
+                run_stage(9, "rising_score", cmd_rising_score(slug))
+                note(9, "score", "OK",
+                     postcheck=pc_after("9", 9, "9", _b9, plan_scale.get("9"), (ta_id,)))
+            else:
+                print(f"[stage 9] SKIPPED: {skip_reason('9')}", flush=True)
+                note(9, "score", f"SKIPPED({skip_reason('9')})")
 
             # 9.5 BOARD SNAPSHOT -- BLOCKING as of 2026-08-29. Inside stage 9's gate because it captures
             # stage 9's output: the board plus the variables it was gated on. It must never
@@ -2015,11 +2156,15 @@ def run_cycle(
             # with extra steps, and this was the only WARN in the cycle whose damage cannot be
             # repaired by re-running the stage later. Irreversibility is what should gate;
             # every other non-blocking stage leaves an artifact that merely goes stale.
-            _b95 = pc_before("9.5", (snapshot, ta_id))
-            run_stage(9, "board_snapshot(9.5)", cmd_board_snapshot(slug))
-            note(9, "board_snapshot", "OK",
-                 postcheck=pc_after("9.5", 9, "9.5", _b95, plan_scale.get("9"),
-                                    (snapshot, ta_id)))
+            if running_label("9.5"):
+                _b95 = pc_before("9.5", (snapshot, ta_id))
+                run_stage(9, "board_snapshot(9.5)", cmd_board_snapshot(slug))
+                note(9, "board_snapshot", "OK",
+                     postcheck=pc_after("9.5", 9, "9.5", _b95, plan_scale.get("9"),
+                                        (snapshot, ta_id)))
+            else:
+                print(f"[stage 9.5] SKIPPED: {skip_reason('9.5')}", flush=True)
+                note(9, "board_snapshot", f"SKIPPED({skip_reason('9.5')})")
 
         # 10 ASSET MATCHES (NSCLC only) -- NON-BLOCKING. After the scoring chain; failure is
         # isolated so it never marks the cycle FAILED (a stale asset table costs ~400 pubs/month
@@ -2103,6 +2248,10 @@ def run_cycle(
                 # does not apply to the NSCLC board.
                 ("narratives_community(13c)", "community", None, "13c"),
             ):
+                if not running_label(pc_key):
+                    print(f"[stage {pc_key}] SKIPPED: {skip_reason(pc_key)}", flush=True)
+                    note(13, sub_name, f"SKIPPED({skip_reason(pc_key)})")
+                    continue
                 try:
                     # STAYS NON-BLOCKING -- a stale narrative must never gate the data cycle,
                     # which is already committed by now. But non-blocking no longer means
@@ -2135,6 +2284,9 @@ def run_cycle(
             # Only cohorts with a membership table are swept; community's board is
             # a tier-filtered view and is deliberately unsupported in the script.
             for sweep_cohort in ("rising_star", "established"):
+                if not running_label("13.5"):
+                    print(f"[stage 13.5] SKIPPED: {skip_reason('13.5')}", flush=True)
+                    break
                 try:
                     run_stage(13, f"stranded_sweep(13.5:{sweep_cohort})",
                               cmd_stranded_sweep(slug, sweep_cohort))
@@ -2171,6 +2323,11 @@ def run_cycle(
         # (or a later audit) must be able to tell.
         "operation": operation,
         "stages_skipped": [13] if operation == "build" else [],
+        # Machine-visible, same reason as `operation`: a run that stopped where it was told is
+        # NOT the same artifact as a completed cycle, and "SUCCESS" alone cannot say which.
+        "stop_after": stop_after,
+        "last_label_run": STAGE_LABELS[stop_ord][0],
+        "complete_cycle": stop_ord == LAST_ORDINAL,
     })
     print(f"\n{'='*72}\n  TA CYCLE SUCCESS ({operation})  ta={slug}  ({time.time()-t0:.0f}s)\n{'='*72}")
 
@@ -2236,6 +2393,16 @@ def parse_args() -> argparse.Namespace:
                         f"stop after stage {BUILD_MAX_STAGE} (skip billed narratives), confirm "
                         "blast radius, refuse a populated TA. Persisted to run_state.json; "
                         "--resume-from re-reads it and refuses a disagreement.")
+    # Same shape as generate_cycle's --stop-after: an ordinal into one ordered list, with
+    # `stop < start` refused. The grain is the SUB-STAGE label the plan and the postchecks
+    # already print, because "stop after 8f" is a thing an operator actually wants and
+    # "stop after 8" is not expressible any other way.
+    p.add_argument("--stop-after", metavar="LABEL", default=None,
+                   choices=[lbl for lbl, _ in STAGE_LABELS],
+                   help="Run no further than this sub-stage (inclusive). Labels, in order: "
+                        + ", ".join(lbl for lbl, _ in STAGE_LABELS)
+                        + ". Composes with --resume-from; persisted to run_state.json so a "
+                          "later resume can tell a deliberate stop from a failure.")
     p.add_argument("--force-rebuild", action="store_true",
                    help="--operation build only: proceed even though the TA already holds "
                         "publications (e.g. recovering a build that died mid-cycle).")
@@ -2255,6 +2422,35 @@ def parse_args() -> argparse.Namespace:
                 "do not also pass --days/--mindate/--maxdate.")
     if args.operation != "build" and (args.force_rebuild or args.yes):
         p.error("--force-rebuild and --yes apply only to --operation build.")
+
+    # PRECEDENCE: THE CEILING WINS, AND IT REFUSES RATHER THAN CLAMPS.
+    #
+    # --operation build stops after stage 12 because the billed narrative stages must not run
+    # against a board nobody has validated. --stop-after is an operator preference; the ceiling
+    # is a property of the operation. So they cannot disagree: asking a build to stop after 13a
+    # is asking it to RUN 13a, which the operation forbids.
+    #
+    # Refusing, not warning-and-clamping, for the same reason --operation has no default: a run
+    # that silently does less (or more) than what was typed is the exact class of defect that
+    # made 2026-08-25 a near-miss. Clamping would print a warning into a log nobody reads and
+    # proceed; refusing costs one retype and cannot be missed. The remedy is named in the error.
+    if args.stop_after and args.operation == "build":
+        if LABEL_ORDINAL[args.stop_after] > BUILD_CEILING_ORDINAL:
+            ceiling_label = STAGE_LABELS[BUILD_CEILING_ORDINAL][0]
+            p.error(
+                f"--stop-after {args.stop_after} is above --operation build's ceiling "
+                f"(stage {BUILD_MAX_STAGE}, last label {ceiling_label!r}). A build must not "
+                f"reach the billed narrative stages against an unvalidated board. Use "
+                f"--stop-after {ceiling_label} or lower, or run the narratives separately "
+                f"with --operation refresh --resume-from 13 once the board is validated."
+            )
+
+    # Same check generate_cycle makes: an empty window is a typo, not an instruction.
+    if args.stop_after and args.resume_from:
+        start_lbl = resolve_resume_label(args.resume_from)
+        if start_lbl and LABEL_ORDINAL[args.stop_after] < LABEL_ORDINAL[start_lbl]:
+            p.error(f"--stop-after {args.stop_after} precedes --resume-from "
+                    f"{args.resume_from} (which starts at {start_lbl}). Nothing would run.")
     return args
 
 
@@ -2270,6 +2466,21 @@ def resolve_resume(value: Optional[str]) -> Optional[int]:
         f"--resume-from: unknown stage '{value}'. Use 1-{MAX_STAGE} or one of: "
         + ", ".join(name for _, name in STAGE_ORDER)
     )
+
+
+def resolve_resume_label(value: Optional[str]) -> Optional[str]:
+    """--resume-from's coarse stage number -> the FIRST sub-stage label of that stage.
+
+    --resume-from has always addressed the 13 coarse stages and keeps doing so; resuming at 8
+    means resuming at 8a. This only exists so the two flags can be compared on one axis.
+    """
+    n = resolve_resume(value)
+    if n is None:
+        return None
+    for lbl, stage_no in STAGE_LABELS:
+        if stage_no == n:
+            return lbl
+    return None
 
 
 def force_utf8_stdio() -> None:
@@ -2333,7 +2544,7 @@ def main() -> int:
         # a preview that reversed them would rehearse a different decision than the real run.
         if probe_ta_id:
             print_scale_estimates(probe_ta_id, slug, args.operation, days)
-            print_postcheck_plan(slug, args.operation)
+            print_postcheck_plan(slug, args.operation, args.stop_after)
         else:
             print("  SCALE ESTIMATES: skipped -- could not resolve ta_id for "
                   f"'{slug}' (DB unavailable).")
@@ -2346,12 +2557,12 @@ def main() -> int:
                 existing = None
             confirm_build(slug, probe_ta_id or "<TA_ID>", days, existing,
                           args.force_rebuild, args.yes, prompt=False)
-        print_plan(slug, date.today().isoformat(), work_dir_for(slug), args.ingest_limit, date_args,
-                   operation=args.operation)
+        print_plan(slug, date.today().isoformat(), work_dir_for(slug), args.ingest_limit,
+                   date_args, operation=args.operation, stop_after=args.stop_after)
         return 0
     return run_cycle(slug, resume_from, args.ingest_limit, date_args,
                      operation=args.operation, force_rebuild=args.force_rebuild,
-                     assume_yes=args.yes)
+                     assume_yes=args.yes, stop_after=args.stop_after)
 
 
 if __name__ == "__main__":
