@@ -661,6 +661,7 @@ async def run_all_hcps(
     args: argparse.Namespace,
     stats: dict[str, Any],
     ta: dict[str, str],
+    ta_id: str,
 ) -> None:
     total_hcps = len(target_hcp_ids)
     semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
@@ -673,7 +674,7 @@ async def run_all_hcps(
         try:
             try:
                 async with db_lock:
-                    positions = get_positions_for_hcp(conn, hcp_id, _ta_id)
+                    positions = get_positions_for_hcp(conn, hcp_id, ta_id)
             except Exception as exc:
                 async with db_lock:
                     stats["db_errors"] += 1
@@ -828,7 +829,7 @@ def main() -> int:
             return 0
 
         asyncio.run(
-            run_all_hcps(conn, client, target_hcp_ids, args, stats, ta),
+            run_all_hcps(conn, client, target_hcp_ids, args, stats, ta, _ta_id),
         )
 
         print("\n=== Summary ===")
