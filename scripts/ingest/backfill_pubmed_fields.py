@@ -3,7 +3,7 @@ backfill_pubmed_fields.py — repair the four fields pubmed_pipeline used to dro
 
 WHY THIS EXISTS. _publication_v2_row() hardcoded abstract, language, mesh_terms and
 publication_types to None from 2026-07-02 (5f5c0d7) until 2026-08-26, while the
-article XML sat in scope. Every TA ingested through reingest_cycle.py in that
+article XML sat in scope. Every TA ingested through ta_cycle.py (then reingest_cycle.py) in that
 window lost all four. Split by the source stamp:
 
     source='pubmed_v2_ingest' (ingest_publications.py)  403,671 pubs, 403,671 typed

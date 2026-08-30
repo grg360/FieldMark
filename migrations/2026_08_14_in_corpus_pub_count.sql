@@ -40,7 +40,7 @@
 -- absence, not as a count of nothing.
 --
 -- ── Populated by ────────────────────────────────────────────────────────────
--- scripts/enrich/recompute_in_corpus_pub_count.py, wired into reingest_cycle.py
+-- scripts/enrich/recompute_in_corpus_pub_count.py, wired into ta_cycle.py (was reingest_cycle.py)
 -- as stage 8f (after 8c, before 8d/8e). Idempotent: the first run populates
 -- from NULL, later runs write only rows whose count actually moved.
 --

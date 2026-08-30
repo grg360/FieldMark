@@ -20,7 +20,7 @@ copy the gate inputs at the moment they are true.
 
 THIS SCRIPT CAPTURES, IT NEVER RECOMPUTES. Every value is read from the tables
 the scoring stage wrote. It must therefore run AFTER stage 9 (see
-reingest_cycle.py stage 9.5), and source_computed_at carries the scoring row's
+ta_cycle.py stage 9.5), and source_computed_at carries the scoring row's
 own computed_at so a snapshot can be proven to match what shipped.
 
 RISING CAPTURES THE ELIGIBLE POOL, NOT THE BOARD (~2,232 rows/TA vs 251).

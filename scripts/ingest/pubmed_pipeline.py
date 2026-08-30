@@ -1142,7 +1142,7 @@ def parse_authorships(article: ET.Element) -> List[Dict[str, Any]]:
 #   source='pubmed_v2_ingest' (ingest_publications.py)  403,671 pubs, 403,671 typed
 #   source='pubmed'           (THIS pipeline)           169,197 pubs,      81 typed
 #
-# Every TA built through reingest_cycle.py since 07-02 lost all four. Colorectal
+# Every TA built through ta_cycle.py (then reingest_cycle.py) since 07-02 lost all four. Colorectal
 # Cancer is 100% this path: 147,218 publications with zero publication_types, zero
 # mesh_terms, zero abstracts, zero language. publication_leadership_scoring.py
 # reads publication_types for its Editorial and Systematic Review / Meta-Analysis

@@ -1,4 +1,4 @@
-# Orchestrator debt — `reingest_cycle.py` execution and operator experience
+# Orchestrator debt — `ta_cycle.py` execution and operator experience
 
 Scope: how the cycle *runs* — per-stage cost, progress visibility, partial-completion guards and
 stop control. Distinct from `TA_GENERATION_LAYER.md`, which covers what the cycle does **not
@@ -157,7 +157,7 @@ Fidelity notes, so a future rewrite does not lose behaviour:
 
 ## 2. Children run without `-u` — the operator flies blind by construction
 
-`py()` (`reingest_cycle.py:235`) builds `[sys.executable, str(REPO_ROOT / SCRIPTS[key])]` with **no
+`py()` (`ta_cycle.py:235`) builds `[sys.executable, str(REPO_ROOT / SCRIPTS[key])]` with **no
 `-u`**. `run_stage` gives every child `stdout=subprocess.PIPE`. Python block-buffers into a pipe at
 8KB, and no stage sets `flush=True` or `reconfigure(line_buffering=True)`.
 
@@ -195,30 +195,33 @@ degradation class as the `hcp_industry_classification_v1` INNER JOIN noted at `:
 ## 4. Stage 8f is executed but absent from the plan
 
 Already recorded in `TA_GENERATION_LAYER.md` § *Open defects found during this audit*. Restated here
-only for cross-reference: `reingest_cycle.py:1145` runs
+only for cross-reference: `ta_cycle.py:1145` runs
 `run_stage(8, "in_corpus_pub_count(8f)", ...)`, while `print_plan` (`:824`) lists 8a–8e and jumps to
 stage 9. Confirmed still present at 2026-08-25. Same omission class as the 12/13/13.5 gap fixed in
 `234b5bf`, which patched only the stages named in that task and did not re-audit the 8-series.
 
 ---
 
-## 5. No `--stop-after`; build mode's ceiling cannot combine with `--resume-from`
+## 5. No `--stop-after` (build ceiling on resume: FIXED 2026-08-29)
 
-There is no `--stop-after` flag. The only early stop is build mode's ceiling
-(`BUILD_MODE_MAX_STAGE = 12`, `:197`), applied via `max_stage = BUILD_MODE_MAX_STAGE if build_mode
-== "new" else MAX_STAGE` (`:968`).
+There is no `--stop-after` flag. The only early stop is the build ceiling
+(`BUILD_MAX_STAGE = 12`), applied via
+`max_stage = BUILD_MAX_STAGE if operation == "build" else MAX_STAGE`.
 
-That ceiling is unreachable on a resume. `--build-mode new` runs Gate D (`:973`), which refuses when
-the TA already holds publications:
+**~~That ceiling is unreachable on a resume.~~ FIXED 2026-08-29 by `--operation`.** As recorded,
+`--build-mode new` ran Gate D on every invocation, so after stage 1 — when the TA is populated by
+definition — `--resume-from N --build-mode new` always tripped it, and the only way through was
+`--force-rebuild`: the wrong instrument, and a flag that stops being read once it is passed
+routinely.
 
-```
---build-mode new: TA '<slug>' already holds {existing:,} publication(s).
-```
+Gate D and the blast-radius confirmation are now **start-of-run only** (`resume_from is None`).
+They are decisions about *starting* a multi-hour destructive build, not about continuing one, and
+skipping them on a resume is safe precisely because `--operation` is persisted to
+`run_state.json` and re-read — a resume can no longer change the operation, so there is nothing
+for the gates to re-verify. `--resume-from 6 --operation build` now correctly stops at 12.
 
-After stage 1 the TA is populated by definition, so `--resume-from N --build-mode new` always trips
-Gate D unless `--force-rebuild` is passed — and `--force-rebuild` on a resume is exactly the wrong
-instrument. **An operator resuming mid-cycle has no way to stop at a chosen stage.** On the CRC
-build this meant no way to resume into stage 6 and halt before the billed downstream work.
+**Still open: there is no `--stop-after`.** The ceiling is the only early stop, and it is fixed at
+12. An operator cannot resume into stage 6 and halt at, say, 8 — the CRC build's actual need.
 
 ---
 

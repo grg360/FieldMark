@@ -1,5 +1,19 @@
 """
-FieldMark - single orchestrator for ONE incremental reingest cycle (Monday-3am cron entrypoint).
+FieldMark - single orchestrator for ONE TA cycle. Two operations, declared with --operation:
+
+  --operation refresh   the weekly incremental cycle (Monday-3am cron entrypoint). Windows
+                        relative to today, runs all 13 stages.
+  --operation build     the ONE-TIME FIRST BUILD of a TA holding no corpus. Window comes from
+                        the TA's pubmed.years_back, the cycle stops after stage 12 (the billed
+                        narrative stages must not run against an unvalidated board), the blast
+                        radius is confirmed interactively, and a populated TA is refused.
+
+--operation is REQUIRED and has no default. It is not a setting on one operation; it names
+which of two operations this is, and the two differ by ~600x in batch size (the 2026-08-24 CRC
+build ingested 147,400 primary pmids against 162 for the NSCLC weekly). It is persisted into
+run_state.json and RE-READ by --resume-from, so a resume recovers the operation instead of
+re-declaring it -- see the comment at the resume site for the 2026-08-25 failure that forced
+this. Renamed from reingest_cycle.py 2026-08-29: "reingest" described only the refresh half.
 
 PURE ORCHESTRATION: this file contains NO scoring/data logic and does NOT reimplement any stage.
 It chains the existing stage scripts via subprocess, fail-fast, threading the cycle's run ids.
@@ -101,7 +115,10 @@ running each script with --dry-run individually.)
 
 --resume-from STAGE: skip to a named/numbered stage, reusing the previous run's ids + generated
 files persisted in the per-TA work dir. If those are missing, recovery is: re-run from the top
-(all stages are upsert/idempotent).
+(all stages are upsert/idempotent). The run's --operation is recovered from run_state.json;
+passing an --operation that disagrees is REFUSED, not silently resolved. One carve-out: a
+resume ABOVE the build ceiling (stage > 12) may differ, because no build-gated stage can run
+in it -- that is the documented "validate the board, then run stage 13" path.
 
 Env: DATABASE_URL (for the glue SELECTs) + whatever the stage scripts need.
 """
@@ -123,7 +140,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
-REPO_ROOT = Path(__file__).resolve().parent.parent  # scripts/reingest_cycle.py -> scripts -> repo root
+REPO_ROOT = Path(__file__).resolve().parent.parent  # scripts/ta_cycle.py -> scripts -> repo root
 
 SCRIPTS: Dict[str, str] = {
     "pubmed": "scripts/ingest/pubmed_pipeline.py",
@@ -196,7 +213,7 @@ DEFAULT_INGEST_DAYS = 7
 # Correct for a weekly incremental, wrong for a TA holding zero papers -- a first build needs
 # the TA's whole configured history, and must not run the billed narrative stages against a
 # board nobody has validated yet.
-BUILD_MODE_MAX_STAGE = 12  # stop after 12; 13 (billed, 2 of 3 sub-stages uncapped) and 13.5 wait
+BUILD_MAX_STAGE = 12  # stop after 12; 13 (billed, 2 of 3 sub-stages uncapped) and 13.5 wait
 DAYS_PER_YEAR = 365
 
 # Ordered stages for --resume-from and the plan.
@@ -444,6 +461,11 @@ def cmd_trials_status_refresh() -> List[str]:
 def cmd_hcpcs_topup() -> List[str]:
     # 12: Medicare claims top-up. Derives its own target set (NPI'd HCPs with no
     # hcp_hcpcs_detail rows) and no-ops when clean -- TA-agnostic, local parquets only.
+    #
+    # "reingest_cycle" is a DATA VALUE, not this file's name: it lands in
+    # pipeline_runs.triggered_by, which has history behind it. Deliberately NOT renamed with
+    # the script (2026-08-29) -- changing it would fragment that history into before/after
+    # buckets for no gain. Change it only alongside a backfill.
     return py("hcpcs_topup") + ["--execute", "--triggered-by", "reingest_cycle"]
 
 
@@ -620,8 +642,8 @@ def _connect():
     return psycopg.connect(get_required_env("DATABASE_URL"))
 
 
-def build_mode_date_args(slug: str) -> List[str]:
-    """Stage-1 window for a FIRST BUILD, from the TA's own pubmed.years_back.
+def build_date_args(slug: str) -> List[str]:
+    """Stage-1 window for --operation build, from the TA's own pubmed.years_back.
 
     Emitted as --days rather than letting pubmed_pipeline read its own config, for two
     reasons: it preserves this orchestrator's invariant that stage 1 is NEVER invoked
@@ -634,23 +656,23 @@ def build_mode_date_args(slug: str) -> List[str]:
     """
     cfg_path = REPO_ROOT / "config" / "therapeutic_areas" / f"{slug}.json"
     if not cfg_path.is_file():
-        raise SystemExit(f"--build-mode new: no TA config at {cfg_path}.")
+        raise SystemExit(f"--operation build: no TA config at {cfg_path}.")
     try:
         cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"--build-mode new: {cfg_path} is not valid JSON: {exc}") from exc
+        raise SystemExit(f"--operation build: {cfg_path} is not valid JSON: {exc}") from exc
 
     years_back = (cfg.get("pubmed") or {}).get("years_back")
     if years_back is None:
         raise SystemExit(
-            f"--build-mode new: {cfg_path.name} has pubmed.years_back = null.\n"
+            f"--operation build: {cfg_path.name} has pubmed.years_back = null.\n"
             f"  A first build needs an explicit window. null means NO date filter -- the full\n"
             f"  PubMed corpus back to 1947 -- which is an untested path on this pipeline.\n"
             f"  Set pubmed.years_back to an integer (NSCLC's shipped corpus used 10)."
         )
     if not isinstance(years_back, int) or years_back <= 0:
         raise SystemExit(
-            f"--build-mode new: {cfg_path.name} has pubmed.years_back = {years_back!r}; "
+            f"--operation build: {cfg_path.name} has pubmed.years_back = {years_back!r}; "
             f"expected a positive integer."
         )
     return ["--days", str(years_back * DAYS_PER_YEAR)]
@@ -694,11 +716,17 @@ def esearch_total_for_window(slug: str, days: int) -> Optional[int]:
         return None
 
 
-def confirm_build_mode(
+def confirm_build(
     slug: str, ta_id: str, days: int, existing_pubs: Optional[int],
     force_rebuild: bool, assume_yes: bool, prompt: bool = True,
 ) -> None:
     """Gate C + the not-resumable warning. Prints scale and cross-TA blast radius, then blocks.
+
+    START-OF-RUN ONLY -- the caller gates this and Gate D on `resume_from is None`. Both are
+    decisions about STARTING a multi-hour destructive build; re-asking them at stage 7 answers
+    a question nobody asked. Before --operation was persisted, the only way past them on a
+    resume was --force-rebuild, which is the wrong instrument and stops being read once it is
+    passed routinely. A resume can no longer change the operation, so re-gating buys nothing.
 
     STDIN IS DEVNULL FOR EVERY CHILD PROCESS in this orchestrator because it runs unattended
     at 3am. A prompt that blocks forever in cron is worse than no prompt, so a non-TTY without
@@ -713,12 +741,12 @@ def confirm_build_mode(
     existing_s = f"{existing_pubs:,} tagged to this TA" if existing_pubs is not None else "unavailable (DB probe failed)"
 
     print("=" * 72)
-    print(f"  BUILD MODE (--build-mode new)  ta={slug}")
+    print(f"  BUILD  (--operation build)  ta={slug}")
     print("=" * 72)
     print(f"  Window            : --days {days}  ({days // DAYS_PER_YEAR} years, from pubmed.years_back)")
     print(f"  Projected scale   : {projected_s}")
     print(f"  Existing pubs     : {existing_s}")
-    print(f"  Stages            : 1 -> {BUILD_MODE_MAX_STAGE} (13 narratives + 13.5 sweep SKIPPED)")
+    print(f"  Stages            : 1 -> {BUILD_MAX_STAGE} (13 narratives + 13.5 sweep SKIPPED)")
     print()
     print("  STAGE 1 IS NOT RESUMABLE. If it dies partway you restart from zero:")
     print("    - run_state.json is only written AFTER stage 1 completes, so --resume-from has")
@@ -739,7 +767,7 @@ def confirm_build_mode(
     if existing_pubs and not force_rebuild:
         print()
         print(f"  GATE D WILL REFUSE THIS RUN: {existing_pubs:,} publication(s) already tagged.")
-        print(f"    Pass --force-rebuild to override, or --build-mode incremental to top up.")
+        print(f"    Pass --force-rebuild to override, or --operation refresh to top up.")
     print("=" * 72)
 
     if not prompt:
@@ -749,7 +777,7 @@ def confirm_build_mode(
         return
     if not sys.stdin.isatty():
         raise SystemExit(
-            "--build-mode new requires an interactive terminal for confirmation "
+            "--operation build requires an interactive terminal for confirmation "
             "(stdin is not a TTY). Pass --yes to proceed non-interactively."
         )
     try:
@@ -759,7 +787,7 @@ def confirm_build_mode(
         # stdin redirected), so the isatty check above can pass and input() still hit EOF.
         # Treat that as a refusal: an unattended build must abort cleanly, never traceback.
         raise SystemExit(
-            "\n--build-mode new: stdin closed before confirmation (no interactive terminal). "
+            "\n--operation build: stdin closed before confirmation (no interactive terminal). "
             "Pass --yes to proceed non-interactively."
         )
     if reply != "y":
@@ -855,7 +883,7 @@ def load_state(work: Path) -> Dict:
 def write_completion_marker(work: Path, marker: Dict) -> None:
     path = work / "reingest_last_run.json"
     path.write_text(json.dumps(marker, indent=2, sort_keys=True), encoding="utf-8")
-    print(f"\n[reingest_cycle] completion marker -> {path}")
+    print(f"\n[ta_cycle] completion marker -> {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -865,7 +893,7 @@ def write_completion_marker(work: Path, marker: Dict) -> None:
 def print_plan(
     slug: str, snapshot: str, work: Path,
     ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
-    build_mode: str = "incremental",
+    operation: str = "refresh",
 ) -> None:
     A = str(work / "affected.txt")
     B = str(work / "batch_pubs.txt")
@@ -933,17 +961,17 @@ def print_plan(
          cmd_hcpcs_topup()),
     ]
 
-    if build_mode == "new":
+    if operation == "build":
         # Rendered as SKIPPED rather than omitted, mirroring stage 10's
         # "[SKIPPED: NSCLC-only, ta=...]". Build mode's headline promise is that 13 will not
         # run; a plan that simply dropped 13 would make that promise unverifiable -- which is
         # the exact defect commit 1 just fixed.
         plan += [
-            (f"13 narratives   [SKIPPED: build mode, ceiling is stage {BUILD_MODE_MAX_STAGE}] "
+            (f"13 narratives   [SKIPPED: --operation build, ceiling is stage {BUILD_MAX_STAGE}] "
              f"-- BILLED; 13a rising and 13c community are UNCAPPED", []),
-            ("13.5 stranded_sweep  [SKIPPED: build mode, nested inside stage 13's gate]", []),
-            (f"   run later, AFTER validating the board: "
-             f"python scripts/reingest_cycle.py --ta {slug} --execute --resume-from 13", []),
+            ("13.5 stranded_sweep  [SKIPPED: --operation build, nested inside stage 13's gate]", []),
+            (f"   run later, AFTER validating the board: python scripts/ta_cycle.py "
+             f"--ta {slug} --operation refresh --execute --resume-from 13", []),
         ]
     else:
         plan += [
@@ -962,7 +990,7 @@ def print_plan(
         ]
 
     print("=" * 72)
-    print("  REINGEST CYCLE - PLAN (DRY-RUN: nothing is executed)")
+    print(f"  TA CYCLE - PLAN ({operation})  (DRY-RUN: nothing is executed)")
     print("=" * 72)
     print(f"  TA:            {slug}")
     print(f"  ta_id:         {TAID}  (resolved at execute time)")
@@ -994,7 +1022,7 @@ def print_plan(
 def run_cycle(
     slug: str, resume_from: Optional[int],
     ingest_limit: Optional[int] = None, date_args: Optional[List[str]] = None,
-    build_mode: str = "incremental", force_rebuild: bool = False, assume_yes: bool = False,
+    operation: str = "refresh", force_rebuild: bool = False, assume_yes: bool = False,
 ) -> int:
     work = work_dir_for(slug)
     affected = work / "affected.txt"
@@ -1016,7 +1044,42 @@ def run_cycle(
         pub_run_id = state.get("pub_run_id")
         hcp_run_id = state.get("hcp_run_id")
         ta_id = state.get("ta_id") or resolve_ta_id(slug)
-        print(f"[reingest_cycle] RESUME from stage {resume_from}: "
+        # THE OPERATION IS RECOVERED, NOT RE-DECLARED. On 2026-08-25 the CRC build was resumed
+        # with --resume-from 4 and 7 and no --build-mode new; the mode was a CLI arg the run
+        # state never recorded, so max_stage silently reverted 12 -> 13. Had stages 6 and 8a not
+        # crashed, that resume would have generated uncapped rising, established and community
+        # narratives against a board stage 9 had not yet scored. A crash prevented it, not a
+        # guard. So: persisted here, re-read here, and a disagreement is refused rather than
+        # resolved in either direction -- preferring the flag reintroduces the original defect,
+        # preferring the file silently ignores what the operator typed.
+        persisted = state.get("operation")
+        if persisted is None:
+            # ONE-TIME COMPATIBILITY BRANCH. run_state.json files written before --operation
+            # existed have no key. Refusing outright would strand the in-flight CRC build, so an
+            # explicit --operation is accepted as the answer -- but it must be explicit, which is
+            # why --operation has no default. Delete this branch once no pre-2026-08-29 run state
+            # is still resumable.
+            print(f"[ta_cycle] run_state.json predates --operation (no key); "
+                  f"taking --operation {operation} from the command line.")
+        elif persisted != operation and resume_from <= BUILD_MAX_STAGE:
+            raise SystemExit(
+                f"--resume-from {resume_from}: run_state.json records --operation "
+                f"{persisted}; you passed --operation {operation}.\n"
+                f"  A resume cannot change the operation. Re-run without --resume-from to\n"
+                f"  start a new {operation} run, or resume with --operation {persisted}."
+            )
+        elif persisted != operation:
+            # THE ONE CARVE-OUT, and it cannot reintroduce the defect above. resume_from is
+            # ABOVE the build ceiling, so no stage the ceiling protects can run in this
+            # invocation -- start_n > BUILD_MAX_STAGE means stages 1-12 are all skipped
+            # regardless of which operation wins. It exists for exactly one documented path:
+            # a completed build prints "--operation refresh --execute --resume-from 13" so the
+            # billed narrative stages can run once the operator has validated the board. The
+            # 2026-08-25 failures were --resume-from 4 and 7; both are still refused.
+            print(f"[ta_cycle] run_state.json records --operation {persisted}; running "
+                  f"--operation {operation} from stage {resume_from}, which is above the "
+                  f"build ceiling ({BUILD_MAX_STAGE}) -- no build-gated stage can run.")
+        print(f"[ta_cycle] RESUME from stage {resume_from} (--operation {operation}): "
               f"hcp_run_id={hcp_run_id} pub_run_id={pub_run_id} ta_id={ta_id}")
     else:
         pub_run_id = None
@@ -1026,31 +1089,38 @@ def run_cycle(
     def note(n: int, name: str, status: str) -> None:
         stage_status.append({"stage": n, "name": name, "status": status})
 
-    # Build mode caps the cycle at stage 12. One predicate carries both bounds, so stage 13's
-    # existing `if running(13):` gate suppresses 13 AND the 13.5 sweep nested inside it with
-    # no edit at either site.
-    max_stage = BUILD_MODE_MAX_STAGE if build_mode == "new" else MAX_STAGE
+    # --operation build caps the cycle at stage 12. One predicate carries both bounds, so
+    # stage 13's existing `if running(13):` gate suppresses 13 AND the 13.5 sweep nested inside
+    # it with no edit at either site. Now that the operation survives a resume, this ceiling is
+    # reachable on one -- see ORCHESTRATOR_DEBT.md section 5.
+    max_stage = BUILD_MAX_STAGE if operation == "build" else MAX_STAGE
 
     def running(n: int) -> bool:
         return start_n <= n <= max_stage
 
-    if build_mode == "new":
+    if operation == "build" and resume_from is None:
+        # START-OF-RUN ONLY. Gate D and the confirmation are decisions about STARTING a build,
+        # not about continuing one: after stage 1 the TA is populated by definition, so a
+        # re-gated resume would ALWAYS trip Gate D and could only proceed via --force-rebuild --
+        # the wrong instrument, and a flag that stops being read once it is passed routinely.
+        # Safe to skip precisely because the operation can no longer change across a resume.
+        #
         # Gate D: a first build on a populated TA is a mistake, not a re-run. Checked before
         # the prompt so a doomed run is refused without asking anything.
         existing = ta_publication_count(ta_id)
         if existing and not force_rebuild:
             raise SystemExit(
-                f"--build-mode new: TA '{slug}' already holds {existing:,} publication(s).\n"
+                f"--operation build: TA '{slug}' already holds {existing:,} publication(s).\n"
                 f"  A first build on a populated TA is a mistake, not a re-run.\n"
                 f"  If this is a deliberate rebuild (e.g. recovering a build that died\n"
                 f"  mid-cycle), pass --force-rebuild. To top up incrementally instead, use\n"
-                f"  --build-mode incremental."
+                f"  --operation refresh."
             )
         days = int(date_args[1]) if date_args and date_args[0] == "--days" else 0
-        confirm_build_mode(slug, ta_id, days, existing, force_rebuild, assume_yes)
+        confirm_build(slug, ta_id, days, existing, force_rebuild, assume_yes)
 
     print("=" * 72)
-    print(f"  REINGEST CYCLE - EXECUTE  ta={slug} ta_id={ta_id} snapshot={snapshot}")
+    print(f"  TA CYCLE - EXECUTE ({operation})  ta={slug} ta_id={ta_id} snapshot={snapshot}")
     print(f"  work dir: {work}   resume_from: {resume_from or '(top)'}")
     print("=" * 72)
 
@@ -1064,7 +1134,8 @@ def run_cycle(
             )
             if not pub_run_id:
                 raise StageFailure(1, "ingest", 1)  # could not capture PUB_RUN_ID
-            save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id, "hcp_run_id": hcp_run_id})
+            save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id,
+                              "hcp_run_id": hcp_run_id, "operation": operation})
             note(1, "ingest", "OK")
 
             # QUIET-WEEK GATE: stage 1 emits primary_pmids.txt (the authoritative batch = the esearch
@@ -1131,7 +1202,8 @@ def run_cycle(
             if not hcp_run_id:
                 raise SystemExit("run_summary.json has no ingestion_run_id.")
             print(f"  captured HCP_RUN_ID={hcp_run_id}")
-            save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id, "hcp_run_id": hcp_run_id})
+            save_state(work, {"ta_id": ta_id, "pub_run_id": pub_run_id,
+                              "hcp_run_id": hcp_run_id, "operation": operation})
             note(2, "create_hcps", "OK")
 
         # [gen batch_pubs] needed by stages 3 and 6 -- resolved from the PRIMARY pmid set
@@ -1236,7 +1308,7 @@ def run_cycle(
                 note(9, "board_snapshot", "OK")
             except Exception as se:  # non-blocking: log + continue (StageFailure incl.)
                 note(9, "board_snapshot", f"WARN({type(se).__name__})")
-                print(f"\n[reingest_cycle] WARN: stage 9.5 board_snapshot failed ({se}); "
+                print(f"\n[ta_cycle] WARN: stage 9.5 board_snapshot failed ({se}); "
                       f"cycle still SUCCESS (non-blocking). THIS WEEK'S GATE INPUTS ARE LOST "
                       f"PERMANENTLY -- the momentum tables are overwritten next cycle. "
                       f"Re-run TODAY: python scripts/utilities/take_weekly_snapshot.py "
@@ -1254,7 +1326,7 @@ def run_cycle(
                     note(10, "asset_matches", "OK")
                 except Exception as ae:  # non-blocking: log + continue (StageFailure incl.)
                     note(10, "asset_matches", f"WARN({type(ae).__name__})")
-                    print(f"\n[reingest_cycle] WARN: stage 10 asset_matches failed ({ae}); "
+                    print(f"\n[ta_cycle] WARN: stage 10 asset_matches failed ({ae}); "
                           f"cycle still SUCCESS (non-blocking). Asset table left at prior build.",
                           file=sys.stderr)
 
@@ -1269,7 +1341,7 @@ def run_cycle(
                 note(11, "trials_status", "OK")
             except Exception as te:  # non-blocking: log + continue (StageFailure incl.)
                 note(11, "trials_status", f"WARN({type(te).__name__})")
-                print(f"\n[reingest_cycle] WARN: stage 11 trials_status_refresh failed ({te}); "
+                print(f"\n[ta_cycle] WARN: stage 11 trials_status_refresh failed ({te}); "
                       f"cycle still SUCCESS (non-blocking). Trial facts left at prior refresh.",
                       file=sys.stderr)
 
@@ -1285,7 +1357,7 @@ def run_cycle(
                 note(12, "hcpcs_topup", "OK")
             except Exception as he:  # non-blocking: log + continue (StageFailure incl.)
                 note(12, "hcpcs_topup", f"WARN({type(he).__name__})")
-                print(f"\n[reingest_cycle] WARN: stage 12 hcpcs_topup failed ({he}); "
+                print(f"\n[ta_cycle] WARN: stage 12 hcpcs_topup failed ({he}); "
                       f"cycle still SUCCESS (non-blocking). Claims detail left at prior load.",
                       file=sys.stderr)
 
@@ -1315,7 +1387,7 @@ def run_cycle(
                     note(13, sub_name, "OK")
                 except Exception as ne:  # non-blocking: log + continue (StageFailure incl.)
                     note(13, sub_name, f"WARN({type(ne).__name__})")
-                    print(f"\n[reingest_cycle] WARN: stage 13 {sub_name} failed ({ne}); "
+                    print(f"\n[ta_cycle] WARN: stage 13 {sub_name} failed ({ne}); "
                           f"cycle still SUCCESS (non-blocking). Narratives left at prior generation.",
                           file=sys.stderr)
 
@@ -1340,7 +1412,7 @@ def run_cycle(
                     note(13, f"stranded_sweep_{sweep_cohort}", "OK")
                 except Exception as se:  # non-blocking: log + continue
                     note(13, f"stranded_sweep_{sweep_cohort}", f"WARN({type(se).__name__})")
-                    print(f"\n[reingest_cycle] WARN: stage 13.5 stranded_sweep "
+                    print(f"\n[ta_cycle] WARN: stage 13.5 stranded_sweep "
                           f"({sweep_cohort}) failed ({se}); cycle still SUCCESS "
                           f"(non-blocking). Narratives for former board members remain "
                           f"on file and will be swept next cycle. Re-run manually: "
@@ -1368,20 +1440,23 @@ def run_cycle(
         # Machine-visible so the deferral is not merely printed: a build that stopped at 12
         # is NOT the same artifact as a completed cycle, and anything reading the marker
         # (or a later audit) must be able to tell.
-        "build_mode": build_mode,
-        "stages_skipped": [13] if build_mode == "new" else [],
+        "operation": operation,
+        "stages_skipped": [13] if operation == "build" else [],
     })
-    print(f"\n{'='*72}\n  REINGEST CYCLE SUCCESS  ta={slug}  ({time.time()-t0:.0f}s)\n{'='*72}")
-    if build_mode == "new":
-        print(f"\n  SKIPPED (build mode): stage 13 narratives + 13.5 stranded sweep.")
+    print(f"\n{'='*72}\n  TA CYCLE SUCCESS ({operation})  ta={slug}  ({time.time()-t0:.0f}s)\n{'='*72}")
+    if operation == "build":
+        print(f"\n  SKIPPED (--operation build): stage 13 narratives + 13.5 stranded sweep.")
         print(f"    13a narratives_rising       --cohort rising_star          (UNCAPPED, whole board)")
         print(f"    13b narratives_established  --cohort established --established-top 200")
         print(f"    13c narratives_community    --cohort community            (UNCAPPED, anchored+supported)")
         print(f"    13.5 stranded sweep         rising_star, established")
         print(f"  All BILLED (Anthropic API). Validate the board FIRST, then run:")
-        # NOT --build-mode new: the stage-12 ceiling would suppress the very stage being
-        # resumed for. Spelled out because that interaction is a footgun.
-        print(f"    python scripts/reingest_cycle.py --ta {slug} --execute --resume-from 13")
+        # --operation refresh, NOT build: the stage-12 ceiling would suppress the very stage
+        # being resumed for. And NOT --resume-from either -- this build's run_state.json records
+        # operation="build", so a resume against it would (correctly) refuse the operation
+        # change. Stage 13 needs no state beyond ids it re-reads, so it is a fresh refresh run.
+        print(f"    python scripts/ta_cycle.py --ta {slug} --operation refresh --execute "
+              f"--resume-from 13")
         print()
     return 0
 
@@ -1408,16 +1483,23 @@ def parse_args() -> argparse.Namespace:
                    help=f"Skip to a stage (number 1-{MAX_STAGE} or name: "
                         + ", ".join(name for _, name in STAGE_ORDER)
                         + "), reusing the last run's ids/files from the work dir.")
-    p.add_argument("--build-mode", choices=["incremental", "new"], default="incremental",
-                   help="'incremental' (default) = the weekly cycle. 'new' = FIRST BUILD of a TA "
-                        "with no corpus: window from the TA's pubmed.years_back, stop after stage "
-                        f"{BUILD_MODE_MAX_STAGE} (skip billed narratives), confirm blast radius, "
-                        "refuse a populated TA.")
+    # REQUIRED, NO DEFAULT. These are two operations, not two settings of one. A default is
+    # what let the 2026-08-25 CRC resumes silently become refreshes: build mode was the
+    # non-default, so omitting the flag on --resume-from 4 and 7 quietly reverted the stage-12
+    # ceiling and put uncapped billed narrative generation one un-crashed stage away. Making it
+    # required means the operator states the operation every time, and run_cycle persists it so
+    # a resume recovers it rather than re-declaring it.
+    p.add_argument("--operation", choices=["build", "refresh"], required=True,
+                   help="REQUIRED. 'refresh' = the weekly incremental cycle. 'build' = FIRST "
+                        "BUILD of a TA with no corpus: window from the TA's pubmed.years_back, "
+                        f"stop after stage {BUILD_MAX_STAGE} (skip billed narratives), confirm "
+                        "blast radius, refuse a populated TA. Persisted to run_state.json; "
+                        "--resume-from re-reads it and refuses a disagreement.")
     p.add_argument("--force-rebuild", action="store_true",
-                   help="--build-mode new only: proceed even though the TA already holds "
+                   help="--operation build only: proceed even though the TA already holds "
                         "publications (e.g. recovering a build that died mid-cycle).")
     p.add_argument("--yes", action="store_true",
-                   help="--build-mode new only: skip the interactive confirmation. Required for "
+                   help="--operation build only: skip the interactive confirmation. Required for "
                         "any non-TTY invocation.")
     args = p.parse_args()
     # --days and --mindate/--maxdate are mutually exclusive; an explicit range needs both bounds.
@@ -1425,13 +1507,13 @@ def parse_args() -> argparse.Namespace:
         p.error("--days is mutually exclusive with --mindate/--maxdate.")
     if bool(args.mindate) != bool(args.maxdate):
         p.error("--mindate and --maxdate must be given together.")
-    # Build mode owns the window (from years_back). Accepting a CLI window too would let the
-    # two disagree silently, which is exactly the class of bug this flag exists to prevent.
-    if args.build_mode == "new" and (args.days is not None or args.mindate or args.maxdate):
-        p.error("--build-mode new takes its window from the TA's pubmed.years_back; "
+    # --operation build owns the window (from years_back). Accepting a CLI window too would let
+    # the two disagree silently, which is exactly the class of bug this flag exists to prevent.
+    if args.operation == "build" and (args.days is not None or args.mindate or args.maxdate):
+        p.error("--operation build takes its window from the TA's pubmed.years_back; "
                 "do not also pass --days/--mindate/--maxdate.")
-    if args.build_mode != "new" and (args.force_rebuild or args.yes):
-        p.error("--force-rebuild and --yes apply only to --build-mode new.")
+    if args.operation != "build" and (args.force_rebuild or args.yes):
+        p.error("--force-rebuild and --yes apply only to --operation build.")
     return args
 
 
@@ -1485,20 +1567,20 @@ def main() -> int:
     slug = args.ta
     execute = args.execute and not args.dry_run  # dry-run is the safe default
     resume_from = resolve_resume(args.resume_from)
-    if args.build_mode == "new":
-        date_args = build_mode_date_args(slug)
-        print(f"[reingest_cycle] BUILD MODE: stage-1 window from {slug}.json pubmed.years_back "
-              f"-> {' '.join(date_args)}. Cycle will stop after stage {BUILD_MODE_MAX_STAGE}.")
+    if args.operation == "build":
+        date_args = build_date_args(slug)
+        print(f"[ta_cycle] BUILD: stage-1 window from {slug}.json pubmed.years_back "
+              f"-> {' '.join(date_args)}. Cycle will stop after stage {BUILD_MAX_STAGE}.")
     else:
         date_args = build_ingest_date_args(args.days, args.mindate, args.maxdate)
         if args.days is None and not (args.mindate and args.maxdate):
-            print(f"[reingest_cycle] No date window given; DEFAULTING stage 1 to --days "
+            print(f"[ta_cycle] No date window given; DEFAULTING stage 1 to --days "
                   f"{DEFAULT_INGEST_DAYS} (un-windowed ingest would pull the full PubMed corpus back "
                   f"to 1947 -- never correct for an incremental cycle). Pass --days N or "
                   f"--mindate/--maxdate to override.")
 
     if not execute:
-        if args.build_mode == "new":
+        if args.operation == "build":
             # Same block --execute prints, minus the gate. Resolving ta_id here means the dry
             # run makes two read-only probes (a SELECT and one retmax=0 ESearch) where it
             # previously made none -- worth it, since the existing-pub count and the blast
@@ -1510,13 +1592,13 @@ def main() -> int:
             except Exception:
                 probe_ta_id, existing = "<TA_ID>", None
             days = int(date_args[1]) if date_args and date_args[0] == "--days" else 0
-            confirm_build_mode(slug, probe_ta_id, days, existing,
-                               args.force_rebuild, args.yes, prompt=False)
+            confirm_build(slug, probe_ta_id, days, existing,
+                          args.force_rebuild, args.yes, prompt=False)
         print_plan(slug, date.today().isoformat(), work_dir_for(slug), args.ingest_limit, date_args,
-                   build_mode=args.build_mode)
+                   operation=args.operation)
         return 0
     return run_cycle(slug, resume_from, args.ingest_limit, date_args,
-                     build_mode=args.build_mode, force_rebuild=args.force_rebuild,
+                     operation=args.operation, force_rebuild=args.force_rebuild,
                      assume_yes=args.yes)
 
 

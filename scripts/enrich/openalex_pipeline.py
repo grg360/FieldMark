@@ -725,7 +725,7 @@ def run_pipeline(
         # publication ids this script has ever processed, so every stale row is already in it from
         # its original enrichment. Honouring it here would select exactly the right rows and then
         # filter all of them out -- a silent no-op, the same class of bug that cost 23-vs-368 pubs
-        # in pubmed_pipeline and that reingest_cycle now defends against by always passing
+        # in pubmed_pipeline and that ta_cycle now defends against by always passing
         # --reset-checkpoint. In refresh mode openalex_enriched_at IS the progress marker: it is
         # stamped on every successful write, so a killed run resumes correctly from the database
         # with no file involved, and cannot disagree with it.

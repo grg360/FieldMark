@@ -1,4 +1,4 @@
-# The TA Generation Layer — what `reingest_cycle.py` does NOT produce
+# The TA Generation Layer — what `ta_cycle.py` does NOT produce
 
 **Written:** 2026-08-24, from a live audit of the repo and database while standing up Colorectal Cancer.
 **Corrected:** 2026-08-26 — the Established finding was wrong; see *Scoring chains not in the cycle*.
@@ -88,7 +88,7 @@ any flag added to that script. The view has to be generalised first.
 - **`congress/ingest_asco_abstracts.py:62` and `:68`** — an `NSCLC` constant is bound into both
   roster queries (`WHERE r.therapeutic_area_id=%s`). No `--ta` flag.
 - **`assets/build_asset_matches.py`** — not hardcoded internally, but the orchestrator gates it:
-  `ASSET_MATCHES_TA = "nsclc"` in `reingest_cycle.py`, and stage 10 renders
+  `ASSET_MATCHES_TA = "nsclc"` in `ta_cycle.py`, and stage 10 renders
   `[SKIPPED: NSCLC-only, ta=<slug>]` for anything else. Asset matching is unavailable to CRC by
   construction.
 
@@ -163,7 +163,7 @@ inputs exist for the TA. No code change is required to get there.
 
 `rising_score.py` is a pure orchestrator — it resolves the TA's model from config and sequences the
 five momentum steps with the right window flags, so `--ta <slug> --execute` is the whole operator
-interface. **There is no Established equivalent.** `reingest_cycle.py` stage 9 runs `rising_score.py`
+interface. **There is no Established equivalent.** `ta_cycle.py` stage 9 runs `rising_score.py`
 and nothing else, and `take_weekly_snapshot.py:37` records Established as "write-on-change, not
 weekly", which is why the omission has never surfaced on NSCLC.
 
@@ -263,13 +263,13 @@ TA-scoped until the board view is, so this gates step 1's web-signals item.
 `ta_hcpcs_codes`, `ta_cohort_counts_cache` — plus `nppes.taxonomies` in the TA config JSON. These
 are content decisions, not code, and they can proceed in parallel with 1 and 2.
 
-**4. Only then orchestrate.** Extend `reingest_cycle.py` past stage 13 with the generation layer,
+**4. Only then orchestrate.** Extend `ta_cycle.py` past stage 13 with the generation layer,
 with the same discipline the existing stages have: per-stage completion notes, non-blocking where a
 failure must not gate the data cycle, and the billed stages gated behind an explicit flag the way
 build mode gates stage 13.
 
 > Designed 2026-08-25 as a separate second orchestrator (`scripts/generate_cycle.py`) rather than an
-> extension of `reingest_cycle.py` — see [`GENERATE_CYCLE_DESIGN.md`](GENERATE_CYCLE_DESIGN.md) for
+> extension of `ta_cycle.py` — see [`GENERATE_CYCLE_DESIGN.md`](GENERATE_CYCLE_DESIGN.md) for
 > the dependency order, billed-stage cost shape, verified-resume model, completion guards, and the
 > slug/name/id resolution trap. Not yet built.
 
@@ -278,7 +278,7 @@ build mode gates stage 13.
 ## Open defects found during this audit
 
 **Stage 8f is executed but absent from the dry-run plan.**
-`reingest_cycle.py:1145` runs `run_stage(8, "in_corpus_pub_count(8f)", cmd_in_corpus_pub_count(...))`,
+`ta_cycle.py:1145` runs `run_stage(8, "in_corpus_pub_count(8f)", cmd_in_corpus_pub_count(...))`,
 populating `hcps_v2.in_corpus_pub_count` from `author_pub_flat`. `print_plan` jumps from 8e to 9, so
 `--dry-run` never shows it.
 
@@ -293,5 +293,5 @@ only the stages named in the task and did not re-audit the 8-series. Not yet fix
 ---
 
 *Audit method: `pg_class`/`pg_get_viewdef` for object types and view definitions; repo-wide grep for
-table writers, `--ta` flags and billed API clients; `reingest_cycle.py`'s `SCRIPTS` map and stage
+table writers, `--ta` flags and billed API clients; `ta_cycle.py`'s `SCRIPTS` map and stage
 gates for orchestration membership.*

@@ -34,13 +34,13 @@ $sha = (& git rev-parse HEAD)
 $python = "C:\Users\garre\AppData\Local\Programs\Python\Python312\python.exe"
 
 # UTF-8 mode for python and every child it spawns (2026-08-03): with stdout on a
-# pipe, Windows Python defaults to cp1252 and reingest_cycle's child-output
+# pipe, Windows Python defaults to cp1252 and ta_cycle's child-output
 # streaming crashes on the first unencodable char (tqdm's U+2588 bar blocks did
 # exactly this to the 03:00 run, at stage 1, before the Stop-preference bug ate
 # the traceback). Inherited by all stage subprocesses.
 $env:PYTHONUTF8 = "1"
 
-& $python -u "scripts\reingest_cycle.py" --ta nsclc --days 10 --execute *>&1 |
+& $python -u "scripts\ta_cycle.py" --ta nsclc --operation refresh --days 10 --execute *>&1 |
     Tee-Object -FilePath $log -Append
 
 $code = $LASTEXITCODE

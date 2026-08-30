@@ -4,7 +4,7 @@
 **Companions:** [`TA_GENERATION_LAYER.md`](TA_GENERATION_LAYER.md) (what the cycle does not produce),
 [`ORCHESTRATOR_DEBT.md`](ORCHESTRATOR_DEBT.md) (phase 1 execution debt), `TA_BUILD_GUIDE.md` (runbook).
 
-A second orchestrator that runs after `reingest_cycle.py` completes and produces the surfaces a demo
+A second orchestrator that runs after `ta_cycle.py` completes and produces the surfaces a demo
 actually shows. **Design only — no code has been written.**
 
 **Scope:** the stages that already take `--ta` and do not depend on the two NSCLC-hardcoded views.

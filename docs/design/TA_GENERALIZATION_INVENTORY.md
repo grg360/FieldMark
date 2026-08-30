@@ -167,7 +167,7 @@ Mock/fixture NSCLC content (DEF, not blockers): `lib/pulseFixture.ts`,
 | `scripts/ingest/nppes_workstream_b_dryrun.py:20,96-116` | `NSCLC_TAXONOMIES` code list | CFG | Breast (oncology) taxonomy set | no | standard oncology codes | W3 |
 | `scripts/aggregate/open_payments_aggregator.py:70` · `medicare_aggregator.py:51` | `"expected_ta":"NSCLC"` assertion | CFG | Breast expected-TA | yes | guard assertion | W3 |
 | `frontend/narrative_pipeline.py:17` · `scripts/utilities/ta_audit.py:48` | slug↔UUID / UUID↔label maps | P | add Breast entry | yes | tooling maps | W3 |
-| `scripts/**/*.py` `--ta nsclc` **CLI defaults** (rising_score, recompute_established_ranks_v3, rising_star_scoring, pharma_engagement_scoring, network_momentum/centrality_scoring, scientific_momentum_scoring, publication_leadership_scoring, compute_top_collaborators, bucket_themes, reingest_cycle:751, derive_career_first_pub_year_v2, scrape_leadership_signals) | default value only | P | pass `--ta breast-cancer` | yes | ~14 scripts; fully parameterized | W3 |
+| `scripts/**/*.py` `--ta nsclc` **CLI defaults** (rising_score, recompute_established_ranks_v3, rising_star_scoring, pharma_engagement_scoring, network_momentum/centrality_scoring, scientific_momentum_scoring, publication_leadership_scoring, compute_top_collaborators, bucket_themes, ta_cycle:751, derive_career_first_pub_year_v2, scrape_leadership_signals) | default value only | P | pass `--ta breast-cancer` | yes | ~14 scripts; fully parameterized | W3 |
 
 ## Layer: Config & Edge functions
 

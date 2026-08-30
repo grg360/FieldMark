@@ -403,7 +403,7 @@ hepatologist -> community; every real AD KOL retained. This should be STANDARD f
 ## 0z. TWO INGEST SCRIPTS - READ BEFORE SECTION 1 (added 2026-07-23)
 
 This playbook documents `ingest_publications.py` as the canonical ingester. **The orchestrator
-(`reingest_cycle.py`, stage 1) calls a DIFFERENT script: `pubmed_pipeline.py`.** They now do the same job
+(`ta_cycle.py`, stage 1) calls a DIFFERENT script: `pubmed_pipeline.py`.** They now do the same job
 but read their query from DIFFERENT places:
 
 | | canonical per this playbook | what the orchestrator runs |
@@ -414,7 +414,7 @@ but read their query from DIFFERENT places:
 **Consequence for a new TA:** authoring the query ONLY in the DB config table (as section 2a instructs) is
 NOT enough if you intend to run the weekly orchestrator - `pubmed_pipeline.py` will look for a JSON config
 and not find your query. **Populate BOTH** until the two are reconciled, and verify with
-`python scripts/reingest_cycle.py --ta <slug> --dry-run` before a real run.
+`python scripts/ta_cycle.py --operation refresh --ta <slug> --dry-run` before a real run.
 
 **Behavioural convergence (2026-07-23):** `pubmed_pipeline.py` was refactored to be publications-only - it
 no longer mints HCPs, no longer gates publication persistence on author resolution, and now populates

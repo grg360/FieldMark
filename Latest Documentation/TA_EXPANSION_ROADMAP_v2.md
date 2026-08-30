@@ -269,7 +269,7 @@ Run the scripts in the current v2 sequence. NOTE: `pubmed_pipeline.py` persists 
 HCP identity is resolved OpenAlex-first, AFTER ingestion, by `create_hcps_v2.py`. So OpenAlex enrichment
 must run BEFORE HCP creation (PubMed pubs → OpenAlex enrich → build_author_flat → inventory →
 create_hcps_v2 → tag → …). See `docs/TA_BUILD_GUIDE.md` for the authoritative chain; prefer the
-`reingest_cycle.py` orchestrator, which runs it end-to-end.
+`ta_cycle.py` orchestrator, which runs it end-to-end.
 
 ```powershell
 # publications only (no HCPs):

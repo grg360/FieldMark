@@ -150,7 +150,7 @@ weights on real true/false positives — don't pre-guess membership.
 Two ways to run, depending on how much the orchestrator has been generalized for multi-TA:
 
 ### Path A — the orchestrator (preferred if your TA is wired into it)
-`reingest_cycle.py` runs the whole chain (ingest → OpenAlex enrich → flatten → inventory → create HCPs →
+`ta_cycle.py` runs the whole chain (ingest → OpenAlex enrich → flatten → inventory → create HCPs →
 affected → tag → Step F → authorship → dedup → career → cohort → score). **Always `--dry-run` first.**
 
 > Stage 1 of the orchestrator is `pubmed_pipeline.py`, which — like `ingest_publications.py` in Path B —
@@ -162,10 +162,10 @@ affected → tag → Step F → authorship → dedup → career → cohort → s
 > batch — the old name-based-HCP loss).
 ```powershell
 # DRY RUN FIRST — prints the full plan, writes nothing:
-python scripts/reingest_cycle.py --ta <slug> --dry-run
+python scripts/ta_cycle.py --operation refresh --ta <slug> --dry-run
 
 # then a real, windowed run:
-python scripts/reingest_cycle.py --ta <slug> --mindate YYYY/MM/DD --maxdate YYYY/MM/DD --execute
+python scripts/ta_cycle.py --operation refresh --ta <slug> --mindate YYYY/MM/DD --maxdate YYYY/MM/DD --execute
 # or --days N for a rolling window
 ```
 - `--resume-from <stage>` re-enters after a failed step (reuses run-ids/files from the work dir).
@@ -285,7 +285,7 @@ something upstream is wrong — stop and trace, don't ship.**
 
 ## The end-state you're building toward
 A config-driven, gated, orchestrated pipeline where a TA is built from its config row by
-`reingest_cycle.py --ta <slug>` with verification gates as code. We're partway there (the orchestrator
+`ta_cycle.py --operation refresh --ta <slug>` with verification gates as code. We're partway there (the orchestrator
 works for NSCLC; per-TA parameterization is in progress). Your build both USES the pipeline and helps
 prove which pieces still need generalizing — log anything TA-hardcoded you hit into `TA_BUILD_DEBT.md`.
 

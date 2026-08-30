@@ -121,7 +121,7 @@ def write_funnel(summary_path: Path, payload: dict) -> None:
     """Merge funnel counters into the run summary.
 
     MERGE, never overwrite: ingest_run_summary.json is stage 1's file (see
-    reingest_cycle.py:649) and clobbering it would destroy the ingest funnel this
+    ta_cycle.py) and clobbering it would destroy the ingest funnel this
     cycle depends on. Counters land under a namespaced key.
     """
     existing = {}

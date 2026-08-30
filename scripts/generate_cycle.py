@@ -1,7 +1,7 @@
 """
 generate_cycle.py — Phase 2 generation orchestrator.
 
-Runs AFTER reingest_cycle.py completes. reingest_cycle produces a corpus, identities and the
+Runs AFTER ta_cycle.py completes. ta_cycle produces a corpus, identities and the
 boards; this produces the surfaces a demo actually shows — research themes, canonical theme
 buckets, collaborators, scientific positions, position synthesis, payment rollups, community
 scores, and narratives.
@@ -551,7 +551,7 @@ def pre_g4(conn, ta):
     if rising == 0:
         return False, (
             f"hcp_rising_star_ranks_v3 has 0 rows for {ta.slug} -- the rising board does not exist "
-            f"yet. Run reingest_cycle stage 9 (rising_score.py --ta {ta.slug}) first. Refusing "
+            f"yet. Run ta_cycle stage 9 (rising_score.py --ta {ta.slug}) first. Refusing "
             f"rather than targeting zero HCPs and exiting 0."
         )
     return _ok(f"rising board {rising:,}; scoped to --cohort rising_star (the default 'both' "
