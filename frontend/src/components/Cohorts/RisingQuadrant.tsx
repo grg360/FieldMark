@@ -311,7 +311,7 @@ export default function RisingQuadrant() {
                       <div style={{ position: "absolute", right: 12, bottom: 10, font: `600 8.5px/1 ${MONO}`, letterSpacing: ".15em", color: "#7f93ad" }}>ESTABLISHED VISIBILITY</div>
                       {quadPoints.map((pt) => (
                         <div key={pt.row.hcp_id}
-                          onClick={() => navigate(`/hcp/${pt.row.hcp_id}`)}
+                          onClick={() => navigate(`/hcp/${pt.row.hcp_id}?ta=${TA_SLUG}`)}
                           title={`${pt.row.name} · #${pt.row.drank} ${scopeLabel} · VIS ${pt.row.vis?.toFixed(2)} · MOM ${pt.row.mom?.toFixed(2)}`}
                           style={{ position: "absolute", left: `${pt.left}%`, bottom: `${pt.bottom}%`, width: 7, height: 7, marginLeft: -3, marginBottom: -3, borderRadius: "50%", background: pt.color, opacity: 0.72, cursor: "pointer" }} />
                       ))}

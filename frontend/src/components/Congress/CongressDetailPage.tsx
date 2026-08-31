@@ -216,7 +216,7 @@ function PresenterCard({ p }: { p: ConfirmedPresenter }) {
     <div style={{ border: `1px solid ${LINE.HAIR}`, borderRadius: 6, background: GROUND.RAISE, padding: "14px 16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
-          <Link to={`/hcp/${p.hcp_id}`} style={{ fontSize: T.BODY, fontWeight: 600, color: INK.PRIME }}>{p.name}</Link>
+          <Link to={`/hcp/${p.hcp_id}?ta=${TA_SLUG}`} style={{ fontSize: T.BODY, fontWeight: 600, color: INK.PRIME }}>{p.name}</Link>
           <div style={{ ...mono(T.LABEL, INK.MUTE), marginTop: 4 }}>{p.institution ?? "—"}</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>

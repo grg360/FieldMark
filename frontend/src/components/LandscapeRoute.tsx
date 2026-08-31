@@ -52,7 +52,7 @@ export default function LandscapeRoute() {
   }, [taSlug]);
 
   function handleHcpClick(hcpId: string) {
-    navigate(`/hcp/${String(hcpId)}`);
+    navigate(`/hcp/${String(hcpId)}?ta=${taSlug}`);
   }
 
   return (

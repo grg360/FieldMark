@@ -967,7 +967,7 @@ export default function RisingHcpProfile({ hcpId, taId, taSlug }: { hcpId: strin
                       <div style={{ marginTop: 6, ...mono(9, MUT, 0.06), whiteSpace: "nowrap" }}>{s.detail}</div>
                     </div>
                     <div style={{ font: `400 13px/1.35 ${SERIF}`, color: INK0 }}>
-                      <Link to={`/hcp/${c.hcp_id}`} style={{ color: "inherit", font: "inherit", textDecoration: "none", borderBottom: `1px solid ${RULE}` }}>{c.name}</Link>
+                      <Link to={`/hcp/${c.hcp_id}?ta=${taSlug}`} style={{ color: "inherit", font: "inherit", textDecoration: "none", borderBottom: `1px solid ${RULE}` }}>{c.name}</Link>
                     </div>
                     <div style={{ font: `400 11px/1.35 ${SERIF}`, color: MUT3 }}>{c.institution ?? "INSTITUTION NOT ON RECORD"}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

@@ -390,7 +390,7 @@ export default function InstitutionRoute() {
           return (
             <div
               key={m.hcp_id}
-              onClick={() => navigate(`/hcp/${m.hcp_id}`)}
+              onClick={() => navigate(`/hcp/${m.hcp_id}?ta=${taSlug}`)}
               style={{
                 cursor: "pointer",
                 display: isMobile ? "flex" : "grid",
@@ -611,7 +611,7 @@ export default function InstitutionRoute() {
             <InstitutionCollaborationsPanel
               collaborations={collabs}
               institutionName={record.name}
-              onHcpClick={(hcpId: string) => navigate(`/hcp/${hcpId}`)}
+              onHcpClick={(hcpId: string) => navigate(`/hcp/${hcpId}?ta=${taSlug}`)}
             />
             <InstitutionExternalPartnersPanel partners={partners} sourceInstitutionName={record.name} />
           </div>

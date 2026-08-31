@@ -41,7 +41,7 @@ export function AuthorsPanel({ authors }: { authors: AuthorsPayload }) {
             <div key={r.hcp_id} style={{ padding: "11px 0", borderBottom: `1px solid ${CANON.LINE.HAIR}` }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
                 <Link
-                  to={`/hcp/${r.hcp_id}`}
+                  to={`/hcp/${r.hcp_id}?ta=${ASSETS_TA_SLUG}`}
                   style={{ fontFamily: FACE.ui, fontSize: 13, fontWeight: 500, color: CANON.INK.BODY, textDecoration: "none" }}
                 >
                   {authorInitialName(r.first_name, r.last_name)}
@@ -92,7 +92,7 @@ export function CongressPanel({ presenters }: { presenters: CongressPresenter[] 
               >
                 <div>
                   <Link
-                    to={`/hcp/${p.hcp_id}`}
+                    to={`/hcp/${p.hcp_id}?ta=${ASSETS_TA_SLUG}`}
                     style={{ fontFamily: FACE.ui, fontSize: 13, fontWeight: 500, color: CANON.INK.BODY, textDecoration: "none" }}
                   >
                     {p.name}

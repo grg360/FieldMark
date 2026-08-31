@@ -23,6 +23,7 @@
 // Source of fact is the DB (ledger_meta for ceilings; *_ledger RPCs for rows).
 
 import { supabase } from "./supabase";
+import { apiSlugForTaId } from "./api";
 import { statesFromTerritory } from "./filter-context";
 import { resolveLocation } from "./location";
 import type { LedgerRegion } from "./ledgerRegions";
@@ -266,6 +267,12 @@ export function cohortServesTa(trackKey: string, taSlug: string | null | undefin
 }
 
 export interface LedgerRow {
+  /** The TA this row was loaded for, as a data slug. Stamped by loadLedgerPage rather than
+   *  threaded as a prop: the four profile links live in four different sub-components
+   *  (LedgerDrawerView, Row, MobileRow, CommunityCallSheet), none of which has the ledger's
+   *  TA in scope. Carrying it on the row means a link can never be built without it.
+   *  Empty only on the COM path, whose RPC takes no TA. */
+  taSlug: string;
   // EST/RS: the real cohort rank. COM (Phase 3 roster): null — community is
   // not ranked; ordinal (array position, stamped by the component) carries
   // keys/neighbor lookups without ever displaying as a position.
@@ -620,7 +627,9 @@ const N = (v: unknown): number | null => (v == null ? null : Number(v));
 export const titleCase = (s: string): string =>
   s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 
-function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
+function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, "taSlug"> {
+  // taSlug is stamped by the CALLER -- loadLedgerPage is the only place that knows the TA.
+  // Omit<> rather than a placeholder so the compiler, not a convention, enforces that.
   const name = `${S(r.first_name)} ${S(r.last_name)}`.trim();
   const scores: Record<string, number | null> = {};
   for (const col of cfg.cols) scores[col.key] = N(r[col.key]);
@@ -661,7 +670,7 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
     chips = [place, inst].filter(Boolean);
   }
 
-  const base: LedgerRow = {
+  const base: Omit<LedgerRow, "taSlug"> = {
     // COM (Phase 3 roster): the RPC emits no rank and no idx — community is
     // not ranked. EST/RS keep both.
     rank: cfg.tag === "COM" ? null : Number(r.rank),
@@ -1008,7 +1017,9 @@ export async function loadLedgerPage(
     return { cohortTotal: 0, filteredTotal: 0, tierCounts: null, rows: [], hasMore: false };
   }
   const d = (data as { cohort_total?: number; filtered_total?: number; tier_counts?: Record<string, number> | null; rows?: unknown[] }) ?? {};
-  const rows: LedgerRow[] = ((d.rows ?? []) as Record<string, unknown>[]).map((r) => mapRow(cfg, r));
+  const rowTaSlug = cfg.tag === "COM" ? (cfg.pinnedTaSlug ?? "") : (apiSlugForTaId(taId) ?? "");
+  const rows: LedgerRow[] = ((d.rows ?? []) as Record<string, unknown>[])
+    .map((r) => ({ ...mapRow(cfg, r), taSlug: rowTaSlug }));
   const cohortTotal = Number(d.cohort_total) || rows.length;
   const filteredTotal = d.filtered_total != null ? Number(d.filtered_total) : cohortTotal;
   return { cohortTotal, filteredTotal, tierCounts: d.tier_counts ?? null, rows, hasMore: rows.length === limit };

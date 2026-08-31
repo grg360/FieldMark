@@ -3,7 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "./supabase";
 import { getCurrentUser } from "./authHelpers";
 import { taIdForApiSlug, apiSlugForTaId } from "./api";
-import { deriveTAValue } from "./TAContext";
+import { deriveTAValue, useTA } from "./TAContext";
+import { parentTaLabelForIndicationSlug, taSlugToLabel, taLabelToSlug } from "./routeSlugs";
 
 /**
  * WHICH TA IS THE LEDGER SHOWING? Resolved for /cohorts/ledger/:cohort, which carries no TA
@@ -99,6 +100,7 @@ async function fetchAddressableTas(): Promise<AddressableTa[]> {
 
 export function useLedgerTa(sessionDataSlug: string | undefined): LedgerTa {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { setTA } = useTA();
   const urlTa = searchParams.get("ta")?.trim().toLowerCase() || null;
 
   // Layer 1 + 2 resolve synchronously; only the profile needs a fetch.
@@ -166,6 +168,30 @@ export function useLedgerTa(sessionDataSlug: string | undefined): LedgerTa {
     next.set("ta", state.slug);
     setSearchParams(next, { replace: true });
   }, [state, urlTa, searchParams, setSearchParams]);
+
+  // WRITE THE SESSION TA. Not decoration -- this is what makes TAContext mean "the TA the
+  // user is looking at" rather than "the default nobody updated".
+  //
+  // It was missing, and the cost was a wrong profile: /hcp/:id resolves ?ta= -> TAContext ->
+  // resolvePrimaryTaId, and with TAContext stuck on its sessionStorage default of nsclc,
+  // layer 2 answered CONFIDENTLY AND WRONGLY for every colorectal HCP -- pre-empting layer 3,
+  // which had the right answer. A layer that returns a stale default is worse than one that
+  // returns nothing, because falling through is the recovery path and a hit prevents it.
+  // (Bryson W. Katona, CRC rising, rendered the community shell with "no publication record".)
+  //
+  // Fires on ANY resolution, not just the picker: arriving at ?ta=colorectal-cancer from a
+  // shared link must update the session too, or a deep link leaves TAContext lying.
+  //
+  // The parent slug is derived two ways for the two registry shapes -- an indication-level TA
+  // (nsclc) is found by its parent, a TA that IS its own area (hepatology) by its own slug.
+  const synced = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.status !== "resolved" || synced.current === state.slug) return;
+    const areaLabel = parentTaLabelForIndicationSlug(state.slug) ?? taSlugToLabel(state.slug);
+    if (!areaLabel) return;
+    synced.current = state.slug;
+    setTA(taLabelToSlug(areaLabel), state.slug);
+  }, [state, setTA]);
 
   const choose = useCallback(
     (slug: string) => {

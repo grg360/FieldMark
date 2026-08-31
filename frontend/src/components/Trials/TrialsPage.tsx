@@ -437,7 +437,7 @@ function MobileBoard({ surface, listed, rosterChips, isTracked, toggleSave, regi
           <div style={{ ...mono(9, 400, ".16em"), color: P.amberDim, marginBottom: 8 }}>ON YOUR ROSTER · {rosterChips.length}</div>
           <div style={{ display: "flex", gap: 6, rowGap: 6, flexWrap: "wrap" }}>
             {rosterChips.map((r) => (
-              <a key={r.hcp_id} onClick={() => navigate(`/hcp/${r.hcp_id}`)} style={{ ...serif(13), color: P.link, cursor: "pointer" }}>{r.name}{r.state ? ` · ${r.state}` : ""}</a>
+              <a key={r.hcp_id} onClick={() => navigate(`/hcp/${r.hcp_id}?ta=${TRIALS_TA_SLUG}`)} style={{ ...serif(13), color: P.link, cursor: "pointer" }}>{r.name}{r.state ? ` · ${r.state}` : ""}</a>
             ))}
           </div>
         </div>

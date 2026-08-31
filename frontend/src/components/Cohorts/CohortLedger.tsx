@@ -828,7 +828,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
           shadow cast downward, label bold. Cohort hue per Garrett's call
           (cfg.markerColor, semantic use). */}
       <Link
-        to={`/hcp/${row.hcpId}`}
+        to={`/hcp/${row.hcpId}${row.taSlug ? `?ta=${row.taSlug}` : ""}`}
         onClick={(e) => e.stopPropagation()}
         title={`${row.name} — profile`}
         style={{
@@ -1190,7 +1190,7 @@ function Row({
             {/* Name links to the profile; the row's own onClick toggles the drawer,
                 so stop propagation here. The row also keeps its OPEN ↗ affordance. */}
             <Link
-              to={`/hcp/${row.hcpId}`}
+              to={`/hcp/${row.hcpId}${row.taSlug ? `?ta=${row.taSlug}` : ""}`}
               onClick={stop}
               style={{ ...serif(17, 500), color: P.ink0, letterSpacing: "-.005em", textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}` }}
             >
@@ -1535,7 +1535,7 @@ function MobileRow({
 
         {/* name + archetype + meta */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <Link to={`/hcp/${row.hcpId}`} onClick={stop} style={{ ...serif(17, 500), color: P.ink0, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}` }}>{row.name}</Link>
+          <Link to={`/hcp/${row.hcpId}${row.taSlug ? `?ta=${row.taSlug}` : ""}`} onClick={stop} style={{ ...serif(17, 500), color: P.ink0, textDecoration: "none", borderBottom: `1px solid ${P.lineStrong}` }}>{row.name}</Link>
           {row.archetype ? (
             <span style={{ ...mono(9, 500), color: P.ink3, letterSpacing: ".08em", padding: "1px 5px", border: `1px solid ${P.lineStrong}`, borderRadius: 2 }}>{row.archetype.toUpperCase()}</span>
           ) : null}
@@ -1779,7 +1779,7 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
           profile affordance sits in the identical spot across all three
           cohort drawers (rose from cfg.markerColor for COM). */}
       <Link
-        to={`/hcp/${row.hcpId}`}
+        to={`/hcp/${row.hcpId}${row.taSlug ? `?ta=${row.taSlug}` : ""}`}
         onClick={(e) => e.stopPropagation()}
         title={`${row.name} — profile`}
         style={{
