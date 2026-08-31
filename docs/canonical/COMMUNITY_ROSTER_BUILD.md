@@ -281,6 +281,14 @@ in the 90th percentile within her therapeutic area"). Two things must move:
    rank language. Lean: all 3,005.
 4. **Hussein** — likely resolves as a dedup outcome (cohort-collision case) rather than a manual
    UPDATE. Confirm in Phase 0b; if dedup handles it, no separate Hussein step.
+5. **`pharma_engagement` is a lifetime, all-TA figure for 99.8% of the roster** — measured
+   2026-08-28: 52,066 community HCPs fall through `community_scoring.py:403-406` to
+   `total_payments_lifetime`, which is not TA-scoped at any level, against 45 on the TA-scoped
+   payment total and 56 on speaker/consulting. It is a displayed fact, not a scored input, so no
+   rank moves — but a dermatologist's psoriasis payments currently render as pharma engagement on
+   a colorectal profile. Three options and a recommendation are written up in
+   [`COMMUNITY_PHARMA_ENGAGEMENT_FALLBACK.md`](COMMUNITY_PHARMA_ENGAGEMENT_FALLBACK.md).
+   Belongs with Phase 2's displayed-facts work; nothing has been changed.
 
 ---
 

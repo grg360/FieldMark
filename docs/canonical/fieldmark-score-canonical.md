@@ -118,7 +118,7 @@ Current co-authorship centrality in the recent window. Source: `hcp_network_cent
 Rising Star is restricted to:
 
 - **Academic HCPs only** (classification = 'ACADEMIC' in `hcp_industry_classification_v1`)
-- **Classified `rising_eligible` in `hcp_cohort_classification_v2`** for the TA — career age 3-10 plus the per-TA publication floor. EXCLUSIVE: an HCP classified `established` is not eligible at any momentum. (Until 2026-08-26 this read "≤15 years since first publication", implemented as `cohort = 'rising_eligible' OR (cohort = 'established' AND career_age <= 15)`. The 15-year cap survives one level up as `MAX_CAREER_YEARS` in the two momentum scorers, which gate a different and wider population — see the mixed-denominator entry in `docs/RISING_EXCLUSIVE_GATE_DEBT.md`.)
+- **Classified `rising_eligible` in `hcp_cohort_classification_v2`** for the TA — career age 3-10 plus the per-TA publication floor. EXCLUSIVE: an HCP classified `established` is not eligible at any momentum. (Until 2026-08-26 this read "≤15 years since first publication", implemented as `cohort = 'rising_eligible' OR (cohort = 'established' AND career_age <= 15)`. The 15-year cap survives one level up as `MAX_CAREER_YEARS` in the two momentum scorers, which gate a different and wider population — see the mixed-denominator entry in `docs/canonical/RISING_EXCLUSIVE_GATE_DEBT.md`.)
 - **Minimum 5 publications per window** (Scientific Momentum input)
 - **Minimum 20 collaborators per window** (Network Momentum input)
 

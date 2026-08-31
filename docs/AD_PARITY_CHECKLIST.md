@@ -114,4 +114,4 @@ Coverage = cohort HCPs with a row / cohort population. **⏳ = in progress at sn
 ---
 
 *Reproduce this matrix:* `scratchpad/parity_matrix.py` (read-only coverage counts) against the live DB.
-*Grounding docs:* `docs/TA_NEW_PLAYBOOK.md` (canonical pipeline + scoring doctrine), `docs/TA_BUILD_DEBT.md`.
+*Grounding docs:* `docs/canonical/TA_NEW_PLAYBOOK.md` (canonical pipeline + scoring doctrine), `docs/TA_BUILD_DEBT.md`.

@@ -526,7 +526,9 @@ orchestrate the fixed chain threaded by --ta. Provisional chain (MAP FROM CODE b
      ⚠️ playbook flag: "reads established set from hcp_established_ranks_v2 — needs wiring to hcp_cohort_classification_v2"
   2. network_centrality_scoring.py --ta <slug> --window-type 10yr  → hcp_network_centrality_v2 (10yr — DIFFERENT window
      than rising's hist_2016_2020/recent_2021_2025)
-  3. pharma_engagement_scoring.py --ta <slug>  → hcp_pharma_engagement_v2   (playbook: PENDING retrofit)
+  3. pharma_engagement_scoring.py --ta <slug>  → hcp_pharma_engagement_v2
+     (Corrected 2026-08-31: the "playbook: PENDING retrofit" note here was stale — the script
+     takes `--ta` at pharma_engagement_scoring.py:159.)
   4. recompute_established_ranks_v3.py --ta <slug> --w-scientific 0.60 --w-network 0.40 --w-pharma 0.0
      → hcp_established_ranks_v3 (THE established board; frontend reads this + detail via api.ts)
 BEFORE BUILDING: map the real chain from code (confirm scripts/flags/windows/weights + resolve the wiring gaps above,

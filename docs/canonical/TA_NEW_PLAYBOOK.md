@@ -605,7 +605,10 @@ new TA. When a script fails this, fix it TO STANDARD (permanent), do not one-off
   - publication_leadership_scoring.py ................. ✓ (verified July 7: fully TA-scoped via ta_pubs CTE;
         BUT reads established set from hcp_established_ranks_v2 — needs wiring to hcp_cohort_classification_v2)
   - network_centrality_scoring.py .................... ✗ PENDING
-  - pharma_engagement_scoring.py ..................... ✗ PENDING
+  - pharma_engagement_scoring.py ..................... ✓ (retrofitted; `--ta` at
+        pharma_engagement_scoring.py:159, `@click.option("--ta", default="nsclc")`. Corrected
+        2026-08-31: this line read ✗ PENDING while line 645 of this same document already
+        invoked the script as `--ta <slug>`.)
   - open_payments_aggregator.py / open_payments_filter.py ✗ PENDING
   - [state-derivation script — see below] ............ ✗ TO BUILD/PORT from v1
 

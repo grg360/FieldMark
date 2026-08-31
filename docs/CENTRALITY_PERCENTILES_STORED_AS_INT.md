@@ -3,7 +3,7 @@
 **Status:** open, deliberately deferred. Logged 2026-08-18.
 **Columns:** `hcp_network_centrality_v2.degree_percentile`, `.eigenvector_percentile`,
 `.betweenness_percentile`.
-**Related:** `docs/PERCENTILE_CONVENTION.md` — this is the one place that convention does
+**Related:** `docs/canonical/PERCENTILE_CONVENTION.md` — this is the one place that convention does
 not reach.
 
 ## The defect

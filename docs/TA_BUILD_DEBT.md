@@ -1,6 +1,22 @@
 # TA_BUILD_DEBT.md — What the Platform Owes Itself
 
-**Status:** FOUNDATIONAL — CANONICAL. The honest ledger of what is still hardcoded, broken, worked-around,
+> ## ⚠️ SUPERSEDED — NOT CANONICAL. Read `docs/canonical/` instead.
+>
+> Marked 2026-08-31 during the canonical carve-out. This is a **session log**, correct as a record
+> of what was believed while it was written and wrong as guidance today. It was left out of
+> `docs/canonical/` deliberately.
+>
+> **The specific known-stale claim, not corrected inline** (the file is a chronological log and
+> rewriting its history would make it a worse record, not a better one): it describes
+> `established_scoring.py` as a live scoring step. That script is **dead** — nothing under
+> `scripts/` invokes it; the only surviving reference is a comment in
+> `scripts/utilities/export_telescope_data.py`. The Established board comes from
+> `recompute_established_ranks_v3.py`, which takes `--ta`. See
+> `docs/canonical/TA_GENERATION_LAYER.md` (§ "established_scoring.py is not the Established
+> board"), which carries the corrected account.
+
+
+**Status:** SUPERSEDED 2026-08-31 (this line read "FOUNDATIONAL — CANONICAL"). The honest ledger of what is still hardcoded, broken, worked-around,
 or un-parameterized. This is the backlog that, when retired, makes `TA_NEW_PLAYBOOK.md` turnkey and the
 automation orchestrator writable.
 **Created:** July 3, 2026 (Atopic Dermatitis / TA #2 build)

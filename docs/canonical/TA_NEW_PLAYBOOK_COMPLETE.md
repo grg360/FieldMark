@@ -3,7 +3,7 @@
 How to onboard a new therapeutic area on FieldMark. Merged from TA_NEW_PLAYBOOK.md (foundational) plus
 the _ch2 and _ch3 addenda â€” chapters were size splits, not topic splits.
 
-**This is the canonical deep reference.** For a condensed, command-driven runbook see docs/TA_BUILD_GUIDE.md.
+**This is the canonical deep reference.** For a condensed, command-driven runbook see docs/canonical/TA_BUILD_GUIDE.md.
 For the raw chronological record these rules were extracted from, see docs/TA_BUILD_DEBT_COMPLETE.md.
 Where this document and the live code disagree, **the code wins** â€” parts of ch1 predate the 2026-07-23
 ingest refactor (see section 0z).

@@ -4,7 +4,7 @@
 `OR (cc.cohort = 'established' AND cc.career_age <= 15)`. Rising Star membership is now
 `hcp_cohort_classification_v2.cohort = 'rising_eligible'` and nothing else — career age 3–10 plus
 the per-TA publication floor. The three customer-facing cohorts are mutually exclusive in fact and
-not only in `docs/fieldmark-methodology-page.md`.
+not only in `docs/canonical/fieldmark-methodology-page.md`.
 
 **Measured, NSCLC, `--vis-window recent_roll`, before any re-run:**
 
@@ -172,10 +172,10 @@ against the live tables on 2026-08-26 without writing.
   edited. The corrected `COMMENT ON COLUMN` for `max_career_years_applied` ships in the 08-26
   migration instead, which is where a live database reads it from.
 
-- **`docs/fieldmark-methodology-page.md:7`**, **`MethodologyPage.tsx:168`** and
+- **`docs/canonical/fieldmark-methodology-page.md:7`**, **`MethodologyPage.tsx:168`** and
   **`ScoringExplainedModal.tsx:257`** promise mutually exclusive cohorts. They were the accurate
   statements the code failed to honour. **They become true and are left untouched.**
 
-- **`docs/fieldmark-methodology-page.md:62-67`** still documents the four Rising archetypes, removed
+- **`docs/canonical/fieldmark-methodology-page.md:62-67`** still documents the four Rising archetypes, removed
   2026-08-05. Pre-existing and out of scope for this commit; flagged so it is not mistaken for
   collateral from the gate change.

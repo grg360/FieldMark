@@ -1142,12 +1142,20 @@ def parse_authorships(article: ET.Element) -> List[Dict[str, Any]]:
 #   source='pubmed_v2_ingest' (ingest_publications.py)  403,671 pubs, 403,671 typed
 #   source='pubmed'           (THIS pipeline)           169,197 pubs,      81 typed
 #
-# Every TA built through ta_cycle.py (then reingest_cycle.py) since 07-02 lost all four. Colorectal
-# Cancer is 100% this path: 147,218 publications with zero publication_types, zero
-# mesh_terms, zero abstracts, zero language. publication_leadership_scoring.py
-# reads publication_types for its Editorial and Systematic Review / Meta-Analysis
-# terms, so both are inert for CRC today; zero abstracts is the wider cost, since
-# abstracts feed the billed theme and scientific-position extractors.
+# Every TA built through ta_cycle.py (then reingest_cycle.py) since 07-02 lost all four.
+#
+# FIXED AND BACKFILLED 2026-08-26 -- see the note at the foot of this block, which is the
+# authoritative one. This paragraph used to end "Colorectal Cancer is 100% this path: 147,218
+# publications with zero publication_types, zero mesh_terms, zero abstracts, zero language",
+# and it stayed that way after the fix landed ninety lines below it -- one comment in this
+# file saying broken, another saying fixed. Corrected 2026-08-31; measured that day:
+#
+#   colorectal-cancer  147,218 pubs  147,218 typed  147,218 meshed  131,905 abstracts (89.6%)
+#   nsclc               88,251 pubs   82,820 typed   82,820 meshed   76,287 abstracts (86.4%)
+#
+# The consequence described below was real while it lasted: publication_leadership_scoring.py
+# reads publication_types for its Editorial and Systematic Review / Meta-Analysis terms, and
+# abstracts feed the billed theme and scientific-position extractors. Both are populated now.
 # ---------------------------------------------------------------------------
 
 

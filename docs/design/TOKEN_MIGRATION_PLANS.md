@@ -10,7 +10,7 @@ Two rules bind both plans:
   `#4ECDC4`), Community (slate `#7B9EBD`) have no design reference — the design only ever showed the
   Established cohort. Leave every cohort accent exactly as-is; only the *Established* path gets the
   amber/role-1 treatment (where amber already coincides with the cohort accent).
-- Roles/tokens referenced are from `docs/FIELDMARK_DESIGN_SYSTEM.md`.
+- Roles/tokens referenced are from `docs/canonical/FIELDMARK_DESIGN_SYSTEM.md`.
 
 ---
 

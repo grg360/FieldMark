@@ -1,5 +1,21 @@
 # TA BUILD DEBT â€” COMPLETE LOG
 
+> ## ⚠️ SUPERSEDED — NOT CANONICAL. Read `docs/canonical/` instead.
+>
+> Marked 2026-08-31 during the canonical carve-out. This is a **session log**, correct as a record
+> of what was believed while it was written and wrong as guidance today. It was left out of
+> `docs/canonical/` deliberately.
+>
+> **The specific known-stale claim, not corrected inline** (the file is a chronological log and
+> rewriting its history would make it a worse record, not a better one): it describes
+> `established_scoring.py` as a live scoring step. That script is **dead** — nothing under
+> `scripts/` invokes it; the only surviving reference is a comment in
+> `scripts/utilities/export_telescope_data.py`. The Established board comes from
+> `recompute_established_ranks_v3.py`, which takes `--ta`. See
+> `docs/canonical/TA_GENERATION_LAYER.md` (§ "established_scoring.py is not the Established
+> board"), which carries the corrected account.
+
+
 Consolidated chronological session record for the FieldMark TA build work.
 Merged from TA_BUILD_DEBT.md (ch1), _ch2.md, and _ch3.md â€” chapters were size splits, not topic splits.
 
