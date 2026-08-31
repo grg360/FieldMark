@@ -60,6 +60,42 @@ export function getDrawerLayerData(
   return p;
 }
 
+/**
+ * Does this TA have ANY labelled corpus? One cached HEAD count per TA.
+ *
+ * NOT a TA resolution — the TA is already decided by the board and arrives as an argument.
+ * This answers a data question the drawer cannot otherwise distinguish: an HCP with zero
+ * labelled publications reads identically whether THEY are thinly labelled or whether the
+ * labelling pass has never run for their area. Those are different facts and the drawer says
+ * different things about them, so it has to know which one it is looking at.
+ *
+ * Measured 2026-08-31: publication_theme_v1 holds 64,155 nsclc rows and zero for any other TA,
+ * while theme_canonical_v1 already carries 25 colorectal-cancer canonical themes. The taxonomy
+ * is seeded; scripts/label_pub_themes.py has not been run for it.
+ */
+const labeledCorpusCache = new Map<string, Promise<boolean>>();
+
+export function taHasLabeledCorpus(taId: string): Promise<boolean> {
+  const hit = labeledCorpusCache.get(taId);
+  if (hit) return hit;
+  const p = (async () => {
+    const { count, error } = await supabase
+      .from("hcp_canonical_topic_share_v1")
+      .select("hcp_id", { count: "exact", head: true })
+      .eq("therapeutic_area_id", taId)
+      .limit(1);
+    if (error) {
+      labeledCorpusCache.delete(taId);
+      // Fail toward the EXISTING message. An unknown corpus state must not let the drawer
+      // announce that a labelling pass has not run when it may well have.
+      return true;
+    }
+    return (count ?? 0) > 0;
+  })();
+  labeledCorpusCache.set(taId, p);
+  return p;
+}
+
 /** Fire-and-forget hover prefetch — same cache, same promise as the mount fetch. */
 export function prefetchDrawerLayerData(hcpIds: string[], taId: string): void {
   void getDrawerLayerData(hcpIds, taId);

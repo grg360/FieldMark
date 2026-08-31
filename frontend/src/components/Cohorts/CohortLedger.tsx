@@ -30,7 +30,7 @@ import { taLabelForSlug } from "../../lib/taLabels";
 // rows cannot disagree.
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
 import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
-import { getDrawerLayerData, prefetchDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
+import { getDrawerLayerData, prefetchDrawerLayerData, taHasLabeledCorpus, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
 import TrialsPopup from "./TrialsPopup";
 import TerritorySelect from "./TerritorySelect";
 import ScoreTooltip from "../ScoreTooltip";
@@ -47,7 +47,7 @@ import {
   taSlugToLabel,
   taLabelToSlug,
 } from "../../lib/routeSlugs";
-import { taIdForApiSlug, getHcpWebSignals, type WebSignal } from "../../lib/api";
+import { getHcpWebSignals, type WebSignal } from "../../lib/api";
 import { useLedgerTa, loadAddressableTas, type AddressableTa } from "../../lib/ledgerTa";
 import { useTA } from "../../lib/TAContext";
 import { supabase } from "../../lib/supabase";
@@ -592,8 +592,22 @@ function spineLayer(cfg: CohortConfig, row: LedgerRow, nbrs: LedgerRow[]): { tex
 function practiceLayer(
   subject: DrawerLayerData,
   nbrs: Array<{ rank: number; d: DrawerLayerData }>,
+  corpusLabeled: boolean,
 ): { text: string; color: string; classes: Array<{ count: string; name: string; primary: string }>; lines: NeighbourLine[] } {
   const total = subject.topicTotal;
+  // TWO ABSENCES, NOT ONE. Zero labelled publications reads the same on this row whether the
+  // HCP is thinly labelled or the area has never been through the labelling pass -- and the
+  // second is not a fact about this person. Saying "too few of THIS HCP's publications" when
+  // no publication in the area has been labelled at all names the wrong cause, which is the
+  // failure this drawer just had: it showed lung labels under colorectal rows, and the honest
+  // replacement is not silence but the reason.
+  if (!corpusLabeled) {
+    return {
+      text: "No publication in this therapeutic area carries a canonical label yet — the theme taxonomy is seeded, the labelling pass has not been run. Focus is not asserted because the corpus has not been read, which is a different absence from a record read and found thin.",
+      color: CANON.INK.MUTE, classes: [],
+      lines: nbrs.map((n) => ({ rank: `#${n.rank}`, text: "not compared — the area has no labelled corpus on either side.", color: NOSEP_INK })),
+    };
+  }
   if (total < PRACTICE_FLOOR) {
     return {
       text: `Too few labeled publications to characterize focus — ${total} of this HCP’s publications carry a canonical label, below the floor of ${PRACTICE_FLOOR}. Focus is not asserted here rather than inferred thinly.`,
@@ -656,7 +670,7 @@ function beliefLayer(
   const n = subject.beliefCount;
   if (n === 0) {
     return {
-      text: "No extracted belief positions for this HCP yet. Nothing has been surfaced from this record — the layer is empty, not contradicted.",
+      text: "No extracted belief positions for this HCP in this therapeutic area. Nothing has been surfaced from this record — the layer is empty, not contradicted. Positions are extracted per area, so a position held in another area does not appear here.",
       color: CANON.INK.MUTE, claims: [], more: 0,
       lines: nbrs.map((x) => ({
         rank: `#${x.rank}`,
@@ -793,15 +807,22 @@ function DrawerOverhang({ children }: { children: ReactNode }) {
 
 function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false }: { cfg: CohortConfig; row: LedgerRow; up?: LedgerRow; down?: LedgerRow; mobile?: boolean; overhang?: boolean }) {
   const [layers, setLayers] = useState<Map<string, DrawerLayerData> | null>(null);
+  // Corpus-level, not row-level: whether this AREA has any labelled publications at all.
+  const [corpusLabeled, setCorpusLabeled] = useState<boolean | null>(null);
   const nbrRows = [up, down].filter((r): r is LedgerRow => !!r); // rank 1 down-only; last loaded rank up-only
-  const taId = taIdForApiSlug("nsclc");
+  // THE BOARD'S TA, carried on the row (lib/cohortLedger.ts). This read
+  // `taIdForApiSlug("nsclc")` -- a second, independent resolution inside a component whose
+  // board query was already parameterised, so a colorectal board opened lung drawers.
+  const taId = row.taId;
   const nbrKey = nbrRows.map((r) => r.hcpId).join(",");
 
   useEffect(() => {
     if (!taId) return; // slug map miss — layers stay in their loading state rather than fetching unscoped
     let alive = true;
     setLayers(null);
+    setCorpusLabeled(null);
     void getDrawerLayerData([row.hcpId, ...nbrRows.map((r) => r.hcpId)], taId).then((m) => { if (alive) setLayers(m); });
+    void taHasLabeledCorpus(taId).then((v) => { if (alive) setCorpusLabeled(v); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.hcpId, nbrKey, taId]);
@@ -810,7 +831,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
   const empty: DrawerLayerData = { topicTotal: 0, topicClasses: [], beliefCount: 0, beliefTexts: [] };
   const subj = layers?.get(row.hcpId) ?? empty;
   const nbrData = nbrRows.map((r) => ({ rank: r.rank ?? 0, d: layers?.get(r.hcpId) ?? empty }));
-  const pr = practiceLayer(subj, nbrData);
+  const pr = practiceLayer(subj, nbrData, corpusLabeled !== false);
   const bl = beliefLayer(subj, nbrData);
 
   return (
@@ -872,7 +893,7 @@ function LedgerDrawerView({ cfg, row, up, down, mobile = false, overhang = false
           rail reads as a fact about that row. Record and rebuild conditions in
           docs/DRAWER_COVERAGE_SUBLINES_REMOVED.md. */}
       <DrawerSection label="PRACTICE · CANONICAL FOCUS" sub="" mobile={mobile}>
-        {layers == null ? (
+        {layers == null || corpusLabeled == null ? (
           <div style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em" }}>READING THE LABELED CORPUS…</div>
         ) : (
           <>
@@ -1099,7 +1120,7 @@ function Row({
   const startPrefetch = () => {
     if (cfg.tag === "COM") return; // COM's old drawer reads no layer data
     prefetchTimer.current = window.setTimeout(() => {
-      const taId = taIdForApiSlug("nsclc");
+      const taId = row.taId; // the board's TA, not a second resolution -- see LedgerDrawerView
       if (!taId) return;
       const nbrs = [rowByRank?.get((row.rank ?? 0) - 1), rowByRank?.get((row.rank ?? 0) + 1)].filter((r): r is LedgerRow => !!r);
       prefetchDrawerLayerData([row.hcpId, ...nbrs.map((r) => r.hcpId)], taId);

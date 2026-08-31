@@ -267,6 +267,11 @@ export function cohortServesTa(trackKey: string, taSlug: string | null | undefin
 }
 
 export interface LedgerRow {
+  /** The TA this row was loaded for, as the uuid the board RPC was called with. Same value,
+   *  same source as taSlug below -- carried so the row DRAWER cannot resolve a TA of its own.
+   *  It used to call taIdForApiSlug("nsclc") and rendered lung topic-share and lung positions
+   *  under colorectal rows on a board that was already parameterised. */
+  taId: string;
   /** The TA this row was loaded for, as a data slug. Stamped by loadLedgerPage rather than
    *  threaded as a prop: the four profile links live in four different sub-components
    *  (LedgerDrawerView, Row, MobileRow, CommunityCallSheet), none of which has the ledger's
@@ -627,7 +632,7 @@ const N = (v: unknown): number | null => (v == null ? null : Number(v));
 export const titleCase = (s: string): string =>
   s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 
-function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, "taSlug"> {
+function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, "taSlug" | "taId"> {
   // taSlug is stamped by the CALLER -- loadLedgerPage is the only place that knows the TA.
   // Omit<> rather than a placeholder so the compiler, not a convention, enforces that.
   const name = `${S(r.first_name)} ${S(r.last_name)}`.trim();
@@ -670,7 +675,7 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, 
     chips = [place, inst].filter(Boolean);
   }
 
-  const base: Omit<LedgerRow, "taSlug"> = {
+  const base: Omit<LedgerRow, "taSlug" | "taId"> = {
     // COM (Phase 3 roster): the RPC emits no rank and no idx — community is
     // not ranked. EST/RS keep both.
     rank: cfg.tag === "COM" ? null : Number(r.rank),
@@ -1019,7 +1024,7 @@ export async function loadLedgerPage(
   const d = (data as { cohort_total?: number; filtered_total?: number; tier_counts?: Record<string, number> | null; rows?: unknown[] }) ?? {};
   const rowTaSlug = cfg.tag === "COM" ? (cfg.pinnedTaSlug ?? "") : (apiSlugForTaId(taId) ?? "");
   const rows: LedgerRow[] = ((d.rows ?? []) as Record<string, unknown>[])
-    .map((r) => ({ ...mapRow(cfg, r), taSlug: rowTaSlug }));
+    .map((r) => ({ ...mapRow(cfg, r), taSlug: rowTaSlug, taId }));
   const cohortTotal = Number(d.cohort_total) || rows.length;
   const filteredTotal = d.filtered_total != null ? Number(d.filtered_total) : cohortTotal;
   return { cohortTotal, filteredTotal, tierCounts: d.tier_counts ?? null, rows, hasMore: rows.length === limit };
