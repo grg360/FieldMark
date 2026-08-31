@@ -43,6 +43,7 @@ const INDICATIONS: Record<string, IndicationChoice[]> = {
   Oncology: [
     { slug: "all", label: "All" },
     { slug: "nsclc", label: "Lung Cancer" },
+    { slug: "colorectal-cancer", label: "Colorectal Cancer" },
     { slug: "car-t", label: "CAR-T" },
     { slug: "dlbcl", label: "DLBCL" },
     { slug: "melanoma", label: "Melanoma" },
@@ -90,6 +91,10 @@ const TA_SLUG_TO_NAME: Record<string, string> = {
 const INDICATION_SLUG_TO_NAME: Record<string, string> = {
   "all": "All",
   "nsclc": "Lung Cancer",
+  // Listed HERE as well as in INDICATIONS above - this map is the persistence
+  // gate, so an entry missing from it saves as "all" no matter what the picker
+  // offered. Both built TAs (nsclc, colorectal-cancer) are present.
+  "colorectal-cancer": "Colorectal Cancer",
   "car-t": "CAR-T",
   "dlbcl": "DLBCL",
   "melanoma": "Melanoma",

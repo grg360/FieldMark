@@ -145,6 +145,7 @@ function formatPublicationVelocity(value: number): string {
 function formatTherapeuticAreaLabel(value: string | null | undefined): string {
   const v = String(value ?? "").trim().toLowerCase();
   if (v === "nsclc") return "Lung Cancer";
+  if (v === "colorectal-cancer") return "Colorectal Cancer";
   if (v === "rare-disease") return "Rare Disease";
   if (v === "hepatology") return "Hepatology";
   if (v === "oncology") return "Oncology";

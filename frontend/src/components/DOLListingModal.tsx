@@ -73,6 +73,7 @@ function AscoActiveBadge() {
 export function formatTALabel(taSlug: string): string {
   const slug = taSlug.trim().toLowerCase();
   if (slug === "nsclc") return "Lung Cancer";
+  if (slug === "colorectal-cancer") return "Colorectal Cancer";
   if (slug === "rare-disease") return "Rare Disease";
   if (slug === "hepatology") return "Hepatology";
   if (slug === "oncology") return "Oncology";

@@ -2491,6 +2491,9 @@ const TA_DISPLAY_BY_ID: Record<string, string> = {
   "095bc902-c3dc-48a3-8167-52ee55795d60": "Oncology",
   "4cf07827-ff1c-451e-832e-0e0a14ea9c86": "Immunology",
   "9e4139d2-e062-4a58-8728-cdabb2d7dca1": "Atopic Dermatitis",
+  // Indication-level TAs carry their own name here (like AD above), not the
+  // parent's. Without the row a colorectal HCP renders as "Other TA" in search.
+  "a2b28e54-0e0e-48a7-98e1-504f48e45d81": "Colorectal Cancer",
 };
 
 const SEARCH_COHORT_ORDER: Record<string, number> = {
@@ -3482,6 +3485,7 @@ export interface LandscapeLeaderboards {
 function landscapeTaSlugToName(taSlug: string): string {
   const map: Record<string, string> = {
     nsclc: "Lung Cancer",
+    "colorectal-cancer": "Colorectal Cancer",
     oncology: "Oncology",
     hepatology: "Hepatology",
     immunology: "Immunology",

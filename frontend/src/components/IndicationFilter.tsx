@@ -29,7 +29,11 @@ export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
     { slug: "aml", label: "AML", active: false },
     { slug: "breast", label: "Breast", active: false },
     { slug: "prostate", label: "Prostate", active: false },
-    { slug: "colorectal-cancer", label: "Colorectal Cancer", active: false },
+    // taId is REQUIRED here, not decoration. getEstablished/getCommunity/getRisingStars
+    // do `filters.taId ?? TA_ID_MAP[taSlug]`, and taSlug for Oncology is hardcoded
+    // "nsclc" (taLabelToApiSlug) - so an active option with no taId serves LUNG rows
+    // under a colorectal chip. Same shape as atopic-dermatitis below.
+    { slug: "colorectal-cancer", label: "Colorectal Cancer", active: true, taId: "a2b28e54-0e0e-48a7-98e1-504f48e45d81" },
     { slug: "bladder", label: "Bladder", active: false },
     { slug: "ovarian", label: "Ovarian", active: false },
     { slug: "kidney", label: "Kidney", active: false },
@@ -65,7 +69,11 @@ export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
   ],
 };
 
-const ONCOLOGY_FI_ACTIVE = new Set(["all", "nsclc"]); // slugs, never labels
+// Slugs, never labels. This is a SECOND gate on top of each option's `active`
+// flag: a slug missing here renders as an inert, unexplained grey chip on
+// /field-intelligence even when the option is active everywhere else. Keep it in
+// step with the active entries above.
+const ONCOLOGY_FI_ACTIVE = new Set(["all", "nsclc", "colorectal-cancer"]);
 
 function indicationsForContext(therapeuticArea: string, isFieldIntelligence: boolean): IndicationOption[] {
   const base = INDICATIONS_BY_TA[therapeuticArea] ?? [{ label: "All", active: true }];
