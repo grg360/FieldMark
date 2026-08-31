@@ -80,6 +80,13 @@ export interface CohortConfig {
   factFinish?: boolean;
   sortLabel?: string; // COM roster: visible default-order label (no rank exists)
   rpc: string; // source RPC
+  // SET ONLY WHERE A COHORT IS STILL WELDED TO ONE TA. COM's RPC reads
+  // community_board_nsclc_v1 and takes no p_ta_id, so the community ledger can only
+  // answer for that TA until the evidence tier is generalised (Phase 3 of
+  // docs/TA_NEUTRAL_DB_LAYER.md). The ledger reads this to render an explicit absence
+  // for any other TA rather than silently serving lung rows under its name.
+  // DELETE THE FIELD when COM takes p_ta_id -- its absence is how EST/RS say "any TA".
+  pinnedTaSlug?: string;
   notes: string[];
   traceFoot: string;
   // Mobile (≤767): Design pairs score columns rather than dropping them. When present,
@@ -91,7 +98,7 @@ export interface CohortConfig {
 //    frame's own COH map: EST #6E8F76 DEEP SAGE, RS #9A8CC8 PURPLE, COM #B0848F ROSE) ──
 export const EST_CONFIG: CohortConfig = {
   tag: "EST",
-  title: "ESTABLISHED / NSCLC",
+  title: "ESTABLISHED",
   markerColor: "#6E8F76",
   label: "Established",
   nameSub: "INSTITUTION · GENERATED SUMMARY",
@@ -144,7 +151,7 @@ export const EST_CONFIG: CohortConfig = {
   // idxDecimals only formats the label.
   idxDecimals: 2,
   numericRamp: true,
-  rpc: "established_ledger",
+  rpc: "board_established",
   notes: [
     "SCI AND NET PRINT AS STORED · THE COHORT COMPRESSES AT THE TOP BY CONSTRUCTION, SO NEAR-IDENTICAL HEAD VALUES ARE THE DATA, NOT A DISPLAY ARTIFACT — THE TIED BANDS ABOVE CARRY THAT.",
     "INDEX = SCI + NET COMPOSITE · RANK IS THE ONLY FIGURE ON THIS ROW THAT SEPARATES ANYONE.",
@@ -157,7 +164,7 @@ export const EST_CONFIG: CohortConfig = {
 
 export const RS_CONFIG: CohortConfig = {
   tag: "RS",
-  title: "RISING STARS / NSCLC",
+  title: "RISING STARS",
   markerColor: "#9A8CC8",
   label: "Rising Star",
   nameSub: "INSTITUTION · GENERATED SUMMARY",
@@ -183,7 +190,7 @@ export const RS_CONFIG: CohortConfig = {
   bandResolution: 2.1,
   idxDecimals: 1,
   numericRamp: true,
-  rpc: "rising_ledger",
+  rpc: "board_rising",
   notes: [
     "NO SUPPRESSION HERE: MOMENTUM AND VISIBILITY RUN WIDE ACROSS THIS COHORT, SO EVERY VALUE CARRIES INFORMATION AND EVERY VALUE PRINTS. THE SAME COMPUTED RULE THAT COLLAPSES ESTABLISHED'S TWO COLUMNS LEAVES ALL FOUR OF THESE STANDING.",
     "MOMENTUM IS MEASURED AGAINST THIS HCP'S OWN FIVE-YEAR BASELINE; VISIBILITY IS A PERCENTILE WITHIN THE RISING STAR COHORT.",
@@ -195,7 +202,7 @@ export const RS_CONFIG: CohortConfig = {
 
 export const COM_CONFIG: CohortConfig = {
   tag: "COM",
-  title: "COMMUNITY / NSCLC",
+  title: "COMMUNITY",
   markerColor: "#B0848F",
   label: "Community",
   nameSub: "SPECIALTY · LOCATION · GENERATED SUMMARY",
@@ -216,7 +223,8 @@ export const COM_CONFIG: CohortConfig = {
   factFinish: true,
   // Roster default order (Phase 3): the visible, swappable view-state label.
   sortLabel: "BY EVIDENCE TIER, THEN MEDICARE REACH",
-  rpc: "community_ledger",
+  rpc: "community_ledger",   // unchanged: no p_ta_id until Phase 3
+  pinnedTaSlug: "nsclc",
   notes: [
     "COMMUNITY IS NOT RANKED. TIER IS THE ONLY ASSERTED EVIDENCE CLAIM; EVERY FIGURE ON A ROW IS A DISPLAYED FACT, AND THE DEFAULT ORDER (TIER, THEN MEDICARE REACH) IS A VIEW-STATE, NOT A JUDGMENT.",
     "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE — THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
@@ -228,6 +236,34 @@ export const COM_CONFIG: CohortConfig = {
 
 // Ordered cohorts for the tab toggle. One ranked ledger displays at a time.
 export const COHORTS: CohortConfig[] = [EST_CONFIG, RS_CONFIG, COM_CONFIG];
+
+// Track key (the URL/TrackContext vocabulary) -> cohort tag (the config vocabulary). The two
+// have always been separate spellings of the same three things; this is the one place that
+// says so, rather than a fourth ad-hoc map at each call site.
+const TRACK_TO_TAG: Record<string, CohortConfig["tag"]> = {
+  established: "EST",
+  "rising-stars": "RS",
+  community: "COM",
+};
+
+/**
+ * Can this cohort answer for this TA? False only where a cohort is still welded to one TA
+ * (COM, until Phase 3) and the caller is asking about a different one.
+ *
+ * SHARED BY THE LEDGER AND THE STRIP ON PURPOSE. The ledger uses it to render an absence
+ * instead of a board; the strip uses it to render the chip unavailable so the click never
+ * happens. Two surfaces, one rule -- if they disagreed, the strip would invite a click into
+ * an explanation, which is the shape of a dead end.
+ *
+ * Unknown track, or no TA resolved yet: true. Neither is evidence of unavailability, and
+ * disabling a control on missing information is its own kind of lie.
+ */
+export function cohortServesTa(trackKey: string, taSlug: string | null | undefined): boolean {
+  const tag = TRACK_TO_TAG[trackKey];
+  const cfg = tag ? COHORTS.find((c) => c.tag === tag) : undefined;
+  if (!cfg?.pinnedTaSlug || !taSlug) return true;
+  return cfg.pinnedTaSlug === taSlug;
+}
 
 export interface LedgerRow {
   // EST/RS: the real cohort rank. COM (Phase 3 roster): null — community is
@@ -669,10 +705,18 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): LedgerRow {
 /** Fetch the cohort-level ceilings + total once per cohort load. This is the cheap
  *  max() aggregate that makes suppression scope-independent — it must NOT be derived
  *  from the loaded rows. */
-export async function loadLedgerMeta(cfg: CohortConfig): Promise<LedgerMeta> {
-  const { data, error } = await supabase.rpc("ledger_meta", { p_cohort: cfg.tag });
+export async function loadLedgerMeta(cfg: CohortConfig, taId: string): Promise<LedgerMeta> {
+  // COM stays on the old NSCLC-pinned ledger_meta until Phase 3: board_meta RAISES for a
+  // non-NSCLC COM request rather than answering with lung numbers, and the ledger already
+  // refuses to mount COM off-TA (cfg.pinnedTaSlug), so this branch is only ever reached
+  // for the TA it is pinned to.
+  const [rpc, args] =
+    cfg.tag === "COM"
+      ? ["ledger_meta", { p_cohort: cfg.tag }]
+      : ["board_meta", { p_ta_id: taId, p_cohort: cfg.tag }];
+  const { data, error } = await supabase.rpc(rpc as string, args);
   if (error || !data) {
-    console.error("ledger_meta failed:", error?.message);
+    console.error(`${rpc} failed:`, error?.message);
     return { cohortTotal: 0, ceilings: {} };
   }
   const d = data as { cohort_total?: number; ceilings?: Record<string, number> };
@@ -924,6 +968,9 @@ export interface RosterCursor {
  *  no dup/skip. hasMore is true when a full page came back. */
 export async function loadLedgerPage(
   cfg: CohortConfig,
+  /** The TA to load. REQUIRED and not defaulted -- see docs/TA_NEUTRAL_DB_LAYER.md. Ignored
+   *  only by COM, whose RPC has no p_ta_id until Phase 3. */
+  taId: string,
   afterCursor: number | RosterCursor | undefined = 0,
   limit = LEDGER_PAGE_SIZE,
   tiers?: string[],
@@ -951,6 +998,10 @@ export async function loadLedgerPage(
   // held deliberately: ~50% of that board has no country signal at all). Omitted =
   // the RPCs' DEFAULT '{US}', so an unset country axis behaves exactly as before.
   if (cfg.tag !== "COM" && countries && countries.length) args.p_countries = countries;
+  // p_ta_id goes to the board_* RPCs only. community_ledger does not accept it, and an
+  // unknown named argument makes the RPC unresolvable through PostgREST -- the same trap
+  // the p_after_rank / p_tiers split above documents.
+  if (cfg.tag !== "COM") args.p_ta_id = taId;
   const { data, error } = await supabase.rpc(cfg.rpc, args);
   if (error) {
     console.error(`${cfg.rpc} failed:`, error.message);

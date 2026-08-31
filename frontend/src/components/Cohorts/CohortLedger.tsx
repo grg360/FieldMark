@@ -23,7 +23,11 @@ import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 import { taLabelForSlug } from "../../lib/taLabels";
 
 // The ledger RPCs are TA-locked (see the strip note below). Slug is the pin.
-const LEDGER_TA_SLUG = "nsclc";
+// LEDGER_TA_SLUG DELETED 2026-08-30 (Phase 2). It fed one thing -- the hero eyebrow -- while
+// the RPCs underneath were NSCLC-locked in SQL, so it read as a display choice when it was
+// really the only visible trace of a hard pin. The TA now comes from useLedgerTa() and the
+// board comes from board_established/board_rising with that TA's uuid, so the eyebrow and the
+// rows cannot disagree.
 import { getRisingFlags, getBoardOpenTrials, getEstablishedFlags, type RisingFlags, type OpenTrialFlag, type EstablishedFlags } from "../../lib/risingProfile";
 import { prefetchOpenTrialsDetail } from "../../lib/openTrials";
 import { getDrawerLayerData, prefetchDrawerLayerData, dominantClasses, PRACTICE_FLOOR, type DrawerLayerData } from "../../lib/ledgerDrawer";
@@ -36,8 +40,16 @@ import { resolveLocation } from "../../lib/location";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { useFilterContext } from "../../lib/filter-context";
 import { useTrack, type Track } from "../../lib/TrackContext";
-import { resolveFeedRoute, trackToDashboardSlug } from "../../lib/routeSlugs";
+import {
+  resolveFeedRoute,
+  trackToDashboardSlug,
+  parentTaLabelForIndicationSlug,
+  taSlugToLabel,
+  taLabelToSlug,
+} from "../../lib/routeSlugs";
 import { taIdForApiSlug, getHcpWebSignals, type WebSignal } from "../../lib/api";
+import { useLedgerTa, loadAddressableTas, type AddressableTa } from "../../lib/ledgerTa";
+import { useTA } from "../../lib/TAContext";
 import { supabase } from "../../lib/supabase";
 import { STATUS_LABEL, type RelationshipStatus } from "../../lib/relationships";
 import {
@@ -1934,6 +1946,24 @@ export default function CohortLedger() {
   const tag = COHORT_SLUG_TO_TAG[(params.cohort ?? "").toLowerCase()] ?? "EST";
   const cfg = COHORTS.find((c) => c.tag === tag) ?? COHORTS[0];
 
+  // THE TA. /cohorts/ledger/:cohort carries none of its own, so it is resolved
+  // ?ta= -> session -> profile -> picker and the URL is rewritten to carry the answer.
+  // See lib/ledgerTa.ts for why none of those layers ends in a hardcoded slug.
+  const { dataSlug: sessionDataSlug } = useTA();
+  const { state: taState, choose: chooseTa } = useLedgerTa(sessionDataSlug);
+  const taId = taState.status === "resolved" ? taState.taId : null;
+  const taSlug = taState.status === "resolved" ? taState.slug : null;
+  // COM is still welded to one TA (community_ledger takes no p_ta_id -- Phase 3). Mounting
+  // it against any other TA must show an absence, never another TA's roster.
+  const cohortOffTa = Boolean(cfg.pinnedTaSlug && taSlug && cfg.pinnedTaSlug !== taSlug);
+  const [taChoices, setTaChoices] = useState<AddressableTa[]>([]);
+  useEffect(() => {
+    if (taState.status !== "unresolved" && !cohortOffTa) return;
+    let alive = true;
+    void loadAddressableTas().then((t) => { if (alive) setTaChoices(t); });
+    return () => { alive = false; };
+  }, [taState.status, cohortOffTa]);
+
   // Territory scope — default SPLIT by cohort (Garrett 2026-08-12, second
   // pass): COM is a practice-based roster and opens on the MSL's territory;
   // EST/RS are NATIONAL ranked leaderboards and open US-wide — a territory
@@ -2007,13 +2037,21 @@ export default function CohortLedger() {
     setTrack(cohortTrack);
   }, [cohortTrack, setTrack]);
 
-  // Synthetic feed route for the strip: the ledger RPCs are NSCLC-locked, so the strip's
-  // subject scope is pinned to Oncology/NSCLC until the RPCs take a TA parameter. TA and
-  // indication controls navigate to the (unlinked but routed) card feed as shipped.
+  // Feed route for the strip, DERIVED from the resolved TA (2026-08-30). This was a literal
+  // {ta:"oncology", indication:"nsclc"} pair with a comment explaining that the RPCs were
+  // NSCLC-locked -- true when written, and the reason the strip could say "Lung Cancer" over
+  // any board at all. board_established/board_rising take the TA now, so the strip names
+  // whatever the rows are. The parent area comes from the indication rather than being
+  // stated, so colorectal resolves to Oncology without a second mapping.
+  // The AREA this TA sits under. Two sources because the registry has two shapes: an
+  // indication-level TA (nsclc, colorectal-cancer) is found by its parent, while a TA that
+  // IS its own area (hepatology, rare-disease) is found by its own slug. Neither branch
+  // names a TA; an unresolvable one yields null and the strip renders unscoped.
+  const areaLabel = taSlug ? (parentTaLabelForIndicationSlug(taSlug) ?? taSlugToLabel(taSlug)) : null;
   const stripRoute = resolveFeedRoute({
-    ta: "oncology",
+    ta: areaLabel ? taLabelToSlug(areaLabel) : undefined,
     dashboard: trackToDashboardSlug(cohortTrack),
-    indication: "nsclc",
+    indication: taSlug ?? undefined,
     isHomePath: false,
   });
   const [rows, setRows] = useState<LedgerRow[]>([]);
@@ -2037,6 +2075,10 @@ export default function CohortLedger() {
     let alive = true;
     setLoading(true);
     if (!scope) return; // territory still resolving — one fetch, no national flash
+    // NO TA, NO QUERY. Either it is still resolving, or nothing resolved and the picker is
+    // up, or this cohort is pinned to a different TA. Every one of those is a reason to show
+    // nothing -- none of them is a reason to show another TA's board.
+    if (!taId || cohortOffTa) { setLoading(false); return; }
     setFailed(false);
     setRows([]);
     setMeta(null);
@@ -2050,7 +2092,7 @@ export default function CohortLedger() {
     // European scope; this is the belt-and-braces gate at the call site.
     const statesArg = scopeIncludesUs(scope) ? scope?.states : [];
     const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
-    Promise.all([loadLedgerMeta(cfg), loadLedgerPage(cfg, 0, LEDGER_PAGE_SIZE, tiersArg, statesArg, scope?.countries)])
+    Promise.all([loadLedgerMeta(cfg, taId), loadLedgerPage(cfg, taId, 0, LEDGER_PAGE_SIZE, tiersArg, statesArg, scope?.countries)])
       .then(([m, page]) => {
         if (!alive) return;
         setMeta(m);
@@ -2072,10 +2114,10 @@ export default function CohortLedger() {
     return () => {
       alive = false;
     };
-  }, [cfg, selectedTiers, scope]);
+  }, [cfg, selectedTiers, scope, taId, cohortOffTa]);
 
   const loadMore = useCallback(() => {
-    if (loadingMore.current || !hasMore) return;
+    if (loadingMore.current || !hasMore || !taId || cohortOffTa) return;
     loadingMore.current = true;
     // EST/RS keyset on the last rank; COM (Phase 3 roster, no rank) keysets on
     // the composite (tier_priority, patient_volume, hcp_id) cursor.
@@ -2091,7 +2133,7 @@ export default function CohortLedger() {
     // European scope; this is the belt-and-braces gate at the call site.
     const statesArg = scopeIncludesUs(scope) ? scope?.states : [];
     const tiersArg = cfg.tag === "COM" ? selectedTiers : undefined;
-    loadLedgerPage(cfg, afterCursor, LEDGER_PAGE_SIZE, tiersArg, statesArg, scope?.countries)
+    loadLedgerPage(cfg, taId, afterCursor, LEDGER_PAGE_SIZE, tiersArg, statesArg, scope?.countries)
       .then((page) => {
         setRows((prev) => [...prev, ...page.rows]);
         setHasMore(page.hasMore);
@@ -2100,7 +2142,7 @@ export default function CohortLedger() {
       .catch(() => {
         loadingMore.current = false;
       });
-  }, [cfg, hasMore, rows, selectedTiers, scope]);
+  }, [cfg, hasMore, rows, selectedTiers, scope, taId, cohortOffTa]);
 
   const th = meta ? thresholds(cfg, meta.ceilings) : {};
   const isCom = cfg.tag === "COM";
@@ -2183,7 +2225,14 @@ export default function CohortLedger() {
           userTerritory={userTerritory}
           showSubjectLine={false}
           showScopeChips={false}
-          onPickCohort={(key) => navigate(`/cohorts/ledger/${key}`)}
+          // Cohort switches keep the TA. Without this the ledger would re-resolve from
+          // session/profile on every tab click and could silently land on another area.
+          onPickCohort={(key) => navigate(`/cohorts/ledger/${key}${taSlug ? `?ta=${taSlug}` : ""}`)}
+          // TA selection happens IN PLACE: chooseTa writes ?ta= and useLedgerTa re-resolves
+          // from the URL, so the rows reload without a navigation. Territory scope, the open
+          // drawer and the scroll position all survive a TA switch.
+          onPickTa={chooseTa}
+          dataTaSlug={taSlug}
         />
         {/* Commit C 2026-08-05: g2 board per the Pulse scheme; the ledger card
             inside is a g1 well with an l1 edge. */}
@@ -2214,7 +2263,7 @@ export default function CohortLedger() {
               //
               // It spells out now (ESTABLISHED, not EST) for the same reason the
               // abbreviations went elsewhere: EST read as a truncation artifact.
-              // cfg.title.split is the same source the cluster label and the
+              // cfg.title is the same source the cluster label and the
               // identity mark below already read, so the three agree by
               // construction.
               //
@@ -2235,20 +2284,69 @@ export default function CohortLedger() {
               // cohort segment. The six TA-only surfaces sit at 203px at every
               // width and keep both segments — dropping ONCOLOGY there would
               // leave LUNG CANCER alone, buying nothing and costing the pairing.
-              eyebrow={[cfg.title.split(" / ")[0], taLabelForSlug(LEDGER_TA_SLUG), isMobile ? null : "Oncology"].filter(Boolean).join(" · ")}
+              // Third segment is the AREA, derived from the TA rather than stated. It used
+              // to be the literal "Oncology" beside a literal NSCLC label; both are now the
+              // resolved TA's own, so a colorectal board reads
+              // "ESTABLISHED · Colorectal Cancer · Oncology" without a second mapping.
+              eyebrow={[cfg.title, taSlug ? taLabelForSlug(taSlug) : null, isMobile ? null : areaLabel].filter(Boolean).join(" · ")}
               meta={`WEEKLY BUILD · AS OF ${formatScoringDate(scoredAt)}`}
               title="Cohort Ledger"
               // The cluster label names the cohort instead of saying "IN COHORT".
               // With the cohort out of the H1 this is the one place it is stated
               // at a legible size, next to the figure it counts. The name is
-              // taken from cfg.title, which lost its only consumer when the
-              // title rule moved the cohort out of the H1 — so the field earns
-              // its keep again rather than sitting dead with a stale "/ NSCLC"
-              // half nobody renders.
-              stats={cohortTotal ? { variant: "cluster", items: [{ value: cohortTotal.toLocaleString(), label: `${cfg.title.split(" / ")[0]} HCPs`, center: true }] } : undefined}
+              // taken from cfg.title. The "/ NSCLC" half every title used to
+              // carry was dead string -- every consumer split it off -- so it was
+              // removed with the TA pin on 2026-08-30 rather than left to rot.
+              stats={cohortTotal ? { variant: "cluster", items: [{ value: cohortTotal.toLocaleString(), label: `${cfg.title} HCPs`, center: true }] } : undefined}
             />
           </div>
           <div style={{ border: `1px solid ${CANON.LINE.HAIR}`, background: P.card }}>
+
+            {/* NO TA RESOLVED, OR THIS COHORT IS PINNED ELSEWHERE. Rendered INSTEAD of the
+                board, never beside it: the failure being designed out is a board that looks
+                authoritative while showing another TA's people, so there must be no state in
+                which rows are on screen without a TA the header can name. */}
+            {taState.status === "unresolved" || cohortOffTa ? (
+              <div style={{ padding: isMobile ? "28px 16px" : "40px 24px" }}>
+                <div style={{ ...mono(9, 500), color: P.ink4, letterSpacing: ".16em", marginBottom: 12 }}>
+                  {cohortOffTa ? "COHORT UNAVAILABLE FOR THIS AREA" : "NO THERAPEUTIC AREA SELECTED"}
+                </div>
+                <div style={{ fontFamily: FACE.value, fontSize: isMobile ? 17 : 20, color: P.ink1, marginBottom: 10, textWrap: "pretty" }}>
+                  {cohortOffTa
+                    ? `${cfg.title} is only built for ${taLabelForSlug(cfg.pinnedTaSlug as string)} so far.`
+                    : "This ledger needs a therapeutic area."}
+                </div>
+                <div style={{ fontFamily: FACE.value, fontSize: 14, fontWeight: 300, color: P.ink3, maxWidth: 620, lineHeight: 1.6, marginBottom: 20, textWrap: "pretty" }}>
+                  {cohortOffTa
+                    ? `The community roster is built on an evidence ladder that is curated per area, and ${taSlug ? taLabelForSlug(taSlug) : "this area"} has not been curated yet. Established and Rising Stars are available for it now.`
+                    : "Nothing in the address, this session, or your profile default named one — so rather than pick an area for you and label the result as though you had chosen it, the ledger is asking."}
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {taChoices
+                    .filter((t) => !cohortOffTa || t.slug === cfg.pinnedTaSlug)
+                    .map((t) => (
+                      <button
+                        key={t.slug}
+                        type="button"
+                        onClick={() => chooseTa(t.slug)}
+                        style={{ ...mono(11), letterSpacing: ".08em", color: P.ink1, background: "transparent", border: `1px solid ${P.lineMed}`, padding: "9px 14px", cursor: "pointer" }}
+                      >
+                        {t.name.toUpperCase()}
+                      </button>
+                    ))}
+                  {cohortOffTa ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/cohorts/ledger/established?ta=${taSlug ?? ""}`)}
+                      style={{ ...mono(11), letterSpacing: ".08em", color: P.ink1, background: "transparent", border: `1px solid ${P.lineMed}`, padding: "9px 14px", cursor: "pointer" }}
+                    >
+                      {`ESTABLISHED · ${taSlug ? taLabelForSlug(taSlug).toUpperCase() : ""}`}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+            <>
 
             {/* header — cohort tick + meta line (title moved to the page hero) */}
             <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 6 : 0, justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
@@ -2259,13 +2357,13 @@ export default function CohortLedger() {
                   with a 4x22 rule: a step above the 11px meta beside it and well
                   below the 30/52 title, which is the slot it should hold. The
                   eyebrow no longer abbreviates against it (2026-08-16): both
-                  read cfg.title.split(" / ")[0], so the gold eyebrow above and
+                  read cfg.title, so the gold eyebrow above and
                   this mark in the cohort's own colour say the same word.
                   Tracking eases .14em -> .11em: wide tracking at 9px reads as
                   deliberate, at 13px it reads as loose. */}
               <span style={{ display: "flex", alignItems: "center", gap: 11 }}>
                 <span style={{ width: 4, height: 22, background: cfg.markerColor }} />
-                <span style={{ ...mono(13, 600), color: cfg.markerColor, letterSpacing: ".11em" }}>{cfg.title.split(" / ")[0]}</span>
+                <span style={{ ...mono(13, 600), color: cfg.markerColor, letterSpacing: ".11em" }}>{cfg.title}</span>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <span style={{ ...mono(11), color: P.ink5, letterSpacing: ".1em", textWrap: "pretty" }}>{metaLine}</span>
@@ -2441,6 +2539,8 @@ export default function CohortLedger() {
                 <div key={i} style={{ ...mono(11), lineHeight: 1.75, color: CANON.INK.MUTE, letterSpacing: ".04em" }}>{n}</div>
               ))}
             </div>
+            </>
+            )}
           </div>
         </div>
       </div>

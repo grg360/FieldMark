@@ -21,7 +21,7 @@
 // the data and the brief forbade logic changes; the three real cohort filters are wired. The
 // "All" that remains is the real "All" INDICATION in Row 1.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTrack, type Track } from "../lib/TrackContext";
@@ -29,9 +29,10 @@ import { useTA } from "../lib/TAContext";
 import { useFilterContext, statesFromTerritory } from "../lib/filter-context";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { INDICATIONS_BY_TA } from "./IndicationFilter";
+import { loadAddressableTas } from "../lib/ledgerTa";
+import { cohortServesTa } from "../lib/cohortLedger";
 import {
   buildFeedPath,
-  resolveFeedRoute,
   resolveIndicationForTaSwitch,
   taLabelToSlug,
   trackToDashboardSlug,
@@ -73,12 +74,22 @@ interface Props {
   // the feed's when this override is provided — one cohort control, context-appropriate
   // target. The default (absent) keeps the shipped feed behavior byte-identical.
   onPickCohort?: (key: Track) => void;
+  // TA SELECTION IN PLACE (2026-08-31). Supplied only by the ledger, which now serves any TA
+  // with board rows. When present, row 1's tabs SELECT A TA on the current surface instead of
+  // navigating to the card feed -- so the strip stops being decoration there. Its presence is
+  // also what splits `ledgerMount`: feed navigation stays inert, TA selection goes live.
+  onPickTa?: (slug: string) => void;
+  // The resolved DATA-TA slug (nsclc, colorectal-cancer, ...). Passed explicitly rather than
+  // read back off `route`: resolveFeedRoute rewrites an indication it does not recognise for
+  // the domain (a hepatology ledger would come back as "mash"), and this value decides which
+  // tab is current and which cohorts are available. Too load-bearing to round-trip.
+  dataTaSlug?: string | null;
   // Filters / All-US(territory) chips mutate filter-context, which the ledger RPCs do not
   // read — rendering them there would be dead controls. Default true (feed) renders them.
   showScopeChips?: boolean;
 }
 
-export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, showSubjectLine = true, onPickCohort, showScopeChips = true }: Props) {
+export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, showSubjectLine = true, onPickCohort, showScopeChips = true, onPickTa, dataTaSlug }: Props) {
   const { track, setTrack } = useTrack();
   const { setTA } = useTA();
   const navigate = useNavigate();
@@ -93,15 +104,49 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   const taSlug = route.taSlug;
   const indicationSlug = route.indicationSlug;
 
-  // --- REAL live / planned from the indication config (active flag) ---
+  // Ledger mount marker (onPickCohort is only supplied there). On the ledger, controls that
+  // would route to the card feed — which is not shipping — are rendered inert.
+  const ledgerMount = !!onPickCohort;
+  // THE SPLIT (2026-08-31). `ledgerMount` used to mean two things at once: "do not navigate
+  // to the feed" AND "no other TA is reachable". The second stopped being true when the
+  // ledger RPCs took p_ta_id, but the single flag kept every other TA greyed out — a chip
+  // rendered under "Live now" that could not be clicked, which is worse than either honest
+  // state. Feed navigation stays inert; TA selection is live wherever onPickTa is supplied.
+  const taSelectable = !!onPickTa;
+
+  // --- WHICH INDICATIONS ARE LIVE HERE ---
   // Identity is o.slug throughout; labels are rendered, never compared.
   const opts = INDICATIONS_BY_TA[taLabel] ?? [];
-  const live = opts.filter((o) => o.active && o.slug !== "all");
-  const planned = opts.filter((o) => !o.active);
+  // On a TA-selecting surface the honest predicate is "does this TA have a board", which is
+  // therapeutic_areas + TA_ID_MAP (loadAddressableTas), NOT INDICATIONS_BY_TA.active — that
+  // flag means "the card feed has data for this indication". The two agree for colorectal
+  // today by coincidence, and coincidences of that kind are how the last four TA defects got
+  // in. On the feed the `active` flag remains exactly right, so it is unchanged there.
+  const [addressable, setAddressable] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!taSelectable) return;
+    let alive = true;
+    void loadAddressableTas().then((tas) => {
+      if (alive) setAddressable(tas.map((t) => t.slug));
+    });
+    return () => { alive = false; };
+  }, [taSelectable]);
 
-  // Ledger mount marker (onPickCohort is only supplied there). On the ledger, controls
-  // that would route to the card feed — which is not shipping — are rendered inert.
-  const ledgerMount = !!onPickCohort;
+  const liveByFlag = opts.filter((o) => o.active && o.slug !== "all");
+  const live = taSelectable
+    // null = still loading. Show only the current TA rather than flashing the feed's set and
+    // then narrowing it -- a tab that appears and disappears reads as a bug.
+    ? (addressable === null
+        ? opts.filter((o) => o.slug === dataTaSlug)
+        : opts.filter((o) => o.slug !== "all" && addressable.includes(o.slug)))
+    : liveByFlag;
+  const planned = taSelectable
+    ? opts.filter((o) => o.slug !== "all" && !live.some((l) => l.slug === o.slug))
+    : opts.filter((o) => !o.active);
+
+  // The tab that reads as current. On a TA-selecting surface that is the resolved TA, not
+  // route.indicationSlug -- see the dataTaSlug prop note.
+  const currentSlug = taSelectable ? (dataTaSlug ?? "") : indicationSlug;
 
   // Immunology deactivated 2026-07-31: its only target is the card feed. Rendered in the
   // planned treatment — visible, clearly unavailable, not clickable. Oncology stays live.
@@ -118,10 +163,14 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   };
 
   const pickIndication = (indSlug: string) => {
-    // The active indication is a scope label, not a navigation — clicking it is a no-op
-    // (on the ledger it would otherwise route to the card feed under the same scope).
-    if (indSlug === indicationSlug) { setTaOpen(false); setSheet(false); return; }
-    // Ledger: no other indication has a ledger, and the feed is not shipping — inert.
+    // Clicking the current tab is a no-op on every surface: it is a scope label, not a
+    // navigation.
+    if (indSlug === currentSlug) { setTaOpen(false); setSheet(false); return; }
+    // TA-SELECTING SURFACE (the ledger): stay put and change the TA. onPickTa writes ?ta=,
+    // the ledger re-resolves from the URL and reloads its rows. No navigation, so the
+    // territory scope, the open cohort and the scroll position all survive the switch.
+    if (taSelectable) { onPickTa?.(indSlug); setTaOpen(false); setSheet(false); return; }
+    // Ledger without TA selection, and "All": still inert — the target is the card feed.
     if (ledgerMount) { setTaOpen(false); setSheet(false); return; }
     setTA(taSlug, indSlug);
     navigate(buildFeedPath(taSlug, trackToDashboardSlug(track), indSlug));
@@ -136,6 +185,10 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
 
   const pickCohort = (key: Track) => {
     if (key === track) return;
+    // A cohort that cannot answer for this TA is rendered unavailable below; this is the
+    // handler-side half of the same rule, so a keyboard or programmatic path cannot get in
+    // where the pointer cannot.
+    if (taSelectable && !cohortServesTa(key, dataTaSlug)) return;
     setTrack(key);
     if (onPickCohort) { onPickCohort(key); return; }
     navigate(buildFeedPath(taSlug, trackToDashboardSlug(key), indicationSlug));
@@ -204,8 +257,9 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
           <div style={{ display: "flex", alignItems: "stretch", border: `1px solid ${HAIR_STRONG}`, overflowX: "auto", scrollbarWidth: "none" }}>
             {COHORTS.map((c, i) => {
               const on = cohortActive(c.key);
+              const off = taSelectable && !cohortServesTa(c.key, dataTaSlug);
               return (
-                <div key={c.key} onClick={() => pickCohort(c.key)} style={{ cursor: "pointer", padding: "7px 11px", whiteSpace: "nowrap", borderLeft: `1px solid ${i === 0 ? "transparent" : HAIR_STRONG}`, fontFamily: SERIF, fontSize: 13, background: on ? "rgba(216,169,75,.09)" : "transparent", color: on ? GOLD : MID }}>{c.label}</div>
+                <div key={c.key} onClick={() => pickCohort(c.key)} title={off ? `Not built for ${indicationLabel} yet` : undefined} style={{ cursor: off ? "default" : "pointer", padding: "7px 11px", whiteSpace: "nowrap", borderLeft: `1px solid ${i === 0 ? "transparent" : HAIR_STRONG}`, fontFamily: SERIF, fontSize: 13, background: on ? "rgba(216,169,75,.09)" : "transparent", color: on ? GOLD : off ? FAINT : MID }}>{c.label}</div>
               );
             })}
           </div>
@@ -230,8 +284,8 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
                 <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD }}>Live now · {live.length}</div>
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>
                   {live.map((o) => (
-                    <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && o.slug !== indicationSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
-                      <span style={{ fontFamily: SERIF, fontSize: 17, color: o.slug === indicationSlug ? GOLD : ledgerMount ? FAINT : INK }}>{o.label}</span>
+                    <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && !taSelectable && o.slug !== currentSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
+                      <span style={{ fontFamily: SERIF, fontSize: 17, color: o.slug === currentSlug ? GOLD : ledgerMount && !taSelectable ? FAINT : INK }}>{o.label}</span>
                       <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{o.count != null ? `${num(o.count)} HCPs` : "Live"}</span>
                     </div>
                   ))}
@@ -267,11 +321,17 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
 
         <div style={{ display: "flex", alignItems: "flex-end", gap: 26, flex: 1 }}>
           {/* live indications as serif tabs, "All" first */}
-          {[{ label: "All", key: "all" }, ...live.map((o) => ({ label: o.label, key: o.slug }))].map((t) => {
-            const on = t.key === indicationSlug;
-            // Ledger: the active indication is the ledger's scope tab; every OTHER
-            // indication would route to the card feed, so it renders planned-inert.
-            const inert = ledgerMount && !on;
+          {[
+            // "All" is an aggregate across the feed's indications, not a TA -- there is no
+            // all-TA board to select, so a TA-selecting surface omits it rather than
+            // offering a tab that cannot resolve to a uuid.
+            ...(taSelectable ? [] : [{ label: "All", key: "all" }]),
+            ...live.map((o) => ({ label: o.label, key: o.slug })),
+          ].map((t) => {
+            const on = t.key === currentSlug;
+            // Inert only where the click would go to the unshipped card feed. On a
+            // TA-selecting surface every live tab is a real selection.
+            const inert = ledgerMount && !on && !taSelectable;
             return (
               <div key={t.key} onClick={() => pickIndication(t.key)} title={inert ? "Planned" : undefined} style={{ position: "relative", cursor: inert ? "default" : "pointer", paddingBottom: 11, fontFamily: SERIF, fontSize: 16.5, lineHeight: 1, whiteSpace: "nowrap", color: on ? INK : inert ? FAINT : MID }}>
                 {t.label}
@@ -297,8 +357,8 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
                       <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>Live now · {live.length}</div>
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         {live.map((o) => (
-                          <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && o.slug !== indicationSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
-                            <span style={{ fontFamily: SERIF, fontSize: 15.5, color: o.slug === indicationSlug ? GOLD : ledgerMount ? FAINT : INK }}>{o.label}</span>
+                          <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && !taSelectable && o.slug !== currentSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
+                            <span style={{ fontFamily: SERIF, fontSize: 15.5, color: o.slug === currentSlug ? GOLD : ledgerMount && !taSelectable ? FAINT : INK }}>{o.label}</span>
                             <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{o.count != null ? `${num(o.count)} HCPs` : "Live"}</span>
                           </div>
                         ))}
@@ -353,8 +413,14 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
             <div style={{ display: "flex", alignItems: "stretch", border: `1px solid ${HAIR_STRONG}` }}>
               {COHORTS.map((c, i) => {
                 const on = cohortActive(c.key);
+                // UNAVAILABLE, NOT HIDDEN. Community exists for one TA so far; greying the
+                // chip says that, where removing it would imply the cohort does not exist.
+                // The tooltip names the reason so the state is legible without a click --
+                // the ledger's absence panel is a fallback for deep links now, not the
+                // primary way a user learns this.
+                const off = taSelectable && !cohortServesTa(c.key, dataTaSlug);
                 return (
-                  <div key={c.key} onClick={() => pickCohort(c.key)} style={{ cursor: "pointer", padding: "6px 10px", whiteSpace: "nowrap", borderLeft: `1px solid ${i === 0 ? "transparent" : HAIR_STRONG}`, fontFamily: SERIF, fontSize: 13.5, lineHeight: 1.2, background: on ? "rgba(216,169,75,.09)" : "transparent", color: on ? GOLD : MID }}>{c.label}</div>
+                  <div key={c.key} onClick={() => pickCohort(c.key)} title={off ? `Not built for ${indicationLabel} yet` : undefined} style={{ cursor: off ? "default" : "pointer", padding: "6px 10px", whiteSpace: "nowrap", borderLeft: `1px solid ${i === 0 ? "transparent" : HAIR_STRONG}`, fontFamily: SERIF, fontSize: 13.5, lineHeight: 1.2, background: on ? "rgba(216,169,75,.09)" : "transparent", color: on ? GOLD : off ? FAINT : MID }}>{c.label}</div>
                 );
               })}
             </div>
