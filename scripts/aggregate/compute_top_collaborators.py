@@ -14,6 +14,7 @@ Required environment variables (.env):
 from __future__ import annotations
 
 import os
+import sys
 
 import click
 import psycopg2
@@ -190,6 +191,17 @@ def main(ta: str, window_years: int, window_type: str, top_n: int, dry_run: bool
         print("Inserting new rows...")
         n = write_collaborators(conn, ta_id, window_type, rows)
         print(f"Wrote {n} rows to hcp_top_collaborators_v2")
+
+        # ALL-FAILED RULE. attempted = collaborator edges the query produced, succeeded = rows
+        # written. This one is worth guarding despite having no swallow handlers, because
+        # write_collaborators TRUNCATES the TA's rows before inserting: a run that computes
+        # edges and then writes none does not leave the old data in place, it leaves the table
+        # empty. A TA with no co-authorship edges yields rows == [] and stays quiet.
+        if rows and not n:
+            print(f"[FAIL] 0 of {len(rows):,} collaborator rows written after the delete.",
+                  file=sys.stderr)
+            conn.close()
+            raise SystemExit(1)
 
     conn.close()
 

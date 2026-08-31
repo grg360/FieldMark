@@ -136,7 +136,7 @@ def compute_percentile_ranks(
     arr = [values[h] for h in hcp_ids]
     # rankdata: 1 = lowest.
     ranks = rankdata(arr, method="average")
-    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/canonical/PERCENTILE_CONVENTION.md.
     # Weibull plotting position: ascending rank r maps to 100 * r / (n + 1), so the
     # highest value lands at 100n/(n+1) and the lowest at 100/(n+1).
     #

@@ -85,6 +85,301 @@ def sb() -> Client:
     return create_client(env("SUPABASE_URL"), env("SUPABASE_KEY"))
 
 
+# ============================================================
+# Set-based write path (stage 6's 13.3-hour problem)
+# ============================================================
+#
+# THE PER-ROW PATH IS ONE HTTP UPDATE PER ROW. Measured: 583 rows / 28.7s weekly (~20 rows/s),
+# and 631,928 rows on the 2026-08-25 CRC first build at 13 rows/s = 13.3 HOURS. It was killed
+# mid-run and finished by hand with chunked SQL in minutes. Every input already lives in
+# Postgres, so the whole derivation collapses to one UPDATE ... FROM and no round-trip is
+# warranted at all. See docs/canonical/ORCHESTRATOR_DEBT.md section 1.
+#
+# FIDELITY -- WHERE THE RECORDED SQL WAS WRONG. That doc says "bool_or reproduces the Python
+# priority rule for free". It does not, in one case, and the case is real:
+#
+#   derive_position() ranks an HCP's matching authorship entries by
+#       (0 if label in ('first','last') else 1, array_index)
+#   and takes exactly ONE winner, so is_first and is_senior are MUTUALLY EXCLUSIVE by
+#   construction. bool_or(pos='first') / bool_or(pos='last') computed independently sets BOTH
+#   true when an HCP matches a 'first' entry AND a 'last' entry on the same publication.
+#
+#   Measured 2026-08-29: 40 such (pub, hcp) pairs in CRC, 11 in NSCLC -- rare, but exactly the
+#   rows the script's own `anomaly` branch exists to flag. bool_or would have written a
+#   simultaneously-first-and-senior author on every one of them.
+#
+# DISTINCT ON with that ORDER BY reproduces the ranking exactly: priority class first, array
+# ordinal as the tiebreak, one row out. Two further fidelity points the recorded SQL missed:
+#
+#   * COALESCE on the comparisons. Python writes False for a matched entry whose
+#     author_position is missing; `pos = 'first'` yields NULL, not false. (0 such entries in
+#     CRC today, but the column is nullable and the loop's behaviour is defined.)
+#   * WITH ORDINALITY. The ranking needs the array index; the recorded SQL had no ordinal and
+#     so could not have implemented the tiebreak even in principle.
+#
+# Rows whose HCP matches no authorship entry stay absent from `resolved` and keep
+# is_first_author = NULL -- the existing unresolved behaviour, matching the loop's `label is
+# None` branch.
+
+#: Statement timeout per chunk. A chunk that exceeds it is SPLIT, not failed -- see
+#: run_set_based_update. Deliberately short: discovering a too-big chunk quickly is cheaper
+#: than waiting out a slow one.
+SET_BASED_CHUNK_TIMEOUT = "180s"
+#: Stop splitting here. 2^6 = 64 slices of the uuid space; the hand-run needed 6.
+MAX_CHUNK_DEPTH = 6
+#: Below this many target rows the per-row path is left alone -- see choose_write_path.
+SET_BASED_MIN_ROWS = 5000
+
+_UUID_MAX = (1 << 128) - 1
+
+
+def _int_to_uuid(n: int) -> str:
+    h = f"{n:032x}"
+    return f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
+
+
+def _pg_connect():
+    """Direct Postgres connection. Local import so the per-row path needs neither psycopg
+    nor DATABASE_URL -- that is the whole reason the per-row path stays available."""
+    import psycopg
+    return psycopg.connect(env("DATABASE_URL"))
+
+
+#: The derivation, as one statement. `{scope}` is an optional extra predicate; lo/hi bound the
+#: publication_id range so a chunk can be split without changing the logic.
+DERIVE_SQL = """
+WITH matched AS (
+  SELECT pa.publication_id,
+         pa.hcp_id,
+         lower(trim(ae.elem->>'author_position')) AS pos,
+         ae.ord                                   AS ord
+  FROM publication_authors_v2 pa
+  JOIN publications_v2 p ON p.id = pa.publication_id
+  CROSS JOIN LATERAL jsonb_array_elements(p.authorships) WITH ORDINALITY AS ae(elem, ord)
+  JOIN hcp_openalex_authors_v2 hoa
+    ON hoa.hcp_id = pa.hcp_id
+   AND regexp_replace(ae.elem->'author'->>'id', '^.*/', '')
+     = regexp_replace(hoa.openalex_author_id,   '^.*/', '')
+  WHERE jsonb_typeof(p.authorships) = 'array'
+    AND pa.publication_id >= %(lo)s::uuid
+    AND pa.publication_id <= %(hi)s::uuid
+    {scope}
+),
+resolved AS (
+  -- EXACTLY derive_position()'s rank(): priority class, then array ordinal, take one.
+  SELECT DISTINCT ON (publication_id, hcp_id)
+         publication_id, hcp_id, pos, ord
+  FROM matched
+  ORDER BY publication_id, hcp_id,
+           (CASE WHEN pos IN ('first', 'last') THEN 0 ELSE 1 END),
+           ord
+)
+"""
+
+UPDATE_TAIL = """
+UPDATE publication_authors_v2 pa
+SET is_first_author  = COALESCE(r.pos = 'first', false),
+    is_senior_author = COALESCE(r.pos = 'last',  false){extra}
+FROM resolved r
+WHERE pa.publication_id = r.publication_id
+  AND pa.hcp_id         = r.hcp_id
+"""
+
+COUNT_TAIL = """
+SELECT count(*)                                                  AS resolved,
+       count(*) FILTER (WHERE pos = 'first')                     AS is_first_true,
+       count(*) FILTER (WHERE pos = 'last')                      AS is_senior_true,
+       count(*) FILTER (WHERE pos IS DISTINCT FROM 'first'
+                          AND pos IS DISTINCT FROM 'last')       AS middle
+FROM resolved
+"""
+
+
+def _scope_clause(pub_ids: Set[str], hcp_ids: Set[str]) -> str:
+    """Extra predicates for the temp scope tables. Empty when the run is whole-corpus."""
+    parts = []
+    if pub_ids:
+        parts.append("AND pa.publication_id IN (SELECT id FROM _s6_pubs)")
+    if hcp_ids:
+        parts.append("AND pa.hcp_id IN (SELECT id FROM _s6_hcps)")
+    return ("\n    ").join(parts)
+
+
+def _load_scope_tables(cur, pub_ids: Set[str], hcp_ids: Set[str]) -> None:
+    """Materialise the id filters ONCE as indexed temp tables rather than shipping a 147k-element
+    array into every chunk. Same scope semantics as the per-row path's read_ids_file sets."""
+    for name, ids in (("_s6_pubs", pub_ids), ("_s6_hcps", hcp_ids)):
+        if not ids:
+            continue
+        cur.execute(f"CREATE TEMP TABLE {name} (id uuid PRIMARY KEY) ON COMMIT DROP")
+        with cur.copy(f"COPY {name} (id) FROM STDIN") as cp:
+            for i in sorted(ids):
+                cp.write_row((i,))
+        cur.execute(f"ANALYZE {name}")
+
+
+def run_set_based_update(
+    pub_ids: Set[str], hcp_ids: Set[str], author_position_mode: str, execute: bool,
+) -> Dict[str, int]:
+    """The whole derivation as chunked SQL. Returns the same counters the loop produced.
+
+    CHUNKING IS AUTOMATIC AND ADAPTIVE, not a parameter. The uuid space starts as ONE range;
+    any range whose statement exceeds SET_BASED_CHUNK_TIMEOUT is bisected and both halves are
+    pushed back onto the queue. That is strictly better than a fixed slice count: the hand-run
+    guessed six and got lucky, whereas bisection finds whatever the data and the server need
+    today, and needs no tuning when the corpus doubles. The statement is idempotent
+    (UPDATE ... SET), so a timed-out chunk that already did partial work is simply redone.
+    """
+    import psycopg
+    from psycopg import errors as pg_errors
+
+    counts: Dict[str, int] = {
+        "examined": 0, "resolved": 0, "is_first_true": 0, "is_senior_true": 0,
+        "middle": 0, "null_position": 0, "chunks": 0, "splits": 0,
+    }
+    scope = _scope_clause(pub_ids, hcp_ids)
+    # index mode writes the 0-based array position, matching the loop's `idx`.
+    extra = (",\n    author_position  = (r.ord - 1)::int"
+             if author_position_mode == "index" else "")
+
+    conn = _pg_connect()
+    try:
+        with conn.cursor() as cur:
+            _load_scope_tables(cur, pub_ids, hcp_ids)
+
+            # `examined` is the same population the loop counted: rows in scope, before any
+            # derivation. Read from the target table so the number is evidence, not self-report.
+            cur.execute(
+                "SELECT count(*) FROM publication_authors_v2 pa WHERE true " + scope
+            )
+            counts["examined"] = int(cur.fetchone()[0])
+
+            queue: List[Tuple[int, int, int]] = [(0, _UUID_MAX, 0)]   # (lo, hi, depth)
+            while queue:
+                lo, hi, depth = queue.pop()
+                params = {"lo": _int_to_uuid(lo), "hi": _int_to_uuid(hi)}
+                body = DERIVE_SQL.format(scope=scope)
+                try:
+                    cur.execute(f"SET statement_timeout = '{SET_BASED_CHUNK_TIMEOUT}'")
+                    cur.execute(body + COUNT_TAIL, params)
+                    r = cur.fetchone()
+                    if execute:
+                        cur.execute(body + UPDATE_TAIL.format(extra=extra), params)
+                    counts["resolved"] += int(r[0])
+                    counts["is_first_true"] += int(r[1])
+                    counts["is_senior_true"] += int(r[2])
+                    counts["middle"] += int(r[3])
+                    counts["chunks"] += 1
+                    conn.commit()
+                except (pg_errors.QueryCanceled, psycopg.OperationalError):
+                    conn.rollback()
+                    if depth >= MAX_CHUNK_DEPTH or lo >= hi:
+                        raise RuntimeError(
+                            f"chunk [{_int_to_uuid(lo)}, {_int_to_uuid(hi)}] still exceeds "
+                            f"{SET_BASED_CHUNK_TIMEOUT} at split depth {depth}; refusing to "
+                            f"split further. Raise MAX_CHUNK_DEPTH or investigate the plan."
+                        )
+                    mid = (lo + hi) // 2
+                    queue.append((mid + 1, hi, depth + 1))
+                    queue.append((lo, mid, depth + 1))
+                    counts["splits"] += 1
+                    print(f"  chunk too slow at depth {depth}; split into 2 "
+                          f"(total splits: {counts['splits']})", flush=True)
+        counts["null_position"] = counts["examined"] - counts["resolved"]
+        return counts
+    finally:
+        conn.close()
+
+
+def count_target_rows_cheap(pub_ids: Set[str], hcp_ids: Set[str]) -> Optional[int]:
+    """Target row count via one COUNT, so the path can be chosen before the slow read.
+
+    Best-effort: if this cannot run (no DATABASE_URL, no psycopg, unreachable) the caller gets
+    None and falls back to the per-row path, which is the pre-existing behaviour.
+    """
+    try:
+        conn = _pg_connect()
+    except Exception:
+        return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '60s'")
+            _load_scope_tables(cur, pub_ids, hcp_ids)
+            cur.execute("SELECT count(*) FROM publication_authors_v2 pa WHERE true "
+                        + _scope_clause(pub_ids, hcp_ids))
+            return int(cur.fetchone()[0])
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
+def report_set_based(counts: Dict[str, int], execute: bool,
+                     author_position_mode: str, t0: float) -> None:
+    """The same summary block the per-row path prints, from the same counters.
+
+    Deliberately the SAME shape: whichever path ran, the operator reads one report and
+    ta_cycle's postcheck reads one target table. The two lines the per-row path cannot produce
+    (chunking) are additive, and the two it can that this cannot (per-row anomaly list, sample
+    rows) are named as absent rather than silently dropped.
+    """
+    print("\n" + "=" * 66)
+    print("STAGE 9b - SUMMARY (set-based)")
+    print("=" * 66)
+    print(f"  rows examined:            {counts['examined']:,}")
+    print(f"  rows resolved (position): {counts['resolved']:,}")
+    print(f"    is_first_author=true:   {counts['is_first_true']:,}")
+    print(f"    is_senior_author=true:  {counts['is_senior_true']:,}")
+    print(f"    middle (both false):    {counts['middle']:,}")
+    print(f"  null-position (unresolved): {counts['null_position']:,}  "
+          f"(no matching author entry, or authorships JSON absent)")
+    print(f"  chunks executed:          {counts['chunks']:,}"
+          + (f"  ({counts['splits']} adaptive split(s))" if counts["splits"] else "  (no splits needed)"))
+    print("  NOTE: the per-row path's anomaly list and validation samples are not produced by")
+    print("        this path -- the winner is chosen inside the DISTINCT ON, not in Python.")
+    if execute:
+        pos_note = ("" if author_position_mode == "skip"
+                    else f", author_position written as {author_position_mode}")
+        print(f"\n  UPDATES: {counts['resolved']:,} rows updated{pos_note}")
+    else:
+        print(f"\n  *** DRY-RUN: no writes. Would update {counts['resolved']:,} rows. ***")
+    print(f"\n  Wall time: {time.time() - t0:.1f}s")
+
+
+def choose_write_path(
+    requested: str, examined: Optional[int], author_position_mode: str,
+) -> Tuple[str, str]:
+    """(path, reason). AUTOMATIC ON SIZE, with an explicit override -- and the reasoning:
+
+    The set-based path is strictly faster at every size, so 'always use it' was tempting. It is
+    NOT the default unconditionally for two reasons that are about capability, not speed:
+
+      1. It needs DATABASE_URL and psycopg. The per-row path needs only SUPABASE_URL/KEY. A
+         machine or CI job that has one and not the other must still be able to run the stage.
+      2. --author-position-mode label writes a STRING to author_position. The live column is
+         INTEGER (measured), so label mode is already the wrong instrument; rather than
+         silently reinterpret it, the set-based path declines it and says so.
+
+    The 583-row weekly case takes 29 seconds on the per-row path. That is not worth the risk of
+    a rewrite it does not need, which is why the switch is on SIZE and the small case is left
+    exactly as it was.
+    """
+    if requested == "row":
+        return "row", "--write-mode row"
+    if author_position_mode == "label":
+        return "row", ("--author-position-mode label writes a string; the set-based path "
+                       "handles skip and index only")
+    if not os.getenv("DATABASE_URL"):
+        return "row", "DATABASE_URL not set (the set-based path needs a direct connection)"
+    if requested == "set":
+        return "set", "--write-mode set"
+    if examined is not None and examined < SET_BASED_MIN_ROWS:
+        return "row", (f"{examined:,} target rows < {SET_BASED_MIN_ROWS:,}; the per-row path "
+                       f"costs seconds at this size")
+    return "set", (f"{examined:,} target rows >= {SET_BASED_MIN_ROWS:,}"
+                   if examined is not None else "work-set size unknown")
+
+
 def get_table_name(base: str, target_version: str) -> str:
     return f"{base}_v2" if target_version == "v2" else base
 
@@ -318,6 +613,13 @@ def parse_args() -> argparse.Namespace:
                    help="What to write to author_position: label (string, needs TEXT col; default), "
                         "index (0-based int, for INTEGER col), or skip (booleans only). Booleans "
                         "always written regardless.")
+    p.add_argument("--write-mode", choices=["auto", "set", "row"], default="auto",
+                   help="auto (default): set-based SQL when the work-set is large and "
+                        f"the mode allows it (>= {SET_BASED_MIN_ROWS:,} rows, "
+                        "--author-position-mode skip|index, DATABASE_URL present); "
+                        "otherwise the original per-row PostgREST path. 'set'/'row' "
+                        "force one. The per-row path measured 13 rows/s -- 13.3h on the "
+                        "2026-08-25 CRC build.")
     p.add_argument("--target-version", choices=["v1", "v2"], default="v2", help="Schema version (default v2).")
     return p.parse_args()
 
@@ -345,6 +647,27 @@ def main() -> None:
               "requires publication_authors_v2.author_position to be TEXT. If the LIVE column is "
               "INTEGER (per the phase1_addendum_3 correction), use --author-position-mode index "
               "(or skip). The is_first_author/is_senior_author booleans are written either way.")
+
+    # PATH CHOICE BEFORE THE EXPENSIVE READ. fetch_target_rows + fetch_pub_authorships is the
+    # phase that produced NO writes for the first ~90 minutes of the CRC run (1,473 chunked
+    # reads at IN_CHUNK_SIZE=100, then authorships JSON for 119,309 pubs). The set-based path
+    # does none of it -- the join happens in Postgres -- so the decision must happen here,
+    # before that cost is paid, not after.
+    cheap_examined = (count_target_rows_cheap(pub_ids, hcp_ids)
+                      if args.write_mode != "row" and os.getenv("DATABASE_URL") else None)
+    path, why = choose_write_path(args.write_mode, cheap_examined, args.author_position_mode)
+    print(f"\nWrite path: {path.upper()}  ({why})")
+
+    if path == "set":
+        counts_sb = run_set_based_update(pub_ids, hcp_ids, args.author_position_mode, execute)
+        report_set_based(counts_sb, execute, args.author_position_mode, t0)
+        # ALL-FAILED RULE -- same predicate as the per-row path, so the postcheck and the exit
+        # rule behave identically whichever path ran.
+        if counts_sb["examined"] and not counts_sb["resolved"]:
+            print(f"\n[FAIL] 0 of {counts_sb['examined']:,} examined rows resolved to a "
+                  f"position ({counts_sb['null_position']:,} null).", file=sys.stderr)
+            raise SystemExit(1)
+        return
 
     print("\nFetching target publication_authors_v2 rows...")
     target = fetch_target_rows(client, pa_table, pub_ids, hcp_ids)
@@ -452,6 +775,16 @@ def main() -> None:
         print(f"\n  *** DRY-RUN: no writes. Would update {len(planned):,} rows' booleans and "
               f"{would_pos:,} author_position value(s). ***")
     print(f"\n  Wall time: {time.time() - t0:.1f}s")
+
+    # ALL-FAILED RULE. `examined` and `resolved` were already counted and printed; nothing
+    # consulted them. attempted = examined, succeeded = resolved. null_position alone is NOT a
+    # failure -- a pub with no authorships JSON legitimately leaves the position NULL -- so only
+    # "every row we examined resolved to nothing" is unambiguous. Not a partial threshold: what
+    # share of nulls is acceptable varies with how much of the batch OpenAlex has enriched.
+    if counts["examined"] and not counts["resolved"]:
+        print(f"\n[FAIL] 0 of {counts['examined']:,} examined rows resolved to a position "
+              f"({counts['null_position']:,} null).", file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

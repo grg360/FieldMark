@@ -103,6 +103,25 @@ def fetch_ad_drug_aliases(client: Client, ta_id: str) -> List[Tuple[str, str, bo
     Returns list of (normalized_alias, display_drug_name, brand_only).
     brand_only=True means match this alias only (tacrolimus/Protopic exception).
     """
+    # PRIMARY-ONLY, AND THE GATE IS CORRECT HERE (semantic recorded 2026-08-28).
+    #
+    # ta_drug_keywords.is_primary_signal means:
+    #   primary   - a payment for this drug may INDEPENDENTLY establish TA engagement
+    #   secondary - contributes only AFTER TA relevance is established elsewhere
+    #
+    # This script starts from community_practitioners, an NPPES-derived directory of
+    # community dermatologists. It has NO independent evidence of AD engagement for these
+    # NPIs -- no publication record, no hcp_therapeutic_areas_v2 membership, no board
+    # position. The drug payment IS the evidence. So only a PRIMARY drug can carry that
+    # weight on its own, and admitting secondary drugs here would let a cross-indication
+    # payment manufacture a TA relevance that nothing else supports.
+    #
+    # THE SIBLING AGGREGATOR DELIBERATELY DOES NOT GATE, and that is not an inconsistency:
+    # open_payments_aggregator INNER JOINs hcp_therapeutic_areas_v2 before the drug match,
+    # so every HCP reaching its drug join has already satisfied "established elsewhere" --
+    # exactly the precondition under which the semantic admits secondary drugs. Two correct
+    # applications of one rule to two different evidentiary situations. See the matching
+    # comment at that script's INNER JOIN before changing either.
     rows = (
         client.table("ta_drug_keywords")
         .select("drug_brand_name,drug_generic_name")

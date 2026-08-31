@@ -376,7 +376,8 @@ def run_pass_2(
     batch_size: int,
     dry_run: bool,
     resume: bool,
-) -> None:
+) -> tuple:
+    """Returns (attempted, assigned) for the all-failed rule in main()."""
     canonicals = load_canonicals(sb, ta_upper)
     if not canonicals:
         raise RuntimeError("No canonical buckets found. Run pass 1 first.")
@@ -384,7 +385,7 @@ def run_pass_2(
     all_themes = fetch_all_themes(ta_upper, exclude_assigned=resume)
     if not all_themes:
         print("No raw themes to assign.")
-        return
+        return 0, 0   # nothing attempted -- a --resume no-op is not a failure
 
     print(
         f"Pass 2: assigning {len(all_themes)} raw themes to "
@@ -500,7 +501,7 @@ def run_pass_2(
             f"Dry run complete. Would assign {len(assignments)}, "
             f"flag {len(no_fit)} as no-fit."
         )
-        return
+        return 0, 0   # dry run writes nothing; nothing to judge
 
     for assignment in assignments:
         sb.table("theme_to_canonical_v1").upsert(
@@ -515,6 +516,7 @@ def run_pass_2(
     print(
         f"Flagged {len(no_fit)} as no-fit — see {no_fit_path} for manual review."
     )
+    return len(all_themes), len(assignments)
 
 
 @click.command()
@@ -565,7 +567,20 @@ def main(
     if pass_num in ("1", "all"):
         run_pass_1(client, sb, ta_upper, pass_1_sample_size, dry_run)
     if pass_num in ("2", "all"):
-        run_pass_2(client, sb, ta_upper, pass_2_batch_size, dry_run, resume)
+        attempted, assigned = run_pass_2(
+            client, sb, ta_upper, pass_2_batch_size, dry_run, resume
+        )
+        # ALL-FAILED RULE. attempted = raw themes pass 2 set out to bucket, succeeded = themes
+        # assigned to a canonical. no_fit is NOT counted as failure -- a theme that fits no
+        # bucket is a real answer this script is designed to record. Only "we had themes and
+        # assigned none of them" is unambiguous, which is what a run where every batch errored
+        # looks like. A --resume run with nothing left returns (0, 0) and stays quiet.
+        if attempted and not assigned:
+            click.echo(
+                f"[FAIL] 0 of {attempted} raw themes assigned to a canonical bucket.",
+                err=True,
+            )
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

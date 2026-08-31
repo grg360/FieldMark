@@ -1,7 +1,7 @@
 """
 validate_ta_neutrality.py
 
-Phase 0 of docs/TA_NEUTRAL_DB_LAYER.md. Reads the LIVE catalog and reports every place the
+Phase 0 of docs/canonical/TA_NEUTRAL_DB_LAYER.md. Reads the LIVE catalog and reports every place the
 database is welded to one therapeutic area.
 
 WHY THE LIVE CATALOG AND NOT THE REPO. migrations/2026_08_04_community_ledger_tiered.sql

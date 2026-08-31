@@ -6,8 +6,8 @@ boards; this produces the surfaces a demo actually shows — research themes, ca
 buckets, collaborators, scientific positions, position synthesis, payment rollups, community
 scores, and narratives.
 
-Design: docs/GENERATE_CYCLE_DESIGN.md (2026-08-25).
-Companions: docs/TA_GENERATION_LAYER.md, docs/ORCHESTRATOR_DEBT.md.
+Design: docs/canonical/GENERATE_CYCLE_DESIGN.md (2026-08-25).
+Companions: docs/canonical/TA_GENERATION_LAYER.md, docs/canonical/ORCHESTRATOR_DEBT.md.
 
 PURE ORCHESTRATION. No scoring or generation logic lives here. Every stage is an existing script
 invoked by subprocess. What this file owns is the things phase 1 got wrong and paid for: key
@@ -79,7 +79,7 @@ LOG_DIR_NAME = "logs"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# THE RESOLUTION TRAP  (docs/GENERATE_CYCLE_DESIGN.md § "slug / name / id")
+# THE RESOLUTION TRAP  (docs/canonical/GENERATE_CYCLE_DESIGN.md § "slug / name / id")
 #
 # The generation layer keys therapeutic area THREE ways, and one column is internally
 # inconsistent. hcp_ai_overviews holds 'NSCLC' for one TA and 'atopic-dermatitis' for another --
@@ -906,8 +906,23 @@ def cmd_g7(ta, execute):
 
 
 def cmd_g8(ta, execute):
+    # --yes IS REQUIRED, NOT OPTIONAL (2026-08-29). generate_narratives_v2:2710 gates its
+    # writes behind an interactive input("Proceed with generation?"). Its own comment says the
+    # flag is "required when this runs as reingest stage 13 -- the orchestrator gives children
+    # stdin=DEVNULL, so input() would block/EOF". generate_cycle was written without it, so
+    # every G8 run died at that prompt: EOF -> exception -> main() returns 1 -> stage recorded
+    # as failed with no narratives written. CRC had ZERO narratives for exactly this reason,
+    # and the printed "140 rising / 200 established / 18 community" that looked like a result
+    # was the cost ESTIMATE, printed before the prompt.
+    #
+    # Suppressing the child's confirmation is correct here because THIS orchestrator already
+    # owns the spend gate, more strictly than the child does: --allow-billed defaults off, a
+    # non-TTY billed run additionally requires --yes, a 1-token pre-flight probe checks for a
+    # spend wall before the first billed stage, and the measured cost floor is printed for
+    # every billed stage. A second prompt inside the child adds no protection and, under the
+    # tee in run_stage, cannot be answered reliably.
     c = _py("scripts/narrative/generate_narratives_v2.py") + [
-        "--ta", ta.slug, "--target-version", "v2", "--established-top", "200",
+        "--ta", ta.slug, "--target-version", "v2", "--established-top", "200", "--yes",
     ]
     return c if execute else c + ["--dry-run"]
 

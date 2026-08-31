@@ -162,7 +162,7 @@ def compute_percentile_ranks(raw_scores: list[float]) -> list[float]:
     n = len(raw_scores)
     indexed = sorted(enumerate(raw_scores), key=lambda item: item[1], reverse=True)
     ranks = [0.0] * n
-    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/canonical/PERCENTILE_CONVENTION.md.
     # Weibull plotting position: 100 * (n + 1 - rank) / (n + 1), which for this
     # 0-indexed descending loop is 100 * (n - position) / (n + 1).
     #

@@ -67,6 +67,14 @@ class EnrichmentStats:
     failed: int = 0
     partial: int = 0
     skipped: int = 0
+    #: BATCHED PATH ONLY. Clusters left unwritten because at least one author id never got a
+    #: trustworthy answer. Distinct from `partial`, which the singleton path uses for clusters
+    #: it wrote anyway from an incomplete fetch -- see the write contract in run_pipeline.
+    unresolved_clusters: int = 0
+    author_ids_total: int = 0
+    author_ids_not_found: int = 0
+    author_ids_unresolved: int = 0
+    requests_made: int = 0
 
 
 @dataclass
@@ -105,6 +113,68 @@ def extract_openalex_short_id(value: str) -> str:
     v = str(value).strip()
     m = re.search(r"(A\d+)$", v)
     return m.group(1) if m else v
+
+
+# ============================================================
+# Batched author fetch -- REUSED from stage 8b, not reimplemented
+# ============================================================
+#
+# 8a had the same shape 8b had before 2026-08-25: one GET /authors/{id} per author id, plus a
+# fixed SLEEP_SECONDS = 0.05 per HCP. Measured 4.2 HCP/s over 92,638 clusters = ~5h51m on the
+# CRC first build, against 69 candidates in 64s weekly -- a 1,343x work-set multiple against
+# code whose shape was chosen when the input was a few hundred rows.
+#
+# The list form /authors?filter=openalex_id:A1|A2|... collapses 50 authors into one request.
+# Every hard-won detail of that path already exists in openalex_author_enrichment: the per-page
+# trap (per-page MUST be >= the id count or a 200 silently truncates), the
+# meta.count/len(results) assertion that catches it, split-and-retry so one bad id or one
+# transient 504 cannot condemn its 49 neighbours, and Retry-After honouring. Importing it is
+# the point -- a second implementation would be a second place for the per-page trap to be
+# rediscovered the hard way.
+_ENRICH_DIR = os.path.dirname(os.path.abspath(__file__))
+if _ENRICH_DIR not in sys.path:
+    sys.path.insert(0, _ENRICH_DIR)
+from openalex_author_enrichment import (  # noqa: E402
+    AUTHOR_CHUNK_SIZE,
+    author_id_to_slug,
+    resolve_author_ids,
+)
+
+
+def resolve_clusters_batched(
+    candidates: Sequence["CandidateHCP"], api_key: str, mailto: str,
+) -> Tuple[Dict[str, Dict[str, Any]], Set[str], Set[str]]:
+    """Resolve every author id across every cluster, in AUTHOR_CHUNK_SIZE-sized list requests.
+
+    Returns (payload_by_short_id, not_found, unresolved) with 8b's three-way meaning:
+      payload_by_short_id : present in a 200 response
+      not_found           : PROVEN absent from a 200 response -- a real answer
+      unresolved          : never got a trustworthy answer -- says nothing about the id
+
+    Ids are DEDUPED across clusters first. An author id shared by two HCPs was previously
+    fetched twice; here it is fetched once.
+    """
+    all_ids: List[str] = sorted({
+        author_id_to_slug(a) for c in candidates for a in c.author_ids if a
+    })
+    payloads: Dict[str, Dict[str, Any]] = {}
+    not_found: Set[str] = set()
+    unresolved: Set[str] = set()
+    total_chunks = (len(all_ids) + AUTHOR_CHUNK_SIZE - 1) // AUTHOR_CHUNK_SIZE
+    print(f"Resolving {len(all_ids):,} distinct author id(s) in {total_chunks:,} batched "
+          f"request(s) of <={AUTHOR_CHUNK_SIZE}...", flush=True)
+
+    for i in range(0, len(all_ids), AUTHOR_CHUNK_SIZE):
+        chunk = all_ids[i : i + AUTHOR_CHUNK_SIZE]
+        got, nf, unres, _rate = resolve_author_ids(chunk, api_key, mailto)
+        payloads.update(got)
+        not_found |= nf
+        unresolved |= unres
+        done = min(i + AUTHOR_CHUNK_SIZE, len(all_ids))
+        if (i // AUTHOR_CHUNK_SIZE) % 20 == 0 or done == len(all_ids):
+            print(f"  [{done:,}/{len(all_ids):,}] resolved={len(payloads):,} "
+                  f"not_found={len(not_found):,} unresolved={len(unresolved):,}", flush=True)
+    return payloads, not_found, unresolved
 
 
 def fetch_openalex_author(
@@ -385,6 +455,9 @@ def run_pipeline(args: argparse.Namespace) -> EnrichmentStats:
 
     start_time = time.time()
 
+    if args.fetch_mode == "batched":
+        return run_pipeline_batched(args, supabase, candidates, stats, polite_mailto, start_time)
+
     for idx, cand in enumerate(tqdm(candidates, desc="enriching careers (clusters)", unit="hcp"), start=1):
         if not cand.author_ids:
             stats.no_cluster += 1
@@ -447,6 +520,91 @@ def run_pipeline(args: argparse.Namespace) -> EnrichmentStats:
     return stats
 
 
+def run_pipeline_batched(
+    args: argparse.Namespace,
+    supabase: Client,
+    candidates: Sequence[CandidateHCP],
+    stats: EnrichmentStats,
+    polite_mailto: str,
+    start_time: float,
+) -> EnrichmentStats:
+    """Resolve every author id first, then aggregate per cluster from the resolved map.
+
+    THE WRITE CONTRACT, carried over from 8b and TIGHTENED for the cluster shape.
+
+    8b's rule is per-id: an id we did not get a trustworthy answer about gets no row. Here the
+    unit written is a CLUSTER AGGREGATE -- SUM(works_count), MIN(first year) -- so one missing
+    id does not merely leave a gap, it silently UNDERSTATES total_career_pubs for that HCP.
+    The three-way outcome maps onto that as:
+
+      resolved    -> contributes its payload
+      not_found   -> PROVEN absent from a 200. A real answer: the id contributes nothing and
+                     the cluster is still written. (An id OpenAlex has deleted or merged away
+                     genuinely has no works to add.)
+      unresolved  -> no trustworthy answer. The WHOLE CLUSTER is left unwritten and counted,
+                     for the next --resume to pick up.
+
+    That last line is a deliberate BEHAVIOUR CHANGE from the singleton path, which counted such
+    clusters as `partial` and wrote the under-counted aggregate anyway. Writing a wrong
+    total_career_pubs is worse than writing nothing, and TOTAL_CAREER_PUBS.md already records
+    that column as unreliable partly because of writes like these.
+    """
+    api_key = os.getenv("OPENALEX_API_KEY", "")
+    payloads, not_found, unresolved = resolve_clusters_batched(
+        candidates, api_key, polite_mailto
+    )
+    stats.author_ids_total = len({author_id_to_slug(a) for c in candidates for a in c.author_ids if a})
+    stats.author_ids_not_found = len(not_found)
+    stats.author_ids_unresolved = len(unresolved)
+    stats.requests_made = (stats.author_ids_total + AUTHOR_CHUNK_SIZE - 1) // AUTHOR_CHUNK_SIZE
+
+    for idx, cand in enumerate(candidates, start=1):
+        if not cand.author_ids:
+            stats.no_cluster += 1
+            stats.skipped += 1
+            stats.processed += 1
+            continue
+
+        slugs = [author_id_to_slug(a) for a in cand.author_ids if a]
+        blocked = [x for x in slugs if x in unresolved]
+        if blocked:
+            stats.unresolved_clusters += 1
+            stats.processed += 1
+            eprint(f"[hcp {cand.hcp_id}] {len(blocked)}/{len(slugs)} author id(s) unresolved; "
+                   f"cluster NOT written (re-run to retry)")
+            continue
+
+        fetched = [payloads[x] for x in slugs if x in payloads]
+        if not fetched:
+            # Every id in the cluster was PROVEN absent. That is an answer, not a failure to
+            # get one -- but there is nothing to aggregate, so nothing is written.
+            stats.failed += 1
+            stats.processed += 1
+            eprint(f"[hcp {cand.hcp_id}] all {len(slugs)} author id(s) not found in OpenAlex")
+            continue
+
+        new_total, new_first_year = aggregate_cluster_stats(fetched)
+
+        if args.dry_run:
+            print(f"[dry-run] hcp_id={cand.hcp_id} authors={len(slugs)} fetched={len(fetched)} "
+                  f"old_total_career_pubs={cand.total_career_pubs} -> "
+                  f"new_total_career_pubs={new_total} first_pub_year={new_first_year}",
+                  flush=True)
+            stats.updated += 1
+        else:
+            try:
+                update_hcp_career_fields(supabase, cand.hcp_id, new_total, new_first_year,
+                                         target_version=args.target_version)
+                stats.updated += 1
+            except RuntimeError as exc:
+                eprint(str(exc))
+                stats.failed += 1
+        stats.processed += 1
+        if idx % PROGRESS_EVERY == 0:
+            _print_progress(idx, stats, start_time)
+    return stats
+
+
 def _print_progress(idx: int, stats: EnrichmentStats, start_time: float) -> None:
     elapsed = time.time() - start_time
     rate = stats.processed / elapsed if elapsed > 0 else 0.0
@@ -488,6 +646,18 @@ def parse_args() -> argparse.Namespace:
         help="File with HCP UUIDs (one per line); only process those IDs.",
     )
     parser.add_argument(
+        "--fetch-mode",
+        choices=["batched", "singleton"],
+        default="batched",
+        help=("batched (default): resolve authors ~%d at a time via "
+              "/authors?filter=openalex_id:A1|A2|... -- a BILLED List operation "
+              "($0.0001/request, so cents for a whole build) that collapses ~1,343x of HTTP "
+              "round-trips. singleton: the original free GET /authors/{id} per author id, "
+              "kept for a run with no api_key and for comparison. See the write-contract note "
+              "in run_pipeline_batched -- the two paths differ on partial clusters."
+              % AUTHOR_CHUNK_SIZE),
+    )
+    parser.add_argument(
         "--only-changed-today",
         action="store_true",
         help="Only HCPs with hcp_openalex_authors rows created today (UTC).",
@@ -524,14 +694,26 @@ def main() -> int:
     print(f"Processed: {stats.processed}", flush=True)
     print(f"Updated: {stats.updated}", flush=True)
     print(f"No cluster (no hcp_openalex_authors rows): {stats.no_cluster}", flush=True)
-    print(f"Failed (all author fetches failed): {stats.failed}", flush=True)
-    print(f"Partial (some author fetches failed but proceeded): {stats.partial}", flush=True)
+    print(f"Failed (all author fetches failed / all ids not found): {stats.failed}", flush=True)
+    if args.fetch_mode == "batched":
+        print(f"Unresolved clusters (NOT written, retry next run): "
+              f"{stats.unresolved_clusters}", flush=True)
+        print(f"Author ids: {stats.author_ids_total:,} distinct | "
+              f"not_found {stats.author_ids_not_found:,} | "
+              f"unresolved {stats.author_ids_unresolved:,}", flush=True)
+        print(f"OpenAlex list requests: {stats.requests_made:,} "
+              f"(~{stats.requests_made * 0.0001:.2f} USD at $0.0001/request)", flush=True)
+    else:
+        print(f"Partial (some author fetches failed but proceeded): {stats.partial}", flush=True)
     print(f"Wall time: {wall:.1f}s", flush=True)
 
     # ALL-FAILED RULE. This script already draws the line the rule needs: `failed` means the
     # item produced nothing, `partial` means it proceeded anyway -- so only `failed` counts
     # against success, and `partial` is deliberately ignored here. attempted EXCLUDES
     # no_cluster: an HCP with no hcp_openalex_authors rows was never attempted.
+    # attempted EXCLUDES no_cluster (never attempted) and unresolved_clusters (deliberately
+    # deferred, not failed) -- a run where every cluster was deferred by a transient API
+    # outage is a retry, not a failure.
     attempted = stats.updated + stats.failed
     if attempted and not stats.updated:
         eprint(f"[FAIL] 0 of {attempted} attempted HCPs enriched ({stats.failed} failed).")

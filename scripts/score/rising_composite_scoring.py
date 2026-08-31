@@ -24,7 +24,7 @@ Scopes mirror recompute_established_ranks_v3:
 
 Network percentile is re-derived within each scope using the shared convention
 100.0 * (n - position) / (n + 1) — the Weibull plotting position, see
-docs/PERCENTILE_CONVENTION.md. Missing network raw scores are excluded from
+docs/canonical/PERCENTILE_CONVENTION.md. Missing network raw scores are excluded from
 the composite via per-HCP weight renormalization (emergence-only when network absent).
 
 Usage:
@@ -157,7 +157,7 @@ def compute_percentiles_in_scope(values_dict):
     items = sorted(values_dict.items(), key=lambda kv: kv[1], reverse=True)
     n = len(items)
     out = {}
-    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/canonical/PERCENTILE_CONVENTION.md.
     # Weibull plotting position: 100 * (n + 1 - rank) / (n + 1), which for this
     # 0-indexed descending loop is 100 * (n - position) / (n + 1).
     #

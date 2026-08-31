@@ -169,7 +169,7 @@ SCRIPTS: Dict[str, str] = {
     "ta_neutrality": "scripts/utilities/validate_ta_neutrality.py",  # 0: preflight, read-only catalog scan
 }
 
-# STAGE 0 -- TA-NEUTRALITY PREFLIGHT. Phase 0 of docs/TA_NEUTRAL_DB_LAYER.md.
+# STAGE 0 -- TA-NEUTRALITY PREFLIGHT. Phase 0 of docs/canonical/TA_NEUTRAL_DB_LAYER.md.
 #
 # WHY IT LIVES HERE and not in a test or a pre-commit hook: this repo has no test suite, no
 # conftest.py, no .pre-commit-config.yaml and no CI. A rule whose enforcement needs CI stood

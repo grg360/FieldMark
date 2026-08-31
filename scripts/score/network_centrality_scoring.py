@@ -268,7 +268,7 @@ def compute_percentiles(scores_dict):
     items = sorted(scores_dict.items(), key=lambda kv: kv[1], reverse=True)
     n = len(items)
     out = {}
-    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/canonical/PERCENTILE_CONVENTION.md.
     # Weibull plotting position: 100 * (n + 1 - rank) / (n + 1), which for this
     # 0-indexed descending loop is 100 * (n - position) / (n + 1).
     #

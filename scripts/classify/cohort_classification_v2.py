@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import uuid
 from collections import Counter
 from dataclasses import dataclass
@@ -618,6 +619,16 @@ def main() -> None:
         print(f"\nUpserting {len(write_payload):,} rows into hcp_cohort_classification_v2 ...")
         written = upsert_classifications(client, write_payload, ta_id, dry_run=False)
         print(f"Upserted {written:,} rows into hcp_cohort_classification_v2")
+
+        # ALL-FAILED RULE. attempted = rows the classifier actually produced for this TA;
+        # succeeded = rows upserted. A TA with no members yields an empty payload and stays
+        # quiet. This stage gates community membership (hcp_cohort_classification_v2 is
+        # community_scoring's whole selector), so a silent zero here empties a downstream board
+        # rather than erroring.
+        if write_payload and not written:
+            print(f"[FAIL] 0 of {len(write_payload):,} classification rows upserted.",
+                  file=sys.stderr)
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

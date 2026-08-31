@@ -30,6 +30,7 @@ from collections import Counter, defaultdict
 from uuid import uuid4
 
 import click
+import sys
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import execute_values
@@ -378,6 +379,16 @@ def main(dry_run: bool, verbose: bool, batch_size: int, hcp_ids_file: str | None
         written = upsert_classifications(conn, upsert_rows, batch_size)
         print(f"\nWrote {written:,} rows to hcp_industry_classification_v1")
         print(f"Run ID: {run_id}")
+
+        # ALL-FAILED RULE. attempted = rows the classifier produced, succeeded = rows written.
+        # Cheap to guard and worth it: rising scoring INNER JOINs this table filtered to
+        # classification='ACADEMIC', so an HCP with no row is silently dropped from the board.
+        # An empty upsert_rows (no HCPs loaded) stays quiet.
+        if upsert_rows and not written:
+            print(f"[FAIL] 0 of {len(upsert_rows):,} industry classification rows written.",
+                  file=sys.stderr)
+            conn.close()
+            raise SystemExit(1)
 
     conn.close()
 

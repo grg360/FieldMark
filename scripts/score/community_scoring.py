@@ -45,6 +45,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import sys
 import uuid
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -486,6 +487,16 @@ def main() -> None:
         f"\nScored {len(rows_to_write):,} (hcp, TA) pairs from {len(pairs):,} "
         f"community taxonomy pairs across {len(community_ids):,} HCPs."
     )
+
+    # ALL-FAILED RULE. attempted = rows the scorer produced, succeeded = rows upserted.
+    # Skipped on --dry-run, which writes nothing by design. A TA with no community members
+    # yields an empty rows_to_write and stays quiet. This matters more than most: the
+    # community board and the NSCLC evidence-tier view read hcp_community_scores_v2 directly,
+    # so a silent zero here empties a surface rather than erroring.
+    if not dry_run and rows_to_write and not written:
+        print(f"[FAIL] 0 of {len(rows_to_write):,} community score rows upserted.",
+              file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

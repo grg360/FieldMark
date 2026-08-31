@@ -164,7 +164,7 @@ def fetch_input_signals(conn, ta_id: str, vis_window: str = 'recent_roll') -> li
             -- The clause solved a DATA-SOURCE problem and created a COHORT-OVERLAP
             -- problem as a side effect: 203 of NSCLC's 336 members were also
             -- classified established, and 34 of those held an established narrative
-            -- alongside a rising one. docs/fieldmark-methodology-page.md promises
+            -- alongside a rising one. docs/canonical/fieldmark-methodology-page.md promises
             -- customers "three mutually exclusive cohorts"; while the clause stood,
             -- that sentence was false. Rising now means what the taxonomy says it
             -- means: career age 3-10 with the TA publication floor.
@@ -207,7 +207,7 @@ def compute_percentile_ranks(hcp_ids: list[str], values: dict[str, float]) -> di
     n = len(hcp_ids)
     ordered_values = [values[hcp_id] for hcp_id in hcp_ids]
     ranks = rankdata(ordered_values, method="average")
-    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/canonical/PERCENTILE_CONVENTION.md.
     # Weibull plotting position. rankdata gives 1 = lowest, so ascending rank r maps
     # to 100 * r / (n + 1); the highest value (r = n) lands at 100n/(n+1), the lowest
     # at 100/(n+1).
@@ -292,7 +292,7 @@ def build_results(rows: list[dict]) -> list[dict]:
     # The mixture PREDATES this change and is NOT fixed here, deliberately: aligning
     # the momentum pipelines to the rising cohort would re-scope four scorers and
     # every board that reads them. It is recorded so the gap is not rediscovered as
-    # a surprise. See docs/RISING_EXCLUSIVE_GATE_DEBT.md.
+    # a surprise. See docs/canonical/RISING_EXCLUSIVE_GATE_DEBT.md.
     gated: list[dict] = []
     excluded_by_component = {"sci_mom": 0, "net_mom": 0, "sci_vis": 0, "net_vis": 0}
     for row in rows:

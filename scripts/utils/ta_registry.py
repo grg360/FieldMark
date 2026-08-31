@@ -45,7 +45,7 @@ from typing import Any, Dict, List, Optional, Tuple
 @dataclass(frozen=True)
 class TA:
     """The three forms a therapeutic area is keyed by. Carry all three; pass none as a bare
-    string. See docs/GENERATE_CYCLE_DESIGN.md on the slug/name/id resolution trap."""
+    string. See docs/canonical/GENERATE_CYCLE_DESIGN.md on the slug/name/id resolution trap."""
     id: str
     slug: str
     name: str

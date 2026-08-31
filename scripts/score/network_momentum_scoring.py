@@ -220,7 +220,7 @@ def compute_percentile_ranks(hcp_ids: list[str], values: dict[str, float]) -> di
     n = len(hcp_ids)
     ordered_values = [values[hcp_id] for hcp_id in hcp_ids]
     ranks = rankdata(ordered_values, method="average")
-    # PERCENTILE CONVENTION (2026-08-18) — see docs/PERCENTILE_CONVENTION.md.
+    # PERCENTILE CONVENTION (2026-08-18) — see docs/canonical/PERCENTILE_CONVENTION.md.
     # Weibull plotting position. rankdata gives 1 = lowest, so ascending rank r maps
     # to 100 * r / (n + 1); the highest value (r = n) lands at 100n/(n+1), the lowest
     # at 100/(n+1).

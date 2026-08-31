@@ -142,7 +142,13 @@ def fetch_all_pages(
 def fetch_ta_drug_keywords(client: Client) -> List[Dict[str, Any]]:
     return (
         client.table("ta_drug_keywords")
-        .select("id,therapeutic_area_id,drug_name,drug_brand_name,drug_generic_name")
+        # is_primary_signal added 2026-08-28 for the *_primary companion columns. It does
+        # NOT filter this fetch -- see the INNER JOIN comment in the by_ta query for why
+        # this aggregator counts secondary drugs and the community one does not.
+        .select(
+            "id,therapeutic_area_id,drug_name,drug_brand_name,drug_generic_name,"
+            "is_primary_signal"
+        )
         .execute()
         .data
         or []
@@ -353,12 +359,13 @@ if __name__ == "__main__":
           therapeutic_area_id VARCHAR,
           drug_name VARCHAR,
           drug_brand_name VARCHAR,
-          drug_generic_name VARCHAR
+          drug_generic_name VARCHAR,
+          is_primary_signal BOOLEAN
         )
         """
     )
     con.executemany(
-        "INSERT INTO drug_keywords VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO drug_keywords VALUES (?, ?, ?, ?, ?, ?)",
         [
             (
                 str(r.get("id") or ""),
@@ -366,6 +373,10 @@ if __name__ == "__main__":
                 str(r.get("drug_name") or ""),
                 str(r.get("drug_brand_name") or ""),
                 str(r.get("drug_generic_name") or ""),
+                # NULL is treated as secondary: the FILTER aggregates below count only rows
+                # that are explicitly primary, so an unset flag never inflates the primary
+                # figure. 103 of 105 live rows are true today, so this matters first for CRC.
+                bool(r.get("is_primary_signal")),
             )
             for r in ta_drug_keywords
         ],
@@ -473,8 +484,33 @@ if __name__ == "__main__":
       COUNT(DISTINCT fp.manufacturer_name) AS ta_distinct_companies_3yr,
       SUM(CASE WHEN fp.nature_of_payment IN ({speaker_list_sql}) THEN fp.payment_amount_usd ELSE 0 END) AS ta_speaker_bureau_3yr,
       SUM(CASE WHEN fp.nature_of_payment = 'Consulting Fee' THEN fp.payment_amount_usd ELSE 0 END) AS ta_consulting_3yr,
-      SUM(CASE WHEN fp.nature_of_payment = 'Honoraria' THEN fp.payment_amount_usd ELSE 0 END) AS ta_honoraria_3yr
+      SUM(CASE WHEN fp.nature_of_payment = 'Honoraria' THEN fp.payment_amount_usd ELSE 0 END) AS ta_honoraria_3yr,
+      -- PRIMARY-ONLY COMPANIONS (2026-08-28). Same shape as ta_hcpcs_codes' high_confidence
+      -- columns in migrations/2026_08_02_medicare_by_ta_recompute.sql:
+      --     sum(benes) FILTER (WHERE is_primary_signal) AS hc_benes
+      -- Totals above keep their existing meaning and every current consumer is unaffected;
+      -- these are additive and unread until something opts in. They exist so the CRC split
+      -- (~9 primary / 12 secondary, against 103/105 primary corpus-wide today) can be
+      -- MEASURED before anything is made to depend on it.
+      SUM(fp.payment_amount_usd) FILTER (WHERE dk.is_primary_signal) AS ta_payments_3yr_primary,
+      COUNT(*) FILTER (WHERE dk.is_primary_signal) AS ta_payments_count_3yr_primary,
+      COUNT(DISTINCT dk.keyword_id) FILTER (WHERE dk.is_primary_signal) AS ta_distinct_drugs_3yr_primary
     FROM filtered_payments fp
+    -- THIS JOIN IS WHY THIS AGGREGATOR DOES NOT GATE ON is_primary_signal.
+    --
+    -- The semantic: primary = a payment for this drug may INDEPENDENTLY establish TA
+    -- engagement; secondary = contributes only AFTER TA relevance is established elsewhere.
+    --
+    -- hcp_ta is hcp_therapeutic_areas_v2 -- TA membership established from the publication
+    -- record, independently of any payment. So every HCP that survives this INNER JOIN has
+    -- ALREADY met the "established elsewhere" precondition, which is precisely the case in
+    -- which the semantic says secondary drugs SHOULD count. Filtering to primary here would
+    -- discard the payments the definition admits.
+    --
+    -- aggregate_community_payments.py DOES gate, correctly: it starts from an NPPES-derived
+    -- directory with no publication record, so the payment is the only evidence and only a
+    -- primary drug can carry it alone. The asymmetry is deliberate. Do not "reconcile" the
+    -- two by making them match.
     INNER JOIN hcp_ta ht
       ON ht.hcp_id = fp.hcp_id
     INNER JOIN drug_keywords dk
@@ -500,6 +536,12 @@ if __name__ == "__main__":
             "ta_speaker_bureau_3yr": float(r.get("ta_speaker_bureau_3yr") or 0.0),
             "ta_consulting_3yr": float(r.get("ta_consulting_3yr") or 0.0),
             "ta_honoraria_3yr": float(r.get("ta_honoraria_3yr") or 0.0),
+            # Additive; requires migrations/2026_08_28_open_payments_primary_signal.sql.
+            # FILTER yields NULL (not 0) when an HCP has no primary-drug payments at all,
+            # so the `or 0.0` is load-bearing rather than defensive.
+            "ta_payments_3yr_primary": float(r.get("ta_payments_3yr_primary") or 0.0),
+            "ta_payments_count_3yr_primary": int(r.get("ta_payments_count_3yr_primary") or 0),
+            "ta_distinct_drugs_3yr_primary": int(r.get("ta_distinct_drugs_3yr_primary") or 0),
         }
         for r in by_ta_rows_raw
     ]

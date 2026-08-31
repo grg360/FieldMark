@@ -1,7 +1,7 @@
 """capture_percentiles.py -- before/after capture for the percentile convention change.
 
 Snapshots every percentile column written by the nine scorers listed in
-docs/PERCENTILE_CONVENTION.md, so the rescore can be verified rather than trusted.
+docs/canonical/PERCENTILE_CONVENTION.md, so the rescore can be verified rather than trusted.
 
 WHY A CAPTURE AND NOT A ROW-IMAGE RESTORE. These tables are DERIVED: the scorers are
 deterministic functions of the publication/payment/graph data beneath them, so the revert
