@@ -7,6 +7,7 @@ import { CANON } from "../lib/canonicalTokens";
 interface Props {
   themes: InstitutionResearchTheme[];
   institutionName: string;
+  /** Optional. When absent the subhead drops the TA word rather than guessing one. */
   taDisplayName?: string;
 }
 
@@ -15,6 +16,13 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
   const [expanded, setExpanded] = useState(false);
   const visibleThemes = expanded ? themes : themes.slice(0, 10);
   const hasMore = themes.length > 10;
+  // NO FALLBACK LABEL. This read `taDisplayName || "Lung Cancer"`, which named a REAL RIVAL
+  // TA whenever the prop was missing or empty - so a colorectal institution page announced
+  // "Most-published Lung Cancer topics", a sentence that is wrong and reads as authoritative.
+  // `||` not `??` made an empty string trip it too, which is the likelier miss: taDisplayName
+  // is derived, and a derivation that yields "" is exactly the case a `??` guard would pass
+  // through. An unnamed TA is honest; the wrong TA is not.
+  const taWord = (taDisplayName ?? "").trim();
 
   return (
     <div style={{ padding: "20px 24px", borderRadius: 8, border: "1px solid #1E1E22", backgroundColor: CANON.GROUND.BASE }}>
@@ -30,7 +38,9 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
         Top Research Themes
       </div>
       <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginBottom: 12 }}>
-        Most-published {taDisplayName || "Lung Cancer"} topics at {institutionName}
+        {taWord
+          ? `Most-published ${taWord} topics at ${institutionName}`
+          : `Most-published topics at ${institutionName}`}
       </div>
 
       {themes.length === 0 ? (

@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
+import { COM_CONFIG } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { getCurrentUser } from "../../lib/authHelpers";
@@ -204,7 +205,7 @@ export default function PracticeFirstProfile() {
       {/* breadcrumb */}
       <div style={{ display: "flex", gap: 8, padding: "10px 28px", ...mono(10), letterSpacing: "0.1em", color: F.ghost2, borderBottom: `1px solid ${F.lineSub}` }}>
         <Link to="/me" style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Home</Link><span>/</span>
-        <Link to="/cohorts/ledger/community" style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Community</Link><span>/</span>
+        <Link to={`/cohorts/ledger/community${COM_CONFIG.pinnedTaSlug ? `?ta=${COM_CONFIG.pinnedTaSlug}` : ""}`} style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Community</Link><span>/</span>
         <span style={{ color: F.gray }}>{p.hcp.name}</span>
       </div>
 

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
 // Shared right-rail section styling. Header follows the design system's role-5 "eyebrow"
-// (see docs/FIELDMARK_DESIGN_SYSTEM.md §3): sans, 11/600, 0.18em, uppercase, --ink-4.
+// (see docs/canonical/FIELDMARK_DESIGN_SYSTEM.md §3): sans, 11/600, 0.18em, uppercase, --ink-4.
 // This is the single migration point for every rail section header (Identification, Top
 // Pharma, Contact & Access), so they all pick up the new type role at once.
 

@@ -313,6 +313,23 @@ export async function getEvidenceForTheme(positionIds: string[]): Promise<Eviden
  *   2. citation_count DESC (nulls last)
  *   3. confidence DESC
  *
+ * WHY SENIORITY OUTRANKS CITATIONS. Senior authorship is a stronger indicator of a scientist's
+ * core beliefs than first authorship. A senior author chooses the project's direction, shapes
+ * the central hypotheses, secures the funding the work must align with, and signs off on the
+ * final conclusions. A first author is often executing an idea handed down by a mentor — the
+ * work reflects a training phase rather than settled conviction, and may be adapted to a
+ * supervisor's viewpoint.
+ *
+ * So this surface orders by WHOSE BELIEFS THE PAPER REPRESENTS, not by impact. That is why a
+ * senior-authored paper can sort above a more-cited first-authored one, and it is a deliberate
+ * departure from the citation-first ordering used everywhere else in the product. Concretely,
+ * on Heymach the change moves his 650-citation first-author paper from positions 1-5 down to
+ * 10: the most-cited item on the profile is no longer the first thing a reader sees, because
+ * it is the least likely of his papers to represent his own settled view.
+ *
+ * If this surface is ever repurposed to rank by influence rather than by conviction, this
+ * comparator is the thing to change — not the interleave.
+ *
  * author_role IS USED DELIBERATELY, AND IT IS NOT A GUESS. It is written by
  * extract_scientific_positions.TOP_PAPERS_SQL as
  *   CASE WHEN is_senior_author THEN 'senior_author' ELSE 'first_author' END

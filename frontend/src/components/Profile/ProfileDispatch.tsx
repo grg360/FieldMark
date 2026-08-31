@@ -14,7 +14,7 @@
 //
 //      CONSEQUENCE, LOGGED NOT FIXED: RisingHcpProfile still renders an established
 //      rank as a SECTION for dual-board members. That path is now unreachable. Read
-//      docs/RISING_EXCLUSIVE_GATE_DEBT.md before deleting it — the section is also the
+//      docs/canonical/RISING_EXCLUSIVE_GATE_DEBT.md before deleting it — the section is also the
 //      layout slot the design authority reserves for it.
 //   2. ACADEMIC — membership of the ESTABLISHED board, via hcp_profile_spine().
 //   3. COMMUNITY — everyone else.
@@ -48,26 +48,62 @@ import HcpProfileBrief from "./HcpProfileBrief";
 import CommunityHcpProfile from "./CommunityHcpProfile";
 import RisingHcpProfile from "./RisingHcpProfile";
 import { CANON, FACE } from "../../lib/canonicalTokens";
+import { useProfileTa } from "../../lib/profileTa";
+import { taLabelForSlug } from "../../lib/taLabels";
+import { COM_CONFIG } from "../../lib/cohortLedger";
 
 export default function ProfileDispatch() {
   const { id } = useParams<{ id: string }>();
   const [route, setRoute] = useState<"rising" | "academic" | "community" | null>(null);
+  // ?ta= -> session -> the HCP's own primary TA. Optional by design; see lib/profileTa.ts for
+  // the measurement that makes a fallback safe here where the ledger needed a picker.
+  const ta = useProfileTa(id);
+  const taId = ta.status === "resolved" ? ta.taId : null;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !taId) return;
     let alive = true;
+    setRoute(null);
     (async () => {
-      const rising = await isOnRisingBoard(id);
+      const rising = await isOnRisingBoard(id, taId);
       if (!alive) return;
       if (rising) {
         setRoute("rising");
         return;
       }
-      const spine = await loadProfileSpine(id);
+      const spine = await loadProfileSpine(id, taId);
       if (alive) setRoute(spine);
     })();
     return () => { alive = false; };
-  }, [id]);
+  }, [id, taId]);
+
+  // The HCP belongs to no therapeutic area at all -- profileTa never substitutes one, so
+  // there is nothing to render a profile ABOUT. Named, not blank.
+  if (ta.status === "none") {
+    return (
+      <Absence
+        eyebrow="NO THERAPEUTIC AREA"
+        head="This person is not in any therapeutic area we hold."
+        body="A profile is always scoped to one area — the ranks, themes and narratives on it are per-area. With no area membership there is nothing to scope it to, so nothing is shown rather than an empty frame under a borrowed heading."
+      />
+    );
+  }
+
+  // COMMUNITY IS STILL NSCLC-ONLY (Phase 3). community_hcp_profile reads
+  // community_board_nsclc_v1 and hcp_nsclc_evidence_tier_v1, neither of which takes a TA, so
+  // rendering the community shell for another area would show LUNG evidence tiers under that
+  // area's name. An explicit absence is the honest alternative, and it is the same boundary
+  // the ledger draws for its Community cohort.
+  if (route === "community" && ta.status === "resolved"
+      && COM_CONFIG.pinnedTaSlug && ta.slug !== COM_CONFIG.pinnedTaSlug) {
+    return (
+      <Absence
+        eyebrow={`COMMUNITY PROFILE UNAVAILABLE · ${taLabelForSlug(ta.slug).toUpperCase()}`}
+        head={`The community profile is only built for ${taLabelForSlug(COM_CONFIG.pinnedTaSlug)} so far.`}
+        body={`This person is not on the ${taLabelForSlug(ta.slug)} established or rising board, so the community view is the one that applies — and it rests on an evidence ladder that is curated per area. ${taLabelForSlug(ta.slug)} has not been curated yet, so there is nothing to show. Their lung-cancer profile, if they have one, is at ?ta=${COM_CONFIG.pinnedTaSlug}.`}
+      />
+    );
+  }
 
   if (route === null) {
     return (
@@ -76,6 +112,21 @@ export default function ProfileDispatch() {
       </div>
     );
   }
-  if (route === "rising") return <RisingHcpProfile hcpId={id as string} />;
-  return route === "academic" ? <HcpProfileBrief /> : <CommunityHcpProfile />;
+  if (route === "rising") return <RisingHcpProfile hcpId={id as string} taId={taId as string} taSlug={ta.status === "resolved" ? ta.slug : ""} />;
+  return route === "academic"
+    ? <HcpProfileBrief taId={taId as string} taSlug={ta.status === "resolved" ? ta.slug : ""} />
+    : <CommunityHcpProfile />;
+}
+
+/** Shared frame for the two states where no profile can honestly be drawn. */
+function Absence({ eyebrow, head, body }: { eyebrow: string; head: string; body: string }) {
+  return (
+    <div style={{ background: CANON.GROUND.BASE, minHeight: "100vh", padding: "72px 28px" }}>
+      <div style={{ maxWidth: 620, margin: "0 auto" }}>
+        <div style={{ font: `500 9px ${FACE.data}`, letterSpacing: ".16em", color: CANON.INK.LABEL, marginBottom: 14 }}>{eyebrow}</div>
+        <div style={{ font: `400 21px ${FACE.value}`, color: CANON.INK.PRIME, marginBottom: 12, textWrap: "pretty" } as React.CSSProperties}>{head}</div>
+        <div style={{ font: `300 14px/1.65 ${FACE.value}`, color: CANON.INK.MUTE, textWrap: "pretty" } as React.CSSProperties}>{body}</div>
+      </div>
+    </div>
+  );
 }

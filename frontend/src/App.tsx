@@ -270,6 +270,14 @@ function FeedLayout({
     [route.taSlug, route.indicationSlug],
   );
   const isAdFeed = feedDataSlug === "atopic-dermatitis";
+  // The TA's DATA slug for this feed, or null when selectedTA is not a registered TA.
+  // taLabelToApiSlug used to default to "rare-disease" for anything it did not recognise, so
+  // an unknown TA rendered a complete, plausible rare-disease board under the wrong heading.
+  // It returns null now; the three fetch paths below refuse to query on null and the four
+  // TA-scoped panels render nothing, so an unknown TA shows an ABSENCE rather than a
+  // different TA's data. selectedTA comes from resolveFeedRoute, which only emits registered
+  // labels, so null is unreachable today -- these guards are what keep it unreachable.
+  const taApiSlug = taLabelToApiSlug(selectedTA);
   const [indicationCount, setIndicationCount] = useState<number | null>(
     route.indicationCount ?? HOME_INDICATION_COUNT,
   );
@@ -368,12 +376,12 @@ function FeedLayout({
       if (loadingAsRefresh) setRefreshingFeed(true);
       else setLoadingHCPs(true);
       setFeedOffset(0);
-      const taSlug = taLabelToApiSlug(selectedTA);
+      if (!taApiSlug) return;   // unknown TA: no query is better than another TA's board
       // AD RISING defaults to global scope (82% intl). Gated on the rising track so
       // AD Established/Community stay region/US (their RPCs still bail on global).
       const isAdRising = isAdFeed && track === "rising-stars";
       const filters = {
-        therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId,
+        therapeuticArea: taApiSlug, region, states, national, themeIds, taId: indicationTaId,
         ...(isAdRising ? { scope: "global" as const } : {}),
       };
       let data: CohortFeedResult | null = null;
@@ -426,12 +434,12 @@ function FeedLayout({
       setLoadingHCPs(true);
       setFeedOffset(0);
       setFeedTotal(0);
-      const taSlug = taLabelToApiSlug(selectedTA);
+      if (!taApiSlug) return;   // unknown TA: no query is better than another TA's board
       // AD RISING defaults to global scope (82% intl). Gated on the rising track so
       // AD Established/Community stay region/US (their RPCs still bail on global).
       const isAdRising = isAdFeed && track === "rising-stars";
       const filters = {
-        therapeuticArea: taSlug, region, states, national, themeIds, taId: indicationTaId,
+        therapeuticArea: taApiSlug, region, states, national, themeIds, taId: indicationTaId,
         ...(isAdRising ? { scope: "global" as const } : {}),
       };
       let data: CohortFeedResult | null = null;
@@ -469,12 +477,12 @@ function FeedLayout({
     if (!isCohortFeedTrack(track)) return;
     if (track === "community" && isAdFeed) return;
     const nextOffset = feedOffset + FEED_PAGE_SIZE;
-    const taSlug = taLabelToApiSlug(selectedTA);
+    if (!taApiSlug) return;   // unknown TA: no query is better than another TA's board
     // AD RISING defaults to global scope (82% intl). Gated on the rising track so
     // AD Established/Community stay region/US (their RPCs still bail on global).
     const isAdRising = isAdFeed && track === "rising-stars";
     const filters = {
-      therapeuticArea: taSlug, region, states, themeIds, taId: indicationTaId,
+      therapeuticArea: taApiSlug, region, states, themeIds, taId: indicationTaId,
       ...(isAdRising ? { scope: "global" as const } : {}),
     };
     setLoadingMore(true);
@@ -580,7 +588,7 @@ function FeedLayout({
 
       {/* DOL hero — cohort-feed data panel. Updated-label, subject title, and the
           Filters / territory / Landscape controls now live in PeopleNavStrip above. */}
-      {isCohortFeedTrack(track) && <DOLHeroPanel taSlug={taLabelToApiSlug(selectedTA)} />}
+      {isCohortFeedTrack(track) && taApiSlug ? <DOLHeroPanel taSlug={taApiSlug} /> : null}
 
       {/* FI feed track removed 2026-07-31: it rendered mockFieldIntelligencePosts on a
           URL-reachable route as though it were real field intelligence. The forum
@@ -643,8 +651,8 @@ function FeedLayout({
           <CommunityExplorer taLabel={selectedIndication} />
         ) : (
         <>
-        {route.indicationDataActive ? <InstitutionsInTerritoryPanel taSlug={taLabelToApiSlug(selectedTA)} taId={indicationTaId} /> : null}
-        <ActiveFilterPills taSlug={taLabelToApiSlug(selectedTA)} />
+        {route.indicationDataActive && taApiSlug ? <InstitutionsInTerritoryPanel taSlug={taApiSlug} taId={indicationTaId} /> : null}
+        {taApiSlug ? <ActiveFilterPills taSlug={taApiSlug} /> : null}
         <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
           {showInactiveIndicationEmpty ? (
             <div
@@ -754,11 +762,14 @@ function FeedLayout({
         )
       ) : null}
 
-      <FilterDrawer
-        open={filterDrawerOpen}
-        onClose={() => setFilterDrawerOpen(false)}
-        taSlug={taLabelToApiSlug(selectedTA)}
-      />
+      {/* No TA, nothing to filter -- the drawer's facets are all TA-scoped. */}
+      {taApiSlug ? (
+        <FilterDrawer
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          taSlug={taApiSlug}
+        />
+      ) : null}
 
       {/* Action Tray */}
         <ActionTray
@@ -898,7 +909,7 @@ export default function App() {
           {/* CUTOVER (stage 4): the primary HCP surface is now the two-spine profile.
               /hcp/:id renders ProfileDispatch; /hcp/:id/profile also resolves to it (kept
               so existing /profile links + bookmarks work). DetailScreen / HCPDetailRoute
-              were deleted 2026-08-05 (dead-code sweep, docs/design/DESIGN_SYSTEM_AUDIT.md
+              were deleted 2026-08-05 (dead-code sweep, docs/canonical/DESIGN_SYSTEM_AUDIT.md
               §5.16) — recover from git history if ever needed. */}
           <Route path="/hcp/:id" element={<ProfileDispatch />} />
           {/* FI feed track routes removed 2026-07-31 — the forum (/field-intelligence)

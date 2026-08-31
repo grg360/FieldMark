@@ -125,8 +125,8 @@ export interface RisingBoard {
   band_mix: { band: string; archetype: string | null; n: number }[];
 }
 
-export async function getRisingProfile(hcpId: string): Promise<RisingProfile | null> {
-  const { data, error } = await supabase.rpc("hcp_rising_profile", { p_hcp_id: hcpId });
+export async function getRisingProfile(hcpId: string, taId: string): Promise<RisingProfile | null> {
+  const { data, error } = await supabase.rpc("hcp_rising_profile_ta", { p_hcp_id: hcpId, p_ta_id: taId });
   if (error) throw new Error(`hcp_rising_profile failed: ${error.message}`);
   return (data as RisingProfile | null) ?? null;
 }
@@ -139,11 +139,17 @@ export async function getRisingBoard(): Promise<RisingBoard> {
 
 // Fast dispatch check: rising board membership wins the profile route. Reads the
 // ranks table directly (already anon-readable — the Landscape quadrant does).
-export async function isOnRisingBoard(hcpId: string): Promise<boolean> {
+export async function isOnRisingBoard(hcpId: string, taId: string): Promise<boolean> {
+  // TA PREDICATE ADDED 2026-08-31. Without it this asked "is this person on ANY rising board"
+  // and the answer was yes for a colorectal rising star -- so dispatch sent them to the rising
+  // shell, whose RPC was NSCLC-locked and returned nothing, and the shell rendered
+  // "this route should not have dispatched here". Dispatch was right; the shell could not see
+  // them. Both halves are fixed: this asks about ONE board, and the shell RPCs take p_ta_id.
   const { data, error } = await supabase
     .from("hcp_rising_star_ranks_v3")
     .select("hcp_id")
     .eq("hcp_id", hcpId)
+    .eq("therapeutic_area_id", taId)
     .limit(1);
   if (error) return false; // fail open to the existing spine, never block the profile
   return (data ?? []).length > 0;

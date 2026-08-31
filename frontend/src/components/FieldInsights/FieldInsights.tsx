@@ -136,7 +136,11 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
 
   if (notes.length === 0) {
     return (
-      <div style={sectionStyle}>
+      // Same ledger de-chroming as the populated branch below. This branch used bare
+      // sectionStyle, so on every ledger host the EMPTY state alone carried a 16px
+      // inset and a bottom rule the populated state does not -- nested inside the
+      // host's own bordered DEPTH.PANEL. Three frames where the design has one.
+      <div style={variant === "ledger" ? { ...sectionStyle, padding: 0, borderBottom: "none" } : sectionStyle}>
         <EmptyInsightsState firstName={firstName} onAddClick={handleAddClick} />
         {!isMobile && composerOpen ? (
           <div style={{ marginTop: 12 }}>
@@ -188,7 +192,13 @@ export default function FieldInsights({ hcp, variant, hideHeader }: Props) {
       {variant === "ledger" ? (
         // ledger capture affordance — the frame's "+ CAPTURE" bar (composer renders the
         // gold marker + serif prompt + SOURCE·TAG·LINK affordance in the ledger register).
-        <div style={{ borderBottom: `1px solid ${CANON.LINE.HAIR}`, background: CANON.GROUND.BASE }}>
+        // GROUND.INSET, not GROUND.BASE (2026-08-20). BASE is the APP CANVAS at L* 7;
+        // this bar sits inside the profile's DEPTH.PANEL (a gradient over RAISE, L* 11),
+        // so a canvas fill read as a hole punched two steps THROUGH the panel -- the
+        // near-black. INSET (L* 15) is the token for "inputs, wells, hover fill", which
+        // is what a capture bar is, and it sits one step ABOVE the panel: the direction
+        // a thing you click into should go.
+        <div style={{ borderBottom: `1px solid ${CANON.LINE.HAIR}`, background: CANON.GROUND.INSET }}>
           <InsightComposer userId={userId} hcpId={hcpId} firstName={firstName} isInline variant="ledger" onSave={handleSave} />
         </div>
       ) : !isMobile ? (

@@ -3,7 +3,7 @@
 // (:root) so the same values are reachable from both inline styles (this module,
 // the app's dominant convention) and CSS classes (var(--token)).
 //
-// Full rationale + usage rules: docs/FIELDMARK_DESIGN_SYSTEM.md.
+// Full rationale + usage rules: docs/canonical/FIELDMARK_DESIGN_SYSTEM.md.
 // Canonical theme: dark only.
 
 import type { CSSProperties } from "react";
@@ -13,7 +13,7 @@ import type { CSSProperties } from "react";
 // serif already rendered by 6 of 9 top-level surfaces (Pulse is the reference).
 // Approved knowing it re-fonts the remaining FONT.serif consumers (Institutions,
 // Congress, ThreadPage/forum chrome, HCPCard, Assets panels, PublicationCard) —
-// all on the reconcile/rebuild list. See docs/design/DESIGN_SYSTEM_AUDIT.md §6.
+// all on the reconcile/rebuild list. See docs/canonical/DESIGN_SYSTEM_AUDIT.md §6.
 export const FONT = {
   sans: "'IBM Plex Sans', system-ui, sans-serif",
   serif: "'Source Serif 4', Georgia, serif",

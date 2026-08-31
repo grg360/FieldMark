@@ -11,7 +11,7 @@ import { COLOR, FONT } from "../../lib/designTokens";
  * surfaces (--surface-card #151515, warm inks). They are left as-is: there is no
  * exact design token for them and force-mapping would visually drift the admin
  * page with no design reference. Flagged in the report as needing its own token
- * pass. See docs/FIELDMARK_DESIGN_SYSTEM.md.
+ * pass. See docs/canonical/FIELDMARK_DESIGN_SYSTEM.md.
  */
 
 export const PALETTE = {

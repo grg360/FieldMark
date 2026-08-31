@@ -104,8 +104,8 @@ export async function loadEvidenceTier(hcpId: string): Promise<NsclcEvidenceTier
   return (data as NsclcEvidenceTier | null) ?? null;
 }
 
-export async function loadProfileSpine(hcpId: string): Promise<"academic" | "community"> {
-  const { data, error } = await supabase.rpc("hcp_profile_spine", { p_hcp_id: hcpId });
+export async function loadProfileSpine(hcpId: string, taId: string): Promise<"academic" | "community"> {
+  const { data, error } = await supabase.rpc("hcp_profile_spine_ta", { p_hcp_id: hcpId, p_ta_id: taId });
   if (error || !data) return "community"; // safe fallback: the spine that renders without publications
   return data === "academic" ? "academic" : "community";
 }

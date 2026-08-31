@@ -130,9 +130,14 @@ export default function TheWeekPage() {
           .eq("user_id", user.id)
           .maybeSingle();
         const parentSlug = profile?.default_ta_slug ?? "oncology";
-        const indicationSlug = profile?.default_indication_slug ?? taLabelToApiSlug(taSlugToLabel(parentSlug));
+        // Same stored-slug case as HomePage: null rather than a substituted TA. resolvedTaId
+        // is already Optional here and every downstream reader handles undefined.
+        const parentLabel = taSlugToLabel(parentSlug);
+        const parentApiSlug = parentLabel ? taLabelToApiSlug(parentLabel) : null;
+        const indicationSlug = profile?.default_indication_slug ?? parentApiSlug;
         const resolvedTaId =
-          taIdForApiSlug(indicationSlug) ?? taIdForApiSlug(taLabelToApiSlug(taSlugToLabel(parentSlug)));
+          (indicationSlug ? taIdForApiSlug(indicationSlug) : undefined) ??
+          (parentApiSlug ? taIdForApiSlug(parentApiSlug) : undefined);
         if (!cancelled) setTaId(resolvedTaId);
 
         const people = await loadTrackedPeople(user.id);

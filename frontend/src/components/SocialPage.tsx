@@ -28,7 +28,12 @@ export default function SocialPage() {
   const params = useParams();
   const narrow = useMediaQuery("(max-width: 767px)");
   const taSlug = (params.ta ?? "oncology").toLowerCase();
-  const taLabel = taSlugToLabel(taSlug);
+  // Slug verbatim when unregistered. taSlugToLabel returns null now rather than substituting
+  // "Oncology" -- which on /social/cardiology printed "Capture has not started for Oncology",
+  // naming a TA the user had not asked for. Displaying the slug is the taLabels.ts convention:
+  // an unmapped thing should look unmapped. (Past the SOCIAL_CAPTURE_TAS guard below, both
+  // live slugs are in SURFACE_LABEL, so the fallback only ever reaches the not-captured copy.)
+  const taLabel = taSlugToLabel(taSlug) ?? taSlug;
   const [searchActive, setSearchActive] = useState(false);
 
   if (!SOCIAL_CAPTURE_TAS.has(taSlug)) {

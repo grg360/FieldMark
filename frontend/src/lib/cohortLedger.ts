@@ -83,7 +83,7 @@ export interface CohortConfig {
   // SET ONLY WHERE A COHORT IS STILL WELDED TO ONE TA. COM's RPC reads
   // community_board_nsclc_v1 and takes no p_ta_id, so the community ledger can only
   // answer for that TA until the evidence tier is generalised (Phase 3 of
-  // docs/TA_NEUTRAL_DB_LAYER.md). The ledger reads this to render an explicit absence
+  // docs/canonical/TA_NEUTRAL_DB_LAYER.md). The ledger reads this to render an explicit absence
   // for any other TA rather than silently serving lung rows under its name.
   // DELETE THE FIELD when COM takes p_ta_id -- its absence is how EST/RS say "any TA".
   pinnedTaSlug?: string;
@@ -968,7 +968,7 @@ export interface RosterCursor {
  *  no dup/skip. hasMore is true when a full page came back. */
 export async function loadLedgerPage(
   cfg: CohortConfig,
-  /** The TA to load. REQUIRED and not defaulted -- see docs/TA_NEUTRAL_DB_LAYER.md. Ignored
+  /** The TA to load. REQUIRED and not defaulted -- see docs/canonical/TA_NEUTRAL_DB_LAYER.md. Ignored
    *  only by COM, whose RPC has no p_ta_id until Phase 3. */
   taId: string,
   afterCursor: number | RosterCursor | undefined = 0,

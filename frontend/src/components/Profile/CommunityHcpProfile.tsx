@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
+import { COM_CONFIG } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -256,7 +257,7 @@ export default function CommunityHcpProfile() {
         <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>
           <span style={{ width: 3, height: 12, background: P.rose }} />
           <span style={{ color: P.rose }}>COMMUNITY</span><span>›</span>
-          <Link to="/cohorts/ledger/community" style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
+          <Link to={`/cohorts/ledger/community${COM_CONFIG.pinnedTaSlug ? `?ta=${COM_CONFIG.pinnedTaSlug}` : ""}`} style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
         </div>
 
         {/* header — frame 1a: three cells (identity+actions | PRACTICE SHAPE | COMMUNITY

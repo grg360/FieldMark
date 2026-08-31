@@ -134,7 +134,9 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, [untrackHint]);
   const [homeTaId, setHomeTaId] = useState<string | undefined>(undefined);
-  const [taSlug, setTaSlug] = useState<string>("nsclc");
+  // null until the profile resolves, and STAYS null if the profile's TA is unregistered.
+  // Consumers must not build a TA-scoped link out of nothing -- see the Institutions action.
+  const [taSlug, setTaSlug] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("there");
   const [loading, setLoading] = useState(true);
 
@@ -168,11 +170,22 @@ export default function HomePage() {
         if (cancelled) return;
         if (profile?.first_name) setFirstName(profile.first_name);
         const parentSlug = profile?.default_ta_slug ?? "oncology";
-        const indicationSlug = profile?.default_indication_slug ?? taLabelToApiSlug(taSlugToLabel(parentSlug));
-        const resolvedTaId = taIdForApiSlug(indicationSlug) ?? taIdForApiSlug(taLabelToApiSlug(taSlugToLabel(parentSlug)));
+        // default_ta_slug is a STORED value, so an unregistered slug is a real case -- a TA
+        // that was parked, renamed, or never shipped. taSlugToLabel/taLabelToApiSlug return
+        // null for one now instead of substituting Oncology/rare-disease, which is what used
+        // to give that user a complete NSCLC home page under their own TA's name.
+        const parentLabel = taSlugToLabel(parentSlug);
+        const parentApiSlug = parentLabel ? taLabelToApiSlug(parentLabel) : null;
+        const indicationSlug = profile?.default_indication_slug ?? parentApiSlug;
+        const resolvedTaId =
+          (indicationSlug ? taIdForApiSlug(indicationSlug) : undefined) ??
+          (parentApiSlug ? taIdForApiSlug(parentApiSlug) : undefined);
         setHomeTaId(resolvedTaId);
-        setTaSlug(indicationSlug || "nsclc");
-        setTA(parentSlug, indicationSlug);
+        // WAS `indicationSlug || "nsclc"`. That default sat one line downstream of the two
+        // this change removed and would have reinstated them: an unresolvable TA would have
+        // pointed the Institutions link at lung. Null leaves the link unbuilt instead.
+        setTaSlug(indicationSlug);
+        if (indicationSlug) setTA(parentSlug, indicationSlug);
 
         const [statsD, trackedIds, coverageD, territoryD, actionsD, overdueD, insightsD, briefsD, activityD, pinsD, chipsD] = await Promise.all([
           getOpenFollowUpStats(user.id),
@@ -252,7 +265,7 @@ export default function HomePage() {
   const go = {
     ledger: () => navigate("/cohorts/ledger"),
     followUps: () => navigate("/me/follow-ups"),
-    institutions: () => navigate(`/institutions/${taSlug}`),
+    institutions: () => { if (taSlug) navigate(`/institutions/${taSlug}`); },
     insights: () => navigate("/me/insights"),
     watchlists: () => navigate("/me/watchlists"),
   };

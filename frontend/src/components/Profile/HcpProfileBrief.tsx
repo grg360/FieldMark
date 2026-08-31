@@ -44,9 +44,13 @@ import { taLabelForSlug } from "../../lib/taLabels";
 // This surface is pinned to one therapeutic area. The SLUG is the pin — it is
 // the stable identity — and the display label is derived from it, never typed
 // out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
-const PROFILE_TA_SLUG = "nsclc";
+// TA COMES FROM DISPATCH NOW (2026-08-31). This was `const PROFILE_TA_SLUG = "nsclc"`,
+// a module const that fed every label on the page while the data RPC underneath was
+// independently NSCLC-locked in SQL. The two agreed only by coincidence -- and stopped
+// agreeing the moment a colorectal HCP reached this shell. Both halves now take the TA
+// that ProfileDispatch resolved, so the heading and the rows cannot disagree.
 // Prose voice of the same label: sentences take it lowercase.
-const TA_PROSE = taLabelForSlug(PROFILE_TA_SLUG).toLowerCase();
+
 
 // CANONICAL MIGRATION (pilot, 2026-08-12): every P key resolves to an
 // RFC-01/02 token — near-twin greys, alpha hairlines and warm surfaces
@@ -231,7 +235,7 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
   );
 }
 
-export default function HcpProfileBrief() {
+export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug: string }) {
   const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 profile mobile pass
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -250,7 +254,7 @@ export default function HcpProfileBrief() {
     // compiler forbids the dead wiring (noUnusedLocals); the ledger's own ceiling
     // machinery in cohortLedger.ts is untouched.
     Promise.all([
-      loadHcpProfile(id),
+      loadHcpProfile(id, taId),
       loadFieldPresence(id),
       fetchHcpThemes(id),
     ]).then(([prof, fn, th]) => {
@@ -263,7 +267,7 @@ export default function HcpProfileBrief() {
     // collaborator network — same source DetailScreen uses (established score breakdown).
     // DEFECT FIX: getEstablishedScoreBreakdown requires (hcpId, taSlug); it was called with
     // one arg, so the breakdown never resolved and the collaborator rail loaded nothing.
-    getEstablishedScoreBreakdown(id, "nsclc").then((b) => alive && setCollaborators(b?.top_collaborators ?? [])).catch(() => {});
+    getEstablishedScoreBreakdown(id, taSlug).then((b) => alive && setCollaborators(b?.top_collaborators ?? [])).catch(() => {});
     return () => { alive = false; };
   }, [id]);
 
@@ -307,14 +311,14 @@ export default function HcpProfileBrief() {
           <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>
             <span style={{ width: 3, height: 12, background: P.sage }} />
             <span style={{ color: P.sage }}>EST</span>
-            <span style={{ color: P.ink3 }}>ESTABLISHED / {taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()}</span>
+            <span style={{ color: P.ink3 }}>ESTABLISHED / {taLabelForSlug(taSlug).toUpperCase()}</span>
             <span>›</span>
             {/* The POOL, not a hardcoded US (2026-08-19). hcp_profile_brief resolves the
                 US row if there is one and otherwise the global row, so this asserted a US
                 rank for every non-US HCP — Martin Reck read "RANK 3 US" with no US row. */}
             <span>RANK {s?.rank ?? "—"} {s?.scope_label ?? "US"}</span>
             <span>›</span>
-            <Link to="/cohorts/ledger/established" style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
+            <Link to={`/cohorts/ledger/established?ta=${taSlug}`} style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
           </div>
           {/* section spine — frame order: orientation/operational first, belief payoff last */}
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>
@@ -425,7 +429,7 @@ export default function HcpProfileBrief() {
               </div>
             </div>
           ) : (
-            <Withheld head="SIGNAL SUMMARY · WITHHELD" title="No generated synthesis for this HCP yet." body={`The synthesis is generated over the sourced record. None is on file for this HCP in ${TA_PROSE}.`} />
+            <Withheld head="SIGNAL SUMMARY · WITHHELD" title="No generated synthesis for this HCP yet." body={`The synthesis is generated over the sourced record. None is on file for this HCP in ${taLabelForSlug(taSlug).toLowerCase()}.`} />
           )}
         </div>
 
@@ -579,7 +583,7 @@ export default function HcpProfileBrief() {
             no-NPI absence text — which explained, at three paragraphs, why Part B
             could not be read for a German oncologist. A US record with no NPI still
             gets that text: the absence is real there, and this gate does not touch it. */}
-        {nonUs ? null : <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug="nsclc" withholdSeam />}
+        {nonUs ? null : <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug={taSlug} withholdSeam />}
 
         {/* THE BRIEF section removed (2026-08-03, per Design): the frame drops it in
             both populated and sparse. Its three cards were WHAT CHANGED and WHERE
@@ -698,7 +702,7 @@ export default function HcpProfileBrief() {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SOURCED POSITIONS</span>
                 <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
-                  Nothing has been extracted from the published record for this HCP in {TA_PROSE}. This is an absence in the record, not evidence that no position exists — the score band above is comparable cohort-wide regardless.
+                  Nothing has been extracted from the published record for this HCP in {taLabelForSlug(taSlug).toLowerCase()}. This is an absence in the record, not evidence that no position exists — the score band above is comparable cohort-wide regardless.
                   {themes.length ? " Publication-derived research involvement is below — a broader, any-authorship signal that shows where the work is without asserting a stance." : ""}
                 </span>
               </div>
@@ -717,7 +721,7 @@ export default function HcpProfileBrief() {
             <SectionHead id="themes" tag="RESEARCH INVOLVEMENT" count={`${themes.length} THEME${themes.length === 1 ? "" : "S"} · PUBLICATION-DERIVED`} sub="ACTIVE IN THESE AREAS · ANY-AUTHORSHIP BASIS · INVOLVEMENT, NOT ADVOCACY" />
             <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px" }}>
               <div style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", paddingBottom: 4 }}>
-                Themes are extracted from this HCP's authored publications in the {TA_PROSE} corpus — any authorship position counts. They show where the work is. They are a weaker claim than the positions above{nPos ? "" : " would be"}: involvement in an area is not a stance on it.
+                Themes are extracted from this HCP's authored publications in the {taLabelForSlug(taSlug).toLowerCase()} corpus — any authorship position counts. They show where the work is. They are a weaker claim than the positions above{nPos ? "" : " would be"}: involvement in an area is not a stance on it.
               </div>
               {themes.map((t) => <ThemeRow key={t.id} t={t} />)}
             </div>

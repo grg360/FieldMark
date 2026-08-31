@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { softDeleteNote, type InteractionType, type InsightStrength, type Note } from "../../lib/relationships";
 import { formatOccurredAt, formatRelative } from "./dateFormat";
 import { COLOR, COOL } from "../../lib/designTokens";
-import { FACE } from "../../lib/canonicalTokens";
+import { CANON, FACE } from "../../lib/canonicalTokens";
 import InsightComposer from "./InsightComposer";
 
 function interactionTypeLabel(type: InteractionType): string {
@@ -11,34 +11,45 @@ function interactionTypeLabel(type: InteractionType): string {
   return type.toUpperCase();
 }
 
+// Interaction-type chips, on canonical marks (2026-08-20). These carried six bespoke
+// hues -- #4A90E2, #5A9B7F, #7B7B9C, #9B6DFF, #3FB8AF, #E8A020 -- none of them tokens.
+//
+// email / other / conference NOW SHARE MARK.RS, and that is the accepted trade. All
+// three were in the blue/indigo family, which MARK.RS absorbs by construction ("no
+// separate blue"); keeping them apart means keeping three raw hexes on a profile
+// surface, which is the thing the token system exists to remove. The chip carries its
+// type as TEXT, so nothing becomes unreadable -- only less colour-separable. If the
+// interaction axis ever needs to be visually separable, that is a VIZ-palette question
+// (canonicalTokens VIZ), not six one-off values re-entered here.
 function interactionChipStyle(type: InteractionType): CSSProperties | null {
   switch (type) {
     case "general":
       return null;
     case "meeting":
-      return { backgroundColor: "#E8A020", color: "#0A0A0B" };
+      return { backgroundColor: CANON.GOLD.PRIME, color: CANON.GROUND.BASE };
     case "email":
-      return { backgroundColor: "#4A90E2", color: "#FFFFFF" };
+      return { backgroundColor: CANON.MARK.RS, color: CANON.INK.PRIME };
     case "phone":
-      return { backgroundColor: "#5A9B7F", color: "#FFFFFF" };
+      return { backgroundColor: CANON.MARK.EST, color: CANON.INK.PRIME };
     case "other":
-      return { backgroundColor: "#7B7B9C", color: "#FFFFFF" };
+      return { backgroundColor: CANON.MARK.RS, color: CANON.INK.PRIME };
     case "conference":
-      return { backgroundColor: "#9B6DFF", color: "#FFFFFF" };
+      return { backgroundColor: CANON.MARK.RS, color: CANON.INK.PRIME };
     case "publication_review":
-      return { backgroundColor: "#3FB8AF", color: "#0A0A0B" };
+      // #3FB8AF was already ACTION.LINK's exact value -- a token by coincidence.
+      return { backgroundColor: CANON.ACTION.LINK, color: CANON.GROUND.BASE };
     case "internal":
-      return { border: "1px solid #6B6A65", color: "#6B6A65", backgroundColor: "transparent" };
+      return { border: `1px solid ${CANON.INK.MUTE}`, color: CANON.INK.MUTE, backgroundColor: "transparent" };
     default:
-      return { backgroundColor: "#2A2A30", color: "#9B9892" };
+      return { backgroundColor: CANON.GROUND.INSET, color: CANON.INK.LABEL };
   }
 }
 
 function strengthChipStyle(strength: InsightStrength): CSSProperties {
   if (strength === "notable") {
-    return { border: "1px solid #E8A020", color: "#E8A020", backgroundColor: "transparent" };
+    return { border: `1px solid ${CANON.GOLD.PRIME}`, color: CANON.GOLD.PRIME, backgroundColor: "transparent" };
   }
-  return { backgroundColor: "#E8A020", color: "#0A0A0B", fontWeight: 600 };
+  return { backgroundColor: CANON.GOLD.PRIME, color: CANON.GROUND.BASE, fontWeight: 600 };
 }
 
 const chipBase: CSSProperties = {
@@ -128,7 +139,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
       <div
         style={
           ledger
-            ? { padding: "18px 24px", borderBottom: "1px solid #141716" } // ledger register: tight row, no card chrome
+            ? { padding: "18px 24px", borderBottom: `1px solid ${CANON.LINE.HAIR}` } // ledger register: tight row, no card chrome
             : {
                 backgroundColor: "#0D0D10",
                 border: "1px solid #1E1E22",
@@ -152,20 +163,20 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
             // bordered mono chip. Platform charcoal/gold/ink only — no purple/orange/blue.
             <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
               {note.interaction_type !== "general" ? (
-                <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: "#8caf94", textTransform: "uppercase" }}>
+                <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: CANON.MARK.EST, textTransform: "uppercase" }}>
                   {interactionTypeLabel(note.interaction_type)}
                 </span>
               ) : null}
               {note.insight_strength !== "routine" ? (
                 <span style={{
                   font: `600 9px/1 ${FACE.data}`, letterSpacing: ".14em", padding: "3px 6px",
-                  color: note.insight_strength === "notable" ? "#9aa19b" : "#d99a3c",
-                  border: `1px solid ${note.insight_strength === "notable" ? "#2a2e2c" : "#5c4419"}`,
+                  color: note.insight_strength === "notable" ? CANON.INK.LABEL : CANON.GOLD.PRIME,
+                  border: `1px solid ${note.insight_strength === "notable" ? CANON.LINE.HAIR : CANON.GOLD.EDGE}`,
                 }}>
                   {note.insight_strength === "notable" ? "NOTABLE" : "STRATEGIC"}
                 </span>
               ) : null}
-              <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: "#5f6762" }}>
+              <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: CANON.INK.MUTE }}>
                 {formatOccurredAt(note.occurred_at).toUpperCase()}
               </span>
             </div>
@@ -187,9 +198,9 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                 </span>
               ) : null}
               {(typeStyle || note.insight_strength !== "routine") && (
-                <span style={{ color: "#6B6A65", margin: "0 6px" }}>·</span>
+                <span style={{ color: CANON.INK.MUTE, margin: "0 6px" }}>·</span>
               )}
-              <span style={{ fontSize: 13, color: "#9B9892" }}>{formatOccurredAt(note.occurred_at)}</span>
+              <span style={{ fontSize: 13, color: CANON.INK.LABEL }}>{formatOccurredAt(note.occurred_at)}</span>
             </div>
           )}
 
@@ -205,7 +216,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
               onMouseLeave={ledger ? (e) => { e.currentTarget.style.color = "#4b514d"; } : undefined}
               style={
                 ledger
-                  ? { background: "none", border: "none", color: "#4b514d", cursor: "pointer", padding: "0 2px", lineHeight: 1,
+                  ? { background: "none", border: "none", color: CANON.INK.GHOST, cursor: "pointer", padding: "0 2px", lineHeight: 1,
                       font: `700 13px/1 ${FACE.data}`, letterSpacing: ".08em" }
                   : { background: "none", border: "none", color: "#6B6A65", fontSize: 17, cursor: "pointer", padding: "0 4px", lineHeight: 1 }
               }
@@ -265,7 +276,7 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
         {/* Body prose is serif on this platform (both variants); ledger uses the frame's
             note ink + measure. */}
         <div style={ledger
-          ? { fontFamily: FACE.value, fontSize: 13, color: "#ddd8cd", lineHeight: 1.6, whiteSpace: "pre-wrap", marginTop: 11, textWrap: "pretty" as const }
+          ? { fontFamily: FACE.value, fontSize: 13, color: CANON.INK.BODY, lineHeight: 1.6, whiteSpace: "pre-wrap", marginTop: 11, textWrap: "pretty" as const }
           : { fontFamily: FACE.value, fontSize: 15, color: COLOR.ink1, lineHeight: 1.72, whiteSpace: "pre-wrap" }}>
           {note.body}
         </div>
@@ -291,13 +302,13 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
             if (ledger) {
               return (
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 8, marginTop: 11 }}>
-                  <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: "#4b514d" }}>LINKED POSITION</span>
+                  <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: CANON.INK.GHOST }}>LINKED POSITION</span>
                   <button
                     type="button"
                     onClick={goToClaim}
                     aria-label={`View linked Belief Profile: ${note.belief_claim_title}`}
                     style={{ background: "none", border: "none", padding: "0 0 2px", cursor: "pointer",
-                      font: `600 9px/1 ${FACE.data}`, letterSpacing: ".1em", color: "#71b3a7", borderBottom: "1px solid #2f4a46" }}
+                      font: `600 9px/1 ${FACE.data}`, letterSpacing: ".1em", color: CANON.ACTION.LINK, borderBottom: `1px solid ${CANON.LINE.HAIR}` }}
                   >
                     {note.belief_claim_title.toUpperCase()} ↗
                   </button>
@@ -312,22 +323,22 @@ export default function InsightCard({ note, userId, hcpId, firstName, onMutate, 
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
                   background: "rgba(155, 109, 255, 0.08)", border: "1px solid rgba(155, 109, 255, 0.30)",
-                  color: "#B89BFF", padding: "6px 10px", borderRadius: 6, fontSize: 13, fontWeight: 500,
+                  color: CANON.MARK.RS, padding: "6px 10px", borderRadius: 6, fontSize: 13, fontWeight: 500,
                   cursor: "pointer", fontFamily: "inherit", marginTop: 10, transition: "background-color 120ms ease",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.14)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(155, 109, 255, 0.08)"; }}
               >
-                <span style={{ color: "#9B9892", fontWeight: 400 }}>Linked Belief Profile:</span>
+                <span style={{ color: CANON.INK.LABEL, fontWeight: 400 }}>Linked Belief Profile:</span>
                 <span>{note.belief_claim_title}</span>
-                <span aria-hidden style={{ color: "#9B9892", marginLeft: 2 }}>{String.fromCharCode(0x2192)}</span>
+                <span aria-hidden style={{ color: CANON.INK.LABEL, marginLeft: 2 }}>{String.fromCharCode(0x2192)}</span>
               </button>
             );
           })()
         ) : null}
 
         {showFooter ? (
-          <div style={{ fontSize: 11, color: "#6B6A65", marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: CANON.INK.MUTE, marginTop: 8 }}>
             Added {formatRelative(note.created_at)}
           </div>
         ) : null}

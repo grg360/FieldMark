@@ -31,7 +31,11 @@ import { taLabelForSlug } from "../../lib/taLabels";
 // This surface is pinned to one therapeutic area. The SLUG is the pin — it is
 // the stable identity — and the display label is derived from it, never typed
 // out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
-const PROFILE_TA_SLUG = "nsclc";
+// TA COMES FROM DISPATCH NOW (2026-08-31). This was `const PROFILE_TA_SLUG = "nsclc"`,
+// a module const that fed every label on the page while the data RPC underneath was
+// independently NSCLC-locked in SQL. The two agreed only by coincidence -- and stopped
+// agreeing the moment a colorectal HCP reached this shell. Both halves now take the TA
+// that ProfileDispatch resolved, so the heading and the rows cannot disagree.
 
 // Register tokens (2026-08-05): this surface was written fresh, so unlike the
 // migrated frames it CONSUMES the register rather than preserving frame bytes —
@@ -341,7 +345,7 @@ function FieldIntelligencePanel() {
   );
 }
 
-export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
+export default function RisingHcpProfile({ hcpId, taId, taSlug }: { hcpId: string; taId: string; taSlug: string }) {
   const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint — 2026-08-10 mobile stack pass
   const navigate = useNavigate();
   const [p, setP] = useState<RisingProfile | null | undefined>(undefined);
@@ -350,7 +354,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
 
   useEffect(() => {
     let alive = true;
-    getRisingProfile(hcpId).then((d) => alive && setP(d)).catch(() => alive && setP(null));
+    getRisingProfile(hcpId, taId).then((d) => alive && setP(d)).catch(() => alive && setP(null));
     return () => { alive = false; };
   }, [hcpId]);
   useEffect(() => {
@@ -458,14 +462,14 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         {/* breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 14px", flexWrap: "wrap" }}>
           <div style={{ padding: "2px 5px", background: "#1c2a26", font: `600 9px/1.4 ${MONO}`, letterSpacing: ".12em", color: GREEN }}>RIS</div>
-          <div style={mono(9, MUT2)}>RISING / {taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()}</div>
+          <div style={mono(9, MUT2)}>RISING / {taLabelForSlug(taSlug).toUpperCase()}</div>
           <div style={{ color: CANON.LINE.EDGE, fontSize: 9 }}>›</div>
           <div style={mono(9, MUT2)}>
             {usRank != null ? `RANK #${usRank} US` : `RANK #${rank.toLocaleString("en-US")} GLOBAL`}
             {dual ? ` · EST #${p.established_us!.rank} US` : ""}
           </div>
           <div style={{ color: CANON.LINE.EDGE, fontSize: 9 }}>›</div>
-          <div onClick={() => navigate("/cohorts/ledger/rising-stars")} style={{ cursor: "pointer", ...mono(9, GREEN_DK) }}>↑ BACK TO RISING LEDGER</div>
+          <div onClick={() => navigate(`/cohorts/ledger/rising-stars?ta=${taSlug}`)} style={{ cursor: "pointer", ...mono(9, GREEN_DK) }}>↑ BACK TO RISING LEDGER</div>
         </div>
 
         {/* hero */}
@@ -763,10 +767,10 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
         <SectionHead title="RELATIONSHIP" sub="TRACK · STATUS · FOLLOW-UPS" right="SYNCS WITH THE RISING LEDGER" />
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
           <Card style={{ padding: 18 }}>
-            <ProfileRelationshipControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
+            <ProfileRelationshipControls hcpId={hcpId} hcpName={name} specialty={taLabelForSlug(taSlug)} />
           </Card>
           <Card style={{ padding: 18 }}>
-            <ProfileSecondaryControls hcpId={hcpId} hcpName={name} specialty="NSCLC" />
+            <ProfileSecondaryControls hcpId={hcpId} hcpName={name} specialty={taLabelForSlug(taSlug)} />
           </Card>
         </div>
 
@@ -778,7 +782,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
           right="COMPOSER + BELIEF LINKS · SAME WRITE PATH AS THE OTHER SPINES" />
         <Card style={{ padding: "18px 22px" }}>
           {/* hideHeader: the SectionHead above is the one header (same fix as community) */}
-          <FieldInsights hcp={profileHcp(hcpId, name, "NSCLC")} variant="ledger" hideHeader />
+          <FieldInsights hcp={profileHcp(hcpId, name, taLabelForSlug(taSlug))} variant="ledger" hideHeader />
         </Card>
 
         {/* the record — frame 1A, paired windows (see the REC note above) */}
@@ -853,12 +857,12 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             NPI — the block's honest-absence states (no_claims / no_npi) are the
             intended render there, exactly as on the established spine. */}
         <div style={{ marginTop: 26 }}>
-          <AdministeredVolumeBlock hcpId={hcpId} taSlug="nsclc" withholdSeam />
+          <AdministeredVolumeBlock hcpId={hcpId} taSlug={taSlug} withholdSeam />
         </div>
 
         {/* established standing */}
         <SectionHead title="ESTABLISHED STANDING"
-          sub={`DUAL-BOARD MEMBERS CARRY AN ESTABLISHED RANK IN ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()}`}
+          sub={`DUAL-BOARD MEMBERS CARRY AN ESTABLISHED RANK IN ${taLabelForSlug(taSlug).toUpperCase()}`}
           right="RISING WINS THE ROUTE · ESTABLISHED RANK IS A SECTION, NOT A COMPETING SURFACE" />
         {dual ? (
           <Card style={{ padding: "20px 22px" }}>
@@ -898,7 +902,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             </div>
             <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={mono(9, MUT2, 0.11)}>
-                {estScope} ESTABLISHED RANK IN {taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} · SCORE {Number(p.established_us!.cohort_score).toFixed(2)}
+                {estScope} ESTABLISHED RANK IN {taLabelForSlug(taSlug).toUpperCase()} · SCORE {Number(p.established_us!.cohort_score).toFixed(2)}
                 {/* Suppressed when the rank ABOVE is already the global one (2026-08-19),
                     which is the case whenever est_us fell back — otherwise the line reads
                     "GLOBAL ESTABLISHED RANK 3 · GLOBAL ESTABLISHED RANK 3". */}
@@ -917,7 +921,7 @@ export default function RisingHcpProfile({ hcpId }: { hcpId: string }) {
             <div style={{ marginTop: 14, ...serif(13, INK2) }}>
               {p.established_global
                 ? `Ranked on the global established board (rank ${p.established_global.rank.toLocaleString("en-US")}) but not US-scoped. The rising surface is the primary record for this profile.`
-                : `No established rank in ${taLabelForSlug(PROFILE_TA_SLUG)}. For rising-only physicians this surface is the whole record — nothing is routed elsewhere and no established section renders.`}
+                : `No established rank in ${taLabelForSlug(taSlug)}. For rising-only physicians this surface is the whole record — nothing is routed elsewhere and no established section renders.`}
             </div>
           </Card>
         )}

@@ -122,10 +122,10 @@ export interface FieldNote {
   insight_category: string | null;
 }
 
-export async function loadHcpProfile(hcpId: string): Promise<HcpProfile | null> {
-  const { data, error } = await supabase.rpc("hcp_profile_brief", { p_hcp_id: hcpId });
+export async function loadHcpProfile(hcpId: string, taId: string): Promise<HcpProfile | null> {
+  const { data, error } = await supabase.rpc("hcp_profile_brief_ta", { p_hcp_id: hcpId, p_ta_id: taId });
   if (error || !data) {
-    console.error("hcp_profile_brief failed:", error?.message);
+    console.error("hcp_profile_brief_ta failed:", error?.message);
     return null;
   }
   return data as HcpProfile;

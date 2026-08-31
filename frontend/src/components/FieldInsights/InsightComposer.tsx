@@ -19,7 +19,7 @@ import {
 } from "../../lib/insightCategories";
 import { formatOccurredAt } from "./dateFormat";
 import { FONT, GROUND, LINE, GOLD, COOL } from "../../lib/designTokens";
-import { FACE } from "../../lib/canonicalTokens";
+import { CANON, FACE } from "../../lib/canonicalTokens";
 
 // ── Register kit (2026-08-07 conversion — Beat 8 surface) ────────────────────
 // Chip treatment shared with the profile rails; the category glyph is the
@@ -349,10 +349,10 @@ export default function InsightComposer({
             aria-label={`Add an insight about Dr. ${firstName}`}
             style={{ display: "flex", flexDirection: "column", gap: 8, padding: "13px 16px", cursor: "text" }}
           >
-            <span style={{ fontFamily: FACE.value, fontSize: 13, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
+            <span style={{ fontFamily: FACE.value, fontSize: 13, color: CANON.INK.MUTE }}>Add an insight about Dr. {firstName}…</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
-              <span style={{ font: `400 9px/1.5 ${FACE.data}`, letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
+              <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: CANON.GOLD.PRIME }}>+ CAPTURE</span>
+              <span style={{ font: `400 9px/1.5 ${FACE.data}`, letterSpacing: ".14em", color: CANON.INK.GHOST }}>SOURCE · TAG · LINK A POSITION</span>
             </span>
           </div>
         );
@@ -366,9 +366,9 @@ export default function InsightComposer({
           aria-label={`Add an insight about Dr. ${firstName}`}
           style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 24px", cursor: "text" }}
         >
-          <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: "#d99a3c" }}>+ CAPTURE</span>
-          <span style={{ flex: 1, fontFamily: FACE.value, fontSize: 13, color: "#5f6762" }}>Add an insight about Dr. {firstName}…</span>
-          <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: "#3f4542" }}>SOURCE · TAG · LINK A POSITION</span>
+          <span style={{ font: `600 9px/1 ${FACE.data}`, letterSpacing: ".16em", color: CANON.GOLD.PRIME }}>+ CAPTURE</span>
+          <span style={{ flex: 1, fontFamily: FACE.value, fontSize: 13, color: CANON.INK.MUTE }}>Add an insight about Dr. {firstName}…</span>
+          <span style={{ font: `400 9px/1 ${FACE.data}`, letterSpacing: ".14em", color: CANON.INK.GHOST }}>SOURCE · TAG · LINK A POSITION</span>
         </div>
       );
     }

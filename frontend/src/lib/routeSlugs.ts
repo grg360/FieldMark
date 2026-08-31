@@ -115,16 +115,48 @@ const INDICATION_SLUG_MAP_BY_TA: Record<string, Record<string, string>> = {
 // string silently resolved to "all" instead of failing. Identity flows one way
 // now - slug in, label out - and callers hold the slug.
 
-export function taSlugToLabel(taSlug: string | undefined): string {
+/**
+ * TA slug -> display label, or NULL when the slug is not a registered TA.
+ *
+ * RETURNED HOME_TA ("Oncology") UNTIL 2026-08-30. An unrecognised slug did not fail and did
+ * not return the slug - it returned a DIFFERENT REAL TA, which then resolved, queried and
+ * rendered a complete, plausible, wrong board. That is the worst available failure: a raw
+ * slug on screen announces itself (see taLabels.ts, where returning the key verbatim is the
+ * deliberate design), but "Oncology" over colorectal data looks exactly like success.
+ *
+ * NULL rather than the slug because this value is a LABEL that callers also key on
+ * (indicationSlugToLabel, the === "Immunology" compare in HomePage): a slug passed off as a
+ * label would silently miss those lookups instead of failing at them. Callers decide what an
+ * unknown TA means for their surface - render an absence, fall back explicitly, or refuse.
+ */
+export function taSlugToLabel(taSlug: string | undefined): string | null {
   if (taSlug && TA_SLUG_TO_LABEL[taSlug]) return TA_SLUG_TO_LABEL[taSlug];
-  return HOME_TA;
+  return null;
 }
 
 export function taLabelToSlug(taLabel: string): string {
   return TA_LABEL_TO_SLUG[taLabel] ?? "oncology";
 }
 
-export function taLabelToApiSlug(taLabel: string): string {
+/**
+ * TA label -> the API/data slug that TA's queries run against, or NULL if unrecognised.
+ *
+ * DEFAULTED TO "rare-disease" UNTIL 2026-08-30 - an unknown label silently became a real,
+ * unrelated TA. Worse than its twin above, because this output is a QUERY KEY, not a
+ * displayed string: nothing on the page would have looked wrong. It reaches TA_ID_MAP and
+ * filters.therapeuticArea on the feed's hot path (App.tsx fetchHCPs / the feed effect), so
+ * the substitution bought a fully-rendered rare-disease board under a colorectal heading.
+ *
+ * NULL, NOT A THROW. Every call site is inside a render or an effect on the feed; throwing
+ * would trade a wrong answer for a blank application, on a branch that auto-deploys. NULL
+ * makes the compiler enumerate the consumers instead - the loudest place to fail is the
+ * typecheck, not the browser.
+ *
+ * NULL, NOT THE INPUT UNCHANGED. Returning "Cardiology" as if it were a slug would miss
+ * TA_ID_MAP and degrade to an EMPTY feed - quieter than the bug it replaces, not louder.
+ * The raw-input convention is right for taLabels.ts, whose output is only ever displayed.
+ */
+export function taLabelToApiSlug(taLabel: string): string | null {
   switch (taLabel) {
     case "Hepatology":
       return "hepatology";
@@ -135,7 +167,7 @@ export function taLabelToApiSlug(taLabel: string): string {
     case "Immunology":
       return "immunology";
     default:
-      return "rare-disease";
+      return null;
   }
 }
 
@@ -259,7 +291,11 @@ export function resolveFeedRoute(params: {
   const isHomePath = Boolean(params.isHomePath);
   const taSlug =
     params.ta && TA_SLUG_TO_LABEL[params.ta] ? params.ta : taLabelToSlug(HOME_TA);
-  const taLabel = taSlugToLabel(taSlug);
+  // taSlug was just validated against TA_SLUG_TO_LABEL on the line above, so the lookup
+  // cannot miss. The ?? states that guarantee AT THE SITE THAT MAKES IT, which is the whole
+  // difference from the default this replaced: taSlugToLabel used to hand HOME_TA to every
+  // caller, including the ones that had validated nothing.
+  const taLabel = taSlugToLabel(taSlug) ?? HOME_TA;
   const dashboardSlug =
     params.dashboard && DASHBOARD_SLUG_TO_TRACK[params.dashboard]
       ? params.dashboard

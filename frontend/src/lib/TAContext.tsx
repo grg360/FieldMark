@@ -64,6 +64,25 @@ const DEFAULT_INDICATION_SLUG = "nsclc";
  */
 export function deriveTAValue(parentSlug: string, indicationSlug: string): TAValue {
   const parentLabel = taSlugToLabel(parentSlug);
+  // UNKNOWN PARENT TA -> NO DATA IDENTITY. taSlugToLabel returns null now instead of
+  // substituting Oncology (see routeSlugs). That matters most HERE: parentSlug arrives from
+  // sessionStorage via readStoredSelection, so a stale or hand-edited value is a real input,
+  // not a hypothetical -- and every derivation below keys on the LABEL. Under the old default
+  // a junk stored slug produced a complete, confident NSCLC TAValue.
+  //
+  // An unknown TA must not borrow a known one's maps, so it gets a value that carries no data
+  // identity: the slug shown verbatim as its own label (the taLabels.ts convention -- an
+  // unmapped thing should look unmapped), no indicationTaId, dataSlug left as the caller's
+  // indication. Consumers already branch on indicationTaId being undefined.
+  if (parentLabel === null) {
+    return {
+      parentTa: { label: parentSlug, slug: parentSlug, uuid: undefined },
+      indication: { label: indicationSlug, slug: indicationSlug },
+      indicationTaId: undefined,
+      dataSlug: indicationSlug,
+    };
+  }
+
   const indicationLabel =
     indicationSlugToLabel(parentLabel, indicationSlug) ?? indicationSlug;
 
@@ -73,7 +92,9 @@ export function deriveTAValue(parentSlug: string, indicationSlug: string): TAVal
     const byIndication = getIndicationTaId(parentLabel, indicationSlug);
     dataSlug = byIndication
       ? apiSlugForTaId(byIndication) ?? dataSlug
-      : taLabelToApiSlug(parentLabel);
+      // parentLabel came out of TA_SLUG_TO_LABEL above, so it is one of the four registered
+      // labels and this cannot be null. Stated, not assumed.
+      : taLabelToApiSlug(parentLabel) ?? dataSlug;
     indicationTaId = taIdForApiSlug(dataSlug);
   }
 

@@ -49,6 +49,7 @@ const LEDGER_SUBSECTION_HEADER_STYLE: CSSProperties = {
 
 const LINK_STYLE: CSSProperties = {
   fontSize: 13,
+  lineHeight: 1.5,
   color: "#5C7CE8",
   textDecoration: "none",
   marginBottom: 4,
@@ -57,6 +58,9 @@ const LINK_STYLE: CSSProperties = {
 
 const LEDGER_LINK_STYLE: CSSProperties = {
   ...serif(13),
+  // serif() writes the `font` shorthand, which resets line-height to `normal`
+  // (~1.2 on this face). Every stacked row in this block restates it.
+  lineHeight: 1.5,
   color: LP.teal,
   textDecoration: "none",
   marginBottom: 4,
@@ -169,21 +173,21 @@ export default function ContactAccessCard({ hcpName, signals, loading, variant }
       ) : (
         <>
           {hasIdentityContent && (
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 18 }}>
               {hcpName ? (
-                <div style={ledger ? { ...serif(15, 600), color: LP.ink0 } : { fontSize: 14, color: "#E8E6DF", fontWeight: 600 }}>{hcpName}</div>
+                <div style={ledger ? { ...serif(15, 600), lineHeight: 1.35, color: LP.ink0 } : { fontSize: 14, lineHeight: 1.35, color: "#E8E6DF", fontWeight: 600 }}>{hcpName}</div>
               ) : null}
               {academicTitle ? (
-                <div style={ledger ? { ...serif(13), color: LP.ink3 } : { fontSize: 13, color: "#9B9892" }}>{academicTitle}</div>
+                <div style={ledger ? { ...serif(13), lineHeight: 1.55, color: LP.ink3 } : { fontSize: 13, lineHeight: 1.55, color: "#9B9892" }}>{academicTitle}</div>
               ) : null}
               {department ? (
-                <div style={ledger ? { ...serif(13), color: LP.ink3 } : { fontSize: 13, color: "#9B9892" }}>{department}</div>
+                <div style={ledger ? { ...serif(13), lineHeight: 1.55, color: LP.ink3 } : { fontSize: 13, lineHeight: 1.55, color: "#9B9892" }}>{department}</div>
               ) : null}
               {institution ? (
-                <div style={ledger ? { ...serif(13), color: LP.ink3 } : { fontSize: 13, color: "#9B9892" }}>{institution}</div>
+                <div style={ledger ? { ...serif(13), lineHeight: 1.55, color: LP.ink3 } : { fontSize: 13, lineHeight: 1.55, color: "#9B9892" }}>{institution}</div>
               ) : null}
               {locationLine ? (
-                <div style={ledger ? { ...serif(13), color: LP.ink5, fontStyle: "italic" } : { fontSize: 13, color: "#6B6A65", fontStyle: "italic" }}>{locationLine}</div>
+                <div style={ledger ? { ...serif(13), lineHeight: 1.55, color: LP.ink5, fontStyle: "italic" } : { fontSize: 13, lineHeight: 1.55, color: "#6B6A65", fontStyle: "italic" }}>{locationLine}</div>
               ) : null}
             </div>
           )}
@@ -247,7 +251,7 @@ export default function ContactAccessCard({ hcpName, signals, loading, variant }
               {phones.map((signal, idx) => (
                 <div
                   key={`phone-${idx}-${signal.signal_value}`}
-                  style={ledger ? { ...serif(13), color: LP.ink1, marginBottom: 4 } : { fontSize: 13, color: "#E8E6DF", marginBottom: 4 }}
+                  style={ledger ? { ...serif(13), lineHeight: 1.5, color: LP.ink1, marginBottom: 4 } : { fontSize: 13, lineHeight: 1.5, color: "#E8E6DF", marginBottom: 4 }}
                 >
                   {"☎"} {signal.signal_value}
                 </div>

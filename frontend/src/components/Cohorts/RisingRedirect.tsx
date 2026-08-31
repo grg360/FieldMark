@@ -19,6 +19,13 @@ import { Navigate, useSearchParams } from "react-router-dom";
  */
 export default function RisingRedirect() {
   const [params] = useSearchParams();
-  const to = params.get("mode") === "quadrant" ? "/rising/quadrant" : "/cohorts/ledger/rising-stars";
+  // FORWARDS ?ta=, never supplies one. /rising has no TA of its own, so a redirect that
+  // invented one would be a default wearing a redirect's clothes; absent, the ledger's own
+  // session -> profile -> picker chain answers.
+  const ta = params.get("ta");
+  const to =
+    params.get("mode") === "quadrant"
+      ? "/rising/quadrant"
+      : `/cohorts/ledger/rising-stars${ta ? `?ta=${encodeURIComponent(ta)}` : ""}`;
   return <Navigate to={to} replace />;
 }
