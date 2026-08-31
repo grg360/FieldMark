@@ -166,7 +166,28 @@ SCRIPTS: Dict[str, str] = {
     "hcpcs_topup": "scripts/ingest/hcpcs_detail_topup.py",            # 12: Medicare claims top-up for newly-NPI'd HCPs
     "board_snapshot": "scripts/utilities/take_weekly_snapshot.py",    # 9.5: capture board state + GATE INPUTS after scoring
     "narratives": "scripts/narrative/generate_narratives_v2.py",      # 13: narrative regen coupled to the scoring recompute
+    "ta_neutrality": "scripts/utilities/validate_ta_neutrality.py",  # 0: preflight, read-only catalog scan
 }
+
+# STAGE 0 -- TA-NEUTRALITY PREFLIGHT. Phase 0 of docs/TA_NEUTRAL_DB_LAYER.md.
+#
+# WHY IT LIVES HERE and not in a test or a pre-commit hook: this repo has no test suite, no
+# conftest.py, no .pre-commit-config.yaml and no CI. A rule whose enforcement needs CI stood
+# up first is a rule that will not exist by TA #4. ta_cycle is the thing you actually RUN for
+# a new TA -- `--ta <slug> --operation build` is TA #4's first act -- and it runs against the
+# LIVE database, which is mandatory here: community_ledger's live body already differs from
+# its migration file, so a repo-only linter would pass a deployed defect.
+#
+# WHY IT IS OUTSIDE THE STAGE_LABELS WINDOW. A preflight that --resume-from can skip is not a
+# preflight. It is also deliberately not addressable by --stop-after: there is nothing to stop
+# after, it costs one read-only catalog query, and adding "0" to STAGE_LABELS would shift
+# every ordinal that --resume-from / --stop-after / BUILD_CEILING_ORDINAL arithmetic depends
+# on, for no gain.
+#
+# OBSERVE-ONLY. The checker is invoked WITHOUT --strict, so it reports and returns 0 while the
+# Phase 1-3 debt is outstanding. FLIP TO STRICT WHEN PHASE 3 CLEARS -- set the constant below
+# to True. That is the whole change; the stage is already blocking-shaped.
+TA_NEUTRALITY_STRICT = False
 
 # Stage 10 ASSET MATCHES: rebuild asset_publication_v1 from config/assets.json (the Drug
 # Intelligence vocabulary is the file; this derives the asset<->publication edges). NSCLC-ONLY --
@@ -369,6 +390,13 @@ def cmd_openalex_enrich_pubs() -> List[str]:
     # ~25k rows is a predictable per-cycle ceiling that converges the corpus over about three weeks
     # of cycles. Until then, run refresh as a separate deliberate job.
     return py("openalex_pipeline") + ["--target-version", "v2", "--skip-career-enrichment"]
+
+
+def cmd_ta_neutrality() -> List[str]:
+    cmd = py("ta_neutrality")
+    if TA_NEUTRALITY_STRICT:
+        cmd.append("--strict")
+    return cmd
 
 
 def cmd_run_sql_file(
@@ -667,6 +695,32 @@ def run_stage(
     print(f"[stage {stage_no}] {name} OK ({dt:.0f}s)"
           + (f"  log: {log_path.name}" if log_path else ""), flush=True)
     return captured
+
+
+def run_preflight() -> None:
+    """Stage 0: the TA-neutrality catalog scan. Runs on every execute, including a resume.
+
+    OBSERVE-ONLY CONTRACT (TA_NEUTRALITY_STRICT False): this must not be able to stop a cycle,
+    and that includes stopping it by CRASHING. A preflight whose own DB hiccup kills a
+    multi-hour build has made the pipeline less reliable in exchange for a lint. So every
+    exception is caught and downgraded to a WARN line -- the same treatment stage 10 gets, for
+    the same reason.
+
+    Once TA_NEUTRALITY_STRICT is True the checker exits non-zero on a NEW violation and
+    run_stage raises StageFailure, which propagates: at that point stopping the cycle IS the
+    intent. An infrastructure failure still degrades to a warning rather than a false block --
+    a failed scan is not evidence of a violation.
+    """
+    try:
+        run_stage(0, "ta_neutrality (preflight)", cmd_ta_neutrality())
+    except StageFailure:
+        if TA_NEUTRALITY_STRICT:
+            raise
+        print("[stage 0] ta_neutrality reported violations -- observe-only, continuing.",
+              flush=True)
+    except Exception as exc:                       # noqa: BLE001 -- see docstring
+        print(f"[stage 0] ta_neutrality could not run ({exc.__class__.__name__}: {exc}) -- "
+              f"not treated as a violation, continuing.", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1501,7 +1555,11 @@ def print_plan(
     else:
         ingest_label += "  [unbounded]"
 
+    neutrality_mode = "STRICT (a new violation stops the cycle)" if TA_NEUTRALITY_STRICT \
+        else "observe-only (reports, never fails)"
     plan: List[Tuple[str, List[str]]] = [
+        (f"0  ta_neutrality preflight -- live catalog scan, 4 rules  [{neutrality_mode}; "
+         f"always runs, not skippable by --resume-from/--stop-after]", cmd_ta_neutrality()),
         (ingest_label, cmd_ingest(slug, ingest_limit, date_args, P, IS)),
         ("   [quiet-week gate] if primary_pmids.txt is EMPTY -> skip whole cycle (incl. all billed OpenAlex), mark SUCCESS/skipped, exit 0", []),
         ("1b openalex enrich pubs -> publications_v2.authorships  [GATE-A: ALL enriched_at IS NULL DOI pubs "
@@ -1826,6 +1884,13 @@ def run_cycle(
     print(f"  TA CYCLE - EXECUTE ({operation})  ta={slug} ta_id={ta_id} snapshot={snapshot}")
     print(f"  work dir: {work}   resume_from: {resume_from or '(top)'}")
     print("=" * 72)
+
+    # STAGE 0 -- preflight, before anything is written and before the first billed API call.
+    # Outside the try/except below on purpose: in observe mode it cannot raise (run_preflight
+    # swallows everything), and in strict mode a violation should stop the run BEFORE the
+    # StageFailure bookkeeping that exists to make a half-finished cycle resumable -- there is
+    # nothing to resume from a run that never started.
+    run_preflight()
 
     try:
         # 1 INGEST

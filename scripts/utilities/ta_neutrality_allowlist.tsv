@@ -1,0 +1,109 @@
+# TA-neutrality allowlist -- the Phase 0 baseline. See docs/TA_NEUTRAL_DB_LAYER.md.
+#
+# EVERY VIOLATION LIVE ON 2026-08-30 IS LISTED HERE, so validate_ta_neutrality.py reports
+# NEW = 0 on the day it ships. That is the whole design: the NEW count is the signal, and
+# the KNOWN count is a debt ledger that can only go DOWN. You pay debt by DELETING a row --
+# never by adding one to silence a finding you just created.
+#
+# The checker reports a row that no longer matches anything as STALE. Delete stale rows;
+# they are how a baseline rots into a list of things that used to be true.
+#
+# reason column:
+#   debt                the object is wrong and is scheduled. note names the phase.
+#   archive             dead snapshot/backup table. Listed BY NAME -- a wildcard on
+#                       %_backup would hide the next real violation that happens to be
+#                       named _backup.
+#   per_ta_content      the NAME is a data-domain name; the TA-specific thing is the
+#                       CONTENT, and it moves into per-TA rows in Phase 3 (design E).
+#   false_positive      the scanner is wrong. No expiry.
+#   ta_agnostic         genuinely TA-neutral already; the rule mis-fires on it.
+#   slug_parameterised  parameterised, but by slug rather than uuid. Phase 4.
+#
+# expires: ISO date or '-'. A shim row past its expiry is reported as a violation again --
+# that is what stops "temporary wrapper" from becoming permanent. Nothing here is a shim
+# yet; the Phase 1 wrappers get dated rows when they are created.
+#
+# rule: 1..4, or * to exempt an object from all four.
+
+object	rule	reason	expires	note
+function:asset_authors	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:asset_index_meta	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:asset_overview	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:community_hcp_profile	1	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:community_ledger	1	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:community_practice_profile	1	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:established_ledger	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:hcp_administered_therapy	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:hcp_belief_claims	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:hcp_profile_brief	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:hcp_profile_spine	1	debt	-	Phase 1, pending the design C.4 set-vs-scalar decision
+function:hcp_rising_profile	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:ledger_meta	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:normalize_institution	1	false_positive	-	'oncology'/'hepatology' inside a specialty word-list; not a TA reference
+function:rising_board	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:rising_ledger	1	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+argument:get_community_directory_filtered.p_ad_only	2	debt	-	unsequenced: p_ad_only rename + p_ta_id (design B.2, C.1)
+argument:get_community_directory_filtered_count.p_ad_only	2	debt	-	unsequenced: p_ad_only rename + p_ta_id (design B.2, C.1)
+function:get_nsclc_trials_surface	2	debt	-	Phase 2: -> trials_surface(p_ta_id uuid), old name kept as a wrapper
+index:ad_pubs_delete_list_pkey	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+index:ad_yearly_hcp_id_year_idx	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+index:hcp_part_d_oncology_v1_pkey	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+index:hcps_v2_ad_july_delete_list_pkey	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+index:idx_cpp_ad_drug	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+index:ix_hcp_part_d_oncology_v1_grade	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+index:ix_hcp_part_d_oncology_v1_npi	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+index:ix_hcp_part_d_oncology_v1_stem	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+index:ix_hcp_part_d_oncology_v1_year	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+index:part_d_oncology_drugs_v1_drug_stem_int4range_excl	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+index:part_d_oncology_drugs_v1_pkey	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+table:ad_pubs_delete_list	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:ad_stale_detour_tags_backup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:ad_yearly	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:hcp_cohort_classification_v2_pre_crc	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:hcp_established_ranks_v3_nsclc_contaminated_backup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:hcp_established_ranks_v3_pre_crc	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:hcp_part_d_oncology_v1	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+table:hcp_publication_leadership_v2_nsclc_presweep_backup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:hcp_rising_star_ranks_v3_pre_crc	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:hcps_v2_ad_july_delete_list	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:hcps_v2_ad_july_detour_backup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:nsclc_oracle_counts_20260720	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:nsclc_oracle_counts_postcleanup_20260720	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:nsclc_oracle_hcpset_20260720	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:nsclc_oracle_merges_20260720	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:openalex_author_inventory_pre_ad_backup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:part_d_oncology_drugs_v1	2	per_ta_content	-	Phase 3: 'oncology' names the CMS Part D extract; the lung-specific part is anchor_grade, not the name
+table:pub_authors_v2_ad_july_detour_backup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:publications_v2_ad_contaminated_backup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:social_posts_backup_pre_nash_cleanup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+table:social_users_backup_pre_nash_cleanup	2	archive	-	dead snapshot/backup; exempt by name, never by wildcard
+view:community_board_nsclc_v1	2	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+view:hcp_nsclc_evidence_tier_v1	2	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:asset_authors	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:asset_index_meta	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:asset_overview	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:community_hcp_profile	3	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:community_ledger	3	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:community_practice_profile	3	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:established_ledger	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:get_community_directory_filtered	3	debt	-	unsequenced: p_ad_only rename + p_ta_id (design B.2, C.1)
+function:get_community_directory_filtered_count	3	debt	-	unsequenced: p_ad_only rename + p_ta_id (design B.2, C.1)
+function:get_nsclc_trials_surface	3	debt	-	Phase 2: -> trials_surface(p_ta_id uuid), old name kept as a wrapper
+function:get_pulse_synthesis_facts	3	slug_parameterised	-	takes p_ta_slug; converge to p_ta_id in Phase 4
+function:hcp_administered_therapy	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:hcp_belief_claims	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:hcp_profile_brief	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:hcp_profile_spine	3	debt	-	Phase 1, pending the design C.4 set-vs-scalar decision
+function:hcp_rising_profile	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:ledger_meta	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:merge_hcp_pair	3	ta_agnostic	-	operates across every TA; the mention is hcp_therapeutic_areas_v2 bookkeeping
+function:public_conversation	3	slug_parameterised	-	takes p_ta_slug; converge to p_ta_id in Phase 4
+function:rising_board	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:rising_ledger	3	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
+function:social_post_search	3	slug_parameterised	-	takes p_ta_slug; converge to p_ta_id in Phase 4
+function:community_hcp_profile	4	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:community_ledger	4	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:community_practice_profile	4	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:get_community_filtered	4	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:get_community_filtered_count	4	debt	-	Phase 3: blocked on the evidence-tier generalisation + CRC curation
+function:ledger_meta	4	debt	-	Phase 1: new name taking p_ta_id uuid, old name kept as a pinned wrapper
