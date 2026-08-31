@@ -30,7 +30,7 @@
 -- they arrive already percentiled from hcp_scientific_momentum_v1 and
 -- hcp_network_momentum_v1, neither of which reads hcp_cohort_classification_v2 at
 -- all. That is a known mixed denominator, widened by this change and deliberately
--- not fixed here -- see docs/RISING_EXCLUSIVE_GATE_DEBT.md.
+-- not fixed here -- see docs/canonical/RISING_EXCLUSIVE_GATE_DEBT.md.
 --
 -- The backfill is a STATEMENT OF FACT about captures already taken, not a guess:
 -- every existing row was captured under the OR-15 pool, which was in force from

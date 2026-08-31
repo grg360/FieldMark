@@ -4,7 +4,19 @@
 -- hcps_v2.country / institution_normalized / institution_raw / institution_ror /
 -- institution_canonical are NOT in any SET clause -- historical values preserved.
 
-SET statement_timeout = '30min';
+-- RAISED 30min -> 60min on 2026-08-31. This is the only step that writes patient-facing
+-- data, and it is the slower half: two UPDATEs over a 523 MB table, 334,791 rows on the
+-- first and ~46,538 on the second, ten columns including the institution_history jsonb.
+-- It fitted 30min at 289,311 rows on 2026-08-14; the corpus is 381,329 now.
+--
+-- THIS LINE, NOT --statement-timeout, IS WHAT GOVERNS. run_sql.py sets the GUC as a libpq
+-- connect option, and this SET runs as the first statement of the transaction and overrides
+-- it. Passing the flag without editing here is inert.
+--
+-- 02_build_staging.sql deliberately stays at 30min: its derivation was measured at 54s
+-- read-only on 2026-08-31, so 30min is already ~20x headroom and a longer ceiling would only
+-- delay the discovery of a pathological plan.
+SET statement_timeout = '60min';
 
 UPDATE hcps_v2 h
 SET current_country         = s.current_country,

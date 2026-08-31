@@ -1,0 +1,128 @@
+id	hcp_id	name	classification_v2	prompt_version	generated_on	after_delete
+bcbb6503-a2ec-462c-b5cf-cb42b7a7625f	eb27a02f-ce11-44c3-9701-430496fd1490	Esra A. Akbay	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+ec5ee6f9-e227-4a7d-9a4e-75df9b61ba2b	1d0ea2fc-b2a9-4072-ae2f-9feb5622d1cc	J.B. Auliac	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+293ba9e4-1cb3-4124-893c-2577e6069ee3	2ad8a104-ab2d-4265-9391-acaad6cb69f1	Eric Bernicker	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+4a6cbdfe-c681-4a89-bc84-a4945b013846	fa69f266-3bd4-42a6-baaf-c816fa68ff38	Yanis Boumber	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+bb12fcbc-c00b-450f-be53-b01d33e605f8	06c08fbb-3845-4a16-bad5-69c34edf0f62	Aadel A. Chaudhuri	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+bb32438a-9f2f-4cc3-8487-ef6016fe0ed5	1e1df233-b820-4427-b6ac-9a2ec4c50a42	Parneet Cheema	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+c09c3860-bd25-477c-bbda-5ae90ab1f1ac	de9c70de-2fbe-47cc-a0ee-bd059bb1227b	Cheng Chen	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+eba4e320-13b7-46e0-8773-3d892b510c76	394b8b07-c6c8-4bc8-a262-4823d0cf3e71	Dawei Chen	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+9de96148-2065-4bdf-a9c6-256fc53c662e	6ab07416-9643-409f-9696-5b9f54f9ef2d	Enguo Chen	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+e20824e5-8b13-4a98-92bb-01fa620729ab	ae7b8a9a-399a-4caa-883f-539b09d763ed	Tianxiang Chen	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+8b470c33-46ad-41db-8149-64ce5a0c454c	b3190189-ec98-4e12-8895-acd7e8376cb1	Yue Chen	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+3ebf3b80-58e3-4e96-8dda-dd839c4d08cd	b4638244-aeb0-49e4-aaf2-b20c1bdf6f30	Anne C. Chiang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+ca35d89c-94e2-4284-9648-2876047fe573	37309ee9-ef80-4284-b05b-442e395f97f6	Simona Coco	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+e55819d6-854c-41c4-a04e-65b6acf315e1	07c739e9-e6d2-4cb9-b04d-2aef0e6f2225	Huijuan Cui	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+f485f985-6ad1-4c34-a211-154656604113	493410d2-73fc-4ac9-bf6f-fea4e0fd23f8	Chenyang Dai	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+5c308484-05dd-4bb7-b504-88bc1cca6c06	59396a8b-5c95-46ae-8506-051240b4c048	Lei Deng	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+1a22d818-3f0f-4900-82d5-ce8c94a2ff19	c7f51f58-79ea-4bd9-aa75-a3338de39fb8	Jing Du	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+5247e969-7e8d-4a39-8bfc-2d538b2224ce	8a352c93-1286-4cac-9147-74c8e78cd09d	Elizabeth Dudnik	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+eceeccce-6f31-4950-a490-e06b0d29d0a8	036c6bb6-8f57-4e4c-9d0e-0e2fd4e177a5	Florian Eichhorn	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+9a8e751f-4501-4f53-835f-561565574118	bb087b49-0127-4a3a-af4f-7f5029fac92a	Jung Seop Eom	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+160e429c-4030-4347-b777-328dfe862d80	ddf6ad98-1cf7-47a2-a731-0f169fe223d6	Xing‐Xing Fan	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+13ea8f1d-dab0-4e35-a527-add35d0b794f	7fec185d-74fa-46d1-ae48-860a38ef4347	Yun Fan	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+9f91a30b-1d98-4737-9ac1-1543a062ce42	dab34f28-c60f-4ad5-a11c-e4689c9e9e39	Wenfeng Fang	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+2ff3e86c-3aa1-4828-b019-3c2b95f9f525	1ed9c5ce-6040-4b1a-a71d-ddb57032d997	Wentao Fang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+ac4c73a1-30c3-4fde-a140-dc1c40588c9f	4e77e7b4-a1d3-499a-8233-56199e8e81d7	Florian J. Fintelmann	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+b0e90809-ad25-49a0-b959-ca684b61643e	f1df9fba-3b24-41f0-9bc4-9c38a4f78cb5	Patrizia Froesch	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+97e81868-f9d7-4354-9c33-362b24e176a0	500d8b7b-8f4f-45fc-bf52-64443b5ed458	Shugeng Gao	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+9af2ab85-89bb-4e3a-b56f-8107a48124cb	74a32e0a-c24b-4471-abcd-7943e794acaa	Melissa Gilbert‐Ross	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+771d0ceb-5184-4c5b-97ad-cf157df3fc4f	2c857054-7598-424d-9b42-daf367f5a545	Xiaomei Gong	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+b3ff864c-490c-4a42-9425-1e94ca845be7	f2cc41fe-a746-4e98-8787-e520762ff278	María González‐Cao	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+df86a644-3cfd-4ab3-9c16-b23cf8bd54f8	2dba367f-84da-4253-ae7b-3a5f377914a6	Renhua Guo	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+815aa1c0-60f8-42e3-b164-b211248261f2	16fa1f74-cc91-4e85-9eae-9a59f2377b4c	Summer S. Han	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+5317581c-97b6-476b-987b-c44e1b39de05	8572c16f-df1a-44d7-ab50-6fd5b9724a3e	Osamu Hataji	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+9c114411-b9a3-49ff-9e91-89197806ed7c	f3659021-6ab8-4832-96b4-8b42b387f1f3	Yayi He	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+5a3c6b71-7b29-43f1-8849-a23e04376451	5c8afb96-ea03-4512-83c6-283066d19eaf	Zhengfu He	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+2ff994e7-f287-4fbf-819c-cb225dc59380	f1204a49-d96e-4bac-8555-49e277df55da	David J. Heineman	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+528b0174-80e2-4790-acf1-5df9fd266b9a	d2923aaf-6ba3-4253-852e-0a1a970a1a6a	Maximilian J. Hochmair	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+f3595a56-32de-49b0-be50-cee7ec44bf81	8c790466-0740-43e1-a663-2fc5b9585538	Shaodong Hong	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+9cbce892-12a0-4e95-a87c-22afe0a06c77	88b422cd-5e2f-4631-aecc-455a215190c7	Helei Hou	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+879739e9-6922-4480-8d94-602443504413	14801610-81e2-4c92-9003-f6f256299dd8	Likun Hou	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+3b613cec-998a-459e-8856-598f8fc1286a	692fe14b-d756-472e-9974-319acbd574ca	Xue Hou	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+5ffe7b1b-4812-4ef6-b48a-8aed6f41e4d8	db6a2789-4a49-4fe9-8c28-b0551d481369	Yan Hu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+8187fe39-a504-436d-8342-388878f5ae87	35c1ef31-9b10-49be-bf78-62381ba201bc	Zhouguang Hui	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+db15bc0f-e109-4995-be50-722ca248f2f3	19e0a5fe-c324-4f95-98cc-837792f003e8	Mitchell S. von Itzstein	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+435bbffb-4e42-44dd-b5d7-afdfff722af5	ad09d42b-b3f2-4375-a2e9-8a3dc9f11044	Kota Iwahori	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+0be15af0-8cd1-40b2-9160-4d610a725cd1	53367b09-9c72-458a-95c5-9d55fd06afb0	Tae Won Jang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+8b884d80-c34c-4269-9bea-87a5832cf4c3	5dcc068a-9877-4cd6-b484-a75feaa1681f	Zebo Jiang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+e99dd95e-ee90-4763-98e6-6619089333fa	2b88daef-62b6-46c6-907f-527b3ca10d87	Dragana J. Jovanović	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+42b75b21-0c07-4715-b438-add8fedf569b	f10f8416-a40f-4097-8c76-5ccdb391ce8b	Susan M. Kaech	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+1629c77b-c229-4f0a-a2dc-65abc0697a0e	7a7da7a5-1b7b-474b-83fb-52004c62ae9f	Nagla Abdel Karim	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+670866ee-13d8-4329-b91a-d665c188b13c	2330ad29-a1b8-4436-9003-7ad225700e09	John Langenfeld	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+b0ed196c-04b0-48fe-ad78-b83f75b2a9a6	6eaf5c1a-7759-4fb5-af94-f31fc2e61e22	Shanqing Li	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+e5f12695-4ee5-4d01-aa11-8a0b38acb736	29f96f46-c13c-4e00-9c79-696ecca1157f	Xiao Li	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+f7984a1d-a4ae-43f2-a3a5-8a6e7d1f054e	25425c2f-5a34-4e0b-9b87-5e0359bcd801	Jun Hyeok Lim	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+3ffff964-fcac-40ec-8d70-6004291b6ba8	d9a085a0-caac-4491-bc10-0caecff4ff6c	Dongmei Lin	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+a311ccb9-7791-498c-9e74-2031b4f0f1db	33f1cafd-4bb6-41df-b703-d939568fa4ce	Hongbing Liu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+ed1c8435-1cbf-4d81-addf-ceee8f9d9d36	e446c0f0-d244-4f1f-8941-bce11d567431	Jiewei Liu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+91990b05-3f5e-45bd-85aa-7f0537e7796c	ac98b11c-50df-40d6-8034-b02139cc447b	Quanxing Liu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+442af2ea-0979-4384-89d1-8136589430a1	5f36152d-e259-412c-8a20-27688bc86804	Yifei Liu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+12ed5884-b135-424d-8c5b-0e1e3afc7270	ddb8c065-cf00-48cb-b172-860be7be13a1	Yutao Liu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+fa78aaa8-73e1-4d25-ae27-f832039b0951	c81aeb2e-3d43-402e-a1c8-88f930061585	Natalie S. Lui	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+2a73e24e-855e-47b3-a094-56b5d1f9a840	b04d0d31-cad1-4603-abf5-b63e82237f47	Tangfeng Lv	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+fb783649-0ede-4fef-9ed7-c701e4fff7cc	ad37607e-a171-4fa5-ac3d-b955eb2be335	Jianqun Ma	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+370ce036-bf60-45ba-bc74-e6d66f35f826	a819fecc-37ee-414c-a381-e1c17a1e4a1e	Rami Manochakian	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+c72e0c19-1a43-418b-aae7-f1f15129ce41	7f309779-a3f7-4a81-b1a1-7bccc0731478	Laura Mezquita	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+3645aeca-4378-4d5c-8e00-b170c899b576	cb1eab08-6ff3-4191-866e-6fc5dc8cf0f1	Drew Moghanaki	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+b57ff644-db50-448b-aef1-51bc9f1181a0	5689dd05-df2f-47dd-8e6d-04a9d78cdcf4	Fábio Ynoe de Moraes	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+f8359315-27f3-4b37-a614-958dc9fdc230	e7efb372-ea8d-4308-a16d-16c05fe58a6e	Víctor Moreno	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+831d20fa-e462-428e-b5cf-1165ab7c0ef0	60528a0e-c537-44db-adc1-6fd22ac5c1f3	Olugbenga T. Okusanya	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+e9ac83e1-7553-449c-a93f-752361af733d	d477d3b7-f9c0-49e5-bbdb-c379fd9830bf	Sukhmani K. Padda	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+62c02066-078f-45a1-ab04-9fa8e3c8b762	20111c87-16c8-4f12-8238-cedddb2035be	Hongming Pan	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+8bfe4647-becc-46ce-aef5-d45760f335bc	9cf98434-5d2f-40e4-9412-05a0ef307125	Henry S. Park	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+c75c14cd-5620-43f7-999b-88171a1bfe08	7b020e88-90e0-4075-91c6-f87451e3adc1	Muyun Peng	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+b8c3cafc-7004-4d12-8052-c3ee7abe67f4	5585e0ce-d48e-4774-b519-3fffb869cddb	Kyoung‐Ho Pyo	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+869eee37-20c0-418b-9b8d-b292729827f8	ba22f0de-ca25-48d2-9673-2372eb7e7663	Lishuang Qi	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+ada03629-2699-4740-9e4a-6f6e4cb24219	659f9c22-db22-4213-812f-514d2f76db79	Haifeng Qin	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+69cfda4e-a978-4100-9e79-cc4ca13f8d3f	c7720848-16c7-4bae-a6ce-b138d324b9b9	Tingting Qin	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+60983044-6bac-48f5-87c5-b958ca9afb2a	459a7c6c-8f61-4326-b240-2f5969af4fcb	Bo Qiu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+f613de13-e180-40f8-b0ab-50156c3208e5	5571ce51-082a-4733-b0af-b8ae6b565a18	Mantang Qiu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+c63c197e-aca6-47d5-a383-ab7ef3c6280e	f6ce3a60-2a43-4585-85c5-94ba427a029b	Laila C. Roisman	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+7118d1b7-d3f3-4a20-9aee-40fc18393b66	3fecbb1f-2b91-411a-a6e9-1443e854a144	Rami A. El Shafie	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+e01e5494-2e03-40dd-a86b-184fb4900738	3de25180-d770-49c7-8f76-d7727df4cbca	Mototsugu Shimokawa	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+0c42630e-1f33-4fea-9ddb-7d7b96599863	44f7f78e-8a98-4a34-8592-47de277155d0	Kellie N. Smith	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+30485f86-641d-4ebd-8168-c8f880e3860c	ee0abcce-0ea4-4fed-a4c2-68f27d08c05d	Zhengbo Song	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+c1897901-6dac-4aa1-b292-c6c33113a129	519b2c9c-456d-4a66-921c-7c0d6a47c162	Chunxia Su	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+3efadf84-fc76-4a1a-a75f-7d375307fa56	cd7a1cac-98e3-4bc4-bbe1-a3b3907e2fd9	Wenmei Su	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+7375648d-cc21-4e9c-a08e-0c22c6ea2bc8	18a23b41-9426-4110-9b03-d9a3a5e0dd2e	Xinbing Sui	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+ffdb5505-db05-464c-8863-2312c4c029fb	e8a48883-8449-47b6-a825-9bd5de4b595e	Feifei Teng	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+85bf867a-4375-4933-840e-7bbbefc6d5e3	fa295194-874f-4fc8-94ec-88cf538c0543	Rajat Thawani	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+67ee6701-13c1-49e8-b3d1-f2e897750217	b48e6458-428a-490f-b223-720134b99be6	Jianhui Tian	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+961c9cd3-229c-4e7a-91d5-21b9a5a19f8d	8774a33f-e1be-42bb-a3d1-e7c6d578a20c	Ying‐Ming Tsai	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+83e8a910-c33a-40ae-92fc-b8bdd25a28b9	e51273bd-3c6e-4b2c-9760-bc5e6a08fd7a	Georgios Tsakonas	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+9bf0a770-a700-4839-a30f-c849c3e22198	98e91560-3588-4e94-9aad-a065fc7b827c	Yukari Tsubata	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+17045a37-c20b-4bd4-8ca7-dc57cc111045	30a2b891-4a0e-433d-b286-0d9c5dd96704	Fabiana Vitiello	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+784152b6-0368-443b-902d-cb1155c5ec9b	eac30b9f-0db2-4fbd-9315-fc415bb6ea76	Lihui Wang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+a141f040-c91c-4fd3-bcd8-c32a1a3db08b	eaf4bc09-5773-4c93-9a13-831054c0df1c	Yun Wang	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+3ad841a2-4da0-486f-bbd3-f50abf900a65	da407111-6ead-4e67-9e48-2562dcd3af55	Melisa L. Wong	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+e2870650-1ae5-481a-beb6-ec3ee7755054	1644e08a-4951-41e0-a4b7-a7e7a93389ad	Fengying Wu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+21378f66-48ba-4736-a7ab-a6c0c6f33c76	22fe2115-4026-4c9b-9835-068a4e16b5bf	Nan Wu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+0c14e57c-066b-444f-9df0-21ffa81481a2	9d2dfd14-9311-4b39-8f08-ea7934690d8f	Tao Xin	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+4c24f505-9557-4504-8942-52caae6dc795	39d5557e-faef-4ea4-8086-53abf25f6ceb	Puyuan Xing	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+42286e06-df05-4619-aab1-1468ec02b4fd	16ba3369-3685-4712-81a0-99faaaef9525	Chuan Xu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+2ee75acd-425c-45b4-9036-cd00781e55a0	458bf6f1-938f-4e89-a465-f532b13c5bc7	Meng Xu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+a3382e68-7263-47ff-8f01-6fea628bd93c	f8d5e01d-0ad0-4651-b949-6e9cde6c2f47	Xinying Xue	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+faab5e87-7d7b-4245-8989-5941988731e6	fabf48bf-19f8-4c39-91d7-216fd63def14	Chi‐Fu Jeffrey Yang	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+eb7358bd-f19b-43fd-b564-f49f045bfaa2	addc766f-704d-44bc-8c6b-c84980faf981	Hao‐Xian Yang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+f8d7f4af-65c8-4e89-a585-12cec9745a24	ce420328-1879-4675-8efe-3174399bc7e1	Yunpeng Yang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+636b1cb8-2ce4-45fe-9cdd-143f5630b900	c5bce64f-24a2-480a-9f70-d95d8c5140d1	Ülkü Yılmaz	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+d5a02756-9002-4a28-9775-348b008acded	b93cceb0-47d6-45a1-add4-1464f5e40fce	Jiangyong Yu	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+71e6300a-2673-4c7d-a0ce-7723f5348d79	1a8468fb-9a55-44a5-847a-2afd82102a2e	Shaorong Yu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+c61ab408-ddb5-46f2-ad92-a4ec4d5d4b02	bc3f6b57-ed0c-4274-8ac8-606108b8e5d6	Zongyang Yu	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+841c14ef-5f3e-4fdc-adef-1b217afc6d6c	06995d3d-f92b-4b3b-b617-a36cb3c614ca	Jian Zeng	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+df8ce863-e163-44fc-bfe8-212e9bec2ede	e2ea4d34-daa2-4bd9-8138-572c14f36cb4	Yulan Zeng	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+a83da5bb-f207-4d37-ad9d-586c06bb4023	f34b91a2-8e10-44e2-890c-2c499eaefd0b	Cheng Zhan	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+2f85ad4f-da27-4478-8c2e-b9d860bbbdee	346bada0-d4a0-4731-8f0c-ecc74a5567d4	Boxiang Zhang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+41785fd7-000c-4b0c-972b-90e63142dff5	3c1cd527-8748-4675-aa43-426573c7168f	Pei Zhang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+5de4ae20-5f14-4e9f-a166-dc458975777a	e7b7ae55-b899-4b03-80ce-ba121cb759a0	Ruyang Zhang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+768c4336-f1c4-43f2-8f94-f17fd25c9591	47f3c7dd-b2c3-446e-a990-d11d590b2498	Wenxiong Zhang	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+c1cdc3e8-be41-44a3-b3f0-84a38c080853	e08ed27e-a203-4798-9fac-65ab0e67b465	Yan Zhang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+2366a29b-fd66-43bf-afd2-54b3d2a1ed1f	1d4a1e06-f342-4af5-a7bf-0eba93881c34	Yaxiong Zhang	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+e9f12615-f3b8-4380-823c-9bd071fddcb3	55d56f27-d096-4ed8-b6fd-c0bc2ccffb67	Yongchang Zhang	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+a47f2c45-642f-4db0-92b4-e5f175b6c792	1a02122b-0bb2-4fc7-a97f-895e162ff9a1	Chengzhi Zhou	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+9e8db8d1-f83c-46c1-aae7-348f59e1f964	a9312f07-d2ac-4911-8452-93f1a340a3a6	Jianya Zhou	rising_eligible	rising_star_v4.1	2026-08-19	NONE_LEFT
+9e803660-d390-43c6-83a6-b548927aa493	4767cff6-b21d-4829-a4c8-3a81241d2577	Jinhong Zhu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+a0f563ef-814f-4683-9322-21852edb056a	c03fce61-b110-4b57-b9ae-ad05cee20d23	Lucheng Zhu	established	rising_star_v4.1	2026-08-19	NONE_LEFT
+8f6c2771-9552-4f3e-b66a-25c09bb098d0	9470c4ea-e389-4c3b-97e9-ad6cacd65752	Zhengfei Zhu	established	rising_star_v4.1	2026-08-19	HAS_OTHER
+b1f1430c-fa31-4b46-b743-735979376490	00c93561-f7bc-4090-adbf-24b81dc105c2	Daiying Zuo	established	rising_star_v4.1	2026-08-19	NONE_LEFT
