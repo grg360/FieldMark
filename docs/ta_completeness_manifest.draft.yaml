@@ -1,0 +1,1888 @@
+# TA completeness manifest — DRAFT r2, 2026-08-31
+#
+# A PROPOSAL FOR REVIEW. Structural pass: three kinds, per-entry applicability, and a
+# depends_on graph where every edge carries the file:line that proves it. Companion findings:
+# docs/TA_COMPLETENESS_REPORT_2026-08-31.md (see the Amendment section for the reconciliation
+# that produced r2).
+#
+# Read-only authoring. No producer was run, no billed job invoked, nothing committed.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# WHAT CHANGED IN r2
+#
+#   kind:           every entry is now output | input | schema_gap. r1 had only outputs, so
+#                   hand-supplied content (curated_ta_concepts, ta_hcpcs_codes) and
+#                   new-object-required debt (community_board_nsclc_v1) had nowhere to live.
+#   applicability:  the condition under which an artifact is EXPECTED for a given TA. r1 had
+#                   no way to say "zero is correct here", so branch-conditional artifacts read
+#                   as permanent gaps. Never absent: unconditional artifacts say so.
+#   depends_on:     now a list of {upstream, gate, evidence}. gate is hard_fail | degrade |
+#                   weight_gated. An edge without evidence was DROPPED, not kept on intuition.
+#                   A runner orders work by these; a wrong edge runs a stage against inputs
+#                   that are not ready.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# KINDS
+#
+#   output      produced by a script or view. A runner can create it.
+#   input       a human or upstream process must SUPPLY it. NO RUNNER CAN CREATE IT. Every
+#               input records `consumers` with on_missing: hard_fail | silent_degrade and the
+#               file:line that proves which. silent_degrade is the dangerous half: the stage
+#               exits 0 and the surface goes blank.
+#   schema_gap  a new TA requires a NEW DATABASE OBJECT, not new rows. No runner can populate
+#               these either, but unlike inputs the fix is DDL, not content. Cross-referenced
+#               to scripts/utilities/ta_neutrality_allowlist.tsv so the two lists cannot drift.
+#
+# GATES
+#
+#   hard_fail    the consumer refuses to run. Cheap, loud, correct.
+#   degrade      the consumer runs and produces thinner output. Cited from the code that
+#                explicitly chose to proceed.
+#   weight_gated read unconditionally but multiplied by a weight that defaults to 0, so a
+#                missing value changes nothing at default settings.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# COVERAGE QUERIES
+#
+# EVERY coverage_query READS THE TARGET OBJECT DIRECTLY — never a state file, cache or log.
+#
+# TEXT-KEY WARNING, MEASURED 2026-08-31 AND NOT THEORETICAL. r1 asserted that
+# `lower(col) = :ta_slug` resolves for text-keyed tables, generalising a measurement taken on
+# hcp_ai_overviews alone. It is FALSE for hcp_research_themes_v2. Live distinct values:
+#
+#   hcp_research_themes_v2.therapeutic_area : 'NSCLC' | 'COLORECTAL-CANCER' | 'Atopic Dermatitis'
+#   theme_canonical_v1.therapeutic_area     : 'NSCLC' | 'COLORECTAL-CANCER'
+#   hcp_ai_overviews.therapeutic_area       : 'NSCLC' | 'colorectal-cancer' | 'atopic-dermatitis'
+#   hcp_narratives_v2.therapeutic_area_slug : all registered slugs, lowercase
+#   hcp_leadership_evidence.therapeutic_area: 'nsclc'
+#
+# lower('Atopic Dermatitis') = 'atopic dermatitis', which is not the slug 'atopic-dermatitis'.
+# Measured result of r1's own query, by TA:
+#
+#   slug               research_themes  canonical_themes  ai_overviews
+#   nsclc                       10,640                25           598
+#   colorectal-cancer            1,120                25            15
+#   atopic-dermatitis                0                 0            87   <-- 3,499 rows exist
+#   hepatology                       0                 0             0
+#
+# A checker built on r1 would have reported AD as having zero research themes. Entries below
+# carry key_form so the mismatch is visible rather than silently wrong; three text-keyed
+# entries are marked coverage_query_unsafe until the key is normalised.
+
+meta:
+  authored: 2026-08-31
+  revision: r2
+  reference_ta: nsclc
+  measured_ta: colorectal-cancer
+  live_artifacts: 56
+  entries: 57            # r1 had 42. +14 objects r1 left unaccounted, +1 (nsclc_trials_surface)
+                         # that no relation-based census could see: it is a FUNCTION, found by
+                         # reading ta_neutrality_allowlist.tsv rather than by querying pg_class.
+  excluded: { superseded: 13, backup: 18 }
+  reference_contamination: true
+  note: >
+    NSCLC IS NOT A CLEAN BASELINE. It carries at least one artifact its own configured model
+    does not produce (hcp_scientific_emergence_v1, 16,620 rows written 2026-08-19 while
+    RISING_MODEL['nsclc'] = 'momentum'), plus two superseded score tables frozen at May. The
+    diff read that surplus as CRC deficit. Any artifact with an applicability condition must
+    be evaluated against that condition before its NSCLC/CRC delta means anything. See
+    contaminated_reference at the foot of this file.
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# INPUTS — nothing here has a producer. A runner must STOP and ask a human.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# MACHINE-READABLE LAYER — everything scripts/ta_completeness.py needs to know.
+#
+# The checker contains NO slug literal, NO table name, NO producer path and NO threshold.
+# Every TA-specific fact lives here. If the checker would need to know something about a TA
+# to be correct, it goes in ta_facts, not in Python.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+registry:
+  table: therapeutic_areas
+  slug_column: slug
+  id_column: id
+
+# coverage_query bind names -> where the value comes from.
+binds:
+  ta_id:          { from: registry,  column: id }
+  ta_slug:        { from: registry,  column: slug }
+  themes_tag:     { from: ta_facts,  key: themes_tag }
+  specialty_slug: { from: ta_facts,  key: specialty }
+  # nullable: NULL is a MEANING here, not a missing value -- "this TA has no contracted depth,
+  # so count the whole population". run_count only tolerates NULL for binds declared this way.
+  established_rank_cut: { from: ta_facts, key: contracted_established_rank_cut, nullable: true }
+  community_basis:      { from: ta_facts, key: contracted_community_basis,      nullable: true }
+
+# Per-TA facts. Every applicability predicate resolves against this table.
+#
+# LIFECYCLE. A TA that nobody has bought has no contracted narrative depth, so there is no
+# honest denominator for "how much of the board should carry a narrative" -- the answer is
+# whatever a future contract says. Unsold TAs therefore MEASURE the narrative coverage ratios
+# and report them, but carry no threshold on those axes and can never be INSUFFICIENT because
+# of them. Selling a TA fixes the depth; the depth becomes the denominator.
+#   lifecycle                        unsold | sold
+#   contracted_established_rank_cut  when sold: narratives contracted down to rank <= N.
+#                                    null when unsold.
+#   contracted_community_basis       when sold: the community basis contracted for. null when
+#                                    unsold. NOTE: the sold-path denominator for community
+#                                    CANNOT BE EXPRESSED YET -- see narratives_community.
+ta_facts:
+  nsclc:
+    rising_model: momentum                # scripts/score/rising_score.py:46
+    themes_tag: NSCLC                     # extract_research_themes.py TA_CONFIGS
+    has_themes_config: true               # slug present in TA_CONFIGS (:152)
+    themes_tag_matches_upper: true        # 'NSCLC' == 'NSCLC' -> G2 runs (pre_g2:519-529)
+    specialty: oncology                   # social layer grain
+    social_ta_addressable: false          # no TA-grain rows exist or can exist
+    pharma_weight_nonzero: false          # --w-pharma default 0.0 (recompute_..._v3.py:415)
+    has_congress_ingest: true             # ingest_asco_abstracts.py covers it
+    is_visible_in_ui: true
+    lifecycle: unsold
+    contracted_established_rank_cut: null
+    contracted_community_basis: null
+  colorectal-cancer:
+    rising_model: momentum                # scripts/score/rising_score.py:47
+    themes_tag: COLORECTAL-CANCER
+    has_themes_config: true
+    themes_tag_matches_upper: true
+    specialty: oncology
+    social_ta_addressable: false
+    pharma_weight_nonzero: false
+    has_congress_ingest: true             # ASCO covers colorectal cancer
+    is_visible_in_ui: true
+    lifecycle: unsold
+    contracted_established_rank_cut: null
+    contracted_community_basis: null
+  atopic-dermatitis:
+    rising_model: emergence_composite     # scripts/score/rising_score.py:48
+    themes_tag: Atopic Dermatitis
+    has_themes_config: true
+    themes_tag_matches_upper: false       # 'Atopic Dermatitis' != 'ATOPIC-DERMATITIS'
+    specialty: dermatology
+    social_ta_addressable: false
+    pharma_weight_nonzero: false
+    has_congress_ingest: false
+    is_visible_in_ui: true
+    lifecycle: unsold
+    contracted_established_rank_cut: null
+    contracted_community_basis: null
+  hepatology:
+    rising_model: null                    # never migrated to the v3 rising pipeline
+    themes_tag: null
+    has_themes_config: false              # no TA_CONFIGS entry -> argparse rejects it
+    themes_tag_matches_upper: false
+    specialty: hepatology
+    social_ta_addressable: true           # the social layer IS keyed at this grain
+    pharma_weight_nonzero: false
+    has_congress_ingest: false
+    is_visible_in_ui: false               # excluded by the live_therapeutic_areas gate
+    lifecycle: unsold
+    contracted_established_rank_cut: null
+    contracted_community_basis: null
+
+# What each classification means to the checker.
+#   gap_eligible: false  -> a zero count is NOT a gap; the entry reports N/A with na_reason.
+classification_semantics:
+  automatable:            { gap_eligible: true,  plan_group: AUTOMATABLE }
+  billed:                 { gap_eligible: true,  plan_group: BILLED }
+  founder_gated:          { gap_eligible: true,  plan_group: FOUNDER_GATED }
+  blocked:                { gap_eligible: true,  plan_group: NEEDS_DECISION }
+  unknown:                { gap_eligible: true,  plan_group: NEEDS_DECISION }
+  conditional_gap:        { gap_eligible: true,  plan_group: NEEDS_DECISION }
+  schema_gap:             { gap_eligible: true,  plan_group: SCHEMA_GAP }
+  superseded:             { gap_eligible: false, plan_group: null, na_reason: "superseded; a zero here is correct" }
+  frozen:                 { gap_eligible: false, plan_group: null, na_reason: "deliberately frozen; no longer written" }
+  user_generated:         { gap_eligible: false, plan_group: null, na_reason: "accrues from app use; no producer can fill it" }
+  not_ta_scoped:          { gap_eligible: false, plan_group: null, na_reason: "not keyed at TA grain; a TA bind can never match" }
+  not_applicable_for_crc: { gap_eligible: false, plan_group: null, na_reason: "produced only on a branch this TA does not take" }
+
+# Order the plan prints its groups in. NEEDS_DECISION is not one of the four requested
+# groups; it exists because three classifications (blocked, unknown, conditional_gap) are
+# real gaps that none of the four describe, and dropping them to fit the shape would hide
+# them.
+# INSUFFICIENT is last because those artifacts EXIST and are already serving data: a
+# top-up is a smaller, later job than a build. GAP work comes first because it unblocks.
+plan_group_order: [AUTOMATABLE, BILLED, FOUNDER_GATED, SCHEMA_GAP, NEEDS_DECISION, INSUFFICIENT]
+
+# NOTE ON THE KEY NAME: the edge key is `upstream`, not `on`. YAML 1.1 resolves a bare `on:`
+# key to the BOOLEAN true, so every edge silently parsed as {true: <name>} and the checker
+# could not read its own graph. Do not rename it back.
+#
+# depends_on targets that are NOT manifest entries. Named so the checker can tell an
+# untracked upstream from a typo, and so the topological sort does not invent nodes.
+external_dependencies:
+  - hcp_industry_classification_v1   # TA-agnostic; ta_cycle stage 8e
+  - institution_primary_links_v1     # TA-agnostic institution layer
+  - social_posts_v2                  # social corpus, specialty-keyed
+  - ta_configs_entry                 # a dict literal in extract_research_themes.py, not a table
+
+
+artifacts:
+
+  - name: ta_registry_row
+    kind: input
+    target_table: therapeutic_area_ingestion_config
+    coverage_query: "select count(*) from therapeutic_area_ingestion_config where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true, note: "every TA needs exactly one config row" }
+    producer: null
+    runs_in: none
+    supplied_by: human (SQL insert)
+    searches_run:
+      - "scripts/**/*.py for insert/upsert/update against it — EMPTY"
+      - "pg_proc bodies with INSERT/UPDATE/DELETE against it — 0 rows, EMPTY"
+      - "pg_trigger on the table — 0 rows, EMPTY"
+    consumers:
+      - { consumer: scripts/ingest/ingest_publications.py:219, on_missing: hard_fail, evidence: "ingest_publications.py:890 — 'Did you populate therapeutic_area_ingestion_config?'" }
+      - { consumer: scripts/narrative/generate_narratives_v2.py:207, on_missing: silent_degrade, evidence: "generate_narratives_v2.py:216 — '[WARNING] No visible TAs found... Narrative selection will be empty.' Warns and continues." }
+      - { consumer: scripts/score/rising_score.py:54-55, on_missing: silent_degrade, evidence: "rising_score.py:118-124 falls back to the hardcoded RISING_MODEL map rather than failing" }
+      - { consumer: frontend/src/lib/api.ts:896 (via live_therapeutic_areas), on_missing: silent_degrade, evidence: "api.ts:866-867 — the view is the authoritative TA gate; an absent row means the TA never appears in the UI" }
+    depends_on: []
+    classification: founder_gated
+    status_2026_08_31: { nsclc: 1, crc: 1, ad: 1, hepatology: 1 }
+    note: >
+      Excluded from the TA-neutrality validator by design — validate_ta_neutrality.py:231-235
+      lists it in REGISTRY_OBJECTS: "therapeutic_areas IS the registry, and
+      live_therapeutic_areas is its gate. Flagging them would be flagging the definition of
+      TA-ness as a TA violation."
+
+  - name: live_ta_gate
+    kind: output
+    target_object: live_therapeutic_areas
+    object_kind: view
+    coverage_query: "select count(*) from live_therapeutic_areas where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: is_visible_in_ui
+        equals: true
+      condition: "therapeutic_area_ingestion_config.is_visible_in_ui = true AND is_active = true"
+      evaluate: "select is_visible_in_ui and is_active from therapeutic_area_ingestion_config where therapeutic_area_id = :ta_id"
+      evidence: frontend/src/lib/api.ts:866-867
+    producer: null
+    runs_in: none
+    depends_on:
+      - upstream: ta_registry_row
+        gate: hard_fail
+        evidence: "pg_depend/pg_rewrite — live_therapeutic_areas reads therapeutic_area_ingestion_config and nothing else (verified 2026-08-31)"
+    classification: automatable
+    status_2026_08_31: { rows_total: 3, tas_visible: [nsclc, colorectal-cancer, atopic-dermatitis], hepatology: excluded_by_gate }
+    note: >
+      THE ONE TRUE FOLD in this manifest — a view whose only source is its base table. r1
+      omitted both and never stated a folding rule; r1 in fact gave three other views their
+      own entries, so no such rule was ever in force. Kept as a separate entry because its
+      is_visible_in_ui gate is a distinct, evaluable predicate that the base table does not
+      express.
+
+  - name: curated_concepts
+    kind: input
+    target_table: curated_ta_concepts
+    coverage_query: "select count(*) from curated_ta_concepts where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    supplied_by: human (curated OpenAlex concept ids)
+    searches_run:
+      - "scripts/**/*.py for insert/upsert/update — EMPTY (only .select() reads)"
+      - "pg_proc writers — 0 rows, EMPTY. pg_trigger — 0 rows, EMPTY."
+    consumers:
+      - { consumer: scripts/classify/ta_tagging_rebuild_v2.py:422, on_missing: hard_fail, evidence: "ta_tagging_rebuild_v2.py:923 — raise RuntimeError('curated_ta_concepts is empty - cannot proceed')" }
+      - { consumer: scripts/score/scoring_pipeline.py:376, on_missing: silent_degrade, evidence: "scoring_pipeline.py:1398 loads it for per-pub TA relevance; no guard — an empty set yields zero relevance, not an error" }
+      - { consumer: scripts/score/established_scoring.py:140, on_missing: silent_degrade, evidence: "established_scoring.py:730 — same load, same absence of a guard" }
+    depends_on: []
+    classification: founder_gated
+    status_2026_08_31: { nsclc: 37, crc: 24, ad: 23, hepatology: 46, ratio: 0.649 }
+    note: >
+      THE MOST CONSEQUENTIAL OMISSION FROM r1 — absent entirely, with no reason recorded
+      anywhere. It is the hard precondition for ta_cycle stage 4; a manifest that measures
+      publication_ta_membership but omits the curation stage 4 refuses to run without cannot
+      explain why a new TA's corpus stage failed. Same class as ta_drug_keywords, which r1
+      did carry. generate_cycle.py:458 cites the same guard as the model for its own.
+
+  - name: ta_drug_keywords
+    kind: input
+    target_table: ta_drug_keywords
+    coverage_query: "select count(*) from ta_drug_keywords where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    supplied_by: human (curated drug names, with exclusions and traps recorded beside them)
+    searches_run: ["scripts/**/*.py writes — EMPTY", "pg_proc writers — 0, EMPTY", "pg_trigger — 0, EMPTY"]
+    consumers:
+      - { consumer: scripts/aggregate/open_payments_aggregator.py:144, on_missing: hard_fail_at_orchestrator, evidence: "generate_cycle.py:572-587 (pre_g6) blocks G6 BEFORE spending. The script itself has no guard — open_payments_aggregator.py:142-154 just fetches — so run standalone it silently writes zero rows and exits 0." }
+    depends_on: []
+    classification: founder_gated
+    status_2026_08_31: { nsclc: 21, crc: 29, ratio: 1.381 }
+    note: >
+      DONE for CRC — migrations/2026_08_28_seed_ta_drug_keywords_crc.sql. The model for the
+      inputs below. pre_g6 is the reference guard in this codebase; generate_cycle.py:458
+      calls it "the highest-value one in the set: it turns today's silent zero into a
+      one-second failure naming the missing thing."
+
+  - name: ta_hcpcs_codes
+    kind: input
+    target_table: ta_hcpcs_codes
+    coverage_query: "select count(*) from ta_hcpcs_codes where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true, note: "any TA with an administered-therapy surface" }
+    producer: null
+    runs_in: none
+    supplied_by: human (HCPCS code curation, code_category and is_primary_signal per code)
+    searches_run: ["scripts/**/*.py writes — EMPTY", "pg_proc writers — 0, EMPTY", "pg_trigger — 0, EMPTY"]
+    consumers:
+      - { consumer: "public.hcp_administered_volume (RPC)", on_missing: silent_degrade, evidence: "the RPC INNER JOINs ta_hcpcs_codes ON c.therapeutic_area_id = p_ta_id; with zero rows v_set_rows = 0 and it returns jsonb {'state':'no_set_activity'} or {'state':'no_medicare'} — a NAMED ABSENCE STATE indistinguishable from an HCP who genuinely administers nothing" }
+      - { consumer: "public.hcp_administered_therapy (RPC)", on_missing: silent_degrade, evidence: "same join shape; pg_proc body reference verified 2026-08-31" }
+      - { consumer: "public.community_practice_profile (RPC)", on_missing: silent_degrade, evidence: "same; pg_proc body reference verified 2026-08-31" }
+      - { consumer: scripts/aggregate/medicare_aggregator.py:195-202, on_missing: silent_degrade, evidence: "fetch_all_pages with no emptiness guard; an empty set yields an empty TA slice and exit 0" }
+    depends_on: []
+    classification: founder_gated
+    status_2026_08_31: { nsclc: 49, crc: 0, gap: true }
+    note: >
+      THE WORST SILENT DEGRADE IN THE SET, and r1 recorded none of it. For CRC every HCP
+      currently returns an absence state from hcp_administered_volume, and no surface can tell
+      "we hold no codes for this TA" from "this doctor administers nothing." Unlike
+      ta_drug_keywords there is NO orchestrator guard, because these RPCs are read paths, not
+      cycle stages. A pre-flight equivalent of pre_g6 is the fix.
+
+  - name: ta_clinical_taxonomies
+    kind: input
+    target_table: ta_clinical_taxonomies
+    coverage_query: "select count(*) from ta_clinical_taxonomies where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    supplied_by: human (clinical taxonomy curation)
+    searches_run:
+      - "scripts/**/*.py — the ONLY reference is generate_cycle.py:1232, the hand-maintained list itself. No reader, no writer. EMPTY."
+      - "pg_proc — 0 rows, EMPTY. pg_trigger — 0 rows, EMPTY."
+    consumers: []
+    depends_on: []
+    classification: founder_gated
+    status_2026_08_31: { nsclc: 7, crc: 0, gap: true }
+    note: >
+      NO CONSUMER FOUND ANYWHERE. Searched scripts/, frontend/src, sql/, migrations/, pg_proc
+      and pg_trigger. The only mention is its own line in generate_cycle.py's
+      "Config content -- no script writes these" list. Before curating 7 CRC rows to match
+      NSCLC, establish what would read them — this may be an artifact of a plan that was never
+      built rather than a gap.
+
+  - name: cohort_counts_cache
+    kind: input
+    target_table: ta_cohort_counts_cache
+    coverage_query: "select count(*) from ta_cohort_counts_cache where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    supplied_by: human (hand-maintained cache)
+    searches_run:
+      - "scripts/**/*.py — the only reference is generate_cycle.py:1233. EMPTY otherwise."
+      - "sql/, migrations/ — DDL, RLS and grants only, no DML. EMPTY."
+      - "pg_proc writers — 0 rows, EMPTY. pg_trigger — 0 rows, EMPTY."
+    consumers: []
+    depends_on: []
+    classification: founder_gated
+    status_2026_08_31: { nsclc: 1, crc: 0, gap: true }
+    note: >
+      RECLASSIFIED FROM OUTPUT — r1 claimed producer scripts/generate_cycle.py, runs_in
+      generate_cycle, citing :1233. That line does not write the table: it is an element of
+      the tuple inside print_manual_work, whose own header at :1231 reads
+      "Config content -- no script writes these:". r1 cited the line that says nothing writes
+      it as proof that something does. Nothing writes it, in the repo or the database.
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# OUTPUTS — corpus and membership
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+  - name: publication_ta_membership
+    kind: output
+    target_table: publication_therapeutic_areas_v2
+    coverage_query: "select count(*) from publication_therapeutic_areas_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/classify/ta_tagging_rebuild_v2.py, flags: ["--ta <slug>", "--candidate-hcp-ids-file", "--execute"] }
+    runs_in: ta_cycle:4
+    depends_on:
+      - upstream: curated_concepts
+        gate: hard_fail
+        evidence: scripts/classify/ta_tagging_rebuild_v2.py:923
+    classification: automatable
+    status_2026_08_31: { nsclc: 88251, crc: 147218, ratio: 1.668 }
+
+  - name: hcp_ta_membership
+    kind: output
+    target_table: hcp_therapeutic_areas_v2
+    coverage_query: "select count(distinct hcp_id) from hcp_therapeutic_areas_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/classify/ta_tagging_rebuild_v2.py, flags: ["--ta <slug>", "--execute"] }
+    runs_in: ta_cycle:4
+    depends_on:
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "same script, same stage — the HCP tags are derived from the publication tags in one pass (ta_cycle.py:44, stage 4)"
+      - upstream: curated_concepts
+        gate: hard_fail
+        evidence: scripts/classify/ta_tagging_rebuild_v2.py:923
+    classification: automatable
+    status_2026_08_31: { nsclc: 86436, crc: 106551, ratio: 1.233 }
+
+  - name: cohort_classification
+    kind: output
+    target_table: hcp_cohort_classification_v2
+    coverage_query: "select count(*) from hcp_cohort_classification_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/classify/cohort_classification_v2.py, flags: ["--ta <slug>", "--execute"] }
+    runs_in: ta_cycle:8d
+    depends_on:
+      - upstream: hcp_ta_membership
+        gate: hard_fail
+        evidence: "ta_cycle.py:44-66 — stage 4 writes hcp_therapeutic_areas_v2 and generates ta_hcp_ids.txt; 8d runs after it under fail-fast ordering (ta_cycle.py:40)"
+    classification: automatable
+    status_2026_08_31: { nsclc: 86142, crc: 106551, ratio: 1.237 }
+
+# ─── scoring inputs and boards ────────────────────────────────────────────────────────────
+
+  - name: publication_leadership
+    kind: output
+    target_table: hcp_publication_leadership_v2
+    coverage_query: "select count(*) from hcp_publication_leadership_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/score/publication_leadership_scoring.py, flags: ["--ta <slug>"] }
+    runs_in: ta_cycle:9
+    depends_on:
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "ta_cycle.py:40 fail-fast ordering — stage 4 precedes stage 9; leadership is computed over the TA's tagged publications"
+    classification: automatable
+    status_2026_08_31: { nsclc: 17473, crc: 24879, ratio: 1.424 }
+
+  - name: network_centrality
+    kind: output
+    target_table: hcp_network_centrality_v2
+    coverage_query: "select count(*) from hcp_network_centrality_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/score/network_centrality_scoring.py, flags: ["--ta <slug>", "--window-type early_roll|recent_roll"] }
+    runs_in: ta_cycle:9
+    depends_on:
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "ta_cycle.py:40 fail-fast ordering; rising_score.py:93-96 runs it twice, once per rolling window"
+    classification: automatable
+    status_2026_08_31: { nsclc: 470127, crc: 288730, ratio: 0.614 }
+
+  - name: scientific_momentum
+    kind: output
+    target_table: hcp_scientific_momentum_v1
+    coverage_query: "select count(*) from hcp_scientific_momentum_v1 where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: rising_model
+        equals: momentum
+      condition: "rising_model = 'momentum'"
+      evaluate: "RISING_MODEL[slug] in scripts/score/rising_score.py:45-49, or the therapeutic_area_ingestion_config.rising_model column once it exists"
+      evidence: scripts/score/rising_score.py:97-99 (MOMENTUM_STEPS)
+    producer: { script: scripts/score/scientific_momentum_scoring.py, flags: ["--ta <slug>", "--early-start-date", "--recent-start-date"] }
+    runs_in: ta_cycle:9
+    depends_on:
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "ta_cycle.py:40 fail-fast ordering"
+      - upstream: hcp_industry_classification_v1
+        gate: degrade
+        evidence: "ta_cycle.py:70-73 — 'scientific_momentum_scoring / network_momentum_scoring INNER JOIN that table filtered to classification=ACADEMIC; an HCP with no row is silently dropped from rising scoring'"
+    classification: automatable
+    status_2026_08_31: { nsclc: 2247, crc: 2753, ratio: 1.225 }
+    note: >
+      The hcp_industry_classification_v1 edge is a SILENT DROP, not a failure, and it is
+      TA-agnostic (stage 8e reclassifies every HCP with no --ta). r1 had no edge for it at all.
+
+  - name: network_momentum
+    kind: output
+    target_table: hcp_network_momentum_v1
+    coverage_query: "select count(*) from hcp_network_momentum_v1 where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: rising_model
+        equals: momentum
+      condition: "rising_model = 'momentum'"
+      evaluate: "RISING_MODEL[slug] in scripts/score/rising_score.py:45-49"
+      evidence: scripts/score/rising_score.py:100-103 (MOMENTUM_STEPS)
+    producer: { script: scripts/score/network_momentum_scoring.py, flags: ["--ta <slug>", "--early-window-type early_roll", "--recent-window-type recent_roll"] }
+    runs_in: ta_cycle:9
+    depends_on:
+      - upstream: network_centrality
+        gate: hard_fail
+        evidence: "rising_score.py:93-103 — network_centrality_scoring runs twice (early_roll, recent_roll) BEFORE network_momentum_scoring, which consumes both window types by name"
+      - upstream: hcp_industry_classification_v1
+        gate: degrade
+        evidence: ta_cycle.py:70-73
+    classification: automatable
+    status_2026_08_31: { nsclc: 4291, crc: 4376, ratio: 1.020 }
+
+  - name: rising_board
+    kind: output
+    target_table: hcp_rising_star_ranks_v3
+    coverage_query: "select count(*) from hcp_rising_star_ranks_v3 where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: rising_model
+        equals: momentum
+      condition: "rising_model = 'momentum'"
+      evaluate: "RISING_MODEL[slug] in scripts/score/rising_score.py:45-49"
+      evidence: "scripts/score/rising_score.py:62 — MODEL_OUTPUT_TABLE['momentum'] = 'hcp_rising_star_ranks_v3'"
+    producer: { script: scripts/score/rising_score.py, flags: ["--ta <slug>", "--execute"] }
+    runs_in: ta_cycle:9
+    depends_on:
+      - upstream: scientific_momentum
+        gate: hard_fail
+        evidence: "rising_score.py:97-104 — rising_star_scoring.py is the last MOMENTUM_STEPS entry, after both momentum scorers"
+      - upstream: network_momentum
+        gate: hard_fail
+        evidence: scripts/score/rising_score.py:100-104
+      - upstream: cohort_classification
+        gate: hard_fail
+        evidence: "ta_cycle.py:40 fail-fast ordering — 8d precedes 9"
+    classification: automatable
+    status_2026_08_31: { nsclc: 149, crc: 140, ratio: 0.940 }
+
+  - name: rising_emergence
+    kind: output
+    target_table: hcp_scientific_emergence_v1
+    coverage_query: "select count(*) from hcp_scientific_emergence_v1 where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: rising_model
+        equals: emergence_composite
+      condition: "rising_model = 'emergence_composite'"
+      evaluate: "RISING_MODEL[slug] in scripts/score/rising_score.py:45-49 — nsclc: momentum, colorectal-cancer: momentum, atopic-dermatitis: emergence_composite"
+      evidence: "scripts/score/rising_score.py:109-112 — EMERGENCE_STEPS = [emergence_scoring.py, rising_composite_scoring.py]; scripts/score/rising_score.py:113-116 MODEL_STEPS dispatch"
+      expected_for_crc: false
+    producer: { script: scripts/score/emergence_scoring.py, flags: ["--ta <slug>"] }
+    runs_in: ta_cycle:9 (emergence branch only)
+    depends_on:
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "ta_cycle.py:40 fail-fast ordering"
+    classification: not_applicable_for_crc
+    exceptions:
+    - ta: nsclc
+      expect: rows_present_though_not_applicable
+      observed_rows: 16620
+      reason: 'emergence_scoring.py run out of band 2026-08-19 for a momentum TA. Only
+        EMERGENCE_STEPS[0] ran: hcp_rising_composite_v1 has no NSCLC rows. Reference surplus,
+        not a CRC deficit.'
+    status_2026_08_31: { nsclc: 16620, crc: 0, ad: 3052, gap: false }
+    note: >
+      RECLASSIFIED FROM automatable GAP. CRC is a momentum TA, so zero is the CORRECT value
+      and no runner should ever try to fill it. It read as a gap because NSCLC — also a
+      momentum TA — holds 16,620 rows written 2026-08-19, out of band. Only the first of the
+      two emergence steps ran: hcp_rising_composite_v1 has no NSCLC rows at all. This is the
+      reference contamination, not a CRC deficit.
+
+  - name: rising_composite
+    kind: output
+    target_table: hcp_rising_composite_v1
+    coverage_query: "select count(*) from hcp_rising_composite_v1 where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: rising_model
+        equals: emergence_composite
+      condition: "rising_model = 'emergence_composite'"
+      evaluate: "RISING_MODEL[slug] in scripts/score/rising_score.py:45-49"
+      evidence: "scripts/score/rising_score.py:63 — MODEL_OUTPUT_TABLE['emergence_composite'] = 'hcp_rising_composite_v1'"
+      expected_for_crc: false
+    producer: { script: scripts/score/rising_composite_scoring.py, flags: ["--ta <slug>", "--execute"] }
+    runs_in: ta_cycle:9 (emergence branch only, via rising_score.py:111)
+    depends_on:
+      - upstream: rising_emergence
+        gate: hard_fail
+        evidence: "rising_score.py:109-112 — emergence_scoring.py precedes rising_composite_scoring.py in EMERGENCE_STEPS"
+    classification: not_applicable_for_crc
+    status_2026_08_31: { nsclc: 0, crc: 0, ad: 11125, gap: false }
+    note: >
+      One of r1's eight "empty for both", and the ONLY one with live readers: RPCs
+      get_rising_composite_filtered(_count) and get_community_directory_filtered(_count); the
+      view institution_ta_roster_v1; api.ts:1278/1920/2010/2061/3916/3968;
+      institutionRegistry.ts:223; home.ts:1308; generate_narratives_v2.py:552/727/1607;
+      export_telescope_data.py:193/221/289; extract_research_themes.py:103;
+      capture_percentiles.py:50. Live readers over a for-both-empty artifact was exactly the
+      blind spot the diff could not see — and it turns out not to be a gap, because
+      applicability explains the zero.
+
+  - name: established_board
+    kind: output
+    target_table: hcp_established_ranks_v3
+    coverage_query: "select count(*) from hcp_established_ranks_v3 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/score/recompute_established_ranks_v3.py, flags: ["--ta <slug>", "--w-scientific 0.60", "--w-network 0.40", "--w-pharma 0.0"] }
+    runs_in: by_hand
+    depends_on:
+      - upstream: cohort_classification
+        gate: hard_fail
+        evidence: scripts/score/recompute_established_ranks_v3.py:202
+      - upstream: publication_leadership
+        gate: hard_fail
+        evidence: scripts/score/recompute_established_ranks_v3.py:286
+      - upstream: network_centrality
+        gate: hard_fail
+        evidence: scripts/score/recompute_established_ranks_v3.py:302
+      - upstream: pharma_engagement
+        gate: weight_gated
+        evidence: "recompute_established_ranks_v3.py:313-325 reads hcp_pharma_engagement_v2 unconditionally, but :415 declares --w-pharma default 0.0, so at default weights a missing value changes no rank"
+      - upstream: hcp_industry_classification_v1
+        gate: degrade
+        evidence: scripts/score/recompute_established_ranks_v3.py:215
+    classification: automatable
+    status_2026_08_31: { nsclc: 46015, crc: 67550, ratio: 1.468 }
+    note: >
+      r1 listed only [publication_leadership, network_centrality]. Three edges were missing
+      and one of the two present was under-specified. NOTE the weight_gated edge: CRC's
+      established board was built with zero pharma rows and is unaffected at default weights.
+
+  - name: community_scores
+    kind: output
+    target_table: hcp_community_scores_v2
+    coverage_query: "select count(*) from hcp_community_scores_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/score/community_scoring.py, flags: ["--ta <slug>"] }
+    runs_in: generate_cycle:G7
+    depends_on:
+      - upstream: cohort_classification
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:589-600 (pre_g7) — refuses when cohort='community' rows are 0"
+      - upstream: open_payments_rollup
+        gate: degrade
+        evidence: "generate_cycle.py:601-618 (pre_g7) — 'DEGRADED, NOT BLOCKED... missing payment/medicare inputs blank DISPLAYED FACTS rather than corrupting a score. Warn and proceed'"
+      - upstream: medicare_by_ta
+        gate: degrade
+        evidence: scripts/generate_cycle.py:601-618
+    classification: automatable
+    status_2026_08_31: { nsclc: 49379, crc: 52167, ratio: 1.056 }
+    note: >
+      r1 listed all three edges as equal. They are not: one blocks, two degrade, and the code
+      says so explicitly. A runner that treats the degrade edges as blocking will refuse a
+      stage that still produces useful rows.
+
+  - name: top_collaborators
+    kind: output
+    target_table: hcp_top_collaborators_v2
+    coverage_query: "select count(*) from hcp_top_collaborators_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/aggregate/compute_top_collaborators.py, flags: ["--ta <slug>"] }
+    runs_in: generate_cycle:G3
+    depends_on:
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:533-544 (pre_g3) — refuses when the publication_authors_v2 x publication_therapeutic_areas_v2 join is empty"
+    classification: automatable
+    status_2026_08_31: { nsclc: 434845, crc: 543347, ratio: 1.250 }
+    note: "STAGES[0] — generate_cycle.py:931-933: 'unbilled, no generation-layer dependencies'."
+
+  - name: board_snapshots
+    kind: output
+    target_table: hcp_established_board_snapshots
+    coverage_query: "select count(*) from hcp_established_board_snapshots where therapeutic_area_slug = :ta_slug"
+    key_form: slug
+    applicability: { unconditional: true }
+    producer: { script: scripts/utilities/take_weekly_snapshot.py, flags: ["--ta <slug>"] }
+    runs_in: ta_cycle:9.5
+    depends_on:
+      - upstream: established_board
+        gate: hard_fail
+        evidence: "ta_cycle.py:81 — 'MUST follow stage 9: it copies what shipped, never recomputes'"
+    classification: automatable
+    status_2026_08_31: { nsclc: 107472, crc: 0, gap: true }
+    note: >
+      r1 gave this entry depends_on [established_board, rising_board]. The rising edge belongs
+      to the sibling entry, not this one — this table holds only the established board.
+      Stage 9.5 is NON-BLOCKING but its loss is PERMANENT (ta_cycle.py:83-86).
+
+  - name: rising_board_snapshots
+    kind: output
+    target_table: hcp_rising_board_snapshots
+    coverage_query: "select count(*) from hcp_rising_board_snapshots where therapeutic_area_slug = :ta_slug"
+    key_form: slug
+    applicability:
+      applies_when:
+        fact: rising_model
+        equals: momentum
+      condition: "rising_model = 'momentum' (the snapshot copies hcp_rising_star_ranks_v3)"
+      evaluate: "RISING_MODEL[slug] in scripts/score/rising_score.py:45-49"
+      evidence: "ta_cycle.py:76-80 — captures 'the rising ELIGIBLE POOL... and the established board... WITH THE GATE INPUTS'"
+    producer: { script: scripts/utilities/take_weekly_snapshot.py, flags: ["--ta <slug>"] }
+    runs_in: ta_cycle:9.5
+    depends_on:
+      - upstream: rising_board
+        gate: hard_fail
+        evidence: ta_cycle.py:81
+    classification: automatable
+    status_2026_08_31: { nsclc: 10856, crc: 1193, ratio: 0.110, thin: true }
+
+# ─── themes: the critical path ────────────────────────────────────────────────────────────
+
+  - name: research_themes
+    kind: output
+    target_table: hcp_research_themes_v2
+    coverage_query: "select count(distinct hcp_id) from hcp_research_themes_v2 where therapeutic_area = :themes_tag"
+    coverage_query_unsafe: false
+    key_form: themes_tag
+    key_note: >
+      BIND :themes_tag, NOT :ta_slug. The column holds TA_CONFIGS[slug]['tag'], which is
+      'NSCLC', 'COLORECTAL-CANCER' and 'Atopic Dermatitis' — three different conventions.
+      r1's `lower(therapeutic_area) = :ta_slug` returns 0 for atopic-dermatitis while 3,499
+      rows exist. Resolve the tag from scripts/classify/extract_research_themes.py TA_CONFIGS,
+      the same source generate_cycle resolves ta.themes_tag from.
+    applicability:
+      applies_when:
+        fact: has_themes_config
+        equals: true
+      condition: "slug has a TA_CONFIGS entry in extract_research_themes.py"
+      evaluate: "slug in TA_CONFIGS (scripts/classify/extract_research_themes.py:152) — currently nsclc, atopic-dermatitis, colorectal-cancer"
+      evidence: "scripts/generate_cycle.py:488-496 (pre_g1) — '--ta is declared choices=tuple(TA_CONFIGS.keys()), so argparse rejects the slug today'. hepatology has no entry."
+    producer: { script: scripts/classify/extract_research_themes.py, flags: ["--ta <slug>"] }
+    runs_in: generate_cycle:G1
+    depends_on:
+      - upstream: hcp_ta_membership
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:497-505 (pre_g1) — 'no hcp_therapeutic_areas_v2 rows for {slug} -- nothing to extract for'"
+      - upstream: ta_configs_entry
+        gate: hard_fail
+        evidence: scripts/generate_cycle.py:488-496
+    classification: billed
+    sufficiency_absent_reason: 'NO HONEST DENOMINATOR EXISTS IN THE MANIFEST. The eligible population
+      is TA_CONFIGS[slug][''selection''][scope] -- per-TA SQL living inside a Python dict at scripts/classify/extract_research_themes.py:152-230,
+      which generate_cycle runs verbatim (ws_g1, :745-780). Copying it here would duplicate a definition
+      that must not drift. ws_g1''s whole-TA fallback is available and REJECTED: generate_cycle labels
+      it a proxy and records that using it unlabelled ''caused the false BELOW THRESHOLD'' (:761-764,
+      ws_g1_is_proxy). An invented denominator is worse than none. The fix is to expose the selection
+      SQL as data both tools read.'
+    status_2026_08_31: { nsclc_hcps: 1064, crc_hcps: 115, ad_hcps: "present under tag 'Atopic Dermatitis'", ratio: 0.105, thin: true }
+
+  - name: canonical_themes
+    kind: output
+    target_table: theme_canonical_v1
+    coverage_query: "select count(*) from theme_canonical_v1 where therapeutic_area = :themes_tag"
+    key_form: themes_tag
+    applicability:
+      applies_when:
+        fact: themes_tag_matches_upper
+        equals: true
+      condition: "themes_tag == upper(slug) — G2 raises otherwise"
+      evaluate: "TA_CONFIGS[slug]['tag'] == slug.upper()"
+      evidence: >
+        scripts/generate_cycle.py:519-529 (pre_g2) — 'KEY MISMATCH, and this is the defect,
+        not a config gap. G1 wrote {themes_tag}; bucket_themes.py computes ta.upper() and
+        raises No themes found for anything else.' CONFIRMED LIVE: AD has 3,499 theme rows
+        under 'Atopic Dermatitis' and ZERO canonical themes, exactly as the guard predicts.
+    producer: { script: scripts/classify/bucket_themes.py, flags: ["--ta <slug>"] }
+    runs_in: generate_cycle:G2
+    depends_on:
+      - upstream: research_themes
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:508-518 (pre_g2) — 'G1 has written no themes for {slug}'"
+    classification: billed
+    status_2026_08_31: { nsclc: 25, crc: 25, ad: 0, ratio: 1.000 }
+    note: >
+      generate_cycle.py:1259-1261 still warns that bucket_themes.py's --ta is a hardcoded
+      click.Choice of [nsclc, hepatology, immunology, raredisease]. THAT COMMENT IS STALE:
+      bucket_themes.py:39 now imports TA_CONFIGS from extract_research_themes and :544 derives
+      the choice list from it, so the two agree by construction. The tag/upper mismatch above
+      is the surviving half of that defect.
+
+  - name: theme_to_canonical_map
+    kind: output
+    target_table: theme_to_canonical_v1
+    coverage_query: "select count(*) from theme_to_canonical_v1 where therapeutic_area = :themes_tag"
+    key_form: themes_tag
+    applicability:
+      condition: same as canonical_themes
+      evidence: scripts/generate_cycle.py:519-529
+      applies_when:
+        fact: themes_tag_matches_upper
+        equals: true
+    producer: { script: scripts/classify/bucket_themes.py, flags: ["--ta <slug>"] }
+    runs_in: generate_cycle:G2
+    depends_on:
+      - upstream: research_themes
+        gate: hard_fail
+        evidence: scripts/generate_cycle.py:508-518
+    classification: billed
+    sufficiency:
+      throughput_covered: "select count(distinct t.theme_name) from hcp_research_themes_v2 t where t.therapeutic_area = :themes_tag and exists (select 1 from theme_to_canonical_v1 m where m.therapeutic_area = :themes_tag and m.raw_theme_name = t.theme_name)"
+      throughput_eligible: "select count(distinct t.theme_name) from hcp_research_themes_v2 t where t.therapeutic_area = :themes_tag"
+      throughput_threshold: 0.90
+      throughput_ratified: false
+      throughput_basis: >
+        ws_g2 verbatim (scripts/generate_cycle.py:789-797): every distinct raw theme name G1
+        extracted for this TA. Bucketing is meant to assign all of them.
+      throughput_threshold_reasoning: >
+        Observed 9,048/9,768 = 0.926 (nsclc) and 1,098/1,101 = 0.997 (colorectal-cancer). The
+        720 unmapped nsclc names are most likely themes extracted after its last bucketing run.
+        0.90 sits below both observations and above the level where a whole run's worth of new
+        themes sits unmapped. CAVEAT: ver_g2 (generate_cycle.py:681-688) records that
+        theme_to_canonical_v1's TA-key convention has never been verified against a real run;
+        both queries bind :themes_tag, correct for the two TAs measured but the assumption most
+        likely to break on a TA whose tag is not slug.upper().
+      coverage_covered: "select count(*) from (select t.hcp_id from hcp_research_themes_v2 t where t.therapeutic_area = :themes_tag group by t.hcp_id having bool_and(exists (select 1 from theme_to_canonical_v1 m where m.therapeutic_area = :themes_tag and m.raw_theme_name = t.theme_name))) fully_mapped"
+      coverage_eligible: "select count(distinct t.hcp_id) from hcp_research_themes_v2 t where t.therapeutic_area = :themes_tag"
+      coverage_threshold: 1.00
+      coverage_ratified: false
+      coverage_basis: >
+        HCPS, NOT THEME STRINGS -- the count of people whose ENTIRE theme rail is bucketed
+        (bool_and over their themes), against every HCP holding at least one theme for this TA.
+        A theme-string ratio can look healthy while individual profiles each carry one unmapped
+        theme; this asks the question the profile asks.
+      coverage_threshold_reasoning: >
+        1.00 because a partially-bucketed rail is a visibly broken profile, not a rounding
+        error. Observed 660/1,064 = 0.620 (nsclc) and 112/115 = 0.974 (colorectal-cancer). The
+        contrast with the throughput axis is the point: nsclc maps 92.6% of theme STRINGS but
+        only 62.0% of PEOPLE have a complete rail, because the 720 unmapped names are spread
+        thinly across many profiles rather than concentrated in a few.
+    status_2026_08_31: { nsclc: 9049, crc: 1098, ratio: 0.121, thin: true }
+
+  - name: publication_theme_labels
+    kind: output
+    target_table: publication_theme_v1
+    coverage_query: "select count(*) from publication_theme_v1 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/label_pub_themes.py, flags: ["--ta <slug>"] }
+    runs_in: none
+    depends_on:
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "scripts/label_pub_themes.py:103-104 — JOIN publication_therapeutic_areas_v2 pta ON pta.publication_id = p.id"
+      - upstream: canonical_themes
+        gate: hard_fail
+        evidence: "scripts/label_pub_themes.py:54-55 and :70-71 — JOIN theme_canonical_v1 tc ON tc.id = s.canonical_id, on both the concept and keyword signature paths"
+    classification: automatable
+    status_2026_08_31: { nsclc: 64155, crc: 0, gap: true }
+    note: >
+      THE HIGHEST-VALUE UNBLOCK. One unbilled script, never run for CRC, in neither cycle. It
+      unblocks hcp_canonical_topic_share_v1, the ledger drawer's PRACTICE layer, which today
+      renders its named absence on every CRC row. Both prerequisites are already satisfied for
+      CRC (147,218 tagged publications; 25 canonical themes).
+
+  - name: canonical_topic_share
+    kind: output
+    target_object: hcp_canonical_topic_share_v1
+    object_kind: view
+    coverage_query: "select count(*) from hcp_canonical_topic_share_v1 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    depends_on:
+      - upstream: publication_theme_labels
+        gate: hard_fail
+        evidence: "pg_depend/pg_rewrite — the view reads publication_theme_v1, theme_canonical_v1 and publication_authors_v2 (verified 2026-08-31)"
+      - upstream: canonical_themes
+        gate: hard_fail
+        evidence: "pg_depend/pg_rewrite, same query"
+    classification: automatable
+    status_2026_08_31: { nsclc: 234857, crc: 0, gap: true }
+
+# ─── billed generation ────────────────────────────────────────────────────────────────────
+
+  - name: scientific_positions
+    kind: output
+    target_table: hcp_scientific_positions_v1
+    coverage_query: "select count(distinct hcp_id) from hcp_scientific_positions_v1 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/narrative/extract_scientific_positions.py, flags: ["--ta <slug>", "--cohort rising_star"] }
+    runs_in: generate_cycle:G4
+    depends_on:
+      - upstream: rising_board
+        gate: hard_fail
+        evidence: >
+          scripts/generate_cycle.py:546-559 (pre_g4) — 'hcp_rising_star_ranks_v3 has 0 rows for
+          {slug} -- the rising board does not exist yet. Run ta_cycle stage 9 first. Refusing
+          rather than targeting zero HCPs and exiting 0.'
+    classification: billed
+    sufficiency:
+      throughput_covered: "select count(*) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and r.us_rank is not null and r.us_rank <= 100 and exists (select 1 from hcp_scientific_positions_v1 p where p.hcp_id = r.hcp_id and p.therapeutic_area_id = :ta_id)"
+      throughput_eligible: "select count(*) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and r.us_rank is not null and r.us_rank <= 100"
+      throughput_threshold: 0.70
+      throughput_ratified: false
+      throughput_basis: >
+        ws_g4 verbatim (scripts/generate_cycle.py:809-816): the top-100 US slice of the rising
+        board. This is the queue G4 is handed, not the board it is displayed against.
+      throughput_threshold_reasoning: >
+        THE WEAKEST THRESHOLD IN THE MANIFEST, AND THE NUMBER MATTERS MORE THAN THE VERDICT.
+        Observed 31/40 = 0.775 (nsclc) and 15/21 = 0.714 (colorectal-cancer). Both under-cover
+        their own queue by 22-29%, so any threshold drawn BETWEEN them would pass one TA and
+        fail the other purely by where the line fell -- tuning, not measuring. 0.70 sits below
+        both and is therefore nearly inert; it fires only on a materially worse run. The fact
+        to act on is that neither TA finishes its queue.
+      coverage_covered: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and exists (select 1 from hcp_scientific_positions_v1 p where p.hcp_id = r.hcp_id and p.therapeutic_area_id = :ta_id)"
+      coverage_eligible: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id"
+      coverage_threshold: 1.00
+      coverage_ratified: false
+      coverage_basis: >
+        The whole rising board, uncapped -- 149 for nsclc, 140 for colorectal-cancer. A user
+        browsing the board can click any member and expects a scientific-position section.
+      coverage_threshold_reasoning: >
+        1.00 is the user-facing contract: every board profile shows the section or it does not.
+        Observed 31/149 = 0.208 (nsclc) and 15/140 = 0.107 (colorectal-cancer) -- four in five
+        board profiles have no positions. THIS IS A SCOPING MISMATCH, NOT A FAILED RUN: ws_g4
+        deliberately targets the top-100 US slice of a GLOBAL board, so this axis can never
+        approach 1.00 without widening ws_g4, which is a billed-cost decision. That is exactly
+        why the two axes are separate -- throughput says the stage nearly finished its queue,
+        coverage says the queue is a fifth of the board. Ratify by choosing: widen ws_g4, or
+        set this threshold to the board fraction you intend to cover.
+    status_2026_08_31: { nsclc_hcps: 568, crc_hcps: 15, ratio: 0.020, thin: true }
+    note: >
+      EDGE CORRECTED. r1 said depends_on [publication_ta_membership]. The guard checks the
+      RISING BOARD, not TA membership — a runner using r1's edge would launch a billed stage
+      against a TA with tagged publications and no board, which is precisely the failure
+      pre_g4 was written to prevent. Also note the flag: pre_g4:557-558 warns the default
+      --cohort 'both' 'silently half-fails'.
+
+  - name: position_synthesis
+    kind: output
+    target_table: hcp_ai_overviews
+    coverage_query: "select count(*) from hcp_ai_overviews where lower(therapeutic_area) = :ta_slug"
+    key_form: slug_case_insensitive
+    key_note: "SAFE — measured 2026-08-31: values are 'NSCLC', 'colorectal-cancer', 'atopic-dermatitis'; all three lower to a registered slug."
+    applicability: { unconditional: true }
+    producer: { script: scripts/narrative/generate_scientific_position_synthesis.py, flags: ["--ta <slug>"] }
+    runs_in: generate_cycle:G5
+    depends_on:
+      - upstream: scientific_positions
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:561-570 (pre_g5) — 'hcp_scientific_positions_v1 is empty for {slug} -- G4 must run first'"
+    classification: billed
+    sufficiency:
+      throughput_covered: "select count(distinct p.hcp_id) from hcp_scientific_positions_v1 p where p.therapeutic_area_id = :ta_id and exists (select 1 from hcp_ai_overviews o where o.hcp_id = p.hcp_id)"
+      throughput_eligible: "select count(distinct p.hcp_id) from hcp_scientific_positions_v1 p where p.therapeutic_area_id = :ta_id"
+      throughput_threshold: 0.95
+      throughput_ratified: false
+      throughput_basis: >
+        ws_g5 verbatim (scripts/generate_cycle.py:819-824): every HCP holding a scientific
+        position for this TA. Joined on the uuid, never on hcp_ai_overviews.therapeutic_area --
+        ver_g5:707-712 warns that column is internally mixed and filtering it directly is a
+        landmine that works for whichever TA was tested.
+      throughput_threshold_reasoning: >
+        The stage's contract is one synthesis per positioned HCP: pre_g5 gates on positions
+        existing and G5 processes all of them. Observed 568/568 = 1.000 (nsclc) and 15/15 =
+        1.000 (colorectal-cancer) -- met exactly in both. 0.95 leaves room for a handful of
+        per-row API failures while still catching a run that died part-way. 1.00 is the
+        stricter reading and equally defensible.
+      coverage_covered: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and exists (select 1 from hcp_ai_overviews o where o.hcp_id = r.hcp_id)"
+      coverage_eligible: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id"
+      coverage_threshold: 1.00
+      coverage_ratified: false
+      coverage_basis: >
+        The whole rising board, uncapped -- the same population a user browses. The synthesis
+        is what renders on the profile, so the board is the honest denominator.
+      coverage_threshold_reasoning: >
+        1.00 as the user-facing contract, measured independently of the throughput axis above
+        even though the observed values are inherited. Observed 31/149 = 0.208 (nsclc) and
+        15/140 = 0.107 (colorectal-cancer) -- IDENTICAL to scientific_positions' coverage,
+        because every positioned board member does have a synthesis. That is the useful
+        finding: G5 is not the constraint, G4's scope is. Fixing this axis means fixing
+        scientific_positions; nothing about G5 needs to change.
+    status_2026_08_31: { nsclc: 598, crc: 15, ratio: 0.025, thin: true }
+
+  # ── narratives: SPLIT PER COHORT 2026-09-01 ────────────────────────────────────────────
+  # r2 carried one `narratives` entry whose denominator was the rising board alone. That was
+  # a deliberate subset of ws_g8, not ws_g8, and carrying it as if it were the work-set hid
+  # two whole cohorts. Split so each arm is measured against its own queue and its own board.
+  #
+  # WHY covered IS ALWAYS THE BOARD INTERSECTION, ON BOTH AXES: NSCLC holds 463 rising_star
+  # narrative rows against a 149-member rising board. A raw row count would report throughput
+  # above 3.0 while the board itself sits at 0.879 -- the ~331 surplus rows belong to HCPs who
+  # have left the board (the 13.5 stranded sweep, ta_cycle.py:526). Rows measure history;
+  # the intersection measures the product.
+
+  - name: narratives_rising
+    kind: output
+    target_table: hcp_narratives_v2
+    coverage_query: "select count(*) from hcp_narratives_v2 where therapeutic_area_slug = :ta_slug and cohort = 'rising_star'"
+    key_form: slug
+    applicability:
+      applies_when: {fact: rising_model, equals: momentum}
+    producer: {script: scripts/narrative/generate_narratives_v2.py, flags: ["--ta <slug>", "--cohort rising_star", "--target-version v2"]}
+    runs_in: [ta_cycle:13a, generate_cycle:G8]
+    depends_on:
+      - upstream: rising_board
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:620-638 (pre_g8) -- 'no board rows for {slug} -- nothing to write narratives about'"
+      - upstream: research_themes
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:640-649 (pre_g8) -- context inputs; refuses rather than pay full token cost for thinner text"
+      - upstream: scientific_positions
+        gate: hard_fail
+        evidence: scripts/generate_cycle.py:640-649
+    classification: billed
+    sufficiency:
+      throughput_covered: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = r.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'rising_star')"
+      throughput_eligible: "select count(*) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id"
+      throughput_threshold: 0.95
+      throughput_ratified: false
+      throughput_basis: >
+        ws_g8's rising arm verbatim (scripts/generate_cycle.py:842-845). THIS ARM CARRIES NO
+        CAP -- ta_cycle.py:99 runs 13a with 'NO --rising-top = whole board' -- so the queue and
+        the board are the same set, and the two axes below coincide by construction rather than
+        by choice. That identity is the finding, not a shortcut.
+      throughput_threshold_reasoning: >
+        The contract is 1.00: an uncapped arm is asked to write one narrative per board member.
+        0.95 leaves ~5% for per-row API failures inside a single run without crying wolf.
+        Observed 131/149 = 0.879 for nsclc -- 18 board members short, which is more than
+        transient failure -- and 140/140 = 1.000 for colorectal-cancer.
+      coverage_covered: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = r.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'rising_star')"
+      coverage_eligible: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id"
+      coverage_applies_when: {fact: lifecycle, equals: sold}
+      coverage_threshold: 1.00
+      coverage_ratified: false
+      coverage_basis: >
+        The rising board, uncapped and de-duplicated by hcp_id. No contracted depth applies to
+        this cohort: the two depths a contract names are the established rank cut and the
+        community basis, so a sold TA's rising denominator is still the whole board. hcp_rising_star_ranks_v3 IS the
+        board for this cohort -- 149 rows for nsclc, no membership flag needed.
+      coverage_threshold_reasoning: >
+        No slack, unlike throughput: a board member with no narrative is a user-visible hole in
+        a profile, not a retryable row. Observed 0.879 (nsclc) and 1.000 (colorectal-cancer).
+        GATED ON LIFECYCLE: both nsclc and colorectal-cancer are unsold today, so this axis
+        reports its ratio and carries no threshold. The 1.00 above applies only once a TA is
+        sold. NOTE FOR RATIFICATION: this denominator is identical to the throughput one
+        because the arm is uncapped, so the two axes can only differ by their thresholds. If you accept
+        that, consider collapsing this cohort to a single axis -- I have kept both so the
+        cohorts stay symmetrical and so a future cap on 13a is caught.
+
+  - name: narratives_established
+    kind: output
+    target_table: hcp_narratives_v2
+    coverage_query: "select count(*) from hcp_narratives_v2 where therapeutic_area_slug = :ta_slug and cohort = 'established'"
+    key_form: slug
+    applicability: {unconditional: true}
+    producer: {script: scripts/narrative/generate_narratives_v2.py, flags: ["--ta <slug>", "--cohort established", "--established-top 200", "--target-version v2"]}
+    runs_in: [ta_cycle:13b, generate_cycle:G8]
+    depends_on:
+      - upstream: established_board
+        gate: hard_fail
+        evidence: "ta_cycle.py:98-100 -- stage 13b runs --cohort established --established-top 200 over the board stage 9 produced"
+    classification: billed
+    sufficiency:
+      throughput_covered: "select count(distinct e.hcp_id) from hcp_established_ranks_v3 e where e.therapeutic_area_id = :ta_id and e.scope_type = 'global' and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = e.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'established')"
+      throughput_eligible: "select least(200, count(*)) from hcp_established_ranks_v3 e where e.therapeutic_area_id = :ta_id and e.scope_type = 'global'"
+      throughput_threshold: 1.00
+      throughput_ratified: false
+      throughput_basis: >
+        ws_g8's established arm VERBATIM, least(200, ...) INCLUDED (generate_cycle.py:846-851).
+        THE CAP IS THE DENOMINATOR ON PURPOSE, and on this axis that is correct: throughput
+        asks 'did the run finish the queue it was handed?', and the queue handed to 13b is
+        literally --established-top 200 (ta_cycle.py:98-99). Measuring against the 17,041-strong
+        ranked cohort would answer a question this axis is not asking -- that is the coverage
+        axis below, which uses exactly that number.
+      throughput_threshold_reasoning: >
+        1.00 with no slack, and unlike the rising arm that is not brittle: the numerator counts
+        board members with a narrative CUMULATIVELY, so it can exceed the per-run cap and does.
+        Observed 1,411/200 = 7.055 for nsclc -- seven runs' worth of queue accumulated over
+        time -- and exactly 200/200 = 1.000 for colorectal-cancer, one clean run. The threshold
+        therefore fires only on a run that died part-way through its 200, which is precisely
+        what a throughput test should catch.
+      coverage_covered: "select count(distinct e.hcp_id) from hcp_established_ranks_v3 e where e.therapeutic_area_id = :ta_id and e.scope_type = 'global' and (cast(:established_rank_cut as integer) is null or e.rank <= cast(:established_rank_cut as integer)) and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = e.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'established')"
+      coverage_eligible: "select count(distinct e.hcp_id) from hcp_established_ranks_v3 e where e.therapeutic_area_id = :ta_id and e.scope_type = 'global' and (cast(:established_rank_cut as integer) is null or e.rank <= cast(:established_rank_cut as integer))"
+      coverage_applies_when: {fact: lifecycle, equals: sold}
+      coverage_threshold: 1.00
+      coverage_ratified: false
+      coverage_basis: >
+        Every globally-ranked established HCP for this TA, uncapped: 17,041 for nsclc, 24,735
+        for colorectal-cancer. There is NO board-membership flag on hcp_established_ranks_v3
+        (columns verified 2026-09-01: id, hcp_id, therapeutic_area_id, scope_type, scope_value,
+        rank, cohort_score, three percentiles, computed_at, enrichment_run_id), so the ranked
+        cohort is the only uncapped population that exists to measure against.
+      coverage_threshold_reasoning: >
+        RESOLVED BY THE LIFECYCLE GATE, 2026-09-01. The earlier draft set 1.00 against the whole
+        17,041-strong ranked cohort and admitted the number was a placeholder for a product
+        decision. The decision has a shape now: the denominator is the CONTRACTED DEPTH, and an
+        unsold TA has none. So this axis is gated on lifecycle == sold. Both nsclc and
+        colorectal-cancer are unsold, so both report the ratio -- 1,411/17,041 = 0.083 and
+        200/24,735 = 0.008 against the whole cohort -- and neither can be INSUFFICIENT from it.
+        When a TA is sold, set contracted_established_rank_cut and the denominator narrows to
+        rank <= that cut automatically; 1.00 is then the right threshold, because a contracted
+        depth is a promise, not an aspiration. That is why 1.00 stays rather than being
+        softened: it becomes meaningful at exactly the moment it becomes applicable.
+
+  - name: narratives_community
+    kind: output
+    target_table: hcp_narratives_v2
+    coverage_query: "select count(*) from hcp_narratives_v2 where therapeutic_area_slug = :ta_slug and cohort = 'community'"
+    key_form: slug
+    applicability: {unconditional: true}
+    producer: {script: scripts/narrative/generate_narratives_v2.py, flags: ["--ta <slug>", "--cohort community", "--target-version v2"]}
+    runs_in: generate_cycle:G8
+    depends_on:
+      - upstream: community_scores
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:841-855 (ws_g8) -- the community arm is sized from hcp_community_scores_v2"
+    classification: billed
+    sufficiency:
+      throughput_covered: "select count(distinct c.hcp_id) from hcp_community_scores_v2 c where c.therapeutic_area_id = :ta_id and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = c.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'community')"
+      throughput_eligible: "select least(500, count(*)) from hcp_community_scores_v2 c where c.therapeutic_area_id = :ta_id"
+      throughput_threshold: 1.00
+      throughput_ratified: false
+      throughput_basis: >
+        ws_g8's community arm VERBATIM, least(500, ...) INCLUDED (generate_cycle.py:852-855).
+        The cap is the denominator for the same reason as the established arm: it is the size
+        of one run's queue.
+      throughput_threshold_reasoning: >
+        1.00, same semantics as the established arm and measured independently of it. Observed
+        1,622/500 = 3.244 for nsclc, three queues' worth accumulated. Colorectal-cancer has NO
+        community narratives at all, so its coverage_query returns 0 and it is reported as a
+        GAP before this axis is ever evaluated -- see the note on that entry.
+      coverage_covered: "select count(distinct c.hcp_id) from hcp_community_scores_v2 c where c.therapeutic_area_id = :ta_id and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = c.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'community')"
+      coverage_eligible: "select count(distinct c.hcp_id) from hcp_community_scores_v2 c where c.therapeutic_area_id = :ta_id"
+      coverage_applies_when: {fact: lifecycle, equals: sold}
+      coverage_threshold: 1.00
+      coverage_ratified: false
+      coverage_basis: >
+        Every scored community HCP for this TA, uncapped: 49,379 for nsclc, 52,167 for
+        colorectal-cancer. As with the established cohort there is no membership flag on
+        hcp_community_scores_v2, so the scored cohort is the only uncapped population available.
+        THE SOLD-PATH DENOMINATOR IS NOT IMPLEMENTED AND MUST NOT BE GUESSED: unlike established,
+        the community roster is deliberately not ranked, so contracted_community_basis names an
+        EVIDENCE TIER, and there is no TA-neutral tier source to query -- hcp_nsclc_evidence_tier_v1
+        is lung-only and is itself a schema_gap entry in this manifest. When a TA is sold, this
+        query has to be rewritten against the generalised tier view, and the gate below will
+        start applying a threshold to a denominator that is still the whole cohort. THAT IS A
+        KNOWN SHARP EDGE: do not sell a TA and ratify this axis without fixing the query first.
+      coverage_threshold_reasoning: >
+        Gated on lifecycle == sold, like the established arm, and measured independently of it.
+        Observed against the whole cohort: 1,622/49,379 = 0.033 for nsclc -- 97% of scored
+        community HCPs have no narrative -- and 0 for colorectal-cancer, which has no community
+        narratives at all and is reported as a GAP before this axis is reached. 1.00 is correct
+        for a contracted depth and wrong for the whole cohort, which is precisely why the gate
+        matters here. See coverage_basis: the sold-path query is NOT yet expressible, so this
+        threshold must not be ratified on the strength of the gate alone.
+    note: >
+      ta_cycle.py:101-102 records that stage 13 EXCLUDES community deliberately -- "Community
+      deliberately excluded (rank cut vs evidence-tier ledger -- open decision)". NSCLC's 1,622
+      covered HCPs therefore came from generate_cycle G8 or an earlier run, not from the weekly
+      cycle. Colorectal-cancer's zero is that open decision showing up as a measurement; it is
+      reported as a GAP rather than N/A because no per-TA config disables it -- inventing a
+      ta_facts flag to suppress it would be exactly the kind of unevidenced fact this manifest
+      exists to prevent.
+  - name: open_payments_rollup
+    kind: output
+    target_table: hcp_open_payments_by_ta_v2
+    coverage_query: "select count(*) from hcp_open_payments_by_ta_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/aggregate/open_payments_aggregator.py, flags: ["--ta <slug>"] }
+    runs_in: generate_cycle:G6
+    depends_on:
+      - upstream: ta_drug_keywords
+        gate: hard_fail
+        evidence: >
+          scripts/generate_cycle.py:572-587 (pre_g6) — 'open_payments_aggregator builds its TA
+          slice with INNER JOIN drug_keywords ON dk.therapeutic_area_id = ht.therapeutic_area_id,
+          so it would write ZERO rows and exit 0. No script populates ta_drug_keywords -- it is
+          hand-curated content, not code.'
+    classification: automatable
+    sufficiency_absent_reason: 'ABSENCE HERE IS A FACT, NOT A GAP. The only self-contained denominator
+      is ''TA members holding an NPI'', since open_payments_aggregator joins payments by npi_number (:265-267).
+      Measured against it: reference TA 3,601/9,849 = 0.366, colorectal-cancer 270/1,415 = 0.191. But
+      an HCP with an NPI who simply received no payments for this TA''s drugs is CORRECTLY absent, so
+      that ratio measures payment prevalence in the specialty, not pipeline coverage, and a threshold
+      on it would flag reality as a defect. A true denominator would have to re-derive the aggregator''s
+      keyword join, duplicating its logic. Left absent deliberately.'
+    status_2026_08_31: { nsclc: 3601, crc: 270, ratio: 0.075, thin: true }
+
+  - name: pharma_engagement
+    kind: output
+    target_table: hcp_pharma_engagement_v2
+    coverage_query: "select count(*) from hcp_pharma_engagement_v2 where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: pharma_weight_nonzero
+        equals: true
+      condition: "established_board is run with --w-pharma > 0"
+      evaluate: "the --w-pharma value passed to recompute_established_ranks_v3.py; default 0.0"
+      evidence: "scripts/score/recompute_established_ranks_v3.py:415 — @click.option('--w-pharma', default=0.0)"
+    producer: { script: scripts/score/pharma_engagement_scoring.py, flags: ["--ta <slug>"] }
+    runs_in: none
+    depends_on:
+      - upstream: open_payments_rollup
+        gate: hard_fail
+        evidence: "scripts/score/pharma_engagement_scoring.py:62 — FROM hcp_open_payments_by_ta_v2; :4 'Uses 3-year Open Payments aggregates from hcp_open_payments_by_ta_v2'"
+    classification: conditional_gap
+    status_2026_08_31: { nsclc: 3460, crc: 0, gap: conditional }
+    note: >
+      DOWNGRADED FROM GAP. Its only consumer is established_board, which multiplies it by a
+      weight defaulting to 0.0. CRC's established board (67,550 rows) was built with zero
+      pharma rows and is unaffected at default weights. This becomes a real gap only if
+      --w-pharma is ever raised — and then it becomes a blocking one.
+
+# ─── by hand, outside both cycles ─────────────────────────────────────────────────────────
+
+  - name: trial_ta_mapping
+    kind: output
+    target_table: clinical_trials_ta_v2
+    coverage_query: "select count(*) from clinical_trials_ta_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/classify/trial_ta_mapping.py, flags: ["--ta <slug>"] }
+    runs_in: none
+    depends_on: []
+    classification: automatable
+    status_2026_08_31: { nsclc: 2463, crc: 0, gap: true }
+    note: "Creates its own DDL at trial_ta_mapping.py:143. Never run for CRC. No upstream edge found — searched the script for TA-keyed reads, EMPTY."
+
+  - name: reingest_snapshot
+    kind: output
+    target_table: reingest_snapshot_v2
+    coverage_query: "select count(*) from reingest_snapshot_v2 where lower(ta_slug) = :ta_slug"
+    key_form: slug_case_insensitive
+    applicability: { unconditional: true }
+    producer: { script: scripts/score/reingest_diff.py, flags: ["--ta <slug>", "--snapshot"] }
+    runs_in: none
+    depends_on:
+      - upstream: score_ranks
+        gate: hard_fail
+        evidence: >
+          scripts/score/reingest_diff.py:19-28 — 'cohort + rank + score all live together in
+          hcp_score_ranks_v2, at global scope: cohort_classification <- hcp_score_ranks_v2.cohort,
+          cohort_score <- score_at_rank, rank <- rank'
+    classification: automatable
+    status_2026_08_31: { nsclc: 43535, crc: 0, gap: true }
+    note: >
+      EDGE CORRECTED. r1 said depends_on [established_board, rising_board] — neither is read by
+      this script. It reads hcp_score_ranks_v2 and hcps_v2. CRC cannot get a snapshot until
+      scoring_pipeline.py runs for CRC, which is the same unblock as score_ranks below: two of
+      r1's UNKNOWNs collapse into one action.
+
+  - name: reingest_diff
+    kind: output
+    target_table: reingest_diff_v2
+    coverage_query: "select count(*) from reingest_diff_v2 where lower(ta_slug) = :ta_slug"
+    key_form: slug_case_insensitive
+    applicability: { unconditional: true }
+    producer: { script: scripts/score/reingest_diff.py, flags: ["--ta <slug>", "--diff", "--before <id>", "--after <id>"] }
+    runs_in: none
+    depends_on:
+      - upstream: reingest_snapshot
+        gate: hard_fail
+        evidence: "scripts/score/reingest_diff.py:16 — 'reingest_diff_v2 and one run-level row to reingest_diff_summary_v2'; :619 --diff requires --before/--after snapshot ids"
+    classification: automatable
+    status_2026_08_31: { nsclc: 0, crc: 0, gap: false }
+    note: >
+      One of r1's eight "empty for both", now explained: the --snapshot arm HAS run (43,535
+      NSCLC rows) and the --diff arm has NEVER run, for any TA. No reader found —
+      reingest_diff.py:6 names the intended consumer ('watchlists - filter reingest_diff_v2 by
+      hcp_id') but no code does it. Searched frontend/src, EMPTY. Unbuilt for everyone, so not
+      a CRC gap.
+
+  - name: reingest_diff_summary
+    kind: output
+    target_table: reingest_diff_summary_v2
+    coverage_query: "select count(*) from reingest_diff_summary_v2 where lower(ta_slug) = :ta_slug"
+    key_form: slug_case_insensitive
+    applicability: { unconditional: true }
+    producer: { script: scripts/score/reingest_diff.py, flags: ["--ta <slug>", "--diff"] }
+    runs_in: none
+    depends_on:
+      - upstream: reingest_snapshot
+        gate: hard_fail
+        evidence: scripts/score/reingest_diff.py:16
+    classification: automatable
+    status_2026_08_31: { nsclc: 0, crc: 0, gap: false }
+    note: "Same as reingest_diff. No reader found; searched frontend/src and scripts/, EMPTY."
+
+  - name: medicare_by_ta
+    kind: output
+    target_table: hcp_medicare_by_ta_v2
+    coverage_query: "select count(*) from hcp_medicare_by_ta_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: scripts/aggregate/medicare_aggregator.py, flags: null }
+    runs_in: none
+    depends_on:
+      - upstream: ta_hcpcs_codes
+        gate: degrade
+        evidence: "scripts/aggregate/medicare_aggregator.py:195-202 fetches ta_hcpcs_codes with no emptiness guard; an empty set yields an empty TA slice and exit 0"
+    classification: blocked
+    status_2026_08_31: { nsclc: 4413, crc: 0, gap: true }
+    note: >
+      MECHANICALLY BLOCKED, not merely unrun — generate_cycle.py:610 states it:
+      'hcp_medicare_by_ta_v2 (medicare_aggregator.py has no --ta)'. The script needs a flag
+      first. Note the compounding: even with a --ta flag it would produce an empty CRC slice,
+      because ta_hcpcs_codes has no CRC rows. Two gaps in series, and r1 recorded neither edge.
+
+  - name: leadership_evidence
+    kind: output
+    target_table: hcp_leadership_evidence
+    coverage_query: "select count(*) from hcp_leadership_evidence where lower(therapeutic_area) = :ta_slug"
+    key_form: slug_case_insensitive
+    key_note: "SAFE — the only live value is 'nsclc'."
+    applicability: { unconditional: true, confidence: low, note: "no config or branch found governing it; searched rising_score.py, ta_cycle.py and generate_cycle.py, EMPTY" }
+    producer: { script: scripts/social/scrape_leadership_signals.py, flags: null }
+    runs_in: none
+    depends_on: []
+    classification: unknown
+    status_2026_08_31: { nsclc: 955, crc: 0, gap: true }
+
+  - name: congress_presenters
+    kind: output
+    target_table: congress_confirmed_presenters
+    coverage_query: "select count(*) from congress_confirmed_presenters where therapeutic_area_id = :ta_id"
+    applicability:
+      applies_when:
+        fact: has_congress_ingest
+        equals: true
+      condition: "the TA has a congress with an ingestible abstract book"
+      evaluate: manual
+      evidence: "scripts/congress/ingest_asco_abstracts.py:94-115 is a DROP + INSERT specific to ASCO; generate_cycle.py:1257 lists 'ingest_asco_abstracts.py  no --ta (congress presenters)' among the un-generalised"
+    producer: { script: scripts/congress/ingest_asco_abstracts.py, flags: null }
+    runs_in: none
+    depends_on: []
+    classification: unknown
+    status_2026_08_31: { nsclc: 47, crc: 0, gap: true }
+    note: "ASCO covers colorectal cancer, so unlike most entries here the CRC answer may already be inside the existing source. A product question, not a pipeline one."
+
+  - name: pulse_synthesis
+    kind: output
+    target_table: pulse_ai_synthesis
+    coverage_query: "select count(*) from pulse_ai_synthesis where lower(ta_slug) = :ta_slug"
+    key_form: slug_case_insensitive
+    applicability: { unconditional: true, confidence: low }
+    producer: { script: null, sql: sql/pulse_ai_synthesis.sql }
+    runs_in: by_hand
+    depends_on: []
+    classification: unknown
+    status_2026_08_31: { nsclc: 1, crc: 0, gap: true }
+    note: "No producer script. Searched scripts/**/*.py for the table name; found only sql/. The RPC get_pulse_synthesis_facts reads the registry, verified in pg_proc."
+
+# ─── legacy scoring: producer found, table superseded ─────────────────────────────────────
+
+  - name: score_ranks
+    kind: output
+    target_table: hcp_score_ranks_v2
+    coverage_query: "select count(*) from hcp_score_ranks_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer:
+      library: "scripts/score/score_ranking.py :: compute_and_write_ranks() (defined :116, upsert :220)"
+      invoked_by:
+        - scripts/score/scoring_pipeline.py:51 (import), :1444 (call) — takes --ta
+        - scripts/score/established_scoring.py:29 (import), :789 (call) — takes --ta
+        - scripts/score/rerun_ranks.py:4, :24 — no --ta
+    runs_in: by_hand
+    depends_on:
+      - upstream: hcp_scores_legacy
+        gate: hard_fail
+        evidence: "scoring_pipeline.py:1431-1444 — upsert_scores() writes hcp_scores_v2, then compute_and_write_ranks() ranks the same in-memory score_rows"
+    classification: automatable
+    status_2026_08_31: { nsclc: 254243, crc: 0, gap: true }
+    note: >
+      RECLASSIFIED unknown -> automatable. r1 said 'score_ranking.py has no --ta' and 'unclear
+      whether the table is still read'. Both are wrong. It is not a standalone script but a
+      library function called by the two per-TA scoring scripts, inheriting their scoping. And
+      it IS read, by reingest_diff.py:19-28. Its only frontend read (api.ts:1716) is inside
+      getHCPDetail, which is exported and called nowhere.
+
+  - name: hcp_scores_legacy
+    kind: output
+    target_table: hcp_scores_v2
+    coverage_query: "select count(*) from hcp_scores_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer:
+      script: scripts/score/scoring_pipeline.py
+      flags: ["--ta <slug>", "--target-version v2", "--execute"]
+      write_site: "scoring_pipeline.py:1201 — supabase.table(scores_table).upsert(...), where scores_table = get_table_name('hcp_scores', target_version) at :1153 and get_table_name returns f'{base_name}_v2' at :55-58"
+    runs_in: by_hand
+    depends_on:
+      - upstream: curated_concepts
+        gate: degrade
+        evidence: scripts/score/scoring_pipeline.py:376, :1398
+    classification: superseded
+    exceptions:
+    - ta: nsclc
+      expect: stale_rows_present
+      observed_rows: 25737
+      newest_row: '2026-05-29'
+      reason: Superseded scoring generation frozen at May. Present for NSCLC, absent for
+        both TAs built since.
+    superseded_by: [rising_board, established_board]
+    status_2026_08_31: { nsclc: 25737, crc: 0, gap: false, newest_row: 2026-05-29 }
+    note: >
+      RECLASSIFIED unknown -> SUPERSEDED, and the "no writer found" in r1 is withdrawn. The
+      producer exists; the literal string 'hcp_scores_v2' simply never appears at the write
+      site because the name is constructed, so a grep for the table name near an insert
+      returns nothing. Corroborated by docs/TA_BUILD_DEBT.md:798 and
+      docs/Umbra/SCRIPT_CATALOG - 28May26.md:125.
+      EVIDENCE FOR SUPERSEDED, both halves:
+        STALENESS — max(scored_at) = 2026-05-29 across all three TAs present (hepatology
+        53,769 / nsclc 25,737 / rare-disease 1). No atopic-dermatitis rows and no
+        colorectal-cancer rows: the table predates the last two TA builds, and AD shipped
+        without it.
+        DEAD READERS — exactly one dependent relation in pg_depend, the view
+        hcp_rising_star_ranks_v2, itself already on the SUPERSEDED list. rerun_ranks.py:14
+        reads it; dedup_merge.py:542 re-points FKs. The only frontend read is api.ts:1655
+        inside getHCPDetail, which is exported and called nowhere — /hcp/:id renders
+        ProfileDispatch (App.tsx:914). No live surface reads this table.
+      Searches that came back EMPTY: pg_proc bodies (0), pg_proc with INSERT/UPDATE/DELETE (0),
+      pg_trigger (0), and every *.sql in the repo (DDL, indexes, FKs, RLS and grants only —
+      no DML anywhere).
+
+  - name: established_scores_legacy
+    kind: output
+    target_table: hcp_established_scores_v2
+    coverage_query: "select count(*) from hcp_established_scores_v2 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer:
+      script: scripts/score/established_scoring.py
+      flags: ["--ta <slug>", "--execute"]
+      write_site: "established_scoring.py:646 — client.table('hcp_established_scores_v2').upsert(batch, on_conflict='hcp_id,therapeutic_area_id')"
+    runs_in: by_hand
+    depends_on:
+      - upstream: curated_concepts
+        gate: degrade
+        evidence: scripts/score/established_scoring.py:140, :730
+    classification: superseded
+    exceptions:
+    - ta: nsclc
+      expect: stale_rows_present
+      observed_rows: 11389
+      newest_row: '2026-05-27'
+      reason: Superseded. DATA_COMPLETENESS_AUDIT.md:68 records 0 remaining readers after
+        the v3 repoint.
+    superseded_by: [established_board]
+    status_2026_08_31: { nsclc: 11389, crc: 0, gap: false, newest_row: 2026-05-27 }
+    note: >
+      IS established_scoring.py A DISTINCT HAND-RUN STEP, OR PART OF THE ESTABLISHED CHAIN
+      UNDER ANOTHER NAME? — A DISTINCT STEP, and a legacy one. It is not the v3 chain renamed:
+      recompute_established_ranks_v3.py (which produces established_board) reads
+      hcp_cohort_classification_v2 (:202), hcp_industry_classification_v1 (:215),
+      hcp_publication_leadership_v2 (:286), hcp_network_centrality_v2 (:302) and
+      hcp_pharma_engagement_v2 (:319). IT DOES NOT READ hcp_established_scores_v2 AT ALL. The
+      two chains share no artifact.
+      THE SCRIPT IS NOT DEAD, which r1 asserted. It is a documented manual step:
+      TA_EXPANSION_ROADMAP.md:117 'Run established_scoring.py --execute for new TA (~5 min)';
+      ATOPIC_DERMATITIS_BUILD.md:95 tracks it as Pending for AD; KNOWN_ISSUES.md:28 and :292
+      describe its live behaviour; RESTRUCTURE_SCRIPTS.ps1:158-159 keeps it maintained.
+      Neither orchestrator calls it because it is a roadmap step, not a cycle stage. Accurate
+      description: alive, --ta-capable, run by hand, skipped for both AD and CRC.
+      THE TABLE is superseded regardless: newest row 2026-05-27, nsclc 11,389 / hepatology
+      11,389 and nothing else; one dependent relation, the superseded view
+      hcp_established_ranks_v2; docs/DATA_COMPLETENESS_AUDIT.md:68 independently records
+      '0 remaining hcp_established_scores_v2 readers' after the v3 repoint. pg_proc: 0, EMPTY.
+      pg_trigger: 0, EMPTY.
+      It also still calls compute_and_write_ranks (:789), so running it writes live
+      hcp_score_ranks_v2 rows — the script is a live writer of a live table even though its
+      own output table is superseded. Do not delete it without repointing that.
+
+# ─── views that follow their inputs ───────────────────────────────────────────────────────
+
+  - name: board_movement
+    kind: output
+    target_object: hcp_board_movement_v1
+    object_kind: view
+    coverage_query: "select count(*) from hcp_board_movement_v1 where therapeutic_area_slug = :ta_slug"
+    key_form: slug
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    depends_on:
+      - upstream: board_snapshots
+        gate: hard_fail
+        evidence: "pg_depend/pg_rewrite — the view reads hcp_established_board_snapshots and hcp_rising_board_snapshots, and nothing else (verified 2026-08-31)"
+      - upstream: rising_board_snapshots
+        gate: hard_fail
+        evidence: "pg_depend/pg_rewrite, same query"
+    classification: automatable
+    status_2026_08_31: { nsclc: 118328, crc: 1193, ratio: 0.010, thin: true }
+
+  - name: institution_ta_roster
+    kind: output
+    target_object: institution_ta_roster_v1
+    object_kind: view
+    coverage_query: "select count(*) from institution_ta_roster_v1 where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    depends_on:
+      - upstream: established_board
+        gate: degrade
+        evidence: "pg_depend/pg_rewrite — reads hcp_established_ranks_v3 (verified 2026-08-31)"
+      - upstream: rising_board
+        gate: degrade
+        evidence: "pg_depend/pg_rewrite — reads hcp_rising_star_ranks_v3"
+      - upstream: rising_composite
+        gate: degrade
+        evidence: "pg_depend/pg_rewrite — reads hcp_rising_composite_v1; this is the AD arm, empty for momentum TAs by applicability"
+      - upstream: institution_primary_links_v1
+        gate: hard_fail
+        evidence: "pg_depend/pg_rewrite — reads institution_primary_links_v1 and hcps_v2"
+    classification: automatable
+    status_2026_08_31: { nsclc: 2525, crc: 1572, ratio: 0.623 }
+    note: >
+      r1 listed [established_board, rising_board]. Two sources were missing, and the gates are
+      degrade not hard_fail: the view unions board arms, so a missing arm thins the roster
+      rather than emptying it. That is why it holds 1,572 CRC rows while hcp_rising_composite_v1
+      is empty for CRC.
+
+# ─── social: live, refreshed, and not addressable by TA ───────────────────────────────────
+
+  - name: social_hot_topics
+    kind: output
+    target_object: mv_social_hot_topics_by_ta
+    object_kind: matview
+    coverage_query: "select count(*) from mv_social_hot_topics_by_ta where ta_slug = :specialty_slug"
+    coverage_query_unsafe: true
+    key_form: specialty_slug
+    key_note: >
+      NOT A TA KEY. Live distinct values are 'oncology' and 'hepatology' — specialty grain, not
+      TA grain. A :ta_slug bind returns 0 for nsclc and colorectal-cancer FOREVER, by
+      construction. SocialPage.tsx:9 confirms the corpus covers 'oncology and hepatology
+      (social_posts_v2.therapeutic_areas)'.
+    applicability:
+      applies_when:
+        fact: social_ta_addressable
+        equals: true
+      condition: "the TA's specialty has social coverage"
+      evaluate: "map slug -> specialty; NSCLC and CRC both map to 'oncology'"
+      evidence: "frontend/src/lib/api.ts:3077-3081 — slugMap {Oncology: 'oncology', Hepatology: 'hepatology', 'Rare Disease': 'rare-disease'}"
+      expected_for_crc: false
+    producer: { function: "public.refresh_social_analytics()", invoked_by: scripts/social/social_update.py:196 }
+    runs_in: social_update
+    depends_on:
+      - upstream: social_posts_v2
+        gate: hard_fail
+        evidence: "refresh_social_analytics() body, verified in pg_proc 2026-08-31"
+    classification: not_ta_scoped
+    status_2026_08_31: { rows_total: 126, oncology: 122, hepatology: 4, nsclc: 0, crc: 0, last_refresh: 2026-08-31, gap: false }
+    note: >
+      NOT EMPTY, contrary to r1. Refreshed the same day this manifest was authored. Its
+      readers — api.ts:3172 in getSocialAnalytics (:3152) — are exported and called nowhere;
+      the shipped social surface (SocialPage.tsx, socialLatest.ts:32-45, socialVoice.ts:63-75)
+      reads social_posts_v2 / social_users_v2 directly. A live producer under dead readers.
+
+  - name: social_share_of_voice
+    kind: output
+    target_object: mv_social_share_of_voice_by_ta
+    object_kind: matview
+    coverage_query: "select count(*) from mv_social_share_of_voice_by_ta where ta_slug = :specialty_slug"
+    coverage_query_unsafe: true
+    key_form: specialty_slug
+    applicability:
+      condition: same as social_hot_topics
+      evidence: frontend/src/lib/api.ts:3155-3160
+      expected_for_crc: false
+      applies_when:
+        fact: social_ta_addressable
+        equals: true
+    producer: { function: "public.refresh_social_analytics()", invoked_by: scripts/social/social_update.py:196 }
+    runs_in: social_update
+    depends_on: [{ upstream: social_posts_v2, gate: hard_fail, evidence: "refresh_social_analytics() body, pg_proc" }]
+    classification: not_ta_scoped
+    status_2026_08_31: { rows_total: 2178, oncology: 1798, hepatology: 380, nsclc: 0, crc: 0, last_refresh: 2026-08-31, gap: false }
+
+  - name: social_trending_topics
+    kind: output
+    target_object: mv_social_trending_topics_by_ta
+    object_kind: matview
+    coverage_query: "select count(*) from mv_social_trending_topics_by_ta where ta_slug = :specialty_slug"
+    coverage_query_unsafe: true
+    key_form: specialty_slug
+    applicability:
+      condition: same as social_hot_topics
+      evidence: frontend/src/lib/api.ts:3155-3160
+      expected_for_crc: false
+      applies_when:
+        fact: social_ta_addressable
+        equals: true
+    producer: { function: "public.refresh_social_analytics()", invoked_by: scripts/social/social_update.py:196 }
+    runs_in: social_update
+    depends_on: [{ upstream: social_posts_v2, gate: hard_fail, evidence: "refresh_social_analytics() body, pg_proc" }]
+    classification: not_ta_scoped
+    status_2026_08_31: { rows_total: 161, oncology: 28, null_slug: 133, nsclc: 0, crc: 0, last_refresh: 2026-08-31, gap: false }
+    note: "133 of 161 rows carry a NULL ta_slug — worth a look on its own terms, separately from TA completeness."
+
+  - name: social_voice_emergence
+    kind: output
+    target_object: mv_social_voice_emergence_by_ta
+    object_kind: matview
+    coverage_query: "select count(*) from mv_social_voice_emergence_by_ta where ta_slug = :specialty_slug"
+    coverage_query_unsafe: true
+    key_form: specialty_slug
+    applicability:
+      condition: same as social_hot_topics
+      evidence: frontend/src/lib/api.ts:3077-3081
+      expected_for_crc: false
+      applies_when:
+        fact: social_ta_addressable
+        equals: true
+    producer: { function: "public.refresh_social_analytics()", invoked_by: scripts/social/social_update.py:196 }
+    runs_in: social_update
+    depends_on: [{ upstream: social_posts_v2, gate: hard_fail, evidence: "refresh_social_analytics() body, pg_proc" }]
+    classification: not_ta_scoped
+    status_2026_08_31: { rows_total: 699, oncology: 661, hepatology: 38, nsclc: 0, crc: 0, last_refresh: 2026-08-31, gap: false }
+
+# ─── user-generated: written by the app, never by a pipeline ──────────────────────────────
+
+  - name: belief_claim_reactions
+    kind: input
+    target_table: msl_belief_claim_reactions
+    coverage_query: "select count(*) from msl_belief_claim_reactions where therapeutic_area_slug = :ta_slug"
+    key_form: slug
+    applicability: { unconditional: true, note: "accrues from MSL use, not from a build" }
+    producer: null
+    runs_in: none
+    supplied_by: end users (in-app)
+    searches_run:
+      - "scripts/, frontend/src, migrations/ — the ONLY references are generate_cycle.py:1264 and DDL/RLS/index rows in sql/schema_full.sql. No reader and no writer in application code. EMPTY."
+      - "pg_proc — 0, EMPTY. pg_trigger — 0, EMPTY."
+    consumers: []
+    depends_on: []
+    classification: user_generated
+    status_2026_08_31: { nsclc: 1, crc: 0, gap: false }
+    note: >
+      generate_cycle.py:1263-1264 — 'Out of scope by nature: belief claims have no populating
+      script -- hcp_belief_claims does not exist; the system is msl_belief_claim_reactions,
+      filled by MSLs in-app.' Note that no app code reads or writes it either: the frontend's
+      belief_claim_key / belief_claim_title columns live on msl_hcp_notes
+      (frontend/src/lib/fieldInsights.ts:71, :81-82). Its RLS policies are wired
+      (schema_full.sql:16346-16360) but nothing exercises them.
+
+  - name: msl_contributions
+    kind: input
+    target_table: msl_contributions
+    coverage_query: "select count(*) from msl_contributions where therapeutic_area_slug = :ta_slug"
+    key_form: slug
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    supplied_by: end users (in-app), intended
+    searches_run:
+      - "scripts/, frontend/src — no reader, no writer. EMPTY."
+      - "pg_proc — 1 match, public.merge_hcp_pair, which re-points hcp_id on a dedup merge and creates no rows."
+    consumers: []
+    depends_on: []
+    classification: user_generated
+    status_2026_08_31: { rows_total: 0, nsclc: 0, crc: 0, gap: false }
+    note: "0 rows for every TA. Nothing writes it, nothing reads it. Entered the object set on its therapeutic_area_slug column, not on its name."
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# SCHEMA GAPS — a new TA needs a NEW OBJECT, not new rows. No runner can populate these.
+#
+# CROSS-REFERENCE: scripts/utilities/ta_neutrality_allowlist.tsv. That file is a debt ledger
+# that can only go DOWN (its header: "You pay debt by DELETING a row -- never by adding one
+# to silence a finding you just created"), and validate_ta_neutrality.py reports an allowlist
+# row that no longer matches as STALE. Every entry below names its allowlist row so the two
+# lists cannot drift: if a schema_gap here has no allowlist row, one of the two is wrong.
+# Rule 2 = "TA token in a database object name"; rule 4 = "function reaches a TA THROUGH a
+# TA-named object" (validate_ta_neutrality.py:220-225).
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+  - name: community_board_nsclc
+    kind: schema_gap
+    target_object: community_board_nsclc_v1
+    object_kind: view
+    coverage_query: null
+    coverage_query_reason: "no TA column exists on this object — there is no predicate to count a TA's rows with. THIS IS A THIRD OUTCOME, distinct from both 'no gap' and 'gap'."
+    applicability:
+      unconditional: true
+      note: >
+        Every TA needs this surface — that is why its absence is a gap. The condition is not
+        WHETHER the TA needs it but whether the OBJECT exists for that TA, which is answered
+        by exists_for below, not by a row count.
+    producer: null
+    runs_in: none
+    allowlist_rows:
+      - "view:community_board_nsclc_v1  rule 2  debt  -  Phase 3: blocked on the evidence-tier generalisation + CRC curation"
+    reads_from:
+      - hcp_nsclc_evidence_tier_v1
+      - hcp_part_d_oncology_v1
+      - hcp_community_scores_v2
+      - hcps_v2
+    to_create_for_a_new_ta: >
+      A TA-parameterised replacement — community_board(p_ta_id uuid) or a view carrying
+      therapeutic_area_id — which is blocked on generalising hcp_nsclc_evidence_tier_v1 first
+      (below). Downstream, rule-4 rows in the allowlist name the functions that reach a TA
+      THROUGH this view and must be repointed with it: get_community_filtered,
+      get_community_filtered_count, community_hcp_profile, community_ledger,
+      community_practice_profile.
+    classification: schema_gap
+    status_2026_08_31: { exists_for: [nsclc], phase: 3, source: docs/canonical/TA_NEUTRAL_DB_LAYER.md }
+
+  - name: nsclc_evidence_tier
+    kind: schema_gap
+    target_object: hcp_nsclc_evidence_tier_v1
+    object_kind: view
+    coverage_query: null
+    coverage_query_reason: "no TA column; verified against pg_attribute 2026-08-31"
+    applicability:
+      unconditional: true
+      note: >
+        Every TA needs this surface — that is why its absence is a gap. The condition is not
+        WHETHER the TA needs it but whether the OBJECT exists for that TA, which is answered
+        by exists_for below, not by a row count.
+    producer: null
+    runs_in: none
+    allowlist_rows:
+      - "view:hcp_nsclc_evidence_tier_v1  rule 2  debt  -  Phase 3: blocked on the evidence-tier generalisation + CRC curation"
+    reads_from:
+      - hcp_part_d_oncology_v1
+      - hcp_hcpcs_detail
+      - hcp_community_scores_v2
+      - hcps_v2
+      - therapeutic_areas
+    to_create_for_a_new_ta: >
+      THE ROOT OF THE PHASE 3 CHAIN — everything else in this section is blocked on it. Needs
+      (a) a TA-parameterised tier view, and (b) the per-TA CONTENT it tiers on: CRC rows in
+      part_d_oncology_drugs_v1 (the drug-stem/grade set) and CRC rows in ta_hcpcs_codes, which
+      is an input above and is currently empty for CRC. The DDL and the curation are two
+      separate blockers and both are open.
+    classification: schema_gap
+    status_2026_08_31: { exists_for: [nsclc], phase: 3 }
+
+  - name: nsclc_trials_surface
+    kind: schema_gap
+    target_object: "public.get_nsclc_trials_surface"
+    object_kind: function
+    coverage_query: null
+    coverage_query_reason: "a function, not a relation — nothing to count"
+    applicability:
+      unconditional: true
+      note: >
+        Every TA needs a trials surface. Existence is judged by exists_for, not a row count.
+    producer: null
+    runs_in: none
+    allowlist_rows:
+      - "function:get_nsclc_trials_surface  rule 2  debt  -  Phase 2: -> trials_surface(p_ta_id uuid), old name kept as a wrapper"
+      - "function:get_nsclc_trials_surface  rule 3  debt  -  Phase 2: -> trials_surface(p_ta_id uuid), old name kept as a wrapper"
+    to_create_for_a_new_ta: "trials_surface(p_ta_id uuid), with the old name retained as a pinned wrapper. Phase 2, ahead of the Phase 3 items above."
+    classification: schema_gap
+    status_2026_08_31: { exists_for: [nsclc], phase: 2 }
+    note: >
+      NOT IN r1 AT ALL, in any section. It is a function, so a relation-only scan could never
+      see it — which is the argument for driving this section from the allowlist rather than
+      from pg_class. Found by reading ta_neutrality_allowlist.tsv, not by querying the catalog.
+
+# ─── examined and NOT schema gaps, recorded so the question is not re-opened ──────────────
+#
+#   hcp_part_d_oncology_v1, part_d_oncology_drugs_v1 — TA-slug-ish names (79,988 and 68 rows),
+#   MISSED ENTIRELY by r1's name-token scan. The allowlist already adjudicates them:
+#     table:hcp_part_d_oncology_v1   rule 2  per_ta_content  -  Phase 3: 'oncology' names the
+#                                    CMS Part D extract; the lung-specific part is anchor_grade,
+#                                    not the name
+#     table:part_d_oncology_drugs_v1 rule 2  per_ta_content  (same note)
+#   per_ta_content means the NAME is a data-domain name and the TA-specific thing is the
+#   CONTENT, which moves into per-TA rows in Phase 3. So a new TA needs new ROWS here, not a
+#   new object — an input, not a schema gap. They are the content half of nsclc_evidence_tier's
+#   blocker above.
+#
+#   Backups and oracles (nsclc_oracle_*, *_pre_crc, *_contaminated_backup, *_detour_backup,
+#   *_delete_list) carry slugs but are allowlisted rule 2 / archive: "dead snapshot/backup
+#   table. Listed BY NAME -- a wildcard on %_backup would hide the next real violation that
+#   happens to be named _backup." Excluded here for the same reason.
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# SUPERSEDED / FROZEN — carried so nothing is dropped silently
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+  - name: established_snapshots_v1
+    kind: output
+    target_table: hcp_established_snapshots
+    coverage_query: "select count(*) from hcp_established_snapshots where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    depends_on: []
+    classification: superseded
+    superseded_by: [board_snapshots]
+    status_2026_08_31: { nsclc: 55633, crc: 0, gap: false }
+    note: >
+      migrations/2026_08_17_board_snapshots_v2.sql:9-11 — 'hcp_rising_star_snapshots recorded
+      the OUTPUTS of scoring (ranks and percentiles) and none of the variables the board is
+      GATED on.' take_weekly_snapshot.py writes only the _board_ pair (:261, :609). No producer
+      found; searched scripts/**/*.py, EMPTY.
+
+  - name: rising_snapshots_v1
+    kind: output
+    target_table: hcp_rising_star_snapshots
+    coverage_query: "select count(*) from hcp_rising_star_snapshots where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    depends_on: []
+    classification: superseded
+    superseded_by: [rising_board_snapshots]
+    status_2026_08_31: { nsclc: 2263, crc: 0, gap: false }
+    note: "Same migration. No producer found; searched scripts/**/*.py, EMPTY."
+
+  - name: community_snapshots_frozen
+    kind: output
+    target_table: hcp_community_snapshots
+    coverage_query: "select count(*) from hcp_community_snapshots where therapeutic_area_id = :ta_id"
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    depends_on: []
+    classification: frozen
+    status_2026_08_31: { nsclc: 25920, crc: 0, gap: false }
+    note: >
+      take_weekly_snapshot.py:709 — 'hcp_community_snapshots (160,712 rows through 2026-08-05)
+      is retained as the...' — deliberately retained and no longer written.
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# THE GAP LIST, RE-DERIVED WITH APPLICABILITY APPLIED
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#
+# 13 of the 13 survive — but they are not the same 13. Applicability removed one and the
+# hcp_scores_v2 / hcp_established_scores_v2 reclassification removed two more; the input
+# reclassification of ta_cohort_counts_cache and the split of ta_hcpcs_codes /
+# ta_clinical_taxonomies out of "founder-gated outputs" put three back.
+#
+# gaps_2026_08_31:
+#   automatable_unbilled:
+#     - publication_theme_labels     # THE critical path; both prerequisites already met for CRC
+#     - canonical_topic_share        # view, follows the above
+#     - score_ranks                  # scoring_pipeline.py --ta; r1 had this as unknown
+#     - reingest_snapshot            # needs score_ranks, not the boards
+#     - board_snapshots              # take_weekly_snapshot.py --ta
+#     - trial_ta_mapping             # trial_ta_mapping.py --ta
+#   blocked_on_code:
+#     - medicare_by_ta               # medicare_aggregator.py has no --ta, AND ta_hcpcs_codes is empty
+#   inputs_needing_curation:
+#     - ta_hcpcs_codes               # silent degrade on three live profile RPCs
+#     - ta_clinical_taxonomies       # curate only after establishing what reads it
+#     - cohort_counts_cache          # hand-maintained; r1 wrongly called it automatable
+#   unknown:
+#     - leadership_evidence
+#     - congress_presenters
+#     - pulse_synthesis
+#
+# conditional_gaps:
+#   - pharma_engagement              # only if --w-pharma > 0; default 0.0
+#
+# removed_by_applicability:
+#   - rising_emergence               # CRC is a momentum TA (rising_score.py:45-49)
+#   - rising_composite               # same branch
+#   - social_* (4)                   # specialty-keyed; a :ta_slug bind can only ever return 0
+#
+# removed_by_supersession:
+#   - hcp_scores_legacy              # newest row 2026-05-29; only reader is a superseded view
+#   - established_scores_legacy      # newest row 2026-05-27; DATA_COMPLETENESS_AUDIT.md:68
+#
+# NOT COUNTED AS GAPS, and not counted as "no gap" either — the diff cannot express them:
+#   - community_board_nsclc, nsclc_evidence_tier, nsclc_trials_surface (schema_gap)
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# contaminated_reference — artifacts NSCLC holds that its own configuration does not produce
+# ─────────────────────────────────────────────────────────────────────────────────────────
+#
+#   hcp_scientific_emergence_v1   16,620 NSCLC rows, computed 2026-08-19, while
+#                                 RISING_MODEL['nsclc'] = 'momentum' (rising_score.py:46).
+#                                 emergence_scoring.py is EMERGENCE_STEPS[0] and should never
+#                                 run for a momentum TA. Only the first of the two emergence
+#                                 steps ran — hcp_rising_composite_v1 has no NSCLC rows — so
+#                                 this was a partial out-of-band run, not a model switch.
+#                                 THIS SURPLUS IS WHAT MADE CRC LOOK DEFICIENT.
+#
+#   hcp_scores_v2                 25,737 NSCLC rows frozen at 2026-05-29, from a superseded
+#                                 scoring generation. Present for NSCLC, absent for the two
+#                                 TAs built since. Reference surplus, not CRC deficit.
+#
+#   hcp_established_scores_v2     11,389 NSCLC rows frozen at 2026-05-27. Same shape.
+#
+# Everything else checked clean: hcp_rising_composite_v1 correctly holds no NSCLC rows, and no
+# other artifact carries NSCLC rows its branch config forbids.
+#
+# THE STANDING RULE THIS IMPLIES: an artifact with an applicability condition must be
+# evaluated against that condition BEFORE its NSCLC/CRC delta is read as anything. A diff
+# against a reference that has been experimented on reports the experiments as gaps.

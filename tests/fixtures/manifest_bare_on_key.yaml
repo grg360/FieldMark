@@ -1,0 +1,52 @@
+# REGRESSION FIXTURE -- reproduces the YAML 1.1 bare-`on:` bug. NOT a real manifest.
+#
+# Every depends_on edge below is written with a bare `on:` key, exactly as manifest r2 was
+# written before the bug was found. YAML 1.1 resolves bare on/off/yes/no/true/false to
+# BOOLEANS, so `on: corpus` parses to {True: 'corpus'} and the `upstream` field the checker
+# reads is simply absent. The graph then looked correct in the file and ordered nothing.
+#
+# The schema gate must FAIL on this file. If it ever passes, the gate has regressed.
+# Expected: a non-string mapping key error, plus a missing 'upstream' error per edge.
+
+meta:
+  revision: fixture
+  reference_ta: alpha
+
+registry:
+  table: registry_table
+  slug_column: slug
+  id_column: id
+
+binds:
+  ta_id: { from: registry, column: id }
+
+ta_facts:
+  alpha:
+    some_fact: true
+
+classification_semantics:
+  automatable: { gap_eligible: true, plan_group: AUTOMATABLE }
+
+plan_group_order: [AUTOMATABLE]
+
+external_dependencies: []
+
+artifacts:
+  - name: corpus
+    kind: output
+    target_table: corpus_table
+    coverage_query: "select count(*) from corpus_table where ta = :ta_id"
+    applicability: { unconditional: true }
+    classification: automatable
+    depends_on: []
+
+  - name: downstream
+    kind: output
+    target_table: downstream_table
+    coverage_query: "select count(*) from downstream_table where ta = :ta_id"
+    applicability: { unconditional: true }
+    classification: automatable
+    depends_on:
+      - on: corpus                     # <-- THE BUG: parses to the boolean True, not "on"
+        gate: hard_fail
+        evidence: fixture edge
