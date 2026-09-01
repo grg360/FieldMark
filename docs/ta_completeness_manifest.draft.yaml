@@ -134,6 +134,7 @@ ta_facts:
   nsclc:
     rising_model: momentum                # scripts/score/rising_score.py:46
     themes_tag: NSCLC                     # extract_research_themes.py TA_CONFIGS
+    buckets_key: NSCLC                    # upper(slug) -- what bucket_themes writes
     has_themes_config: true               # slug present in TA_CONFIGS (:152)
     themes_tag_matches_upper: true        # 'NSCLC' == 'NSCLC' -> G2 runs (pre_g2:519-529)
     specialty: oncology                   # social layer grain
@@ -215,6 +216,31 @@ plan_group_order: [AUTOMATABLE, BILLED, FOUNDER_GATED, SCHEMA_GAP, NEEDS_DECISIO
 # key to the BOOLEAN true, so every edge silently parsed as {true: <name>} and the checker
 # could not read its own graph. Do not rename it back.
 #
+# Tables every producer may read without it being a per-TA precondition. These exist before any
+# TA build and are not artifacts a TA build creates, so modelling them as edges would add a node
+# that every producer depends on and that orders nothing. Listed BY NAME, never by wildcard --
+# the same discipline ta_neutrality_allowlist.tsv uses, and for the same reason.
+substrate_tables:
+  - hcps_v2                       # the HCP spine
+  - hcps                          # v1 spine, still referenced by scoring_pipeline's v1 branch
+  - publications_v2               # the publication corpus
+  - publications                  # v1 corpus
+  - publication_authors_v2        # authorship links
+  - publication_authors           # v1 authorship
+  - author_pub_flat               # denormalised authorship, rebuilt in ta_cycle 1c
+  - hcp_openalex_authors_v2       # OpenAlex identity links
+  - therapeutic_areas             # THE REGISTRY -- validate_ta_neutrality.py:231-235 excludes it
+                                  # as "the definition of TA-ness"; an edge to it is meaningless
+  - regions                       # global scope config
+  - region_countries              # global scope config
+  - clinical_trials_v2            # trial mirror, TA-agnostic
+  - narrative_prompt_versions     # prompt registry, not a TA artifact
+  - msl_hcp_notes                 # user-generated field notes
+  - hcp_hcpcs_detail              # CMS claims detail, TA-agnostic
+  - pulse_concept_blocklist_v1    # 29 curated homonym exclusions, TA-AGNOSTIC and non-blocking:
+                                  # label_pub_themes.py:46 reads it to filter noise concepts, and
+                                  # an empty blocklist means no filtering, not a failed run.
+
 # depends_on targets that are NOT manifest entries. Named so the checker can tell an
 # untracked upstream from a typo, and so the topological sort does not invent nodes.
 external_dependencies:
@@ -449,6 +475,9 @@ artifacts:
       - upstream: hcp_ta_membership
         gate: hard_fail
         evidence: "ta_cycle.py:44-66 — stage 4 writes hcp_therapeutic_areas_v2 and generates ta_hcp_ids.txt; 8d runs after it under fail-fast ordering (ta_cycle.py:40)"
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "scripts/classify/cohort_classification_v2.py reads publication_therapeutic_areas_v2 directly inside its own SQL; the orchestrator never models this because the stage ordering happens to satisfy it"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -470,6 +499,9 @@ artifacts:
       - upstream: publication_ta_membership
         gate: hard_fail
         evidence: "ta_cycle.py:40 fail-fast ordering — stage 4 precedes stage 9; leadership is computed over the TA's tagged publications"
+      - upstream: cohort_classification
+        gate: hard_fail
+        evidence: "scripts/score/publication_leadership_scoring.py reads hcp_cohort_classification_v2 directly inside its own SQL"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -605,6 +637,9 @@ artifacts:
       - upstream: publication_ta_membership
         gate: hard_fail
         evidence: "ta_cycle.py:40 fail-fast ordering"
+      - upstream: cohort_classification
+        gate: hard_fail
+        evidence: "scripts/score/emergence_scoring.py reads hcp_cohort_classification_v2 directly inside its own SQL"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -644,6 +679,12 @@ artifacts:
       - upstream: rising_emergence
         gate: hard_fail
         evidence: "rising_score.py:109-112 — emergence_scoring.py precedes rising_composite_scoring.py in EMERGENCE_STEPS"
+      - upstream: network_centrality
+        gate: hard_fail
+        evidence: "scripts/score/rising_composite_scoring.py:142 FROM hcp_network_centrality_v2 -- the network axis of the composite"
+      - upstream: hcp_industry_classification_v1
+        gate: degrade
+        evidence: "scripts/score/rising_composite_scoring.py reads hcp_industry_classification_v1 directly; an HCP with no row is silently dropped rather than failing the run (ta_cycle.py:70-73 documents the same filter for the momentum scripts)"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -762,6 +803,18 @@ artifacts:
       - upstream: established_board
         gate: hard_fail
         evidence: "ta_cycle.py:81 — 'MUST follow stage 9: it copies what shipped, never recomputes'"
+      - upstream: scientific_momentum
+        gate: hard_fail
+        evidence: "scripts/utilities/take_weekly_snapshot.py:236 JOIN hcp_scientific_momentum_v1 -- inner join, and :14-15 records these are OVERWRITTEN in place so the snapshot must run while they exist"
+      - upstream: network_momentum
+        gate: degrade
+        evidence: "take_weekly_snapshot.py:240 LEFT JOIN hcp_network_momentum_v1 -- outer, so absence thins the captured gate inputs rather than emptying the snapshot"
+      - upstream: cohort_classification
+        gate: hard_fail
+        evidence: "take_weekly_snapshot.py:230 FROM hcp_cohort_classification_v2"
+      - upstream: hcp_industry_classification_v1
+        gate: degrade
+        evidence: "scripts/utilities/take_weekly_snapshot.py reads hcp_industry_classification_v1 directly; an HCP with no row is silently dropped rather than failing the run (ta_cycle.py:70-73 documents the same filter for the momentum scripts)"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -792,6 +845,18 @@ artifacts:
       - upstream: rising_board
         gate: hard_fail
         evidence: ta_cycle.py:81
+      - upstream: scientific_momentum
+        gate: hard_fail
+        evidence: "scripts/utilities/take_weekly_snapshot.py:236 JOIN hcp_scientific_momentum_v1"
+      - upstream: network_momentum
+        gate: degrade
+        evidence: "take_weekly_snapshot.py:240 LEFT JOIN hcp_network_momentum_v1"
+      - upstream: cohort_classification
+        gate: hard_fail
+        evidence: "take_weekly_snapshot.py:230 FROM hcp_cohort_classification_v2"
+      - upstream: hcp_industry_classification_v1
+        gate: degrade
+        evidence: "scripts/utilities/take_weekly_snapshot.py reads hcp_industry_classification_v1 directly; an HCP with no row is silently dropped rather than failing the run (ta_cycle.py:70-73 documents the same filter for the momentum scripts)"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -830,6 +895,12 @@ artifacts:
       - upstream: ta_configs_entry
         gate: hard_fail
         evidence: scripts/generate_cycle.py:488-496
+      - upstream: rising_board
+        gate: hard_fail
+        evidence: "scripts/classify/extract_research_themes.py:117-123 TARGET_HCPS_SQL_RISING_ALL_COUNTRIES JOINs hcp_rising_star_ranks_v3; :222 makes it colorectal-cancer default selection. pre_g1 checks only hcp_therapeutic_areas_v2, so this precondition is invisible to the orchestrator"
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "scripts/classify/extract_research_themes.py reads publication_therapeutic_areas_v2 directly inside its own SQL; the orchestrator never models this because the stage ordering happens to satisfy it"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -937,6 +1008,55 @@ artifacts:
         thinly across many profiles rather than concentrated in a few.
     status_2026_08_31: { nsclc: 9049, crc: 1098, ratio: 0.121, thin: true }
 
+  # ── theme signatures: founder-curated, NSCLC-only, and the reason publication_theme_labels
+  #    could not have run for colorectal-cancer no matter how correct its command was ────────
+  - name: theme_concept_signatures
+    kind: input
+    target_table: theme_concept_signature_v1
+    coverage_query: "select count(*) from theme_concept_signature_v1 s join theme_canonical_v1 tc on tc.id = s.canonical_id where tc.therapeutic_area = :buckets_key"
+    key_form: buckets_key
+    key_note: >
+      The table has NO TA column of its own -- it is scoped only through
+      theme_canonical_v1.canonical_id, which is why no TA-column census ever saw it.
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    supplied_by: human (hand-written INSERT ... VALUES in docs/02_pulse_signature_seed.sql)
+    searches_run:
+      - "scripts/**/*.py for a writer -- EMPTY. label_pub_themes.py only READS it (:54)."
+      - "pg_proc mentioning it: 0. pg_trigger: 0. EMPTY."
+      - "repo-wide INSERT INTO: docs/02_pulse_signature_seed.sql only, literal VALUES tuples."
+    consumers:
+      - { consumer: scripts/label_pub_themes.py:50-62, on_missing: hard_fail, evidence: "load_signatures() selects concept signatures joined to theme_canonical_v1; :232-233 raises SystemExit(\"No signatures found for ta_label=...\") when both signature sets come back empty" }
+    depends_on:
+      - upstream: canonical_themes
+        gate: hard_fail
+        evidence: "rows are keyed by canonical_id -> theme_canonical_v1.id; signatures for a TA cannot exist before its canonical themes do"
+    classification: founder_gated
+    status_2026_09_01: { nsclc: 91, crc: 0, gap: true }
+
+  - name: theme_keyword_signatures
+    kind: input
+    target_table: theme_keyword_signature_v1
+    coverage_query: "select count(*) from theme_keyword_signature_v1 s join theme_canonical_v1 tc on tc.id = s.canonical_id where tc.therapeutic_area = :buckets_key"
+    key_form: buckets_key
+    applicability: { unconditional: true }
+    producer: null
+    runs_in: none
+    supplied_by: human (hand-written INSERT ... VALUES in sql/03_pulse_signature_patch.sql)
+    searches_run:
+      - "scripts/**/*.py for a writer -- EMPTY. label_pub_themes.py only READS it (:70)."
+      - "pg_proc mentioning it: 0. pg_trigger: 0. EMPTY."
+      - "repo-wide INSERT INTO: sql/03_pulse_signature_patch.sql only, literal VALUES tuples."
+    consumers:
+      - { consumer: scripts/label_pub_themes.py:66-78, on_missing: hard_fail, evidence: "load_signatures() selects keyword signatures joined to theme_canonical_v1; :232-233 raises SystemExit when both signature sets are empty" }
+    depends_on:
+      - upstream: canonical_themes
+        gate: hard_fail
+        evidence: "rows are keyed by canonical_id -> theme_canonical_v1.id"
+    classification: founder_gated
+    status_2026_09_01: { nsclc: 201, crc: 0, gap: true }
+
   - name: publication_theme_labels
     kind: output
     target_table: publication_theme_v1
@@ -946,6 +1066,8 @@ artifacts:
       script: scripts/label_pub_themes.py
       flags: ["--ta-id <ta_id>", "--ta-label <buckets_key>", "--execute"]
     runs_in: none
+    supplied_by: >
+      human (curated theme signatures per canonical theme, seeded by hand-written SQL) -- then the recorded command runs unattended
     depends_on:
       - upstream: publication_ta_membership
         gate: hard_fail
@@ -953,12 +1075,38 @@ artifacts:
       - upstream: canonical_themes
         gate: hard_fail
         evidence: "scripts/label_pub_themes.py:54-55 and :70-71 — JOIN theme_canonical_v1 tc ON tc.id = s.canonical_id, on both the concept and keyword signature paths"
+      - upstream: theme_concept_signatures
+        gate: hard_fail
+        evidence: "scripts/label_pub_themes.py:54 FROM theme_concept_signature_v1; :232-233 SystemExit when no signatures match ta_label"
+      - upstream: theme_keyword_signatures
+        gate: hard_fail
+        evidence: "scripts/label_pub_themes.py:70 FROM theme_keyword_signature_v1; same SystemExit"
     producer_verified:
       status: OK
       checked: "2026-09-01"
       method: static ast parse of the producer source; never executed
       flags: ["--ta-id <ta_id>", "--ta-label <buckets_key>", "--execute"]
-    classification: automatable
+    classification: founder_gated
+    correction_2026_09_01_signatures: >
+      RECLASSIFIED automatable -> founder_gated, 2026-09-01, AND THIS ENTRY WAS THE FIRST STEP OF
+      THE COLORECTAL-CANCER PLAN. It could never have run.
+
+      label_pub_themes.py:50-77 loads its scoring signatures from theme_concept_signature_v1 and
+      theme_keyword_signature_v1, both joined to theme_canonical_v1 on canonical_id. Neither table
+      is produced by any script: repo-wide the only INSERTs are literal VALUES tuples in
+      docs/02_pulse_signature_seed.sql and sql/03_pulse_signature_patch.sql. pg_proc and pg_trigger
+      are both empty for them. They are founder-curated.
+
+      Measured 2026-09-01: 91 concept + 201 keyword signatures for NSCLC, and ZERO of either for
+      COLORECTAL-CANCER. So the run would reach :232-233 and raise
+      SystemExit("No signatures found for ta_label='COLORECTAL-CANCER'").
+
+      An AUTOMATABLE step whose input a human must supply is not automatable. The producer command
+      is still recorded and still correct -- it is simply not runnable until the signatures exist.
+
+      NOTE the obvious suspect was wrong: this is NOT curated_ta_concepts. That input feeds the
+      tagging and scoring stages; these two feed theme labelling and are a separate curation with a
+      separate seed file.
     correction_2026_09_01: >
       THE r2 COMMAND WAS WRONG AND WOULD NOT HAVE RUN. The entry recorded `--ta <slug>`.
       label_pub_themes.py has NO --ta. Its real signature, read statically from source on
@@ -1028,6 +1176,9 @@ artifacts:
           scripts/generate_cycle.py:546-559 (pre_g4) — 'hcp_rising_star_ranks_v3 has 0 rows for
           {slug} -- the rising board does not exist yet. Run ta_cycle stage 9 first. Refusing
           rather than targeting zero HCPs and exiting 0.'
+      - upstream: publication_ta_membership
+        gate: hard_fail
+        evidence: "scripts/narrative/extract_scientific_positions.py reads publication_therapeutic_areas_v2 directly inside its own SQL; the orchestrator never models this because the stage ordering happens to satisfy it"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -1154,6 +1305,9 @@ artifacts:
       - upstream: scientific_positions
         gate: hard_fail
         evidence: scripts/generate_cycle.py:640-649
+      - upstream: ta_registry_row
+        gate: degrade
+        evidence: "scripts/narrative/generate_narratives_v2.py:200-216 loads VISIBLE_TA_IDS from therapeutic_area_ingestion_config filtered is_visible_in_ui AND is_active; :216 warns and continues with an EMPTY selection rather than failing, so an invisible TA silently generates nothing"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -1207,6 +1361,15 @@ artifacts:
       - upstream: established_board
         gate: hard_fail
         evidence: "ta_cycle.py:98-100 -- stage 13b runs --cohort established --established-top 200 over the board stage 9 produced"
+      - upstream: ta_registry_row
+        gate: degrade
+        evidence: "scripts/narrative/generate_narratives_v2.py:200-216 loads VISIBLE_TA_IDS from therapeutic_area_ingestion_config filtered is_visible_in_ui AND is_active; :216 warns and continues with an EMPTY selection rather than failing, so an invisible TA silently generates nothing"
+      - upstream: research_themes
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:640-649 (pre_g8) hard-fails on missing themes for EVERY cohort, not just rising -- the guard does not branch on --cohort"
+      - upstream: scientific_positions
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:640-649 (pre_g8), same guard, same non-branching"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -1267,6 +1430,15 @@ artifacts:
       - upstream: community_scores
         gate: hard_fail
         evidence: "scripts/generate_cycle.py:841-855 (ws_g8) -- the community arm is sized from hcp_community_scores_v2"
+      - upstream: ta_registry_row
+        gate: degrade
+        evidence: "scripts/narrative/generate_narratives_v2.py:200-216 loads VISIBLE_TA_IDS from therapeutic_area_ingestion_config filtered is_visible_in_ui AND is_active; :216 warns and continues with an EMPTY selection rather than failing, so an invisible TA silently generates nothing"
+      - upstream: research_themes
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:640-649 (pre_g8) hard-fails on missing themes for EVERY cohort, not just rising -- the guard does not branch on --cohort"
+      - upstream: scientific_positions
+        gate: hard_fail
+        evidence: "scripts/generate_cycle.py:640-649 (pre_g8), same guard, same non-branching"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -1446,6 +1618,9 @@ artifacts:
       - upstream: reingest_snapshot
         gate: hard_fail
         evidence: "scripts/score/reingest_diff.py:16 — 'reingest_diff_v2 and one run-level row to reingest_diff_summary_v2'; :619 --diff requires --before/--after snapshot ids"
+      - upstream: score_ranks
+        gate: hard_fail
+        evidence: "scripts/score/reingest_diff.py:19-28 reads hcp_score_ranks_v2 directly; previously only transitively implied through reingest_snapshot"
     producer_verified:
       status: UNRESOLVED PLACEHOLDER
       checked: "2026-09-01"
@@ -1479,6 +1654,9 @@ artifacts:
       - upstream: reingest_snapshot
         gate: hard_fail
         evidence: scripts/score/reingest_diff.py:16
+      - upstream: score_ranks
+        gate: hard_fail
+        evidence: "scripts/score/reingest_diff.py:19-28 reads hcp_score_ranks_v2 directly; previously only transitively implied through reingest_snapshot"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -1525,7 +1703,10 @@ artifacts:
     applicability: { unconditional: true, confidence: low, note: "no config or branch found governing it; searched rising_score.py, ta_cycle.py and generate_cycle.py, EMPTY" }
     producer: { script: scripts/social/scrape_leadership_signals.py, flags: null }
     runs_in: none
-    depends_on: []
+    depends_on:
+      - upstream: established_board
+        gate: hard_fail
+        evidence: "scripts/social/scrape_leadership_signals.py:331 FROM hcp_established_ranks_v3 er -- signals are scraped for board members"
     producer_verified:
       status: OK
       checked: "2026-09-01"
@@ -1547,7 +1728,13 @@ artifacts:
       evidence: "scripts/congress/ingest_asco_abstracts.py:94-115 is a DROP + INSERT specific to ASCO; generate_cycle.py:1257 lists 'ingest_asco_abstracts.py  no --ta (congress presenters)' among the un-generalised"
     producer: { script: scripts/congress/ingest_asco_abstracts.py, flags: [] }
     runs_in: none
-    depends_on: []
+    depends_on:
+      - upstream: established_board
+        gate: hard_fail
+        evidence: "scripts/congress/ingest_asco_abstracts.py:57-63 builds its name lookup from hcp_established_ranks_v3 (US region scope); a speaker is confirmed only by matching it"
+      - upstream: rising_board
+        gate: hard_fail
+        evidence: "ingest_asco_abstracts.py:64-71 second lookup from hcp_rising_star_ranks_v3 where us_rank is not null"
     producer_verified:
       status: NO CLI
       checked: "2026-09-01"
@@ -1630,6 +1817,12 @@ artifacts:
       - upstream: congress_presenters
         gate: hard_fail
         evidence: "written by the same script in the same pass (ingest_asco_abstracts.py:103-117); this entry's coverage is scoped through congress_confirmed_presenters because the table has no TA column of its own"
+      - upstream: established_board
+        gate: hard_fail
+        evidence: "scripts/congress/ingest_asco_abstracts.py:57-63 builds its name lookup from hcp_established_ranks_v3 (US region scope); a speaker is confirmed only by matching it"
+      - upstream: rising_board
+        gate: hard_fail
+        evidence: "ingest_asco_abstracts.py:64-71 second lookup from hcp_rising_star_ranks_v3 where us_rank is not null"
     classification: blocked
     rebuild_semantics_2026_09_01: >
       A REBUILD-AFTER-TA-BUILD ARTIFACT, AND NO RUNNER MAY EVER PLAN IT. classification is
@@ -1764,6 +1957,9 @@ artifacts:
       - upstream: curated_concepts
         gate: degrade
         evidence: scripts/score/established_scoring.py:140, :730
+      - upstream: hcp_industry_classification_v1
+        gate: degrade
+        evidence: "scripts/score/established_scoring.py:310 reads hcp_industry_classification_v1; an HCP with no row is dropped from the academic filter rather than failing the run"
     producer_verified:
       status: OK
       checked: "2026-09-01"

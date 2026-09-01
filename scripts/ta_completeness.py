@@ -168,6 +168,18 @@ def validate_manifest(m) -> list:
     for slug, facts in m["ta_facts"].items():
         if not isinstance(facts, dict):
             errors.append(f"ta_facts.{slug}: expected mapping, got {type(facts).__name__}")
+            continue
+        # Every ta_facts-sourced BIND key must be PRESENT for every TA. A null value is a
+        # legitimate "no value for this TA" and correctly yields UNKNOWN at measure time; a
+        # MISSING key is a manifest bug that silently produced UNKNOWN once, because only
+        # applies_when facts were being checked and bind-sourced facts were not.
+        for bind, spec in m["binds"].items():
+            if isinstance(spec, dict) and spec.get("from") == "ta_facts":
+                key = spec.get("key")
+                if isinstance(key, str) and key not in facts:
+                    errors.append(
+                        f"ta_facts.{slug}: missing {key!r}, required by bind :{bind}. Use an "
+                        f"explicit null if the TA genuinely has no value.")
 
     entry_names, external = set(), set(m.get("external_dependencies") or [])
     for i, e in enumerate(m["artifacts"]):
@@ -485,6 +497,73 @@ def verify_all_producers(manifest, cwd):
     resolvable = resolvable_placeholders(manifest)
     return [verify_producer(e, cwd, resolvable) for e in manifest["artifacts"]
             if (e.get("producer") or {})]
+
+
+# ---------------------------------------------------------------------------------------
+# producer-internal reads -- dependencies no orchestrator has ever seen
+# ---------------------------------------------------------------------------------------
+#
+# Every depends_on edge in this manifest was justified from ta_cycle / generate_cycle, so
+# every edge is one an ORCHESTRATOR knows about. A producer that reads a table directly inside
+# its own SQL creates a precondition the orchestrator has never heard of, and such an edge is
+# absent by construction rather than by oversight.
+#
+# STATIC ONLY, same rule as verify_producer: sources are read, never imported or executed.
+#
+# KNOWN IMPRECISION, STATED RATHER THAN HIDDEN: this matches FROM/JOIN inside string literals,
+# and Python string literals include LLM prompts. bucket_themes.py:136 contains the prose
+# "...themes extracted from publications by HCPs..." and was reported as a read of the
+# `publications` table. Treat the output as a worklist to check by hand, never as truth --
+# which is why it reports and does not gate.
+
+_SQL_READ = re.compile(r"\b(?:from|join)\s+(?:public\.)?\"?([a-z_][a-z0-9_]*)", re.I)
+_SQL_WRITE = re.compile(
+    r"(?:insert\s+into|update|delete\s+from|truncate|drop\s+table(?:\s+if\s+exists)?|"
+    r"create\s+table(?:\s+if\s+not\s+exists)?)\s+(?:public\.)?\"?([a-z_][a-z0-9_]*)", re.I)
+_PY_TABLE = re.compile(r"\.table\(\s*[\"']([a-z_][a-z0-9_]*)[\"']")
+_PY_WRITE = re.compile(
+    r"\.table\(\s*[\"']([a-z_][a-z0-9_]*)[\"']\s*\)\s*\.\s*(?:upsert|insert|update|delete)")
+
+
+def producer_reads(entry, cwd, known_relations):
+    """-> sorted table names the producer READS, minus what it writes. Static."""
+    script = (entry.get("producer") or {}).get("script")
+    if not script:
+        return []
+    path = Path(cwd) / script
+    if not path.exists():
+        return []
+    src = path.read_text(encoding="utf-8-sig", errors="replace")
+    writes = {t.lower() for t in _SQL_WRITE.findall(src)} | {t.lower() for t in _PY_WRITE.findall(src)}
+    reads = {t.lower() for t in _SQL_READ.findall(src)} | {t.lower() for t in _PY_TABLE.findall(src)}
+    return sorted((reads & known_relations) - writes)
+
+
+def unmodelled_reads(manifest, cwd, known_relations):
+    """-> {entry name: [tables read but neither modelled as an upstream nor declared substrate]}"""
+    substrate = {str(t) for t in (manifest.get("substrate_tables") or [])}
+    external = set(manifest.get("external_dependencies") or [])
+    target_of = {}
+    for e in manifest["artifacts"]:
+        t = e.get("target_table") or e.get("target_object")
+        if t:
+            target_of[e["name"]] = t
+    out = {}
+    for e in manifest["artifacts"]:
+        reads = producer_reads(e, cwd, known_relations)
+        if not reads:
+            continue
+        modelled = set()
+        for d in e.get("depends_on") or []:
+            up = d["upstream"]
+            modelled.add(target_of.get(up, up))
+            if up in external:
+                modelled.add(up)
+        gap = [t for t in reads if t not in modelled and t not in substrate]
+        if gap:
+            out[e["name"]] = gap
+    return out
+
 
 
 def n_axes(m):
@@ -878,6 +957,9 @@ def main() -> int:
     ap.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     ap.add_argument("--validate-manifest", action="store_true",
                     help="run the schema gate and exit; touches no database")
+    ap.add_argument("--verify-reads", action="store_true",
+                    help="list tables each producer reads that are not modelled as upstreams "
+                         "and not declared substrate. Static; runs no producer.")
     ap.add_argument("--verify-producers", action="store_true",
                     help="invoke each recorded producer's --help and check the recorded flags "
                          "against its real CLI. Runs no producer and touches no database.")
@@ -891,6 +973,36 @@ def main() -> int:
 
     # --verify-producers is what CREATES the stamps the gate requires, so it must run
     # BEFORE the gate -- otherwise the gate blocks the only command that can satisfy it.
+    if args.verify_reads:
+        errs = validate_manifest(manifest)
+        if errs:
+            print(f"gate failed ({len(errs)} errors); fix the manifest first", file=sys.stderr)
+            return 2
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(REPO_ROOT / ".env")
+        except ImportError:
+            pass
+        reader = Reader(os.environ["DATABASE_URL"])
+        try:
+            rows = reader.one("select array_agg(c.relname) as names from pg_class c "
+                              "join pg_namespace n on n.oid=c.relnamespace "
+                              "where n.nspname='public' and c.relkind in ('r','v','m','p')")
+        finally:
+            reader.close()
+        known = set(rows["names"])
+        gaps = unmodelled_reads(manifest, REPO_ROOT, known)
+        if not gaps:
+            print("  every producer read is modelled as an upstream or declared substrate")
+            return 0
+        width = max(len(k) for k in gaps)
+        for name in sorted(gaps):
+            print(f"  {name:<{width}}  {', '.join(gaps[name])}")
+        print(f"\n  {len(gaps)} entr{'y' if len(gaps) == 1 else 'ies'} with unmodelled reads, "
+              f"{sum(len(v) for v in gaps.values())} tables. Check by hand: this matches SQL "
+              f"inside string literals, prompts included.")
+        return 1
+
     if args.verify_producers:
         rows = verify_all_producers(manifest, REPO_ROOT)
         width = max((len(r["name"]) for r in rows), default=10)
