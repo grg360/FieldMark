@@ -6853,6 +6853,13 @@ Do NOT patch in display; the congress page now honestly shows them unchipped in 
 not-currently-in-a-cohort group until this is resolved. Investigate cohort_classification writers
 (scripts/classify/cohort_classification_v2.py) vs established ranks coverage.
 
+2026-09-01: congress_confirmed_presenters was REBUILT on this date and the count changed from 47 to 51.
+The 18-of-47 figures above are AS-OF their original date and have deliberately not been restated -- this
+is a debt log, a record of what was found when it was found, not a claim about the current table. The
+rebuild is HCP-dependent (ingest_asco_abstracts.py matches ASCO speaker names against the live NSCLC
+US established + rising boards), so the presenter set drifts with every board recompute; re-derive before
+reusing any ratio from this entry.
+
 **RESOLVED July 28 (same day) - #2 was the wrong table, not a data gap.**
 hcps_v2.cohort_classification is a stale denormalized column (73.6% null across the 3,178 US
 Established board, last bulk-written 2026-07-24, no maintainer found). The authoritative source is

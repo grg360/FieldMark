@@ -80,3 +80,5 @@ Medicare/
 .generate_work/
 no_fit_*.json
 failed_batches_*.json
+
+docs/ta_plan_*.txt

@@ -106,6 +106,42 @@ def test_thresholds_are_marked_unratified_until_a_human_says_otherwise():
                     f"{e['name']}.{axis}: unratified threshold with no reasoning recorded"
 
 
+def test_every_producer_command_is_verified():
+    """A recorded command may never exist without having been checked against the real CLI."""
+    m = tc.load_manifest(tc.DEFAULT_MANIFEST)
+    for e in m["artifacts"]:
+        prod = e.get("producer") or {}
+        if not prod.get("script"):
+            continue
+        stamp = e.get("producer_verified")
+        assert isinstance(stamp, dict), f"{e['name']}: producer command with no verification"
+        assert [str(x) for x in stamp["flags"]] == [str(x) for x in (prod.get("flags") or [])],             f"{e['name']}: stamp is stale -- flags changed since verification"
+
+
+def test_editing_flags_invalidates_the_stamp():
+    """The stamp must not survive a flag edit -- otherwise it certifies nothing."""
+    m = tc.load_manifest(tc.DEFAULT_MANIFEST)
+    target = next(e for e in m["artifacts"]
+                  if (e.get("producer") or {}).get("script") and e.get("producer_verified"))
+    target["producer"]["flags"] = list(target["producer"].get("flags") or []) + ["--invented"]
+    errors = tc.validate_manifest(m)
+    assert any("stale" in e for e in errors),         f"the gate accepted an edited command carrying an old stamp: {errors[:3]}"
+
+
+def test_verifier_never_executes_a_producer():
+    """The incident test. --verify-producers must not shell out, ever.
+
+    scripts/congress/ingest_asco_abstracts.py has no argument parser and does its DROP+INSERT
+    on execution, so an earlier `--help`-based verifier RAN it during a read-only audit and
+    rewrote congress_confirmed_presenters 47 -> 51. Static parsing is the only safe check.
+    """
+    src = Path(tc.__file__).read_text(encoding="utf-8")
+    code = "\n".join(l.split("#")[0] for l in src.splitlines())
+    for forbidden in ("subprocess", "os.system", "popen", "check_output"):
+        assert forbidden not in code.lower(), \
+            f"the checker can execute processes again ({forbidden!r}); it must never do so"
+
+
 def test_checker_holds_no_domain_knowledge():
     """The hard constraint, asserted rather than trusted."""
     import re

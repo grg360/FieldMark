@@ -1,0 +1,66 @@
+# FIXTURE -- two independent automatable entries, the first with a producer that exits 0
+# without writing. Proves the runner reports SHORT and STOPS rather than continuing.
+# a_noop sorts before b_never_reached, and neither depends on the other, so if the runner
+# carried on after SHORT it would reach b_never_reached. It must not.
+
+meta:
+  revision: fixture
+  reference_ta: alpha
+
+registry:
+  table: registry_table
+  slug_column: slug
+  id_column: id
+
+binds:
+  ta_id: { from: registry, column: id }
+
+ta_facts:
+  alpha:
+    lifecycle: unsold
+
+classification_semantics:
+  automatable: { gap_eligible: true, plan_group: AUTOMATABLE }
+
+plan_group_order: [AUTOMATABLE]
+
+external_dependencies: []
+
+artifacts:
+  - name: a_noop
+    kind: output
+    target_table: a_table
+    coverage_query: "select count(*) from a_table where ta = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: tests/fixtures/noop_producer.py, flags: [] }
+    producer_verified:
+      status: NO CLI
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: []
+      note: >-
+        Deliberate. The fixture producer takes no arguments -- it exists only to exit 0
+        without writing. The RUNNER executes it on purpose; only the VERIFIER is forbidden
+        from executing producers.
+    runs_in: none
+    depends_on: []
+    classification: automatable
+
+  - name: b_never_reached
+    kind: output
+    target_table: b_table
+    coverage_query: "select count(*) from b_table where ta = :ta_id"
+    applicability: { unconditional: true }
+    producer: { script: tests/fixtures/noop_producer.py, flags: [] }
+    producer_verified:
+      status: NO CLI
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: []
+      note: >-
+        Deliberate. The fixture producer takes no arguments -- it exists only to exit 0
+        without writing. The RUNNER executes it on purpose; only the VERIFIER is forbidden
+        from executing producers.
+    runs_in: none
+    depends_on: []
+    classification: automatable

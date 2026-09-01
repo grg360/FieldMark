@@ -400,7 +400,7 @@ Cut these first if you're running long.
 **Congress:**
 
 > Congress coverage — ASCO 2026, eleven thousand posts captured
-> under the hashtag, forty-seven confirmed presenters from the
+> under the hashtag, fifty-one confirmed presenters from the
 > abstract list. Note the chart caption: "This is social volume,
 > not attendance."
 

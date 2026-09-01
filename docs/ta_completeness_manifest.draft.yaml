@@ -111,6 +111,7 @@ binds:
   ta_slug:        { from: registry,  column: slug }
   themes_tag:     { from: ta_facts,  key: themes_tag }
   specialty_slug: { from: ta_facts,  key: specialty }
+  buckets_key:    { from: ta_facts,  key: buckets_key }
   # nullable: NULL is a MEANING here, not a missing value -- "this TA has no contracted depth,
   # so count the whole population". run_count only tolerates NULL for binds declared this way.
   established_rank_cut: { from: ta_facts, key: contracted_established_rank_cut, nullable: true }
@@ -146,6 +147,7 @@ ta_facts:
   colorectal-cancer:
     rising_model: momentum                # scripts/score/rising_score.py:47
     themes_tag: COLORECTAL-CANCER
+    buckets_key: COLORECTAL-CANCER
     has_themes_config: true
     themes_tag_matches_upper: true
     specialty: oncology
@@ -159,6 +161,7 @@ ta_facts:
   atopic-dermatitis:
     rising_model: emergence_composite     # scripts/score/rising_score.py:48
     themes_tag: Atopic Dermatitis
+    buckets_key: ATOPIC-DERMATITIS        # DIVERGES from themes_tag; the known AD defect
     has_themes_config: true
     themes_tag_matches_upper: false       # 'Atopic Dermatitis' != 'ATOPIC-DERMATITIS'
     specialty: dermatology
@@ -172,6 +175,7 @@ ta_facts:
   hepatology:
     rising_model: null                    # never migrated to the v3 rising pipeline
     themes_tag: null
+    buckets_key: null
     has_themes_config: false              # no TA_CONFIGS entry -> argparse rejects it
     themes_tag_matches_upper: false
     specialty: hepatology
@@ -404,6 +408,11 @@ artifacts:
       - upstream: curated_concepts
         gate: hard_fail
         evidence: scripts/classify/ta_tagging_rebuild_v2.py:923
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--candidate-hcp-ids-file", "--execute"]
     classification: automatable
     status_2026_08_31: { nsclc: 88251, crc: 147218, ratio: 1.668 }
 
@@ -421,6 +430,11 @@ artifacts:
       - upstream: curated_concepts
         gate: hard_fail
         evidence: scripts/classify/ta_tagging_rebuild_v2.py:923
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--execute"]
     classification: automatable
     status_2026_08_31: { nsclc: 86436, crc: 106551, ratio: 1.233 }
 
@@ -435,6 +449,11 @@ artifacts:
       - upstream: hcp_ta_membership
         gate: hard_fail
         evidence: "ta_cycle.py:44-66 — stage 4 writes hcp_therapeutic_areas_v2 and generates ta_hcp_ids.txt; 8d runs after it under fail-fast ordering (ta_cycle.py:40)"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--execute"]
     classification: automatable
     status_2026_08_31: { nsclc: 86142, crc: 106551, ratio: 1.237 }
 
@@ -451,6 +470,11 @@ artifacts:
       - upstream: publication_ta_membership
         gate: hard_fail
         evidence: "ta_cycle.py:40 fail-fast ordering — stage 4 precedes stage 9; leadership is computed over the TA's tagged publications"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: automatable
     status_2026_08_31: { nsclc: 17473, crc: 24879, ratio: 1.424 }
 
@@ -465,6 +489,11 @@ artifacts:
       - upstream: publication_ta_membership
         gate: hard_fail
         evidence: "ta_cycle.py:40 fail-fast ordering; rising_score.py:93-96 runs it twice, once per rolling window"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--window-type early_roll|recent_roll"]
     classification: automatable
     status_2026_08_31: { nsclc: 470127, crc: 288730, ratio: 0.614 }
 
@@ -488,6 +517,11 @@ artifacts:
       - upstream: hcp_industry_classification_v1
         gate: degrade
         evidence: "ta_cycle.py:70-73 — 'scientific_momentum_scoring / network_momentum_scoring INNER JOIN that table filtered to classification=ACADEMIC; an HCP with no row is silently dropped from rising scoring'"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--early-start-date", "--recent-start-date"]
     classification: automatable
     status_2026_08_31: { nsclc: 2247, crc: 2753, ratio: 1.225 }
     note: >
@@ -514,6 +548,11 @@ artifacts:
       - upstream: hcp_industry_classification_v1
         gate: degrade
         evidence: ta_cycle.py:70-73
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--early-window-type early_roll", "--recent-window-type recent_roll"]
     classification: automatable
     status_2026_08_31: { nsclc: 4291, crc: 4376, ratio: 1.020 }
 
@@ -540,6 +579,11 @@ artifacts:
       - upstream: cohort_classification
         gate: hard_fail
         evidence: "ta_cycle.py:40 fail-fast ordering — 8d precedes 9"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--execute"]
     classification: automatable
     status_2026_08_31: { nsclc: 149, crc: 140, ratio: 0.940 }
 
@@ -561,6 +605,11 @@ artifacts:
       - upstream: publication_ta_membership
         gate: hard_fail
         evidence: "ta_cycle.py:40 fail-fast ordering"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: not_applicable_for_crc
     exceptions:
     - ta: nsclc
@@ -595,6 +644,11 @@ artifacts:
       - upstream: rising_emergence
         gate: hard_fail
         evidence: "rising_score.py:109-112 — emergence_scoring.py precedes rising_composite_scoring.py in EMERGENCE_STEPS"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--execute"]
     classification: not_applicable_for_crc
     status_2026_08_31: { nsclc: 0, crc: 0, ad: 11125, gap: false }
     note: >
@@ -630,6 +684,11 @@ artifacts:
       - upstream: hcp_industry_classification_v1
         gate: degrade
         evidence: scripts/score/recompute_established_ranks_v3.py:215
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--w-scientific 0.60", "--w-network 0.40", "--w-pharma 0.0"]
     classification: automatable
     status_2026_08_31: { nsclc: 46015, crc: 67550, ratio: 1.468 }
     note: >
@@ -642,7 +701,7 @@ artifacts:
     target_table: hcp_community_scores_v2
     coverage_query: "select count(*) from hcp_community_scores_v2 where therapeutic_area_id = :ta_id"
     applicability: { unconditional: true }
-    producer: { script: scripts/score/community_scoring.py, flags: ["--ta <slug>"] }
+    producer: { script: scripts/score/community_scoring.py, flags: ["--ta <slug>", "--execute"] }
     runs_in: generate_cycle:G7
     depends_on:
       - upstream: cohort_classification
@@ -654,7 +713,17 @@ artifacts:
       - upstream: medicare_by_ta
         gate: degrade
         evidence: scripts/generate_cycle.py:601-618
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--execute"]
     classification: automatable
+    correction_2026_09_01: >
+      r2 recorded only `--ta <slug>`. community_scoring.py's usage is
+      "community_scoring.py [-h] (--dry-run | --execute) [--ta TA]" -- the write mode is a
+      REQUIRED mutually-exclusive group, and r2 recorded neither member, so the command would
+      have been rejected by argparse before doing anything. Added --execute.
     status_2026_08_31: { nsclc: 49379, crc: 52167, ratio: 1.056 }
     note: >
       r1 listed all three edges as equal. They are not: one blocks, two degrade, and the code
@@ -672,6 +741,11 @@ artifacts:
       - upstream: publication_ta_membership
         gate: hard_fail
         evidence: "scripts/generate_cycle.py:533-544 (pre_g3) — refuses when the publication_authors_v2 x publication_therapeutic_areas_v2 join is empty"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: automatable
     status_2026_08_31: { nsclc: 434845, crc: 543347, ratio: 1.250 }
     note: "STAGES[0] — generate_cycle.py:931-933: 'unbilled, no generation-layer dependencies'."
@@ -688,6 +762,11 @@ artifacts:
       - upstream: established_board
         gate: hard_fail
         evidence: "ta_cycle.py:81 — 'MUST follow stage 9: it copies what shipped, never recomputes'"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: automatable
     status_2026_08_31: { nsclc: 107472, crc: 0, gap: true }
     note: >
@@ -713,6 +792,11 @@ artifacts:
       - upstream: rising_board
         gate: hard_fail
         evidence: ta_cycle.py:81
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: automatable
     status_2026_08_31: { nsclc: 10856, crc: 1193, ratio: 0.110, thin: true }
 
@@ -746,6 +830,11 @@ artifacts:
       - upstream: ta_configs_entry
         gate: hard_fail
         evidence: scripts/generate_cycle.py:488-496
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: billed
     sufficiency_absent_reason: 'NO HONEST DENOMINATOR EXISTS IN THE MANIFEST. The eligible population
       is TA_CONFIGS[slug][''selection''][scope] -- per-TA SQL living inside a Python dict at scripts/classify/extract_research_themes.py:152-230,
@@ -778,6 +867,11 @@ artifacts:
       - upstream: research_themes
         gate: hard_fail
         evidence: "scripts/generate_cycle.py:508-518 (pre_g2) — 'G1 has written no themes for {slug}'"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: billed
     status_2026_08_31: { nsclc: 25, crc: 25, ad: 0, ratio: 1.000 }
     note: >
@@ -804,6 +898,11 @@ artifacts:
       - upstream: research_themes
         gate: hard_fail
         evidence: scripts/generate_cycle.py:508-518
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: billed
     sufficiency:
       throughput_covered: "select count(distinct t.theme_name) from hcp_research_themes_v2 t where t.therapeutic_area = :themes_tag and exists (select 1 from theme_to_canonical_v1 m where m.therapeutic_area = :themes_tag and m.raw_theme_name = t.theme_name)"
@@ -843,7 +942,9 @@ artifacts:
     target_table: publication_theme_v1
     coverage_query: "select count(*) from publication_theme_v1 where therapeutic_area_id = :ta_id"
     applicability: { unconditional: true }
-    producer: { script: scripts/label_pub_themes.py, flags: ["--ta <slug>"] }
+    producer:
+      script: scripts/label_pub_themes.py
+      flags: ["--ta-id <ta_id>", "--ta-label <buckets_key>", "--execute"]
     runs_in: none
     depends_on:
       - upstream: publication_ta_membership
@@ -852,7 +953,40 @@ artifacts:
       - upstream: canonical_themes
         gate: hard_fail
         evidence: "scripts/label_pub_themes.py:54-55 and :70-71 — JOIN theme_canonical_v1 tc ON tc.id = s.canonical_id, on both the concept and keyword signature paths"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta-id <ta_id>", "--ta-label <buckets_key>", "--execute"]
     classification: automatable
+    correction_2026_09_01: >
+      THE r2 COMMAND WAS WRONG AND WOULD NOT HAVE RUN. The entry recorded `--ta <slug>`.
+      label_pub_themes.py has NO --ta. Its real signature, read statically from source on
+      2026-09-01, is: --ta-id TA_ID (uuid, REQUIRED), --ta-label TA_LABEL (text, REQUIRED),
+      --execute (write to DB), plus optional --dry-run/--limit/--version. Passing --ta would have
+      died in argparse as an ambiguous prefix of --ta-id and --ta-label.
+
+      WHAT --ta-label MUST BE, decided by the CONSUMER rather than by the TA display name.
+      label_pub_themes.py:50-77 loads its signatures with
+      "JOIN theme_canonical_v1 tc ON tc.id = s.canonical_id WHERE tc.therapeutic_area = %s"
+      on BOTH the concept and keyword paths, and :233 raises
+      SystemExit("No signatures found for ta_label=...") when nothing matches. So the label is
+      matched against theme_canonical_v1.therapeutic_area, which bucket_themes.py writes as
+      upper(slug). That is the new buckets_key fact: for colorectal-cancer the correct value is
+      COLORECTAL-CANCER. Measured live 2026-09-01, theme_canonical_v1.therapeutic_area holds
+      exactly NSCLC and COLORECTAL-CANCER and nothing else.
+
+      buckets_key, NOT themes_tag, even though the two coincide for both live TAs. They diverge
+      for atopic-dermatitis (tag "Atopic Dermatitis" vs upper "ATOPIC-DERMATITIS"), and it is
+      bucket_themes that writes theme_canonical_v1, so the bucket side decides. AD has zero
+      canonical themes, so it would SystemExit either way -- the correct loud failure.
+
+      ON --execute, which the question asked about specifically: it IS required for anything to
+      be written -- the INSERT at :313 is guarded by "if args.execute and payload". But omitting
+      it does NOT silently succeed. :216-217 raises SystemExit("Pass --dry-run or --execute.")
+      before any work happens. So the feared outcome -- a run that "succeeds" and writes nothing
+      -- does not occur here; this script refuses instead. The r2 command would have failed on
+      the missing --ta-id/--ta-label first.
     status_2026_08_31: { nsclc: 64155, crc: 0, gap: true }
     note: >
       THE HIGHEST-VALUE UNBLOCK. One unbilled script, never run for CRC, in neither cycle. It
@@ -894,6 +1028,11 @@ artifacts:
           scripts/generate_cycle.py:546-559 (pre_g4) — 'hcp_rising_star_ranks_v3 has 0 rows for
           {slug} -- the rising board does not exist yet. Run ta_cycle stage 9 first. Refusing
           rather than targeting zero HCPs and exiting 0.'
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--cohort rising_star"]
     classification: billed
     sufficiency:
       throughput_covered: "select count(*) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and r.us_rank is not null and r.us_rank <= 100 and exists (select 1 from hcp_scientific_positions_v1 p where p.hcp_id = r.hcp_id and p.therapeutic_area_id = :ta_id)"
@@ -947,6 +1086,11 @@ artifacts:
       - upstream: scientific_positions
         gate: hard_fail
         evidence: "scripts/generate_cycle.py:561-570 (pre_g5) — 'hcp_scientific_positions_v1 is empty for {slug} -- G4 must run first'"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: billed
     sufficiency:
       throughput_covered: "select count(distinct p.hcp_id) from hcp_scientific_positions_v1 p where p.therapeutic_area_id = :ta_id and exists (select 1 from hcp_ai_overviews o where o.hcp_id = p.hcp_id)"
@@ -1010,6 +1154,11 @@ artifacts:
       - upstream: scientific_positions
         gate: hard_fail
         evidence: scripts/generate_cycle.py:640-649
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--cohort rising_star", "--target-version v2"]
     classification: billed
     sufficiency:
       throughput_covered: "select count(distinct r.hcp_id) from hcp_rising_star_ranks_v3 r where r.therapeutic_area_id = :ta_id and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = r.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'rising_star')"
@@ -1058,6 +1207,11 @@ artifacts:
       - upstream: established_board
         gate: hard_fail
         evidence: "ta_cycle.py:98-100 -- stage 13b runs --cohort established --established-top 200 over the board stage 9 produced"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--cohort established", "--established-top 200", "--target-version v2"]
     classification: billed
     sufficiency:
       throughput_covered: "select count(distinct e.hcp_id) from hcp_established_ranks_v3 e where e.therapeutic_area_id = :ta_id and e.scope_type = 'global' and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = e.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'established')"
@@ -1113,6 +1267,11 @@ artifacts:
       - upstream: community_scores
         gate: hard_fail
         evidence: "scripts/generate_cycle.py:841-855 (ws_g8) -- the community arm is sized from hcp_community_scores_v2"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--cohort community", "--target-version v2"]
     classification: billed
     sufficiency:
       throughput_covered: "select count(distinct c.hcp_id) from hcp_community_scores_v2 c where c.therapeutic_area_id = :ta_id and exists (select 1 from hcp_narratives_v2 n where n.hcp_id = c.hcp_id and n.therapeutic_area_slug = :ta_slug and n.cohort = 'community')"
@@ -1175,6 +1334,11 @@ artifacts:
           slice with INNER JOIN drug_keywords ON dk.therapeutic_area_id = ht.therapeutic_area_id,
           so it would write ZERO rows and exit 0. No script populates ta_drug_keywords -- it is
           hand-curated content, not code.'
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: automatable
     sufficiency_absent_reason: 'ABSENCE HERE IS A FACT, NOT A GAP. The only self-contained denominator
       is ''TA members holding an NPI'', since open_payments_aggregator joins payments by npi_number (:265-267).
@@ -1202,6 +1366,11 @@ artifacts:
       - upstream: open_payments_rollup
         gate: hard_fail
         evidence: "scripts/score/pharma_engagement_scoring.py:62 — FROM hcp_open_payments_by_ta_v2; :4 'Uses 3-year Open Payments aggregates from hcp_open_payments_by_ta_v2'"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>"]
     classification: conditional_gap
     status_2026_08_31: { nsclc: 3460, crc: 0, gap: conditional }
     note: >
@@ -1217,10 +1386,23 @@ artifacts:
     target_table: clinical_trials_ta_v2
     coverage_query: "select count(*) from clinical_trials_ta_v2 where therapeutic_area_id = :ta_id"
     applicability: { unconditional: true }
-    producer: { script: scripts/classify/trial_ta_mapping.py, flags: ["--ta <slug>"] }
+    producer: { script: scripts/classify/trial_ta_mapping.py, flags: ["--execute"] }
     runs_in: none
     depends_on: []
-    classification: automatable
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--execute"]
+    classification: blocked
+    correction_2026_09_01: >
+      RECLASSIFIED automatable -> blocked. r2 recorded `--ta <slug>`; trial_ta_mapping.py has NO
+      --ta. Its entire signature is "trial_ta_mapping.py [-h] (--dry-run | --execute)" -- it maps
+      ALL trials for ALL TAs in one pass. There is therefore no per-TA invocation, and a per-TA
+      runner cannot scope it: running it for colorectal-cancer would rewrite every other TA's
+      trial tags as a side effect nobody asked for. Same defect and same treatment as
+      medicare_by_ta, whose producer also has no --ta. It remains a real gap for CRC; it is just
+      not a step a TA runner may take unattended.
     status_2026_08_31: { nsclc: 2463, crc: 0, gap: true }
     note: "Creates its own DDL at trial_ta_mapping.py:143. Never run for CRC. No upstream edge found — searched the script for TA-keyed reads, EMPTY."
 
@@ -1239,6 +1421,11 @@ artifacts:
           scripts/score/reingest_diff.py:19-28 — 'cohort + rank + score all live together in
           hcp_score_ranks_v2, at global scope: cohort_classification <- hcp_score_ranks_v2.cohort,
           cohort_score <- score_at_rank, rank <- rank'
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--snapshot"]
     classification: automatable
     status_2026_08_31: { nsclc: 43535, crc: 0, gap: true }
     note: >
@@ -1259,7 +1446,19 @@ artifacts:
       - upstream: reingest_snapshot
         gate: hard_fail
         evidence: "scripts/score/reingest_diff.py:16 — 'reingest_diff_v2 and one run-level row to reingest_diff_summary_v2'; :619 --diff requires --before/--after snapshot ids"
-    classification: automatable
+    producer_verified:
+      status: UNRESOLVED PLACEHOLDER
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--diff", "--before <id>", "--after <id>"]
+      note: >-
+        --before/--after take snapshot ids from two prior captures; a runner cannot choose which window matters. Entry is classified blocked.
+    classification: blocked
+    correction_2026_09_01: >
+      RECLASSIFIED automatable -> blocked. --diff takes --before and --after, which are SNAPSHOT
+      IDS from two prior capture runs (reingest_diff.py:622-623). A runner has no way to choose
+      which two captures to compare -- that is a judgement about which window matters -- so this
+      is not a step that can be taken unattended, however cheap it is.
     status_2026_08_31: { nsclc: 0, crc: 0, gap: false }
     note: >
       One of r1's eight "empty for both", now explained: the --snapshot arm HAS run (43,535
@@ -1280,7 +1479,16 @@ artifacts:
       - upstream: reingest_snapshot
         gate: hard_fail
         evidence: scripts/score/reingest_diff.py:16
-    classification: automatable
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--diff"]
+    classification: blocked
+    correction_2026_09_01: >
+      RECLASSIFIED automatable -> blocked for the same reason as reingest_diff: --diff needs two
+      snapshot ids a runner cannot choose. Note that the r2 flags omitted --before/--after
+      entirely, so the recorded command would have asked for a diff with no window at all.
     status_2026_08_31: { nsclc: 0, crc: 0, gap: false }
     note: "Same as reingest_diff. No reader found; searched frontend/src and scripts/, EMPTY."
 
@@ -1295,6 +1503,11 @@ artifacts:
       - upstream: ta_hcpcs_codes
         gate: degrade
         evidence: "scripts/aggregate/medicare_aggregator.py:195-202 fetches ta_hcpcs_codes with no emptiness guard; an empty set yields an empty TA slice and exit 0"
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: []
     classification: blocked
     status_2026_08_31: { nsclc: 4413, crc: 0, gap: true }
     note: >
@@ -1313,6 +1526,11 @@ artifacts:
     producer: { script: scripts/social/scrape_leadership_signals.py, flags: null }
     runs_in: none
     depends_on: []
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: []
     classification: unknown
     status_2026_08_31: { nsclc: 955, crc: 0, gap: true }
 
@@ -1327,12 +1545,106 @@ artifacts:
       condition: "the TA has a congress with an ingestible abstract book"
       evaluate: manual
       evidence: "scripts/congress/ingest_asco_abstracts.py:94-115 is a DROP + INSERT specific to ASCO; generate_cycle.py:1257 lists 'ingest_asco_abstracts.py  no --ta (congress presenters)' among the un-generalised"
-    producer: { script: scripts/congress/ingest_asco_abstracts.py, flags: null }
+    producer: { script: scripts/congress/ingest_asco_abstracts.py, flags: [] }
     runs_in: none
     depends_on: []
-    classification: unknown
-    status_2026_08_31: { nsclc: 47, crc: 0, gap: true }
+    producer_verified:
+      status: NO CLI
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: []
+      note: >-
+        source declares no argparse/click options -- this script takes no arguments and must never be probed by running it
+    classification: blocked
+    hcp_dependence_2026_09_01: >
+      HCP-DEPENDENT, AND THIS IS WHY 47 WAS STALE RATHER THAN CORRECT.
+      ingest_asco_abstracts.py does not simply load a CSV. It builds a live lookup from two
+      queries (:57-71, read as text -- the file is never imported, see the safety note below):
+        hcp_established_ranks_v3 JOIN hcps_v2 WHERE therapeutic_area_id = <NSCLC>
+          AND scope_type = 'region' AND scope_value = 'US'
+        hcp_rising_star_ranks_v3 JOIN hcps_v2 WHERE therapeutic_area_id = <NSCLC>
+          AND us_rank IS NOT NULL
+      keyed by hcp_key(first_name, last_name) = "first|last" lowercased, and matches ASCO
+      speaker_key(SpeakerDisplayName) built the same way. A lung-track speaker is confirmed
+      only when the key matches EXACTLY ONE board HCP (:84-90, `elif len(hits) == 1`);
+      multiple matches go to `ambiguous` and are DROPPED.
+
+      So the same CSV yields a different presenter set whenever the NSCLC US established board,
+      the NSCLC rising board, or hcps_v2 names change -- which is every board recompute and
+      every dedup merge. Note the drift is NOT monotonic: corpus growth can also REMOVE a
+      presenter by turning a unique name match into an ambiguous one. 47 -> 51 is that drift,
+      measured against a board that had moved since the previous run.
+
+      CONSEQUENCE FOR THIS MANIFEST: the count here is not a build-completeness signal in the
+      way every other entry's is. It is a rebuild output whose value is only meaningful
+      relative to the board state at the moment it ran.
+
+    safety_2026_09_01: >
+      DO NOT RUN, DO NOT PASS --help, AND DO NOT IMPORT. Verified 2026-09-01: the file has NO
+      `if __name__ == "__main__"` guard, so its DROP + INSERT executes on import as readily as
+      on invocation. Read it with ast or as text only. See the incident recorded in this
+      entry's correction note.
+    correction_2026_09_01: >
+      DANGEROUS PRODUCER. DO NOT PROBE IT AND DO NOT LET A RUNNER NEAR IT.
+      ingest_asco_abstracts.py declares NO argument parser. It ignores argv entirely and performs
+      its DROP + INSERT (:94-115) as soon as it is executed, so there is no safe way to ask it
+      anything at all -- "--help" is a full ingest run.
+
+      THIS IS RECORDED FROM AN INCIDENT, NOT FROM THEORY. On 2026-09-01 the first version of
+      --verify-producers shelled out to "python <script> --help" for every entry. For this entry
+      that RAN THE INGEST during a read-only audit and rewrote congress_confirmed_presenters from
+      47 rows to 51. The verifier is now static -- ast parsing only, no subprocess -- precisely
+      because of this script. status_2026_08_31 has been corrected to the post-incident count with
+      the original recorded beside it.
+
+      RECLASSIFIED unknown -> blocked: a producer with no CLI, no --ta, and an unconditional
+      destructive rebuild is not a step any runner may take unattended.
+    status_2026_08_31: { nsclc: 51, crc: 0, gap: true, was_before_incident: 47, corrected: 2026-09-01 }
     note: "ASCO covers colorectal cancer, so unlike most entries here the CRC answer may already be inside the existing source. A product question, not a pipeline one."
+
+  # ── the ASCO rebuild's other output, untracked until 2026-09-01 ─────────────────────────
+  - name: congress_abstracts
+    kind: output
+    target_table: congress_abstracts
+    coverage_query: "select count(*) from congress_abstracts a where exists (select 1 from congress_confirmed_presenters p where p.speaker_key = a.speaker_key and p.therapeutic_area_id = :ta_id)"
+    key_form: via_presenters
+    key_note: >
+      congress_abstracts has NO TA column -- it is keyed by congress_slug and speaker_key
+      (columns read from the INSERT at ingest_asco_abstracts.py:103-110). It is scoped to a TA
+      only through congress_confirmed_presenters, so this counts abstracts presented by THIS
+      TA's confirmed presenters. That is why the original relation census never picked it up:
+      it carries neither a TA column nor a TA token in its name.
+    applicability:
+      applies_when: {fact: has_congress_ingest, equals: true}
+    producer: { script: scripts/congress/ingest_asco_abstracts.py, flags: [] }
+    producer_verified:
+      status: NO CLI
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: []
+      note: >-
+        Declares no argparse/click options and has no __main__ guard, so ANY execution --
+        including --help and including a bare import -- performs its DROP + INSERT.
+    runs_in: none
+    depends_on:
+      - upstream: congress_presenters
+        gate: hard_fail
+        evidence: "written by the same script in the same pass (ingest_asco_abstracts.py:103-117); this entry's coverage is scoped through congress_confirmed_presenters because the table has no TA column of its own"
+    classification: blocked
+    rebuild_semantics_2026_09_01: >
+      A REBUILD-AFTER-TA-BUILD ARTIFACT, AND NO RUNNER MAY EVER PLAN IT. classification is
+      blocked on two grounds that are each sufficient: the producer has no CLI, so there is no
+      command to issue; and it is destructive on ANY invocation, so there is no safe probe
+      either. A human runs it deliberately, after a TA build, having decided that the board has
+      moved enough to be worth re-deriving.
+
+      Its sibling congress_confirmed_presenters is HCP-DEPENDENT and its count is EXPECTED to
+      change whenever the HCP corpus or the boards change -- see hcp_dependence_2026_09_01 on
+      that entry, and the incident note there recording the 47 -> 51 rebuild of 2026-09-01.
+      THIS table is the CSV-only half: its row count follows the ASCO abstract list, not the
+      board, so a change here means the source CSV changed. Reading the two together is how you
+      tell a source refresh apart from board drift.
+    status_2026_09_01: { rows_total: 3451, note: "CSV-only; 3,451 presented abstracts across all tracks" }
 
   - name: pulse_synthesis
     kind: output
@@ -1365,7 +1677,15 @@ artifacts:
       - upstream: hcp_scores_legacy
         gate: hard_fail
         evidence: "scoring_pipeline.py:1431-1444 — upsert_scores() writes hcp_scores_v2, then compute_and_write_ranks() ranks the same in-memory score_rows"
-    classification: automatable
+    classification: blocked
+    correction_2026_09_01: >
+      RECLASSIFIED automatable -> blocked, on two independent grounds. FIRST, no CLI:
+      compute_and_write_ranks() is a library function, so there is no command a runner can issue
+      -- the runner reached this step and had nothing to run. SECOND, its only upstream is
+      hcp_scores_legacy, which is classified superseded and therefore always measures N/A; it can
+      never report SATISFIED, so a runner honouring the dependency gate could never legitimately
+      start this step at all. Note also that the invoked_by list below is now partly wrong:
+      established_scoring.py does NOT take --ta (see that entry). scoring_pipeline.py does.
     status_2026_08_31: { nsclc: 254243, crc: 0, gap: true }
     note: >
       RECLASSIFIED unknown -> automatable. r1 said 'score_ranking.py has no --ta' and 'unclear
@@ -1381,14 +1701,26 @@ artifacts:
     applicability: { unconditional: true }
     producer:
       script: scripts/score/scoring_pipeline.py
-      flags: ["--ta <slug>", "--target-version v2", "--execute"]
+      flags: ["--ta <slug>", "--target-version v2"]
       write_site: "scoring_pipeline.py:1201 — supabase.table(scores_table).upsert(...), where scores_table = get_table_name('hcp_scores', target_version) at :1153 and get_table_name returns f'{base_name}_v2' at :55-58"
     runs_in: by_hand
     depends_on:
       - upstream: curated_concepts
         gate: degrade
         evidence: scripts/score/scoring_pipeline.py:376, :1398
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--ta <slug>", "--target-version v2"]
     classification: superseded
+    correction_2026_09_01: >
+      THE WRITE POLARITY IS INVERTED FROM EVERY OTHER PRODUCER IN THIS MANIFEST, and r2 recorded
+      it wrongly. scoring_pipeline.py has NO --execute. Its signature is
+      "[-h] [--dry-run] [--target-version {v1,v2}] [--ta SLUG]", and --dry-run is documented as
+      "Compute and print scores without writing to hcp_scores". IT WRITES BY DEFAULT. A runner
+      must not add --execute (argparse would reject it) and must understand that a bare
+      invocation is a WRITE, not a rehearsal. Everything else here is opt-in-to-write.
     exceptions:
     - ta: nsclc
       expect: stale_rows_present
@@ -1425,14 +1757,26 @@ artifacts:
     applicability: { unconditional: true }
     producer:
       script: scripts/score/established_scoring.py
-      flags: ["--ta <slug>", "--execute"]
+      flags: ["--execute"]
       write_site: "established_scoring.py:646 — client.table('hcp_established_scores_v2').upsert(batch, on_conflict='hcp_id,therapeutic_area_id')"
     runs_in: by_hand
     depends_on:
       - upstream: curated_concepts
         gate: degrade
         evidence: scripts/score/established_scoring.py:140, :730
+    producer_verified:
+      status: OK
+      checked: "2026-09-01"
+      method: static ast parse of the producer source; never executed
+      flags: ["--execute"]
     classification: superseded
+    correction_2026_09_01: >
+      IT HAS NO --ta FLAG. This entry said it did, and so does ATOPIC_DERMATITIS_BUILD.md:95
+      ("Uses existing established_scoring.py --ta flag"). Both are wrong. Read statically from
+      source 2026-09-01, the whole signature is
+      "established_scoring.py [-h] (--dry-run | --execute)" -- it scores every TA in one pass.
+      TA_EXPANSION_ROADMAP.md:117 is the accurate instruction precisely because it says "Run
+      established_scoring.py --execute for new TA" and names no --ta.
     exceptions:
     - ta: nsclc
       expect: stale_rows_present

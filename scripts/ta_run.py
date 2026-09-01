@@ -62,13 +62,23 @@ class Halt(Exception):
     """A step said stop. Nothing after it is attempted."""
 
 
-def build_argv(producer, ta_slug):
-    """-> argv list, or None when the producer has no runnable script form."""
+def build_argv(producer, ta_slug, binds=None):
+    """-> argv list, or None when the producer has no runnable script form.
+
+    Substitutes <slug> and any <bind_name> the manifest declares, using the values already
+    resolved for this TA. A placeholder with no matching bind is left intact so the caller's
+    unresolved-placeholder guard can refuse it rather than passing nonsense to a producer.
+    """
     if not producer or not producer.get("script"):
         return None
+    subs = {SLUG_PLACEHOLDER: ta_slug}
+    for name, value in (binds or {}).items():
+        if value is not None:
+            subs[f"<{name}>"] = str(value)
     argv = [sys.executable, str(producer["script"])]
     for flag in producer.get("flags") or []:
-        argv.extend(str(flag).replace(SLUG_PLACEHOLDER, ta_slug).split())
+        for tok in str(flag).split():
+            argv.append(subs.get(tok, tok))
     return argv
 
 
@@ -193,7 +203,7 @@ def run_plan(manifest, ta_slug, reader, binds, ref_binds, execute, log, spawn_fn
         # what kind of thing it is -- a billed stage that is under-covered is still billed.
         cls_group = manifest["classification_semantics"][step["classification"]].get("plan_group")
         if group != runnable_group:
-            argv = build_argv(step.get("producer"), ta_slug)
+            argv = build_argv(step.get("producer"), ta_slug, binds)
             log.emit(f"  NOT EXECUTABLE -- group {group} (classification group: {cls_group}). "
                      f"The runner stops here.")
             if cls_group == "FOUNDER_GATED":
@@ -215,7 +225,7 @@ def run_plan(manifest, ta_slug, reader, binds, ref_binds, execute, log, spawn_fn
             outcomes.append((name, PRINTED))
             break
 
-        argv = build_argv(step.get("producer"), ta_slug)
+        argv = build_argv(step.get("producer"), ta_slug, binds)
         if not argv:
             # A derived object -- the manifest records its object_kind and no producer, because
             # it follows its dependencies rather than being built. Not runnable, NOT a failure:

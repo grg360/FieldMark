@@ -274,6 +274,31 @@ def validate_manifest(m) -> list:
                             f"{sp}.{axis}_threshold_reasoning: an unratified threshold must "
                             f"record why it was chosen")
 
+        # A PRODUCER COMMAND MAY NEVER BE RECORDED WITHOUT HAVING BEEN CHECKED. The gate
+        # is offline and deterministic, so it does not shell out; it requires the stamp that
+        # --verify-producers writes, and requires the stamp's flag list to still match the
+        # entry's. Editing flags therefore invalidates the stamp and fails the gate.
+        prod = e.get("producer") or {}
+        if prod.get("script"):
+            stamp = e.get("producer_verified")
+            if not isinstance(stamp, dict):
+                errors.append(
+                    f"{p}.producer_verified: missing. A recorded producer command must be "
+                    f"checked against its real CLI -- run --verify-producers.")
+            else:
+                st = _typed(stamp, "status", str, f"{p}.producer_verified", errors)
+                _typed(stamp, "checked", str, f"{p}.producer_verified", errors)
+                recorded = _typed(stamp, "flags", list, f"{p}.producer_verified", errors)
+                if recorded is not None and \
+                        [str(x) for x in recorded] != [str(x) for x in (prod.get("flags") or [])]:
+                    errors.append(
+                        f"{p}.producer_verified.flags: stale. The entry's flags have changed "
+                        f"since verification; re-run --verify-producers.")
+                if st is not None and st != P_OK and not str(stamp.get("note", "")).strip():
+                    errors.append(
+                        f"{p}.producer_verified: status {st!r} must record a note explaining "
+                        f"why the entry keeps a command that does not verify.")
+
         dep = e.get("depends_on")
         if dep is None:
             continue
@@ -297,6 +322,169 @@ def validate_manifest(m) -> list:
                     f"{dp}.upstream: {up!r} is neither a manifest entry nor listed in "
                     f"external_dependencies")
     return errors
+
+
+# ---------------------------------------------------------------------------------------
+# producer verification -- does the recorded command match the real CLI?
+# ---------------------------------------------------------------------------------------
+#
+# STATIC ONLY. This reads each producer's SOURCE with `ast` and extracts the options it
+# declares. IT NEVER EXECUTES A PRODUCER, not even with --help.
+#
+# WHY, AND THIS IS NOT THEORETICAL: the first version of this check shelled out to
+# `python <script> --help`. scripts/congress/ingest_asco_abstracts.py has NO argument parser
+# at all -- it ignores argv and does its work at import -- so `--help` RAN THE INGEST and
+# rewrote congress_confirmed_presenters (47 rows -> 51) during what was supposed to be a
+# read-only audit. A script without an argument parser cannot be asked a question; running it
+# IS the answer. Static parsing is the only safe way to check a producer you have not read.
+#
+# The trade-off is recorded openly: a CLI assembled dynamically at runtime is invisible to
+# this check and will report NO CLI. That is the correct failure direction -- it under-claims
+# rather than executing something to find out.
+
+P_OK = "OK"
+P_WRONG = "WRONG FLAGS"
+P_NO_CLI = "NO CLI"
+P_PLACEHOLDER = "UNRESOLVED PLACEHOLDER"
+
+#: Placeholders a runner CAN substitute: <slug>, plus any bind the manifest declares, since
+#: the runner resolves those before building the command. Anything else is unsupplyable.
+def resolvable_placeholders(manifest):
+    return {"<slug>"} | {f"<{b}>" for b in manifest.get("binds", {})}
+
+#: Call names that declare a command-line option: argparse and click.
+_OPTION_DECLARERS = ("add_argument", "option")
+
+
+def split_flags(flags):
+    """-> (option tokens, value tokens) from the manifest's recorded flag strings."""
+    opts, vals = [], []
+    for flag in flags or []:
+        for tok in str(flag).split():
+            (opts if tok.startswith("-") else vals).append(tok)
+    return opts, vals
+
+
+def declared_cli(source):
+    """Parse a producer's source. -> (options, required, mutex_groups) or None if no CLI.
+
+    Parsing only -- ast.parse never runs the module.
+    """
+    import ast
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        # Distinct from "declares no options": an unparseable source is UNKNOWN, and saying
+        # NO CLI here would quietly under-report. A BOM did exactly that once.
+        return exc
+
+    options, required, mutex = set(), set(), []
+    mutex_vars = {}
+
+    for node in ast.walk(tree):
+        # var = parser.add_mutually_exclusive_group(required=True)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            fn = node.value.func
+            if getattr(fn, "attr", None) == "add_mutually_exclusive_group":
+                is_req = any(k.arg == "required" and getattr(k.value, "value", False) is True
+                             for k in node.value.keywords)
+                for t in node.targets:
+                    if isinstance(t, ast.Name) and is_req:
+                        mutex_vars[t.id] = set()
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        name = getattr(fn, "attr", None) or getattr(fn, "id", None)
+        if name not in _OPTION_DECLARERS:
+            continue
+        flags = [a.value for a in node.args
+                 if isinstance(a, ast.Constant) and isinstance(a.value, str)
+                 and a.value.startswith("--")]
+        if not flags:
+            continue
+        is_req = any(k.arg == "required" and getattr(k.value, "value", False) is True
+                     for k in node.keywords)
+        owner = getattr(getattr(fn, "value", None), "id", None)
+        for f in flags:
+            options.add(f)
+            if is_req:
+                required.add(f)
+            if owner in mutex_vars:
+                mutex_vars[owner].add(f)
+
+    if not options:
+        return None
+    mutex = [g for g in mutex_vars.values() if g]
+    return options, required, mutex
+
+
+def verify_producer(entry, cwd, resolvable=("<slug>",)):
+    """-> dict(status, detail, flags, script). Reads source; never executes it."""
+    prod = entry.get("producer") or {}
+    flags = prod.get("flags") or []
+    script = prod.get("script")
+    res = {"name": entry["name"], "script": script, "flags": list(flags)}
+
+    if not script:
+        other = next((k for k in ("library", "function", "sql") if prod.get(k)), None)
+        res.update(status=P_NO_CLI,
+                   detail=(f"no script; producer recorded as {other}" if other
+                           else "no producer recorded"))
+        return res
+
+    path = Path(cwd) / script
+    if not path.exists():
+        res.update(status=P_WRONG, detail=f"script not found: {script}")
+        return res
+
+    # utf-8-sig: a leading BOM is not a syntax error to Python's own importer but IS one to
+    # ast.parse, and one producer in this repo carries one.
+    parsed = declared_cli(path.read_text(encoding="utf-8-sig", errors="replace"))
+    if isinstance(parsed, SyntaxError):
+        res.update(status=P_WRONG, detail=f"source will not parse: {parsed}")
+        return res
+    if parsed is None:
+        res.update(status=P_NO_CLI,
+                   detail="source declares no argparse/click options -- this script takes no "
+                          "arguments and must never be probed by running it")
+        return res
+    declared, required, mutex = parsed
+
+    opts, vals = split_flags(flags)
+    # EXACT option match, never substring: `--ta` is a substring of `--ta-id`, and that is
+    # precisely how a wrong flag passed an earlier version of this check.
+    unknown = [o for o in opts if o not in declared]
+    if unknown:
+        res.update(status=P_WRONG, detail=f"not declared by the CLI: {', '.join(sorted(unknown))}")
+        return res
+
+    missing = sorted(required - set(opts))
+    unsatisfied = [sorted(g) for g in mutex if not (g & set(opts))]
+    if missing or unsatisfied:
+        bits = []
+        if missing:
+            bits.append(f"required but not recorded: {', '.join(missing)}")
+        for g in unsatisfied:
+            bits.append(f"requires one of ({' | '.join(g)}), none recorded")
+        res.update(status=P_WRONG, detail="; ".join(bits))
+        return res
+
+    stray = [v for v in vals
+             if v.startswith("<") and v.endswith(">") and v not in resolvable]
+    if stray:
+        res.update(status=P_PLACEHOLDER,
+                   detail=f"flags parse, but {', '.join(stray)} cannot be supplied by a runner")
+        return res
+    res.update(status=P_OK, detail=f"{len(opts)} flag(s) match the declared CLI")
+    return res
+
+
+def verify_all_producers(manifest, cwd):
+    resolvable = resolvable_placeholders(manifest)
+    return [verify_producer(e, cwd, resolvable) for e in manifest["artifacts"]
+            if (e.get("producer") or {})]
 
 
 def n_axes(m):
@@ -690,6 +878,9 @@ def main() -> int:
     ap.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     ap.add_argument("--validate-manifest", action="store_true",
                     help="run the schema gate and exit; touches no database")
+    ap.add_argument("--verify-producers", action="store_true",
+                    help="invoke each recorded producer's --help and check the recorded flags "
+                         "against its real CLI. Runs no producer and touches no database.")
     args = ap.parse_args()
 
     try:
@@ -697,6 +888,23 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"MANIFEST UNREADABLE: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
+
+    # --verify-producers is what CREATES the stamps the gate requires, so it must run
+    # BEFORE the gate -- otherwise the gate blocks the only command that can satisfy it.
+    if args.verify_producers:
+        rows = verify_all_producers(manifest, REPO_ROOT)
+        width = max((len(r["name"]) for r in rows), default=10)
+        order = {P_OK: 3, P_PLACEHOLDER: 2, P_NO_CLI: 1, P_WRONG: 0}
+        for r in sorted(rows, key=lambda r: (order.get(r["status"], 0), r["name"])):
+            print(f"  {r['status']:<22} {r['name']:<{width}}  {r['detail']}")
+            if r["script"]:
+                print(f"  {'':<22} {'':<{width}}  {r['script']} {' '.join(r['flags'])}")
+        tally = {}
+        for r in rows:
+            tally[r["status"]] = tally.get(r["status"], 0) + 1
+        print("\n  " + " | ".join(f"{k}={v}" for k, v in sorted(tally.items())))
+        return 0 if tally.get(P_WRONG, 0) == 0 else 1
+
 
     # THE GATE RUNS BEFORE EVERY MEASUREMENT PASS. It cannot be skipped.
     errors = validate_manifest(manifest)
