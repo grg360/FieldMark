@@ -44,11 +44,26 @@ from typing import Any, Dict, List, Optional, Tuple
 
 @dataclass(frozen=True)
 class TA:
-    """The three forms a therapeutic area is keyed by. Carry all three; pass none as a bare
-    string. See docs/canonical/GENERATE_CYCLE_DESIGN.md on the slug/name/id resolution trap."""
+    """The forms a therapeutic area is keyed by. Carry them all; pass none as a bare string.
+    See docs/canonical/GENERATE_CYCLE_DESIGN.md on the slug/name/id resolution trap."""
     id: str
     slug: str
     name: str
+    # A FOURTH KEY, because the theme tables use one (2026-09-02).
+    #
+    # hcp_research_themes_v2.therapeutic_area and theme_canonical_v1.therapeutic_area are keyed
+    # by a TAG that is neither the slug nor the name and is not derivable from either: 'NSCLC'
+    # for slug nsclc, 'Atopic Dermatitis' for atopic-dermatitis, 'COLORECTAL-CANCER' for
+    # colorectal-cancer. Two producers each derived it independently -- extract_research_themes
+    # from a Python dict, bucket_themes from slug.upper() -- and they agreed only where the two
+    # rules happened to coincide. Where they did not, AD's 3,499 extracted rows were never
+    # bucketed and its canonical table is empty.
+    #
+    # It now lives on therapeutic_areas.themes_tag and rides along here, so a script that has
+    # resolved its TA has already resolved its tag and cannot compute a different one.
+    #
+    # OPTIONAL, so this module keeps working against a database without the column.
+    themes_tag: Optional[str] = None
 
     def __str__(self) -> str:
         return f"{self.name} ({self.slug})"
@@ -160,7 +175,8 @@ def resolve_ta(slug: str, conn=None) -> TA:
     try:
         with c.cursor() as cur:
             cur.execute(
-                "SELECT id::text AS id, slug, name FROM therapeutic_areas WHERE slug = %s",
+                "SELECT id::text AS id, slug, name, themes_tag "
+                "FROM therapeutic_areas WHERE slug = %s",
                 (slug,),
             )
             row = cur.fetchone()
@@ -169,10 +185,12 @@ def resolve_ta(slug: str, conn=None) -> TA:
             c.close()
     if not row:
         raise _not_found(slug, conn)
+    _tag = _row_get(row, "themes_tag", 3)
     ta = TA(
         id=str(_row_get(row, "id", 0)),
         slug=str(_row_get(row, "slug", 1)),
         name=str(_row_get(row, "name", 2) or ""),
+        themes_tag=str(_tag) if _tag else None,
     )
     _CACHE[slug] = ta
     return ta
@@ -197,7 +215,7 @@ def resolve_ta_supabase(client, slug: str) -> TA:
         return hit
     rows = (
         client.table("therapeutic_areas")
-        .select("id,slug,name")
+        .select("id,slug,name,themes_tag")
         .eq("slug", slug)
         .limit(1)
         .execute()
@@ -212,7 +230,13 @@ def resolve_ta_supabase(client, slug: str) -> TA:
             f"\nTherapeutic area slug not found: {slug!r}\n\nValid slugs:\n"
             f"{body or '    (could not list therapeutic_areas)'}\n"
         )
-    ta = TA(id=str(rows[0]["id"]), slug=str(rows[0]["slug"]), name=str(rows[0].get("name") or ""))
+    _tag = rows[0].get("themes_tag")
+    ta = TA(
+        id=str(rows[0]["id"]),
+        slug=str(rows[0]["slug"]),
+        name=str(rows[0].get("name") or ""),
+        themes_tag=str(_tag) if _tag else None,
+    )
     _CACHE[slug] = ta
     return ta
 

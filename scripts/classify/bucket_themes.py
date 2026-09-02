@@ -37,6 +37,9 @@ from anthropic import Anthropic
 # Anthropic client construction both live inside main() -- so importing it is free.
 # See the --ta option below for why this import exists at all.
 from extract_research_themes import TA_CONFIGS as _THEME_TA_CONFIGS
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
+from ta_registry import resolve_ta  # noqa: E402
 from dotenv import load_dotenv
 from psycopg.rows import dict_row
 from supabase import Client, create_client
@@ -373,6 +376,7 @@ def run_pass_2(
     client: Anthropic,
     sb: Client,
     ta_upper: str,
+    ta_slug: str,
     batch_size: int,
     dry_run: bool,
     resume: bool,
@@ -491,7 +495,7 @@ def run_pass_2(
         time.sleep(1)
 
     if failed_batches:
-        failed_path = f"failed_batches_{ta_upper}.json"
+        failed_path = f"failed_batches_{ta_slug}.json"
         with open(failed_path, "w", encoding="utf-8") as f:
             json.dump(failed_batches, f, indent=2)
         print(f"Logged {len(failed_batches)} failed batch(es) to {failed_path}")
@@ -510,7 +514,7 @@ def run_pass_2(
         ).execute()
 
     print(f"Assigned {len(assignments)} raw themes.")
-    no_fit_path = f"no_fit_{ta_upper}.json"
+    no_fit_path = f"no_fit_{ta_slug}.json"
     with open(no_fit_path, "w", encoding="utf-8") as f:
         json.dump(no_fit, f, indent=2)
     print(
@@ -560,15 +564,38 @@ def main(
     dry_run: bool,
     resume: bool,
 ) -> None:
-    ta_upper = ta.upper()
-    client = Anthropic(api_key=get_required_env("ANTHROPIC_API_KEY"))
+    # THE TAG IS READ, NOT COMPUTED (2026-09-02).
+    #
+    # This was `ta_upper = ta.upper()` -- an independent derivation of the key that
+    # extract_research_themes.py had already chosen when it WROTE the rows. The two agreed for
+    # nsclc ('nsclc'.upper() == 'NSCLC' == the tag) and for colorectal-cancer (whose tag was
+    # deliberately spelled SLUG.UPPER() as a workaround), and disagreed for atopic-dermatitis:
+    # tag 'Atopic Dermatitis' against a computed 'ATOPIC-DERMATITIS', which is why AD's 3,499
+    # extracted theme rows have never been bucketed and theme_canonical_v1 holds zero AD rows.
+    #
+    # Both scripts now read therapeutic_areas.themes_tag. There is no second rule left to
+    # diverge. The variable keeps the name ta_upper only where it is threaded through prompts;
+    # as a DB key it is the tag.
+    #
+    # NOT A RETAG OF AD. This makes the reader agree with what is already stored
+    # ('Atopic Dermatitis'); it does not rewrite the stored value. AD becomes bucketable at the
+    # next run of this script -- nothing is fixed retroactively.
     sb = init_supabase()
+    ta_record = resolve_ta(ta)
+    ta_upper = ta_record.themes_tag
+    if not ta_upper:
+        raise SystemExit(
+            f"therapeutic_areas.themes_tag is NULL for '{ta}'. It is the key "
+            f"extract_research_themes.py writes and this script reads back. Set it before "
+            f"bucketing -- a guessed key finds nothing and reports it as an empty TA."
+        )
+    client = Anthropic(api_key=get_required_env("ANTHROPIC_API_KEY"))
 
     if pass_num in ("1", "all"):
         run_pass_1(client, sb, ta_upper, pass_1_sample_size, dry_run)
     if pass_num in ("2", "all"):
         attempted, assigned = run_pass_2(
-            client, sb, ta_upper, pass_2_batch_size, dry_run, resume
+            client, sb, ta_upper, ta, pass_2_batch_size, dry_run, resume
         )
         # ALL-FAILED RULE. attempted = raw themes pass 2 set out to bucket, succeeded = themes
         # assigned to a canonical. no_fit is NOT counted as failure -- a theme that fits no

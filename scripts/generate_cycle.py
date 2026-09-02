@@ -150,6 +150,21 @@ def _themes_ta_configs() -> Optional[Dict[str, Dict]]:
         return None
 
 
+def read_themes_tag(conn, slug: str) -> Optional[str]:
+    """therapeutic_areas.themes_tag -- the key BOTH theme producers now read.
+
+    Replaces read_ta_configs_tag (below, kept for the G1-runnability precheck) as the source
+    of the stored literal. The dict is still where a TA's extraction CONFIG lives -- domain,
+    theme_examples, selection SQL -- but it is no longer where the KEY lives, because a key in
+    a Python dict cannot be read by bucket_themes' predicate, the manifest's coverage_query, or
+    the frontend, and each of those invented its own instead.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT themes_tag FROM therapeutic_areas WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+    return row[0] if row and row[0] else None
+
+
 def read_ta_configs_tag(slug: str) -> Optional[str]:
     """G1's `tag` for this slug -- the literal written to
     hcp_research_themes_v2.therapeutic_area.
@@ -219,12 +234,23 @@ def resolve_ta(conn, slug: str) -> ResolvedTA:
             cur.execute("SELECT slug FROM therapeutic_areas ORDER BY slug")
             known = ", ".join(r[0] for r in cur.fetchall())
         raise SystemExit(f"TA slug not found: {slug}\nKnown slugs: {known}")
+    # BOTH KEYS ARE NOW THE SAME COLUMN (2026-09-02). themes_tag came from
+    # TA_CONFIGS[slug]["tag"] (G1's private dict) and buckets_key from slug.upper()
+    # (bucket_themes' private rule); pre_g2 existed to detect them disagreeing. Both
+    # producers now read therapeutic_areas.themes_tag, so the two fields are the same value
+    # by construction and the mismatch class is retired rather than merely detected.
+    #
+    # BOTH FIELDS ARE KEPT, not collapsed to one. They name two different tables
+    # (hcp_research_themes_v2 vs theme_canonical_v1 / theme_to_canonical_v1), the manifest
+    # binds them separately, and a future divergence should be visible as two facts that
+    # stopped agreeing rather than invisible behind one.
+    tag = read_themes_tag(conn, slug)
     return ResolvedTA(
         slug=row[1],
         name=row[2],
         uuid=row[0],
-        themes_tag=read_ta_configs_tag(slug),
-        buckets_key=slug.upper(),
+        themes_tag=tag,
+        buckets_key=tag,
     )
 
 
@@ -235,19 +261,24 @@ def assert_key_conventions(conn) -> None:
     asserts it matches at least one live row. If any of these ever returns 0, a convention changed
     and every verification query built on that form is silently wrong.
     """
-    good_tag = read_ta_configs_tag(KNOWN_GOOD_SLUG)
+    # BOTH THEME CHECKS NOW RESOLVE THE KEY THE WAY THE STAGES DO -- from
+    # therapeutic_areas.themes_tag. They used to resolve it two other ways (TA_CONFIGS for one
+    # table, slug.upper() for the other), which meant this assertion could pass while the two
+    # producers disagreed, because it was reproducing the disagreement rather than testing for
+    # it. Same column, same value, for the same reason the stages use it.
+    good_tag = read_themes_tag(conn, KNOWN_GOOD_SLUG)
     checks = [
         (
-            f"hcp_research_themes_v2.therapeutic_area == TA_CONFIGS['{KNOWN_GOOD_SLUG}']['tag']"
+            f"hcp_research_themes_v2.therapeutic_area == therapeutic_areas.themes_tag"
             f" == {good_tag!r}",
             "SELECT count(*) FROM hcp_research_themes_v2 WHERE therapeutic_area = %s",
             (good_tag,),
         ),
         (
-            f"theme_canonical_v1.therapeutic_area == '{KNOWN_GOOD_SLUG}'.upper()"
-            f" == {KNOWN_GOOD_SLUG.upper()!r}",
+            f"theme_canonical_v1.therapeutic_area == therapeutic_areas.themes_tag"
+            f" == {good_tag!r}",
             "SELECT count(*) FROM theme_canonical_v1 WHERE therapeutic_area = %s",
-            (KNOWN_GOOD_SLUG.upper(),),
+            (good_tag,),
         ),
         (
             f"hcp_narratives_v2.therapeutic_area_slug == {KNOWN_GOOD_SLUG!r}",
@@ -486,7 +517,11 @@ def _ok(msg: str = "") -> Tuple[bool, str]:
 # --- preconditions ----------------------------------------------------------
 
 def pre_g1(conn, ta):
-    if ta.themes_tag is None:
+    # CHECKS THE CONFIG, NOT THE TAG (2026-09-02). This read `ta.themes_tag is None`, which was
+    # a valid proxy while themes_tag CAME FROM TA_CONFIGS -- no entry, no tag. themes_tag is now
+    # therapeutic_areas.themes_tag and is non-null for every TA, so the proxy would pass for a
+    # TA that G1 still cannot run for. Ask the real question: is there a TA_CONFIGS entry?
+    if read_ta_configs_tag(ta.slug) is None:
         return False, (
             f"extract_research_themes.py has no TA_CONFIGS entry for '{ta.slug}'. That entry is "
             f"not boilerplate -- it needs `tag`, `domain`, `generic_negative`, `theme_examples`, "
@@ -516,18 +551,20 @@ def pre_g2(conn, ta):
             f"G1 has written no themes for {ta.slug} "
             f"(hcp_research_themes_v2.therapeutic_area = {ta.themes_tag!r})"
         )
-    if ta.themes_tag != ta.buckets_key:
-        return False, (
-            f"KEY MISMATCH, and this is the defect, not a config gap. G1 wrote "
-            f"{ta.themes_tag!r}; bucket_themes.py computes ta.upper() = {ta.buckets_key!r} and "
-            f"raises 'No themes found' for anything else. The two agree ONLY for nsclc. This is "
-            f"why Atopic Dermatitis has {n if ta.slug == 'atopic-dermatitis' else 3499:,} theme "
-            f"rows and ZERO canonical themes -- billed extraction that has never been bucketed. "
-            f"Set tag == {ta.buckets_key!r} to conform, or fix bucket_themes.py to read "
-            f"TA_CONFIGS[slug]['tag'] from the same source G1 writes from (the real fix, and it "
-            f"retires the class)."
-        )
-    return _ok(f"{n:,} theme rows under {ta.themes_tag!r}; key agrees with ta.upper()")
+    # THE KEY-MISMATCH GUARD IS GONE, because the mismatch is (2026-09-02).
+    #
+    # It compared G1's TA_CONFIGS[slug]["tag"] against bucket_themes' computed slug.upper() and
+    # blocked G2 when they differed -- correctly: that difference is why Atopic Dermatitis has
+    # 3,499 theme rows and zero canonical themes. Both producers now read
+    # therapeutic_areas.themes_tag, so there is no second derivation left to disagree, and both
+    # of this ResolvedTA's key fields are that one column.
+    #
+    # The guard is not merely satisfied, it is unreachable: keeping a test that can no longer
+    # fail would read as ongoing verification of something nothing checks any more.
+    #
+    # NOT RETROACTIVE. AD's existing rows still carry 'Atopic Dermatitis' and are still
+    # unbucketed; this unblocks the next run of G2, it does not perform it.
+    return _ok(f"{n:,} theme rows under {ta.themes_tag!r} (therapeutic_areas.themes_tag)")
 
 
 def pre_g3(conn, ta):
@@ -680,9 +717,10 @@ def ver_g1(conn, ta):
 
 
 def ver_g2(conn, ta):
-    # NOT EMPIRICALLY BACKED. theme_to_canonical_v1 is empty everywhere, so its convention has
-    # never been observed. bucket_themes writes slug.upper(), so that is the predicate used here --
-    # but do not trust this guard until G2 has run once somewhere and the value can be read back.
+    # STILL NOT EMPIRICALLY BACKED, for a different reason now. theme_to_canonical_v1 is empty
+    # everywhere, so the convention has never been observed. The predicate is no longer a guess
+    # at bucket_themes' rule, though: bucket_themes reads therapeutic_areas.themes_tag and this
+    # reads the same column, so they agree by construction. Confirm once G2 has run somewhere.
     return scalar(
         conn, "SELECT count(*) FROM theme_to_canonical_v1 WHERE therapeutic_area = %s",
         (ta.buckets_key,),
@@ -1257,9 +1295,13 @@ def print_manual_work(conn, ta: ResolvedTA) -> None:
     print("  ingest_asco_abstracts.py     no --ta (congress presenters)")
     print("  ingest_nih_grants.py         no --ta")
     print("  social/dol_matching.py       no --ta")
-    print("  bucket_themes.py             --ta is click.Choice([nsclc, hepatology, immunology,")
-    print("                               raredisease]) AND derives ta.upper() independently of")
-    print("                               G1's TA_CONFIGS tag. Both must change for any new TA.")
+    # Both halves of this entry are fixed: --ta became click.Choice(TA_CONFIGS.keys())
+    # on 2026-08-27, and the independent ta.upper() derivation was replaced by a read of
+    # therapeutic_areas.themes_tag on 2026-09-02. It stays listed because the CONFIG half
+    # remains hand-work: a new TA still needs a TA_CONFIGS entry and a themes_tag value.
+    print("  bucket_themes.py             reads therapeutic_areas.themes_tag (no independent")
+    print("                               derivation). A new TA still needs a TA_CONFIGS entry")
+    print("                               in extract_research_themes.py and a themes_tag value.")
     print("\nOut of scope by nature: belief claims have no populating script -- hcp_belief_claims")
     print("does not exist; the system is msl_belief_claim_reactions, filled by MSLs in-app.")
     print("\nThis orchestrator covers the generation layer only. It does not imply the TA is done.")
@@ -1294,8 +1336,8 @@ def main() -> int:
     print(f"  uuid          {ta.uuid}")
     print(f"  slug          {ta.slug}          (hcp_narratives_v2, snapshots)")
     print(f"  name          {ta.name}")
-    print(f"  themes tag    {ta.themes_tag!r}  (hcp_research_themes_v2 -- G1's own literal)")
-    print(f"  buckets key   {ta.buckets_key!r}  (theme_canonical_v1 -- bucket_themes' ta.upper())")
+    print(f"  themes tag    {ta.themes_tag!r}  (hcp_research_themes_v2 -- therapeutic_areas.themes_tag)")
+    print(f"  buckets key   {ta.buckets_key!r}  (theme_canonical_v1 -- therapeutic_areas.themes_tag)")
     print(f"  mode          {'EXECUTE' if execute else 'DRY-RUN'}"
           f"   billed stages {'ALLOWED' if args.allow_billed else 'REFUSED (--allow-billed is off)'}")
     print()

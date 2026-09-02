@@ -284,7 +284,7 @@ SELECT COUNT(*) AS cnt FROM public.hcp_research_themes_v2 WHERE hcp_id = %s AND 
 # The shared resolver caches per process and raises with the full slug list.
 import os as _os, sys as _sys  # noqa: E402
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
-from ta_registry import resolve_ta_id  # noqa: E402,F401
+from ta_registry import resolve_ta, resolve_ta_id  # noqa: E402,F401
 
 
 def utc_now_iso() -> str:
@@ -760,7 +760,8 @@ def main() -> int:
             f"(selection is not region-scoped). Refusing to run rather than "
             f"silently ignoring it."
         )
-    tag = ta_cfg["tag"]
+    # tag IS NO LONGER READ FROM TA_CONFIGS. It comes from therapeutic_areas.themes_tag,
+    # resolved inside the `with conn` block below alongside ta_id -- see there for why.
     domain = ta_cfg["domain"]
     theme_examples = ta_cfg["theme_examples"]
     generic_negative = ta_cfg["generic_negative"]
@@ -791,7 +792,29 @@ def main() -> int:
 
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         conn.autocommit = False
-        ta_id = resolve_ta_id(conn, ta_slug)  # fix B: needs conn
+        # ONE RESOLUTION, FOUR KEYS (2026-09-02). resolve_ta returns id, slug, name AND
+        # themes_tag, so the literal this script writes into
+        # hcp_research_themes_v2.therapeutic_area is now READ from the same row every other
+        # tool reads, rather than being the private property of TA_CONFIGS[slug]["tag"].
+        #
+        # WHY IT MATTERS HERE SPECIFICALLY: this script is the WRITER. Whatever sits in `tag`
+        # becomes the stored key, and bucket_themes.py then has to find it again by its own
+        # rule (slug.upper()). The two agreed for nsclc by coincidence and for
+        # colorectal-cancer by a workaround; they disagreed for atopic-dermatitis, whose 3,499
+        # rows have never been bucketed. Reading the column removes the second rule entirely.
+        #
+        # A TA WITH NO TAG IS A HARD STOP, not a fallback to slug.upper(). Guessing the key on
+        # a billed extraction is how the AD orphan happened; refusing costs one UPDATE.
+        ta = resolve_ta(ta_slug, conn)  # fix B: needs conn
+        ta_id = ta.id
+        tag = ta.themes_tag
+        if not tag:
+            raise SystemExit(
+                f"therapeutic_areas.themes_tag is NULL for '{ta_slug}'. It is the key this "
+                f"script writes into hcp_research_themes_v2.therapeutic_area and the key "
+                f"bucket_themes.py reads back. Set it before extracting -- a guessed key "
+                f"produces rows nothing downstream can find."
+            )
         print(
             f"Loading target HCPs | TA: {tag} ({ta_slug}) | scope: {scope}"
             + (f" | scope-value: {','.join(scope_value)}" if scope_value else "")
