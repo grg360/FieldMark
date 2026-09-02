@@ -857,7 +857,7 @@ export default function RisingHcpProfile({ hcpId, taId, taSlug }: { hcpId: strin
             NPI — the block's honest-absence states (no_claims / no_npi) are the
             intended render there, exactly as on the established spine. */}
         <div style={{ marginTop: 26 }}>
-          <AdministeredVolumeBlock hcpId={hcpId} taSlug={taSlug} withholdSeam />
+          <AdministeredVolumeBlock hcpId={hcpId} taId={taId} withholdSeam />
         </div>
 
         {/* established standing */}

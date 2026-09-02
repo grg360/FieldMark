@@ -1,8 +1,19 @@
-// Medicare Administered Therapy — data layer. Reads hcp_administered_therapy (a
-// SECURITY DEFINER RPC over hcp_hcpcs_detail scoped to the office-administered infused
-// oncology agents: NSCLC ta_hcpcs_codes drug_admin J/Q codes, minus denosumab J0897 and
-// leuprolide J9217). The RPC returns raw per-(code, year) cells; the molecule merge and
-// shaping happen here.
+// Medicare Administered Therapy — data layer. Reads administered_therapy(p_hcp_id, p_ta_id),
+// a SECURITY DEFINER RPC over hcp_hcpcs_detail scoped to THIS TA's ta_hcpcs_codes drug_admin
+// J/Q codes, minus denosumab J0897 and leuprolide J9217. The RPC returns raw per-(code, year)
+// cells; the molecule merge and shaping happen here.
+//
+// THE TA IS AN ARGUMENT, NOT AN ASSUMPTION (2026-09-01). This previously called the 1-arg
+// hcp_administered_therapy, whose code set was pinned to lung inside the function, so every
+// profile in every TA was assessed against the NSCLC set — a colorectal profile rendered lung
+// agents as though they were its own. The taId passed here is the one the PROFILE resolved;
+// nothing in this module or the block looks a TA up.
+//
+// AND ZERO ROWS IS TWO DIFFERENT FACTS. Either this TA has no HCPCS code set defined, so
+// administered volume cannot be assessed at all, or the set exists and this HCP has nothing
+// against it. Only the database can tell them apart, so when there are no rows we ask
+// hcp_administered_volume, which answers the code-set question before any HCP-level work.
+// Querying ta_hcpcs_codes from here would be a second resolution point and is not done.
 //
 // This block is the observed infused-oncology footprint and nothing more. CMS claims
 // carry no indication field, so no figure here is attributed to a tumour type — the two
@@ -50,7 +61,7 @@ export interface AdministeredTherapy {
   // this state, an RPC error returned no_claims — asserting "nothing billed"
   // as fact on a network hiccup. Unavailable renders a one-line notice and
   // claims nothing, mirroring Federal Funding's GRANT RECORD UNAVAILABLE.
-  state: "reported" | "no_claims" | "no_npi" | "unavailable";
+  state: "reported" | "no_claims" | "no_code_set" | "no_npi" | "unavailable";
   windowYears: number[]; // filled min..max, e.g. [2021, 2022, 2023]
   productCount: number; // distinct HCPCS codes reported
   agentRowCount: number; // distinct molecules
@@ -108,7 +119,10 @@ interface RawCell {
   total_bene_day_services: number | null;
 }
 
-export async function loadAdministeredTherapy(hcpId: string): Promise<AdministeredTherapy> {
+export async function loadAdministeredTherapy(
+  hcpId: string,
+  taId: string,
+): Promise<AdministeredTherapy> {
   const empty: AdministeredTherapy = {
     state: "no_claims", windowYears: [], productCount: 0, agentRowCount: 0, cellCount: 0, maxRecentDays: 0, rows: [],
   };
@@ -123,14 +137,31 @@ export async function loadAdministeredTherapy(hcpId: string): Promise<Administer
   if (!npiKnown) {
     return { ...empty, state: "no_npi" };
   }
-  const { data, error } = await supabase.rpc("hcp_administered_therapy", { p_hcp_id: hcpId });
+  const { data, error } = await supabase.rpc("administered_therapy", {
+    p_hcp_id: hcpId,
+    p_ta_id: taId,
+  });
   if (error) {
     // A failed read is NOT a claims fact — never render the no_claims copy here.
-    console.warn("hcp_administered_therapy failed:", error.message);
+    console.warn("administered_therapy failed:", error.message);
     return { ...empty, state: "unavailable" };
   }
   const raw = (data ?? []) as RawCell[];
-  if (raw.length === 0) return empty;
+  if (raw.length === 0) {
+    // No rows. Ask the database WHY: no code set for this TA (cannot assess) or a set that
+    // this HCP has nothing against (a real zero). Only reached on the empty path, and the
+    // RPC answers the code-set question before doing any HCP-level work, so it is cheap here.
+    const probe = await supabase.rpc("hcp_administered_volume", {
+      p_hcp_id: hcpId,
+      p_ta_id: taId,
+    });
+    if (probe.error) {
+      console.warn("hcp_administered_volume failed:", probe.error.message);
+      return { ...empty, state: "unavailable" };
+    }
+    const state = (probe.data as { state?: string } | null)?.state;
+    return state === "no_code_set" ? { ...empty, state: "no_code_set" } : empty;
+  }
 
   const present = Array.from(new Set(raw.map((r) => r.program_year))).sort((a, b) => a - b);
   const minY = present[0];

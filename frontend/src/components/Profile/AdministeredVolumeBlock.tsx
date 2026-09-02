@@ -23,12 +23,6 @@ import {
   type AgentBadge,
 } from "../../lib/administeredVolume";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
-import { taLabelForSlug } from "../../lib/taLabels";
-
-// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
-// the stable identity — and the display label is derived from it, never typed
-// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
-const BLOCK_TA_SLUG = "nsclc";
 
 // Ink follows reading mode at the BLOCK level (2026-08-06): this is a data table
 // scanned as a unit, so it is one temperature — the COOL ramp throughout. The
@@ -59,13 +53,24 @@ const mono = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.data}` } as co
 const serif = (s: number, w = 400) => ({ font: `${w} ${s}px ${FACE.value}` } as const);
 const int = (v: number | null | undefined) => (v == null ? "—" : Math.round(v).toLocaleString());
 
+// THE BADGE DESCRIBES THE DRUG, NOT THE DOCTOR (2026-09-01). badgeFor() keys on
+// molecules — J9305/J9304 pemetrexed, J9173 durvalumab — so what it knows is the
+// AGENT's labelled indication. It knows nothing about this physician's case mix and
+// nothing about the therapeutic area of the profile it is rendering on.
+//
+// The old string read "ANCHORED · LUNG CANCER", built from a BLOCK_TA_SLUG = "nsclc"
+// constant. Unqualified, next to a physician's name, that reads as a claim about the
+// physician. It was also the wrong thing to make TA-aware: feeding the profile's TA into
+// it would have relabelled pemetrexed as a colorectal agent on a colorectal profile —
+// a false clinical statement, manufactured by the fix. The indication is a property of
+// the HCPCS code, so this needs no TA at all and BLOCK_TA_SLUG is gone.
+//
+// "DRUG LABEL ·" is the attribution: it says whose property the indication is, and it
+// reads correctly on a profile of any therapeutic area.
 const BADGE_LABEL: Record<AgentBadge, string> = {
   // The KEY stays nsclc_anchored — it is the value administeredVolume.ts emits.
-  // Only the label moves. Reads "ANCHORED · LUNG CANCER", matching the sibling
-  // tier vocabulary in PracticeFirstProfile/HCPCard; the hyphenated compound
-  // worked for an acronym and not for two words.
-  nsclc_anchored: `ANCHORED · ${taLabelForSlug(BLOCK_TA_SLUG).toUpperCase()}`,
-  thoracic_enriched: "THORACIC-ENRICHED · MULTI-INDICATION",
+  nsclc_anchored: "DRUG LABEL · LUNG CANCER",
+  thoracic_enriched: "DRUG LABEL · THORACIC, MULTI-INDICATION",
 };
 
 function Header({ subtitle }: { subtitle: string }) {
@@ -243,15 +248,17 @@ function ReservedAndSource() {
   );
 }
 
-export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSlug?: string; withholdSeam?: boolean }) {
+export default function AdministeredVolumeBlock(
+  { hcpId, taId }: { hcpId: string; taId: string; withholdSeam?: boolean },
+) {
   const [t, setT] = useState<AdministeredTherapy | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    loadAdministeredTherapy(hcpId).then((d) => { if (alive) { setT(d); setLoading(false); } });
+    loadAdministeredTherapy(hcpId, taId).then((d) => { if (alive) { setT(d); setLoading(false); } });
     return () => { alive = false; };
-  }, [hcpId]);
+  }, [hcpId, taId]);
 
   if (loading || !t) return null;
 
@@ -289,6 +296,36 @@ export default function AdministeredVolumeBlock({ hcpId }: { hcpId: string; taSl
           </p>
           <p style={{ margin: 0, ...mono(9), color: C.dim, lineHeight: 1.6, letterSpacing: ".02em" }}>
             Absence here means no NPI match — never that no therapy is administered. When an NPI is matched, this section fills from the same code set.
+          </p>
+        </div>
+        <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL }}>
+          <ReservedAndSource />
+        </div>
+      </div>
+    );
+  }
+
+  // ── No-code-set absence state (2026-09-01) — a property of the THERAPEUTIC AREA, not of
+  // this HCP. ta_hcpcs_codes has no rows for this area, so there is nothing to match claims
+  // against and administered volume is not assessed. Before this state existed the empty
+  // INNER JOIN fell through to the no-claims copy below, which says the bill was filed
+  // elsewhere — a statement about this physician, made on every HCP in the area, and false.
+  // The two absences are different facts and the block must not collapse them. ──
+  if (t.state === "no_code_set") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Header subtitle="office-administered oncology agents" />
+        <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 9 }}>
+          <p style={{ margin: 0, ...serif(15), color: C.ink, lineHeight: 1.5 }}>
+            No HCPCS code set is defined for this therapeutic area, so administered volume is not assessed here.
+          </p>
+          <p style={{ margin: 0, ...serif(13), color: C.blue, lineHeight: 1.6, textWrap: "pretty" }}>
+            The claims record has not been read and found empty — there is no code set to read it against. Which
+            HCPCS codes belong to a therapeutic area is curated, not derived, and that curation has not been done
+            for this one. Nothing here is a fact about this physician.
+          </p>
+          <p style={{ margin: 0, ...mono(9), color: C.dim, lineHeight: 1.6, letterSpacing: ".02em" }}>
+            Absence here means the area has no code set — never that no therapy is administered. This section fills for every HCP in the area once the set exists.
           </p>
         </div>
         <div style={{ border: `1px solid ${C.line}`, ...DEPTH.PANEL }}>

@@ -21,6 +21,7 @@ import FieldInsights from "../FieldInsights/FieldInsights";
 import ContactAccessCard from "../ContactAccessCard";
 import { getHcpWebSignals, type WebSignal } from "../../lib/api";
 import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
+import { useProfileTa } from "../../lib/profileTa";
 import RelationshipSection from "../RelationshipSection/RelationshipSection";
 import AddToWatchlistPopover from "../AddToWatchlistPopover";
 import ContextualizeHCPForm from "../ContextualizeHCPForm";
@@ -199,6 +200,9 @@ function EvidenceLine({ ev }: { ev: NsclcEvidenceTier | null }) {
 export default function CommunityHcpProfile() {
   const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 community mobile pass
   const { id } = useParams<{ id: string }>();
+  // This call site passed no TA at all, so the block fell back to the lung-pinned RPC.
+  // Same resolution chain as ProfileDispatch; the block never looks a TA up.
+  const profileTa = useProfileTa(id);
   const navigate = useNavigate();
   const rel = useRelationships();
   const [p, setP] = useState<CommunityProfile | null>(null);
@@ -521,7 +525,9 @@ export default function CommunityHcpProfile() {
             <>
         {/* ◆ MEDICARE ADMINISTERED THERAPY — infused-oncology footprint (self-contained
             header + card). Below the engagement record, above field insights. */}
-        <AdministeredVolumeBlock hcpId={p.hcp.id} />
+        {profileTa.status === "resolved"
+          ? <AdministeredVolumeBlock hcpId={p.hcp.id} taId={profileTa.taId} />
+          : null}
             </>
           );
           const secInsights = (

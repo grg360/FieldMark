@@ -583,7 +583,7 @@ export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug
             no-NPI absence text — which explained, at three paragraphs, why Part B
             could not be read for a German oncologist. A US record with no NPI still
             gets that text: the absence is real there, and this gate does not touch it. */}
-        {nonUs ? null : <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug={taSlug} withholdSeam />}
+        {nonUs ? null : <AdministeredVolumeBlock hcpId={p.hcp.id} taId={taId} withholdSeam />}
 
         {/* THE BRIEF section removed (2026-08-03, per Design): the frame drops it in
             both populated and sparse. Its three cards were WHAT CHANGED and WHERE

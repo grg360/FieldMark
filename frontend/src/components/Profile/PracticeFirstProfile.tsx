@@ -26,6 +26,7 @@ import { getOrCreateRelationship, type RelationshipStatus } from "../../lib/rela
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import AdministeredVolumeBlock from "./AdministeredVolumeBlock";
+import { useProfileTa } from "../../lib/profileTa";
 import RelationshipSection from "../RelationshipSection/RelationshipSection";
 import AddToWatchlistPopover from "../AddToWatchlistPopover";
 import ContextualizeHCPForm from "../ContextualizeHCPForm";
@@ -118,6 +119,10 @@ const COMMUNITY_TIER_LABEL: Record<string, string> = {
 export default function PracticeFirstProfile() {
   const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 mobile stack pass
   const { id } = useParams<{ id: string }>();
+  // The TA is RESOLVED, not asserted. This call site passed taSlug="nsclc" as a literal,
+  // which is how a colorectal profile came to be assessed against the lung code set.
+  // useProfileTa is the same chain ProfileDispatch uses; the block never looks a TA up.
+  const profileTa = useProfileTa(id);
   const navigate = useNavigate();
   const rel = useRelationships();
   const [p, setP] = useState<CommunityProfile | null>(null);
@@ -597,7 +602,9 @@ export default function PracticeFirstProfile() {
       {/* ── ADMINISTERED VOLUME — beneath practice scale; seam shown (this page
              carries the practice-scale block, so rule 04's denominator is visible) ── */}
       <div style={{ padding: "22px 28px 26px", borderBottom: `1px solid ${F.line}` }}>
-        <AdministeredVolumeBlock hcpId={p.hcp.id} taSlug="nsclc" />
+        {profileTa.status === "resolved"
+          ? <AdministeredVolumeBlock hcpId={p.hcp.id} taId={profileTa.taId} />
+          : null}
       </div>
 
       {/* ── lower two-column: insights + engagement + why | rail ── */}
