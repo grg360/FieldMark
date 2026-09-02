@@ -7,6 +7,8 @@ import {
   type PublicationListRow,
 } from "../../lib/publicationsList";
 import { institutionToSlug } from "../../lib/institutionUtils";
+import { themesTagForApiSlug } from "../../lib/api";
+import { useTA } from "../../lib/TAContext";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import AppLayout from "../AppLayout";
 import PublicationList from "./PublicationList";
@@ -20,6 +22,17 @@ export default function PublicationsListPage() {
   const partnerName1 = searchParams.get("partner_name1");
   const partnerName2 = searchParams.get("partner_name2");
   const institutionParam = searchParams.get("institution");
+  // WHICH TA'S THEME IS THIS? The theme-mode read is keyed by therapeutic_areas.themes_tag,
+  // and this page used the literal "NSCLC" — so every non-lung institution's
+  // publications-by-theme list was assembled from the lung corpus.
+  //
+  // ?ta= is written by InstitutionResearchThemesPanel, the only link into theme mode. The
+  // session TA covers links made before that param existed; it is the app's own answer to
+  // "which TA am I in", not a substituted default, and it is the same layer-2 signal
+  // useProfileTa trusts. If neither resolves, the list stays empty rather than borrowing a TA.
+  const { dataSlug: sessionSlug } = useTA();
+  const taParam = searchParams.get("ta")?.trim().toLowerCase() || null;
+  const themeTaSlug = taParam ?? sessionSlug ?? null;
 
   const [pubs, setPubs] = useState<PublicationListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +52,8 @@ export default function PublicationsListPage() {
     (async () => {
       try {
         if (theme) {
-          const data = await getPublicationsByTheme(institutionName, theme, "NSCLC", 50);
-          setPubs(data);
+          const themesTag = await themesTagForApiSlug(themeTaSlug);
+          setPubs(themesTag ? await getPublicationsByTheme(institutionName, theme, themesTag, 50) : []);
         } else if (internalPair) {
           const [h1, h2] = internalPair.split(",");
           if (h1 && h2) {
@@ -57,7 +70,7 @@ export default function PublicationsListPage() {
         setLoading(false);
       }
     })();
-  }, [institutionName, theme, internalPair, partner]);
+  }, [institutionName, theme, internalPair, partner, themeTaSlug]);
 
   function headerForMode(): { title: string; subtitle: string } {
     if (theme) {

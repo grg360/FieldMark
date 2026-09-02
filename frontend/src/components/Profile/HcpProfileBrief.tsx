@@ -14,7 +14,7 @@ import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { floorFixed } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
-import { fetchHcpThemes, getEstablishedScoreBreakdown, type TopCollaborator } from "../../lib/api";
+import { fetchHcpThemes, taHasAnyThemes, getEstablishedScoreBreakdown, type TopCollaborator } from "../../lib/api";
 import type { ResearchTheme } from "../../types/researchTheme";
 import FieldInsights from "../FieldInsights/FieldInsights";
 import MiniCollaboratorNetwork from "../MiniCollaboratorNetwork";
@@ -235,7 +235,7 @@ function PositionCard({ pos, sourceRows }: { pos: ProfilePosition; sourceRows: P
   );
 }
 
-export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug: string }) {
+export default function HcpProfileBrief({ taId, taSlug, themesTag }: { taId: string; taSlug: string; themesTag: string | null }) {
   const isMobile = useMediaQuery("(max-width: 767px)"); // ledger breakpoint - 2026-08-10 profile mobile pass
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -244,6 +244,10 @@ export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug
   const [notes, setNotes] = useState<FieldNote[]>([]);
   const [collaborators, setCollaborators] = useState<TopCollaborator[]>([]);
   const [themes, setThemes] = useState<ResearchTheme[]>([]);
+  // null = not yet known. Distinguishes "extraction has never run for this TA" from "it ran
+  // and this record was outside the cohort"; the absence line says different things for each,
+  // and must say neither until it knows which.
+  const [taExtracted, setTaExtracted] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -256,12 +260,10 @@ export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug
     Promise.all([
       loadHcpProfile(id, taId),
       loadFieldPresence(id),
-      fetchHcpThemes(id),
-    ]).then(([prof, fn, th]) => {
+    ]).then(([prof, fn]) => {
       if (!alive) return;
       setP(prof);
       setNotes(fn);
-      setThemes(th.data ?? []);
       setLoading(false);
     }).catch(() => alive && setLoading(false));
     // collaborator network — same source DetailScreen uses (established score breakdown).
@@ -270,6 +272,24 @@ export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug
     getEstablishedScoreBreakdown(id, taSlug).then((b) => alive && setCollaborators(b?.top_collaborators ?? [])).catch(() => {});
     return () => { alive = false; };
   }, [id]);
+
+  // THEMES ARE READ SEPARATELY, and only once the TA's tag has arrived.
+  //
+  // They were in the Promise.all above with `fetchHcpThemes(id)` -- one argument, no TA -- and
+  // that is what put eight EGFR-mutant NSCLC papers under a colorectal heading. The read is now
+  // keyed by therapeutic_areas.themes_tag, which useProfileTa resolves a beat after taId, so it
+  // cannot share an effect with the profile load.
+  //
+  // A NULL TAG CLEARS THE SECTION, it never widens the query. Null means the TA is still
+  // resolving, or has no tag at all; either way an unscoped read is the defect, not the
+  // fallback.
+  useEffect(() => {
+    if (!id || !themesTag) { setThemes([]); setTaExtracted(null); return; }
+    let alive = true;
+    fetchHcpThemes(id, themesTag).then((th) => alive && setThemes(th.data ?? [])).catch(() => {});
+    taHasAnyThemes(themesTag).then((any) => alive && setTaExtracted(any)).catch(() => {});
+    return () => { alive = false; };
+  }, [id, themesTag]);
 
   // honor a #hash on arrival (e.g. #belief-profile deep-links) once content is laid out
   useEffect(() => {
@@ -322,7 +342,7 @@ export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug
           </div>
           {/* section spine — frame order: orientation/operational first, belief payoff last */}
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", ...mono(9, 500), letterSpacing: ".1em", color: P.ink6 }}>
-            {[["SIGNAL", "signal"], ["RELATIONSHIP", "relationship"], ["CONTROLS", "contact"], [`FIELD ${notes.length}`, "field"], ["RECORD", "record"], ["BRIEF", "brief"], [`BELIEF ${nPos}`, "belief-profile"], ...(themes.length ? [["RESEARCH", "themes"] as [string, string]] : [])].map(([t, a]) => (
+            {[["SIGNAL", "signal"], ["RELATIONSHIP", "relationship"], ["CONTROLS", "contact"], [`FIELD ${notes.length}`, "field"], ["RECORD", "record"], ["BRIEF", "brief"], [`BELIEF ${nPos}`, "belief-profile"], ...(themes.length || (themesTag && taExtracted !== null) ? [["RESEARCH", "themes"] as [string, string]] : [])].map(([t, a]) => (
               <a key={a} href={`#${a}`} style={{ color: P.ink5, textDecoration: "none" }}>{t}</a>
             ))}
           </div>
@@ -703,7 +723,7 @@ export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug
                 <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>NO SOURCED POSITIONS</span>
                 <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
                   Nothing has been extracted from the published record for this HCP in {taLabelForSlug(taSlug).toLowerCase()}. This is an absence in the record, not evidence that no position exists — the score band above is comparable cohort-wide regardless.
-                  {themes.length ? " Publication-derived research involvement is below — a broader, any-authorship signal that shows where the work is without asserting a stance." : ""}
+                  {themes.length ? " Publication-derived research involvement is below — a broader signal that shows where the work is without asserting a stance." : ""}
                 </span>
               </div>
             )}
@@ -712,18 +732,52 @@ export default function HcpProfileBrief({ taId, taSlug }: { taId: string; taSlug
 
         {/* RESEARCH INVOLVEMENT — hcp_research_themes_v2, the second tier of the two-tier
             model. Positions above ASSERT a stance (leadership-authored, advocacy tier);
-            themes show INVOLVEMENT (any authorship) and must never read as "advocates
-            for". Data-gated: absent entirely when the HCP has no ranked themes.
+            themes show INVOLVEMENT and must never read as "advocates for".
+
+            SCOPED BY themesTag, not by hcp_id alone (2026-09-02). The read used to take only
+            the HCP, so a profile showed every theme that person had in ANY TA: 105 of the 220
+            colorectal board members who rendered this section were shown lung themes.
+
+            NOT DATA-GATED ANY MORE, and that is the point of the change. Gating on
+            themes.length made the section VANISH for those 105 once the predicate landed —
+            a blank where a heading had been, which reads as broken. The absence now says
+            which of the two absences it is.
+
             NOTE: no Design frame exists for this section — treatment is a minimal
             adaptation of this profile's ledger register, pending a frame. */}
         {themes.length ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <SectionHead id="themes" tag="RESEARCH INVOLVEMENT" count={`${themes.length} THEME${themes.length === 1 ? "" : "S"} · PUBLICATION-DERIVED`} sub="ACTIVE IN THESE AREAS · ANY-AUTHORSHIP BASIS · INVOLVEMENT, NOT ADVOCACY" />
+            <SectionHead id="themes" tag="RESEARCH INVOLVEMENT" count={`${themes.length} THEME${themes.length === 1 ? "" : "S"} · PUBLICATION-DERIVED`} sub="ACTIVE IN THESE AREAS · FIRST/SENIOR-AUTHORED CORPUS · INVOLVEMENT, NOT ADVOCACY" />
             <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px" }}>
+              {/* WAS: "...authored publications ... — any authorship position counts", and the
+                  sub read ANY-AUTHORSHIP BASIS. PAPERS_SQL has always filtered
+                  `(pa.is_first_author OR pa.is_senior_author)`, `pub_year >= 2021`, ORDER BY
+                  pub_year DESC, LIMIT 30 (extract_research_themes.py:241-250). For Spira that
+                  is 18 publications, not 78. Name the corpus; do not characterise it. */}
               <div style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty", paddingBottom: 4 }}>
-                Themes are extracted from this HCP's authored publications in the {taLabelForSlug(taSlug).toLowerCase()} corpus — any authorship position counts. They show where the work is. They are a weaker claim than the positions above{nPos ? "" : " would be"}: involvement in an area is not a stance on it.
+                Themes are extracted from this HCP's first- or senior-authored {taLabelForSlug(taSlug).toLowerCase()} publications since 2021, up to the thirty most recent. They show where the work is. They are a weaker claim than the positions above{nPos ? "" : " would be"}: involvement in an area is not a stance on it.
               </div>
               {themes.map((t) => <ThemeRow key={t.id} t={t} />)}
+            </div>
+          </div>
+        ) : themesTag && taExtracted !== null ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <SectionHead id="themes" tag="RESEARCH INVOLVEMENT" count="NOT EXTRACTED" sub="ACTIVE IN THESE AREAS · FIRST/SENIOR-AUTHORED CORPUS · INVOLVEMENT, NOT ADVOCACY" />
+            <div style={{ border: `1px solid ${P.lineMed}`, ...DEPTH.PANEL, padding: "18px 22px", display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ ...mono(9, 600), letterSpacing: ".14em", color: P.ink5 }}>{taExtracted ? "OUTSIDE THE EXTRACTED COHORT" : "NOT RUN FOR THIS AREA"}</span>
+              {/* TWO DIFFERENT ABSENCES, and conflating them is what "no themes" does.
+                  taExtracted false: the batch has never run for this TA at all.
+                  taExtracted true: it ran over a SELECTED COHORT and this record was outside
+                  it — for colorectal that cohort is the 140-member rising board, and all 105
+                  established-board members here fall outside. The scope NAME is a producer
+                  fact the frontend cannot verify (TA_CONFIGS[slug]["selection"], a Python
+                  dict), so the copy names the boundary without asserting which cohort it was.
+                  See the themes_scope follow-up. */}
+              <span style={{ ...serif(13), color: P.ink4, lineHeight: 1.55, textWrap: "pretty" }}>
+                {taExtracted
+                  ? `Theme extraction has run for ${taLabelForSlug(taSlug).toLowerCase()}, but not over this record. It covers a selected cohort rather than the whole board, and this HCP sits outside it. That is an unrun extraction, not an absence in the published record — the publications exist and are counted everywhere else on this page.`
+                  : `Theme extraction has not been run for ${taLabelForSlug(taSlug).toLowerCase()}. No HCP in this area has extracted themes yet, so this says nothing about this record in particular.`}
+              </span>
             </div>
           </div>
         ) : null}

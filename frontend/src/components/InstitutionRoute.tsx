@@ -19,6 +19,7 @@ import {
   type InstitutionCollaboration,
 } from "../lib/api";
 import { getInstitutionResearchThemes, type InstitutionResearchTheme } from "../lib/institutionThemes";
+import { themesTagForTaId } from "../lib/api";
 import InstitutionEnvironmentPanel from "./InstitutionEnvironmentPanel";
 import {
   aggregateInstitutions,
@@ -129,6 +130,11 @@ export default function InstitutionRoute() {
         return;
       }
       setTaIdState(taId);
+      // ONE RESOLUTION, for both theme reads below. The tag is therapeutic_areas.themes_tag
+      // (memoised app-wide), NOT taSlug.toUpperCase() — that derivation is correct for nsclc
+      // and colorectal-cancer by coincidence and silently returns nothing for
+      // atopic-dermatitis, whose tag is 'Atopic Dermatitis'.
+      const themesTag = await themesTagForTaId(taId);
       const all = await fetchTaRoster(taId);
       if (cancelled) return;
       const aggs = aggregateInstitutions(all);
@@ -155,9 +161,11 @@ export default function InstitutionRoute() {
       // Themes / collaboration panels are string-keyed legacy surfaces — fed
       // best-effort by the canonical name; their own empty states stay honest
       // when the registry name has no string twin in hcps_v2.
-      void getInstitutionResearchThemes(rec.name, taSlug.toUpperCase()).then((t) => {
-        if (!cancelled) setInstThemes(t);
-      });
+      if (themesTag) {
+        void getInstitutionResearchThemes(rec.name, themesTag).then((t) => {
+          if (!cancelled) setInstThemes(t);
+        });
+      }
       void getInstitutionCollaborations(rec.name, 8, taSlug).then((c) => {
         if (!cancelled) setCollabs(c);
       });
@@ -166,10 +174,15 @@ export default function InstitutionRoute() {
       });
 
       const ids = [...rosterIds].slice(0, 200);
-      void supabase
+      // THE ROSTER CHIPS WERE UNSCOPED. This read had no therapeutic_area predicate at all,
+      // so a colorectal roster row could carry that HCP's lung themes as its chip — the same
+      // defect as fetchHcpThemes, on a second surface. No tag means no chips; it never means
+      // read every TA.
+      if (themesTag) void supabase
         .from("hcp_research_themes_v2")
         .select("hcp_id, theme_name, display_rank")
         .in("hcp_id", ids)
+        .eq("therapeutic_area", themesTag)
         .order("display_rank", { ascending: true })
         .then(({ data }) => {
           if (cancelled || !data) return;
@@ -605,7 +618,7 @@ export default function InstitutionRoute() {
           }}
         >
           <div style={{ background: C.bg, padding: `24px ${pad} 28px` }}>
-            <InstitutionResearchThemesPanel themes={instThemes} institutionName={record.name} taDisplayName={taUpper} />
+            <InstitutionResearchThemesPanel themes={instThemes} institutionName={record.name} taDisplayName={taUpper} taSlug={taSlug} />
           </div>
           <div style={{ background: C.bg, padding: `24px ${pad} 28px`, display: "flex", flexDirection: "column", gap: 26 }}>
             <InstitutionCollaborationsPanel

@@ -169,7 +169,10 @@ function mapPublicationRow(row: PublicationDbRow): PublicationListRow {
 export async function getPublicationsByTheme(
   institutionName: string,
   themeName: string,
-  therapeuticArea: string = "NSCLC",
+  // NO DEFAULT. The sole caller passed nothing and inherited "NSCLC", so a colorectal
+  // institution's publications-by-theme list was assembled from lung theme rows. Callers pass
+  // therapeutic_areas.themes_tag.
+  themesTag: string,
   limit: number = 50,
 ): Promise<PublicationListRow[]> {
   try {
@@ -191,7 +194,7 @@ export async function getPublicationsByTheme(
         .select("example_pmids")
         .in("hcp_id", chunk)
         .eq("theme_name", themeName)
-        .eq("therapeutic_area", therapeuticArea);
+        .eq("therapeutic_area", themesTag);
 
       for (const row of (data ?? []) as { example_pmids: string[] | null }[]) {
         if (Array.isArray(row.example_pmids)) {

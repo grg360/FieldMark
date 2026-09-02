@@ -9,9 +9,15 @@ interface Props {
   institutionName: string;
   /** Optional. When absent the subhead drops the TA word rather than guessing one. */
   taDisplayName?: string;
+  /**
+   * Carried onto the publications link. Without it PublicationsListPage has no TA at all and
+   * fell back to the literal "NSCLC", so every non-lung institution's publications-by-theme
+   * list was read from the lung corpus.
+   */
+  taSlug?: string;
 }
 
-export default function InstitutionResearchThemesPanel({ themes, institutionName, taDisplayName }: Props) {
+export default function InstitutionResearchThemesPanel({ themes, institutionName, taDisplayName, taSlug }: Props) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const visibleThemes = expanded ? themes : themes.slice(0, 10);
@@ -55,7 +61,7 @@ export default function InstitutionResearchThemesPanel({ themes, institutionName
                 key={theme.theme_name}
                 type="button"
                 onClick={() => {
-                  navigate(`/institution/${institutionToSlug(institutionName)}/publications?theme=${encodeURIComponent(theme.theme_name)}&institution=${encodeURIComponent(institutionName)}`);
+                  navigate(`/institution/${institutionToSlug(institutionName)}/publications?theme=${encodeURIComponent(theme.theme_name)}&institution=${encodeURIComponent(institutionName)}${taSlug ? `&ta=${encodeURIComponent(taSlug)}` : ""}`);
                 }}
                 style={{
                   display: "block",

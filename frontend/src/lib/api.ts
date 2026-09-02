@@ -852,6 +852,66 @@ export function taIdForApiSlug(slug: string): string | undefined {
   return TA_ID_MAP[slug.toLowerCase().trim()];
 }
 
+/**
+ * THE THEMES TAG, RESOLVED ONCE FOR THE WHOLE APP.
+ *
+ * hcp_research_themes_v2.therapeutic_area is keyed by a TAG, not a slug and not an id:
+ * 'NSCLC', 'Atopic Dermatitis', 'COLORECTAL-CANCER'. Three conventions, because two
+ * producers derived the key by two different rules for three years. Every read site that
+ * needed it used to compute its own -- taSlug.toUpperCase() in InstitutionRoute, the literal
+ * "NSCLC" in PublicationsListPage, and nothing at all in fetchHcpThemes, which is how a
+ * colorectal profile came to show eight EGFR-mutant NSCLC papers.
+ *
+ * The tag now lives on therapeutic_areas.themes_tag (2026-09-02), the same row the producers
+ * read. This is the ONLY place the app fetches it. It is a module-level memoised promise, so
+ * four consumers cost one query, and it is keyed by taId because that is what callers already
+ * hold -- there is deliberately no slug->tag map in TypeScript, because a second map is the
+ * thing that drifts.
+ *
+ * A FAILED LOAD IS NOT CACHED. On error the memo is cleared so the next caller retries; a
+ * cached empty registry would turn one dropped request into a permanently themeless session.
+ * Callers get null, and null must mean "do not query", never "query unscoped" -- unscoped is
+ * the original defect.
+ */
+let themesTagRegistry: Promise<Map<string, string>> | null = null;
+let themesTagAttempt = 0;
+
+export function loadThemesTagRegistry(): Promise<Map<string, string>> {
+  if (themesTagRegistry) return themesTagRegistry;
+  // A token rather than a self-reference: the in-flight promise cannot name itself from inside
+  // its own initialiser, and a later attempt must not clear a memo it does not own.
+  const attempt = ++themesTagAttempt;
+  const pending = (async () => {
+    const { data, error } = await supabase
+      .from("therapeutic_areas")
+      .select("id, themes_tag");
+    if (error) {
+      if (themesTagAttempt === attempt) themesTagRegistry = null;
+      console.warn("loadThemesTagRegistry: query error", error);
+      return new Map<string, string>();
+    }
+    return new Map<string, string>(
+      (data ?? [])
+        .filter((r): r is { id: string; themes_tag: string } => Boolean(r?.id && r?.themes_tag))
+        .map((r) => [String(r.id), String(r.themes_tag)]),
+    );
+  })();
+  themesTagRegistry = pending;
+  return pending;
+}
+
+/** The tag for a TA id, or null. Null means the caller must not read the themes table. */
+export async function themesTagForTaId(taId: string | null | undefined): Promise<string | null> {
+  if (!taId) return null;
+  return (await loadThemesTagRegistry()).get(taId) ?? null;
+}
+
+/** Same, from a data slug, for the surfaces whose TA arrives as ?ta=. */
+export async function themesTagForApiSlug(slug: string | null | undefined): Promise<string | null> {
+  const taId = slug ? taIdForApiSlug(slug) : undefined;
+  return themesTagForTaId(taId);
+}
+
 // TA_DISPLAY_NAME_BY_SLUG moved to lib/taLabels.ts 2026-08-15 and is imported
 // back here, so the label strings have exactly one home. See that file for why.
 
@@ -966,6 +1026,28 @@ export async function entitledTASlugs(
  * publication_count is populated for every TA membership. Deterministic tiebreak
  * on therapeutic_area_id.
  */
+/**
+ * Every TA this HCP belongs to, most-published first — one read that answers both questions
+ * the profile chain asks: "is the session's TA one of this person's?" and "if not, which is
+ * their primary?". Same table, same ordering, same tiebreak as resolvePrimaryTaId; that
+ * function is now a thin wrapper so the two can never disagree about what "primary" means.
+ */
+export async function loadHcpTaIds(hcpId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("hcp_therapeutic_areas_v2")
+    .select("therapeutic_area_id, publication_count")
+    .eq("hcp_id", hcpId)
+    .order("publication_count", { ascending: false, nullsFirst: false })
+    .order("therapeutic_area_id", { ascending: true });
+  if (error) {
+    console.warn("loadHcpTaIds: query error", error);
+    return [];
+  }
+  return (data ?? [])
+    .map((r) => (r.therapeutic_area_id ? String(r.therapeutic_area_id) : ""))
+    .filter(Boolean);
+}
+
 export async function resolvePrimaryTaId(hcpId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("hcp_therapeutic_areas_v2")
@@ -1196,12 +1278,28 @@ async function fetchAllPaginated<T>(
   return { data: allRows, error: null };
 }
 
-export async function fetchHcpThemes(hcpId: string): Promise<ApiResult<ResearchTheme[]>> {
+/**
+ * Ranked research themes for one HCP IN ONE THERAPEUTIC AREA.
+ *
+ * themesTag IS REQUIRED, AND THAT IS THE FIX. This read was `.eq("hcp_id", hcpId)` and
+ * nothing else, so it returned every theme the person had in any TA. hcp_research_themes_v2
+ * is written per-TA -- extract_research_themes.py DELETE_THEMES_SQL keys on
+ * (hcp_id, therapeutic_area) deliberately, so one TA's run cannot clear another's -- the
+ * table was always scoped; only the read was not. Measured 2026-09-02: 105 of the 220
+ * colorectal board members who rendered this section were shown NSCLC themes, Spira among
+ * them, with eight EGFR-mutant lung papers under a colorectal heading.
+ *
+ * The caller passes therapeutic_areas.themes_tag via themesTagForTaId. It is a REQUIRED
+ * parameter, not an optional one, so an unscoped call cannot be written by accident: a
+ * caller holding no tag must not call this at all.
+ */
+export async function fetchHcpThemes(hcpId: string, themesTag: string): Promise<ApiResult<ResearchTheme[]>> {
   try {
     const { data, error } = await supabase
       .from("hcp_research_themes_v2")
       .select("*")
       .eq("hcp_id", hcpId)
+      .eq("therapeutic_area", themesTag)
       .gte("display_rank", 1)
       .order("display_rank", { ascending: true });
 
@@ -1221,6 +1319,35 @@ export async function fetchHcpThemes(hcpId: string): Promise<ApiResult<ResearchT
       error: err instanceof Error ? err.message : "Unknown error occurred",
     };
   }
+}
+
+/**
+ * Has theme extraction ever run for this TA? One row is enough to answer it.
+ *
+ * This exists for the ABSENCE LINE, and the distinction it buys is the whole point. False
+ * means extraction has never run for this area at all. True means it ran over a SELECTED
+ * COHORT and this record was outside it. Neither is a statement about the published record,
+ * and the section must not imply one: for colorectal the extraction covered the 140-member
+ * rising board and 105 established-board members fall outside it, so a bare "no themes"
+ * would read as a verdict on 105 real publication histories.
+ *
+ * NOT A COUNT, on purpose. PostgREST counts rows, not distinct hcp_id, and 1,120 colorectal
+ * rows over 115 HCPs is a number that would be wrong in the one place a reader would trust
+ * it. Naming the SCOPE of the run needs a producer fact the frontend does not have -- see
+ * the themes_scope follow-up -- so the copy names the boundary without inventing a figure.
+ */
+export async function taHasAnyThemes(themesTag: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("hcp_research_themes_v2")
+    .select("hcp_id")
+    .eq("therapeutic_area", themesTag)
+    .gte("display_rank", 1)
+    .limit(1);
+  if (error) {
+    console.warn("taHasAnyThemes: query error", error);
+    return false;
+  }
+  return (data ?? []).length > 0;
 }
 
 export async function getRisingStars(

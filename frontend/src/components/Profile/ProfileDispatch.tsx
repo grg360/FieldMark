@@ -114,7 +114,7 @@ export default function ProfileDispatch() {
   }
   if (route === "rising") return <RisingHcpProfile hcpId={id as string} taId={taId as string} taSlug={ta.status === "resolved" ? ta.slug : ""} />;
   return route === "academic"
-    ? <HcpProfileBrief taId={taId as string} taSlug={ta.status === "resolved" ? ta.slug : ""} />
+    ? <HcpProfileBrief taId={taId as string} taSlug={ta.status === "resolved" ? ta.slug : ""} themesTag={ta.status === "resolved" ? ta.themesTag : null} />
     : <CommunityHcpProfile />;
 }
 

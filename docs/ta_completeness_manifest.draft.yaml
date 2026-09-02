@@ -901,6 +901,72 @@ artifacts:
       - upstream: publication_ta_membership
         gate: hard_fail
         evidence: "scripts/classify/extract_research_themes.py reads publication_therapeutic_areas_v2 directly inside its own SQL; the orchestrator never models this because the stage ordering happens to satisfy it"
+    known_states:
+      # NOT A DEFECT. Recorded because it looks exactly like one and will be reported as a bug
+      # by whoever opens a colorectal profile next.
+      - id: colorectal_themes_render_nowhere
+        found: "2026-09-02"
+        severity: none
+        verdict: correct_behaviour
+        claim: >
+          No colorectal-cancer profile can render a RESEARCH INVOLVEMENT section today. Not one.
+          The section shows the named absence or nothing at all, never content — and that is the
+          honest state of the data, not a failure of the read.
+        why:
+          - "All 115 HCPs with colorectal themes are on the RISING board. Measured 2026-09-02:
+             115 themed, 115 on hcp_rising_star_ranks_v3, 0 on hcp_established_ranks_v3."
+          - "RisingHcpProfile.tsx carries no RESEARCH INVOLVEMENT section — zero occurrences of
+             'theme' in the file. The section exists only in HcpProfileBrief.tsx, the established
+             shell."
+          - "The established board has never been theme-extracted. Colorectal runs at
+             --scope rising by default, over the 140-member rising board."
+          - "The boards are mutually exclusive after the OR-15 removal. Measured: rising 140,
+             established 24,735, overlap 0. So nobody reaches the section carrying themes."
+        what_the_2026_09_02_fix_did: >
+          Removed a falsehood without adding content. Before the TA predicate, 105 of the 220
+          colorectal board members who rendered this section were shown NSCLC themes — Spira with
+          eight EGFR-mutant lung papers under a colorectal heading. Those 105 now render the scope
+          absence instead. Zero colorectal profiles gained a theme, because none could.
+        institution_surfaces_same_shape: >
+          The roster theme chips follow identically. MD Anderson's colorectal roster is 166
+          established + 1 rising = 167; 18 of the established members were showing lung chips and
+          now show none, and the single rising member holds the only real colorectal chip on the
+          page. Memorial Sloan Kettering 6 wrong chips to none, Dana-Farber 5, Massachusetts
+          General 4, City of Hope 4. Fewer chips, all of them true.
+        what_would_change_it: >
+          One thing only: run extract_research_themes.py --ta colorectal-cancer over the
+          ESTABLISHED board. TA_CONFIGS already defines the scope — 'global-200', the capped
+          200-HCP established selection (extract_research_themes.py:222-226). It is billed and it
+          is deliberately not the default: the uncapped established board is 24,735 calls. Until
+          that runs, the absence line is the correct and complete rendering.
+        do_not_diagnose_as:
+          - "a missing predicate — the predicate is present and correct"
+          - "a broken section — it renders, with the absence"
+          - "a null themes_tag — verified non-null for all 8 TAs since the 2026-09-02 backfill"
+    known_defects:
+      - id: papers_sql_ignores_is_excluded
+        found: "2026-09-02"
+        severity: contaminates_corpus
+        where: "scripts/classify/extract_research_themes.py:241-251 (PAPERS_SQL)"
+        claim: >
+          PAPERS_SQL JOINs publication_therapeutic_areas_v2 on therapeutic_area_id alone. It
+          never filters AND NOT pta.is_excluded, so a publication the TA has EXPLICITLY
+          excluded still enters the theme-extraction corpus and can produce a theme, a
+          paper_count and an example_pmid. The exclusion is honoured by every other consumer
+          and silently ignored by this one.
+        measured_2026_09_02:
+          nsclc: { excluded_pta_rows: 1435 }
+          colorectal_cancer: { excluded_pta_rows: 0 }
+          atopic_dermatitis: { excluded_pta_rows: 0 }
+          hepatology: { excluded_pta_rows: 0 }
+          note: >
+            Zero blast radius on CRC and AD today, so this is not what made Spira's colorectal
+            profile wrong. NSCLC is the only TA carrying exclusions, and NSCLC is the TA with
+            10,640 theme rows across 1,064 HCPs, all extracted 2026-06-03/06-08 under this
+            SQL. Any NSCLC theme may rest on an excluded publication; the extraction would have
+            to be re-run to know which.
+        fix: "add AND NOT pta.is_excluded to PAPERS_SQL. Separate change; re-extraction is billed."
+        not_fixed_by: "the 2026-09-02 themes_tag / TA-predicate work, which is read-side only"
     producer_verified:
       status: OK
       checked: "2026-09-01"

@@ -17,7 +17,10 @@ export interface InstitutionResearchTheme {
 
 export async function getInstitutionResearchThemes(
   institutionName: string,
-  therapeuticArea: string = "NSCLC",
+  // NO DEFAULT. It was `= "NSCLC"`, and a defaulted TA key is the same class of bug as a
+  // computed one: it makes the wrong answer the quiet one. Callers pass
+  // therapeutic_areas.themes_tag.
+  themesTag: string,
   limit: number = 20,
 ): Promise<InstitutionResearchTheme[]> {
   try {
@@ -54,7 +57,7 @@ export async function getInstitutionResearchThemes(
         .from("hcp_research_themes_v2")
         .select("hcp_id, theme_name, centrality, paper_count, therapeutic_area")
         .in("hcp_id", chunk)
-        .eq("therapeutic_area", therapeuticArea)
+        .eq("therapeutic_area", themesTag)
         .gte("display_rank", 1);
 
       if (error) {
