@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { DEFAULT_REGION, REGION_DISPLAY_NAMES, type RegionKey } from "../lib/regions";
 import { useFilterContext } from "../lib/filter-context";
 import { getCanonicalThemes } from "../lib/themes-api";
+import { countWithoutPracticeState } from "../lib/api";
 
 function isDefaultRegions(regions: RegionKey[]): boolean {
   return regions.length === 1 && regions[0] === "US";
@@ -15,6 +16,7 @@ export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
   const { regions, setRegions, states, setStates, themeIds, setThemeIds } =
     useFilterContext();
   const [totalThemeCount, setTotalThemeCount] = useState(0);
+  const [unplaceable, setUnplaceable] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +27,16 @@ export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
       cancelled = true;
     };
   }, [taSlug]);
+
+  // ONLY WHEN A STATE FILTER IS ON. With no state filter nothing is being hidden, so the
+  // sentence would be noise; the count is also the expensive read on this component.
+  const stateFilterOn = states.length > 0;
+  useEffect(() => {
+    if (!stateFilterOn) { setUnplaceable(null); return; }
+    let cancelled = false;
+    countWithoutPracticeState(taSlug).then((n) => { if (!cancelled) setUnplaceable(n); });
+    return () => { cancelled = true; };
+  }, [stateFilterOn, taSlug]);
 
   const showRegions = !isDefaultRegions(regions);
   const showStates = states.length > 0;
@@ -70,12 +82,12 @@ export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
   }
 
   return (
+    <div style={{ margin: "8px 16px 12px" }}>
     <div
       style={{
         display: "flex",
         flexWrap: "wrap",
         gap: 4,
-        margin: "8px 16px 12px",
       }}
     >
       {showRegions &&
@@ -137,6 +149,18 @@ export default function ActiveFilterPills({ taSlug }: ActiveFilterPillsProps) {
           </button>
         </span>
       )}
+    </div>
+      {/* F4: THE SILENT NARROWING, NAMED. The feed's get_*_filtered endpoints did not gain
+          the institution opt-in this release, so a state filter here matches an NPPES-sourced
+          state only and quietly drops everyone placed by their institution. A filter that
+          shows fewer people than the user expects, with no explanation, is the blank-panel
+          failure in another costume. */}
+      {stateFilterOn && unplaceable != null && unplaceable > 0 ? (
+        <div style={{ marginTop: 6, fontSize: 11, lineHeight: 1.5, color: "rgba(232,230,223,0.55)" }}>
+          {unplaceable.toLocaleString()} HCPs in this area have no established practice
+          location and are not shown.
+        </div>
+      ) : null}
     </div>
   );
 }

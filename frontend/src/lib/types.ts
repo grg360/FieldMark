@@ -6,6 +6,9 @@ export interface HCP {
   institution_normalized?: string | null;
   nppes_practice_city?: string | null;
   nppes_practice_state?: string | null;
+  /** hcps_v2.institution_state — where the INSTITUTION is. Not a practice location;
+   *  render only via resolvePracticeState, which attaches the qualifier. */
+  institution_state?: string | null;
   nppes_practice_setting?: string | null;
   nppes_practice_zip?: string | null;
   institution_full?: string | null;
@@ -249,6 +252,7 @@ export interface RankRow {
   institution_normalized: string | null;
   country: string | null;
   nppes_practice_state: string | null;
+  institution_state: string | null;
   nppes_practice_city: string | null;
   total_career_pubs: number | null;
   career_first_pub_year: number | null;

@@ -7,7 +7,7 @@ import { formatEngagementDollar, formatIntDisplay, formatScoreFloor1 } from "../
 import { institutionToSlug } from "../lib/institutionUtils";
 import { supabase } from "../lib/supabase";
 import { buildSubline } from "../lib/subline";
-import { LOCATION_ABSENT_LABEL, resolveLocation } from "../lib/location";
+import { LOCATION_ABSENT_LABEL, resolveLocation, resolvePracticeState } from "../lib/location";
 import InfoTooltip from "./InfoTooltip";
 import { StatPillWithTooltip } from "./StatPillWithTooltip";
 import { FONT, COLOR } from "../lib/designTokens";
@@ -266,11 +266,15 @@ function getCardInstitutionAndState(hcp: HCPCardHCP): { institution: string; sta
       hcp.institution ??
       "",
   ).trim();
-  const state = String(
-    hcp.nppesPracticeState ??
-      (hcp as { nppes_practice_state?: string | null }).nppes_practice_state ??
-      "",
-  ).trim();
+  // Routed through the one formatter (2026-09-02): an institution-placed state must carry
+  // its qualifier here too, or the card asserts a practice location the record cannot
+  // support. See lib/location.ts — a call site that formats its own location is a defect.
+  const state = resolvePracticeState({
+    nppesPracticeState:
+      hcp.nppesPracticeState ??
+      (hcp as { nppes_practice_state?: string | null }).nppes_practice_state,
+    institutionState: (hcp as { institution_state?: string | null }).institution_state,
+  }).label;
   return { institution, state };
 }
 

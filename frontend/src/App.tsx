@@ -110,6 +110,10 @@ type AppHCP = Omit<UIHCP, "id"> & {
   institutionShort?: string | null;
   nppesPracticeCity?: string | null;
   nppesPracticeState?: string | null;
+  /** hcps_v2.institution_state — where the INSTITUTION is, not a practice location.
+   *  Passed to HCPCard so resolvePracticeState can attach the · INSTITUTION qualifier
+   *  rather than presenting it as a registered practice state. */
+  institution_state?: string | null;
   nppesPracticeSetting?: string | null;
   nppesPracticeAddress?: string | null;
   nppesPracticeZip?: string | null;
@@ -199,6 +203,11 @@ function mapRisingStarToHCP(item: RisingStar): AppHCP {
     institutionShort: item.institution_normalized ?? null,
     nppesPracticeCity: item.nppes_practice_city ?? null,
     nppesPracticeState: item.nppes_practice_state ?? null,
+    // Carried so HCPCard's resolvePracticeState can tell a practice registration from an
+    // institution's address. Without it the card shows NO state at all for institution-placed
+    // HCPs after the block-7 clear — a silent blank, which is the failure this change exists
+    // to remove.
+    institution_state: (item as { institution_state?: string | null }).institution_state ?? null,
     nppesPracticeSetting: item.nppes_practice_setting ?? null,
     nppesPracticeZip: item.nppes_practice_zip ?? null,
     institutionFull: item.institution_full ?? null,

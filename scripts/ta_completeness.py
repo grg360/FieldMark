@@ -948,6 +948,57 @@ def render_text(report):
 
 # ---------------------------------------------------------------------------------------
 
+# --- data invariants -------------------------------------------------------
+#
+# STRUCTURE IS NOT THE ONLY THING THAT DRIFTS. --validate-manifest asserts shape and never
+# touches the database, deliberately. But the defect that cost three days in September 2026
+# was not a shape error: hcps_v2.nppes_practice_state held 14,678 INSTITUTION states in an
+# NPPES-named column, four RPCs displayed them as practice locations, one filtered territory
+# by them, and nothing anywhere noticed. A CHECK constraint now refuses new ones; this
+# refuses to let existing ones go unmentioned.
+#
+# REPORTS, NEVER BLOCKS. These are measurements, not preconditions: a non-zero count is a
+# fact about the data that the operator should see before reading the plan, not a reason to
+# refuse to produce one. Same posture as assert_key_conventions in generate_cycle.py --
+# fail at second zero, not at stage seven -- with the failure downgraded to a notice because
+# nothing downstream of it is unsafe to compute.
+DATA_INVARIANTS = (
+    (
+        "nppes_practice_state implies npi_number",
+        "select count(*) from hcps_v2 where nppes_practice_state is not null "
+        "and npi_number is null",
+        "a practice state with no NPI behind it cannot have come from NPPES. Two rows are "
+        "known-unrecoverable exceptions and are named in the manifest under "
+        "hcp_nppes_practice_state; anything above 2 is new drift.",
+    ),
+    (
+        "institution_state paired with its source",
+        "select count(*) from hcps_v2 where (institution_state is null) "
+        "<> (institution_state_source is null)",
+        "a value with no source is a provenance split gone decorative; a source with no "
+        "value is a claim about the origin of nothing. Expected 0.",
+    ),
+    (
+        "themes tag resolvable for every TA",
+        "select count(*) from therapeutic_areas where themes_tag is null",
+        "hcp_research_themes_v2 is keyed by therapeutic_areas.themes_tag; a null tag makes "
+        "that TA's themes unreadable from every consumer. Expected 0.",
+    ),
+)
+
+
+def report_data_invariants(reader) -> list:
+    """-> [(name, count, note)]. Never raises: a broken invariant check must not stop a run."""
+    out = []
+    for name, sql, note in DATA_INVARIANTS:
+        try:
+            row = reader.one(sql, {})
+            out.append((name, int(list(row.values())[0]) if row else None, note))
+        except Exception as exc:  # noqa: BLE001 -- a missing column is itself the finding
+            out.append((name, None, f"could not measure: {exc}"))
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1067,6 +1118,7 @@ def main() -> int:
                      if ref_row and ref_slug != args.ta else None)
         results = [assess(e, manifest, args.ta, reader, binds, ref_binds)
                    for e in manifest["artifacts"]]
+        invariants = report_data_invariants(reader)
     except ManifestError as exc:
         print(f"MANIFEST ERROR: {exc}", file=sys.stderr)
         return 2
@@ -1080,6 +1132,13 @@ def main() -> int:
                   "object_kind"):
             if k in src:
                 r[k] = src[k]
+
+    for name, count, note in invariants:
+        if count is None:
+            print(f"DATA INVARIANT  {name}: NOT MEASURED -- {note}", file=sys.stderr)
+        elif count:
+            print(f"DATA INVARIANT  {name}: {count:,} row(s) violate it -- {note}",
+                  file=sys.stderr)
 
     plan, dangling = build_plan(results, manifest)
     counts = {s: sum(1 for r in results if r["state"] == s) for s in STATE_ORDER}

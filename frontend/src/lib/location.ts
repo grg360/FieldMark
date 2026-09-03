@@ -46,6 +46,77 @@ export interface LocationDisplay {
 
 export const LOCATION_ABSENT_LABEL = "LOCATION UNKNOWN";
 
+/** Shown when neither an NPPES state nor an institution state nor a country exists. */
+export const PRACTICE_STATE_ABSENT_LABEL = "LOCATION NOT ESTABLISHED";
+
+export type StateBasis = "nppes" | "institution" | null;
+
+export interface PracticeStateInput {
+  /** hcps_v2.nppes_practice_state — a practice registration. Only this is a claim
+   *  about where the person WORKS. */
+  nppesPracticeState?: string | null;
+  /** hcps_v2.derived_state — also NPPES-sourced; 0.4% populated, kept for the rows
+   *  that have it. Treated as the same tier as nppesPracticeState. */
+  derivedState?: string | null;
+  /** hcps_v2.institution_state — where their INSTITUTION is. Not a practice location. */
+  institutionState?: string | null;
+  /** hcps_v2.institution_state_source — 'institution_ror_confirmed' | 'legacy_nppes_column' */
+  institutionStateSource?: string | null;
+}
+
+export interface PracticeStateDisplay {
+  /** The bare code, for comparisons and filters. Never carries the qualifier. */
+  code: string | null;
+  basis: StateBasis;
+  /** Ready-to-render: "TX", "TX · INSTITUTION", or "" when there is no state at all.
+   *  Empty rather than the absence phrase, because most callers fall back to a country
+   *  before giving up — see PRACTICE_STATE_ABSENT_LABEL for the end of that chain. */
+  label: string;
+}
+
+/**
+ * THE ONLY PLACE A PRACTICE STATE IS TURNED INTO A DISPLAY STRING.
+ *
+ * A CALL SITE THAT FORMATS ITS OWN LOCATION IS A DEFECT. Five sites read these columns
+ * and, before this function, each would have grown its own qualifier — which is precisely
+ * how one therapeutic-area tag became four different spellings across four call sites and
+ * put eight EGFR-mutant lung papers under a colorectal heading. One formatter, or they
+ * drift; there is no third outcome.
+ *
+ * WHY THE QUALIFIER IS NOT OPTIONAL. hcps_v2 carried 14,678 rows whose
+ * nppes_practice_state held an INSTITUTION's state (Northwestern IL, Johns Hopkins MD)
+ * with no NPI behind it, and every surface displayed those as practice locations and
+ * filtered territory by them. The 2026-09-02 split moved them to institution_state. The
+ * split is only worth anything if the difference REACHES THE READER: a silent
+ * `nppesPracticeState ?? institutionState` is the original defect with extra steps.
+ *
+ * `code` is deliberately separate from `label`. Anything comparing a state to a code —
+ * a filter, a territory test, a group-by — uses `code`; only rendering uses `label`.
+ * Gluing "· INSTITUTION" onto the value would break the former and cannot be parsed back.
+ */
+export function resolvePracticeState(input: PracticeStateInput): PracticeStateDisplay {
+  const nppes = (input.nppesPracticeState ?? input.derivedState ?? "").trim().toUpperCase();
+  if (nppes) return { code: nppes, basis: "nppes", label: nppes };
+
+  const institution = (input.institutionState ?? "").trim().toUpperCase();
+  if (institution) {
+    return { code: institution, basis: "institution", label: `${institution} · INSTITUTION` };
+  }
+  return { code: null, basis: null, label: "" };
+}
+
+/**
+ * The profile's sentence, not a chip suffix. Returns null when nothing needs saying.
+ *
+ * A chip has room for a qualifier and no room for a reason. On a profile the reader is
+ * looking at one person and the honest statement is longer than two words: this record has
+ * no practice registration, so the location is their institution's, not theirs.
+ */
+export function practiceStateNote(basis: StateBasis, stateCode: string | null): string | null {
+  if (basis !== "institution" || !stateCode) return null;
+  return `No NPI is on record for this HCP, so where they practise is not established — ${stateCode} is where their institution is, not where they have been shown to practise.`;
+}
+
 function normConfidence(raw?: string | null): AffiliationConfidence {
   switch ((raw ?? "").toLowerCase()) {
     case "high":

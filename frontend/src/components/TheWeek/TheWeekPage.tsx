@@ -14,6 +14,7 @@
 // No fabricated events; social silence is stated as our coverage, not theirs.
 
 import { useEffect, useMemo, useState } from "react";
+import { resolvePracticeState } from "../../lib/location";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
@@ -77,7 +78,15 @@ async function loadTrackedPeople(userId: string): Promise<TrackedPerson[]> {
   const [{ data: hcps }, { data: ranks }] = await Promise.all([
     supabase
       .from("hcps_v2")
-      .select("id, first_name, last_name, institution_canonical, institution_normalized, nppes_practice_state")
+      // DIRECT TABLE READ, NOT AN RPC (2026-09-02). This select goes straight at hcps_v2, so
+      // none of the 23 functions that were changed for the state-provenance split reaches it.
+      // institution_state has to be requested here explicitly or this surface silently loses
+      // every institution-placed location when block 7 clears the old column.
+      //
+      // THE RPC LAYER IS NOT A BOUNDARY. Any future column-level guarantee has to account for
+      // reads like this one; recorded in the completeness manifest against
+      // hcp_nppes_practice_state.
+      .select("id, first_name, last_name, institution_canonical, institution_normalized, nppes_practice_state, institution_state")
       .in("id", ids),
     supabase.from("hcp_rising_star_ranks_v3").select("hcp_id, us_rank").in("hcp_id", ids).not("us_rank", "is", null),
   ]);
@@ -95,13 +104,17 @@ async function loadTrackedPeople(userId: string): Promise<TrackedPerson[]> {
       institution_canonical: string | null;
       institution_normalized: string | null;
       nppes_practice_state: string | null;
+      institution_state: string | null;
     };
     return {
       hcp_id: r.id,
       relationship_id: null,
       name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim() || "Unknown",
       institution: r.institution_canonical ?? r.institution_normalized ?? null,
-      state: r.nppes_practice_state ?? null,
+      state: resolvePracticeState({
+        nppesPracticeState: r.nppes_practice_state,
+        institutionState: r.institution_state,
+      }).label || null,
       us_rank: rankMap.get(r.id) ?? null,
     };
   });

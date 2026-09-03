@@ -1,4 +1,5 @@
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { resolvePracticeState, practiceStateNote } from "../../lib/location";
 // Rising star profile — the third profile surface, keyed on rising board
 // membership (ProfileDispatch: rising board → academic spine → community).
 // Layout authority: docs/design/Rising Surface.dc.html (three profile states:
@@ -387,7 +388,19 @@ export default function RisingHcpProfile({ hcpId, taId, taSlug }: { hcpId: strin
 
   const composite = p.rising.rising_star_percentile;
   const career = careerYears(p.hcp.career_first_pub_year);
-  const geo = p.hcp.nppes_practice_state || p.hcp.country || "GEOGRAPHY NOT ON RECORD";
+  // GEOGRAPHY, THREE CASES (2026-09-02). This was
+  // `nppes_practice_state || country || "GEOGRAPHY NOT ON RECORD"`, which was right while
+  // nppes_practice_state meant "a practice registration". It stopped being right when
+  // 14,678 rows turned out to hold an INSTITUTION's state in that column, and it will read
+  // wrong in a new way after the block-7 clear: the absence string would start firing for
+  // people who DO have a location and merely lack a supportable one. Those are different
+  // facts and get different sentences.
+  const geoState = resolvePracticeState({
+    nppesPracticeState: p.hcp.nppes_practice_state,
+    institutionState: (p.hcp as { institution_state?: string | null }).institution_state,
+  });
+  const geo = geoState.label || p.hcp.country || "GEOGRAPHY NOT ON RECORD";
+  const geoNote = practiceStateNote(geoState.basis, geoState.code);
   const m = p.momentum;
   const nw = p.network;
   const insideWindow = usRank != null && usRank <= 100;
@@ -585,6 +598,15 @@ export default function RisingHcpProfile({ hcpId, taId, taSlug }: { hcpId: strin
                   {career != null ? `${career} YR CAREER AGE` : "CAREER AGE NOT ON RECORD"}
                 </span>
               </div>
+              {/* F2: A SENTENCE, NOT A CHIP SUFFIX. The chip already carries "· INSTITUTION",
+                  which says WHICH source; it has no room to say what that means. On a profile
+                  the reader is looking at one named person, and the honest statement is that
+                  this record has no practice registration at all. */}
+              {geoNote ? (
+                <div style={{ marginTop: 6, maxWidth: 620, textAlign: isMobile ? "center" : "left" }}>
+                  <span style={{ ...serif(11, MUT3, 1.5) }}>{geoNote}</span>
+                </div>
+              ) : null}
               <div style={{ marginTop: 5, ...mono(9, DIM2, 0.13) }}>
                 · {p.hcp.npi_number ? "VERIFIED NPI REGISTRY" : "NPI NOT ON RECORD"}
               </div>

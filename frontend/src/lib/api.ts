@@ -77,8 +77,15 @@ function resolveRpcScopeParams(filters: FilterState): RpcScopeParams {
 
   const scopeIncludesUs = scopeValues.includes("US");
   // National mode (the default) sends no state filter, so all US HCPs surface —
-  // including the ~68% with a null nppes_practice_state and DC-based HCPs. A
+  // including the ~72% with a null nppes_practice_state and DC-based HCPs. A
   // specific-state selection (national=false) narrows to those states.
+  //
+  // 68% -> 72% ON 2026-09-02, and the reason matters more than the number. The
+  // state-provenance split moved 14,676 institution-derived values out of
+  // nppes_practice_state into institution_state, so the share of US HCPs with no
+  // NPPES-sourced state ROSE without anyone losing a fact. This is why national mode
+  // must keep sending no state filter: a state-filtered query now asks a strictly
+  // narrower question than most callers assume.
   const states =
     !filters.national && filters.states && filters.states.length > 0 && scopeIncludesUs
       ? filters.states.map((s) => s.toUpperCase())
@@ -185,6 +192,7 @@ async function enrichAndMapCohortRows(
           nppes_career_stage_years,
           nppes_practice_city,
           nppes_practice_state,
+          institution_state,
           nppes_practice_setting,
           nppes_practice_zip,
           npi_number,
@@ -543,6 +551,11 @@ async function enrichAndMapCohortRows(
         nppes_career_stage_years: rr.nppes_career_stage_years ?? hcp.nppes_career_stage_years,
         nppes_practice_city: rr.nppes_practice_city ?? hcp.nppes_practice_city,
         nppes_practice_state: rr.nppes_practice_state ?? hcp.nppes_practice_state,
+        // Carried alongside, never merged INTO nppes_practice_state (2026-09-02). The two
+        // are different claims: one is a practice registration, the other is where their
+        // institution is. resolvePracticeState decides which to show and says which it was.
+        // A value that stops at the fetch is the same blank as no value at all.
+        institution_state: rr.institution_state ?? hcp.institution_state,
         nppes_practice_setting: rr.nppes_practice_setting ?? hcp.nppes_practice_setting,
         npi_specialty: rr.npi_specialty ?? hcp.npi_specialty,
         cohort_classification: cohort,
@@ -1161,6 +1174,10 @@ function mapRisingStarRow(row: any, therapeuticArea: string): RisingStar {
       hcp.nppes_practice_state != null && String(hcp.nppes_practice_state).trim() !== ""
         ? String(hcp.nppes_practice_state)
         : null,
+    institution_state:
+      hcp.institution_state != null && String(hcp.institution_state).trim() !== ""
+        ? String(hcp.institution_state)
+        : null,
     nppes_practice_setting:
       hcp.nppes_practice_setting != null && String(hcp.nppes_practice_setting).trim() !== ""
         ? String(hcp.nppes_practice_setting)
@@ -1336,6 +1353,36 @@ export async function fetchHcpThemes(hcpId: string, themesTag: string): Promise<
  * it. Naming the SCOPE of the run needs a producer fact the frontend does not have -- see
  * the themes_scope follow-up -- so the copy names the boundary without inventing a figure.
  */
+/**
+ * HCPs in this TA that a STATE FILTER CANNOT REACH, because they have no NPPES-sourced
+ * practice state.
+ *
+ * The get_*_filtered family deliberately did NOT gain p_include_institution_placed in the
+ * 2026-09-02 release: those are 13 independent implementations whose _filtered/_count pairs
+ * already differ only by a trailing uuid[], and a defaulted trailing boolean on both halves
+ * is how PostgREST overload resolution goes ambiguous. Only board_established and
+ * board_rising took the parameter.
+ *
+ * So on those surfaces a state filter silently shows fewer people than the user expects —
+ * 272 fewer in Texas alone across the established boards. This count is what lets the UI say
+ * so instead of leaving a gap. It is the honest denominator for "and are not shown".
+ */
+export async function countWithoutPracticeState(taSlug: string): Promise<number | null> {
+  const taId = taIdForApiSlug(taSlug);
+  if (!taId) return null;
+  const { data, error } = await supabase
+    .from("hcp_therapeutic_areas_v2")
+    .select("hcp_id, hcps_v2!inner(nppes_practice_state, country)")
+    .eq("therapeutic_area_id", taId)
+    .eq("hcps_v2.country", "US")
+    .is("hcps_v2.nppes_practice_state", null);
+  if (error) {
+    console.warn("countWithoutPracticeState:", error);
+    return null;
+  }
+  return (data ?? []).length;
+}
+
 export async function taHasAnyThemes(themesTag: string): Promise<boolean> {
   const { data, error } = await supabase
     .from("hcp_research_themes_v2")
@@ -1737,6 +1784,7 @@ export async function getHCPDetail(
           nppes_career_stage_years,
           nppes_practice_city,
           nppes_practice_state,
+          institution_state,
           nppes_practice_zip,
           nppes_practice_setting,
           is_verified_dol
@@ -4832,7 +4880,13 @@ async function getInstitutionsIndexUncached(
   for (const chunk of chunkInstitutionHcpIds(cohortHcpIds)) {
     const { data: hcps } = await supabase
       .from("hcps_v2")
-      .select("id, institution_canonical, institution_normalized, first_name, last_name, nppes_practice_state")
+      // institution_state is SELECTED BUT NOT USED IN THE AGGREGATION BELOW, deliberately.
+      // agg.states is a TERRITORY set, and an institution's own state is evidence of
+      // territory rather than a claim about where a person practises. Widening it here would
+      // do silently what board_established / board_rising made an explicit opt-in
+      // (p_include_institution_placed). The value is fetched so a reader that wants it does
+      // not have to re-query; using it is a separate, deliberate decision.
+      .select("id, institution_canonical, institution_normalized, first_name, last_name, nppes_practice_state, institution_state")
       .in("id", chunk);
     if (hcps) cohortHcps.push(...(hcps as CohortHcpRow[]));
   }
@@ -5022,7 +5076,9 @@ export async function getTopInstitutionsInTerritory(
     const chunk = allCohortIds.slice(i, i + CHUNK_SIZE);
     const { data: hcps } = await supabase
       .from("hcps_v2")
-      .select("id, first_name, last_name, institution_canonical, institution_normalized, nppes_practice_state")
+      // Same as above: fetched, not folded into the state filter on the next lines. That
+      // widening belongs with the board_* opt-in, not here.
+      .select("id, first_name, last_name, institution_canonical, institution_normalized, nppes_practice_state, institution_state")
       .in("id", chunk);
     (hcps ?? []).forEach((h) => {
       const state = h.nppes_practice_state

@@ -134,6 +134,7 @@ ta_facts:
   nsclc:
     rising_model: momentum                # scripts/score/rising_score.py:46
     themes_tag: NSCLC                     # extract_research_themes.py TA_CONFIGS
+    npi_coverage_target_agreed: false   # no agreed target exists for ANY TA; see community_scores.sufficiency
     buckets_key: NSCLC                    # upper(slug) -- what bucket_themes writes
     has_themes_config: true               # slug present in TA_CONFIGS (:152)
     themes_tag_matches_upper: true        # 'NSCLC' == 'NSCLC' -> G2 runs (pre_g2:519-529)
@@ -148,6 +149,7 @@ ta_facts:
   colorectal-cancer:
     rising_model: momentum                # scripts/score/rising_score.py:47
     themes_tag: COLORECTAL-CANCER
+    npi_coverage_target_agreed: false   # no agreed target exists for ANY TA; see community_scores.sufficiency
     buckets_key: COLORECTAL-CANCER
     has_themes_config: true
     themes_tag_matches_upper: true
@@ -162,6 +164,7 @@ ta_facts:
   atopic-dermatitis:
     rising_model: emergence_composite     # scripts/score/rising_score.py:48
     themes_tag: Atopic Dermatitis
+    npi_coverage_target_agreed: false   # no agreed target exists for ANY TA; see community_scores.sufficiency
     buckets_key: ATOPIC-DERMATITIS        # DIVERGES from themes_tag; the known AD defect
     has_themes_config: true
     themes_tag_matches_upper: false       # 'Atopic Dermatitis' != 'ATOPIC-DERMATITIS'
@@ -176,6 +179,7 @@ ta_facts:
   hepatology:
     rising_model: null                    # never migrated to the v3 rising pipeline
     themes_tag: null
+    npi_coverage_target_agreed: false   # no agreed target exists for ANY TA; see community_scores.sufficiency
     buckets_key: null
     has_themes_config: false              # no TA_CONFIGS entry -> argparse rejects it
     themes_tag_matches_upper: false
@@ -742,6 +746,56 @@ artifacts:
     target_table: hcp_community_scores_v2
     coverage_query: "select count(*) from hcp_community_scores_v2 where therapeutic_area_id = :ta_id"
     applicability: { unconditional: true }
+    sufficiency:
+      coverage_covered: >
+        select count(*) from hcp_community_scores_v2 c join hcps_v2 h on h.id = c.hcp_id
+        where c.therapeutic_area_id = :ta_id and h.country = 'US' and h.npi_number is not null
+      coverage_eligible: >
+        select count(*) from hcp_community_scores_v2 c join hcps_v2 h on h.id = c.hcp_id
+        where c.therapeutic_area_id = :ta_id and h.country = 'US'
+      coverage_threshold: 1.00
+      coverage_ratified: false
+      coverage_applies_when:
+        fact: npi_coverage_target_agreed
+        equals: true
+      coverage_basis: >
+        NPI COVERAGE OF THE US COMMUNITY COHORT, and it is the single number that says whether
+        a community cohort is worth building for a new TA. Everything the community surface
+        shows is Medicare-derived, and Medicare is keyed to a BILLING NPI: patient_volume,
+        the evidence tier, administered volume, the board's own qualifies test. An HCP with
+        no NPI is in the cohort and invisible to all of it.
+
+        Both queries read this TA's OWN data, with no reference TA and no cross-TA ratio.
+        Eligible is US residents because NPPES is a US registry; a non-US HCP without an NPI
+        is not a gap, and counting them would make an international cohort look broken
+        instead of foreign.
+      coverage_threshold_reasoning: >
+        THE THRESHOLD IS INERT BY CONSTRUCTION, and that is the point rather than an oversight.
+        npi_coverage_target_agreed is false for every TA, so coverage_applies_when never holds,
+        so measure_sufficiency (ta_completeness.py:670-711) reports the ratio with a NULL
+        threshold and the axis can never produce INSUFFICIENT. The 1.00 literal exists only
+        because <axis>_threshold is a required field; it is never compared against anything.
+        Flip the fact to true for a TA on the day someone agrees a real target for it.
+
+        NO TARGET IS PROPOSED HERE, AND NOT BECAUSE ONE IS PENDING. The four live TAs sit at 100.00,
+        100.00, 58.94 and 6.68 percent, and the spread is not quality -- it is provenance.
+        Hepatology and rare-disease were INGESTED FROM NPPES (a single directory batch on
+        2026-05-26), so every member has an NPI by construction and 100% measures the import,
+        not the enrichment. NSCLC is a publication-derived cohort that received 6,432 of those
+        directory rows. Colorectal is publication-derived and received one.
+
+        A threshold over those four numbers would be a line drawn through two different kinds
+        of cohort. Per the standing rule the axis PRINTS THE RATIO and never fires
+        INSUFFICIENT.
+      status_2026_09_02:
+        hepatology:        { covered: 20399, eligible: 20400, ratio: 1.0000, origin: nppes_ingested }
+        rare_disease:      { covered: 13298, eligible: 13298, ratio: 1.0000, origin: nppes_ingested }
+        nsclc:             { covered: 7691,  eligible: 13048, ratio: 0.5894, origin: publication_derived_plus_batch }
+        colorectal_cancer: { covered: 498,   eligible: 7454,  ratio: 0.0668, origin: publication_derived }
+      why_this_axis_exists: >
+        Nobody knew colorectal was at 6.68% until three days of tracing surfaced it, and by
+        then a code set, an aggregator run and a scoring pass had all been planned against a
+        cohort that cannot carry them. A new TA should learn this from the checker on day one.
     producer: { script: scripts/score/community_scoring.py, flags: ["--ta <slug>", "--execute"] }
     runs_in: generate_cycle:G7
     depends_on:
@@ -1618,6 +1672,355 @@ artifacts:
       --w-pharma is ever raised — and then it becomes a blocking one.
 
 # ─── by hand, outside both cycles ─────────────────────────────────────────────────────────
+
+# ─── the NPI chain: hand-run, and it gates the whole community cohort ─────────────────────
+#
+# Added 2026-09-02. Neither script below appears in ta_cycle, generate_cycle or (until now)
+# this manifest, yet nothing on the community surface works without them: Medicare is keyed
+# to a billing NPI, so no NPI means no patient_volume, no evidence tier, no administered
+# volume and no board qualification. See community_scores.sufficiency for the per-TA ratio.
+
+  - name: npi_match_proposals
+    kind: output
+    target_table: npi_match_proposals
+    coverage_query: "select count(*) from npi_match_proposals"
+    coverage_query_unsafe: false
+    key_form: none
+    key_note: >
+      NOT TA-SCOPED IN THE TABLE. The producer takes --ta, but nothing it writes records
+      which TA the run was for, so a per-TA coverage number cannot be recovered after the
+      fact. That is itself the gap: the run history is unreconstructable from the data.
+    applicability: { unconditional: true }
+    producer: { script: scripts/enrich/nppes_matcher.py, flags: ["--ta <slug>"] }
+    runs_in: none
+    depends_on:
+      - upstream: hcp_nppes_practice_state
+        gate: hard_fail
+        evidence: >
+          nppes_matcher.py:150 reads COALESCE(nppes_practice_state, derived_state) and
+          :105 indexes NPPES on (last_name_norm, practice_state). See the hard_stop recorded
+          on hcp_nppes_practice_state.known_defects.blocks.
+    producer_verified:
+      status: OK
+      checked: "2026-09-02"
+      method: static read of the producer source; never executed
+      flags: ["--ta <slug>"]
+    classification: blocked
+    status_2026_09_02:
+      rows: 20225
+      only_run: "2026-05-06"
+      match_status: { no_match: 14965, review_pending: 3015, ambiguous: 1641, matched_high: 598, matched_medium: 6 }
+    known_defects:
+      - id: proposals_orphaned_by_the_v2_rebuild
+        found: "2026-09-02"
+        severity: writes_to_ids_that_do_not_exist
+        where: "npi_match_proposals.hcp_id, and scripts/enrich/established_npi_resolver.py:322"
+        claim: >
+          ALL 20,225 PROPOSALS POINT AT PRE-REBUILD `hcps` IDS. Measured 2026-09-02: 20,225
+          resolve in the legacy `hcps` table and ZERO in hcps_v2. The single run predates the
+          v2 rebuild (proposals 2026-05-06; the earliest hcps_v2 row is 2026-05-22), so the
+          matcher has never run against the current tables for any TA.
+        why_it_is_a_trap: >
+          THIS ONE HAS A PERSON'S HAND ON IT. The proposals are an ADJUDICATION QUEUE: a human
+          reads a row, decides the match is right, and approves it. The write path,
+          established_npi_resolver.py:322, is
+          `UPDATE hcps_v2 SET npi_number = %s, npi_source = 'human' ...` and does not appear
+          to verify that the target id exists in hcps_v2. Approving this backlog therefore
+          spends human judgement on rows that cannot land, and does so silently -- an UPDATE
+          matching no row is not an error. The 3,015 review_pending and 1,641 ambiguous rows
+          are exactly the ones a person would work through first.
+        fix: >
+          Re-run the matcher against hcps_v2 and discard the 2026-05-06 backlog, or map the
+          legacy ids forward before anyone opens the queue. Do neither until the state
+          provenance separation lands: see the hard_stop on hcp_nppes_practice_state.
+
+  - name: established_npi_resolution
+    kind: output
+    target_table: hcps_v2
+    coverage_query: "select count(*) from hcps_v2 where npi_source = 'human'"
+    coverage_query_unsafe: false
+    key_form: none
+    key_note: "NOT TA-SCOPED in the data. The producer takes --ta; the write records no TA."
+    applicability: { unconditional: true }
+    producer:
+      script: scripts/enrich/established_npi_resolver.py
+      flags: ["--ta <slug>", "--execute"]
+    runs_in: none
+    depends_on:
+      - upstream: npi_match_proposals
+        gate: hard_fail
+        evidence: "it writes the approved rows from that queue"
+      - upstream: hcp_nppes_practice_state
+        gate: hard_fail
+        evidence: "same (last_name, state) index; the hard_stop applies to this script too"
+    producer_verified:
+      status: by_hand
+      checked: "2026-09-02"
+      method: >
+        static read. Two-phase and DELIBERATELY not automatable: phase one emits a proposals
+        CSV, a human approves rows, phase two writes only the approved file under --execute.
+        That is the correct shape for a write that attaches a real person's Medicare identity
+        to a record, and it is why this entry is by_hand rather than blocked.
+      note: >
+        NOT VERIFIABLE BY A COMMAND. --verify-producers can confirm the flags parse; it cannot
+        confirm the adjudication happened, and the adjudication is the control. Recorded as
+        by_hand so the checker stops reporting it as an unrun automatable step.
+      flags: ["--ta <slug>", "--execute"]
+    classification: founder_gated
+    status_2026_09_02: { rows_written_by_hand: 0, note: "npi_source='human' appears on no row; the queue has never been adjudicated" }
+
+# ─── geography: the chain nothing models ──────────────────────────────────────────────────
+#
+# Added 2026-09-02 while tracing why colorectal community NPI coverage is 0.96% against
+# nsclc's 15.60%. These four entries are the location chain. NONE was modelled before, which
+# is how a column four RPCs read and no script writes went unnoticed.
+#
+# THE CHAIN, AS BUILT:
+#   institution_geo_lookup        ROR -> (country_code, state_code, city). Has a producer.
+#   hcps_v2.current_country       affiliation re-derivation. Hand-run SQL, in neither cycle.
+#   hcps_v2.derived_state         NOTHING WRITES IT. 0.4% populated. Seven objects read it.
+#   hcps_v2.nppes_practice_state  NPPES-named, but 14,678 rows hold a state with no NPI, no
+#                                 zip, no taxonomy, no nppes_enriched_at -- an
+#                                 institution-derived value in an NPPES-named column.
+
+  - name: institution_geo_lookup
+    kind: input
+    target_table: institution_geo_lookup
+    coverage_query: "select count(*) from institution_geo_lookup where state_code is not null"
+    coverage_query_unsafe: false
+    key_form: none
+    key_note: >
+      NOT TA-SCOPED. One registry of institutions keyed by ROR id, shared by every TA. The
+      coverage_query is deliberately unfiltered; a per-TA number here would be a fiction.
+    applicability: { unconditional: true }
+    producer: { script: scripts/enrich/institution_geo_backfill_ror.py, flags: [] }
+    runs_in: none
+    depends_on: []
+    producer_verified:
+      status: OK
+      checked: "2026-09-02"
+      method: static read of the producer source; never executed
+      flags: []
+    classification: not_ta_scoped
+    status_2026_09_02: { rows: 7468, with_state_code: 7315, us_rows: 1893 }
+    known_defects:
+      - id: ror_id_format_mismatch
+        found: "2026-09-02"
+        severity: silent_zero_join
+        where: "institution_geo_lookup.ror_id vs hcps_v2.current_institution_ror"
+        claim: >
+          THE TWO COLUMNS HOLD THE SAME IDENTIFIER IN DIFFERENT FORMS. hcps_v2 stores a BARE
+          ROR id ('01jfd9z49'); institution_geo_lookup stores the FULL URL
+          ('https://ror.org/0000yrh61'). A natural join on the two returns ZERO rows, and
+          reads as "the registry does not cover these institutions" rather than as a format
+          mismatch. Measured both ways 2026-09-02: naive join 0 rows; with the prefix
+          stripped, the same query resolves 42,908 of colorectal's 50,801 stateless members.
+        fix: >
+          Normalise on read until one side is migrated -- strip the leading
+          https://ror.org/ from institution_geo_lookup.ror_id before comparing it to
+          hcps_v2.current_institution_ror.
+        note: "Recorded here because this is where the next person hits it."
+
+  - name: affiliation_rederivation
+    kind: output
+    target_table: hcps_v2
+    coverage_query: "select count(*) from hcps_v2 where current_country is not null"
+    coverage_query_unsafe: false
+    key_form: none
+    key_note: "NOT TA-SCOPED. Runs over all of hcps_v2; a per-TA number is a slice, not a run."
+    applicability: { unconditional: true }
+    producer:
+      script: sql/affiliation/00_snapshot.sql + 02_build_staging.sql + 03_apply.sql + 05_verify.sql
+      flags: []
+    runs_in: none
+    depends_on: []
+    producer_verified:
+      status: OK
+      checked: "2026-09-02"
+      method: static read of the SQL files; never executed
+      flags: []
+    classification: not_ta_scoped
+    note: >
+      HAND-RUN, IN NEITHER CYCLE. Steps 01 and 04 are skipped: 01_add_columns.sql is additive
+      DDL whose columns already exist, and 04_rising_board_current_country.sql repoints
+      rising_board()'s EU DISPLAY scope only (nsclc-hardcoded, read-time, us_rank untouched).
+      NEITHER SKIPPED STEP DERIVES STATE -- grepping all six files for 'state' returns only
+      SET statement_timeout. State derivation is a SEPARATE pass from affiliation derivation,
+      and it does not exist.
+    status_2026_09_02:
+      colorectal_community: { members: 52167, current_country_present: 51236 }
+      cross_check: >
+        current_country CONFIRMS country for colorectal rather than correcting it: country='US'
+        7,454 / current_country='US' 7,423 / effective 7,448. A third independent check -- ROR
+        country_code over the stateless members -- puts 5,749 in the US and 38,280 outside it.
+        Three sources agree to ~94%. The cohort really is ~14% US; the low US share is NOT an
+        artefact of unparsed affiliations.
+
+  - name: hcp_derived_state
+    kind: schema_gap
+    target_table: hcps_v2
+    coverage_query: "select count(*) from hcps_v2 where derived_state is not null"
+    coverage_query_unsafe: false
+    key_form: none
+    key_note: "NOT TA-SCOPED."
+    applicability: { unconditional: true }
+    runs_in: none
+    depends_on: []
+    producer_verified:
+      status: NO_PRODUCER_FOUND
+      checked: "2026-09-02"
+      method: >
+        grep for every write to hcps_v2.derived_state across scripts/, sql/ and migrations/.
+        The three candidate sites (targeted_nppes_enrichment.py:327, :371, :434) build an
+        in-memory work-item dict passed to search_nppes(). That script's only UPDATE payloads
+        (:736-742 v1, :782-790 v2) write npi_number, nppes_practice_address,
+        nppes_organization_npi, nppes_career_stage_years, nppes_enriched_at, npi_source and
+        npi_verified_at -- never derived_state. Every other match in the repo is a restore
+        INSERT.
+      flags: []
+    classification: schema_gap
+    status_2026_09_02: { hcps_v2_rows: 381329, derived_state_populated: 1479, pct: 0.4 }
+    note: >
+      A COLUMN THE SYSTEM READS AND NOTHING WRITES -- the clearest instance found so far.
+      Seven database objects read it; no producer exists anywhere in the repo; and it is
+      absent from ta_cycle, generate_cycle and (until this entry) this manifest.
+    readers:
+      display_and_territory:
+        - "board_established:62 -- COALESCE(nppes_practice_state, derived_state) = any(p_states): the TERRITORY FILTER"
+        - "board_established:95 -- ... as state: the ledger location chip"
+        - "board_rising:94 and :106 -- the same two uses"
+        - "community_hcp_profile:19 -- ... as state"
+        - "hcp_profile_brief_ta:25 -- ... as state"
+      dedup_merge_gates:
+        - "run_pass_7_openalex_state_merge:24,31 -- HAVING COUNT(DISTINCT derived_state) FILTER (WHERE derived_state IS NOT NULL) <= 1"
+        - "run_pass_7b_initialized_name_merge:29 -- the same gate"
+        - "run_pass_2_openalex_merge:35 -- array_agg(derived_state ...)"
+      frontend: "none directly; the app reads the RPCs above"
+    why_populating_it_is_not_safe: >
+      The display readers surface it AS A PRACTICE LOCATION and filter territory by it, so
+      writing an institution's state there makes the app assert where a physician practises
+      on the basis of where their university is. The dedup readers are worse: the gate is
+      "at most one DISTINCT non-null state", so a NULL today means NO DISAGREEMENT and the
+      pair merges on other evidence -- but populating the column turns two same-surname
+      records at one university into a CONFIRMED state agreement, converting a missing signal
+      into false corroboration on the merge path. Those three functions read the legacy
+      `hcps` table rather than hcps_v2, which bounds the blast radius today but not the
+      design. See hcp_nppes_practice_state.known_defects: this contamination has already been
+      committed once, in the column next door.
+
+  - name: hcp_nppes_practice_state
+    kind: input
+    target_table: hcps_v2
+    coverage_query: "select count(*) from hcps_v2 where nppes_practice_state is not null"
+    coverage_query_unsafe: false
+    key_form: none
+    key_note: "NOT TA-SCOPED."
+    applicability: { unconditional: true }
+    producer: { script: scripts/enrich/community_nppes_backfill.py, flags: ["--execute"] }
+    runs_in: none
+    depends_on: []
+    producer_verified:
+      status: PARTIAL
+      checked: "2026-09-02"
+      method: >
+        static read. The named producer writes this column from NPPES, but the column's
+        current contents do not all come from it -- see known_defects.
+      note: >
+        THE COMMAND IS KEPT BECAUSE IT IS STILL THE RIGHT PRODUCER, not because it accounts
+        for the column. community_nppes_backfill.py does write nppes_practice_state from a
+        real NPPES lookup, and re-running it is how a legitimate value gets there. What it
+        cannot explain is the 14,678 rows that hold a state with no NPI and no other NPPES
+        field -- those predate it and came from somewhere the repo no longer contains, most
+        likely the v1->v2 rebuild (the phase1/phase2 backup tables carry institution_state,
+        institution_state_code and state alongside derived_state). Removing the producer
+        would lose the one command that can repair the column; marking it OK would assert a
+        provenance the data contradicts.
+      flags: ["--execute"]
+    classification: not_ta_scoped
+    known_defects:
+      - id: institution_state_in_an_nppes_named_column
+        found: "2026-09-02"
+        severity: false_provenance
+        where: "hcps_v2.nppes_practice_state"
+        claim: >
+          14,678 hcps_v2 rows carry nppes_practice_state with npi_number NULL. In the
+          colorectal community slice (854 rows) EVERY ONE also has nppes_enriched_at NULL,
+          npi_specialty NULL, nppes_practice_zip NULL and npi_taxonomy NULL -- NPPES was never
+          consulted for them. The values are institution states: Northwestern -> IL, UNC
+          Chapel Hill -> NC, Johns Hopkins -> MD, Harvard -> MA, Dana-Farber -> MA, UT
+          Southwestern -> TX, Yale -> CT, Cedars-Sinai -> CA. Checked against the ROR
+          registry: of the 819 that resolve, 625 (76%) EXACTLY match the institution's
+          registry state and 194 differ.
+        consequence: >
+          nppes_matcher.py:150 reads COALESCE(nppes_practice_state, derived_state) and treats
+          the result as an NPPES-sourced state, indexing NPPES on
+          (last_name_norm, practice_state) at :105. An institution-derived state entering that
+          index at full confidence is exactly the mechanism that produces a confident match to
+          a DIFFERENT physician with the same surname, and writes that person's NPI.
+        no_npi_is_recoverable: >
+          Checked because 854 looked like "NPPES answered and the guarded write did not fire".
+          It is not that: no NPI was ever retained because none was ever found. Per TA --
+          nsclc 2,721, colorectal 854, hepatology 1 (the only genuinely enriched row),
+          rare-disease 0. Repo-wide 14,678, of which 2 have nppes_enriched_at.
+        enforced_by:
+          constraint: nppes_state_implies_npi
+          form: "CHECK (nppes_practice_state IS NULL OR npi_number IS NOT NULL) NOT VALID"
+          added_in: docs/2026_09_02_state_provenance_readers.sql (S6)
+          why_not_valid: >
+            NOT VALID skips the scan of existing rows but IS ENFORCED ON EVERY INSERT AND
+            UPDATE from the moment it exists, which is the whole requirement: no future
+            producer can reintroduce this class silently. A validating constraint was not
+            available, because two rows cannot satisfy it and their NPIs are unrecoverable.
+          grandfathered_rows:
+            note: >
+              NAMED HERE ON PURPOSE. NOT VALID records that exceptions exist without recording
+              WHICH, and whoever runs VALIDATE CONSTRAINT one day should not have to rediscover
+              them. Both carry real NPPES evidence (zip, taxonomy, specialty, nppes_enriched_at
+              2026-05-26) with no npi_number. The NPI is unrecoverable: neither has a row in
+              nppes_enrichment_log, npi_match_proposals or hcp_nppes_detail_v2, and neither has
+              an NPI-bearing twin, so they are not dedup residue either. Deleting them or
+              inventing an NPI to make the constraint pass would be worse than the exception.
+            rows:
+              - { id: "865eae68-5d72-474d-8434-1431d6a26715", name: "Pasi Antero Janne", state: MA, zip: "02115", taxonomy: 207RX0202X }
+              - { id: "236b29a2-4403-447f-b86d-92278f265764", name: "Kuchikula Reddy", state: PA, zip: "191045127", taxonomy: 207RG0100X }
+          companion_constraint:
+            name: institution_state_has_a_source
+            form: "CHECK ((institution_state IS NULL) = (institution_state_source IS NULL))"
+            validated: true
+            why_both_directions: >
+              A value with no source is a provenance split that has gone decorative; a source
+              with no value is a claim about the origin of nothing. Measured 2026-09-02: zero
+              of each, so this one validates fully.
+        fix: >
+          Separate provenance from value, the way npi_source already does for npi_number.
+          SQL drafted 2026-09-02 at docs/2026_09_02_state_provenance_separation.sql: move the
+          uncorroborated values to hcps_v2.institution_state with institution_state_source,
+          leaving nppes_practice_state holding only what its name claims. NOT RUN.
+        blocks:
+          - id: nppes_matcher_must_not_run_first
+            blocks_producer: scripts/enrich/nppes_matcher.py
+            severity: hard_stop
+            claim: >
+              DO NOT RUN nppes_matcher.py UNTIL THE SEPARATION LANDS. The matcher reads
+              COALESCE(nppes_practice_state, derived_state) at :150 and indexes NPPES on
+              (last_name_norm, practice_state) at :105, treating the result as an
+              NPPES-sourced fact. Today 14,676 rows feed an institution's state into that
+              index at full confidence.
+            why_the_order_matters: >
+              THE DIFFERENCE IS A WRONG LABEL VERSUS A WRONG NPI. Left alone, the defect is a
+              location chip that overstates what the system knows -- visible, reversible, and
+              wrong about nobody in particular. Run the matcher over it and a wrong state
+              produces a confident match to a DIFFERENT physician with the same surname, whose
+              npi_number is then written to this row, pulling that person's Medicare claims
+              and payments onto a named individual's profile. Measured 2026-09-02: of the
+              5,749 colorectal members an institution state would place, 480 already collide
+              on (surname, state) inside FieldMark's own corpus; NPPES is orders of magnitude
+              larger, so the real collision rate is higher.
+            clears_when: >
+              docs/2026_09_02_state_provenance_separation.sql has run and its block 8 verify
+              reports state_without_npi = 2, AND nppes_matcher.py has been changed to carry
+              provenance rather than a bare string (see the entry's fix).
+
 
   - name: trial_ta_mapping
     kind: output

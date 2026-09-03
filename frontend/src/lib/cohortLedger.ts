@@ -25,7 +25,7 @@
 import { supabase } from "./supabase";
 import { apiSlugForTaId } from "./api";
 import { statesFromTerritory } from "./filter-context";
-import { resolveLocation } from "./location";
+import { resolveLocation, resolvePracticeState, PRACTICE_STATE_ABSENT_LABEL } from "./location";
 import type { LedgerRegion } from "./ledgerRegions";
 
 export type ColKind = "pct" | "money" | "count";
@@ -650,7 +650,26 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, 
 
   let chips: string[];
   if (cfg.tag === "COM") {
-    const loc = [titleCase(S(r.city)), S(r.state)].filter(Boolean).join(", ");
+    // community_ledger is not in this release's RPC changes, so it sends no state_basis and
+    // this reads exactly as before. Routed through the shared formatter anyway so it picks
+    // the qualifier up for free when that RPC gains one.
+    const comState = resolvePracticeState({
+      nppesPracticeState: S(r.state_basis) === "institution" ? null : S(r.state),
+      institutionState: S(r.state_basis) === "institution" ? S(r.state) : null,
+    }).label;
+    // CITY IS NOT SUBSTITUTED, DELIBERATELY (2026-09-02). r.city is community_ledger's
+    // nppes_practice_city, and block 7 nulls it for 2,436 rows, so this chip will lose its
+    // city for those people. DO NOT REACH FOR institution_city TO FILL THE GAP. That column
+    // holds a mixture nothing can reliably separate: of 2,436 values only 96 have a ROR city
+    // to check against and just 15 agree, 740 are over 30 characters, and 1,286 contain an
+    // organisation word -- "Memorial Sloan Kettering Cancer Center", "Ltd", "Inserm CIC 1413"
+    // sit beside real cities like San Diego and Durham. The substring test that looks
+    // decisive is not: "San Diego" is inside "University of California, San Diego" too.
+    //
+    // A missing city is an absence. A wrong city is a false claim about where someone works.
+    // City returns when it is DERIVED from the ROR registry rather than salvaged --
+    // attach_institution_city (targeted_nppes_enrichment.py:228-263) already does exactly that.
+    const loc = [titleCase(S(r.city)), comState].filter(Boolean).join(", ");
     chips = [S(r.specialty), loc].filter(Boolean);
   } else {
     const inst = S(r.institution);
@@ -658,8 +677,19 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, 
     // the country this row is placed by — so a European KOL reads "GERMANY · Charité"
     // instead of losing their location entirely to a US-only NPPES field. Hedged via
     // lib/location.ts: a location we cannot confirm is current carries its evidence year.
-    const state = S(r.state);
-    let place = state;
+    // LOCATION CHIP, THREE STATES (2026-09-02). The RPC now sends `state` alongside
+    // `state_basis` ('nppes' | 'institution' | null) because 14,678 hcps_v2 rows carried an
+    // INSTITUTION's state in an NPPES-named column and this chip presented it as a practice
+    // location. The qualifier is not decoration: without it the two cases are
+    // indistinguishable on screen, which is the defect.
+    //
+    // NEVER COALESCE THE TWO SOURCES INTO ONE STRING. A silent fallback reinstates exactly
+    // the lie the column split removed; the basis has to reach the reader.
+    const ps = resolvePracticeState({
+      nppesPracticeState: S(r.state_basis) === "institution" ? null : S(r.state),
+      institutionState: S(r.state_basis) === "institution" ? S(r.state) : null,
+    });
+    let place = ps.label;
     if (!place) {
       const loc = resolveLocation({
         country: S(r.scored_country) || S(r.country),
@@ -672,6 +702,10 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, 
       const placed = S(r.scored_country) || loc.code || "";
       place = placed && loc.hedged && loc.asOf ? `${placed} · ${loc.asOf}` : placed;
     }
+    // NO STATE AND NO COUNTRY. Previously the chip slot simply vanished and the row showed
+    // its institution alone, which reads as "somewhere" rather than as "not recorded". After
+    // the provenance split this case gets more common, so it gets a sentence instead of a gap.
+    if (!place) place = PRACTICE_STATE_ABSENT_LABEL;
     chips = [place, inst].filter(Boolean);
   }
 
@@ -990,6 +1024,7 @@ export async function loadLedgerPage(
   tiers?: string[],
   states?: string[],
   countries?: string[],
+  includeInstitutionPlaced?: boolean,
 ): Promise<LedgerData & { hasMore: boolean }> {
   // COM's roster RPC takes the composite cursor + p_tiers (default anchored+supported
   // when omitted) and returns filtered_total alongside cohort_total. EST/RS RPCs take
@@ -1012,6 +1047,18 @@ export async function loadLedgerPage(
   // held deliberately: ~50% of that board has no country signal at all). Omitted =
   // the RPCs' DEFAULT '{US}', so an unset country axis behaves exactly as before.
   if (cfg.tag !== "COM" && countries && countries.length) args.p_countries = countries;
+  // TERRITORY OPT-IN (2026-09-02). board_established / board_rising gained
+  // p_include_institution_placed, DEFAULT FALSE: p_states matches an NPPES-sourced state
+  // only, unless this says otherwise. Sent ONLY when true and only for EST/RS, because an
+  // unknown named argument makes the RPC unresolvable through PostgREST — the same trap
+  // p_ta_id and p_tiers document above, and community_ledger has no such parameter.
+  //
+  // FALSE IS THE HONEST DEFAULT. An institution's state is evidence of territory and not a
+  // claim about the individual, so widening the filter is the operator's choice to accept
+  // weaker evidence, not something handed to them silently. When it is on, those rows still
+  // carry the · INSTITUTION qualifier in the chip, so the basis travels with the row rather
+  // than living in a filter setting nobody remembers setting.
+  if (cfg.tag !== "COM" && includeInstitutionPlaced) args.p_include_institution_placed = true;
   // p_ta_id goes to the board_* RPCs only. community_ledger does not accept it, and an
   // unknown named argument makes the RPC unresolvable through PostgREST -- the same trap
   // the p_after_rank / p_tiers split above documents.
