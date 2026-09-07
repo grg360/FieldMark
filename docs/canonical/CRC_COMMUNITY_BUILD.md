@@ -236,6 +236,98 @@ and §C; this build is that design's first consumer.
   board.
 - Every empty modality must say which absence it is.
 
+## PROVENANCE OF EVERY TA LINK — MEASURED 2026-09-03
+
+`hcp_therapeutic_areas_v2.source` added, backfilled read-only, not yet applied.
+Two values, because there are exactly two writers of that table:
+`ta_tagging_rebuild_v2.py` (publication concepts) and `nppes_workstream_b_ingest.py`
+(NPPES taxonomy). A third value would be wider than the evidence.
+
+| | rows | share |
+|---|---|---|
+| `publication` | 343,925 | 87.7% |
+| `nppes_taxonomy` | 40,119 | 10.2% |
+| NULL — could not determine | 8,320 | 2.1% |
+| **total** | **392,364** | |
+
+| TA | links | publication | nppes_taxonomy | unknown |
+|---|---|---|---|---|
+| hepatology | 170,189 | 149,586 | 20,393 | 210 |
+| colorectal-cancer | 106,551 | 106,550 | 0 | 1 |
+| nsclc | 86,436 | 75,882 | 6,432 | 4,122 |
+| atopic-dermatitis | 15,846 | 11,907 | 0 | 3,939 |
+| rare-disease | 13,342 | **0** | 13,294 | 48 |
+
+**Three findings here matter more than the backfill itself.**
+
+**`rare-disease` has zero publication-derived links.** Its entire 13,342-link population is a
+specialty-code assertion with no publication evidence behind any of it. If that TA is ever taken
+live, that is where it starts.
+
+**`nsclc` carries 4,122 links of undeterminable basis — 4.8% of the reference TA.** NSCLC is the
+regression oracle and the parity template for every subsequent build. One link in twenty in it has
+unknown provenance.
+
+**The `nppes_taxonomy` backfill is an elimination, not a record.** Workstream B left no log, so the
+value was written only where the elimination is airtight: has an NPI, zero corpus publications,
+zero career pubs — unreachable by the publication-concept writer, leaving one candidate. It agrees
+with the writer-side count of 6,432 for nsclc. Two independent derivations agreeing is what makes
+the rest credible.
+
+The 8,320 NULLs stay NULL. 8,219 are HCPs with publications, none tagged to this TA — could be a
+taxonomy assertion onto a publishing physician, or a publication tag rewritten since (three backup
+tables in this schema are evidence that re-tagging happens). 85 have no publications and no NPI.
+16 have `total_career_pubs > 0` but no `publication_authors_v2` rows. **NULL means unknown. It is
+never a default and never written deliberately.**
+
+### The constraint
+
+```sql
+ALTER TABLE public.hcp_therapeutic_areas_v2
+  ADD CONSTRAINT hcp_ta_v2_source_known_value_or_unknown
+  CHECK (source IS NULL OR source IN ('publication', 'nppes_taxonomy'));
+```
+
+Not `NOT VALID`, and it does not need to be: the column is added in the same transaction and
+starts entirely NULL, so all 392,364 rows satisfy it at creation. It validates immediately and is
+enforced from that moment, with **no grandfathered cohort left to detonate on a later UPDATE** —
+which is exactly what `nppes_state_implies_npi` did to the city clear on 2026-09-02
+(`docs/state_provenance/13b_clear_city.sql`, resolved in `18_replace_constraint.sql`).
+
+`source IS NULL OR …` is the load-bearing clause. It makes the 8,320 undetermined rows legal
+rather than violations.
+
+The constraint was renamed from `hcp_ta_v2_source_vocab`, which read as "this column holds a value
+from the vocabulary" — overstating what it checks. The name now states the true, weaker rule.
+Same discipline as `nppes_state_has_nppes_provenance`.
+
+## THE AD LANDMINE — DEFUSED, RECORDED
+
+`nppes_workstream_b_ingest.py` had **no TA selector**. It processed the union of every TA config
+with a non-empty `taxonomies` list. Running it for colorectal today would also have created
+**17,296 Atopic Dermatitis records** — a deprioritised TA whose 15,846 links came from a different
+script entirely (`ingest_community_dermatologists.py`), arriving unannounced under a run nobody
+asked for.
+
+`--ta` is now required, has no default, and takes exactly one TA per run, resolved before the
+parquet load so a bad invocation fails in under a second. A CRC run cannot reach AD. Missing flag,
+unknown slug, and empty-taxonomies all fail with a message naming what is wrong; the
+empty-taxonomies message points at founder inputs #1 and #2 in this document and refuses to guess.
+
+Verified: the NSCLC control re-run under `--ta nsclc` returns byte-identical numbers to the union
+run (7,233 matching, 2 new records, 104 TA links) with Atopic Dermatitis absent. The flag scopes
+the work without changing the answer.
+
+**The general lesson for `TA_NEW_PLAYBOOK.md`:** a pipeline script that loops every configured TA
+is a landmine the moment a second TA exists. One TA per run, named explicitly, no default.
+
+### About those 104
+
+104 existing NSCLC HCPs lack an nsclc link and would gain one. **103 of them have publications** —
+so their corpus record did not place them in NSCLC, and a taxonomy code would. That is founder
+input #1 in miniature: *treat* versus *could*. With `--ta` in place they are written only if
+someone deliberately runs nsclc, so nothing forces that decision now.
+
 ## FOUNDER INPUTS REQUIRED
 
 These stop the build until answered. Nothing downstream of them can be guessed.

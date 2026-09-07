@@ -4,6 +4,39 @@ Ingest Workstream B community HCPs from NPPES Parquet into hcps + hcp_therapeuti
 Requires SUPABASE_URL, SUPABASE_KEY in environment (.env OK via load_dotenv).
 
 Run manually after applying schema SQL migrations.
+
+TWO OUTCOMES, NOT ONE (changed 2026-09-06, CRC_COMMUNITY_BUILD.md phase 1)
+--------------------------------------------------------------------------
+This script used to treat "this NPI already has an hcps record" as "nothing to
+do." That is correct for the first TA ever ingested and wrong for every one
+after it: a physician already in the database under one TA, who also carries a
+second TA's taxonomy code, was dropped by the skip and never got the second
+TA's link. The population read as absent when it was only unlinked -- which is
+the whole reason a hand-written INSERT...SELECT backfill looked necessary.
+
+Now:
+  to_create  no record for this NPI  -> insert the record and all its TA links
+  to_link    record exists           -> add ONLY the TA links it is missing
+
+ADD-ONLY. An existing link is never rewritten and never deleted. publication_count
+and a publication-derived `source` on a link this script did not create are not
+ours to touch. That is also what makes re-running a no-op: a link either already
+exists (skip) or does not (add once).
+
+Both outcomes are logged to nppes_enrichment_log_v2 under DISTINCT match_reason
+prefixes (LOG_REASON_CREATED / LOG_REASON_LINKED) -- creating a person and
+asserting a disease area about an existing person are different events with
+different risk, and the counts must stay separable afterwards.
+
+Every link this script writes carries source='nppes_taxonomy'. Applying
+docs/crc_community/01_ta_link_source.sql is a prerequisite for --execute.
+
+ONE TA PER RUN. --ta is required and has no default. The script used to process
+the union of every config carrying a taxonomy set, so a colorectal run would also
+have created 17,296 Atopic Dermatitis records -- a decision nobody made, arriving
+unannounced inside another TA's build.
+
+MODE: --dry-run is the DEFAULT. Writes require an explicit --execute.
 """
 
 from __future__ import annotations
@@ -40,6 +73,26 @@ BATCH_TA = 500
 RETRY_CHUNK = 250
 PROGRESS_EVERY = 1000
 PREFLIGHT_PAGE_SIZE = 1000
+
+# hcp_therapeutic_areas_v2.source -- how the link was derived. Two values only,
+# because there are only two writers of that table: ta_tagging_rebuild_v2.py
+# (publication concepts) and this script (NPPES taxonomy). NULL means unknown and
+# is never written deliberately. DDL + backfill: docs/crc_community/01_ta_link_source.sql
+LINK_SOURCE_TAXONOMY = "nppes_taxonomy"
+
+# nppes_enrichment_log_v2.match_reason prefixes. "A record was created" and "an
+# existing record gained a TA link" are different events with different risk, and
+# the counts have to be separable after the fact -- hence two stable prefixes
+# rather than one reason with a flag buried in the JSON.
+LOG_REASON_CREATED = "workstream_b: new HCP record created from NPPES taxonomy match"
+LOG_REASON_LINKED = "workstream_b: TA link added to existing HCP record from NPPES taxonomy match"
+
+# Not a probabilistic match. Identity here IS the NPI, taken from the registry, so
+# 'high_confidence'/'ambiguous' (this script's siblings' vocabulary) would both
+# misdescribe it.
+LOG_CONFIDENCE = "registry_identity"
+
+LOG_BATCH = 500
 
 AFFILIATION_PROFILE: Dict[str, Any] = {
     "version": "v1.1",
@@ -112,9 +165,16 @@ def taxonomy_match_mask(df: pd.DataFrame, codes: Set[str]) -> pd.Series:
     return m
 
 
-def fetch_existing_npis(client: Client, target_version: str = "v1") -> Set[str]:
+def fetch_existing_npi_map(client: Client, target_version: str = "v1") -> Dict[str, str]:
+    """
+    npi -> hcp_id for every HCP that already has an NPI.
+
+    Used to be a Set[str] used only to skip. It has to be a map now: an NPI that
+    already has a record is not "nothing to do" -- it may still be missing this
+    TA's link, and adding that link needs the hcp_id.
+    """
     hcps_table = get_table_name("hcps", target_version)
-    existing: Set[str] = set()
+    existing: Dict[str, str] = {}
     offset = 0
     while True:
         response = (
@@ -131,12 +191,38 @@ def fetch_existing_npis(client: Client, target_version: str = "v1") -> Set[str]:
         for row in batch:
             n = normalize_npi_digits(row.get("npi_number"))
             if n:
-                existing.add(n)
+                existing[n] = str(row["id"])
         offset += PREFLIGHT_PAGE_SIZE
         if len(batch) < PREFLIGHT_PAGE_SIZE:
             break
     print(f"Preflight: {len(existing):,} existing NPIs in hcps (non-null)")
     return existing
+
+
+def fetch_linked_hcp_ids(client: Client, ta_uuid: str, target_version: str = "v1") -> Set[str]:
+    """hcp_ids already linked to this TA. The idempotency guard for the link pass."""
+    ta_table = get_table_name("hcp_therapeutic_areas", target_version)
+    linked: Set[str] = set()
+    offset = 0
+    while True:
+        batch = (
+            client.table(ta_table)
+            .select("hcp_id")
+            .eq("therapeutic_area_id", ta_uuid)
+            .order("hcp_id")
+            .range(offset, offset + PREFLIGHT_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            linked.add(str(row["hcp_id"]))
+        offset += PREFLIGHT_PAGE_SIZE
+        if len(batch) < PREFLIGHT_PAGE_SIZE:
+            break
+    return linked
 
 
 def build_hcp_payload(
@@ -194,8 +280,16 @@ def ta_rows_for_hcp(
     hcp_id: str, ta_ids: Sequence[str], target_version: str = "v1"
 ) -> List[Dict[str, Any]]:
     if target_version == "v2":
+        # source: every link this script writes is asserted from an NPPES taxonomy
+        # code and nothing else -- no publication, no claim, no drug. It says so on
+        # the row. See docs/crc_community/01_ta_link_source.sql.
         return [
-            {"hcp_id": hcp_id, "therapeutic_area_id": tid, "publication_count": 0}
+            {
+                "hcp_id": hcp_id,
+                "therapeutic_area_id": tid,
+                "publication_count": 0,
+                "source": LINK_SOURCE_TAXONOMY,
+            }
             for tid in ta_ids
         ]
     return [{"hcp_id": hcp_id, "therapeutic_area_id": tid, "strength_score": None} for tid in ta_ids]
@@ -252,6 +346,96 @@ def insert_batch(
         return 0
 
 
+def log_rows_for_created(
+    hcp_id: str, npi: str, ta_slugs: Sequence[str], codes: Sequence[str], ts_iso: str
+) -> List[Dict[str, Any]]:
+    return [
+        {
+            "hcp_id": hcp_id,
+            "matched_npi": npi,
+            "match_confidence": LOG_CONFIDENCE,
+            "match_reason": f"{LOG_REASON_CREATED}; ta={','.join(sorted(ta_slugs))}",
+            "candidates_considered": {
+                "source": LINK_SOURCE_TAXONOMY,
+                "ta_slugs": sorted(ta_slugs),
+                "taxonomy_codes": sorted(set(codes)),
+            },
+            "enriched_at": ts_iso,
+        }
+    ]
+
+
+def log_row_for_link(
+    hcp_id: str, npi: str, ta_slug: str, codes: Sequence[str], ts_iso: str
+) -> Dict[str, Any]:
+    return {
+        "hcp_id": hcp_id,
+        "matched_npi": npi,
+        "match_confidence": LOG_CONFIDENCE,
+        "match_reason": f"{LOG_REASON_LINKED}; ta={ta_slug}",
+        "candidates_considered": {
+            "source": LINK_SOURCE_TAXONOMY,
+            "ta_slugs": [ta_slug],
+            "taxonomy_codes": sorted(set(codes)),
+        },
+        "enriched_at": ts_iso,
+    }
+
+
+def write_enrichment_log(client: Client, rows: List[Dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    written = 0
+    for start in range(0, len(rows), LOG_BATCH):
+        batch = rows[start : start + LOG_BATCH]
+        client.table("nppes_enrichment_log_v2").insert(batch).execute()
+        written += len(batch)
+    return written
+
+
+def matched_codes_for(row: pd.Series, codes: Set[str]) -> List[str]:
+    """Which of this TA's taxonomy codes this NPPES record actually carries."""
+    found: List[str] = []
+    for i in range(1, 6):
+        c = ns(str(row.get(f"taxonomy_{i}")))
+        if c in codes and c not in found:
+            found.append(c)
+    return found
+
+
+def resolve_requested_ta(slug: Optional[str]) -> Tuple[str, Dict[str, Any], List[str]]:
+    """
+    --ta is required and has no default. Returns (slug, config, taxonomy codes).
+
+    Exits with the list of valid slugs rather than a bare argparse error, because
+    the failure this guards against is running the wrong TA, and the reader needs
+    to see what the right ones are.
+    """
+    available = sorted(list_ta_configs())
+    if not slug:
+        raise SystemExit(
+            "--ta is required and has no default. One therapeutic area per run.\n"
+            "  This script used to process the union of every TA with a taxonomy set, so a\n"
+            "  colorectal run would also have created 17,296 Atopic Dermatitis records.\n"
+            f"  Available TA slugs: {', '.join(available)}"
+        )
+    if slug not in available:
+        raise SystemExit(
+            f"Unknown TA slug {slug!r}.\n  Available TA slugs: {', '.join(available)}"
+        )
+
+    cfg = load_ta_config(slug)
+    taxonomies = list((cfg.get("nppes") or {}).get("taxonomies") or [])
+    if not taxonomies:
+        raise SystemExit(
+            f"TA {slug!r} has no nppes.taxonomies in config/therapeutic_areas/{slug}.json.\n"
+            "  That code set decides who counts as a member of this therapeutic area. It is a\n"
+            "  founder decision and this script will not guess it.\n"
+            "  See CRC_COMMUNITY_BUILD.md, FOUNDER INPUTS REQUIRED #1 and #2."
+        )
+    return slug, cfg, taxonomies
+
+
 def main() -> None:
     import argparse
 
@@ -263,15 +447,42 @@ def main() -> None:
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
     )
     parser.add_argument(
+        "--ta",
+        type=str,
+        default=None,
+        help="REQUIRED. Therapeutic area slug. One TA per run; there is no default and "
+             "no all-TA mode.",
+    )
+    parser.add_argument(
         "--npi-filter",
         type=str,
         default=None,
         help="Optional CSV path with 'npi' column. Restrict ingest to NPIs in this list "
              "(intersected with taxonomy filter).",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=True,
+        help="Compute the plan and write nothing (DEFAULT; kept for explicitness)",
+    )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually write. Requires hcp_therapeutic_areas_v2.source to exist "
+             "(docs/crc_community/01_ta_link_source.sql).",
+    )
     args = parser.parse_args()
     target_version = args.target_version
     npi_filter_path = args.npi_filter
+    dry_run = not args.execute
+
+    # Resolved BEFORE the parquet load, which costs ~40s. A missing --ta should
+    # fail in under a second.
+    ta_slug, ta_cfg, taxonomies = resolve_requested_ta(args.ta)
+
+    print(f"TA={ta_slug} ({ta_cfg['name']}) — {len(taxonomies)} taxonomy code(s)")
+    print(f"Mode: {'DRY-RUN (no writes)' if dry_run else 'EXECUTE (writes enabled)'}")
 
     load_dotenv()
     client = init_supabase()
@@ -285,30 +496,24 @@ def main() -> None:
     for col in REQUIRED_COLUMNS:
         df[col] = df[col].astype(str)
 
-    ta_masks: Dict[str, Dict[str, Any]] = {}
-    for slug in list_ta_configs():
-        cfg = load_ta_config(slug)
-        nppes_cfg = cfg.get("nppes") or {}
-        taxonomies = nppes_cfg.get("taxonomies") or []
-        if not taxonomies:
-            continue
-        ta_masks[slug] = {
-            "ta_uuid": cfg["ta_uuid"],
+    # ONE TA PER RUN. This used to loop every config with a non-empty taxonomy
+    # list and ingest their union, so a colorectal run would silently have created
+    # 17,296 Atopic Dermatitis records as well -- a decision nobody made, arriving
+    # unannounced inside another TA's build. ta_masks stays a dict so the rest of
+    # the script is unchanged; it now holds exactly one entry.
+    ta_masks: Dict[str, Dict[str, Any]] = {
+        ta_slug: {
+            "ta_uuid": ta_cfg["ta_uuid"],
             "mask": taxonomy_match_mask(df, set(taxonomies)),
-            "name": cfg["name"],
+            "name": ta_cfg["name"],
+            "codes": set(taxonomies),
         }
+    }
 
-    if not ta_masks:
-        raise RuntimeError("No TA configs with nppes.taxonomies found in config/therapeutic_areas/")
+    mask_union = ta_masks[ta_slug]["mask"]
 
-    mask_union = None
-    for slug, entry in ta_masks.items():
-        mask_union = entry["mask"] if mask_union is None else (mask_union | entry["mask"])
-
-    ta_names = [entry["name"] for entry in ta_masks.values()]
-    print(f"Loaded NPPES taxonomy filters for: {', '.join(ta_names)}")
-    for slug, entry in sorted(ta_masks.items()):
-        print(f"  {entry['name']} ({slug}): {int(entry['mask'].sum()):,} matching rows")
+    print(f"Loaded NPPES taxonomy filter for: {ta_cfg['name']}")
+    print(f"  {ta_cfg['name']} ({ta_slug}): {int(mask_union.sum()):,} matching rows")
 
     # If --npi-filter provided, intersect with the NPI list from CSV
     if npi_filter_path:
@@ -353,40 +558,107 @@ def main() -> None:
     total_unique_matching = len(agg_rows)
     print(f"Unique 10-digit NPIs in filter: {total_unique_matching:,}")
 
-    existing = fetch_existing_npis(client, target_version=target_version)
-    to_ingest: List[Tuple[str, pd.Series, List[str]]] = [
-        (npi, row, tas) for npi, row, tas in agg_rows if npi not in existing
-    ]
-    skipped = total_unique_matching - len(to_ingest)
-    print(f"Skipping (already in hcps): {skipped:,}")
-    print(f"New HCPs to insert: {len(to_ingest):,}")
+    existing = fetch_existing_npi_map(client, target_version=target_version)
+
+    # THE SKIP, CORRECTED.
+    #
+    # This used to be one list and one rule: "NPI already in hcps -> nothing to
+    # do." That is right for the first TA ingested and wrong for every one after
+    # it. An oncologist ingested under nsclc who also carries a colorectal code is
+    # already an hcps row, so the old rule dropped them -- and they never got the
+    # colorectal link. The population looked absent when it was only unlinked.
+    #
+    # Two outcomes now, not one:
+    #   to_create  NPI has no record   -> insert the record and all its TA links
+    #   to_link    NPI has a record    -> add ONLY the TA links it is missing
+    #
+    # Add-only, always. An existing link is never rewritten and never removed:
+    # publication_count and a publication-derived `source` on a link this script
+    # did not create are not ours to touch. That is also what makes a second run a
+    # no-op -- the link either exists (skip) or it does not (add once).
+    to_create: List[Tuple[str, pd.Series, List[str]]] = []
+    to_link: List[Tuple[str, pd.Series, List[str]]] = []
+    for npi, row, tas in agg_rows:
+        (to_link if npi in existing else to_create).append((npi, row, tas))
+
+    skipped = len(to_link)
+    print(f"Already in hcps (candidates for a missing TA link): {skipped:,}")
+    print(f"New HCPs to insert: {len(to_create):,}")
+
+    ta_uuid_to_slug = {entry["ta_uuid"]: slug for slug, entry in ta_masks.items()}
+
+    # Idempotency guard for the link pass: who is linked to each TA right now.
+    linked_now: Dict[str, Set[str]] = {}
+    for slug, entry in ta_masks.items():
+        linked_now[entry["ta_uuid"]] = fetch_linked_hcp_ids(
+            client, entry["ta_uuid"], target_version=target_version
+        )
+        print(f"  {slug}: {len(linked_now[entry['ta_uuid']]):,} HCPs already linked")
+
+    link_rows: List[Dict[str, Any]] = []
+    link_log_rows: List[Dict[str, Any]] = []
+    link_dist: Counter[str] = Counter()
+    for npi, row, ta_ids in to_link:
+        hcp_id = existing[npi]
+        missing = [tid for tid in ta_ids if hcp_id not in linked_now.get(tid, set())]
+        if not missing:
+            continue
+        link_rows.extend(ta_rows_for_hcp(hcp_id, missing, target_version=target_version))
+        for tid in missing:
+            slug = ta_uuid_to_slug.get(tid, tid)
+            link_dist[tid] += 1
+            link_log_rows.append(
+                log_row_for_link(
+                    hcp_id, npi, slug, matched_codes_for(row, ta_masks[slug]["codes"]), ts_iso
+                )
+            )
+
+    print(f"TA links to add to existing records: {len(link_rows):,}")
 
     failed_batches: List[Dict[str, Any]] = []
 
     inserted_hcps = 0
     inserted_ta_rows = 0
+    inserted_links = 0
+    logged_created = 0
+    logged_linked = 0
 
     ta_dist: Counter[str] = Counter()
     state_dist: Counter[str] = Counter()
 
     processed_new = 0
-    total_new = len(to_ingest)
+    total_new = len(to_create)
 
-    for npi, row, ta_ids in to_ingest:
+    for npi, row, ta_ids in to_create:
         st = ns(str(row.get("practice_state")))
         if st:
             state_dist[st] += 1
         for tid in ta_ids:
             ta_dist[tid] += 1
 
-    for start in tqdm(range(0, total_new, BATCH_HCPS), desc="ingesting HCPs", unit="batch"):
-        slab = to_ingest[start : start + BATCH_HCPS]
+    if dry_run:
+        print("\n[dry-run] no rows written. Planned:")
+        print(f"  hcps rows to insert ............... {total_new:,}")
+        print(f"  TA links for those new records .... {sum(ta_dist.values()):,}")
+        print(f"  TA links added to existing records  {len(link_rows):,}")
+        print(f"  nppes_enrichment_log_v2 rows ...... {total_new + len(link_log_rows):,}")
+
+    for start in tqdm(
+        range(0, 0 if dry_run else total_new, BATCH_HCPS), desc="ingesting HCPs", unit="batch"
+    ):
+        slab = to_create[start : start + BATCH_HCPS]
         hcp_batch: List[Dict[str, Any]] = []
         ta_batch: List[Dict[str, Any]] = []
+        log_batch: List[Dict[str, Any]] = []
         for npi, row, ta_ids in slab:
             hcp_id = str(uuid.uuid4())
             hcp_batch.append(build_hcp_payload(hcp_id, npi, row, ts_iso, target_version=target_version))
             ta_batch.extend(ta_rows_for_hcp(hcp_id, ta_ids, target_version=target_version))
+            slugs = [ta_uuid_to_slug.get(t, t) for t in ta_ids]
+            codes: List[str] = []
+            for s in slugs:
+                codes.extend(matched_codes_for(row, ta_masks[s]["codes"]))
+            log_batch.extend(log_rows_for_created(hcp_id, npi, slugs, codes, ts_iso))
 
         nh = insert_batch(client, "hcps", hcp_batch, failed_batches, target_version=target_version)
         inserted_hcps += nh
@@ -400,6 +672,8 @@ def main() -> None:
                     failed_batches,
                     target_version=target_version,
                 )
+            if target_version == "v2":
+                logged_created += write_enrichment_log(client, log_batch)
         else:
             failed_batches.append(
                 {
@@ -413,20 +687,45 @@ def main() -> None:
         if processed_new % PROGRESS_EVERY == 0 or processed_new == total_new:
             print(
                 f"Ingested {inserted_hcps:,} of total {total_new:,} new HCPs "
-                f"(skipped {skipped:,} already in database by NPI)"
+                f"({skipped:,} NPIs already had a record)"
             )
+
+    # ---- the link pass: existing records that were missing this TA's link ----
+    # Runs after the create pass so a failure there cannot leave links pointing at
+    # records that were never written. These rows touch no hcps column at all.
+    if not dry_run and link_rows:
+        for l_start in tqdm(
+            range(0, len(link_rows), BATCH_TA), desc="linking existing HCPs", unit="batch"
+        ):
+            sub_l = link_rows[l_start : l_start + BATCH_TA]
+            added = insert_batch(
+                client, "hcp_therapeutic_areas", sub_l, failed_batches, target_version=target_version
+            )
+            inserted_links += added
+            if added == len(sub_l) and target_version == "v2":
+                logged_linked += write_enrichment_log(
+                    client, link_log_rows[l_start : l_start + BATCH_TA]
+                )
 
     print("\n" + "=" * 72)
     print("Summary")
     print("=" * 72)
     print(f"Total NPPES rows matching taxonomy filter: {total_matching_rows:,}")
     print(f"Total unique qualifying NPIs (10-digit): {total_unique_matching:,}")
-    print(f"Total skipped (existing NPI in hcps): {skipped:,}")
+    print(f"NPIs that already had an hcps record: {skipped:,}")
     print(f"Total new hcps rows inserted (acknowledged): {inserted_hcps:,}")
-    print(f"Total hcp_therapeutic_areas rows inserted: {inserted_ta_rows:,}")
-    print("\nTherapeutic-area association counts (planned, one row per TA per new HCP):")
+    print(f"TA links written for new records: {inserted_ta_rows:,}")
+    print(f"TA links added to EXISTING records: {inserted_links:,}")
+    print(f"nppes_enrichment_log_v2 rows -- created: {logged_created:,}, linked: {logged_linked:,}")
+
     ta_labels = {entry["ta_uuid"]: entry["name"] for entry in ta_masks.values()}
+    print("\nNEW RECORD CREATED, per TA (planned):")
     for tid, cnt in sorted(ta_dist.items(), key=lambda kv: (-kv[1], kv[0])):
+        print(f"  {ta_labels.get(tid, tid)}: {cnt:,}")
+    print("\nTA LINK ADDED TO EXISTING RECORD, per TA (planned):")
+    if not link_dist:
+        print("  none -- every existing record already carries the links it qualifies for")
+    for tid, cnt in sorted(link_dist.items(), key=lambda kv: (-kv[1], kv[0])):
         print(f"  {ta_labels.get(tid, tid)}: {cnt:,}")
     print("\nTop 10 source states (planned ingest list before DB failures):")
     for st, cnt in state_dist.most_common(10):

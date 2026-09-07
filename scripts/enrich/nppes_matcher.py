@@ -1,6 +1,35 @@
 """
 NPPES matcher: propose NPI matches for unmatched US HCPs.
 
+BLOCKING KEY (changed 2026-09-06, CRC_COMMUNITY_BUILD.md phase 1)
+-----------------------------------------------------------------
+The blocking key is now COALESCE(nppes_practice_state, derived_state,
+institution_state). It used to be the first two columns only.
+
+WHY: the state provenance repair (2026-09-03) emptied 14,676 institution-derived
+values out of nppes_practice_state, which is exactly what this matcher was
+blocking on. derived_state has no producer (0.4% of hcps_v2). So after the
+repair most colorectal HCPs present no state at all and the matcher generates no
+candidates for them. institution_state is where those values now live.
+
+A weak signal is legitimate for NARROWING a candidate set and illegitimate for
+DECIDING a match. So:
+
+  * every candidate records WHICH column produced its block key (`block_basis`);
+  * a candidate blocked on institution_state may not be written on name+state
+    agreement alone -- it needs an independent confirming signal (specialty,
+    taxonomy or institution agreement), and it needs to be the ONLY candidate
+    that confirms. Otherwise it is held as `unconfirmed`/`ambiguous`;
+  * candidates blocked on nppes_practice_state or derived_state keep exactly the
+    bar they had before this change;
+  * `match_basis` and `confirmation_signals` ride on the proposal row so a weaker
+    match stays auditable, the same way `state_basis` does on the read side.
+
+Dropping the confirmation half would recreate, one layer down, the exact failure
+the provenance repair existed to prevent.
+
+MODE: --dry-run is the DEFAULT. Writes require an explicit --execute.
+
 Expected Supabase table: npi_match_proposals
 Columns:
   hcp_id UUID
@@ -19,16 +48,32 @@ Columns:
   match_status TEXT
   match_calculated_at TIMESTAMPTZ
   candidates_found INTEGER
+
+NOT YET APPLIED -- required before the first --execute run of this version:
+
+  ALTER TABLE public.npi_match_proposals
+    ADD COLUMN IF NOT EXISTS block_basis           TEXT,
+    ADD COLUMN IF NOT EXISTS block_state           TEXT,
+    ADD COLUMN IF NOT EXISTS match_basis           TEXT,
+    ADD COLUMN IF NOT EXISTS confirmation_signals  TEXT[];
+
+  -- block_basis          'nppes' | 'derived' | 'institution'
+  -- block_state          the two-letter state the block key actually used
+  -- match_basis          'nppes_state_unique' | 'nppes_state_disambiguated'
+  --                      | 'name_only_nationwide' | 'institution_state_confirmed'
+  --                      | NULL when nothing was proposed
+  -- confirmation_signals e.g. {'taxonomy:207RX0202X'} -- empty on the nppes bar
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import os
 import time
 from collections import Counter
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -42,7 +87,41 @@ UPSERT_BATCH_SIZE = 500
 # AD ta_id default; resolved from --ta slug at runtime.
 DEFAULT_TA_SLUG = "atopic-dermatitis"
 
+# Which column produced the block key. Ordered strongest-first; this IS the
+# COALESCE order.
+BASIS_NPPES = "nppes"
+BASIS_DERIVED = "derived"
+BASIS_INSTITUTION = "institution"
+STATE_COLUMNS: Tuple[Tuple[str, str], ...] = (
+    ("nppes_practice_state", BASIS_NPPES),
+    ("derived_state", BASIS_DERIVED),
+    ("institution_state", BASIS_INSTITUTION),
+)
+
+# NPPES taxonomy codes that independently corroborate "this person practises in
+# this TA". A positive allow-list, not a negative exclusion list -- the same
+# shape established_npi_resolver.py settled on, expressed as codes because the
+# NPPES parquet carries codes and no descriptions.
+#
+# A TA absent from this map CANNOT confirm an institution-blocked candidate on
+# taxonomy, and the run says so loudly rather than falling back to a permissive
+# default.
+TA_CONFIRMING_TAXONOMIES: Dict[str, Tuple[str, ...]] = {
+    "colorectal-cancer": (
+        "207RX0202X",  # Medical Oncology
+        "207RH0000X",  # Hematology & Oncology
+        "208C00000X",  # Colon & Rectal Surgery
+        "207RG0100X",  # Gastroenterology
+        "2086X0206X",  # Surgical Oncology
+        "2085R0001X",  # Radiation Oncology
+    ),
+}
+
+# Statuses that would put an NPI on a person. Everything else is a hold.
+WRITABLE_STATUSES = frozenset({"matched_high", "matched_medium", "matched_institution_confirmed"})
+
 _ELIGIBLE_HCPS_CACHE: Dict[str, List[Dict]] = {}
+_COHORT_ROWS_CACHE: Dict[str, List[Dict]] = {}
 
 
 def get_required_env(name: str) -> str:
@@ -102,6 +181,8 @@ def load_nppes_df() -> pd.DataFrame:
     df["last_name_norm"] = df["last_name"].str.lower().str.strip()
     df["first_name_norm"] = df["first_name"].str.lower().str.strip()
     df["has_middle_name"] = df["middle_name"].map(lambda v: 1 if ns(v) else 0)
+    # The NPPES side of the block key. This is NPPES's own practice_state and is
+    # unaffected by the provenance repair; only the hcps_v2 side changed.
     df = df.set_index(["last_name_norm", "practice_state"]).sort_index()
     return df
 
@@ -121,7 +202,7 @@ from ta_registry import resolve_ta_id_supabase as resolve_ta_id  # noqa: E402,F4
 
 
 def fetch_community_hcp_ids(supabase: Client, ta_id: str) -> List[str]:
-    """Step 1: AD community cohort hcp_ids from hcp_cohort_classification_v2."""
+    """Step 1: community cohort hcp_ids from hcp_cohort_classification_v2."""
     ids: List[str] = []
     offset = 0
     while True:
@@ -145,22 +226,35 @@ def fetch_community_hcp_ids(supabase: Client, ta_id: str) -> List[str]:
     return ids
 
 
-def hcp_state_from_v2(row: Dict) -> str:
-    """COALESCE(nppes_practice_state, derived_state) for NPPES state matching."""
-    return norm_state(row.get("nppes_practice_state") or row.get("derived_state"))
+def hcp_state_from_v2(row: Dict) -> Tuple[str, Optional[str]]:
+    """
+    The block key: COALESCE(nppes_practice_state, derived_state, institution_state),
+    plus the name of the column that produced it.
+
+    Returns ("", None) when the row presents no state at all -- which, post
+    provenance-repair, is the majority case for colorectal.
+    """
+    for column, basis in STATE_COLUMNS:
+        state = norm_state(row.get(column))
+        if state:
+            return state, basis
+    return "", None
 
 
-def load_eligible_unmatched_hcps(supabase: Client, ta_id: str) -> List[Dict]:
+def load_cohort_rows(supabase: Client, ta_id: str) -> List[Dict]:
     """
-    Two-step v2 cohort load:
-      1) community hcp_ids for scoped TA from hcp_cohort_classification_v2
-      2) hcps_v2 rows: id IN cohort, npi_number IS NULL, US-identifiable via state
+    Every no-NPI community HCP for the TA, state-set or not.
+
+    Loading the stateless rows too costs one extra column-set and buys the
+    absence accounting: "how many HCPs generate no candidate, and why" is not
+    answerable if the rows that generate none are filtered out before they are
+    counted. Only state-set rows are matched; see load_eligible_unmatched_hcps.
     """
-    if ta_id in _ELIGIBLE_HCPS_CACHE:
-        return _ELIGIBLE_HCPS_CACHE[ta_id]
+    if ta_id in _COHORT_ROWS_CACHE:
+        return _COHORT_ROWS_CACHE[ta_id]
 
     community_ids = fetch_community_hcp_ids(supabase, ta_id)
-    eligible: List[Dict] = []
+    rows: List[Dict] = []
 
     for i in range(0, len(community_ids), HCP_ID_CHUNK):
         chunk = community_ids[i : i + HCP_ID_CHUNK]
@@ -168,10 +262,14 @@ def load_eligible_unmatched_hcps(supabase: Client, ta_id: str) -> List[Dict]:
         while True:
             batch = (
                 supabase.table("hcps_v2")
-                .select("id,first_name,last_name,nppes_practice_state,derived_state")
+                .select(
+                    "id,first_name,last_name,country,"
+                    "nppes_practice_state,derived_state,institution_state,institution_state_source,"
+                    "institution_city,institution_canonical,institution_normalized,institution_raw,"
+                    "current_institution,npi_specialty,npi_taxonomy"
+                )
                 .in_("id", chunk)
                 .is_("npi_number", "null")
-                .or_("derived_state.not.is.null,nppes_practice_state.not.is.null")
                 .order("id")
                 .range(offset, offset + HCP_PAGE_SIZE - 1)
                 .execute()
@@ -181,22 +279,42 @@ def load_eligible_unmatched_hcps(supabase: Client, ta_id: str) -> List[Dict]:
             if not batch:
                 break
             for row in batch:
-                state = hcp_state_from_v2(row)
-                if not state:
-                    continue
-                eligible.append(
+                state, basis = hcp_state_from_v2(row)
+                rows.append(
                     {
                         "id": row["id"],
                         "first_name": row.get("first_name"),
                         "last_name": row.get("last_name"),
+                        "country": ns(row.get("country")).upper() or None,
                         "state": state,
+                        "block_basis": basis,
+                        "institution_state_source": row.get("institution_state_source"),
+                        "institution_city": row.get("institution_city"),
+                        "institution": (
+                            ns(row.get("institution_canonical"))
+                            or ns(row.get("current_institution"))
+                            or ns(row.get("institution_normalized"))
+                            or ns(row.get("institution_raw"))
+                            or None
+                        ),
+                        "npi_specialty": row.get("npi_specialty"),
+                        "npi_taxonomy": row.get("npi_taxonomy"),
                     }
                 )
             if len(batch) < HCP_PAGE_SIZE:
                 break
             offset += HCP_PAGE_SIZE
 
-    eligible.sort(key=lambda row: str(row["id"]))
+    rows.sort(key=lambda row: str(row["id"]))
+    _COHORT_ROWS_CACHE[ta_id] = rows
+    return rows
+
+
+def load_eligible_unmatched_hcps(supabase: Client, ta_id: str) -> List[Dict]:
+    """The matchable subset: a block key resolved from one of the three columns."""
+    if ta_id in _ELIGIBLE_HCPS_CACHE:
+        return _ELIGIBLE_HCPS_CACHE[ta_id]
+    eligible = [row for row in load_cohort_rows(supabase, ta_id) if row["state"]]
     _ELIGIBLE_HCPS_CACHE[ta_id] = eligible
     return eligible
 
@@ -231,6 +349,44 @@ def primary_taxonomy_code(row: pd.Series) -> Optional[str]:
             code = ns(row.get(f"taxonomy_{i}"))
             return code or None
     return None
+
+
+def confirmation_signals(hcp: Dict, candidate: pd.Series, allow_taxonomies: Set[str]) -> List[str]:
+    """
+    Independent corroboration that this NPPES record is this HCP -- evidence that
+    does NOT come from the state that produced the block key.
+
+    Three signals, in the order CRC_COMMUNITY_BUILD.md names them. Each is
+    reported by name so a reviewer can see which one carried a given match:
+
+      taxonomy      the NPPES record practises in a TA-relevant specialty
+      specialty     hcps_v2's own specialty/taxonomy agrees with the record's
+      institution   the HCP's institution city agrees with the practice city
+
+    Signals whose input is absent simply do not fire. Empty list == not confirmed.
+    """
+    signals: List[str] = []
+
+    codes = candidate_taxonomy_codes(candidate)
+    if allow_taxonomies:
+        for code in codes:
+            if code in allow_taxonomies:
+                signals.append(f"taxonomy:{code}")
+                break
+
+    hcp_tax = ns(hcp.get("npi_taxonomy"))
+    hcp_spec = ns(hcp.get("npi_specialty")).lower()
+    if hcp_tax and hcp_tax in codes:
+        signals.append(f"specialty:{hcp_tax}")
+    elif hcp_spec and hcp_spec in ns(candidate.get("credentials")).lower():
+        signals.append("specialty:npi_specialty")
+
+    hcp_city = ns(hcp.get("institution_city")).upper()
+    cand_city = ns(candidate.get("practice_city")).upper()
+    if hcp_city and cand_city and hcp_city == cand_city:
+        signals.append(f"institution:city={cand_city}")
+
+    return signals
 
 
 def name_state_candidates(
@@ -320,7 +476,18 @@ def proposal_row(
     status: str,
     candidates_found: int,
     now_iso: str,
+    block_basis: Optional[str] = None,
+    block_state: Optional[str] = None,
+    match_basis: Optional[str] = None,
+    signals: Optional[Sequence[str]] = None,
 ) -> Dict:
+    provenance = {
+        "block_basis": block_basis,
+        "block_state": block_state or None,
+        "match_basis": match_basis,
+        "confirmation_signals": list(signals or []),
+    }
+
     if candidate is None:
         return {
             "hcp_id": hcp_id,
@@ -339,6 +506,7 @@ def proposal_row(
             "match_status": status,
             "match_calculated_at": now_iso,
             "candidates_found": candidates_found,
+            **provenance,
         }
 
     return {
@@ -358,6 +526,7 @@ def proposal_row(
         "match_status": status,
         "match_calculated_at": now_iso,
         "candidates_found": candidates_found,
+        **provenance,
     }
 
 
@@ -369,28 +538,191 @@ def bulk_upsert_proposals(supabase: Client, rows: Sequence[Dict]) -> None:
         supabase.table("npi_match_proposals").upsert(batch, on_conflict="hcp_id").execute()
 
 
+def match_one(
+    hcp: Dict,
+    nppes_df: pd.DataFrame,
+    allow_taxonomies: Set[str],
+    now_iso: str,
+) -> Tuple[Dict, str]:
+    """
+    Returns (proposal row, absence reason or "").
+
+    The bar depends on block_basis and nothing else:
+      nppes / derived  -> unchanged from before the blocking-key change
+      institution      -> a confirming signal is required, and the confirmed
+                          candidate must be the only one
+    """
+    hcp_id = str(hcp["id"])
+    hcp_first = norm_first(hcp.get("first_name"))
+    hcp_last_norm = str(hcp.get("last_name") or "").strip().lower()
+    hcp_state = norm_state(hcp.get("state"))
+    basis = hcp.get("block_basis")
+
+    def row(candidate, tier, confidence, status, found, match_basis=None, signals=None):
+        return proposal_row(
+            hcp_id, candidate, tier, confidence, status, found, now_iso,
+            block_basis=basis, block_state=hcp_state, match_basis=match_basis, signals=signals,
+        )
+
+    if not hcp_first or not hcp_last_norm:
+        return row(None, 4, None, "no_match", 0), "no_usable_name"
+
+    state_candidates = pd.DataFrame()
+    if hcp_state:
+        state_candidates = name_state_candidates(nppes_df, hcp_first, hcp_last_norm, hcp_state)
+
+    # ---- institution-blocked: narrowing only; deciding needs corroboration ----
+    if basis == BASIS_INSTITUTION:
+        found = len(state_candidates)
+        if found == 0:
+            return row(None, 4, None, "no_match", 0), "no_nppes_candidate_in_state"
+
+        confirmed: List[Tuple[pd.Series, List[str]]] = []
+        for _, candidate in state_candidates.iterrows():
+            signals = confirmation_signals(hcp, candidate, allow_taxonomies)
+            if signals:
+                confirmed.append((candidate, signals))
+
+        if len(confirmed) == 1:
+            candidate, signals = confirmed[0]
+            return (
+                row(candidate, 2, 80, "matched_institution_confirmed", found,
+                    match_basis="institution_state_confirmed", signals=signals),
+                "",
+            )
+        if len(confirmed) > 1:
+            # Several corroborated candidates. The first-name heuristics that
+            # break ties on the nppes bar are not strong enough to break this one.
+            best, _amb = disambiguate_multi(state_candidates, hcp_first)
+            return row(best, 4, None, "ambiguous", found), "institution_multiple_confirmed"
+        best, _amb = disambiguate_multi(state_candidates, hcp_first)
+        return row(best, 4, None, "unconfirmed", found), "institution_no_confirming_signal"
+
+    # ---- nppes / derived: the bar these rows already had ----
+    if len(state_candidates) == 1:
+        return row(state_candidates.iloc[0], 1, 95, "matched_high", 1,
+                   match_basis="nppes_state_unique"), ""
+
+    if len(state_candidates) > 1:
+        found = len(state_candidates)
+        best, ambiguous = disambiguate_multi(state_candidates, hcp_first)
+        if ambiguous:
+            return row(best, 4, None, "ambiguous", found), "nppes_ambiguous"
+        return row(best, 2, 85, "matched_medium", found,
+                   match_basis="nppes_state_disambiguated"), ""
+
+    if not hcp_state:
+        nationwide = name_only_candidates(nppes_df, hcp_first, hcp_last_norm)
+        n = len(nationwide)
+        if n == 1:
+            return row(nationwide.iloc[0], 3, 70, "review_pending", n,
+                       match_basis="name_only_nationwide"), ""
+        if 2 <= n <= 5:
+            best, _amb = disambiguate_multi(nationwide, hcp_first)
+            return row(best, 3, 50, "review_pending", n, match_basis="name_only_nationwide"), ""
+        if n >= 6:
+            best, _amb = disambiguate_multi(nationwide, hcp_first)
+            return row(best, 4, None, "ambiguous", n), "name_only_too_many"
+        return row(None, 4, None, "no_match", n), "no_nppes_candidate_nationwide"
+
+    return row(None, 4, None, "no_match", 0), "no_nppes_candidate_in_state"
+
+
+def print_absence(cohort_rows: Sequence[Dict], absence: Counter, ta_slug: str) -> None:
+    total = len(cohort_rows)
+    stateless = [r for r in cohort_rows if not r["state"]]
+    stateless_us = sum(1 for r in stateless if r["country"] == "US")
+    stateless_non_us = sum(1 for r in stateless if r["country"] and r["country"] != "US")
+    stateless_unknown = len(stateless) - stateless_us - stateless_non_us
+
+    print("\n=== HCPs that generate no candidate, and why ===")
+    print(f"  no-NPI {ta_slug} community HCPs: {total}")
+    print(f"  never reach the matcher (no state in any of the three columns): {len(stateless)}")
+    print(f"      country=US .................. {stateless_us}")
+    print(f"      country non-US .............. {stateless_non_us}  (no US NPI to find)")
+    print(f"      country unknown ............. {stateless_unknown}")
+    print("  reach the matcher and still produce no usable match:")
+    for reason in (
+        "no_usable_name",
+        "no_nppes_candidate_in_state",
+        "no_nppes_candidate_nationwide",
+        "name_only_too_many",
+        "nppes_ambiguous",
+        "institution_no_confirming_signal",
+        "institution_multiple_confirmed",
+    ):
+        if absence.get(reason):
+            print(f"      {reason:<32} {absence[reason]}")
+
+
+def write_samples(rows: Sequence[Dict], path: str) -> None:
+    fields = [
+        "hcp_id", "hcp_name", "hcp_institution", "block_basis", "block_state",
+        "institution_state_source", "npi", "npi_name", "npi_practice_city",
+        "npi_practice_state", "npi_primary_taxonomy", "npi_taxonomy_codes",
+        "candidates_found", "confirmation_signals",
+    ]
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k) for k in fields})
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Propose NPI matches for unmatched US community HCPs")
     parser.add_argument("--ta", default=DEFAULT_TA_SLUG, help="Therapeutic area slug")
-    parser.add_argument("--dry-run", action="store_true", help="Compute matches but skip DB writes")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=True,
+        help="Compute matches but skip DB writes (DEFAULT; kept for explicitness)",
+    )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Write npi_match_proposals. Requires the block_basis/match_basis columns to exist.",
+    )
+    parser.add_argument("--sample-size", type=int, default=20,
+                        help="Institution-blocked confirmed matches to print for review")
+    parser.add_argument("--sample-out", help="Optional CSV path for the institution-blocked sample")
     args = parser.parse_args()
+
+    dry_run = not args.execute
 
     load_dotenv()
     started = time.time()
     supabase = init_supabase()
     ta_id = resolve_ta_id(supabase, args.ta)
 
+    allow_taxonomies = set(TA_CONFIRMING_TAXONOMIES.get(args.ta, ()))
+
     print(f"TA={args.ta} (ta_id={ta_id})")
-    print(f"Mode: {'DRY-RUN (no writes)' if args.dry_run else 'EXECUTE (writes enabled)'}")
+    print(f"Mode: {'DRY-RUN (no writes)' if dry_run else 'EXECUTE (writes enabled)'}")
+    print("Block key: COALESCE(nppes_practice_state, derived_state, institution_state)")
+    if allow_taxonomies:
+        print(f"Confirming taxonomies for {args.ta}: {len(allow_taxonomies)} codes")
+    else:
+        print(
+            f"WARNING: no confirming taxonomy list for '{args.ta}'. Institution-blocked "
+            "candidates can only confirm on specialty or institution agreement, and will "
+            "otherwise be held as unconfirmed."
+        )
 
     print("Loading NPPES parquet...")
     nppes_df = load_nppes_df()
 
+    cohort_rows = load_cohort_rows(supabase, ta_id)
     total_hcps = fetch_unmatched_hcps_count(supabase, ta_id)
-    print(f"Loaded {total_hcps} unmatched US community HCPs (v2, state-set, no NPI)")
+    print(f"Loaded {len(cohort_rows)} no-NPI community HCPs; {total_hcps} carry a block key")
 
     tier_counts: Counter = Counter()
     status_counts: Counter = Counter()
+    basis_counts: Counter = Counter()
+    basis_status: Counter = Counter()
+    basis_candidates: Counter = Counter()
+    absence: Counter = Counter()
+    samples: List[Dict] = []
 
     processed = 0
     offset = 0
@@ -403,107 +735,46 @@ def main() -> None:
 
         proposals: List[Dict] = []
         for hcp in hcp_page:
-            hcp_id = str(hcp["id"])
-            hcp_first = norm_first(hcp.get("first_name"))
-            hcp_last_norm = str(hcp.get("last_name") or "").strip().lower()
-            hcp_state = norm_state(hcp.get("state"))
+            proposal, reason = match_one(hcp, nppes_df, allow_taxonomies, now_iso)
+            proposals.append(proposal)
 
-            if not hcp_first or not hcp_last_norm:
-                tier = 4
-                status = "no_match"
-                confidence = None
-                candidate = None
-                candidates_found = 0
-                proposals.append(proposal_row(hcp_id, candidate, tier, confidence, status, candidates_found, now_iso))
-                tier_counts[tier] += 1
-                status_counts[status] += 1
-                continue
+            basis = proposal["block_basis"] or "none"
+            tier_counts[proposal["match_tier"]] += 1
+            status_counts[proposal["match_status"]] += 1
+            basis_counts[basis] += 1
+            basis_status[(basis, proposal["match_status"])] += 1
+            if proposal["candidates_found"]:
+                basis_candidates[basis] += 1
+            if reason:
+                absence[reason] += 1
 
-            # Tier 1 / 2: state-aware
-            state_candidates = pd.DataFrame()
-            if hcp_state:
-                state_candidates = name_state_candidates(nppes_df, hcp_first, hcp_last_norm, hcp_state)
+            if (
+                proposal["match_status"] == "matched_institution_confirmed"
+                and len(samples) < args.sample_size
+            ):
+                samples.append(
+                    {
+                        "hcp_id": proposal["hcp_id"],
+                        "hcp_name": f"{ns(hcp.get('first_name'))} {ns(hcp.get('last_name'))}".strip(),
+                        "hcp_institution": hcp.get("institution"),
+                        "block_basis": proposal["block_basis"],
+                        "block_state": proposal["block_state"],
+                        "institution_state_source": hcp.get("institution_state_source"),
+                        "npi": proposal["npi"],
+                        "npi_name": f"{proposal['npi_first_name']} {proposal['npi_last_name']}",
+                        "npi_practice_city": proposal["npi_practice_city"],
+                        "npi_practice_state": proposal["npi_practice_state"],
+                        "npi_primary_taxonomy": proposal["npi_primary_taxonomy"],
+                        "npi_taxonomy_codes": ";".join(proposal["npi_taxonomy_codes"]),
+                        "candidates_found": proposal["candidates_found"],
+                        "confirmation_signals": ";".join(proposal["confirmation_signals"]),
+                    }
+                )
 
-            if len(state_candidates) == 1:
-                candidate = state_candidates.iloc[0]
-                tier = 1
-                confidence = 95
-                status = "matched_high"
-                candidates_found = 1
-                proposals.append(proposal_row(hcp_id, candidate, tier, confidence, status, candidates_found, now_iso))
-                tier_counts[tier] += 1
-                status_counts[status] += 1
-                continue
-
-            if len(state_candidates) > 1:
-                candidates_found = len(state_candidates)
-                best, ambiguous = disambiguate_multi(state_candidates, hcp_first)
-                if ambiguous:
-                    tier = 4
-                    confidence = None
-                    status = "ambiguous"
-                else:
-                    tier = 2
-                    confidence = 85
-                    status = "matched_medium"
-                proposals.append(proposal_row(hcp_id, best, tier, confidence, status, candidates_found, now_iso))
-                tier_counts[tier] += 1
-                status_counts[status] += 1
-                continue
-
-            # Tier 3 / 4: state missing only
-            if not hcp_state:
-                nationwide = name_only_candidates(nppes_df, hcp_first, hcp_last_norm)
-                n = len(nationwide)
-                if n == 1:
-                    tier = 3
-                    confidence = 70
-                    status = "review_pending"
-                    candidate = nationwide.iloc[0]
-                elif 2 <= n <= 5:
-                    best, _amb = disambiguate_multi(nationwide, hcp_first)
-                    tier = 3
-                    confidence = 50
-                    status = "review_pending"
-                    candidate = best
-                elif n >= 6:
-                    best, _amb = disambiguate_multi(nationwide, hcp_first)
-                    tier = 4
-                    confidence = None
-                    status = "ambiguous"
-                    candidate = best
-                else:
-                    tier = 4
-                    confidence = None
-                    status = "no_match"
-                    candidate = None
-                proposals.append(proposal_row(hcp_id, candidate, tier, confidence, status, n, now_iso))
-                tier_counts[tier] += 1
-                status_counts[status] += 1
-                continue
-
-            # No state-aware candidates and state is present -> no match
-            tier = 4
-            confidence = None
-            status = "no_match"
-            candidate = None
-            candidates_found = 0
-            proposals.append(proposal_row(hcp_id, candidate, tier, confidence, status, candidates_found, now_iso))
-            tier_counts[tier] += 1
-            status_counts[status] += 1
-
-        if not args.dry_run:
+        if not dry_run:
             bulk_upsert_proposals(supabase, proposals)
 
         processed += len(hcp_page)
-        if processed % 1000 == 0 or processed == total_hcps:
-            print(
-                f"Processed {processed} of total {total_hcps} HCPs. "
-                f"Tier 1: {tier_counts.get(1, 0)}, Tier 2: {tier_counts.get(2, 0)}, "
-                f"Tier 3: {tier_counts.get(3, 0)}, Tier 4: {tier_counts.get(4, 0)} "
-                f"(no match: {status_counts.get('no_match', 0)}, ambiguous: {status_counts.get('ambiguous', 0)})"
-            )
-
         if len(hcp_page) < HCP_PAGE_SIZE:
             break
         offset += HCP_PAGE_SIZE
@@ -511,19 +782,63 @@ def main() -> None:
     print("\n=== NPPES Matcher Summary ===")
     print(f"Total HCPs processed: {processed}")
     print("Tier distribution:")
-    print(f"  Tier 1: {tier_counts.get(1, 0)}")
-    print(f"  Tier 2: {tier_counts.get(2, 0)}")
-    print(f"  Tier 3: {tier_counts.get(3, 0)}")
-    print(f"  Tier 4: {tier_counts.get(4, 0)}")
+    for tier in (1, 2, 3, 4):
+        print(f"  Tier {tier}: {tier_counts.get(tier, 0)}")
     print("Status distribution:")
-    for status in ["matched_high", "matched_medium", "review_pending", "no_match", "ambiguous"]:
+    for status in [
+        "matched_high",
+        "matched_medium",
+        "matched_institution_confirmed",
+        "review_pending",
+        "unconfirmed",
+        "no_match",
+        "ambiguous",
+    ]:
         print(f"  {status}: {status_counts.get(status, 0)}")
-    print(f"Estimated v1 application count (Tier 1 + Tier 2): {tier_counts.get(1, 0) + tier_counts.get(2, 0)}")
-    if args.dry_run:
-        print("[dry-run] skipped npi_match_proposals upsert")
+
+    print("\n=== By block basis ===")
+    print(f"{'basis':<14}{'HCPs':>8}{'w/ candidate':>14}{'confirmed':>11}")
+    for basis in (BASIS_NPPES, BASIS_DERIVED, BASIS_INSTITUTION):
+        n = basis_counts.get(basis, 0)
+        if not n:
+            continue
+        confirmed = sum(basis_status.get((basis, s), 0) for s in WRITABLE_STATUSES)
+        print(f"{basis:<14}{n:>8}{basis_candidates.get(basis, 0):>14}{confirmed:>11}")
+    for basis in (BASIS_NPPES, BASIS_DERIVED, BASIS_INSTITUTION):
+        if not basis_counts.get(basis):
+            continue
+        detail = ", ".join(
+            f"{status}={basis_status[(basis, status)]}"
+            for status in sorted({s for b, s in basis_status if b == basis})
+        )
+        print(f"  {basis}: {detail}")
+
+    print_absence(cohort_rows, absence, args.ta)
+
+    inst_confirmed = status_counts.get("matched_institution_confirmed", 0)
+    print(f"\n=== Institution-blocked confirmed sample ({len(samples)} of {inst_confirmed}) ===")
+    if not samples:
+        print("  none")
+    for i, s in enumerate(samples, 1):
+        print(
+            f"  {i:>2}. {s['hcp_name']} [{s['hcp_id'][:8]}] {s['block_state']} "
+            f"({s['institution_state_source']})\n"
+            f"      inst: {s['hcp_institution']}\n"
+            f"      NPI {s['npi']}  {s['npi_name']}  {s['npi_practice_city']}, "
+            f"{s['npi_practice_state']}  tax={s['npi_taxonomy_codes']}\n"
+            f"      candidates_in_state={s['candidates_found']}  evidence={s['confirmation_signals']}"
+        )
+    if args.sample_out and samples:
+        write_samples(samples, args.sample_out)
+        print(f"  sample written to {args.sample_out}")
+
+    applies = sum(status_counts.get(s, 0) for s in ("matched_high", "matched_medium"))
+    print(f"\nEstimated v1 application count (nppes/derived bar): {applies}")
+    print(f"Held pending founder review (institution bar): {inst_confirmed}")
+    if dry_run:
+        print("[dry-run] skipped npi_match_proposals upsert -- no NPI was written")
     print(f"Total runtime: {time.time() - started:.1f}s")
 
 
 if __name__ == "__main__":
     main()
-
