@@ -2,6 +2,11 @@
 
 **Branch:** foundation-rebuild · **Status:** decided, grounded, ready to build (not started)
 
+> **Per-TA consumer:** `CRC_COMMUNITY_BUILD.md` (2026-09-03) applies this document's roster
+> semantics to colorectal. A CRC board must be born as a roster and never pass through a
+> ranked phase. That document also carries the measurement showing CRC Community is blocked
+> upstream of everything here, on NPI coverage (1,415 vs NSCLC's 9,849).
+
 This is the build plan for converting the Community cohort from a **ranked leaderboard** to an
 **intelligence roster**. It is grounded in Code's live diagnostic report (not reconstructed from
 memory). Execute the phases in order — each gates the next. Every phase is its own commit (or a

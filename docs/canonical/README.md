@@ -22,6 +22,7 @@ it reads exactly like a file that is correct.
 | `TA_GENERATION_LAYER.md` | The generation (billed) stages and what each writes. |
 | `GENERATE_CYCLE_DESIGN.md` | Why `generate_cycle.py` is shaped the way it is. |
 | `COMMUNITY_ROSTER_BUILD.md` | The community roster build, tier-grouped and not ranked. |
+| `CRC_COMMUNITY_BUILD.md` | The CRC Community cohort: why it is empty, and the order that fills it. |
 
 ### Reference — how it works
 | File | What it is |

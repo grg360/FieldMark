@@ -3,6 +3,7 @@
 **TA:** Colorectal Cancer · slug `colorectal-cancer`
 **Written:** 2026-08-24, **before** any CRC ingestion. Nothing in this document was informed by a board.
 **Purpose:** the acceptance test for the CRC build, per `TA_BUILD_GUIDE.md` STEP 3.
+**Also the acceptance test for:** `CRC_COMMUNITY_BUILD.md` phase 5.
 
 > This document is only worth something because it predates the board. Group 2 in particular is a
 > falsifiable prediction; recorded after the fact it would be a post-hoc story about whatever the ranking

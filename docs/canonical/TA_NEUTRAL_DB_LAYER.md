@@ -2,6 +2,12 @@
 
 Date: 2026-08-30. Branch: foundation-rebuild. **Design only — nothing in here is built.**
 
+> **First consumer:** `CRC_COMMUNITY_BUILD.md` phase 4 executes §B (the rename + shim) and
+> §C (the `p_ta_id` parameter) for colorectal. Gaps found there are amendments to THIS
+> document, not local workarounds. Note §A.4 held: the NSCLC UUID literal survived the
+> 2026-09-02 filtered-family rewrite — see `docs/state_provenance/04_filtered_family.sql:73`.
+> A rewrite is not a de-pin.
+
 Goal is not "make CRC work". Goal is that TA #4 cannot hit this wall. Every inventory
 figure below comes from the live catalog (`pg_proc` / `pg_get_functiondef`, `pg_class`,
 `pg_get_viewdef`, `pg_attribute`), not from grepping the repo — the repo disagrees with

@@ -129,7 +129,7 @@ Mock/fixture NSCLC content (DEF, not blockers): `lib/pulseFixture.ts`,
 
 | Consumer | Assumption | Class | Breast change | Config-only? | Risk / note | Wave |
 |---|---|---|---|---|---|---|
-| `sql/community_qualification_gate.sql:71,98,130,147` | NSCLC UUID predicate in all 4 `get_community_filtered`/`_count` overloads | BND ⚙ | per-TA gate config (id + volume floor) | no | live functions; floor 500 is NSCLC-derived (calibration); no-ops other TAs today | W3 |
+| `sql/community_roster_v1.sql:41`, `sql/community_count_rpc_board_repoint.sql:10,25`, `docs/state_provenance/04_filtered_family.sql:73` | NSCLC UUID predicate in all 4 `get_community_filtered`/`_count` overloads | BND ⚙ | per-TA gate config (id + volume floor) | no | **Location corrected 2026-09-03.** The previously cited `sql/community_qualification_gate.sql` is SUPERSEDED (its bodies read the retired `hcp_community_ranks_v2`); the literal lives in the files named here. It also SURVIVED the 2026-09-02 filtered-family rewrite — a rewrite is not a de-pin. Does NOT no-op other TAs: it is a `WHERE p_ta_id = <nsclc>` on the read, so every non-NSCLC TA returns zero rows by construction. Closed by `CRC_COMMUNITY_BUILD.md` phase 4.3 | W3 |
 | `sql/04_pulse_payload.sql:3,79,114` | ta_id + `'NSCLC'` literal + theme scope | BND | parameterize by TA slug | no | Pulse payload NSCLC-only | W3 |
 | `sql/03_pulse_signature_patch.sql:2-50` | signature seed scoped `therapeutic_area='NSCLC'` | CFG ⚙ | Breast signature seed | no | signatures are derived theme vocabulary | W3 |
 | `sql/get_pulse_synthesis_facts.sql:30` | `p_ta_slug text` param | P | none | — | already TA-agnostic | — |
