@@ -17,7 +17,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "../../lib/authHelpers";
-import { useTA } from "../../lib/TAContext";
 import { taIdForApiSlug } from "../../lib/api";
 import { taLabelToApiSlug, taSlugToLabel } from "../../lib/routeSlugs";
 import { supabase } from "../../lib/supabase";
@@ -96,7 +95,6 @@ const fmtIdx = (n: number | null): string => (n == null ? "—" : n.toFixed(1));
 export default function HomePage() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const { setTA } = useTA();
   // Same tracking source as the ledger and Trials — the portfolio bookmark is
   // the same control, not a second one.
   const { isTracked, toggleSave, getOtherWatchlists } = useRelationships();
@@ -185,7 +183,12 @@ export default function HomePage() {
         // this change removed and would have reinstated them: an unresolvable TA would have
         // pointed the Institutions link at lung. Null leaves the link unbuilt instead.
         setTaSlug(indicationSlug);
-        if (indicationSlug) setTA(parentSlug, indicationSlug);
+        // THE PROFILE DEFAULT IS NOT WRITTEN TO TACONTEXT HERE (2026-09-06). This was
+        // `if (indicationSlug) setTA(parentSlug, indicationSlug)`, and it ran on EVERY visit to
+        // /me, not just the first: select Colorectal on the ledger, click Home, and the session
+        // TA was silently reset to the profile default. A stored preference is a starting point,
+        // not a correction to a choice the user just made — so it seeds the store once, from
+        // TAProvider, only when the session carries no selection at all. See lib/TAContext.tsx.
 
         const [statsD, trackedIds, coverageD, territoryD, actionsD, overdueD, insightsD, briefsD, activityD, pinsD, chipsD] = await Promise.all([
           getOpenFollowUpStats(user.id),
@@ -242,7 +245,7 @@ export default function HomePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [setTA]);
+  }, []);
 
   // Follow-ups ordered by PRIORITY LABEL, then DUE DATE (DATA RULE 4).
   const PRIO: Record<string, number> = { high: 0, normal: 1, low: 2 };

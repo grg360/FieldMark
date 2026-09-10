@@ -279,6 +279,15 @@ function FeedLayout({
     [route.taSlug, route.indicationSlug],
   );
   const isAdFeed = feedDataSlug === "atopic-dermatitis";
+  // feedDataSlug IS THE QUERY KEY (2026-09-06), not just the AD test above. The three feed
+  // fetches send it as filters.therapeuticArea, which api.ts carries through to the narrative
+  // read as therapeutic_area_slug. It used to send taApiSlug — taLabelToApiSlug(selectedTA) —
+  // which maps the PARENT area to one indication: "Oncology" -> "nsclc" for colorectal as much
+  // as for lung, and "Immunology" -> "immunology", a slug no narrative row carries. So the
+  // colorectal feed asked for lung narratives and got them, and the AD feed asked for a slug
+  // with zero rows and got none. deriveTAValue resolves the INDICATION's own data slug, which
+  // is what the rows are. taApiSlug stays below purely as the unknown-TA guard and for the
+  // parent-scoped panels; it is no longer a query key on this surface.
   // The TA's DATA slug for this feed, or null when selectedTA is not a registered TA.
   // taLabelToApiSlug used to default to "rare-disease" for anything it did not recognise, so
   // an unknown TA rendered a complete, plausible rare-disease board under the wrong heading.
@@ -390,7 +399,7 @@ function FeedLayout({
       // AD Established/Community stay region/US (their RPCs still bail on global).
       const isAdRising = isAdFeed && track === "rising-stars";
       const filters = {
-        therapeuticArea: taApiSlug, region, states, national, themeIds, taId: indicationTaId,
+        therapeuticArea: feedDataSlug, region, states, national, themeIds, taId: indicationTaId,
         ...(isAdRising ? { scope: "global" as const } : {}),
       };
       let data: CohortFeedResult | null = null;
@@ -448,7 +457,7 @@ function FeedLayout({
       // AD Established/Community stay region/US (their RPCs still bail on global).
       const isAdRising = isAdFeed && track === "rising-stars";
       const filters = {
-        therapeuticArea: taApiSlug, region, states, national, themeIds, taId: indicationTaId,
+        therapeuticArea: feedDataSlug, region, states, national, themeIds, taId: indicationTaId,
         ...(isAdRising ? { scope: "global" as const } : {}),
       };
       let data: CohortFeedResult | null = null;
@@ -491,7 +500,7 @@ function FeedLayout({
     // AD Established/Community stay region/US (their RPCs still bail on global).
     const isAdRising = isAdFeed && track === "rising-stars";
     const filters = {
-      therapeuticArea: taApiSlug, region, states, themeIds, taId: indicationTaId,
+      therapeuticArea: feedDataSlug, region, states, themeIds, taId: indicationTaId,
       ...(isAdRising ? { scope: "global" as const } : {}),
     };
     setLoadingMore(true);

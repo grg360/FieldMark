@@ -290,6 +290,33 @@ async function enrichAndMapCohortRows(
   // "rising_composite" is the AD rising model — its narratives are rising rows.
   const narrativeCohort = cohort === "rising_composite" ? "rising_star" : cohort;
 
+  // THE TA THESE ROWS WERE FETCHED UNDER, resolved from taId — the value that went to the
+  // RPC as p_ta_id and therefore the only thing that says what these rank rows ARE. NOT
+  // taSlug: taSlug is a caller-supplied string, and on 2026-09-06 it was "nsclc" for every
+  // Oncology indication (taLabelToApiSlug in routeSlugs.ts maps the PARENT "Oncology" to a
+  // LUNG indication slug), so a colorectal board asked for and received lung narratives.
+  // 323 colorectal established board members hold an NSCLC established narrative; every one
+  // of them rendered lung prose on a colorectal card.
+  const boardTaSlug = apiSlugForTaId(taId) ?? null;
+
+  // THE INVARIANT: a narrative reaches a card ONLY if it was written about the TA that card's
+  // row was fetched under. Checked HERE, at the point of attachment, not at the query — the
+  // query is an input and inputs have been wrong before. Both reads below are already
+  // .eq("therapeutic_area_slug", taSlug), and that filter is exactly what failed: it did what
+  // it was told with a value that named the wrong TA.
+  //
+  // DO NOT REPLACE THIS WITH "TRUST THE QUERY", and do not add a branch that fills a missing
+  // narrative from another TA's row. A narrative is a claim about a person's standing WITHIN
+  // one therapeutic area — their evidence, their trials, their peers there. It does not
+  // transfer, and it is written in prose confident enough that nothing on the card marks it as
+  // borrowed. A missing narrative is an absence the card already renders. A wrong-TA narrative
+  // is a fabricated claim about a named physician, printed as fact.
+  //
+  // boardTaSlug === null (a taId outside TA_ID_MAP) drops everything, deliberately: if we
+  // cannot name the board's TA we cannot prove a match, and unprovable means absent.
+  const narrativeIsForThisBoard = (row: { therapeutic_area_slug?: unknown }): boolean =>
+    boardTaSlug !== null && String(row.therapeutic_area_slug ?? "") === boardTaSlug;
+
   if (narrativeIds.length > 0) {
     const { data: taNarratives, error: taNarrError } = await supabase
       .from("hcp_narratives_v2")
@@ -302,6 +329,8 @@ async function enrichAndMapCohortRows(
       return { rows: [], error: `Narrative query failed: ${taNarrError.message}` };
     }
     for (const n of taNarratives ?? []) {
+      // Wrong TA -> dropped, and the card falls to its existing no-narrative state.
+      if (!narrativeIsForThisBoard(n)) continue;
       narrativeMap.set(String(n.hcp_id), {
         narrative_text: (n as any).narrative_text ?? null,
         why_now: (n as any).why_now ?? null,
@@ -320,7 +349,10 @@ async function enrichAndMapCohortRows(
       // transfer; the TA filter is restored and absence stays absence.
       const { data: fallbackNarratives, error: fbError } = await supabase
         .from("hcp_narratives_v2")
-        .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at")
+        // therapeutic_area_slug is SELECTED, not just filtered on: narrativeIsForThisBoard
+        // re-checks it below, and a column that is absent from the row reads as a mismatch
+        // and drops the narrative. Filtering without selecting would silently empty this path.
+        .select("hcp_id, narrative_text, why_now, engagement_angle, caution_flags, signal_strength, generated_at, therapeutic_area_slug")
         .in("hcp_id", missingIds)
         .eq("cohort", narrativeCohort)
         .eq("therapeutic_area_slug", taSlug)
@@ -330,6 +362,9 @@ async function enrichAndMapCohortRows(
         return { rows: [], error: `Narrative fallback query failed: ${fbError.message}` };
       }
       for (const n of fallbackNarratives ?? []) {
+        // Same invariant on the gap-filling path — this is the branch most tempted to
+        // substitute, so it is checked before it can fill a gap with another TA's prose.
+        if (!narrativeIsForThisBoard(n)) continue;
         const hid = String(n.hcp_id);
         if (!narrativeMap.has(hid)) {
           narrativeMap.set(hid, {

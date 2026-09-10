@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,6 +14,8 @@ import {
   taSlugToLabel,
 } from "./routeSlugs";
 import { apiSlugForTaId, taIdForApiSlug } from "./api";
+import { getCurrentUser } from "./authHelpers";
+import { supabase } from "./supabase";
 
 /**
  * TAContext — global source of truth for the current therapeutic area + indication.
@@ -42,8 +45,9 @@ const TAContext = createContext<TAContextValue | null>(null);
 
 const STORAGE_KEY = "fieldmark.ta";
 // Safe fallback = the app's home landing (Oncology / NSCLC), matching routeSlugs
-// HOME_TA / HOME_INDICATION_SLUG. (A per-user default lives in msl_profiles.default_ta_slug;
-// seeding from it is deferred — it needs an async fetch and no consumer reads this yet.)
+// HOME_TA / HOME_INDICATION_SLUG. The per-user default in msl_profiles.default_ta_slug is no
+// longer "deferred" (2026-09-06): TAProvider seeds from it below, so this pair is now the
+// fallback for a user who has no profile default rather than for every user.
 const DEFAULT_PARENT_SLUG = "oncology";
 const DEFAULT_INDICATION_SLUG = "nsclc";
 
@@ -106,9 +110,14 @@ export function deriveTAValue(parentSlug: string, indicationSlug: string): TAVal
   };
 }
 
-function readStoredSelection(): { parentSlug: string; indicationSlug: string } {
+/**
+ * `stored` reports whether the session actually CARRIED a selection, as opposed to falling
+ * back to the default pair. The profile hydration below needs that distinction: seeding over a
+ * default is filling a blank, seeding over a real selection is overwriting a user's choice.
+ */
+function readStoredSelection(): { parentSlug: string; indicationSlug: string; stored: boolean } {
   if (typeof window === "undefined") {
-    return { parentSlug: DEFAULT_PARENT_SLUG, indicationSlug: DEFAULT_INDICATION_SLUG };
+    return { parentSlug: DEFAULT_PARENT_SLUG, indicationSlug: DEFAULT_INDICATION_SLUG, stored: false };
   }
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
@@ -120,22 +129,29 @@ function readStoredSelection(): { parentSlug: string; indicationSlug: string } {
         typeof parsed?.indicationSlug === "string" &&
         parsed.indicationSlug.trim() !== ""
       ) {
-        return { parentSlug: parsed.parentSlug, indicationSlug: parsed.indicationSlug };
+        return { parentSlug: parsed.parentSlug, indicationSlug: parsed.indicationSlug, stored: true };
       }
     }
   } catch {
     // sessionStorage unavailable / malformed — fall through to default.
   }
-  return { parentSlug: DEFAULT_PARENT_SLUG, indicationSlug: DEFAULT_INDICATION_SLUG };
+  return { parentSlug: DEFAULT_PARENT_SLUG, indicationSlug: DEFAULT_INDICATION_SLUG, stored: false };
 }
 
 export function TAProvider({ children }: { children: ReactNode }) {
+  const hadStoredSelection = useRef(false);
   const [value, setValue] = useState<TAValue>(() => {
-    const { parentSlug, indicationSlug } = readStoredSelection();
+    const { parentSlug, indicationSlug, stored } = readStoredSelection();
+    hadStoredSelection.current = stored;
     return deriveTAValue(parentSlug, indicationSlug);
   });
 
-  const setTA = useCallback((parentSlug: string, indicationSlug: string) => {
+  // Any real write — a picker, a route mirror — closes the door on hydration below. Set
+  // synchronously inside setTA rather than derived from `value`, because the profile fetch is
+  // in flight while those writes land and a state compare would race it.
+  const written = useRef(false);
+
+  const applyTA = useCallback((parentSlug: string, indicationSlug: string) => {
     setValue(deriveTAValue(parentSlug, indicationSlug));
     if (typeof window !== "undefined") {
       try {
@@ -148,6 +164,57 @@ export function TAProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
+
+  const setTA = useCallback(
+    (parentSlug: string, indicationSlug: string) => {
+      written.current = true;
+      applyTA(parentSlug, indicationSlug);
+    },
+    [applyTA],
+  );
+
+  /**
+   * SEED FROM THE USER'S PROFILE DEFAULT — ONCE, AND ONLY INTO AN EMPTY SESSION.
+   *
+   * This work used to live in HomePage, where it ran on EVERY visit to /me and therefore
+   * overwrote whatever the user had selected: pick Colorectal on the ledger, click Home, and
+   * the session TA silently reverted to lung. Moving it here is what makes it a DEFAULT rather
+   * than a correction — it fills a blank and then never speaks again.
+   *
+   * TWO GUARDS, both required. `hadStoredSelection` covers the session that already carries a
+   * choice from a previous page. `written` covers the choice that lands WHILE this fetch is in
+   * flight — a route mirror or a picker firing first — which the storage check cannot see.
+   *
+   * NO FALLBACK ON FAILURE. A logged-out user, a missing profile row, an unregistered stored
+   * slug: all leave the constructor's default pair in place. Inventing a TA here would be the
+   * same class of bug this commit exists to remove.
+   */
+  useEffect(() => {
+    if (hadStoredSelection.current) return;
+    let alive = true;
+    (async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user || !alive || written.current) return;
+        const { data } = await supabase
+          .from("msl_profiles")
+          .select("default_ta_slug, default_indication_slug")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!alive || written.current) return;
+        const parentSlug = data?.default_ta_slug ?? "";
+        if (!parentSlug || taSlugToLabel(parentSlug) === null) return;
+        const indicationSlug = data?.default_indication_slug ?? "";
+        if (!indicationSlug) return;
+        applyTA(parentSlug, indicationSlug);
+      } catch {
+        // Leave the default in place; see NO FALLBACK ON FAILURE above.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [applyTA]);
 
   // TEMPORARY (Phase 1a, dev-only): surface the context so Garrett can confirm the
   // value per route in the browser while NO consumer reads it yet. Logs on change +
