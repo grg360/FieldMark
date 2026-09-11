@@ -225,6 +225,49 @@ is the single most important architectural rule in v2.**
 Runtime: inventory ~30 min; Step C ~1–2 h; career enrichment ~hours; scoring/centrality ~30–40 min.
 Plan a long window.
 
+### STEP 2b — NPI acquisition: one stage, one MANUAL step you must not skip (added 2026-09-07)
+
+Community membership is Medicare-derived and Medicare is keyed on NPI, so this step sets the
+ceiling on your TA's community board. Two scripts produce NPIs and **only one of them is in the
+orchestrator**:
+
+- **`targeted_nppes_enrichment.py` — automated, `ta_cycle` stage 11.5.** UPDATEs existing
+  publication-derived HCPs with an NPI from a live registry search. Reads
+  `nppes.min_career_pubs` from `config/therapeutic_areas/<slug>.json`; **there is no default** —
+  an unset TA gets a named error, surfaced as a stage WARN. Nothing to run by hand.
+- **`nppes_workstream_b_ingest.py` — MANUAL, once per TA, at build time. Deliberately NOT a
+  stage.** INSERTs new HCP records minted from the NPPES registry, filtered by
+  `nppes.taxonomies`. This is where the bulk of community NPI coverage comes from — 85% of
+  NSCLC's community NPI holders were created this way, not matched.
+
+**Run enrichment before workstream B. Always.** One order is reversible and the other is not:
+
+- Enrichment first → the NPI lands on Dr X's **publication record**, and workstream B, seeing the
+  NPI already present, adds the TA link to that same record. One person, one row.
+- Workstream B first → it mints a second record holding the NPI; enrichment then finds the same
+  NPI for Dr X's publication record and the write hits the unique index (`[DUPLICATE_NPI]`,
+  skipped). **That record can never be given its NPI.** The twin is permanent, and dedup will not
+  clean it up — 818 of a measured 843 CRC twins are invisible to `dedup_detect` because a registry
+  record has no OpenAlex id, no co-authors and no `institution_normalized` to fire a strong signal.
+
+Position in the build:
+
+```powershell
+# after the taxonomy + floor decisions are made, and after the build cycle:
+python scripts/ta_cycle.py --operation build --ta <slug> --execute      # enrichment runs at 11.5
+
+python scripts/ingest/nppes_workstream_b_ingest.py --target-version v2 --ta <slug>   # DRY-RUN default
+python scripts/ingest/nppes_workstream_b_ingest.py --target-version v2 --ta <slug> --execute
+
+python scripts/ta_cycle.py --operation refresh --ta <slug> --execute    # 8d classifies the new records
+```
+
+`--ta` is required on workstream B and has no default: it used to process every configured TA at
+once, so a colorectal run would also have created 17,296 Atopic Dermatitis records.
+
+⚠️ **An empty community board on a new TA usually means this manual step was never run.** It is not
+in the cycle and nothing will do it for you. Full reasoning in `TA_NEW_PLAYBOOK.md` §1b.
+
 ---
 
 ## STEP 3 — Validate against known KOLs (the acceptance test)

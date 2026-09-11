@@ -328,6 +328,278 @@ so their corpus record did not place them in NSCLC, and a taxonomy code would. T
 input #1 in miniature: *treat* versus *could*. With `--ta` in place they are written only if
 someone deliberately runs nsclc, so nothing forces that decision now.
 
+## THE ENRICHMENT WEEK — 2026-09-08. How the rules were derived.
+
+The first live enrichment run for CRC. Read this for the reasoning; the numbers are
+CRC's and will not transfer, but every rule below was derived from a measurement and
+each would have to be re-derived to be safely changed.
+
+**Outcome.** 969 candidates at a floor of 25 → 244 written, 130 ambiguous, 515 no-match,
+61 duplicate-NPI, 19 gate-held. **34 of the 244 were then reverted, then 10 more.** Live:
+**200 writes**, taking CRC from 1,415 NPIs to **1,615 of 106,551 (1.52%)**. Against
+NSCLC's 11.4% that is a rounding error, and it confirms the provenance finding: enrichment
+is the precision path, not the volume path. Volume needs workstream B.
+
+**Three revert tranches, three different failures.** `docs/npi_enrichment/01`, `02`, `04`.
+
+| tranche | n | what fired |
+|---|---|---|
+| 1 | 17 | The candidate filter trusted `hcps_v2.country`. It said US for physicians at Wuhan, Harbin, Changchun, Shaanxi and Western University. |
+| 2 | 17 | The matched NPPES taxonomy was implausible for CRC — Community Health Worker, Speech-Language Pathologist, Dentist, and four registered as "Student in an Organized Health Care Education Program". The taxonomy is evidence we matched a **different human**. |
+| 3 | 10 | Live only because they predated the surname gate. Under the rules as they now stand they would not have been written; a write today's rules forbid should not survive on its timestamp. Several are probably correct and all are restorable. |
+
+Two of an original 19 in tranche 1 were **not** reverted: a regex without word boundaries
+matched `western university` inside "Northwestern University" and `india` inside
+"Indiana". Both were US physicians. The classifier that finds a defect can be the defect.
+
+**The invariant now holding, and worth re-checking after any future run:** every live
+written NPI either carries an independent confirming signal (130) or sits below the
+surname threshold on a rare name (70). Zero satisfy neither.
+
+### Two config keys, because one list was doing two jobs
+
+`nppes.taxonomies` was split into `population_taxonomies` and `confirming_taxonomies`
+(`scripts/utils/ta_nppes_config.py`, one implementation, read by the matcher, the enricher
+and workstream B). **This is the transferable lesson.**
+
+- **Population** — who counts as a member of the TA. Workstream B *creates* a record per
+  matching NPPES individual, so narrow is correct and breadth is catastrophic:
+  `208600000X` "Surgery" admits 42,905 people and would define colorectal cancer as
+  "surgery".
+- **Confirming** — what corroborates a name match that already exists. It *admits nobody*.
+  Narrow is therefore wrong, and the cost is invisible: a six-code list held 26 correct-
+  looking writes, including MSK, Cornell, Fox Chase and Stanford colorectal surgeons,
+  because their NPPES code was `208600000X`.
+
+The same code belongs on one list and not the other. Specifying one number for both is
+what produced the error. Codes proposed but not accepted live in
+`confirming_taxonomies_candidates` with the argument for and against recorded — JSON has
+no comments, so a held candidate is a data row a reviewer can read, not a bare code.
+
+### The surname finding: the cliff is at 10, not 1,000
+
+Ambiguity rate by surname block — of attempts where NPPES returned something verifiable,
+how often it returned *several*:
+
+| block | <10 | 10–99 | 100–299 | 300–999 | 1,000–1,999 | ≥2,000 |
+|---|---|---|---|---|---|---|
+| % ambiguous | **12.9** | **57.1** | 66.7 | 58.8 | 57.1 | 69.2 |
+
+One step, 4.4×, between <10 and 10–99; a plateau above it. The intuitive threshold of
+1,000 sits in the middle of the plateau and separates almost nothing. **A round number
+would have been wrong and would have looked reasonable.**
+
+It **gates, it does not reject**: above the threshold a match needs a confirming signal.
+Rejecting outright would have discarded 43 of 55, and inspection showed most were correct
+people failing only because the confirmer list was too narrow. Reads
+`hcp_surname_block_v1`; the enricher refuses to run the gate if the view is missing rather
+than silently treating every surname as rare.
+
+### `hcp_country_disagreement_v1` — record the contradiction, do not resolve it
+
+4,050 HCPs (1,299 CRC-linked, **9.0% of the US-flagged CRC population**) say `country='US'`
+while their resolved institution country or `current_country` says otherwise. The filter
+now skips them — resolved non-US disqualifies, **unresolved does not**, because treating
+unknown as non-US is the same error facing the other way.
+
+They are also written down, with both sides stored and neither declared correct. If the
+filter had simply absorbed the contradiction, the next consumer of `hcps_v2.country` would
+inherit the identical bug, invisibly, because the one process that noticed had quietly
+routed around it. Same principle as `institution_state_source` and
+`hcp_therapeutic_areas_v2.source`: the provenance travels as data.
+
+---
+
+## THE CRC EVIDENCE MODEL — 2026-09-09, clinical advisor, second pass
+
+**Not built. This is the design and the reasoning behind it.** The tier view is designed
+after workstream B: with 3 bevacizumab providers in our data, no composite below is
+measurable.
+
+### Why lung's approach does not transfer
+
+NSCLC's evidence tiers work at **molecule level**. Pemetrexed `J9305`, durvalumab
+`J9173`, and the lung-only oral anchors are indication-specific enough that one code
+implies the disease. That is a property of lung's drug vocabulary, not a property of the
+method.
+
+Colorectal has no such molecule available in the data:
+
+- `J9303` panitumumab, `J9055` cetuximab and `J9400` ziv-aflibercept — the three codes
+  that would carry a `strict` tier — have **zero rows in the CMS Physician & Other
+  Practitioners by-Provider-and-Service file for 2021, 2022 and 2023**. Verified against
+  the source parquets before any join, and re-validated against the raw CSV (J9303 0 rows,
+  J9055 0, J9400 0, against J9035 1,854 and J9263 516 in the same file).
+- Fruquintinib, the only `strict` Part D oral, was approved 2023-11-08 — seven weeks of
+  the latest year we hold.
+- Everything else colorectal touches — oxaliplatin, irinotecan, 5-FU, leucovorin,
+  bevacizumab, capecitabine — is cross-indication by itself.
+
+**So colorectal requires pattern-level specificity where lung got molecule-level.** No
+single CRC code is diagnostic; a *combination* of them, on one provider in one year, is.
+That is the whole design, and it is why the NSCLC view cannot simply be parameterised —
+it has no concept of co-occurrence.
+
+### PRACTICE fingerprint, not regimen fingerprint
+
+**The terminology matters and the earlier drafts got it wrong.** We have no patient-level
+linkage. Every claims table we hold is aggregated to provider × code × year. When
+oxaliplatin, 5-FU and leucovorin all appear under one NPI in one year, that means *this
+provider administered all three during that year*. It does **not** mean any patient
+received them together, and FOLFOX is a statement about a patient.
+
+Call it a **practice fingerprint**: evidence about what a practice does, not what a
+regimen was. The distinction is load-bearing in two directions —
+
+- it is **weaker** than a regimen claim, so nothing downstream may say "this HCP gives
+  FOLFOX"; and
+- it is **sufficient** for our actual question, which is whether this provider treats
+  colorectal cancer, not which protocol they used.
+
+Getting this wrong would put an unsupported clinical claim on a named physician's
+profile — the same defect class as `nppes_practice_state`, `themes_tag`, and every other
+column in this system that asserted more than its evidence.
+
+### Suppression is evidence, not just loss
+
+CMS redacts any provider × HCPCS × place-of-service row with fewer than 11 distinct
+beneficiaries. That erases the tail — but it also means **every row that survives
+represents ≥11 distinct beneficiaries**.
+
+So a provider showing three or four surviving oncology signals in a single NPI-year is
+not a coincidence of small numbers. It is ≥11 beneficiaries on each, independently. The
+redaction that costs us coverage is the same mechanism that makes the surviving pattern
+strong. **Multiple surviving signals in one NPI-year is a treatment footprint.**
+
+### The composite anchors
+
+**Anchor A — oxaliplatin backbone**
+Medical Oncology or Hematology/Oncology taxonomy, plus the bevacizumab family
+(`J9035`, `Q5107`, `Q5118`, `Q5126`, `Q5129`), plus oxaliplatin `J9263`, plus 5-FU
+`J9190` — preferably with `96416` (prolonged chemotherapy infusion pump) or leucovorin
+`J0640`.
+
+**Anchor B — irinotecan backbone**
+The same, with irinotecan `J9206` in place of oxaliplatin.
+
+**PLACEHOLDER — the relative weight of Anchor B is not currently established. Do not
+cite a ratio from this document until this section is rewritten.**
+
+A version of this section claimed B was a markedly weaker tier: half A's size, "loses
+two-thirds of its members to the persistence test where A loses a third", and losing 22%
+to the taxonomy gate against A's 14%. **Those numbers were computed on a broken gate and
+are withdrawn.**
+
+The fault: `nppes_workstream_b_ingest.py` selected 19,043 records on NPPES taxonomy and
+never persisted the taxonomy, so `hcps_v2.npi_taxonomy` was NULL on every one and the
+gate silently excluded the entire registry-derived population. Fixed 2026-09-09 (producer
++ 19,043-row backfill).
+
+**What the corrected figures show is a much smaller gap than the withdrawn claim.** On the
+first read against parquet-derived taxonomy, B was 58% of A rather than 50%, and the
+persistence ratios were 23% against 25% — nearly identical, not two-thirds against a
+third. The taxonomy-gate-cost asymmetry came from the same distorted comparison and is
+withdrawn with the rest.
+
+There may still be a real difference — B remains smaller in absolute terms and sits
+closer to the FOLFIRINOX boundary, where irinotecan + 5-FU without a platinum is
+pancreatic vocabulary, which is a clinical argument independent of any measurement. But
+that is a hypothesis now, not a finding. Rewrite this against the fixed gate, and state
+plainly which claims are clinical reasoning and which are measured.
+
+**Why the VEGF component is load-bearing, and must not be dropped for coverage.**
+Oxaliplatin + irinotecan + 5-FU + pump, *without* bevacizumab, is the FOLFIRINOX
+vocabulary — and FOLFIRINOX is pancreatic. Drop the VEGF requirement to catch more
+people and the pattern stops being colorectal-heavy and starts pulling pancreatic
+oncology. Bevacizumab is what makes the combination lean CRC. It is the discriminating
+element, not a bonus one.
+
+### Cross-channel corroboration
+
+Part B and Part D are independent observation channels. An HCP with **Lonsurf
+(trifluridine), regorafenib or capecitabine in Part D** *and* a coherent Part B footprint
+is far better evidenced than one with either alone — the two channels can fail
+independently, so agreement between them is not double-counting.
+
+This is also the only route that survives our Part B coverage problem, since Part D
+prescriber data has no site-of-care gap.
+
+### Cross-year persistence is its own dimension
+
+Not a tie-breaker. A pattern appearing in two separate years is stronger than the same
+pattern in one, because year is an independent trial. The advisor's ladder:
+
+| evidence | tier |
+|---|---|
+| supported pattern in 1 year | **supported** |
+| supported pattern in ≥2 years | **strong supported** |
+| composite anchor in ≥1 year | **anchored** |
+| composite anchor in ≥2 years | **high-confidence anchored** |
+
+### Evidence FAMILIES, not code counts — and the trap
+
+Corroboration must be counted in **families**, of which there are five:
+
+1. **Cytotoxic backbone** — oxaliplatin, irinotecan
+2. **Fluoropyrimidine + modulation + delivery** — 5-FU, leucovorin, `96416` pump
+3. **Targeted / VEGF** — bevacizumab and its biosimilars
+4. **Oral therapy (Part D)** — capecitabine, trifluridine, regorafenib, encorafenib,
+   fruquintinib
+5. **Specialty and setting** — Med Onc / Heme-Onc taxonomy, practice context
+
+**THE TRAP, written down because it is easy and wrong:** counting 5-FU + leucovorin +
+oxaliplatin + pump as *four independent corroborations*. They are **one clinical
+construct** — a fluoropyrimidine backbone with its modulator and its delivery method,
+plus the platinum it is given with. A provider billing all four has demonstrated one
+thing, not four. Counting codes instead of families inflates confidence exactly where the
+codes cluster, which is precisely where they always cluster.
+
+Family 2 in particular is *internally* correlated: leucovorin without 5-FU is unusual,
+and `96416` without an infusional fluoropyrimidine is close to meaningless. Treat the
+family as one signal with internal consistency checks, never as three.
+
+### What NOT to do
+
+**Never promote oxaliplatin or bevacizumab alone to `anchor` to compensate for the
+missing J-codes.** The temptation will be real: the anchor tier is empty, these two codes
+are present and oncology-flavoured, and promoting either would immediately populate a
+board. Both are broadly cross-indication — bevacizumab spans colorectal, lung, renal,
+ovarian, cervical and glioblastoma; oxaliplatin spans colorectal, gastric and pancreatic.
+Promoting either would rebuild, at the tier level, exactly the defect
+`NSCLC_COHORT_EVIDENCE_TIERS.md` §1 found in `is_primary_signal` — a flag set true for
+cisplatin and docetaxel, "not distinguishing lung-specificity but something else."
+
+**For bevacizumab the case is far stronger than cross-indication, and it is measured.**
+Of the **2,094 providers billing the bevacizumab family nationally in the 2023 CMS file**:
+
+| taxonomy | providers | |
+|---|---|---|
+| `207W00000X` Ophthalmology | **1,608** | |
+| `207WX0107X` Ophthalmology, Retina | **745** | |
+| `207RH0003X` IM, Hematology & Oncology | 198 | |
+| any of the four original CRC population codes | 85 | |
+
+That is **intravitreal Avastin for macular degeneration**. By provider count, bevacizumab
+is not merely cross-indication across tumour types — it is **majority not oncology at
+all**. The ophthalmologists outnumber every oncology encoding combined by roughly ten to
+one.
+
+So bevacizumab alone is not a weak colorectal signal; it is a *retina* signal with an
+oncology tail. **Promoted alone to anchor, it would admit an ophthalmology practice ahead
+of a colorectal one** — and it would do so confidently, in volume, with a code that looks
+unimpeachably oncological to anyone reading the code list rather than the claims.
+
+This is also why the VEGF component works *inside* the composite and only there. Paired
+with oxaliplatin or irinotecan and a fluoropyrimidine under an oncology taxonomy, the
+retina population is excluded by construction — a retina specialist bills none of the
+other three. The composite is not bevacizumab plus corroboration; it is a conjunction in
+which bevacizumab is only meaningful because of what it is conjoined with.
+
+An empty anchor tier that says so is correct. A populated one built from cross-indication
+codes is a board that looks finished and is wrong.
+
+---
+
 ## FOUNDER INPUTS REQUIRED
 
 These stop the build until answered. Nothing downstream of them can be guessed.

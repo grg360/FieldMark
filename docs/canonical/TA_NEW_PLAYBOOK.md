@@ -332,6 +332,62 @@ NOT create HCP rows. This is the single most important architectural rule in v2.
 
 Runtime notes: inventory ~30 min; Step C ~1–2 h; career enrichment ~6 h. Plan a long window.
 
+### 1b. NPI ACQUISITION — one automated stage, one MANUAL step (added 2026-09-07)
+
+Community membership is Medicare-derived and Medicare is keyed on NPI, so a TA's NPI coverage
+decides how large its community board can be. Two scripts produce NPIs. **They are not
+interchangeable and they are not both stages.**
+
+| | `targeted_nppes_enrichment.py` | `nppes_workstream_b_ingest.py` |
+|---|---|---|
+| what it does | **UPDATEs** existing publication-derived HCPs with an NPI | **INSERTs** new HCP records minted from the NPPES registry |
+| keyed on | name + taxonomy, live registry search | an NPPES taxonomy code set. No name matching at all |
+| how it runs | **automated: `ta_cycle` stage 11.5** | **MANUAL, once per TA, at build time. NOT a stage.** |
+| needs | `nppes.min_career_pubs` in the TA config | `nppes.taxonomies` in the TA config |
+
+**Run order is fixed: enrichment first, workstream B second. Always.**
+
+This is not a preference, it is the difference between a reversible outcome and a permanent one:
+
+* **Enrichment first** — it puts NPI *N* onto Dr X's existing publication record. Workstream B
+  then sees *N* already present, routes Dr X down its link path, and attaches the TA link to
+  the **publication record**. One person, one row, publication history intact.
+* **Workstream B first** — it mints a *new* registry record holding *N*. Enrichment still selects
+  Dr X's publication record (it filters on `npi_number IS NULL`), searches, finds *N*, and the
+  write collides with the unique index on `npi_number`. It logs `[DUPLICATE_NPI]` and skips.
+  **Dr X's publication record can now never be given that NPI.** The twin is permanent.
+
+Dedup does not rescue you from the wrong order. Measured on the CRC core-six taxonomy set:
+843 registry records would twin an existing publication-derived HCP, and **818 of them are
+invisible to `dedup_detect` at any cycle position** — a registry record has no OpenAlex id, no
+co-authors and no `institution_normalized`, so none of the three strong signals can fire, and
+97% of the publication-side twins fall under the stub path's `>=100 career pubs OR >=50 linked
+pubs` bar.
+
+**Where the manual step goes:**
+
+```
+… decide nppes.taxonomies and nppes.min_career_pubs for the TA   (founder input)
+… ta_cycle --ta <slug> --operation build          ← runs enrichment at stage 11.5
+… python scripts/ingest/nppes_workstream_b_ingest.py \
+        --target-version v2 --ta <slug>            ← DRY-RUN default; --execute to commit
+… ta_cycle --ta <slug> --operation refresh         ← classifies the new records (stage 8d)
+```
+
+**Why workstream B is not a stage**, recorded so the question is not reopened by inference:
+
+1. It is blocked on a founder decision (`nppes.taxonomies`), and that decision is the *definition
+   of the TA's population* — who counts as a colorectal HCP — not a scheduling matter.
+2. Its input is a hand-refreshed local parquet, not the corpus. A weekly trigger is uncorrelated
+   with the only thing that changes its output; steady state is a 7.2M-row parquet load to
+   produce zero rows.
+3. It must not run before stage 7, and there is no benefit to running before it (see the 818
+   above). Its only legal cycle window would be between 7 and 8d — narrower than it looks, and
+   bought for nothing.
+
+Its absence from `ta_cycle` is therefore deliberate. If a TA's community board is empty, check
+that this step was run — do not assume the cycle did it.
+
 ---
 
 ## 2. Authoring the retrieval query (the make-or-break artifact)
