@@ -9,6 +9,44 @@ Contract:
 - This script only UPDATEs existing `hcps` rows.
 - This script never INSERTs new `hcps` rows.
 - Ambiguous matches are skipped (not guessed), and decisions are logged for audit.
+
+WHY STATE NARROWING IS ON BY DEFAULT (decided 2026-09-08)
+---------------------------------------------------------
+It was OFF, and the stated reason was: "nppes_practice_state is derived from institution
+location and wrongly suppresses real matches." That reason was TRUE when written and is
+FALSE NOW. The 2026-09-03 provenance repair emptied 14,676 institution-derived values out
+of nppes_practice_state; the column holds only NPPES-sourced values, and for this script's
+candidates (npi_number IS NULL) it is empty at every publication floor. The flag was
+switched off to avoid a contaminated column that no longer exists.
+
+Meanwhile the search state came from COALESCE(nppes_practice_state, derived_state), and
+derived_state has no producer -- 1 to 21 candidates depending on the floor. So every live
+registry search went out with no state, across all 50 states, and the measured consequence
+is the ambiguity mode the log is full of: "no city discriminator" between a Boca Raton, a
+Gurnee and a San Diego NPI for the same name. State was never the precision mechanism, but
+without ANY discriminator, precision-first resolves to "match nothing".
+
+institution_state is now in the COALESCE, matching nppes_matcher's blocking key, and it has
+real coverage (173-1,855 candidates depending on floor). That is what makes narrowing worth
+switching on: there is finally a column feeding it.
+
+THE COST, AND WHY IT IS BOUNDED RATHER THAN ACCEPTED. An institution_state says where
+someone PUBLISHES FROM, not where they practise, so as a hard filter it can suppress a real
+match in another state -- and that miss now goes into the attempt memo, making a
+wrong-state search permanent for that person. Two mechanisms bound it:
+
+  1. STATELESS FALLBACK. institution-basis only: if the state-filtered search returns zero
+     results, the search is repeated without the state. A weak state narrows; it never
+     eliminates. nppes/derived basis gets no fallback -- those columns mean where the
+     person practises, so zero results there is a real answer.
+  2. THE CONFIRMATION GATE, imported from nppes_matcher, not restated here. An
+     institution-basis match needs an independent signal (taxonomy / specialty /
+     institution agreement) before an NPI is written. Without one it is logged
+     'unconfirmed_institution' and HELD -- and that status is deliberately outside the
+     attempt memo, because a gate decision is not a search failure and must be revisitable
+     when the TA gets a confirming-taxonomy list.
+
+--no-use-state restores the stateless behaviour for a one-off comparison.
 """
 
 # ============================================================
@@ -105,6 +143,205 @@ US_STATES_AND_TERRITORIES = [
     "DC",
     "PR",
 ]
+
+
+TA_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config" / "therapeutic_areas"
+
+# match_confidence values that mean "we asked NPPES about this person and came back
+# empty-handed". A row carrying one of these is the attempt memo.
+#
+# 'unconfirmed_institution' is DELIBERATELY NOT IN THIS TUPLE. It is not a search
+# failure -- the registry answered, and the answer was held back by the confirmation
+# gate. Memoising it would make a gate decision permanent and would strand those
+# people the moment the TA gets a confirming-taxonomy list.
+#
+# nppes_enrichment_log_v2 carries NO CHECK on match_confidence (verified live
+# 2026-09-08), so these values insert cleanly. The v1 DDL in build_enrichment_log_table's
+# docstring below still shows a two-value CHECK; that is the v1 table, not this one.
+MISS_CONFIDENCES = ("ambiguous", "no_match")
+CONFIDENCE_UNCONFIRMED = "unconfirmed_institution"
+
+# A write that was made and then WITHDRAWN (docs/npi_enrichment/01_revert_suspect_writes.sql).
+# Memoised so the next run does not immediately re-write the same NPI, but kept as its own
+# status: these are not search misses, and a report that lumped them in with the 515 genuine
+# no-matches would hide the fact that we accepted an answer and then took it back.
+CONFIDENCE_WITHDRAWN = "withdrawn_write"
+CONFIDENCE_UNCONFIRMED_NAME = "unconfirmed_common_surname"
+
+# SURNAME BLOCK GATE. Measured on the 2026-09-08 CRC run: of the attempts where NPPES
+# returned something verifiable, 12.9% were ambiguous when the surname block was < 10 and
+# 57.1% when it was 10-99 -- a 4.4x step. Above that it is a plateau (66.7 / 58.8 / 57.1 /
+# 69.2 through to block >= 2000), so the discriminating boundary is 10, not any round
+# number further up. A single NPPES result for a surname shared with ten or more people in
+# hcps_v2 is evidence, not proof.
+#
+# It GATES, it does not reject: the match still needs an independent confirming signal, the
+# same one the institution basis needs. Rejecting outright would discard 43 of 55 writes at
+# this threshold, and inspection showed many of those are correct people failing only
+# because the confirmer list is narrower than real NPPES coding.
+SURNAME_BLOCK_GATE = 10
+MEMO_CONFIDENCES = MISS_CONFIDENCES + (CONFIDENCE_WITHDRAWN,)
+
+# THE CONFIRMATION GATE IS IMPORTED, NOT REIMPLEMENTED. nppes_matcher.py owns the rule
+# that an institution-blocked candidate needs independent corroboration before an NPI is
+# written, and owns the per-TA confirming-taxonomy lists. Two copies of that rule would
+# drift, and the drift would be invisible -- both would still "have a gate".
+import sys as _sys  # noqa: E402
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+_sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "utils"))
+from nppes_matcher import (  # noqa: E402
+    BASIS_DERIVED,
+    BASIS_INSTITUTION,
+    BASIS_NPPES,
+    STATE_COLUMNS,
+    confirmation_signals,
+)
+from ta_nppes_config import load_confirming_taxonomies  # noqa: E402
+
+
+def fetch_surname_blocks(supabase_client: Client, surnames: Set[str]) -> Optional[Dict[str, int]]:
+    """
+    last_name_lower -> how many hcps_v2 rows share it.
+
+    Reads the view hcp_surname_block_v1 (docs/npi_enrichment/03_rules.sql). Returns None
+    -- not an empty dict -- when the view is absent, so the caller can say "the gate did
+    not run" instead of silently behaving as though every surname were rare.
+    """
+    if not surnames:
+        return {}
+    out: Dict[str, int] = {}
+    names = sorted(surnames)
+    chunk = 200
+    for i in range(0, len(names), chunk):
+        try:
+            resp = (
+                supabase_client.table("hcp_surname_block_v1")
+                .select("last_name_lower,freq")
+                .in_("last_name_lower", names[i : i + chunk])
+                .execute()
+                .data
+                or []
+            )
+        except Exception as exc:
+            print(f"[SURNAME] view hcp_surname_block_v1 unavailable ({exc}).")
+            return None
+        for r in resp:
+            out[str(r.get("last_name_lower") or "")] = int(r.get("freq") or 0)
+    return out
+
+
+def resolve_search_state(row: Dict[str, Any]) -> Tuple[str, Optional[str]]:
+    """
+    COALESCE(nppes_practice_state, derived_state, institution_state) + which column won.
+
+    Identical to the blocking key in nppes_matcher.py, and it reads that script's
+    STATE_COLUMNS so the two cannot diverge.
+    """
+    for column, basis in STATE_COLUMNS:
+        value = str(row.get(column) or "").strip().upper()
+        if value:
+            return value, basis
+    return "", None
+
+
+def nppes_record_as_candidate(record: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Adapt one NPPES *API* result into the shape confirmation_signals() reads.
+
+    The matcher works from the NPPES parquet (flat taxonomy_1..5 columns); the API
+    returns a nested `taxonomies` list. This is the only difference between the two
+    call sites, so it is the only thing adapted -- the gate itself is the imported one.
+    """
+    out: Dict[str, Any] = {}
+    for i, tax in enumerate((record.get("taxonomies") or [])[:5], start=1):
+        tax = tax or {}
+        out[f"taxonomy_{i}"] = str(tax.get("code") or "").strip()
+        out[f"primary_taxonomy_switch_{i}"] = "Y" if tax.get("primary") else "N"
+    basic = record.get("basic") or {}
+    out["credentials"] = str(basic.get("credential") or "")
+    city = ""
+    for addr in record.get("addresses") or []:
+        if str((addr or {}).get("address_purpose") or "").upper() == "LOCATION":
+            city = str((addr or {}).get("city") or "").strip()
+            break
+    out["practice_city"] = city
+    return out
+
+
+def resolve_min_career_pubs(slug: str) -> int:
+    """
+    The publication floor for candidate selection, from the TA config.
+
+    It used to be a CLI default of 500, which meant every TA silently inherited the
+    number NSCLC happened to run with. It is a per-TA judgement -- how many career
+    publications make a name specific enough that a live registry search is worth a
+    call and a write -- so it lives beside the TA's other decisions and there is no
+    default. Same shape as nppes.taxonomies in nppes_workstream_b_ingest.py: named
+    error, listing where to put the value, rather than a guess.
+    """
+    path = TA_CONFIG_DIR / f"{slug}.json"
+    if not path.exists():
+        raise SystemExit(f"No TA config at {path}.")
+    with open(path, "r", encoding="utf-8") as fh:
+        cfg = json.load(fh)
+    value = (cfg.get("nppes") or {}).get("min_career_pubs")
+    if value is None:
+        raise SystemExit(
+            f"TA {slug!r} has no nppes.min_career_pubs in config/therapeutic_areas/{slug}.json.\n"
+            "  This is the publication floor above which an HCP is worth a live NPPES search.\n"
+            "  It is a per-TA judgement and this script will not guess it -- a wrong floor\n"
+            "  either burns API calls on names too common to resolve, or silently leaves a\n"
+            "  cohort unenriched. Set it in the TA config, or pass --min-career-pubs to\n"
+            "  override for a one-off run.\n"
+            "  NSCLC and Atopic Dermatitis ran historically at 500; that is history, not a\n"
+            "  recommendation for a new TA."
+        )
+    if not isinstance(value, int) or value < 0:
+        raise SystemExit(
+            f"nppes.min_career_pubs in config/therapeutic_areas/{slug}.json must be a "
+            f"non-negative integer; got {value!r}."
+        )
+    return value
+
+
+def fetch_attempt_memo(supabase_client: Client, target_version: str) -> Set[str]:
+    """
+    hcp_ids not to re-query: searched and came back ambiguous/no-match, or written
+    and later withdrawn.
+
+    WHY: candidate selection filters on npi_number IS NULL and the publication floor
+    and nothing else, so a name the registry cannot resolve is re-queried against the
+    live API every single week, forever. 2,106 HCPs already carry an enrichment-log row
+    and still have no NPI. Nothing about the query changes between runs -- same name,
+    same registry -- so the second call and the two-hundredth are the same call.
+
+    A miss is memoised, not permanent: --retry-misses ignores this set, which is the
+    right move after an NPPES data refresh or a change to the matching rules.
+    """
+    log_table = get_table_name("nppes_enrichment_log", target_version)
+    memo: Set[str] = set()
+    offset = 0
+    while True:
+        batch = (
+            supabase_client.table(log_table)
+            .select("hcp_id")
+            .in_("match_confidence", list(MEMO_CONFIDENCES))
+            .is_("reverted_at", "null")
+            .order("hcp_id")
+            .range(offset, offset + HCPS_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            if row.get("hcp_id"):
+                memo.add(str(row["hcp_id"]))
+        if len(batch) < HCPS_PAGE_SIZE:
+            break
+        offset += HCPS_PAGE_SIZE
+    return memo
 
 
 def resolve_ta_slug(supabase_client: Client, slug: str) -> Tuple[str, str]:
@@ -240,24 +477,32 @@ def attach_institution_city(
         {str(c.get("institution_short")).strip() for c in candidates if c.get("institution_short")}
     )
     city_by_name: Dict[str, str] = {}
+    country_by_name: Dict[str, str] = {}
     chunk = 100  # institution names are long; keep the .in_ URL bounded
     for i in range(0, len(names), chunk):
         resp = (
             supabase_client.table("institution_geo_lookup")
-            .select("institution_display_name,city")
+            .select("institution_display_name,city,country_code")
             .in_("institution_display_name", names[i : i + chunk])
             .execute()
             .data
             or []
         )
         for r in resp:
-            nm, city = r.get("institution_display_name"), r.get("city")
+            nm, city, cc = r.get("institution_display_name"), r.get("city"), r.get("country_code")
             if nm and city and nm not in city_by_name:
                 city_by_name[nm] = str(city).strip()
+            if nm and cc and nm not in country_by_name:
+                country_by_name[nm] = str(cc).strip().upper()
     n_with = 0
     for c in candidates:
-        city = city_by_name.get(str(c.get("institution_short") or "").strip())
+        key = str(c.get("institution_short") or "").strip()
+        city = city_by_name.get(key)
         c["institution_city"] = city
+        # RESOLVED institution country, for the non-US disqualifier. None means the
+        # institution did not resolve -- which is NOT the same as non-US and must not
+        # be treated as one.
+        c["institution_country"] = country_by_name.get(key)
         if city:
             n_with += 1
     return n_with, len(candidates)
@@ -299,9 +544,9 @@ def get_candidate_hcps(
             batch = (
                 supabase_client.table(hcps_table)
                 .select(
-                    "id,first_name,last_name,middle_name,country,institution_normalized,"
+                    "id,first_name,last_name,middle_name,country,current_country,institution_normalized,"
                     "institution_canonical,total_career_pubs,npi_number,nppes_practice_state,"
-                    "derived_state,ingestion_run_id"
+                    "derived_state,institution_state,ingestion_run_id"
                 )
                 .in_("id", chunk)
                 .is_("npi_number", "null")
@@ -314,17 +559,15 @@ def get_candidate_hcps(
                 last = str(row.get("last_name") or "").strip()
                 if not first or not last:
                     continue
-                nppes_state = (
-                    str(row.get("nppes_practice_state") or row.get("derived_state") or "")
-                    .strip()
-                    .upper()
-                )
+                search_state, state_basis = resolve_search_state(row)
                 out.append(
                     {
                         "id": row.get("id"),
                         "first_name": first,
                         "last_name": last,
-                        "derived_state": nppes_state or None,
+                        "derived_state": search_state or None,
+                        "state_basis": state_basis,
+                        "current_country": row.get("current_country"),
                         "institution_short": row.get("institution_normalized")
                         or row.get("institution_canonical"),
                         "total_career_pubs": row.get("total_career_pubs"),
@@ -388,9 +631,9 @@ def get_candidate_hcps(
         q = (
             supabase_client.table(hcps_table)
             .select(
-                "id,first_name,last_name,middle_name,country,institution_normalized,"
+                "id,first_name,last_name,middle_name,country,current_country,institution_normalized,"
                 "institution_canonical,total_career_pubs,npi_number,nppes_practice_state,"
-                "derived_state,ingestion_run_id"
+                "derived_state,institution_state,ingestion_run_id"
             )
             .is_("npi_number", "null")
             .gte("total_career_pubs", min_career_pubs)
@@ -420,18 +663,23 @@ def get_candidate_hcps(
         last = str(row.get("last_name") or "").strip()
         if not first or not last:
             continue
-        # NPPES search state: COALESCE(nppes_practice_state, derived_state)
-        nppes_state = (
-            str(row.get("nppes_practice_state") or row.get("derived_state") or "")
-            .strip()
-            .upper()
-        )
+        # NPPES search state: COALESCE(nppes_practice_state, derived_state, institution_state).
+        # institution_state joined this COALESCE on 2026-09-08, making it identical to the
+        # blocking key in nppes_matcher.py. Before that it was the first two columns, and the
+        # provenance repair had emptied the first, so 94-98% of candidates reached a live
+        # registry search carrying no state at all.
+        search_state, state_basis = resolve_search_state(row)
         filtered_v2.append(
             {
                 "id": row.get("id"),
                 "first_name": first,
                 "last_name": last,
-                "derived_state": nppes_state or None,
+                # `derived_state` is the historical key the rest of this script reads the
+                # search state from. Kept as the carrier so no call site moves; what changed
+                # is what feeds it, and `state_basis` records which column that was.
+                "derived_state": search_state or None,
+                "state_basis": state_basis,
+                "current_country": row.get("current_country"),
                 "institution_short": row.get("institution_normalized")
                 or row.get("institution_canonical"),
                 "total_career_pubs": row.get("total_career_pubs"),
@@ -705,6 +953,9 @@ def update_hcp_with_nppes(
     dry_run: bool = True,
     target_version: str = "v1",
     scoped_hcp_ids: Optional[Set[str]] = None,
+    state_basis: Optional[str] = None,
+    search_path: str = "",
+    gate_signals: Optional[List[str]] = None,
 ) -> bool:
     if scoped_hcp_ids is not None and hcp_id not in scoped_hcp_ids:
         print(
@@ -831,12 +1082,25 @@ def update_hcp_with_nppes(
         except Exception as exc:
             print(f"[DETAIL_UPSERT_FAILED] hcp_id={hcp_id}: {exc}")
 
+    # THE BASIS RIDES ON THE ROW. A match found on an institution_state search state is
+    # weaker than one found on a practice state, and six months from now the only way to
+    # tell them apart is this field. Same principle as state_basis on the read side and
+    # block_basis in nppes_matcher.
     log_payload = {
         "hcp_id": hcp_id,
         "matched_npi": npi,
         "match_confidence": "high_confidence",
-        "match_reason": "Applied targeted publication-source-to-NPPES enrichment update.",
-        "candidates_considered": nppes_data,
+        "match_reason": (
+            "Applied targeted publication-source-to-NPPES enrichment update. "
+            f"basis={state_basis or 'none'} path={search_path or 'unknown'}"
+            + (f" confirmed_by={','.join(gate_signals)}" if gate_signals else "")
+        ),
+        "candidates_considered": {
+            "search_state_basis": state_basis,
+            "search_path": search_path,
+            "confirmation_signals": list(gate_signals or []),
+            "nppes_record": nppes_data,
+        },
     }
     try:
         supabase_client.table(log_table).insert(log_payload).execute()
@@ -883,8 +1147,18 @@ def main() -> None:
     parser.add_argument(
         "--min-career-pubs",
         type=int,
-        default=500,
-        help="Minimum total_career_pubs threshold for candidate selection (default 500).",
+        default=None,
+        help="Override the TA config's nppes.min_career_pubs for this run. NO DEFAULT: with "
+             "--ta the value is read from config/therapeutic_areas/<slug>.json, which is "
+             "where the per-TA judgement belongs.",
+    )
+    parser.add_argument(
+        "--retry-misses",
+        action="store_true",
+        default=False,
+        help="Ignore the attempt memo and re-query HCPs already logged ambiguous/no_match. "
+             "Use after an NPPES data refresh or a change to the matching rules -- not "
+             "routinely: nothing about an unchanged name/registry pair changes between runs.",
     )
     parser.add_argument(
         "--target-version",
@@ -919,21 +1193,54 @@ def main() -> None:
     )
     parser.add_argument(
         "--use-state",
-        action="store_true",
-        default=False,
-        help="Restore the old behaviour: send nppes_practice_state to NPPES. OFF by default "
-             "because that state is derived from institution location and wrongly suppresses "
-             "real matches. State was never the precision mechanism (name + taxonomy are).",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Send the resolved search state to NPPES. ON by default since 2026-09-08 -- see "
+             "the WHY STATE NARROWING IS ON block in the module docstring. --no-use-state "
+             "restores the stateless behaviour.",
     )
     args = parser.parse_args()
     dry_run = args.dry_run
     sample_limit = args.sample_limit
-    min_career_pubs = args.min_career_pubs
     target_version = args.target_version
     ta_slug = args.ta
+    retry_misses = args.retry_misses
+
+    # The floor: explicit override wins, then the TA config, then a named error. An
+    # --hcp-ids-file run bypasses the gate entirely and needs neither.
+    if args.min_career_pubs is not None:
+        min_career_pubs = args.min_career_pubs
+        print(f"[GATE] min_career_pubs={min_career_pubs} (--min-career-pubs override)")
+    elif args.hcp_ids_file:
+        min_career_pubs = 0
+        print("[GATE] min_career_pubs not consulted -- --hcp-ids-file defines the candidate set")
+    elif ta_slug:
+        min_career_pubs = resolve_min_career_pubs(ta_slug)
+        print(f"[GATE] min_career_pubs={min_career_pubs} "
+              f"(config/therapeutic_areas/{ta_slug}.json -> nppes.min_career_pubs)")
+    else:
+        raise SystemExit(
+            "No publication floor available: pass --ta <slug> so it can be read from that "
+            "TA's config, --min-career-pubs <n> to override, or --hcp-ids-file to define the "
+            "candidate set directly."
+        )
+
     ingestion_run_ids = args.ingestion_run_ids
     hcp_ids_file = args.hcp_ids_file
     use_state = args.use_state
+
+    # The confirming-taxonomy list for the gate, from nppes_matcher's registry. A TA that
+    # is absent from it cannot confirm on taxonomy, so its institution-basis matches are
+    # held rather than written -- stated loudly here rather than discovered as a zero.
+    allow_taxonomies = set(load_confirming_taxonomies(ta_slug)) if ta_slug else set()
+    if allow_taxonomies:
+        print(f"[GATE] {len(allow_taxonomies)} confirming taxonomy codes for {ta_slug}")
+    else:
+        print(
+            f"[GATE] WARNING: nppes.confirming_taxonomies is empty for {ta_slug!r} in "
+            "config/therapeutic_areas/. Institution-basis matches can only "
+            "confirm on specialty or institution agreement, and will otherwise be HELD."
+        )
 
     supabase_client = create_supabase_client()
     build_enrichment_log_table(supabase_client, target_version=target_version)
@@ -1018,6 +1325,23 @@ def main() -> None:
                 f"SAFETY VIOLATION: {len(out_of_scope)} candidate(s) outside scoped HCP set. Aborting."
             )
 
+    # ATTEMPT MEMO. Applied after selection rather than inside it so the skip is
+    # COUNTED and printed: "0 candidates" and "0 candidates left after the memo" are
+    # different facts and the second one must not read as the first.
+    memo_skipped = 0
+    if retry_misses:
+        print("[MEMO] --retry-misses: attempt memo IGNORED, previously-missed HCPs re-queried.")
+    else:
+        memo = fetch_attempt_memo(supabase_client, target_version)
+        before_memo = len(candidates)
+        candidates = [h for h in candidates if str(h.get("id")) not in memo]
+        memo_skipped = before_memo - len(candidates)
+        print(
+            f"[MEMO] {len(memo):,} HCPs previously logged ambiguous/no_match; "
+            f"{memo_skipped:,} of {before_memo:,} candidates skipped, {len(candidates):,} remain. "
+            f"Use --retry-misses to re-query them."
+        )
+
     # City-based tiebreak signal: attach each HCP's institution city from institution_geo_lookup.
     n_city, n_total = attach_institution_city(supabase_client, candidates)
     pct = (100.0 * n_city / n_total) if n_total else 0.0
@@ -1027,12 +1351,61 @@ def main() -> None:
     )
     print(f"[STATE] search state filter: {'ON (--use-state)' if use_state else 'OFF (default)'}")
 
+    # NON-US DISQUALIFIER. The candidate filter trusts hcps_v2.country, which said 'US' for
+    # physicians at Wuhan, Harbin, Changchun, Shaanxi and Western University -- 17 wrong NPI
+    # writes on 2026-09-08. Two independent contradictions now disqualify:
+    #   * the institution RESOLVES (institution_geo_lookup) to a country that is not US
+    #   * current_country is set and is not US
+    # An UNRESOLVED institution does NOT disqualify. 42 of 791 candidates at floor 25 do not
+    # resolve, and treating unknown as non-US would silently drop them -- the same class of
+    # error in the other direction.
+    before_geo = len(candidates)
+    kept: List[Dict[str, Any]] = []
+    dropped_inst = dropped_country = 0
+    for c in candidates:
+        inst_cc = (c.get("institution_country") or "").upper()
+        cur_cc = str(c.get("current_country") or "").strip().upper()
+        if inst_cc and inst_cc != "US":
+            dropped_inst += 1
+            continue
+        if cur_cc and cur_cc not in US_COUNTRY_CODES:
+            dropped_country += 1
+            continue
+        kept.append(c)
+    candidates = kept
+    print(
+        f"[NON-US] dropped {before_geo - len(candidates):,} of {before_geo:,} candidates "
+        f"({dropped_inst:,} resolved non-US institution, {dropped_country:,} non-US "
+        f"current_country); unresolved institutions kept."
+    )
+
+    # Surname block frequencies for the confirmation gate below.
+    surname_blocks = fetch_surname_blocks(
+        supabase_client, {str(c.get("last_name") or "").strip().lower() for c in candidates}
+    )
+    if surname_blocks is None:
+        print(
+            "[SURNAME] WARNING: block frequencies unavailable, so the common-surname "
+            "confirmation gate DID NOT RUN. Matches on common names are being written on "
+            "name evidence alone. Apply docs/npi_enrichment/03_rules.sql."
+        )
+    else:
+        n_gated = sum(
+            1 for c in candidates
+            if surname_blocks.get(str(c.get("last_name") or "").strip().lower(), 0) >= SURNAME_BLOCK_GATE
+        )
+        print(
+            f"[SURNAME] gate at block >= {SURNAME_BLOCK_GATE}: {n_gated:,} of "
+            f"{len(candidates):,} candidates will need a confirming signal."
+        )
+
     print(
         f"[START] Candidate HCP count: {len(candidates)} "
         f"(sample_limit={sample_limit}, dry_run={dry_run}, target_version={target_version})"
     )
 
     total_processed = 0
+    unconfirmed = 0
     high_confidence = 0
     ambiguous = 0
     no_match = 0
@@ -1043,17 +1416,91 @@ def main() -> None:
         hcp_id = str(hcp.get("id"))
         first_name = str(hcp.get("first_name") or "")
         last_name = str(hcp.get("last_name") or "")
-        # State OFF by default; only sent when --use-state is passed.
-        state = str(hcp.get("derived_state") or "") if use_state else ""
+        state_basis = hcp.get("state_basis")
+        # INSTITUTION-BASIS STATES ARE NOT SENT. Measured on the 2026-09-08 CRC run:
+        # only 4 of 135 institution-basis candidates returned ANY result in their
+        # institution's state (3%), all 4 failed verification, and 131 fell through to
+        # the stateless fallback -- 131 wasted calls for zero verified writes. An
+        # institution_state says where someone publishes from, and it turns out that is
+        # simply not where they are registered.
+        #
+        # The BASIS IS STILL RESOLVED AND RECORDED, and the confirmation gate below still
+        # keys on it. The gate keys on the candidate's state PROVENANCE, not on which
+        # search found the record, so dropping the narrowing does not weaken it -- an
+        # institution-basis candidate matched by a name-only search is if anything
+        # weaker evidence, and still needs corroboration.
+        send_state = use_state and state_basis in (BASIS_NPPES, BASIS_DERIVED)
+        state = str(hcp.get("derived_state") or "") if send_state else ""
 
         print(
-            f"[PROCESS] hcp_id={hcp_id} name={first_name} {last_name} state={state} "
+            f"[PROCESS] hcp_id={hcp_id} name={first_name} {last_name} "
+            f"state={state or '-'} basis={state_basis or '-'} "
             f"pubs={hcp.get('total_career_pubs')}"
         )
 
         nppes_raw = search_nppes(first_name, last_name, state, max_results=20)
+        search_path = f"state:{state_basis}" if state else f"stateless(basis={state_basis or 'none'})"
+
+        # The stateless fallback that used to live here is gone with the narrowing it
+        # protected: institution-basis candidates now go straight out without a state,
+        # which is what the fallback made them do 131 times out of 135 anyway.
         decision = score_nppes_match(hcp, nppes_raw)
         match_type = decision.get("match")
+
+        # THE CONFIRMATION GATE, for institution-basis candidates only.
+        #
+        # The same rule as nppes_matcher's, imported rather than restated: a state that
+        # came from institution_state is legitimate for NARROWING and illegitimate for
+        # DECIDING, so the match needs a signal that does not come from that state.
+        # Candidates blocked on nppes/derived keep exactly the bar they had.
+        gate_signals: List[str] = []
+        surname_block = (surname_blocks or {}).get(last_name.strip().lower(), 0)
+        needs_gate = (
+            state_basis == BASIS_INSTITUTION
+            or (surname_blocks is not None and surname_block >= SURNAME_BLOCK_GATE)
+        )
+        if match_type == "high_confidence" and needs_gate:
+            gate_signals = confirmation_signals(
+                hcp, nppes_record_as_candidate(decision.get("nppes_data") or {}), allow_taxonomies
+            )
+            if not gate_signals:
+                unconfirmed += 1
+                why = ("institution_state basis" if state_basis == BASIS_INSTITUTION
+                       else f"surname block {surname_block} >= {SURNAME_BLOCK_GATE}")
+                status = (CONFIDENCE_UNCONFIRMED if state_basis == BASIS_INSTITUTION
+                          else CONFIDENCE_UNCONFIRMED_NAME)
+                print(
+                    f"[GATE] HELD hcp_id={hcp_id} npi={decision.get('npi')} -- {why}, and no "
+                    f"independent signal corroborates it. Not written."
+                )
+                if not dry_run and not (
+                    scoped_hcp_ids is not None and hcp_id not in scoped_hcp_ids
+                ):
+                    supabase_client.table(
+                        get_table_name("nppes_enrichment_log", target_version)
+                    ).insert(
+                        {
+                            "hcp_id": hcp_id,
+                            "matched_npi": decision.get("npi"),
+                            "match_confidence": status,
+                            "match_reason": (
+                                f"Match held, not written: {why}, and no independent confirming "
+                                "signal (taxonomy/specialty/institution). Neither status is in "
+                                "the attempt memo -- a gate hold is not a search failure and is "
+                                f"revisitable. basis={state_basis} path={search_path}"
+                            ),
+                            "candidates_considered": {
+                                "search_state": state,
+                                "search_state_basis": state_basis,
+                                "search_path": search_path,
+                                "surname_block": surname_block,
+                                "gate_reason": why,
+                                "confirmation_signals": [],
+                                "results": nppes_raw.get("results") or [],
+                            },
+                        }
+                    ).execute()
+                continue
 
         if match_type == "high_confidence":
             high_confidence += 1
@@ -1075,6 +1522,9 @@ def main() -> None:
                 dry_run=dry_run,
                 target_version=target_version,
                 scoped_hcp_ids=scoped_hcp_ids,
+                state_basis=state_basis,
+                search_path=search_path,
+                gate_signals=gate_signals,
             )
             if did_update:
                 updated += 1
@@ -1096,8 +1546,13 @@ def main() -> None:
                             "hcp_id": hcp_id,
                             "matched_npi": None,
                             "match_confidence": "ambiguous",
-                            "match_reason": "Multiple plausible NPPES matches; skipped.",
-                            "candidates_considered": nppes_raw.get("results") or [],
+                            "match_reason": "Multiple plausible NPPES matches; skipped. "
+                                            f"basis={state_basis or 'none'} path={search_path}",
+                            "candidates_considered": {
+                                "search_state_basis": state_basis,
+                                "search_path": search_path,
+                                "results": nppes_raw.get("results") or [],
+                            },
                         }
                     ).execute()
 
@@ -1106,12 +1561,38 @@ def main() -> None:
             print(
                 f"[DECISION] NO_MATCH hcp_id={hcp_id} reason={decision.get('reason')}"
             )
+            # A no-match used to write NOTHING, which is why the memo could not exist:
+            # the most-repeated outcome was the one that left no trace, so it was the
+            # one re-queried forever. Logging it is what makes the attempt memoisable.
+            if not dry_run:
+                if scoped_hcp_ids is not None and hcp_id not in scoped_hcp_ids:
+                    print(f"[SAFETY] Skipping no_match log for out-of-scope hcp_id={hcp_id}")
+                else:
+                    supabase_client.table(
+                        get_table_name("nppes_enrichment_log", target_version)
+                    ).insert(
+                        {
+                            "hcp_id": hcp_id,
+                            "matched_npi": None,
+                            "match_confidence": "no_match",
+                            "match_reason": f"No plausible NPPES match; skipped. "
+                                            f"reason={decision.get('reason')} "
+                                            f"basis={state_basis or 'none'} path={search_path}",
+                            "candidates_considered": {
+                                "search_state_basis": state_basis,
+                                "search_path": search_path,
+                                "results": nppes_raw.get("results") or [],
+                            },
+                        }
+                    ).execute()
 
     print("\n[SUMMARY]")
     print(f"total_processed={total_processed}")
     print(f"high_confidence_matches={high_confidence}")
     print(f"ambiguous_skipped={ambiguous}")
     print(f"no_match_skipped={no_match}")
+    print(f"unconfirmed_institution_held={unconfirmed} (matched, gate withheld the write)")
+    print(f"memo_skipped={memo_skipped} (not re-queried; --retry-misses to force)")
     print(f"updated={updated} (dry_run={dry_run})")
 
 

@@ -90,10 +90,43 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       upserts status/phase/completion_date into clinical_trials_v2. Does NOT crawl by HCP name
                       and writes NO trial_investigators rows -- the HCP crawl stays manual/occasional. TA-agnostic.
                       NON-BLOCKING (external CT.gov call): failure -> WARN (not FAILED), never gates the cycle.
+ 11.5 npi_enrich      targeted_nppes_enrichment.py --target-version v2 --ta <slug>
+                      NPI ACQUISITION. Live NPPES registry lookups for this TA's HCPs that have
+                      no npi_number and clear the TA config's nppes.min_career_pubs floor.
+                      Fill-only: npi_number IS NULL is enforced ON THE WRITE, not just at
+                      selection, so it can never overwrite an NPI.
+                      THE PRODUCER STAGE 12 CONSUMES. Stage 12 exists to catch "HCPs that gained
+                      an NPI since the last load" and, until 2026-09-07, nothing in either cycle
+                      produced one -- a consumer with no producer. Placed here and not earlier:
+                        * AFTER 7 -- enriching a record dedup is about to merge away spends a
+                          live API call on a row that ceases to exist, and lands its NPI in the
+                          duplicate-NPI conflict path when the survivor is given the same number.
+                        * AFTER 8a -- the publication floor reads total_career_pubs, which 8a
+                          refreshes.
+                        * BEFORE 12 -- later and the new NPIs miss the claims top-up by a week.
+                      min_career_pubs IS PER-TA and lives in config/therapeutic_areas/<slug>.json
+                      (nppes.min_career_pubs). No default: it used to be a CLI default of 500, so
+                      every TA silently inherited the number NSCLC happened to run with. A TA that
+                      has not set it gets a named error, which lands here as a WARN -- the absence
+                      is stated every cycle instead of being assumed.
+                      ATTEMPT MEMO: an HCP already logged ambiguous/no_match in
+                      nppes_enrichment_log_v2 is not re-queried. Without it every permanent miss
+                      hits the live API every week forever (2,106 HCPs were in that loop).
+                      --retry-misses forces a re-query after an NPPES refresh or a rules change.
+                      COVERAGE DELTA: NPI holders for the TA are counted before and after from
+                      hcps_v2, not from the stage's own counter. On --operation build a delta of
+                      ZERO is a WARN -- a build is the only pass over the TA's whole history, so
+                      converting nothing means the floor is wrong, the TA has no US
+                      publication-side population, or the stage did not really run.
+                      NON-BLOCKING (external NPPES API): failure -> WARN, never gates the cycle.
  12 hcpcs_topup       hcpcs_detail_topup.py --execute --triggered-by reingest_cycle
                       Medicare claims top-up for HCPs that gained an NPI since the last hcp_hcpcs_detail load.
                       DERIVES its target set (anti-join vs hcp_hcpcs_detail) from local parquets; no-ops when
                       clean. TA-agnostic. Logs to pipeline_runs as hcpcs_detail_topup.
+                      Its producer is 11.5 immediately above. NPIs also arrive from stub merges
+                      (stage 7) and from the MANUAL, out-of-cycle nppes_workstream_b_ingest.py --
+                      see TA_NEW_PLAYBOOK.md section 1; that one is not a stage and must not
+                      become one.
                       NON-BLOCKING: failure -> WARN (not FAILED), never gates the cycle.
  13 narratives        generate_narratives_v2.py --cohort rising_star|established|community --target-version v2
                       (rising: NO --rising-top = whole board; established: --established-top 200;
@@ -163,6 +196,7 @@ SCRIPTS: Dict[str, str] = {
     "rising_score": "scripts/score/rising_score.py",
     "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
     "trials_status_refresh": "scripts/ingest/trials_pipeline.py",     # 11: weekly trial-fact refresh (--refresh-status)
+    "npi_enrich": "scripts/enrich/targeted_nppes_enrichment.py",      # 11.5: acquire NPIs -- the PRODUCER stage 12 consumes
     "hcpcs_topup": "scripts/ingest/hcpcs_detail_topup.py",            # 12: Medicare claims top-up for newly-NPI'd HCPs
     "board_snapshot": "scripts/utilities/take_weekly_snapshot.py",    # 9.5: capture board state + GATE INPUTS after scoring
     "narratives": "scripts/narrative/generate_narratives_v2.py",      # 13: narrative regen coupled to the scoring recompute
@@ -236,6 +270,15 @@ DEFAULT_INGEST_DAYS = 7
 # the TA's whole configured history, and must not run the billed narrative stages against a
 # board nobody has validated yet.
 BUILD_MAX_STAGE = 12  # stop after 12; 13 (billed, 2 of 3 sub-stages uncapped) and 13.5 wait
+
+#: Stage 11.5's coverage number, read from the TARGET TABLE either side of the stage.
+#: Deliberately not the stage's own "updated=" counter -- that is a claim the stage makes
+#: about itself, and the distinction is the one POSTCHECKS exists for.
+NPI_COVERAGE_SQL = (
+    "SELECT count(*) FROM hcps_v2 h "
+    "JOIN hcp_therapeutic_areas_v2 t ON t.hcp_id = h.id "
+    "WHERE t.therapeutic_area_id = %s AND h.npi_number IS NOT NULL"
+)
 DAYS_PER_YEAR = 365
 
 # Ordered stages for --resume-from and the plan.
@@ -272,7 +315,7 @@ STAGE_LABELS: List[Tuple[str, int]] = [
     ("7a", 7), ("7b", 7),
     ("8a", 8), ("8b", 8), ("8c", 8), ("8f", 8), ("8d", 8), ("8e", 8),
     ("9", 9), ("9.5", 9),
-    ("10", 10), ("11", 11), ("12", 12),
+    ("10", 10), ("11", 11), ("11.5", 11), ("12", 12),
     ("13a", 13), ("13b", 13), ("13c", 13), ("13.5", 13),
 ]
 LABEL_ORDINAL: Dict[str, int] = {lbl: i for i, (lbl, _) in enumerate(STAGE_LABELS)}
@@ -509,6 +552,26 @@ def cmd_trials_status_refresh() -> List[str]:
     # name and writes NO trial_investigators rows (that stays the manual, occasional HCP crawl).
     # TA-agnostic (refreshes every open trial in the table by status), so it runs once per cycle.
     return py("trials_status_refresh") + ["--refresh-status", "--target-version", "v2"]
+
+
+def cmd_npi_enrich(slug: str) -> List[str]:
+    # 11.5: acquire NPIs for this TA's no-NPI, high-publication HCPs via the live NPPES
+    # registry API. This is the PRODUCER of the thing stage 12 consumes ("HCPs that gained
+    # an NPI since the last load"), which is why it sits immediately above it.
+    #
+    # WHY NOT EARLIER: it must follow stage 7. Enriching a record dedup is about to merge
+    # away spends a live API call on a row that ceases to exist, and lands its NPI in the
+    # duplicate-NPI conflict path when the survivor is later given the same number. It also
+    # wants stage 8a's refreshed total_career_pubs, since the publication floor reads it.
+    #
+    # WHY NOT LATER: after 12 the newly-acquired NPIs miss the claims top-up and their
+    # Medicare detail waits a full week. Producer above consumer.
+    #
+    # NO --min-career-pubs HERE, deliberately: the floor is per-TA and lives in
+    # config/therapeutic_areas/<slug>.json (nppes.min_career_pubs). A TA that has not set
+    # it gets a named error from the script, which this non-blocking stage turns into a
+    # WARN -- absence visible, cycle unaffected.
+    return py("npi_enrich") + ["--target-version", "v2", "--ta", slug]
 
 
 def cmd_hcpcs_topup() -> List[str]:
@@ -1194,6 +1257,18 @@ POSTCHECKS: Dict[str, Postcheck] = {
                         "('RECRUITING','NOT_YET_RECRUITING','ACTIVE_NOT_RECRUITING',"
                         "'ENROLLING_BY_INVITATION') AND updated_at::date = %s",
                     ratio=0.50, blocking=False),
+    # 11.5 -- NON_REGRESSION, not GROWTH. Most weeks the honest result is zero new NPIs:
+    # the candidate pool is bounded (~134 for nsclc at a 500-pub floor) and the attempt
+    # memo removes names the registry has already failed to resolve, so after == before is
+    # a legitimate SUCCESS on refresh. It is NOT legitimate on a BUILD, and that case is
+    # handled by the zero-delta WARN in the stage body rather than by loosening this check.
+    # No work-set: the candidate count is an upper bound (a candidate that comes back
+    # ambiguous is correctly not converted), and per the bound rule a bound is not a ratio.
+    "11.5": Postcheck("NON_REGRESSION", "hcps_v2 NPI holders for the TA",
+                      sql="SELECT count(*) FROM hcps_v2 h "
+                          "JOIN hcp_therapeutic_areas_v2 t ON t.hcp_id = h.id "
+                          "WHERE t.therapeutic_area_id = %s AND h.npi_number IS NOT NULL",
+                      ta_scoped=True, ratio=RATIO_NON_REGRESSION, blocking=False),
     # 12 -- the work-set is an UPPER bound (the stage intersects it with local parquets), so
     # per the bound rule no ratio is applied to it. NON_REGRESSION on coverage instead.
     "12": Postcheck("NON_REGRESSION", "hcp_hcpcs_detail distinct hcp_id",
@@ -1598,6 +1673,10 @@ def print_plan(
         ("11 trials_status_refresh (open-status trials refreshed by nct_id via filter.ids; trial facts "
          "only, NO HCP crawl, NO trial_investigators writes; NON-BLOCKING -- WARN not FAILED)",
          cmd_trials_status_refresh()),
+        ("11.5 npi_enrich (live NPPES registry lookups for this TA's no-NPI HCPs above the config's "
+         "nppes.min_career_pubs floor; fill-only, attempt-memoised; PRODUCER of stage 12's input; "
+         "NON-BLOCKING -- WARN not FAILED. Coverage delta printed; zero on --operation build is a WARN)",
+         cmd_npi_enrich(slug)),
         # 12/13/13.5 were MISSING from this list until 2026-08-24 while the module docstring
         # claimed --dry-run "prints the full plan (all stages...)". Every dry run to date
         # therefore hid the BILLED portion of the cycle: three narrative sub-stages, two of
@@ -2270,6 +2349,61 @@ def run_cycle(
                 print(f"\n[ta_cycle] WARN: stage 11 trials_status_refresh failed ({te}); "
                       f"cycle still SUCCESS (non-blocking). Trial facts left at prior refresh.",
                       file=sys.stderr)
+
+        # 11.5 NPI ENRICHMENT -- NON-BLOCKING. The PRODUCER of stage 12's input. Live NPPES
+        # registry lookups for this TA's no-NPI HCPs above the config's publication floor;
+        # fill-only writes, guarded on the write (npi_number IS NULL) not just at selection.
+        # External API, so failure is isolated (WARN not FAILED) exactly as 11 and 12 are --
+        # a registry outage must never gate the publication cycle. A TA with no configured
+        # nppes.min_career_pubs exits with a named error, which lands here as a WARN: the
+        # absence is stated every cycle instead of silently defaulting to someone else's
+        # number.
+        if not running_label("11.5"):
+            print(f"[stage 11.5] SKIPPED: {skip_reason('11.5')}", flush=True)
+            note(11, "npi_enrich", f"SKIPPED({skip_reason('11.5')})")
+        else:
+            npi_before = count_scalar(NPI_COVERAGE_SQL, (ta_id,))
+            try:
+                _b115 = pc_before("11.5", (ta_id,))
+                run_stage(11, "npi_enrich(11.5)", cmd_npi_enrich(slug))
+                note(11, "npi_enrich", "OK",
+                     postcheck=pc_after("11.5", 11, "11.5", _b115, None, (ta_id,)))
+            except Exception as ne:  # non-blocking: log + continue (StageFailure incl.)
+                note(11, "npi_enrich", f"WARN({type(ne).__name__})")
+                print(f"\n[ta_cycle] WARN: stage 11.5 npi_enrich failed ({ne}); "
+                      f"cycle still SUCCESS (non-blocking). NPI coverage left where it was.",
+                      file=sys.stderr)
+
+            # COVERAGE DELTA. The stage's own summary counts what IT did; this counts what
+            # the TABLE holds, before and after, which is the number that matters and the
+            # one a stage cannot flatter.
+            #
+            # On REFRESH a zero delta is the normal, correct weekly result -- the pool is
+            # bounded and the attempt memo removes names already known unresolvable.
+            #
+            # On BUILD it is not. A build is the first and only pass over the TA's whole
+            # configured history; if that pass converts nothing, either the floor is wrong,
+            # the TA has no US publication-side population, or the stage did not really run.
+            # All three need a human, and none of them shows up as an error. Zero must be
+            # distinguishable from done.
+            npi_after = count_scalar(NPI_COVERAGE_SQL, (ta_id,))
+            if npi_before is None or npi_after is None:
+                print("[ta_cycle] 11.5 coverage delta unavailable (count failed); "
+                      "not treated as a failure.")
+            else:
+                delta = npi_after - npi_before
+                print(f"[ta_cycle] 11.5 NPI coverage for {slug}: "
+                      f"{npi_before:,} -> {npi_after:,} (delta {delta:+,})")
+                if delta == 0 and operation == "build":
+                    print(
+                        f"\n[ta_cycle] WARN: stage 11.5 acquired 0 NPIs on --operation build "
+                        f"for {slug} ({npi_after:,} holders before and after). A build pass "
+                        f"that converts nothing is not a pass -- check "
+                        f"config/therapeutic_areas/{slug}.json nppes.min_career_pubs, and "
+                        f"whether this TA has a US publication-side population at all.",
+                        file=sys.stderr,
+                    )
+                    note(11, "npi_enrich", "WARN(zero_delta_on_build)")
 
         # 12 HCPCS DETAIL TOP-UP -- NON-BLOCKING. Any HCP that gained an NPI since the last
         # hcp_hcpcs_detail load (enrichment, crosswalk applies, stub merges) has Medicare claims
