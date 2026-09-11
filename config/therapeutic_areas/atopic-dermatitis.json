@@ -17,10 +17,12 @@
     }
   },
   "nppes": {
-    "taxonomies": [
+    "population_taxonomies": [
       "207N00000X",
       "207NI0002X"
     ],
-    "description": "Dermatology (general) and allergy/immunology-derm"
+    "confirming_taxonomies": [],
+    "description": "Dermatology (general) and allergy/immunology-derm",
+    "_taxonomy_keys_note": "SPLIT 2026-09-08. population_taxonomies = who counts as a member of this TA (nppes_workstream_b_ingest.py CREATES a record per matching NPPES individual; narrow is correct, 208600000X would admit 42,905 mostly-irrelevant people). confirming_taxonomies = what corroborates a name match that already exists (targeted_nppes_enrichment.py / nppes_matcher.py; it admits nobody, so narrow is wrong here and 208600000X belongs). The lists overlap; neither contains the other."
   }
 }

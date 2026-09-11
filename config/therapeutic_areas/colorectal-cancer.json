@@ -18,7 +18,68 @@
     "_query_note": "Validated 2026-08-24 against a live Q count of 329,274; live count at write time 329,278.\n\nTen-year window (years_back=10). This matches the shipped NSCLC corpus, which was built at pubmed_days_back=3650. NSCLC's JSON records years_back=null, but that path has never run: the NSCLC corpus came from the DB therapeutic_area_ingestion_config row in May 2026, not from this JSON. Ten years is the product decision; null is an untested value.\n\nMeSH tree verified by count arithmetic, not by diagram. Anus Neoplasms is 100% inside Rectal Neoplasms, Appendiceal is 100% inside Cecal, and Cecal sits OUTSIDE the Colorectal branch entirely. Hence NoExp on Colorectal, Rectal and Cecal; Colonic is safe to explode (wholly inside Colorectal).\n\nThe Cecal[Mesh:NoExp] clause earns 1,529 unique PMIDs -- 58% of that branch is unreachable without it. Do not remove.\n\nThe anchored CRC[tiab] clause adds only 260 unique papers. Its justification is SUPPRESSION, not retrieval: unanchoring it admits 3,298 papers where \"CRC\" appears with no colorectal/colon/rectal token. 12.7:1 noise-to-signal. Do not simplify it away on low unique yield.\n\nScope excludes anal, appendiceal, small bowel, GIST, GI NETs, and screening/surveillance. Screening is excluded via a [majr] NOT block that sheds 24,597 papers; a 25-title sample of the unclassified remainder found 21/25 out of scope and no hidden treatment category. Known cost: ~800 treatment-adjacent papers, ~0.24% of the corpus.\n\nContamination probes: anal 0.48%, appendiceal 0.19%, gastric 2.22%, pancreatic 1.04%, lung 3.22%. Two-corpus overlap with the live NSCLC query is 3,397 papers, 1% of Q.\n\nInterior precision NOT measured pre-ingest. Sample 200 titles in SQL after ingestion.\n\nnppes.taxonomies is UNSET (empty array). NPPES matching for this TA will not work until it is populated."
   },
   "nppes": {
-    "taxonomies": [],
-    "description": "UNSET - no taxonomy codes selected yet; see pubmed._query_note"
+    "population_taxonomies": [
+      "208C00000X",
+      "2086X0206X",
+      "207RX0202X",
+      "207RH0000X",
+      "207RH0003X"
+    ],
+    "confirming_taxonomies": [
+      "207RX0202X",
+      "207RH0000X",
+      "208C00000X",
+      "207RG0100X",
+      "2086X0206X",
+      "2085R0001X",
+      "207RH0003X",
+      "207ZP0102X",
+      "207ZP0101X",
+      "208600000X",
+      "2085R0204X",
+      "204F00000X",
+      "1835X0200X"
+    ],
+    "confirming_taxonomies_candidates": [
+      {
+        "code": "2085R0202X",
+        "label": "Radiology, Diagnostic Radiology",
+        "status": "held_for_clinical_review",
+        "for": "Staging and surveillance imaging is part of the colorectal pathway; a diagnostic radiologist at a cancer centre plausibly reads CRC studies.",
+        "against": "Diagnoses rather than treats, and the code is not disease-specific -- every CRC study is read by someone who also reads everything else. Weaker than 2085R0204X (interventional), which delivers ablation and Y-90 for colorectal liver metastases and IS on the list.",
+        "would_unblock": 1
+      },
+      {
+        "code": "3336C0002X",
+        "label": "Pharmacy, Clinic Pharmacy",
+        "status": "held_for_clinical_review",
+        "for": "Clinic pharmacists at cancer centres manage CRC regimens in practice.",
+        "against": "Generic, not oncology-specific -- unlike 1835X0200X Pharmacist/Oncology, which is indication-adjacent by its own label and IS on the list. Admitting it corroborates on a code that says nothing about cancer.",
+        "would_unblock": 1
+      }
+    ],
+    "min_career_pubs": 25,
+    "description": "UNSET - no taxonomy codes selected yet; see pubmed._query_note",
+    "_min_career_pubs_note": "Set 2026-09-08 by founder decision. The publication floor above which a no-NPI HCP is worth a live NPPES registry search in targeted_nppes_enrichment.py (ta_cycle stage 11.5). Chosen from the measured candidate curve: 500->44 candidates, 100->361, 25->1,018, 5->5,426, 0->12,998. The curve bends between 25 and 5 (a 5.3x step, vs 2.8x from 100 to 25), which is where the population stops being people with a real publication record. At 25 the run is ~1,085 API calls / ~6.4 min, and 137 candidates carry an institution_state search state and therefore pass through the confirmation gate. NSCLC and atopic-dermatitis are deliberately left UNSET: NSCLC is the regression oracle and setting it would start moving it.",
+    "_taxonomy_keys_note": "SPLIT 2026-09-08. population_taxonomies = who counts as a member of this TA (nppes_workstream_b_ingest.py CREATES a record per matching NPPES individual; narrow is correct, 208600000X would admit 42,905 mostly-irrelevant people). confirming_taxonomies = what corroborates a name match that already exists (targeted_nppes_enrichment.py / nppes_matcher.py; it admits nobody, so narrow is wrong here and 208600000X belongs). The lists overlap; neither contains the other.",
+    "population_taxonomies_note": "SET 2026-09-08 with four codes; 207RH0003X ADDED 2026-09-09, making five. 208C00000X Colon & Rectal Surgery (2,703 NPPES individuals), 2086X0206X Surgical Oncology (2,584), 207RX0202X Medical Oncology (7,233), 207RH0000X Hematology & Oncology (2,897), 207RH0003X Internal Medicine / Hematology & Oncology (15,929). This list CREATES an HCP record per matching NPPES individual, so it is the definition of the CRC community population and breadth is not a free parameter.",
+    "population_taxonomies_held": [
+      {
+        "code": "207RG0100X",
+        "label": "Gastroenterology",
+        "nppes_individuals": 21325,
+        "status": "held_for_first_run_review",
+        "why_held": "Half the six-code pool on its own. Gastroenterologists diagnose colorectal cancer at screening colonoscopy and refer; most do not treat it. Admitting them would make the CRC community population majority-gastroenterology and would answer the 'treat vs could' question by accident rather than on purpose. NOT excluded on principle -- reviewed after the first run, when there is a real board to look at."
+      },
+      {
+        "code": "2085R0001X",
+        "label": "Radiation Oncology",
+        "nppes_individuals": 6991,
+        "status": "held_for_first_run_review",
+        "why_held": "6,471 of the 6,991 would be NEW records, the largest new-record cost of any code in the set. Radiation oncologists genuinely treat rectal cancer (neoadjuvant chemoradiation), so the clinical case is stronger than gastroenterology's -- but the population cost is paid up front and the twin risk scales with it. Same review point."
+      }
+    ],
+    "_population_reversibility_note": "ADDING A CODE LATER IS A CONFIG CHANGE PLUS A RE-RUN, NOT A REBUILD. nppes_workstream_b_ingest.py is add-only and idempotent: it skips NPIs that already have a record and skips TA links that already exist, so re-running with a widened list creates only what the new code brings and touches nothing already written. Removing a code is NOT symmetric -- records already created stay created -- so the asymmetry runs in favour of starting narrow.",
+    "_207RH0003X_note": "WHY IT WAS ADDED, and why its absence was an accident rather than a decision. 207RH0003X is the internal-medicine-subspecialty encoding of Hematology & Oncology -- the same practice as 207RH0000X under a different code. Treating them as different specialties has cost us three times: it blocked four correct enrichment writes on 2026-09-08 (Deirdre Cohen at Mount Sinai and Fergus Keane at MSK among them), it is the fourth-largest specialty in hcp_hcpcs_detail at 1,009 HCPs, and it was excluded from this population list by the same accident. The advisor called the split an accident when ruling on the confirmer list, where 207RH0003X was admitted. MEASURED COST OF ADDING IT: pool 13,959 -> 27,122; 12,674 new records; 346 new links. It nearly doubles the CRC population, which is why it is recorded rather than slipped in. THE EVIDENCE THAT IT BELONGS: of the 2,094 national bevacizumab-family billers in the 2023 CMS source file, 198 hold 207RH0003X against 85 holding any of the four original codes combined -- the excluded code catches more than twice as many oncology infusers as every included code together."
   }
 }

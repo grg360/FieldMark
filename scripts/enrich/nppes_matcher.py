@@ -98,24 +98,12 @@ STATE_COLUMNS: Tuple[Tuple[str, str], ...] = (
     ("institution_state", BASIS_INSTITUTION),
 )
 
-# NPPES taxonomy codes that independently corroborate "this person practises in
-# this TA". A positive allow-list, not a negative exclusion list -- the same
-# shape established_npi_resolver.py settled on, expressed as codes because the
-# NPPES parquet carries codes and no descriptions.
-#
-# A TA absent from this map CANNOT confirm an institution-blocked candidate on
-# taxonomy, and the run says so loudly rather than falling back to a permissive
-# default.
-TA_CONFIRMING_TAXONOMIES: Dict[str, Tuple[str, ...]] = {
-    "colorectal-cancer": (
-        "207RX0202X",  # Medical Oncology
-        "207RH0000X",  # Hematology & Oncology
-        "208C00000X",  # Colon & Rectal Surgery
-        "207RG0100X",  # Gastroenterology
-        "2086X0206X",  # Surgical Oncology
-        "2085R0001X",  # Radiation Oncology
-    ),
-}
+# The confirming-taxonomy list MOVED TO CONFIG 2026-09-08
+# (config/therapeutic_areas/<slug>.json -> nppes.confirming_taxonomies), because it was
+# doing a different job from nppes.taxonomies and being specified as though it were the
+# same one. See scripts/utils/ta_nppes_config.py for the two jobs and why narrow is right
+# for one and wrong for the other. One implementation, read by this script and by
+# targeted_nppes_enrichment.py.
 
 # Statuses that would put an NPI on a person. Everything else is a hold.
 WRITABLE_STATUSES = frozenset({"matched_high", "matched_medium", "matched_institution_confirmed"})
@@ -199,6 +187,7 @@ def _ensure_dataframe(result: Union[pd.DataFrame, pd.Series]) -> pd.DataFrame:
 import os as _os, sys as _sys  # noqa: E402
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "utils"))
 from ta_registry import resolve_ta_id_supabase as resolve_ta_id  # noqa: E402,F401
+from ta_nppes_config import load_confirming_taxonomies  # noqa: E402
 
 
 def fetch_community_hcp_ids(supabase: Client, ta_id: str) -> List[str]:
@@ -695,7 +684,7 @@ def main() -> None:
     supabase = init_supabase()
     ta_id = resolve_ta_id(supabase, args.ta)
 
-    allow_taxonomies = set(TA_CONFIRMING_TAXONOMIES.get(args.ta, ()))
+    allow_taxonomies = set(load_confirming_taxonomies(args.ta))
 
     print(f"TA={args.ta} (ta_id={ta_id})")
     print(f"Mode: {'DRY-RUN (no writes)' if dry_run else 'EXECUTE (writes enabled)'}")
@@ -704,7 +693,7 @@ def main() -> None:
         print(f"Confirming taxonomies for {args.ta}: {len(allow_taxonomies)} codes")
     else:
         print(
-            f"WARNING: no confirming taxonomy list for '{args.ta}'. Institution-blocked "
+            f"WARNING: nppes.confirming_taxonomies is empty for '{args.ta}'. Institution-blocked "
             "candidates can only confirm on specialty or institution agreement, and will "
             "otherwise be held as unconfirmed."
         )
