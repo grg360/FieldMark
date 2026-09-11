@@ -639,7 +639,35 @@ def merge_record_into_survivor(
             )
     elif move_npi:
         try:
-            cur.execute("UPDATE hcps_v2 SET npi_number = NULL WHERE id = %s", (stub_id,))
+            # THE NPPES COLUMNS GO WITH THE NPI. Their provenance WAS the NPI, so a row
+            # losing the NPI must lose them in the SAME statement.
+            #
+            # nppes_state_has_nppes_provenance (validated, added 2026-09-06) says a
+            # nppes_practice_state implies npi_number OR nppes_enriched_at. Freeing the
+            # unique slot on its own leaves this row with a state, no NPI and (for
+            # registry-minted rows) no enriched_at, which Postgres re-checks on the row
+            # this UPDATE touches -- the 13b_clear_city.sql failure, one layer down.
+            # 6,547 rows currently in hcps_v2 are that exact shape AND are reachable as
+            # merge stubs; every one of them would have failed here.
+            #
+            # NOTHING IS LOST, and the reason is the read ordering, not the write order:
+            # fetch_hcp_pair() materialised both rows into dicts at the top of this
+            # function, and compute_primary_update_payload() read the state/city out of
+            # those dicts (above) before this statement runs. The survivor's UPDATE fires
+            # BELOW this point and writes from that in-memory copy. If either of those
+            # ever re-reads hcps_v2 instead, this clear starts discarding values -- keep
+            # the read-once / clear-stub / write-survivor order intact.
+            #
+            # city rides along for the invariant, not for the constraint: nothing CHECKs
+            # nppes_practice_city today. 13_clear_state.sql and 13b_clear_city.sql treated
+            # the pair together for exactly this reason, and the stub is deleted below
+            # regardless, so the clear costs nothing and states the rule instead of the
+            # constraint.
+            cur.execute(
+                "UPDATE hcps_v2 SET npi_number = NULL, nppes_practice_state = NULL, "
+                "nppes_practice_city = NULL WHERE id = %s",
+                (stub_id,),
+            )
             moved["stub_npi_null"] = {"updated": int(cur.rowcount or 0), "deleted_conflicts": 0}
 
             cur.execute(
@@ -960,6 +988,33 @@ def main() -> None:
     # so a silent total failure is expensive to discover late. A component set with nothing to
     # merge yields attempted == 0 and stays quiet.
     attempted = successes + failed
+
+    # PARTIAL-FAILURE WARN. The all-failed rule below only fires when NOTHING succeeded, so
+    # a run that merged 400 and dropped 12 printed "Failed record merges: 12" as one line in
+    # a six-line summary, on stdout, unmarked, and exited 0. A merge failing is never
+    # routine -- it means two records the detector called the same person are still two
+    # records, and the reason is usually structural (a constraint, a FK, a unique key)
+    # rather than specific to that pair. Zero must be distinguishable from done.
+    #
+    # WARN, not exit 1: this stage is BLOCKING in ta_cycle, so failing the process on a
+    # partial would stop the cycle over one bad pair. The first error goes out VERBATIM
+    # because that string carries the constraint or key name that identifies the class.
+    #
+    # NOTE (2026-09-07): this reaches stderr and the streamed stage log, NOT
+    # reingest_last_run.json, which records only per-stage status. Nothing about a merge
+    # failure is durable in the database either -- dedup_merge_log rows are written inside
+    # the per-pair transaction and roll back with it, and this script writes no
+    # pipeline_runs row at all. If a failure count needs to survive the run, that is a
+    # separate change to the stage record.
+    if failed:
+        first_id, first_reason = failure_reasons[0]
+        print(
+            f"[WARN] {failed} of {attempted} record merges FAILED ({successes} succeeded). "
+            f"A merge failing is never routine. First failure verbatim -- "
+            f"stub={first_id}: {first_reason}",
+            file=sys.stderr,
+        )
+
     if attempted and not successes:
         print(f"[FAIL] 0 of {attempted} attempted record merges succeeded.", file=sys.stderr)
         raise SystemExit(1)
