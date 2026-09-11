@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import os
 import sys
+import unicodedata
 import uuid
 from collections import Counter
 from datetime import datetime, timezone
@@ -73,6 +74,7 @@ BATCH_TA = 500
 RETRY_CHUNK = 250
 PROGRESS_EVERY = 1000
 PREFLIGHT_PAGE_SIZE = 1000
+HCP_ID_CHUNK_PAIRS = 200
 
 # hcp_therapeutic_areas_v2.source -- how the link was derived. Two values only,
 # because there are only two writers of that table: ta_tagging_rebuild_v2.py
@@ -93,6 +95,15 @@ LOG_REASON_LINKED = "workstream_b: TA link added to existing HCP record from NPP
 LOG_CONFIDENCE = "registry_identity"
 
 LOG_BATCH = 500
+
+# hcp_suspected_identity_pair_v1 -- see docs/crc_community/02_suspected_identity_pairs.sql.
+# This script mints registry records without identity-hashing the NPPES side, so a name
+# collision with an existing publication-derived HCP produces a twin. The twin is created
+# either way; recording it is what makes it findable afterwards, because dedup_detect
+# cannot see this population (no OpenAlex id, no co-authors, no institution -> none of its
+# three strong signals can fire).
+PAIR_CLASS_ON_CREATE = "name_key_on_create"
+PAIR_BATCH = 500
 
 AFFILIATION_PROFILE: Dict[str, Any] = {
     "version": "v1.1",
@@ -155,6 +166,113 @@ def normalize_credentials(value: Optional[str]) -> Optional[str]:
 def is_statement_timeout(exc: BaseException) -> bool:
     text = str(exc).lower()
     return "57014" in text or "statement timeout" in text
+
+
+def _nk(value: Any) -> str:
+    """dedup_detect.name_key: NFKC -> fold hyphens -> strip diacritics -> lower."""
+    text = ns(value)
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKC", text)
+    for ch in ("‐", "‑", "‒", "–", "—", "−"):
+        text = text.replace(ch, "-")
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in decomposed if unicodedata.category(c) != "Mn").lower().strip()
+
+
+def _strip_initials(value: Any) -> str:
+    """dedup_detect.strip_initials: 'Kris V.' -> 'kris'."""
+    parts = ns(value).split()
+    while parts and len(parts[-1].replace(".", "")) == 1 and parts[-1].replace(".", "").isalpha():
+        parts.pop()
+    return " ".join(parts).strip().lower()
+
+
+def name_key(first: Any, last: Any) -> str:
+    """The pairing key. Deliberately dedup_detect's, so a pair recorded here is a pair
+    that system would recognise if it could ever see it."""
+    f, l = _nk(_strip_initials(first)), _nk(last)
+    return f"{f}|{l}" if f and l else ""
+
+
+def load_publication_side_index(client: Client, ta_uuid: str) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    name_key -> the TA's publication-derived HCPs who have NO NPI.
+
+    That is the twinning surface: someone with publications and no NPI is exactly who a
+    registry record minted under the same name would shadow. HCPs who already have an NPI
+    are excluded -- if they matched, workstream B routes them to to_link instead.
+    """
+    index: Dict[str, List[Dict[str, Any]]] = {}
+    linked = fetch_linked_hcp_ids(client, ta_uuid, target_version="v2")
+    ids = sorted(linked)
+    for i in range(0, len(ids), HCP_ID_CHUNK_PAIRS):
+        chunk = ids[i : i + HCP_ID_CHUNK_PAIRS]
+        offset = 0
+        while True:
+            batch = (
+                client.table("hcps_v2")
+                .select("id,first_name,last_name,total_career_pubs")
+                .in_("id", chunk)
+                .is_("npi_number", "null")
+                .gt("total_career_pubs", 0)
+                .order("id")
+                .range(offset, offset + PREFLIGHT_PAGE_SIZE - 1)
+                .execute()
+                .data
+                or []
+            )
+            if not batch:
+                break
+            for row in batch:
+                key = name_key(row.get("first_name"), row.get("last_name"))
+                if key:
+                    index.setdefault(key, []).append(
+                        {"id": str(row["id"]), "pubs": int(row.get("total_career_pubs") or 0)}
+                    )
+            if len(batch) < PREFLIGHT_PAGE_SIZE:
+                break
+            offset += PREFLIGHT_PAGE_SIZE
+    return index
+
+
+def load_cohorts(client: Client, ta_uuid: str) -> Dict[str, str]:
+    """hcp_id -> cohort for the TA, captured at detection time."""
+    out: Dict[str, str] = {}
+    offset = 0
+    while True:
+        batch = (
+            client.table("hcp_cohort_classification_v2")
+            .select("hcp_id,cohort")
+            .eq("therapeutic_area_id", ta_uuid)
+            .order("hcp_id")
+            .range(offset, offset + PREFLIGHT_PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        if not batch:
+            break
+        for row in batch:
+            if row.get("hcp_id"):
+                out[str(row["hcp_id"])] = row.get("cohort")
+        if len(batch) < PREFLIGHT_PAGE_SIZE:
+            break
+        offset += PREFLIGHT_PAGE_SIZE
+    return out
+
+
+def write_suspected_pairs(client: Client, rows: List[Dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    written = 0
+    for start in range(0, len(rows), PAIR_BATCH):
+        batch = rows[start : start + PAIR_BATCH]
+        client.table("hcp_suspected_identity_pair_v1").upsert(
+            batch, on_conflict="registry_hcp_id,publication_hcp_id"
+        ).execute()
+        written += len(batch)
+    return written
 
 
 def taxonomy_match_mask(df: pd.DataFrame, codes: Set[str]) -> pd.Series:
@@ -225,6 +343,51 @@ def fetch_linked_hcp_ids(client: Client, ta_uuid: str, target_version: str = "v1
     return linked
 
 
+def primary_taxonomy(row: pd.Series) -> Optional[str]:
+    """The code flagged primary_taxonomy_switch_N = 'Y'. Resolvable for 7,209,233 of the
+    7.2M NPPES individuals, so effectively universal; falls back to the first non-empty
+    code rather than returning nothing."""
+    first_non_empty = None
+    for i in range(1, 6):
+        code = ns(str(row.get(f"taxonomy_{i}")))
+        if not code or code == "nan":
+            continue
+        if first_non_empty is None:
+            first_non_empty = code
+        if ns(str(row.get(f"primary_taxonomy_switch_{i}"))).upper() == "Y":
+            return code
+    return first_non_empty
+
+
+def all_taxonomies(row: pd.Series) -> List[Dict[str, Any]]:
+    """
+    Every code on the record as {code, primary}. The single text column cannot hold these
+    and a confirmer question ('does this person practise in the TA?') needs the set, not
+    just the primary -- 207RH0003X sits in a secondary slot on many of these records.
+
+    THE OBJECT SHAPE IS THE COLUMN'S SHAPE, and this function exists in this form because
+    it once was not. On 2026-09-09 the backfill wrote bare code strings into
+    hcp_nppes_detail_v2.nppes_taxonomies while community_nppes_backfill.py and
+    targeted_nppes_enrichment.py were writing {code, desc, primary, ...} objects. One
+    column, two shapes, 19,043 rows against 41,674 -- and the reader that spanned them
+    matched nothing on the object form, silently failing the evidence gate for every
+    pre-existing record. A column has one shape. When a script writes a column it writes
+    that shape, or the column stops being readable without a rulebook.
+    """
+    out: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for i in range(1, 6):
+        code = ns(str(row.get(f"taxonomy_{i}")))
+        if not code or code == "nan" or code in seen:
+            continue
+        seen.add(code)
+        out.append({
+            "code": code,
+            "primary": ns(str(row.get(f"primary_taxonomy_switch_{i}"))).upper() == "Y",
+        })
+    return out
+
+
 def build_hcp_payload(
     hcp_id: str,
     npi: str,
@@ -248,6 +411,24 @@ def build_hcp_payload(
             "credentials": normalize_credentials(row.get("credentials")),
             "nppes_practice_city": city if city else None,
             "nppes_practice_state": state if state else None,
+            # These city/state values ARE from an NPPES extract, so stamping the
+            # enrichment timestamp is the honest description of them, not a
+            # workaround. It also satisfies nppes_state_has_nppes_provenance's third
+            # disjunct, so a record minted here stays mergeable at the instant its
+            # NPI is moved to a survivor (dedup_merge.py's NPI shuffle) rather than
+            # violating the constraint mid-transaction. Records born before
+            # 2026-09-07 lack it; dedup_merge's clear is what covers those.
+            "nppes_enriched_at": ts_iso,
+            # PERSIST WHAT WE SELECTED ON. This script filters the NPPES parquet on
+            # taxonomy_1..5 to decide who these people ARE, and until 2026-09-09 it then
+            # dropped the column it had selected on -- so 19,043 records existed that could
+            # not be asked the question that created them. The evidence-tier taxonomy gate
+            # read hcps_v2.npi_taxonomy, found NULL on every one, and silently excluded the
+            # entire workstream-B population: a board of 183 that was really 533.
+            #
+            # A selection criterion that is not persisted cannot be re-derived, checked, or
+            # queried. Write it down.
+            "npi_taxonomy": primary_taxonomy(row),
             "country": "USA",
             "total_career_pubs": 0,
             "career_first_pub_year": None,
@@ -346,6 +527,26 @@ def insert_batch(
         return 0
 
 
+def detail_rows_for_created(hcp_id: str, row: pd.Series, ts_iso: str) -> Optional[Dict[str, Any]]:
+    """hcp_nppes_detail_v2.nppes_taxonomies -- the FULL set, which hcps_v2.npi_taxonomy
+    (a single text column) structurally cannot hold."""
+    codes = all_taxonomies(row)
+    if not codes:
+        return None
+    return {"hcp_id": hcp_id, "nppes_taxonomies": codes, "nppes_enriched_at": ts_iso}
+
+
+def write_nppes_detail(client: Client, rows: List[Dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    written = 0
+    for start in range(0, len(rows), LOG_BATCH):
+        batch = rows[start : start + LOG_BATCH]
+        client.table("hcp_nppes_detail_v2").upsert(batch, on_conflict="hcp_id").execute()
+        written += len(batch)
+    return written
+
+
 def log_rows_for_created(
     hcp_id: str, npi: str, ta_slugs: Sequence[str], codes: Sequence[str], ts_iso: str
 ) -> List[Dict[str, Any]]:
@@ -425,10 +626,10 @@ def resolve_requested_ta(slug: Optional[str]) -> Tuple[str, Dict[str, Any], List
         )
 
     cfg = load_ta_config(slug)
-    taxonomies = list((cfg.get("nppes") or {}).get("taxonomies") or [])
+    taxonomies = list((cfg.get("nppes") or {}).get("population_taxonomies") or [])
     if not taxonomies:
         raise SystemExit(
-            f"TA {slug!r} has no nppes.taxonomies in config/therapeutic_areas/{slug}.json.\n"
+            f"TA {slug!r} has no nppes.population_taxonomies in config/therapeutic_areas/{slug}.json.\n"
             "  That code set decides who counts as a member of this therapeutic area. It is a\n"
             "  founder decision and this script will not guess it.\n"
             "  See CRC_COMMUNITY_BUILD.md, FOUNDER INPUTS REQUIRED #1 and #2."
@@ -615,12 +816,31 @@ def main() -> None:
 
     print(f"TA links to add to existing records: {len(link_rows):,}")
 
+    # TWINNING SURFACE, loaded once. Only needed for to_create: a to_link record already
+    # exists and is the same row, not a twin of one.
+    pub_index: Dict[str, List[Dict[str, Any]]] = {}
+    cohorts: Dict[str, str] = {}
+    if target_version == "v2" and to_create:
+        pub_index = load_publication_side_index(client, ta_masks[ta_slug]["ta_uuid"])
+        cohorts = load_cohorts(client, ta_masks[ta_slug]["ta_uuid"])
+        n_twin = sum(
+            1 for _npi, row, _t in to_create
+            if name_key(row.get("first_name"), row.get("last_name")) in pub_index
+        )
+        print(
+            f"Twinning surface: {len(pub_index):,} publication-derived no-NPI name keys in "
+            f"{ta_slug}; {n_twin:,} of {len(to_create):,} new records collide with one and "
+            f"will be recorded in hcp_suspected_identity_pair_v1."
+        )
+
     failed_batches: List[Dict[str, Any]] = []
 
     inserted_hcps = 0
     inserted_ta_rows = 0
     inserted_links = 0
     logged_created = 0
+    pairs_recorded = 0
+    details_written = 0
     logged_linked = 0
 
     ta_dist: Counter[str] = Counter()
@@ -642,6 +862,7 @@ def main() -> None:
         print(f"  TA links for those new records .... {sum(ta_dist.values()):,}")
         print(f"  TA links added to existing records  {len(link_rows):,}")
         print(f"  nppes_enrichment_log_v2 rows ...... {total_new + len(link_log_rows):,}")
+        print(f"  suspected identity pairs .......... {sum(len(pub_index.get(name_key(r.get('first_name'), r.get('last_name')), ())) for _n, r, _t in to_create):,}")
 
     for start in tqdm(
         range(0, 0 if dry_run else total_new, BATCH_HCPS), desc="ingesting HCPs", unit="batch"
@@ -650,6 +871,8 @@ def main() -> None:
         hcp_batch: List[Dict[str, Any]] = []
         ta_batch: List[Dict[str, Any]] = []
         log_batch: List[Dict[str, Any]] = []
+        pair_batch: List[Dict[str, Any]] = []
+        detail_batch: List[Dict[str, Any]] = []
         for npi, row, ta_ids in slab:
             hcp_id = str(uuid.uuid4())
             hcp_batch.append(build_hcp_payload(hcp_id, npi, row, ts_iso, target_version=target_version))
@@ -659,6 +882,33 @@ def main() -> None:
             for s in slugs:
                 codes.extend(matched_codes_for(row, ta_masks[s]["codes"]))
             log_batch.extend(log_rows_for_created(hcp_id, npi, slugs, codes, ts_iso))
+            detail_row = detail_rows_for_created(hcp_id, row, ts_iso)
+            if detail_row:
+                detail_batch.append(detail_row)
+            key = name_key(row.get("first_name"), row.get("last_name"))
+            for twin in pub_index.get(key, ()):
+                pair_batch.append(
+                    {
+                        "registry_hcp_id": hcp_id,
+                        "publication_hcp_id": twin["id"],
+                        "shared_name_key": key,
+                        "registry_npi": npi,
+                        "registry_taxonomies": sorted(set(codes)),
+                        "publication_career_pubs": twin["pubs"],
+                        "publication_cohort": cohorts.get(twin["id"]),
+                        "pair_class": PAIR_CLASS_ON_CREATE,
+                        "evidence": (
+                            "workstream_b minted a registry record whose first+last name key "
+                            f"({key}) matches an existing publication-derived {ta_slug} HCP with "
+                            f"no NPI. Name-key collision only -- NOT an NPI match, and NOT "
+                            "confirmed to be the same person. Recorded because dedup_detect "
+                            "cannot see this pair: the registry side has no OpenAlex id, no "
+                            "co-authors and no institution."
+                        ),
+                        "detected_by": "nppes_workstream_b_ingest.py",
+                        "detected_at": ts_iso,
+                    }
+                )
 
         nh = insert_batch(client, "hcps", hcp_batch, failed_batches, target_version=target_version)
         inserted_hcps += nh
@@ -674,6 +924,9 @@ def main() -> None:
                 )
             if target_version == "v2":
                 logged_created += write_enrichment_log(client, log_batch)
+                # After the hcps insert, never before: registry_hcp_id is an FK.
+                pairs_recorded += write_suspected_pairs(client, pair_batch)
+                details_written += write_nppes_detail(client, detail_batch)
         else:
             failed_batches.append(
                 {
@@ -717,6 +970,8 @@ def main() -> None:
     print(f"TA links written for new records: {inserted_ta_rows:,}")
     print(f"TA links added to EXISTING records: {inserted_links:,}")
     print(f"nppes_enrichment_log_v2 rows -- created: {logged_created:,}, linked: {logged_linked:,}")
+    print(f"hcp_suspected_identity_pair_v1 rows recorded: {pairs_recorded:,}")
+    print(f"hcp_nppes_detail_v2 rows written (full taxonomy set): {details_written:,}")
 
     ta_labels = {entry["ta_uuid"]: entry["name"] for entry in ta_masks.values()}
     print("\nNEW RECORD CREATED, per TA (planned):")
