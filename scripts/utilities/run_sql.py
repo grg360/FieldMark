@@ -122,14 +122,29 @@ def main() -> None:
         with conn.cursor() as cur:
             cur.execute(sql, params or None)
 
-            if cur.description:
-                columns = [desc.name for desc in cur.description]
-                rows = cur.fetchall()
-                print(format_table(columns, rows))
-                print(f"\n({len(rows)} row{'s' if len(rows) != 1 else ''})")
-            else:
-                conn.commit()
-                print(f"OK: {cur.rowcount} row{'s' if cur.rowcount != 1 else ''} affected")
+            # A .sql file may hold several statements. psycopg exposes one result
+            # set at a time; without nextset() every result after the first is
+            # executed on the server and then silently discarded by the reader.
+            # Verification files are multi-query by nature, so print all of them.
+            index = 0
+            while True:
+                index += 1
+                if cur.description:
+                    columns = [desc.name for desc in cur.description]
+                    rows = cur.fetchall()
+                    print(f"-- result {index} --")
+                    print(format_table(columns, rows))
+                    print(f"\n({len(rows)} row{'s' if len(rows) != 1 else ''})\n")
+                elif cur.rowcount is not None and cur.rowcount >= 0:
+                    print(f"-- result {index} --")
+                    print(f"OK: {cur.rowcount} row{'s' if cur.rowcount != 1 else ''} affected\n")
+                else:
+                    print(f"-- result {index} --")
+                    print("OK\n")
+                if not cur.nextset():
+                    break
+
+            conn.commit()
 
 
 if __name__ == "__main__":

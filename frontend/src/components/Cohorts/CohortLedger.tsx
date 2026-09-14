@@ -63,9 +63,9 @@ import {
   layout,
   evidenceChip,
   LEDGER_PAGE_SIZE,
-  COM_TIER_FILTERS,
-  COM_ALL_TIERS,
-  COM_DEFAULT_TIERS,
+  comTierFilters,
+  comAllTiers,
+  comDefaultTiers,
   type CohortConfig,
   type LedgerMeta,
   type LedgerRow,
@@ -1974,9 +1974,17 @@ export default function CohortLedger() {
   const { state: taState, choose: chooseTa } = useLedgerTa(sessionDataSlug);
   const taId = taState.status === "resolved" ? taState.taId : null;
   const taSlug = taState.status === "resolved" ? taState.slug : null;
-  // COM is still welded to one TA (community_ledger takes no p_ta_id -- Phase 3). Mounting
-  // it against any other TA must show an absence, never another TA's roster.
-  const cohortOffTa = Boolean(cfg.pinnedTaSlug && taSlug && cfg.pinnedTaSlug !== taSlug);
+  // COM answers only for the TAs that have a community board (cfg.boardTaSlugs, mirroring
+  // ta_evidence_tier_config). Mounting it against any other TA must show an absence, never
+  // another TA's roster and never a blank panel.
+  const cohortOffTa = Boolean(cfg.boardTaSlugs && taSlug && !cfg.boardTaSlugs.includes(taSlug));
+  // The board TAs as display labels, for the absence copy below. Built here rather than
+  // inline so the sentence reads correctly at any length instead of only at one.
+  const boardTaNames = (cfg.boardTaSlugs ?? []).map((s) => taLabelForSlug(s));
+  const boardTaList =
+    boardTaNames.length <= 1
+      ? boardTaNames[0] ?? ""
+      : `${boardTaNames.slice(0, -1).join(", ")} and ${boardTaNames[boardTaNames.length - 1]}`;
   const [taChoices, setTaChoices] = useState<AddressableTa[]>([]);
   useEffect(() => {
     if (taState.status !== "unresolved" && !cohortOffTa) return;
@@ -2085,8 +2093,30 @@ export default function CohortLedger() {
   const [hasMore, setHasMore] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const loadingMore = useRef(false); // guards concurrent page fetches
-  // Community evidence-tier filter (COM only). Default = anchored + supported.
-  const [selectedTiers, setSelectedTiers] = useState<string[]>(COM_DEFAULT_TIERS);
+  // Community evidence-tier filter (COM only). The vocabulary AND the mount default are
+  // per-TA now (see COM_TIER_MODELS in lib/cohortLedger.ts): lung opens on anchored +
+  // supported, colorectal opens on candidate, and the two models share no qualifying tier.
+  //
+  // HELD AS {slug, tiers} AND DERIVED DURING RENDER, not reset from an effect. A reset
+  // effect lets exactly one render escape carrying the previous TA's tiers, and the load
+  // effect below would fire against them: on a colorectal mount that is a fetch for
+  // ['anchored','supported'], which the RPC answers correctly and emptily, because
+  // partd_presence_v1 cannot emit either. The reader gets a flash of "no members" on a
+  // board of 4,794. Deriving means the selection is never observably wrong, so there is no
+  // bad frame to chase and no second fetch to swallow.
+  const [tierSel, setTierSel] = useState<{ slug: string | null; tiers: string[] }>({ slug: null, tiers: [] });
+  const selectedTiers = tierSel.slug === taSlug ? tierSel.tiers : comDefaultTiers(taSlug);
+  // Same shape as the useState setter it replaces (value or updater), so the chip handlers
+  // below are untouched. comDefaultTiers hands back a module-level array, so the derived
+  // value above is referentially stable and safe in the load effect's dependency list.
+  const setSelectedTiers = useCallback(
+    (next: string[] | ((prev: string[]) => string[])) =>
+      setTierSel((prev) => {
+        const base = prev.slug === taSlug ? prev.tiers : comDefaultTiers(taSlug);
+        return { slug: taSlug, tiers: typeof next === "function" ? next(base) : next };
+      }),
+    [taSlug],
+  );
   const [filteredTotal, setFilteredTotal] = useState(0);
   const [rpcCohortTotal, setRpcCohortTotal] = useState(0);
   const [tierCounts, setTierCounts] = useState<Record<string, number> | null>(null);
@@ -2334,7 +2364,7 @@ export default function CohortLedger() {
                 </div>
                 <div style={{ fontFamily: FACE.value, fontSize: isMobile ? 17 : 20, color: P.ink1, marginBottom: 10, textWrap: "pretty" }}>
                   {cohortOffTa
-                    ? `${cfg.title} is only built for ${taLabelForSlug(cfg.pinnedTaSlug as string)} so far.`
+                    ? `${cfg.title} is built for ${boardTaList} so far.`
                     : "This ledger needs a therapeutic area."}
                 </div>
                 <div style={{ fontFamily: FACE.value, fontSize: 14, fontWeight: 300, color: P.ink3, maxWidth: 620, lineHeight: 1.6, marginBottom: 20, textWrap: "pretty" }}>
@@ -2344,7 +2374,7 @@ export default function CohortLedger() {
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {taChoices
-                    .filter((t) => !cohortOffTa || t.slug === cfg.pinnedTaSlug)
+                    .filter((t) => !cohortOffTa || (cfg.boardTaSlugs?.includes(t.slug) ?? true))
                     .map((t) => (
                       <button
                         key={t.slug}
@@ -2410,14 +2440,14 @@ export default function CohortLedger() {
             {isCom ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "11px 20px", borderBottom: `1px solid ${P.lineMed}` }}>
                 {(() => {
-                  const allOn = COM_ALL_TIERS.every((t) => selectedTiers.includes(t));
+                  const allOn = comAllTiers(taSlug).every((t) => selectedTiers.includes(t));
                   return (
-                    <button onClick={() => setSelectedTiers(allOn ? COM_DEFAULT_TIERS : COM_ALL_TIERS)} style={chipStyle(allOn)}>
+                    <button onClick={() => setSelectedTiers(allOn ? comDefaultTiers(taSlug) : comAllTiers(taSlug))} style={chipStyle(allOn)}>
                       ALL{rpcCohortTotal ? ` ${rpcCohortTotal.toLocaleString()}` : ""}
                     </button>
                   );
                 })()}
-                {COM_TIER_FILTERS.map((t) => {
+                {comTierFilters(taSlug).map((t) => {
                   const on = selectedTiers.includes(t.key);
                   const n = tierCounts?.[t.key];
                   const tip = metricKeyFor("COM", t.key);
@@ -2447,7 +2477,7 @@ export default function CohortLedger() {
                         onClick={() =>
                           setSelectedTiers((prev) => {
                             const next = prev.includes(t.key) ? prev.filter((x) => x !== t.key) : [...prev, t.key];
-                            return next.length ? next : COM_DEFAULT_TIERS; // never empty
+                            return next.length ? next : comDefaultTiers(taSlug); // never empty
                           })
                         }
                         aria-pressed={on}

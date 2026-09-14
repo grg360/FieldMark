@@ -81,13 +81,24 @@ export interface CohortConfig {
   factFinish?: boolean;
   sortLabel?: string; // COM roster: visible default-order label (no rank exists)
   rpc: string; // source RPC
-  // SET ONLY WHERE A COHORT IS STILL WELDED TO ONE TA. COM's RPC reads
-  // community_board_nsclc_v1 and takes no p_ta_id, so the community ledger can only
-  // answer for that TA until the evidence tier is generalised (Phase 3 of
-  // docs/canonical/TA_NEUTRAL_DB_LAYER.md). The ledger reads this to render an explicit absence
-  // for any other TA rather than silently serving lung rows under its name.
-  // DELETE THE FIELD when COM takes p_ta_id -- its absence is how EST/RS say "any TA".
-  pinnedTaSlug?: string;
+  // WHICH TAs THIS COHORT HAS A BOARD FOR. Set only where a cohort cannot answer for
+  // every TA; absent is how EST/RS say "any TA". The ledger and the nav strip both read
+  // it, so a TA outside the list never gets a mountable tab rather than getting one that
+  // renders blank.
+  //
+  // THIS ARRAY MIRRORS public.ta_evidence_tier_config, AND THAT TABLE IS THE AUTHORITY.
+  // A TA has a community board by having a row there -- community_board_v1 joins it, so a
+  // TA without a row returns zero rows by construction (measured 2026-09-11: hepatology 0,
+  // rare-disease 0, against 4,915 nsclc and 4,794 colorectal-cancer). This list exists
+  // only because the frontend cannot read that table at mount time, when it must already
+  // know whether to offer the tab.
+  //
+  // A MIRROR IS A THING THAT CAN DISAGREE, AND BOTH DIRECTIONS FAIL DIFFERENTLY. Here and
+  // not there: the tab mounts, the RPC returns nothing, and the user gets a blank panel --
+  // the third bad state, worse than an absent tab because it reads as breakage. There and
+  // not here: the board exists and nothing in the UI can reach it. When a TA gains a
+  // ta_evidence_tier_config row, it gains an entry here in the same change.
+  boardTaSlugs?: string[];
   notes: string[];
   traceFoot: string;
   // Mobile (≤767): Design pairs score columns rather than dropping them. When present,
@@ -224,8 +235,12 @@ export const COM_CONFIG: CohortConfig = {
   factFinish: true,
   // Roster default order (Phase 3): the visible, swappable view-state label.
   sortLabel: "BY EVIDENCE TIER, THEN MEDICARE REACH",
-  rpc: "community_ledger",   // unchanged: no p_ta_id until Phase 3
-  pinnedTaSlug: "nsclc",
+  rpc: "community_ledger",   // takes p_ta_id as of docs/crc_community/31 (2026-09-14)
+  // Mirrors ta_evidence_tier_config, which holds exactly these two rows. See the
+  // boardTaSlugs declaration for why this list is a copy and what breaks when it drifts.
+  boardTaSlugs: ["nsclc", "colorectal-cancer"],
+  // See COMMUNITY_PROFILE_TA_SLUGS below -- the board and the PROFILE now cover different
+  // TAs, and the two lists must not be conflated.
   notes: [
     "COMMUNITY IS NOT RANKED. TIER IS THE ONLY ASSERTED EVIDENCE CLAIM; EVERY FIGURE ON A ROW IS A DISPLAYED FACT, AND THE DEFAULT ORDER (TIER, THEN MEDICARE REACH) IS A VIEW-STATE, NOT A JUDGMENT.",
     "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE — THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
@@ -259,11 +274,32 @@ const TRACK_TO_TAG: Record<string, CohortConfig["tag"]> = {
  * Unknown track, or no TA resolved yet: true. Neither is evidence of unavailability, and
  * disabling a control on missing information is its own kind of lie.
  */
+/**
+ * WHICH TAs THE COMMUNITY *PROFILE* IS BUILT FOR. Deliberately NOT COM_CONFIG.boardTaSlugs,
+ * and the gap between the two is the point of this constant existing at all.
+ *
+ * The BOARD is TA-parameterised: community_board_v1 carries ta_id and
+ * get_community_filtered takes p_ta_id, so it answers for every TA with a
+ * ta_evidence_tier_config row -- lung and colorectal today.
+ *
+ * The PROFILE is not. community_hcp_profile and community_practice_profile both still read
+ * community_board_nsclc_v1 and hcp_nsclc_evidence_tier_v1 and both still resolve their TA
+ * with `slug = 'nsclc'` internally (verified against the live catalog 2026-09-11). Neither
+ * takes a TA argument, so calling either for a colorectal HCP returns LUNG evidence tiers,
+ * lung anchor stems and a lung ladder -- rendered under a colorectal heading, with nothing
+ * on the page marking it as borrowed.
+ *
+ * So these two lists WERE the same list and are now different, and the moment they became
+ * different is the moment reusing one for the other became a wrong-TA bug. This grows to
+ * match boardTaSlugs when the two profile RPCs take p_ta_id, and not before.
+ */
+export const COMMUNITY_PROFILE_TA_SLUGS: readonly string[] = ["nsclc"];
+
 export function cohortServesTa(trackKey: string, taSlug: string | null | undefined): boolean {
   const tag = TRACK_TO_TAG[trackKey];
   const cfg = tag ? COHORTS.find((c) => c.tag === tag) : undefined;
-  if (!cfg?.pinnedTaSlug || !taSlug) return true;
-  return cfg.pinnedTaSlug === taSlug;
+  if (!cfg?.boardTaSlugs || !taSlug) return true;
+  return cfg.boardTaSlugs.includes(taSlug);
 }
 
 export interface LedgerRow {
@@ -333,7 +369,9 @@ export interface LedgerData {
 
 // ── Community evidence tiers (COM only) ──────────────────────────────────────
 // Tier vocabulary is shared between the filter chips and the row chip so filter↔row
-// is stated, not inferred. Default ledger = anchored + supported (the frame's 1,068).
+// is stated, not inferred. COM_TIER_LABEL stays a FLAT map across every tier model: it
+// answers "what does this row's tier word say", which is a per-ROW question and needs no
+// TA. Which tiers exist, and which are on at mount, ARE per-TA — see COM_TIER_MODELS below.
 export const COM_TIER_LABEL: Record<string, string> = {
   anchored: "ANCHORED",
   supported: "SUPPORTED",
@@ -341,15 +379,74 @@ export const COM_TIER_LABEL: Record<string, string> = {
   heme_dominant: "HEME-DOMINANT",
   unresolved: "NO MEDICARE EVIDENCE",
 };
-export const COM_TIER_FILTERS: { key: string; label: string }[] = [
-  { key: "anchored", label: "ANCHORED" },
-  { key: "supported", label: "SUPPORTED" },
-  { key: "candidate", label: "CANDIDATES" },
-  { key: "unresolved", label: "NO MEDICARE EVIDENCE" },
-  { key: "heme_dominant", label: "HEME-DOMINANT" },
-];
-export const COM_ALL_TIERS: string[] = COM_TIER_FILTERS.map((t) => t.key);
-export const COM_DEFAULT_TIERS: string[] = ["anchored", "supported"];
+/**
+ * THE TIER VOCABULARY IS PER-TA, BECAUSE THE TIER MODEL IS (2026-09-14).
+ *
+ * This was one flat list and one default, both lung-shaped, and that was correct while
+ * Community answered for one TA. ta_evidence_tier_config now holds two tier_models and they
+ * do not share a vocabulary:
+ *
+ *   nsclc             nsclc_v1           anchored / supported / heme_dominant /
+ *                                        candidate / unresolved
+ *   colorectal-cancer partd_presence_v1  candidate / unresolved     <- two tiers, by design
+ *
+ * Colorectal's ENTIRE qualifying board is 'candidate' (4,794 of 4,794, measured 2026-09-14):
+ * anchored and supported need colorectal drug grading that has not been curated yet, and
+ * NULL in that config means NOT CURATED, never none. So sending the old default of
+ * ["anchored","supported"] at a colorectal mount asks the RPC for two tiers that model
+ * cannot emit and gets back a correct, well-formed, EMPTY roster -- under a heading that
+ * says 4,794. That is the same class of lie as the lung rows this build removed, just
+ * arriving as an absence instead of as someone else's data.
+ *
+ * Showing all five chips everywhere would be the other half of the same mistake: an
+ * ANCHORED chip reading 0 on colorectal asserts a tier that model has no way to produce,
+ * which reads as "nobody qualified" rather than "this does not apply here".
+ *
+ * A TA WITH NO ENTRY FALLS BACK TO THE LUNG VOCABULARY rather than to an empty chip row --
+ * the ledger already refuses to mount COM off cfg.boardTaSlugs, so an unlisted TA cannot
+ * reach this in practice, and a wrong-but-visible filter bar is easier to notice in
+ * development than no filter bar at all. Add the row when the TA gets its tier model.
+ */
+const COM_TIER_MODELS: Record<string, { filters: { key: string; label: string }[]; defaults: string[] }> = {
+  nsclc: {
+    filters: [
+      { key: "anchored", label: "ANCHORED" },
+      { key: "supported", label: "SUPPORTED" },
+      { key: "candidate", label: "CANDIDATES" },
+      { key: "unresolved", label: "NO MEDICARE EVIDENCE" },
+      { key: "heme_dominant", label: "HEME-DOMINANT" },
+    ],
+    defaults: ["anchored", "supported"],
+  },
+  "colorectal-cancer": {
+    filters: [
+      { key: "candidate", label: "CANDIDATES" },
+      { key: "unresolved", label: "NO MEDICARE EVIDENCE" },
+    ],
+    // The whole qualifying board. 'unresolved' is off by default for the same reason it is
+    // off for lung: it is the tier for people the claims record cannot speak to.
+    defaults: ["candidate"],
+  },
+};
+
+const COM_TIER_FALLBACK_SLUG = "nsclc";
+
+function comTierModel(taSlug: string | null | undefined) {
+  return COM_TIER_MODELS[taSlug ?? ""] ?? COM_TIER_MODELS[COM_TIER_FALLBACK_SLUG];
+}
+
+/** Filter chips for this TA, in display order. */
+export function comTierFilters(taSlug: string | null | undefined): { key: string; label: string }[] {
+  return comTierModel(taSlug).filters;
+}
+/** Every tier this TA's model can emit — what the ALL chip selects. */
+export function comAllTiers(taSlug: string | null | undefined): string[] {
+  return comTierModel(taSlug).filters.map((t) => t.key);
+}
+/** The tiers a fresh mount opens on. */
+export function comDefaultTiers(taSlug: string | null | undefined): string[] {
+  return comTierModel(taSlug).defaults;
+}
 
 export interface EvidenceChip {
   tierWord: string; // ANCHORED / SUPPORTED / …
@@ -754,17 +851,26 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, 
  *  max() aggregate that makes suppression scope-independent — it must NOT be derived
  *  from the loaded rows. */
 export async function loadLedgerMeta(cfg: CohortConfig, taId: string): Promise<LedgerMeta> {
-  // COM stays on the old NSCLC-pinned ledger_meta until Phase 3: board_meta RAISES for a
-  // non-NSCLC COM request rather than answering with lung numbers, and the ledger already
-  // refuses to mount COM off-TA (cfg.pinnedTaSlug), so this branch is only ever reached
-  // for the TA it is pinned to.
-  const [rpc, args] =
-    cfg.tag === "COM"
-      ? ["ledger_meta", { p_cohort: cfg.tag }]
-      : ["board_meta", { p_ta_id: taId, p_cohort: cfg.tag }];
-  const { data, error } = await supabase.rpc(rpc as string, args);
+  // ONE RPC FOR ALL THREE COHORTS (docs/crc_community/31, applied 2026-09-14). What stood
+  // here was a COM branch onto ledger_meta, and a paragraph saying that branch was about to
+  // become a wrong-TA bug. It has been fixed rather than deleted, so here is what is now
+  // true instead.
+  //
+  // ledger_meta(p_cohort text) never held any board logic: it delegates to board_meta with
+  // a hardcoded nsclc id. The NSCLC pin, and the RAISE that refused a non-NSCLC COM request
+  // rather than answering it with lung numbers, both lived inside board_meta's COM arm.
+  // That arm now counts community_board_v1 bounded by ta_id, so it answers for whichever TA
+  // it is asked about and the refusal is gone -- which is what makes "colorectal-cancer"
+  // safe in boardTaSlugs above.
+  //
+  // So the branch collapses. Both sides were already passing the same two arguments; the
+  // only difference was which name they sent them to, and COM no longer needs a different
+  // one. ledger_meta survives as a pinned shim for the deploy window only (the DB change and
+  // this build cannot land in the same instant on a branch that auto-deploys) and carries a
+  // dated row in scripts/utilities/ta_neutrality_allowlist.tsv. Nothing in the app calls it.
+  const { data, error } = await supabase.rpc("board_meta", { p_ta_id: taId, p_cohort: cfg.tag });
   if (error || !data) {
-    console.error(`${rpc} failed:`, error?.message);
+    console.error("board_meta failed:", error?.message);
     return { cohortTotal: 0, ceilings: {} };
   }
   const d = data as { cohort_total?: number; ceilings?: Record<string, number> };
@@ -1059,17 +1165,30 @@ export async function loadLedgerPage(
   // carry the · INSTITUTION qualifier in the chip, so the basis travels with the row rather
   // than living in a filter setting nobody remembers setting.
   if (cfg.tag !== "COM" && includeInstitutionPlaced) args.p_include_institution_placed = true;
-  // p_ta_id goes to the board_* RPCs only. community_ledger does not accept it, and an
-  // unknown named argument makes the RPC unresolvable through PostgREST -- the same trap
-  // the p_after_rank / p_tiers split above documents.
-  if (cfg.tag !== "COM") args.p_ta_id = taId;
+  // p_ta_id NOW GOES TO ALL THREE (docs/crc_community/31, applied 2026-09-14).
+  // community_ledger gained a p_ta_id overload; its six-argument signature is still there,
+  // untouched and granted, and the two are told apart by exactly this argument -- naming
+  // p_ta_id selects the TA-taking one, omitting it selects the pinned shim. So this line is
+  // what routes the call, not a detail of it: drop it for COM and the ledger silently falls
+  // back to the lung board under whatever heading the page is wearing.
+  args.p_ta_id = taId;
   const { data, error } = await supabase.rpc(cfg.rpc, args);
   if (error) {
     console.error(`${cfg.rpc} failed:`, error.message);
     return { cohortTotal: 0, filteredTotal: 0, tierCounts: null, rows: [], hasMore: false };
   }
   const d = (data as { cohort_total?: number; filtered_total?: number; tier_counts?: Record<string, number> | null; rows?: unknown[] }) ?? {};
-  const rowTaSlug = cfg.tag === "COM" ? (cfg.pinnedTaSlug ?? "") : (apiSlugForTaId(taId) ?? "");
+  // THE ROW'S TA COMES FROM THE RESOLVED TA, FOR EVERY COHORT. This was
+  // `cfg.tag === "COM" ? (cfg.pinnedTaSlug ?? "") : (apiSlugForTaId(taId) ?? "")` -- COM
+  // took its slug from the config because the config named exactly one TA, so the config
+  // and the resolved TA could not disagree. With boardTaSlugs holding two, a config lookup
+  // has no way to say WHICH, and the honest source is the taId the page was loaded for.
+  // The two branches now compute the same thing, so there is no branch.
+  //
+  // What this stamps is load-bearing: LedgerRow.taSlug builds the four profile links, and
+  // a row carrying the wrong TA sends the reader to a profile scoped to a TA the row is
+  // not from -- the same class as the lung tier that used to arrive under colorectal rows.
+  const rowTaSlug = apiSlugForTaId(taId) ?? "";
   const rows: LedgerRow[] = ((d.rows ?? []) as Record<string, unknown>[])
     .map((r) => ({ ...mapRow(cfg, r), taSlug: rowTaSlug, taId }));
   const cohortTotal = Number(d.cohort_total) || rows.length;
