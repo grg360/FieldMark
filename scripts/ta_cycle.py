@@ -90,7 +90,7 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       upserts status/phase/completion_date into clinical_trials_v2. Does NOT crawl by HCP name
                       and writes NO trial_investigators rows -- the HCP crawl stays manual/occasional. TA-agnostic.
                       NON-BLOCKING (external CT.gov call): failure -> WARN (not FAILED), never gates the cycle.
- 11.5 npi_enrich      targeted_nppes_enrichment.py --target-version v2 --ta <slug>
+  11.5 npi_enrich      targeted_nppes_enrichment.py --target-version v2 --ta <slug>
                       NPI ACQUISITION. Live NPPES registry lookups for this TA's HCPs that have
                       no npi_number and clear the TA config's nppes.min_career_pubs floor.
                       Fill-only: npi_number IS NULL is enforced ON THE WRITE, not just at
@@ -119,6 +119,13 @@ STAGES (fail-fast: any non-zero exit -> stop, mark FAILED, exit 1):
                       converting nothing means the floor is wrong, the TA has no US
                       publication-side population, or the stage did not really run.
                       NON-BLOCKING (external NPPES API): failure -> WARN, never gates the cycle.
+  11.75 part_d_oncology part_d_oncology_ingest.py --execute
+                      Part D oral-oncology evidence ingest. Builds its NPI cohort at run time
+                      from hcps_v2 (not from an acquired-NPI log), then upserts matching Part D
+                      drug rows into hcp_part_d_oncology_v1 and verifies by re-reading that table.
+                      This is the third NPI consumer: after 11.5 produces new NPIs and before 12
+                      claims top-up / all downstream evidence-tier readers. Non-blocking: a
+                      missing local Part D file or ingest failure WARNs, never gates the cycle.
  12 hcpcs_topup       hcpcs_detail_topup.py --execute --triggered-by reingest_cycle
                       Medicare claims top-up for HCPs that gained an NPI since the last hcp_hcpcs_detail load.
                       DERIVES its target set (anti-join vs hcp_hcpcs_detail) from local parquets; no-ops when
@@ -197,6 +204,7 @@ SCRIPTS: Dict[str, str] = {
     "asset_matches": "scripts/assets/build_asset_matches.py",         # 10: derived asset-mention table (NSCLC only)
     "trials_status_refresh": "scripts/ingest/trials_pipeline.py",     # 11: weekly trial-fact refresh (--refresh-status)
     "npi_enrich": "scripts/enrich/targeted_nppes_enrichment.py",      # 11.5: acquire NPIs -- the PRODUCER stage 12 consumes
+    "part_d_oncology_ingest": "scripts/ingest/part_d_oncology_ingest.py", # 11.75: Part D evidence for hcps_v2 NPI cohort
     "hcpcs_topup": "scripts/ingest/hcpcs_detail_topup.py",            # 12: Medicare claims top-up for newly-NPI'd HCPs
     "board_snapshot": "scripts/utilities/take_weekly_snapshot.py",    # 9.5: capture board state + GATE INPUTS after scoring
     "narratives": "scripts/narrative/generate_narratives_v2.py",      # 13: narrative regen coupled to the scoring recompute
@@ -279,6 +287,9 @@ NPI_COVERAGE_SQL = (
     "JOIN hcp_therapeutic_areas_v2 t ON t.hcp_id = h.id "
     "WHERE t.therapeutic_area_id = %s AND h.npi_number IS NOT NULL"
 )
+# Stage 11.75 reads this target table before and after, never the ingest's own
+# funnel log. The ingest's cohort is ALL hcps_v2 NPI holders, hence no TA parameter.
+PART_D_ONCOLOGY_COVERAGE_SQL = "SELECT count(DISTINCT hcp_id) FROM hcp_part_d_oncology_v1"
 DAYS_PER_YEAR = 365
 
 # Ordered stages for --resume-from and the plan.
@@ -315,7 +326,7 @@ STAGE_LABELS: List[Tuple[str, int]] = [
     ("7a", 7), ("7b", 7),
     ("8a", 8), ("8b", 8), ("8c", 8), ("8f", 8), ("8d", 8), ("8e", 8),
     ("9", 9), ("9.5", 9),
-    ("10", 10), ("11", 11), ("11.5", 11), ("12", 12),
+    ("10", 10), ("11", 11), ("11.5", 11), ("11.75", 11), ("12", 12),
     ("13a", 13), ("13b", 13), ("13c", 13), ("13.5", 13),
 ]
 LABEL_ORDINAL: Dict[str, int] = {lbl: i for i, (lbl, _) in enumerate(STAGE_LABELS)}
@@ -572,6 +583,13 @@ def cmd_npi_enrich(slug: str) -> List[str]:
     # it gets a named error from the script, which this non-blocking stage turns into a
     # WARN -- absence visible, cycle unaffected.
     return py("npi_enrich") + ["--target-version", "v2", "--ta", slug]
+
+
+def cmd_part_d_oncology_ingest() -> List[str]:
+    # 11.75: deliberately after NPI acquisition. Unlike stage 12's anti-join,
+    # this script constructs its exact cohort live from hcps_v2.npi_number; it
+    # therefore sees NPPES fills from 11.5 in this same cycle.
+    return py("part_d_oncology_ingest") + ["--execute"]
 
 
 def cmd_hcpcs_topup() -> List[str]:
@@ -945,6 +963,9 @@ SCALE_PROBES: Tuple[ScaleProbe, ...] = (
     ScaleProbe("11", "open-status trials refreshed (global, TA-agnostic)",
                "SELECT count(*) FROM clinical_trials_v2 WHERE status IN "
                "('RECRUITING','NOT_YET_RECRUITING','ACTIVE_NOT_RECRUITING','ENROLLING_BY_INVITATION')"),
+    ScaleProbe("11.75", "hcps_v2 NPI holders in the Part D oncology ingest cohort",
+               "SELECT count(*) FROM hcps_v2 WHERE npi_number IS NOT NULL",
+               caveat="exact live cohort before Part D drug matching; not a claim of rows that will land"),
     ScaleProbe("12", "NPI'd HCPs with no hcp_hcpcs_detail row",
                "SELECT count(*) FROM hcps_v2 h WHERE h.npi_number IS NOT NULL "
                "AND NOT EXISTS (SELECT 1 FROM hcp_hcpcs_detail d WHERE d.hcp_id = h.id)",
@@ -1269,6 +1290,12 @@ POSTCHECKS: Dict[str, Postcheck] = {
                           "JOIN hcp_therapeutic_areas_v2 t ON t.hcp_id = h.id "
                           "WHERE t.therapeutic_area_id = %s AND h.npi_number IS NOT NULL",
                       ta_scoped=True, ratio=RATIO_NON_REGRESSION, blocking=False),
+    # 11.75 -- the ingest self-verifies staged keys, but the cycle independently
+    # reads its target table. Non-regression is right for refreshes; a build that
+    # leaves this at zero is called out explicitly in the stage body below.
+    "11.75": Postcheck("NON_REGRESSION", "hcp_part_d_oncology_v1 distinct hcp_id",
+                        sql=PART_D_ONCOLOGY_COVERAGE_SQL,
+                        ratio=RATIO_NON_REGRESSION, blocking=False),
     # 12 -- the work-set is an UPPER bound (the stage intersects it with local parquets), so
     # per the bound rule no ratio is applied to it. NON_REGRESSION on coverage instead.
     "12": Postcheck("NON_REGRESSION", "hcp_hcpcs_detail distinct hcp_id",
@@ -1677,6 +1704,10 @@ def print_plan(
          "nppes.min_career_pubs floor; fill-only, attempt-memoised; PRODUCER of stage 12's input; "
          "NON-BLOCKING -- WARN not FAILED. Coverage delta printed; zero on --operation build is a WARN)",
          cmd_npi_enrich(slug)),
+        ("11.75 part_d_oncology_ingest (builds live hcps_v2 NPI cohort; upserts Part D oral-oncology "
+         "evidence and confirms target-table rows; PRODUCER relationship recorded after 11.5 and before "
+         "tier readers; NON-BLOCKING -- WARN not FAILED; zero delta on --operation build is a WARN)",
+         cmd_part_d_oncology_ingest()),
         # 12/13/13.5 were MISSING from this list until 2026-08-24 while the module docstring
         # claimed --dry-run "prints the full plan (all stages...)". Every dry run to date
         # therefore hid the BILLED portion of the cycle: three narrative sub-stages, two of
@@ -2404,6 +2435,40 @@ def run_cycle(
                         file=sys.stderr,
                     )
                     note(11, "npi_enrich", "WARN(zero_delta_on_build)")
+
+        # 11.75 PART D ONCOLOGY -- NON-BLOCKING. Its cohort is constructed live from
+        # hcps_v2.npi_number, so it is a consumer of 11.5's NPI acquisition rather than a
+        # consumer of that stage's log. It must precede 12 and evidence-tier readers: otherwise
+        # claims-evidenced oral-oncology HCPs wait another cycle to reach the board.
+        if not running_label("11.75"):
+            print(f"[stage 11.75] SKIPPED: {skip_reason('11.75')}", flush=True)
+            note(11, "part_d_oncology_ingest", f"SKIPPED({skip_reason('11.75')})")
+        else:
+            part_d_before = count_scalar(PART_D_ONCOLOGY_COVERAGE_SQL)
+            try:
+                _b1175 = pc_before("11.75")
+                run_stage(11, "part_d_oncology_ingest(11.75)", cmd_part_d_oncology_ingest())
+                note(11, "part_d_oncology_ingest", "OK",
+                     postcheck=pc_after("11.75", 11, "11.75", _b1175,
+                                        plan_scale.get("11.75")))
+            except Exception as pe:  # non-blocking: local Medicare files / DB may be unavailable
+                note(11, "part_d_oncology_ingest", f"WARN({type(pe).__name__})")
+                print(f"\n[ta_cycle] WARN: stage 11.75 part_d_oncology_ingest failed ({pe}); "
+                      "cycle still SUCCESS (non-blocking). Part D evidence remains at its prior load.",
+                      file=sys.stderr)
+            part_d_after = count_scalar(PART_D_ONCOLOGY_COVERAGE_SQL)
+            if part_d_before is None or part_d_after is None:
+                print("[ta_cycle] 11.75 Part D coverage delta unavailable (count failed); "
+                      "not treated as a failure.")
+            else:
+                delta = part_d_after - part_d_before
+                print(f"[ta_cycle] 11.75 Part D oncology coverage: {part_d_before:,} -> "
+                      f"{part_d_after:,} distinct HCPs (delta {delta:+,})")
+                if delta == 0 and operation == "build":
+                    print(f"\n[ta_cycle] WARN: stage 11.75 landed zero Part D oncology HCPs on "
+                          f"--operation build ({part_d_after:,} before and after). Check local Part D "
+                          "files, drug reference rows, and the live hcps_v2 NPI cohort.", file=sys.stderr)
+                    note(11, "part_d_oncology_ingest", "WARN(zero_delta_on_build)")
 
         # 12 HCPCS DETAIL TOP-UP -- NON-BLOCKING. Any HCP that gained an NPI since the last
         # hcp_hcpcs_detail load (enrichment, crosswalk applies, stub merges) has Medicare claims
