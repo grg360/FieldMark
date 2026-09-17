@@ -66,6 +66,8 @@ import {
   comTierFilters,
   comAllTiers,
   comDefaultTiers,
+  comSortLabel,
+  comOrderClause,
   type CohortConfig,
   type LedgerMeta,
   type LedgerRow,
@@ -2094,16 +2096,25 @@ export default function CohortLedger() {
   const [open, setOpen] = useState<string | null>(null);
   const loadingMore = useRef(false); // guards concurrent page fetches
   // Community evidence-tier filter (COM only). The vocabulary AND the mount default are
-  // per-TA now (see COM_TIER_MODELS in lib/cohortLedger.ts): lung opens on anchored +
-  // supported, colorectal opens on candidate, and the two models share no qualifying tier.
+  // per-TA (see COM_TIER_MODELS in lib/cohortLedger.ts). Both board TAs now open on
+  // anchored + supported -- under partb_practice_v1 colorectal's top two tiers mean what
+  // lung's mean -- but their VOCABULARIES still differ: lung has heme_dominant and
+  // colorectal has no way to emit it.
   //
   // HELD AS {slug, tiers} AND DERIVED DURING RENDER, not reset from an effect. A reset
-  // effect lets exactly one render escape carrying the previous TA's tiers, and the load
-  // effect below would fire against them: on a colorectal mount that is a fetch for
-  // ['anchored','supported'], which the RPC answers correctly and emptily, because
-  // partd_presence_v1 cannot emit either. The reader gets a flash of "no members" on a
-  // board of 4,794. Deriving means the selection is never observably wrong, so there is no
-  // bad frame to chase and no second fetch to swallow.
+  // effect lets exactly one render escape carrying the previous TA's selection, and the
+  // load effect below would fire against it. The defaults matching across TAs does NOT
+  // retire the hazard, it just narrows which selections trigger it: a reader who has
+  // selected HEME-DOMINANT on lung and switches to colorectal would, for one frame, ask the
+  // RPC for a tier partb_practice_v1 cannot produce -- a correct, well-formed, empty answer
+  // under a populated heading.
+  //
+  // UPDATED 2026-09-17: this comment previously illustrated the hazard with colorectal
+  // defaulting to ['candidate'] under partd_presence_v1, which has not been true since
+  // block 52, and quoted a board size that the Part D re-ingest moved. The mechanism was
+  // right and the example had rotted -- which is the argument for describing a mechanism
+  // and not a measurement. Deriving means the selection is never observably wrong, so there
+  // is no bad frame to chase and no second fetch to swallow.
   const [tierSel, setTierSel] = useState<{ slug: string | null; tiers: string[] }>({ slug: null, tiers: [] });
   const selectedTiers = tierSel.slug === taSlug ? tierSel.tiers : comDefaultTiers(taSlug);
   // Same shape as the useState setter it replaces (value or updater), so the chip handlers
@@ -2243,6 +2254,12 @@ export default function CohortLedger() {
   const metaLine = isCom
     ? `${filteredTotal.toLocaleString()} OF ${cohortTotal.toLocaleString()} HCP · PART D + PART B DERIVED · EVIDENCE TIERS`
     : (loading ? "" : cfg.meta.replace("{total}", cohortTotal.toLocaleString()));
+  // THE ORDER LABEL IS PER-TA FOR COM. The roster's ORDER BY does not vary -- it is always
+  // (tier_priority, -patient_volume, hcp_id) -- but whether the SECOND key discriminates
+  // does: lung has patient_volume on 79.4% of its board and colorectal on none of it, so
+  // for colorectal the label must not claim a reach ordering. EST/RS carry no sortLabel and
+  // render nothing here, exactly as before.
+  const sortLabelText = isCom ? comSortLabel(taSlug) : cfg.sortLabel;
 
   const toggle = useCallback((id: string) => setOpen((o) => (o === id ? null : id)), []);
   const isMobile = useIsMobile();
@@ -2514,9 +2531,9 @@ export default function CohortLedger() {
                     </span>
                   );
                 })}
-                {cfg.sortLabel ? (
+                {sortLabelText ? (
                   <span style={{ ...mono(9), color: P.ink5, letterSpacing: ".1em", alignSelf: "center", marginLeft: "auto" }}>
-                    {cfg.sortLabel}
+                    {sortLabelText}
                   </span>
                 ) : null}
               </div>
@@ -2586,8 +2603,12 @@ export default function CohortLedger() {
 
             {/* footer caveats */}
             <div style={{ padding: "14px 20px 16px 23px", display: "flex", flexDirection: "column", gap: 5, maxWidth: 1180 }}>
+              {/* {order} carries this TA's real sort keys into the not-ranked note. No other
+                  cohort's notes contain the token, so the replace is a no-op for EST/RS. */}
               {cfg.notes.map((n, i) => (
-                <div key={i} style={{ ...mono(11), lineHeight: 1.75, color: CANON.INK.MUTE, letterSpacing: ".04em" }}>{n}</div>
+                <div key={i} style={{ ...mono(11), lineHeight: 1.75, color: CANON.INK.MUTE, letterSpacing: ".04em" }}>
+                  {n.replace("{order}", comOrderClause(taSlug))}
+                </div>
               ))}
             </div>
             </>

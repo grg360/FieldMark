@@ -88,10 +88,12 @@ export interface CohortConfig {
   //
   // THIS ARRAY MIRRORS public.ta_evidence_tier_config, AND THAT TABLE IS THE AUTHORITY.
   // A TA has a community board by having a row there -- community_board_v1 joins it, so a
-  // TA without a row returns zero rows by construction (measured 2026-09-11: hepatology 0,
-  // rare-disease 0, against 4,915 nsclc and 4,794 colorectal-cancer). This list exists
-  // only because the frontend cannot read that table at mount time, when it must already
-  // know whether to offer the tab.
+  // TA without a row returns ZERO rows by construction, not a small number: hepatology and
+  // rare-disease both have scored HCPs and no config row, and both return nothing
+  // (re-verified 2026-09-17). That zero is the safety property, and it does not depend on
+  // how large the two real boards are -- their sizes live in
+  // docs/canonical/COMMUNITY_BOARD_BASELINE.md. This list exists only because the frontend
+  // cannot read that table at mount time, when it must already know whether to offer the tab.
   //
   // A MIRROR IS A THING THAT CAN DISAGREE, AND BOTH DIRECTIONS FAIL DIFFERENTLY. Here and
   // not there: the tab mounts, the RPC returns nothing, and the user gets a blank panel --
@@ -218,7 +220,11 @@ export const COM_CONFIG: CohortConfig = {
   markerColor: "#B0848F",
   label: "Community",
   nameSub: "SPECIALTY · LOCATION · GENERATED SUMMARY",
-  meta: "{total} HCP · CMS-DERIVED · TIER-GROUPED, NOT RANKED · SORTED BY EVIDENCE TIER, THEN MEDICARE REACH",
+  // DEAD FOR COM AND KEPT ONLY TO SATISFY THE TYPE. CohortLedger builds its own metaLine
+  // for the COM branch ("N OF M HCP · PART D + PART B DERIVED · EVIDENCE TIERS") and never
+  // reads this string, which is why its stale "THEN MEDICARE REACH" tail was not the bug
+  // the sort label was. Do not add facts here expecting them to render.
+  meta: "{total} HCP · CMS-DERIVED · TIER-GROUPED, NOT RANKED",
   cols: [
     // Head relabel 2026-08-12: the dollars column reads PHARMA / PAYMENTS and
     // the count column COMPANIES / ENGAGED — the pair now names its facts
@@ -233,8 +239,10 @@ export const COM_CONFIG: CohortConfig = {
   idxDecimals: 0,
   numericRamp: false,
   factFinish: true,
-  // Roster default order (Phase 3): the visible, swappable view-state label.
-  sortLabel: "BY EVIDENCE TIER, THEN MEDICARE REACH",
+  // sortLabel is NOT set here any more (2026-09-15). The default order is per-TA because
+  // the second sort key only discriminates where patient_volume is populated, so the label
+  // lives with the tier model in COM_TIER_MODELS and reaches the strip via comSortLabel().
+  // EST/RS still have no sortLabel at all, so the strip renders nothing for them.
   rpc: "community_ledger",   // takes p_ta_id as of docs/crc_community/31 (2026-09-14)
   // Mirrors ta_evidence_tier_config, which holds exactly these two rows. See the
   // boardTaSlugs declaration for why this list is a copy and what breaks when it drifts.
@@ -242,7 +250,10 @@ export const COM_CONFIG: CohortConfig = {
   // See COMMUNITY_PROFILE_TA_SLUGS below -- the board and the PROFILE now cover different
   // TAs, and the two lists must not be conflated.
   notes: [
-    "COMMUNITY IS NOT RANKED. TIER IS THE ONLY ASSERTED EVIDENCE CLAIM; EVERY FIGURE ON A ROW IS A DISPLAYED FACT, AND THE DEFAULT ORDER (TIER, THEN MEDICARE REACH) IS A VIEW-STATE, NOT A JUDGMENT.",
+    // {order} is substituted at render with this TA's real sort keys -- see comOrderClause.
+    // Hardcoding "TIER, THEN MEDICARE REACH" here asserted a second key colorectal does not
+    // have, in the one note whose whole job is to say what the order does and does not mean.
+    "COMMUNITY IS NOT RANKED. TIER IS THE ONLY ASSERTED EVIDENCE CLAIM; EVERY FIGURE ON A ROW IS A DISPLAYED FACT, AND THE DEFAULT ORDER ({order}) IS A VIEW-STATE, NOT A JUDGMENT.",
     "ENGAGEMENT IS A CMS PAYMENT TOTAL, NOT A SCORE — THE LEDGER CANNOT BE READ AS A LEADERBOARD OF PHARMA MONEY.",
     "“NONE RECORDED” MEANS CMS HOLDS NO PAYMENT RECORD. NO RELATIONSHIP AND NO RECORD ARE INDISTINGUISHABLE IN THE SOURCE, SO THE ROW SAYS WHAT IS KNOWN AND NOTHING MORE. MISSING MODALITY = UNKNOWN, NEVER ZERO.",
   ],
@@ -380,34 +391,67 @@ export const COM_TIER_LABEL: Record<string, string> = {
   unresolved: "NO MEDICARE EVIDENCE",
 };
 /**
- * THE TIER VOCABULARY IS PER-TA, BECAUSE THE TIER MODEL IS (2026-09-14).
+ * THE TIER VOCABULARY AND THE DEFAULT ORDER ARE PER-TA, BECAUSE THE TIER MODEL IS.
+ * Rewritten 2026-09-15 against docs/crc_community/52; the text this replaced described a
+ * two-tier colorectal model that no longer exists.
  *
- * This was one flat list and one default, both lung-shaped, and that was correct while
- * Community answered for one TA. ta_evidence_tier_config now holds two tier_models and they
- * do not share a vocabulary:
+ * ta_evidence_tier_config maps each board TA to a tier_model, and the models do not share
+ * a vocabulary:
  *
  *   nsclc             nsclc_v1           anchored / supported / heme_dominant /
  *                                        candidate / unresolved
- *   colorectal-cancer partd_presence_v1  candidate / unresolved     <- two tiers, by design
+ *   colorectal-cancer partb_practice_v1  anchored / supported / candidate / unresolved
  *
- * Colorectal's ENTIRE qualifying board is 'candidate' (4,794 of 4,794, measured 2026-09-14):
- * anchored and supported need colorectal drug grading that has not been curated yet, and
- * NULL in that config means NOT CURATED, never none. So sending the old default of
- * ["anchored","supported"] at a colorectal mount asks the RPC for two tiers that model
- * cannot emit and gets back a correct, well-formed, EMPTY roster -- under a heading that
- * says 4,794. That is the same class of lie as the lung rows this build removed, just
- * arriving as an absence instead of as someone else's data.
+ * COLORECTAL'S anchored AND supported ARE NOW REAL, AND THEY MEAN WHAT LUNG'S MEAN: a
+ * claims-verified practice pattern rather than a Part D footprint. partb_practice_v1 reads
+ * Part B co-occurrence -- a VEGF agent plus a backbone plus a fluoropyrimidine in one
+ * provider-year, behind a Med-Onc/Heme-Onc taxonomy gate -- so the two top tiers are an
+ * assertion about observed practice, which is exactly the claim lung's carry. That is why
+ * the default is the SAME as lung's rather than a colorectal-specific choice.
  *
- * Showing all five chips everywhere would be the other half of the same mistake: an
- * ANCHORED chip reading 0 on colorectal asserts a tier that model has no way to produce,
- * which reads as "nobody qualified" rather than "this does not apply here".
+ * NO COUNTS IN THIS BLOCK, DELIBERATELY (2026-09-17). It carried four board-size literals
+ * and every one of them went stale in two days when the Part D re-ingest ran. Board sizes
+ * and tier distributions live in ONE place now:
+ *
+ *     docs/canonical/COMMUNITY_BOARD_BASELINE.md
+ *
+ * which is dated, states what moved the numbers, and carries the query to re-measure. What
+ * belongs HERE is the shape of the model -- which tiers exist and which are on at mount --
+ * because that is what this constant decides. A count here decides nothing and rots.
+ *
+ * unresolved is 0 ON THE BOARD and large off it, for a structural reason rather than a
+ * measured one: an HCP with neither a Part B pattern nor a Part D row also has no
+ * patient_volume, so qualifies is false and they never reach the board at all. The chip is
+ * offered anyway -- the tier exists in the model and a future scoring run can populate it,
+ * and a chip reading 0 for a tier the model CAN emit is an honest empty set, unlike a chip
+ * for a tier the model cannot produce.
+ *
+ * WHAT THIS REPLACED, AND WHY IT WAS WRONG BY THE TIME IT SHIPPED. The previous entry
+ * offered candidate and unresolved only and defaulted to ["candidate"], because under
+ * partd_presence_v1 the whole board really was one tier. Left in place after block 52 it
+ * did the mirror-image damage of the bug it was written to prevent: instead of asking for
+ * tiers the model could not emit and rendering an empty roster, it asked for ONE TIER OUT
+ * OF FOUR -- hiding exactly the two tiers the new model exists to surface, with no chip to
+ * bring them back. Both failures are the same defect: a vocabulary that has drifted from
+ * the tier model it is supposed to mirror.
+ *
+ * Showing lung's five chips everywhere would still be wrong in the other direction: a
+ * HEME-DOMINANT chip on colorectal asserts a tier partb_practice_v1 has no way to produce.
  *
  * A TA WITH NO ENTRY FALLS BACK TO THE LUNG VOCABULARY rather than to an empty chip row --
  * the ledger already refuses to mount COM off cfg.boardTaSlugs, so an unlisted TA cannot
  * reach this in practice, and a wrong-but-visible filter bar is easier to notice in
  * development than no filter bar at all. Add the row when the TA gets its tier model.
+ *
+ * ON orderClause. The roster's ORDER BY is (tier_priority, -patient_volume, hcp_id) for
+ * every TA -- the RPC does not vary. What varies is whether the SECOND key discriminates,
+ * and the label must not claim an ordering the data cannot deliver. See the colorectal
+ * entry, and COMMUNITY_BOARD_BASELINE.md for the reach coverage behind both.
  */
-const COM_TIER_MODELS: Record<string, { filters: { key: string; label: string }[]; defaults: string[] }> = {
+const COM_TIER_MODELS: Record<
+  string,
+  { filters: { key: string; label: string }[]; defaults: string[]; orderClause: string }
+> = {
   nsclc: {
     filters: [
       { key: "anchored", label: "ANCHORED" },
@@ -417,15 +461,45 @@ const COM_TIER_MODELS: Record<string, { filters: { key: string; label: string }[
       { key: "heme_dominant", label: "HEME-DOMINANT" },
     ],
     defaults: ["anchored", "supported"],
+    // Most of the lung board carries a positive patient_volume -- roughly four rows in five,
+    // re-verified 2026-09-17 -- so reach genuinely orders the rows inside a tier and the
+    // label is earned. Coverage figure in COMMUNITY_BOARD_BASELINE.md rather than inline; it
+    // is the SHAPE that licenses the label ("populated for most of the board"), not the
+    // percentage, and the shape is what this comment needs to survive a re-ingest.
+    orderClause: "EVIDENCE TIER, THEN MEDICARE REACH",
   },
   "colorectal-cancer": {
     filters: [
+      { key: "anchored", label: "ANCHORED" },
+      { key: "supported", label: "SUPPORTED" },
       { key: "candidate", label: "CANDIDATES" },
       { key: "unresolved", label: "NO MEDICARE EVIDENCE" },
     ],
-    // The whole qualifying board. 'unresolved' is off by default for the same reason it is
-    // off for lung: it is the tier for people the claims record cannot speak to.
-    defaults: ["candidate"],
+    // Same as lung, and for the same reason: under partb_practice_v1 these two tiers are a
+    // claims-verified practice pattern, so opening on them puts the physicians the model was
+    // built to find in front of the reader first. That is the whole point of the default and
+    // it does not depend on how many there are -- the set grew by more than 2.5x on
+    // 2026-09-17 and the reasoning did not move. 'unresolved' is off by default as it is for
+    // lung: it is the tier for people the claims record cannot speak to.
+    defaults: ["anchored", "supported"],
+    // NO REACH HALF, AND THIS IS MEASURED, NOT STYLISTIC. patient_volume is 0 on EVERY
+    // colorectal board row -- every tier, max 0.0. Re-verified 2026-09-17 against the
+    // post-ingest board, which is a bigger board and still entirely zero:
+    // hcp_community_scores_v2 has never been populated with colorectal Part B volume. So the
+    // RPC's second sort key is constant, the effective within-tier order is hcp_id, and
+    // claiming "THEN MEDICARE REACH" would assert an ordering that does not exist.
+    //
+    // A ZERO, NOT A SMALL NUMBER, WHICH IS WHY IT IS STATED AS AN ABSOLUTE AND NOT A COUNT.
+    // If it ever stops being zero this whole decision is back open, and the label should be
+    // revisited rather than nudged -- so the condition to re-check is "any colorectal row
+    // with patient_volume > 0", not a threshold.
+    //
+    // NOT THE SAME COLUMN AS PART B COVERAGE. A minority of the board has a row in
+    // hcp_hcpcs_detail against the colorectal code set -- that is what block 53 reports, and
+    // it is a different column from the patient_volume this sort reads. Populating REACH
+    // from those claims is upstream work, not a label change. Both figures live in
+    // COMMUNITY_BOARD_BASELINE.md.
+    orderClause: "EVIDENCE TIER",
   },
 };
 
@@ -446,6 +520,14 @@ export function comAllTiers(taSlug: string | null | undefined): string[] {
 /** The tiers a fresh mount opens on. */
 export function comDefaultTiers(taSlug: string | null | undefined): string[] {
   return comTierModel(taSlug).defaults;
+}
+/** The keys the default order actually sorts on, for the header strip and the notes. */
+export function comOrderClause(taSlug: string | null | undefined): string {
+  return comTierModel(taSlug).orderClause;
+}
+/** The header strip's right-aligned order label. */
+export function comSortLabel(taSlug: string | null | undefined): string {
+  return `BY ${comOrderClause(taSlug)}`;
 }
 
 export interface EvidenceChip {
