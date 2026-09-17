@@ -1,5 +1,19 @@
 # CRC Community read path — run sheet
 
+> **The numbers in blocks 24–61 are measurements at their stated dates, not current state
+> (note added 2026-09-17).** 13,048 / 4,915 / 4,794 / 116 and the tier distributions were
+> all true when captured and are all superseded: the boards are **4,918** (nsclc) and
+> **13,864** (colorectal) after the 2026-09-17 Part D re-ingest.
+>
+> They were deliberately **not** rewritten. Each block is the audit trail for a sequence
+> that has already been applied, and editing a verification record to match today falsifies
+> it — the evidence that blocks 60 and 61 were inert *when they ran* is the numbers they
+> recorded at the time. Expect re-running 53, 60/61 sections B–D, or
+> `docs/country_normalisation/05` to report mismatches now. That is a dated record behaving
+> correctly.
+>
+> Current numbers and what moved them: `docs/canonical/COMMUNITY_BOARD_BASELINE.md`.
+
 Blocks 24–30. `CRC_COMMUNITY_BUILD.md` phase 5, executing `TA_NEUTRAL_DB_LAYER.md` §B and §C.
 
 Nothing upstream: no ingest, no taxonomy config, no Medicare work. This is the read path only.

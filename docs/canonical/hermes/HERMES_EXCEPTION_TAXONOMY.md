@@ -21,6 +21,10 @@ claims-evidenced physicians were never classified `community` and could not be
 scored. Re-running classification then scoring took the board to 4,794 and moved
 `established` by one person.
 
+*Sequel, 2026-09-17: the same workstream-B population had a second stale consumer.*
+*`part_d_oncology_ingest.py` had not run either, and running it took the board 4,794 →*
+*13,864. One upstream event, two detections eight days apart, same root shape.*
+
 **Detection.** Compare each artifact's last-write time against the last-write time of
 every artifact it `depends_on`. The manifest already has the edges.
 
@@ -183,6 +187,24 @@ presenter by turning a unique name match into an ambiguous one.
 regression oracle: its board must still return 4,913, byte-for-byte." That file was
 committed 2026-09-10 — two days before this measurement — which is the point:
 **recency is not correctness.** No SQL was edited; a view beneath the board moved.
+
+**The same instance, a third time, 2026-09-17 — and this paragraph was part of it.** The
+board now returns **4,918**. "Returns 4,915 today" was true when written on 2026-09-12 and
+was a stale prose fact five days later, in the document whose job is to warn about stale
+prose facts. That is not irony, it is the exception class being well-formed: no amount of
+care makes a quoted number track a moving query.
+
+What changed this time was not a view but an ingest — `part_d_oncology_ingest.py` scanned
+NPIs that did not exist in `hcps_v2` at its previous run, adding 3 lung members and
+redistributing tiers within the board. The colorectal board moved 4,794 → 13,864 in the
+same run.
+
+**What was done about it, so the fourth occurrence lands somewhere useful:** line 233 now
+states the capture procedure instead of a literal, and
+`docs/canonical/COMMUNITY_BOARD_BASELINE.md` is the single dated home for the figures.
+Numbered verification blocks keep their original numbers on purpose — they are dated
+records, and rewriting one to match today destroys the evidence that a change was inert
+when it ran.
 
 **Rule.** *The oracle is whatever the query returns now, captured before the change —
 never a number quoted from a document.*

@@ -388,6 +388,31 @@ pubs` bar.
 Its absence from `ta_cycle` is therefore deliberate. If a TA's community board is empty, check
 that this step was run — do not assume the cycle did it.
 
+#### The consumer side is only half-wired (added 2026-09-17)
+
+Stage 11.5 acquires NPIs and stage 12 `hcpcs_topup` tops up **Part B** claims for them. That
+pairing exists because stage 12 was a consumer with no producer until 11.5 was added on
+2026-09-07 — its own docstring records this.
+
+**Nothing tops up Part D.** `scripts/ingest/part_d_oncology_ingest.py` builds its cohort from
+`hcps_v2` at run time and appears in **neither `ta_cycle.py` nor `generate_cycle.py`**. It is
+the **third consumer of NPI acquisition with no producer relationship in a cycle**, after
+stage 12, and it has not had stage 12's fix.
+
+What that costs, measured: workstream B added 19,043 NPI-native records on 2026-09-09; the
+Part D ingest was next run by hand on 2026-09-17 and inserted 171,623 rows, taking the
+colorectal board from 4,794 to 13,864 and the NSCLC board from 4,915 to 4,918. None of that
+was a fix — it was eight days of a board being a snapshot of whenever the script last ran.
+
+**No coverage query reports this gap**, which is why it survived: every row that exists is
+correct, and what is missing is invisible. A freshness check (artifact write-time against the
+write-time of everything it depends on, per `hermes/HERMES_CHARTER.md` §2) would catch it; a
+presence check never will.
+
+Until `part_d_oncology_ingest.py` sits beside stage 11.5, **every future NPI acquisition
+recreates this gap silently.** Its `--dry-run` now reports the full delta and the board
+impact before a write, so the gap is at least measurable from a standing start.
+
 ---
 
 ## 2. Authoring the retrieval query (the make-or-break artifact)

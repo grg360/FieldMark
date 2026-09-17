@@ -85,8 +85,10 @@ supervising physician, and `Prscrbr_Type` gives them **no specialty at all** —
 oncology NP and a primary-care NP are identical in this field.
 
 **This is not a breast problem.** `hcp_part_d_oncology_v1` and the Med-Onc/Heme-Onc
-taxonomy gate running the live 4,794-member CRC community board have the same blind
-spot. Exception class E8.
+taxonomy gate running the live CRC community board — **13,864 members as of 2026-09-17,
+4,794 when this was written** — have the same blind spot. Exception class E8. The blind
+spot got nearly three times larger with the Part D re-ingest, which is an argument for
+sizing it before the breast build rather than after.
 
 Two findings that fall out of the same table:
 - **Letrozole's fertility cross-indication does not apply in Medicare data** — no

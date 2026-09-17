@@ -35,9 +35,25 @@ lifted the hard stop this build depends on.
 | rows in `hcp_medicare_by_ta_v2` | 0 | 4,413 |
 | live community board | none | 4,913 |
 
+> **Both cells are now historical (corrected 2026-09-17).** The colorectal board is
+> **13,864** members and NSCLC is **4,918**. The NSCLC cell was never 4,913 at any point
+> this document was read — it was 4,915 from before 2026-09-07. Current numbers and what
+> moved them: `docs/canonical/COMMUNITY_BOARD_BASELINE.md`.
+
 **Read the second row.** Community membership is entirely Medicare-derived and Medicare is keyed
 on NPI. NSCLC converts 9,849 NPIs into a 4,913-member board — roughly half. At the same ratio
 CRC's ceiling today is about **700 people out of 106,551**.
+
+> **The ~700 ceiling was wrong by a factor of 20, and the reason is instructive
+> (2026-09-17).** The colorectal board is **13,864**. The estimate was not a bad ratio — it
+> was a correct ratio applied to a denominator that then changed. It assumed NPI coverage
+> was fixed at 1,415; workstream B minted 19,043 NPI-native records on 2026-09-09, and the
+> Part D re-ingest of 2026-09-17 scanned them for the first time.
+>
+> The *conclusion* of the paragraph below survived intact and is the part to keep: NPI
+> coverage was the binding constraint. It was relieved rather than worked around, which is
+> what moved the board. Do not re-derive a ceiling from today's coverage and treat it as
+> fixed either — that is the same mistake with fresher numbers.
 
 So the binding constraint is not the board view, not the tier view, not the HCPCS code set. It is
 **NPI coverage**, and everything else is downstream of it. A perfect build on 1,415 NPIs produces
@@ -230,7 +246,19 @@ and §C; this build is that design's first consumer.
 - `CRC_VALIDATION_ANCHORS.md` is the acceptance test. Record outcomes in its results section;
   do not edit its expectations.
 - The board is a **roster**, per `COMMUNITY_ROSTER_BUILD.md`: no rank, no composite score.
-- NSCLC is the regression oracle: its board must still return 4,913, byte-for-byte.
+- **NSCLC is the regression oracle, and the oracle is a measurement you take — never a
+  literal quoted from this file.** Capture `community_board_v1` members and the on-board
+  tier distribution immediately BEFORE your change, then compare your after against your
+  own before. For anything that could move tiers without moving the total, diff per HCP
+  (`to_jsonb`) rather than by count — see `docs/crc_community/60` and `61` section A.
+
+  This bullet said "must still return 4,913, byte-for-byte" and **has now been wrong three
+  times**: the board was 4,915 from before 2026-09-07 (this file was committed 2026-09-10,
+  two days before that was measured), and it is **4,918** as of 2026-09-17. Each time the
+  document was freshly committed and still wrong, because a view beneath the board moved or
+  an ingest scanned NPIs that had not existed before. A literal here cannot track that; a
+  captured before-value always can. Current numbers, dated and with causes:
+  `docs/canonical/COMMUNITY_BOARD_BASELINE.md`.
 - **A TA link is not board membership.** Phases 1–3 build the population; phase 4 decides who
   qualifies. Report both numbers separately and never let the population number stand in for the
   board.

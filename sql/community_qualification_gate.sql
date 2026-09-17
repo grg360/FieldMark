@@ -12,6 +12,14 @@
 -- G2 CUTOVER (2026-08-11): membership truth moved to the view
 -- community_board_nsclc_v1 (one row per US-NSCLC-scored HCP; qualifies =
 -- patient_volume > 0 OR any hcp_part_d_oncology_v1 row — 4,913 members).
+--
+-- THE 4,913 IS A DATED RECORD OF THE G2 CUTOVER AND IS LEFT AS WRITTEN (note added
+-- 2026-09-17). It is what the view returned on 2026-08-11. It is NOT the current board:
+-- that was 4,915 from before 2026-09-07 and is 4,918 today. This file is SUPERSEDED and
+-- kept for exactly this history, so correcting the number in place would destroy the
+-- record without helping anyone -- but it has been cited three times as though it were a
+-- live figure, which is why this note exists.
+-- Current numbers: docs/canonical/COMMUNITY_BOARD_BASELINE.md.
 -- These RPCs no longer re-derive a predicate; they defer to the view:
 --
 --     AND (cr.therapeutic_area_id <> 'c0065b03-a25e-4e9a-bde4-4b4d0db7827d'::uuid

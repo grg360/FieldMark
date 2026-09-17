@@ -66,6 +66,13 @@ Known instances of exactly this: `CRC_COMMUNITY_BUILD.md` phase 6 and
 4,915 since before 2026-09-07 and no SQL changed. `ATOPIC_DERMATITIS_BUILD.md:95`
 claims `established_scores_legacy` takes `--ta`; it does not.
 
+**This example has since gone one better, which is the strongest argument for the rule
+below (updated 2026-09-17).** The board is now **4,918** — so the document said 4,913, the
+correction said 4,915, and both are wrong. The correction was itself a prose fact with a
+shelf life. `CRC_COMMUNITY_BUILD.md:233` has been rewritten to state a capture procedure
+instead of a number, and `docs/canonical/COMMUNITY_BOARD_BASELINE.md` is now the single
+dated home for these figures — one file to correct instead of nine.
+
 **Rule for Hermes.** The manifest and the database are authoritative. The prose docs
 are a source of CLAIMS TO TEST, never of facts to act on. When a prose doc and the
 database disagree, the database is right and the disagreement is a finding to record.
@@ -154,6 +161,13 @@ On 2026-09-10 the colorectal community board sat at 116 members instead of 4,794
 because `cohort_classification_v2.py` had not been re-run since workstream B added
 19,043 NPI-native records. Every coverage query was green. The artifact existed; it
 was stale.
+
+**The same population had a second stale consumer, found 2026-09-17.** Re-running
+classification fixed 116 → 4,794, but `part_d_oncology_ingest.py` had *also* not run since
+workstream B, and it too builds its cohort from `hcps_v2` at run time. Running it took the
+board 4,794 → **13,864**. One upstream event, three stale consumers, and every coverage
+query green for all three — which is this section's point rather than a footnote to it. See
+`TA_NEW_PLAYBOOK.md` §1b and `COMMUNITY_BOARD_BASELINE.md`.
 
 **3. The evidence model, decided before the build.** See `TA_BUILD_PRECHECK.md`.
 

@@ -5,6 +5,10 @@
 -- ACADEMIC-ONLY (Phase 3 decision, 2026-08-11): the community arm is REMOVED
 -- entirely — community does not belong on institution rosters. Rationale:
 -- with G2 membership, only 295 of 4,913 qualifying community clinicians held
+-- [4,913 is the board as measured 2026-08-11, when this decision was taken; it is 4,918
+--  today and the colorectal board is 13,864. The ratio is what carried the decision, not
+--  the absolute, and the decision stands. Note added 2026-09-17; current numbers in
+--  docs/canonical/COMMUNITY_BOARD_BASELINE.md.]
 -- a primary institution link (18 of 980 anchored); the old arm's 4,388
 -- community rows were overwhelmingly the gated-out pharma-only/academic-
 -- adjacent tail. Community clinicians are practice-based; the institutions
