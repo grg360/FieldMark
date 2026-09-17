@@ -263,11 +263,250 @@ def verify_confirmed(conn, keys: Sequence[Tuple[str, int, str]]) -> int:
     return int(n)
 
 
+# ---------------------------------------------------------------------------
+# DRY-RUN DELTA (read-only; added 2026-09-15)
+#
+# THE FUNNEL ANSWERS "HOW MUCH MATCHES", NOT "HOW MUCH IS NEW". 257,664 matched
+# rows against the 79,988 already in the table is not a delta, and the difference
+# is not subtraction: the grains differ (CSV rows aggregate to hcp_id + year +
+# gnrc_name) and an upsert rewrites as well as inserts.
+#
+# WHY NOBODY NEEDED A DELTA BEFORE, AND WHY IT IS NEEDED NOW. The cohort is built
+# from hcps_v2 AT RUN TIME (load_npi_to_hcp below). Workstream B added 19,043
+# NPI-native records on 2026-09-09 and this script has not run since, so those
+# physicians have never been scanned for. "No Part D row" for them means nobody
+# looked -- which is not the same claim as "does not prescribe", and the two are
+# indistinguishable once written. Same class as cohort_classification_v2 not being
+# re-run, five days apart, same upstream event.
+#
+# EVERYTHING HERE IS READ-ONLY. It stages the candidate rows into a TEMP table and
+# joins; no persistent object is written and --execute is untouched.
+#
+# COST: a row-level delta needs the rows, so dry-run now calls fetch_year_rows --
+# a second full pass over each ~4GB CSV on top of scan_year's. Dry-run wall time
+# roughly doubles. The funnel alone cannot produce this answer.
+# ---------------------------------------------------------------------------
+
+# The columns the upsert actually overwrites. ingested_at is excluded deliberately:
+# it moves on every upsert by construction, so including it would report 100% of
+# updates as "changed" and tell nobody anything.
+DELTA_COLUMNS = ("npi", "brnd_name", "drug_stem", "drug_group", "anchor_grade",
+                 "tot_clms", "tot_30day_fills", "tot_benes")
+
+
+def stage_candidates(cur, staged: Sequence[Tuple[Any, ...]]) -> None:
+    """Load the rows --execute WOULD write into a TEMP table, at the PK grain."""
+    cur.execute(
+        """
+        CREATE TEMP TABLE tmp_pd_candidate (
+          hcp_id uuid, npi text, program_year int, gnrc_name text, brnd_name text,
+          drug_stem text, drug_group text, anchor_grade text,
+          tot_clms int, tot_30day_fills numeric, tot_benes int
+        ) ON COMMIT DROP
+        """
+    )
+    for i in range(0, len(staged), CHUNK_SIZE):
+        cur.executemany(
+            "INSERT INTO tmp_pd_candidate VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            staged[i:i + CHUNK_SIZE],
+        )
+    cur.execute("CREATE INDEX ON tmp_pd_candidate (hcp_id, program_year, gnrc_name)")
+    cur.execute("ANALYZE tmp_pd_candidate")
+
+
+def _one(cur, sql: str) -> Tuple[Any, ...]:
+    cur.execute(sql)
+    return cur.fetchone()
+
+
+def report_delta(staged: Sequence[Tuple[Any, ...]]) -> None:
+    """Print the delta. Opens its own short-lived connection, like write_year_rows."""
+    print("=" * 64)
+    if not staged:
+        print("[DELTA] no candidate rows staged - nothing to compare.")
+        return
+
+    with psycopg.connect(get_db_url()) as conn:
+        with conn.cursor() as cur:
+            stage_candidates(cur, staged)
+
+            # In-batch key collisions: two NPIs mapping to one hcp_id would collide on
+            # the PK inside a single --execute batch, last-write-wins. Reported because
+            # the insert/update split below counts DISTINCT keys, and a gap between the
+            # two is a real defect this dry run can see for free.
+            rows_staged, keys_distinct = _one(cur, """
+                SELECT count(*), count(DISTINCT (hcp_id, program_year, gnrc_name))
+                FROM tmp_pd_candidate
+            """)
+            print(f"[DELTA] candidate rows staged:          {rows_staged:,}")
+            print(f"[DELTA] distinct PK keys:               {keys_distinct:,}"
+                  + ("" if rows_staged == keys_distinct
+                     else f"   <-- {rows_staged - keys_distinct:,} IN-BATCH COLLISIONS"))
+
+            present, to_insert = _one(cur, """
+                SELECT count(*) FILTER (WHERE d.hcp_id IS NOT NULL),
+                       count(*) FILTER (WHERE d.hcp_id IS NULL)
+                FROM (SELECT DISTINCT hcp_id, program_year, gnrc_name FROM tmp_pd_candidate) k
+                LEFT JOIN hcp_part_d_oncology_v1 d
+                       ON d.hcp_id = k.hcp_id AND d.program_year = k.program_year
+                      AND d.gnrc_name = k.gnrc_name
+            """)
+            print(f"[DELTA] already present (same grain):   {present:,}")
+            print(f"[DELTA] would be INSERTED:              {to_insert:,}")
+
+            changed, = _one(cur, f"""
+                SELECT count(*)
+                FROM tmp_pd_candidate c
+                JOIN hcp_part_d_oncology_v1 d
+                  ON d.hcp_id = c.hcp_id AND d.program_year = c.program_year
+                 AND d.gnrc_name = c.gnrc_name
+                WHERE {" OR ".join("d." + col + " IS DISTINCT FROM c." + col for col in DELTA_COLUMNS)}
+            """)
+            print(f"[DELTA] would be UPDATED:               {present:,}")
+            print(f"[DELTA]   ...of which a value CHANGES:  {changed:,}   "
+                  f"({'no-op rewrite' if changed == 0 else 'REAL CHANGES'}; "
+                  f"ingested_at excluded, it always moves)")
+
+            # Per-column, so "something changed" names itself.
+            for col in DELTA_COLUMNS:
+                n, = _one(cur, f"""
+                    SELECT count(*) FROM tmp_pd_candidate c
+                    JOIN hcp_part_d_oncology_v1 d
+                      ON d.hcp_id = c.hcp_id AND d.program_year = c.program_year
+                     AND d.gnrc_name = c.gnrc_name
+                    WHERE d.{col} IS DISTINCT FROM c.{col}
+                """)
+                if n:
+                    print(f"[DELTA]     {col:<16} differs on {n:,} rows")
+
+            # ---- HCPs gaining a FIRST Part D row ----
+            # "First" = no row in hcp_part_d_oncology_v1 at all, any year, any drug.
+            # This is the population whose board qualification can change, because
+            # community_board_v1.qualifies reads Part D PRESENCE, not counts.
+            print("-" * 64)
+            total_new, nsclc_n, crc_n, neither_n = _one(cur, """
+                WITH firsts AS (
+                  SELECT DISTINCT c.hcp_id FROM tmp_pd_candidate c
+                  WHERE NOT EXISTS (SELECT 1 FROM hcp_part_d_oncology_v1 d WHERE d.hcp_id = c.hcp_id)
+                ),
+                scored AS (
+                  SELECT f.hcp_id,
+                         EXISTS (SELECT 1 FROM hcp_community_scores_v2 s
+                                  JOIN therapeutic_areas t ON t.id = s.therapeutic_area_id
+                                 WHERE s.hcp_id = f.hcp_id AND t.slug = 'nsclc')             AS in_nsclc,
+                         EXISTS (SELECT 1 FROM hcp_community_scores_v2 s
+                                  JOIN therapeutic_areas t ON t.id = s.therapeutic_area_id
+                                 WHERE s.hcp_id = f.hcp_id AND t.slug = 'colorectal-cancer') AS in_crc
+                  FROM firsts f
+                )
+                SELECT count(*),
+                       count(*) FILTER (WHERE in_nsclc),
+                       count(*) FILTER (WHERE in_crc),
+                       count(*) FILTER (WHERE NOT in_nsclc AND NOT in_crc)
+                FROM scored
+            """)
+            print(f"[DELTA] HCPs gaining a FIRST Part D row: {total_new:,}")
+            print(f"[DELTA]   scored for nsclc:              {nsclc_n:,}")
+            print(f"[DELTA]   scored for colorectal-cancer:  {crc_n:,}")
+            print(f"[DELTA]   scored for neither:            {neither_n:,}")
+            print("[DELTA]   (nsclc and colorectal overlap, so the three need not sum)")
+
+            # ---- THE NUMBER THAT DECIDES THE RUN ----
+            # 4,915 is the regression oracle for the whole fortnight. qualifies is
+            # patient_volume > 0 OR Part D presence, so a FIRST Part D row can only
+            # ADD a member, never remove one. Two populations, and only the second
+            # moves the oracle:
+            #   already_member  on the board today; they already qualified on
+            #                   patient_volume, so a first Part D row changes nothing.
+            #   would_be_added  in the nsclc cohort, NOT qualifying today, gaining a
+            #                   first Part D row. This is what turns 4,915 into
+            #                   4,915 + n, and it is the number to decide on.
+            print("-" * 64)
+            already, added = _one(cur, """
+                WITH firsts AS (
+                  SELECT DISTINCT c.hcp_id FROM tmp_pd_candidate c
+                  WHERE NOT EXISTS (SELECT 1 FROM hcp_part_d_oncology_v1 d WHERE d.hcp_id = c.hcp_id)
+                )
+                SELECT count(*) FILTER (WHERE b.qualifies),
+                       count(*) FILTER (WHERE NOT b.qualifies)
+                FROM firsts f
+                JOIN community_board_v1 b ON b.hcp_id = f.hcp_id
+                JOIN therapeutic_areas t ON t.id = b.ta_id AND t.slug = 'nsclc'
+            """)
+            members_now, = _one(cur, """
+                SELECT count(*) FROM community_board_v1 b
+                JOIN therapeutic_areas t ON t.id = b.ta_id AND t.slug = 'nsclc'
+                WHERE b.qualifies
+            """)
+            print(f"[ORACLE] nsclc board members today:               {members_now:,}")
+            print(f"[ORACLE] already qualifying, gaining a first row: {already:,}   (no effect on the count)")
+            print(f"[ORACLE] NON-qualifying, gaining a first row:     {added:,}   <-- WOULD BE ADDED")
+            if added:
+                print(f"[ORACLE] nsclc board would become {members_now:,} + {added:,} = {members_now + added:,}")
+            else:
+                print("[ORACLE] nsclc board count UNCHANGED by this run.")
+
+            # ---- NON-LUNG anchor_grade ----
+            # Block 50 withheld anchor_grade from this table because
+            # hcp_nsclc_evidence_tier_v1 counts dominant_rows / cross_rows /
+            # supporting_grade_rows over hcp_part_d_oncology_v1 with NO drug_group
+            # predicate: it reads the column as a LUNG grade whatever TA the drug
+            # belongs to. A non-lung grade moved 130 lung physicians into 'supported'
+            # with supported_evidence reading "lung-dominant oral".
+            #
+            # This ingest resolves anchor_grade from part_d_oncology_drugs_v1 and the
+            # upsert sets anchor_grade = EXCLUDED.anchor_grade, so a re-run RE-OPENS
+            # that door. 'strict' is the worst case: the ladder reads strict_rows > 0
+            # as ANCHORED, the top tier, not merely supported.
+            print("-" * 64)
+            cur.execute("""
+                SELECT c.drug_group, c.anchor_grade, c.drug_stem,
+                       count(*) AS rows, count(DISTINCT c.hcp_id) AS hcps
+                FROM tmp_pd_candidate c
+                WHERE c.anchor_grade IS NOT NULL AND c.drug_group <> 'lung'
+                GROUP BY 1, 2, 3 ORDER BY 4 DESC
+            """)
+            non_lung = cur.fetchall()
+            if not non_lung:
+                print("[GRADE ] no non-lung anchor_grade would be written. Block 50's "
+                      "invariant survives this run.")
+            else:
+                total = sum(r[3] for r in non_lung)
+                print(f"[GRADE ] *** {total:,} ROWS WOULD CARRY A NON-LUNG anchor_grade ***")
+                for grp, grade, stem, rows_n, hcps_n in non_lung:
+                    print(f"[GRADE ]   {grp}/{grade:<16} {stem:<14} {rows_n:,} rows - {hcps_n:,} HCPs")
+                lung_hit, = _one(cur, """
+                    SELECT count(DISTINCT c.hcp_id)
+                    FROM tmp_pd_candidate c
+                    JOIN community_board_v1 b ON b.hcp_id = c.hcp_id
+                    JOIN therapeutic_areas t ON t.id = b.ta_id AND t.slug = 'nsclc'
+                    WHERE c.anchor_grade IS NOT NULL AND c.drug_group <> 'lung' AND b.qualifies
+                """)
+                strict_hit, = _one(cur, """
+                    SELECT count(DISTINCT c.hcp_id)
+                    FROM tmp_pd_candidate c
+                    JOIN community_board_v1 b ON b.hcp_id = c.hcp_id
+                    JOIN therapeutic_areas t ON t.id = b.ta_id AND t.slug = 'nsclc'
+                    WHERE c.anchor_grade = 'strict' AND c.drug_group <> 'lung' AND b.qualifies
+                """)
+                print(f"[GRADE ]   on the nsclc board today: {lung_hit:,} HCPs would carry a "
+                      f"non-lung grade the ladder reads as lung evidence")
+                print(f"[GRADE ]   ...of which graded 'strict', which reads as ANCHORED: {strict_hit:,}")
+                print("[GRADE ] This is the block 50 defect returning through the ingest door. "
+                      "Do NOT --execute until either the ladder scopes its grade counts by "
+                      "drug_group, or this script is taught to write lung grades only.")
+
+        conn.commit()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Ingest Part D oral-oncology anchor rows")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true",
-                      help="Scan and print the funnel + hcps_v2 match count. No writes.")
+                      help="Scan and print the funnel, the hcps_v2 match count, and the "
+                           "INSERT/UPDATE delta against hcp_part_d_oncology_v1. No writes. "
+                           "Reads each CSV twice, so it takes about twice as long as the "
+                           "funnel alone.")
     mode.add_argument("--execute", action="store_true",
                       help="Write matched rows (chunked upsert) and verify against the DB.")
     parser.add_argument("--medicare-dir", default=MEDICARE_DIR_DEFAULT)
@@ -307,6 +546,9 @@ def main() -> int:
     dry_run = bool(args.dry_run)
     total_read = total_after = total_matched = total_written = 0
     written_keys: List[Tuple[str, int, str]] = []
+    # Dry-run only. Same tuple shape as write_year_rows' batch, so what is compared is
+    # what would be written.
+    delta_staged: List[Tuple[Any, ...]] = []
 
     for year, path in paths:
         rows_read, after_drug, matched = scan_year(con, path)
@@ -317,6 +559,24 @@ def main() -> int:
               f"{matched:,} matched to a cohort NPI")
 
         if dry_run:
+            # SECOND PASS, DRY RUN ONLY. scan_year gives counts; the delta needs the
+            # rows themselves at the write grain, which is what fetch_year_rows
+            # produces. Same function --execute uses, so the delta is computed from
+            # exactly the rows that would be written rather than from a reimplementation
+            # of them -- a separate query here could drift from the writer and report a
+            # delta for a run that never happens.
+            rows = fetch_year_rows(con, path, year)
+            staged_rows = 0
+            for (npi, gnrc, brnd, stem, grp, grade, clms, fills, benes) in rows:
+                hcp_id = npi_to_hcp.get(npi)
+                if hcp_id is None:
+                    continue  # mirrors write_year_rows' belt-and-braces skip
+                delta_staged.append((hcp_id, npi, year, gnrc, brnd, stem, grp, grade,
+                                     None if clms is None else int(clms), fills,
+                                     None if benes is None else int(benes)))
+                staged_rows += 1
+            print(f"[DELTA] {year}: {staged_rows:,} candidate rows at the write grain "
+                  f"(from {len(rows):,} aggregated)")
             continue
 
         rows = fetch_year_rows(con, path, year)
@@ -337,6 +597,8 @@ def main() -> int:
     print(f"[FUNNEL] rows matched to a cohort NPI: {total_matched:,}")
 
     if dry_run:
+        report_delta(delta_staged)
+        print("=" * 64)
         print("[DRY RUN] no writes.")
         return 0
 
