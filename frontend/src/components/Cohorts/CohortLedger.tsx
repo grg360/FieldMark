@@ -68,6 +68,8 @@ import {
   comDefaultTiers,
   comSortLabel,
   comOrderClause,
+  comDrawerSentence,
+  comEvidenceFacts,
   type CohortConfig,
   type LedgerMeta,
   type LedgerRow,
@@ -349,10 +351,14 @@ function Bookmark({ on }: { on: boolean }) {
 }
 
 // Evidence chip (COM) — frame 1a/2a. Tier word first (same vocabulary as the filter
-// chips, so filter↔row is stated), then the evidence segments: anchored = LUNG-ONLY
-// ORAL · drug · years; supported = the view's verbatim string (group 5 stays
-// "cross-indication targeted therapy observed"). Other tiers carry the tier word alone,
-// dashed. LUNG-WEIGHTED ORAL MIX marker below when flagged. No percentage in v1.
+// chips, so filter↔row is stated), then the evidence segments — WHOSE LEADING SEGMENT IS
+// A PROPERTY OF THE TIER MODEL, NOT A CONSTANT. Under nsclc_v1: LUNG-ONLY ORAL · drug ·
+// years, with supported carrying the view's verbatim string (group 5 stays
+// "cross-indication targeted therapy observed"). Under partb_practice_v1: the billed
+// pattern alone, because that model has no stem and no year to name. Both come from
+// COM_EVIDENCE_MODELS in lib/cohortLedger.ts — see the note there for the defect this
+// replaced. Other tiers carry the tier word alone, dashed. LUNG-WEIGHTED ORAL MIX marker
+// below when flagged AND the model can produce one. No percentage in v1.
 // Rising evidence chip (2026-08-05): the /rising badges (RECENT SENIOR
 // AUTHORSHIP, OPEN TRIAL) in the community ledger's chip slot — same component
 // family, cohort-specific content. Both facts come from rising_board_flags,
@@ -1281,15 +1287,31 @@ function Row({
             {row.partDPresent ? (cfg.factFinish ? <>PART D <span style={{ color: P.amber }}>✓</span></> : "PART D ✓") : ""}
           </div>
         )}
-        {/* MEDICARE PART B presence (2026-08-12): patient_volume > 0 is the
-            only presence definition the board carries — no part_b_present flag
-            exists, and the ledger RPC coalesces null volume to 0, so absent
-            and zero are one state. Dash for that state, never a "0" and never
-            a ✓ — absence is not a count. The reach NUMBER stays in the rail;
-            this cell is presence only. */}
+        {/* MEDICARE PART B presence. REPOINTED 2026-09-17 — this cell used to read
+            patient_volume > 0, which is a beneficiary COUNT out of hcp_medicare_by_ta_v2,
+            a table that holds rows for nsclc, hepatology and rare-disease and NONE for
+            colorectal. community_scoring.py defaults the missing row to 0.0, the board
+            view coalesces null to 0, and this cell's > 0 erased it a third time — so all
+            330 anchored colorectal rows printed a dash for the Part B claims that are the
+            entire reason they are anchored.
+
+            part_b_present is TA-correct by construction: hcp_hcpcs_detail joined to THIS
+            TA's ta_hcpcs_codes, computed in community_ledger over the returned page.
+            Measured 2026-09-17, it is a strict superset of the old test on both board TAs
+            — 0 rows anywhere lose a check — so this only ever converts a false dash.
+
+            FALLS BACK TO THE OLD TEST when the column is absent, i.e. against a deployed
+            RPC that predates docs/crc_community/63. undefined means the RPC did not answer,
+            which is not the same as answering no, and rendering a dash for it would invent
+            the absence this change exists to remove.
+
+            Dash for a real absence, never a "0" and never a ✓ — absence is not a count.
+            The reach NUMBER stays in the rail; this cell is presence only. */}
         {cfg.tag === "COM" ? (
           <div style={{ width: 88, textAlign: "center" }}>
-            {row.patientVolume != null && row.patientVolume > 0 ? (
+            {(row.partBPresent !== undefined && row.partBPresent !== null
+              ? row.partBPresent
+              : row.patientVolume != null && row.patientVolume > 0) ? (
               <span style={cfg.factFinish ? { ...serif(13, 500), color: P.ink0, letterSpacing: ".02em" } : { ...mono(9), color: P.ink5, letterSpacing: ".08em" }}>
                 {cfg.factFinish ? <>PART B <span style={{ color: P.amber }}>✓</span></> : "PART B ✓"}
               </span>
@@ -1691,28 +1713,25 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
   const tierWord = COM_RAIL_TIER_WORD[row.tier ?? ""] ?? "community";
   const loc = row.chips[1] ?? "";
 
-  // LEFT prose — factual templates only; every clause is a held fact.
-  const tierSentence = (() => {
-    if (row.tier === "anchored") {
-      const stems = (row.anchorStems ?? (row.anchorStem ? [row.anchorStem] : [])).join(", ");
-      const years = (row.anchorYears ?? []).join(" and ");
-      const recurs = row.recurrenceBand === "recurs" ? ", recurring across years rather than appearing once" : "";
-      return "Anchored on their own prescribing record — " + (stems || "lung-only oral") + " claims" + (years ? " in " + years : "") + recurs + ".";
-    }
-    // NSCLC IS CORRECT HERE — DO NOT WIDEN TO "LUNG CANCER". The evidence tier is
-    // computed from a claims code set that is NSCLC-specific and carries no SCLC
-    // codes, so naming it "lung cancer" would assert coverage the data does not
-    // have. The TA DISPLAY LABEL was renamed 2026-08-15; this clinical criterion
-    // was not. Same for the candidate tier below, and ScoringExplainedModal.
-    if (row.tier === "supported") return "Supported by " + (row.supportedEvidence ?? "corroborating NSCLC evidence") + " in the claims record.";
-    if (row.tier === "heme_dominant") return "A heme-focused practice — the oral record concentrates in blood cancers; a different specialty, not a deficit.";
-    // NSCLC-specific by construction: see the supported-tier note above.
-    if (row.tier === "candidate") return "An oncology claims footprint without NSCLC-specific drug evidence — a candidate on the record so far.";
-    return "No Medicare drug-claims evidence to characterize the treatment mix.";
-  })();
+  // LEFT prose — factual templates only; every clause is a held fact. The tier sentence
+  // is KEYED ON THE ROW'S TIER MODEL and lives in COM_EVIDENCE_MODELS: this block used to
+  // compose it inline and opened with "Anchored on their own prescribing record — lung-only
+  // oral claims", which on a colorectal row is a false statement about a physician rather
+  // than a named absence. Every string it used to build is preserved verbatim under
+  // nsclc_v1, so lung reads exactly as it did.
+  const tierSentence = comDrawerSentence(row.taSlug, comEvidenceFacts(row));
+  // REACH AND PRESENCE ARE DIFFERENT FACTS FROM DIFFERENT SOURCES. vol is a beneficiary
+  // count that exists for some board TAs and not others; partBPresent is this TA's own
+  // claims. Reporting "No Part B beneficiary record" on a row billing Part B would
+  // contradict its own PART B ✓, so the middle state names which half is missing.
+  const partB = row.partBPresent !== undefined && row.partBPresent !== null
+    ? row.partBPresent
+    : row.patientVolume != null && row.patientVolume > 0;
   const reachSentence = vol != null
     ? vol.toLocaleString() + " Medicare beneficiaries over three years of Part B."
-    : "No Part B beneficiary record — reach is unmeasured here, not zero.";
+    : partB
+      ? "Part B claims are on record against this area's code set; beneficiary reach is not computed for this area."
+      : "No Part B beneficiary record — reach is unmeasured here, not zero.";
   const practiceBits = [
     facts.setting ? titleCase(facts.setting) + " practice" : null,
     row.scores["years"] != null ? String(Math.round(row.scores["years"] as number)) + " years in practice" : null,
@@ -1725,7 +1744,7 @@ function CommunityCallSheet({ cfg, row, mobile, overhang }: { cfg: CohortConfig;
 
   const gridRows: { label: string; value: string; dim?: boolean }[] = [
     { label: "EVIDENCE TIER", value: titleCase(tierWord) + (row.supportedEvidence ? " · " + row.supportedEvidence : "") },
-    { label: "MEDICARE REACH", value: vol != null ? vol.toLocaleString() + " beneficiaries · 3-year Part B" : "No Part B record — unmeasured, not zero", dim: vol == null },
+    { label: "MEDICARE REACH", value: vol != null ? vol.toLocaleString() + " beneficiaries · 3-year Part B" : partB ? "Part B claims on record · reach not computed for this area" : "No Part B record — unmeasured, not zero", dim: vol == null },
     { label: "SETTING", value: [facts.setting ? titleCase(facts.setting) : null, loc || null].filter(Boolean).join(" · ") || "Not on record", dim: !facts.setting && !loc },
     { label: "PHARMA CONTACT", value: eng != null && eng > 0 ? money(eng) + " lifetime" + (companies ? " across " + Math.round(companies) + " companies" : "") + " — a fact, not a rating" : "None recorded — absence of a record, not of relationships", dim: !(eng != null && eng > 0) },
     // No `> 0` test: in_corpus_pub_count is never 0 when non-null (a staged row has

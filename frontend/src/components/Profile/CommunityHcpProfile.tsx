@@ -11,7 +11,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
-import { COM_CONFIG } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { loadFieldPresence, type FieldNote } from "../../lib/hcpProfile";
@@ -36,9 +35,10 @@ import {
   titleCase,
   MATERIALITY_USD,
   type CommunityProfile,
-  type NsclcEvidenceTier,
+  type CommunityEvidenceTier,
   type Product,
 } from "../../lib/communityProfile";
+import { comProfileEvidence, comShowsLungWeighted } from "../../lib/cohortLedger";
 
 // CANONICAL MIGRATION (pilot, 2026-08-12): every P key resolves to an
 // RFC-01/02 token — the near-twin greys, alpha hairlines and warm surfaces
@@ -138,57 +138,41 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Evidence line — frame 1d. Directly under the name, one slot, every state. Absence
-// states its cause and never renders empty or as a zero. Prose is composed from the
-// view's fields; the supported string is used verbatim (group 5 must read
+// Evidence line — frame 1d. Directly under the name, one slot, every state. Absence states
+// its cause and never renders empty or as a zero. Never renders a patient count or any
+// tumour-type-attributed volume.
+//
+// EVERY STRING COMES FROM THE TA'S TIER MODEL (COM_EVIDENCE_MODELS in lib/cohortLedger.ts),
+// because what "anchored" asserts is a property of the model and not of the word. This block
+// used to hold five hard-coded lung branches and a "MEDICARE PART D" header, and
+// ProfileDispatch routes every community HCP of every TA here — so an anchored colorectal
+// physician was told they had prescribed an oral indicated only for NSCLC, under a Part D
+// header, for a tier defined entirely by Part B. The nsclc_v1 entry carries these exact
+// strings forward, so lung is unchanged.
+//
+// The supported string is still used verbatim where the model produces one (group 5 must read
 // "cross-indication targeted therapy observed", never "NSCLC prescribing observed").
-// Never renders a patient count or any tumour-type-attributed volume.
-function EvidenceLine({ ev }: { ev: NsclcEvidenceTier | null }) {
+function EvidenceLine({ ev, taSlug }: { ev: CommunityEvidenceTier | null; taSlug: string | null }) {
   if (!ev) return null;
-  const yrs = ev.anchor_years ?? [];
-  const consecutive = yrs.length >= 2 && yrs[yrs.length - 1] - yrs[0] === yrs.length - 1;
-  const stems = ev.anchor_stems ?? (ev.anchor_stem ? [ev.anchor_stem] : []);
-  const stemPhrase = stems.length > 1 ? `${stems.slice(0, -1).join(", ")} and ${stems[stems.length - 1]}` : stems[0] ?? "a lung-only oral";
-  const oralNoun = stems.length > 1 ? "orals indicated only for non-small cell lung cancer" : "an oral indicated only for non-small cell lung cancer";
-
-  let accent: string = P.ink6; // dim by default (absence / other)
-  let label = "EVIDENCE";
-  let lead = "";
-  let caveat = "";
-  if (ev.tier === "anchored") {
-    accent = P.amber;
-    label = "EVIDENCE · MEDICARE PART D";
-    const yearList = yrs.length ? yrs.join(", ") : "the observed period";
-    lead = `Prescribed ${stemPhrase} — ${oralNoun} — in ${yearList}.`;
-    caveat =
-      (ev.years_anchored ?? yrs.length) >= 2
-        ? `${ev.years_anchored ?? yrs.length}${consecutive ? " consecutive" : ""} years of prescribing is a materially stronger claim than one. Claims and prescribing carry no diagnosis.`
-        : `A single year of prescribing. Claims and prescribing carry no diagnosis.`;
-  } else if (ev.tier === "supported") {
-    accent = CANON.GOLD.RANK;
-    label = "EVIDENCE · SUPPORTING";
-    lead = ev.supported_evidence ? `${ev.supported_evidence}.` : "Supporting evidence observed.";
-    caveat = "Supporting evidence, not a lung-specific anchor. Claims and prescribing carry no diagnosis.";
-  } else if (ev.tier === "candidate") {
-    label = "EVIDENCE · SOLID-TUMOUR ORAL";
-    lead = "Solid-tumour oral oncology prescribing, with no lung-specific evidence observed 2022–2024.";
-    caveat = "Not disqualifying. A lung panel with no targetable mutation prescribes no oral therapy at all, so absence of a lung oral is never disproof of lung practice.";
-  } else if (ev.tier === "heme_dominant") {
-    label = "EVIDENCE · ORAL MIX";
-    lead = "Oral oncology prescribing is predominantly haematology agents — over 70% of fills 2022–2024. No lung-only oral was prescribed in that period.";
-    caveat = "A description of practice, not a disqualification. Reachable from the ledger by filter and searchable throughout.";
-  } else {
-    label = "EVIDENCE · NOT OBSERVED";
-    lead = "No Medicare drug evidence was observed 2022–2024 — no Part D prescribing and no Part B drug billing. The likely reason is billing path: prescribing under an organisational NPI, or a panel weighted to Medicare Advantage.";
-    caveat = "This is not evidence of inactivity. A lung panel with no targetable mutation prescribes no oral therapy at all, so absence of a lung oral is never disproof of lung practice.";
-  }
+  const copy = comProfileEvidence(taSlug, {
+    tier: ev.tier ?? null,
+    anchorStems: ev.anchor_stems ?? (ev.anchor_stem ? [ev.anchor_stem] : []),
+    anchorYears: ev.anchor_years ?? [],
+    yearsAnchored: ev.years_anchored ?? null,
+    recurrenceBand: ev.recurrence_band ?? null,
+    supportedEvidence: ev.supported_evidence ?? null,
+  });
+  const { label, lead, caveat } = copy;
+  const accent = ev.tier === "anchored" ? P.amber : ev.tier === "supported" ? CANON.GOLD.RANK : P.ink6;
 
   return (
     <div style={{ borderLeft: `2px solid ${accent}`, padding: "2px 0 2px 14px", marginTop: 4, display: "flex", flexDirection: "column", gap: 8 }}>
       <span style={{ ...mono(9, 500), letterSpacing: ".11em", color: ev.tier === "anchored" ? P.amber : P.ink4 }}>{label}</span>
       <p style={{ margin: 0, ...serif(13), lineHeight: 1.55, color: P.ink2, textWrap: "pretty" }}>{lead}</p>
       <p style={{ margin: 0, ...serif(13), lineHeight: 1.55, color: P.ink4, textWrap: "pretty" }}>{caveat}</p>
-      {ev.lung_weighted ? (
+      {/* lung_weighted is NULL on every arm but nsclc_v1; the model flag makes that
+          structural rather than a coercion that happens to come out false. */}
+      {comShowsLungWeighted(taSlug) && ev.lung_weighted ? (
         <span style={{ alignSelf: "flex-start", ...mono(9), letterSpacing: ".1em", color: P.ink4, border: `1px solid ${P.lineStrong}`, padding: "4px 8px" }}>
           LUNG-WEIGHTED ORAL MIX
         </span>
@@ -207,20 +191,35 @@ export default function CommunityHcpProfile() {
   const rel = useRelationships();
   const [p, setP] = useState<CommunityProfile | null>(null);
   const [notes, setNotes] = useState<FieldNote[]>([]);
-  const [evidence, setEvidence] = useState<NsclcEvidenceTier | null>(null);
+  const [evidence, setEvidence] = useState<CommunityEvidenceTier | null>(null);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"recency" | "amount">("recency");
 
+  // THE EVIDENCE TIER IS TA-SCOPED AND SO IS ITS LOAD. loadEvidenceTier now requires a taId,
+  // so it waits for useProfileTa to resolve instead of reading the lung view unscoped — see
+  // the note on loadEvidenceTier. The profile itself does not wait: the other two reads are
+  // TA-neutral and fire on the first pass, and the evidence line fills in when the TA lands.
+  // status "none" (the HCP belongs to no TA) leaves it null, which renders nothing — the
+  // honest state, and not a lung tier borrowed to fill the slot.
+  const evidenceTaId = profileTa.status === "resolved" ? profileTa.taId : null;
   useEffect(() => {
     if (!id) return;
     let alive = true;
     setLoading(true);
-    Promise.all([loadCommunityProfile(id), loadFieldPresence(id), loadEvidenceTier(id)]).then(([prof, fn, ev]) => {
+    Promise.all([loadCommunityProfile(id), loadFieldPresence(id)]).then(([prof, fn]) => {
       if (!alive) return;
-      setP(prof); setNotes(fn); setEvidence(ev); setLoading(false);
+      setP(prof); setNotes(fn); setLoading(false);
     }).catch(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [id]);
+  useEffect(() => {
+    if (!id || !evidenceTaId) { setEvidence(null); return; }
+    let alive = true;
+    loadEvidenceTier(id, evidenceTaId)
+      .then((ev) => { if (alive) setEvidence(ev); })
+      .catch(() => { if (alive) setEvidence(null); });
+    return () => { alive = false; };
+  }, [id, evidenceTaId]);
 
   if (loading) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>Loading profile…</div></Shell>;
   if (!p || !p.hcp?.name) return <Shell><div style={{ padding: "40px 24px", ...mono(11), color: P.ink5 }}>This profile could not be loaded.</div></Shell>;
@@ -261,7 +260,12 @@ export default function CommunityHcpProfile() {
         <div style={{ display: "flex", alignItems: "center", gap: 9, ...mono(9, 500), letterSpacing: ".1em", color: P.ink5 }}>
           <span style={{ width: 3, height: 12, background: P.rose }} />
           <span style={{ color: P.rose }}>COMMUNITY</span><span>›</span>
-          <Link to={`/cohorts/ledger/community${COM_CONFIG.pinnedTaSlug ? `?ta=${COM_CONFIG.pinnedTaSlug}` : ""}`} style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
+          {/* BACK TO THE LEDGER, IN THIS PROFILE'S OWN TA. Was `?ta=${COM_CONFIG.pinnedTaSlug}`,
+                        a config pin that could only name one TA; the ledger now serves two, so a pin
+                        would send a colorectal reader to the lung board. profileTa is the TA this page
+                        was actually resolved for. When it has not resolved, the param is omitted and
+                        useLedgerTa falls through session -> profile -> picker, which is its job. */}
+          <Link to={`/cohorts/ledger/community${profileTa.status === "resolved" ? `?ta=${profileTa.slug}` : ""}`} style={{ color: P.teal, textDecoration: "none" }}>↑ BACK TO LEDGER</Link>
         </div>
 
         {/* header — frame 1a: three cells (identity+actions | PRACTICE SHAPE | COMMUNITY
@@ -290,7 +294,7 @@ export default function CommunityHcpProfile() {
               {loc ? ` · ${loc}` : ""}
               {p.hcp.npi ? ` · NPI ${p.hcp.npi}` : ""}
             </span>
-            <EvidenceLine ev={evidence} />
+            <EvidenceLine ev={evidence} taSlug={profileTa.status === "resolved" ? profileTa.slug : null} />
             <HeaderActions hcpId={p.hcp.id} npi={p.hcp.npi} onBrief={() => navigate(`/hcp/${p.hcp.id}/brief`)} />
           </div>
           {/* practice shape — frame: its own 300px cell, label-left / value-right rows */}

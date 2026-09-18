@@ -68,12 +68,30 @@ export async function loadCommunityProfile(hcpId: string): Promise<CommunityProf
   return data as CommunityProfile;
 }
 
-// NSCLC evidence tier for a single HCP (hcp_nsclc_evidence_tier_v1). Cheap per-hcp
-// lookup (~0.4ms; the hcp_id predicate pushes through the view's aggregates into PK
-// indexes). Drives the profile evidence line. Reasoning:
-// docs/design/NSCLC_COHORT_EVIDENCE_TIERS.md.
+// Community evidence tier for a single HCP, IN ONE TA. Cheap per-hcp lookup (~0.4ms; the
+// hcp_id predicate pushes through the view's aggregates into PK indexes). Drives the profile
+// evidence line. Reasoning: docs/design/NSCLC_COHORT_EVIDENCE_TIERS.md.
+//
+// TA-SCOPED SINCE 2026-09-17, AND THAT IS A DEFECT FIX, NOT A REFACTOR. This read went
+// straight at hcp_nsclc_evidence_tier_v1 — the LUNG-ONLY view — with an hcp_id predicate and
+// no TA at all, while ProfileDispatch routes every community HCP of every TA to the profile
+// that consumes it. Measured against the 330 anchored colorectal HCPs on the day of the fix:
+// 214 had no row in that view and silently rendered no evidence line, and the other 116 had
+// their LUNG tier rendered on a colorectal profile — 54 of them reading "anchored" with lung
+// stems and lung years, 48 reading "no NSCLC-specific drug evidence", 3 "heme-dominant". That
+// is another TA's evidence presented as this one's, which is worse than the missing line.
+//
+// hcp_evidence_tier_v1 is the TA-neutral union (nsclc_v1 / partd_presence_v1 /
+// partb_practice_v1 arms, keyed ta_id + hcp_id) and is granted to anon and authenticated.
+// Its non-nsclc arms select anchor_stem, anchor_stems, anchor_years, supported_evidence,
+// lung_share, oral_denominator, oral_recent_year and lung_weighted as NULL by construction —
+// so a caller must describe the tier from its MODEL, never from those fields. See
+// COM_EVIDENCE_MODELS in lib/cohortLedger.ts.
+//
+// taId IS REQUIRED. useProfileTa returns null while resolving, and a null there must gate
+// this read rather than widen it — an unscoped query is exactly the defect above.
 export type EvidenceTierName = "anchored" | "supported" | "candidate" | "heme_dominant" | "unresolved";
-export interface NsclcEvidenceTier {
+export interface CommunityEvidenceTier {
   tier: EvidenceTierName;
   years_anchored: number | null;
   recurrence_band: "recurs" | "single_year" | null;
@@ -88,20 +106,21 @@ export interface NsclcEvidenceTier {
   lung_weighted: boolean;
 }
 
-export async function loadEvidenceTier(hcpId: string): Promise<NsclcEvidenceTier | null> {
+export async function loadEvidenceTier(hcpId: string, taId: string): Promise<CommunityEvidenceTier | null> {
   const { data, error } = await supabase
-    .from("hcp_nsclc_evidence_tier_v1")
+    .from("hcp_evidence_tier_v1")
     .select(
       "tier, years_anchored, recurrence_band, anchor_stem, anchor_stems, anchor_years, " +
         "supported_evidence, supported_evidence_rank, lung_share, oral_denominator, oral_recent_year, lung_weighted",
     )
     .eq("hcp_id", hcpId)
+    .eq("ta_id", taId)
     .maybeSingle();
   if (error) {
     console.warn("loadEvidenceTier: supabase error", error.message);
     return null;
   }
-  return (data as NsclcEvidenceTier | null) ?? null;
+  return (data as CommunityEvidenceTier | null) ?? null;
 }
 
 export async function loadProfileSpine(hcpId: string, taId: string): Promise<"academic" | "community"> {

@@ -335,6 +335,12 @@ export interface LedgerRow {
   tierPriority?: number | null;
   patientVolume?: number | null;
   partDPresent?: boolean | null;
+  /** Part B claims observed against THIS TA's ta_hcpcs_codes set (community_ledger's
+   *  part_b_present). DISTINCT FROM patientVolume, which is a beneficiary COUNT from
+   *  hcp_medicare_by_ta_v2 and exists for only some TAs — see the Part B presence cell in
+   *  CohortLedger.tsx. undefined when the RPC predates the column, which is why every read
+   *  falls back rather than rendering a dash it cannot justify. */
+  partBPresent?: boolean | null;
   hcpId: string;
   name: string;
   chips: string[]; // small mono chips after the name (state·institution, or specialty·location)
@@ -346,7 +352,10 @@ export interface LedgerRow {
   // Absent on EST/RS rows. Never composed client-side — the RPC returns the strings.
   tier?: string | null;
   recurrenceBand?: string | null;
-  anchorStem?: string | null; // representative lung-only oral for the chip
+  // nsclc_v1 only: the representative lung-only oral. NULL on every partb_practice_v1 row
+  // by construction — that model has no Part D stem. Read it through comEvidenceFacts(),
+  // never as "the drug behind this tier".
+  anchorStem?: string | null;
   anchorStems?: string[] | null; // every distinct strict stem, for the profile
   anchorYears?: number[] | null;
   supportedEvidence?: string | null; // verbatim from the view (group 5 stays "cross-indication targeted therapy observed")
@@ -419,12 +428,18 @@ export const COM_TIER_LABEL: Record<string, string> = {
  * belongs HERE is the shape of the model -- which tiers exist and which are on at mount --
  * because that is what this constant decides. A count here decides nothing and rots.
  *
- * unresolved is 0 ON THE BOARD and large off it, for a structural reason rather than a
- * measured one: an HCP with neither a Part B pattern nor a Part D row also has no
- * patient_volume, so qualifies is false and they never reach the board at all. The chip is
- * offered anyway -- the tier exists in the model and a future scoring run can populate it,
- * and a chip reading 0 for a tier the model CAN emit is an honest empty set, unlike a chip
- * for a tier the model cannot produce.
+ * unresolved WAS 0 ON THE BOARD, AND IS NOT ANY MORE -- the "future scoring run" this
+ * paragraph used to anticipate has happened. It read 0 for a reason that was structural at
+ * the time: an HCP with neither a Part B pattern nor an oncology Part D row also had no
+ * patient_volume, because colorectal patient_volume was uniformly zero, so qualifies was
+ * false and they never reached the board. On 2026-09-18 medicare_aggregator was run for
+ * colorectal and the board re-scored, patient_volume became real, and HCPs with Part B claims
+ * but no Part D record now qualify on the volume arm and land here. The tier is populated;
+ * count in COMMUNITY_BOARD_BASELINE.md.
+ *
+ * The principle the paragraph was defending is unchanged and is why the chip was always
+ * offered: a chip reading 0 for a tier the model CAN emit is an honest empty set, unlike a
+ * chip for a tier the model cannot produce. What changed is only that it is no longer empty.
  *
  * WHAT THIS REPLACED, AND WHY IT WAS WRONG BY THE TIME IT SHIPPED. The previous entry
  * offered candidate and unresolved only and defaulted to ["candidate"], because under
@@ -448,11 +463,14 @@ export const COM_TIER_LABEL: Record<string, string> = {
  * and the label must not claim an ordering the data cannot deliver. See the colorectal
  * entry, and COMMUNITY_BOARD_BASELINE.md for the reach coverage behind both.
  */
+export type ComTierModel = "nsclc_v1" | "partb_practice_v1";
+
 const COM_TIER_MODELS: Record<
   string,
-  { filters: { key: string; label: string }[]; defaults: string[]; orderClause: string }
+  { tierModel: ComTierModel; filters: { key: string; label: string }[]; defaults: string[]; orderClause: string }
 > = {
   nsclc: {
+    tierModel: "nsclc_v1",
     filters: [
       { key: "anchored", label: "ANCHORED" },
       { key: "supported", label: "SUPPORTED" },
@@ -469,6 +487,7 @@ const COM_TIER_MODELS: Record<
     orderClause: "EVIDENCE TIER, THEN MEDICARE REACH",
   },
   "colorectal-cancer": {
+    tierModel: "partb_practice_v1",
     filters: [
       { key: "anchored", label: "ANCHORED" },
       { key: "supported", label: "SUPPORTED" },
@@ -482,23 +501,37 @@ const COM_TIER_MODELS: Record<
     // 2026-09-17 and the reasoning did not move. 'unresolved' is off by default as it is for
     // lung: it is the tier for people the claims record cannot speak to.
     defaults: ["anchored", "supported"],
-    // NO REACH HALF, AND THIS IS MEASURED, NOT STYLISTIC. patient_volume is 0 on EVERY
-    // colorectal board row -- every tier, max 0.0. Re-verified 2026-09-17 against the
-    // post-ingest board, which is a bigger board and still entirely zero:
-    // hcp_community_scores_v2 has never been populated with colorectal Part B volume. So the
-    // RPC's second sort key is constant, the effective within-tier order is hcp_id, and
-    // claiming "THEN MEDICARE REACH" would assert an ordering that does not exist.
+    // NO REACH HALF, AND THIS IS MEASURED, NOT STYLISTIC. SAME DECISION AS BEFORE
+    // 2026-09-18, DIFFERENT REASON -- and the reason is the part worth reading, because the
+    // old one is now false.
     //
-    // A ZERO, NOT A SMALL NUMBER, WHICH IS WHY IT IS STATED AS AN ABSOLUTE AND NOT A COUNT.
-    // If it ever stops being zero this whole decision is back open, and the label should be
-    // revisited rather than nudged -- so the condition to re-check is "any colorectal row
-    // with patient_volume > 0", not a threshold.
+    // IT USED TO BE "IDENTICALLY ZERO". patient_volume was 0 on every colorectal board row,
+    // every tier, max 0.0 -- so the RPC's second sort key was constant, the effective
+    // within-tier order was hcp_id, and "THEN MEDICARE REACH" would have named an ordering
+    // that did not exist. That comment set its own re-check condition as "any colorectal row
+    // with patient_volume > 0", and on 2026-09-18 that condition fired: medicare_aggregator
+    // gained --ta, was run for colorectal for the first time, and community_scoring re-read
+    // it. Reach is now populated for part of the board.
     //
-    // NOT THE SAME COLUMN AS PART B COVERAGE. A minority of the board has a row in
-    // hcp_hcpcs_detail against the colorectal code set -- that is what block 53 reports, and
-    // it is a different column from the patient_volume this sort reads. Populating REACH
-    // from those claims is upstream work, not a label change. Both figures live in
-    // COMMUNITY_BOARD_BASELINE.md.
+    // IT IS NOW "TOO SPARSE TO ORDER ON". Reach is populated for a MINORITY of colorectal
+    // board rows -- roughly one in eight; coverage in COMMUNITY_BOARD_BASELINE.md, not here,
+    // because it will move again. A secondary key that is null for most rows does not order
+    // the board: the few rows carrying reach sort among themselves and everything else falls
+    // through to hcp_id, which READS as an ordering to someone who trusts the label while
+    // being arbitrary for seven rows in eight. That is a worse failure than an absent label,
+    // because it is not visible.
+    //
+    // THE TEST IS THE SHAPE, NOT A THRESHOLD, and it is the same test lung passes: is reach
+    // populated for MOST of the board? Lung's is (see its entry). Colorectal's is not. Do not
+    // turn this into a percentage cutoff -- re-measure the shape and decide. If a later
+    // Medicare run populates most of the colorectal board, this label should change.
+    //
+    // NOT THE SAME COLUMN AS PART B PRESENCE, AND NOW LESS EASILY CONFUSED. patient_volume is
+    // a beneficiary COUNT out of hcp_medicare_by_ta_v2; part_b_present (community_ledger, see
+    // docs/crc_community/63) is a presence FACT computed from this TA's own ta_hcpcs_codes.
+    // The Part B cell reads the second; this sort reads the first. They now agree in
+    // direction for colorectal, which is exactly why they are easy to conflate -- the count
+    // is still absent for most of the board that the presence fact covers.
     orderClause: "EVIDENCE TIER",
   },
 };
@@ -530,21 +563,242 @@ export function comSortLabel(taSlug: string | null | undefined): string {
   return `BY ${comOrderClause(taSlug)}`;
 }
 
+/**
+ * WHAT "ANCHORED" MEANS IS A PROPERTY OF THE TIER MODEL — NOT OF THE TIER, AND NOT OF THE TA.
+ *
+ * Added 2026-09-17, closing a live defect. The anchored chip printed the string
+ * "LUNG-ONLY ORAL" from a bare literal inside evidenceChip(), so EVERY anchored row in every
+ * TA claimed a lung-only oral prescription. On colorectal that is a false claim about a
+ * physician, not a named absence — and it was invisible in lung because nsclc_v1 also fills
+ * anchor_stem/anchor_years, so lung rows read ANCHORED · LUNG-ONLY ORAL · osimertinib · 2023
+ * and looked right. The partb_practice_v1 arm of hcp_evidence_tier_v1 selects those three
+ * columns as NULL by construction (it has no Part D stem to name), so .filter(Boolean) dropped
+ * both data segments and left the literal standing alone.
+ *
+ * THE KEY IS THE TIER MODEL. Not the tier: "anchored" is a word two models both use and mean
+ * different things by. Not the TA: a second TA put on partb_practice_v1 must inherit the right
+ * copy without editing this file, and the registry entry above already names its model.
+ *
+ *   nsclc_v1           anchored = at least one Part D row with anchor_grade='strict' — an oral
+ *                      indicated only for NSCLC. There IS a stem and there ARE years, so the
+ *                      chip names and dates them.
+ *   partb_practice_v1  anchored = a VEGF agent AND a chemotherapy backbone AND a
+ *                      fluoropyrimidine billed by the same provider in the same program year,
+ *                      behind a Med-Onc/Heme-Onc taxonomy gate. There is no stem to name; the
+ *                      PATTERN is the evidence. The board row carries no program year for it
+ *                      either, so no year is printed and the profile says so.
+ *
+ * NOTHING HERE COMPOSES A FACT. Every string is either a constant description of the model's
+ * own definition or a verbatim field from the view. The one place prose interpolates data is
+ * the anchored stem/year list, and only where namesAnchorStems says the model has them.
+ */
+export interface ComEvidenceCopy {
+  label: string; // the profile's rule-label, e.g. "EVIDENCE · MEDICARE PART B"
+  lead: string;
+  caveat: string;
+}
+
+/** The evidence fields both call sites hold, normalised — the ledger row carries them in
+ *  camelCase and the profile in snake_case, and neither shape belongs in this registry. */
+export interface ComEvidenceFacts {
+  tier: string | null;
+  anchorStems: string[];
+  anchorYears: number[];
+  yearsAnchored: number | null;
+  recurrenceBand: string | null;
+  supportedEvidence: string | null;
+}
+
+interface ComEvidenceModel {
+  /** Chip segment printed after the tier word on an anchored row. */
+  anchoredChipSegment: string;
+  /** Chip segment for a supported row; null = print the view's verbatim supported_evidence. */
+  supportedChipSegment: string | null;
+  /** Does this model carry anchor_stem / anchor_years worth naming? */
+  namesAnchorStems: boolean;
+  /** Can this model produce a lung-weighted oral mix? Gates the LUNG-WEIGHTED ORAL MIX marker,
+   *  which reads lung_weighted — NULL on every non-nsclc_v1 arm, but a flag this explicit is
+   *  cheaper to trust than a coercion two files away. */
+  lungWeightedMarker: boolean;
+  /** One sentence for the ledger call sheet. */
+  drawerSentence(f: ComEvidenceFacts): string;
+  /** The profile evidence line. */
+  profileCopy(f: ComEvidenceFacts): ComEvidenceCopy;
+}
+
+/** A tier the model cannot emit reaching a copy function is a bug upstream, and the honest
+ *  render is to say so rather than to print the nearest plausible sentence. */
+const unmodelled = (tier: string | null, model: string) =>
+  `Tier "${tier ?? "none"}" is not one ${model} can produce — this row's evidence cannot be described.`;
+
+const COM_EVIDENCE_MODELS: Record<ComTierModel, ComEvidenceModel> = {
+  // ── nsclc_v1 — Part D, a lung-only oral. COPY UNCHANGED 2026-09-17: every string below is
+  // character-for-character what evidenceChip(), CommunityCallSheet and EvidenceLine already
+  // rendered. This entry is a move, not a rewrite; lung must read exactly as it did.
+  nsclc_v1: {
+    anchoredChipSegment: "LUNG-ONLY ORAL",
+    supportedChipSegment: null,
+    namesAnchorStems: true,
+    lungWeightedMarker: true,
+    drawerSentence(f) {
+      if (f.tier === "anchored") {
+        const stems = f.anchorStems.join(", ");
+        const years = f.anchorYears.join(" and ");
+        const recurs = f.recurrenceBand === "recurs" ? ", recurring across years rather than appearing once" : "";
+        return "Anchored on their own prescribing record — " + (stems || "lung-only oral") + " claims" + (years ? " in " + years : "") + recurs + ".";
+      }
+      if (f.tier === "supported") return "Supported by " + (f.supportedEvidence ?? "corroborating NSCLC evidence") + " in the claims record.";
+      if (f.tier === "heme_dominant") return "A heme-focused practice — the oral record concentrates in blood cancers; a different specialty, not a deficit.";
+      if (f.tier === "candidate") return "An oncology claims footprint without NSCLC-specific drug evidence — a candidate on the record so far.";
+      return "No Medicare drug-claims evidence to characterize the treatment mix.";
+    },
+    profileCopy(f) {
+      const yrs = f.anchorYears;
+      const consecutive = yrs.length >= 2 && yrs[yrs.length - 1] - yrs[0] === yrs.length - 1;
+      const stems = f.anchorStems;
+      const stemPhrase = stems.length > 1 ? `${stems.slice(0, -1).join(", ")} and ${stems[stems.length - 1]}` : stems[0] ?? "a lung-only oral";
+      const oralNoun = stems.length > 1 ? "orals indicated only for non-small cell lung cancer" : "an oral indicated only for non-small cell lung cancer";
+      if (f.tier === "anchored") {
+        const yearList = yrs.length ? yrs.join(", ") : "the observed period";
+        const n = f.yearsAnchored ?? yrs.length;
+        return {
+          label: "EVIDENCE · MEDICARE PART D",
+          lead: `Prescribed ${stemPhrase} — ${oralNoun} — in ${yearList}.`,
+          caveat: n >= 2
+            ? `${n}${consecutive ? " consecutive" : ""} years of prescribing is a materially stronger claim than one. Claims and prescribing carry no diagnosis.`
+            : `A single year of prescribing. Claims and prescribing carry no diagnosis.`,
+        };
+      }
+      // NSCLC IS CORRECT IN THESE BRANCHES — DO NOT WIDEN TO "LUNG CANCER". The evidence tier
+      // is computed from a claims code set that is NSCLC-specific and carries no SCLC codes, so
+      // naming it "lung cancer" would assert coverage the data does not have. The TA DISPLAY
+      // LABEL was renamed 2026-08-15; this clinical criterion was not.
+      if (f.tier === "supported") return {
+        label: "EVIDENCE · SUPPORTING",
+        lead: f.supportedEvidence ? `${f.supportedEvidence}.` : "Supporting evidence observed.",
+        caveat: "Supporting evidence, not a lung-specific anchor. Claims and prescribing carry no diagnosis.",
+      };
+      if (f.tier === "candidate") return {
+        label: "EVIDENCE · SOLID-TUMOUR ORAL",
+        lead: "Solid-tumour oral oncology prescribing, with no lung-specific evidence observed 2022–2024.",
+        caveat: "Not disqualifying. A lung panel with no targetable mutation prescribes no oral therapy at all, so absence of a lung oral is never disproof of lung practice.",
+      };
+      if (f.tier === "heme_dominant") return {
+        label: "EVIDENCE · ORAL MIX",
+        lead: "Oral oncology prescribing is predominantly haematology agents — over 70% of fills 2022–2024. No lung-only oral was prescribed in that period.",
+        caveat: "A description of practice, not a disqualification. Reachable from the ledger by filter and searchable throughout.",
+      };
+      return {
+        label: "EVIDENCE · NOT OBSERVED",
+        lead: "No Medicare drug evidence was observed 2022–2024 — no Part D prescribing and no Part B drug billing. The likely reason is billing path: prescribing under an organisational NPI, or a panel weighted to Medicare Advantage.",
+        caveat: "This is not evidence of inactivity. A lung panel with no targetable mutation prescribes no oral therapy at all, so absence of a lung oral is never disproof of lung practice.",
+      };
+    },
+  },
+
+  // ── partb_practice_v1 — Part B co-occurrence in one provider-year. NO STEM, NO YEAR, AND
+  // BOTH ABSENCES ARE STATED RATHER THAN PAPERED OVER. The view's anchor_stem, anchor_stems,
+  // anchor_years and supported_evidence are NULL on this arm by construction, so nothing here
+  // interpolates them; the anchored caveat says the board row does not carry the years, which
+  // is the named absence the lung literal was faking.
+  partb_practice_v1: {
+    anchoredChipSegment: "VEGF + BACKBONE + FLUOROPYRIMIDINE",
+    supportedChipSegment: "BACKBONE + FLUOROPYRIMIDINE",
+    namesAnchorStems: false,
+    lungWeightedMarker: false,
+    drawerSentence(f) {
+      if (f.tier === "anchored")
+        return "Anchored on their own Part B billing — a VEGF agent, a chemotherapy backbone and a fluoropyrimidine billed in a single program year.";
+      if (f.tier === "supported")
+        return "Supported by their Part B billing — a chemotherapy backbone and a fluoropyrimidine in one program year, without a VEGF agent.";
+      if (f.tier === "candidate")
+        return "An oncology Part D record with no Part B treatment pattern against this area's code set — a candidate on the record so far.";
+      if (f.tier === "unresolved")
+        return "No Medicare evidence — no Part B claims against this area's code set and no oncology Part D record.";
+      return unmodelled(f.tier, "partb_practice_v1");
+    },
+    profileCopy(f) {
+      if (f.tier === "anchored") return {
+        label: "EVIDENCE · MEDICARE PART B",
+        lead: "Billed a VEGF agent, a chemotherapy backbone and a fluoropyrimidine in the same program year — the administered treatment pattern this area's evidence model is built on.",
+        caveat: "The pattern is the evidence: three agent classes in one provider-year, behind a Medical or Haematology Oncology taxonomy gate. The board row does not carry which years, so none are named. Claims carry no diagnosis.",
+      };
+      if (f.tier === "supported") return {
+        label: "EVIDENCE · SUPPORTING",
+        lead: "Billed a chemotherapy backbone and a fluoropyrimidine in the same program year, without a VEGF agent.",
+        caveat: "One agent class short of the anchor pattern — corroborating practice evidence, not the full pattern. Claims carry no diagnosis.",
+      };
+      if (f.tier === "candidate") return {
+        label: "EVIDENCE · ORAL ONCOLOGY ONLY",
+        lead: "An oncology Part D record, with no Part B treatment pattern observed against this area's code set.",
+        caveat: "Not disqualifying. Infusion is billed under the practice or facility NPI in many settings, so an absent pattern under an individual NPI is not disproof of the practice.",
+      };
+      if (f.tier === "unresolved") return {
+        label: "EVIDENCE · NOT OBSERVED",
+        lead: "No Medicare evidence — no Part B claims against this area's code set and no oncology Part D record.",
+        caveat: "This is not evidence of inactivity. The likely reason is billing path: billing under an organisational NPI, or a panel weighted to Medicare Advantage.",
+      };
+      const dead = unmodelled(f.tier, "partb_practice_v1");
+      return { label: "EVIDENCE · UNMODELLED", lead: dead, caveat: "" };
+    },
+  },
+};
+
+/** The evidence model behind this TA's tiers. Falls back with the tier vocabulary, so an
+ *  unlisted TA gets lung's copy and lung's chips together rather than a mismatched pair. */
+export function comEvidenceModelFor(taSlug: string | null | undefined): ComEvidenceModel {
+  return COM_EVIDENCE_MODELS[comTierModel(taSlug).tierModel];
+}
+/** Normalise a ledger row into the facts the copy functions read. */
+export function comEvidenceFacts(row: LedgerRow): ComEvidenceFacts {
+  return {
+    tier: row.tier ?? null,
+    anchorStems: row.anchorStems ?? (row.anchorStem ? [row.anchorStem] : []),
+    anchorYears: row.anchorYears ?? [],
+    yearsAnchored: null, // not carried on the ledger row — the drawer never needed it
+    recurrenceBand: row.recurrenceBand ?? null,
+    supportedEvidence: row.supportedEvidence ?? null,
+  };
+}
+/** One sentence describing this row's evidence, in this TA's model. */
+export function comDrawerSentence(taSlug: string | null | undefined, f: ComEvidenceFacts): string {
+  return comEvidenceModelFor(taSlug).drawerSentence(f);
+}
+/** The profile evidence line's three strings, in this TA's model. */
+export function comProfileEvidence(taSlug: string | null | undefined, f: ComEvidenceFacts): ComEvidenceCopy {
+  return comEvidenceModelFor(taSlug).profileCopy(f);
+}
+/** Whether this TA's model can produce a lung-weighted oral mix at all. */
+export function comShowsLungWeighted(taSlug: string | null | undefined): boolean {
+  return comEvidenceModelFor(taSlug).lungWeightedMarker;
+}
+
 export interface EvidenceChip {
   tierWord: string; // ANCHORED / SUPPORTED / …
   strength: "anchored" | "supported" | "other";
-  segments: string[]; // e.g. ["LUNG-ONLY ORAL", "osimertinib", "2022 2023 2024"] or ["pemetrexed (Part B)"]
+  /** e.g. nsclc_v1 ["LUNG-ONLY ORAL", "osimertinib", "2022 2023 2024"], partb_practice_v1
+   *  ["VEGF + BACKBONE + FLUOROPYRIMIDINE"]. The leading segment comes from the TIER MODEL. */
+  segments: string[];
   lungWeighted: boolean;
 }
 
-/** The row evidence chip content (COM). Anchored names the representative drug and the
- *  actual years; supported uses the view's verbatim evidence string; other tiers carry
- *  the tier word alone. Returns null for non-COM rows. */
+/** The row evidence chip content (COM). THE LEADING SEGMENT COMES FROM THE TIER MODEL, not
+ *  from a literal — see COM_EVIDENCE_MODELS. Under nsclc_v1 anchored then names the
+ *  representative drug and the actual years; under partb_practice_v1 there is no stem or year
+ *  to name and the pattern segment stands alone. Supported uses the view's verbatim evidence
+ *  string where the model produces one, else the model's own pattern segment. Other tiers
+ *  carry the tier word alone. Returns null for non-COM rows. */
 export function evidenceChip(row: LedgerRow): EvidenceChip | null {
   if (!row.tier) return null;
+  const model = comEvidenceModelFor(row.taSlug);
   const tierWord = COM_TIER_LABEL[row.tier] ?? row.tier.toUpperCase();
-  const lungWeighted = !!row.lungWeighted;
+  // lung_weighted is NULL on every arm but nsclc_v1; the model flag makes that structural
+  // rather than a coercion that happens to come out false.
+  const lungWeighted = model.lungWeightedMarker && !!row.lungWeighted;
   if (row.tier === "anchored") {
+    if (!model.namesAnchorStems) {
+      return { tierWord, strength: "anchored", lungWeighted, segments: [model.anchoredChipSegment] };
+    }
     // Lead with the representative stem (anchor_stem), then the remaining stems in the
     // view's alphabetical order — so the significant drug shows and never hides in "+N".
     // Then up to two shown, "+N" for the rest.
@@ -553,10 +807,11 @@ export function evidenceChip(row: LedgerRow): EvidenceChip | null {
     const ordered = lead ? [lead, ...all.filter((s) => s !== lead)] : all;
     const drug = ordered.length <= 2 ? ordered.join(", ") : `${ordered.slice(0, 2).join(", ")} +${ordered.length - 2}`;
     const years = (row.anchorYears ?? []).join(" ");
-    return { tierWord, strength: "anchored", lungWeighted, segments: ["LUNG-ONLY ORAL", drug, years].filter(Boolean) };
+    return { tierWord, strength: "anchored", lungWeighted, segments: [model.anchoredChipSegment, drug, years].filter(Boolean) };
   }
   if (row.tier === "supported") {
-    return { tierWord, strength: "supported", lungWeighted, segments: [row.supportedEvidence ?? ""].filter(Boolean) };
+    const seg = model.supportedChipSegment ?? row.supportedEvidence ?? "";
+    return { tierWord, strength: "supported", lungWeighted, segments: [seg].filter(Boolean) };
   }
   return { tierWord, strength: "other", lungWeighted, segments: [] };
 }
@@ -788,12 +1043,19 @@ export function trace(cfg: CohortConfig, row: LedgerRow, cohortTotal: number): T
       label: "EVIDENCE TIER",
       value: `${row.tier ?? "unresolved"}${row.recurrenceBand === "recurs" ? " · recurs across years" : ""} · ${cohortTotal.toLocaleString()} qualifying ${cfg.label}`,
     });
+    // REACH IS A COUNT, PRESENCE IS A FACT, AND THEY HAVE DIFFERENT SOURCES. patient_volume
+    // comes from hcp_medicare_by_ta_v2, which holds no rows at all for some board TAs; Part B
+    // presence comes from this TA's own code set. Saying "no Part B beneficiary record" on a
+    // row whose Part B claims are the reason it is anchored would contradict the row's own
+    // cell, so the unmeasured-reach case says which of the two is missing.
     t.push({
       label: "MEDICARE REACH",
       value:
         row.patientVolume != null && row.patientVolume > 0
           ? `${Math.round(row.patientVolume).toLocaleString()} beneficiaries · 3yr Part B`
-          : "no Part B beneficiary record",
+          : row.partBPresent
+            ? "Part B claims observed · beneficiary reach not computed for this area"
+            : "no Part B beneficiary record",
     });
     t.push({ label: "PART D ONCOLOGY", value: row.partDPresent ? "present" : "not observed" });
   } else {
@@ -914,6 +1176,9 @@ function mapRow(cfg: CohortConfig, r: Record<string, unknown>): Omit<LedgerRow, 
     base.tierPriority = N(r.tier_priority);
     base.patientVolume = N(r.patient_volume);
     base.partDPresent = r.part_d_present == null ? null : Boolean(r.part_d_present);
+    // undefined (not null) when the deployed RPC has no part_b_present column yet, so the
+    // cell can tell "the RPC did not answer" from "the RPC answered no".
+    base.partBPresent = r.part_b_present === undefined ? undefined : Boolean(r.part_b_present);
   }
 
   if (cfg.tag === "COM") {
