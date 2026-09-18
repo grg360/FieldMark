@@ -18,7 +18,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import AppLayout from "../AppLayout";
 import { CANON, DEPTH, FACE } from "../../lib/canonicalTokens";
-import { COM_CONFIG } from "../../lib/cohortLedger";
 import { institutionToSlug } from "../../lib/institutionUtils";
 import { useRelationships } from "../../contexts/RelationshipsContext";
 import { getCurrentUser } from "../../lib/authHelpers";
@@ -102,18 +101,32 @@ const CLAIMS_TAG: Record<string, { text: (c: ClassifiedProduct) => string; color
   route_unknown: { text: () => "ROUTE UNKNOWN", color: F.ghost2 },
 };
 
-// This surface is pinned to one therapeutic area. The SLUG is the pin — it is
-// the stable identity — and the display label is derived from it, never typed
-// out and never manufactured by uppercasing the slug. See lib/taLabels.ts.
+// The PRACTICE reference set is still pinned to one therapeutic area: loadPracticeProfile
+// calls the one-argument community_practice_profile, which resolves lung internally. This
+// constant labels THAT read (the admin-code reference set, below) and stays lung until that
+// RPC takes a TA. It no longer labels the community standing block — see
+// communityTierLabels.
 const PROFILE_TA_SLUG = "nsclc";
 
 // Community roster tier vocabulary (Phase 3) — affirmative labels only.
-const COMMUNITY_TIER_LABEL: Record<string, string> = {
-  anchored: `ANCHORED · ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} EVIDENCE`,
-  supported: `SUPPORTED · ${taLabelForSlug(PROFILE_TA_SLUG).toUpperCase()} EVIDENCE`,
-  heme_dominant: "HEME-FOCUSED PRACTICE",
-  candidate: "CANDIDATE",
-  unresolved: "NO MEDICARE EVIDENCE",
+//
+// DERIVED FROM THE RESOLVED TA SINCE 2026-09-18, not from PROFILE_TA_SLUG. The standing
+// block now carries whichever TA's board the profile resolved, so a constant built from a
+// lung literal would have printed "ANCHORED · LUNG CANCER EVIDENCE" over a colorectal tier
+// — the evidence claim naming the wrong disease, in the one line whose whole job is to say
+// what the tier is evidence OF.
+//
+// A null slug (the TA has not landed, or the HCP is in none) yields the unqualified
+// "ANCHORED" rather than a borrowed area name. Absent, never lung.
+const communityTierLabels = (taSlug: string | null): Record<string, string> => {
+  const area = taSlug ? `${taLabelForSlug(taSlug).toUpperCase()} EVIDENCE` : null;
+  return {
+    anchored: area ? `ANCHORED · ${area}` : "ANCHORED",
+    supported: area ? `SUPPORTED · ${area}` : "SUPPORTED",
+    heme_dominant: "HEME-FOCUSED PRACTICE",
+    candidate: "CANDIDATE",
+    unresolved: "NO MEDICARE EVIDENCE",
+  };
 };
 
 export default function PracticeFirstProfile() {
@@ -132,17 +145,28 @@ export default function PracticeFirstProfile() {
   const [engSort, setEngSort] = useState<"amount" | "recency" | "administered">("amount");
   const [hoverYear, setHoverYear] = useState<2021 | 2022 | 2023 | null>(null);
 
+  // THE COMMUNITY READ IS TA-SCOPED AND SO IS ITS LOAD (2026-09-18). loadCommunityProfile
+  // now requires a taId, so this waits for useProfileTa rather than calling the
+  // one-argument RPC that resolved lung internally. There is no fallback slug: this route
+  // has no ProfileDispatch above it and no COMMUNITY_PROFILE_TA_SLUGS gate, so a default
+  // here would be the lung pin coming straight back on the one surface that has nothing
+  // else guarding it.
+  //
+  // loadPracticeProfile and loadFieldPresence are in the same wait only because they share
+  // the promise. Neither takes a TA today — community_practice_profile is still
+  // one-argument and lung-pinned, which is the next thing on this path to fix.
+  const profileTaId = profileTa.status === "resolved" ? profileTa.taId : null;
   useEffect(() => {
-    if (!id) return;
+    if (!id || !profileTaId) return;
     let alive = true;
     setLoading(true);
-    Promise.all([loadCommunityProfile(id), loadPracticeProfile(id), loadFieldPresence(id)])
+    Promise.all([loadCommunityProfile(id, profileTaId), loadPracticeProfile(id), loadFieldPresence(id)])
       .then(([prof, prac, fn]) => {
         if (!alive) return;
         setP(prof); setPr(prac); setNotes(fn); setLoading(false);
       }).catch(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [id]);
+  }, [id, profileTaId]);
 
   const status = id ? rel.getStatus(id) : "not_engaged";
 
@@ -161,6 +185,23 @@ export default function PracticeFirstProfile() {
     return { classified, aligned: by("aligned"), oral: by("oral"), injectable: by("injectable_none"), unknown: by("route_unknown"), adminMapped, adminNoEng };
   }, [p, pr]);
 
+  // The HCP belongs to no therapeutic area, so the effect above never fires and there is
+  // nothing to scope a profile to. Named, not a spinner that never resolves — this route
+  // has no ProfileDispatch above it to draw the absence, unlike CommunityHcpProfile.
+  if (profileTa.status === "none") {
+    return (
+      <Shell>
+        <div style={{ padding: "40px 28px", maxWidth: 560, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ ...mono(9), letterSpacing: "0.18em", color: F.ghost }}>NO THERAPEUTIC AREA</div>
+          <div style={{ ...serif(19), color: F.body, lineHeight: 1.4 }}>This person is not in any therapeutic area we hold.</div>
+          <div style={{ ...serif(13.5), color: F.subtle, lineHeight: 1.6 }}>
+            The standing, evidence tier and narrative on this page are all per-area. With no area membership there is
+            nothing to scope them to, so nothing is shown rather than an empty frame under a borrowed heading.
+          </div>
+        </div>
+      </Shell>
+    );
+  }
   if (loading) return <Shell><div style={{ padding: "40px 28px", ...mono(11), color: F.ghost }}>Loading profile…</div></Shell>;
   if (!p || !p.hcp?.name) return <Shell><div style={{ padding: "40px 28px", ...mono(11), color: F.ghost }}>This profile could not be loaded.</div></Shell>;
 
@@ -210,7 +251,12 @@ export default function PracticeFirstProfile() {
       {/* breadcrumb */}
       <div style={{ display: "flex", gap: 8, padding: "10px 28px", ...mono(10), letterSpacing: "0.1em", color: F.ghost2, borderBottom: `1px solid ${F.lineSub}` }}>
         <Link to="/me" style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Home</Link><span>/</span>
-        <Link to={`/cohorts/ledger/community${COM_CONFIG.pinnedTaSlug ? `?ta=${COM_CONFIG.pinnedTaSlug}` : ""}`} style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Community</Link><span>/</span>
+        {/* BACK TO THE LEDGER, IN THIS PROFILE'S OWN TA. Was `?ta=${COM_CONFIG.pinnedTaSlug}`,
+                      a config pin that could only name one TA; the ledger now serves two, so a pin
+                      would send a colorectal reader to the lung board. profileTa is the TA this page
+                      was actually resolved for. When it has not resolved, the param is omitted and
+                      useLedgerTa falls through session -> profile -> picker, which is its job. */}
+        <Link to={`/cohorts/ledger/community${profileTa.status === "resolved" ? `?ta=${profileTa.slug}` : ""}`} style={{ color: F.subtle, textDecoration: "none", border: 0 }}>Community</Link><span>/</span>
         <span style={{ color: F.gray }}>{p.hcp.name}</span>
       </div>
 
@@ -261,7 +307,7 @@ export default function PracticeFirstProfile() {
               standing node; no numeral, no rank, no decomposition. */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <span style={{ ...mono(11, 600), letterSpacing: "0.1em", color: F.blue }}>
-              {COMMUNITY_TIER_LABEL[st?.evidence_tier ?? ""] ?? "NOT RANKED"}
+              {communityTierLabels(profileTa.status === "resolved" ? profileTa.slug : null)[st?.evidence_tier ?? ""] ?? "NOT RANKED"}
             </span>
             {st?.patient_volume != null && st.patient_volume > 0 ? (
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>

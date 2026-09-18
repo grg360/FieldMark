@@ -59,8 +59,27 @@ export interface CommunityProfile {
   narrative: { why_this: string | null; signal_strength: string | null; why_now: string | null; engagement_angle: string | null; caution: string | null } | null;
 }
 
-export async function loadCommunityProfile(hcpId: string): Promise<CommunityProfile | null> {
-  const { data, error } = await supabase.rpc("community_hcp_profile", { p_hcp_id: hcpId });
+// TA-SCOPED SINCE 2026-09-18, for the same reason loadEvidenceTier was the day before,
+// plus one the evidence read did not have.
+//
+// The one-argument RPC resolved its TA as the literal slug 'nsclc' and read
+// community_board_nsclc_v1, so every community profile of every TA rendered LUNG board
+// data — a colorectal community physician got standing: null, because the lung shim has
+// no row for them. The two-argument overload takes the TA and resolves the narrative
+// slug from it, so the id and the slug can never name different areas.
+//
+// AND IT GATES THE NARRATIVE ON THE BOARD. The old RPC fetched the narrative on
+// (hcp_id, slug, cohort) alone, with no reference to the board CTE: 2,066 of the 3,005
+// nsclc community narratives belong to HCPs who are not qualifying members, and every
+// one of them rendered as prose above a null standing block. Membership is what makes
+// the synthesis true, so the overload returns narrative: null without a qualifying
+// board row. The absence is a state both callers already draw.
+//
+// taId IS REQUIRED, and a null must gate this read rather than widen it. The old
+// signature still exists and still has its grants — calling it is how the defect comes
+// back, so there is no fallback to it here and no lung default anywhere on this path.
+export async function loadCommunityProfile(hcpId: string, taId: string): Promise<CommunityProfile | null> {
+  const { data, error } = await supabase.rpc("community_hcp_profile", { p_ta_id: taId, p_hcp_id: hcpId });
   if (error || !data) {
     console.error("community_hcp_profile failed:", error?.message);
     return null;

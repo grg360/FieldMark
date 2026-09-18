@@ -202,16 +202,24 @@ export default function CommunityHcpProfile() {
   // status "none" (the HCP belongs to no TA) leaves it null, which renders nothing — the
   // honest state, and not a lung tier borrowed to fill the slot.
   const evidenceTaId = profileTa.status === "resolved" ? profileTa.taId : null;
+  // THE PROFILE READ NOW WAITS FOR THE TA TOO (2026-09-18). It used to fire on the first
+  // pass because "the other two reads are TA-neutral" — that was true of loadFieldPresence
+  // and false of loadCommunityProfile, which only LOOKED TA-neutral because the RPC had
+  // the lung TA baked into it. It is the same read the evidence line already waits for.
+  //
+  // status "none" holds this at loading rather than calling unscoped: an HCP in no TA has
+  // no community standing to render, and ProfileDispatch has already drawn its own absence
+  // above this component in that case.
   useEffect(() => {
-    if (!id) return;
+    if (!id || !evidenceTaId) return;
     let alive = true;
     setLoading(true);
-    Promise.all([loadCommunityProfile(id), loadFieldPresence(id)]).then(([prof, fn]) => {
+    Promise.all([loadCommunityProfile(id, evidenceTaId), loadFieldPresence(id)]).then(([prof, fn]) => {
       if (!alive) return;
       setP(prof); setNotes(fn); setLoading(false);
     }).catch(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [id]);
+  }, [id, evidenceTaId]);
   useEffect(() => {
     if (!id || !evidenceTaId) { setEvidence(null); return; }
     let alive = true;
