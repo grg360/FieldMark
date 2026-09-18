@@ -465,9 +465,25 @@ def parse_country_from_affiliation(affiliation: Optional[str]) -> Optional[str]:
         return None
 
     value = affiliation.strip()
-    # Explicit US matching anywhere in the string.
+    # ONE SPELLING: 'US'. This returned "USA" and is the second producer of the
+    # hcps_v2.country split -- the boards and the get_community_filtered family all
+    # compare `= 'US'`, so every row this function stamped was invisible to them.
+    # Normalised by docs/country_normalisation/02; the hcps_v2_country_not_usa CHECK
+    # now rejects the old value outright.
+    #
+    # THE INPUT PATTERNS ARE UNCHANGED AND STAY WIDE. What was wrong was the value
+    # emitted, not the strings accepted: USA / U.S.A. / United States are all real
+    # affiliation spellings and all still match here. Narrowing the recogniser would
+    # turn a normalisation bug into a coverage bug.
+    #
+    # NOT FIXED HERE, AND IT IS THE SAME DEFECT: known_countries below emits long names
+    # ("Canada", "Germany", ...) while the terminal-code branch emits ISO-2, so one
+    # country lands under two spellings. 1,172 rows across 18 countries, measured
+    # 2026-09-15 in docs/country_normalisation/00 section E. No board filters on those
+    # values, so nothing is hidden by them today -- out of scope, and logged so the next
+    # person finds the measurement rather than the surprise.
     if re.search(r"\b(USA|U\.S\.A\.|United States)\b", value, flags=re.IGNORECASE):
-        return "USA"
+        return "US"
 
     # Look at the last comma-separated segment for country-like endings.
     parts = [p.strip(" .;") for p in value.split(",") if p.strip()]
@@ -1502,11 +1518,19 @@ def upsert_publication_therapeutic_area_links(
 
         i = batch_idx * batch_size
         batch_ids = unique_publication_ids[i : i + batch_size]
+        # tagged_at IS IN THE PAYLOAD DELIBERATELY (2026-09-18). The column has
+        # DEFAULT now(), which fires only on the INSERT half of this upsert, so a
+        # re-tag of an existing (publication_id, therapeutic_area_id) left the stamp
+        # at its first-ever value. The freshness gate reads max(tagged_at) per TA to
+        # decide whether downstream work is stale; a first-write date read as a
+        # last-write date is worse than no date, because it is confidently wrong.
+        tagged_at = datetime.now(timezone.utc).isoformat()
         rows = [
             {
                 "publication_id": publication_id,
                 "therapeutic_area_id": therapeutic_area_id,
                 "source": PUBMED_SOURCE,
+                "tagged_at": tagged_at,
             }
             for publication_id in batch_ids
         ]

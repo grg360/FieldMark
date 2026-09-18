@@ -317,7 +317,8 @@ RISING_INSERT = """
       recent_collaborator_count = EXCLUDED.recent_collaborator_count,
       early_collaborator_count = EXCLUDED.early_collaborator_count,
       min_component_percentile_applied = EXCLUDED.min_component_percentile_applied,
-      cohort_gate_applied = EXCLUDED.cohort_gate_applied
+      cohort_gate_applied = EXCLUDED.cohort_gate_applied,
+      refreshed_at = now()
 """
 
 
@@ -729,6 +730,19 @@ def report_history(conn) -> None:
     capture_id is the only column that identifies a capture. created_at is honest
     row-level provenance -- when each row was physically written -- so it is shown
     as a DISPLAY column (the earliest write in the capture) and never grouped on.
+
+    THE SAME BEHAVIOUR WAS ALSO A FRESHNESS DEFECT, FIXED 2026-09-18. Because
+    ON CONFLICT DO UPDATE does not touch created_at, a capture REFRESHED IN PLACE
+    (find_existing_capture_id reusing an id) changed every data column while
+    max(created_at) stood still -- so a freshness check reading that column would
+    have reported the table older than it was, and after a refresh-only week would
+    have reported it stale forever. created_at was NOT changed to fix this: doing so
+    would collapse the write_passes count below, which is the instrument that caught
+    the original grouping bug. A separate refreshed_at column now carries last-write
+    time and is set in the DO UPDATE list; created_at keeps its exact prior meaning.
+    hcp_established_board_snapshots needs no equivalent -- it is ON CONFLICT DO
+    NOTHING, so it has no update path and every new capture inserts rows with a
+    fresh created_at.
 
     Established has no capture_id: its table is still date-keyed and carries the
     same defect, so it keeps the old grouping and is labelled as such.

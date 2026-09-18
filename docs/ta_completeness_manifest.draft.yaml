@@ -1,4 +1,4 @@
-# TA completeness manifest — DRAFT r2, 2026-08-31
+# TA completeness manifest — DRAFT r3, 2026-09-18
 #
 # A PROPOSAL FOR REVIEW. Structural pass: three kinds, per-entry applicability, and a
 # depends_on graph where every edge carries the file:line that proves it. Companion findings:
@@ -6,6 +6,62 @@
 # that produced r2).
 #
 # Read-only authoring. No producer was run, no billed job invoked, nothing committed.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# WHAT CHANGED IN r3 (2026-09-18) — THE PRODUCER COLUMN WAS AUDITED FOR THE FIRST TIME
+#
+# The freshness gate (scripts/utils/freshness.py) routes through `producer` and blocks
+# billed stages on it, so a wrong attribution means blocking — or failing to block — on the
+# wrong evidence. r1 and r2 authored this column from reading, never from checking that the
+# named file contains a write against the named target.
+#
+#   THE AUDIT: 68 entries parsed, 45 carrying BOTH a target and a producer.
+#              43 correct · 2 wrong · 0 unresolvable.
+#
+#   READ THE CAVEAT BEFORE THE NUMBER. It is the most reusable thing in this audit.
+#   An automated grep for "target name near a write verb" returned 11 raw hits. EIGHT were
+#   false positives, it MISSED one true error, and on first pass the auditor reported TWO
+#   FURTHER ENTRIES AS WRONG THAT WERE CORRECT. Every one of those failures is the same
+#   blind spot: a grep cannot see a write through a variable, a constant, an f-string, a
+#   SQL function, or a subprocess.
+#     · 3 × hcp_narratives_v2 — narratives_table = "hcp_narratives_v2" at :3067,
+#           .upsert() twenty lines later at :3087
+#     · 4 × mv_social_*_by_ta — refreshed by the SQL function refresh_social_analytics(),
+#           so the matview name appears nowhere in the Python
+#     · 1 × reingest_diff_summary_v2 — written via an f-string off SUMMARY_TABLE at :68
+#     · MISSED: pulse_ai_synthesis — the DDL file named as its producer contains the word
+#           INSERT inside a GRANT, which satisfied the write-context test
+#     · WRONGLY CALLED WRONG: hcp_scores_v2 — writes via
+#           scores_table = get_table_name("hcp_scores", target_version) at :1153,
+#           upsert at :1201. THIS ENTRY ALREADY CARRIED A CORRECT write_site FIELD AND THE
+#           AUDITOR DID NOT READ IT. Read the entry before doubting it.
+#     · WRONGLY CALLED WRONG: hcp_rising_star_ranks_v3 — rising_score.py is an ORCHESTRATOR
+#           that subprocesses the writer (:104 names rising_star_scoring.py, :243 runs it).
+#           Naming the entry point is correct and is more useful than naming the writer:
+#           "what do I re-run to refresh this" is the question the gate asks.
+#
+#   AN AUTOMATED SWEEP OF THIS COLUMN IS NOT TRUSTWORTHY. Hand-verify, and prefer the
+#   entry's own write_site field over any grep.
+#
+#   THE TWO REAL CORRECTIONS, each carrying the evidence this manifest demands of its edges:
+#     publication_therapeutic_areas_v2  was classify/ta_tagging_rebuild_v2.py. That file
+#                                       never references the table in any form — no literal,
+#                                       no get_table_name, nothing; it writes
+#                                       hcp_therapeutic_areas_v2 at :784 and that is all.
+#                                       → ingest/pubmed_pipeline.py:1538
+#     pulse_ai_synthesis                was sql/pulse_ai_synthesis.sql, the table's DDL,
+#                                       which creates it and writes no row.
+#                                       → supabase/functions/generate-pulse-synthesis/
+#                                         index.ts:166
+#
+#   write_site ADDED to the two entries whose producer is correct but INDIRECT, so the next
+#   auditor does not repeat the two false accusations above.
+#
+#   NEW FIELD `instrumentable` (default true). False means the artifact's writer cannot
+#   reach the ledger call sites in ta_cycle.py / generate_cycle.py, so its absence from
+#   pipeline_runs is expected rather than evidence of a missed run. It suppresses ONLY that
+#   escalation — the retrospective timestamp comparison still runs against the artifact and
+#   a genuine stale verdict still fires. Requires an evidence string when false.
 #
 # ─────────────────────────────────────────────────────────────────────────────────────────
 # WHAT CHANGED IN r2
@@ -432,7 +488,10 @@ artifacts:
     target_table: publication_therapeutic_areas_v2
     coverage_query: "select count(*) from publication_therapeutic_areas_v2 where therapeutic_area_id = :ta_id"
     applicability: { unconditional: true }
-    producer: { script: scripts/classify/ta_tagging_rebuild_v2.py, flags: ["--ta <slug>", "--candidate-hcp-ids-file", "--execute"] }
+    producer: { script: scripts/ingest/pubmed_pipeline.py, flags: [] }
+    write_site: "scripts/ingest/pubmed_pipeline.py:1538 — supabase.table(PUBLICATION_THERAPEUTIC_AREAS_TABLE).upsert(rows, on_conflict='publication_id,therapeutic_area_id')"
+    producer_corrected_in: r3
+    producer_was: "scripts/classify/ta_tagging_rebuild_v2.py — that file never references this table in any form; it writes hcp_therapeutic_areas_v2 at :784 and nothing else"
     runs_in: ta_cycle:4
     depends_on:
       - upstream: curated_concepts
@@ -604,6 +663,7 @@ artifacts:
       evaluate: "RISING_MODEL[slug] in scripts/score/rising_score.py:45-49"
       evidence: "scripts/score/rising_score.py:62 — MODEL_OUTPUT_TABLE['momentum'] = 'hcp_rising_star_ranks_v3'"
     producer: { script: scripts/score/rising_score.py, flags: ["--ta <slug>", "--execute"] }
+    write_site: "INDIRECT — rising_score.py is an orchestrator: it names rising_star_scoring.py at :104 and subprocesses it at :243. The write is scripts/score/rising_star_scoring.py:420 INSERT INTO hcp_rising_star_ranks_v3, with :458 DELETE. The producer field names the ENTRY POINT deliberately, because the question it answers is what to re-run. Checked and upheld in the r3 audit after being wrongly flagged by a grep."
     runs_in: ta_cycle:9
     depends_on:
       - upstream: scientific_momentum
@@ -2314,7 +2374,13 @@ artifacts:
     coverage_query: "select count(*) from pulse_ai_synthesis where lower(ta_slug) = :ta_slug"
     key_form: slug_case_insensitive
     applicability: { unconditional: true, confidence: low }
-    producer: { script: null, sql: sql/pulse_ai_synthesis.sql }
+    producer: { edge_function: supabase/functions/generate-pulse-synthesis/index.ts, flags: [] }
+    write_site: "supabase/functions/generate-pulse-synthesis/index.ts:166 — upsert onConflict='ta_slug,window_start,window_end'; generated_at set EXPLICITLY at :178 from :164, so the DO UPDATE half stamps it"
+    producer_corrected_in: r3
+    producer_was: "sql/pulse_ai_synthesis.sql — the table's DDL, which creates it and writes no row"
+    instrumentable: false
+    instrumentable_evidence: "written by a Supabase Edge Function, which cannot reach the pipeline_runs call sites in ta_cycle.py / generate_cycle.py; freshness for it stays retrospective-only"
+    note: "THE PRIOR VALUE POINTED AT THE TABLE'S DDL, and that DDL also defeated the r3 automated sweep: sql/pulse_ai_synthesis.sql:37 reads GRANT SELECT, INSERT, UPDATE, DELETE, and the word INSERT inside that GRANT satisfied a write-context test. A future auditor needs to know the trap exists — a DDL or GRANT file reads as a writer to any grep that looks for write verbs."
     runs_in: by_hand
     depends_on: []
     classification: unknown
@@ -2365,6 +2431,7 @@ artifacts:
       script: scripts/score/scoring_pipeline.py
       flags: ["--ta <slug>", "--target-version v2"]
       write_site: "scoring_pipeline.py:1201 — supabase.table(scores_table).upsert(...), where scores_table = get_table_name('hcp_scores', target_version) at :1153 and get_table_name returns f'{base_name}_v2' at :55-58"
+      write_site_note: "CHECKED AND UPHELD in the r3 audit. A grep for the literal hcp_scores_v2 finds only a COMMENT at scoring_pipeline.py:894, a READ at rerun_ranks.py:9,14 and an id-remap entry at dedup_merge.py:542 — which briefly produced a false 'no writer exists' finding. The write is real and this field already proved it."
     runs_in: by_hand
     depends_on:
       - upstream: curated_concepts

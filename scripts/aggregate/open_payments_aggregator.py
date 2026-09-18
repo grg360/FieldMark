@@ -885,6 +885,14 @@ if __name__ == "__main__":
                 batch = by_ta_rows[start_idx : start_idx + WRITE_BATCH_SIZE]
                 try:
                     if target_version == "v2":
+                        # aggregated_at STAMPED HERE (2026-09-18): the column has
+                        # DEFAULT now(), which fires only on INSERT, so re-aggregating
+                        # an existing (hcp, TA) left the stamp at its first value and
+                        # the table reported itself fresher than it was. Set on the
+                        # batch so the DO UPDATE half writes it too.
+                        _agg_ts = datetime.now(timezone.utc).isoformat()
+                        for _r in batch:
+                            _r["aggregated_at"] = _agg_ts
                         response = client.table(by_ta_table).upsert(
                             batch, on_conflict="hcp_id,therapeutic_area_id"
                         ).execute()

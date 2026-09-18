@@ -22,6 +22,7 @@ Usage:
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 import os
 import sys
@@ -507,7 +508,14 @@ def run_pass_2(
         )
         return 0, 0   # dry run writes nothing; nothing to judge
 
+    # assigned_at STAMPED HERE (2026-09-18): the column has DEFAULT now(), which fires
+    # only on the INSERT half of this upsert, so re-bucketing an existing
+    # (raw_theme_name, therapeutic_area) left the stamp frozen at first assignment. The
+    # freshness gate reads max(assigned_at) per TA; a first-write date read as a
+    # last-write date is worse than no date, because it is confidently wrong.
+    _assigned_ts = _dt.datetime.now(_dt.timezone.utc).isoformat()
     for assignment in assignments:
+        assignment["assigned_at"] = _assigned_ts
         sb.table("theme_to_canonical_v1").upsert(
             assignment,
             on_conflict="raw_theme_name,therapeutic_area",
