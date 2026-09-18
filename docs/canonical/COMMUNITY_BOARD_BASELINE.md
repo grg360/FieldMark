@@ -171,3 +171,114 @@ Consequence to expect: **re-running `docs/crc_community/53_verify.sql`,
 report mismatches against their embedded literals.** That is correct behaviour for a dated
 record, not a regression. The per-HCP diffs in 60 and 61 section A are the parts that
 proved something, and they were spent on their first run.
+
+---
+
+# Re-baseline, 2026-09-18 — the colorectal Part B arm gets data for the first time
+
+Measured immediately before and after, with the capture query above. Supersedes the
+2026-09-17 colorectal numbers; **nsclc is untouched and its 2026-09-17 numbers still stand.**
+
+## What was run
+
+1. `medicare_aggregator.py --ta colorectal-cancer --target-version v2 --execute` — wrote
+   **1,741** rows to `hcp_medicare_by_ta_v2`, the first colorectal rows that table has ever
+   held. Zero rows for any other TA, zero `hcp_medicare_summary_v2` rows (39,765 withheld).
+2. `community_scoring.py --ta colorectal-cancer --execute` — upserted 78,658 rows;
+   `patient_volume > 0` went from **0 to 1,717**.
+
+`patient_volume` is read at score time, so step 1 alone moved nothing. Both were needed.
+
+### Why 1,741 aggregated but only 1,717 scored
+
+Not a discrepancy. The aggregator's TA membership is `hcp_therapeutic_areas_v2`, which is
+publication-derived and **cohort-agnostic**; `community_scoring` scores the `community` arm of
+`hcp_cohort_classification_v2`. The 24-row difference is 22 `established` and 2
+`rising_eligible` colorectal HCPs — correctly aggregated, correctly not community-scored.
+
+## The numbers
+
+### nsclc — UNCHANGED, which was the requirement
+
+| | 2026-09-17 | **2026-09-18** |
+|---|---|---|
+| board members | 4,918 | **4,918** |
+| anchored | 980 | **980** |
+| candidate | 2,763 | **2,763** |
+| heme_dominant | 628 | **628** |
+| supported | 94 | **94** |
+| unresolved | 453 | **453** |
+
+Every nsclc `hcp_medicare_by_ta_v2` row still carries `aggregated_at = 2026-08-03 14:15:31`
+and every nsclc `hcp_community_scores_v2` row still carries `scored_at = 2026-08-06`. The
+scoping held structurally, not by luck: `--ta` filtered the code set to 10 of 107 rows, so no
+other TA could enter `all_matches`.
+
+### colorectal-cancer
+
+| | 2026-09-17 | **2026-09-18** | delta |
+|---|---|---|---|
+| board members | 13,864 | **13,914** | **+50** |
+| anchored | 330 | **337** | **+7** |
+| supported | 515 | **530** | **+15** |
+| candidate | 13,019 | **13,019** | 0 |
+| unresolved | 0 | **28** | **+28** |
+
+**The board grew, and the growth is entirely new qualifiers on the Part B arm.** All 50 new
+members have `patient_volume > 0` and **no** `part_d_present` — they were previously invisible
+because neither qualifying signal could see them. 28 of them are `unresolved`: Part B claims
+against the colorectal code set, no oncology Part D record at all.
+
+Note `candidate` did not move by a single row. Everything that changed is a person the Part D
+flag could never have admitted.
+
+### The original 330 anchored
+
+| | |
+|---|---:|
+| qualify on `patient_volume` | **330** |
+| qualify on `part_d_present` | **330** |
+| qualify on **both** | **330** |
+| beneficiaries, min / median / max | **34 / 126 / 431** |
+
+All 330 now stand on their own Part B evidence as well as the Part D flag. The 7 new anchored
+qualify on volume **only**.
+
+### REACH
+
+| | |
+|---|---:|
+| board rows with non-zero 3yr reach | **1,717 of 13,914** |
+| as a share of the board | **12.3%** |
+| mean / max reach where present | **57.7 / 431** |
+
+**This re-opens a decision that was explicitly left open.** The `orderClause` note in
+`frontend/src/lib/cohortLedger.ts` says colorectal omits the `THEN MEDICARE REACH` half
+because `patient_volume` is 0 on *every* colorectal board row, and that "if it ever stops
+being zero this whole decision is back open". It has stopped being zero — **and that comment
+is now factually wrong and should be corrected.** But 12.3% is not nsclc's 79.4%, so the
+second sort key still fails to discriminate for seven rows in eight. Reporting the number,
+not changing the label.
+
+## What this unblocks — `part_d_present` scoping, re-measured
+
+The reason for the whole exercise. Scoping `community_board_v1.part_d_present` by
+`drug_group IN ('colorectal','gi_renal')`, measured before and after today's work:
+
+| | before (2026-09-17) | **after (2026-09-18)** |
+|---|---:|---:|
+| board if scoped | 13,864 → 4,507 | 13,914 → **5,360** |
+| **anchored lost** | **133 of 330** | **0 of 337** |
+| **supported lost** | not measured | **0 of 530** |
+
+**Zero.** Every anchored and every supported colorectal physician now qualifies on their own
+Part B beneficiaries, so narrowing the over-broad Part D flag no longer evicts the people the
+evidence model exists to find. Before today it would have dropped 133 of them.
+
+**`part_d_present` is still NOT scoped.** That remains a separate decision — it still removes
+~8,554 candidate-tier members, which is a real membership change needing its own measurement
+and its own re-baseline. What changed today is only that it no longer costs anchored and
+supported physicians to do it.
+
+See `docs/canonical/COMMUNITY_EVIDENCE_DISPLAY_DEBT.md` item 2 for the standing record.
+

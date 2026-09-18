@@ -852,8 +852,29 @@ if __name__ == "__main__":
 
         level_2_canonicals.append(entry)
 
+    # SCOPED RUNS REPORT UNMATCHED CODES FOR THE SCOPED TA ONLY. This diagnostic asks "which
+    # HCPCS codes do this TA's members bill that the TA's code set does NOT cover", and it
+    # answers it by LEFT JOINing hcpcs_codes -- the table --ta has already filtered. So on a
+    # scoped run every other TA's own codes come back as "unmatched", because they were
+    # removed from the join, not because anybody failed to match them: the 2026-09-17
+    # colorectal run listed 43239 and 45385 as unmatched for Hepatology, which are two of
+    # hepatology's own 27 codes. Structure where there is no finding, in a log that is read
+    # precisely to spot gaps. The scoped TA's list stays, because for that TA the join is
+    # complete and the answer is real.
+    unmatched_ta_ids = (
+        {scoped_ta_id: ta_name_by_id.get(scoped_ta_id, scoped_ta_id)}
+        if scoped_ta_id is not None
+        else ta_name_by_id
+    )
+    if scoped_ta_id is not None:
+        print(
+            f"SCOPED RUN: unmatched-HCPCS diagnostic limited to {ta_slug_arg}. "
+            f"Other TAs' code sets are not loaded, so their 'unmatched' lists would be "
+            f"every code they bill."
+        )
+
     level_3_unmatched: Dict[str, List[Dict[str, Any]]] = {}
-    for ta_id, ta_name in ta_name_by_id.items():
+    for ta_id, ta_name in unmatched_ta_ids.items():
         q = f"""
         SELECT
           fm.hcpcs_code,

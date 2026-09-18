@@ -100,3 +100,19 @@ Blocks 25–28 are the only ones that write. To revert to the pre-build state:
   still carries `pinnedTaSlug: "nsclc"` on the COM config, which refuses to mount Community
   off-lung. That flag is what keeps the CRC Community tab dark after this build, and removing
   it is the frontend half.
+
+## Block 63 — community_ledger.part_b_present (authored 2026-09-17, NOT APPLIED)
+
+Standalone; does not depend on 60/61/62 and nothing depends on it. Read the header of
+`63_ledger_part_b_present.sql` before running it — it changes what the LUNG ledger renders as
+well as colorectal, and the header carries the measured delta in both directions.
+
+| # | File | Kind | Expect |
+|---|------|------|--------|
+| 63 | `63_ledger_part_b_present.sql` | DDL + read-only verify | `CREATE OR REPLACE` on the 7-arg overload only, then a tier table. colorectal-cancer anchored: **330 rows, part_b_true 330, old_test_true 0**. nsclc anchored: **980 rows, part_b_true 950, old_test_true 814**. |
+
+The frontend already reads `part_b_present` and falls back to the old `patient_volume > 0`
+test whenever the column is absent, so the deploy order is free: either side can ship first.
+
+Recorded but deliberately not done, with measurements:
+`docs/canonical/COMMUNITY_EVIDENCE_DISPLAY_DEBT.md`.

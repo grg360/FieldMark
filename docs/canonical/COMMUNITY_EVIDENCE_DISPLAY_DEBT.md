@@ -11,6 +11,18 @@ Current board sizes and tier distributions: `docs/canonical/COMMUNITY_BOARD_BASE
 
 ## 1. `patient_volume` cannot distinguish "never computed" from "measured zero"
 
+> **STATUS 2026-09-18 — the colorectal instance is gone; the MECHANISM is not.**
+> `medicare_aggregator.py` gained `--ta` and was run for colorectal, writing 1,741
+> `hcp_medicare_by_ta_v2` rows; `community_scoring.py --ta colorectal-cancer --execute` then
+> took `patient_volume > 0` from **0 to 1,717**. So the specific zero described below is no
+> longer in the table. See `COMMUNITY_BOARD_BASELINE.md`, re-baseline 2026-09-18.
+>
+> **The defect itself is untouched.** `parse_float(..., 0.0)` still turns a missing row into an
+> explicit zero, `coalesce(...,0)` and `> 0` still erase it twice more, and the next TA
+> onboarded without a code set will reproduce it exactly. What has changed is that the
+> aggregator now **refuses to run** against an empty `ta_hcpcs_codes` slice, which closes the
+> upstream route to it — but not the mechanism.
+
 ### The mechanism, in three erasures
 
 `scripts/score/community_scoring.py` reads its volume from `hcp_medicare_by_ta_v2`:
@@ -94,24 +106,37 @@ a dash.
 | lung | 9,656 | 3,886 |
 | colorectal | 1,662 | 1,157 |
 
-**Measured 2026-09-17**, scoping it to `drug_group IN ('colorectal','gi_renal')`:
+Scoping it to `drug_group IN ('colorectal','gi_renal')`, measured twice:
 
-| | |
-|---|---:|
-| colorectal board today | **13,864** |
-| colorectal board if scoped | **4,507** |
-| **anchored HCPs that fall off the board entirely** | **133 of 330** |
+| | 2026-09-17 | **2026-09-18** |
+|---|---:|---:|
+| colorectal board | 13,864 | **13,914** |
+| board if scoped | **4,507** | **5,360** |
+| **anchored lost** | **133 of 330** | **0 of 337** |
+| **supported lost** | not measured | **0 of 530** |
 
-That last row is the finding. `qualifies` is `patient_volume > 0 OR part_d_present`, and
-`patient_volume` is identically zero across colorectal (item 1) — so **the unscoped Part D flag
-is the only thing holding the entire colorectal board up.** Scoping it correctly would drop 133
-physicians whose `anchored` tier is defined by a Part B pattern they demonstrably have, because
-their *Part D* record happens to be in another tumour group.
+**The blocker is gone.** On 2026-09-17 `qualifies` was `patient_volume > 0 OR part_d_present`
+with `patient_volume` identically zero across colorectal, so the unscoped Part D flag was the
+only thing holding that board up and narrowing it would have evicted 133 anchored physicians
+whose tier is defined by a Part B pattern they demonstrably have. Now that the Part B arm has
+data, every anchored and supported member stands on their own claims and **scoping costs zero
+of them.**
+
+**It is still not scoped, and that is still a decision.** It removes roughly 8,554
+candidate-tier members — a real membership change that needs its own measurement, its own
+block, and its own re-baseline. What changed is only the price of doing it.
 
 Same class as blocks 60 and 61: a correct-looking narrowing whose blast radius is a membership
 change. **Measure before anyone touches it.**
 
 ### The shape of the real fix, for whoever picks it up
+
+> **Superseded in part, 2026-09-18.** The paragraph below said `qualifies` has no Part B arm.
+> That was wrong in an instructive way: it **has** one — `patient_volume > 0` — it had simply
+> never had data for colorectal. No schema change was needed, only a run. The remaining gap is
+> narrower than stated: `patient_volume` is a beneficiary COUNT from `hcp_medicare_by_ta_v2`,
+> not a presence fact, so it still answers "how many" where `part_b_present` answers "any at
+> all", and a TA whose aggregator has not been run still reads as a confident zero.
 
 The defect underneath both items is that `qualifies` has no Part B arm at all. It asks "do they
 have beneficiaries, or any oncology Part D row" and never "do they have claims against this
