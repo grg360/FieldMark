@@ -1,4 +1,5 @@
 import argparse
+import io
 import json
 import os
 import statistics
@@ -61,6 +62,43 @@ def parse_args() -> argparse.Namespace:
         choices=["v1", "v2"],
         default="v1",
         help="Schema version. v1=legacy tables, v2=rebuild tables.",
+    )
+    # SCOPE IS REQUIRED AND HAS NO DEFAULT (2026-09-17). Exactly one of --ta / --all-tas
+    # must be given. There is no cron and no pipeline behind this script -- generate_cycle.py
+    # only READS hcp_medicare_by_ta_v2 and reports the missing --ta as a known degradation
+    # (:647) -- so making the caller state their scope breaks nothing and removes the only
+    # way to rewrite three TAs by accident while fixing a fourth.
+    scope = parser.add_mutually_exclusive_group(required=True)
+    scope.add_argument(
+        "--ta",
+        default=None,
+        metavar="SLUG",
+        help="Aggregate ONE therapeutic area, by therapeutic_areas.slug (e.g. colorectal-cancer). "
+             "Writes hcp_medicare_by_ta_v2 for that TA only and does NOT touch "
+             "hcp_medicare_summary_v2, which has no TA dimension.",
+    )
+    scope.add_argument(
+        "--all-tas",
+        action="store_true",
+        default=False,
+        help="The historic unscoped behaviour: every TA in ta_hcpcs_codes, plus the "
+             "hcp_medicare_summary rewrite. Keeps its interactive confirmation.",
+    )
+    parser.add_argument(
+        "--dump-by-ta",
+        default=None,
+        metavar="PATH",
+        help="Write the computed hcp_medicare_by_ta payload to PATH as NDJSON, before any "
+             "write and regardless of --execute. This is what makes a dry run auditable: the "
+             "run prints per-TA row COUNTS, which cannot answer 'did these specific HCPs get a "
+             "non-zero value'. Verify against it, then execute.",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        default=False,
+        help="Skip the interactive confirmation on --execute. Honoured for --ta runs only; "
+             "an unscoped --all-tas --execute always asks. Piped stdin also works.",
     )
     return parser.parse_args()
 
@@ -171,6 +209,7 @@ if __name__ == "__main__":
     args = parse_args()
     execute = bool(args.execute)
     target_version: str = args.target_version
+    ta_slug_arg: Optional[str] = (args.ta or "").strip() or None
     mode = "execute" if execute else "dry_run"
     errors: List[str] = []
 
@@ -192,6 +231,20 @@ if __name__ == "__main__":
     hcp_to_npi = {str(r["id"]): str(r["npi_number"]).strip() for r in hcps_npi_rows if r.get("npi_number")}
     print(f"Loaded {len(npi_set)} FieldMark NPIs")
 
+    # Fetched BEFORE the code set now, because --ta resolves a slug against it.
+    therapeutic_areas = fetch_all_pages(client, "therapeutic_areas", "id,name,slug")
+    ta_name_by_id = {str(r["id"]): str(r["name"]) for r in therapeutic_areas if r.get("id")}
+    ta_id_by_name = {str(r["name"]): str(r["id"]) for r in therapeutic_areas if r.get("id")}
+
+    scoped_ta_id: Optional[str] = None
+    if ta_slug_arg:
+        matches = [r for r in therapeutic_areas if str(r.get("slug") or "") == ta_slug_arg]
+        if not matches:
+            known = ", ".join(sorted(str(r.get("slug")) for r in therapeutic_areas if r.get("slug")))
+            raise SystemExit(f"--ta {ta_slug_arg!r} does not match any therapeutic_areas.slug. Known: {known}")
+        scoped_ta_id = str(matches[0]["id"])
+        print(f"SCOPED RUN: {ta_slug_arg} ({ta_name_by_id.get(scoped_ta_id)}) -> {scoped_ta_id}")
+
     ta_hcpcs_rows_raw = fetch_all_pages(
         client,
         "ta_hcpcs_codes",
@@ -201,9 +254,24 @@ if __name__ == "__main__":
         ),
     )
 
-    therapeutic_areas = fetch_all_pages(client, "therapeutic_areas", "id,name")
-    ta_name_by_id = {str(r["id"]): str(r["name"]) for r in therapeutic_areas if r.get("id")}
-    ta_id_by_name = {str(r["name"]): str(r["id"]) for r in therapeutic_areas if r.get("id")}
+    if scoped_ta_id is not None:
+        before = len(ta_hcpcs_rows_raw)
+        ta_hcpcs_rows_raw = [
+            r for r in ta_hcpcs_rows_raw if str(r.get("therapeutic_area_id") or "") == scoped_ta_id
+        ]
+        print(f"Code set filtered to {ta_slug_arg}: {len(ta_hcpcs_rows_raw)} of {before} rows")
+        # AN EMPTY CODE SET IS A REFUSAL, NOT A QUIET NO-OP. This is the exact failure that
+        # produced the defect this flag exists to fix: ta_hcpcs_codes was empty for colorectal,
+        # the aggregator matched nothing, wrote nothing, exited 0, and community_scoring's
+        # parse_float(..., 0.0) turned the absent row into an explicit zero that read as a
+        # measurement. An empty slice cannot be told from "this HCP has no claims" downstream,
+        # so it must not be allowed to reach downstream at all.
+        if not ta_hcpcs_rows_raw:
+            raise SystemExit(
+                f"REFUSING TO RUN: ta_hcpcs_codes holds no codes for {ta_slug_arg!r}. "
+                f"An empty code set writes nothing and is indistinguishable downstream from a "
+                f"measured zero. Load the code set first."
+            )
 
     if target_version == "v2":
         # v2 schema: hcp_therapeutic_areas_v2 has composite PK (hcp_id, therapeutic_area_id),
@@ -817,21 +885,57 @@ if __name__ == "__main__":
 
     rows_inserted: Optional[Dict[str, int]] = None
 
+    if args.dump_by_ta:
+        with io.open(args.dump_by_ta, "w", encoding="utf-8", newline="\n") as fh:
+            for r in by_ta_insert_payload:
+                fh.write(json.dumps(r, default=str) + "\n")
+        print(f"Wrote {len(by_ta_insert_payload)} by_ta payload rows to {args.dump_by_ta}")
+
+    # A SCOPED RUN MUST NOT TOUCH hcp_medicare_summary_v2. That table has no TA dimension --
+    # it is computed from filtered_medicare across ALL of an HCP's claims -- so a colorectal
+    # job that wrote it would rewrite every summary row in the database (~36,700) as a side
+    # effect, a far larger blast radius than the thing being fixed. The payload is emptied
+    # here rather than at the call site so that every counter, log line and the confirmation
+    # prompt all report the same zero.
+    if scoped_ta_id is not None:
+        if summary_insert_payload:
+            print(
+                f"SCOPED RUN: withholding {len(summary_insert_payload)} hcp_medicare_summary rows. "
+                f"That table has no TA dimension and is not this job's to write."
+            )
+        summary_insert_payload = []
+
     if not execute:
         print("[DRY-RUN] Skipping Supabase write.")
     else:
-        if target_version == "v2":
-            confirm = input(
+        if scoped_ta_id is not None:
+            prompt = (
+                f"About to UPSERT {len(by_ta_insert_payload)} rows to "
+                f"{get_table_name('hcp_medicare_by_ta', target_version)} for {ta_slug_arg} ONLY.\n"
+                f"hcp_medicare_summary will NOT be written. Continue? (yes/no): "
+            )
+        elif target_version == "v2":
+            prompt = (
                 "About to UPSERT to hcp_medicare_summary_v2 and hcp_medicare_by_ta_v2.\n"
                 f"Will write {len(summary_insert_payload)} summary rows and "
                 f"{len(by_ta_insert_payload)} by_ta rows. Continue? (yes/no): "
             )
         else:
-            confirm = input(
+            prompt = (
                 "About to TRUNCATE and rewrite hcp_medicare_summary and hcp_medicare_by_ta.\n"
                 f"Will write {len(summary_insert_payload)} summary rows and {len(by_ta_insert_payload)} by_ta rows. Continue? (yes/no): "
             )
-        if confirm != "yes":
+        # --yes IS HONOURED FOR SCOPED RUNS ONLY. An unscoped run rewrites three TAs and every
+        # summary row, and that always gets a human. Piped stdin still works for both.
+        if args.yes and scoped_ta_id is not None:
+            print(prompt + "yes  [--yes]")
+            confirm = "yes"
+        else:
+            try:
+                confirm = input(prompt)
+            except EOFError:
+                confirm = ""
+        if confirm.strip() != "yes":
             print("Execution cancelled.")
             errors.append("execute_cancelled_by_user")
         else:
