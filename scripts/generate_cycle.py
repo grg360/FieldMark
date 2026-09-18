@@ -1137,6 +1137,36 @@ def save_state(slug: str, state: Dict) -> None:
 # Runner
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Stage id -> the ARTIFACT it produces. pipeline_name identifies the producer; the freshness
+# gate joins on the artifact, and one producer can write several (G2 writes both
+# theme_canonical_v1 and theme_to_canonical_v1 - the latter is named here because it is the
+# one carrying a repaired category-B stamp). Kept as a dict rather than a Stage field so the
+# eight Stage() constructions stay untouched.
+GATE_ARTIFACT: Dict[str, str] = {
+    "G1": "hcp_research_themes_v2",
+    "G2": "theme_to_canonical_v1",
+    "G3": "hcp_top_collaborators_v2",
+    "G4": "hcp_scientific_positions_v1",
+    "G5": "hcp_ai_overviews",
+    "G6": "hcp_open_payments_by_ta_v2",
+    "G7": "hcp_community_scores_v2",
+    "G8": "hcp_narratives_v2",
+}
+
+
+def _pl(fn_name: str):
+    """Lazy, defensive import of pipeline_log. Observability must never stop a cycle; the
+    freshness gate reads a missing ledger row as unknown rather than pass, so degrading here
+    fails toward a false alarm and never toward a false all-clear."""
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "scripts" / "social"))
+        import pipeline_log as _pl_mod
+        return getattr(_pl_mod, fn_name)
+    except Exception as exc:
+        print(f"  WARN      ledger {fn_name} unavailable: {exc}")
+        return None
+
+
 def run_stage(stage: Stage, ta: ResolvedTA, conn, execute: bool, state: Dict) -> bool:
     print(f"\n{'=' * 78}\n{stage.id}  {stage.title}"
           f"{'   [BILLED]' if stage.billed else ''}\n{'=' * 78}")
@@ -1148,6 +1178,14 @@ def run_stage(stage: Stage, ta: ResolvedTA, conn, execute: bool, state: Dict) ->
     if not ok:
         state[stage.id] = {"status": "blocked", "reason": msg, "at": _now()}
         return False
+
+    _run_id = None
+    _art = GATE_ARTIFACT.get(stage.id)
+    _start = _pl("start_run") if (execute and _art) else None
+    if _start:
+        _run_id = _start(f"generate_cycle.{stage.id}", "generate_cycle",
+                         therapeutic_area_id=str(ta.uuid),
+                         target_artifact=_art)
 
     before, vlabel = stage.verify(conn, ta)
     workset = stage.workset(conn, ta)
@@ -1246,6 +1284,9 @@ def run_stage(stage: Stage, ta: ResolvedTA, conn, execute: bool, state: Dict) ->
         print(f"  FAILED    exit {rc}")
         if notable:
             print("  last notable line: " + notable[-1][:160])
+        _fin = _pl("finish_run")
+        if _fin and _run_id:
+            _fin(_run_id, "failed", error_message=f"{stage.id} exit {rc}")
         state[stage.id] = {"status": "failed", "at": _now(), **provenance}
         return False
 
@@ -1254,6 +1295,10 @@ def run_stage(stage: Stage, ta: ResolvedTA, conn, execute: bool, state: Dict) ->
     passed = after > before and after >= threshold if workset else after > before
     print(f"  postcheck {after:,} rows (was {before:,}, need >= {threshold:,}) "
           f"-> {'OK' if passed else 'BELOW THRESHOLD'}")
+    _fin = _pl("finish_run")
+    if _fin and _run_id:
+        _fin(_run_id, "success" if passed else "failed",
+             rows_processed=workset or None, rows_succeeded=after)
     state[stage.id] = {"status": "complete" if passed else "short", "actual": after,
                        "expected": workset, "at": _now(), "verified": True, **provenance}
     return passed

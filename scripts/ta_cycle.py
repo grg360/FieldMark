@@ -703,11 +703,94 @@ def _stage_log_path(stage_no: int, name: str) -> Optional[Path]:
     return _LOG_DIR / f"{stage_no:02d}-{safe}-{stamp}.log"
 
 
+# ── Ledger + freshness shims ──────────────────────────────────────────────────────────────
+# pipeline_log lives under scripts/social/ and freshness under scripts/utils/; both are
+# imported lazily and defensively. A missing or broken import must NOT stop a cycle: the
+# ledger is observability, and freshness.py already treats an absent ledger row as unknown
+# rather than as pass, so degrading here fails toward a false alarm, never a false all-clear.
+def _pl_start_run(pipeline_name, triggered_by, **kw):
+    try:
+        import sys as _s, os as _o
+        _s.path.insert(0, _o.path.join(str(REPO_ROOT), "scripts", "social"))
+        from pipeline_log import start_run as _sr
+        return _sr(pipeline_name, triggered_by, **kw)
+    except Exception as exc:
+        print(f"[ta_cycle] WARN: ledger start_run unavailable: {exc}", flush=True)
+        return None
+
+
+def _pl_finish_run(run_id, status, **kw):
+    if run_id is None:
+        return
+    try:
+        import sys as _s, os as _o
+        _s.path.insert(0, _o.path.join(str(REPO_ROOT), "scripts", "social"))
+        from pipeline_log import finish_run as _fr
+        _fr(run_id, status, **kw)
+    except Exception as exc:
+        print(f"[ta_cycle] WARN: ledger finish_run unavailable: {exc}", flush=True)
+
+
+def freshness_precheck(ta_slug: str, block_on_billed: bool = True) -> bool:
+    """Stage 0 - is every artifact this cycle depends on newer than its inputs, for THIS TA?
+
+    WARN ON UNBILLED, BLOCK ON BILLED, which is the rule this file already states at the top:
+    the billed narrative stages must not run against an unvalidated board. A stale scoring
+    table makes a cheap stage produce a stale artifact; it makes an expensive stage produce
+    hundreds of confident briefs about the wrong population. Same asymmetry, same enforcement.
+
+    This is a WRAPPER, not a second implementation. The standalone script is the primary form
+    -- the 2026-09-09 incident ran eight days with nobody executing a cycle, so a check that
+    only fires inside ta_cycle cannot see the window it exists to close.
+
+    Returns True when the cycle may proceed.
+    """
+    try:
+        import sys as _s, os as _o
+        _s.path.insert(0, _o.path.join(str(REPO_ROOT), "scripts", "utils"))
+        from freshness import run_gate, render, STALE
+    except Exception as exc:
+        print(f"[ta_cycle] WARN: freshness gate unavailable ({exc}); proceeding unchecked.",
+              flush=True)
+        return True
+    results = run_gate([ta_slug])
+    stale, billed_stale = render(results)
+    if billed_stale and block_on_billed:
+        print(f"[ta_cycle] BLOCKED: {billed_stale} billed input(s) stale for {ta_slug}. "
+              f"Re-run the producer(s) above before the narrative stages.", flush=True)
+        return False
+    if stale:
+        print(f"[ta_cycle] WARN: {stale} stale artifact(s) for {ta_slug}, none billed.",
+              flush=True)
+    return True
+
+
 def run_stage(
     stage_no: int, name: str, cmd: List[str],
     capture_pattern: Optional[str] = None, extra_env: Optional[Dict[str, str]] = None,
+    artifact: Optional[str] = None, ta_id: Optional[str] = None,
 ) -> Optional[str]:
+    """Run one stage as a subprocess.
+
+    LEDGER STAMP (2026-09-18). When `artifact` and `ta_id` are given, the run is recorded in
+    pipeline_runs so scripts/utils/freshness.py can tell "this producer ran for this TA" from
+    "the artifact's max(timestamp) did not move". Those are indistinguishable retrospectively:
+    a producer that ran and wrote nothing -- empty input, wrong table read, refused at the
+    permissions boundary -- leaves the artifact's timestamp exactly where it was. All three
+    happened here in September 2026.
+
+    The call site is HERE, in the orchestrator, not in the 30+ producer scripts: one place to
+    get right, and a producer run outside a cycle then logs nothing, which is honest -- an
+    out-of-cycle run is precisely the unobserved case the gate exists to flag.
+
+    pipeline_log is non-blocking; a logging failure warns and the stage proceeds. That stays
+    safe because freshness.py reads a MISSING ledger row as unknown, never as pass.
+    """
     print(f"\n{'='*72}\n[stage {stage_no}] {name}\n  $ {_display(cmd)}\n{'='*72}", flush=True)
+    run_id = None
+    if artifact and ta_id:
+        run_id = _pl_start_run(f"ta_cycle.{stage_no}.{name}", "ta_cycle",
+                               therapeutic_area_id=ta_id, target_artifact=artifact)
     t0 = time.time()
     captured: Optional[str] = None
     # Force UTF-8 both ways: decode child output as utf-8 with errors="replace" so a stray
@@ -771,8 +854,11 @@ def run_stage(
     if proc.returncode != 0:
         if log_path:
             print(f"[stage {stage_no}] full output: {log_path}", flush=True)
+        _pl_finish_run(run_id, "failed",
+                       error_message=f"stage {stage_no} {name} exit {proc.returncode}")
         raise StageFailure(stage_no, name, proc.returncode,
                            log_path=str(log_path) if log_path else None, tail=list(tail))
+    _pl_finish_run(run_id, "success")
     print(f"[stage {stage_no}] {name} OK ({dt:.0f}s)"
           + (f"  log: {log_path.name}" if log_path else ""), flush=True)
     return captured

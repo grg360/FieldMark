@@ -3370,6 +3370,8 @@ def run_pipeline(
     failed = 0
     done = 0
     start_time = time.time()
+    # Wall-clock start, for the generated_at assertion after the run.
+    run_started_iso = datetime.now(timezone.utc).isoformat()
     progress_lock = threading.Lock()
 
     def _process(ctx: HCPContext) -> None:
@@ -3414,6 +3416,37 @@ def run_pipeline(
     print(f"Narratives generated: {success}")
     print(f"Failures: {failed}")
     print(f"Actual cost: ~${estimate_cost(success):.2f}")
+
+    # STAMP ASSERTION (2026-09-18). generate_at is written on the UPSERT path here
+    # (:3062 in the payload, on_conflict at :3068), so a REGENERATION must move
+    # max(generated_at) forward. If it does not, this table has silently become a
+    # category-B artifact -- a first-write date being read as a last-write date -- and the
+    # freshness gate in scripts/utils/freshness.py would trust it. That gate blocks the
+    # billed stages, so a wrong stamp here is the most expensive one in the set.
+    #
+    # Warn, do not raise: the narratives are already written and paid for by this point,
+    # and failing the run would not unwrite them. The warning is the signal.
+    if success and not dry_run and not single_hcp_id:
+        try:
+            slugs = sorted({c.therapeutic_area_slug for c in contexts if c.therapeutic_area_slug})
+            for slug in slugs:
+                resp = (supabase.table("hcp_narratives_v2")
+                        .select("generated_at")
+                        .eq("therapeutic_area_slug", slug)
+                        .order("generated_at", desc=True).limit(1).execute())
+                rows = resp.data or []
+                newest = rows[0]["generated_at"] if rows else None
+                if newest is None or str(newest) < run_started_iso:
+                    print(f"[stamp] WARN: max(generated_at) for {slug} is {newest}, which does "
+                          f"not postdate this run's start ({run_started_iso}). generated_at is "
+                          f"not tracking writes - the freshness gate must not trust it.",
+                          flush=True)
+                else:
+                    print(f"[stamp] ok: {slug} max(generated_at)={newest} > run start "
+                          f"{run_started_iso}")
+        except Exception as exc:
+            print(f"[stamp] WARN: could not verify generated_at: {exc}", flush=True)
+
     return (success, failed)
 
 
