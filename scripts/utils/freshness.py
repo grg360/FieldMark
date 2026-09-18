@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg
@@ -50,6 +50,31 @@ from dotenv import load_dotenv
 # mutates nothing and cannot break a reader. One constant, one place.
 STAMP_REPAIR_DATE = datetime(2026, 9, 18, tzinfo=timezone.utc)
 
+# ── Same-run tolerance ────────────────────────────────────────────────────────────────────
+# CONSECUTIVE STAGES OF ONE CYCLE INTERLEAVE, and without a tolerance every cycle leaves a
+# trail of stale verdicts that mean nothing -- which is how a gate gets ignored.
+#
+# THE RIGHT TEST IS THE LEDGER, AND IT IS IMPLEMENTED BELOW (same_run_ok). pipeline_runs
+# knows when each producer actually ran, so "was the artifact produced after its upstream
+# finished" becomes a fact rather than an inference from row timestamps. That test is
+# preferred and taken whenever both artifacts have a successful ledger row.
+#
+# THE EPSILON IS THE INTERIM, because the ledger is empty until cycles run with the new
+# call sites. It is deliberately SMALL, and the size was measured rather than guessed:
+#
+#   atopic-dermatitis  hcp_rising_composite_v1   14:15:38  vs  hcp_scientific_emergence_v1
+#                      14:18:55  -> 3m17s apart. Consecutive stages of one run. Noise.
+#   colorectal-cancer  hcp_narratives_v2         15:04:34  vs  hcp_rising_star_ranks_v3
+#                      18:12:03  -> 3h07m apart, upstream LATER. The board was recomputed
+#                      after the narratives were written. A GENUINE stale verdict.
+#
+# Both rendered as "2026-08-19 < 2026-08-19" and "2026-09-18 < 2026-09-18" under the old
+# date-truncated display, which is why FIX 1a exists. A tolerance of hours would have
+# masked the second case -- the expensive one, 867 billed narratives written from a board
+# that then moved. 15 minutes sits an order of magnitude above the interleaving and two
+# below the real defect.
+SAME_RUN_EPSILON = timedelta(minutes=15)
+
 # Artifacts whose stored stamps predate the repair. Each names the site that was fixed.
 CATEGORY_B: Dict[str, str] = {
     "publication_therapeutic_areas_v2": "ingest/pubmed_pipeline.py upsert payload",
@@ -64,6 +89,17 @@ CATEGORY_B: Dict[str, str] = {
 # is dead and no re-run will ever refresh it. An operator must be able to tell those apart at
 # a glance, because the actions are opposite: investigate versus retire.
 R_NO_TIMESTAMP = "no_timestamp"
+# no_rows AND no_timestamp ARE OPPOSITE PROBLEMS AND MUST NOT SHARE A BUCKET. no_timestamp
+# means no usable column exists, structurally, for anyone -- the instrument is missing.
+# no_rows means the column is fine and THIS TA has nothing in the table -- the data is
+# missing. The remedies are opposite: fix the instrument versus build the TA. Added
+# 2026-09-18 after the first eight-TA run reported no_timestamp on all 29 artifacts for
+# immunology, mesothelioma and oncology, which are registered-but-unbuilt and have no rows
+# at all. The proof that the old code was conflating them was in its own output:
+# immunology's publication_therapeutic_areas_v2 came back pre_watermark, so that TA
+# demonstrably has both rows and a stamp. This is the gate's named-absence rule applied to
+# the gate.
+R_NO_ROWS = "no_rows"
 R_PRE_WATERMARK = "pre_watermark"
 # no_producer is retained and wired, but NO ARTIFACT CURRENTLY CARRIES IT. The r3 audit
 # checked the one candidate (hcp_scores_v2) and found a real, indirect writer. The code path
@@ -209,15 +245,21 @@ def _ta_filter(art: Artifact, ta_slug: str, ta_id: str) -> Tuple[str, Any]:
     return "lower(%s) = lower(%%s)" % col, ta_slug
 
 
-def read_ts(cur, art: Artifact, ta_slug: str, ta_id: str) -> Optional[datetime]:
+def read_ts(cur, art: Artifact, ta_slug: str, ta_id: str) -> Tuple[Optional[datetime], int]:
+    """(max timestamp, row count) for this TA. The COUNT is what separates no_rows from
+    no_timestamp: a NULL max with zero rows means this TA has no data here; a NULL max with
+    rows present means the column is unpopulated, which is an instrument problem."""
     if not art.ts_column or not art.ta_column:
-        return None
+        return None, 0
     pred, val = _ta_filter(art, ta_slug, ta_id)
     cur.execute(
-        "SELECT max(%s) FROM public.%s WHERE %s" % (art.ts_column, art.name, pred), (val,)
+        "SELECT max(%s), count(*) FROM public.%s WHERE %s" % (art.ts_column, art.name, pred),
+        (val,),
     )
     row = cur.fetchone()
-    return row[0] if row else None
+    if not row:
+        return None, 0
+    return row[0], int(row[1] or 0)
 
 
 def ledger_ts(cur, artifact_name: str, ta_id: str) -> Optional[datetime]:
@@ -234,13 +276,28 @@ def ledger_ts(cur, artifact_name: str, ta_id: str) -> Optional[datetime]:
     return row[0] if row else None
 
 
+def same_run_ok(cur, artifact_name: str, upstream_name: str, ta_id: str) -> Optional[bool]:
+    """Did the artifact's producer run at or after the upstream's, for this TA?
+
+    THE PREFERRED TEST. Row timestamps infer ordering; the ledger records it. Returns
+    True/False when BOTH artifacts have a successful run recorded, and None when they do
+    not -- in which case the caller falls back to SAME_RUN_EPSILON. Returning None rather
+    than a guess is the point: an absent ledger must never manufacture a verdict.
+    """
+    a = ledger_ts(cur, artifact_name, ta_id)
+    u = ledger_ts(cur, upstream_name, ta_id)
+    if a is None or u is None:
+        return None
+    return a >= u
+
+
 def evaluate(cur, art: Artifact, ta_slug: str, ta_id: str) -> Dict[str, Any]:
     """One verdict. Order matters: the reasons that make a comparison impossible are
     resolved before the comparison is attempted."""
     res: Dict[str, Any] = {
         "artifact": art.name, "state": UNKNOWN, "reason": None,
         "artifact_ts": None, "newest_upstream": None, "upstream_name": None,
-        "billed": art.name in BILLED_INPUTS,
+        "billed": art.name in BILLED_INPUTS, "rows": 0, "gap": None, "tolerance": None,
     }
 
     if art.producer is None:
@@ -251,10 +308,14 @@ def evaluate(cur, art: Artifact, ta_slug: str, ta_id: str) -> Dict[str, Any]:
         res["reason"] = R_NO_TIMESTAMP
         return res
 
-    ts = read_ts(cur, art, ta_slug, ta_id)
+    ts, rows = read_ts(cur, art, ta_slug, ta_id)
     res["artifact_ts"] = ts
+    res["rows"] = rows
     if ts is None:
-        res["reason"] = R_NO_TIMESTAMP
+        # THE FIFTH CODE. Zero rows means this TA has no data here -- build the TA. Rows
+        # present with a NULL max means the column is unpopulated -- fix the instrument.
+        # One bucket cannot carry both; see R_NO_ROWS.
+        res["reason"] = R_NO_ROWS if rows == 0 else R_NO_TIMESTAMP
         return res
 
     if art.name in CATEGORY_B and ts <= STAMP_REPAIR_DATE:
@@ -268,8 +329,10 @@ def evaluate(cur, art: Artifact, ta_slug: str, ta_id: str) -> Dict[str, Any]:
         if ua is None:
             unknown_upstream = up
             continue
-        uts = read_ts(cur, ua, ta_slug, ta_id)
+        uts, urows = read_ts(cur, ua, ta_slug, ta_id)
         if uts is None:
+            # An upstream this TA has no rows for cannot make the artifact stale, but it
+            # also cannot confirm it fresh. Either way the comparison is unavailable.
             unknown_upstream = up
             continue
         if ua.name in CATEGORY_B and uts <= STAMP_REPAIR_DATE:
@@ -282,8 +345,28 @@ def evaluate(cur, art: Artifact, ta_slug: str, ta_id: str) -> Dict[str, Any]:
     res["upstream_name"] = newest_name
 
     if newest is not None and ts < newest:
-        res["state"] = STALE
-        return res
+        # TOLERANCE. The ledger is asked FIRST because it records when producers ran rather
+        # than inferring it from row timestamps; it answers None when either side has no
+        # successful run, and only then does the epsilon apply. Recording which test decided
+        # matters: an operator reading "stale by 3m" needs to know whether that came from a
+        # measured run boundary or from a 15-minute constant.
+        gap = newest - ts
+        res["gap"] = gap
+        verdict = same_run_ok(cur, art.name, newest_name, ta_id) if newest_name else None
+        if verdict is True:
+            res["tolerance"] = "ledger"
+            res["state"] = OK
+        elif verdict is False:
+            res["tolerance"] = "ledger"
+            res["state"] = STALE
+            return res
+        elif gap <= SAME_RUN_EPSILON:
+            res["tolerance"] = "epsilon"
+            res["state"] = OK
+        else:
+            res["tolerance"] = "epsilon"
+            res["state"] = STALE
+            return res
 
     # LEDGER ESCALATION, AND THE ONE THING instrumentable SUPPRESSES. Row-max cannot prove a
     # producer ran; a run that wrote nothing looks identical to one that never happened. If
@@ -325,7 +408,22 @@ def run_gate(ta_slugs: List[str]) -> Dict[str, List[Dict[str, Any]]]:
 
 
 def _fmt(ts) -> str:
-    return ts.strftime("%Y-%m-%d") if ts else "-"
+    """FULL TIMESTAMP, NEVER A DATE. A date-truncated display of a timestamp comparison is a
+    proxy for the real answer, which is the exact failure mode this gate exists to remove:
+    the first eight-TA run printed "2026-08-19 < 2026-08-19" for a 3m17s intra-run gap and
+    "2026-09-18 < 2026-09-18" for a 3h07m genuine staleness, and neither was legible."""
+    return ts.strftime("%Y-%m-%d %H:%M:%S") if ts else "-"
+
+
+def _gap(td) -> str:
+    if td is None:
+        return ""
+    secs = int(td.total_seconds())
+    if secs < 60:
+        return "%ds" % secs
+    if secs < 3600:
+        return "%dm%02ds" % (secs // 60, secs % 60)
+    return "%dh%02dm" % (secs // 3600, (secs % 3600) // 60)
 
 
 def render(results: Dict[str, List[Dict[str, Any]]], verbose: bool = False) -> Tuple[int, int]:
@@ -340,9 +438,11 @@ def render(results: Dict[str, List[Dict[str, Any]]], verbose: bool = False) -> T
         print("  ok %d   stale %d   dead %d   unknown %d" % (len(ok), len(stale), len(dead), len(unk)))
         for r in stale:
             mark = "BILLED" if r["billed"] else "      "
-            print("  STALE   %s %-34s %s  <  %s (%s)" % (
+            by = (" [%s]" % r["tolerance"]) if r.get("tolerance") else ""
+            gap = (" behind by %s%s" % (_gap(r.get("gap")), by)) if r.get("gap") else ""
+            print("  STALE   %s %-34s %s  <  %s (%s)%s" % (
                 mark, r["artifact"], _fmt(r["artifact_ts"]),
-                _fmt(r["newest_upstream"]), r["upstream_name"]))
+                _fmt(r["newest_upstream"]), r["upstream_name"], gap))
             stale_total += 1
             if r["billed"]:
                 billed_stale += 1
@@ -386,17 +486,56 @@ def gate(ta_slugs: List[str], verbose: bool = False) -> int:
     return 0
 
 
+def visible_slugs(cur) -> Tuple[List[str], List[str]]:
+    """(visible, skipped). THE DEFAULT SCOPE IS WHAT THE APP SHOWS.
+
+    is_visible_in_ui AND is_active is the same gate live_therapeutic_areas uses, so the
+    default run matches the surface a reader sees. Without it, four registered-but-unbuilt
+    TAs contributed 116 unknown rows to every run -- noise that trains an operator to skim,
+    which is how a gate stops being read.
+
+    THE SKIPPED SLUGS ARE PRINTED, NOT DROPPED. A TA that is registered and invisible is a
+    fact worth one line: atopic-dermatitis sat half-built without anyone noticing, and a
+    silent omission is precisely how that happens again.
+    """
+    cur.execute(
+        """
+        SELECT ta.slug,
+               coalesce(cfg.is_visible_in_ui, false) AND coalesce(cfg.is_active, false)
+        FROM public.therapeutic_areas ta
+        LEFT JOIN public.therapeutic_area_ingestion_config cfg
+               ON cfg.therapeutic_area_id = ta.id
+        ORDER BY ta.slug
+        """
+    )
+    vis, skip = [], []
+    for slug, ok in cur.fetchall():
+        (vis if ok else skip).append(slug)
+    return vis, skip
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="TA freshness gate (read-only).")
     ap.add_argument("--ta", action="append", default=None,
-                    help="TA slug; repeatable. Default: every slug in therapeutic_areas.")
+                    help="TA slug; repeatable. Any slug, visible or not.")
+    ap.add_argument("--all-tas", action="store_true",
+                    help="Every slug in therapeutic_areas, including registered-but-unbuilt.")
     ap.add_argument("--verbose", action="store_true", help="list ok and unknown rows too")
     args = ap.parse_args()
+
     slugs = args.ta
     if not slugs:
         with _conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT slug FROM public.therapeutic_areas ORDER BY slug")
-            slugs = [r[0] for r in cur.fetchall()]
+            vis, skip = visible_slugs(cur)
+            if args.all_tas:
+                slugs = sorted(vis + skip)
+                print("scope: --all-tas, %d TA(s)" % len(slugs))
+            else:
+                slugs = vis
+                print("scope: visible + active, %d TA(s): %s" % (len(vis), ", ".join(vis)))
+                if skip:
+                    print("skipped (registered, not visible+active): %s"
+                          % ", ".join(skip))
     return gate(slugs, verbose=args.verbose)
 
 
