@@ -191,6 +191,74 @@ COHORT_SCORE_CONFIG: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# ── Community evidence, keyed on the TIER MODEL ──────────────────────────────────────────
+# WHAT A TIER MEANS IS A PROPERTY OF THE TIER MODEL, NOT OF THE TIER AND NOT OF THE TA.
+# This is the Python twin of COM_EVIDENCE_MODELS in frontend/src/lib/cohortLedger.ts and
+# must stay in step with it: the ledger chip and the narrative describe the same row, and
+# a physician reading one beside the other must not be told two different things.
+#
+# The database also states this, in ta_evidence_tier_config.notes -- which is where these
+# sentences were checked against, not invented. notes is NOT read directly because it is
+# written for engineers and carries block numbers and table names ("partb_practice_v1
+# (block 52, 2026-09-14)..."), and an MSL brief must not leak build references.
+#
+# NOTHING HERE IS LUNG WORDING REUSED. nsclc_v1 anchors on an oral indicated only for
+# NSCLC; partb_practice_v1 anchors on an administered Part B pattern and has no oral and
+# no stem at all. Restating the first for the second is the exact defect the chip fix
+# closed on 2026-09-17.
+COMMUNITY_EVIDENCE_MODELS: Dict[str, Dict[str, str]] = {
+    "nsclc_v1": {
+        "anchored": "Prescribed an oral drug indicated only for non-small cell lung cancer, "
+                    "under their own Part D record.",
+        "supported": "Corroborating drug evidence in the claims record, short of a "
+                     "lung-exclusive oral.",
+        "candidate": "An oncology claims footprint with no NSCLC-specific drug evidence.",
+        "heme_dominant": "Oral oncology prescribing concentrated in haematology agents — a "
+                         "different specialty, not a deficit.",
+        "unresolved": "No Medicare drug-claims evidence in the observed period.",
+    },
+    "partb_practice_v1": {
+        "anchored": "Billed a VEGF agent, a chemotherapy backbone and a fluoropyrimidine in "
+                    "the same program year — an administered treatment pattern, behind a "
+                    "Medical or Haematology Oncology taxonomy gate.",
+        "supported": "Billed a chemotherapy backbone and a fluoropyrimidine in the same "
+                     "program year, without a VEGF agent — one agent class short of the "
+                     "anchor pattern.",
+        "candidate": "An oncology Part D record with no administered treatment pattern "
+                     "against this area's code set.",
+        "unresolved": "No Medicare evidence — no Part B claims against this area's code set "
+                      "and no oncology Part D record.",
+    },
+}
+
+# Part D is stored pan-oncology (hcp_part_d_oncology_v1 has no therapeutic_area_id), so
+# naming an HCP's oral agents for a TA requires knowing which drug_groups belong to it.
+#
+# A TA WITH NO ENTRY IS NOT AN ERROR AND MUST NOT BE GUESSED. Without a mapping the only
+# honest Part D statement is the one the column actually supports -- "has an oncology Part D
+# record", pan-tumour -- which is exactly what community_board_v1.part_d_present means and
+# what docs/canonical/COMMUNITY_EVIDENCE_DISPLAY_DEBT.md item 2 records. The fact builder
+# below degrades to that rather than attributing another tumour's drugs to this one.
+#
+# THIS BELONGS IN ta_evidence_tier_config, NOT HERE. It is a TA-keyed literal in a file
+# that just had three of them removed, and it is written down as debt rather than hidden:
+# the column to add is an inclusion group beside the existing exclusion_group.
+# NAMING AN AGENT IS A CLINICAL CLAIM, SO THIS IS NARROWER THAN THE QUALIFICATION MAPPING.
+# The board-scoping measurement in COMMUNITY_EVIDENCE_DISPLAY_DEBT.md item 2 treats
+# colorectal as ('colorectal','gi_renal') because a GI-adjacent oral record is evidence of
+# the right KIND of practice. That is the wrong set for PROSE. gi_renal holds axitinib,
+# cabozantinib, everolimus, lenvatinib, pazopanib, sorafenib and sunitinib -- renal-cell,
+# hepatocellular and neuroendocrine agents, NONE of them indicated in colorectal cancer --
+# so a brief saying "Part D oral agents for this area: cabozantinib" states something
+# clinically false about a named physician. Caught in review 2026-09-18 on the first
+# rendered sample after the service_role grant landed.
+#
+# Only groups whose agents are actually indicated in the TA belong here.
+TA_PART_D_DRUG_GROUPS: Dict[str, Tuple[str, ...]] = {
+    "nsclc": ("lung",),
+    "colorectal-cancer": ("colorectal",),
+}
+
 # VISIBLE_TA_IDS is loaded dynamically from therapeutic_area_ingestion_config
 # via load_visible_ta_ids() — see function below.
 
@@ -222,6 +290,43 @@ def load_visible_ta_ids(supabase: Client) -> List[str]:
         return []
 
 
+_BOARD_TA_IDS_CACHE: Optional[Set[str]] = None
+
+
+def board_ta_ids(supabase: Client) -> Set[str]:
+    """TAs whose community membership is decided by a board, resolved from the database.
+
+    A TA has a board iff it has a row in ta_evidence_tier_config -- which is not a
+    convention, it is the join community_board_v1 itself makes, so this cannot disagree
+    with the view it gates. Replaces a hardcoded NSCLC uuid that silently routed every
+    other TA down the non-board path.
+
+    Cached for the process: it is read once per run and the answer cannot change mid-run.
+    On failure returns an EMPTY set, which routes every TA to the non-board path -- the
+    pre-2026-09-18 behaviour for non-NSCLC, and loud in the log rather than silent.
+    """
+    global _BOARD_TA_IDS_CACHE
+    if _BOARD_TA_IDS_CACHE is not None:
+        return _BOARD_TA_IDS_CACHE
+    try:
+        resp = (
+            supabase.table("ta_evidence_tier_config")
+            .select("therapeutic_area_id,tier_model")
+            .execute()
+        )
+        rows = resp.data or []
+        ids = {str(r["therapeutic_area_id"]) for r in rows if r.get("therapeutic_area_id")}
+        models = ", ".join(
+            sorted(f"{r.get('tier_model')}" for r in rows if r.get("therapeutic_area_id"))
+        )
+        print(f"Board TAs (ta_evidence_tier_config): {len(ids)} [{models}]")
+        _BOARD_TA_IDS_CACHE = ids
+    except Exception as exc:
+        print(f"[ERROR] Failed to load ta_evidence_tier_config: {exc}. No TA will be treated as having a board.")
+        _BOARD_TA_IDS_CACHE = set()
+    return _BOARD_TA_IDS_CACHE
+
+
 def ta_slug_from_name(ta_name: Optional[str]) -> str:
     """Convert a TA display name to its slug form used in hcp_narratives_v2."""
     if not ta_name:
@@ -238,13 +343,23 @@ ESTABLISHED_DEFAULT_TOP_N = 100
 # Pipeline behavior
 COMMUNITY_DEFAULT_TOP_N = 500
 
-# Community membership (read layer), NSCLC ONLY — G2 cutover (2026-08-11):
-# membership truth lives in community_board_nsclc_v1.qualifies (patient_volume
-# > 0 OR any Part-D oncology row); this script reads the view instead of
-# re-deriving a predicate. Non-NSCLC TAs stay ungated. Mirrors the
-# get_community_filtered RPCs (sql/community_qualification_gate.sql).
-COMMUNITY_GATE_NSCLC_TA_ID = "c0065b03-a25e-4e9a-bde4-4b4d0db7827d"
-COMMUNITY_BOARD_VIEW = "community_board_nsclc_v1"
+# Community membership (read layer) — G2 cutover (2026-08-11), DE-PINNED 2026-09-18.
+# Membership truth lives in the board view's `qualifies` (patient_volume > 0 OR any
+# Part-D oncology row); this script reads the view instead of re-deriving a predicate.
+# Mirrors the get_community_filtered RPCs (sql/community_qualification_gate.sql).
+#
+# WAS community_board_nsclc_v1 PLUS A HARDCODED NSCLC UUID, AND THAT COMBINATION MADE
+# COLORECTAL NARRATIVES IMPOSSIBLE. The shim carries no ta_id, so it can only answer for
+# lung; and the selector branched on `ta_id == COMMUNITY_GATE_NSCLC_TA_ID`, so every other
+# TA fell through to the NON-BOARD path -- ungated, untiered, capped at --community-top.
+# A colorectal run would not merely have been wrong, it would have selected a different
+# POPULATION (top-N by reach across all tiers) and looked plausible doing it.
+#
+# community_board_v1 has carried ta_id since block 27 and INNER JOINs
+# ta_evidence_tier_config, so "does this TA have a board" is a question the database can
+# answer. It is resolved once per run by board_ta_ids() rather than listed here: a TA
+# constant in this file is exactly what went stale last time.
+COMMUNITY_BOARD_VIEW = "community_board_v1"
 
 # The community narrative cut (decided 2026-08-17): anchored + supported only.
 # This is EXACTLY community_ledger()'s own default -- that RPC opens with
@@ -262,6 +377,22 @@ COMMUNITY_BOARD_VIEW = "community_board_nsclc_v1"
 # happens to agree with priority 1 < 2, but that is a coincidence of these two
 # names and breaks the moment a tier like 'heme_dominant' (priority 3, sorts
 # before 'supported') enters the cut.
+#
+# THE heme_dominant HAZARD DOES NOT APPLY TO COLORECTAL, CONFIRMED NOT ASSUMED
+# (2026-09-18). Measured against community_board_v1, the tiers actually present on each
+# qualifying board are:
+#   nsclc             anchored, candidate, heme_dominant, supported, unresolved
+#   colorectal-cancer anchored, candidate, supported, unresolved
+# partb_practice_v1 has no branch that can emit heme_dominant -- see the tier CASE in
+# hcp_evidence_tier_v1 -- so the alphabetical-vs-priority collision cannot arise there.
+# The hazard is real for nsclc_v1 and the explicit ordering stays for it. Re-check with:
+#   select ta.slug, string_agg(distinct b.evidence_tier, ', ' order by b.evidence_tier)
+#   from community_board_v1 b join therapeutic_areas ta on ta.id = b.ta_id
+#   where b.qualifies group by 1;
+#
+# THE CUT ITSELF IS UNCHANGED. anchored + supported, per the 2026-08-17 decision above.
+# For colorectal that is 867 people (337 anchored + 530 supported) as of the 2026-09-18
+# re-baseline; the count lives in COMMUNITY_BOARD_BASELINE.md, not here.
 COMMUNITY_NARRATIVE_TIERS = ("anchored", "supported")
 API_SLEEP_SECONDS = 0.5
 PROGRESS_EVERY = 25
@@ -272,6 +403,34 @@ PROGRESS_EVERY = 25
 # it costs nothing for the shorter rising/community outputs, which stop well below.
 MAX_TOKENS_RESPONSE = 1200
 TEMPERATURE = 0.1
+
+
+@dataclass
+class CommunityFacts:
+    """Displayed facts behind one community HCP×TA row. NO SCORES, BY CONSTRUCTION.
+
+    Every field is something a surface already shows or could show verbatim. The four
+    *_score columns this replaced were 100% NULL and fed None into prompts (Phase 2,
+    2026-08-11); restoring them was explicitly not the fix. Absent facts stay None and the
+    formatter STATES the absence rather than omitting the line -- "no published literature"
+    is a fact about a community physician, not a gap, and an omitted line invites the model
+    to infer a record.
+    """
+    evidence_tier: Optional[str] = None
+    tier_model: Optional[str] = None
+    tier_meaning: Optional[str] = None          # from COMMUNITY_EVIDENCE_MODELS
+    part_b_beneficiaries_3yr: Optional[int] = None
+    part_b_codes: Optional[List[str]] = None    # TA code-set codes actually billed
+    part_b_years: Optional[List[int]] = None
+    part_d_present: Optional[bool] = None
+    part_d_stems: Optional[List[str]] = None    # scoped by drug_group; None when unmapped
+    part_d_scoped: bool = False                 # False => presence is pan-oncology
+    practice_setting: Optional[str] = None
+    specialty: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    nppes_career_years: Optional[int] = None
+    publications_in_corpus: Optional[int] = None
 
 
 @dataclass
@@ -298,6 +457,7 @@ class HCPContext:
     therapeutic_area_slug: str = ""
     rising_star_v3: Optional[Dict[str, Any]] = None
     established_v3: Optional[Dict[str, Any]] = None
+    community_facts: Optional["CommunityFacts"] = None
 
 
 def get_required_env(name: str) -> str:
@@ -441,7 +601,7 @@ def collect_top_n_hcp_ids(
     terminates the uncapped path, so page_size must not exceed the server cap.
 
     allowed_ids (G2 cutover): when set, only ids in it are collected — the
-    membership filter lives in community_board_nsclc_v1, not in the rank query,
+    membership filter lives in the community board view, not in the rank query,
     so paging continues past filtered-out rows until top_n MEMBERS are found
     (the unfiltered path keeps its original scan-at-most-top_n-rows behavior).
     """
@@ -1051,19 +1211,26 @@ def fetch_established_top_hcp_ids(
 def fetch_community_top_hcp_ids(
     supabase: Client, top_n: int, visible_ta_ids: List[str]
 ) -> Set[str]:
-    """Community cohort selection: NSCLC = anchored + supported tiers, uncapped.
+    """Community cohort selection: BOARD TAs = anchored + supported tiers, uncapped.
 
-    MERGE NOTE (2026-08-19): the two branches below now come from different
-    commits — the NSCLC branch from resurfacing (tier-scoped, 08-17), the
-    non-NSCLC branch from foundation-rebuild's ranks retirement (08-12). Each
-    side's docstring described only its own branch, so both were wrong for the
-    merged function. This describes what the code actually does.
+    DE-PINNED 2026-09-18. This said "NSCLC" and meant it: the branch below tested
+    `ta_id == COMMUNITY_GATE_NSCLC_TA_ID`, so colorectal -- which has had a board since
+    block 27 and a real tier model since block 52 -- fell through to the non-board path
+    and would have been selected ungated, untiered and capped at top_n. The test is now
+    "does this TA have a board", answered by board_ta_ids() against the same config table
+    community_board_v1 joins.
 
-    The NSCLC branch reads the qualifying board view, filtered to the narrative
-    tiers and ordered exactly as community_ledger() orders its rows. top_n does
+    MERGE NOTE (2026-08-19): the two branches below come from different commits — the
+    board branch from resurfacing (tier-scoped, 08-17), the non-board branch from
+    foundation-rebuild's ranks retirement (08-12). Each side's docstring described only
+    its own branch, so both were wrong for the merged function. This describes what the
+    code actually does.
+
+    The BOARD branch reads the qualifying board view for THAT TA, filtered to the
+    narrative tiers and ordered exactly as community_ledger() orders its rows. top_n does
     NOT apply there -- see the branch comment.
 
-    Non-NSCLC TAs read hcp_community_scores_v2 membership with the same volume
+    TAs with no board read hcp_community_scores_v2 membership with the same volume
     ordering (2026-08-12: hcp_community_ranks_v2 retired — its post-freeze rank
     was row_number over NULL scores), capped at top_n. Both replace the old
     selector that read hcps_v2.cohort_classification/cohort_score — a
@@ -1074,9 +1241,10 @@ def fetch_community_top_hcp_ids(
     community narratives.
     """
     selected: Set[str] = set()
+    boards = board_ta_ids(supabase)
     for ta_id in visible_ta_ids:
         try:
-            if ta_id == COMMUNITY_GATE_NSCLC_TA_ID:
+            if str(ta_id) in boards:
                 # TIER-SCOPED, UNCAPPED (2026-08-17). One query per tier in the
                 # ledger's priority order, each ordered by Medicare reach then
                 # hcp_id -- i.e. (tier_priority, -patient_volume, hcp_id), which
@@ -1099,6 +1267,13 @@ def fetch_community_top_hcp_ids(
                         return (
                             supabase.table(COMMUNITY_BOARD_VIEW)
                             .select("hcp_id")
+                            # .eq("ta_id") IS LOAD-BEARING, NOT TIDINESS. The old view was
+                            # the lung shim and carried no ta_id, so the query could not be
+                            # scoped and did not need to be. community_board_v1 holds every
+                            # board TA; without this predicate a colorectal run would select
+                            # the lung board as well and stamp it with colorectal's slug.
+                            # Must follow .select(): eq() lives on the filter builder.
+                            .eq("ta_id", ta_id)
                             .eq("qualifies", True)
                             .eq("evidence_tier", tier)
                             .order("patient_volume", desc=True)
@@ -1106,7 +1281,7 @@ def fetch_community_top_hcp_ids(
                         )
                     selected.update(collect_top_n_hcp_ids(make_query, None))
             else:
-                # Non-NSCLC TAs: no board view exists; membership is the scores
+                # TAs with no board: membership is the scores
                 # base table (hcp_community_ranks_v2 retired post-freeze — its
                 # rank was row_number over NULL scores). Ordering mirrors the
                 # NSCLC board fix: Medicare reach (patient_volume DESC), the
@@ -1127,6 +1302,246 @@ def fetch_community_top_hcp_ids(
         except Exception as exc:
             print(f"[load] community selector query failed for TA {ta_id}: {exc}")
     return selected
+
+
+def _batched(items: List[str], size: int = 300):
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
+
+
+def _select_all(make_query, page: int = 1000) -> List[Dict[str, Any]]:
+    """Page a PostgREST select to exhaustion.
+
+    POSTGREST CAPS ANY SINGLE RESPONSE AT 1000 ROWS and says nothing when it truncates.
+    A per-HCP fact read fans out -- one HCP can hold a dozen claim rows -- so a 300-HCP
+    batch can ask for several thousand and silently receive the first thousand.
+
+    This was not hypothetical: the first rendered colorectal context showed
+    "J9190, J9263 in 2021" for a physician whose tier line says VEGF + backbone +
+    fluoropyrimidine. The VEGF rows (Q5107, 2022 and 2023) existed and were cut off by the
+    cap, so the prompt carried a tier claim and a contradicting evidence list on the same
+    page. Truncation here does not fail, it fabricates.
+
+    make_query must return a FRESH builder each call (builders are single-use); a short
+    page means exhaustion, which is only true while page <= the server cap.
+    """
+    rows: List[Dict[str, Any]] = []
+    offset = 0
+    while True:
+        batch = (make_query().range(offset, offset + page - 1).execute()).data or []
+        rows.extend(batch)
+        if len(batch) < page:
+            return rows
+        offset += page
+
+
+def fetch_community_facts(
+    supabase: Client,
+    hcp_ids: Set[str],
+    ta_ids: List[str],
+    ta_slug_by_id: Dict[str, str],
+) -> Dict[Tuple[str, str], CommunityFacts]:
+    """Assemble the DISPLAYED facts behind each community HCP×TA row.
+
+    Replaces the score_fields path removed on 2026-08-11, which mapped four columns that
+    are 100% NULL and whose absence silently skipped the whole community branch (the
+    context loop does `if "score_fields" not in config: continue`). Nothing here is a
+    score, a rank or a percentile: every field is a claim the ledger already renders or
+    could render verbatim beside the prose.
+
+    TA-NEUTRAL BY CONSTRUCTION. The tier's MEANING comes from COMMUNITY_EVIDENCE_MODELS
+    keyed on the TA's tier_model; the Part B codes come from that TA's own ta_hcpcs_codes;
+    the Part D stems come from that TA's drug_groups or are withheld entirely. No branch
+    tests a TA uuid and no sentence is carried over from another TA's model.
+    """
+    facts: Dict[Tuple[str, str], CommunityFacts] = {}
+    if not hcp_ids or not ta_ids:
+        return facts
+    ids = [str(h) for h in hcp_ids]
+
+    # tier_model per TA, so the tier can be explained in its own model's terms.
+    model_by_ta: Dict[str, str] = {}
+    try:
+        resp = (
+            supabase.table("ta_evidence_tier_config")
+            .select("therapeutic_area_id,tier_model")
+            .in_("therapeutic_area_id", ta_ids)
+            .execute()
+        )
+        for row in resp.data or []:
+            model_by_ta[str(row["therapeutic_area_id"])] = str(row.get("tier_model") or "")
+    except Exception as exc:
+        print(f"[facts] ta_evidence_tier_config read failed: {exc}")
+
+    # 1. The board row: tier + reach. patient_volume is the 3-year Part B beneficiary
+    #    count out of hcp_medicare_by_ta_v2 -- absent (not zero) for a TA whose aggregator
+    #    has never run, which is why None survives to the formatter instead of becoming 0.
+    for ta_id in ta_ids:
+        for chunk in _batched(ids):
+            try:
+                resp = (
+                    supabase.table(COMMUNITY_BOARD_VIEW)
+                    .select("hcp_id,evidence_tier,patient_volume,part_d_present")
+                    .eq("ta_id", ta_id)
+                    .in_("hcp_id", chunk)
+                    .execute()
+                )
+            except Exception as exc:
+                print(f"[facts] board read failed for TA {ta_id}: {exc}")
+                continue
+            for row in resp.data or []:
+                key = (str(row["hcp_id"]), ta_id)
+                tier = row.get("evidence_tier")
+                model = model_by_ta.get(ta_id) or ""
+                vol = row.get("patient_volume")
+                facts[key] = CommunityFacts(
+                    evidence_tier=tier,
+                    tier_model=model or None,
+                    tier_meaning=(COMMUNITY_EVIDENCE_MODELS.get(model, {}) or {}).get(tier or ""),
+                    part_b_beneficiaries_3yr=(int(vol) if vol not in (None, "") and float(vol) > 0 else None),
+                    part_d_present=(None if row.get("part_d_present") is None else bool(row["part_d_present"])),
+                )
+
+    # 2. Part B: WHICH of this TA's codes they actually billed, and in which years.
+    #    Only is_primary_signal codes are named -- those are the ones the tier model
+    #    anchors on; corroborators sit behind a specialty gate this read cannot apply.
+    for ta_id in ta_ids:
+        try:
+            code_resp = (
+                supabase.table("ta_hcpcs_codes")
+                .select("hcpcs_code,is_primary_signal,pattern_role")
+                .eq("therapeutic_area_id", ta_id)
+                .execute()
+            )
+        except Exception as exc:
+            print(f"[facts] ta_hcpcs_codes read failed for TA {ta_id}: {exc}")
+            continue
+        primary = sorted(
+            {str(r["hcpcs_code"]) for r in (code_resp.data or []) if r.get("is_primary_signal")}
+        )
+        # A code alone is opaque in a brief; the ROLE is what makes the evidence legible
+        # against the tier sentence ("a VEGF agent, a backbone and a fluoropyrimidine").
+        # pattern_role is NULL under tier models that do not use one (nsclc_v1), so the
+        # formatter must render a bare code when it is absent rather than an empty paren.
+        role_by_code = {
+            str(r["hcpcs_code"]): (r.get("pattern_role") or "").strip()
+            for r in (code_resp.data or [])
+            if r.get("is_primary_signal")
+        }
+        if not primary:
+            continue
+        for chunk in _batched(ids):
+            try:
+                def _q(chunk=chunk, primary=primary):
+                    return (
+                        supabase.table("hcp_hcpcs_detail")
+                        .select("hcp_id,hcpcs_code,program_year,tot_benes")
+                        .in_("hcp_id", chunk)
+                        .in_("hcpcs_code", primary)
+                        .order("hcp_id")
+                        .order("program_year")
+                        .order("hcpcs_code")
+                    )
+                detail_rows = _select_all(_q)
+            except Exception as exc:
+                print(f"[facts] hcp_hcpcs_detail read failed: {exc}")
+                continue
+            for row in detail_rows:
+                key = (str(row["hcp_id"]), ta_id)
+                f = facts.get(key)
+                if f is None:
+                    continue
+                if (row.get("tot_benes") or 0) <= 0:
+                    continue
+                code = str(row["hcpcs_code"])
+                role = role_by_code.get(code) or ""
+                label = f"{code} ({role})" if role else code
+                f.part_b_codes = sorted(set((f.part_b_codes or []) + [label]))
+                yr = row.get("program_year")
+                if yr is not None:
+                    f.part_b_years = sorted(set((f.part_b_years or []) + [int(yr)]))
+
+    # 3. Part D: stems, scoped by this TA's drug_groups. WITHHELD when the TA has no
+    #    mapping -- see TA_PART_D_DRUG_GROUPS. part_d_present stays as read from the board,
+    #    where it is a pan-oncology fact, and part_d_scoped records which of the two the
+    #    formatter is allowed to claim.
+    for ta_id in ta_ids:
+        groups = TA_PART_D_DRUG_GROUPS.get(ta_slug_by_id.get(ta_id, ""), ())
+        if not groups:
+            continue
+        scoped_ok = True
+        for chunk in _batched(ids):
+            try:
+                def _q(chunk=chunk, groups=groups):
+                    return (
+                        supabase.table("hcp_part_d_oncology_v1")
+                        .select("hcp_id,drug_stem")
+                        .in_("hcp_id", chunk)
+                        .in_("drug_group", list(groups))
+                        .order("hcp_id")
+                        .order("drug_stem")
+                    )
+                pd_rows = _select_all(_q)
+            except Exception as exc:
+                # A FAILED READ IS NOT AN EMPTY RESULT. hcp_part_d_oncology_v1 has SELECT
+                # for anon and authenticated but NOT for service_role (confirmed
+                # 2026-09-18), so this raises under the key this script runs with. Leaving
+                # part_d_scoped False on failure makes the formatter fall back to the
+                # pan-oncology wording, which is what part_d_present actually means -- a
+                # weaker claim, but a true one. Setting it would have printed "present, but
+                # none of the oral agents are specific to this therapeutic area" for every
+                # HCP on the board, which is a fabricated negative.
+                print(f"[facts] hcp_part_d_oncology_v1 read failed ({exc}) — Part D stems "
+                      f"withheld for this TA; prose falls back to pan-oncology presence.")
+                scoped_ok = False
+                break
+            for row in pd_rows:
+                key = (str(row["hcp_id"]), ta_id)
+                f = facts.get(key)
+                if f is None:
+                    continue
+                stem = (row.get("drug_stem") or "").strip()
+                if stem:
+                    f.part_d_stems = sorted(set((f.part_d_stems or []) + [stem]))
+        if scoped_ok:
+            for (hcp_id, key_ta), f in facts.items():
+                if key_ta == ta_id:
+                    f.part_d_scoped = True
+
+    # 4. Practice facts + the publication count, INCLUDING zero. in_corpus_pub_count is
+    #    what WE hold, not a career total; NULL means no OpenAlex record (unmeasured), and
+    #    the formatter distinguishes that from a measured zero.
+    practice: Dict[str, Dict[str, Any]] = {}
+    for chunk in _batched(ids):
+        try:
+            resp = (
+                supabase.table("hcps_v2")
+                .select(
+                    "id,nppes_practice_setting,npi_specialty,nppes_practice_city,"
+                    "nppes_practice_state,nppes_career_stage_years,in_corpus_pub_count"
+                )
+                .in_("id", chunk)
+                .execute()
+            )
+        except Exception as exc:
+            print(f"[facts] hcps_v2 practice read failed: {exc}")
+            continue
+        for row in resp.data or []:
+            practice[str(row["id"])] = row
+    for (hcp_id, ta_id), f in facts.items():
+        row = practice.get(hcp_id)
+        if not row:
+            continue
+        f.practice_setting = row.get("nppes_practice_setting")
+        f.specialty = row.get("npi_specialty")
+        f.city = row.get("nppes_practice_city")
+        f.state = row.get("nppes_practice_state")
+        cy = row.get("nppes_career_stage_years")
+        f.nppes_career_years = int(cy) if cy is not None else None
+        pc = row.get("in_corpus_pub_count")
+        f.publications_in_corpus = int(pc) if pc is not None else None
+
+    return facts
 
 
 def fetch_hcps_by_ids(
@@ -1352,6 +1767,21 @@ def load_hcp_contexts(
         if hid and cohort in hcp_ids_by_cohort:
             hcp_ids_by_cohort[cohort].add(hid)
 
+    # Community context is built from DISPLAYED FACTS, not scores (2026-09-18). The score
+    # path this replaces read four columns that are 100% NULL, and because the config no
+    # longer lists them the whole community branch was skipped by
+    # `if "score_fields" not in config: continue` -- 0 contexts for every TA since
+    # 2026-08-11, selection working the entire time.
+    community_facts_by_pair: Dict[Tuple[str, str], CommunityFacts] = {}
+    if "community" in target_cohorts and hcp_ids_by_cohort.get("community"):
+        community_facts_by_pair = fetch_community_facts(
+            supabase,
+            hcp_ids_by_cohort["community"],
+            list(visible_ta_ids),
+            ta_slug_map,
+        )
+        print(f"Loaded community facts for {len(community_facts_by_pair)} HCP x TA pairs")
+
     scores_by_cohort: Dict[str, Dict[Tuple[str, str], Dict]] = {}
     for cohort in target_cohorts:
         if cohort == "rising_star":
@@ -1426,8 +1856,47 @@ def load_hcp_contexts(
                     ta_distributions_by_cohort[cohort][ta_id][field_name].append(value)
 
     contexts: List[HCPContext] = []
+
+    # COMMUNITY: one context per (hcp, TA) pair that has board facts. Driven by the FACTS
+    # map rather than by a score row, so a cohort with no score_fields still builds.
+    if "community" in target_cohorts:
+        for (hcp_id, ta_id), cfacts in community_facts_by_pair.items():
+            if (hcp_id, ta_id) not in ta_membership:
+                continue
+            hcp = hcp_map.get(hcp_id)
+            if not hcp:
+                continue
+            ops = ops_by_hcp.get(hcp_id, {})
+            contexts.append(
+                HCPContext(
+                    hcp_id=hcp_id,
+                    therapeutic_area_id=ta_id,
+                    therapeutic_area_name=ta_name_map.get(ta_id, ta_id),
+                    first_name=hcp.get("first_name"),
+                    last_name=hcp.get("last_name"),
+                    institution=hcp.get("institution"),
+                    country=hcp.get("country"),
+                    cohort_classification="community",
+                    # NO SCORE, DELIBERATELY. Community is not ranked and the four score
+                    # columns are NULL; passing None here keeps every downstream reader
+                    # honest instead of printing a fabricated 0.
+                    cohort_score=None,
+                    composite_score=None,
+                    pub_velocity_pct=None,
+                    citation_trajectory_pct=None,
+                    trial_investigator_pct=None,
+                    first_pub_year=safe_int(hcp.get("first_pub_year")),
+                    total_career_pubs=safe_int(hcp.get("total_career_pubs")),
+                    pharma_engagement_lifetime=safe_float(ops.get("total_payments_lifetime")),
+                    pharma_companies_distinct=safe_int(ops.get("distinct_companies_lifetime")),
+                    percentile_data={},
+                    therapeutic_area_slug=ta_slug_map.get(ta_id, ""),
+                    community_facts=cfacts,
+                )
+            )
+
     for cohort, cohort_scores in scores_by_cohort.items():
-        if cohort == "established":
+        if cohort in ("established", "community"):
             continue
         config = COHORT_SCORE_CONFIG[cohort]
         if "score_fields" not in config:
@@ -1789,36 +2258,134 @@ def format_hcp_facts_established(ctx: HCPContext) -> str:
 
 
 def format_hcp_facts_community(ctx: HCPContext) -> str:
-    """Build prompt fact list for a Community-cohort HCP. Reads from ctx.percentile_data dict."""
+    """Build the prompt fact list for a Community-cohort HCP -- DISPLAYED FACTS ONLY.
+
+    Rewritten 2026-09-18. The previous version led with "Cohort Score" and four
+    within-TA percentiles; all five are NULL corpus-wide (the composite freeze), so the
+    prompt either said "Unknown" or omitted them, and the model was left characterising a
+    physician from a name and a dollar figure. Nothing below is a score, a rank or a
+    percentile.
+
+    ABSENCE IS STATED, NOT OMITTED. A community physician with no publications is the
+    normal case, not a gap, and the prose must be able to say so -- the v1.0 lung
+    narratives already do ("Despite a practice-first profile with no formal publication
+    record..."). Silently dropping the line invites the model to infer a record.
+    """
+    f = ctx.community_facts or CommunityFacts()
     lines = [
         f"HCP: {ctx.first_name or ''} {ctx.last_name or ''}".strip(),
-        f"Institution: {ctx.institution or 'Unknown'}",
-        f"Country: {ctx.country or 'Unknown'}",
         f"Therapeutic Area: {ctx.therapeutic_area_name}",
-        f"Cohort: Community (top visible board by cohort_score within TA)",
-        f"Cohort Score: {ctx.cohort_score if ctx.cohort_score is not None else 'Unknown'}",
+        "Cohort: Community (a qualifying board member; community is NOT ranked and carries no score)",
     ]
-    if ctx.first_pub_year is not None:
-        career_years = datetime.now(timezone.utc).year - ctx.first_pub_year
-        lines.append(f"Career Length: ~{career_years} years (first publication {ctx.first_pub_year})")
-    if ctx.total_career_pubs is not None:
-        lines.append(f"Total Career Publications: {ctx.total_career_pubs}")
-    pd = ctx.percentile_data or {}
-    if "pharma_engagement" in pd:
-        lines.append(f"Pharma Engagement Score: {pd['pharma_engagement']}th percentile within TA")
-    if "engagement_breadth" in pd:
-        lines.append(f"Engagement Breadth: {pd['engagement_breadth']}th percentile within TA")
-    if "medicare_volume" in pd:
-        lines.append(f"Medicare Patient Volume: {pd['medicare_volume']}th percentile within TA")
-    if "career_stage" in pd:
-        lines.append(f"Career Stage Score: {pd['career_stage']}th percentile within TA")
-    # Emit engagement facts only when there is real engagement: $0/null lifetime
-    # spend must produce NO engagement lines, or the model asserts engagement
-    # for HCPs who have none.
+
+    # Practice identity.
+    #
+    # AN UNPOPULATED FIELD IS NOT A MEASURED ABSENCE, AND EVERY LINE HERE NAMES WHICH IT IS.
+    # This block previously printed "Affiliation on record: none — practice-based, no
+    # institutional affiliation held" whenever institution_normalized was NULL. That is a
+    # positive claim about how someone practises, asserted from an empty column:
+    # institution_normalized is populated for 19 of the 867 colorectal cut (2026-09-18), so
+    # the sentence was being manufactured for 848 named physicians. The other fields were
+    # worse in a quieter way -- specialty, setting and career length were simply OMITTED
+    # when null, which tells the model nothing and lets it fill the silence.
+    #
+    # Coverage across that same cut, for why each line reads as it does:
+    #   city/state 867  ·  specialty 339  ·  setting 341  ·  career years 341  ·  institution 19
+    if f.specialty:
+        lines.append(f"Specialty (NPPES): {f.specialty}")
+    else:
+        lines.append("Specialty (NPPES): not recorded in NPPES for this physician — unknown, not 'none'")
+    if f.practice_setting:
+        lines.append(f"Practice setting: {f.practice_setting}")
+    else:
+        lines.append("Practice setting: not recorded — unknown, do NOT infer solo, group or hospital")
+    location = ", ".join(x for x in [f.city, f.state] if x) or ctx.country or None
+    if location:
+        lines.append(f"Practice location: {location}")
+    else:
+        lines.append("Practice location: not recorded")
+    if ctx.institution:
+        lines.append(f"Affiliation on record: {ctx.institution}")
+    else:
+        lines.append(
+            "Affiliation on record: FIELD IS EMPTY — we hold no institution for this "
+            "physician. This is an unpopulated field, NOT evidence that they practise "
+            "independently. Do not describe them as practice-based, independent, "
+            "unaffiliated, or community-only on the strength of it"
+        )
+    if f.nppes_career_years is not None:
+        lines.append(f"Years since NPI enumeration: {f.nppes_career_years}")
+    else:
+        lines.append("Years since NPI enumeration: not recorded — career length unknown")
+
+    # Evidence tier, explained in ITS OWN MODEL'S TERMS
+    if f.evidence_tier:
+        lines.append(f"Evidence tier: {f.evidence_tier}")
+        if f.tier_meaning:
+            lines.append(f"What that tier means here: {f.tier_meaning}")
+
+    # Part B — administered claims against THIS area's code set
+    if f.part_b_codes:
+        years = (
+            f" in {', '.join(str(y) for y in f.part_b_years)}" if f.part_b_years else ""
+        )
+        lines.append(
+            f"Part B claims against this area's code set: {', '.join(f.part_b_codes)}{years}"
+        )
+    if f.part_b_beneficiaries_3yr is not None:
+        lines.append(
+            f"Medicare Part B reach: {f.part_b_beneficiaries_3yr:,} beneficiaries over three years"
+        )
+    else:
+        lines.append(
+            "Medicare Part B reach: not computed for this therapeutic area — unmeasured, NOT zero"
+        )
+
+    # Part D — only as specific as the data permits
+    if f.part_d_present is None:
+        lines.append("Part D oncology record: unknown")
+    elif not f.part_d_present:
+        lines.append("Part D oncology record: none observed")
+    elif f.part_d_scoped and f.part_d_stems:
+        lines.append(
+            f"Part D oral agents for this area: {', '.join(f.part_d_stems)}"
+        )
+    elif f.part_d_scoped:
+        lines.append(
+            "Part D oncology record: present, but none of the oral agents are specific to "
+            "this therapeutic area"
+        )
+    else:
+        lines.append(
+            "Part D oncology record: present (oncology-wide; this dataset is not scoped to "
+            "a single tumour type, so do NOT attribute it to this therapeutic area)"
+        )
+
+    # Publications — INCLUDING zero
+    if f.publications_in_corpus is None:
+        lines.append(
+            "Publications in the FieldMark corpus: not indexed — no OpenAlex record. "
+            "Expected for a community physician; this is unmeasured, not a count of zero"
+        )
+    elif f.publications_in_corpus == 0:
+        lines.append(
+            "Publications in the FieldMark corpus: 0 — no published literature. This is the "
+            "normal case for a practising community physician and is NOT a deficiency"
+        )
+    else:
+        lines.append(f"Publications in the FieldMark corpus: {f.publications_in_corpus}")
+
+    # Open Payments — emitted only when real: $0/null must produce NO engagement line, or
+    # the model asserts engagement for someone who has none.
     if ctx.pharma_engagement_lifetime:
-        lines.append(f"Lifetime Pharma Engagement: ${ctx.pharma_engagement_lifetime:,.0f}")
+        lines.append(f"Open Payments, lifetime total: ${ctx.pharma_engagement_lifetime:,.0f}")
     if ctx.pharma_companies_distinct:
-        lines.append(f"Distinct Pharma Companies (lifetime): {ctx.pharma_companies_distinct}")
+        lines.append(f"Open Payments, distinct companies: {ctx.pharma_companies_distinct}")
+    if not ctx.pharma_engagement_lifetime and not ctx.pharma_companies_distinct:
+        lines.append(
+            "Open Payments: no record — CMS holds no payment record for this physician. "
+            "Absence of a record, not absence of relationships"
+        )
     return "\n".join(lines)
 
 
@@ -2217,27 +2784,48 @@ def build_prompt_established(ctx: HCPContext) -> str:
 
 
 def build_prompt_community(ctx: HCPContext) -> str:
-    """Prompt for Community cohort — active community physician framing."""
+    """Prompt for the Community cohort — a practising physician, described from claims.
+
+    REWRITTEN 2026-09-18, ALONGSIDE THE FACTS-BASED CONTEXT. Three things were wrong with
+    the version this replaces, all of them invitations to assert what we do not hold:
+
+      1. It opened "algorithmically selected as a top Community-cohort name ... with
+         meaningful patient volume". Community is NOT RANKED -- there is no top -- and
+         patient volume is unmeasured for any TA whose Medicare aggregator has not run.
+         Both halves were asserted to the model as given.
+      2. It said "Percentile data below is computed within the community cohort in their
+         TA". No percentile has been supplied since the composite freeze; the line
+         described a section of the prompt that is not there.
+      3. Its only real lever was pharma engagement, so narratives about physicians with a
+         claims record and no Open Payments row had almost nothing to stand on.
+
+    The evidence tier and its MEANING now carry the brief, and the meaning is read per
+    TIER MODEL from COMMUNITY_EVIDENCE_MODELS -- so an anchored colorectal physician is
+    described by an administered Part B pattern and an anchored lung physician by an oral,
+    from one prompt with no TA branch in it.
+    """
     facts = format_hcp_facts(ctx, "community")
     has_engagement = bool(ctx.pharma_engagement_lifetime)
-    if has_engagement:
-        selection_framing = (
-            "This HCP has been algorithmically selected as a top Community-cohort name within their therapeutic area — a practicing clinician with meaningful patient volume, industry engagement experience, and demonstrated openness to medical affairs interaction. "
-        )
-        no_engagement_rule = ""
-    else:
-        selection_framing = (
-            "This HCP has been algorithmically selected as a top Community-cohort name within their therapeutic area — a practicing clinician with meaningful patient volume. "
-        )
-        no_engagement_rule = (
-            "- IMPORTANT: This HCP has NO recorded pharma engagement data. Ground every field in patient volume and clinical practice ONLY. Do NOT assert or imply industry engagement, engagement history, medical-affairs interaction, sponsored exchange, or openness to industry — no such data exists for this HCP.\n"
-        )
+    no_engagement_rule = (
+        ""
+        if has_engagement
+        else "- NO OPEN PAYMENTS RECORD EXISTS for this physician. Ground every field in the "
+             "claims record and practice facts ONLY. Do NOT assert or imply industry "
+             "engagement, engagement history, medical-affairs interaction or openness to "
+             "industry — no such data exists here.\n"
+    )
     prompt = (
-        "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL about an active community physician. "
-        + selection_framing +
-        "They are NOT framed as a researcher or KOL; they are a practitioner. "
-        "The MSL value here is patient-care impact, real-world treatment patterns, and practical clinical perspective — not citation metrics or trial leadership. "
-        "Percentile data below is computed within the community cohort in their TA.\n\n"
+        "You are writing a medical-affairs-safe intelligence brief for a pharmaceutical MSL "
+        "about a practising community physician.\n\n"
+        "They are a PRACTITIONER, not a researcher and not a KOL. The MSL value is "
+        "real-world treatment patterns, patient-care impact and practical clinical "
+        "perspective — never citation metrics or trial leadership.\n\n"
+        "THE EVIDENCE TIER IS THE SPINE OF THIS BRIEF. The facts below state the tier and "
+        "what that tier means for THIS therapeutic area. Describe the physician in those "
+        "terms and no others: if the tier rests on administered Part B claims, the brief is "
+        "about an administered treatment pattern; if it rests on an oral prescription, it is "
+        "about prescribing. Do not import the vocabulary of one into the other, and do not "
+        "name a drug class the facts do not name.\n\n"
         "Return ONLY valid JSON with exactly these five fields:\n"
         "{\n"
         '  "narrative": "string (exactly 3 sentences)",\n'
@@ -2248,26 +2836,38 @@ def build_prompt_community(ctx: HCPContext) -> str:
         "}\n\n"
         "Constraints:\n"
         + no_engagement_rule +
-        (
-            "- narrative: exactly 3 sentences. Frame as an active community physician with patient-care impact and industry engagement experience. Reference practice setting, pharma engagement history, and breadth of industry relationships. Do NOT frame as a researcher or KOL — they're a practitioner.\n"
-            if has_engagement else
-            "- narrative: exactly 3 sentences. Frame as an active community physician with patient-care impact. Reference practice setting and patient volume. Do NOT frame as a researcher or KOL — they're a practitioner. Do NOT reference pharma engagement or industry relationships.\n"
-        ) +
-        (
-            "- why_now: exactly 1 sentence. Why an MSL would engage now — recent prescribing patterns, current engagement breadth, or career-stage signals.\n"
-            if has_engagement else
-            "- why_now: exactly 1 sentence. Why an MSL would engage now — recent prescribing patterns, patient volume, or career-stage signals; do not cite engagement history.\n"
-        ) +
-        "- engagement_angle: exactly 2 sentences. Suggest topics relevant to a community physician's practice — patient case discussion, clinical pearls, real-world evidence rather than basic science. Tone should be practical.\n"
-        "- signal_strength: exactly 1 sentence. Honest confidence statement. Community signals are different from research signals — say so if relevant.\n"
-        "- caution_flags: 1 sentence OR the JSON literal null. Use null in most cases — high pharma engagement in Community is common and not inherently a flag. Only populate when there is a SPECIFIC actionable concern: engagement breadth so extreme it suggests low signal per relationship (e.g., 30+ companies), evidence of recent inactivity, or specific competitor saturation. Do NOT use this field to hedge.\n"
-        "- No markdown. No text outside JSON.\n"
-        "- Do not name specific drug brands or NCT trial numbers.\n\n"
-        "HCP context:\n"
+        "- narrative: exactly 3 sentences. Open on what the claims record shows this "
+        "physician DOES — the evidence tier in its own terms. Then practice setting, "
+        "specialty and location. Frame as an active clinician, never as a researcher.\n"
+        "- why_now: exactly 1 sentence. Why an MSL would engage now, from the treatment "
+        "pattern, the reach, or the career stage. Never from a rank or a score.\n"
+        "- engagement_angle: exactly 2 sentences. Practical topics for a practising "
+        "clinician — case discussion, real-world outcomes, sequencing and tolerability — "
+        "not basic science.\n"
+        "- signal_strength: exactly 1 sentence. An honest confidence statement. Say plainly "
+        "where the record is thin.\n"
+        "- caution_flags: 1 sentence OR the JSON literal null. Use null in most cases. "
+        "Populate only for a SPECIFIC actionable concern: engagement breadth so extreme it "
+        "suggests low signal per relationship (30+ companies), or evidence of recent "
+        "inactivity. Do NOT use this field to hedge.\n"
+        "\n"
+        "ABSOLUTE RULES — these describe a real, named physician:\n"
+        "- NEVER state or imply a rank, a score, a percentile, or that they are a 'top' "
+        "anything. Community is not ranked. There is no score behind this brief.\n"
+        "- A fact marked unmeasured, not indexed, or 'not computed' is NOT zero and NOT a "
+        "weakness. Never convert an absence into a low value, and never describe an absent "
+        "measurement as if it were a measured one.\n"
+        "- ZERO PUBLICATIONS IS NORMAL and is not a deficiency. If you mention it, mention "
+        "it as the practice-first profile it is.\n"
+        "- Claims and prescribing records carry NO DIAGNOSIS. Never assert what condition a "
+        "patient had, and never infer a treated population size from a claim count.\n"
+        "- Do not name drug brands or NCT numbers. Generic agent or class names only, and "
+        "only where the facts below name them.\n"
+        "- No markdown. No text outside the JSON.\n\n"
+        "HCP facts:\n"
         f"{facts}\n"
     )
     return prompt
-
 
 def build_prompt(ctx: HCPContext) -> str:
     """Route to cohort-specific prompt template."""
@@ -2506,6 +3106,7 @@ def run_pipeline(
     established_top_n: int,
     dry_run: bool,
     force: bool,
+    plan_only: bool = False,
     target_version: str = "v1",
     single_hcp_id: Optional[str] = None,
     ta_slug: Optional[str] = None,
@@ -2562,34 +3163,48 @@ def run_pipeline(
             f"{hcp_rows[0].get('first_name') or ''} {hcp_rows[0].get('last_name') or ''}"
         ).strip()
         if expected_cohort == "community":
-            # Community membership (NSCLC only, G2 cutover): refuse single-HCP
-            # regeneration for an HCP the board no longer shows. Qualifies via
-            # community_board_nsclc_v1.qualifies, or any non-NSCLC community
-            # rank row (other TAs are ungated) — same read-layer rule as the
-            # board RPCs and the batch selector.
-            gate_resp = (
-                supabase.table(COMMUNITY_BOARD_VIEW)
-                .select("hcp_id")
-                .eq("hcp_id", single_hcp_id)
-                .eq("qualifies", True)
-                .limit(1)
-                .execute()
-            )
-            if not (gate_resp.data or []):
-                gate_resp = (
+            # Community membership gate (G2 cutover; DE-PINNED 2026-09-18): refuse
+            # single-HCP regeneration for an HCP the board no longer shows. Qualifies via
+            # community_board_v1.qualifies for a BOARD TA, or a community scores row for a
+            # TA with no board (those stay ungated) — the same read-layer rule as the batch
+            # selector, and it has to stay the same or a single regen can mint a narrative
+            # the batch run would never have produced.
+            #
+            # BOTH ARMS ARE NOW TA-SCOPED. The board arm asked community_board_nsclc_v1
+            # with no TA at all, so a colorectal HCP was gated on their LUNG membership;
+            # the fallback arm then said "any TA that is not NSCLC", which let a hepatology
+            # scores row satisfy a colorectal regen. Both are scoped to the visible TAs,
+            # split by whether the TA has a board.
+            gate_ta_ids = [str(t) for t in (visible_ta_ids_for_gate or [])]
+            boards = board_ta_ids(supabase)
+            board_scoped = [t for t in gate_ta_ids if t in boards]
+            unboarded = [t for t in gate_ta_ids if t not in boards]
+            gate_rows = []
+            if board_scoped:
+                gate_rows = (
+                    supabase.table(COMMUNITY_BOARD_VIEW)
+                    .select("hcp_id")
+                    .eq("hcp_id", single_hcp_id)
+                    .eq("qualifies", True)
+                    .in_("ta_id", board_scoped)
+                    .limit(1)
+                    .execute()
+                ).data or []
+            if not gate_rows and unboarded:
+                gate_rows = (
                     supabase.table("hcp_community_scores_v2")
                     .select("hcp_id")
                     .eq("hcp_id", single_hcp_id)
-                    .neq("therapeutic_area_id", COMMUNITY_GATE_NSCLC_TA_ID)
+                    .in_("therapeutic_area_id", unboarded)
                     .limit(1)
                     .execute()
-                )
-            if not (gate_resp.data or []):
+                ).data or []
+            if not gate_rows:
                 raise ValueError(
-                    f"HCP {single_hcp_id} is not a Community board member "
-                    "(community_board_nsclc_v1.qualifies = false and no "
-                    "non-NSCLC community rank row) — excluded from the board, "
-                    "no narrative should be generated."
+                    f"HCP {single_hcp_id} is not a Community board member for the visible "
+                    f"TAs (community_board_v1.qualifies is false across {board_scoped or 'no board TA'} "
+                    f"and no community scores row in {unboarded or 'no unboarded TA'}) — "
+                    "excluded from the board, no narrative should be generated."
                 )
         print(f"Single-HCP mode: {hcp_name or single_hcp_id} ({single_hcp_id})")
         print(f"Cohort cross-check passed: {expected_cohort}")
@@ -2644,6 +3259,38 @@ def run_pipeline(
         cohort_breakdown[ctx.cohort_classification] = (
             cohort_breakdown.get(ctx.cohort_classification, 0) + 1
         )
+
+    # PLAN-ONLY: WHO WOULD BE GENERATED, AT ZERO COST. --dry-run is not a zero-cost
+    # check -- it makes one real sample call -- so verifying a SELECTION change (a
+    # repointed view, a changed tier cut, a new TA) had no honest path that did not
+    # bill. This exits before the API key is even read.
+    if plan_only:
+        print("=== PLAN ONLY — no API call, no DB write ===")
+        print(f"Target set: {len(contexts)} narrative(s)")
+        by_pair: Dict[str, int] = {}
+        for ctx in contexts:
+            key = f"{ctx.therapeutic_area_name} / {ctx.cohort_classification}"
+            by_pair[key] = by_pair.get(key, 0) + 1
+        for key in sorted(by_pair):
+            print(f"  {key}: {by_pair[key]}")
+        preview = 10
+        print(f"\nFirst {min(preview, len(contexts))} in selection order:")
+        for i, ctx in enumerate(contexts[:preview], 1):
+            name = f"{ctx.first_name or ''} {ctx.last_name or ''}".strip() or "(no name)"
+            print(
+                f"  {i:>3}. {name}  [{ctx.therapeutic_area_name}]"
+                f"  {ctx.institution or 'no institution on record'}  {ctx.hcp_id}"
+            )
+        # THE FULL RENDERED CONTEXT FOR ONE HCP. The counts above say how many; this says
+        # what the model would actually be handed. Reviewing a prompt change without
+        # reading one is how lung wording reaches a colorectal brief.
+        if contexts:
+            sample = contexts[0]
+            sname = f"{sample.first_name or ''} {sample.last_name or ''}".strip()
+            print(f"\n=== Rendered context - {sname} ({sample.hcp_id}) ===")
+            print(build_prompt(sample))
+            print("=== end rendered context - NO API CALL WAS MADE ===")
+        return (0, 0)
 
     # Cost estimate (+1 sample call in dry-run for cohort mode only)
     num_calls = len(contexts) + (1 if dry_run and not single_hcp_id else 0)
@@ -2805,7 +3452,16 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Compute cohort sizes and estimated cost, but don't call API or write to DB",
+        help="Compute cohort sizes and estimated cost, then generate ONE SAMPLE narrative "
+             "(a real, billed API call) and exit without DB writes. Use --plan-only to "
+             "verify selection at zero cost.",
+    )
+    parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Report exactly who would be generated -- count, per-TA/per-cohort breakdown "
+             "and the first names in selection order -- then exit. Makes NO API call and "
+             "needs no ANTHROPIC_API_KEY. This is the flag for verifying a selection change.",
     )
     parser.add_argument(
         "--force",
@@ -2877,6 +3533,7 @@ def main() -> int:
             established_top_n=args.established_top,
             dry_run=args.dry_run,
             force=args.force,
+            plan_only=args.plan_only,
             target_version=args.target_version,
             single_hcp_id=args.hcp_id,
             ta_slug=args.ta,
