@@ -82,3 +82,4 @@ no_fit_*.json
 failed_batches_*.json
 
 docs/ta_plan_*.txt
+docs/**/*_out.txt
