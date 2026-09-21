@@ -50,7 +50,7 @@ import RisingHcpProfile from "./RisingHcpProfile";
 import { CANON, FACE } from "../../lib/canonicalTokens";
 import { useProfileTa } from "../../lib/profileTa";
 import { taLabelForSlug } from "../../lib/taLabels";
-import { COM_CONFIG } from "../../lib/cohortLedger";
+import { COMMUNITY_PROFILE_TA_SLUGS } from "../../lib/cohortLedger";
 
 export default function ProfileDispatch() {
   const { id } = useParams<{ id: string }>();
@@ -92,15 +92,21 @@ export default function ProfileDispatch() {
   // COMMUNITY IS STILL NSCLC-ONLY (Phase 3). community_hcp_profile reads
   // community_board_nsclc_v1 and hcp_nsclc_evidence_tier_v1, neither of which takes a TA, so
   // rendering the community shell for another area would show LUNG evidence tiers under that
-  // area's name. An explicit absence is the honest alternative, and it is the same boundary
-  // the ledger draws for its Community cohort.
+  // area's name. An explicit absence is the honest alternative.
+  //
+  // THIS IS NO LONGER THE SAME BOUNDARY THE LEDGER DRAWS (2026-09-11). It was, and the
+  // sentence here used to say so. The Community LEDGER now serves colorectal as well as
+  // lung, because its board and count RPCs take p_ta_id; the two PROFILE RPCs still do not.
+  // So a colorectal community physician is reachable on the board and has no profile, and
+  // this gate is narrower than cohortServesTa on purpose. COMMUNITY_PROFILE_TA_SLUGS is the
+  // narrower list and must not be swapped for COM_CONFIG.boardTaSlugs.
   if (route === "community" && ta.status === "resolved"
-      && COM_CONFIG.pinnedTaSlug && ta.slug !== COM_CONFIG.pinnedTaSlug) {
+      && !COMMUNITY_PROFILE_TA_SLUGS.includes(ta.slug)) {
     return (
       <Absence
         eyebrow={`COMMUNITY PROFILE UNAVAILABLE · ${taLabelForSlug(ta.slug).toUpperCase()}`}
-        head={`The community profile is only built for ${taLabelForSlug(COM_CONFIG.pinnedTaSlug)} so far.`}
-        body={`This person is not on the ${taLabelForSlug(ta.slug)} established or rising board, so the community view is the one that applies — and it rests on an evidence ladder that is curated per area. ${taLabelForSlug(ta.slug)} has not been curated yet, so there is nothing to show. Their lung-cancer profile, if they have one, is at ?ta=${COM_CONFIG.pinnedTaSlug}.`}
+        head={`The community profile is only built for ${COMMUNITY_PROFILE_TA_SLUGS.map(taLabelForSlug).join(" and ")} so far.`}
+        body={`This person is not on the ${taLabelForSlug(ta.slug)} established or rising board, so the community view is the one that applies — and it rests on an evidence ladder that is curated per area. ${taLabelForSlug(ta.slug)} has not been curated yet, so there is nothing to show. Their lung-cancer profile, if they have one, is at ?ta=${COMMUNITY_PROFILE_TA_SLUGS[0]}.`}
       />
     );
   }
