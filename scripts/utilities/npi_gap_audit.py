@@ -203,6 +203,17 @@ def fetch_hcps_gap_cohort(supabase: Client) -> List[Dict[str, Any]]:
                 )
                 .is_("npi_number", "null")
                 .not_.is_("state", "null")
+                # LEGACY TABLE, LEGACY SPELLING -- "USA" IS CORRECT HERE. This reads
+                # `hcps`, the v1 table: 327,154 rows, frozen since 2026-07-02, sharing
+                # ZERO ids with hcps_v2. Its majority spelling is "USA" (72,500 against
+                # 5,269 "US"), the inverse of hcps_v2.
+                #
+                # So this line is NOT on the other side of the hcps_v2 country split and
+                # docs/country_normalisation does not touch it. Changing it to "US" to
+                # match that cleanup would cut this query from 72,500 candidates to 5,269
+                # -- causing the blindness the cleanup exists to prevent. Repointing this
+                # script at hcps_v2 is a real change with its own blast radius; the
+                # spelling is not the thing standing in its way.
                 .eq("country", "USA")
                 .range(offset, offset + PAGE_SIZE - 1)
                 .execute()

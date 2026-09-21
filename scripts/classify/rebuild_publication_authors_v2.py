@@ -120,6 +120,13 @@ def normalize_institution_for_match(s: Optional[str]) -> str:
 
 
 def normalize_country_code(raw: Optional[str]) -> str:
+    # REVIEWED 2026-09-15 FOR THE COUNTRY NORMALISATION AND DELIBERATELY UNCHANGED.
+    # This is a NORMALISER, not a filter: it already maps both legacy spellings onto
+    # the canonical "US", which is exactly the behaviour the cleanup wants. The other
+    # three tolerant readers were narrowed because they used a two-spelling tuple to
+    # DECIDE something; this one uses it to CONVERT, so accepting "USA" on input is
+    # the feature. Narrowing it would start emitting "USA" unchanged through the
+    # len(s) == 2 / s[:2] fallthrough below -- reintroducing the split it prevents.
     if not raw:
         return ""
     s = str(raw).strip().upper()
