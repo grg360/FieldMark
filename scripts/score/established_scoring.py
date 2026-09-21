@@ -259,8 +259,16 @@ def safe_int(value: Any, default: int = 0) -> int:
 
 
 def is_us_country(country: Optional[str]) -> bool:
+    # ONE SPELLING: "US". This reads hcps_v2 (load_established_hcps, line ~330), which
+    # holds "US" only as of docs/country_normalisation/02 and is held there by the
+    # hcps_v2_country_not_usa CHECK. Accepting "USA" too would make this function unable
+    # to notice the split coming back -- which is precisely how the last one survived.
+    #
+    # strip().upper() STAYS. It guards casing and padding, which the CHECK does not and
+    # which no measurement has ruled out for future writers; it is not the tolerance that
+    # hid the split.
     c = (country or "").strip().upper()
-    return c in ("US", "USA")
+    return c == "US"
 
 
 # ---------------------------------------------------------------------------

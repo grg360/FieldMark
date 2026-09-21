@@ -429,7 +429,14 @@ def build_hcp_payload(
             # A selection criterion that is not persisted cannot be re-derived, checked, or
             # queried. Write it down.
             "npi_taxonomy": primary_taxonomy(row),
-            "country": "USA",
+            # ONE SPELLING: 'US'. This line and its twin below are where the second
+            # spelling came from -- 19,304 rows of it, which is this workstream's own
+            # population. hcps_v2.country is compared with `= 'US'` by community_board_v1,
+            # hcp_evidence_tier_v1 and the whole get_community_filtered family, so a row
+            # written 'USA' is invisible to every board no matter what its claims say.
+            # Normalised by docs/country_normalisation/02 and now refused by the
+            # hcps_v2_country_not_usa CHECK, so writing 'USA' here fails loudly.
+            "country": "US",
             "total_career_pubs": 0,
             "career_first_pub_year": None,
             "cohort_classification": "community",
@@ -441,7 +448,9 @@ def build_hcp_payload(
         "npi_number": npi,
         "credentials": normalize_credentials(row.get("credentials")),
         "state": state if state else None,
-        "country": "USA",
+        # ONE SPELLING: 'US'. See the note on the insert payload above -- same column,
+        # same reason, and this is the path that wrote most of the 19,304.
+        "country": "US",
         "city": city if city else None,
         "institution_short": None,
         "middle_name": middle,

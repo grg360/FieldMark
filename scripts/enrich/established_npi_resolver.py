@@ -227,7 +227,14 @@ def cmd_match(args) -> None:
             for a, b, c, d, e, g in cur.fetchall()]
     con.close()
 
-    us = [r for r in rows if r["country"] in ("US", "USA", "")]
+    # ONE SPELLING: hcps_v2.country holds "US" only as of
+    # docs/country_normalisation/02, and a CHECK now enforces it -- so "USA" here is
+    # dead weight that would hide a regression rather than survive one. This query reads
+    # hcps_v2 (see the JOIN above), so it IS on the normalised side of the split.
+    # "" IS DELIBERATELY KEPT and is not a US spelling: it is the unknown-country bucket,
+    # which this resolver includes on purpose -- the print below calls the set
+    # "US/unknown", and NPPES is exactly how an unknown country gets resolved.
+    us = [r for r in rows if r["country"] in ("US", "")]
     print(f"[{args.ta}] no-NPI Established: {len(rows)} | US/unknown (querying NPPES): {len(us)} "
           f"| taxonomy allow-list: {allow}")
 

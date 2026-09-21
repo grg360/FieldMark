@@ -87,7 +87,17 @@ REQUEST_TIMEOUT_SECONDS = 20
 API_SLEEP_SECONDS = 0.1
 HCPS_PAGE_SIZE = 1000
 
-US_COUNTRY_CODES = ("US", "USA")
+# ONE SPELLING: hcps_v2.country holds "US" only (docs/country_normalisation/02, enforced
+# by the hcps_v2_country_not_usa CHECK). A tolerant tuple here is what let the split live:
+# readers that accept both spellings never report either as wrong.
+#
+# SCOPED TO THE v2 PATH, WHICH IS THE ONLY ONE THIS FILTER RUNS ON. get_table_name()
+# resolves "hcps" -> hcps_v2 under target_version="v2"; the v1 branch is a separate query
+# that filters on derived_state and never reads country. v1 targets the legacy `hcps`
+# table, which is frozen (last write 2026-07-02), shares no ids with hcps_v2 and still
+# holds "USA" as its majority spelling -- so this tuple must not be widened back to cover
+# it. Normalising that table is a separate job with its own blast radius.
+US_COUNTRY_CODES = ("US",)
 
 US_STATES_AND_TERRITORIES = [
     "AL",
