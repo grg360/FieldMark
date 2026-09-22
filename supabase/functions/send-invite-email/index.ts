@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    const appOrigin = (Deno.env.get("APP_ORIGIN") ?? "https://app.besselanalytics.com").replace(/\/$/, "");
+    const appOrigin = (Deno.env.get("APP_ORIGIN") ?? "https://fieldmark.besselanalytics.com").replace(/\/$/, "");
     const fromEmail = Deno.env.get("INVITE_FROM_EMAIL") ?? "FieldMark <invites@besselanalytics.com>";
 
     if (!supabaseUrl || !serviceRoleKey || !resendApiKey) {

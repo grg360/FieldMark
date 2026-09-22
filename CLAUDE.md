@@ -38,7 +38,7 @@ Laptop setup complete (5/29). XPS 13 now a functional FieldMark dev machine.
 
 \- Both work on `foundation-rebuild` directly
 
-\- Cloudflare auto-deploys foundation-rebuild → app.besselanalytics.com
+\- Cloudflare auto-deploys foundation-rebuild → fieldmark.besselanalytics.com
 
 \- Pull before start, push before stop — no exceptions
 
