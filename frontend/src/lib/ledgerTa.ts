@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "./supabase";
 import { getCurrentUser } from "./authHelpers";
-import { taIdForApiSlug, apiSlugForTaId } from "./api";
+import { taIdForApiSlug } from "./api";
+import { loadTaManifest, offerableTas, clearTaManifestCache } from "./taManifest";
 import { deriveTAValue, useTA } from "./TAContext";
 import { parentTaLabelForIndicationSlug, taSlugToLabel, taLabelToSlug } from "./routeSlugs";
 
@@ -51,51 +52,30 @@ export interface AddressableTa {
 }
 
 /**
- * The TAs the picker can offer, read from therapeutic_areas -- NOT a list in this file.
+ * The TAs the picker can offer -- now ta_capability_manifest(), filtered to the ones that
+ * actually have something behind them.
  *
- * Two filters, both derived:
- *   * the frontend must hold an id for it (apiSlugForTaId round-trips), so choosing one
- *     produces a slug the resolver can turn back into a uuid;
- *   * it must be a LEAF among the addressable rows -- a TA that is the parent of another
- *     addressable TA is a grouping, not a board. That drops "oncology" while nsclc and
- *     colorectal-cancer are present, and keeps hepatology and rare-disease, which parent
- *     nothing. No slug is named here, so TA #4 appears the moment it is in TA_ID_MAP.
+ * WHAT THIS USED TO DO, AND WHY IT OFFERED DEAD TAs. It read therapeutic_areas directly and
+ * kept a row if the frontend held an id for it (apiSlugForTaId round-trip) and it was a
+ * LEAF among those rows. Both tests are about ADDRESSABILITY -- can this slug be turned
+ * back into a uuid -- and neither asks whether any board exists. So the picker offered five
+ * TAs of which three had no board in any cohort: hepatology and rare-disease (nothing at
+ * all) and, for two of three cohorts, atopic-dermatitis. Choosing one produced an empty
+ * titled board, which reads as breakage rather than as absence.
+ *
+ * Leaf-ness is still the rule and is still derived, just server-side now (a TA that parents
+ * another is a grouping, which is what drops "oncology"). The round-trip test is gone: the
+ * manifest returns ta_id, so a chosen TA carries its own uuid and nothing needs TA_ID_MAP to
+ * agree. A TA appears here the moment it has a board and its ingestion config admits it.
  */
-let addressableCache: Promise<AddressableTa[]> | null = null;
+export async function loadAddressableTas(): Promise<AddressableTa[]> {
+  const manifest = await loadTaManifest();
+  return offerableTas(manifest).map((c) => ({ slug: c.slug, taId: c.taId, name: c.label }));
+}
 
 /** Cleared on error only; the TA registry does not change within a session. */
 export function clearAddressableTaCache(): void {
-  addressableCache = null;
-}
-
-export async function loadAddressableTas(): Promise<AddressableTa[]> {
-  // Memoised: the ledger's picker and the nav strip's live-tab set both read this, and it is
-  // the same answer for the life of the session. Same shape as getLiveTASlugs in api.ts.
-  if (!addressableCache) {
-    addressableCache = fetchAddressableTas();
-    addressableCache.catch(() => { addressableCache = null; });
-  }
-  return addressableCache;
-}
-
-async function fetchAddressableTas(): Promise<AddressableTa[]> {
-  const { data, error } = await supabase
-    .from("therapeutic_areas")
-    .select("id, name, slug, parent_ta_id")
-    .order("name");
-  if (error || !data) return [];
-  const rows = data
-    .map((r) => ({
-      id: String(r.id),
-      name: (r.name as string) ?? "",
-      slug: (r.slug as string) ?? "",
-      parentId: r.parent_ta_id ? String(r.parent_ta_id) : null,
-    }))
-    .filter((r) => apiSlugForTaId(r.id) === r.slug);
-  const parentIds = new Set(rows.map((r) => r.parentId).filter(Boolean) as string[]);
-  return rows
-    .filter((r) => !parentIds.has(r.id))
-    .map((r) => ({ slug: r.slug, taId: r.id, name: r.name }));
+  clearTaManifestCache();
 }
 
 export function useLedgerTa(sessionDataSlug: string | undefined): LedgerTa {

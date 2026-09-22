@@ -15,7 +15,6 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { taLabelForSlug } from "./lib/taLabels";
 import { useMediaQuery } from "./lib/useMediaQuery";
 import {
   Navigate,
@@ -26,7 +25,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { ArrowUp } from "lucide-react";
-import TelescopeField from "./components/TelescopeField";
+import TelescopeField, { TELESCOPE_TA_SLUGS } from "./components/TelescopeField";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import SignupScreen from "./components/SignupScreen";
 import AuthWrapper from "./components/AuthWrapper";
@@ -261,7 +260,7 @@ function FeedLayout({
 
   // Phase 1a: mirror the URL-resolved TA into TAContext (the URL stays authoritative
   // on feed routes; the context reflects it). No consumer reads it yet.
-  const { setTA } = useTA();
+  const { setTA, manifest } = useTA();
   useEffect(() => {
     setTA(route.taSlug, route.indicationSlug);
   }, [route.taSlug, route.indicationSlug, setTA]);
@@ -295,6 +294,24 @@ function FeedLayout({
   // TA-scoped panels render nothing, so an unknown TA shows an ABSENCE rather than a
   // different TA's data. selectedTA comes from resolveFeedRoute, which only emits registered
   // labels, so null is unreachable today -- these guards are what keep it unreachable.
+  /**
+   * TELESCOPE'S COVERAGE SENTENCE, FROM DATA. It used to be three hardcoded strings naming
+   * Oncology, Immunology, "Atopic Dermatitis", and "Hepatology and Rare Disease" in prose.
+   * That copy had already drifted: it announced Immunology as available while PeopleNavStrip
+   * refused to switch to it, so the app advertised a destination it would not navigate to.
+   *
+   * TWO SOURCES, EACH ANSWERING WHAT IT KNOWS. TELESCOPE_TA_SLUGS is Telescope's own
+   * (bundled subgraphs, not a cohort fact -- the manifest's `surfaces` slot is where it goes
+   * when that is populated); the manifest supplies every NAME, so no TA or domain is spelled
+   * out here and a fourth TA changes this sentence by existing.
+   */
+  const telescopeTas = (manifest ?? []).filter((c) => TELESCOPE_TA_SLUGS.includes(c.slug));
+  const telescopeCoverage =
+    telescopeTas
+      .map((c) => (c.parentLabel ? `${c.parentLabel} (${c.label})` : c.label))
+      .join(" and ") || "no therapeutic area yet";
+  const telescopeHere = telescopeTas.filter((c) => c.parentLabel === selectedTA);
+
   const taApiSlug = taLabelToApiSlug(selectedTA);
   const [indicationCount, setIndicationCount] = useState<number | null>(
     route.indicationCount ?? HOME_INDICATION_COUNT,
@@ -651,14 +668,12 @@ function FeedLayout({
                 marginBottom: "12px",
               }}
             >
-              Telescope is currently available for Oncology ({taLabelForSlug("nsclc")}) and Immunology (Atopic Dermatitis)
+              Telescope is currently available for {telescopeCoverage}
             </div>
             <div style={{ fontSize: "13px", maxWidth: "480px", lineHeight: 1.5 }}>
-              {selectedTA === "Immunology"
-                ? "Select the Atopic Dermatitis indication under Immunology to explore its collaboration network. Other immunology indications are in development."
-                : selectedTA === "Oncology"
-                ? `Select the All or ${taLabelForSlug("nsclc")} indication under Oncology to explore the ${taLabelForSlug("nsclc").toLowerCase()} collaboration network. Other oncology indications are in development.`
-                : `Hepatology and Rare Disease coverage are in development. Select Oncology (${taLabelForSlug("nsclc")}) or Immunology (Atopic Dermatitis) to explore a collaboration network.`}
+              {telescopeHere.length > 0
+                ? `Select ${telescopeHere.map((t) => t.label).join(" or ")} under ${selectedTA} to explore ${telescopeHere.length === 1 ? "its" : "their"} collaboration network. Other ${selectedTA.toLowerCase()} indications are in development.`
+                : `${selectedTA} coverage is in development. Select ${telescopeCoverage} to explore a collaboration network.`}
             </div>
           </div>
         )

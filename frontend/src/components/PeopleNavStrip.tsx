@@ -6,31 +6,39 @@
 // setTrack, buildFeedPath, navigate, useFilterContext), so behavior is byte-identical;
 // only the look + organization change:
 //   Row 1 (SUBJECT): domain (Oncology/Immunology) as a scope label + serif TA tabs for the
-//     LIVE indications + an "All areas · N live · M planned ▾" roadmap dropdown.
+//     LIVE TAs + an "All areas · N live ▾" dropdown (the roadmap half was removed
+//     2026-09-21; see the manifest note below).
 //   Row 2 left (VIEWS): Telescope (mono) — the only remaining view chip after the
 //     2026-07-31 collapse; Pulse / Congress / Social / Field intelligence moved to NavBar.
 //   Row 2 right (SCOPE): Cohort filter (Established / Rising Stars / Community) grouped with
 //     Filters / All-US(territory) / Landscape.
 //   Subject line echoes the current selection.
 //
-// LIVE vs PLANNED is REAL — derived from INDICATIONS_BY_TA[domain].active (the same flag the
-// old IndicationFilter used). Live = active indications (excluding the "All" aggregate);
-// planned = the rest. The config carries no timeframes, so the roadmap lists names only.
+// LIVE COMES FROM THE CAPABILITY MANIFEST (2026-09-21). It used to be derived from
+// INDICATIONS_BY_TA[domain].active, a hand-maintained literal, with "planned" as everything
+// else in that array. PLANNED IS GONE, and the count is why: of the twelve indications the
+// roadmap listed for Oncology, ELEVEN did not exist in therapeutic_areas at all -- they were
+// strings in a TypeScript array. Meanwhile mesothelioma, which IS a real registry row,
+// appeared in neither count because nobody had added it to the literal. A roadmap computed
+// as "everything I typed minus everything that works" is not a fact about the product, and
+// it sat beside a live count that is one.
+//
+// Live now means: a leaf TA with at least one cohort behind it, admitted by its ingestion
+// config. See lib/taManifest.ts.
 //
 // NOTE: the frame's "All" COHORT is intentionally omitted — there is no all-cohorts feed in
 // the data and the brief forbade logic changes; the three real cohort filters are wired. The
 // "All" that remains is the real "All" INDICATION in Row 1.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTrack, type Track } from "../lib/TrackContext";
 import { useTA } from "../lib/TAContext";
 import { useFilterContext, statesFromTerritory } from "../lib/filter-context";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import { INDICATIONS_BY_TA } from "./IndicationFilter";
-import { loadAddressableTas } from "../lib/ledgerTa";
 import { cohortServesTa } from "../lib/cohortLedger";
+import { offerableByDomain, domainIsLive, type TaCapability } from "../lib/taManifest";
 import {
   buildFeedPath,
   resolveIndicationForTaSwitch,
@@ -45,7 +53,7 @@ const MONO = "'IBM Plex Mono', ui-monospace, monospace";
 const HAIR = "rgba(255,255,255,.07)", HAIR_STRONG = "rgba(255,255,255,.12)", HAIR_SOFT = "rgba(255,255,255,.05)";
 const PANEL = "#101013";
 
-const DOMAINS = ["Oncology", "Immunology"];
+// DOMAINS is derived from the manifest inside the component, with domainLive.
 // Views (2026-07-31 collapse): only genuine re-renderings of the same people
 // remain — Telescope here, Landscape as the gold chip in the scope group.
 // Pulse / Congress / Social / Field intelligence left the strip: each is a
@@ -55,6 +63,21 @@ const DOMAINS = ["Oncology", "Immunology"];
 const VIEWS: { key: string; label: string }[] = [
   { key: "skyview", label: "SkyView" },
 ];
+/**
+ * The right-hand meta on a TA row. It used to print "N HCPs" from INDICATIONS_BY_TA.count --
+ * a hand-typed number (Oncology "All" said 6,549; the two live boards are far larger) that
+ * nothing recomputed. Naming the cohorts a TA actually has is a fact the manifest holds, and
+ * it is the fact a reader picking a TA needs: not how many people are in it, but whether the
+ * board they are about to look for exists there.
+ */
+function cohortSummary(cap: TaCapability): string {
+  const parts: string[] = [];
+  if (cap.est) parts.push("EST");
+  if (cap.rs) parts.push("RS");
+  if (cap.com) parts.push("COM");
+  return parts.join(" · ");
+}
+
 const COHORTS: { key: Track; label: string }[] = [
   { key: "established", label: "Established" },
   { key: "rising-stars", label: "Rising Stars" },
@@ -91,7 +114,7 @@ interface Props {
 
 export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, showSubjectLine = true, onPickCohort, showScopeChips = true, onPickTa, dataTaSlug }: Props) {
   const { track, setTrack } = useTrack();
-  const { setTA } = useTA();
+  const { setTA, manifest } = useTA();
   const navigate = useNavigate();
   const { states, setStates, hydrateFromProfile } = useFilterContext();
   const narrow = useMediaQuery("(max-width: 767px)");
@@ -114,43 +137,29 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   // state. Feed navigation stays inert; TA selection is live wherever onPickTa is supplied.
   const taSelectable = !!onPickTa;
 
-  // --- WHICH INDICATIONS ARE LIVE HERE ---
-  // Identity is o.slug throughout; labels are rendered, never compared.
-  const opts = INDICATIONS_BY_TA[taLabel] ?? [];
-  // On a TA-selecting surface the honest predicate is "does this TA have a board", which is
-  // therapeutic_areas + TA_ID_MAP (loadAddressableTas), NOT INDICATIONS_BY_TA.active — that
-  // flag means "the card feed has data for this indication". The two agree for colorectal
-  // today by coincidence, and coincidences of that kind are how the last four TA defects got
-  // in. On the feed the `active` flag remains exactly right, so it is unchanged there.
-  const [addressable, setAddressable] = useState<string[] | null>(null);
-  useEffect(() => {
-    if (!taSelectable) return;
-    let alive = true;
-    void loadAddressableTas().then((tas) => {
-      if (alive) setAddressable(tas.map((t) => t.slug));
-    });
-    return () => { alive = false; };
-  }, [taSelectable]);
-
-  const liveByFlag = opts.filter((o) => o.active && o.slug !== "all");
-  const live = taSelectable
-    // null = still loading. Show only the current TA rather than flashing the feed's set and
-    // then narrowing it -- a tab that appears and disappears reads as a bug.
-    ? (addressable === null
-        ? opts.filter((o) => o.slug === dataTaSlug)
-        : opts.filter((o) => o.slug !== "all" && addressable.includes(o.slug)))
-    : liveByFlag;
-  const planned = taSelectable
-    ? opts.filter((o) => o.slug !== "all" && !live.some((l) => l.slug === o.slug))
-    : opts.filter((o) => !o.active);
+  // --- WHICH TAs ARE LIVE HERE ---
+  // Identity is slug throughout; labels are rendered, never compared. ONE SOURCE FOR BOTH
+  // SURFACES NOW: the feed read INDICATIONS_BY_TA.active ("the card feed has data for this
+  // indication") and the ledger read addressability ("this slug maps to a uuid"). Neither
+  // asked whether a board exists, they answered the same question differently, and they
+  // agreed for colorectal only by coincidence.
+  const domains = offerableByDomain(manifest);
+  const DOMAINS = domains.map((d) => d.domainLabel);
+  // null manifest = still loading. Empty, not a guess: a tab that appears and then
+  // disappears reads as a bug, and a tab rendered from a stale literal reads as a promise.
+  const live: TaCapability[] =
+    manifest === null ? [] : (domains.find((d) => d.domainLabel === taLabel)?.tas ?? []);
 
   // The tab that reads as current. On a TA-selecting surface that is the resolved TA, not
   // route.indicationSlug -- see the dataTaSlug prop note.
   const currentSlug = taSelectable ? (dataTaSlug ?? "") : indicationSlug;
 
-  // Immunology deactivated 2026-07-31: its only target is the card feed. Rendered in the
-  // planned treatment — visible, clearly unavailable, not clickable. Oncology stays live.
-  const domainLive = (d: string) => d === "Oncology";
+  // WAS `(d) => d === "Oncology"`, a literal that outlived its reason. Immunology was
+  // deactivated 2026-07-31 because its only target was the card feed; Atopic Dermatitis has
+  // had an Established board since, is admitted by its ingestion config, and is offered by
+  // the ledger picker -- so the app told users Immunology was live in three places while
+  // this line quietly refused to switch to it. The manifest is the one answer now.
+  const domainLive = (d: string) => domainIsLive(manifest, d);
 
   // --- handlers (identical wiring to the retired components) ---
   const pickDomain = (chip: string) => {
@@ -214,7 +223,7 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   const count = route.indicationCount;
   const territoryLabel = states.length > 0 ? `Territory · ${states.length}` : "All US";
   const landscapeLabel = indicationSlug === "all" ? "Landscape" : `${indicationLabel} landscape`;
-  const moreMeta = `${live.length} live · ${planned.length} planned`;
+  const moreMeta = `${live.length} live`;
 
   // ============================ MOBILE ============================
   if (narrow) {
@@ -286,16 +295,7 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
                   {live.map((o) => (
                     <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && !taSelectable && o.slug !== currentSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
                       <span style={{ fontFamily: SERIF, fontSize: 17, color: o.slug === currentSlug ? GOLD : ledgerMount && !taSelectable ? FAINT : INK }}>{o.label}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{o.count != null ? `${num(o.count)} HCPs` : "Live"}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: "#7d786f", marginTop: 22 }}>On the roadmap · {planned.length}</div>
-                <div style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>
-                  {planned.map((o) => (
-                    <div key={o.slug} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
-                      <span style={{ fontFamily: SERIF, fontSize: 15.5, color: "#6f6b64" }}>{o.label}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: ".14em", textTransform: "uppercase", color: FAINT }}>Planned</span>
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{cohortSummary(o)}</span>
                     </div>
                   ))}
                 </div>
@@ -351,36 +351,19 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
             {taOpen ? (
               <div>
                 <div onClick={() => setTaOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <div style={{ position: "absolute", top: "calc(100% + 1px)", left: -16, zIndex: 50, width: 660, background: PANEL, border: `1px solid ${HAIR_STRONG}`, boxShadow: "0 24px 60px rgba(0,0,0,.6)" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "238px 1fr" }}>
-                    <div style={{ padding: "18px 20px", borderRight: `1px solid rgba(255,255,255,.08)` }}>
+                <div style={{ position: "absolute", top: "calc(100% + 1px)", left: -16, zIndex: 50, width: 300, background: PANEL, border: `1px solid ${HAIR_STRONG}`, boxShadow: "0 24px 60px rgba(0,0,0,.6)" }}>
+                  <div>
+                    <div style={{ padding: "18px 20px" }}>
                       <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 14 }}>Live now · {live.length}</div>
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         {live.map((o) => (
                           <div key={o.slug} onClick={() => pickIndication(o.slug)} style={{ cursor: ledgerMount && !taSelectable && o.slug !== currentSlug ? "default" : "pointer", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
                             <span style={{ fontFamily: SERIF, fontSize: 15.5, color: o.slug === currentSlug ? GOLD : ledgerMount && !taSelectable ? FAINT : INK }}>{o.label}</span>
-                            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{o.count != null ? `${num(o.count)} HCPs` : "Live"}</span>
+                            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".1em", color: "#5b5852" }}>{cohortSummary(o)}</span>
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div style={{ padding: "18px 20px" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
-                        <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".22em", textTransform: "uppercase", color: "#7d786f" }}>On the roadmap · {planned.length}</div>
-                        <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".12em", color: "#4e4b45" }}>Opens as coverage clears review</div>
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 24px" }}>
-                        {planned.map((o) => (
-                          <div key={o.slug} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: `1px solid ${HAIR_SOFT}` }}>
-                            <span style={{ fontFamily: SERIF, fontSize: 14.5, color: "#6f6b64" }}>{o.label}</span>
-                            <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: FAINT }}>Planned</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 20px", borderTop: `1px solid rgba(255,255,255,.08)`, background: "rgba(255,255,255,.015)" }}>
-                    <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: ".14em", textTransform: "uppercase", color: FAINT }}>Planned areas open as coverage clears review</span>
                   </div>
                 </div>
               </div>

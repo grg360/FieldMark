@@ -50,6 +50,7 @@ import {
 import { getHcpWebSignals, type WebSignal } from "../../lib/api";
 import { useLedgerTa, loadAddressableTas, type AddressableTa } from "../../lib/ledgerTa";
 import { useTA } from "../../lib/TAContext";
+import { taManifestSync, cohortAvailable, availableCohortTags, type CohortTag } from "../../lib/taManifest";
 import { supabase } from "../../lib/supabase";
 import { STATUS_LABEL, type RelationshipStatus } from "../../lib/relationships";
 import {
@@ -250,7 +251,7 @@ function fmtReachK(v: number | null | undefined): string {
 // control, driving the addressable /cohorts/ledger/:cohort routes via onPickCohort —
 // URL-addressable where the in-page state was not, and one control system across all
 // people surfaces.
-const COHORT_SLUG_TO_TAG: Record<string, string> = {
+const COHORT_SLUG_TO_TAG: Record<string, CohortTag> = {
   established: "EST",
   "rising-stars": "RS",
   community: "COM",
@@ -1995,17 +1996,68 @@ export default function CohortLedger() {
   const { state: taState, choose: chooseTa } = useLedgerTa(sessionDataSlug);
   const taId = taState.status === "resolved" ? taState.taId : null;
   const taSlug = taState.status === "resolved" ? taState.slug : null;
-  // COM answers only for the TAs that have a community board (cfg.boardTaSlugs, mirroring
-  // ta_evidence_tier_config). Mounting it against any other TA must show an absence, never
-  // another TA's roster and never a blank panel.
-  const cohortOffTa = Boolean(cfg.boardTaSlugs && taSlug && !cfg.boardTaSlugs.includes(taSlug));
-  // The board TAs as display labels, for the absence copy below. Built here rather than
-  // inline so the sentence reads correctly at any length instead of only at one.
-  const boardTaNames = (cfg.boardTaSlugs ?? []).map((s) => taLabelForSlug(s));
+  // EVERY COHORT ANSWERS ONLY FOR THE TAs THAT HAVE ITS BOARD. This used to read
+  // `cfg.boardTaSlugs && ...`, and only COM declared that array -- so EST and RS could never
+  // be "off TA" and mounted against anything. Atopic Dermatitis Rising has zero rows in
+  // every scope and rendered a titled board with none; hepatology and rare-disease did it
+  // for both cohorts. cohortServesTa now asks the manifest per cohort, so all three get the
+  // absence below and an empty titled board is unreachable.
+  // NULL MANIFEST IS NOT AN ABSENCE. While it is loading this stays false and the board
+  // shows its own loading state -- rendering "unavailable" and taking it back a beat later
+  // is worse than waiting, and it is the one way this branch could lie.
+  const cohortOffTa =
+    Boolean(taSlug) && taManifestSync() !== null && !cohortAvailable(cfg.tag, taSlug);
+  // The TAs that DO have this cohort, as display labels, for the absence copy below. Built
+  // here rather than inline so the sentence reads correctly at any length, not only at one.
+  const boardTaNames = (taManifestSync() ?? [])
+    .filter((c) => (cfg.tag === "EST" ? c.est : cfg.tag === "RS" ? c.rs : c.com))
+    .map((c) => c.label);
   const boardTaList =
     boardTaNames.length <= 1
       ? boardTaNames[0] ?? ""
       : `${boardTaNames.slice(0, -1).join(", ")} and ${boardTaNames[boardTaNames.length - 1]}`;
+
+  /**
+   * ONE SENTENCE PER COHORT. The body used to be COM's alone -- an evidence ladder "curated
+   * per area" -- which was the right sentence when COM was the only cohort that could be
+   * off-TA. It is the wrong sentence for Rising: Atopic Dermatitis has no rising board
+   * because nothing has been SCORED for it, not because a ladder is uncurated, and telling a
+   * reader the wrong reason for an absence is its own small lie.
+   *
+   * Each names what is missing and what remains, and the second half is computed -- offering
+   * "Established and Rising Stars" for a TA that has neither would repeat the defect one
+   * line further down.
+   */
+  const otherCohorts = (taSlug ? availableCohortTags(taSlug) : []).filter((t) => t !== cfg.tag);
+  const otherCohortNames = otherCohorts.map((t) => COHORTS.find((c) => c.tag === t)?.title ?? t);
+  const otherCohortList =
+    otherCohortNames.length === 0
+      ? ""
+      : otherCohortNames.length === 1
+        ? otherCohortNames[0]
+        : `${otherCohortNames.slice(0, -1).join(", ")} and ${otherCohortNames[otherCohortNames.length - 1]}`;
+  const thisArea = taSlug ? taLabelForSlug(taSlug) : "this area";
+  const absenceReason =
+    cfg.tag === "COM"
+      ? `The community roster is built on an evidence ladder that is curated per area, and ${thisArea} has not been curated yet.`
+      : cfg.tag === "RS"
+        ? `Rising Stars ranks momentum against a scored cohort, and no rising cohort has been scored for ${thisArea} yet.`
+        : `Established ranks scientific and network influence against a scored cohort, and none has been scored for ${thisArea} yet.`;
+  const absenceBody = otherCohortList
+    ? `${absenceReason} ${otherCohortList} ${otherCohortNames.length === 1 ? "is" : "are"} available for it now.`
+    : `${absenceReason} No cohort is available for it yet — the areas below are the ones this board can answer for.`;
+  // The escape hatch offers a cohort this TA ACTUALLY has, and does not render when there is
+  // none. It used to hardcode /cohorts/ledger/established, which for hepatology or rare
+  // disease would have walked the reader straight into a second empty board.
+  const escapeHatch = (() => {
+    const tag = otherCohorts[0];
+    if (!tag) return null;
+    const c = COHORTS.find((x) => x.tag === tag);
+    // TAG_TO_TRACK already holds exactly the ledger route slugs (established /
+    // rising-stars / community); a second map would be a third thing to keep in step.
+    const slug = TAG_TO_TRACK[tag];
+    return c && slug ? { slug, title: c.title } : null;
+  })();
   const [taChoices, setTaChoices] = useState<AddressableTa[]>([]);
   useEffect(() => {
     if (taState.status !== "unresolved" && !cohortOffTa) return;
@@ -2115,7 +2167,7 @@ export default function CohortLedger() {
   const [open, setOpen] = useState<string | null>(null);
   const loadingMore = useRef(false); // guards concurrent page fetches
   // Community evidence-tier filter (COM only). The vocabulary AND the mount default are
-  // per-TA (see COM_TIER_MODELS in lib/cohortLedger.ts). Both board TAs now open on
+  // per-TA (see COM_TIER_VOCAB in lib/cohortLedger.ts). Both board TAs now open on
   // anchored + supported -- under partb_practice_v1 colorectal's top two tiers mean what
   // lung's mean -- but their VOCABULARIES still differ: lung has heme_dominant and
   // colorectal has no way to emit it.
@@ -2405,12 +2457,14 @@ export default function CohortLedger() {
                 </div>
                 <div style={{ fontFamily: FACE.value, fontSize: 14, fontWeight: 300, color: P.ink3, maxWidth: 620, lineHeight: 1.6, marginBottom: 20, textWrap: "pretty" }}>
                   {cohortOffTa
-                    ? `The community roster is built on an evidence ladder that is curated per area, and ${taSlug ? taLabelForSlug(taSlug) : "this area"} has not been curated yet. Established and Rising Stars are available for it now.`
+                    ? absenceBody
                     : "Nothing in the address, this session, or your profile default named one — so rather than pick an area for you and label the result as though you had chosen it, the ledger is asking."}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {taChoices
-                    .filter((t) => !cohortOffTa || (cfg.boardTaSlugs?.includes(t.slug) ?? true))
+                    // When the cohort is off-TA, offer only TAs that HAVE this cohort --
+                    // otherwise the buttons walk the reader from one absence to the next.
+                    .filter((t) => !cohortOffTa || cohortAvailable(cfg.tag, t.slug))
                     .map((t) => (
                       <button
                         key={t.slug}
@@ -2421,13 +2475,13 @@ export default function CohortLedger() {
                         {t.name.toUpperCase()}
                       </button>
                     ))}
-                  {cohortOffTa ? (
+                  {cohortOffTa && escapeHatch ? (
                     <button
                       type="button"
-                      onClick={() => navigate(`/cohorts/ledger/established?ta=${taSlug ?? ""}`)}
+                      onClick={() => navigate(`/cohorts/ledger/${escapeHatch.slug}?ta=${taSlug ?? ""}`)}
                       style={{ ...mono(11), letterSpacing: ".08em", color: P.ink1, background: "transparent", border: `1px solid ${P.lineMed}`, padding: "9px 14px", cursor: "pointer" }}
                     >
-                      {`ESTABLISHED · ${taSlug ? taLabelForSlug(taSlug).toUpperCase() : ""}`}
+                      {`${escapeHatch.title} · ${taSlug ? taLabelForSlug(taSlug).toUpperCase() : ""}`}
                     </button>
                   ) : null}
                 </div>

@@ -29,11 +29,14 @@ export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
     { slug: "aml", label: "AML", active: false },
     { slug: "breast", label: "Breast", active: false },
     { slug: "prostate", label: "Prostate", active: false },
-    // taId is REQUIRED here, not decoration. getEstablished/getCommunity/getRisingStars
-    // do `filters.taId ?? TA_ID_MAP[taSlug]`, and taSlug for Oncology is hardcoded
-    // "nsclc" (taLabelToApiSlug) - so an active option with no taId serves LUNG rows
-    // under a colorectal chip. Same shape as atopic-dermatitis below.
-    { slug: "colorectal-cancer", label: "Colorectal Cancer", active: true, taId: "a2b28e54-0e0e-48a7-98e1-504f48e45d81" },
+    // taId REMOVED 2026-09-21, and the hazard it guarded is gone with it. The note here
+    // used to say taId was REQUIRED, not decoration: getEstablished/getCommunity/
+    // getRisingStars do `filters.taId ?? TA_ID_MAP[taSlug]` and taSlug for Oncology is
+    // hardcoded "nsclc", so an active option with no taId served LUNG rows under a
+    // colorectal chip. getIndicationTaId now resolves a real TA's uuid from
+    // ta_capability_manifest() by slug, so there is no per-indication field left to forget
+    // and no way for a new indication to be added without one. See routeSlugs.
+    { slug: "colorectal-cancer", label: "Colorectal Cancer", active: true },
     { slug: "bladder", label: "Bladder", active: false },
     { slug: "ovarian", label: "Ovarian", active: false },
     { slug: "kidney", label: "Kidney", active: false },
@@ -58,8 +61,12 @@ export const INDICATIONS_BY_TA: Record<string, IndicationOption[]> = {
     { slug: "cystic-fibrosis", label: "Cystic Fibrosis", active: false },
   ],
   Immunology: [
+    // THE ONE taId THAT STAYS, and it is not a per-TA uuid: "all" is an AGGREGATE with no
+    // therapeutic_areas row, so the manifest has nothing to match it against. It encodes
+    // "Immunology All resolves to AD", which deriveTAValue needs and which is stage 2's to
+    // move. Every INDICATION uuid now comes from the manifest.
     { slug: "all", label: "All", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
-    { slug: "atopic-dermatitis", label: "Atopic Dermatitis", active: true, count: 7462, taId: "9e4139d2-e062-4a58-8728-cdabb2d7dca1" },
+    { slug: "atopic-dermatitis", label: "Atopic Dermatitis", active: true, count: 7462 },
     { slug: "psoriasis", label: "Psoriasis", active: false },
     { slug: "rheumatoid-arthritis", label: "Rheumatoid Arthritis", active: false },
     { slug: "crohns", label: "Crohn's Disease", active: false },

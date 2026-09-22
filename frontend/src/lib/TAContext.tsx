@@ -16,6 +16,7 @@ import {
 import { apiSlugForTaId, taIdForApiSlug } from "./api";
 import { getCurrentUser } from "./authHelpers";
 import { supabase } from "./supabase";
+import { loadTaManifest, type TaCapability } from "./taManifest";
 
 /**
  * TAContext — global source of truth for the current therapeutic area + indication.
@@ -39,6 +40,13 @@ export interface TAValue {
 interface TAContextValue extends TAValue {
   /** Set the current TA from the two canonical slugs (parent + indication). */
   setTA: (parentSlug: string, indicationSlug: string) => void;
+  /**
+   * WHAT EACH TA HAS. One read at mount (see lib/taManifest.ts), null until it lands.
+   * NULL MEANS "NOT YET KNOWN", NEVER "NOTHING IS AVAILABLE" -- a consumer that renders an
+   * absence on null would be claiming a cohort does not exist because a fetch has not
+   * returned yet.
+   */
+  manifest: TaCapability[] | null;
 }
 
 const TAContext = createContext<TAContextValue | null>(null);
@@ -216,6 +224,26 @@ export function TAProvider({ children }: { children: ReactNode }) {
     };
   }, [applyTA]);
 
+  /**
+   * THE CAPABILITY MANIFEST, FETCHED ONCE. Not per surface: the answer is the same for the
+   * life of the session and four separate literals used to hold copies of it.
+   *
+   * loadTaManifest memoises and also fills the module-level cache the pure helpers in
+   * cohortLedger.ts read, so this one call serves both the React consumers below and
+   * comTierFilters / cohortServesTa / cohortAvailable, which are not hooks.
+   *
+   * NO FALLBACK ON FAILURE. It stays null, and every consumer treats null as "not yet
+   * known" rather than as an empty registry -- the same rule as the profile seed above.
+   */
+  const [manifest, setManifest] = useState<TaCapability[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void loadTaManifest()
+      .then((m) => { if (alive) setManifest(m); })
+      .catch(() => { /* leave null; consumers say nothing rather than guess */ });
+    return () => { alive = false; };
+  }, []);
+
   // TEMPORARY (Phase 1a, dev-only): surface the context so Garrett can confirm the
   // value per route in the browser while NO consumer reads it yet. Logs on change +
   // exposes window.__fieldmarkTA. REMOVE/GATE before Phase 1b.
@@ -226,7 +254,7 @@ export function TAProvider({ children }: { children: ReactNode }) {
     console.log("[TAContext]", value);
   }, [value]);
 
-  return <TAContext.Provider value={{ ...value, setTA }}>{children}</TAContext.Provider>;
+  return <TAContext.Provider value={{ ...value, setTA, manifest }}>{children}</TAContext.Provider>;
 }
 
 export function useTA(): TAContextValue {

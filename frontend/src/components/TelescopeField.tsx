@@ -26,6 +26,7 @@ import nsclcEdges from "../data/telescope_nsclc_edges.json";
 import adNodes from "../data/telescope_ad_nodes.json";
 import adEdges from "../data/telescope_ad_edges.json";
 import { taLabelForSlug } from "../lib/taLabels";
+import { taManifestSync } from "../lib/taManifest";
 
 // `cohort` + `rank` are the collaborator's OWN standing, baked by the exporter
 // from the rank tables (cohort = the stronger of the cohorts they hold, by
@@ -40,7 +41,43 @@ interface FNode { id: string; name: string; inst: string; cohort: string; rank: 
 interface OrbNode { name: string; inst: string; cohort: string; srcCohort: string; rank: number | null; w: number; inField: boolean; fieldIndex: number; hcp_id: string; x: number; y: number }
 type Focus = { t: "f"; i: number } | { t: "o"; p: number; k: number };
 
+/**
+ * STILL HERE, AND STILL A TWO-WAY BRANCH, for the two things below that genuinely are one:
+ * which bundled node/edge JSON to build the field from (field(), ~line 241) and the short
+ * "AD"/"NSCLC" gloss beside it. Telescope ships two static subgraphs; that is a property of
+ * this surface's DATA, not of the TA registry, and the manifest cannot answer it -- a third
+ * TA needs a third file before it needs a third branch. It belongs to the per-surface
+ * capability slot the manifest reserves (surfaces jsonb, deliberately empty in stage 1).
+ */
 const AD_TA_ID = "9e4139d2-e062-4a58-8728-cdabb2d7dca1";
+
+/**
+ * WHICH TAs TELESCOPE COVERS. Declared HERE, beside the imports that decide it, because it
+ * is a fact about this surface's bundled data -- nsclcNodes/nsclcEdges and adNodes/adEdges
+ * are the whole reason the list is two long. It is NOT a cohort fact, so the capability
+ * manifest cannot answer it: colorectal has all three cohorts and no subgraph.
+ *
+ * This is what the manifest's reserved `surfaces` slot is for. Until that is populated, the
+ * honest place for the list is the surface that owns the files, exported so the copy that
+ * describes Telescope reads the same list Telescope renders from -- App.tsx used to spell
+ * the TA names out in prose and drifted from this file twice.
+ */
+export const TELESCOPE_TA_SLUGS: readonly string[] = ["nsclc", "atopic-dermatitis"];
+
+/**
+ * WAS `taId === AD_TA_ID ? "atopic-dermatitis" : "nsclc"`, in the two LABEL sites. A branch on
+ * a hardcoded uuid answers "which of our two TAs is this" -- and silently answers "lung" for
+ * every TA that is neither, which is a label claiming the wrong therapeutic area over a real
+ * network. The manifest knows every TA's slug, so the question does not need a branch.
+ *
+ * NULL-SAFE BY FALLING BACK TO THE UUID rather than to a TA: an unrecognised id renders as
+ * itself, which looks unmapped, instead of borrowing lung's name. Same convention as
+ * taLabels.ts, and the same one deriveTAValue uses for an unknown parent.
+ */
+function slugForTaId(taId: string | null | undefined): string {
+  if (!taId) return "";
+  return (taManifestSync() ?? []).find((c) => c.taId === taId)?.slug ?? taId;
+}
 const GOLD = "#ffd89b", PURP = "#c3a9ff", OTHER = "#a8bdd8";
 const TINT: Record<string, string> = { established: GOLD, rising: PURP, community: OTHER, other: OTHER };
 const HALO: Record<string, string> = { established: "rgba(255,196,120,0.78)", rising: "rgba(160,116,255,0.72)", other: "rgba(140,178,228,0.66)" };
@@ -691,7 +728,7 @@ class Sky extends Component<Props, State> {
         // Was the bare abbreviation "AD"/"NSCLC" typed inline. These strings are
         // SENTENCES, so the label comes from the map and the community form was
         // reworded — "A Lung Cancer community board clinician" does not parse.
-        const ta = taLabelForSlug(this.props.taId === AD_TA_ID ? "atopic-dermatitis" : "nsclc");
+        const ta = taLabelForSlug(slugForTaId(this.props.taId));
         // The star is "outside the sky" (not drawn among the fifty) — but that is a
         // fact about the DRAWING, not the person. Where the platform ranks them,
         // SHOW the rank; deny a ranking ONLY when there genuinely is none.
@@ -937,7 +974,7 @@ class Sky extends Component<Props, State> {
               <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#ffd89b", boxShadow: "0 0 10px rgba(255,216,155,0.9)" }} />
               <div style={{ font: "400 10px/1 Jost,sans-serif", letterSpacing: "0.36em", textTransform: "uppercase", color: "#e6e3da" }}>SkyView</div>
             </div>
-            <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#4d5468" }}>{taLabelForSlug(this.props.taId === AD_TA_ID ? "atopic-dermatitis" : "nsclc").toUpperCase()}</div>
+            <div style={{ font: "300 10px/1 Jost,sans-serif", letterSpacing: "0.16em", textTransform: "uppercase", color: "#4d5468" }}>{taLabelForSlug(slugForTaId(this.props.taId)).toUpperCase()}</div>
           </div>
           <div style={{ font: "200 22px/1.24 Jost,sans-serif", color: "#e6e3da", textWrap: "pretty" } as CSSProperties}>Recognized names</div>
           <div style={{ font: "300 12px/1.55 Jost,sans-serif", color: "#6b7288", marginTop: 6, textWrap: "pretty" } as CSSProperties}>Established and rising stars, and the co-authorship among them. Tap one, then travel collaborator to collaborator.</div>

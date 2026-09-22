@@ -12,6 +12,7 @@ import {
 import { aggregateScopeValues } from "./ledgerRegions";
 import { resolveFilterScope } from "./rank-filters";
 import { institutionToSlug } from "./institutionUtils";
+import { loadTaManifest, offerableTas } from "./taManifest";
 import { supabase } from "./supabase";
 import { classifyVoice } from "./voiceClassification";
 import type { ResearchTheme } from "../types/researchTheme";
@@ -996,44 +997,30 @@ export function clearLiveTASlugsCache(): void {
   liveTASlugsCache = null;
 }
 
+/**
+ * The LIVE PARENT slugs, now derived from the capability manifest.
+ *
+ * WHAT THIS USED TO BE: two queries (live_therapeutic_areas, then therapeutic_areas) and a
+ * hand-rolled walk from each live indication up to its parent slug. The manifest already
+ * carries parent_slug on every row and already applies the admission gate
+ * (is_visible_in_ui AND is_active), so the walk and both queries collapse into a map.
+ *
+ * STILL PARENT SLUGS, because that is the grain msl_profiles.allowed_ta_slugs is stored in
+ * -- entitlement names DOMAINS ('oncology'), sessions name INDICATIONS ('nsclc'). Two grains
+ * doing two jobs; see docs/canonical/TA_SESSION_BOUNDARY.md.
+ *
+ * "LIVE" IS NOW "HAS A BOARD", NOT "IS LISTED". live_therapeutic_areas listed three rows and
+ * this returned their parents. The manifest asks whether a cohort actually exists, so a TA
+ * listed as live with nothing behind it no longer makes its whole domain selectable.
+ */
 export async function getLiveTASlugs(): Promise<string[]> {
   if (liveTASlugsCache) return liveTASlugsCache;
-
   const promise = (async () => {
-    const { data: cfgRows, error: cfgErr } = await supabase
-      .from("live_therapeutic_areas")
-      .select("therapeutic_area_id");
-    if (cfgErr) throw cfgErr;
-
-    const liveIds = (cfgRows ?? [])
-      .map((r) => (r.therapeutic_area_id ? String(r.therapeutic_area_id) : ""))
-      .filter(Boolean);
-    if (liveIds.length === 0) return [];
-
-    const { data: taRows, error: taErr } = await supabase
-      .from("therapeutic_areas")
-      .select("id, slug, parent_ta_id");
-    if (taErr) throw taErr;
-
-    const byId = new Map<string, { slug: string | null; parentId: string | null }>();
-    for (const row of taRows ?? []) {
-      byId.set(String(row.id), {
-        slug: row.slug ?? null,
-        parentId: row.parent_ta_id ? String(row.parent_ta_id) : null,
-      });
-    }
-
-    const parentSlugs = new Set<string>();
-    for (const id of liveIds) {
-      const node = byId.get(id);
-      if (!node) continue;
-      const parent = node.parentId ? byId.get(node.parentId) : null;
-      const slug = parent?.slug ?? node.slug;
-      if (slug) parentSlugs.add(slug);
-    }
-    return Array.from(parentSlugs);
+    const manifest = await loadTaManifest();
+    const slugs = new Set<string>();
+    for (const cap of offerableTas(manifest)) slugs.add(cap.parentSlug ?? cap.slug);
+    return Array.from(slugs);
   })();
-
   liveTASlugsCache = promise;
   promise.catch(() => {
     liveTASlugsCache = null;
@@ -1051,6 +1038,25 @@ export async function getLiveTASlugs(): Promise<string[]> {
  *
  * Guard-reads the array like states_covered. Returns parent slugs.
  */
+/**
+ * THE FAIL-OPEN, NAMED (2026-09-21). Behaviour is unchanged -- an empty or null
+ * allowed_ta_slugs still returns every live TA. What changed is that it is now a decision
+ * with a name instead of a silent `return live`, because it is a decision that has to be
+ * reversed and a silent one cannot be found when the time comes.
+ *
+ * THIS MUST BECOME false BEFORE THE FIRST SINGLE-TA CUSTOMER. Today every user is entitled
+ * to everything that is live, so failing open grandfathers users onboarded before
+ * entitlement was written and costs nothing. The moment one customer is meant to see
+ * Oncology and not Immunology, a missing or mis-written allowed_ta_slugs silently grants
+ * them the whole registry -- and it grants it in the TA CHOOSER, where the extra areas are
+ * listed by name rather than merely reachable. TA_SESSION_BOUNDARY.md calls this out:
+ * "much harder to defend once TA is a compliance boundary".
+ *
+ * Flipping this to false is not the whole job. A user with no entitlement then resolves to
+ * NO TA at all, which is the blocking-chooser state stage 2 builds -- so the flip belongs
+ * with that work, not before it.
+ */
+const ENTITLEMENT_UNSET_MEANS_ALL_LIVE = true;
 export async function entitledTASlugs(
   profile: { allowed_ta_slugs?: string[] | null },
 ): Promise<string[]> {
@@ -1058,7 +1064,7 @@ export async function entitledTASlugs(
   const allowed = Array.isArray(profile.allowed_ta_slugs)
     ? profile.allowed_ta_slugs
     : [];
-  if (allowed.length === 0) return live;
+  if (allowed.length === 0) return ENTITLEMENT_UNSET_MEANS_ALL_LIVE ? live : [];
   const liveSet = new Set(live);
   return allowed.filter((slug) => liveSet.has(slug));
 }

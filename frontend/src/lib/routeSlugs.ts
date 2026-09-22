@@ -1,5 +1,6 @@
 import type { Track } from "./TrackContext";
 import { INDICATIONS_BY_TA } from "../components/IndicationFilter";
+import { taManifestSync } from "./taManifest";
 
 export const HOME_TA = "Oncology";
 // The home indication as a SLUG, not a label. It was "NSCLC" - a display string
@@ -223,10 +224,27 @@ export function getIndicationCount(taLabel: string, indicationSlug: string): num
   return match?.count ?? null;
 }
 
+/**
+ * THE TA UUID FOR AN INDICATION SLUG. Asks the manifest first, which is authoritative and
+ * covers every real TA; falls back to the config's own `taId` field, which now carries only
+ * the "all" AGGREGATE rows (Immunology all -> AD) that no manifest row can answer for.
+ *
+ * WHY THE TRANSFER MATTERED. The config comment at INDICATIONS_BY_TA warned that an active
+ * option with no taId serves LUNG rows under that option's chip, because the fetchers do
+ * `filters.taId ?? TA_ID_MAP[taSlug]` and taSlug for Oncology is hardcoded "nsclc". That
+ * condition required someone to hand-add a uuid to a new indication and remember to do it.
+ * It can no longer occur for a real TA: the uuid comes from the row's own slug, so there is
+ * no field to forget. See the note left in IndicationFilter.
+ *
+ * SYNCHRONOUS ON PURPOSE. deriveTAValue calls this during render. Before the manifest lands
+ * this returns the aggregate fallback exactly as it did, so route resolution is unchanged --
+ * only the source of the per-TA uuid moved.
+ */
 export function getIndicationTaId(taLabel: string, indicationSlug: string): string | undefined {
+  const fromManifest = (taManifestSync() ?? []).find((c) => c.slug === indicationSlug);
+  if (fromManifest) return fromManifest.taId;
   const options = INDICATIONS_BY_TA[taLabel] ?? [];
-  const match = options.find((o) => o.slug === indicationSlug);
-  return match?.taId;
+  return options.find((o) => o.slug === indicationSlug)?.taId;
 }
 
 export function resolveIndicationForTa(
