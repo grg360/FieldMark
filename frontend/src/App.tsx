@@ -26,6 +26,7 @@ import {
 } from "react-router-dom";
 import { ArrowUp } from "lucide-react";
 import TelescopeField, { TELESCOPE_TA_SLUGS } from "./components/TelescopeField";
+import FeedRedirect from "./components/FeedRedirect";
 import LinkedInAuthScreen from "./components/LinkedInAuthScreen";
 import SignupScreen from "./components/SignupScreen";
 import AuthWrapper from "./components/AuthWrapper";
@@ -947,10 +948,26 @@ export default function App() {
           <Route path="/hcp/:id" element={<ProfileDispatch />} />
           {/* FI feed track routes removed 2026-07-31 — the forum (/field-intelligence)
               is the one FI system. Old /:ta/field-intelligence URLs fall through the
-              greedy /:ta/:dashboard match to the default cohort feed. */}
-          <Route path="/:ta/:dashboard/:indication" element={<FeedLayout />} />
-          <Route path="/:ta/:dashboard" element={<FeedLayout />} />
-          <Route path="/:ta" element={<FeedLayout />} />
+              greedy /:ta/:dashboard match, which now redirects to the ledger. */}
+
+          {/* TELESCOPE FIRST, AND EXPLICITLY. NavBar links SkyView to
+              /oncology/telescope/nsclc, which matches the greedy /:ta/:dashboard shape
+              below. It is a live surface with its own bundled subgraphs and is NOT part of
+              the retired card feed, so it keeps rendering FeedLayout. Listed above the
+              redirect rather than relying on react-router ranking static segments over
+              dynamic ones, because the cost of that ordering being wrong is SkyView
+              silently redirecting to an Established board. */}
+          <Route path="/:ta/telescope/:indication" element={<FeedLayout />} />
+          <Route path="/:ta/telescope" element={<FeedLayout />} />
+
+          {/* THE CARD FEED IS RETIRED (2026-09-21) — the cohort ledger is the only People
+              surface. These three URL shapes were the feed's and are in bookmarks, shared
+              links and history, so they redirect to the equivalent ledger view instead of
+              404ing. See components/FeedRedirect.tsx for how ?ta= is resolved, and for why
+              it is sometimes deliberately omitted. */}
+          <Route path="/:ta/:dashboard/:indication" element={<FeedRedirect />} />
+          <Route path="/:ta/:dashboard" element={<FeedRedirect />} />
+          <Route path="/:ta" element={<FeedRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </RelationshipsProvider>

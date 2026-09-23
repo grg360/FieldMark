@@ -162,12 +162,40 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
   const domainLive = (d: string) => domainIsLive(manifest, d);
 
   // --- handlers (identical wiring to the retired components) ---
+
+  /**
+   * SWITCH THE DOMAIN. On a TA-selecting surface this stays put and changes the TA, exactly
+   * like pickIndication below.
+   *
+   * IT USED TO NAVIGATE TO THE CARD FEED, UNCONDITIONALLY, and it was the only one of the
+   * four handlers with no ledger guard -- pickIndication returns early on taSelectable,
+   * pickCohort returns through onPickCohort, and pickView's row is suppressed on the ledger.
+   * So clicking the domain chip on the ledger left the ledger for /:domain/:cohort/all.
+   *
+   * That was unreachable until 2026-09-21 because domainLive was `d === "Oncology"` and
+   * Oncology was already the current chip, so the first line returned. Sourcing domainLive
+   * from the capability manifest made Immunology live and exposed the navigation behind it.
+   * The feed is retired now, so there is nowhere for this to navigate TO -- and switching in
+   * place is what it should always have done here: the territory scope, the open cohort and
+   * the scroll position all survive, which is the whole reason pickIndication is written the
+   * way it is.
+   *
+   * THE TARGET TA IS THE DOMAIN'S OWN, NOT A CARRIED INDICATION. resolveIndicationForTaSwitch
+   * keeps the current indication when the new domain also has it and otherwise takes that
+   * domain's first live one -- Immunology does not have "nsclc", so the switch resolves to
+   * Atopic Dermatitis rather than carrying lung across.
+   */
   const pickDomain = (chip: string) => {
     if (chip === taLabel || !domainLive(chip)) return;
     const newTaSlug = taLabelToSlug(chip);
     const { slug: indSlug } = resolveIndicationForTaSwitch(chip, indicationSlug);
+    // TA-SELECTING SURFACE (the ledger): change the TA and stay. onPickTa writes ?ta=, the
+    // ledger re-resolves from the URL and reloads its rows -- and useLedgerTa's own effect
+    // writes the session TA, so setTA here would be a second writer racing it.
+    if (taSelectable) { onPickTa?.(indSlug); setTaOpen(false); setSheet(false); return; }
+    // Ledger without TA selection: inert, as pickIndication is. Nothing to navigate to.
+    if (ledgerMount) { setTaOpen(false); setSheet(false); return; }
     setTA(newTaSlug, indSlug);
-    navigate(buildFeedPath(newTaSlug, trackToDashboardSlug(track), indSlug));
     setTaOpen(false); setSheet(false);
   };
 

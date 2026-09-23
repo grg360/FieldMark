@@ -133,8 +133,16 @@ function activeKey(pathname: string): NavKey | null {
   if (p.startsWith("/cohorts")) return "people";
   if (/\/telescope(\/|$)/.test(p)) return "skyview";
   if (p.startsWith("/hcp") || p.startsWith("/landscape")) return "people";
+  // Retired card-feed URLs. They redirect to /cohorts/ledger (see FeedRedirect), which
+  // already lights People above -- this line only covers the frame or two before the
+  // redirect commits, so the nav does not flicker unlit on the way through.
   if (/\/(established|rising-stars|community)(\/|$)/.test(p)) return "people";
-  if (p === "/") return "people"; // feed root resolves the default cohort feed
+  // "/" REDIRECTS TO /me, so this lights People for a path that is never rendered. The
+  // comment used to say "feed root resolves the default cohort feed", which stopped being
+  // true when / became <Navigate to="/me"> -- and /me is HOME, lit two lines below. Kept
+  // rather than deleted because it costs nothing and removing it is a behaviour change on a
+  // path nobody sees; it is listed with the rest of the feed's dead weight in the commit.
+  if (p === "/") return "people";
   // HOME lights for /me and the personal surfaces under it (week, settings,
   // watchlists, follow-ups, insights).
   if (p === "/me" || p.startsWith("/me/")) return "home";
