@@ -556,6 +556,22 @@ export function comTierModelFor(taSlug: string | null | undefined): ComTierModel
 }
 
 /**
+ * The empty vocabulary, HOISTED TO MODULE LEVEL AND FROZEN. It was a literal inside
+ * comVocab, which made comDefaultTiers return a FRESH ARRAY on every call for any TA with
+ * no tier model. CohortLedger derives `selectedTiers` during render and lists it in the
+ * load effect's dependency array, so a new identity per render restarted that effect every
+ * render: setLoading(true), fire board_meta + the board RPC, re-render, cleanup marks the
+ * in-flight pair dead, repeat. Atopic Dermatitis Established never left "Loading ledger…"
+ * and sent hundreds of requests a minute until PostgREST answered 503. The two board TAs
+ * were untouched because COM_TIER_VOCAB hands back the SAME object each time.
+ *
+ * So the referential stability is the fix, not an optimisation: identity is what the
+ * dependency array compares.
+ */
+const EMPTY_COM_VOCAB: { filters: { key: string; label: string }[]; defaults: string[]; orderClause: string } =
+  Object.freeze({ filters: Object.freeze([]) as never[], defaults: Object.freeze([]) as never[], orderClause: "" });
+
+/**
  * The vocabulary for this TA's model. Falls back to an EMPTY vocabulary, not to lung's:
  * every caller is downstream of a ledger that only mounts COM where com_available is true,
  * so reaching this with no model means the manifest has not landed yet, and an empty chip
@@ -563,7 +579,7 @@ export function comTierModelFor(taSlug: string | null | undefined): ComTierModel
  */
 function comVocab(taSlug: string | null | undefined) {
   const model = comTierModelFor(taSlug);
-  return model ? COM_TIER_VOCAB[model] : { filters: [], defaults: [], orderClause: "" };
+  return model ? COM_TIER_VOCAB[model] : EMPTY_COM_VOCAB;
 }
 
 /** Filter chips for this TA, in display order. */
