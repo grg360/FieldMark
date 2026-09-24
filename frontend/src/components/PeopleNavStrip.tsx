@@ -41,7 +41,6 @@ import { cohortServesTa } from "../lib/cohortLedger";
 import { offerableByDomain, domainIsLive, type TaCapability } from "../lib/taManifest";
 import {
   buildFeedPath,
-  resolveIndicationForTaSwitch,
   taLabelToSlug,
   trackToDashboardSlug,
   type ResolvedFeedRoute,
@@ -167,35 +166,48 @@ export default function PeopleNavStrip({ route, onOpenFilters, userTerritory, sh
    * SWITCH THE DOMAIN. On a TA-selecting surface this stays put and changes the TA, exactly
    * like pickIndication below.
    *
-   * IT USED TO NAVIGATE TO THE CARD FEED, UNCONDITIONALLY, and it was the only one of the
-   * four handlers with no ledger guard -- pickIndication returns early on taSelectable,
-   * pickCohort returns through onPickCohort, and pickView's row is suppressed on the ledger.
-   * So clicking the domain chip on the ledger left the ledger for /:domain/:cohort/all.
+   * THE TARGET IS A LEAF TA FROM THE MANIFEST, AND THAT IS THE WHOLE FIX (2026-09-23).
    *
-   * That was unreachable until 2026-09-21 because domainLive was `d === "Oncology"` and
-   * Oncology was already the current chip, so the first line returned. Sourcing domainLive
-   * from the capability manifest made Immunology live and exposed the navigation behind it.
-   * The feed is retired now, so there is nowhere for this to navigate TO -- and switching in
-   * place is what it should always have done here: the territory scope, the open cohort and
-   * the scroll position all survive, which is the whole reason pickIndication is written the
-   * way it is.
+   * It used to compute the target with resolveIndicationForTaSwitch, which returns a FEED
+   * INDICATION slug -- a vocabulary that includes the "all" aggregate. Immunology's first
+   * active indication IS "all", so clicking the chip called onPickTa("all"), the ledger wrote
+   * ?ta=all, useLedgerTa asked taIdForApiSlug("all") and got undefined because "all" is not
+   * in TA_ID_MAP, layer 1 failed, layer 2 answered with the CURRENT session TA, and the
+   * URL-rewrite effect replaced ?ta=all with the TA the user was already on. The chip did
+   * exactly what it was told and looked completely inert.
    *
-   * THE TARGET TA IS THE DOMAIN'S OWN, NOT A CARRIED INDICATION. resolveIndicationForTaSwitch
-   * keeps the current indication when the new domain also has it and otherwise takes that
-   * domain's first live one -- Immunology does not have "nsclc", so the switch resolves to
-   * Atopic Dermatitis rather than carrying lung across.
+   * INDICATIONS AND LEAF TAs ARE DIFFERENT VOCABULARIES. The feed had an "all" board, so
+   * resolveIndicationForTaSwitch returning "all" was right THERE. The ledger has no "all"
+   * board -- it is one TA at a time by construction -- so its TA selector must be given
+   * something taIdForApiSlug can resolve. Reaching for the feed's resolver on a ledger
+   * control was the mistake, and the retired feed is why nobody noticed it was the wrong
+   * resolver rather than merely the wrong surface.
+   *
+   * FIRST OFFERABLE LEAF IN MANIFEST ORDER, which covers both shapes without a branch:
+   * Immunology has exactly one (Atopic Dermatitis) and Oncology has two, where the first is
+   * Colorectal Cancer because the manifest orders by label. The leaf tabs beside the chips
+   * are how the reader reaches the other one, so landing on either is a starting point rather
+   * than a verdict.
+   *
+   * NO TARGET -> INERT, AND NOTHING INVENTED. A domain with no offerable leaf returns without
+   * writing anything. The old `!domainLive(chip)` guard said the same thing less directly;
+   * absence of a target IS absence of a live domain, read off the same manifest.
+   *
+   * IF THE NEW TA LACKS THE MOUNTED COHORT the ledger's own "unavailable for this area" state
+   * handles it -- Immunology + Rising Stars is the live example. Not special-cased here: a
+   * chip that silently changed cohort as well as area would be two actions on one click.
    */
   const pickDomain = (chip: string) => {
-    if (chip === taLabel || !domainLive(chip)) return;
-    const newTaSlug = taLabelToSlug(chip);
-    const { slug: indSlug } = resolveIndicationForTaSwitch(chip, indicationSlug);
+    if (chip === taLabel) return;
+    const target = domains.find((d) => d.domainLabel === chip)?.tas[0];
+    if (!target) return;
     // TA-SELECTING SURFACE (the ledger): change the TA and stay. onPickTa writes ?ta=, the
     // ledger re-resolves from the URL and reloads its rows -- and useLedgerTa's own effect
     // writes the session TA, so setTA here would be a second writer racing it.
-    if (taSelectable) { onPickTa?.(indSlug); setTaOpen(false); setSheet(false); return; }
+    if (taSelectable) { onPickTa?.(target.slug); setTaOpen(false); setSheet(false); return; }
     // Ledger without TA selection: inert, as pickIndication is. Nothing to navigate to.
     if (ledgerMount) { setTaOpen(false); setSheet(false); return; }
-    setTA(newTaSlug, indSlug);
+    setTA(taLabelToSlug(chip), target.slug);
     setTaOpen(false); setSheet(false);
   };
 
