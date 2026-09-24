@@ -145,8 +145,17 @@ ARTIFACTS: List[Artifact] = [
     Artifact("hcp_cohort_classification_v2", "classified_at", "therapeutic_area_id",
              ["hcp_therapeutic_areas_v2", "publication_therapeutic_areas_v2"],
              "classify/cohort_classification_v2.py"),
+    # COHORT IS AN UPSTREAM BECAUSE THE SCORER IS COHORT-BOUNDED, not merely cohort-aware:
+    # publication_leadership_scoring.py:117 restricts to hcp_cohort_classification_v2 rows
+    # with cohort='established' AT THE MOMENT IT RUNS. An HCP admitted after that run never
+    # gets a row, and no later stage backfills one. On 2026-07-08 atopic-dermatitis ran the
+    # backfill at 14:34, leadership at 15:45 and the reclassification at 17:21; the cohort
+    # grew 2,546 -> 2,586 and those 40 have no leadership row to this day. 39 of them are on
+    # the board, 6 inside the top 100, each displaying scientific 0.0 -- Paller at US #5 on
+    # network alone. This edge is what makes that ordering legible: 1h36m, past the epsilon.
     Artifact("hcp_publication_leadership_v2", "computed_at", "therapeutic_area_id",
-             ["publication_therapeutic_areas_v2"], "score/publication_leadership_scoring.py"),
+             ["publication_therapeutic_areas_v2", "hcp_cohort_classification_v2"],
+             "score/publication_leadership_scoring.py"),
     Artifact("hcp_network_centrality_v2", "computed_at", "therapeutic_area_id",
              ["publication_therapeutic_areas_v2"], "score/network_centrality_scoring.py"),
     Artifact("hcp_scientific_momentum_v1", "computed_at", "therapeutic_area_id",
@@ -166,8 +175,32 @@ ARTIFACTS: List[Artifact] = [
     Artifact("hcp_established_scores_v2", "scored_at", "therapeutic_area_id",
              ["hcp_publication_leadership_v2", "hcp_network_centrality_v2"],
              "score/established_scoring.py"),
+    # THE UPSTREAMS ARE WHAT THE SCRIPT READS, which hcp_established_scores_v2 is not.
+    # recompute_established_ranks_v3.py does not mention that table anywhere; it is written
+    # by established_scoring.py:654 and holds 22,778 rows for nsclc and hepatology only,
+    # last scored 2026-05-27. So the one declared edge named a table this artifact does not
+    # consume AND that two of the three live TAs have no rows in -- which is why the ranks
+    # read unknown/upstream_unknown for atopic-dermatitis while its board sat on a cohort
+    # that had moved. The four below are the actual reads: :286 scientific, :302 network
+    # (window_type='10yr' at :304), :319 pharma, :202 the cohort the board is drawn from.
+    #
+    # hcp_industry_classification_v1 (:215) IS ALSO READ AND IS DELIBERATELY ABSENT. It has
+    # no therapeutic_area_id column, so it cannot be TA-scoped, and a whole-relation answer
+    # is the wrong answer here (see the header). An upstream missing from BY_NAME resolves
+    # to unknown_upstream, which would replace a specific no_ledger_row verdict with a
+    # permanent one no run can clear. Measured: adding it changed exactly one line of the
+    # three-TA output, atopic-dermatitis ranks no_ledger_row -> upstream_unknown, and
+    # nothing else. It belongs here when that table gains a TA key, not before.
+    #
+    # KNOWN NOISE IN THE NETWORK EDGE. read_ts takes max() over the whole TA slice while
+    # this consumer reads only window_type='10yr'. nsclc therefore reads STALE by 21m17s
+    # against a recent_roll pass, when the 10yr rows it actually consumes are from
+    # 2026-06-05, months older than the ranks. Making read_ts window-aware is a change to
+    # the gate's shape, not to this registry, and is left for when it is worth making.
     Artifact("hcp_established_ranks_v3", "computed_at", "therapeutic_area_id",
-             ["hcp_established_scores_v2"], "score/recompute_established_ranks_v3.py"),
+             ["hcp_publication_leadership_v2", "hcp_network_centrality_v2",
+              "hcp_pharma_engagement_v2", "hcp_cohort_classification_v2"],
+             "score/recompute_established_ranks_v3.py"),
     Artifact("hcp_community_scores_v2", "scored_at", "therapeutic_area_id",
              ["hcp_cohort_classification_v2", "hcp_medicare_by_ta_v2",
               "hcp_open_payments_by_ta_v2"], "score/community_scoring.py"),
