@@ -17,11 +17,16 @@ import { offerableTas } from "../lib/taManifest";
  * composite_v1 is a SUPERSEDED definition; the manifest's rs_available=false for AD is the
  * current one, and AD Rising correctly shows the ledger's absence state.
  *
- * TELESCOPE IS NOT REDIRECTED, and it is not handled here. NavBar links SkyView to
- * /oncology/telescope/nsclc, which matches this same URL shape -- so App.tsx routes
- * /:ta/telescope[/:indication] to FeedLayout explicitly, ABOVE these routes. Retiring the
- * CARD FEED means the three cohort dashboards, not every route shaped like one. If that
- * explicit route is ever removed, SkyView starts redirecting to an Established board.
+ * TELESCOPE IS NOT REDIRECTED, and this component never sees it. NavBar links SkyView to
+ * /oncology/telescope/nsclc, which matches the same URL shape -- so App.tsx's FeedOrRedirect
+ * checks the resolved track first and renders FeedLayout for anything that is not a cohort.
+ * Retiring the CARD FEED means the three cohort dashboards, not every route shaped like one.
+ *
+ * It was briefly done with an explicit /:ta/telescope route listed above the greedy one. That
+ * route won the match and still broke SkyView, because "telescope" then arrived as a literal
+ * path segment rather than as :dashboard, and FeedLayout -- which reads params.dashboard --
+ * fell through resolveFeedRoute's default to the Established cohort. Hence the dispatch on a
+ * param instead: see the note on FeedOrRedirect.
  */
 
 /** The three cohort dashboards the feed served, mapped to the ledger's own cohort slugs. */

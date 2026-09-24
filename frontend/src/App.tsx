@@ -84,6 +84,7 @@ import { TrackProvider, useTrack } from "./lib/TrackContext";
 import { TAProvider, deriveTAValue, useTA } from "./lib/TAContext";
 import {
   buildHcpDetailPath,
+  dashboardSlugToTrack,
   getIndicationTaId,
   resolveFeedRoute,
   taLabelToApiSlug,
@@ -129,6 +130,39 @@ const FEED_PAGE_SIZE = 20;
 
 function isCohortFeedTrack(track: string): boolean {
   return track === "established" || track === "community" || track === "rising-stars";
+}
+
+/**
+ * /:ta/:dashboard/:indication SERVES TWO KINDS OF THING, and this is the one place that
+ * decides which. A cohort dashboard is retired and redirects to the ledger; a non-cohort one
+ * (telescope, today the only one) is a live surface and renders.
+ *
+ * WHY THE PARAM AND NOT TWO ROUTES. The feed-retire change listed /:ta/telescope explicitly
+ * ABOVE the greedy route so it would win, and it did win -- but "telescope" then stopped
+ * arriving as :dashboard, because it was a literal path segment. FeedLayout reads
+ * params.dashboard (see resolveFeedRoute below), got undefined, and resolveFeedRoute's own
+ * default took over: routeSlugs.ts:317-320 substitutes trackToDashboardSlug(HOME_DASHBOARD)
+ * for a missing or unrecognised slug, and HOME_DASHBOARD is "established". So SkyView
+ * rendered the Established cohort feed -- 287 physicians under an "Oncology - Lung Cancer
+ * ESTABLISHED" heading -- while the URL still said telescope. The route won and the
+ * component never knew.
+ *
+ * Keeping :dashboard a param means the value reaches the component that reads it, which is
+ * the actual fix. FeedLayout does accept a forcedDashboard prop, and passing
+ * forcedDashboard="telescope" on a literal route would also have worked -- but it would put
+ * the slug in two places that must agree, which is the same shape of coupling that produced
+ * this bug.
+ *
+ * THE TEST IS DERIVED, NOT A LIST. dashboardSlugToTrack maps the slug through
+ * DASHBOARD_SLUG_TO_TRACK -- the existing authority on which slugs exist -- and defaults to
+ * HOME_DASHBOARD for undefined and for anything unrecognised. So a bare /:ta and an old
+ * /:ta/social both resolve to a cohort track and redirect, which is what they should do, and
+ * a second non-cohort dashboard needs no change here: register it in DASHBOARD_SLUG_TO_TRACK
+ * and it renders.
+ */
+function FeedOrRedirect() {
+  const { dashboard } = useParams<{ dashboard?: string }>();
+  return isCohortFeedTrack(dashboardSlugToTrack(dashboard)) ? <FeedRedirect /> : <FeedLayout />;
 }
 
 // Keyed on the indication SLUG. This took the LABEL until 2026-08-15, so the
@@ -950,24 +984,14 @@ export default function App() {
               is the one FI system. Old /:ta/field-intelligence URLs fall through the
               greedy /:ta/:dashboard match, which now redirects to the ledger. */}
 
-          {/* TELESCOPE FIRST, AND EXPLICITLY. NavBar links SkyView to
-              /oncology/telescope/nsclc, which matches the greedy /:ta/:dashboard shape
-              below. It is a live surface with its own bundled subgraphs and is NOT part of
-              the retired card feed, so it keeps rendering FeedLayout. Listed above the
-              redirect rather than relying on react-router ranking static segments over
-              dynamic ones, because the cost of that ordering being wrong is SkyView
-              silently redirecting to an Established board. */}
-          <Route path="/:ta/telescope/:indication" element={<FeedLayout />} />
-          <Route path="/:ta/telescope" element={<FeedLayout />} />
-
           {/* THE CARD FEED IS RETIRED (2026-09-21) — the cohort ledger is the only People
               surface. These three URL shapes were the feed's and are in bookmarks, shared
               links and history, so they redirect to the equivalent ledger view instead of
-              404ing. See components/FeedRedirect.tsx for how ?ta= is resolved, and for why
-              it is sometimes deliberately omitted. */}
-          <Route path="/:ta/:dashboard/:indication" element={<FeedRedirect />} />
-          <Route path="/:ta/:dashboard" element={<FeedRedirect />} />
-          <Route path="/:ta" element={<FeedRedirect />} />
+              404ing — EXCEPT for the non-cohort dashboards, which are live surfaces that
+              happen to share the shape. FeedOrRedirect decides which; see its note. */}
+          <Route path="/:ta/:dashboard/:indication" element={<FeedOrRedirect />} />
+          <Route path="/:ta/:dashboard" element={<FeedOrRedirect />} />
+          <Route path="/:ta" element={<FeedOrRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </RelationshipsProvider>
