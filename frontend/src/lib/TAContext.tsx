@@ -37,6 +37,31 @@ export interface TAValue {
   dataSlug: string;
 }
 
+/**
+ * WHETHER THE SESSION HAS A TA AT ALL. Added 2026-09-24, ahead of the code that needs it.
+ *
+ * TAValue cannot express absence: every field is required and the constructor always
+ * produces one (see DEFAULT_PARENT_SLUG below). So "no TA" has no representation, and the
+ * blocking chooser stage 3 builds has no condition to fire on. This type is that condition,
+ * introduced first so consumers can learn the vocabulary before the state becomes reachable.
+ *
+ * THREE STATES, NOT TWO, and the third is the one people forget. Establishment needs two
+ * async reads -- the profile row and the capability manifest -- and collapsing "still
+ * loading" into "no TA" would fire the chooser on every cold load and then retract it. Same
+ * rule the manifest already follows: null means NOT YET KNOWN, never NOTHING AVAILABLE.
+ *
+ *   resolving     REACHABLE TODAY. The profile seed below is in flight.
+ *   established   the normal state.
+ *   unresolved    DECLARED BUT UNREACHABLE TODAY, and deliberately so. It becomes reachable
+ *                 when the oncology/nsclc default is deleted and establishment can fail --
+ *                 a separate change, because that is the one that can leave a real user
+ *                 with no board. Until then this arm is vocabulary, not behaviour.
+ */
+export type TAStatus = "resolving" | "established" | "unresolved";
+
+/** Why establishment produced no TA. Null unless status is "unresolved". */
+export type TAUnresolvedReason = "no-default" | "no-entitlement" | "refused-link";
+
 interface TAContextValue extends TAValue {
   /** Set the current TA from the two canonical slugs (parent + indication). */
   setTA: (parentSlug: string, indicationSlug: string) => void;
@@ -47,6 +72,16 @@ interface TAContextValue extends TAValue {
    * returned yet.
    */
   manifest: TaCapability[] | null;
+  /**
+   * SHAPE IS ADDITIVE ON PURPOSE. TAValue's fields stay flat and always present rather than
+   * moving behind a discriminated union, so no consumer has to change on the commit that
+   * introduces the vocabulary. A union would force all nine call sites to handle a state
+   * that cannot yet occur -- churn whose only effect would be to make the commit that
+   * matters harder to read. The union is the right final shape and belongs with the change
+   * that makes `unresolved` reachable.
+   */
+  status: TAStatus;
+  unresolvedReason: TAUnresolvedReason | null;
 }
 
 const TAContext = createContext<TAContextValue | null>(null);
@@ -154,6 +189,22 @@ export function TAProvider({ children }: { children: ReactNode }) {
     return deriveTAValue(parentSlug, indicationSlug);
   });
 
+  /**
+   * RESOLVING UNTIL THE PROFILE SEED SETTLES. This is a real signal today, not a placeholder:
+   * the seed below is an async read, and until it returns the session is carrying the
+   * constructor's default rather than the user's stored preference. A consumer that renders
+   * a TA name during that window is showing a guess.
+   *
+   * A session that already CARRIES a selection is established immediately -- there is nothing
+   * to wait for, and hadStoredSelection is exactly that test.
+   */
+  const [status, setStatus] = useState<TAStatus>(() =>
+    hadStoredSelection.current ? "established" : "resolving",
+  );
+  // Always null while `unresolved` is unreachable. Present so consumers can read it from the
+  // start rather than acquiring it in the commit where the reason actually matters.
+  const [unresolvedReason] = useState<TAUnresolvedReason | null>(null);
+
   // Any real write — a picker, a route mirror — closes the door on hydration below. Set
   // synchronously inside setTA rather than derived from `value`, because the profile fetch is
   // in flight while those writes land and a state compare would race it.
@@ -176,6 +227,8 @@ export function TAProvider({ children }: { children: ReactNode }) {
   const setTA = useCallback(
     (parentSlug: string, indicationSlug: string) => {
       written.current = true;
+      // A write settles the question, whatever the seed is doing.
+      setStatus("established");
       applyTA(parentSlug, indicationSlug);
     },
     [applyTA],
@@ -201,6 +254,15 @@ export function TAProvider({ children }: { children: ReactNode }) {
     if (hadStoredSelection.current) return;
     let alive = true;
     (async () => {
+      /**
+       * SETTLE THE STATUS ON EVERY EXIT, including the early returns and the catch. The
+       * session is "resolving" only while this is in flight; once it has run, the TA on
+       * screen is the one the session is going to carry, whether that came from the profile
+       * or from the constructor's default. Leaving status at "resolving" on the failure
+       * paths would be the more dangerous mistake of the two: a surface that waits for
+       * establishment would wait forever, and the state it is waiting for is exactly the one
+       * the chooser will key on.
+       */
       try {
         const user = await getCurrentUser();
         if (!user || !alive || written.current) return;
@@ -217,6 +279,11 @@ export function TAProvider({ children }: { children: ReactNode }) {
         applyTA(parentSlug, indicationSlug);
       } catch {
         // Leave the default in place; see NO FALLBACK ON FAILURE above.
+      } finally {
+        // NOT `unresolved`: the default pair is still in place, so the session HAS a TA.
+        // This is the line that changes when that default is deleted -- the failure paths
+        // above become the unresolved cases, and each gets its reason.
+        if (alive) setStatus("established");
       }
     })();
     return () => {
@@ -254,7 +321,11 @@ export function TAProvider({ children }: { children: ReactNode }) {
     console.log("[TAContext]", value);
   }, [value]);
 
-  return <TAContext.Provider value={{ ...value, setTA, manifest }}>{children}</TAContext.Provider>;
+  return (
+    <TAContext.Provider value={{ ...value, setTA, manifest, status, unresolvedReason }}>
+      {children}
+    </TAContext.Provider>
+  );
 }
 
 export function useTA(): TAContextValue {
