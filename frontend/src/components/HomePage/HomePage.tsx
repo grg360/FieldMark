@@ -17,8 +17,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "../../lib/authHelpers";
-import { taIdForApiSlug } from "../../lib/api";
-import { taLabelToApiSlug, taSlugToLabel } from "../../lib/routeSlugs";
+// taIdForApiSlug / taLabelToApiSlug / taSlugToLabel went with the local TA derivation.
+import { useTA } from "../../lib/TAContext";
 import { supabase } from "../../lib/supabase";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { getTrackedHcpIds } from "../../lib/watchlists";
@@ -131,10 +131,29 @@ export default function HomePage() {
     const t = setTimeout(() => setUntrackHint(null), 6000);
     return () => clearTimeout(t);
   }, [untrackHint]);
-  const [homeTaId, setHomeTaId] = useState<string | undefined>(undefined);
-  // null until the profile resolves, and STAYS null if the profile's TA is unregistered.
-  // Consumers must not build a TA-scoped link out of nothing -- see the Institutions action.
-  const [taSlug, setTaSlug] = useState<string | null>(null);
+  /**
+   * HOME READS THE SESSION TA. It used to derive its own from msl_profiles.default_ta_slug,
+   * which is why Home and the ledger could disagree: pick Colorectal on the ledger, click
+   * Home, and Home showed LUNG -- its territory coverage, its search scope and its
+   * Institutions link all pointed at the profile default while the ledger you just left was
+   * on colorectal. Neither surface was wrong about its own source; there were two sources.
+   *
+   * The profile default has not stopped mattering -- TAProvider still seeds the session from
+   * it, once, into an empty session (see lib/TAContext.tsx). Home now reads the RESULT of
+   * that seed instead of re-deriving it, so a stored preference still decides where a fresh
+   * session starts and a choice made since decides everything after.
+   *
+   * GATED ON `established`, not read raw. While the seed is in flight the context carries the
+   * constructor's default pair, so reading it during that window would show lung to a
+   * colorectal user for a beat -- the same wrong answer, just faster. undefined/null until
+   * then is what this component already did while it awaited its own fetch.
+   */
+  const { dataSlug: sessionTaSlug, indicationTaId: sessionTaId, status: taStatus, parentTa } = useTA();
+  const sessionParentLabel = parentTa.label;
+  const homeTaId = taStatus === "established" ? sessionTaId : undefined;
+  // STAYS null if the session TA is unregistered. Consumers must not build a TA-scoped link
+  // out of nothing -- see the Institutions action.
+  const taSlug = taStatus === "established" ? sessionTaSlug : null;
   const [firstName, setFirstName] = useState("there");
   const [loading, setLoading] = useState(true);
 
@@ -167,22 +186,11 @@ export default function HomePage() {
           .maybeSingle();
         if (cancelled) return;
         if (profile?.first_name) setFirstName(profile.first_name);
-        const parentSlug = profile?.default_ta_slug ?? "oncology";
-        // default_ta_slug is a STORED value, so an unregistered slug is a real case -- a TA
-        // that was parked, renamed, or never shipped. taSlugToLabel/taLabelToApiSlug return
-        // null for one now instead of substituting Oncology/rare-disease, which is what used
-        // to give that user a complete NSCLC home page under their own TA's name.
-        const parentLabel = taSlugToLabel(parentSlug);
-        const parentApiSlug = parentLabel ? taLabelToApiSlug(parentLabel) : null;
-        const indicationSlug = profile?.default_indication_slug ?? parentApiSlug;
-        const resolvedTaId =
-          (indicationSlug ? taIdForApiSlug(indicationSlug) : undefined) ??
-          (parentApiSlug ? taIdForApiSlug(parentApiSlug) : undefined);
-        setHomeTaId(resolvedTaId);
-        // WAS `indicationSlug || "nsclc"`. That default sat one line downstream of the two
-        // this change removed and would have reinstated them: an unresolvable TA would have
-        // pointed the Institutions link at lung. Null leaves the link unbuilt instead.
-        setTaSlug(indicationSlug);
+        // The TA is READ FROM THE SESSION above, not derived here. This query keeps fetching
+        // the profile for first_name; default_ta_slug and default_indication_slug are
+        // TAProvider's inputs now, not this component's, and the `?? "oncology"` that used to
+        // sit on the first of them went with the derivation.
+        const resolvedTaId = homeTaId;
         // THE PROFILE DEFAULT IS NOT WRITTEN TO TACONTEXT HERE (2026-09-06). This was
         // `if (indicationSlug) setTA(parentSlug, indicationSlug)`, and it ran on EVERY visit to
         // /me, not just the first: select Colorectal on the ledger, click Home, and the session
@@ -230,7 +238,10 @@ export default function HomePage() {
         // Institutions — national pins hydrated by name (HCP + RISING; no per-user tracked col).
         const pinNames = pinsD.map((p) => p.institution_name).slice(0, 5);
         if (pinNames.length) {
-          const idxMap = await getInstitutionsByNames(pinNames, taSlugToLabel(parentSlug) === "Immunology" ? "Immunology" : "NSCLC");
+          // STILL A PINNED PAIR, now fed from the session rather than from the profile.
+          // getInstitutionsByNames takes a corpus label and only these two exist; widening it
+          // is a label-pin job, not this commit's.
+          const idxMap = await getInstitutionsByNames(pinNames, sessionParentLabel === "Immunology" ? "Immunology" : "NSCLC");
           if (!cancelled) {
             setInstitutions(pinNames.map((n) => {
               const e = idxMap.get(n);
@@ -245,7 +256,12 @@ export default function HomePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+    // homeTaId / sessionParentLabel ARE DEPENDENCIES NOW. This effect used to await the
+    // profile INSIDE itself, so the TA arrived during the run and `[]` was correct.
+    // Reading the session at render time means the first run sees undefined while it is
+    // still resolving; without these deps the territory stats and the institution pins
+    // would stay scoped to that first, TA-less pass.
+  }, [homeTaId, sessionParentLabel]);
 
   // Follow-ups ordered by PRIORITY LABEL, then DUE DATE (DATA RULE 4).
   const PRIO: Record<string, number> = { high: 0, normal: 1, low: 2 };

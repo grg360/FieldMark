@@ -20,8 +20,8 @@ import AppLayout from "../AppLayout";
 import PageHero from "../PageHero";
 import { supabase } from "../../lib/supabase";
 import { getCurrentUser } from "../../lib/authHelpers";
-import { taIdForApiSlug } from "../../lib/api";
-import { taLabelToApiSlug, taSlugToLabel } from "../../lib/routeSlugs";
+// taIdForApiSlug / taLabelToApiSlug / taSlugToLabel went with the local TA derivation.
+import { useTA } from "../../lib/TAContext";
 import { getTrackedHcpIds } from "../../lib/watchlists";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import {
@@ -123,6 +123,10 @@ async function loadTrackedPeople(userId: string): Promise<TrackedPerson[]> {
 export default function TheWeekPage() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
+  // Gated on `established` for the same reason HomePage is: during the seed the context
+  // carries the constructor's default pair, and scoping the week to it would be a guess.
+  const { indicationTaId, status: taStatus } = useTA();
+  const sessionTaId = taStatus === "established" ? indicationTaId : undefined;
   const [taId, setTaId] = useState<string | undefined>(undefined);
   const [week, setWeek] = useState<TheWeek | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,20 +141,15 @@ export default function TheWeekPage() {
           if (!cancelled) setLoading(false);
           return;
         }
-        const { data: profile } = await supabase
-          .from("msl_profiles")
-          .select("default_ta_slug, default_indication_slug")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        const parentSlug = profile?.default_ta_slug ?? "oncology";
-        // Same stored-slug case as HomePage: null rather than a substituted TA. resolvedTaId
-        // is already Optional here and every downstream reader handles undefined.
-        const parentLabel = taSlugToLabel(parentSlug);
-        const parentApiSlug = parentLabel ? taLabelToApiSlug(parentLabel) : null;
-        const indicationSlug = profile?.default_indication_slug ?? parentApiSlug;
-        const resolvedTaId =
-          (indicationSlug ? taIdForApiSlug(indicationSlug) : undefined) ??
-          (parentApiSlug ? taIdForApiSlug(parentApiSlug) : undefined);
+        // THE WEEK READS THE SESSION TA. It used to re-derive its own from
+        // msl_profiles.default_ta_slug, the same second source HomePage carried, with the
+        // same consequence: the week's items were scoped to the profile default while the
+        // ledger you came from was on another area. TAProvider still seeds the session from
+        // that profile default once; this reads the result.
+        //
+        // The profile query is gone entirely here -- unlike HomePage, TA was the only thing
+        // it fetched.
+        const resolvedTaId = sessionTaId;
         if (!cancelled) setTaId(resolvedTaId);
 
         const people = await loadTrackedPeople(user.id);
@@ -165,7 +164,11 @@ export default function TheWeekPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // sessionTaId IS A DEPENDENCY NOW, and it has to be. This effect used to await the
+    // profile INSIDE itself, so the TA arrived during the run and `[]` was correct. Reading
+    // it at render time means the first run sees `undefined` (the session is still
+    // resolving), and without this dep the week would load unscoped and never reload.
+  }, [sessionTaId]);
 
   const goFollowUps = () => navigate("/me/follow-ups");
   const goHcp = (id: string) => navigate(`/hcp/${id}`);
