@@ -14,7 +14,7 @@
  * - Refresh deep URL -> same content after auth
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMediaQuery } from "./lib/useMediaQuery";
 import {
   Navigate,
@@ -35,8 +35,6 @@ import WelcomeWizard from "./components/WelcomeWizard";
 import AppLayout from "./components/AppLayout";
 import PeopleNavStrip from "./components/PeopleNavStrip";
 import SearchBar from "./components/SearchBar";
-import HCPCard from "./components/HCPCard";
-import CommunityExplorer from "./components/CommunityExplorer";
 import ActionTray from "./components/ActionTray";
 import AssetsIndexPage from "./components/Assets/AssetsIndexPage";
 import AssetPage from "./components/Assets/AssetPage";
@@ -66,22 +64,17 @@ import HcpPositionsPage from "./components/HcpPositionsPage";
 import DOLHeroPanel from "./components/DOLHeroPanel";
 import SocialPage from "./components/SocialPage";
 import SocialVoicePage from "./components/SocialVoicePage";
-import InstitutionsInTerritoryPanel from "./components/InstitutionsInTerritoryPanel";
 import ScoringExplainedModal, {
   type ScoringExplainedScrollTarget,
 } from "./components/ScoringExplainedModal";
 import type { HCP as UIHCP } from "./data/hcpData";
 import {
-  getCommunity,
-  getEstablished,
-  getRisingStars,
   getTAIdForLabel,
 } from "./lib/api";
-import ActiveFilterPills from "./components/ActiveFilterPills";
 import FilterDrawer from "./components/FilterDrawer";
 import { useFilterContext, statesFromTerritory } from "./lib/filter-context";
 import { TrackProvider, useTrack } from "./lib/TrackContext";
-import { TAProvider, deriveTAValue, useTA } from "./lib/TAContext";
+import { TAProvider, useTA } from "./lib/TAContext";
 import {
   buildHcpDetailPath,
   dashboardSlugToTrack,
@@ -90,7 +83,6 @@ import {
   taLabelToApiSlug,
   taSlugToLabel,
 } from "./lib/routeSlugs";
-import type { CohortFeedResult, RisingStar } from "./lib/types";
 import DemoPage from "./pages/DemoPage";
 import PulsePage from "./components/Pulse/PulsePage";
 import CongressCalendarPage from "./components/Congress/CongressCalendarPage";
@@ -126,7 +118,6 @@ type AppHCP = Omit<UIHCP, "id"> & {
   engagementMix?: UIHCP["engagementMix"];
 };
 
-const FEED_PAGE_SIZE = 20;
 
 function isCohortFeedTrack(track: string): boolean {
   return track === "established" || track === "community" || track === "rising-stars";
@@ -175,97 +166,6 @@ function isTelescopeAvailable(ta: string, indicationSlug: string): boolean {
   return false;
 }
 
-function formatPublicationVelocity(value: number): string {
-  if (!Number.isFinite(value)) return "--";
-  return `${value.toFixed(1)}`;
-}
-
-function formatTherapeuticAreaLabel(value: string | null | undefined): string {
-  const v = String(value ?? "").trim().toLowerCase();
-  if (v === "nsclc") return "Lung Cancer";
-  if (v === "colorectal-cancer") return "Colorectal Cancer";
-  if (v === "rare-disease") return "Rare Disease";
-  if (v === "hepatology") return "Hepatology";
-  if (v === "oncology") return "Oncology";
-  return value ?? "";
-}
-
-function mapRisingStarToHCP(item: RisingStar): AppHCP {
-  return {
-    id: item.id ?? item.hcp_id ?? "",
-    hcp_id: item.hcp_id ?? item.id ?? "",
-    name: `${item.first_name} ${item.last_name}`.trim(),
-    institution: item.institution,
-    specialty: formatTherapeuticAreaLabel(item.therapeutic_area),
-    score: item.composite_score,
-    normalizedScore: Number(item.normalized_score ?? 0),
-    firstPubYear: Number(item.firstPubYear ?? item.first_pub_year ?? 0),
-    explanation: item.narrative ?? "Narrative generating � check back soon.",
-    pubVel: formatPublicationVelocity(item.pub_velocity),
-    citTraj: item.citTraj ?? null,
-    trialScore: item.trialScore ?? null,
-    country: item.country ?? null,
-    currentCountry: item.current_country ?? null,
-    affiliationConfidence: item.affiliation_confidence ?? null,
-    affiliationAsOf: item.affiliation_as_of ?? null,
-    narrative: item.narrative ?? null,
-    why_now: item.why_now ?? null,
-    engagement_angle: item.engagement_angle ?? null,
-    caution_flags: item.caution_flags ?? null,
-    signal_strength: item.signal_strength ?? null,
-    h_index: item.h_index ?? null,
-    rank: item.rank,
-    scope: item.scope,
-    global_rank: item.global_rank ?? null,
-    tier: item.tier ?? null,
-    evidenceTier: item.evidence_tier ?? null,
-    patientVolume: item.patient_volume ?? null,
-    partDPresent: item.part_d_present ?? null,
-    cohort_classification: item.cohort_classification ?? null,
-    medicareVolume: item.medicare_volume ?? null,
-    distinctCompanies: item.distinct_companies ?? null,
-    careerYears: item.career_years ?? null,
-    totalCareerPubs: item.total_career_pubs ?? null,
-    citedByCount: item.citedByCount ?? item.total_citations ?? null,
-    hIndex: item.hIndex ?? item.h_index ?? null,
-    worksCount: item.worksCount ?? item.works_count ?? null,
-    openPaymentsLifetime: item.open_payments_lifetime ?? null,
-    cohortScore: item.cohort_score ?? null,
-    scientificInfluencePctile: item.scientific_influence_pctile ?? null,
-    networkInfluencePctile: item.network_influence_pctile ?? null,
-    pharmaEngagementPctile: item.pharma_engagement_pctile ?? null,
-    institutionShort: item.institution_normalized ?? null,
-    nppesPracticeCity: item.nppes_practice_city ?? null,
-    nppesPracticeState: item.nppes_practice_state ?? null,
-    // Carried so HCPCard's resolvePracticeState can tell a practice registration from an
-    // institution's address. Without it the card shows NO state at all for institution-placed
-    // HCPs after the block-7 clear — a silent blank, which is the failure this change exists
-    // to remove.
-    institution_state: (item as { institution_state?: string | null }).institution_state ?? null,
-    nppesPracticeSetting: item.nppes_practice_setting ?? null,
-    nppesPracticeZip: item.nppes_practice_zip ?? null,
-    institutionFull: item.institution_full ?? null,
-    npiNumber: item.npi_number ?? null,
-    npiSpecialty: item.npi_specialty ?? null,
-    paymentsByYear: item.paymentsByYear ?? null,
-    beneficiariesByYear: item.beneficiariesByYear ?? null,
-    engagementMix: item.engagementMix ?? null,
-    rising_star_percentile: item.rising_star_percentile ?? null,
-    momentum_component: item.momentum_component ?? null,
-    visibility_component: item.visibility_component ?? null,
-    scientific_momentum_percentile: item.scientific_momentum_percentile ?? null,
-    network_momentum_percentile: item.network_momentum_percentile ?? null,
-    scientific_visibility_percentile: item.scientific_visibility_percentile ?? null,
-    network_visibility_percentile: item.network_visibility_percentile ?? null,
-    archetype: item.archetype ?? null,
-    us_rank: item.us_rank ?? null,
-    scope_rank: item.scope_rank ?? null,
-    emergence_pctile: item.emergence_pctile ?? null,
-    rising_model: item.rising_model,
-    is_industry_affiliated: item.is_industry_affiliated,
-  };
-}
-
 const HOME_INDICATION_COUNT = 287;
 
 function LandingRoute() {
@@ -278,7 +178,9 @@ function FeedLayout({
   forcedIndication,
 }: { forcedDashboard?: string; forcedIndication?: string } = {}) {
   const { track, setTrack } = useTrack();
-  const { region, regions, states, national, themeIds, setStates, userTerritory, hydrateFromProfile } = useFilterContext();
+  // region / regions / states / national / themeIds were the feed query's filter axes; the
+  // ledger reads the same context through its own hooks.
+  const { setStates, userTerritory, hydrateFromProfile } = useFilterContext();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -300,19 +202,6 @@ function FeedLayout({
     setTA(route.taSlug, route.indicationSlug);
   }, [route.taSlug, route.indicationSlug, setTA]);
 
-  // Phase 1b.2: the feed's AD branches derive their TA from the ROUTE via TAContext's
-  // pure deriveTAValue — NOT from useTA(), whose value is mirrored by the effect above and
-  // so still holds the previous TA on the render a switch happens. Reading the lagging
-  // value here would compute isAdFeed=false for the first AD render/effect pass, and the
-  // cohort effect below (deps: selectedTA/indicationTaId) would never re-fire to correct
-  // it — AD Rising would silently keep region/US instead of its global default.
-  // Route-derived is exactly equivalent to the old `indicationTaId === <AD uuid>` compare
-  // on every route (incl. Immunology "All", which maps to AD) and is correct at render N.
-  const feedDataSlug = useMemo(
-    () => deriveTAValue(route.taSlug, route.indicationSlug).dataSlug,
-    [route.taSlug, route.indicationSlug],
-  );
-  const isAdFeed = feedDataSlug === "atopic-dermatitis";
   // feedDataSlug IS THE QUERY KEY (2026-09-06), not just the AD test above. The three feed
   // fetches send it as filters.therapeuticArea, which api.ts carries through to the narrative
   // read as therapeutic_area_slug. It used to send taApiSlug — taLabelToApiSlug(selectedTA) —
@@ -354,15 +243,16 @@ function FeedLayout({
   // Immersive Skyview is a desktop treatment; mobile keeps the stacked list under the nav.
   const isNarrow = useMediaQuery("(max-width: 767px)");
   const [trayOpen, setTrayOpen] = useState(false);
-  const [activeHCP, setActiveHCP] = useState<AppHCP | null>(null);
-  const [hcpList, setHcpList] = useState<AppHCP[]>([]);
-  const [feedOffset, setFeedOffset] = useState(0);
-  const [feedTotal, setFeedTotal] = useState(0);
-  const [feedEmptyReason, setFeedEmptyReason] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [loadingHCPs, setLoadingHCPs] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
-  const [refreshingFeed, setRefreshingFeed] = useState(false);
+  // setActiveHCP died with handleAddPress; activeHCP is still read by the tray.
+  const [activeHCP] = useState<AppHCP | null>(null);
+  // The feed's paging state (hcpList / feedOffset / feedTotal / feedEmptyReason /
+  // loadingMore / loadingHCPs) went with the card feed. lastUpdatedAt and refreshingFeed are
+  // still READ by the "Updated ..." label below and keep their state, but nothing writes
+  // them any more -- the feed fetch was the only writer. The label therefore reads "Updated
+  // just now" permanently on this surface. Left in place rather than guessed at: what
+  // SkyView should say about freshness is a question for whoever gives it a data source.
+  const [lastUpdatedAt] = useState<Date | null>(null);
+  const [refreshingFeed] = useState(false);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [scoringExplainedOpen, setScoringExplainedOpen] = useState(false);
   const [scoringExplainedScroll, setScoringExplainedScroll] = useState<ScoringExplainedScrollTarget | null>(null);
@@ -428,162 +318,12 @@ function FeedLayout({
     setScoringExplainedScroll(null);
   }, [location.pathname]);
 
-  async function fetchHCPs(loadingAsRefresh = false) {
-    if (!isCohortFeedTrack(track) || !route.indicationDataActive) {
-      setHcpList([]);
-      setFeedTotal(0);
-      setFeedEmptyReason(null);
-      return;
-    }
-    // AD Community renders the CommunityExplorer directory; skip getCommunity.
-    if (track === "community" && isAdFeed) {
-      setHcpList([]);
-      setFeedTotal(0);
-      setFeedEmptyReason(null);
-      return;
-    }
-    try {
-      if (loadingAsRefresh) setRefreshingFeed(true);
-      else setLoadingHCPs(true);
-      setFeedOffset(0);
-      if (!taApiSlug) return;   // unknown TA: no query is better than another TA's board
-      // AD RISING defaults to global scope (82% intl). Gated on the rising track so
-      // AD Established/Community stay region/US (their RPCs still bail on global).
-      const isAdRising = isAdFeed && track === "rising-stars";
-      const filters = {
-        therapeuticArea: feedDataSlug, region, states, national, themeIds, taId: indicationTaId,
-        ...(isAdRising ? { scope: "global" as const } : {}),
-      };
-      let data: CohortFeedResult | null = null;
-      if (track === "established") {
-        ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
-      } else if (track === "community") {
-        ({ data } = await getCommunity(filters, FEED_PAGE_SIZE, { offset: 0 }));
-      } else {
-        ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: 0 }));
-      }
-      const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
-      setHcpList(mapped);
-      if (data) {
-        setFeedTotal(data.total);
-        setFeedEmptyReason(data.emptyReason ?? null);
-      } else {
-        setFeedEmptyReason(null);
-      }
-      setLastUpdatedAt(new Date());
-    } finally {
-      if (loadingAsRefresh) setRefreshingFeed(false);
-      else setLoadingHCPs(false);
-    }
-  }
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchData() {
-      if (!isCohortFeedTrack(track) || !route.indicationDataActive) {
-        setHcpList([]);
-        setFeedOffset(0);
-        setFeedTotal(0);
-        setFeedEmptyReason(null);
-        setLastUpdatedAt(new Date());
-        setLoadingHCPs(false);
-        return;
-      }
-      // AD Community renders the CommunityExplorer directory via its own RPC; skip
-      // the unused getCommunity round-trip on this branch.
-      if (track === "community" && isAdFeed) {
-        setHcpList([]);
-        setFeedOffset(0);
-        setFeedTotal(0);
-        setFeedEmptyReason(null);
-        setLastUpdatedAt(new Date());
-        setLoadingHCPs(false);
-        return;
-      }
-      setLoadingHCPs(true);
-      setFeedOffset(0);
-      setFeedTotal(0);
-      if (!taApiSlug) return;   // unknown TA: no query is better than another TA's board
-      // AD RISING defaults to global scope (82% intl). Gated on the rising track so
-      // AD Established/Community stay region/US (their RPCs still bail on global).
-      const isAdRising = isAdFeed && track === "rising-stars";
-      const filters = {
-        therapeuticArea: feedDataSlug, region, states, national, themeIds, taId: indicationTaId,
-        ...(isAdRising ? { scope: "global" as const } : {}),
-      };
-      let data: CohortFeedResult | null = null;
-      if (track === "established") {
-        ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: 0 }));
-      } else if (track === "community") {
-        ({ data } = await getCommunity(filters, FEED_PAGE_SIZE, { offset: 0 }));
-      } else {
-        ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: 0 }));
-      }
-      if (cancelled) return;
-
-      const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
-      setHcpList(mapped);
-      if (data) {
-        setFeedTotal(data.total);
-        setFeedEmptyReason(data.emptyReason ?? null);
-      } else {
-        setFeedEmptyReason(null);
-      }
-      setLastUpdatedAt(new Date());
-      setLoadingHCPs(false);
-    }
-
-    fetchData();
-
-    return () => {
-      cancelled = true;
-    };
-    // isAdFeed is route-derived, so it flips on the SAME render as selectedTA/indicationTaId
-    // — listing it adds no extra fire, it just keeps the dep list honest about the read.
-  }, [selectedTA, track, region, regions, states, themeIds, route.indicationDataActive, indicationTaId, isAdFeed]);
-
-  async function loadMore() {
-    if (!isCohortFeedTrack(track)) return;
-    if (track === "community" && isAdFeed) return;
-    const nextOffset = feedOffset + FEED_PAGE_SIZE;
-    if (!taApiSlug) return;   // unknown TA: no query is better than another TA's board
-    // AD RISING defaults to global scope (82% intl). Gated on the rising track so
-    // AD Established/Community stay region/US (their RPCs still bail on global).
-    const isAdRising = isAdFeed && track === "rising-stars";
-    const filters = {
-      therapeuticArea: feedDataSlug, region, states, themeIds, taId: indicationTaId,
-      ...(isAdRising ? { scope: "global" as const } : {}),
-    };
-    setLoadingMore(true);
-    try {
-      let data;
-      if (track === "established") {
-        ({ data } = await getEstablished(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
-      } else if (track === "community") {
-        ({ data } = await getCommunity(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
-      } else {
-        ({ data } = await getRisingStars(filters, FEED_PAGE_SIZE, { offset: nextOffset }));
-      }
-      const mapped = (data?.rows ?? []).map(mapRisingStarToHCP);
-      setHcpList((prev) => [...prev, ...mapped]);
-      setFeedOffset(nextOffset);
-      if (data) setFeedTotal(data.total);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
-  function handleCardPress(hcp: AppHCP) {
-    const hcpId = hcp.hcp_id ?? hcp.id;
-    if (hcpId) navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA, taId: indicationTaId } });
-  }
-
-  function handleAddPress(hcp: AppHCP) {
-    setActiveHCP(hcp);
-    setTrayOpen(true);
-  }
-
+  // handleCardPress / handleAddPress were the card feed's row handlers. NOTE: handleAddPress
+  // was the ONLY caller of setActiveHCP and setTrayOpen, so the QuickAddTray below can no
+  // longer be opened. It is left mounted rather than removed: reachable-in-principle code
+  // with no trigger is a different thing from provably-unused code, and only the second kind
+  // is safe to delete on evidence. Removing it belongs with whatever gives it a trigger.
   function handleCloseTray() {
     setTrayOpen(false);
   }
@@ -597,9 +337,6 @@ function FeedLayout({
   async function handleSearchSelect(hcpId: string, _taId: string) {
     navigate(buildHcpDetailPath(hcpId), { state: { taLabel: selectedTA } });
   }
-
-  const showInactiveIndicationEmpty =
-    isCohortFeedTrack(track) && !route.indicationDataActive;
 
   // Immersive Skyview: the sky fills the whole viewport and the chrome floats over it.
   // Only when the Telescope is actually available for the current TA/indication (else the
@@ -711,122 +448,6 @@ function FeedLayout({
                 : `${selectedTA} coverage is in development. Select ${telescopeCoverage} to explore a collaboration network.`}
             </div>
           </div>
-        )
-      ) : isCohortFeedTrack(track) ? (
-        // AD Community renders the practitioner directory (server-side RPC over
-        // community_practitioners); every other TA/cohort keeps the card feed.
-        track === "community" && isAdFeed ? (
-          <CommunityExplorer taLabel={selectedIndication} />
-        ) : (
-        <>
-        {route.indicationDataActive && taApiSlug ? <InstitutionsInTerritoryPanel taSlug={taApiSlug} taId={indicationTaId} /> : null}
-        {taApiSlug ? <ActiveFilterPills taSlug={taApiSlug} /> : null}
-        <div className="fm-card-grid" style={{ paddingBottom: 24 }}>
-          {showInactiveIndicationEmpty ? (
-            <div
-              style={{
-                gridColumn: "1 / -1",
-                padding: "32px 16px",
-                textAlign: "center",
-                color: "rgba(232, 230, 223, 0.55)",
-                fontSize: 13,
-                lineHeight: 1.5,
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: 4,
-                margin: "0 16px",
-              }}
-            >
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#E8E6DF", marginBottom: 8 }}>
-                {selectedIndication} — coming soon
-              </div>
-              <div>
-                This indication is not yet active in FieldMark. Select an active indication to
-                browse the cohort.
-              </div>
-            </div>
-          ) : loadingHCPs ? (
-            <div style={{ color: "#6B6A65", padding: "8px 16px" }}>Loading...</div>
-          ) : feedEmptyReason === "community-non-us" ? (
-            <div
-              style={{
-                gridColumn: "1 / -1",
-                padding: "48px 24px",
-                textAlign: "center",
-                color: "#888076",
-                fontSize: 13,
-                lineHeight: 1.5,
-              }}
-            >
-              <div
-                style={{
-                  color: "#E8E6DF",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  marginBottom: 8,
-                }}
-              >
-                Community cohort not available outside the US
-              </div>
-              The Community cohort is built from US-only data sources (NPPES, CMS Open
-              Payments, Medicare Provider Data). Switch to the US region to see community
-              HCPs, or select a different cohort track for the current region.
-            </div>
-          ) : (
-            <>
-              {hcpList.map((hcp) => (
-                <HCPCard
-                  key={hcp.id}
-                  hcp={hcp as unknown as UIHCP}
-                  onAddPress={(cardHcp) => handleAddPress(cardHcp as unknown as AppHCP)}
-                  onCardPress={(cardHcp) => handleCardPress(cardHcp as unknown as AppHCP)}
-                  onScoringExplainedPress={(section) => {
-                    setScoringExplainedScroll(section);
-                    setScoringExplainedOpen(true);
-                  }}
-                />
-              ))}
-              {hcpList.length < feedTotal && (
-                <div
-                  style={{
-                    gridColumn: "1 / -1",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    width: "100%",
-                    padding: "24px 16px 8px",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => void loadMore()}
-                    disabled={loadingMore}
-                    style={{
-                      width: "auto",
-                      minWidth: 200,
-                      maxWidth: 320,
-                      padding: "10px 24px",
-                      backgroundColor: "#1A3D2E",
-                      border: "1px solid #4ADE80",
-                      color: "#4ADE80",
-                      fontSize: 13,
-                      lineHeight: 1,
-                      borderRadius: 3,
-                      cursor: loadingMore ? "not-allowed" : "pointer",
-                      opacity: loadingMore ? 0.6 : 1,
-                      fontFamily: "monospace",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {loadingMore ? "Loading..." : `Load ${FEED_PAGE_SIZE} More HCPs`}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-        </>
         )
       ) : null}
 
