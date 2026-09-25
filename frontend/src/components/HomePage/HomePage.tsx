@@ -290,7 +290,7 @@ export default function HomePage() {
   };
 
   return (
-    <AppLayout currentTaId={homeTaId} onSearchSelect={(hcpId) => navigate(`/hcp/${hcpId}`)}>
+    <AppLayout currentTaId={homeTaId} onSearchSelect={(hcpId) => navigate(`/hcp/${hcpId}`)} showSessionTa>
       <style>{`.fmhome a{color:${GOLD_LINK};text-decoration:none} .fmhome a:hover{color:${INK2}} .fmhome-link{cursor:pointer} .fmhome-link:hover{color:${INK2}!important}`}</style>
       {loading ? (
         <div style={{ ...mono(12, 400, MID), padding: "48px 0", textAlign: "center" }}>Loading your workspace…</div>

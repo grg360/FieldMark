@@ -25,6 +25,10 @@ interface Props {
   // Immersive surfaces (SkyView) float the bar over a full-bleed fixed canvas:
   // translucent backdrop, and the bar lifted above the canvas's z-index.
   navTranslucent?: boolean;
+  // Name the session's therapeutic area in the bar. Opt-in, because most surfaces do not
+  // read the session TA yet -- see NavBar's showSessionTa for why an always-on label would
+  // lie on the pinned ones.
+  showSessionTa?: boolean;
 }
 
 export default function AppLayout({
@@ -34,6 +38,7 @@ export default function AppLayout({
   currentTaId,
   onSearchSelect,
   navTranslucent = false,
+  showSessionTa = false,
 }: Props) {
   const maxWidth = CONTENT_WIDTH[width];
   // CONTENT GUTTER (2026-08-19). Was a flat SPACE.lg (16) at every viewport, which is
@@ -72,10 +77,10 @@ export default function AppLayout({
           + select handler; absent where no TA. */}
       {navTranslucent ? (
         <div style={{ position: "relative", zIndex: 6 }}>
-          <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} translucent />
+          <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} translucent showSessionTa={showSessionTa} />
         </div>
       ) : (
-        <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} />
+        <NavBar currentTaId={currentTaId} onSearchSelect={onSearchSelect} showSessionTa={showSessionTa} />
       )}
       <div
         style={{

@@ -183,7 +183,7 @@ export default function TheWeekPage() {
   }, [loading, week, isDesktop]);
 
   return (
-    <AppLayout currentTaId={taId} onSearchSelect={(hcpId) => navigate(`/hcp/${hcpId}`)}>
+    <AppLayout currentTaId={taId} onSearchSelect={(hcpId) => navigate(`/hcp/${hcpId}`)} showSessionTa>
       <style>{`.fmweek a{color:${GOLD};text-decoration:none}.fmweek a:hover{color:${GOLD2}}.fmweek-link{cursor:pointer}.fmweek-btn{cursor:pointer}`}</style>
       <div className="fmweek" style={{ background: PAGE, fontFamily: SERIF, color: INK1, marginTop: 12, marginBottom: 24, border: `1px solid ${BORDER}` }}>
         {content}

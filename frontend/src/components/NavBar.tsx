@@ -28,6 +28,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { CONTENT_WIDTH } from "../lib/designTokens";
 import { CANON, DEPTH, FACE, T } from "../lib/canonicalTokens";
+import { taLabelForSlug } from "../lib/taLabels";
 import { signOut, getCurrentUser, getMslProfile, type MslProfile } from "../lib/authHelpers";
 import { useIsAdmin } from "../lib/useIsAdmin";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -161,18 +162,54 @@ export default function NavBar({
   currentTaId,
   onSearchSelect,
   translucent = false,
+  showSessionTa = false,
 }: {
   currentTaId?: string;
   onSearchSelect?: (hcpId: string, taId: string) => void;
   // Immersive surfaces (Skyview) float the bar over a full-bleed canvas — swap the
   // opaque ground for a translucent, blurred backdrop so the sky shows through.
   translucent?: boolean;
+  /**
+   * NAME THE SESSION'S THERAPEUTIC AREA IN THE BAR. Opt-in per surface, and it has to be.
+   *
+   * THIS IS THE SLOT THE STAGE-3 TA CONTROL WILL OCCUPY -- the right rail, left of the
+   * avatar, where the search toggle already lives. Static text for now, no switcher
+   * affordance: the control replaces this label rather than appearing beside it.
+   *
+   * WHY NOT ALWAYS-ON, WHICH IS WHERE IT ENDS UP. Most surfaces do not read the session TA
+   * yet. Trials, Congress, Assets and RisingQuadrant are still pinned to lung by their own
+   * constants, so a session-TA label in the global bar would print "COLORECTAL CANCER" over
+   * a lung Trials page -- a new instance of exactly the disagreement stage 2 is removing,
+   * and a worse one, because the bar is the most authoritative-looking place in the app to
+   * say it. It goes always-on when every surface reads the session, which is the same
+   * condition that lets the label become a control.
+   */
+  showSessionTa?: boolean;
 } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 767px)");
   const active = activeKey(location.pathname);
-  const { indicationTaId } = useTA();
+  const { indicationTaId, dataSlug, status: taStatus } = useTA();
+  /**
+   * THE LABEL NAMES THE DATA SLUG, NOT THE INDICATION LABEL, and the difference is not
+   * cosmetic. deriveTAValue keeps `indication.label` as the URL's own indication -- for
+   * Immunology that is the "all" aggregate, whose label is literally "All" while dataSlug
+   * resolves to atopic-dermatitis. A bar reading "IMMUNOLOGY - ALL" over a page scoped to
+   * Atopic Dermatitis names something the page is not. dataSlug IS what the surfaces scope
+   * by (it is what indicationTaId is derived from), so it is what the label must say.
+   *
+   * NOTHING WHILE RESOLVING. During the profile seed the context carries the constructor's
+   * default pair, so a label rendered then would read LUNG CANCER to a colorectal user and
+   * then change under them. Null is the honest frame, and it is brief.
+   *
+   * NOTHING WHILE UNRESOLVED either -- not reachable until the oncology/nsclc default is
+   * deleted, and when it is, an absent TA is the chooser's to explain, not a label's.
+   */
+  const sessionTaLabel =
+    showSessionTa && taStatus === "established" && dataSlug
+      ? taLabelForSlug(dataSlug).toUpperCase()
+      : null;
 
   const [profile, setProfile] = useState<MslProfile | null>(null);
   const [email, setEmail] = useState<string>("");
@@ -217,9 +254,9 @@ export default function NavBar({
         : null;
 
   return isMobile ? (
-    <MobileBar active={active} menu={menu} search={search} translucent={translucent} />
+    <MobileBar active={active} menu={menu} search={search} translucent={translucent} sessionTaLabel={sessionTaLabel} />
   ) : (
-    <DesktopBar active={active} menu={menu} search={search} translucent={translucent} />
+    <DesktopBar active={active} menu={menu} search={search} translucent={translucent} sessionTaLabel={sessionTaLabel} />
   );
 }
 
@@ -236,7 +273,7 @@ interface MenuData {
 // CONTENT_WIDTH.standard inside a full-bleed seam, so it renders identically on
 // every mount. Mount sites must NOT wrap it in a narrower width container —
 // AppLayout and the NavBar-direct pages mount it above their content wrappers.
-function DesktopBar({ active, menu, search, translucent }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean }) {
+function DesktopBar({ active, menu, search, translucent, sessionTaLabel }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean; sessionTaLabel?: string | null }) {
   // Click-to-reveal search (2026-08-08, global): the always-visible row below
   // the bar retired. A magnifier in the right rail (left of the avatar) toggles
   // a bar in normal flow — 2/3 nav width, centered, pushing content down while
@@ -336,6 +373,20 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
       {/* Search left the bar (2026-08-03): nine labels need the width. Right rail
           (2026-08-08): magnifier toggle (where a TA is supplied) + avatar. */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginLeft: "auto" }}>
+        {/* SESSION TA — the stage-3 control's slot. Static text, no affordance. */}
+        {sessionTaLabel ? (
+          <span
+            style={{
+              fontFamily: FACE.data,
+              fontSize: T.MICRO,
+              letterSpacing: "0.14em",
+              color: CANON.INK.LABEL,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {sessionTaLabel}
+          </span>
+        ) : null}
         {search ? (
           <button
             ref={searchBtnRef}
@@ -396,7 +447,7 @@ function DesktopBar({ active, menu, search, translucent }: { active: NavKey | nu
 // hairline seams, gold inset for the active route); the drawer closes on
 // select, Esc, and click-away. HOME stays a listed destination — the
 // wordmark's tappability is not discoverable (2026-08-05 note carried over).
-function MobileBar({ active, menu, search, translucent }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean }) {
+function MobileBar({ active, menu, search, translucent, sessionTaLabel }: { active: NavKey | null; menu: MenuData; search: NavSearch | null; translucent?: boolean; sessionTaLabel?: string | null }) {
   const [open, setOpen] = useState(false);
   // Search state lives on the bar (2026-08-10): the revealed field renders IN
   // FLOW below the strip and pushes content down — the same "dropping reads
@@ -454,6 +505,24 @@ function MobileBar({ active, menu, search, translucent }: { active: NavKey | nul
           </span>
         ) : null}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+          {/* Same slot on mobile. The utility strip is tight, so this is the label alone —
+              no domain prefix — and it ellipsises rather than pushing the avatar off. */}
+          {sessionTaLabel ? (
+            <span
+              style={{
+                fontFamily: FACE.data,
+                fontSize: T.MICRO,
+                letterSpacing: "0.12em",
+                color: CANON.INK.LABEL,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                minWidth: 0,
+              }}
+            >
+              {sessionTaLabel}
+            </span>
+          ) : null}
           {search ? (
             <button
               type="button"
